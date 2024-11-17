@@ -151,8 +151,8 @@ function DateRangePicker(props) {
               <Box
                 maxWidth={mdDown ? "516px" : "212px"}
                 width={mdDown ? "100%" : "212px"}
-                padding={{ xs: 5, md: 0 }}
-                paddingBlockEnd={{ xs: 1, md: 0 }}
+                padding={{ xs: 500, md: 0 }}
+                paddingBlockEnd={{ xs: 100, md: 0 }}
               >
                 {mdDown ? (
                   <Select
@@ -184,9 +184,9 @@ function DateRangePicker(props) {
                   </Scrollable>
                 )}
               </Box>
-              <Box padding={{ xs: 5 }} maxWidth={mdDown ? "320px" : "516px"}>
-                <BlockStack gap="4">
-                  <InlineStack gap="2">
+              <Box padding={{ xs: 500 }} maxWidth={mdDown ? "320px" : "516px"}>
+                <BlockStack gap="400">
+                  <InlineStack gap="200">
                     <div style={{ flexGrow: 1 }}>
                       <TextField
                         role="combobox"

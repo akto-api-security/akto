@@ -4,8 +4,8 @@ import React from 'react'
 function SSOTextfield({onClickFunc, logos , text}) {
     return (
         <Button onClick={onClickFunc}>
-            <InlineStack align="center" gap={"3"}>
-                <InlineStack gap={"2"}>
+            <InlineStack align="center" gap={"300"}>
+                <InlineStack gap={"200"}>
                     {logos.map((logo, index) => {
                         return <Avatar size="xs" source={logo} key={index}/>;
                     })}

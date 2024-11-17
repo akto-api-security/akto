@@ -32,8 +32,8 @@ function LearnPopoverComponent({learnMoreObj}) {
             preferredAlignment="right"
         >
             {(learnMoreObj?.title !==undefined ||  learnMoreObj.description !== undefined) ?
-            <Box width="230px" padding={4} paddingBlockEnd={"0"}>
-                <BlockStack gap={1}>
+            <Box width="230px" padding={400} paddingBlockEnd={"0"}>
+                <BlockStack gap={100}>
                     <Text>
                         {learnMoreObj?.title}
                     </Text>

@@ -175,7 +175,7 @@ function Dashboard() {
             {toastMarkup}
             {ConfirmationModalMarkup}
             {displayItems.length > 0 ? <div className="alerts-banner">
-                    <BlockStack gap={"2"}>
+                    <BlockStack gap={"200"}>
                         {displayItems.map((alert, index) => {
                             return(
                                 <AlertsBanner key={index} 

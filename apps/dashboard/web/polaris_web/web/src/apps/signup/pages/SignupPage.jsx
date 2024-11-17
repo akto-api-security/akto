@@ -13,8 +13,8 @@ function SignupPage() {
     return (
         <div style={{display: 'flex', height: '100vh', overflow: 'hidden'}}>
             <div style={{flex: '4', overflow: "hidden", boxShadow: "-1px 0px 0px 0px #E4E5E7 inset"}}>
-                <Box paddingBlockStart={"24"} paddingInlineStart={"20"} paddingInlineEnd={"8"}>
-                    <BlockStack gap="6">
+                <Box paddingBlockStart={"2400"} paddingInlineStart={"2000"} paddingInlineEnd={"800"}>
+                    <BlockStack gap="600">
                         <Text variant="heading3xl" fontWeight="medium">
                             {`"It's truly a game-changer and we highly recommend Akto to anyone looking to effortlessly secure their API endpoints."`}
                         </Text>

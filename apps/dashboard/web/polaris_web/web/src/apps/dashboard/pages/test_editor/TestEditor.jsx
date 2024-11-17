@@ -118,9 +118,9 @@ const TestEditor = () => {
 
     const headerComp = (
         <div className="header-css">
-            <InlineStack gap="5">
+            <InlineStack gap="500">
                 <Button onClick={handleExit} icon={ExitIcon}  variant="plain" />
-                <InlineStack gap={"2"}>
+                <InlineStack gap={"200"}>
                     <TitleWithInfo docsUrl={"https://docs.akto.io/test-editor/concepts"} tooltipContent={"Test editor playground"} titleText={"Test Editor"} />
                 </InlineStack>
             </InlineStack>
@@ -156,7 +156,7 @@ const TestEditor = () => {
     }
         navigation={ <TestEditorFileExplorer addCustomTest={(e) => addCustomTest(e)}/> }
     >
-        <Box paddingInlineStart={12}>
+        <Box paddingInlineStart={1200}>
             <InlineGrid columns={2}>
                 <YamlEditor fetchAllTests={fetchAllTests} />
                 <SampleApi />

@@ -201,7 +201,7 @@ function TestRoleSettings() {
     const descriptionCard = (
         <LegacyCard title="Details" key="desc">
             <LegacyCard.Section>
-                <InlineGrid gap="4" columns={2}>
+                <InlineGrid gap="400" columns={2}>
                     <TextField
                         label="Name" value={roleName} disabled={systemRole}
                         placeholder='New test role name' onChange={isNew ? handleTextChange : () => { }}
@@ -268,7 +268,7 @@ function TestRoleSettings() {
             <br/>
             <Divider />
             <LegacyCard.Section>
-                <BlockStack gap={6}>
+                <BlockStack gap={600}>
                     {getAuthWithCondList().map((authObj,index)=> {
                         return(
                             <ParamsCard showEdit={() => handleOpenEdit(authObj, index)} dataObj={authObj} key={JSON.stringify(authObj)} handleDelete={() => {setDeletedIndex(index); setShowAuthDeleteModal(true)}}/>
@@ -396,7 +396,7 @@ function TestRoleSettings() {
                     </LegacyStack>
                 </LegacyCard.Section>
                 <LegacyCard.Section title="More settings">
-                    <BlockStack gap={"2"}>
+                    <BlockStack gap={"200"}>
                         <Box>
                             <Button disclosure={advancedHeaderSettingsOpen ? "up" : "down"} onClick={() => setAdvancedHeaderSettingsOpen(!advancedHeaderSettingsOpen)}>
                                 Advanced Settings
@@ -406,14 +406,14 @@ function TestRoleSettings() {
                             open={advancedHeaderSettingsOpen}
                             transition={{ duration: '300ms', timingFunction: 'ease-in-out' }}
                         >
-                            <BlockStack gap={"2"}>
+                            <BlockStack gap={"200"}>
                                 <Text variant="headingMd">Api header conditions</Text>
                                 <FormLayout>
                                     <FormLayout.Group>
                                     <TextField
                                         id={"auth-header-key-field"}
                                         label={(
-                                            <InlineStack gap="2">
+                                            <InlineStack gap="200">
                                                 <Text>Header key</Text>
                                                 <Tooltip content="Please enter name of the header which contains your auth token. This field is case-sensitive. eg Authorization" dismissOnMouseOut width="wide" preferredPosition="below">
                                                     <Icon source={InfoIcon} tone="base" />
@@ -426,7 +426,7 @@ function TestRoleSettings() {
                                     <TextField 
                                         id={"auth-header-value-field"}
                                         label={(
-                                            <InlineStack gap="2">
+                                            <InlineStack gap="200">
                                                 <Text>Header value</Text>
                                                 <Tooltip content="Please enter the value of the auth token." dismissOnMouseOut width="wide" preferredPosition="below">
                                                     <Icon source={InfoIcon} tone="base" />

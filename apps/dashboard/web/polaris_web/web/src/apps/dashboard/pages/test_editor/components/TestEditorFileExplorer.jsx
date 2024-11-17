@@ -158,7 +158,7 @@ const TestEditorFileExplorer = ({addCustomTest}) => {
     return (
         <div className="editor-navbar" style={{'overflowY' : 'scroll', overflowX: 'hidden', width: '18rem'}}>
             <Navigation location="/">
-                <BlockStack gap="4">
+                <BlockStack gap="400">
                     <TextField  
                         id={"test-search"}
                         prefix={<Icon source={SearchIcon} />} 
@@ -176,7 +176,7 @@ const TestEditorFileExplorer = ({addCustomTest}) => {
                             fullWidth
                             variant="monochromePlain">
                             <InlineStack align="space-between">
-                                <InlineStack gap={"1"}>
+                                <InlineStack gap={"100"}>
                                     <Box>
                                         <Icon source={showCustom ? ChevronDownIcon : ChevronRightIcon}/>
                                     </Box>
@@ -206,7 +206,7 @@ const TestEditorFileExplorer = ({addCustomTest}) => {
                             fullWidth
                             variant="monochromePlain">
                             <InlineStack align="space-between">
-                                <InlineStack gap="1">
+                                <InlineStack gap="100">
                                     <Box>
                                         <Icon source={showAkto ? ChevronDownIcon : ChevronRightIcon}/>
                                     </Box>

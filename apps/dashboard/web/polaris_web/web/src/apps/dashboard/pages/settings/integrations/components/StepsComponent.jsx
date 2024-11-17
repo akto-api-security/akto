@@ -4,11 +4,11 @@ import React from 'react'
 function StepsComponent({integrationSteps, onClickFunc, buttonActive}) {
     return (
         <LegacyCard.Section title="Follow steps">
-            <BlockStack gap={3}>
+            <BlockStack gap={300}>
                 {integrationSteps.map((x,index)=> {
                     return (
-                        <BlockStack gap={2} key={index}>
-                            <InlineStack gap={1}>
+                        <BlockStack gap={200} key={index}>
+                            <InlineStack gap={100}>
                                 <Text fontWeight="semibold" variant="bodyLg">{index + 1}.</Text>
                                 <Text variant="bodyLg">{x.text}</Text>
                             </InlineStack>

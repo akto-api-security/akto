@@ -8,7 +8,7 @@ function BannerRow(props) {
     const navigate = useNavigate()
 
     const titleComp = (
-        <InlineStack gap={1}>
+        <InlineStack gap={100}>
             <Text fontWeight="semibold" color="subdued">{title}</Text>
             {showRedirect ? <Box><Icon source={ChevronRightIcon} tone="subdued"/></Box> : null}
         </InlineStack>
@@ -19,7 +19,7 @@ function BannerRow(props) {
             <Box>
                 <Icon source={icon} tone="base" />
             </Box>
-            <BlockStack gap={2}>
+            <BlockStack gap={200}>
                 {redirectUrl ? <Link monochrome removeUnderline onClick={() => newTab ? window.open(redirectUrl, "_blank") : navigate(redirectUrl)}>
                     {titleComp}
                 </Link>

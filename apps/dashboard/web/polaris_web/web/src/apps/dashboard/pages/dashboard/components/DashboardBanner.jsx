@@ -17,7 +17,7 @@ import { HOMEDASHBOARD_VIDEO_LENGTH, HOMEDASHBOARD_VIDEO_THUMBNAIL, HOMEDASHBOAR
 
 function InfoComponent({title, items})  {
     return (
-        <BlockStack gap={4}>
+        <BlockStack gap={400}>
             <Text variant="bodyLg" fontWeight="semibold">{title}</Text>
             <GridRows columns={3} items={items} CardComponent={BannerRow} />
         </BlockStack>
@@ -92,11 +92,11 @@ function DashboardBanner() {
     
 
     const containerComp = (
-        <BlockStack gap={8}>
-            <Box paddingBlockEnd={"5"} paddingBlockStart={"5"}>
+        <BlockStack gap={800}>
+            <Box paddingBlockEnd={"500"} paddingBlockStart={"5"}>
                 <InfoComponent items={productGuides} title={"Get started guide"} />
             </Box>
-            <Box paddingBlockEnd={16}>
+            <Box paddingBlockEnd={1600}>
                 <InfoComponent items={websiteGuides} title={"Resources"} />
             </Box>
         </BlockStack>

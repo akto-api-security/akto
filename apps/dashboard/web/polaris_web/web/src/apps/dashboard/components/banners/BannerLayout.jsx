@@ -7,15 +7,15 @@ function BannerLayout({title, text, buttonText, buttonUrl, bodyComponent, videoT
     const navigate = useNavigate();
     const handleRedirect = () =>{ newTab ? window.open(buttonUrl, "_blank") :navigate(buttonUrl)}
     return (
-        <Card padding={"10"}>
-            <BlockStack gap={8}>
+        <Card padding={"1000"}>
+            <BlockStack gap={800}>
                 <div style={{display: "flex", justifyContent: 'space-between'}}>
                     <Box width="400px">
-                        <BlockStack gap={4}>
+                        <BlockStack gap={400}>
                             <Text variant="headingLg">{title}</Text>
                             <Text color="subdued" variant="bodyMd">{text}</Text>
                             {bodyComponent}
-                            {buttonText ? <Box paddingBlockStart={2}>
+                            {buttonText ? <Box paddingBlockStart={200}>
                                 <Button {...properties} onClick={() => {handleRedirect(); onClick()}}>{buttonText}</Button>
                             </Box> : null}
                         </BlockStack>

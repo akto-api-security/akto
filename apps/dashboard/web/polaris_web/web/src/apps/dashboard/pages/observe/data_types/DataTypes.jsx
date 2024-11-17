@@ -240,8 +240,8 @@ function DataTypes() {
   const descriptionCard = (
     <LegacyCard title="Details" key="desc">
       <LegacyCard.Section>
-        <BlockStack gap={"5"}>
-          <InlineGrid gap="4" columns={columnsForGrid}>
+        <BlockStack gap={"500"}>
+          <InlineGrid gap="400" columns={columnsForGrid}>
             <TextField id={"name-field"} label="Name" helpText="Name the data type"
               value={currState.name} placeholder='NEW_CUSTOM_DATA_TYPE'
               {...pageTitle === "Add data type" ? {onChange: (val) => handleChange({name: val})} : {}}
@@ -261,12 +261,12 @@ function DataTypes() {
               label={"Select severity of data type"}
             />
           </InlineGrid>
-          <InlineGrid gap={"4"} columns={['twoThirds', 'oneThird']}>
-            <BlockStack gap={"2"}>
+          <InlineGrid gap={"400"} columns={['twoThirds', 'oneThird']}>
+            <BlockStack gap={"200"}>
               <Form onSubmit={() => handleTagsChange(tagValue, 'add')}>
                   <TextField onChange={setTagValue} value={tagValue} label={<Text color="subdued" fontWeight="medium" variant="bodySm">Datatype Tags</Text>}/>
               </Form>
-              <InlineStack gap={"2"}>
+              <InlineStack gap={"200"}>
                 {currState.categoriesList && currState.categoriesList.length > 0 && currState.categoriesList.map((tag, index) => {
                     return(
                         <Tag key={index} onRemove={() => handleTagsChange(tagValue, 'remove')}>
@@ -280,7 +280,7 @@ function DataTypes() {
               <Text variant="bodyMd">
                 Choose Icon
               </Text>
-              <InlineStack gap={2}>
+              <InlineStack gap={200}>
                 {displayIcons.map((icon, index) => {
                   return (
                     <div className="tag-button" key={index}>
@@ -346,7 +346,7 @@ function DataTypes() {
   }
 
   const requestCard = (
-    <BlockStack gap="5" key="sensitive">
+    <BlockStack gap="500" key="sensitive">
       <LegacyCard title={
           <TitleWithInfo 
             textProps={{variant: 'headingMd'}} 
@@ -367,7 +367,7 @@ function DataTypes() {
   )
 
   const redactCard = (
-    <BlockStack gap="5" key="redact">
+    <BlockStack gap="500" key="redact">
       <LegacyCard title={
           <TitleWithInfo 
             textProps={{variant: 'headingMd'}} 
@@ -393,7 +393,7 @@ function DataTypes() {
   )
 
   const TestTemplateCard = (
-    <BlockStack gap="5" key="testTemplate">
+    <BlockStack gap="500" key="testTemplate">
       <LegacyCard title={
         <TitleWithInfo
           textProps={{ variant: 'headingMd' }}

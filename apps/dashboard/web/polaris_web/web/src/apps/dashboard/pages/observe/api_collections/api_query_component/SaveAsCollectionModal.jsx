@@ -21,7 +21,7 @@ function SaveAsCollectionModal(props) {
             }}
         >
             <Modal.Section>
-                <BlockStack gap={3}>
+                <BlockStack gap={300}>
                     <TextField
                         id={"new-collection-input"}
                         label="Name"

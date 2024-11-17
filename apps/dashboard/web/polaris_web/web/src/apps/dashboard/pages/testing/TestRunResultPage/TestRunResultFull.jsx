@@ -10,7 +10,7 @@ import func from  "@/util/func"
 
 function MoreInformationComponent(props) {
     return (
-      <BlockStack gap={"4"}>
+      <BlockStack gap={"400"}>
         <Text variant='headingMd'>
           More information
         </Text>
@@ -20,8 +20,8 @@ function MoreInformationComponent(props) {
               props?.sections?.map((section) => {
                 return (
                   <LegacyCard.Subsection key={section.title}>
-                    <BlockStack gap="3">
-                      <InlineStack gap="2" align="start" blockAlign='start'>
+                    <BlockStack gap="300">
+                      <InlineStack gap="200" align="start" blockAlign='start'>
                         <div style={{ maxWidth: "0.875rem", maxHeight: "0.875rem" }}>
                           {section?.icon && <Icon source={section.icon}></Icon>}
                         </div>
@@ -76,10 +76,10 @@ function TestRunResultFull(props) {
             </InlineStack>
               <Collapsible open={testLogsCollapsibleOpen} transition={{ duration: '500ms', timingFunction: 'ease-in-out' }}>
                 <LegacyCard.Subsection>
-                  <Box paddingBlockStart={3}><Divider /></Box>
+                  <Box paddingBlockStart={300}><Divider /></Box>
     
                 <Scrollable style={{maxHeight: '40vh'}}>
-                  <BlockStack gap={1}>
+                  <BlockStack gap={100}>
                     {testingRunResult && testingRunResult["testLogs"] && testingRunResult["testLogs"].map((x) => <div style={{fontFamily:theme.font["font-family-mono"], fontWeight: theme.font["font-weight-medium"],fontSize: '12px', letterSpacing: "0px", textAlign: "left"}}>
                       {"[" + x["timestamp"] + "] [" + x["testLogType"] + "] " +x["message"]}
                       </div>)}

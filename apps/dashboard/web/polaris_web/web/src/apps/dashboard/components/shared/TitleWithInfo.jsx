@@ -13,7 +13,7 @@ function TitleWithInfo({titleComp, textProps, titleText, tooltipContent, docsUrl
     const [active, setActive] = useState(false)
     const [contentActive,setContentActive] = useState(false)
     return (
-        <InlineStack gap={"1"}>
+        <InlineStack gap={"100"}>
             {titleComp ? titleComp : <Text variant="headingLg" {...textProps}>{titleText}</Text>}
             {docsUrl ?<Popover 
                 active={active || contentActive}

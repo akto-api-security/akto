@@ -167,7 +167,7 @@ function ApiDetails(props) {
     const SchemaTab = {
         id: 'schema',
         content: "Schema",
-        component: paramList.length > 0 && <Box paddingBlockStart={"4"}> 
+        component: paramList.length > 0 && <Box paddingBlockStart={"400"}> 
         <ApiSchema
             data={paramList} 
             badgeActive={badgeActive}
@@ -185,7 +185,7 @@ function ApiDetails(props) {
     const ValuesTab = {
         id: 'values',
         content: "Values",
-        component: sampleData.length > 0 && <Box paddingBlockStart={"4"}>
+        component: sampleData.length > 0 && <Box paddingBlockStart={"400"}>
             <SampleDataList
                 key="Sample values"
                 sampleData={sampleData}
@@ -198,7 +198,7 @@ function ApiDetails(props) {
     const DependencyTab = {
         id: 'dependency',
         content: "Dependency Graph",
-        component: <Box paddingBlockStart={"2"}>
+        component: <Box paddingBlockStart={"200"}>
             <ApiDependency
                 apiCollectionId={apiDetail['apiCollectionId']}
                 endpoint={apiDetail['endpoint']}
@@ -269,7 +269,7 @@ function ApiDetails(props) {
                     >
                         <Popover.Pane fixed>
                             <Popover.Section>
-                                <BlockStack gap={"2"}>
+                                <BlockStack gap={"200"}>
                                     {isGptActive ? <Button
 
 

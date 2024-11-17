@@ -5,15 +5,15 @@ function AddOnComponenet() {
   return (
       <div className='card-items'>
            <Card background="bg-subdued">
-            <BlockStack gap='3' align="start">
+            <BlockStack gap='300' align="start">
                 <Avatar source="/public/PaymentsMajor.svg" size="sm" shape='square'/>
-                <BlockStack gap='2'>
+                <BlockStack gap='200'>
                     <Text variant='headingMd'>This is an add-on connector</Text>
                     <Text variant='bodyMd'>
                         In order to use this connector, please contact us.
                     </Text>
                 </BlockStack>
-                <Box paddingBlockStart={3}>
+                <Box paddingBlockStart={300}>
                     <Button
 
                         onClick={

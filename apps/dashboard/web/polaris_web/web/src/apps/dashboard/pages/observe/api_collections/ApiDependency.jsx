@@ -43,7 +43,7 @@ function ApiDependency(props) {
     }, [endpoint])
 
     return (
-        <BlockStack gap="2">
+        <BlockStack gap="200">
             <div style={{ height: "800px" }}>
                 <ReactFlow nodes={nodes} edges={edges} nodeTypes={nodeTypes} edgeTypes={edgeTypes}>
                     <Background color="#aaa" gap={6} />

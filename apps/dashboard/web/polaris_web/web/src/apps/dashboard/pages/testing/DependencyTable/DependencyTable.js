@@ -271,7 +271,7 @@ function DependencyTable() {
             const url = "/dashboard/observe/inventory/" + newCollectionId
 
             const forwardLink = (
-                <InlineStack gap={1}>
+                <InlineStack gap={100}>
                     <Text> API collection created successfully. Click </Text>
                     <Link url={url}>here</Link>
                     <Text> to view collection.</Text>

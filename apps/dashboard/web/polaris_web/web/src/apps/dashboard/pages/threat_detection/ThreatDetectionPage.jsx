@@ -28,7 +28,7 @@ function ThreatDetectionPage() {
         }
     }
 
-    const horizontalComponent = <InlineGrid columns={1} gap={2}>
+    const horizontalComponent = <InlineGrid columns={1} gap={200}>
         <FilterComponent key={"filter-component"} />
     </InlineGrid>
 

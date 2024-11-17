@@ -293,8 +293,8 @@ const SummaryCardComponent = () =>{
         {totalVulnerabilities > 0 ? 
         <Collapsible open={collapsible} transition={{duration: '500ms', timingFunction: 'ease-in-out'}}>
           <LegacyCard.Subsection>
-            <Box paddingBlockStart={3}><Divider/></Box>
-            <InlineGrid columns={2} gap={6}>
+            <Box paddingBlockStart={300}><Divider/></Box>
+            <InlineGrid columns={2} gap={600}>
               <ChartypeComponent navUrl={"/dashboard/issues/"} data={subCategoryInfo} title={"Categories"} isNormal={true} boxHeight={'250px'}/>
               <ChartypeComponent data={severityCountMap} reverse={true} title={"Severity"} charTitle={totalVulnerabilities} chartSubtitle={"Total Vulnerabilities"}/>
             </InlineGrid>

@@ -81,9 +81,9 @@ function About() {
 
     function TitleComponent ({title,description}) {
         return(
-            <Box paddingBlockEnd="4">
+            <Box paddingBlockEnd="400">
                 <Text variant="headingMd">{title}</Text>
-                <Box paddingBlockStart="2">
+                <Box paddingBlockStart="200">
                     <Text variant="bodyMd">{description}</Text>
                 </Box>
             </Box>
@@ -139,8 +139,8 @@ function About() {
     
 
     const infoComponent = (
-        <BlockStack gap={4}>
-            <InlineGrid columns={"2"} gap={"3"}>
+        <BlockStack gap={400}>
+            <InlineGrid columns={"2"} gap={"300"}>
                 <TextField 
                     disabled={window.USER_ROLE !== 'ADMIN'} 
                     connectedRight={(
@@ -163,7 +163,7 @@ function About() {
             </InlineGrid>
             {objArr.map((item)=>(
                 <Box key={item.title} >
-                    <BlockStack gap={1}>
+                    <BlockStack gap={100}>
                         <Text fontWeight='semi-bold' color='subdued'>{item.title}</Text>
                         <Text fontWeight='bold'>{item.text}</Text>
                     </BlockStack>
@@ -240,7 +240,7 @@ function About() {
 
     function ToggleComponent({text,onToggle,initial}){
         return (
-            <BlockStack gap={1}>
+            <BlockStack gap={100}>
                 <Text color="subdued">{text}</Text>
                 <ButtonGroup variant="segmented">
                     <Button size="slim" onClick={() => onToggle(true)} pressed={initial === true}>
@@ -320,7 +320,7 @@ function About() {
     }
 
     const redundantUrlComp = (
-        <BlockStack gap={"4"}>
+        <BlockStack gap={"400"}>
             <Box width='220px'>
                 <DropdownSearch
                     label="Select redundant url types"
@@ -339,13 +339,13 @@ function About() {
     )
     
     const filterHeaderComponent = (
-        <BlockStack gap={5}>
+        <BlockStack gap={500}>
             <Text color="subdued">Traffic filters</Text>
             <Scrollable horizontal={false} style={{maxHeight: '100px'}} shadow>
-                <BlockStack gap={1}>
+                <BlockStack gap={100}>
                     {Object.keys(trafficFiltersMap).map((key)=> {
                         return (
-                            <InlineGrid gap={2} columns={3} key={key}>
+                            <InlineGrid gap={200} columns={3} key={key}>
                                 <TooltipText textProps={{variant:"bodyMd", fontWeight:"medium"}} tooltip={key} text={key}/>
                                 <TooltipText textProps={{variant:"bodyMd", color: "subdued"}} tooltip={trafficFiltersMap[key]} text={trafficFiltersMap[key]}/>
                                 <Button
@@ -358,7 +358,7 @@ function About() {
                     })}
                 </BlockStack>
             </Scrollable>
-            <InlineGrid gap={2} columns={3} alignItems="center">
+            <InlineGrid gap={200} columns={3} alignItems="center">
                 <TextFieldWithInfo 
                     labelText="Header key"
                     labelTextColor="subdued"
@@ -375,22 +375,22 @@ function About() {
                     value={headerValue}
                     setValue={setHeaderValue}
                 />
-                {checkSaveActive('filterHeader') ? <Box paddingBlockStart={5} width="100px"><Button onClick={saveFilterHeader} size="medium"  variant="primary">Save</Button></Box> : null}
+                {checkSaveActive('filterHeader') ? <Box paddingBlockStart={500} width="100px"><Button onClick={saveFilterHeader} size="medium"  variant="primary">Save</Button></Box> : null}
             </InlineGrid>
         </BlockStack>
     )
 
     const replaceCollectionComponent = (
-        <BlockStack gap={5}>
+        <BlockStack gap={500}>
             <Text color="subdued">Replace collection</Text>
             <Scrollable horizontal={false} style={{maxHeight: '100px'}} shadow>
-                <BlockStack gap={1}>
+                <BlockStack gap={100}>
                     {Object.keys(apiCollectionNameMapper).map((key)=> {
                         const { headerName, newName, regex } = apiCollectionNameMapper[key]
                         const headerLine = headerName + "=" + regex
 
                         return (
-                            <InlineGrid gap={2} columns={3} key={key}>
+                            <InlineGrid gap={200} columns={3} key={key}>
                                 <TooltipText textProps={{variant:"bodyMd", fontWeight:"medium"}} tooltip={headerLine} text={headerLine}/>
                                 <TooltipText textProps={{variant:"bodyMd", color: "subdued"}} tooltip={newName} text={newName}/>
                                 <Button
@@ -403,7 +403,7 @@ function About() {
                     })}
                 </BlockStack>
             </Scrollable>
-            <InlineGrid gap={2} columns={3} alignItems="center">
+            <InlineGrid gap={200} columns={3} alignItems="center">
                 <TextFieldWithInfo 
                     labelText="Header key"
                     labelTextColor="subdued"
@@ -446,8 +446,8 @@ function About() {
                   <LegacyCard.Section title={<Text variant="headingMd">More settings</Text>}>
                       <div style={{ display: 'flex' }}>
                           <div style={{ flex: "1" }}>
-                              <BlockStack gap={5}>
-                                  <BlockStack gap={1}>
+                              <BlockStack gap={500}>
+                                  <BlockStack gap={100}>
                                       <Text color="subdued">Setup type</Text>
                                       <Box width='120px'>
                                           <Dropdown
@@ -461,7 +461,7 @@ function About() {
                                   <ToggleComponent text={"Activate regex matching in merging"} initial={newMerging} onToggle={handleNewMerging} />
                                   <ToggleComponent text={"Enable telemetry"} initial={enableTelemetry} onToggle={toggleTelemetry} />
                                   {redundantUrlComp}
-                                  <BlockStack gap={1}>
+                                  <BlockStack gap={100}>
                                       <Text color="subdued">Traffic alert threshold</Text>
                                       <Box width='120px'>
                                           <Dropdown
@@ -529,11 +529,11 @@ function About() {
             >
                 <Divider />
                 <LegacyCard.Section>
-                    <BlockStack gap={"2"}>
+                    <BlockStack gap={"200"}>
                         <Form onSubmit={() => onFormSubmit(value)}>
                             <TextField onChange={setValue} value={value} label={<Text color="subdued" fontWeight="medium" variant="bodySm">{labelText}</Text>} {...isError ? {error: "Invalid address"} : {}}/>
                         </Form>
-                        <InlineStack gap={"2"}>
+                        <InlineStack gap={"200"}>
                             {ipsList && ipsList.length > 0 && ipsList.map((ip, index) => {
                                 return(
                                     <Tag key={index} onRemove={() => onRemove(ip)}>

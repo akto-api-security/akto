@@ -207,7 +207,7 @@ const treeViewFunc = {
                     </Box>
                 )
                 : (
-                        <InlineStack gap={"1"} align="space-between" wrap={false}>
+                        <InlineStack gap={"100"} align="space-between" wrap={false}>
                             <Box maxWidth="200px">
                                 <TooltipText tooltip={c.level} text={c.level} textProps={{variant: 'headingSm'}} />
                             </Box>

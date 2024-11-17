@@ -67,19 +67,19 @@ function SingleRequest(){
     return (
         <PageWithMultipleCards
             title={
-                <BlockStack gap="3">
-                    <InlineStack gap="2" align="start" blockAlign='start'>
+                <BlockStack gap="300">
+                    <InlineStack gap="200" align="start" blockAlign='start'>
                         <Box maxWidth="50vw">
                             <Text variant='headingLg' truncate>
                                 {`${subType} in ${method} ${url}`}
                             </Text>
                         </Box>
                     </InlineStack>
-                    <InlineStack gap='2' align="start">
+                    <InlineStack gap='200' align="start">
                         {
                           headerDetails?.map((header) => {
                             return (
-                                <InlineStack key={header.value} gap="1">
+                                <InlineStack key={header.value} gap="100">
                                     <div style={{ maxWidth: "0.875rem", maxHeight: "0.875rem" }}>
                                       <Icon source={header.icon} tone="subdued" />
                                     </div>

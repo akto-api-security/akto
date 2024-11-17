@@ -17,7 +17,7 @@ function CollectionsPageBanner() {
     const connectorsList = quickStartFunc.getConnectorsList()
     
     const iconComponent = (
-        <InlineStack gap={"2"} align="start">
+        <InlineStack gap={"200"} align="start">
             <InlineStack>
                 {iconsList.map((iconUrl, index) => {
                     return (

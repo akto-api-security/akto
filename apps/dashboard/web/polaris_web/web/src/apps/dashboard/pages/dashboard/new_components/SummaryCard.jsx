@@ -5,12 +5,12 @@ import TitleWithInfo from '../../../components/shared/TitleWithInfo'
 function SummaryCard({ summaryItems }) {
     return (
         <Card padding={0} key="info">
-            <Box padding={3} paddingInlineStart={5} paddingInlineEnd={5}>
-                <InlineGrid columns={summaryItems.length} gap={4}>
+            <Box padding={300} paddingInlineStart={500} paddingInlineEnd={500}>
+                <InlineGrid columns={summaryItems.length} gap={400}>
                     {summaryItems.map((item, index) => (
                         <Box borderInlineEndWidth={index < (summaryItems.length - 1) ? "1" : ""} key={index} borderColor="transparent">
                             <InlineStack>
-                                <BlockStack gap="4">
+                                <BlockStack gap="400">
                                     <TitleWithInfo
                                         titleComp={
                                         <Text variant="headingMd">
@@ -20,8 +20,8 @@ function SummaryCard({ summaryItems }) {
                                         docsUrl={item?.docsUrl}
                                         tooltipContent={item?.tooltipContent}
                                     />
-                                    <InlineGrid gap={1} columns={2}>
-                                        <BlockStack gap={4}>
+                                    <InlineGrid gap={100} columns={2}>
+                                        <BlockStack gap={400}>
                                             {item?.isComp ? item.data : 
                                             <div className='custom-color'>
                                                 <Text variant={item.variant ? item.variant : 'bodyLg'} color={item.color ? item.color : ""}>

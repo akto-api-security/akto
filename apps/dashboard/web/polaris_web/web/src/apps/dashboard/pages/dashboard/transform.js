@@ -248,7 +248,7 @@ const transform = {
                 <Button onClick={()=>setActive(true)}   removeUnderline variant="monochromePlain">
 
                   <Box width='250px'  > 
-                 <InlineStack align="space-between" gap="2">
+                 <InlineStack align="space-between" gap="200">
                      <Text>{collectionsMap[c.id]}</Text>
                      <Badge tone={c.status} size="small">{c.score.toString()}</Badge>
                  </InlineStack>   

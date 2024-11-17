@@ -305,14 +305,14 @@ function AllSensitiveData() {
     }
 
     const secondaryActionsComp = (
-        <InlineStack gap={"2"}>
+        <InlineStack gap={"200"}>
             { (func.checkOnPrem() && window?.USER_NAME !== undefined && window.USER_NAME.includes("razorpay")) ? <Button onClick={resetSampleData}>Reset Sample Data</Button> : <></>}
             <Button onClick={displayGPT}>Ask AktoGPT</Button>
         </InlineStack>
     )
 
     const graphComponents = (
-        <InlineGrid key={"graphs"} gap={"5"} columns={2}>
+        <InlineGrid key={"graphs"} gap={"500"} columns={2}>
             <InfoCard
                 title={"APIs by Sensitive data severity"}
                 titleToolTip={"Number of APIs per each category"}
@@ -338,7 +338,7 @@ function AllSensitiveData() {
                 title={"Top 5 sensitive datatype"}
                 titleToolTip={"Numbers of APIs having the corresponding data type in request or response"}
                 component={
-                    <Box paddingBlockStart={"6"}>
+                    <Box paddingBlockStart={"600"}>
                         <ChartypeComponent
                             data={countMap}
                             isNormal={true} 

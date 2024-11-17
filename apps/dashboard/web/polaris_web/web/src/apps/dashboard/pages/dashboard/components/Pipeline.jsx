@@ -44,8 +44,8 @@ function Pipeline({riskScoreMap, collections, collectionsMap}) {
                 }}
             >
                 <Modal.Section>
-                    <BlockStack gap={2}>
-                        <InlineStack gap={2} align="start">
+                    <BlockStack gap={200}>
+                        <InlineStack gap={200} align="start">
                             <Text breakWord truncate>
                             Akto's integration with GitHub enterprise and Github.com allows you to maintain API security through GitHub pull requests itself. &nbsp;
 
@@ -66,8 +66,8 @@ function Pipeline({riskScoreMap, collections, collectionsMap}) {
 
     return (
         <Card>
-            <BlockStack gap={5}>
-                <BlockStack gap={2}>
+            <BlockStack gap={500}>
+                <BlockStack gap={200}>
                     <Text variant="bodyLg" fontWeight="semibold">Add in your CI/CD pipeline</Text>
                     <Text>Seamlessly enhance your web application security with CI/CD integration, empowering you to efficiently detect vulnerabilities, analyze and intercept web traffic, and fortify your digital defenses.</Text>
                 </BlockStack>

@@ -8,7 +8,7 @@ function TextFieldWithInfo({labelText, labelTextColor, labelTooltip, tooltipIcon
     const tooltipIconColorV = tooltipIconColor || "base"
 
     const label = (
-        <InlineStack gap="2">
+        <InlineStack gap="200">
             <Text color={labelTextColorV}>{labelText}</Text>
             <Tooltip content={labelTooltip} dismissOnMouseOut width="wide">
                 <Icon source={QuestionCircleIcon} tone={tooltipIconColorV} />

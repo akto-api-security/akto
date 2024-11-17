@@ -118,12 +118,12 @@ function AktoGptLayout({prompts,closeModal, runCustomTests}) {
     return (
         <div style={{display:"flex"}}>
             <div className='left-nav-gpt'>
-                <Box padding="3">
+                <Box padding="300">
                     <Text variant="bodyLg" fontWeight="semibold">Select any prompt</Text>
                 </Box>
                 <br/>
 
-                <BlockStack gap="2">
+                <BlockStack gap="200">
                     {prompts.map((item)=>(
                         <PromptContainer itemObj={item} activePrompt={activePrompt} setActivePrompt={(item) => setSelectedObj(item)} key={item.label}/>
                     ))}
@@ -133,16 +133,16 @@ function AktoGptLayout({prompts,closeModal, runCustomTests}) {
             <div className='message-container'>
                 <div style={{flex: 6.5}}>
                     {buttonState > 0 ? <Box ref={chatLogRef}>
-                        <Box padding="5" maxWidth="65vw">
-                            <InlineStack gap="6">
+                        <Box padding="500" maxWidth="65vw">
+                            <InlineStack gap="600">
                                 <Avatar name={username} initials={func.initials(username)} size="md"/>
                                 <Text variant="bodyMd" fontWeight="semibold" color="subdued">{activePrompt.split("${input}")[0] + inputPrompt}</Text>
                             </InlineStack>
                         </Box>
                         <Scrollable shadow style={{height: '35vh'}} focusable>
-                            <Box padding="5" maxWidth="65vw" background="bg-subdued">
+                            <Box padding="500" maxWidth="65vw" background="bg-subdued">
                                 <div className="response-message">
-                                    <InlineStack gap="6" align="start">
+                                    <InlineStack gap="600" align="start">
                                         <Avatar name="Akto" source='/public/akto_colored.svg' size="md"/>
                                         {loading ? <Spinner size="small" /> 
                                             : <ResponseComponent response={func.getResponse(response,queryType)} chatLogRef={chatLogRef} onCompletion={() => handleCompletion()}/>

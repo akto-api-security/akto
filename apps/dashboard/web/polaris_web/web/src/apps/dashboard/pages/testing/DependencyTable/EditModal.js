@@ -19,7 +19,7 @@ function EditModal(props) {
             }}
         >
             <Modal.Section>
-                <BlockStack gap={2}>
+                <BlockStack gap={200}>
                     {editData.map((ele, index) => {
                         return EditTextField(ele, modifyEditData)
                     })}

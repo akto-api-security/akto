@@ -31,7 +31,7 @@ function UpdateConnections(props) {
     },[])
 
     const components = [
-        currentCardObj ? <InlineStack gap="1">
+        currentCardObj ? <InlineStack gap="100">
             <Text variant="headingMd" as="h6">{currentCardObj.label} </Text>
             {currentCardObj.badge ? <Badge size='small' tone='info'>{currentCardObj.badge}</Badge> : null}
         </InlineStack> : null,
@@ -48,11 +48,11 @@ function UpdateConnections(props) {
                     />}
         >
             <div>
-                <BlockStack gap="8">
+                <BlockStack gap="800">
                     {Object.keys(obj).map((key, index) => {
                         return (
-                            <BlockStack gap="4" key={key}>
-                                <InlineStack gap={"3"}>
+                            <BlockStack gap="400" key={key}>
+                                <InlineStack gap={"300"}>
                                     <Text variant="headingMd" as="h6" color=""> {key} </Text>
                                     <Tag>{obj[key].length.toString()}</Tag>
                                 </InlineStack>

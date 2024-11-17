@@ -35,7 +35,7 @@ function FilterComponent() {
     return (
         <LegacyCard>
             <LegacyCard.Section flush>
-                <Box padding={"2"}>
+                <Box padding={"200"}>
                     <InlineStack padding="2" align='space-between'>Threat detection filter<Button   removeUnderline onClick={onSave} variant="monochromePlain">
                             Save
                         </Button>

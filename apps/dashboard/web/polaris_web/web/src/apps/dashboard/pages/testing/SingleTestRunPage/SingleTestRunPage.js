@@ -374,13 +374,13 @@ const promotedBulkActions = (selectedDataHexIds) => {
     missingConfigs.length > 0 ? 
     <div className="banner-wrapper">
       <Banner tone="critical">
-        <InlineStack gap={3}>
+        <InlineStack gap={300}>
           <Box>
             <Text fontWeight="semibold">
               {`${missingConfigs.length} configuration${missingConfigs.length > 1 ? 's' : ''} missing: `}  
             </Text>
           </Box>
-          <InlineStack gap={2}>
+          <InlineStack gap={200}>
             {missingConfigs.map((config) => {
               return(<Link url={baseUrl + config.toUpperCase()} key={config} target="_blank">
                 {config}
@@ -478,7 +478,7 @@ const promotedBulkActions = (selectedDataHexIds) => {
 const runningTestsComp = useMemo(() => (
     currentTestObj.testingRunId !== -1 ? (
         <Card key={"test-progress"}>
-            <BlockStack gap={"3"}>
+            <BlockStack gap={"300"}>
               <Text variant="headingSm">{`Running ${currentTestObj.testsInitiated} tests`}</Text>
               <div style={{ display: "flex", gap: '4px', alignItems: 'center' }}>
                   <ProgressBar progress={progress} tone="primary" size="small" />
@@ -500,14 +500,14 @@ const runningTestsComp = useMemo(() => (
   const EmptyData = () => {
     return (
       <div style={{margin: 'auto', marginTop: '20vh'}}>
-        <Box width="300px" padding={4}>
-          <BlockStack gap={5}>
+        <Box width="300px" padding={400}>
+          <BlockStack gap={500}>
             <InlineStack align="center">
               <div style={{borderRadius: '50%', border: '6px solid white', padding: '4px', display: 'flex', alignItems: 'center', height: '50px', width: '50px'}}>
                 <Icon source={InfoIcon} />
               </div>
             </InlineStack>
-            <BlockStack gap={2}>
+            <BlockStack gap={200}>
               <InlineStack align="center">
                 <Text variant="bodyLg" fontWeight="semibold">
                   No test run data found
@@ -526,9 +526,9 @@ const runningTestsComp = useMemo(() => (
   const allResultsLength = testRunResults.skipped.length + testRunResults.need_configurations.length + testRunResults.no_vulnerability_found.length + testRunResults.vulnerable.length + testRunResults.ignored_issues.length + progress
   const useComponents = (!workflowTest && allResultsLength === 0 && (selectedTestRun.run_type && selectedTestRun.run_type ==='One-time')) ? [<EmptyData key="empty"/>] : components
   const headingComp = (
-    <Box paddingBlockStart={1}>
-      <BlockStack gap="2">
-        <InlineStack gap="2" align="start">
+    <Box paddingBlockStart={100}>
+      <BlockStack gap="200">
+        <InlineStack gap="200" align="start">
           { selectedTestRun?.icon && <Box>
             <Icon tone={selectedTestRun.iconColor} source={selectedTestRun.icon }></Icon>
           </Box>
@@ -551,21 +551,21 @@ const runningTestsComp = useMemo(() => (
             )}
           <Button   onClick={() => fetchData(true)} variant="monochromePlain"><Tooltip content="Refresh page" dismissOnMouseOut> <Icon source={RefreshIcon} /></Tooltip></Button>
         </InlineStack>
-        <InlineStack gap={"2"}>
-          <InlineStack gap={"1"}>
+        <InlineStack gap={"200"}>
+          <InlineStack gap={"100"}>
             <Box><Icon tone="subdued" source={PersonIcon}/></Box>
             <Text color="subdued" fontWeight="medium" variant="bodyMd">created by:</Text>
             <Text color="subdued" variant="bodyMd">{selectedTestRun.userEmail}</Text>
           </InlineStack>
           <Box width="1px" borderColor="border-subdued" borderInlineStartWidth="1" minHeight='16px'/>
           <Link monochrome target="_blank" url={"/dashboard/observe/inventory/" + selectedTestRun?.apiCollectionId} removeUnderline>
-            <InlineStack gap={"1"}>
+            <InlineStack gap={"100"}>
               <Box><Icon tone="subdued" source={ArchiveIcon}/></Box>
               <Text color="subdued" variant="bodyMd">{collectionsMap[selectedTestRun?.apiCollectionId]}</Text>
             </InlineStack>
           </Link>
           <Box width="1px" borderColor="border-subdued" borderInlineStartWidth="1" minHeight='16px'/>
-          <InlineStack gap={"1"}>
+          <InlineStack gap={"100"}>
             <Box><Icon tone="subdued" source={SearchListIcon}/></Box>
             <Text color="subdued" variant="bodyMd">{getHeadingStatus(selectedTestRun)}</Text>
           </InlineStack>
@@ -601,7 +601,7 @@ const runningTestsComp = useMemo(() => (
     <PageWithMultipleCards
       title={headingComp}
       backUrl={`/dashboard/testing/`}
-      primaryAction={!workflowTest ? <Box paddingInlineEnd={1}><Button
+      primaryAction={!workflowTest ? <Box paddingInlineEnd={100}><Button
 
         onClick={() => 
           func.downloadAsCSV((testRunResultsText[selectedTab]), selectedTestRun)

@@ -36,13 +36,13 @@ function PrettifyDisplayName({name, level, isTerminal, isOpen, selectItems, coll
     return (
         <Box width='230px'>
             <div className="styled-name">
-                <InlineStack gap={"2"} wrap={false}>
+                <InlineStack gap={"200"} wrap={false}>
                     {spacingWidth > 0 ? <Box width={`${spacingWidth}px`} /> : null}
                     {len !== 0 ? <Checkbox checked={checkedVal} onChange={() => handleChange(collectionIds, selectItems)}/> : null}
                     {!isTerminal ? <Box><Icon source={icon} /></Box> : null}
                     <Box maxWidth="160px">
                         <Tooltip content={name || displayName} dismissOnMouseOut>
-                            <InlineStack align="space-between" wrap={false} gap={"2"}>
+                            <InlineStack align="space-between" wrap={false} gap={"200"}>
                                 <Box maxWidth="130px">
                                     <Text variant="headingSm" truncate>{displayName}</Text>
                                 </Box>

@@ -57,9 +57,9 @@ function OpenApiSpec({apiCollectionId}) {
     }
 
     return (
-        <Box padding="4">
+        <Box padding="400">
             {loading ? <SpinnerCentered /> :
-                <BlockStack gap={"4"}>
+                <BlockStack gap={"400"}>
                     <TextField placeholder="Upload JSON file here" value={fileName} prefix={UploadFile} />
                     {content ? <SampleData minHeight="60vh" data={data} language="json"/> : null}
                 </BlockStack>

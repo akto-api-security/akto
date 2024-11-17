@@ -145,7 +145,7 @@ function OpenApiSource() {
                 Use openAPI/swagger file to add API endpoints. If you like what you see, we highly recommend using AWS or GCP traffic mirroring to get real user data for a smooth, automated and minimum false positive experience.
             </Text>
 
-            <InlineStack gap="2">
+            <InlineStack gap="200">
                 {files ?
                     <Badge size='medium' tone='success'>
                         {files.name}
@@ -159,7 +159,7 @@ function OpenApiSource() {
                         allowedSize={5*1024*1024} />
             </InlineStack>
 
-            <BlockStack gap="2">
+            <BlockStack gap="200">
                 <ButtonGroup>
                     <Button
                         onClick={uploadFile}

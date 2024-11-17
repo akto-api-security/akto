@@ -88,7 +88,7 @@ function TagDetails() {
     const descriptionCard = (
         <LegacyCard title="Details" key="desc">
             <LegacyCard.Section>
-                <InlineGrid gap="4" columns={2}>
+                <InlineGrid gap="400" columns={2}>
                     <TextField
                         id={"name-field"} 
                         label="Name" value={currState.name}

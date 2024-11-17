@@ -6,15 +6,15 @@ import JsonComponent from './JsonComponent'
 function NoAccessComponent({steps , dataString, onClickFunc, toolTipContent, title}) {
     const navigate = useNavigate(0)
     const noAccessComponent = (
-        <BlockStack gap="1">
+        <BlockStack gap="100">
             {steps.map((element,index) => (
-                <BlockStack gap="1" key={index}>
-                    <InlineStack gap="1" wrap={false} key={element.text}>
+                <BlockStack gap="100" key={index}>
+                    <InlineStack gap="100" wrap={false} key={element.text}>
                         <span>{index + 1}.</span>
                         <span>{element.text}</span>
                         <span>{element.textComponent}</span>
                     </InlineStack>
-                    <InlineStack gap="3">
+                    <InlineStack gap="300">
                         <div/>
                         {element?.component}
                     </InlineStack>

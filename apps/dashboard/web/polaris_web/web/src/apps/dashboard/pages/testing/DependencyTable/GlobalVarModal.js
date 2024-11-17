@@ -51,7 +51,7 @@ function GlobalVarModal(props) {
         >
             <Scrollable style={{ maxHeight: "400px" }} shadow>
                 <Modal.Section>
-                    <BlockStack gap={2}>
+                    <BlockStack gap={200}>
                         {globalVarsData.map((ele, index) => {
                             return EditGlobalDataFields(ele, handleTextFieldChange)
                         })}

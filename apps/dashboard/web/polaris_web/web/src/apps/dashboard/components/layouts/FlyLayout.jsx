@@ -17,8 +17,8 @@ function FlyLayout(props) {
             <div className="innerFlyLayout">
                 <Box borderColor="border-subdued" borderWidth="1" background="bg" width={divWidth} minHeight="100%">
                     { loading ? <div style={{position: "absolute", right: "25vw" , top: "50vh"}}><Spinner size="large" /></div>:
-                    <BlockStack gap={"5"}>
-                        <Box padding={"4"} paddingBlockEnd={"0"} >
+                    <BlockStack gap={"500"}>
+                        <Box padding={"400"} paddingBlockEnd={"0"} >
                             <InlineStack align="space-between">
                                 {titleComp ? titleComp : 
                                     <Text variant="headingMd">
@@ -29,7 +29,7 @@ function FlyLayout(props) {
                             </InlineStack>
                         </Box>
                         <Scrollable style={{ height: "92vh" }} shadow>
-                        <Box paddingBlockEnd={"20"}>
+                        <Box paddingBlockEnd={"2000"}>
                         <BlockStack>
                             {
                                 show ?
@@ -39,7 +39,7 @@ function FlyLayout(props) {
                                                 {newComp ? <Box>
                                                     {component}
                                                 </Box>:
-                                                <Box paddingInlineEnd={"4"} paddingInlineStart={"4"}>
+                                                <Box paddingInlineEnd={"400"} paddingInlineStart={"400"}>
                                                     {component}
                                                 </Box>
                                                 }

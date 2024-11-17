@@ -81,13 +81,13 @@ function SignUp() {
 
   const ssoCard = (
     ssoList.length === 0 ? null :
-      <BlockStack gap={5}>
+      <BlockStack gap={500}>
         {
           ssoList.map((sso, index) => {
             return (
-              <BlockStack gap={5} key={index}>
+              <BlockStack gap={500} key={index}>
                 <SSOTextfield onClickFunc={sso.onClickFunc} logos={[sso.logo]} text={sso.text} />
-                <InlineStack gap={3}>
+                <InlineStack gap={300}>
                   <div style={{ flexGrow: 1, borderBottom: '1px solid #c9cccf' }}></div>
                   <Text variant="bodySm" color="subdued">or</Text>
                   <div style={{ flexGrow: 1, borderBottom: '1px solid #c9cccf' }}></div>
@@ -258,9 +258,9 @@ function SignUp() {
   const isOnPrem = websiteHostName && !notOnPremHostnames.includes(window.location.hostname)
 
   const signupEmailCard = (
-    <BlockStack gap={4}>
+    <BlockStack gap={400}>
       <Form onSubmit={loginFunc}>
-        <BlockStack gap={4}>
+        <BlockStack gap={400}>
           <div className='form-class'>
             <TextField onChange={setEmail} inputMode='email' value={forgotPasswordState.isForgotPasswordActive ? "" : email} label="Email" placeholder="name@workemail.com" monospaced={true}/>
           </div>
@@ -277,7 +277,7 @@ function SignUp() {
             variant="primary"><div data-testid="signin_signup_button">{activeObject.buttonText}</div></Button>
         </BlockStack>
       </Form>
-      <InlineStack align="center" gap={1}>
+      <InlineStack align="center" gap={100}>
         <Text>{activeObject.descriptionText}</Text>
         <Button
 
@@ -288,9 +288,9 @@ function SignUp() {
   )
 
   const customComponent = (
-    <BlockStack gap={8}>
+    <BlockStack gap={800}>
       <Text alignment="center" variant="heading2xl">{activeObject.headingText}</Text>
-      <BlockStack gap={5}>
+      <BlockStack gap={500}>
         {ssoCard}
         {!func.checkLocal() ? <SSOTextfield onClickFunc={() => window.location.href="/sso-login"} logos={['/public/azure_logo.svg', '/public/gcp.svg']} text={"Sign in with SSO"} /> : null}
         {signupEmailCard}

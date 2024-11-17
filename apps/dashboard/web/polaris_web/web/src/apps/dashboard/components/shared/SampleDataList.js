@@ -17,13 +17,13 @@ function SampleDataList(props) {
     }, [sampleData])
   
     return (
-      <BlockStack gap="3">
+      <BlockStack gap="300">
         <InlineStack align='space-between'>
-          <InlineStack gap="2">
+          <InlineStack gap="200">
             <Text variant='headingMd'>
               {heading}
             </Text>
-            {isVulnerable ? <Box paddingBlockStart={"05"}><Badge tone="critical">Vulnerable</Badge></Box> : null}
+            {isVulnerable ? <Box paddingBlockStart={"050"}><Badge tone="critical">Vulnerable</Badge></Box> : null}
           </InlineStack>
           <Pagination
                   label={
@@ -38,7 +38,7 @@ function SampleDataList(props) {
                   onNext={() => {setPage((old) => (old+1))}}
                 />
         </InlineStack>
-        <InlineGrid columns={vertical ? "1" : "2"} gap="2">
+        <InlineGrid columns={vertical ? "1" : "2"} gap="200">
           {
             ["request","response"].map((type) => {
               return (

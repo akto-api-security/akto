@@ -200,23 +200,23 @@ function SampleDataComponent(props) {
     return (
         <Box>
             <LegacyCard.Section flush>
-                <Box padding={"2"}>
+                <Box padding={"200"}>
                     <InlineStack padding="2" align='space-between'>
                         {func.toSentenceCase(type)}
                         { type=="response" && responseTime ? (` (${responseTime} ms)`) : "" }
-                        <InlineStack gap={2}>
+                        <InlineStack gap={200}>
                             {isNewDiff ? <InlineStack gap="2">
-                                <Box borderInlineEndWidth='1' borderColor="border-subdued" padding="1">
+                                <Box borderInlineEndWidth='1' borderColor="border-subdued" padding="100">
                                     <Text variant="bodyMd" color="subdued">{ lineNumbers[type].length } changes</Text>
                                 </Box>
-                                <InlineStack gap="1">
+                                <InlineStack gap="100">
                                     <Button
 
 
                                         disabled={!checkButtonActive("prev")}
                                         onClick={() => changeIndex("prev")}
                                         variant="monochromePlain">
-                                        <Box padding="05" borderWidth="1" borderColor="border" borderRadius="1">
+                                        <Box padding="050" borderWidth="1" borderColor="border" borderRadius="1">
                                             <Icon source={ArrowUpIcon} />
                                         </Box>
                                     </Button>
@@ -226,7 +226,7 @@ function SampleDataComponent(props) {
                                         disabled={!checkButtonActive("next")}
                                         onClick={() => changeIndex("next")}
                                         variant="monochromePlain">
-                                        <Box padding="05" borderWidth="1" borderColor="border" borderRadius="1">
+                                        <Box padding="050" borderWidth="1" borderColor="border" borderRadius="1">
                                             <Icon source={ArrowDownIcon} />
                                         </Box>
                                     </Button>

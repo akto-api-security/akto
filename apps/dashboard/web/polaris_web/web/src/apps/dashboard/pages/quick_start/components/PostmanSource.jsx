@@ -106,11 +106,11 @@ function PostmanSource() {
 
     const apiActionComponent = (
         <div>
-            <BlockStack gap="1">
+            <BlockStack gap="100">
                 <span>4. Paste your postman key here: </span>
                 <PasswordTextField setField={setPostmanKey} onFunc={true} field={postmanKey}/>
             </BlockStack>
-            <BlockStack gap="1">
+            <BlockStack gap="100">
                 <span>5. Select workspace you wish to import:  </span>
                 <Dropdown menuItems={workspaces} selected={handleSelectChange} initial={selected}/>
             </BlockStack>
@@ -127,9 +127,9 @@ function PostmanSource() {
 
     const collectionComponent = (
         <div>
-            <BlockStack gap="1">
+            <BlockStack gap="100">
                 <span>4. Upload postman collection:</span>
-                <InlineStack gap="2">
+                <InlineStack gap="200">
                     {files ? 
                         <Badge size='medium' tone='success'>
                             {files.name}
@@ -291,7 +291,7 @@ function PostmanSource() {
                 Use postman to send traffic to Akto and realize quick value. If you like what you see, we highly recommend using AWS or GCP traffic mirroring to get real user data for a smooth, automated and minimum false positive experience.
             </Text>
 
-            <BlockStack gap="1">
+            <BlockStack gap="100">
                 <RadioButton id="api" label="Import using postman API key" checked={type === "api"} onChange={()=>handleChange("api")}/>
                 <RadioButton id="collection" label="Import using postman collection file" checked={type === "collection"} onChange={()=>handleChange("collection")}/>
             </BlockStack>
@@ -299,9 +299,9 @@ function PostmanSource() {
                     content="Please ensure the pre-requisites " 
             />
 
-            <BlockStack gap="1">
+            <BlockStack gap="100">
                 {steps.map((element,index) => (
-                    <InlineStack gap="1" wrap={false} key={element.text}>
+                    <InlineStack gap="100" wrap={false} key={element.text}>
                         <span>{index + 1}.</span>
                         <span>{element.text}</span>
                     </InlineStack>
@@ -312,7 +312,7 @@ function PostmanSource() {
                 }
             </BlockStack>
 
-            <BlockStack gap="2">
+            <BlockStack gap="200">
                 <Checkbox label="Allow Akto to replay API requests if responses are not found." checked={allowResponses} onChange={toggleResponse} />
                 <ButtonGroup>
                     <Button

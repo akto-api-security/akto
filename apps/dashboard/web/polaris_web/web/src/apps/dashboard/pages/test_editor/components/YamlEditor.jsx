@@ -143,7 +143,7 @@ const YamlEditor = ({ fetchAllTests }) => {
     return (
         <BlockStack>
             <div className="editor-header">
-                <InlineStack gap={"1"}>
+                <InlineStack gap={"100"}>
                     <div ref={ref} />
                     <Tooltip content={selectedTest.label + '.yaml'} width="wide">
                         <Text variant="headingSm" as="h5" truncate>{selectedTest.label + '.yaml'}</Text>

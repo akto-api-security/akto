@@ -5,7 +5,7 @@ import StepperComponent from '../../../components/shared/StepperComponent'
 function OnboardingLayout({stepObj, requestStepChange, currentStep, skipOnboarding, next}) {
 
     const titleComponent = (
-        <BlockStack gap="1">
+        <BlockStack gap="100">
             <Text variant="headingMd" as="h4">{stepObj.cardTitle}</Text>
         </BlockStack>
     )
@@ -22,12 +22,12 @@ function OnboardingLayout({stepObj, requestStepChange, currentStep, skipOnboardi
                     {...(currentStep > 1 && currentStep < 4) ? {secondaryFooterActions: [{content: "Back", onAction: ()=> requestStepChange(currentStep - 1)}]}: null}
             >
                 <LegacyCard.Section>
-                    <BlockStack gap="3">
+                    <BlockStack gap="300">
                         {stepObj?.component}
                     </BlockStack>
                 </LegacyCard.Section>
                 <Divider/>
-                <Box padding="2"/>
+                <Box padding="200"/>
             </LegacyCard>
 
             <Button  onClick={() => skipOnboarding()} fullWidth variant="plain">I'm a ninja!! I dont need onboarding.</Button>

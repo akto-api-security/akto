@@ -33,7 +33,7 @@ function SelectCollectionComponent() {
             preferredAlignment="left"
         >
             <Popover.Pane fixed>
-                <Box padding={"1"}>
+                <Box padding={"100"}>
                     <DropdownSearch
                         placeholder="Search collection"
                         optionsList={allCollectionsOptions}

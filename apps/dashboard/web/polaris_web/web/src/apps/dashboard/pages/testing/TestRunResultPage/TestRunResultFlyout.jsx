@@ -153,7 +153,7 @@ function TestRunResultFlyout(props) {
     >
         <Popover.Pane fixed>
             <Popover.Section>
-                <BlockStack gap={"4"}>
+                <BlockStack gap={"400"}>
                     {issuesActions.map((issue, index) => {
                         return(
                             <div style={{cursor: 'pointer'}} onClick={() => {issue.onAction(); setPopoverActive(false)}} key={index}>
@@ -169,7 +169,7 @@ function TestRunResultFlyout(props) {
         const severity = (selectedTestRunResult && selectedTestRunResult.vulnerable) ? issueDetails.severity : ""
         return (
             <div style={{display: 'flex', justifyContent: "space-between", gap:"24px", padding: "16px", paddingTop: '0px'}}>
-                <BlockStack gap={"2"}>
+                <BlockStack gap={"200"}>
                     <Box width="100%">
                         <div style={{display: 'flex', gap: '4px'}} className='test-title'>
                             <Button removeUnderline   onClick={() => openTest()} variant="monochromePlain">
@@ -179,13 +179,13 @@ function TestRunResultFlyout(props) {
                                 <Badge size="small" tone={observeFunc.getColor(severity)}>{severity}</Badge></Box>) : null}
                         </div>
                     </Box>
-                    <InlineStack gap={"2"}>
+                    <InlineStack gap={"200"}>
                         <Text color="subdued" variant="bodySm">{transform.getTestingRunResultUrl(selectedTestRunResult)}</Text>
                         <Box width="1px" borderColor="border-subdued" borderInlineStartWidth="1" minHeight='16px'/>
                         <Text color="subdued" variant="bodySm">{selectedTestRunResult?.testCategory}</Text>
                     </InlineStack>
                 </BlockStack>
-                <InlineStack gap={2} wrap={false}>
+                <InlineStack gap={200} wrap={false}>
                     <ActionsComp />
                     {selectedTestRunResult && selectedTestRunResult.vulnerable && 
                         <Modal
@@ -205,7 +205,7 @@ function TestRunResultFlyout(props) {
                             }}
                         >
                             <Modal.Section>
-                                <BlockStack gap={"3"}>
+                                <BlockStack gap={"300"}>
                                     <DropdownSearch
                                         disabled={jiraProjectMaps === undefined || Object.keys(jiraProjectMaps).length === 0}
                                         placeholder="Select JIRA project"
@@ -231,7 +231,7 @@ function TestRunResultFlyout(props) {
         );
     }
 
-    const dataExpiredComponent = <Box paddingBlockStart={3} paddingInlineEnd={4} paddingInlineStart={4}>
+    const dataExpiredComponent = <Box paddingBlockStart={300} paddingInlineEnd={400} paddingInlineStart={400}>
         <Text>
             Sample data might not be available for non-vulnerable tests more than 2 months ago.
             <br/>
@@ -249,7 +249,7 @@ function TestRunResultFlyout(props) {
             !(selectedTestRunResult?.testResults?.[0]?.originalMessage || selectedTestRunResult?.testResults?.[0]?.message) )
             ? dataExpiredComponent :
             (func.showTestSampleData(selectedTestRunResult) && selectedTestRunResult.testResults &&
-        <Box paddingBlockStart={3} paddingInlineEnd={4} paddingInlineStart={4}><SampleDataList
+        <Box paddingBlockStart={300} paddingInlineEnd={400} paddingInlineStart={400}><SampleDataList
             key="Sample values"
             heading={"Attempt"}
             minHeight={"30vh"}
@@ -268,8 +268,8 @@ function TestRunResultFlyout(props) {
         <BlockStack gap={"5"}>
             {infoStateFlyout.map((item, index) => {
                 return (
-                    <BlockStack gap={"5"} key={index}>
-                        <BlockStack gap={"2"}>
+                    <BlockStack gap={"500"} key={index}>
+                        <BlockStack gap={"200"}>
                             <InlineStack gap="1_5-experimental">
                                 <Box><Icon source={item.icon} tone='subdued'/></Box>
                                 <TitleWithInfo
@@ -291,7 +291,7 @@ function TestRunResultFlyout(props) {
     function RowComp ({cardObj}){
         const {title, value, tooltipContent} = cardObj
         return value ? <Box width="224px">
-            <BlockStack gap={"2"}>
+            <BlockStack gap={"200"}>
                 <TitleWithInfo
                     textProps={{variant:"bodyMd", fontWeight:"semibold"}}
                     titleText={title}
@@ -307,9 +307,9 @@ function TestRunResultFlyout(props) {
     )
 
     const overviewComp = (
-        <Box padding={"4"}>
-            <BlockStack gap={"5"}>
-                <BlockStack gap={"2"}>
+        <Box padding={"400"}>
+            <BlockStack gap={"500"}>
+                <BlockStack gap={"200"}>
                     <TitleWithInfo
                         textProps={{variant:"bodyMd", fontWeight:"semibold", color:"subdued"}}
                         titleText={"Description"}
@@ -373,7 +373,7 @@ function TestRunResultFlyout(props) {
     const errorTab = {
         id: "error",
         content: "Attempt",
-        component:  ( selectedTestRunResult.errors && selectedTestRunResult.errors.length > 0 ) && <Box padding={"4"}>
+        component:  ( selectedTestRunResult.errors && selectedTestRunResult.errors.length > 0 ) && <Box padding={"400"}>
             {
             selectedTestRunResult?.errors?.map((error, i) => {
                 if (error) {

@@ -11,9 +11,9 @@ function SuitesCard({cardObj}) {
     return (
         <div onClick={() => setSelectedTest(cardObj._name)}>
             <Card>
-                <BlockStack gap="2">
+                <BlockStack gap="200">
                     <InlineStack align="space-between">
-                        <InlineStack gap="1">
+                        <InlineStack gap="100">
                             <RadioButton checked={selectedTest === cardObj._name} />
                             <Text variant="bodyLg" fontWeight="semibold">{cardObj?.name}</Text>
                         </InlineStack>
@@ -23,7 +23,7 @@ function SuitesCard({cardObj}) {
                             </Box>
                         </Tooltip>
                     </InlineStack>
-                    <Box as="span" paddingInlineStart="8">
+                    <Box as="span" paddingInlineStart="800">
                         <Text variant="bodyMd">
                             {cardObj?.tests?.length} Tests
                         </Text>

@@ -8,7 +8,7 @@ function JsonComponent({dataString, onClickFunc, title, toolTipContent, language
   let data = {message:dataString}
 
   return (
-      <BlockStack gap="1">
+      <BlockStack gap="100">
           <div className='copyRequest'>
               <Text>{title}</Text>
               <Tooltip dismissOnMouseOut preferredPosition='above' content={toolTipContent}>

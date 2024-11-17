@@ -221,7 +221,7 @@ const SampleApi = () => {
     }
 
     const resultComponent = (
-        <Box background={getColor()} width="100%" padding={"2"}>
+        <Box background={getColor()} width="100%" padding={"200"}>
             <Button
                 id={"test-results"}
                 removeUnderline
@@ -242,7 +242,7 @@ const SampleApi = () => {
                 <div className="req-resp-tabs">
                     <LegacyTabs tabs={tabs} selected={selected} onSelect={handleTabChange} fitted />
                 </div>
-                <InlineStack gap={2}>
+                <InlineStack gap={200}>
                     <Button id={"select-sample-api"} onClick={toggleSelectApiActive} size="slim">
                         <Box maxWidth="200px">
                             <Tooltip content={copySelectedApiEndpoint} hoverDelay={"100"}>
@@ -270,7 +270,7 @@ const SampleApi = () => {
                 size="large"
             >
                 <Frame >
-                <Box paddingBlockEnd={"8"}>
+                <Box paddingBlockEnd={"800"}>
                 <TestRunResultPage
                     testingRunResult={testResult?.testingRunResult}
                     runIssues={testResult?.testingRunIssues}

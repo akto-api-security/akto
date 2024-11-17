@@ -25,8 +25,8 @@ function NewConnection() {
     const thumbnailUrl = "https://img.youtube.com/vi/fRyusl8ppdY/sddefault.jpg"
 
     const knowMoreLabel = (
-        <InlineGrid gap="10" columns="2">
-            <BlockStack gap="4">
+        <InlineGrid gap="1000" columns="2">
+            <BlockStack gap="400">
                 <Text variant='bodyMd'>
                     Akto is an open source, instant API security platform that takes only 60 secs to get started. Akto is used by security teams to maintain a continuous inventory of APIs, test APIs for vulnerabilities and find runtime issues. Akto offers tests for all OWASP top 10 and HackerOne Top 10 categories including BOLA, authentication, SSRF, XSS, security configurations, etc.
                 </Text>
@@ -63,7 +63,7 @@ function NewConnection() {
     function renderItem(item){
         const {icon,label,text,badge, docsUrl} = item
         const media = (
-            <Box padding={"2"} borderWidth='1' borderColor='border-subdued' borderRadius='2'>
+            <Box padding={"200"} borderWidth='1' borderColor='border-subdued' borderRadius='2'>
                 <Avatar customer size="xs" name={label} source={icon} shape="square"/>
             </Box>
         )
@@ -92,7 +92,7 @@ function NewConnection() {
     }
 
     const allConnectorsLabel = (
-        <BlockStack gap="3">
+        <BlockStack gap="300">
             <SearchField getSearchedItems={searchFunc} placeholder={`Search within ${connectorsList.length} connectors available.`} items={connectorsList} />
             <Scrollable style={{height: '300px'}} focusable shadow>
                 <div className='items-list'>
@@ -107,7 +107,7 @@ function NewConnection() {
 
     const trafficScreenLabel = (
         <div className='connector-container'>
-            <BlockStack gap="4">
+            <BlockStack gap="400">
                 <DropdownSearch optionsList={dropdownList} value={connectors?.label} avatarIcon={connectors?.icon} setSelected={(item)=> setConnector(item)} dropdownSearchKey="value"/>
                 {connectors?.component}
             </BlockStack>
@@ -136,9 +136,9 @@ function NewConnection() {
         <div style={{padding: '32px 15vw'}}>
             <LegacyCard title="Your quick start guide">
                 <LegacyCard.Section>
-                    <BlockStack gap="5">
+                    <BlockStack gap="500">
                         <p>Use this personalized guide to get your traffic and start testing.</p>
-                        <InlineStack gap="3">
+                        <InlineStack gap="300">
                             <Text variant='bodyMd' color='subdued' fontWeight="medium">{tasksCompleted} of {totalTasks} tasks completed</Text>
                             <Box width='36vw'>
                                 <ProgressBar tone='success' progress={calculateWidth()} size='small'/>
@@ -148,10 +148,10 @@ function NewConnection() {
                 </LegacyCard.Section>
 
                 <LegacyCard.Section>
-                    <BlockStack gap="5">
+                    <BlockStack gap="500">
                         {tasksList.map((element,index) => (
-                            <BlockStack gap="5" key={element?.id}>
-                                <InlineStack gap="3">
+                            <BlockStack gap="500" key={element?.id}>
+                                <InlineStack gap="300">
                                     <Button   onClick={() => setTasksCompleted(index)} variant="monochromePlain">
                                         <Avatar customer name='circle' size="xs"
                                             source={tasksCompleted > index ? "/public/circle_check.svg" : "/public/circle_icon.svg"}

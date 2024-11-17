@@ -96,7 +96,7 @@ function DefaultPayloads() {
         <Page title='Default payloads'>
             <LegacyCard>
                 <LegacyCard.Section>
-                    <BlockStack gap={"4"}>
+                    <BlockStack gap={"400"}>
                         <DropdownSearch
                             id={"select-domain-name"}
                             placeholder="Select domain name"

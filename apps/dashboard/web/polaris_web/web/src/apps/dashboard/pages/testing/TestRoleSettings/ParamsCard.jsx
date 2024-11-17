@@ -28,10 +28,10 @@ function ParamsCard({dataObj, handleDelete, showEdit}) {
 
     function ParamsList({valuesList}){
         return (
-            <BlockStack align="start" gap={1}>
+            <BlockStack align="start" gap={100}>
                 {valuesList.map((param,index) => {
                     return (
-                        <InlineStack blockAlign="start" gap={"4"} key={index}>
+                        <InlineStack blockAlign="start" gap={"400"} key={index}>
                             <LineComponent title={(param.key || '-') + " :"} value={(param.value || '-')} />
                             {param.showHeader !== null ? 
                                 <InlineStack blockAlign="start" gap={1}><Box borderInlineEndWidth='1' borderColor="border-subdued" minHeight='20px'/><LineComponent title={"Position :"} value={param.where}/></InlineStack>
@@ -44,27 +44,27 @@ function ParamsCard({dataObj, handleDelete, showEdit}) {
     }
 
     return (
-        <Box borderWidth="1" borderRadius='2' padding={2} borderColor="border-subdued" >
-            <BlockStack gap={2}>
-                <BlockStack gap={3}>
-                    {headerKey.length > 0 ? <BlockStack gap={2}>
+        <Box borderWidth="1" borderRadius='2' padding={200} borderColor="border-subdued" >
+            <BlockStack gap={200}>
+                <BlockStack gap={300}>
+                    {headerKey.length > 0 ? <BlockStack gap={200}>
                         <TitleComponent title={"Api header conditions"} />
-                        <Box paddingInlineStart={4}>{headerKey.length > 0 ? <LineComponent title={headerKey + " :"} value={headerValue}/> : <Text variant="headingMd">-</Text>}</Box>
+                        <Box paddingInlineStart={400}>{headerKey.length > 0 ? <LineComponent title={headerKey + " :"} value={headerValue}/> : <Text variant="headingMd">-</Text>}</Box>
                     </BlockStack> : null}
-                    <BlockStack gap={2}>
+                    <BlockStack gap={200}>
                         <TitleComponent title={"Token details"} />
-                        <Box paddingInlineStart={4}>
-                            <BlockStack gap={2}>
+                        <Box paddingInlineStart={400}>
+                            <BlockStack gap={200}>
                                 <LineComponent title={"Token type :"} value={authMechanism.type}/>
                                 <LineComponent title={"Token values :"} />
                             </BlockStack>
-                            <Box paddingInlineStart={4}>
+                            <Box paddingInlineStart={400}>
                                 <ParamsList valuesList={authMechanism.authParams} />
                             </Box>
                         </Box>
                     </BlockStack>
                 </BlockStack>
-                <InlineStack gap={"2"} align="end">
+                <InlineStack gap={"200"} align="end">
                     <Button size="slim" onClick={handleDelete} icon={DeleteIcon}><div data-testid="delete_button">Delete</div></Button>
                     {authMechanism?.type?.toLowerCase() === 'hardcoded' ? <Button size="slim"  onClick={() => showEdit()} variant="primary">Edit</Button> : null}
                 </InlineStack>

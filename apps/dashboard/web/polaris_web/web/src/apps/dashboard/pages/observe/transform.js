@@ -412,7 +412,7 @@ const transform = {
 
     getIssuesList(severityInfo){
         return (
-            <InlineStack gap="1" wrap={false}>
+            <InlineStack gap="100" wrap={false}>
                 {
                     Object.keys(severityInfo).length > 0 ? Object.keys(severityInfo).map((key,index)=>{
                         return(
@@ -439,7 +439,7 @@ const transform = {
     prettifySubtypes(sensitiveTags, deactivated){
         return (
             <Box maxWidth="200px">
-                <InlineStack gap={1} wrap={false}>
+                <InlineStack gap={100} wrap={false}>
                     {sensitiveTags.map((item,index)=>{
                         return index < 4 ? <Tooltip dismissOnMouseOut content={item} key={index + item}><Box>
                             <div className={deactivated ? "icon-deactivated" : ""}>
@@ -660,7 +660,7 @@ const transform = {
         }
         const source = val > 0 ? ArrowUpIcon : ArrowDownIcon
         return (
-            <InlineStack gap={1}>
+            <InlineStack gap={100}>
                 <Box>
                     <Icon source={source} tone='subdued' />
                 </Box>

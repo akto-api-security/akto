@@ -482,7 +482,7 @@ function HomeDashboard() {
     const genreateDataTableRows = (collections) => {
         return collections.map((collection, index) => ([
             <InlineStack align='space-between'>
-                <InlineStack gap={2}>
+                <InlineStack gap={200}>
                     <Box maxWidth='287px'>
                         <TooltipText tooltip={collection.name} text={collection.name}/>
                     </Box>
@@ -614,7 +614,7 @@ function HomeDashboard() {
         [apisByRiskscoreComponent, apisByAccessTypeComponent, apisByAuthTypeComponent, apisByTypeComponent, newDomainsComponent, criticalUnsecuredAPIsOverTime, vulnerableApisBySeverityComponent, criticalFindings]
 
     const gridComponent = (
-        <InlineGrid gap={5} columns={2}>
+        <InlineGrid gap={500} columns={2}>
             {gridComponents}
         </InlineGrid>
     )
@@ -622,7 +622,7 @@ function HomeDashboard() {
     const components = [summaryComp, testSummaryCardsList, gridComponent]
 
     const dashboardComp = (
-        <BlockStack gap={4}>
+        <BlockStack gap={400}>
             {components.map((component) => {
                 return component
             })}

@@ -11,11 +11,11 @@ function GridRows(props) {
 
     return (
         <div style={{width: widthChanged }}>
-            <BlockStack gap="5">
+            <BlockStack gap="500">
                 {Array.from({length: rows}).map((_,index)=>(
                     <InlineGrid
                         columns={{xs: 1, sm: Math.max(usedColumns - 2,1) , md: usedColumns - 1 , lg:usedColumns, xl: usedColumns}}
-                        gap="5"
+                        gap="500"
                         key={(index + 1) * 1000}>
                         {Array.from({ length: usedColumns }).map((_, col) => {
                             const itemIndex = index * usedColumns + col;

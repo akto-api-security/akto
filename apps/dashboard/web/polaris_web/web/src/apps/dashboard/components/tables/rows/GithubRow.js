@@ -104,7 +104,7 @@ function GithubRow(props) {
         }).map((header) => {
             return (
                 <IndexTable.Cell key={header.text}>
-                    <BlockStack gap="2">
+                    <BlockStack gap="200">
                         <Text variant='bodyMd' fontWeight="medium">
                             {header.text}
                         </Text>
@@ -203,7 +203,7 @@ function GithubRow(props) {
         return (
             <IndexTable.Cell key={"collapsible"}>
                 <Box maxWidth={treeView ? "180px": ''} >
-                    <InlineStack align={treeView ? "start" : "end"} wrap={false} gap={"2"}>
+                    <InlineStack align={treeView ? "start" : "end"} wrap={false} gap={"200"}>
                         <Box><Icon source={iconSource} /></Box>
                         {treeView ? value : null}
                     </InlineStack>

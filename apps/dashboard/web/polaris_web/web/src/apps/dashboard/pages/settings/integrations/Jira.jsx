@@ -31,7 +31,7 @@ function Jira() {
         <Scrollable
             style={{maxHeight: '250px'}}
         >
-            <BlockStack gap={"4"}>
+            <BlockStack gap={"400"}>
                 <Box>
                     <Button
 
@@ -39,7 +39,7 @@ function Jira() {
                         removeUnderline
                         onClick={() => setCollapsibleOpen(!collapsibleOpen)}
                         variant="monochromePlain">
-                        <InlineStack gap={"4"}>
+                        <InlineStack gap={"400"}>
                             <Text variant="headingSm">Found {Object.keys(projectIssueMap).length} projects out of {projId.split(',').length}</Text>
                             <Box><Icon source={collapsibleOpen ? ChevronUpIcon : ChevronDownIcon} /></Box>
                         </InlineStack>
@@ -82,7 +82,7 @@ function Jira() {
           </LegacyCard.Section>
 
           <LegacyCard.Section>
-                <BlockStack gap={"2"}>
+                <BlockStack gap={"200"}>
                     <TextField label="Base Url" value={baseUrl} helpText="Specify the base url of your jira project(for ex - https://jiraintegloc.atlassian.net)"  placeholder='Base Url' requiredIndicator onChange={setBaseUrl} />
                     <TextField label="Email" value={userEmail} helpText="Specify your email id for which api token will be generated" placeholder='Email' requiredIndicator onChange={setUserEmail} />
                     <PasswordTextField label="Api Token" helpText="Specify the api token created for your user email" field={apiToken} onFunc={true} setField={setApiToken} />

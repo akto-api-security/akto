@@ -20,24 +20,24 @@ function RiskScoreTrend({riskScoreRangeMap, riskScoreRanges}) {
 
     const dataComponent = (
         <Card key="scoreTrend">
-            <BlockStack gap={5}>
+            <BlockStack gap={500}>
                 <TitleWithInfo
                     titleText={"APIs by risk score"}
                     tooltipContent={"All your endpoints grouped on the basis of their risk score."}
                     textProps={{variant: "headingMd"}}
                     docsUrl={"https://docs.akto.io/api-inventory/concepts/risk-score"}
                 />
-                <InlineGrid columns={2} gap={5}>
+                <InlineGrid columns={2} gap={500}>
                     <HighchartsReact
                         highcharts={Highcharts}
                         options={transform.getRiskScoreTrendOptions(riskScoreRangeMap, riskScoreRanges, navigate)}
                         ref={riskScoreTrendRef}
                     />
-                    <Box paddingInlineEnd={4} paddingInlineStart={4} paddingBlockEnd={2} paddingBlockStart={2}>
-                        <BlockStack gap={3}>
+                    <Box paddingInlineEnd={400} paddingInlineStart={400} paddingBlockEnd={200} paddingBlockStart={200}>
+                        <BlockStack gap={300}>
                             {riskScoreRanges.map((range)=>{
                                 return (
-                                    <BlockStack gap={1} key={range.text}>
+                                    <BlockStack gap={100} key={range.text}>
                                         <InlineStack align="space-between">
                                             <Button
 

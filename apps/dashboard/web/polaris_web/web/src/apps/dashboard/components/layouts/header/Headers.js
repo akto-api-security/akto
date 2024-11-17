@@ -26,7 +26,7 @@ import homeFunctions from '../../../../dashboard/pages/home/module';
 
 function ContentWithIcon({icon,text, isAvatar= false}) {
     return (
-        <InlineStack gap={2}>
+        <InlineStack gap={200}>
             <Box width='20px'>
                 {isAvatar ? <div className='reduce-size'><Avatar size="xs" source={icon} /> </div>:
                 <Icon source={icon} tone="base" />}
@@ -207,9 +207,9 @@ export default function Header() {
 
 
     const secondaryMenuMarkup = (
-        <InlineStack gap={"4"}>
+        <InlineStack gap={"400"}>
             {(Object.keys(currentTestsObj).length > 0 && currentTestsObj?.testRunsArr?.length !== 0 && currentTestsObj?.totalTestsCompleted > 0) ? 
-            <InlineStack gap={"2"}>
+            <InlineStack gap={"200"}>
                 <Button   onClick={() => {handleTestingNavigate()}} variant="monochromePlain">
                  <SemiCircleProgress key={"progress"} progress={progress} size={60} height={55} width={75}/>
                 </Button>

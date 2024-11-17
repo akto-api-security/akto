@@ -25,25 +25,25 @@ function Kubernetes({bannerTitle, docsUrl}) {
     const setupButtonText = "Setup Daemonset stack"
 
     const stackCompleteComponent = (
-      <BlockStack gap="2">
+      <BlockStack gap="200">
         <div ref = {ref}/>
         <span>You need to setup a daemonset for your Kubernetes environment:</span>
-        <BlockStack gap="1">
+        <BlockStack gap="100">
           <span>1. Create a file akto-daemonset-deploy.yaml with the following config:</span>
           <JsonComponent title="Yaml Template" toolTipContent="Copy the yaml template" onClickFunc={()=> copyYaml()} dataString={yamlContent} language="yaml" />
         </BlockStack>
-        <BlockStack gap="1">
+        <BlockStack gap="100">
           <span>2. Replace the following values:</span>
-          <BlockStack gap="1">
+          <BlockStack gap="100">
             <span>a. {'{' + 'NAMESPACE' + '}'} : With the namespace of your app</span>
             <span>b. {'{' + 'APP_NAME' + '}'} : Replace with the name of the app where daemonset will be deployed. Note that this has to be done at 3 places in the config</span>
           </BlockStack>
         </BlockStack>
-        <BlockStack gap="1">
+        <BlockStack gap="100">
           <span>3. Run the following command with appropriate namespace:</span>
           <JsonComponent title="Command" toolTipContent="Copy the command" onClickFunc={()=> copyText()} dataString="kubectl apply -f akto-daemonset-deploy.yaml -n <NAMESPACE>" language="text/plain" minHeight="50px"/>
         </BlockStack>
-        <InlineStack gap="1">
+        <InlineStack gap="100">
           <span>4. Add traffic sources from our docs. Click</span>
           <a href='dashboard/observe/inventory'>here</a>
         </InlineStack>

@@ -12,7 +12,7 @@ function CopyCommand({command}) {
     }
 
     return (
-        <Box background="bg-subdued" padding={2} borderRadius="1">
+        <Box background="bg-subdued" padding={200} borderRadius="1">
             <TextField 
                 connectedRight={(<Tooltip dismissOnMouseOut content="Copy URL">
                     <Box>

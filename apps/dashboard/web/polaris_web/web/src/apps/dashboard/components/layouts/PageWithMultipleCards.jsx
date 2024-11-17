@@ -32,7 +32,7 @@ const PageWithMultipleCards = (props) => {
     )
 
     const useSecondaryActions = (
-        <InlineStack gap={2}>
+        <InlineStack gap={200}>
             {learnMoreObj ? learnMoreComp : null }
             {secondaryActions}
         </InlineStack>
@@ -45,7 +45,7 @@ const PageWithMultipleCards = (props) => {
             primaryAction={primaryAction}
             secondaryActions={useSecondaryActions}
         >
-            <BlockStack gap="4">
+            <BlockStack gap="400">
                 {components?.filter((component) => {
                     return component
                 })}

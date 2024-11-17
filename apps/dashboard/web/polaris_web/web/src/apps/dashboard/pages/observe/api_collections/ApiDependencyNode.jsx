@@ -22,14 +22,14 @@ function ApiDependencyNode({ data }) {
     return <>
         {!isFirstNode ? <Handle type="target" position={Position.Top} /> : null}
         <div onClick={() => { !isCurrentNode && openTargetUrl(apiCollectionId, endpoint, method) }} style={isCurrentNode ? { "cursor": "default" } : { "cursor": "pointer" }}>
-            <BlockStack gap={2}>
+            <BlockStack gap={200}>
                 <Card padding={0}>
-                    <Box padding={3}>
-                        <BlockStack gap={1}>
+                    <Box padding={300}>
+                        <BlockStack gap={100}>
                             <Box width='250px'>
                                 <TooltipText tooltip={apiCollectionName} text={apiCollectionName} textProps={{ color: "subdued", variant: "bodySm" }} />
                             </Box>
-                            <InlineStack gap={1}>
+                            <InlineStack gap={100}>
                                 <Box width='230px'>
                                     {StyledEndpoint(methodPlusUrl, "12px", "bodySm")}
                                 </Box>

@@ -39,7 +39,7 @@ function SetConfig() {
     }
 
     const formLayout = (
-        <BlockStack gap="4">
+        <BlockStack gap="400">
             <TextFieldWithInfo  value={authObject?.key} 
                                 labelTooltip="Attacker token header key" 
                                 labelText="Auth header key" 

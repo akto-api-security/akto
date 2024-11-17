@@ -409,7 +409,7 @@ function IssuesPage() {
                 endTimestamp={endTimestamp}
             />
 
-            <InlineGrid gap={5} columns={2} key={"critical-issues-graph-detail"}>
+            <InlineGrid gap={500} columns={2} key={"critical-issues-graph-detail"}>
                 <CriticalUnsecuredAPIsOverTimeGraph linkText={""} linkUrl={""} />
                 <CriticalFindingsGraph linkText={""} linkUrl={""} />
             </InlineGrid>
@@ -445,7 +445,7 @@ function IssuesPage() {
     return <>
     <PageWithMultipleCards
         title={
-            <InlineStack gap={4}>
+            <InlineStack gap={400}>
                 <TitleWithInfo
                     titleText={"Issues"}
                     tooltipContent={"Issues are created when a test from test library has passed validation and thus a potential vulnerability is found."}

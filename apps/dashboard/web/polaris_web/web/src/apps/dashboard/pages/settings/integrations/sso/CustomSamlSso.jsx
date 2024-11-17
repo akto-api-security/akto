@@ -43,9 +43,9 @@ function CustomSamlSso({ssoType,entityTitle, entityId, loginURL,pageTitle, signi
         <LegacyCard.Section>
             <Form onSubmit={handleSubmit}>
                 <FormLayout>
-                    <BlockStack gap={"4"}>
+                    <BlockStack gap={"400"}>
                         {showCustomInputs ? 
-                            <BlockStack gap={"3"}>
+                            <BlockStack gap={"300"}>
                                 <TextField label={<Text fontWeight="medium" variant="bodySm">Enter sso url</Text>} 
                                     placeholder='Enter your SSO url'
                                     onChange={setSSOUrl}
@@ -58,10 +58,10 @@ function CustomSamlSso({ssoType,entityTitle, entityId, loginURL,pageTitle, signi
                                 />
                             </BlockStack> : null
                         }
-                        <InlineStack gap="3">
+                        <InlineStack gap="300">
                             {files ? 
                                 <Tag>
-                                    <InlineStack gap={1}>
+                                    <InlineStack gap={100}>
                                         <Text variant="bodyMd" fontWeight="medium">{files.name}</Text>
                                         <Button onClick={() => setFiles(null)}  icon={XIcon} variant="plain" />
                                     </InlineStack>
@@ -108,9 +108,9 @@ function CustomSamlSso({ssoType,entityTitle, entityId, loginURL,pageTitle, signi
     )
 
     const useCardContent = (
-        <BlockStack gap={"2"}>
+        <BlockStack gap={"200"}>
             <Text>{cardContent}</Text>
-            <InlineStack gap={"1"}>
+            <InlineStack gap={"100"}>
                 <Text>Use</Text>
                 <Link>https://app.akto.io/sso-login</Link>
                 <Text>for signing into AKTO dashboard via SSO.</Text>

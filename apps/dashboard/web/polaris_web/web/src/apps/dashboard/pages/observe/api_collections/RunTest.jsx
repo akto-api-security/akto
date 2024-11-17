@@ -290,7 +290,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
             const label = (
                 <span style={{display: 'flex', gap: '4px', alignItems: 'flex-start'}}>
                     <Text variant="bodyMd">{test.label}</Text>
-                    {isCustom ? <Box paddingBlockStart={"05"}><Badge tone="warning" size="small">Custom</Badge></Box> : null}
+                    {isCustom ? <Box paddingBlockStart={"050"}><Badge tone="warning" size="small">Custom</Badge></Box> : null}
                 </span>
             )
             return ([(
@@ -436,7 +436,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
 
         setActive(false)
         const forwardLink = (
-            <InlineStack gap={1}>
+            <InlineStack gap={100}>
                 <Text> Test run created successfully. Click </Text>
                 <Link url="/dashboard/testing">here</Link>
                 <Text> to view results.</Text>
@@ -485,7 +485,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
 
     function generateLabelForSlackIntegration() {
         return (
-            <InlineStack gap={1}>
+            <InlineStack gap={100}>
                 <Link url='/dashboard/settings/integrations/slack' target="_blank" rel="noopener noreferrer" style={{ color: "#3385ff", textDecoration: 'none' }}>
                     Enable
                 </Link>
@@ -580,14 +580,14 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                             </div>
                             <div>
                                 <div style={{ padding: !showSearch ? "13px" : "9px", alignItems: "center", justifyContent: 'space-between', display: 'flex' }}>
-                                    <InlineStack gap={"2"}>
+                                    <InlineStack gap={"200"}>
                                         <Checkbox
                                             checked={allTestsSelectedOfCategory}
                                             onChange={(val) => toggleTestsSelection(val)}
                                         />
                                         <Text variant="headingMd">Tests</Text>
                                     </InlineStack>
-                                    <InlineStack gap={"2"}>
+                                    <InlineStack gap={"200"}>
                                         <Popover
                                             activator={<Button
 
@@ -631,7 +631,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                         <br />
 
                         <BlockStack gap={"4"}>
-                            <InlineGrid gap={"4"} columns={"3"}>
+                            <InlineGrid gap={"400"} columns={"3"}>
                                 <Dropdown
                                     label="Run Type"
                                     menuItems={runTypeOptions}
@@ -691,7 +691,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                                         }))
                                     }} />
                             </InlineGrid>
-                            <InlineGrid gap={"4"} columns={"2"}>
+                            <InlineGrid gap={"400"} columns={"2"}>
                                 <div style={{marginTop: '-10px'}}>
                                     <Text>Select Test Role</Text>
                                     <Dropdown

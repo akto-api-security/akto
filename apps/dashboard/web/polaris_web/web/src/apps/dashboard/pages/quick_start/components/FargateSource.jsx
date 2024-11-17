@@ -22,9 +22,9 @@ function FargateSource({docsUrl,bannerTitle, innerUrl}) {
     const setupButtonText = "Setup traffic processors"
 
     const stackCompleteComponent = (
-        <BlockStack gap="2">
+        <BlockStack gap="200">
             <div ref = {ref}/>
-            <InlineStack gap="1">
+            <InlineStack gap="100">
                 <span>Your stack is ready. Now follow the steps mentioned 
                 {" "} <a target="_blank" href={innerUrl}>here</a>. You will need the following variables for the next steps.
                 </span>

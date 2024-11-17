@@ -635,7 +635,7 @@ function ApiEndpoints(props) {
     const isApiGroup = collectionsObj?.type === 'API_GROUP'
 
     const secondaryActionsComponent = (
-        <InlineStack gap="2">
+        <InlineStack gap="200">
             <Popover
                 active={exportOpen}
                 activator={(
@@ -649,7 +649,7 @@ function ApiEndpoints(props) {
             >
                 <Popover.Pane fixed>
                     <Popover.Section>
-                        <BlockStack gap={2}>
+                        <BlockStack gap={200}>
                             <div onClick={handleRefresh} style={{cursor: 'pointer'}}>
                                 <Text fontWeight="regular" variant="bodyMd">Refresh</Text>
                             </div>
@@ -672,9 +672,9 @@ function ApiEndpoints(props) {
                         </BlockStack>
                     </Popover.Section>
                     <Popover.Section>
-                        <BlockStack gap={2}>
+                        <BlockStack gap={200}>
                             <Text>Export as</Text>
-                            <BlockStack gap={1}>
+                            <BlockStack gap={100}>
                                 <div data-testid="openapi_spec_option" onClick={(selectedResourcesForPrimaryAction && selectedResourcesForPrimaryAction.length > 0) ? exportOpenApiForSelectedApi : exportOpenApi} style={{cursor: 'pointer'}}>
                                     <Text fontWeight="regular" variant="bodyMd">OpenAPI spec</Text>
                                 </div>
@@ -688,9 +688,9 @@ function ApiEndpoints(props) {
                         </BlockStack>
                     </Popover.Section>
                     <Popover.Section>
-                        <BlockStack gap={2}>
+                        <BlockStack gap={200}>
                             <Text>Others</Text>
-                            <BlockStack gap={1}>
+                            <BlockStack gap={100}>
                                 <Checkbox
                                     label='Redact'
                                     checked={redacted}
@@ -700,7 +700,7 @@ function ApiEndpoints(props) {
                         </BlockStack>
                     </Popover.Section>
                     <Popover.Section>
-                        <BlockStack gap={2}>
+                        <BlockStack gap={200}>
                             <div onClick={toggleWorkflowTests} style={{ cursor: 'pointer' }}>
                                 <Text fontWeight="regular" variant="bodyMd">
                                     {`${showWorkflowTests ? "Hide" : "Show"} workflow tests`}

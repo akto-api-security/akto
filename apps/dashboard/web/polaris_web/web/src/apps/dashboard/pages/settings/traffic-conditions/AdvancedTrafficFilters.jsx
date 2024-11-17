@@ -116,7 +116,7 @@ function AdvancedTrafficFilters() {
                     autofocusTarget="container"
                 >
                     <Popover.Section>
-                        <BlockStack gap={"2"}>
+                        <BlockStack gap={"200"}>
                             <Checkbox
                                 checked={permissionsMap['allowFilterLogs']}
                                 label="Allow filtered urls in logs"
@@ -158,10 +158,10 @@ function AdvancedTrafficFilters() {
                 />
             </LegacyCard.Section>
             <LegacyCard.Section flush>
-                <Box paddingBlockStart={4} paddingBlockEnd={4}>
-                    <BlockStack gap={"1"}>
-                        <Box paddingInlineEnd={"4"}>
-                            <InlineStack align="end" gap={"2"}>
+                <Box paddingBlockStart={400} paddingBlockEnd={400}>
+                    <BlockStack gap={"100"}>
+                        <Box paddingInlineEnd={"400"}>
+                            <InlineStack align="end" gap={"200"}>
                                 <Button
 
 

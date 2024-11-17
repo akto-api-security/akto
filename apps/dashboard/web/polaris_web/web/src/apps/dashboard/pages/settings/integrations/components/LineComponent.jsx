@@ -3,7 +3,7 @@ import React from 'react'
 
 function LineComponent({title,value}){
     return (
-        <InlineStack gap={5}>
+        <InlineStack gap={500}>
             <Box width='180px'>
                 <InlineStack align="end">
                     <Text variant="headingSm">{title}: </Text>

@@ -4,9 +4,9 @@ import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo"
 
 function InfoCard({component, title, titleToolTip, linkText, linkUrl, minHeight}) {
     return (
-        <Card padding={5} key="info">
+        <Card padding={500} key="info">
             <Box  minHeight={minHeight ? minHeight : "100%"}>
-                <BlockStack gap={5} align='center'>
+                <BlockStack gap={500} align='center'>
                     <InlineStack align='space-between'>
                         <TitleWithInfo
                             tooltipContent={titleToolTip}

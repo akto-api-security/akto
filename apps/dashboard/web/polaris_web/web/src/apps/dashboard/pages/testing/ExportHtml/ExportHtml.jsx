@@ -127,7 +127,7 @@ function ExportHtml() {
         <div className="header-css">
             <Box width="60%">
                 <InlineStack align="space-between">
-                    <Box paddingBlockStart={3}>
+                    <Box paddingBlockStart={300}>
                         <Avatar size="md" shape="square" source="/public/akto_colored.svg" customer name='aktoLogo' />
                     </Box>
                     <Text variant="headingXl">Akto Vulnerabilities Report</Text>
@@ -165,12 +165,12 @@ function ExportHtml() {
             <Box borderWidth="1" background={getColor(item)}>
                 <InlineStack>
                     <Box borderInlineEndWidth='1' width='35%'>
-                        <Box padding={1}>
+                        <Box padding={100}>
                             <Text variant="headingMd">Vulnerability</Text>
                         </Box>
                     </Box>
                     <Box>
-                        <Box padding={1}>
+                        <Box padding={100}>
                             <Text variant="headingMd">{item?.category.testName}</Text>
                         </Box>
                     </Box>
@@ -182,14 +182,14 @@ function ExportHtml() {
     return (
         <Frame topBar={headerEditor}>
             <div className="html-component" style={{ padding: "32px" }}>
-                <BlockStack gap="5">
-                    <BlockStack gap="3">
+                <BlockStack gap="500">
+                    <BlockStack gap="300">
                         <Text variant="headingLg" fontWeight="medium">Summary of alerts</Text>
                         <Box borderWidth="2" borderRadius="1" width="40%">
                             <InlineGrid columns={2}>
                                 <div style={{ background: "#666666", borderRight: '2px solid white', borderBottom: '2px solid white' }}>
                                     <InlineStack align="center">
-                                        <Box padding="1">
+                                        <Box padding="100">
                                             <Text variant="bodyLg" fontWeight="medium" color="text-inverse">
                                                 Severity
                                             </Text>
@@ -198,7 +198,7 @@ function ExportHtml() {
                                 </div>
                                 <div style={{ background: "#666666", borderBottom: '2px solid white' }}>
                                     <InlineStack align="center">
-                                        <Box padding="1">
+                                        <Box padding="100">
                                             <Text variant="bodyLg" fontWeight="medium" color="text-inverse">
                                                 Vulnerable APIs
                                             </Text>
@@ -210,7 +210,7 @@ function ExportHtml() {
                                 <InlineGrid columns={2} key={index}>
                                     <div style={{ background: "#e8e8e8", borderRight: '2px solid white', borderBottom: (index < 2 ? "2px solid white" : "") }}>
                                         <InlineStack align="center">
-                                            <Box padding="1">
+                                            <Box padding="100">
                                                 <Text variant="bodyMd" fontWeight="medium">
                                                     {element}
                                                 </Text>
@@ -219,7 +219,7 @@ function ExportHtml() {
                                     </div>
                                     <div style={{ background: "#e8e8e8", borderBottom: (index < 2 ? "2px solid white" : "") }}>
                                         <InlineStack align="center">
-                                            <Box padding="1">
+                                            <Box padding="100">
                                                 <Text variant="bodyMd" fontWeight="medium">
                                                     {severitiesCount[element]}
                                                 </Text>
@@ -230,9 +230,9 @@ function ExportHtml() {
                             ))}
                         </Box>
                     </BlockStack>
-                    <BlockStack gap={4}>
+                    <BlockStack gap={400}>
                         <Text variant="headingLg" fontWeight="medium">Vulnerabilities details</Text>
-                        <BlockStack gap={3}>
+                        <BlockStack gap={300}>
                             {vulnerableResultsMap?.map((item, index) => (
                                 <LegacyCard sectioned title={cardTitleComponent(item)} key={index}>
                                     <LegacyCard.Section>
@@ -285,7 +285,7 @@ function VulnerableMultiStepTestDetails(props) {
                         return (
                             <div key={index}>
                                 <div className="row-div-1">
-                                    <InlineStack gap={1}>
+                                    <InlineStack gap={100}>
                                         <span className="api-text">
                                             Vulnerable endpoint:
                                         </span>
@@ -294,7 +294,7 @@ function VulnerableMultiStepTestDetails(props) {
                                         </span>
                                     </InlineStack>
                                     <InlineStack>
-                                        <Box paddingInlineEnd={4}>
+                                        <Box paddingInlineEnd={400}>
                                             <span className="api-text">
                                                 Collection name: {" "}
                                             </span>
@@ -373,7 +373,7 @@ function VulnerableEndpointDetails(props) {
     return (
         <div className="attempts-div" key={props.index}>
             <div className="row-div-1" key={props.index}>
-                <InlineStack gap={1}>
+                <InlineStack gap={100}>
                     <span className="api-text">
                         Vulnerable endpoint:
                     </span>
@@ -382,7 +382,7 @@ function VulnerableEndpointDetails(props) {
                     </span>
                 </InlineStack>
                 <InlineStack>
-                    <Box paddingInlineEnd={4}>
+                    <Box paddingInlineEnd={400}>
                         <span className="api-text">
                             Collection name: {" "}
                         </span>
@@ -436,15 +436,15 @@ function VulnerableEndpointDetails(props) {
 function MoreInformationComponent(props) {
 
     return (
-        <BlockStack gap={"4"}>
+        <BlockStack gap={"400"}>
             <LegacyCard>
                 <LegacyCard.Section>
                     {
                         props.sections?.map((section, index) => {
                             return (
                                 <LegacyCard.Subsection key={index}>
-                                    <BlockStack gap="3">
-                                        <InlineStack gap="2" align="start" blockAlign='start'>
+                                    <BlockStack gap="300">
+                                        <InlineStack gap="200" align="start" blockAlign='start'>
                                             <div style={{ maxWidth: "0.875rem", maxHeight: "0.875rem" }}>
                                                 {section?.icon && <Icon source={section.icon}></Icon>}
                                             </div>

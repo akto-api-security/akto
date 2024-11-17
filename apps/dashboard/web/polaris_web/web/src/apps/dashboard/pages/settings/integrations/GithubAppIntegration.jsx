@@ -87,7 +87,7 @@ function GithubAppIntegration() {
         <LegacyCard.Section
             title={`Github App Settings`}
         >
-            <BlockStack gap={2}>
+            <BlockStack gap={200}>
                 <TextField
                     label="Github App Id"
                     value={githubAppId}

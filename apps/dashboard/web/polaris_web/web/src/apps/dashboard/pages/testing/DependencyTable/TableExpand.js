@@ -38,8 +38,8 @@ function TableExpand({ data, childApiCollectionId, childUrl, childMethod, showEd
         <tr style={{ background: "#EDEEEF" }}>
             <td></td>
             <td colSpan={4}>
-                <Box paddingInlineStart={4} paddingBlockEnd={2} paddingBlockStart={2}>
-                    <BlockStack gap={2}>
+                <Box paddingInlineStart={400} paddingBlockEnd={200} paddingBlockStart={200}>
+                    <BlockStack gap={200}>
                         {data && data.map((ele, index) => {
                             return (
                                 <Text key={convertToText(ele)}>

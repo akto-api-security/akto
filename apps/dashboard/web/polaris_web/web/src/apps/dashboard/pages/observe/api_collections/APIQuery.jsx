@@ -177,7 +177,7 @@ function APIQuery() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     const collapsibleComponent =
         <BlockStack gap={"0"} key="conditions-filters">
-            <Box background={"bg-subdued"} width="100%" padding={"2"} onClick={handleToggle} key="collapsible-component-header">
+            <Box background={"bg-subdued"} width="100%" padding={"200"} onClick={handleToggle} key="collapsible-component-header">
                 <InlineStack align="space-between">
                     <Text variant="headingSm">
                         {endpointListFromConditions.data ? apiCount > 200 ? `Listing 200 sample endpoints out of total ` + apiCount + ` endpoints` : `Listing total ` + apiCount + ` endpoints` : "Select filters to see endpoints"}
@@ -195,7 +195,7 @@ function APIQuery() {
             >
                 <BlockStack gap={"0"} key="conditions-component">
                     <Card>
-                        <BlockStack gap="4">
+                        <BlockStack gap="400">
                             {
                                 conditions.length > 0 && conditions.map((condition, index) => (
                                     <CollectionComponent
@@ -219,13 +219,13 @@ function APIQuery() {
                                     />
                                 ))
                             }
-                            <InlineStack gap={4} align="start">
+                            <InlineStack gap={400} align="start">
                                 <Button onClick={handleAddField}>Add condition</Button>
                                 {
                                     conditions.length > 0 ? <Button   onClick={handleClearFunction} variant="plain" tone="critical">Clear all</Button> : null
                                 }
                             </InlineStack>
-                            <InlineStack gap={4} align="end">
+                            <InlineStack gap={400} align="end">
                                 <Button onClick={exploreEndpoints}>Explore endpoints</Button>
                             </InlineStack>
                         </BlockStack>

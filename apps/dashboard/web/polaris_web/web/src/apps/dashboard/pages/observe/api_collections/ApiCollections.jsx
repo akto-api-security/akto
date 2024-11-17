@@ -551,7 +551,7 @@ function ApiCollections() {
     ]
 
     const secondaryActionsComp = (
-        <InlineStack gap={2}>
+        <InlineStack gap={200}>
             <Popover
                 active={moreActions}
                 activator={(
@@ -566,7 +566,7 @@ function ApiCollections() {
                 <Popover.Pane fixed>
                     <Popover.Section>
                         <Button   onClick={() =>exportCsv()} removeUnderline variant="monochromePlain">
-                            <InlineStack gap={"2"}>
+                            <InlineStack gap={"200"}>
                                 <Box><Icon source={FileIcon} /></Box>
                                 <Text>Export as CSV</Text>
                             </InlineStack>
@@ -579,7 +579,7 @@ function ApiCollections() {
                             onClick={() => setTreeView(!treeView)}
                             removeUnderline
                             variant="monochromePlain">
-                            <InlineStack gap={"2"}>
+                            <InlineStack gap={"200"}>
                                 <Box><Icon source={treeView ? HideIcon : ViewIcon} /></Box>
                                 <Text>{treeView ? "Hide tree view": "Display tree view"}</Text>
                             </InlineStack>

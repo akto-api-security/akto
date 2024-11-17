@@ -173,7 +173,7 @@ function AwsSource() {
       loading ? 
       <SpinnerCentered />
       :
-        <BlockStack gap="2">
+        <BlockStack gap="200">
           <DropdownSearch itemName="load balancer" optionsList={lbList} placeholder="Select LBs to activate mirroring." 
             allowMultiple disabled={availableLBs.length === 0} preSelected={preSelected} value={`${selectedLBs.length} Load balancers selected`}
             setSelected={handleSelectedLBs}

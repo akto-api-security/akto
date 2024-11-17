@@ -127,7 +127,7 @@ const convertDataIntoTableFormat = (endpoint, apiCollectionMap) => {
     temp['keyValueComp'] = (
         <Badge key={id} tone="critical" size="slim">
             <Box maxWidth="270px">
-                <InlineStack gap={"1"} wrap={false}>
+                <InlineStack gap={"100"} wrap={false}>
                     <Box as="span" maxWidth="180px">
                         <TooltipText tooltip={key} text={key} />
                     </Box>
@@ -260,7 +260,7 @@ const handleReset = async () => {
 }
 
 const primaryActions = (
-    <InlineStack gap={"2"}>
+    <InlineStack gap={"200"}>
         <Button id={"reset-data-type"} onClick={handleReset}>Reset</Button>
         <DateRangeFilter initialDispatch = {currDateRange} dispatch={(dateObj) => dispatchCurrDateRange({type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias})}/>
         <Button id={"all-data-types"}  onClick={() => setModal(!modal)} variant="primary">Create API group</Button>

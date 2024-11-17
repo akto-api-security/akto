@@ -16,7 +16,7 @@ function SettingsHeader() {
 
     const buttonComp = (
         <div className="header-css">
-            <InlineStack gap="2">
+            <InlineStack gap="200">
                 <Box>
                     <Icon source={SettingsIcon}/>
                 </Box>
@@ -35,7 +35,7 @@ const Settings = () => {
 
     return (
         <Frame navigation={<SettingsLeftNav />} topBar={<SettingsHeader />}>
-            <Box paddingBlockEnd={"20"}>
+            <Box paddingBlockEnd={"2000"}>
                 <Outlet />
             </Box>
         </Frame>

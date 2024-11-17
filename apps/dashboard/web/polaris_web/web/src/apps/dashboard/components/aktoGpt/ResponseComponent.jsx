@@ -45,7 +45,7 @@ function ResponseComponent({response,chatLogRef,onCompletion}) {
     }
 
     return (
-        <BlockStack gap="2">
+        <BlockStack gap="200">
             {response.responses ?
                 response.responses[0].functionality ?
                     [...pre.current, component(response?.responses, currentItemIndex, currentResponseIndex, chatLogRef, handleResponseComplete,onCompletion)]

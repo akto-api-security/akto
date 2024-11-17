@@ -124,7 +124,7 @@ function CreateNewCollectionModal(props) {
             }] : []}
         >
             <Modal.Section>
-                <BlockStack gap={3}>
+                <BlockStack gap={300}>
                     <TextField
                         id={"new-collection-input"}
                         label="Name"
@@ -147,7 +147,7 @@ function CreateNewCollectionModal(props) {
                     }
                     {
                         showApiSelector ? <Card background="bg-subdued">
-                            <BlockStack gap={2}>
+                            <BlockStack gap={200}>
                                 {
                                     conditions.length > 0 && conditions.map((condition, index) => (
                                         <CollectionComponent
@@ -170,7 +170,7 @@ function CreateNewCollectionModal(props) {
                                         />
                                     ))
                                 }
-                                <InlineStack gap={4} align="start">
+                                <InlineStack gap={400} align="start">
                                     <Button onClick={() => handleAddField()}>Add condition</Button>
                                     <Button
 

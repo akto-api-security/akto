@@ -5,7 +5,7 @@ import TooltipText from './TooltipText'
 function ShowListInBadge({itemsArr, maxWidth, status, maxItems, itemWidth}) {
     return (
         <Box maxWidth={maxWidth}>
-            <InlineStack gap={"1"} wrap={false}>
+            <InlineStack gap={"100"} wrap={false}>
                 {itemsArr.slice(0,maxItems).map((item, index) => {
                     return(
                         <Badge key={index + item} size="medium" tone={status}>

@@ -9,9 +9,9 @@ function NullData({text,url,description,urlText}) {
     return (
         <LegacyCard title={text}>
             <LegacyCard.Section>
-                <BlockStack gap={1}>
+                <BlockStack gap={100}>
                     <Text variant="bodyMd">{description}</Text>
-                    <InlineStack gap={1}>
+                    <InlineStack gap={100}>
                         <Text>Click</Text>
                         <Button  onClick={()=> navigate(url)} variant="plain">here</Button>
                         <Text>{urlText}</Text>

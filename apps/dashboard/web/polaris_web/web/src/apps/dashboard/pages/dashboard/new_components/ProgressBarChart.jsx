@@ -5,7 +5,7 @@ import CustomProgressBar from './CustomProgressBar';
 function ProgressBarChart({ data }) {
     const generateRows = (data) => {
         return data.map((item) => [
-            <InlineStack gap={2} style={{ display: 'flex', alignItems: 'center' }}>
+            <InlineStack gap={200} style={{ display: 'flex', alignItems: 'center' }}>
                 <div style={{ maxWidth: '24px', display: 'flex', alignItems: 'center'}} className='custom-badge-color'>
                     <Badge size="small" tone={item["badgeColor"]} >{item.badgeValue}</Badge>
                 </div>

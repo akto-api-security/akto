@@ -124,7 +124,7 @@ function SourceCodeRepos({type, typeName, orgName}) {
             </LegacyCard>
 
 
-            <BlockStack gap="1">
+            <BlockStack gap="100">
                 {repoList.map((repo, index) => (
                     <LegacyCard 
                         key={index} 

@@ -448,7 +448,7 @@ function GithubServerTable(props) {
         }
 
       </LegacyCard>
-      {(props?.showFooter !== false) && <InlineStack gap="1" align="center">
+      {(props?.showFooter !== false) && <InlineStack gap="100" align="center">
         <Text>Stuck? feel free to</Text>
         <Link onClick={() => {
           window?.Intercom("show")

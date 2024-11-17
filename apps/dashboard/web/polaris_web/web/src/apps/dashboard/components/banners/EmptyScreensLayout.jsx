@@ -7,12 +7,12 @@ import { InfoComponent } from "../../pages/dashboard/components/DashboardBanner"
 function EmptyScreensLayout({iconSrc,headingText,description, buttonText, redirectUrl, docsUrl, infoTitle, infoItems, learnText, bodyComponent}) {
   const navigate = useNavigate();  
   return (
-      <BlockStack gap={5}>
-          <Card padding={5}>
-              <Box paddingBlockStart={5} paddingBlockEnd={16}>
+      <BlockStack gap={500}>
+          <Card padding={500}>
+              <Box paddingBlockStart={500} paddingBlockEnd={1600}>
                   <InlineStack align="center">
                       <Box width='400px'>
-                          <BlockStack gap={8}>
+                          <BlockStack gap={800}>
                               <InlineStack align="center">
                                   <Box width='162px' minHeight='162px' borderRadius="full" background="bg-subdued">
                                       <div className="empty-icon-container">
@@ -20,13 +20,13 @@ function EmptyScreensLayout({iconSrc,headingText,description, buttonText, redire
                                       </div>
                                   </Box>
                               </InlineStack>
-                              <BlockStack gap={4}>
+                              <BlockStack gap={400}>
                                   <InlineStack align='center'>
                                       <Text variant="headingLg" alignment={"center"}>{headingText}</Text>
                                   </InlineStack>
                                   <Text color="subdued" variant="bodyMd" alignment="center">{description}</Text>
                                   <InlineStack align='center'>
-                                      {redirectUrl ? <Box paddingBlockStart={2}>
+                                      {redirectUrl ? <Box paddingBlockStart={200}>
                                           <Button  onClick={() => navigate(redirectUrl)} variant="primary">{buttonText}</Button>
                                       </Box> : null}
                                       {bodyComponent}
@@ -39,7 +39,7 @@ function EmptyScreensLayout({iconSrc,headingText,description, buttonText, redire
           </Card>
           { learnText ? 
           <InlineStack align="center">
-              <InlineStack gap="1">Learn more about<Link url={docsUrl} target="_blank">{learnText}</Link>
+              <InlineStack gap="100">Learn more about<Link url={docsUrl} target="_blank">{learnText}</Link>
               </InlineStack>
           </InlineStack>
           : <></>}

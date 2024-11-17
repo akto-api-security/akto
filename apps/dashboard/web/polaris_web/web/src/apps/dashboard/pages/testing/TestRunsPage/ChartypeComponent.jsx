@@ -19,7 +19,7 @@ function ChartypeComponent({data, title,charTitle, chartSubtitle, reverse, isNor
                         </div>
                     </Box>
                 ),
-                <InlineStack gap={1} wrap={false}>
+                <InlineStack gap={100} wrap={false}>
                     <Box width='30px'>
                         <Text>{observeFunc.formatNumberWithCommas(data[key]?.text)}</Text>
                     </Box>
@@ -41,10 +41,10 @@ function ChartypeComponent({data, title,charTitle, chartSubtitle, reverse, isNor
     )
 
     return (
-        <Box padding={boxPadding != undefined ? boxPadding : 4}>
-            <InlineStack gap={8}>
+        <Box padding={boxPadding != undefined ? boxPadding : 400}>
+            <InlineStack gap={800}>
                 {chartOnLeft ? chartComponent: null}
-                <BlockStack gap="2">
+                <BlockStack gap="200">
                     <Text fontWeight="semibold" variant="bodySm">{title}</Text>
                     <Scrollable style={{maxHeight: boxHeight}} focusable shadow>
                         <Box width={dataTableWidth ? dataTableWidth : '260px'}>

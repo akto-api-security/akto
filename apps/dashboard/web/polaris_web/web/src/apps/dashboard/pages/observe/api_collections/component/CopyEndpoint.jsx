@@ -5,7 +5,7 @@ import { useRef } from "react";
 const CopyEndpoint = (apiDetail) => {
     const ref = useRef(null)
     return (
-        <Box paddingBlockStart={"05"}>
+        <Box paddingBlockStart={"050"}>
             <Button
 
                 onClick={() => func.copyToClipboard(apiDetail, ref, "URL copied")}

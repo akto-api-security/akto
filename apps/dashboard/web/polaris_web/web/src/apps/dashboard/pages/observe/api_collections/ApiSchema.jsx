@@ -19,7 +19,7 @@ function prepareTableData (data, handleBadgeClick) {
         let paramText = element.param.replaceAll("#", ".").replaceAll(".$", "")
         let isSensitive = func.isSubTypeSensitive(element)
         let nonSensitiveDataType = element?.nonSensitiveDataType
-        let comp = [(<InlineStack gap={"2"} key={index}>
+        let comp = [(<InlineStack gap={"200"} key={index}>
             <Text fontWeight="regular" variant="bodyMd">
                 {paramText}
             </Text>
@@ -98,8 +98,8 @@ function ApiSingleSchema(props) {
     const activeTab = badgeActive ? (dataObj.tabSensitive === "Header") : isHeader
 
     return (
-        <BlockStack gap={"2"}>
-            <Box background={"bg-subdued"} width="100%" padding={"2"} onClick={handleToggle}>
+        <BlockStack gap={"200"}>
+            <Box background={"bg-subdued"} width="100%" padding={"200"} onClick={handleToggle}>
                 <InlineStack align="space-between">
                     <Text variant="headingSm">
                         {title}
@@ -115,11 +115,11 @@ function ApiSingleSchema(props) {
                 transition={{ duration: '200ms', timingFunction: 'ease-in-out' }}
                 expandOnPrint
             >
-                <BlockStack gap={"2"}>
+                <BlockStack gap={"200"}>
                     <ButtonGroup variant="segmented">
                         <Button {...(activeTab? {variant:"primary", tone:"success" } : {})} onClick={() => {setBadgeActive(false); setIsHeader(true)}} size="slim">
-                            <Box paddingBlockStart="05" paddingBlockEnd="05"> 
-                                <InlineStack gap="2">
+                            <Box paddingBlockStart="050" paddingBlockEnd="050"> 
+                                <InlineStack gap="200">
                                     <Text variant="bodyMd">Header</Text>
                                     <span style={{padding: '4px 8px', width: 'fit-content', color: '#202223', background:(isHeader ? "#ECEBFF" : "#E4E5E7"), borderRadius: '4px'}}>
                                         {headerCount}
@@ -128,8 +128,8 @@ function ApiSingleSchema(props) {
                             </Box>
                         </Button>
                         <Button {...(!activeTab? {variant:"primary", tone:"success" } : {})} onClick={() => {setBadgeActive(false); setIsHeader(false)}} size="slim">
-                            <Box paddingBlockStart="05" paddingBlockEnd="05"> 
-                                <InlineStack gap="2">
+                            <Box paddingBlockStart="050" paddingBlockEnd="050"> 
+                                <InlineStack gap="200">
                                     <Text variant="bodyMd">Payload</Text>
                                     <span style={{padding: '4px 8px', width: 'fit-content', color: '#202223', background:(!isHeader ? "#ECEBFF" : "#E4E5E7"), borderRadius: '4px'}}>
                                         {payloadCount}
@@ -171,7 +171,7 @@ function ApiSchema(props) {
     }
 
     return (
-        <BlockStack gap="2">
+        <BlockStack gap="200">
             {
                 ['Request', 'Response'].map((type, index) => {
                     return <ApiSingleSchema handleBadgeClick={handleBadgeClick} title={type} key={type} data={index == 0 ? reqData : resData} badgeActive={badgeActive} setBadgeActive={setBadgeActive}/>

@@ -34,7 +34,7 @@ const LogsContainer = ({ logs }) => {
 
             <Scrollable style={{maxHeight: '40vh'}}>
                {logContent.map((logText, idx) => (
-                <BlockStack gap={1} key={idx}>
+                <BlockStack gap={100} key={idx}>
                     <div style={{fontFamily:theme.font["font-family-mono"], fontWeight: theme.font["font-weight-medium"],fontSize: '12px', letterSpacing: "0px", textAlign: "left"}}>
                         {logText}
                     </div>

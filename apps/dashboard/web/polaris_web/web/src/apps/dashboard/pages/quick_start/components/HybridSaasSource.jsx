@@ -66,14 +66,14 @@ function HybridSaasSource() {
     }
 
     const hybridSaasComponent = (
-        <BlockStack gap="2">
+        <BlockStack gap="200">
             <div ref = {ref}/>
             <span>1. Run the below command to add akto helm repo. </span>
-            <BlockStack gap="1">
+            <BlockStack gap="100">
                 <JsonComponent title="Add akto helm repo" toolTipContent="Copy command" onClickFunc={()=> copyCommandUtil(helmAddCommand)} dataString={helmAddCommand} language="text" minHeight="60px" />
             </BlockStack>
             <span>2. Run the below command to setup Akto Runtime service. Change the namespace according to your requirements. </span>
-            <BlockStack gap="1">
+            <BlockStack gap="100">
                 <JsonComponent title="Runtime Service Command" toolTipContent="Copy command" onClickFunc={()=> rcopyCommand()} dataString={runtimeSvcCommand} language="text" minHeight="450px" />
             </BlockStack>
             {/* <VerticalStack gap="1">

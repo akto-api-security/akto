@@ -224,7 +224,7 @@ const transform = {
     },
     prettifyTestName: (testName, icon, iconColor, iconToolTipContent)=>{
       return (
-        <InlineStack gap={4}>
+        <InlineStack gap={400}>
           <Tooltip content={iconToolTipContent} hoverDelay={"300"} dismissOnMouseOut>
             <Box>
               <Icon source={icon} tone={iconColor}/></Box>
@@ -405,7 +405,7 @@ const transform = {
     const jiraComponent = jiraIssueUrl?.length > 0 ? (
       <Box>
               <Tag>
-                  <InlineStack gap={1}>
+                  <InlineStack gap={100}>
                     <Avatar size="xs" shape='round' source="/public/logo_jira.svg" />
                     <Link url={jiraIssueUrl}>
                       <Text>
@@ -447,7 +447,7 @@ const transform = {
             return;
           }
           sectionLocal.content = (
-            <InlineStack gap="2">
+            <InlineStack gap="200">
               {
                 transform.tagList(category?.issueTags)
               }
@@ -459,7 +459,7 @@ const transform = {
             return;
           }
           sectionLocal.content = (
-            <InlineStack gap="2">
+            <InlineStack gap="200">
               {
                 transform.tagList(category?.cwe, "CWE")
               }
@@ -471,7 +471,7 @@ const transform = {
             return;
           }
           sectionLocal.content = (
-            <InlineStack gap="2">
+            <InlineStack gap="200">
               {
                 transform.tagList(category?.cve, "CVE")
               }
@@ -766,7 +766,7 @@ getUrlComp(url){
   const endpoint = arr[1]
 
   return (
-    <InlineStack gap={1}>
+    <InlineStack gap={100}>
       <Box width="54px">
         <InlineStack align="end">
           <Text variant="bodyMd" fontWeight="medium" color="subdued">{method}</Text>
@@ -785,7 +785,7 @@ getCollapsibleRow(urls, severity){
           {urls.map((ele,index)=>{
             const borderStyle = index < (urls.length - 1) ? {borderBlockEndWidth : 1} : {}
             return( 
-              <Box padding={"2"} paddingInlineEnd={"4"} paddingInlineStart={"4"} key={index}
+              <Box padding={"200"} paddingInlineEnd={"400"} paddingInlineStart={"400"} key={index}
                   borderColor="border-subdued" {...borderStyle}
               >
                 <Link monochrome onClick={() => history.navigate(ele.nextUrl)} removeUnderline >
@@ -822,7 +822,7 @@ getPrettifiedTestRunResults(testRunResults){
         const baseUrl = window.location.origin+"/dashboard/testing/roles/details?system="
         const missingConfigs = func.toSentenceCase(test.errorsList[0].split(errorsObject["ROLE_NOT_FOUND"])[0]).split(" ");
         error_message = (
-          <InlineStack gap={"1"}>
+          <InlineStack gap={"100"}>
             {missingConfigs.map((config, index) => {
               return(
                 config.length > 0 ?
@@ -873,7 +873,7 @@ getPrettifiedTestRunResults(testRunResults){
       ...obj,
       nameComp: <div data-testid={obj.name}><Box maxWidth="250px"><TooltipText tooltip={obj.name} text={obj.name} textProps={{fontWeight: 'medium'}}/></Box></div>,
       severityComp: obj?.vulnerable === true ? <Badge size="small" tone={func.getTestResultStatus(obj?.severity[0])}>{obj?.severity[0]}</Badge> : <Text>-</Text>,
-      cweDisplayComp: obj?.cweDisplay?.length > 0 ? <InlineStack gap={1} wrap={false}>
+      cweDisplayComp: obj?.cweDisplay?.length > 0 ? <InlineStack gap={100} wrap={false}>
         {obj.cweDisplay.map((ele,index)=>{
           return(
             <Badge size="small" tone={func.getTestResultStatus(ele)} key={index}>{ele}</Badge>
@@ -920,7 +920,7 @@ getRowInfo(severity, apiInfo,jiraIssueUrl, sensitiveData, isIgnored){
   const jiraComponent = jiraIssueUrl?.length > 0 ? (
     <Box>
       <Tag>
-          <InlineStack gap={1}>
+          <InlineStack gap={100}>
             <Avatar size="xs" shape='round' source="/public/logo_jira.svg" />
             <Link url={jiraIssueUrl}>
               <Text>
@@ -941,7 +941,7 @@ getRowInfo(severity, apiInfo,jiraIssueUrl, sensitiveData, isIgnored){
     {
       title: "API",
       value: (
-        <InlineStack gap={"1"}>
+        <InlineStack gap={"100"}>
           <Text color="subdued" fontWeight="semibold">{apiInfo.id.method}</Text>
           <TextComp value={observeFunc.getTruncatedUrl(apiInfo.id.url)} />
         </InlineStack>

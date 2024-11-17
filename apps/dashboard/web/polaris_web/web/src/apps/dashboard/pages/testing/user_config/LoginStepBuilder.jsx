@@ -176,7 +176,7 @@ function LoginStepBuilder({extractInformation, showOnlyApi, setStoreData}) {
                     <LegacyCard>
                         <div style={{ display: "grid", gridTemplateColumns: "auto max-content", alignItems: "center", padding: "10px" }}>
                             <Tabs tabs={stepsTabs} selected={selectedStep} onSelect={handleStepChange}></Tabs>
-                            <InlineStack gap={"2"}>
+                            <InlineStack gap={"200"}>
                                 <Checkbox
                                     label='Allow All Status codes'
                                     checked={steps[selectedStep].allowAllStatusCodes}

@@ -312,7 +312,7 @@ function TrendChart(props) {
                         variant="monochromePlain" />
                 </InlineStack>
                 <Collapsible open={collapsible} transition={{duration: '500ms', timingFunction: 'ease-in-out'}}>
-                    <Box paddingBlockStart={3}><Divider/></Box>
+                    <Box paddingBlockStart={300}><Divider/></Box>
                     <LegacyCard.Section flush>
                         <div className="filterClass">
                             <Filters

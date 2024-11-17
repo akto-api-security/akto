@@ -6,8 +6,8 @@ import PageWithMultipleCards from '../../../components/layouts/PageWithMultipleC
 function Help() {
     const titleComp = (
         <LegacyCard key={"titleComp"} sectioned={true}>
-            <InlineStack align="space-between" gap="2" blockAlign="center">
-                <BlockStack align="space-between" gap="4">
+            <InlineStack align="space-between" gap="200" blockAlign="center">
+                <BlockStack align="space-between" gap="400">
                     <Text variant="headingMd">Need Assistance?</Text>
                     <Box width="450px">
                         <Text variant="bodyMd">Our team is here to help you. Book a call with our support experts or contact us directly for prompt assistance.</Text>
@@ -20,7 +20,7 @@ function Help() {
                             variant="plain">Contact us</Button>
                     </ButtonGroup>
                 </BlockStack>
-                <BlockStack gap="4">
+                <BlockStack gap="400">
                     <img src="/public/chat_major_help.svg" alt="Help" width="100" height="100" />
                 </BlockStack>
             </InlineStack>

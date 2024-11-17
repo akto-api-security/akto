@@ -30,7 +30,7 @@ function ConditionsPicker(props) {
     }
 
     const fieldsComponent = (
-        <BlockStack gap="4">
+        <BlockStack gap="400">
             {conditions.length > 0 && conditions.map((condition, index) => (
                 <div style={{ display: "flex", gap: "4px" }} key={index}>
                     {index > 0 ? (

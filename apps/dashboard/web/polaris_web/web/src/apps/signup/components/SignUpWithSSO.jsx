@@ -12,11 +12,11 @@ function SignUpWithSSO() {
     }
 
     const customComponent = (
-        <BlockStack gap={8}>
+        <BlockStack gap={800}>
             <Text alignment="center" variant="heading2xl">{"Sign in with SSO"}</Text>
-            <BlockStack gap={5}>
+            <BlockStack gap={500}>
                 <Form onSubmit={() => handleSubmit()}>
-                    <BlockStack gap={3}>
+                    <BlockStack gap={300}>
                         <div className='form-class'>
                             <TextField onChange={setEmail} value={email} label="Email" placeholder="name@workemail.com" monospaced={true}/>
                         </div>

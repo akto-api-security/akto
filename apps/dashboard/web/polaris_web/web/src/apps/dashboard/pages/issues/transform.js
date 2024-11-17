@@ -32,10 +32,10 @@ const transform = {
                     {urls.map((ele,index)=>{
                     const borderStyle = index < (urls.length - 1) ? {borderBlockEndWidth : 1} : {}
                     return (
-                        <Box padding={"2"} paddingInlineEnd={"4"} paddingInlineStart={"3"} key={index}
+                        <Box padding={"200"} paddingInlineEnd={"400"} paddingInlineStart={"300"} key={index}
                         borderColor="border-subdued" {...borderStyle}>
                         <InlineStack gap={24} wrap={false}>
-                            <Box paddingInlineStart={10}>
+                            <Box paddingInlineStart={1000}>
                             <IssuesCheckbox id={ele.id}/>
                             </Box>
                             <Link monochrome onClick={() => this.getNextUrl(JSON.parse(ele.id))} removeUnderline >

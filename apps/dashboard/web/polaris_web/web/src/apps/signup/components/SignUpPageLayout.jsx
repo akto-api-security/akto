@@ -7,11 +7,11 @@ function SignUpPageLayout({customComponent}) {
       <div className='login-page'>
       <Frame >
         <Page fullWidth >
-          <Box padding="10" paddingBlockStart={"24"}>
+          <Box padding="1000" paddingBlockStart={"2400"}>
             <div style={{display: "flex", justifyContent: 'space-between', flexDirection: "column"}}>
               <InlineStack align="center">
                 <Box width='400px'>
-                  <BlockStack gap={8}>
+                  <BlockStack gap={800}>
                     <InlineStack align='center'>
                       <div className="akto-logo">
                         <Avatar source="/public/akto_name_with_logo.svg" size="xl" />
@@ -20,7 +20,7 @@ function SignUpPageLayout({customComponent}) {
                     {customComponent}
                   </BlockStack>
                   <div style={{bottom: "40px", position: "absolute", width: '400px'}}>
-                    <InlineStack gap={3} align="center">
+                    <InlineStack gap={300} align="center">
                       <Button
 
                         onClick={() => window.open("https://www.akto.io/terms-and-policies","_blank")}

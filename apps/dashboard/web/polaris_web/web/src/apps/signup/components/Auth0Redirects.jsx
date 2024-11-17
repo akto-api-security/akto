@@ -31,16 +31,16 @@ function Auth0Redirects({bodyText, errorText}) {
 
     return (
         <Page fullWidth>
-            <Box padding={"20"} paddingBlockEnd={"0"}>
+            <Box padding={"2000"} paddingBlockEnd={"0"}>
                 <InlineStack align='center'>
                     <Box width='400px'>
-                        <BlockStack gap={"8"}>
+                        <BlockStack gap={"800"}>
                             <InlineStack align="center">
                                 <div className="akto-logo">
                                     <Avatar source="/public/akto_name_with_logo.svg" shape="round" size="xl" />
                                 </div>
                             </InlineStack>
-                            <BlockStack gap={"6"}>
+                            <BlockStack gap={"600"}>
                                 <InlineStack align='center'>
                                     <svg xmlns="http://www.w3.org/2000/svg" width="64" height="65" viewBox="0 0 64 65" fill="none">
                                         <g clipPath="url(#clip0_7639_55607)">
@@ -54,7 +54,7 @@ function Auth0Redirects({bodyText, errorText}) {
                                         </defs>
                                     </svg>
                                 </InlineStack>
-                                <BlockStack gap={"2"}>
+                                <BlockStack gap={"200"}>
                                     <Text alignment="center" variant="headingLg">{errorText}</Text>
                                     <Text alignment="center" variant="bodyMd" color="subdued">{bodyText}</Text>
                                 </BlockStack>
@@ -66,7 +66,7 @@ function Auth0Redirects({bodyText, errorText}) {
                     </Box>
                 </InlineStack>
                 <div style={{position: 'absolute' , bottom: '3vh', width: '84%'}}>
-                    <InlineStack gap={3} align="center">
+                    <InlineStack gap={300} align="center">
                         <Button
 
                             onClick={() => window.open("https://www.akto.io/terms-and-policies","_blank")}

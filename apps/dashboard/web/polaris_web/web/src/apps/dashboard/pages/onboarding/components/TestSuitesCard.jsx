@@ -9,9 +9,9 @@ function TestSuitesCard({cardObj}) {
     const color = onFunc.getTextColor(cardObj?.method)
     return (
         <Card>
-            <BlockStack gap="2">
+            <BlockStack gap="200">
                 <InlineStack align="space-between">
-                    <InlineStack gap="1">
+                    <InlineStack gap="100">
                         <div style={{color: color, fontSize: '16px', fontWeight: 600}}>
                             {cardObj?.method}
                         </div>
@@ -19,7 +19,7 @@ function TestSuitesCard({cardObj}) {
                     </InlineStack>
                     <Badge tone={status} size="large-experimental">{cardObj.severity}</Badge>
                 </InlineStack>
-                <InlineStack gap="2">
+                <InlineStack gap="200">
                     <Text variant='bodyLg' fontWeight="medium">{cardObj.vulnerability}</Text>
                     <Tooltip content={cardObj.testName}>
                         <Box>

@@ -6,8 +6,8 @@ function Details({onClickFunc, values}) {
     return (
         <LegacyCard.Section title="Integration details">
             <br/>
-            <BlockStack gap={3}>
-                <BlockStack gap={2}>
+            <BlockStack gap={300}>
+                <BlockStack gap={200}>
                     {values.map((x,index)=> {
                         return (
                             <LineComponent title={x.title} value={x.value} key={index}/>

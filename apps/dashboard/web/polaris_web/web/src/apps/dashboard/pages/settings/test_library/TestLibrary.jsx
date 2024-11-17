@@ -159,7 +159,7 @@ function TestLibrary() {
             >
                 <Modal.Section>
                     <div onKeyDown={(e) => func.handleKeyPress(e, addTestLibrary)}>
-                        <InlineStack gap={2}>
+                        <InlineStack gap={200}>
                             <div style={{ flexGrow: 1 }}>
                                 <TextField
                                     id={"repo-url"}

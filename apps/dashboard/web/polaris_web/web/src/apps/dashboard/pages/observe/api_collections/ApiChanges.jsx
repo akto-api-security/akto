@@ -180,12 +180,12 @@ function ApiChanges() {
 
     const graphComponent = (
         <Card key={"graphComponent"}>
-            <BlockStack gap={4}>
-                <BlockStack gap={3}>
+            <BlockStack gap={400}>
+                <BlockStack gap={300}>
                     <Text variant="bodyMd" fontWeight="medium">Changes</Text>
                     <Divider />
                 </BlockStack>
-                <BlockStack gap={2}>
+                <BlockStack gap={200}>
                     <LineChart
                         key={`trend-chart`}
                         type='line'

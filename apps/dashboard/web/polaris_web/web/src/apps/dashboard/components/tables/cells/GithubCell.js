@@ -16,7 +16,7 @@ function GithubCell(props){
 
     const {data, headers, getStatus, width, nameWidth, isBadgeClickable, badgeClicked, divWrap} = props
     return (
-        <InlineStack gap="1" wrap={false}>
+        <InlineStack gap="100" wrap={false}>
             {
                 headers?.filter((header) => {
                     return header.itemOrder==0
@@ -25,7 +25,7 @@ function GithubCell(props){
                 }).map((header) => {
                     return (
                         <div style={{ marginBottom: "auto" }} key={header.value}>
-                            <Box padding="05">
+                            <Box padding="050">
                                 {data.iconTooltip ? 
                                     <Tooltip content={data?.iconTooltip} dismissOnMouseOut>
                                         <div className='big-icon'>
@@ -39,7 +39,7 @@ function GithubCell(props){
                     )
                 })
             }
-            <BlockStack gap="2" inlineAlign='baseline'>
+            <BlockStack gap="200" inlineAlign='baseline'>
                 <InlineStack wrap={divWrap || false} gap="2" align='start'>
                     {
                         headers?.filter((header) => {
@@ -94,7 +94,7 @@ function GithubCell(props){
                     }
                 </InlineStack>
                 <Box maxWidth={width}>
-                <InlineStack gap='2' align="start">
+                <InlineStack gap='200' align="start">
                     {
                         headers?.filter((header) => {
                             return header.itemOrder==3
@@ -102,7 +102,7 @@ function GithubCell(props){
                             return data[header.value]!=undefined && data[header.value]!="";
                         }).map((header) => {
                             return (
-                                <InlineStack wrap={false} key={header.value} gap="1">
+                                <InlineStack wrap={false} key={header.value} gap="100">
                                     <div style={{ maxWidth: "1rem", maxHeight: "1rem" }}>
                                         <Tooltip content={header.iconTooltip} dismissOnMouseOut>
                                             <Icon source={header.icon} tone="subdued" />
@@ -119,7 +119,7 @@ function GithubCell(props){
                     }
                 </InlineStack>
                 </Box>
-                <InlineStack gap={"2"}>
+                <InlineStack gap={"200"}>
                     {
                         headers?.filter((header) => {
                             return header.itemOrder==4

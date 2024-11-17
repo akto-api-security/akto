@@ -64,7 +64,7 @@ const convertFunc = {
                     let item = {
                         label: (
                             <Tooltip content={testObj?.customTests[key][0]?.category} dismissOnMouseOut width="wide">
-                                <InlineStack gap="2">
+                                <InlineStack gap="200">
                                     <Box>
                                         <Icon source={FolderIcon} tone="base"/>
                                     </Box>
@@ -94,7 +94,7 @@ const convertFunc = {
                     let item = {
                         label: (
                             <Tooltip content={testObj?.aktoTests[key][0]?.category} dismissOnMouseOut width="wide">
-                                <InlineStack gap="2">
+                                <InlineStack gap="200">
                                     <Box>
                                         <Icon source={FolderIcon} tone="base"/>
                                     </Box>

@@ -77,16 +77,16 @@ function BurpSource() {
         {
             text: "Copy the AKTO_IP and AKTO_TOKEN and paste in the options tab.",
             component: (
-                <Box paddingInlineStart={2}>
-                    <BlockStack gap={1}>
+                <Box paddingInlineStart={200}>
+                    <BlockStack gap={100}>
                         <div ref={ref}/>
-                        <InlineStack gap={1}>
+                        <InlineStack gap={100}>
                             <Text variant="bodyMd" fontWeight="medium" color="subdued">AKTO_IP:</Text>
                             <Button onClick={() => copyText(aktoIp, "AKTO_IP")}  variant="plain">
                                 <div style={{maxWidth: "260px"}} className='overflow-text'>{aktoIp}</div>
                             </Button>
                         </InlineStack>
-                        <InlineStack gap={1}>
+                        <InlineStack gap={100}>
                             <Text variant="bodyMd" fontWeight="medium" color="subdued">AKTO_TOKEN:</Text>
                             <Button onClick={() => copyText(aktoToken, "AKTO_TOKEN")}  variant="plain">
                                 <div style={{maxWidth: "210px"}} className='overflow-text'>{aktoToken}</div>
@@ -99,7 +99,7 @@ function BurpSource() {
         {
             text: "Start Burp proxy and browse any website.",
             component: (
-                <InlineStack gap={1}>
+                <InlineStack gap={100}>
                     <Text variant="bodyMd">You will see traffic in</Text>
                     {burpCollectionURL.length > 0 ? <Button  onClick={()=> navigate(burpCollectionURL)} variant="plain">Burp</Button> : <Text>Burp</Text>}
                     <Text>collection.</Text>
@@ -122,7 +122,7 @@ function BurpSource() {
     },[])
 
     const content = (
-        <InlineStack gap={1}>
+        <InlineStack gap={100}>
             <Text variant="bodyMd">Akto Burp plugin will work post</Text>
             <Link target="_blank" url='https://portswigger.net/burp/releases/professional-community-2024-1-1-1'>v2024.1.1.1</Link>
         </InlineStack>
@@ -136,7 +136,7 @@ function BurpSource() {
 
             <InformationBannerComponent content={content} docsUrl={""}/>
 
-            <BlockStack gap="1">
+            <BlockStack gap="100">
                 {steps.map((element,index) => (
                     <BlockStack gap="1" key={index}>
                         <InlineStack gap="1" wrap={false} key={element.text}>
@@ -144,14 +144,14 @@ function BurpSource() {
                             {element?.text ?<Text variant="bodyMd">{element?.text}</Text> : null}
                             {element?.textComponent}
                         </InlineStack>
-                        <Box paddingInlineStart={2}>
+                        <Box paddingInlineStart={200}>
                             {element?.component}
                         </Box>
                     </BlockStack>
                 ))}
             </BlockStack>
 
-            <BlockStack gap="2">
+            <BlockStack gap="200">
                 <ButtonGroup>
                     <Button onClick={primaryAction}  variant="primary">Check Connection</Button>
                     <Button onClick={goToDocs}>Go to docs</Button>

@@ -77,8 +77,8 @@ function InitialSteps({initialSteps}) {
 
     function StepConnection({step,index}) {
         return (
-            <BlockStack gap={4}>
-                <InlineStack gap={2}>
+            <BlockStack gap={400}>
+                <InlineStack gap={200}>
                     <Avatar customer name='circle' size="xs"
                         source={isCompleted(step.id) ? "/public/circle_check.svg" : "/public/circle_icon.svg"}
                     />
@@ -96,11 +96,11 @@ function InitialSteps({initialSteps}) {
                         </InlineStack>
                     </Box>
                 </InlineStack>
-                <Box paddingInlineStart={6}>
+                <Box paddingInlineStart={600}>
                 {index === dropdownActive ?
-                    <BlockStack gap={2}>
+                    <BlockStack gap={200}>
                         <Text variant="bodyMd">{step.text}</Text>
-                        <InlineStack gap={2}>
+                        <InlineStack gap={200}>
                             <Button onClick={()=> navigate(step.url)} size="slim">Configure now</Button>
                             <Button  onClick={()=> markAsComplete(step.id)} size="slim" variant="plain">Skip step</Button>
                         </InlineStack>
@@ -114,11 +114,11 @@ function InitialSteps({initialSteps}) {
 
     return (
         <Card padding={0}>
-            <BlockStack gap={3}>
-                <Box padding={5} background="bg-info-subdued-hover">
-                    <BlockStack gap={3}>
+            <BlockStack gap={300}>
+                <Box padding={500} background="bg-info-subdued-hover">
+                    <BlockStack gap={300}>
                         <Text variant="bodyLg" fontWeight="semibold">Get started checklist</Text>
-                        <InlineStack gap={1}>
+                        <InlineStack gap={100}>
                             <Box width='85%'>
                                 <ProgressBar size="small" progress={((stepsCompleted * 100) / 5)} tone="primary" />
                             </Box>
@@ -126,7 +126,7 @@ function InitialSteps({initialSteps}) {
                         </InlineStack>
                     </BlockStack>
                 </Box>
-                <Box padding={3} paddingInlineEnd={5} paddingInlineStart={5}>
+                <Box padding={300} paddingInlineEnd={500} paddingInlineStart={500}>
                     {steps.map((step, index)=>(
                         <StepConnection step={step} index={index} key={step.title}/>
                     ))}
