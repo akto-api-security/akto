@@ -420,11 +420,7 @@ public class InventoryAction extends UserAction {
 
     public String getSummaryInfoForChanges(){
         long countEndpoints = SingleTypeInfoDao.instance.fetchEndpointsCount(startTimestamp, endTimestamp, deactivatedCollections);
-
-        List<String> sensitiveSubtypes = new ArrayList<>();
-        sensitiveSubtypes.addAll(SingleTypeInfoDao.instance.sensitiveSubTypeInResponseNames());
-        sensitiveSubtypes.addAll(SingleTypeInfoDao.instance.sensitiveSubTypeInRequestNames());
-        int countSensitiveApis = SingleTypeInfoDao.instance.getSensitiveApisCount(sensitiveSubtypes, false, (
+        int countSensitiveApis = SingleTypeInfoDao.instance.getSensitiveApisCount(new ArrayList<>(), false, (
             Filters.and(
                     Filters.and(
                         Filters.gte(SingleTypeInfo._TIMESTAMP, startTimestamp),
@@ -446,8 +442,8 @@ public class InventoryAction extends UserAction {
         Bson searchFilter = Filters.empty();
         if(!regexPattern.isEmpty() && regexPattern.length() > 0){
             searchFilter = Filters.or(
-                Filters.regex(ApiInfo.ID_METHOD, regexPattern, "i"),
-                Filters.regex(ApiInfo.ID_URL, regexPattern, "i")
+                Filters.regex(ApiInfo.ID_URL, regexPattern, "i"),
+                Filters.regex(ApiInfo.ID_METHOD, regexPattern, "i")
             );
         }
         if(skip < 0){
@@ -538,6 +534,7 @@ public class InventoryAction extends UserAction {
         List <Integer> nonHostApiCollectionIds = ApiCollectionsDao.instance.fetchNonTrafficApiCollectionsIds();
         Bson nonHostFilterWithTs = Filters.and(
             Filters.in(SingleTypeInfo._API_COLLECTION_ID, nonHostApiCollectionIds),
+            Filters.nin(SingleTypeInfo._API_COLLECTION_ID, deactivatedCollections),
             Filters.gte(SingleTypeInfo._TIMESTAMP, startTimestamp),
             Filters.lte(SingleTypeInfo._TIMESTAMP, endTimestamp)
         );
@@ -710,7 +707,7 @@ public class InventoryAction extends UserAction {
                         }
                     }
 
-                    Document query = new Document("responseCodes",
+                    Document query = new Document(ApiInfo.RESPONSE_CODES,
                                 new Document("$elemMatch",
                                     new Document("$gte", startVal)
                                         .append("$lte", endVal + 99)
@@ -720,7 +717,7 @@ public class InventoryAction extends UserAction {
                     filterList.add(query);
                     break;
                 case "accessType":
-                    Document typeQ = new Document("responseCodes",
+                    Document typeQ = new Document(ApiInfo.API_ACCESS_TYPES,
                             new Document("$elemMatch",
                                 new Document("$in", value)
                             )
@@ -743,7 +740,9 @@ public class InventoryAction extends UserAction {
         }
         if(collection.equalsIgnoreCase("STI")){
             filterList.add(Filters.nin(SingleTypeInfo._API_COLLECTION_ID, deactivatedCollections));
-        }else{}
+        }else{
+            filterList.add(Filters.nin(ApiInfo.ID_API_COLLECTION_ID, deactivatedCollections));
+        }
         
         loggerMaker.infoAndAddToDb(filterList.toString(), LogDb.DASHBOARD);
         return Filters.and(filterList);
@@ -783,7 +782,7 @@ public class InventoryAction extends UserAction {
             return "";
         }
         String escapedPrefix = Utils.escapeSpecialCharacters(this.searchString);
-        String regexPattern = "^" + escapedPrefix + ".*";
+        String regexPattern = ".*" + escapedPrefix + ".*";
         return regexPattern;
     }
 

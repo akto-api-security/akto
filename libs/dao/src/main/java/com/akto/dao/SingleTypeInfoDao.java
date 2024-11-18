@@ -698,6 +698,7 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
     public Bson getFilterForHostApis(int startTimestamp, int endTimestamp, Set<Integer> deactivatedCollections, List <Integer> nonHostApiCollectionIds){
 
         Bson hostFilterQ = SingleTypeInfoDao.filterForHostHeader(0, false);
+        nonHostApiCollectionIds.addAll(deactivatedCollections);
         Bson filterQWithTs = Filters.and(
                 Filters.gte(SingleTypeInfo._TIMESTAMP, startTimestamp),
                 Filters.lte(SingleTypeInfo._TIMESTAMP, endTimestamp),
