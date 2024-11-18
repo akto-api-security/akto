@@ -39,13 +39,14 @@ public class RedisBackedCounterCache implements CounterCache {
     public RedisBackedCounterCache(RedisClient redisClient, String prefix) {
         this.prefix = prefix;
         this.redis = redisClient.connect(new LongValueCodec());
-        this.localCache = Caffeine.newBuilder()
-                .maximumSize(100000)
-                .expireAfterWrite(1, TimeUnit.HOURS)
-                .build();
+        this.localCache =
+                Caffeine.newBuilder()
+                        .maximumSize(100000)
+                        .expireAfterWrite(3, TimeUnit.HOURS)
+                        .build();
 
         ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
-        executor.scheduleAtFixedRate(this::syncToRedis, 60, 1, TimeUnit.SECONDS);
+        executor.scheduleAtFixedRate(this::syncToRedis, 60, 5, TimeUnit.SECONDS);
 
         this.pendingOps = new ConcurrentLinkedQueue<>();
     }
