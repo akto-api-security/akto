@@ -68,7 +68,7 @@ public class HttpCallFilter {
         if ((lastFilterFetch + FILTER_REFRESH_INTERVAL) < now) {
             // TODO: add support for only active templates.
             List<YamlTemplate> templates = dataActor.fetchFilterYamlTemplates();
-            apiFilters = FilterYamlTemplateDao.instance.fetchFilterConfig(false, templates, false);
+            apiFilters = FilterYamlTemplateDao.fetchFilterConfig(false, templates, false);
             lastFilterFetch = now;
         }
 
