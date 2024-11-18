@@ -11,7 +11,7 @@ import api from '../../api';
 
 function ApiChangesTable(props) {
 
-  const { handleRowClick, tableLoading, startTimeStamp, endTimeStamp} = props ;
+  const { handleRowClick, tableLoading, startTimeStamp, endTimeStamp, newParams} = props ;
   const [selectedTab, setSelectedTab] = useState("new_endpoints") ;
   const [selected, setSelected] = useState(0) ;
   const apiCollectionMap = PersistStore(state => state.collectionsMap)
@@ -20,10 +20,10 @@ function ApiChangesTable(props) {
 
   const definedTableTabs = ['New endpoints', 'New params']
 
-  const initialCount = [newEndpointsCount , 0]
+  const initialCount = [newEndpointsCount , newParams.length]
 
   const { tabsInfo } = useTable()
-  const tableCountObj = func.getTabsCount(definedTableTabs, [], initialCount)
+  const tableCountObj = func.getTabsCount(definedTableTabs, newParams, initialCount)
   const tableTabs = func.getTableTabsContent(definedTableTabs, tableCountObj, setSelectedTab, selectedTab, tabsInfo)
 
   const tableDataObj = apiChangesData.getData(selectedTab);
@@ -83,21 +83,16 @@ function ApiChangesTable(props) {
       })
       return { value: ret, total: total };
     }else{
-      let data = []
-      await api.fetchRecentParams(startTimeStamp, endTimeStamp).then((res) => {
-        const ret = res.data.endpoints.map((x,index) => transform.prepareEndpointForTable(x,index));
-        data = ret;
-      })
       const dataObj = {
         "headers": tableDataObj.headers,
-        "data": data,
+        "data": newParams,
         "sortOptions": tableDataObj.sortOptions,
       }
       return tableFunc.fetchDataSync(sortKey, sortOrder, skip, limit, filters, filterOperators, queryValue, () => {}, dataObj)
     }
   }
 
-  const key = selectedTab + startTimeStamp + endTimeStamp 
+  const key = selectedTab + startTimeStamp + endTimeStamp + newParams.length
   const filterOptions = func.getCollectionFilters(tableDataObj?.filters || [])
 
   return (
