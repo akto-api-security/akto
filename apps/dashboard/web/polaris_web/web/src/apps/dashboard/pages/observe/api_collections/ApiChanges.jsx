@@ -100,16 +100,16 @@ function ApiChanges() {
         setEndpointsTrend(endpointsTrendObj.trend)
         setLoading(false)
 
-        await api.fetchRecentParams(startTimestamp, endTimestamp).then((res) => {
-            const ret = res.data.endpoints.map((x,index) => transform.prepareEndpointForTable(x,index));
-            setNewParams(ret)
-            setSummaryCountObj((prev) => {
-                return{
-                    ...prev,
-                    newParamsCount: ret.length
-                }
-            })
-        })
+        // await api.fetchRecentParams(startTimestamp, endTimestamp).then((res) => {
+        //     const ret = res.data.endpoints.map((x,index) => transform.prepareEndpointForTable(x,index));
+        //     setNewParams(ret)
+        //     setSummaryCountObj((prev) => {
+        //         return{
+        //             ...prev,
+        //             newParamsCount: ret.length
+        //         }
+        //     })
+        // })
     }
 
     useEffect(() => {
