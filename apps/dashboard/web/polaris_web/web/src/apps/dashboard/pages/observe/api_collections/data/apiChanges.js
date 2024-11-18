@@ -165,6 +165,56 @@ const parameterSortOptions = [
     { label: 'Discovered time', value: 'timestamp desc', directionLabel: 'Oldest', sortKey: 'timestamp', columnIndex: 3 },
 ];
 
+let filtersOptions = [
+    {
+        key: 'apiCollectionId',
+        label: 'Collection',
+        title: 'Collection',
+        choices: [],
+    },
+    {
+        key: 'method',
+        label: 'Method',
+        title: 'Method',
+        choices: [
+            { label: "GET",value: "GET"},
+            { label: "POST",value: "POST"},
+            { label: "PUT",value: "PUT"},
+            { label: "PATCH",value: "PATCH"},
+            { label: "DELETE",value: "DELETE"},
+            { label: "OPTIONS",value: "OPTIONS"},
+            { label: "HEAD",value: "HEAD"},
+        ]
+    },
+    {
+        key: 'responseCodes',
+        label: 'Response code',
+        title: 'Response code', 
+        choices: [
+            {label: '2xx', value: 200},
+            {label: '3xx', value: 300}
+        ]
+    },
+    {
+        key: 'accessType',
+        label: "Access types",
+        title: "Access types",
+        choices: [
+            {label: 'Internal', value: "PRIVATE"},
+            {label: 'Public', value: "PUBLIC"},
+            {label: "Third party", value: "THIRD_PARTY"},
+            {label: "Partner", value: "PARTNER"}
+        ]
+    },
+    {
+        key: 'collectionIds',
+        label: 'API groups',
+        title: 'API groups',
+        choices: [],
+    }
+]
+
+
 const apiChangesData = {
     getData(key){
         if(key.includes('param')){
@@ -181,6 +231,7 @@ const apiChangesData = {
                 headers: [...endpointHeadings, ...responseCodesArr],
                 resourceName: endpointResourceName,
                 sortOptions: endpointSortOptions,
+                filters: filtersOptions
             }
             return obj;
         }

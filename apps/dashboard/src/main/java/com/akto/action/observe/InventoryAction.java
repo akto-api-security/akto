@@ -33,6 +33,8 @@ import io.swagger.v3.oas.models.PathItem;
 import io.swagger.v3.oas.models.Paths;
 import io.swagger.v3.oas.models.servers.Server;
 import io.swagger.v3.parser.core.models.SwaggerParseResult;
+
+import org.bson.Document;
 import org.bson.conversions.Bson;
 
 import java.net.URI;
@@ -416,25 +418,52 @@ public class InventoryAction extends UserAction {
         return Action.SUCCESS.toUpperCase();
     }
 
-    public String loadRecentApiInfos(){
-        Bson filter = Filters.and(
-            Filters.nin(ApiInfo.ID_API_COLLECTION_ID,deactivatedCollections),
-            Filters.gte(ApiInfo.DISCOVERED_TIMESTAMP, startTimestamp),
-            Filters.lte(ApiInfo.DISCOVERED_TIMESTAMP, endTimestamp)
-        );
-        List<ApiInfo> apiInfos = ApiInfoDao.instance.findAll(filter);
-        for(ApiInfo info: apiInfos){
-            info.calculateActualAuth();
-        }
+    public String getSummaryInfoForChanges(){
+        long countEndpoints = SingleTypeInfoDao.instance.fetchEndpointsCount(startTimestamp, endTimestamp, deactivatedCollections);
+        int countSensitiveApis = SingleTypeInfoDao.instance.getSensitiveApisCount(new ArrayList<>(), false, (
+            Filters.and(
+                    Filters.and(
+                        Filters.gte(SingleTypeInfo._TIMESTAMP, startTimestamp),
+                        Filters.lte(SingleTypeInfo._TIMESTAMP, endTimestamp)
+                    ),
+                    Filters.nin(SingleTypeInfo._API_COLLECTION_ID, deactivatedCollections)
+            )
+        ));
+
         response = new BasicDBObject();
-        response.put("apiInfoList", apiInfos);
+        response.put("newEndpointsCount", countEndpoints);
+        response.put("sensitiveEndpointsCount", countSensitiveApis);
+
         return Action.SUCCESS.toUpperCase();
     }
 
     public String loadRecentEndpoints() {
-        List<BasicDBObject> list = fetchRecentEndpoints(startTimestamp, endTimestamp);
+        String regexPattern = getRegexPattern();
+        Bson searchFilter = Filters.empty();
+        if(!regexPattern.isEmpty() && regexPattern.length() > 0){
+            searchFilter = Filters.or(
+                Filters.regex(ApiInfo.ID_URL, regexPattern, "i"),
+                Filters.regex(ApiInfo.ID_METHOD, regexPattern, "i")
+            );
+        }
+        if(skip < 0){
+            skip *= -1;
+        }
+
+        if(limit < 0){
+            limit *= -1;
+        }
+
+        int pageLimit = Math.min(limit == 0 ? 50 : limit, 200);
+        Bson filter = Filters.and(prepareFilters("API_INFO"), searchFilter);
+        List<ApiInfo> list = ApiInfoDao.instance.findAll(filter, skip, pageLimit, Sorts.descending(ApiInfo.DISCOVERED_TIMESTAMP));
+        for(ApiInfo apiInfo: list){
+            apiInfo.calculateActualAuth();
+        }
+        long countDocuments = ApiInfoDao.instance.count(filter);
         response = new BasicDBObject();
         response.put("endpoints", list);
+        response.put("totalCount", countDocuments);
         return Action.SUCCESS.toUpperCase();
     }
 
@@ -474,22 +503,7 @@ public class InventoryAction extends UserAction {
         return Action.SUCCESS.toUpperCase();
     }
 
-    public String fetchNewParametersTrend() {
-        List<Bson> pipeline = new ArrayList<>();
-        pipeline.add(Aggregates.sort(Sorts.descending(SingleTypeInfo._TIMESTAMP)));
-        pipeline.add(Aggregates.match(Filters.gte("timestamp", startTimestamp)));
-        pipeline.add(Aggregates.match(Filters.lte("timestamp", endTimestamp)));
-        pipeline.add(Aggregates.match(Filters.nin(SingleTypeInfo._API_COLLECTION_ID, deactivatedCollections)));
-        pipeline.add(Aggregates.limit(100_000));
-        pipeline.add(Aggregates.project(Projections.computed("dayOfYearFloat", new BasicDBObject("$divide", new Object[]{"$timestamp", 86400}))));
-
-        Bson doyProj = Projections.computed("dayOfYear", new BasicDBObject("$divide", new Object[]{"$timestamp", 86400}));
-        if (InitializerListener.isNotKubernetes()) {
-            doyProj = Projections.computed("dayOfYear", new BasicDBObject("$floor", new Object[]{"$dayOfYearFloat"}));
-        }
-        pipeline.add(Aggregates.project(doyProj));
-        pipeline.add(Aggregates.group("$dayOfYear", Accumulators.sum("count", 1)));
-
+    private void getResponseForTrendApis(List<Bson> pipeline){
         MongoCursor<BasicDBObject> endpointsCursor = SingleTypeInfoDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
 
         List<BasicDBObject> endpoints = new ArrayList<>();
@@ -499,6 +513,57 @@ public class InventoryAction extends UserAction {
 
         response = new BasicDBObject();
         response.put("data", new BasicDBObject("endpoints", endpoints));
+    }
+
+    public String fetchNewEndpointsTrendForHostCollections(){
+        List <Integer> nonHostApiCollectionIds = ApiCollectionsDao.instance.fetchNonTrafficApiCollectionsIds();
+        nonHostApiCollectionIds.addAll(deactivatedCollections);
+        
+        Bson filterQWithTs = SingleTypeInfoDao.instance.getFilterForHostApis(startTimestamp, endTimestamp, deactivatedCollections, nonHostApiCollectionIds);
+
+        List<Bson> pipeline = new ArrayList<>();
+        pipeline.add(Aggregates.sort(Sorts.descending(SingleTypeInfo._TIMESTAMP)));
+        pipeline.add(Aggregates.match(filterQWithTs));
+        pipeline.addAll(SingleTypeInfoDao.instance.buildPipelineForTrend(InitializerListener.isNotKubernetes()));
+        getResponseForTrendApis(pipeline);
+
+        return SUCCESS.toUpperCase();
+    }
+
+    public String fetchNewEndpointsTrendForNonHostCollections(){
+        List <Integer> nonHostApiCollectionIds = ApiCollectionsDao.instance.fetchNonTrafficApiCollectionsIds();
+        Bson nonHostFilterWithTs = Filters.and(
+            Filters.in(SingleTypeInfo._API_COLLECTION_ID, nonHostApiCollectionIds),
+            Filters.nin(SingleTypeInfo._API_COLLECTION_ID, deactivatedCollections),
+            Filters.gte(SingleTypeInfo._TIMESTAMP, startTimestamp),
+            Filters.lte(SingleTypeInfo._TIMESTAMP, endTimestamp)
+        );
+        List<Bson> pipeline = new ArrayList<>();
+
+        BasicDBObject _id = 
+                new BasicDBObject(SingleTypeInfo._API_COLLECTION_ID, "$" + SingleTypeInfo._API_COLLECTION_ID)
+                .append(SingleTypeInfo._URL, "$" + SingleTypeInfo._URL)
+                .append(SingleTypeInfo._METHOD, "$" +  SingleTypeInfo._METHOD);
+
+        pipeline.add(Aggregates.sort(Sorts.descending(SingleTypeInfo._TIMESTAMP)));
+        pipeline.add(Aggregates.match(nonHostFilterWithTs));
+
+        pipeline.add(Aggregates.group(_id, Accumulators.last(SingleTypeInfo._TIMESTAMP, "$" + SingleTypeInfo._TIMESTAMP)));
+        pipeline.addAll(SingleTypeInfoDao.instance.buildPipelineForTrend(InitializerListener.isNotKubernetes()));
+        getResponseForTrendApis(pipeline);
+        return SUCCESS.toUpperCase();
+    }
+
+    public String fetchNewParametersTrend() {
+        List<Bson> pipeline = new ArrayList<>();
+        pipeline.add(Aggregates.sort(Sorts.descending(SingleTypeInfo._TIMESTAMP)));
+        pipeline.add(Aggregates.match(Filters.gte("timestamp", startTimestamp)));
+        pipeline.add(Aggregates.match(Filters.lte("timestamp", endTimestamp)));
+        pipeline.add(Aggregates.match(Filters.nin(SingleTypeInfo._API_COLLECTION_ID, deactivatedCollections)));
+        pipeline.add(Aggregates.limit(100_000));
+        pipeline.addAll(SingleTypeInfoDao.instance.buildPipelineForTrend(InitializerListener.isNotKubernetes()));
+
+        getResponseForTrendApis(pipeline);
 
         return Action.SUCCESS.toUpperCase();
 
@@ -540,11 +605,16 @@ public class InventoryAction extends UserAction {
     private boolean sensitive;
     private boolean request;
 
-    private Bson prepareFilters() {
+    private Bson prepareFilters(String collection) {
         ArrayList<Bson> filterList = new ArrayList<>();
-        filterList.add(Filters.gt("timestamp", startTimestamp));
-        filterList.add(Filters.lt("timestamp", endTimestamp));
-
+        if(collection.equalsIgnoreCase("STI")){
+            filterList.add(Filters.gt("timestamp", startTimestamp));
+            filterList.add(Filters.lt("timestamp", endTimestamp));
+        }else{
+            filterList.add(Filters.gt(ApiInfo.DISCOVERED_TIMESTAMP, startTimestamp));
+            filterList.add(Filters.lt(ApiInfo.DISCOVERED_TIMESTAMP, endTimestamp));
+        }
+        
         if (sensitive) {
             Bson sensitveSubTypeFilter;
             if (request) {
@@ -613,6 +683,47 @@ public class InventoryAction extends UserAction {
                     }
                     filterList.add(Filters.or(locationFilters));
                     break;
+                case "method":
+                case "apiCollectionId":
+                    String keyForFilter = key;
+                    if(collection.equalsIgnoreCase("API_INFO")){
+                        keyForFilter = Constants.ID + "." + key;
+                    }
+                    filterList.add(Filters.in(keyForFilter, value));
+                    break;
+                case "responseCodes":
+                    List<Long> temp = value;
+                    if(temp.isEmpty()){
+                        break;
+                    }
+                    long startVal = temp.get(0);
+                    long endVal = temp.get(0);
+
+                    for(long t: temp){
+                        if(t > endVal){
+                            endVal = t;
+                        }else if(t < startVal){
+                            startVal = t;
+                        }
+                    }
+
+                    Document query = new Document(ApiInfo.RESPONSE_CODES,
+                                new Document("$elemMatch",
+                                    new Document("$gte", startVal)
+                                        .append("$lte", endVal + 99)
+                                )
+                            );
+                    
+                    filterList.add(query);
+                    break;
+                case "accessType":
+                    Document typeQ = new Document(ApiInfo.API_ACCESS_TYPES,
+                            new Document("$elemMatch",
+                                new Document("$in", value)
+                            )
+                        );
+                    filterList.add(typeQ);
+                    break;
                 default: 
                     switch (operator) {
                         case "OR":
@@ -627,8 +738,12 @@ public class InventoryAction extends UserAction {
                     
             }
         }
-
-        filterList.add(Filters.nin(SingleTypeInfo._API_COLLECTION_ID, deactivatedCollections));
+        if(collection.equalsIgnoreCase("STI")){
+            filterList.add(Filters.nin(SingleTypeInfo._API_COLLECTION_ID, deactivatedCollections));
+        }else{
+            filterList.add(Filters.nin(ApiInfo.ID_API_COLLECTION_ID, deactivatedCollections));
+        }
+        
         loggerMaker.infoAndAddToDb(filterList.toString(), LogDb.DASHBOARD);
         return Filters.and(filterList);
 
@@ -662,12 +777,20 @@ public class InventoryAction extends UserAction {
         return Action.SUCCESS.toUpperCase();
     }
 
-    private Bson getSearchFilters(){
+    private String getRegexPattern(){
         if(this.searchString == null || this.searchString.length() < 3){
-            return Filters.empty();
+            return "";
         }
         String escapedPrefix = Utils.escapeSpecialCharacters(this.searchString);
-        String regexPattern = "^" + escapedPrefix + ".*";
+        String regexPattern = ".*" + escapedPrefix + ".*";
+        return regexPattern;
+    }
+
+    private Bson getSearchFilters(){
+        String regexPattern = getRegexPattern();
+        if(regexPattern.isEmpty() || regexPattern.length() == 0){
+            return Filters.empty();
+        }
         Bson filter = Filters.regex(SingleTypeInfo._PARAM, regexPattern, "i");
         return filter;
     }
@@ -691,12 +814,12 @@ public class InventoryAction extends UserAction {
 
         int pageLimit = Math.min(limit == 0 ? 50 : limit, 200);
 
-        List<SingleTypeInfo> list = SingleTypeInfoDao.instance.findAll(Filters.and(prepareFilters(), getSearchFilters()), skip,pageLimit, sort);
+        List<SingleTypeInfo> list = SingleTypeInfoDao.instance.findAll(Filters.and(prepareFilters("STI"), getSearchFilters()), skip,pageLimit, sort);
         return list;        
     }
 
     private long getTotalParams() {
-        return SingleTypeInfoDao.instance.getMCollection().countDocuments(Filters.and(prepareFilters(), getSearchFilters()));
+        return SingleTypeInfoDao.instance.getMCollection().countDocuments(Filters.and(prepareFilters("STI"), getSearchFilters()));
     }
 
     public String fetchChanges() {
