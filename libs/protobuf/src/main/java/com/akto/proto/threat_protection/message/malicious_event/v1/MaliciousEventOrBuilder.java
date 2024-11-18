@@ -34,6 +34,7 @@ public interface MaliciousEventOrBuilder extends
       getFilterIdBytes();
 
   /**
+<<<<<<< HEAD
    * <code>int64 detected_at = 3 [json_name = "detectedAt"];</code>
    * @return The detectedAt.
    */
@@ -103,4 +104,65 @@ public interface MaliciousEventOrBuilder extends
    * @return The eventType.
    */
   com.akto.proto.threat_protection.message.malicious_event.v1.MaliciousEvent.EventType getEventType();
+||||||| parent of 36e13656a (refactor code)
+=======
+   * <code>string ip = 3 [json_name = "ip"];</code>
+   * @return The ip.
+   */
+  java.lang.String getIp();
+  /**
+   * <code>string ip = 3 [json_name = "ip"];</code>
+   * @return The bytes for ip.
+   */
+  com.google.protobuf.ByteString
+      getIpBytes();
+
+  /**
+   * <code>int64 timestamp = 4 [json_name = "timestamp"];</code>
+   * @return The timestamp.
+   */
+  long getTimestamp();
+
+  /**
+   * <code>string url = 5 [json_name = "url"];</code>
+   * @return The url.
+   */
+  java.lang.String getUrl();
+  /**
+   * <code>string url = 5 [json_name = "url"];</code>
+   * @return The bytes for url.
+   */
+  com.google.protobuf.ByteString
+      getUrlBytes();
+
+  /**
+   * <code>string method = 6 [json_name = "method"];</code>
+   * @return The method.
+   */
+  java.lang.String getMethod();
+  /**
+   * <code>string method = 6 [json_name = "method"];</code>
+   * @return The bytes for method.
+   */
+  com.google.protobuf.ByteString
+      getMethodBytes();
+
+  /**
+   * <code>int32 api_collection_id = 7 [json_name = "apiCollectionId"];</code>
+   * @return The apiCollectionId.
+   */
+  int getApiCollectionId();
+
+  /**
+   * <code>string payload = 8 [json_name = "payload"];</code>
+   * @return The payload.
+   */
+  java.lang.String getPayload();
+  /**
+   * <code>string payload = 8 [json_name = "payload"];</code>
+   * @return The bytes for payload.
+   */
+  com.google.protobuf.ByteString
+      getPayloadBytes();
+>>>>>>> 36e13656a (refactor code)
 }
