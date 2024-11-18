@@ -338,18 +338,33 @@ export default {
             data: {}
         })
     },
-    async loadRecentEndpoints (startTimestamp, endTimestamp) {
+    async loadRecentEndpoints (startTimestamp, endTimestamp, skip, limit, filters, filterOperators, searchString) {
         const resp = await request({
             url: '/api/loadRecentEndpoints',
+            method: 'post',
+            data: { startTimestamp, endTimestamp, skip, limit, filters, filterOperators, searchString}
+        })
+        return resp
+    },
+    async getSummaryInfoForChanges (startTimestamp, endTimestamp) {
+        const resp = await request({
+            url: '/api/getSummaryInfoForChanges',
             method: 'post',
             data: { startTimestamp, endTimestamp }
         })
         return resp
     },
-
-    async loadRecentApiInfos (startTimestamp, endTimestamp) {
+    async fetchNewEndpointsTrendForHostCollections (startTimestamp, endTimestamp) {
         const resp = await request({
-            url: '/api/loadRecentApiInfos',
+            url: '/api/fetchNewEndpointsTrendForHostCollections',
+            method: 'post',
+            data: { startTimestamp, endTimestamp }
+        })
+        return resp
+    },
+    async fetchNewEndpointsTrendForNonHostCollections (startTimestamp, endTimestamp) {
+        const resp = await request({
+            url: '/api/fetchNewEndpointsTrendForNonHostCollections',
             method: 'post',
             data: { startTimestamp, endTimestamp }
         })

@@ -695,10 +695,7 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
         return count;
     }
 
-    public List<BasicDBObject> fetchRecentEndpoints(int startTimestamp, int endTimestamp, Set<Integer> deactivatedCollections){
-        List<BasicDBObject> endpoints = new ArrayList<>();
-        List <Integer> nonHostApiCollectionIds = ApiCollectionsDao.instance.fetchNonTrafficApiCollectionsIds();
-        nonHostApiCollectionIds.addAll(deactivatedCollections);
+    public Bson getFilterForHostApis(int startTimestamp, int endTimestamp, Set<Integer> deactivatedCollections, List <Integer> nonHostApiCollectionIds){
 
         Bson hostFilterQ = SingleTypeInfoDao.filterForHostHeader(0, false);
         Bson filterQWithTs = Filters.and(
@@ -707,6 +704,27 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
                 Filters.nin(SingleTypeInfo._API_COLLECTION_ID, nonHostApiCollectionIds),
                 hostFilterQ
         );
+        return filterQWithTs;
+    }
+
+    public List<Bson> buildPipelineForTrend(boolean isNotKubernetes){
+        List<Bson> pipeline = new ArrayList<>();
+        pipeline.add(Aggregates.project(Projections.computed("dayOfYearFloat", new BasicDBObject("$divide", new Object[]{"$timestamp", 86400}))));
+        Bson doyProj = Projections.computed("dayOfYear", new BasicDBObject("$divide", new Object[]{"$timestamp", 86400}));
+        if (isNotKubernetes) {
+            doyProj = Projections.computed("dayOfYear", new BasicDBObject("$floor", new Object[]{"$dayOfYearFloat"}));
+        }
+        pipeline.add(Aggregates.project(doyProj));
+        pipeline.add(Aggregates.group("$dayOfYear", Accumulators.sum("count", 1)));
+
+        return pipeline;
+    }
+
+    public List<BasicDBObject> fetchRecentEndpoints(int startTimestamp, int endTimestamp, Set<Integer> deactivatedCollections){
+        List <Integer> nonHostApiCollectionIds = ApiCollectionsDao.instance.fetchNonTrafficApiCollectionsIds();
+        nonHostApiCollectionIds.addAll(deactivatedCollections);
+        List<BasicDBObject> endpoints = new ArrayList<>();
+        Bson filterQWithTs = getFilterForHostApis(startTimestamp, endTimestamp, deactivatedCollections, nonHostApiCollectionIds);
         List<SingleTypeInfo> latestHosts = SingleTypeInfoDao.instance.findAll(filterQWithTs, 0, 20_000, Sorts.descending("timestamp"), Projections.exclude("values"));
         for(SingleTypeInfo sti: latestHosts) {
             BasicDBObject id = 
