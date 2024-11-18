@@ -31,9 +31,9 @@ public class SampleMaliciousRequest {
         this.url = responseParams.getRequestParams().getURL();
         this.method = Method.fromString(responseParams.getRequestParams().getMethod());
 
-        // For now, we are hardcoding it to 1 hr.
+        // For now, we are hardcoding it to 3 hrs.
         // But later we will read it through FilterConfig
-        this.expiry = now + (60 * 60);
+        this.expiry = now + (3 * 60 * 60);
     }
 
     public static int generateBinId(HttpResponseParams responseParam) {
