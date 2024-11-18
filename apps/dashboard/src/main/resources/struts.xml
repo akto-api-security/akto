@@ -883,8 +883,10 @@
             <result name="SUCCESS"   type="json">
                 <param name="root">response</param>
             </result>
-            <result name="ERROR" type="httpheader">
-                <param name="status">401</param>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
             </result>
         </action>
 
@@ -904,8 +906,10 @@
             <result name="SUCCESS"   type="json">
                 <param name="root">response</param>
             </result>
-            <result name="ERROR" type="httpheader">
-                <param name="status">401</param>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
             </result>
         </action>
 
@@ -925,8 +929,10 @@
             <result name="SUCCESS"   type="json">
                 <param name="root">response</param>
             </result>
-            <result name="ERROR" type="httpheader">
-                <param name="status">401</param>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
             </result>
         </action>
 
@@ -946,8 +952,10 @@
             <result name="SUCCESS"   type="json">
                 <param name="root">response</param>
             </result>
-            <result name="ERROR" type="httpheader">
-                <param name="status">401</param>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
             </result>
         </action>
 
