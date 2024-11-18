@@ -844,7 +844,11 @@ public class InventoryAction extends UserAction {
         long countApiInfosInvalid = ApiInfoDao.instance.count(apiInfoFilter);
         
         Bson useFilter = totalCount >= (2 * countApiInfosInvalid) ? apiInfoFilter : Filters.lt(ApiInfo.DISCOVERED_TIMESTAMP, this.startTimestamp - (Utils.DELTA_PERIOD_VALUE/4));
-        List<ApiInfo> apiInfos = ApiInfoDao.instance.findAll(useFilter, 0, 10000, Sorts.descending(ApiInfo.DISCOVERED_TIMESTAMP), Projections.include(Constants.ID));
+        List<ApiInfo> apiInfos = ApiInfoDao.instance.findAll(useFilter, 0, 2000, Sorts.descending(ApiInfo.DISCOVERED_TIMESTAMP), Projections.include(Constants.ID));
+        Set<Integer> uniqueApiCollections = new HashSet<>();
+        for(ApiInfo info: apiInfos){
+            uniqueApiCollections.add(info.getId().getApiCollectionId());
+        }
         Set<String> apiInfosHash = new HashSet<>();
         for(ApiInfo apiInfo: apiInfos){
             apiInfosHash.add(apiInfo.getId().toString());
@@ -854,11 +858,14 @@ public class InventoryAction extends UserAction {
         pipeline.add(Aggregates.sort(Sorts.descending(SingleTypeInfo._TIMESTAMP)));
         pipeline.add(Aggregates.match(
             Filters.and(
+                Filters.in(SingleTypeInfo._API_COLLECTION_ID, uniqueApiCollections),
+                Filters.nin(SingleTypeInfo._API_COLLECTION_ID, deactivatedCollections),
                 Filters.gte(SingleTypeInfo._TIMESTAMP, this.startTimestamp),
                 Filters.lte(SingleTypeInfo._TIMESTAMP, this.endTimestamp)
             )
         ));
         pipeline.add(Aggregates.project(Projections.exclude(SingleTypeInfo._VALUES)));
+        pipeline.add(Aggregates.limit(20_000));
         List<SingleTypeInfo> singleTypeInfos = new ArrayList<>();
 
         MongoCursor<SingleTypeInfo> cursor = SingleTypeInfoDao.instance.getMCollection().aggregate(pipeline, SingleTypeInfo.class).cursor();

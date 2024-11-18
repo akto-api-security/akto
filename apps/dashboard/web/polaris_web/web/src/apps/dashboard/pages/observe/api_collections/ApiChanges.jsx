@@ -24,6 +24,7 @@ function ApiChanges() {
     const [endpointsTrend, setEndpointsTrend] = useState([])
     const [loading, setLoading] = useState(false);
     const [apiDetail, setApiDetail] = useState({})
+    const [newParams, setNewParams] = useState([])
     const [tableHeaders,setTableHeaders] = useState([])
     const [summaryCountObj,setSummaryCountObj] = useState({
         "newEndpointsCount": 0,
@@ -96,8 +97,18 @@ function ApiChanges() {
         setParametersTrend(trendObj.trend)
 
         const endpointsTrendObj = transform.findNewParametersCountTrend(mergedArrObj, startTimestamp, endTimestamp)
-        setEndpointsTrend(endpointsTrendObj.trend)
         setLoading(false)
+        setEndpointsTrend(endpointsTrendObj.trend)
+        await api.fetchRecentParams(startTimestamp, endTimestamp).then((res) => {
+            const ret = res.data.endpoints.map((x,index) => transform.prepareEndpointForTable(x,index));
+            setNewParams(ret)
+            setSummaryCountObj((prev) => {
+                return{
+                    ...prev,
+                    newParamsCount: ret.length
+                }
+            })
+        })
     }
 
     useEffect(() => {
@@ -135,6 +146,7 @@ function ApiChanges() {
             endTimeStamp={endTimestamp}
             key="table"
             tab={(location.state)?(location.state.tab):0 }
+            newParams={newParams}
         />
     )
 
