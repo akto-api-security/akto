@@ -17,6 +17,7 @@ public class WindowBasedThresholdNotifier {
     // more than once by multiple instances of the service.
     // But on 1 instance, we should not notify more than once in the cooldown
     // period.
+    // TODO: Move this to redis
     private final ConcurrentMap<String, Long> notifiedMap;
 
     public static class Config {
