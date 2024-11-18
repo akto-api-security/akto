@@ -29,6 +29,7 @@ private static final long serialVersionUID = 0L;
   private MaliciousEvent() {
     actor_ = "";
     filterId_ = "";
+<<<<<<< HEAD
     latestApiIp_ = "";
     latestApiEndpoint_ = "";
     latestApiMethod_ = "";
@@ -1477,6 +1478,1237 @@ private static final long serialVersionUID = 0L;
     public Builder clearEventType() {
       bitField0_ = (bitField0_ & ~0x00000100);
       eventType_ = 0;
+||||||| parent of 36e13656a (refactor code)
+=======
+    ip_ = "";
+    url_ = "";
+    method_ = "";
+    payload_ = "";
+  }
+
+  public static final com.google.protobuf.Descriptors.Descriptor
+      getDescriptor() {
+    return com.akto.proto.threat_protection.message.malicious_event.v1.MessageProto.internal_static_threat_protection_message_malicious_event_v1_MaliciousEvent_descriptor;
+  }
+
+  @java.lang.Override
+  protected com.google.protobuf.GeneratedMessage.FieldAccessorTable
+      internalGetFieldAccessorTable() {
+    return com.akto.proto.threat_protection.message.malicious_event.v1.MessageProto.internal_static_threat_protection_message_malicious_event_v1_MaliciousEvent_fieldAccessorTable
+        .ensureFieldAccessorsInitialized(
+            com.akto.proto.threat_protection.message.malicious_event.v1.MaliciousEvent.class, com.akto.proto.threat_protection.message.malicious_event.v1.MaliciousEvent.Builder.class);
+  }
+
+  public static final int ACTOR_FIELD_NUMBER = 1;
+  @SuppressWarnings("serial")
+  private volatile java.lang.Object actor_ = "";
+  /**
+   * <code>string actor = 1 [json_name = "actor"];</code>
+   * @return The actor.
+   */
+  @java.lang.Override
+  public java.lang.String getActor() {
+    java.lang.Object ref = actor_;
+    if (ref instanceof java.lang.String) {
+      return (java.lang.String) ref;
+    } else {
+      com.google.protobuf.ByteString bs = 
+          (com.google.protobuf.ByteString) ref;
+      java.lang.String s = bs.toStringUtf8();
+      actor_ = s;
+      return s;
+    }
+  }
+  /**
+   * <code>string actor = 1 [json_name = "actor"];</code>
+   * @return The bytes for actor.
+   */
+  @java.lang.Override
+  public com.google.protobuf.ByteString
+      getActorBytes() {
+    java.lang.Object ref = actor_;
+    if (ref instanceof java.lang.String) {
+      com.google.protobuf.ByteString b = 
+          com.google.protobuf.ByteString.copyFromUtf8(
+              (java.lang.String) ref);
+      actor_ = b;
+      return b;
+    } else {
+      return (com.google.protobuf.ByteString) ref;
+    }
+  }
+
+  public static final int FILTER_ID_FIELD_NUMBER = 2;
+  @SuppressWarnings("serial")
+  private volatile java.lang.Object filterId_ = "";
+  /**
+   * <code>string filter_id = 2 [json_name = "filterId"];</code>
+   * @return The filterId.
+   */
+  @java.lang.Override
+  public java.lang.String getFilterId() {
+    java.lang.Object ref = filterId_;
+    if (ref instanceof java.lang.String) {
+      return (java.lang.String) ref;
+    } else {
+      com.google.protobuf.ByteString bs = 
+          (com.google.protobuf.ByteString) ref;
+      java.lang.String s = bs.toStringUtf8();
+      filterId_ = s;
+      return s;
+    }
+  }
+  /**
+   * <code>string filter_id = 2 [json_name = "filterId"];</code>
+   * @return The bytes for filterId.
+   */
+  @java.lang.Override
+  public com.google.protobuf.ByteString
+      getFilterIdBytes() {
+    java.lang.Object ref = filterId_;
+    if (ref instanceof java.lang.String) {
+      com.google.protobuf.ByteString b = 
+          com.google.protobuf.ByteString.copyFromUtf8(
+              (java.lang.String) ref);
+      filterId_ = b;
+      return b;
+    } else {
+      return (com.google.protobuf.ByteString) ref;
+    }
+  }
+
+  public static final int IP_FIELD_NUMBER = 3;
+  @SuppressWarnings("serial")
+  private volatile java.lang.Object ip_ = "";
+  /**
+   * <code>string ip = 3 [json_name = "ip"];</code>
+   * @return The ip.
+   */
+  @java.lang.Override
+  public java.lang.String getIp() {
+    java.lang.Object ref = ip_;
+    if (ref instanceof java.lang.String) {
+      return (java.lang.String) ref;
+    } else {
+      com.google.protobuf.ByteString bs = 
+          (com.google.protobuf.ByteString) ref;
+      java.lang.String s = bs.toStringUtf8();
+      ip_ = s;
+      return s;
+    }
+  }
+  /**
+   * <code>string ip = 3 [json_name = "ip"];</code>
+   * @return The bytes for ip.
+   */
+  @java.lang.Override
+  public com.google.protobuf.ByteString
+      getIpBytes() {
+    java.lang.Object ref = ip_;
+    if (ref instanceof java.lang.String) {
+      com.google.protobuf.ByteString b = 
+          com.google.protobuf.ByteString.copyFromUtf8(
+              (java.lang.String) ref);
+      ip_ = b;
+      return b;
+    } else {
+      return (com.google.protobuf.ByteString) ref;
+    }
+  }
+
+  public static final int TIMESTAMP_FIELD_NUMBER = 4;
+  private long timestamp_ = 0L;
+  /**
+   * <code>int64 timestamp = 4 [json_name = "timestamp"];</code>
+   * @return The timestamp.
+   */
+  @java.lang.Override
+  public long getTimestamp() {
+    return timestamp_;
+  }
+
+  public static final int URL_FIELD_NUMBER = 5;
+  @SuppressWarnings("serial")
+  private volatile java.lang.Object url_ = "";
+  /**
+   * <code>string url = 5 [json_name = "url"];</code>
+   * @return The url.
+   */
+  @java.lang.Override
+  public java.lang.String getUrl() {
+    java.lang.Object ref = url_;
+    if (ref instanceof java.lang.String) {
+      return (java.lang.String) ref;
+    } else {
+      com.google.protobuf.ByteString bs = 
+          (com.google.protobuf.ByteString) ref;
+      java.lang.String s = bs.toStringUtf8();
+      url_ = s;
+      return s;
+    }
+  }
+  /**
+   * <code>string url = 5 [json_name = "url"];</code>
+   * @return The bytes for url.
+   */
+  @java.lang.Override
+  public com.google.protobuf.ByteString
+      getUrlBytes() {
+    java.lang.Object ref = url_;
+    if (ref instanceof java.lang.String) {
+      com.google.protobuf.ByteString b = 
+          com.google.protobuf.ByteString.copyFromUtf8(
+              (java.lang.String) ref);
+      url_ = b;
+      return b;
+    } else {
+      return (com.google.protobuf.ByteString) ref;
+    }
+  }
+
+  public static final int METHOD_FIELD_NUMBER = 6;
+  @SuppressWarnings("serial")
+  private volatile java.lang.Object method_ = "";
+  /**
+   * <code>string method = 6 [json_name = "method"];</code>
+   * @return The method.
+   */
+  @java.lang.Override
+  public java.lang.String getMethod() {
+    java.lang.Object ref = method_;
+    if (ref instanceof java.lang.String) {
+      return (java.lang.String) ref;
+    } else {
+      com.google.protobuf.ByteString bs = 
+          (com.google.protobuf.ByteString) ref;
+      java.lang.String s = bs.toStringUtf8();
+      method_ = s;
+      return s;
+    }
+  }
+  /**
+   * <code>string method = 6 [json_name = "method"];</code>
+   * @return The bytes for method.
+   */
+  @java.lang.Override
+  public com.google.protobuf.ByteString
+      getMethodBytes() {
+    java.lang.Object ref = method_;
+    if (ref instanceof java.lang.String) {
+      com.google.protobuf.ByteString b = 
+          com.google.protobuf.ByteString.copyFromUtf8(
+              (java.lang.String) ref);
+      method_ = b;
+      return b;
+    } else {
+      return (com.google.protobuf.ByteString) ref;
+    }
+  }
+
+  public static final int API_COLLECTION_ID_FIELD_NUMBER = 7;
+  private int apiCollectionId_ = 0;
+  /**
+   * <code>int32 api_collection_id = 7 [json_name = "apiCollectionId"];</code>
+   * @return The apiCollectionId.
+   */
+  @java.lang.Override
+  public int getApiCollectionId() {
+    return apiCollectionId_;
+  }
+
+  public static final int PAYLOAD_FIELD_NUMBER = 8;
+  @SuppressWarnings("serial")
+  private volatile java.lang.Object payload_ = "";
+  /**
+   * <code>string payload = 8 [json_name = "payload"];</code>
+   * @return The payload.
+   */
+  @java.lang.Override
+  public java.lang.String getPayload() {
+    java.lang.Object ref = payload_;
+    if (ref instanceof java.lang.String) {
+      return (java.lang.String) ref;
+    } else {
+      com.google.protobuf.ByteString bs = 
+          (com.google.protobuf.ByteString) ref;
+      java.lang.String s = bs.toStringUtf8();
+      payload_ = s;
+      return s;
+    }
+  }
+  /**
+   * <code>string payload = 8 [json_name = "payload"];</code>
+   * @return The bytes for payload.
+   */
+  @java.lang.Override
+  public com.google.protobuf.ByteString
+      getPayloadBytes() {
+    java.lang.Object ref = payload_;
+    if (ref instanceof java.lang.String) {
+      com.google.protobuf.ByteString b = 
+          com.google.protobuf.ByteString.copyFromUtf8(
+              (java.lang.String) ref);
+      payload_ = b;
+      return b;
+    } else {
+      return (com.google.protobuf.ByteString) ref;
+    }
+  }
+
+  private byte memoizedIsInitialized = -1;
+  @java.lang.Override
+  public final boolean isInitialized() {
+    byte isInitialized = memoizedIsInitialized;
+    if (isInitialized == 1) return true;
+    if (isInitialized == 0) return false;
+
+    memoizedIsInitialized = 1;
+    return true;
+  }
+
+  @java.lang.Override
+  public void writeTo(com.google.protobuf.CodedOutputStream output)
+                      throws java.io.IOException {
+    if (!com.google.protobuf.GeneratedMessage.isStringEmpty(actor_)) {
+      com.google.protobuf.GeneratedMessage.writeString(output, 1, actor_);
+    }
+    if (!com.google.protobuf.GeneratedMessage.isStringEmpty(filterId_)) {
+      com.google.protobuf.GeneratedMessage.writeString(output, 2, filterId_);
+    }
+    if (!com.google.protobuf.GeneratedMessage.isStringEmpty(ip_)) {
+      com.google.protobuf.GeneratedMessage.writeString(output, 3, ip_);
+    }
+    if (timestamp_ != 0L) {
+      output.writeInt64(4, timestamp_);
+    }
+    if (!com.google.protobuf.GeneratedMessage.isStringEmpty(url_)) {
+      com.google.protobuf.GeneratedMessage.writeString(output, 5, url_);
+    }
+    if (!com.google.protobuf.GeneratedMessage.isStringEmpty(method_)) {
+      com.google.protobuf.GeneratedMessage.writeString(output, 6, method_);
+    }
+    if (apiCollectionId_ != 0) {
+      output.writeInt32(7, apiCollectionId_);
+    }
+    if (!com.google.protobuf.GeneratedMessage.isStringEmpty(payload_)) {
+      com.google.protobuf.GeneratedMessage.writeString(output, 8, payload_);
+    }
+    getUnknownFields().writeTo(output);
+  }
+
+  @java.lang.Override
+  public int getSerializedSize() {
+    int size = memoizedSize;
+    if (size != -1) return size;
+
+    size = 0;
+    if (!com.google.protobuf.GeneratedMessage.isStringEmpty(actor_)) {
+      size += com.google.protobuf.GeneratedMessage.computeStringSize(1, actor_);
+    }
+    if (!com.google.protobuf.GeneratedMessage.isStringEmpty(filterId_)) {
+      size += com.google.protobuf.GeneratedMessage.computeStringSize(2, filterId_);
+    }
+    if (!com.google.protobuf.GeneratedMessage.isStringEmpty(ip_)) {
+      size += com.google.protobuf.GeneratedMessage.computeStringSize(3, ip_);
+    }
+    if (timestamp_ != 0L) {
+      size += com.google.protobuf.CodedOutputStream
+        .computeInt64Size(4, timestamp_);
+    }
+    if (!com.google.protobuf.GeneratedMessage.isStringEmpty(url_)) {
+      size += com.google.protobuf.GeneratedMessage.computeStringSize(5, url_);
+    }
+    if (!com.google.protobuf.GeneratedMessage.isStringEmpty(method_)) {
+      size += com.google.protobuf.GeneratedMessage.computeStringSize(6, method_);
+    }
+    if (apiCollectionId_ != 0) {
+      size += com.google.protobuf.CodedOutputStream
+        .computeInt32Size(7, apiCollectionId_);
+    }
+    if (!com.google.protobuf.GeneratedMessage.isStringEmpty(payload_)) {
+      size += com.google.protobuf.GeneratedMessage.computeStringSize(8, payload_);
+    }
+    size += getUnknownFields().getSerializedSize();
+    memoizedSize = size;
+    return size;
+  }
+
+  @java.lang.Override
+  public boolean equals(final java.lang.Object obj) {
+    if (obj == this) {
+     return true;
+    }
+    if (!(obj instanceof com.akto.proto.threat_protection.message.malicious_event.v1.MaliciousEvent)) {
+      return super.equals(obj);
+    }
+    com.akto.proto.threat_protection.message.malicious_event.v1.MaliciousEvent other = (com.akto.proto.threat_protection.message.malicious_event.v1.MaliciousEvent) obj;
+
+    if (!getActor()
+        .equals(other.getActor())) return false;
+    if (!getFilterId()
+        .equals(other.getFilterId())) return false;
+    if (!getIp()
+        .equals(other.getIp())) return false;
+    if (getTimestamp()
+        != other.getTimestamp()) return false;
+    if (!getUrl()
+        .equals(other.getUrl())) return false;
+    if (!getMethod()
+        .equals(other.getMethod())) return false;
+    if (getApiCollectionId()
+        != other.getApiCollectionId()) return false;
+    if (!getPayload()
+        .equals(other.getPayload())) return false;
+    if (!getUnknownFields().equals(other.getUnknownFields())) return false;
+    return true;
+  }
+
+  @java.lang.Override
+  public int hashCode() {
+    if (memoizedHashCode != 0) {
+      return memoizedHashCode;
+    }
+    int hash = 41;
+    hash = (19 * hash) + getDescriptor().hashCode();
+    hash = (37 * hash) + ACTOR_FIELD_NUMBER;
+    hash = (53 * hash) + getActor().hashCode();
+    hash = (37 * hash) + FILTER_ID_FIELD_NUMBER;
+    hash = (53 * hash) + getFilterId().hashCode();
+    hash = (37 * hash) + IP_FIELD_NUMBER;
+    hash = (53 * hash) + getIp().hashCode();
+    hash = (37 * hash) + TIMESTAMP_FIELD_NUMBER;
+    hash = (53 * hash) + com.google.protobuf.Internal.hashLong(
+        getTimestamp());
+    hash = (37 * hash) + URL_FIELD_NUMBER;
+    hash = (53 * hash) + getUrl().hashCode();
+    hash = (37 * hash) + METHOD_FIELD_NUMBER;
+    hash = (53 * hash) + getMethod().hashCode();
+    hash = (37 * hash) + API_COLLECTION_ID_FIELD_NUMBER;
+    hash = (53 * hash) + getApiCollectionId();
+    hash = (37 * hash) + PAYLOAD_FIELD_NUMBER;
+    hash = (53 * hash) + getPayload().hashCode();
+    hash = (29 * hash) + getUnknownFields().hashCode();
+    memoizedHashCode = hash;
+    return hash;
+  }
+
+  public static com.akto.proto.threat_protection.message.malicious_event.v1.MaliciousEvent parseFrom(
+      java.nio.ByteBuffer data)
+      throws com.google.protobuf.InvalidProtocolBufferException {
+    return PARSER.parseFrom(data);
+  }
+  public static com.akto.proto.threat_protection.message.malicious_event.v1.MaliciousEvent parseFrom(
+      java.nio.ByteBuffer data,
+      com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+      throws com.google.protobuf.InvalidProtocolBufferException {
+    return PARSER.parseFrom(data, extensionRegistry);
+  }
+  public static com.akto.proto.threat_protection.message.malicious_event.v1.MaliciousEvent parseFrom(
+      com.google.protobuf.ByteString data)
+      throws com.google.protobuf.InvalidProtocolBufferException {
+    return PARSER.parseFrom(data);
+  }
+  public static com.akto.proto.threat_protection.message.malicious_event.v1.MaliciousEvent parseFrom(
+      com.google.protobuf.ByteString data,
+      com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+      throws com.google.protobuf.InvalidProtocolBufferException {
+    return PARSER.parseFrom(data, extensionRegistry);
+  }
+  public static com.akto.proto.threat_protection.message.malicious_event.v1.MaliciousEvent parseFrom(byte[] data)
+      throws com.google.protobuf.InvalidProtocolBufferException {
+    return PARSER.parseFrom(data);
+  }
+  public static com.akto.proto.threat_protection.message.malicious_event.v1.MaliciousEvent parseFrom(
+      byte[] data,
+      com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+      throws com.google.protobuf.InvalidProtocolBufferException {
+    return PARSER.parseFrom(data, extensionRegistry);
+  }
+  public static com.akto.proto.threat_protection.message.malicious_event.v1.MaliciousEvent parseFrom(java.io.InputStream input)
+      throws java.io.IOException {
+    return com.google.protobuf.GeneratedMessage
+        .parseWithIOException(PARSER, input);
+  }
+  public static com.akto.proto.threat_protection.message.malicious_event.v1.MaliciousEvent parseFrom(
+      java.io.InputStream input,
+      com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+      throws java.io.IOException {
+    return com.google.protobuf.GeneratedMessage
+        .parseWithIOException(PARSER, input, extensionRegistry);
+  }
+
+  public static com.akto.proto.threat_protection.message.malicious_event.v1.MaliciousEvent parseDelimitedFrom(java.io.InputStream input)
+      throws java.io.IOException {
+    return com.google.protobuf.GeneratedMessage
+        .parseDelimitedWithIOException(PARSER, input);
+  }
+
+  public static com.akto.proto.threat_protection.message.malicious_event.v1.MaliciousEvent parseDelimitedFrom(
+      java.io.InputStream input,
+      com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+      throws java.io.IOException {
+    return com.google.protobuf.GeneratedMessage
+        .parseDelimitedWithIOException(PARSER, input, extensionRegistry);
+  }
+  public static com.akto.proto.threat_protection.message.malicious_event.v1.MaliciousEvent parseFrom(
+      com.google.protobuf.CodedInputStream input)
+      throws java.io.IOException {
+    return com.google.protobuf.GeneratedMessage
+        .parseWithIOException(PARSER, input);
+  }
+  public static com.akto.proto.threat_protection.message.malicious_event.v1.MaliciousEvent parseFrom(
+      com.google.protobuf.CodedInputStream input,
+      com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+      throws java.io.IOException {
+    return com.google.protobuf.GeneratedMessage
+        .parseWithIOException(PARSER, input, extensionRegistry);
+  }
+
+  @java.lang.Override
+  public Builder newBuilderForType() { return newBuilder(); }
+  public static Builder newBuilder() {
+    return DEFAULT_INSTANCE.toBuilder();
+  }
+  public static Builder newBuilder(com.akto.proto.threat_protection.message.malicious_event.v1.MaliciousEvent prototype) {
+    return DEFAULT_INSTANCE.toBuilder().mergeFrom(prototype);
+  }
+  @java.lang.Override
+  public Builder toBuilder() {
+    return this == DEFAULT_INSTANCE
+        ? new Builder() : new Builder().mergeFrom(this);
+  }
+
+  @java.lang.Override
+  protected Builder newBuilderForType(
+      com.google.protobuf.GeneratedMessage.BuilderParent parent) {
+    Builder builder = new Builder(parent);
+    return builder;
+  }
+  /**
+   * Protobuf type {@code threat_protection.message.malicious_event.v1.MaliciousEvent}
+   */
+  public static final class Builder extends
+      com.google.protobuf.GeneratedMessage.Builder<Builder> implements
+      // @@protoc_insertion_point(builder_implements:threat_protection.message.malicious_event.v1.MaliciousEvent)
+      com.akto.proto.threat_protection.message.malicious_event.v1.MaliciousEventOrBuilder {
+    public static final com.google.protobuf.Descriptors.Descriptor
+        getDescriptor() {
+      return com.akto.proto.threat_protection.message.malicious_event.v1.MessageProto.internal_static_threat_protection_message_malicious_event_v1_MaliciousEvent_descriptor;
+    }
+
+    @java.lang.Override
+    protected com.google.protobuf.GeneratedMessage.FieldAccessorTable
+        internalGetFieldAccessorTable() {
+      return com.akto.proto.threat_protection.message.malicious_event.v1.MessageProto.internal_static_threat_protection_message_malicious_event_v1_MaliciousEvent_fieldAccessorTable
+          .ensureFieldAccessorsInitialized(
+              com.akto.proto.threat_protection.message.malicious_event.v1.MaliciousEvent.class, com.akto.proto.threat_protection.message.malicious_event.v1.MaliciousEvent.Builder.class);
+    }
+
+    // Construct using com.akto.proto.threat_protection.message.malicious_event.v1.MaliciousEvent.newBuilder()
+    private Builder() {
+
+    }
+
+    private Builder(
+        com.google.protobuf.GeneratedMessage.BuilderParent parent) {
+      super(parent);
+
+    }
+    @java.lang.Override
+    public Builder clear() {
+      super.clear();
+      bitField0_ = 0;
+      actor_ = "";
+      filterId_ = "";
+      ip_ = "";
+      timestamp_ = 0L;
+      url_ = "";
+      method_ = "";
+      apiCollectionId_ = 0;
+      payload_ = "";
+      return this;
+    }
+
+    @java.lang.Override
+    public com.google.protobuf.Descriptors.Descriptor
+        getDescriptorForType() {
+      return com.akto.proto.threat_protection.message.malicious_event.v1.MessageProto.internal_static_threat_protection_message_malicious_event_v1_MaliciousEvent_descriptor;
+    }
+
+    @java.lang.Override
+    public com.akto.proto.threat_protection.message.malicious_event.v1.MaliciousEvent getDefaultInstanceForType() {
+      return com.akto.proto.threat_protection.message.malicious_event.v1.MaliciousEvent.getDefaultInstance();
+    }
+
+    @java.lang.Override
+    public com.akto.proto.threat_protection.message.malicious_event.v1.MaliciousEvent build() {
+      com.akto.proto.threat_protection.message.malicious_event.v1.MaliciousEvent result = buildPartial();
+      if (!result.isInitialized()) {
+        throw newUninitializedMessageException(result);
+      }
+      return result;
+    }
+
+    @java.lang.Override
+    public com.akto.proto.threat_protection.message.malicious_event.v1.MaliciousEvent buildPartial() {
+      com.akto.proto.threat_protection.message.malicious_event.v1.MaliciousEvent result = new com.akto.proto.threat_protection.message.malicious_event.v1.MaliciousEvent(this);
+      if (bitField0_ != 0) { buildPartial0(result); }
+      onBuilt();
+      return result;
+    }
+
+    private void buildPartial0(com.akto.proto.threat_protection.message.malicious_event.v1.MaliciousEvent result) {
+      int from_bitField0_ = bitField0_;
+      if (((from_bitField0_ & 0x00000001) != 0)) {
+        result.actor_ = actor_;
+      }
+      if (((from_bitField0_ & 0x00000002) != 0)) {
+        result.filterId_ = filterId_;
+      }
+      if (((from_bitField0_ & 0x00000004) != 0)) {
+        result.ip_ = ip_;
+      }
+      if (((from_bitField0_ & 0x00000008) != 0)) {
+        result.timestamp_ = timestamp_;
+      }
+      if (((from_bitField0_ & 0x00000010) != 0)) {
+        result.url_ = url_;
+      }
+      if (((from_bitField0_ & 0x00000020) != 0)) {
+        result.method_ = method_;
+      }
+      if (((from_bitField0_ & 0x00000040) != 0)) {
+        result.apiCollectionId_ = apiCollectionId_;
+      }
+      if (((from_bitField0_ & 0x00000080) != 0)) {
+        result.payload_ = payload_;
+      }
+    }
+
+    @java.lang.Override
+    public Builder mergeFrom(com.google.protobuf.Message other) {
+      if (other instanceof com.akto.proto.threat_protection.message.malicious_event.v1.MaliciousEvent) {
+        return mergeFrom((com.akto.proto.threat_protection.message.malicious_event.v1.MaliciousEvent)other);
+      } else {
+        super.mergeFrom(other);
+        return this;
+      }
+    }
+
+    public Builder mergeFrom(com.akto.proto.threat_protection.message.malicious_event.v1.MaliciousEvent other) {
+      if (other == com.akto.proto.threat_protection.message.malicious_event.v1.MaliciousEvent.getDefaultInstance()) return this;
+      if (!other.getActor().isEmpty()) {
+        actor_ = other.actor_;
+        bitField0_ |= 0x00000001;
+        onChanged();
+      }
+      if (!other.getFilterId().isEmpty()) {
+        filterId_ = other.filterId_;
+        bitField0_ |= 0x00000002;
+        onChanged();
+      }
+      if (!other.getIp().isEmpty()) {
+        ip_ = other.ip_;
+        bitField0_ |= 0x00000004;
+        onChanged();
+      }
+      if (other.getTimestamp() != 0L) {
+        setTimestamp(other.getTimestamp());
+      }
+      if (!other.getUrl().isEmpty()) {
+        url_ = other.url_;
+        bitField0_ |= 0x00000010;
+        onChanged();
+      }
+      if (!other.getMethod().isEmpty()) {
+        method_ = other.method_;
+        bitField0_ |= 0x00000020;
+        onChanged();
+      }
+      if (other.getApiCollectionId() != 0) {
+        setApiCollectionId(other.getApiCollectionId());
+      }
+      if (!other.getPayload().isEmpty()) {
+        payload_ = other.payload_;
+        bitField0_ |= 0x00000080;
+        onChanged();
+      }
+      this.mergeUnknownFields(other.getUnknownFields());
+      onChanged();
+      return this;
+    }
+
+    @java.lang.Override
+    public final boolean isInitialized() {
+      return true;
+    }
+
+    @java.lang.Override
+    public Builder mergeFrom(
+        com.google.protobuf.CodedInputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      if (extensionRegistry == null) {
+        throw new java.lang.NullPointerException();
+      }
+      try {
+        boolean done = false;
+        while (!done) {
+          int tag = input.readTag();
+          switch (tag) {
+            case 0:
+              done = true;
+              break;
+            case 10: {
+              actor_ = input.readStringRequireUtf8();
+              bitField0_ |= 0x00000001;
+              break;
+            } // case 10
+            case 18: {
+              filterId_ = input.readStringRequireUtf8();
+              bitField0_ |= 0x00000002;
+              break;
+            } // case 18
+            case 26: {
+              ip_ = input.readStringRequireUtf8();
+              bitField0_ |= 0x00000004;
+              break;
+            } // case 26
+            case 32: {
+              timestamp_ = input.readInt64();
+              bitField0_ |= 0x00000008;
+              break;
+            } // case 32
+            case 42: {
+              url_ = input.readStringRequireUtf8();
+              bitField0_ |= 0x00000010;
+              break;
+            } // case 42
+            case 50: {
+              method_ = input.readStringRequireUtf8();
+              bitField0_ |= 0x00000020;
+              break;
+            } // case 50
+            case 56: {
+              apiCollectionId_ = input.readInt32();
+              bitField0_ |= 0x00000040;
+              break;
+            } // case 56
+            case 66: {
+              payload_ = input.readStringRequireUtf8();
+              bitField0_ |= 0x00000080;
+              break;
+            } // case 66
+            default: {
+              if (!super.parseUnknownField(input, extensionRegistry, tag)) {
+                done = true; // was an endgroup tag
+              }
+              break;
+            } // default:
+          } // switch (tag)
+        } // while (!done)
+      } catch (com.google.protobuf.InvalidProtocolBufferException e) {
+        throw e.unwrapIOException();
+      } finally {
+        onChanged();
+      } // finally
+      return this;
+    }
+    private int bitField0_;
+
+    private java.lang.Object actor_ = "";
+    /**
+     * <code>string actor = 1 [json_name = "actor"];</code>
+     * @return The actor.
+     */
+    public java.lang.String getActor() {
+      java.lang.Object ref = actor_;
+      if (!(ref instanceof java.lang.String)) {
+        com.google.protobuf.ByteString bs =
+            (com.google.protobuf.ByteString) ref;
+        java.lang.String s = bs.toStringUtf8();
+        actor_ = s;
+        return s;
+      } else {
+        return (java.lang.String) ref;
+      }
+    }
+    /**
+     * <code>string actor = 1 [json_name = "actor"];</code>
+     * @return The bytes for actor.
+     */
+    public com.google.protobuf.ByteString
+        getActorBytes() {
+      java.lang.Object ref = actor_;
+      if (ref instanceof String) {
+        com.google.protobuf.ByteString b = 
+            com.google.protobuf.ByteString.copyFromUtf8(
+                (java.lang.String) ref);
+        actor_ = b;
+        return b;
+      } else {
+        return (com.google.protobuf.ByteString) ref;
+      }
+    }
+    /**
+     * <code>string actor = 1 [json_name = "actor"];</code>
+     * @param value The actor to set.
+     * @return This builder for chaining.
+     */
+    public Builder setActor(
+        java.lang.String value) {
+      if (value == null) { throw new NullPointerException(); }
+      actor_ = value;
+      bitField0_ |= 0x00000001;
+      onChanged();
+      return this;
+    }
+    /**
+     * <code>string actor = 1 [json_name = "actor"];</code>
+     * @return This builder for chaining.
+     */
+    public Builder clearActor() {
+      actor_ = getDefaultInstance().getActor();
+      bitField0_ = (bitField0_ & ~0x00000001);
+      onChanged();
+      return this;
+    }
+    /**
+     * <code>string actor = 1 [json_name = "actor"];</code>
+     * @param value The bytes for actor to set.
+     * @return This builder for chaining.
+     */
+    public Builder setActorBytes(
+        com.google.protobuf.ByteString value) {
+      if (value == null) { throw new NullPointerException(); }
+      checkByteStringIsUtf8(value);
+      actor_ = value;
+      bitField0_ |= 0x00000001;
+      onChanged();
+      return this;
+    }
+
+    private java.lang.Object filterId_ = "";
+    /**
+     * <code>string filter_id = 2 [json_name = "filterId"];</code>
+     * @return The filterId.
+     */
+    public java.lang.String getFilterId() {
+      java.lang.Object ref = filterId_;
+      if (!(ref instanceof java.lang.String)) {
+        com.google.protobuf.ByteString bs =
+            (com.google.protobuf.ByteString) ref;
+        java.lang.String s = bs.toStringUtf8();
+        filterId_ = s;
+        return s;
+      } else {
+        return (java.lang.String) ref;
+      }
+    }
+    /**
+     * <code>string filter_id = 2 [json_name = "filterId"];</code>
+     * @return The bytes for filterId.
+     */
+    public com.google.protobuf.ByteString
+        getFilterIdBytes() {
+      java.lang.Object ref = filterId_;
+      if (ref instanceof String) {
+        com.google.protobuf.ByteString b = 
+            com.google.protobuf.ByteString.copyFromUtf8(
+                (java.lang.String) ref);
+        filterId_ = b;
+        return b;
+      } else {
+        return (com.google.protobuf.ByteString) ref;
+      }
+    }
+    /**
+     * <code>string filter_id = 2 [json_name = "filterId"];</code>
+     * @param value The filterId to set.
+     * @return This builder for chaining.
+     */
+    public Builder setFilterId(
+        java.lang.String value) {
+      if (value == null) { throw new NullPointerException(); }
+      filterId_ = value;
+      bitField0_ |= 0x00000002;
+      onChanged();
+      return this;
+    }
+    /**
+     * <code>string filter_id = 2 [json_name = "filterId"];</code>
+     * @return This builder for chaining.
+     */
+    public Builder clearFilterId() {
+      filterId_ = getDefaultInstance().getFilterId();
+      bitField0_ = (bitField0_ & ~0x00000002);
+      onChanged();
+      return this;
+    }
+    /**
+     * <code>string filter_id = 2 [json_name = "filterId"];</code>
+     * @param value The bytes for filterId to set.
+     * @return This builder for chaining.
+     */
+    public Builder setFilterIdBytes(
+        com.google.protobuf.ByteString value) {
+      if (value == null) { throw new NullPointerException(); }
+      checkByteStringIsUtf8(value);
+      filterId_ = value;
+      bitField0_ |= 0x00000002;
+      onChanged();
+      return this;
+    }
+
+    private java.lang.Object ip_ = "";
+    /**
+     * <code>string ip = 3 [json_name = "ip"];</code>
+     * @return The ip.
+     */
+    public java.lang.String getIp() {
+      java.lang.Object ref = ip_;
+      if (!(ref instanceof java.lang.String)) {
+        com.google.protobuf.ByteString bs =
+            (com.google.protobuf.ByteString) ref;
+        java.lang.String s = bs.toStringUtf8();
+        ip_ = s;
+        return s;
+      } else {
+        return (java.lang.String) ref;
+      }
+    }
+    /**
+     * <code>string ip = 3 [json_name = "ip"];</code>
+     * @return The bytes for ip.
+     */
+    public com.google.protobuf.ByteString
+        getIpBytes() {
+      java.lang.Object ref = ip_;
+      if (ref instanceof String) {
+        com.google.protobuf.ByteString b = 
+            com.google.protobuf.ByteString.copyFromUtf8(
+                (java.lang.String) ref);
+        ip_ = b;
+        return b;
+      } else {
+        return (com.google.protobuf.ByteString) ref;
+      }
+    }
+    /**
+     * <code>string ip = 3 [json_name = "ip"];</code>
+     * @param value The ip to set.
+     * @return This builder for chaining.
+     */
+    public Builder setIp(
+        java.lang.String value) {
+      if (value == null) { throw new NullPointerException(); }
+      ip_ = value;
+      bitField0_ |= 0x00000004;
+      onChanged();
+      return this;
+    }
+    /**
+     * <code>string ip = 3 [json_name = "ip"];</code>
+     * @return This builder for chaining.
+     */
+    public Builder clearIp() {
+      ip_ = getDefaultInstance().getIp();
+      bitField0_ = (bitField0_ & ~0x00000004);
+      onChanged();
+      return this;
+    }
+    /**
+     * <code>string ip = 3 [json_name = "ip"];</code>
+     * @param value The bytes for ip to set.
+     * @return This builder for chaining.
+     */
+    public Builder setIpBytes(
+        com.google.protobuf.ByteString value) {
+      if (value == null) { throw new NullPointerException(); }
+      checkByteStringIsUtf8(value);
+      ip_ = value;
+      bitField0_ |= 0x00000004;
+      onChanged();
+      return this;
+    }
+
+    private long timestamp_ ;
+    /**
+     * <code>int64 timestamp = 4 [json_name = "timestamp"];</code>
+     * @return The timestamp.
+     */
+    @java.lang.Override
+    public long getTimestamp() {
+      return timestamp_;
+    }
+    /**
+     * <code>int64 timestamp = 4 [json_name = "timestamp"];</code>
+     * @param value The timestamp to set.
+     * @return This builder for chaining.
+     */
+    public Builder setTimestamp(long value) {
+
+      timestamp_ = value;
+      bitField0_ |= 0x00000008;
+      onChanged();
+      return this;
+    }
+    /**
+     * <code>int64 timestamp = 4 [json_name = "timestamp"];</code>
+     * @return This builder for chaining.
+     */
+    public Builder clearTimestamp() {
+      bitField0_ = (bitField0_ & ~0x00000008);
+      timestamp_ = 0L;
+      onChanged();
+      return this;
+    }
+
+    private java.lang.Object url_ = "";
+    /**
+     * <code>string url = 5 [json_name = "url"];</code>
+     * @return The url.
+     */
+    public java.lang.String getUrl() {
+      java.lang.Object ref = url_;
+      if (!(ref instanceof java.lang.String)) {
+        com.google.protobuf.ByteString bs =
+            (com.google.protobuf.ByteString) ref;
+        java.lang.String s = bs.toStringUtf8();
+        url_ = s;
+        return s;
+      } else {
+        return (java.lang.String) ref;
+      }
+    }
+    /**
+     * <code>string url = 5 [json_name = "url"];</code>
+     * @return The bytes for url.
+     */
+    public com.google.protobuf.ByteString
+        getUrlBytes() {
+      java.lang.Object ref = url_;
+      if (ref instanceof String) {
+        com.google.protobuf.ByteString b = 
+            com.google.protobuf.ByteString.copyFromUtf8(
+                (java.lang.String) ref);
+        url_ = b;
+        return b;
+      } else {
+        return (com.google.protobuf.ByteString) ref;
+      }
+    }
+    /**
+     * <code>string url = 5 [json_name = "url"];</code>
+     * @param value The url to set.
+     * @return This builder for chaining.
+     */
+    public Builder setUrl(
+        java.lang.String value) {
+      if (value == null) { throw new NullPointerException(); }
+      url_ = value;
+      bitField0_ |= 0x00000010;
+      onChanged();
+      return this;
+    }
+    /**
+     * <code>string url = 5 [json_name = "url"];</code>
+     * @return This builder for chaining.
+     */
+    public Builder clearUrl() {
+      url_ = getDefaultInstance().getUrl();
+      bitField0_ = (bitField0_ & ~0x00000010);
+      onChanged();
+      return this;
+    }
+    /**
+     * <code>string url = 5 [json_name = "url"];</code>
+     * @param value The bytes for url to set.
+     * @return This builder for chaining.
+     */
+    public Builder setUrlBytes(
+        com.google.protobuf.ByteString value) {
+      if (value == null) { throw new NullPointerException(); }
+      checkByteStringIsUtf8(value);
+      url_ = value;
+      bitField0_ |= 0x00000010;
+      onChanged();
+      return this;
+    }
+
+    private java.lang.Object method_ = "";
+    /**
+     * <code>string method = 6 [json_name = "method"];</code>
+     * @return The method.
+     */
+    public java.lang.String getMethod() {
+      java.lang.Object ref = method_;
+      if (!(ref instanceof java.lang.String)) {
+        com.google.protobuf.ByteString bs =
+            (com.google.protobuf.ByteString) ref;
+        java.lang.String s = bs.toStringUtf8();
+        method_ = s;
+        return s;
+      } else {
+        return (java.lang.String) ref;
+      }
+    }
+    /**
+     * <code>string method = 6 [json_name = "method"];</code>
+     * @return The bytes for method.
+     */
+    public com.google.protobuf.ByteString
+        getMethodBytes() {
+      java.lang.Object ref = method_;
+      if (ref instanceof String) {
+        com.google.protobuf.ByteString b = 
+            com.google.protobuf.ByteString.copyFromUtf8(
+                (java.lang.String) ref);
+        method_ = b;
+        return b;
+      } else {
+        return (com.google.protobuf.ByteString) ref;
+      }
+    }
+    /**
+     * <code>string method = 6 [json_name = "method"];</code>
+     * @param value The method to set.
+     * @return This builder for chaining.
+     */
+    public Builder setMethod(
+        java.lang.String value) {
+      if (value == null) { throw new NullPointerException(); }
+      method_ = value;
+      bitField0_ |= 0x00000020;
+      onChanged();
+      return this;
+    }
+    /**
+     * <code>string method = 6 [json_name = "method"];</code>
+     * @return This builder for chaining.
+     */
+    public Builder clearMethod() {
+      method_ = getDefaultInstance().getMethod();
+      bitField0_ = (bitField0_ & ~0x00000020);
+      onChanged();
+      return this;
+    }
+    /**
+     * <code>string method = 6 [json_name = "method"];</code>
+     * @param value The bytes for method to set.
+     * @return This builder for chaining.
+     */
+    public Builder setMethodBytes(
+        com.google.protobuf.ByteString value) {
+      if (value == null) { throw new NullPointerException(); }
+      checkByteStringIsUtf8(value);
+      method_ = value;
+      bitField0_ |= 0x00000020;
+      onChanged();
+      return this;
+    }
+
+    private int apiCollectionId_ ;
+    /**
+     * <code>int32 api_collection_id = 7 [json_name = "apiCollectionId"];</code>
+     * @return The apiCollectionId.
+     */
+    @java.lang.Override
+    public int getApiCollectionId() {
+      return apiCollectionId_;
+    }
+    /**
+     * <code>int32 api_collection_id = 7 [json_name = "apiCollectionId"];</code>
+     * @param value The apiCollectionId to set.
+     * @return This builder for chaining.
+     */
+    public Builder setApiCollectionId(int value) {
+
+      apiCollectionId_ = value;
+      bitField0_ |= 0x00000040;
+      onChanged();
+      return this;
+    }
+    /**
+     * <code>int32 api_collection_id = 7 [json_name = "apiCollectionId"];</code>
+     * @return This builder for chaining.
+     */
+    public Builder clearApiCollectionId() {
+      bitField0_ = (bitField0_ & ~0x00000040);
+      apiCollectionId_ = 0;
+      onChanged();
+      return this;
+    }
+
+    private java.lang.Object payload_ = "";
+    /**
+     * <code>string payload = 8 [json_name = "payload"];</code>
+     * @return The payload.
+     */
+    public java.lang.String getPayload() {
+      java.lang.Object ref = payload_;
+      if (!(ref instanceof java.lang.String)) {
+        com.google.protobuf.ByteString bs =
+            (com.google.protobuf.ByteString) ref;
+        java.lang.String s = bs.toStringUtf8();
+        payload_ = s;
+        return s;
+      } else {
+        return (java.lang.String) ref;
+      }
+    }
+    /**
+     * <code>string payload = 8 [json_name = "payload"];</code>
+     * @return The bytes for payload.
+     */
+    public com.google.protobuf.ByteString
+        getPayloadBytes() {
+      java.lang.Object ref = payload_;
+      if (ref instanceof String) {
+        com.google.protobuf.ByteString b = 
+            com.google.protobuf.ByteString.copyFromUtf8(
+                (java.lang.String) ref);
+        payload_ = b;
+        return b;
+      } else {
+        return (com.google.protobuf.ByteString) ref;
+      }
+    }
+    /**
+     * <code>string payload = 8 [json_name = "payload"];</code>
+     * @param value The payload to set.
+     * @return This builder for chaining.
+     */
+    public Builder setPayload(
+        java.lang.String value) {
+      if (value == null) { throw new NullPointerException(); }
+      payload_ = value;
+      bitField0_ |= 0x00000080;
+      onChanged();
+      return this;
+    }
+    /**
+     * <code>string payload = 8 [json_name = "payload"];</code>
+     * @return This builder for chaining.
+     */
+    public Builder clearPayload() {
+      payload_ = getDefaultInstance().getPayload();
+      bitField0_ = (bitField0_ & ~0x00000080);
+      onChanged();
+      return this;
+    }
+    /**
+     * <code>string payload = 8 [json_name = "payload"];</code>
+     * @param value The bytes for payload to set.
+     * @return This builder for chaining.
+     */
+    public Builder setPayloadBytes(
+        com.google.protobuf.ByteString value) {
+      if (value == null) { throw new NullPointerException(); }
+      checkByteStringIsUtf8(value);
+      payload_ = value;
+      bitField0_ |= 0x00000080;
+>>>>>>> 36e13656a (refactor code)
       onChanged();
       return this;
     }

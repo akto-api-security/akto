@@ -41,6 +41,7 @@ public final class MessageProto {
     java.lang.String[] descriptorData = {
       "\n:threat_protection/message/malicious_ev" +
       "ent/v1/message.proto\022,threat_protection." +
+<<<<<<< HEAD
       "message.malicious_event.v1\"\215\004\n\016Malicious" +
       "Event\022\024\n\005actor\030\001 \001(\tR\005actor\022\033\n\tfilter_id" +
       "\030\002 \001(\tR\010filterId\022\037\n\013detected_at\030\003 \001(\003R\nd" +
@@ -74,6 +75,34 @@ public final class MessageProto {
       com.google.protobuf.GeneratedMessage.FieldAccessorTable(
         internal_static_threat_protection_message_malicious_event_v1_MaliciousEvent_descriptor,
         new java.lang.String[] { "Actor", "FilterId", "DetectedAt", "LatestApiIp", "LatestApiEndpoint", "LatestApiMethod", "LatestApiCollectionId", "LatestApiPayload", "EventType", });
+||||||| parent of 36e13656a (refactor code)
+=======
+      "message.malicious_event.v1\"\341\001\n\016Malicious" +
+      "Event\022\024\n\005actor\030\001 \001(\tR\005actor\022\033\n\tfilter_id" +
+      "\030\002 \001(\tR\010filterId\022\016\n\002ip\030\003 \001(\tR\002ip\022\034\n\ttime" +
+      "stamp\030\004 \001(\003R\ttimestamp\022\020\n\003url\030\005 \001(\tR\003url" +
+      "\022\026\n\006method\030\006 \001(\tR\006method\022*\n\021api_collecti" +
+      "on_id\030\007 \001(\005R\017apiCollectionId\022\030\n\007payload\030" +
+      "\010 \001(\tR\007payloadB\226\002\n;com.akto.proto.threat" +
+      "_protection.message.malicious_event.v1B\014" +
+      "MessageProtoP\001\242\002\003TMM\252\002*ThreatProtection." +
+      "Message.MaliciousEvent.V1\312\002*ThreatProtec" +
+      "tion\\Message\\MaliciousEvent\\V1\342\0026ThreatP" +
+      "rotection\\Message\\MaliciousEvent\\V1\\GPBM" +
+      "etadata\352\002-ThreatProtection::Message::Mal" +
+      "iciousEvent::V1b\006proto3"
+    };
+    descriptor = com.google.protobuf.Descriptors.FileDescriptor
+      .internalBuildGeneratedFileFrom(descriptorData,
+        new com.google.protobuf.Descriptors.FileDescriptor[] {
+        });
+    internal_static_threat_protection_message_malicious_event_v1_MaliciousEvent_descriptor =
+      getDescriptor().getMessageTypes().get(0);
+    internal_static_threat_protection_message_malicious_event_v1_MaliciousEvent_fieldAccessorTable = new
+      com.google.protobuf.GeneratedMessage.FieldAccessorTable(
+        internal_static_threat_protection_message_malicious_event_v1_MaliciousEvent_descriptor,
+        new java.lang.String[] { "Actor", "FilterId", "Ip", "Timestamp", "Url", "Method", "ApiCollectionId", "Payload", });
+>>>>>>> 36e13656a (refactor code)
     descriptor.resolveAllFeaturesImmutable();
   }
 
