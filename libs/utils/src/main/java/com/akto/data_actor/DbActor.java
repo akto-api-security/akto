@@ -1,11 +1,13 @@
 package com.akto.data_actor;
 
+import com.akto.dao.DependencyFlowNodesDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.testing.TestingRunResultSummariesDao;
 import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.billing.Tokens;
+import com.akto.dto.dependency_flow.Node;
 import com.akto.dto.filter.MergedUrls;
 import com.akto.dto.runtime_filters.RuntimeFilter;
 import com.akto.dto.settings.DataControlSettings;
@@ -15,9 +17,12 @@ import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.AccessMatrixTaskInfo;
 import com.akto.dto.testing.AccessMatrixUrlToRole;
 import com.akto.dto.testing.EndpointLogicalGroup;
+import com.akto.dto.testing.LoginFlowStepsData;
+import com.akto.dto.testing.OtpTestData;
 import com.akto.dto.testing.TestRoles;
 import com.akto.dto.testing.TestingRun;
 import com.akto.dto.testing.TestingRun.State;
+import com.akto.dto.testing.config.TestScript;
 import com.akto.dto.testing.TestingRunConfig;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.TestingRunResultSummary;
@@ -33,6 +38,12 @@ import com.akto.dto.type.URLMethods;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.dto.usage.MetricTypes;
 import com.mongodb.BasicDBList;
+import com.akto.util.Constants;
+import com.mongodb.BasicDBObject;
+import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.FindOneAndUpdateOptions;
+import com.mongodb.client.model.ReturnDocument;
+import com.mongodb.client.model.Updates;
 import com.mongodb.client.model.WriteModel;
 
 import java.util.ArrayList;
@@ -509,6 +520,54 @@ public class DbActor extends DataActor {
 
     public List<TestingRunResultSummary> fetchStatusOfTests() {
         return DbLayer.fetchStatusOfTests();
+    }
+
+    public void createCollectionSimpleForVpc(int vxlanId, String vpcId) {
+        DbLayer.createCollectionSimpleForVpc(vxlanId, vpcId);
+    }
+
+    public void createCollectionForHostAndVpc(String host, int colId, String vpcId) {
+        DbLayer.createCollectionForHostAndVpc(host, colId, vpcId);
+    }
+
+    public List<BasicDBObject> fetchEndpointsInCollectionUsingHost(int apiCollectionId, int skip, int deltaPeriodValue) {
+        return DbLayer.fetchEndpointsInCollectionUsingHost(apiCollectionId, skip, deltaPeriodValue);
+    }
+
+    public OtpTestData fetchOtpTestData(String uuid, int curTime){
+        return DbLayer.fetchOtpTestData(uuid, curTime);
+    }
+
+    public RecordedLoginFlowInput fetchRecordedLoginFlowInput(){
+        return DbLayer.fetchRecordedLoginFlowInput();
+    }
+
+    public LoginFlowStepsData fetchLoginFlowStepsData(int userId) {
+        return DbLayer.fetchLoginFlowStepsData(userId);
+    }
+
+    public void updateLoginFlowStepsData(int userId, Map<String, Object> valuesMap){
+        DbLayer.updateLoginFlowStepsData(userId, valuesMap);
+    }
+
+    public Node fetchDependencyFlowNodesByApiInfoKey(int apiCollectionId, String url, String method) {
+        return DbLayer.fetchDependencyFlowNodesByApiInfoKey(apiCollectionId, url, method);
+    }
+
+    public List<SampleData> fetchSampleDataForEndpoints(List<ApiInfo.ApiInfoKey> endpoints){
+        return DbLayer.fetchSampleDataForEndpoints(endpoints);
+    }
+
+    public List<Node> fetchNodesForCollectionIds(List<Integer> apiCollectionsIds, boolean removeZeroLevel, int skip){
+        return DbLayer.fetchNodesForCollectionIds(apiCollectionsIds, removeZeroLevel, skip);
+    }
+
+    public long countTestingRunResultSummaries(Bson filter){
+        return DbLayer.countTestingRunResultSummaries(filter);
+    }
+
+    public TestScript fetchTestScript(){
+        return DbLayer.fetchTestScript();
     }
 
 }

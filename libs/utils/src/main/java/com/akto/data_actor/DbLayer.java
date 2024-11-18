@@ -32,6 +32,7 @@ import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing.AccessMatrixTaskInfosDao;
 import com.akto.dao.testing.AccessMatrixUrlToRolesDao;
 import com.akto.dao.testing.EndpointLogicalGroupDao;
+import com.akto.dao.testing.LoginFlowStepsDao;
 import com.akto.dao.testing.TestRolesDao;
 import com.akto.dao.testing.TestingRunConfigDao;
 import com.akto.dao.testing.TestingRunDao;
@@ -39,6 +40,8 @@ import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dao.testing.TestingRunResultSummariesDao;
 import com.akto.dao.testing.WorkflowTestResultsDao;
 import com.akto.dao.testing.WorkflowTestsDao;
+import com.akto.dao.testing.config.TestCollectionPropertiesDao;
+import com.akto.dao.testing.config.TestScriptsDao;
 import com.akto.dao.testing.sources.TestSourceConfigsDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dao.traffic_metrics.RuntimeMetricsDao;
@@ -46,6 +49,7 @@ import com.akto.dao.traffic_metrics.TrafficMetricsDao;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.billing.Tokens;
+import com.akto.dto.dependency_flow.Node;
 import com.akto.dto.runtime_filters.RuntimeFilter;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.test_run_findings.TestingIssuesId;
@@ -53,6 +57,8 @@ import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.AccessMatrixTaskInfo;
 import com.akto.dto.testing.AccessMatrixUrlToRole;
 import com.akto.dto.testing.EndpointLogicalGroup;
+import com.akto.dto.testing.LoginFlowStepsData;
+import com.akto.dto.testing.OtpTestData;
 import com.akto.dto.testing.TestRoles;
 import com.akto.dto.testing.TestingRun;
 import com.akto.dto.testing.TestingRunConfig;
@@ -61,6 +67,7 @@ import com.akto.dto.testing.TestingRunResultSummary;
 import com.akto.dto.testing.WorkflowTest;
 import com.akto.dto.testing.WorkflowTestResult;
 import com.akto.dto.testing.TestingRun.State;
+import com.akto.dto.testing.config.TestScript;
 import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.traffic.SuspectSampleData;
@@ -358,6 +365,22 @@ public class DbLayer {
         );
     }
 
+    public static void createCollectionSimpleForVpc(int vxlanId, String vpcId) {
+        UpdateOptions updateOptions = new UpdateOptions();
+        updateOptions.upsert(true);
+
+        ApiCollectionsDao.instance.getMCollection().updateOne(
+                Filters.eq("_id", vxlanId),
+                Updates.combine(
+                        Updates.set(ApiCollection.VXLAN_ID, vxlanId),
+                        Updates.setOnInsert("startTs", Context.now()),
+                        Updates.setOnInsert("urls", new HashSet<>()),
+                        Updates.set("userSetEnvType", vpcId)
+                ),
+                updateOptions
+        );
+    }
+
     public static void createCollectionForHost(String host, int id) {
 
         FindOneAndUpdateOptions updateOptions = new FindOneAndUpdateOptions();
@@ -367,6 +390,21 @@ public class DbLayer {
             Updates.setOnInsert("_id", id),
             Updates.setOnInsert("startTs", Context.now()),
             Updates.setOnInsert("urls", new HashSet<>())
+        );
+
+        ApiCollectionsDao.instance.getMCollection().findOneAndUpdate(Filters.eq(ApiCollection.HOST_NAME, host), updates, updateOptions);
+    }
+
+    public static void createCollectionForHostAndVpc(String host, int id, String vpcId) {
+
+        FindOneAndUpdateOptions updateOptions = new FindOneAndUpdateOptions();
+        updateOptions.upsert(true);
+
+        Bson updates = Updates.combine(
+            Updates.setOnInsert("_id", id),
+            Updates.setOnInsert("startTs", Context.now()),
+            Updates.setOnInsert("urls", new HashSet<>()),
+            Updates.set("userSetEnvType", vpcId)
         );
 
         ApiCollectionsDao.instance.getMCollection().findOneAndUpdate(Filters.eq(ApiCollection.HOST_NAME, host), updates, updateOptions);
@@ -564,7 +602,7 @@ public class DbLayer {
     }
 
     public static List<ApiCollection> fetchAllApiCollectionsMeta() {
-        List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(new BasicDBObject(), Projections.exclude("urls", "conditions"));
+        List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(ApiCollectionsDao.instance.nonApiGroupFilter(), Projections.exclude("urls", "conditions"));
         return apiCollections;
     }
 
@@ -941,4 +979,91 @@ public class DbLayer {
         }
         return currentRunningTests;
     }
+
+    private static final int ENDPOINT_LIMIT = 50;
+
+    public static List<BasicDBObject> fetchEndpointsInCollectionUsingHost(int apiCollectionId, int skip, int deltaPeriodValue) {
+        ApiCollection apiCollection = ApiCollectionsDao.instance.getMeta(apiCollectionId);
+
+        if(apiCollection == null){
+            return new ArrayList<>();
+        }
+
+        if (apiCollection.getHostName() == null || apiCollection.getHostName().length() == 0 ) {
+            return ApiCollectionsDao.fetchEndpointsInCollection(apiCollectionId, skip, ENDPOINT_LIMIT, deltaPeriodValue);
+        } else {
+            List<SingleTypeInfo> allUrlsInCollection = ApiCollectionsDao.fetchHostSTI(apiCollectionId, skip);
+
+            List<BasicDBObject> endpoints = new ArrayList<>();
+            for(SingleTypeInfo singleTypeInfo: allUrlsInCollection) {
+                BasicDBObject groupId = new BasicDBObject(ApiInfoKey.API_COLLECTION_ID, singleTypeInfo.getApiCollectionId())
+                    .append(ApiInfoKey.URL, singleTypeInfo.getUrl())
+                    .append(ApiInfoKey.METHOD, singleTypeInfo.getMethod());
+                endpoints.add(new BasicDBObject("startTs", singleTypeInfo.getTimestamp()).append(Constants.ID, groupId));
+            }
+
+            return endpoints;
+        }
+    }    
+
+    public static OtpTestData fetchOtpTestData(String uuid, int curTime){
+        Bson filters = Filters.and(
+            Filters.eq("uuid", uuid),
+            Filters.gte("createdAtEpoch", curTime)
+        );
+        return OtpTestDataDao.instance.findOne(filters);
+    }
+
+    public static RecordedLoginFlowInput fetchRecordedLoginFlowInput(){
+        return RecordedLoginInputDao.instance.findOne(new BasicDBObject());
+    }
+
+    public static LoginFlowStepsData fetchLoginFlowStepsData(int userId) {
+        Bson filters = Filters.and(
+                Filters.eq("userId", userId));
+        return LoginFlowStepsDao.instance.findOne(filters);
+    }
+
+    public static void updateLoginFlowStepsData(int userId, Map<String, Object> valuesMap) {
+        Bson filter = Filters.and(
+                Filters.eq("userId", userId));
+        Bson update = Updates.set("valuesMap", valuesMap);
+        LoginFlowStepsDao.instance.updateOne(filter, update);
+    }
+
+    public static Node fetchDependencyFlowNodesByApiInfoKey(int apiCollectionId, String url, String method) {
+        Node node = DependencyFlowNodesDao.instance.findOne(
+                Filters.and(
+                        Filters.eq("apiCollectionId", apiCollectionId + ""),
+                        Filters.eq("url", url),
+                        Filters.eq("method", method)));
+        return node;
+    }
+
+    public static List<SampleData> fetchSampleDataForEndpoints(List<ApiInfo.ApiInfoKey> endpoints) {
+        List<Bson> filters = new ArrayList<>();
+        for (ApiInfo.ApiInfoKey endpoint : endpoints) {
+            filters.add(Filters.and(
+                    Filters.eq("_id.apiCollectionId", endpoint.getApiCollectionId()),
+                    Filters.eq("_id.url", endpoint.getUrl()),
+                    Filters.eq("_id.method", endpoint.getMethod().name())));
+        }
+        return SampleDataDao.instance.findAll(Filters.or(filters));
+    }
+
+    final static int NODE_LIMIT = 100;
+
+    public static List<Node> fetchNodesForCollectionIds(List<Integer> apiCollectionsIds, boolean removeZeroLevel, int skip) {
+        return DependencyFlowNodesDao.instance.findNodesForCollectionIds(apiCollectionsIds, removeZeroLevel, skip,
+                NODE_LIMIT);
+    }
+
+    public static long countTestingRunResultSummaries(Bson filter){
+        return TestingRunResultSummariesDao.instance.count(filter);
+    }
+
+    public static TestScript fetchTestScript(){
+        return TestScriptsDao.instance.fetchTestScript();
+    }
+
 }

@@ -5,7 +5,6 @@ import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.traffic_collector.TrafficCollectorInfoDao;
 import com.akto.dao.traffic_collector.TrafficCollectorMetricsDao;
-import com.akto.data_actor.DbActor;
 import com.akto.data_actor.DbLayer;
 import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
@@ -13,6 +12,7 @@ import com.akto.dto.billing.Organization;
 import com.akto.dto.billing.Tokens;
 import com.akto.dto.bulk_updates.BulkUpdates;
 import com.akto.dto.bulk_updates.UpdatePayload;
+import com.akto.dto.dependency_flow.Node;
 import com.akto.dto.filter.MergedUrls;
 import com.akto.dto.runtime_filters.RuntimeFilter;
 import com.akto.dto.settings.DataControlSettings;
@@ -20,6 +20,7 @@ import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.*;
+import com.akto.dto.testing.config.TestScript;
 import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.traffic.SuspectSampleData;
@@ -91,6 +92,7 @@ public class DbAction extends ActionSupport {
     List<BulkUpdates> writesForTestingRunIssues;
     List<BulkUpdates> writesForSuspectSampleData;
     List<DependencyNode> dependencyNodeList;
+    TestScript testScript;
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(DbAction.class, LogDb.DB_ABS);
 
@@ -156,6 +158,7 @@ public class DbAction extends ActionSupport {
     Set<MergedUrls> mergedUrls;
     List<TestingRunResultSummary> currentlyRunningTests;
     String state;
+    Bson filter;
 
     public BasicDBList getIssuesIds() {
         return issuesIds;
@@ -224,6 +227,7 @@ public class DbAction extends ActionSupport {
     ObjectMapper objectMapper = new ObjectMapper().configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false).configure(DeserializationFeature.FAIL_ON_INVALID_SUBTYPE, false).configure(DeserializationFeature.FAIL_ON_IGNORED_PROPERTIES, false);
     KafkaUtils kafkaUtils = new KafkaUtils();
     String endpointLogicalGroupId;
+    String vpcId;
 
     String metricType;
 
@@ -247,6 +251,18 @@ public class DbAction extends ActionSupport {
 
     DataControlSettings dataControlSettings;
     BasicDBList metricsData;
+
+    int deltaPeriodValue;
+    String uuid;
+    int currTime;
+    OtpTestData otpTestData;
+    RecordedLoginFlowInput recordedLoginFlowInput;
+    LoginFlowStepsData loginFlowStepsData;
+    int userId;
+    Map<String, Object> valuesMap;
+    Node node;
+    List<Node> nodes;
+    boolean removeZeroLevel;
 
     public String fetchDataControlSettings() {
         try {
@@ -390,7 +406,7 @@ public class DbAction extends ActionSupport {
                 if (UsageMetricCalculator.getDeactivated().contains(id.getApiCollectionId())) {
                     continue;
                 }
-                if (accountId == 1714700875 && URLMethods.Method.OPTIONS.equals(id.getMethod())) {
+                if (URLMethods.Method.OPTIONS.equals(id.getMethod()) || URLMethods.Method.OTHER.equals(id.getMethod())) {
                     continue;
                 }
                 if (accountId == 1721887185 && (id.getApiCollectionId() == 1991121043 || id.getApiCollectionId() == -1134993740)  && !id.getMethod().equals(Method.OPTIONS))  {
@@ -457,7 +473,7 @@ public class DbAction extends ActionSupport {
                                 url = entry.getValue().toString();
                             } else if(entry.getKey().equalsIgnoreCase(SingleTypeInfo._METHOD)){
                                 method = entry.getValue().toString();
-                                if (accId == 1714700875 && URLMethods.Method.OPTIONS.equals(Method.valueOf(method))) {
+                                if ("OPTIONS".equals(method) || "CONNECT".equals(method)) {
                                     ignore = true;
                                 }
                             } else if(entry.getKey().equalsIgnoreCase(SingleTypeInfo._PARAM)){
@@ -619,7 +635,7 @@ public class DbAction extends ActionSupport {
                     String url = (String) mObj.get("url");
                     String method = (String) mObj.get("method");
 
-                    if (accId == 1714700875 && URLMethods.Method.OPTIONS.equals(Method.valueOf(method))) {
+                    if ("OPTIONS".equals(method) || "CONNECT".equals(method)) {
                         continue;
                     }
 
@@ -703,8 +719,8 @@ public class DbAction extends ActionSupport {
                             try {
                                 String key = entry.getKey();
                                 String value = (String) entry.getValue();
-                                if ("_id.method".equals(key) && accId == 1714700875
-                                        && URLMethods.Method.OPTIONS.equals(Method.valueOf(value))) {
+                                if ("_id.method".equals(key)
+                                        && ("OPTIONS".equals(value) || "CONNECT".equals(value))) {
                                     ignore = true;
                                     break;
                                 }
@@ -954,6 +970,11 @@ public class DbAction extends ActionSupport {
                              * cause the info. from mini-testing always contains HIGH.
                              * To be fixed in mini-testing.
                              */
+                            /*
+                             * Severity from info. fixed,
+                             * so taking for dynamic_severity,
+                             * since rest would be same and for old deployments.
+                             */
                             String testSubCategory = idd.getTestSubCategory();
                             YamlTemplate template = YamlTemplateDao.instance
                                     .findOne(Filters.eq(Constants.ID, testSubCategory));
@@ -961,7 +982,7 @@ public class DbAction extends ActionSupport {
 
                             if (template != null) {
                                 String severity = template.getInfo().getSeverity();
-                                if (severity != null) {
+                                if (severity != null && !"dynamic_severity".equals(severity)) {
                                     dVal = severity;
                                 }
                             }
@@ -1901,6 +1922,13 @@ public class DbAction extends ActionSupport {
     public String insertTestingLog() {
         try {
             Log dbLog = new Log(log.getString("log"), log.getString("key"), log.getInt("timestamp"));
+
+            // Skip writing cyborg call logs.
+            if (dbLog.getLog().contains("ApiExecutor") &&
+                    dbLog.getLog().contains("cyborg")) {
+                return Action.SUCCESS.toUpperCase();
+            }
+
             DbLayer.insertTestingLog(dbLog);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in insertTestingLog " + e.toString());
@@ -2119,6 +2147,121 @@ public class DbAction extends ActionSupport {
                 summaryId
         );
         SlackSender.sendAlert(accountId, apiTestStatusAlert);
+    }
+
+    public String createCollectionSimpleForVpc() {
+        try {
+            DbLayer.createCollectionSimpleForVpc(vxlanId, vpcId);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in createCollectionSimpleForVpc " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String createCollectionForHostAndVpc() {
+        try {
+            DbLayer.createCollectionForHostAndVpc(host, colId, vpcId);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in createCollectionForHostAndVpc " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String fetchEndpointsInCollectionUsingHost() {
+        try {
+            apiInfoList = DbLayer.fetchEndpointsInCollectionUsingHost(apiCollectionId, skip, deltaPeriodValue);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in fetchEndpointsInCollectionUsingHost " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String fetchOtpTestData() {
+        try {
+            otpTestData = DbLayer.fetchOtpTestData(uuid, currTime);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in fetchOtpTestData " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String fetchRecordedLoginFlowInput() {
+        try {
+            recordedLoginFlowInput = DbLayer.fetchRecordedLoginFlowInput();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in fetchRecordedLoginFlowInput " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String fetchLoginFlowStepsData() {
+        try {
+            loginFlowStepsData = DbLayer.fetchLoginFlowStepsData(userId);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in fetchLoginFlowStepsData " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String updateLoginFlowStepsData() {
+        try {
+            DbLayer.updateLoginFlowStepsData(userId, valuesMap);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in updateLoginFlowStepsData " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String fetchDependencyFlowNodesByApiInfoKey() {
+        try {
+            node = DbLayer.fetchDependencyFlowNodesByApiInfoKey(apiCollectionId, url, methodVal);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in fetchDependencyFlowNodesByApiInfoKey " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String fetchSampleDataForEndpoints() {
+        try {
+            sampleDatas = DbLayer.fetchSampleDataForEndpoints(endpoints);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in fetchSampleDataForEndpoints " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String fetchNodesForCollectionIds() {
+        try {
+            nodes = DbLayer.fetchNodesForCollectionIds(apiCollectionIds,removeZeroLevel, skip);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in fetchNodesForCollectionIds " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String countTestingRunResultSummaries() {
+        count = DbLayer.countTestingRunResultSummaries(filter);
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String fetchTestScript() {
+        try {
+            testScript = DbLayer.fetchTestScript();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in fetchTestScript " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
     }
 
     public List<CustomDataTypeMapper> getCustomDataTypes() {
@@ -3049,6 +3192,111 @@ public class DbAction extends ActionSupport {
 
     public void setState(String state) {
         this.state = state;
+    }
+
+    public String getVpcId() {
+        return vpcId;
+    }
+
+    public void setVpcId(String vpcId) {
+        this.vpcId = vpcId;
+    }
+
+
+    public int getDeltaPeriodValue() {
+        return deltaPeriodValue;
+    }
+
+    public void setDeltaPeriodValue(int deltaPeriodValue) {
+        this.deltaPeriodValue = deltaPeriodValue;
+    }
+
+    public String getUuid() {
+        return uuid;
+    }
+
+    public void setUuid(String uuid) {
+        this.uuid = uuid;
+    }
+
+    public int getCurrTime() {
+        return currTime;
+    }
+
+    public void setCurrTime(int currTime) {
+        this.currTime = currTime;
+    }
+
+    public OtpTestData getOtpTestData() {
+        return otpTestData;
+    }
+
+    public void setOtpTestData(OtpTestData otpTestData) {
+        this.otpTestData = otpTestData;
+    }
+
+    public RecordedLoginFlowInput getRecordedLoginFlowInput() {
+        return recordedLoginFlowInput;
+    }
+
+    public void setRecordedLoginFlowInput(RecordedLoginFlowInput recordedLoginFlowInput) {
+        this.recordedLoginFlowInput = recordedLoginFlowInput;
+    }
+
+    public LoginFlowStepsData getLoginFlowStepsData() {
+        return loginFlowStepsData;
+    }
+
+    public void setLoginFlowStepsData(LoginFlowStepsData loginFlowStepsData) {
+        this.loginFlowStepsData = loginFlowStepsData;
+    }
+
+    public int getUserId() {
+        return userId;
+    }
+
+    public void setUserId(int userId) {
+        this.userId = userId;
+    }
+
+    public Map<String, Object> getValuesMap() {
+        return valuesMap;
+    }
+
+    public void setValuesMap(Map<String, Object> valuesMap) {
+        this.valuesMap = valuesMap;
+    }
+
+    public Node getNode() {
+        return node;
+    }
+
+    public void setNode(Node node) {
+        this.node = node;
+    }
+
+    public List<Node> getNodes() {
+        return nodes;
+    }
+
+    public void setNodes(List<Node> nodes) {
+        this.nodes = nodes;
+    }
+
+    public boolean getRemoveZeroLevel() {
+        return removeZeroLevel;
+    }
+
+    public void setRemoveZeroLevel(boolean removeZeroLevel) {
+        this.removeZeroLevel = removeZeroLevel;
+    }
+    
+    public void setFilter(Bson filter) {
+        this.filter = filter;
+    }
+
+    public TestScript getTestScript() {
+        return testScript;
     }
 
 }
