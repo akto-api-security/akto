@@ -42,7 +42,7 @@ function BarGraph({defaultChartOptions, backgroundColor, height, title, data, xA
                 },
                 visible: showYAxis,
                 gridLineWidth: showGridLines ? 1 : 0,
-                min: 1,
+                min: 0,
             }
         ],
         tooltip: {
