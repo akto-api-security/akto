@@ -205,7 +205,7 @@ function Integrations() {
           allItems = [...allItems, ...alertsItems, ...automationItems, ...ssoItems,  ...cicdItems]
         }
         if(func.checkOnPrem()){
-          allItems = [...allItems, ...reportingItems,  ...cicdItems]
+          allItems = [...allItems, ...reportingItems]
         }
         return allItems;
     }
