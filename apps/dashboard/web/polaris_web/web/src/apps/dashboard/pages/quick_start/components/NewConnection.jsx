@@ -63,7 +63,7 @@ function NewConnection() {
     function renderItem(item){
         const {icon,label,text,badge, docsUrl} = item
         const media = (
-            <Box padding={"200"} borderWidth='1' borderColor='border-subdued' borderRadius='2'>
+            <Box padding={"200"} borderWidth='1' borderColor='border-secondary' borderRadius='2'>
                 <Avatar customer size="xs" name={label} source={icon} shape="square"/>
             </Box>
         )

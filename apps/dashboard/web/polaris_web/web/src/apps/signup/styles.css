@@ -2,11 +2,17 @@
     height: unset !important;
 }
 
-.akto-logo .Polaris-Avatar__size2xl--experimental {
+.akto-logo .Polaris-Avatar--sizeXl {
     width: 117px !important;
     height: 38px !important;
 }
 
 .login-page .Polaris-Frame__Main{
     background: var(--white) !important;
+}
+
+.akto-heading .Polaris-Text--heading2xl{
+    font-weight: 500;
+    font-size: var(--p-font-size-800);
+    line-height: var(--p-font-line-height-1000);
 }

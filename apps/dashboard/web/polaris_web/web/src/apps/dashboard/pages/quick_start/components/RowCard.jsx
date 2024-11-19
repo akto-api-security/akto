@@ -15,8 +15,8 @@ function RowCard(props) {
         <Card>
             <BlockStack gap="500">
                 <div style={{display: 'flex' , justifyContent: 'space-between'}}>
-                    <Box padding={"200"} borderWidth='1' borderColor='border-subdued' borderRadius='2'>
-                    <Avatar customer size="xs" name={cardObj.label} source={cardObj.icon} shape='square'/>
+                    <Box padding={"200"} borderWidth='025' borderColor='border-secondary' borderRadius='200'>
+                    <Avatar customer size="xs" name={cardObj.label} source={cardObj.icon}/>
                     </Box>
                     <Box paddingBlockStart="100">
                         {cardObj.badge ? <Badge size='small' tone='info'>{cardObj.badge}</Badge> : null}

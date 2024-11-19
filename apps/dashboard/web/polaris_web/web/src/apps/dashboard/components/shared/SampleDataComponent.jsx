@@ -206,7 +206,7 @@ function SampleDataComponent(props) {
                         { type=="response" && responseTime ? (` (${responseTime} ms)`) : "" }
                         <InlineStack gap={200}>
                             {isNewDiff ? <InlineStack gap="2">
-                                <Box borderInlineEndWidth='1' borderColor="border-subdued" padding="100">
+                                <Box borderInlineEndWidth='1' borderColor="border-secondary" padding="100">
                                     <Text variant="bodyMd" color="subdued">{ lineNumbers[type].length } changes</Text>
                                 </Box>
                                 <InlineStack gap="100">

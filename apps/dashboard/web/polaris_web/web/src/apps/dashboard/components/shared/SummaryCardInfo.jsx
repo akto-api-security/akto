@@ -7,7 +7,7 @@ function SummaryCardInfo({summaryItems}) {
             <Box padding={200} paddingInlineStart={400} paddingInlineEnd={400}>
                 <InlineGrid columns={summaryItems.length} gap={400}>
                     {summaryItems.map((item, index) => (
-                        <Box borderInlineEndWidth={index < (summaryItems.length - 1) ? "1" : ""} key={index} paddingBlockStart={1000} paddingBlockEnd={1000} borderColor="border-subdued">
+                        <Box borderInlineEndWidth={index < (summaryItems.length - 1) ? "1" : ""} key={index} paddingBlockStart={100} paddingBlockEnd={100} borderColor="border-secondary">
                             <BlockStack gap="100">
                                 <Text tone="subdued" variant="headingSm">
                                     {item.title}

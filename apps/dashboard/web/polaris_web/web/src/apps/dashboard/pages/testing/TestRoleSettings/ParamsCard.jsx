@@ -44,7 +44,7 @@ function ParamsCard({dataObj, handleDelete, showEdit}) {
     }
 
     return (
-        <Box borderWidth="1" borderRadius='2' padding={200} borderColor="border-subdued" >
+        <Box borderWidth="1" borderRadius='2' padding={200} borderColor="border-secondary" >
             <BlockStack gap={200}>
                 <BlockStack gap={300}>
                     {headerKey.length > 0 ? <BlockStack gap={200}>

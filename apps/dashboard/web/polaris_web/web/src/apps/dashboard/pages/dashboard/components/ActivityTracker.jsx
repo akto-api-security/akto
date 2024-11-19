@@ -33,7 +33,7 @@ function ActivityTracker({ latestActivity }) {
                 {Object.keys(groupedActivity).map((date, dateIndex) => (
                     <Box key={dateIndex}>
                         <InlineStack gap={400}>
-                            <Box borderColor='border-subdued' borderInlineEndWidth='2' width='0' paddingInlineStart={300} minHeight='44px' />
+                            <Box borderColor='border-secondary' borderInlineEndWidth='2' width='0' paddingInlineStart={300} minHeight='44px' />
                             <Text variant="bodySm" color="subdued" style={{ marginBottom: '10px' }}>
                                 {date}
                             </Text>
@@ -44,7 +44,7 @@ function ActivityTracker({ latestActivity }) {
                                     <Box>
                                         <div style={{marginBlock: '5px'}}><Avatar shape="round" size="xs" source="/public/issues-event-icon.svg" /></div>
                                         {eventIndex < (groupedActivity[date].length - 1) ? (
-                                            <Box borderColor='border-subdued' borderInlineEndWidth='2' width='0' paddingInlineStart={300} minHeight='12px' />
+                                            <Box borderColor='border-secondary' borderInlineEndWidth='2' width='0' paddingInlineStart={300} minHeight='12px' />
                                         ) : null}
                                     </Box>
                                     <Box>

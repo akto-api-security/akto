@@ -786,7 +786,7 @@ getCollapsibleRow(urls, severity){
             const borderStyle = index < (urls.length - 1) ? {borderBlockEndWidth : 1} : {}
             return( 
               <Box padding={"200"} paddingInlineEnd={"400"} paddingInlineStart={"400"} key={index}
-                  borderColor="border-subdued" {...borderStyle}
+                  borderColor="border-secondary" {...borderStyle}
               >
                 <Link monochrome onClick={() => history.navigate(ele.nextUrl)} removeUnderline >
                   {this.getUrlComp(ele.url)}

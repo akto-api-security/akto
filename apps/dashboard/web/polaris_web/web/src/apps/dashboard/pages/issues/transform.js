@@ -33,7 +33,7 @@ const transform = {
                     const borderStyle = index < (urls.length - 1) ? {borderBlockEndWidth : 1} : {}
                     return (
                         <Box padding={"200"} paddingInlineEnd={"400"} paddingInlineStart={"300"} key={index}
-                        borderColor="border-subdued" {...borderStyle}>
+                        borderColor="border-secondary" {...borderStyle}>
                         <InlineStack gap={24} wrap={false}>
                             <Box paddingInlineStart={1000}>
                             <IssuesCheckbox id={ele.id}/>

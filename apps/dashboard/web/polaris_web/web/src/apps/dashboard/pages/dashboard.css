@@ -56,6 +56,11 @@
 }
 .Polaris-TopBar{
     border-bottom: 1px solid #E1E3E5;
+    background-color:var(--p-color-bg-surface)!important;
+}
+
+.Polaris-TopBar-SearchField__Backdrop{
+    background-color:var(--p-color-bg-fill-secondary)!important;
 }
 
 .call-banner {

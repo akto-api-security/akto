@@ -181,7 +181,7 @@ function TestRunResultFlyout(props) {
                     </Box>
                     <InlineStack gap={"200"}>
                         <Text color="subdued" variant="bodySm">{transform.getTestingRunResultUrl(selectedTestRunResult)}</Text>
-                        <Box width="1px" borderColor="border-subdued" borderInlineStartWidth="1" minHeight='16px'/>
+                        <Box width="1px" borderColor="border-secondary" borderInlineStartWidth="1" minHeight='16px'/>
                         <Text color="subdued" variant="bodySm">{selectedTestRunResult?.testCategory}</Text>
                     </InlineStack>
                 </BlockStack>

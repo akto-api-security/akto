@@ -15,12 +15,14 @@ function SignupPage() {
             <div style={{flex: '4', overflow: "hidden", boxShadow: "-1px 0px 0px 0px #E4E5E7 inset"}}>
                 <Box paddingBlockStart={"2400"} paddingInlineStart={"2000"} paddingInlineEnd={"800"}>
                     <BlockStack gap="600">
-                        <Text variant="heading3xl" fontWeight="medium">
-                            {`"It's truly a game-changer and we highly recommend Akto to anyone looking to effortlessly secure their API endpoints."`}
-                        </Text>
+                        <div className='akto-heading'>
+                            <Text variant="heading2xl" fontWeight="medium">
+                                {`"It's truly a game-changer and we highly recommend Akto to anyone looking to effortlessly secure their API endpoints."`}
+                            </Text>
+                        </div>
                         <Box>
                             <Text variant="headingLg">— Security team</Text>
-                            <Text fontWeight="medium" color="subdued">Enterprise SaaS customer</Text>
+                            <Text fontWeight="medium" tone="subdued">Enterprise SaaS customer</Text>
                         </Box>
                         <img  src="/public/productss.png" alt='ss' style={{...imageStyle}}/>
                     </BlockStack>

@@ -557,14 +557,14 @@ const runningTestsComp = useMemo(() => (
             <Text color="subdued" fontWeight="medium" variant="bodyMd">created by:</Text>
             <Text color="subdued" variant="bodyMd">{selectedTestRun.userEmail}</Text>
           </InlineStack>
-          <Box width="1px" borderColor="border-subdued" borderInlineStartWidth="1" minHeight='16px'/>
+          <Box width="1px" borderColor="border-secondary" borderInlineStartWidth="1" minHeight='16px'/>
           <Link monochrome target="_blank" url={"/dashboard/observe/inventory/" + selectedTestRun?.apiCollectionId} removeUnderline>
             <InlineStack gap={"100"}>
               <Box><Icon tone="subdued" source={ArchiveIcon}/></Box>
               <Text color="subdued" variant="bodyMd">{collectionsMap[selectedTestRun?.apiCollectionId]}</Text>
             </InlineStack>
           </Link>
-          <Box width="1px" borderColor="border-subdued" borderInlineStartWidth="1" minHeight='16px'/>
+          <Box width="1px" borderColor="border-secondary" borderInlineStartWidth="1" minHeight='16px'/>
           <InlineStack gap={"100"}>
             <Box><Icon tone="subdued" source={SearchListIcon}/></Box>
             <Text color="subdued" variant="bodyMd">{getHeadingStatus(selectedTestRun)}</Text>
