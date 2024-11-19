@@ -449,7 +449,7 @@ prettifyEpoch(epoch) {
   },
   requestJson: function (message, highlightPaths) {
 
-    if(message==undefined){
+    if(!message || typeof message !== "object" || Object.keys(message).length === 0){
       return {}
     }
     let result = {}
@@ -464,8 +464,8 @@ prettifyEpoch(epoch) {
       requestPayloadString = message["request"]["body"] || "{}"
     } else {
       let url = message["path"]
-      let urlSplit = url.split("?")
-      queryParamsString = urlSplit.length > 1 ? urlSplit[1] : ""
+      let urlSplit = (typeof url === "string") ? url?.split("?") : []
+      queryParamsString = urlSplit?.length > 1 ? urlSplit[1] : ""
 
       requestHeadersString = message["requestHeaders"] || "{}"
       requestPayloadString = message["requestPayload"] || "{}"
@@ -515,7 +515,7 @@ prettifyEpoch(epoch) {
   },
   responseJson: function (message, highlightPaths) {
 
-    if(message==undefined){
+    if(!message || typeof message !== "object" || Object.keys(message).length === 0){
       return {}
     }
     let result = {}
