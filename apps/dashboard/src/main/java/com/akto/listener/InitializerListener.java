@@ -2258,15 +2258,15 @@ public class InitializerListener implements ServletContextListener {
                     loggerMaker.infoAndAddToDb("Dashboard started at " + Context.now());
                 }
 
-                setDashboardMode();
-                updateGlobalAktoVersion();
+                // setDashboardMode();
+                // updateGlobalAktoVersion();
 
                 AccountTask.instance.executeTask(new Consumer<Account>() {
                     @Override
                     public void accept(Account account) {
                         AccountSettingsDao.instance.getStats();
                         Intercom.setToken(System.getenv("INTERCOM_TOKEN"));
-                        setDashboardVersionForAccount();
+                        // setDashboardVersionForAccount();
                     }
                 }, "context-initializer");
 
@@ -2299,7 +2299,6 @@ public class InitializerListener implements ServletContextListener {
                     // setUpAktoMixpanelEndpointsScheduler();
                     setUpDailyScheduler();
                     setUpWebhookScheduler();
-                    cleanInventoryJobRunner();
                     setUpDefaultPayloadRemover();
                     setUpTestEditorTemplatesScheduler();
                     setUpDependencyFlowScheduler();
@@ -2924,6 +2923,7 @@ public class InitializerListener implements ServletContextListener {
 
         // backward compatibility
         try {
+            cleanInventoryJobRunner();
             setBackwardCompatibilities(backwardCompatibility);
             loggerMaker.infoAndAddToDb("Backward compatibilities set for " + Context.accountId.get(), LogDb.DASHBOARD);
             insertPiiSources();
