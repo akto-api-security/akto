@@ -8,6 +8,7 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.parsers.HttpCallParser;
 import com.akto.runtime.policies.AuthPolicy;
+import com.akto.test_editor.Utils;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -128,7 +129,9 @@ public class RedactSampleData {
                 responsePayload = "{}";
             }
         } catch (Exception e) {
-            responsePayload = "{}";
+            if (Utils.isJsonPayload(responsePayload)) {
+                responsePayload = "{}";
+            }
         }
 
         httpResponseParams.setPayload(responsePayload);
@@ -164,7 +167,9 @@ public class RedactSampleData {
                 requestPayload = "{}";
             }
         } catch (Exception e) {
-            requestPayload = "{}";
+            if (Utils.isJsonPayload(requestPayload)) {
+                requestPayload = "{}";
+            }
         }
 
         httpResponseParams.requestParams.setPayload(requestPayload);
