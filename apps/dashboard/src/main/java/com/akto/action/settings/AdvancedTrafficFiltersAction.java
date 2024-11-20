@@ -97,6 +97,8 @@ public class AdvancedTrafficFiltersAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    private boolean deleteAPIsInstantly;
+
     public String syncTrafficFromFilters(){
         FilterConfig filterConfig = new FilterConfig();
         try {
@@ -119,7 +121,7 @@ public class AdvancedTrafficFiltersAction extends UserAction {
                 public void run() {
                     Context.accountId.set(accountId);
                     try {
-                        CleanInventory.cleanFilteredSampleDataFromAdvancedFilters(apiCollections,Arrays.asList(yamlTemplate),new ArrayList<>() , "", false, true);
+                        CleanInventory.cleanFilteredSampleDataFromAdvancedFilters(apiCollections,Arrays.asList(yamlTemplate),new ArrayList<>() , "",deleteAPIsInstantly, true);
                     } catch (Exception e) {
                         e.printStackTrace();
                     }
@@ -149,6 +151,10 @@ public class AdvancedTrafficFiltersAction extends UserAction {
 
     public void setInactive(boolean inactive) {
         this.inactive = inactive;
+    }
+
+    public void setDeleteAPIsInstantly(boolean deleteAPIsInstantly) {
+        this.deleteAPIsInstantly = deleteAPIsInstantly;
     }
 
     
