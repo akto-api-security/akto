@@ -136,6 +136,17 @@
                 <module>testing-cli</module>
             </modules>
         </profile>
+        <profile>
+            <id>threat-protection-backend</id>
+            <activation>
+                <file>
+                    <exists>threat-protection-backend/pom.xml</exists>
+                </file>
+            </activation>
+            <modules>
+                <module>threat-protection-backend</module>
+            </modules>
+        </profile>
     </profiles>
 </project>
 

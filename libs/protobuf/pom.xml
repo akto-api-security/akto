@@ -10,7 +10,7 @@
     </parent>
 
     <groupId>com.akto.libs.protobuf</groupId>
-    <artifactId>protobf</artifactId>
+    <artifactId>protobuf</artifactId>
     <packaging>jar</packaging>
 
     <dependencies>
@@ -49,7 +49,6 @@
             </plugin>
         </plugins>
         <sourceDirectory>src/main/java</sourceDirectory>
-        <testSourceDirectory>src/test/java</testSourceDirectory>
     </build>
 
 </project>
