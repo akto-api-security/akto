@@ -2258,8 +2258,8 @@ public class InitializerListener implements ServletContextListener {
                     loggerMaker.infoAndAddToDb("Dashboard started at " + Context.now());
                 }
 
-                setDashboardMode();
-                updateGlobalAktoVersion();
+                // setDashboardMode();
+                // updateGlobalAktoVersion();
 
                 AccountTask.instance.executeTask(new Consumer<Account>() {
                     @Override
