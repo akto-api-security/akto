@@ -109,6 +109,7 @@ public class AdvancedTrafficFiltersAction extends UserAction {
             }
 
             Set<Integer> deactivatedCollections = UsageMetricCalculator.getDeactivated();
+            deactivatedCollections.add(0);
 
             List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(
                 Filters.nin(Constants.ID, deactivatedCollections), Projections.include(ApiCollection.HOST_NAME, ApiCollection.NAME));
@@ -125,7 +126,7 @@ public class AdvancedTrafficFiltersAction extends UserAction {
                 }
             }, 0 , TimeUnit.SECONDS);
 
-            
+            deactivatedCollections.remove(0);
             return Action.SUCCESS.toUpperCase();
         } catch (Exception e) {
             e.printStackTrace();
