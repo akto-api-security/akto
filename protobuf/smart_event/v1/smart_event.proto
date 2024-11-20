@@ -1,0 +1,13 @@
+syntax = "proto3";
+
+package smart_event.v1;
+
+option java_outer_classname = "SmartEventProto";
+option java_package = "smart_event.v1";
+
+message SmartEvent {
+    string actor_id = 1;
+    string filter_id= 2;
+    int64 detected_timestamp= 3;
+    string reason = 4;
+}
