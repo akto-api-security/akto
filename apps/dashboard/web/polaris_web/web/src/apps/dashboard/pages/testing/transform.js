@@ -597,42 +597,30 @@ const transform = {
     let finalDataSubCategories = [], promises = [], categories = [];
     let testSourceConfigs = []
     const limit = 50;
+    for(var i = 0 ; i < 20; i++){
+      promises.push(
+        api.fetchAllSubCategories(fetchActive, type, i * limit, limit)
+      )
+    }
+    const allResults = await Promise.allSettled(promises);
+    for (const result of allResults) {
+      if (result.status === "fulfilled"){
+        if(result?.value?.subCategories && result?.value?.subCategories !== undefined && result?.value?.subCategories.length > 0){
+          finalDataSubCategories.push(...result.value.subCategories);
+        }
 
-    const localSubCategoryMap = LocalStore.getState().subCategoryMap
-    const localCategoryMap = LocalStore.getState().categoryMap
-
-    if (
-      (!localCategoryMap || Object.keys(localCategoryMap).length === 0) ||
-      (!localSubCategoryMap || Object.keys(localSubCategoryMap).length === 0)
-    ) {
-      for(var i = 0 ; i < 20; i++){
-        promises.push(
-          api.fetchAllSubCategories(fetchActive, type, i * limit, limit)
-        )
-      }
-      const allResults = await Promise.allSettled(promises);
-      for (const result of allResults) {
-        if (result.status === "fulfilled"){
-          if(result?.value?.subCategories && result?.value?.subCategories !== undefined && result?.value?.subCategories.length > 0){
-            finalDataSubCategories.push(...result.value.subCategories);
-          }
-
-          if(result?.value?.categories && result?.value?.categories !== undefined && result?.value?.categories.length > 0){
-            if(categories.length === 0){
-              categories.push(...result.value.categories);
-            }
-          }
-
-          if (result?.value?.testSourceConfigs &&
-            result?.value?.testSourceConfigs !== undefined &&
-            result?.value?.testSourceConfigs.length > 0) {
-            testSourceConfigs = result?.value?.testSourceConfigs
+        if(result?.value?.categories && result?.value?.categories !== undefined && result?.value?.categories.length > 0){
+          if(categories.length === 0){
+            categories.push(...result.value.categories);
           }
         }
+
+        if (result?.value?.testSourceConfigs &&
+          result?.value?.testSourceConfigs !== undefined &&
+          result?.value?.testSourceConfigs.length > 0) {
+          testSourceConfigs = result?.value?.testSourceConfigs
+        }
       }
-    } else {
-      categories = Object.values(localCategoryMap)
-      finalDataSubCategories = Object.values(localSubCategoryMap)
     }
     return {
       categories: categories,

@@ -9,8 +9,9 @@ import func from "@/util/func"
 import { useNavigate } from "react-router-dom"
 import PersistStore from "../../../../main/PersistStore";
 import transform from "../../testing/transform";
+import LocalStore from "../../../../main/LocalStorageStore";
 
-function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOutside, closeRunTest, selectedResourcesForPrimaryAction }) {
+function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOutside, closeRunTest, selectedResourcesForPrimaryAction, useLocalSubCategoryData }) {
 
     const initialState = {
         categories: [],
@@ -63,6 +64,9 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
     const [optionsSelected, setOptionsSelected] = useState(initialArr)
     const [slackIntegrated, setSlackIntegrated] = useState(false)
 
+    const localCategoryMap = LocalStore.getState().categoryMap
+    const localSubCategoryMap = LocalStore.getState().subCategoryMap
+
     function nameSuffixes(tests) {
         return Object.entries(tests)
             .filter(category => {
@@ -91,7 +95,20 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
             setSlackIntegrated(apiTokenList && apiTokenList.length > 0)
         })
 
-        const metaDataObj = await transform.getAllSubcategoriesData(true, "runTests")
+        let metaDataObj = {
+            categories: [],
+            subCategories: [],
+            testSourceConfigs: []
+        }
+        if(!useLocalSubCategoryData) {
+            metaDataObj = await transform.getAllSubcategoriesData(true, "runTests")
+        } else {
+            metaDataObj = {
+                categories: Object.values(localCategoryMap),
+                subCategories: Object.values(localSubCategoryMap),
+                testSourceConfigs: []
+            }
+        }
         let categories = metaDataObj.categories
         let businessLogicSubcategories = metaDataObj.subCategories
         const testRolesResponse = await testingApi.fetchTestRoles()
