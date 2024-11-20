@@ -2266,7 +2266,7 @@ public class InitializerListener implements ServletContextListener {
                     public void accept(Account account) {
                         AccountSettingsDao.instance.getStats();
                         Intercom.setToken(System.getenv("INTERCOM_TOKEN"));
-                        // setDashboardVersionForAccount();
+                        setDashboardVersionForAccount();
                     }
                 }, "context-initializer");
 
@@ -2923,7 +2923,6 @@ public class InitializerListener implements ServletContextListener {
 
         // backward compatibility
         try {
-            cleanInventoryJobRunner();
             setBackwardCompatibilities(backwardCompatibility);
             loggerMaker.infoAndAddToDb("Backward compatibilities set for " + Context.accountId.get(), LogDb.DASHBOARD);
             insertPiiSources();
@@ -2936,7 +2935,9 @@ public class InitializerListener implements ServletContextListener {
 
             AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
             dropSampleDataIfEarlierNotDroped(accountSettings);
-
+            if(Context.accountId != null && Context.accountId.get() == 1729478227){
+                cleanInventoryJobRunner();
+            }
             backFillDiscovered();
             backFillStatusCodeType();
         } catch (Exception e) {
