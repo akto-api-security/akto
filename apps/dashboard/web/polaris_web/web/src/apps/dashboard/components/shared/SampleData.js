@@ -146,7 +146,7 @@ function SampleData(props) {
     const [showActionsModal, setShowActionsModal] = useState(false);
     const [showErrorModal, setShowErrorModal] = useState(false);
     const [selectedWord, setSelectedWord] = useState("");
-    const [dynamicHeight, setDynamicHeight] = useState(minHeight);
+    const [dynamicHeight, setDynamicHeight] = useState(minHeight || '300px');
 
     if(minHeight==undefined){
       minHeight="300px";
