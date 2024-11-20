@@ -1187,9 +1187,12 @@ public class APICatalogSync {
     }
 
     Map<String, SingleTypeInfo> convertToMap(List<SingleTypeInfo> l) {
+        Set<MergedUrls> mergedUrls = MergedUrlsDao.instance.getMergedUrls();
         Map<String, SingleTypeInfo> ret = new HashMap<>();
         for(SingleTypeInfo e: l) {
-            ret.put(e.composeKey(), e);
+            if(!mergedUrls.contains(new MergedUrls(e.getUrl(), e.getMethod(), e.getApiCollectionId()))) {
+                ret.put(e.composeKey(), e);
+            }
         }
 
         return ret;
@@ -1910,7 +1913,7 @@ public class APICatalogSync {
             loggerMaker.infoAndAddToDb(res.getInserts().size() + " " +res.getUpserts().size(), LogDb.RUNTIME);
 
         }
-        
+
 
         loggerMaker.infoAndAddToDb("adding " + writesForSampleData.size() + " updates for samples", LogDb.RUNTIME);
         if(writesForSampleData.size() > 0) {
