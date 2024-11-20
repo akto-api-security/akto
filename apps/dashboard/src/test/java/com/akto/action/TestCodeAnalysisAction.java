@@ -60,7 +60,7 @@ public class TestCodeAnalysisAction extends MongoBasedTest {
         addTrafficApi(apiCollectionId, "https://code-analysis-test.com/api/books/INTEGER", URLMethods.Method.POST);
 
         List<CodeAnalysisApi> codeAnalysisApisList = new ArrayList<>();
-        CodeAnalysisApi ca1 = new CodeAnalysisApi("GET", "/api/books/STRING", new CodeAnalysisApiLocation());
+        CodeAnalysisApi ca1 = new CodeAnalysisApi("GET", "/api/books/STRING", new CodeAnalysisApiLocation(), "{'user': 'String', 'friends': [{'name': 'String', 'age': 'int'}] }", "{'registered': 'boolean'}");
         codeAnalysisApisList.add(ca1);
 
         CodeAnalysisAction codeAnalysisAction = new CodeAnalysisAction();

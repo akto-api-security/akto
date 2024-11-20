@@ -119,6 +119,16 @@ public class ApiCollectionsAction extends UserAction {
                 count = SingleTypeInfoDao.instance.countEndpoints(Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionId));
                 apiCollection.setUrlsCount(count);
             } else {
+                /*
+                 * In case the default collection is filled by traffic-collector traffic, 
+                 * the count will not be null, but the fallbackCount would be zero
+                 */
+                if (apiCollectionId == 0 && count != null) {
+                    fallbackCount = count;
+                }
+                if (fallbackCount == 0 && count != null) {
+                    fallbackCount = count;
+                }
                 apiCollection.setUrlsCount(fallbackCount);
             }
             if(map.containsKey(apiCollectionId)) {
