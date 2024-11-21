@@ -11,7 +11,9 @@ function ConditionComponent(props) {
     const { id, condition, index, param, selectOptions, dispatch } = props
 
     useEffect(()=>{
-        fetchApiEndpoints(condition)
+        if(condition?.type !== 'CONTAINS') {
+            fetchApiEndpoints(condition)
+        }
     },[condition])
     const allCollections = PersistStore(state => state.allCollections);
     const allCollectionsOptions = allCollections.map(collection => {
