@@ -4,6 +4,7 @@ import java.util.*;
 import java.util.regex.Pattern;
 
 import com.akto.dao.context.Context;
+import com.akto.dto.AktoDataType;
 import com.akto.dto.CustomDataType;
 import com.akto.dto.IgnoreData;
 import com.akto.dto.SensitiveParamInfo;
@@ -110,6 +111,47 @@ public class KeyTypes {
         return true;
     }
 
+    private static boolean aktoDataTypeChanged(String name) {
+        Map<String, AktoDataType> aktoDataTypeMap = SingleTypeInfo.getAktoDataTypeMap(Context.accountId.get());
+        AktoDataType aktoDataType = aktoDataTypeMap.get(name);
+        return aktoDataType != null && (aktoDataType.getKeyConditions() != null || aktoDataType.getValueConditions() != null);
+    }
+
+    private static boolean matchesAktoDataType(String name, Object key, Object value) {
+        Map<String, AktoDataType> aktoDataTypeMap = SingleTypeInfo.getAktoDataTypeMap(Context.accountId.get());
+        AktoDataType aktoDataType = aktoDataTypeMap.get(name);
+        return aktoDataType != null && aktoDataType.validate(value, key);
+    }
+
+    private static SubType matchesSubType(SingleTypeInfo.SubType subType, Object key, Object val) {
+        String name = subType.getName();
+        // check if user has overriden the default behaviour of the subtype
+        if (aktoDataTypeChanged(name)) {
+            if (matchesAktoDataType(name, key, val)) {
+                return subType;
+            }
+        } else {
+            switch (name) {
+                case "CREDIT_CARD":
+                    if (isCreditCard(val.toString())) return subType;
+                    break;
+                case "JWT":
+                    if (isJWT(val.toString())) return subType;
+                    break;
+                case "IP_ADDRESS":
+                    if (isIP(val.toString())) return subType;
+                    break;
+                case "PHONE_NUMBER":
+                    if (isPhoneNumber(val.toString())) return subType;
+                    break;
+                default:
+                    return null;
+            }
+        }
+
+        return null;
+    }
+
     private static SubType getSubtype(Object o,String key, boolean checkForSubtypes, boolean isHeader){
         if (o == null) {
             return SingleTypeInfo.NULL;
@@ -128,7 +170,8 @@ public class KeyTypes {
             }
         }
 
-        if (checkForSubtypes  && !isHeader && isCreditCard(o.toString())) {
+        String oString = o.toString();
+        if (checkForSubtypes && !isHeader  && matchesSubType(SingleTypeInfo.CREDIT_CARD, key, oString) != null) {
             return SingleTypeInfo.CREDIT_CARD;
         }
 
@@ -165,19 +208,28 @@ public class KeyTypes {
             for(Map.Entry<SubType, Pattern> entry: patternToSubType.entrySet()) {
                 Pattern pattern = entry.getValue();
                 SubType subType = entry.getKey();
-                if( ( checkForSubtypes || subType.getName().equals("URL") ) && pattern.matcher(str).matches()) {
-                    return subType;
+                String name = subType.getName();
+
+                if (aktoDataTypeChanged(name)) {
+                    if (matchesAktoDataType(name, key, oString)) {
+                        return subType;
+                    }
+                } else {
+                    if( ( checkForSubtypes || subType.getName().equals("URL") ) && pattern.matcher(oString).matches()) {
+                        return subType;
+                    }
                 }
             }
-            if (checkForSubtypes && isJWT(str)) {
+
+            if (checkForSubtypes && matchesSubType(SingleTypeInfo.JWT, key, oString) != null) {
                 return SingleTypeInfo.JWT;
             }
 
-            if (checkForSubtypes && isPhoneNumber(str)) {
+            if (checkForSubtypes && matchesSubType(SingleTypeInfo.PHONE_NUMBER, key, oString) != null) {
                 return SingleTypeInfo.PHONE_NUMBER;
             }
 
-            if (checkForSubtypes && isIP(str)) {
+            if (checkForSubtypes && matchesSubType(SingleTypeInfo.IP_ADDRESS, key, oString) != null) {
                 return SingleTypeInfo.IP_ADDRESS;
             }
 
