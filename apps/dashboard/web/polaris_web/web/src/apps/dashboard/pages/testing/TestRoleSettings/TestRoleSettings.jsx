@@ -143,7 +143,7 @@ function TestRoleSettings() {
                     func.setToast(true, true, "Unable to add test role")
                 })
             } else {
-                api.updateTestRoles(roleName, andConditions, orConditions).then((res) => {
+                await api.updateTestRoles(roleName, andConditions, orConditions).then((res) => {
                     setChange(false);
                     navigate(null, { state: { name: roleName, endpoints: { andConditions: andConditions, orConditions: orConditions }, authWithCondList: authWithCondLists || getAuthWithCondList()},
                         replace:true })
