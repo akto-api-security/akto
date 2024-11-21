@@ -7,7 +7,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import com.akto.cache.CounterCache;
 import com.akto.dto.threat_detection.Bin;
-import com.akto.dto.threat_detection.SampleMaliciousRequest;
+import com.akto.proto.threat_protection.consumer_service.v1.MaliciousEvent;
 
 public class WindowBasedThresholdNotifier {
 
@@ -73,8 +73,8 @@ public class WindowBasedThresholdNotifier {
         this.notifiedMap = new ConcurrentHashMap<>();
     }
 
-    public Result shouldNotify(String aggKey, SampleMaliciousRequest sampleMaliciousRequest) {
-        int binId = sampleMaliciousRequest.getBinId();
+    public Result shouldNotify(String aggKey, MaliciousEvent maliciousEvent) {
+        int binId = (int) maliciousEvent.getTimestamp() / 60;
         String cacheKey = aggKey + "|" + binId;
         this.cache.increment(cacheKey);
 
@@ -89,8 +89,7 @@ public class WindowBasedThresholdNotifier {
         long now = System.currentTimeMillis() / 1000L;
         long lastNotified = this.notifiedMap.getOrDefault(aggKey, 0L);
 
-        boolean cooldownBreached =
-                (now - lastNotified) >= this.config.getNotificationCooldownInSeconds();
+        boolean cooldownBreached = (now - lastNotified) >= this.config.getNotificationCooldownInSeconds();
 
         if (thresholdBreached && cooldownBreached) {
             this.notifiedMap.put(aggKey, now);
