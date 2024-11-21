@@ -219,11 +219,11 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
                         } catch (Exception e) {
                         }
                     });
+                    service.submit(() ->{
+                        triggerVulnColUpdation(user);
+                    });
                 }
             }
-            service.submit(() ->{
-                triggerVulnColUpdation(user);
-            });
             return Action.SUCCESS.toUpperCase();
         } catch (NoSuchAlgorithmException | InvalidKeySpecException | IOException e) {
             e.printStackTrace();
