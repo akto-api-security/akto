@@ -2,7 +2,10 @@ package com.akto.dto;
 
 import java.util.List;
 
+import com.akto.dto.data_types.Conditions;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.util.enums.GlobalEnums.Severity;
+
 
 public class AktoDataType {
     private String name;
@@ -15,6 +18,20 @@ public class AktoDataType {
     private boolean redacted;
     public static final String SAMPLE_DATA_FIXED = "sampleDataFixed";
     private boolean sampleDataFixed;
+
+    public static final String CATEGORIES_LIST = "categoriesList";
+    public static final String TAGS_LIST = "tagsLists";
+    private List<String> categoriesList;
+
+    public static final String DATA_TYPE_PRIORITY = "dataTypePriority";
+    private Severity dataTypePriority;
+
+    public static final String KEY_CONDITIONS = "keyConditions";
+    Conditions keyConditions;
+    public static final String VALUE_CONDITIONS = "valueConditions";
+    Conditions valueConditions;
+    public static final String OPERATOR = "operator";
+    Conditions.Operator operator;
 
     public AktoDataType() {
     }
@@ -73,5 +90,55 @@ public class AktoDataType {
 
     public void setSampleDataFixed(boolean sampleDataFixed) {
         this.sampleDataFixed = sampleDataFixed;
+    }
+
+    public Severity getDataTypePriority() {
+        return dataTypePriority;
+    }
+    public void setDataTypePriority(Severity dataTypePriority) {
+        this.dataTypePriority = dataTypePriority;
+    }
+
+    public List<String> getCategoriesList() {
+        return categoriesList;
+    }
+    public void setCategoriesList(List<String> categoriesList) {
+        this.categoriesList = categoriesList;
+    }
+
+    public Conditions getKeyConditions() {
+        return keyConditions;
+    }
+
+    public void setKeyConditions(Conditions keyConditions) {
+        this.keyConditions = keyConditions;
+    }
+
+    public Conditions getValueConditions() {
+        return valueConditions;
+    }
+
+    public void setValueConditions(Conditions valueConditions) {
+        this.valueConditions = valueConditions;
+    }
+
+    public Conditions.Operator getOperator() {
+        return operator;
+    }
+
+    public void setOperator(Conditions.Operator operator) {
+        this.operator = operator;
+    }
+
+    public boolean validate(Object value, Object key) {
+        try {
+            return this.validateRaw(value, key);
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    public boolean validateRaw(Object value, Object key) throws Exception {
+        return CustomDataType.validateRawUtility(value, key, this.keyConditions, this.valueConditions, this.operator);
     }
 }
