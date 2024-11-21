@@ -23,9 +23,10 @@ localStore = persist(localStore,{storage: createJSONStorage(() => localStorage)}
 const LocalStore = create(localStore);
 
 window.addEventListener('storage', (event) => {
-   if (event.key === 'subCategoryMap') {
+  if(event.key === 'undefined') {
+    const newStorageValue = JSON.parse(event.newValue)
     LocalStore.setState({
-      subCategoryMap: JSON.parse(event.newValue)
+      subCategoryMap: newStorageValue.state.subCategoryMap
     });
   }
 });
