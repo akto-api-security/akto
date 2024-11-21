@@ -23,7 +23,8 @@ localStore = persist(localStore,{storage: createJSONStorage(() => localStorage)}
 const LocalStore = create(localStore);
 
 window.addEventListener('storage', (event) => {
-  if(event.key === 'undefined') {
+  const isFromAkto = (window.IS_SAAS === 'true' && event.url.includes("akto") || event.url.includes("dashboard"))
+  if(event.key === 'undefined' && isFromAkto) {
     const newStorageValue = JSON.parse(event.newValue)
     LocalStore.setState({
       subCategoryMap: newStorageValue.state.subCategoryMap
