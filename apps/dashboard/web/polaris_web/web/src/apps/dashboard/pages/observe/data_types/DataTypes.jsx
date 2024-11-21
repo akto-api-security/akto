@@ -160,10 +160,19 @@ function DataTypes() {
 
   const saveAction = async () => {
     if (currState.dataType === 'Akto') {
+
+      const keyArr = currState.keyConditions.predicates.map(transform.convertMapFunction)
+      const valueArr = currState.valueConditions.predicates.map(transform.convertMapFunction)
+
       let obj = {
         name: currState.name,
         redacted:currState.redacted,
         categoriesList: currState?.categoriesList || [],
+        operator: currState.operator,
+        keyConditionFromUsers: keyArr,
+        keyOperator: currState.keyConditions.operator,
+        valueConditionFromUsers: valueArr,
+        valueOperator: currState.valueConditions.operator,
         ...transform.convertToSensitiveData(currState.sensitiveState),
         
       }
@@ -408,7 +417,7 @@ function DataTypes() {
     </VerticalStack>
   )
 
-  let components = (!isNew && currState.dataType === 'Akto') ? [descriptionCard, requestCard, redactCard] : [descriptionCard, conditionsCard, requestCard, redactCard, TestTemplateCard]
+  let components = (!isNew && currState.dataType === 'Akto') ? [descriptionCard, conditionsCard, requestCard, redactCard] : [descriptionCard, conditionsCard, requestCard, redactCard, TestTemplateCard]
 
   return (
     <DetailsPage
