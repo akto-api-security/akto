@@ -29,6 +29,7 @@ private static final long serialVersionUID = 0L;
   private SmartEvent() {
     actorId_ = "";
     filterId_ = "";
+    ruleId_ = "";
   }
 
   public static final com.google.protobuf.Descriptors.Descriptor
@@ -133,6 +134,45 @@ private static final long serialVersionUID = 0L;
     return detectedAt_;
   }
 
+  public static final int RULE_ID_FIELD_NUMBER = 4;
+  @SuppressWarnings("serial")
+  private volatile java.lang.Object ruleId_ = "";
+  /**
+   * <code>string rule_id = 4 [json_name = "ruleId"];</code>
+   * @return The ruleId.
+   */
+  @java.lang.Override
+  public java.lang.String getRuleId() {
+    java.lang.Object ref = ruleId_;
+    if (ref instanceof java.lang.String) {
+      return (java.lang.String) ref;
+    } else {
+      com.google.protobuf.ByteString bs = 
+          (com.google.protobuf.ByteString) ref;
+      java.lang.String s = bs.toStringUtf8();
+      ruleId_ = s;
+      return s;
+    }
+  }
+  /**
+   * <code>string rule_id = 4 [json_name = "ruleId"];</code>
+   * @return The bytes for ruleId.
+   */
+  @java.lang.Override
+  public com.google.protobuf.ByteString
+      getRuleIdBytes() {
+    java.lang.Object ref = ruleId_;
+    if (ref instanceof java.lang.String) {
+      com.google.protobuf.ByteString b = 
+          com.google.protobuf.ByteString.copyFromUtf8(
+              (java.lang.String) ref);
+      ruleId_ = b;
+      return b;
+    } else {
+      return (com.google.protobuf.ByteString) ref;
+    }
+  }
+
   private byte memoizedIsInitialized = -1;
   @java.lang.Override
   public final boolean isInitialized() {
@@ -156,6 +196,9 @@ private static final long serialVersionUID = 0L;
     if (detectedAt_ != 0L) {
       output.writeInt64(3, detectedAt_);
     }
+    if (!com.google.protobuf.GeneratedMessage.isStringEmpty(ruleId_)) {
+      com.google.protobuf.GeneratedMessage.writeString(output, 4, ruleId_);
+    }
     getUnknownFields().writeTo(output);
   }
 
@@ -174,6 +217,9 @@ private static final long serialVersionUID = 0L;
     if (detectedAt_ != 0L) {
       size += com.google.protobuf.CodedOutputStream
         .computeInt64Size(3, detectedAt_);
+    }
+    if (!com.google.protobuf.GeneratedMessage.isStringEmpty(ruleId_)) {
+      size += com.google.protobuf.GeneratedMessage.computeStringSize(4, ruleId_);
     }
     size += getUnknownFields().getSerializedSize();
     memoizedSize = size;
@@ -196,6 +242,8 @@ private static final long serialVersionUID = 0L;
         .equals(other.getFilterId())) return false;
     if (getDetectedAt()
         != other.getDetectedAt()) return false;
+    if (!getRuleId()
+        .equals(other.getRuleId())) return false;
     if (!getUnknownFields().equals(other.getUnknownFields())) return false;
     return true;
   }
@@ -214,6 +262,8 @@ private static final long serialVersionUID = 0L;
     hash = (37 * hash) + DETECTED_AT_FIELD_NUMBER;
     hash = (53 * hash) + com.google.protobuf.Internal.hashLong(
         getDetectedAt());
+    hash = (37 * hash) + RULE_ID_FIELD_NUMBER;
+    hash = (53 * hash) + getRuleId().hashCode();
     hash = (29 * hash) + getUnknownFields().hashCode();
     memoizedHashCode = hash;
     return hash;
@@ -348,6 +398,7 @@ private static final long serialVersionUID = 0L;
       actorId_ = "";
       filterId_ = "";
       detectedAt_ = 0L;
+      ruleId_ = "";
       return this;
     }
 
@@ -390,6 +441,9 @@ private static final long serialVersionUID = 0L;
       if (((from_bitField0_ & 0x00000004) != 0)) {
         result.detectedAt_ = detectedAt_;
       }
+      if (((from_bitField0_ & 0x00000008) != 0)) {
+        result.ruleId_ = ruleId_;
+      }
     }
 
     @java.lang.Override
@@ -416,6 +470,11 @@ private static final long serialVersionUID = 0L;
       }
       if (other.getDetectedAt() != 0L) {
         setDetectedAt(other.getDetectedAt());
+      }
+      if (!other.getRuleId().isEmpty()) {
+        ruleId_ = other.ruleId_;
+        bitField0_ |= 0x00000008;
+        onChanged();
       }
       this.mergeUnknownFields(other.getUnknownFields());
       onChanged();
@@ -458,6 +517,11 @@ private static final long serialVersionUID = 0L;
               bitField0_ |= 0x00000004;
               break;
             } // case 24
+            case 34: {
+              ruleId_ = input.readStringRequireUtf8();
+              bitField0_ |= 0x00000008;
+              break;
+            } // case 34
             default: {
               if (!super.parseUnknownField(input, extensionRegistry, tag)) {
                 done = true; // was an endgroup tag
@@ -647,6 +711,78 @@ private static final long serialVersionUID = 0L;
     public Builder clearDetectedAt() {
       bitField0_ = (bitField0_ & ~0x00000004);
       detectedAt_ = 0L;
+      onChanged();
+      return this;
+    }
+
+    private java.lang.Object ruleId_ = "";
+    /**
+     * <code>string rule_id = 4 [json_name = "ruleId"];</code>
+     * @return The ruleId.
+     */
+    public java.lang.String getRuleId() {
+      java.lang.Object ref = ruleId_;
+      if (!(ref instanceof java.lang.String)) {
+        com.google.protobuf.ByteString bs =
+            (com.google.protobuf.ByteString) ref;
+        java.lang.String s = bs.toStringUtf8();
+        ruleId_ = s;
+        return s;
+      } else {
+        return (java.lang.String) ref;
+      }
+    }
+    /**
+     * <code>string rule_id = 4 [json_name = "ruleId"];</code>
+     * @return The bytes for ruleId.
+     */
+    public com.google.protobuf.ByteString
+        getRuleIdBytes() {
+      java.lang.Object ref = ruleId_;
+      if (ref instanceof String) {
+        com.google.protobuf.ByteString b = 
+            com.google.protobuf.ByteString.copyFromUtf8(
+                (java.lang.String) ref);
+        ruleId_ = b;
+        return b;
+      } else {
+        return (com.google.protobuf.ByteString) ref;
+      }
+    }
+    /**
+     * <code>string rule_id = 4 [json_name = "ruleId"];</code>
+     * @param value The ruleId to set.
+     * @return This builder for chaining.
+     */
+    public Builder setRuleId(
+        java.lang.String value) {
+      if (value == null) { throw new NullPointerException(); }
+      ruleId_ = value;
+      bitField0_ |= 0x00000008;
+      onChanged();
+      return this;
+    }
+    /**
+     * <code>string rule_id = 4 [json_name = "ruleId"];</code>
+     * @return This builder for chaining.
+     */
+    public Builder clearRuleId() {
+      ruleId_ = getDefaultInstance().getRuleId();
+      bitField0_ = (bitField0_ & ~0x00000008);
+      onChanged();
+      return this;
+    }
+    /**
+     * <code>string rule_id = 4 [json_name = "ruleId"];</code>
+     * @param value The bytes for ruleId to set.
+     * @return This builder for chaining.
+     */
+    public Builder setRuleIdBytes(
+        com.google.protobuf.ByteString value) {
+      if (value == null) { throw new NullPointerException(); }
+      checkByteStringIsUtf8(value);
+      ruleId_ = value;
+      bitField0_ |= 0x00000008;
       onChanged();
       return this;
     }

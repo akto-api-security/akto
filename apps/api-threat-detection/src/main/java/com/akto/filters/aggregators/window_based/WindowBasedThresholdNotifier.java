@@ -6,6 +6,8 @@ import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 
 import com.akto.cache.CounterCache;
+import com.akto.dto.api_protection_parse_layer.AggregationRules;
+import com.akto.dto.api_protection_parse_layer.Rule;
 import com.akto.proto.threat_protection.consumer_service.v1.MaliciousEvent;
 
 public class WindowBasedThresholdNotifier {
@@ -66,18 +68,18 @@ public class WindowBasedThresholdNotifier {
         this.notifiedMap = new ConcurrentHashMap<>();
     }
 
-    public Result shouldNotify(String aggKey, MaliciousEvent maliciousEvent) {
+    public Result shouldNotify(String aggKey, MaliciousEvent maliciousEvent, Rule rule) {
         int binId = (int) maliciousEvent.getTimestamp() / 60;
         String cacheKey = aggKey + "|" + binId;
         this.cache.increment(cacheKey);
 
         long windowCount = 0L;
-        List<Bin> bins = getBins(aggKey, binId - this.config.getWindowSizeInMinutes() + 1, binId);
+        List<Bin> bins = getBins(aggKey, binId - rule.getCondition().getWindowThreshold() + 1, binId);
         for (Bin data : bins) {
             windowCount += data.getCount();
         }
 
-        boolean thresholdBreached = windowCount >= this.config.getThreshold();
+        boolean thresholdBreached = windowCount >= rule.getCondition().getMatchCount();
 
         long now = System.currentTimeMillis() / 1000L;
         long lastNotified = this.notifiedMap.getOrDefault(aggKey, 0L);
