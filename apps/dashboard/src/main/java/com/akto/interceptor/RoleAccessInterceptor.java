@@ -114,9 +114,6 @@ public class RoleAccessInterceptor extends AbstractInterceptor {
                 throw new Exception("User role not found");
             }
 
-            logger.info("Found role in: "+ (Context.now() - timeNow));
-
-            
             Feature featureType = Feature.valueOf(this.featureLabel.toUpperCase());
 
             ReadWriteAccess accessGiven = userRoleRecord.getReadWriteAccessForFeature(featureType);
