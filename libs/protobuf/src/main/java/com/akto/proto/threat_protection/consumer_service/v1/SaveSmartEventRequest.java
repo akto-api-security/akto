@@ -43,17 +43,6 @@ private static final long serialVersionUID = 0L;
   }
 
   private int bitField0_;
-  public static final int ACCOUNT_ID_FIELD_NUMBER = 1;
-  private int accountId_ = 0;
-  /**
-   * <code>int32 account_id = 1 [json_name = "accountId"];</code>
-   * @return The accountId.
-   */
-  @java.lang.Override
-  public int getAccountId() {
-    return accountId_;
-  }
-
   public static final int EVENT_FIELD_NUMBER = 2;
   private com.akto.proto.threat_protection.consumer_service.v1.SmartEvent event_;
   /**
@@ -94,9 +83,6 @@ private static final long serialVersionUID = 0L;
   @java.lang.Override
   public void writeTo(com.google.protobuf.CodedOutputStream output)
                       throws java.io.IOException {
-    if (accountId_ != 0) {
-      output.writeInt32(1, accountId_);
-    }
     if (((bitField0_ & 0x00000001) != 0)) {
       output.writeMessage(2, getEvent());
     }
@@ -109,10 +95,6 @@ private static final long serialVersionUID = 0L;
     if (size != -1) return size;
 
     size = 0;
-    if (accountId_ != 0) {
-      size += com.google.protobuf.CodedOutputStream
-        .computeInt32Size(1, accountId_);
-    }
     if (((bitField0_ & 0x00000001) != 0)) {
       size += com.google.protobuf.CodedOutputStream
         .computeMessageSize(2, getEvent());
@@ -132,8 +114,6 @@ private static final long serialVersionUID = 0L;
     }
     com.akto.proto.threat_protection.consumer_service.v1.SaveSmartEventRequest other = (com.akto.proto.threat_protection.consumer_service.v1.SaveSmartEventRequest) obj;
 
-    if (getAccountId()
-        != other.getAccountId()) return false;
     if (hasEvent() != other.hasEvent()) return false;
     if (hasEvent()) {
       if (!getEvent()
@@ -150,8 +130,6 @@ private static final long serialVersionUID = 0L;
     }
     int hash = 41;
     hash = (19 * hash) + getDescriptor().hashCode();
-    hash = (37 * hash) + ACCOUNT_ID_FIELD_NUMBER;
-    hash = (53 * hash) + getAccountId();
     if (hasEvent()) {
       hash = (37 * hash) + EVENT_FIELD_NUMBER;
       hash = (53 * hash) + getEvent().hashCode();
@@ -293,7 +271,6 @@ private static final long serialVersionUID = 0L;
     public Builder clear() {
       super.clear();
       bitField0_ = 0;
-      accountId_ = 0;
       event_ = null;
       if (eventBuilder_ != null) {
         eventBuilder_.dispose();
@@ -332,11 +309,8 @@ private static final long serialVersionUID = 0L;
 
     private void buildPartial0(com.akto.proto.threat_protection.consumer_service.v1.SaveSmartEventRequest result) {
       int from_bitField0_ = bitField0_;
-      if (((from_bitField0_ & 0x00000001) != 0)) {
-        result.accountId_ = accountId_;
-      }
       int to_bitField0_ = 0;
-      if (((from_bitField0_ & 0x00000002) != 0)) {
+      if (((from_bitField0_ & 0x00000001) != 0)) {
         result.event_ = eventBuilder_ == null
             ? event_
             : eventBuilder_.build();
@@ -357,9 +331,6 @@ private static final long serialVersionUID = 0L;
 
     public Builder mergeFrom(com.akto.proto.threat_protection.consumer_service.v1.SaveSmartEventRequest other) {
       if (other == com.akto.proto.threat_protection.consumer_service.v1.SaveSmartEventRequest.getDefaultInstance()) return this;
-      if (other.getAccountId() != 0) {
-        setAccountId(other.getAccountId());
-      }
       if (other.hasEvent()) {
         mergeEvent(other.getEvent());
       }
@@ -389,16 +360,11 @@ private static final long serialVersionUID = 0L;
             case 0:
               done = true;
               break;
-            case 8: {
-              accountId_ = input.readInt32();
-              bitField0_ |= 0x00000001;
-              break;
-            } // case 8
             case 18: {
               input.readMessage(
                   getEventFieldBuilder().getBuilder(),
                   extensionRegistry);
-              bitField0_ |= 0x00000002;
+              bitField0_ |= 0x00000001;
               break;
             } // case 18
             default: {
@@ -418,38 +384,6 @@ private static final long serialVersionUID = 0L;
     }
     private int bitField0_;
 
-    private int accountId_ ;
-    /**
-     * <code>int32 account_id = 1 [json_name = "accountId"];</code>
-     * @return The accountId.
-     */
-    @java.lang.Override
-    public int getAccountId() {
-      return accountId_;
-    }
-    /**
-     * <code>int32 account_id = 1 [json_name = "accountId"];</code>
-     * @param value The accountId to set.
-     * @return This builder for chaining.
-     */
-    public Builder setAccountId(int value) {
-
-      accountId_ = value;
-      bitField0_ |= 0x00000001;
-      onChanged();
-      return this;
-    }
-    /**
-     * <code>int32 account_id = 1 [json_name = "accountId"];</code>
-     * @return This builder for chaining.
-     */
-    public Builder clearAccountId() {
-      bitField0_ = (bitField0_ & ~0x00000001);
-      accountId_ = 0;
-      onChanged();
-      return this;
-    }
-
     private com.akto.proto.threat_protection.consumer_service.v1.SmartEvent event_;
     private com.google.protobuf.SingleFieldBuilder<
         com.akto.proto.threat_protection.consumer_service.v1.SmartEvent, com.akto.proto.threat_protection.consumer_service.v1.SmartEvent.Builder, com.akto.proto.threat_protection.consumer_service.v1.SmartEventOrBuilder> eventBuilder_;
@@ -458,7 +392,7 @@ private static final long serialVersionUID = 0L;
      * @return Whether the event field is set.
      */
     public boolean hasEvent() {
-      return ((bitField0_ & 0x00000002) != 0);
+      return ((bitField0_ & 0x00000001) != 0);
     }
     /**
      * <code>.threat_protection.consumer_service.v1.SmartEvent event = 2 [json_name = "event"];</code>
@@ -483,7 +417,7 @@ private static final long serialVersionUID = 0L;
       } else {
         eventBuilder_.setMessage(value);
       }
-      bitField0_ |= 0x00000002;
+      bitField0_ |= 0x00000001;
       onChanged();
       return this;
     }
@@ -497,7 +431,7 @@ private static final long serialVersionUID = 0L;
       } else {
         eventBuilder_.setMessage(builderForValue.build());
       }
-      bitField0_ |= 0x00000002;
+      bitField0_ |= 0x00000001;
       onChanged();
       return this;
     }
@@ -506,7 +440,7 @@ private static final long serialVersionUID = 0L;
      */
     public Builder mergeEvent(com.akto.proto.threat_protection.consumer_service.v1.SmartEvent value) {
       if (eventBuilder_ == null) {
-        if (((bitField0_ & 0x00000002) != 0) &&
+        if (((bitField0_ & 0x00000001) != 0) &&
           event_ != null &&
           event_ != com.akto.proto.threat_protection.consumer_service.v1.SmartEvent.getDefaultInstance()) {
           getEventBuilder().mergeFrom(value);
@@ -517,7 +451,7 @@ private static final long serialVersionUID = 0L;
         eventBuilder_.mergeFrom(value);
       }
       if (event_ != null) {
-        bitField0_ |= 0x00000002;
+        bitField0_ |= 0x00000001;
         onChanged();
       }
       return this;
@@ -526,7 +460,7 @@ private static final long serialVersionUID = 0L;
      * <code>.threat_protection.consumer_service.v1.SmartEvent event = 2 [json_name = "event"];</code>
      */
     public Builder clearEvent() {
-      bitField0_ = (bitField0_ & ~0x00000002);
+      bitField0_ = (bitField0_ & ~0x00000001);
       event_ = null;
       if (eventBuilder_ != null) {
         eventBuilder_.dispose();
@@ -539,7 +473,7 @@ private static final long serialVersionUID = 0L;
      * <code>.threat_protection.consumer_service.v1.SmartEvent event = 2 [json_name = "event"];</code>
      */
     public com.akto.proto.threat_protection.consumer_service.v1.SmartEvent.Builder getEventBuilder() {
-      bitField0_ |= 0x00000002;
+      bitField0_ |= 0x00000001;
       onChanged();
       return getEventFieldBuilder().getBuilder();
     }

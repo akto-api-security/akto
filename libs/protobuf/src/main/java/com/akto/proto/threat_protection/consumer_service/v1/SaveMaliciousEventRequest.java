@@ -43,17 +43,6 @@ private static final long serialVersionUID = 0L;
             com.akto.proto.threat_protection.consumer_service.v1.SaveMaliciousEventRequest.class, com.akto.proto.threat_protection.consumer_service.v1.SaveMaliciousEventRequest.Builder.class);
   }
 
-  public static final int ACCOUNT_ID_FIELD_NUMBER = 1;
-  private int accountId_ = 0;
-  /**
-   * <code>int32 account_id = 1 [json_name = "accountId"];</code>
-   * @return The accountId.
-   */
-  @java.lang.Override
-  public int getAccountId() {
-    return accountId_;
-  }
-
   public static final int EVENTS_FIELD_NUMBER = 2;
   @SuppressWarnings("serial")
   private java.util.List<com.akto.proto.threat_protection.consumer_service.v1.MaliciousEvent> events_;
@@ -109,9 +98,6 @@ private static final long serialVersionUID = 0L;
   @java.lang.Override
   public void writeTo(com.google.protobuf.CodedOutputStream output)
                       throws java.io.IOException {
-    if (accountId_ != 0) {
-      output.writeInt32(1, accountId_);
-    }
     for (int i = 0; i < events_.size(); i++) {
       output.writeMessage(2, events_.get(i));
     }
@@ -124,10 +110,6 @@ private static final long serialVersionUID = 0L;
     if (size != -1) return size;
 
     size = 0;
-    if (accountId_ != 0) {
-      size += com.google.protobuf.CodedOutputStream
-        .computeInt32Size(1, accountId_);
-    }
     for (int i = 0; i < events_.size(); i++) {
       size += com.google.protobuf.CodedOutputStream
         .computeMessageSize(2, events_.get(i));
@@ -147,8 +129,6 @@ private static final long serialVersionUID = 0L;
     }
     com.akto.proto.threat_protection.consumer_service.v1.SaveMaliciousEventRequest other = (com.akto.proto.threat_protection.consumer_service.v1.SaveMaliciousEventRequest) obj;
 
-    if (getAccountId()
-        != other.getAccountId()) return false;
     if (!getEventsList()
         .equals(other.getEventsList())) return false;
     if (!getUnknownFields().equals(other.getUnknownFields())) return false;
@@ -162,8 +142,6 @@ private static final long serialVersionUID = 0L;
     }
     int hash = 41;
     hash = (19 * hash) + getDescriptor().hashCode();
-    hash = (37 * hash) + ACCOUNT_ID_FIELD_NUMBER;
-    hash = (53 * hash) + getAccountId();
     if (getEventsCount() > 0) {
       hash = (37 * hash) + EVENTS_FIELD_NUMBER;
       hash = (53 * hash) + getEventsList().hashCode();
@@ -299,14 +277,13 @@ private static final long serialVersionUID = 0L;
     public Builder clear() {
       super.clear();
       bitField0_ = 0;
-      accountId_ = 0;
       if (eventsBuilder_ == null) {
         events_ = java.util.Collections.emptyList();
       } else {
         events_ = null;
         eventsBuilder_.clear();
       }
-      bitField0_ = (bitField0_ & ~0x00000002);
+      bitField0_ = (bitField0_ & ~0x00000001);
       return this;
     }
 
@@ -341,9 +318,9 @@ private static final long serialVersionUID = 0L;
 
     private void buildPartialRepeatedFields(com.akto.proto.threat_protection.consumer_service.v1.SaveMaliciousEventRequest result) {
       if (eventsBuilder_ == null) {
-        if (((bitField0_ & 0x00000002) != 0)) {
+        if (((bitField0_ & 0x00000001) != 0)) {
           events_ = java.util.Collections.unmodifiableList(events_);
-          bitField0_ = (bitField0_ & ~0x00000002);
+          bitField0_ = (bitField0_ & ~0x00000001);
         }
         result.events_ = events_;
       } else {
@@ -353,9 +330,6 @@ private static final long serialVersionUID = 0L;
 
     private void buildPartial0(com.akto.proto.threat_protection.consumer_service.v1.SaveMaliciousEventRequest result) {
       int from_bitField0_ = bitField0_;
-      if (((from_bitField0_ & 0x00000001) != 0)) {
-        result.accountId_ = accountId_;
-      }
     }
 
     @java.lang.Override
@@ -370,14 +344,11 @@ private static final long serialVersionUID = 0L;
 
     public Builder mergeFrom(com.akto.proto.threat_protection.consumer_service.v1.SaveMaliciousEventRequest other) {
       if (other == com.akto.proto.threat_protection.consumer_service.v1.SaveMaliciousEventRequest.getDefaultInstance()) return this;
-      if (other.getAccountId() != 0) {
-        setAccountId(other.getAccountId());
-      }
       if (eventsBuilder_ == null) {
         if (!other.events_.isEmpty()) {
           if (events_.isEmpty()) {
             events_ = other.events_;
-            bitField0_ = (bitField0_ & ~0x00000002);
+            bitField0_ = (bitField0_ & ~0x00000001);
           } else {
             ensureEventsIsMutable();
             events_.addAll(other.events_);
@@ -390,7 +361,7 @@ private static final long serialVersionUID = 0L;
             eventsBuilder_.dispose();
             eventsBuilder_ = null;
             events_ = other.events_;
-            bitField0_ = (bitField0_ & ~0x00000002);
+            bitField0_ = (bitField0_ & ~0x00000001);
             eventsBuilder_ = 
               com.google.protobuf.GeneratedMessage.alwaysUseFieldBuilders ?
                  getEventsFieldBuilder() : null;
@@ -425,11 +396,6 @@ private static final long serialVersionUID = 0L;
             case 0:
               done = true;
               break;
-            case 8: {
-              accountId_ = input.readInt32();
-              bitField0_ |= 0x00000001;
-              break;
-            } // case 8
             case 18: {
               com.akto.proto.threat_protection.consumer_service.v1.MaliciousEvent m =
                   input.readMessage(
@@ -460,44 +426,12 @@ private static final long serialVersionUID = 0L;
     }
     private int bitField0_;
 
-    private int accountId_ ;
-    /**
-     * <code>int32 account_id = 1 [json_name = "accountId"];</code>
-     * @return The accountId.
-     */
-    @java.lang.Override
-    public int getAccountId() {
-      return accountId_;
-    }
-    /**
-     * <code>int32 account_id = 1 [json_name = "accountId"];</code>
-     * @param value The accountId to set.
-     * @return This builder for chaining.
-     */
-    public Builder setAccountId(int value) {
-
-      accountId_ = value;
-      bitField0_ |= 0x00000001;
-      onChanged();
-      return this;
-    }
-    /**
-     * <code>int32 account_id = 1 [json_name = "accountId"];</code>
-     * @return This builder for chaining.
-     */
-    public Builder clearAccountId() {
-      bitField0_ = (bitField0_ & ~0x00000001);
-      accountId_ = 0;
-      onChanged();
-      return this;
-    }
-
     private java.util.List<com.akto.proto.threat_protection.consumer_service.v1.MaliciousEvent> events_ =
       java.util.Collections.emptyList();
     private void ensureEventsIsMutable() {
-      if (!((bitField0_ & 0x00000002) != 0)) {
+      if (!((bitField0_ & 0x00000001) != 0)) {
         events_ = new java.util.ArrayList<com.akto.proto.threat_protection.consumer_service.v1.MaliciousEvent>(events_);
-        bitField0_ |= 0x00000002;
+        bitField0_ |= 0x00000001;
        }
     }
 
@@ -647,7 +581,7 @@ private static final long serialVersionUID = 0L;
     public Builder clearEvents() {
       if (eventsBuilder_ == null) {
         events_ = java.util.Collections.emptyList();
-        bitField0_ = (bitField0_ & ~0x00000002);
+        bitField0_ = (bitField0_ & ~0x00000001);
         onChanged();
       } else {
         eventsBuilder_.clear();
@@ -724,7 +658,7 @@ private static final long serialVersionUID = 0L;
         eventsBuilder_ = new com.google.protobuf.RepeatedFieldBuilder<
             com.akto.proto.threat_protection.consumer_service.v1.MaliciousEvent, com.akto.proto.threat_protection.consumer_service.v1.MaliciousEvent.Builder, com.akto.proto.threat_protection.consumer_service.v1.MaliciousEventOrBuilder>(
                 events_,
-                ((bitField0_ & 0x00000002) != 0),
+                ((bitField0_ & 0x00000001) != 0),
                 getParentForChildren(),
                 isClean());
         events_ = null;
