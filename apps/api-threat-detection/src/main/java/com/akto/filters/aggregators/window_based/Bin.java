@@ -1,4 +1,4 @@
-package com.akto.dto.threat_detection;
+package com.akto.filters.aggregators.window_based;
 
 public class Bin {
     int binId;
