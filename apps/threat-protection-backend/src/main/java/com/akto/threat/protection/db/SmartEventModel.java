@@ -1,12 +1,9 @@
-package com.akto.dto.threat_detection;
+package com.akto.threat.protection.db;
 
-import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+public class SmartEventModel {
 
-public class DetectedThreatAlert {
     private String id;
 
     private String filterId;
@@ -15,19 +12,14 @@ public class DetectedThreatAlert {
 
     private String actor;
 
-    private List<Bin> bins;
-
-    private final ObjectMapper objectMapper = new ObjectMapper();
-
-    public DetectedThreatAlert() {
+    public SmartEventModel() {
     }
 
-    public DetectedThreatAlert(String filterId, String actor, long detectedAt, List<Bin> bins) {
+    public SmartEventModel(String filterId, String actor, long detectedAt) {
         this.id = UUID.randomUUID().toString();
         this.filterId = filterId;
         this.detectedAt = detectedAt;
         this.actor = actor;
-        this.bins = bins;
     }
 
     public String getId() {
@@ -62,20 +54,4 @@ public class DetectedThreatAlert {
         this.actor = actor;
     }
 
-    public List<Bin> getBins() {
-        return bins;
-    }
-
-    public void setBins(List<Bin> bins) {
-        this.bins = bins;
-    }
-
-    public Optional<String> marshall() {
-        try {
-            return Optional.of(this.objectMapper.writeValueAsString(this));
-        } catch (Exception e) {
-            e.printStackTrace();
-            return Optional.empty();
-        }
-    }
 }
