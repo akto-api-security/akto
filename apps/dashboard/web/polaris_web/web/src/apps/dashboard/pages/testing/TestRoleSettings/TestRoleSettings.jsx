@@ -134,7 +134,7 @@ function TestRoleSettings() {
             func.setToast(true, true, "Please select valid values for a test role")
         } else {
             if (isNew) {
-                api.addTestRoles(roleName, andConditions, orConditions).then((res) => {
+                await api.addTestRoles(roleName, andConditions, orConditions).then((res) => {
                     func.setToast(true, false, "Test role added")
                     setChange(false);
                     navigate(null, { state: { name: roleName, endpoints: { andConditions: andConditions, orConditions: orConditions } },
