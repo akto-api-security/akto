@@ -590,11 +590,14 @@ public class InitializerListener implements ServletContextListener {
                 CustomDataType existingCDT = customDataTypesMap.getOrDefault(piiKey, null);
                 CustomDataType newCDT = getCustomDataTypeFromPiiType(piiSource, piiType, false);
 
-                if (currTypes.containsKey(piiKey) &&
+                boolean hasNotChangedCondition = currTypes.containsKey(piiKey) &&
                         (currTypes.get(piiKey).equals(piiType) && dt.getBoolean(PIISource.ACTIVE, true)) &&
                         (existingCDT != null && existingCDT.getDataTypePriority() != null)
-                        && (existingCDT.getCategoriesList() != null && !existingCDT.getCategoriesList().isEmpty())
-                ) {
+                        && (existingCDT.getCategoriesList() != null && !existingCDT.getCategoriesList().isEmpty());
+
+                boolean userHasChangedCondition = existingCDT.getUserModifiedTimestamp() > 0;
+                
+                if (userHasChangedCondition || hasNotChangedCondition) {
                     continue;
                 } else {
                     Severity dtSeverity = null;

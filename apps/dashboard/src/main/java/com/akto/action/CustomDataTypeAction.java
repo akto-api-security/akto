@@ -186,12 +186,10 @@ public class CustomDataTypeAction extends UserAction{
             CustomDataTypeDao.instance.insertOne(customDataType);
         } else {
 
-            if (customDataTypeFromDb!=null && customDataTypeFromDb.getCreatorId() == 1638571050 &&
-                    checkConditionUpdate(customDataTypeFromDb, customDataType)) {
-                addActionError("Cannot update data type conditions for akto data types. Please create a new data type.");
-                return ERROR.toUpperCase();
+            if (customDataTypeFromDb!=null && customDataTypeFromDb.getCreatorId() == 1638571050) {
+                customDataType.setUserModifiedTimestamp(Context.now());
             }
-
+            
             FindOneAndUpdateOptions options = new FindOneAndUpdateOptions();
             options.returnDocument(ReturnDocument.AFTER);
             options.upsert(false);
@@ -210,7 +208,8 @@ public class CustomDataTypeAction extends UserAction{
                     Updates.set(CustomDataType.SAMPLE_DATA_FIXED,customDataType.isSampleDataFixed()),
                     Updates.set(AktoDataType.CATEGORIES_LIST, customDataType.getCategoriesList()),
                     Updates.set(AktoDataType.DATA_TYPE_PRIORITY, customDataType.getDataTypePriority()),
-                    Updates.set(CustomDataType.ICON_STRING, customDataType.getIconString())
+                    Updates.set(CustomDataType.ICON_STRING, customDataType.getIconString()),
+                    Updates.set(CustomDataType.USER_MODIFIED_TIMESTAMP, customDataType.getUserModifiedTimestamp())
                 ),
                 options
             );
