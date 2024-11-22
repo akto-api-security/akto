@@ -1,0 +1,47 @@
+syntax = "proto3";
+
+package threat_protection.consumer_service.v1;
+
+// This is a consumer service for saving malicious and smart events.
+// For dashboard purposes we will have a separate service to retrieve these events.
+option java_outer_classname = "ConsumerServiceProto";
+option java_package = "threat_protection.v1.consumer_service";
+
+message SaveMaliciousEventResponse {
+}
+
+message SaveSmartEventResponse {
+}
+
+message SmartEvent {
+  string actor_id= 1;
+  string filter_id = 2;
+  int64 detected_at = 3;
+}
+
+message MaliciousEvent {
+  string actor_id= 1;
+  string filter_id = 2;
+  string ip = 3;
+  int64 timestamp = 4;
+  string url = 5;
+  string method = 6;
+  int32 api_collection_id = 7;
+  string payload = 8;
+}
+
+message SaveMaliciousEventRequest {
+  int32 account_id = 1;
+  repeated MaliciousEvent events = 2;
+}
+
+message SaveSmartEventRequest {
+  int32 account_id = 1;
+  SmartEvent event = 2;
+}
+
+service ConsumerService {
+  rpc SaveMaliciousEvent(SaveMaliciousEventRequest) returns (SaveMaliciousEventResponse) {}
+
+  rpc SaveSmartEvent(SaveSmartEventRequest) returns (SaveSmartEventResponse) {}
+}

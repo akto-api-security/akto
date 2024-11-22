@@ -1,5 +1,7 @@
 version: v2
 
+clean: true
+
 managed:
   enabled: true
 
@@ -8,7 +10,7 @@ managed:
       value: true
 
     - file_option: java_package_prefix
-      value: com.akto.proto.generated
+      value: com.akto.proto
 
 plugins:
   - protoc_builtin: java

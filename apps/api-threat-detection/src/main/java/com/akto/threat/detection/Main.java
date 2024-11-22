@@ -2,14 +2,12 @@ package com.akto.threat.detection;
 
 import java.util.*;
 
-import com.akto.suspect_data.CleanUpTask;
 import com.akto.suspect_data.FlushMessagesTask;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.akto.DaoInit;
 import com.akto.dao.context.Context;
 import com.akto.dto.HttpResponseParams;
 import com.akto.log.LoggerMaker;
@@ -17,8 +15,6 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.metrics.AllMetrics;
 import com.akto.runtime.utils.Utils;
 import com.akto.traffic.KafkaRunner;
-import com.mongodb.ConnectionString;
-
 import io.lettuce.core.RedisClient;
 
 import com.akto.filters.HttpCallFilter;
@@ -37,17 +33,8 @@ public class Main {
     private static final RedisClient redisClient = createRedisClient();
 
     public static void main(String[] args) {
-        // We have a separate Mongo for storing threat detection data
-        // Metadata is stored in the main Mongo, which we call using API
-        // So we always need to enable hybrid mode for this module
-        String mongoURI = System.getenv("AKTO_THREAT_DETECTION_MONGO_CONN");
-        DaoInit.init(new ConnectionString(mongoURI));
-
         // Flush Messages task
         FlushMessagesTask.instance.init();
-
-        // Clean up sample requests for which no alert is generated
-        CleanUpTask.instance.init();
 
         String topicName = System.getenv("AKTO_KAFKA_TOPIC_NAME");
         if (topicName == null) {
@@ -107,8 +94,7 @@ public class Main {
             Context.accountId.set(accountIdInt);
 
             if (!httpCallFilterMap.containsKey(accountId)) {
-                HttpCallFilter filter =
-                        new HttpCallFilter(redisClient, sync_threshold_count, sync_threshold_time);
+                HttpCallFilter filter = new HttpCallFilter(redisClient, sync_threshold_count, sync_threshold_time);
                 httpCallFilterMap.put(accountId, filter);
                 loggerMaker.infoAndAddToDb("New filter created for account: " + accountId);
             }
@@ -123,12 +109,10 @@ public class Main {
 
     public static RedisClient createRedisClient() {
         String host = System.getenv().getOrDefault("AKTO_THREAT_DETECTION_REDIS_HOST", "localhost");
-        int port =
-                Integer.parseInt(
-                        System.getenv().getOrDefault("AKTO_THREAT_DETECTION_REDIS_PORT", "6379"));
-        int database =
-                Integer.parseInt(
-                        System.getenv().getOrDefault("AKTO_THREAT_DETECTION_REDIS_DB", "0"));
+        int port = Integer.parseInt(
+                System.getenv().getOrDefault("AKTO_THREAT_DETECTION_REDIS_PORT", "6379"));
+        int database = Integer.parseInt(
+                System.getenv().getOrDefault("AKTO_THREAT_DETECTION_REDIS_DB", "0"));
 
         return RedisClient.create("redis://" + host + ":" + port + "/" + database);
     }

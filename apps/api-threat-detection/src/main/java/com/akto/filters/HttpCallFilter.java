@@ -5,7 +5,6 @@ import java.util.*;
 import com.akto.cache.RedisBackedCounterCache;
 import com.akto.dao.context.Context;
 import com.akto.dao.monitoring.FilterYamlTemplateDao;
-import com.akto.dao.threat_detection.DetectedThreatAlertDao;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.ApiInfo.ApiInfoKey;
@@ -13,8 +12,6 @@ import com.akto.dto.HttpResponseParams;
 import com.akto.dto.RawApi;
 import com.akto.dto.monitoring.FilterConfig;
 import com.akto.dto.test_editor.YamlTemplate;
-import com.akto.dto.threat_detection.DetectedThreatAlert;
-import com.akto.dto.threat_detection.SampleMaliciousRequest;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.filters.aggregators.key_generator.SourceIPKeyGenerator;
 import com.akto.filters.aggregators.window_based.WindowBasedThresholdNotifier;
@@ -22,16 +19,25 @@ import com.akto.hybrid_parsers.HttpCallParser;
 import com.akto.kafka.Kafka;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.proto.threat_protection.consumer_service.v1.ConsumerServiceGrpc.ConsumerServiceBlockingStub;
+import com.akto.proto.threat_protection.consumer_service.v1.ConsumerServiceGrpc;
+import com.akto.proto.threat_protection.consumer_service.v1.MaliciousEvent;
+import com.akto.proto.threat_protection.consumer_service.v1.SaveSmartEventRequest;
+import com.akto.proto.threat_protection.consumer_service.v1.SmartEvent;
 import com.akto.rules.TestPlugin;
 import com.akto.suspect_data.Message;
 import com.akto.test_editor.execution.VariableResolver;
 import com.akto.test_editor.filter.data_operands_impl.ValidationResult;
+import com.google.protobuf.InvalidProtocolBufferException;
+import com.google.protobuf.util.JsonFormat;
 
+import io.grpc.Grpc;
+import io.grpc.InsecureChannelCredentials;
+import io.grpc.ManagedChannel;
 import io.lettuce.core.RedisClient;
 
 public class HttpCallFilter {
-    private static final LoggerMaker loggerMaker =
-            new LoggerMaker(HttpCallFilter.class, LogDb.THREAT_DETECTION);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(HttpCallFilter.class, LogDb.THREAT_DETECTION);
 
     private Map<String, FilterConfig> apiFilters;
     private final HttpCallParser httpCallParser;
@@ -48,6 +54,8 @@ public class HttpCallFilter {
 
     private final WindowBasedThresholdNotifier windowBasedThresholdNotifier;
 
+    private final ConsumerServiceBlockingStub consumerServiceBlockingStub;
+
     public HttpCallFilter(
             RedisClient redisClient, int sync_threshold_count, int sync_threshold_time) {
         this.apiFilters = new HashMap<>();
@@ -56,10 +64,14 @@ public class HttpCallFilter {
 
         String kafkaBrokerUrl = System.getenv("AKTO_KAFKA_BROKER_URL");
         this.kafka = new Kafka(kafkaBrokerUrl, KAFKA_BATCH_LINGER_MS, KAFKA_BATCH_SIZE);
-        this.windowBasedThresholdNotifier =
-                new WindowBasedThresholdNotifier(
-                        new RedisBackedCounterCache(redisClient, "wbt"),
-                        new WindowBasedThresholdNotifier.Config(100, 10 * 60));
+        this.windowBasedThresholdNotifier = new WindowBasedThresholdNotifier(
+                new RedisBackedCounterCache(redisClient, "wbt"),
+                new WindowBasedThresholdNotifier.Config(100, 10 * 60));
+
+        String target = "localhost:8980";
+        ManagedChannel channel = Grpc.newChannelBuilder(target, InsecureChannelCredentials.create())
+                .build();
+        this.consumerServiceBlockingStub = ConsumerServiceGrpc.newBlockingStub(channel);
     }
 
     public void filterFunction(List<HttpResponseParams> responseParams) {
@@ -95,28 +107,40 @@ public class HttpCallFilter {
                                     actor -> {
                                         String groupKey = apiFilter.getId();
                                         String aggKey = actor + "|" + groupKey;
-                                        SampleMaliciousRequest sampleMaliciousRequest =
-                                                new SampleMaliciousRequest(
-                                                        apiFilter, actor, responseParam);
+
+                                        MaliciousEvent maliciousEvent = MaliciousEvent.newBuilder().setActorId(actor)
+                                                .setFilterId(apiFilter.getId())
+                                                .setUrl(responseParam.getRequestParams().getURL())
+                                                .setMethod(responseParam.getRequestParams().getMethod())
+                                                .setPayload(responseParam.getOrig())
+                                                .setIp(actor) // For now using actor as IP
+                                                .setApiCollectionId(
+                                                        responseParam.getRequestParams().getApiCollectionId())
+                                                .setTimestamp(responseParam.getTime())
+                                                .build();
 
                                         maliciousSamples.add(
                                                 new Message(
                                                         responseParam.getAccountId(),
-                                                        sampleMaliciousRequest));
+                                                        maliciousEvent));
 
-                                        WindowBasedThresholdNotifier.Result result =
-                                                this.windowBasedThresholdNotifier.shouldNotify(
-                                                        aggKey, sampleMaliciousRequest);
+                                        WindowBasedThresholdNotifier.Result result = this.windowBasedThresholdNotifier
+                                                .shouldNotify(
+                                                        aggKey, maliciousEvent);
 
                                         if (result.shouldNotify()) {
-                                            DetectedThreatAlert alert =
-                                                    new DetectedThreatAlert(
-                                                            groupKey,
-                                                            actor,
-                                                            System.currentTimeMillis() / 1000L,
-                                                            result.getBins());
-
-                                            DetectedThreatAlertDao.instance.insertOne(alert);
+                                            this.consumerServiceBlockingStub.saveSmartEvent(
+                                                    SaveSmartEventRequest
+                                                            .newBuilder()
+                                                            .setAccountId(
+                                                                    Integer.parseInt(responseParam.getAccountId()))
+                                                            .setEvent(
+                                                                    SmartEvent.newBuilder()
+                                                                            .setFilterId(apiFilter.getId())
+                                                                            .setActorId(actor)
+                                                                            .setDetectedAt(responseParam.getTime())
+                                                                            .build())
+                                                            .build());
                                         }
                                     });
                 }
@@ -128,11 +152,12 @@ public class HttpCallFilter {
         try {
             maliciousSamples.forEach(
                     sample -> {
-                        sample.marshall()
-                                .ifPresent(
-                                        s -> {
-                                            kafka.send(s, KAFKA_MALICIOUS_TOPIC);
-                                        });
+                        try {
+                            String data = JsonFormat.printer().print(null);
+                            kafka.send(data, KAFKA_MALICIOUS_TOPIC);
+                        } catch (InvalidProtocolBufferException e) {
+                            e.printStackTrace();
+                        }
                     });
         } catch (Exception e) {
             e.printStackTrace();
@@ -159,13 +184,12 @@ public class HttpCallFilter {
                     },
                     apiInfoKey);
             String filterExecutionLogId = UUID.randomUUID().toString();
-            ValidationResult res =
-                    TestPlugin.validateFilter(
-                            apiFilter.getFilter().getNode(),
-                            rawApi,
-                            apiInfoKey,
-                            varMap,
-                            filterExecutionLogId);
+            ValidationResult res = TestPlugin.validateFilter(
+                    apiFilter.getFilter().getNode(),
+                    rawApi,
+                    apiInfoKey,
+                    varMap,
+                    filterExecutionLogId);
 
             return res.getIsValid();
         } catch (Exception e) {

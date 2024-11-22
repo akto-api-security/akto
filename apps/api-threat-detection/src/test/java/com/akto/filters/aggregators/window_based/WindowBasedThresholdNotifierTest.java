@@ -6,8 +6,8 @@ import java.util.Map;
 import com.akto.dto.HttpRequestParams;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.monitoring.FilterConfig;
-import com.akto.dto.threat_detection.SampleMaliciousRequest;
 import com.akto.filters.aggregators.window_based.WindowBasedThresholdNotifier.Result;
+import com.akto.proto.threat_protection.consumer_service.v1.MaliciousEvent;
 
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -75,9 +75,8 @@ public class WindowBasedThresholdNotifierTest {
     public void testShouldNotify() throws InterruptedException {
 
         MemCache cache = new MemCache();
-        WindowBasedThresholdNotifier notifier =
-                new WindowBasedThresholdNotifier(
-                        cache, new WindowBasedThresholdNotifier.Config(10, 1));
+        WindowBasedThresholdNotifier notifier = new WindowBasedThresholdNotifier(
+                cache, new WindowBasedThresholdNotifier.Config(10, 1));
 
         boolean shouldNotify = false;
         String ip = "192.168.0.1";
@@ -86,11 +85,19 @@ public class WindowBasedThresholdNotifierTest {
         filterConfig.setId("4XX_FILTER");
 
         for (int i = 0; i < 1000; i++) {
-            Result res =
-                    notifier.shouldNotify(
-                            ip + "|" + "4XX_FILTER",
-                            new SampleMaliciousRequest(
-                                    filterConfig, ip, generateResponseParamsForStatusCode(400)));
+            HttpResponseParams responseParams = generateResponseParamsForStatusCode(400);
+            Result res = notifier.shouldNotify(
+                    ip + "|" + "4XX_FILTER",
+                    MaliciousEvent
+                            .newBuilder()
+                            .setActorId(ip)
+                            .setIp(ip)
+                            .setTimestamp(responseParams.getTime())
+                            .setApiCollectionId(responseParams.getRequestParams().getApiCollectionId())
+                            .setMethod(responseParams.getRequestParams().getMethod())
+                            .setUrl(responseParams.getRequestParams().getURL())
+                            .setPayload(responseParams.getOrig())
+                            .build());
             shouldNotify = shouldNotify || res.shouldNotify();
         }
 
