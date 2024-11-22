@@ -45,6 +45,9 @@ public class CustomDataType {
     public static final String ICON_STRING = "iconString";
     private String iconString;
 
+    public static final String  USER_MODIFIED_TIMESTAMP = "userModifiedTimestamp";
+    private int userModifiedTimestamp;
+
     public CustomDataType() { }
 
     public CustomDataType(String name, boolean sensitiveAlways, List<SingleTypeInfo.Position> sensitivePosition, int creatorId, boolean active, Conditions keyConditions, Conditions valueConditions, Conditions.Operator operator, IgnoreData ignoreData, boolean redacted, boolean sampleDataFixed) {
@@ -262,4 +265,16 @@ public class CustomDataType {
     public void setIconString(String iconString) {
         this.iconString = iconString;
     }
+
+    public int getUserModifiedTimestamp() {
+        return userModifiedTimestamp;
+    }
+
+    public void setUserModifiedTimestamp(int userModifiedTimestamp) {
+        this.userModifiedTimestamp = userModifiedTimestamp;
+    }
+
+   
+    
+    
 }
