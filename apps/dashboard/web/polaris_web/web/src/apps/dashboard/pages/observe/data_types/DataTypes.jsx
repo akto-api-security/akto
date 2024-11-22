@@ -173,6 +173,7 @@ function DataTypes() {
         keyOperator: currState.keyConditions.operator,
         valueConditionFromUsers: valueArr,
         valueOperator: currState.valueConditions.operator,
+        dataTypePriority: currState?.priority ? currState.priority.toUpperCase() : "",
         ...transform.convertToSensitiveData(currState.sensitiveState),
         
       }
@@ -255,7 +256,6 @@ function DataTypes() {
                 initial={currState.active} label="Active" />
               : null}
             <Dropdown
-              disabled={currState.dataType !== 'Custom'}
               menuItems={severityItems}
               initial={currState.priority}
               selected={(val) => {handleChange({priority: val})}}
