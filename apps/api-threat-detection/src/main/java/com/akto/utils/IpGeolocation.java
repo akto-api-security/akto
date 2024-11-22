@@ -1,11 +1,7 @@
 package com.akto.utils;
 
-import java.io.BufferedReader;
 import java.io.File;
-import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.net.InetAddress;
-import java.nio.file.Paths;
 
 import com.akto.log.LoggerMaker;
 import com.maxmind.geoip2.DatabaseReader;
@@ -18,12 +14,8 @@ public class IpGeolocation {
     private static DatabaseReader reader;
     private static final LoggerMaker loggerMaker = new LoggerMaker(IpGeolocation.class);
 
-    public IpGeolocation() {
-        try {
-            reader = new DatabaseReader.Builder(database).build();   
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("IpGeolocation init failed " + e.getMessage());
-        }
+    public IpGeolocation() throws Exception {
+        reader = new DatabaseReader.Builder(database).build();
     }
 
     public String fetchLocationByIp(String ip) throws Exception {
