@@ -7,7 +7,6 @@ import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 
 import com.akto.DaoInit;
-import com.akto.threat.protection.db.DBService;
 import com.mongodb.ConnectionString;
 import com.mongodb.ReadPreference;
 import com.mongodb.client.MongoClient;
@@ -23,9 +22,7 @@ public class BackendServer {
                 new ConnectionString(System.getenv("AKTO_THREAT_PROTECTION_MONGO")),
                 ReadPreference.secondary());
 
-        DBService dbService = new DBService(mongoClient);
-
-        this.server = ServerBuilder.forPort(port).addService(new ConsumerMaliciousEventService(dbService)).build();
+        this.server = ServerBuilder.forPort(port).addService(new ConsumerMaliciousEventService(mongoClient)).build();
     }
 
     public void stop() throws InterruptedException {
