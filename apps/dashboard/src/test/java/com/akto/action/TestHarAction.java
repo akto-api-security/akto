@@ -35,16 +35,21 @@ public class TestHarAction extends MongoBasedTest{
         httpCallParser.syncFunction(Collections.singletonList(httpResponseParams),true, true, null);
 
         List<ApiInfo> apiInfoList = ApiInfoDao.instance.findAll(Filters.empty());
+
+        assertEquals(1, apiInfoList.size());
+        
+        int apiCollectionId = apiInfoList.get(0).getId().getApiCollectionId();
+
         assertEquals("https://juice-shop.herokuapp.com/api/Deliverys/STRING", apiInfoList.get(0).getId().getUrl());
 
         InventoryAction action = new InventoryAction();
         action.setUrl("https://juice-shop.herokuapp.com/api/Deliverys/STRING");
         action.setMethod("GET");
-        action.setApiCollectionId(335433302);
+        action.setApiCollectionId(apiCollectionId);
         action.deMergeApi();
 
-        Map<URLStatic, RequestTemplate> strictURLToMethods = httpCallParser.apiCatalogSync.dbState.get(335433302).getStrictURLToMethods();
-        Map<URLTemplate, RequestTemplate> templateURLToMethods = httpCallParser.apiCatalogSync.dbState.get(335433302).getTemplateURLToMethods();
+        Map<URLStatic, RequestTemplate> strictURLToMethods = httpCallParser.apiCatalogSync.dbState.get(apiCollectionId).getStrictURLToMethods();
+        Map<URLTemplate, RequestTemplate> templateURLToMethods = httpCallParser.apiCatalogSync.dbState.get(apiCollectionId).getTemplateURLToMethods();
 
         assertEquals(0, strictURLToMethods.size());
         assertEquals(1, templateURLToMethods.size());
@@ -54,8 +59,8 @@ public class TestHarAction extends MongoBasedTest{
 
         httpCallParser.syncFunction(Collections.singletonList(httpResponseParams),true, true, null);
 
-        Map<URLStatic, RequestTemplate> strictURLToMethods1 = httpCallParser.apiCatalogSync.dbState.get(335433302).getStrictURLToMethods();
-        Map<URLTemplate, RequestTemplate> templateURLToMethods1 = httpCallParser.apiCatalogSync.dbState.get(335433302).getTemplateURLToMethods();
+        Map<URLStatic, RequestTemplate> strictURLToMethods1 = httpCallParser.apiCatalogSync.dbState.get(apiCollectionId).getStrictURLToMethods();
+        Map<URLTemplate, RequestTemplate> templateURLToMethods1 = httpCallParser.apiCatalogSync.dbState.get(apiCollectionId).getTemplateURLToMethods();
 
         assertEquals(1, strictURLToMethods1.size());
         assertEquals(0, templateURLToMethods1.size());
