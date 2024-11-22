@@ -19,15 +19,18 @@ public class DetectedThreatAlert {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    public DetectedThreatAlert() {
+    private String ruleId;
+
+	public DetectedThreatAlert() {
     }
 
-    public DetectedThreatAlert(String filterId, String actor, long detectedAt, List<Bin> bins) {
+    public DetectedThreatAlert(String filterId, String actor, long detectedAt, List<Bin> bins, String ruleId) {
         this.id = UUID.randomUUID().toString();
         this.filterId = filterId;
         this.detectedAt = detectedAt;
         this.actor = actor;
         this.bins = bins;
+        this.ruleId = ruleId;
     }
 
     public String getId() {
@@ -68,6 +71,14 @@ public class DetectedThreatAlert {
 
     public void setBins(List<Bin> bins) {
         this.bins = bins;
+    }
+
+    public String getRuleId() {
+        return ruleId;
+    }
+
+    public void setRuleId(String ruleId) {
+        this.ruleId = ruleId;
     }
 
     public Optional<String> marshall() {
