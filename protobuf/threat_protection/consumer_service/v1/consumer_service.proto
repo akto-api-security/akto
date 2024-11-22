@@ -32,12 +32,10 @@ message MaliciousEvent {
 }
 
 message SaveMaliciousEventRequest {
-  int32 account_id = 1;
   repeated MaliciousEvent events = 2;
 }
 
 message SaveSmartEventRequest {
-  int32 account_id = 1;
   SmartEvent event = 2;
 }
 

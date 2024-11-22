@@ -76,29 +76,27 @@ public final class ConsumerServiceProto {
       "\022\016\n\002ip\030\003 \001(\tR\002ip\022\034\n\ttimestamp\030\004 \001(\003R\ttim" +
       "estamp\022\020\n\003url\030\005 \001(\tR\003url\022\026\n\006method\030\006 \001(\t" +
       "R\006method\022*\n\021api_collection_id\030\007 \001(\005R\017api" +
-      "CollectionId\022\030\n\007payload\030\010 \001(\tR\007payload\"\211" +
-      "\001\n\031SaveMaliciousEventRequest\022\035\n\naccount_" +
-      "id\030\001 \001(\005R\taccountId\022M\n\006events\030\002 \003(\01325.th" +
-      "reat_protection.consumer_service.v1.Mali" +
-      "ciousEventR\006events\"\177\n\025SaveSmartEventRequ" +
-      "est\022\035\n\naccount_id\030\001 \001(\005R\taccountId\022G\n\005ev" +
-      "ent\030\002 \001(\01321.threat_protection.consumer_s" +
-      "ervice.v1.SmartEventR\005event2\301\002\n\017Consumer" +
-      "Service\022\233\001\n\022SaveMaliciousEvent\022@.threat_" +
-      "protection.consumer_service.v1.SaveMalic" +
-      "iousEventRequest\032A.threat_protection.con" +
-      "sumer_service.v1.SaveMaliciousEventRespo" +
-      "nse\"\000\022\217\001\n\016SaveSmartEvent\022<.threat_protec" +
-      "tion.consumer_service.v1.SaveSmartEventR" +
-      "equest\032=.threat_protection.consumer_serv" +
-      "ice.v1.SaveSmartEventResponse\"\000B\372\001\n4com." +
-      "akto.proto.threat_protection.consumer_se" +
-      "rvice.v1B\024ConsumerServiceProtoP\001\242\002\003TCX\252\002" +
-      "#ThreatProtection.ConsumerService.V1\312\002#T" +
-      "hreatProtection\\ConsumerService\\V1\342\002/Thr" +
-      "eatProtection\\ConsumerService\\V1\\GPBMeta" +
-      "data\352\002%ThreatProtection::ConsumerService" +
-      "::V1b\006proto3"
+      "CollectionId\022\030\n\007payload\030\010 \001(\tR\007payload\"j" +
+      "\n\031SaveMaliciousEventRequest\022M\n\006events\030\002 " +
+      "\003(\01325.threat_protection.consumer_service" +
+      ".v1.MaliciousEventR\006events\"`\n\025SaveSmartE" +
+      "ventRequest\022G\n\005event\030\002 \001(\01321.threat_prot" +
+      "ection.consumer_service.v1.SmartEventR\005e" +
+      "vent2\301\002\n\017ConsumerService\022\233\001\n\022SaveMalicio" +
+      "usEvent\022@.threat_protection.consumer_ser" +
+      "vice.v1.SaveMaliciousEventRequest\032A.thre" +
+      "at_protection.consumer_service.v1.SaveMa" +
+      "liciousEventResponse\"\000\022\217\001\n\016SaveSmartEven" +
+      "t\022<.threat_protection.consumer_service.v" +
+      "1.SaveSmartEventRequest\032=.threat_protect" +
+      "ion.consumer_service.v1.SaveSmartEventRe" +
+      "sponse\"\000B\372\001\n4com.akto.proto.threat_prote" +
+      "ction.consumer_service.v1B\024ConsumerServi" +
+      "ceProtoP\001\242\002\003TCX\252\002#ThreatProtection.Consu" +
+      "merService.V1\312\002#ThreatProtection\\Consume" +
+      "rService\\V1\342\002/ThreatProtection\\ConsumerS" +
+      "ervice\\V1\\GPBMetadata\352\002%ThreatProtection" +
+      "::ConsumerService::V1b\006proto3"
     };
     descriptor = com.google.protobuf.Descriptors.FileDescriptor
       .internalBuildGeneratedFileFrom(descriptorData,
@@ -133,13 +131,13 @@ public final class ConsumerServiceProto {
     internal_static_threat_protection_consumer_service_v1_SaveMaliciousEventRequest_fieldAccessorTable = new
       com.google.protobuf.GeneratedMessage.FieldAccessorTable(
         internal_static_threat_protection_consumer_service_v1_SaveMaliciousEventRequest_descriptor,
-        new java.lang.String[] { "AccountId", "Events", });
+        new java.lang.String[] { "Events", });
     internal_static_threat_protection_consumer_service_v1_SaveSmartEventRequest_descriptor =
       getDescriptor().getMessageTypes().get(5);
     internal_static_threat_protection_consumer_service_v1_SaveSmartEventRequest_fieldAccessorTable = new
       com.google.protobuf.GeneratedMessage.FieldAccessorTable(
         internal_static_threat_protection_consumer_service_v1_SaveSmartEventRequest_descriptor,
-        new java.lang.String[] { "AccountId", "Event", });
+        new java.lang.String[] { "Event", });
     descriptor.resolveAllFeaturesImmutable();
   }
 
