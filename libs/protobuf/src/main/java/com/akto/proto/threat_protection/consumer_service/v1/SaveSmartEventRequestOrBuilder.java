@@ -10,12 +10,6 @@ public interface SaveSmartEventRequestOrBuilder extends
     com.google.protobuf.MessageOrBuilder {
 
   /**
-   * <code>int32 account_id = 1 [json_name = "accountId"];</code>
-   * @return The accountId.
-   */
-  int getAccountId();
-
-  /**
    * <code>.threat_protection.consumer_service.v1.SmartEvent event = 2 [json_name = "event"];</code>
    * @return Whether the event field is set.
    */
