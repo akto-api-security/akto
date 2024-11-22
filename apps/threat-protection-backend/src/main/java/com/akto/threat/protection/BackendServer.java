@@ -6,22 +6,14 @@ import io.grpc.ServerBuilder;
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 
-import com.akto.DaoInit;
-import com.mongodb.ConnectionString;
-import com.mongodb.ReadPreference;
 import com.mongodb.client.MongoClient;
 
 public class BackendServer {
     private final int port;
     private final Server server;
 
-    public BackendServer(int port) {
+    public BackendServer(int port, MongoClient mongoClient) {
         this.port = port;
-
-        MongoClient mongoClient = DaoInit.createMongoClient(
-                new ConnectionString(System.getenv("AKTO_THREAT_PROTECTION_MONGO")),
-                ReadPreference.secondary());
-
         this.server = ServerBuilder.forPort(port).addService(new ConsumerMaliciousEventService(mongoClient)).build();
     }
 
