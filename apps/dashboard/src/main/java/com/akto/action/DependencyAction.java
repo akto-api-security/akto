@@ -49,7 +49,7 @@ public class DependencyAction extends UserAction {
                 ), Projections.include("_id")
         );
         long end = System.currentTimeMillis();
-        System.out.println("checkIfDependencyGraphAvailable db call took: " + (end - start) + " ms");
+        loggerMaker.infoAndAddToDb("checkIfDependencyGraphAvailable db call took: " + (end - start) + " ms");
 
         dependencyGraphExists = node != null;
         return SUCCESS.toUpperCase();
