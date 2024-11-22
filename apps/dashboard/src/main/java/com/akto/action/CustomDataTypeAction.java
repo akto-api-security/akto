@@ -13,6 +13,7 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.parsers.HttpCallParser;
 import com.akto.util.JSONUtils;
+import com.akto.util.enums.GlobalEnums.Severity;
 import com.akto.utils.AktoCustomException;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParser;
@@ -57,6 +58,7 @@ public class CustomDataTypeAction extends UserAction{
     private boolean redacted;
 
     private List<String> categoriesList;
+    private Severity dataTypePriority;
 
     public static class ConditionFromUser {
         Predicate.Type type;
@@ -886,5 +888,9 @@ public class CustomDataTypeAction extends UserAction{
 
     public void setCategoriesList(List<String> categoriesList) {
         this.categoriesList = categoriesList;
+    }
+
+    public void setDataTypePriority(Severity dataTypePriority) {
+        this.dataTypePriority = dataTypePriority;
     }
 }
