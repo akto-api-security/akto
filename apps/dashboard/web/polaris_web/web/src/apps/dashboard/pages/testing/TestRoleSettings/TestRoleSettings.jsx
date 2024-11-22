@@ -134,30 +134,33 @@ function TestRoleSettings() {
             func.setToast(true, true, "Please select valid values for a test role")
         } else {
             if (isNew) {
-                await api.addTestRoles(roleName, andConditions, orConditions).then((res) => {
+                api.addTestRoles(roleName, andConditions, orConditions).then((_) => {
                     func.setToast(true, false, "Test role added")
                     setChange(false);
                     navigate(null, { state: { name: roleName, endpoints: { andConditions: andConditions, orConditions: orConditions } },
                         replace:true })
                 }).catch((err) => {
                     func.setToast(true, true, "Unable to add test role")
+                }).finally(() => {
+                    setRefresh(!refresh)
                 })
+                func.setToast(true, false, "Creating a new test role.")
             } else {
-                await api.updateTestRoles(roleName, andConditions, orConditions).then((res) => {
+                api.updateTestRoles(roleName, andConditions, orConditions).then((_) => {
+                    if(!updatedAuth){
+                        func.setToast(true, false, "Test role updated successfully.")
+                    }
                     setChange(false);
                     navigate(null, { state: { name: roleName, endpoints: { andConditions: andConditions, orConditions: orConditions }, authWithCondList: authWithCondLists || getAuthWithCondList()},
                         replace:true })
                 }).catch((err) => {
                     func.setToast(true, true, "Unable to update test role")
+                }).finally(() => {
+                    setRefresh(!refresh)
                 })
-                if(!updatedAuth){
-                    func.setToast(true, false, "Test role updated successfully.")
-                }
+                func.setToast(true, false, "Updating test role.")
             }
         }
-        setTimeout(() => {
-            setRefresh(!refresh)
-        },200)
     }
 
     const handleTextChange = (val) => {
