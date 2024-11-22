@@ -72,6 +72,7 @@ import com.akto.util.enums.GlobalEnums;
 import com.mongodb.ConnectionString;
 import com.mongodb.MongoClientSettings;
 import com.mongodb.ReadPreference;
+import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoClients;
 
 import org.bson.codecs.configuration.CodecRegistries;
@@ -351,7 +352,7 @@ public class DaoInit {
                 customEnumCodecs);
     }
 
-    public static void init(ConnectionString connectionString, ReadPreference readPreference) {
+    public static MongoClient createMongoClient(ConnectionString connectionString, ReadPreference readPreference) {
         DbMode.refreshDbType(connectionString.getConnectionString());
         logger.info("DB type: {}", DbMode.dbType);
         DbMode.refreshSetupType(connectionString);
@@ -365,7 +366,11 @@ public class DaoInit {
                 .codecRegistry(codecRegistry)
                 .build();
 
-        clients[0] = MongoClients.create(clientSettings);
+        return MongoClients.create(clientSettings);
+    }
+
+    public static void init(ConnectionString connectionString, ReadPreference readPreference) {
+        clients[0] = createMongoClient(connectionString, readPreference);
     }
     public static void init(ConnectionString connectionString) {
         init(connectionString, ReadPreference.secondary());
