@@ -170,6 +170,7 @@ function DataTypes() {
         keyOperator: currState.keyConditions.operator,
         valueConditionFromUsers: valueArr,
         valueOperator: currState.valueConditions.operator,
+        dataTypePriority: currState?.priority ? currState.priority.toUpperCase() : "",
         ...transform.convertToSensitiveData(currState.sensitiveState),
         
       }

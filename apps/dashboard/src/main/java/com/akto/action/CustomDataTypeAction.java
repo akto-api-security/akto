@@ -279,7 +279,8 @@ public class CustomDataTypeAction extends UserAction{
                 Updates.set(AktoDataType.CATEGORIES_LIST, getUniqueValuesOfList(categoriesList)),
                 Updates.set(AktoDataType.KEY_CONDITIONS, keyConditions),
                 Updates.set(AktoDataType.VALUE_CONDITIONS, valueConditions),
-                Updates.set(AktoDataType.OPERATOR, mainOperator)
+                Updates.set(AktoDataType.OPERATOR, mainOperator),
+                Updates.set(AktoDataType.DATA_TYPE_PRIORITY, dataTypePriority)
             ),
             options
         );
