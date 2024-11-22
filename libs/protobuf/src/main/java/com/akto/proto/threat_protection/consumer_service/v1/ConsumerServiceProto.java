@@ -67,37 +67,38 @@ public final class ConsumerServiceProto {
       "\n<threat_protection/consumer_service/v1/" +
       "consumer_service.proto\022%threat_protectio" +
       "n.consumer_service.v1\"\034\n\032SaveMaliciousEv" +
-      "entResponse\"\030\n\026SaveSmartEventResponse\"e\n" +
+      "entResponse\"\030\n\026SaveSmartEventResponse\"~\n" +
       "\nSmartEvent\022\031\n\010actor_id\030\001 \001(\tR\007actorId\022\033" +
       "\n\tfilter_id\030\002 \001(\tR\010filterId\022\037\n\013detected_" +
-      "at\030\003 \001(\003R\ndetectedAt\"\346\001\n\016MaliciousEvent\022" +
-      "\031\n\010actor_id\030\001 \001(\tR\007actorId\022\033\n\tfilter_id\030" +
-      "\002 \001(\tR\010filterId\022\016\n\002ip\030\003 \001(\tR\002ip\022\034\n\ttimes" +
-      "tamp\030\004 \001(\003R\ttimestamp\022\020\n\003url\030\005 \001(\tR\003url\022" +
-      "\026\n\006method\030\006 \001(\tR\006method\022*\n\021api_collectio" +
-      "n_id\030\007 \001(\005R\017apiCollectionId\022\030\n\007payload\030\010" +
-      " \001(\tR\007payload\"\211\001\n\031SaveMaliciousEventRequ" +
-      "est\022\035\n\naccount_id\030\001 \001(\005R\taccountId\022M\n\006ev" +
-      "ents\030\002 \003(\01325.threat_protection.consumer_" +
-      "service.v1.MaliciousEventR\006events\"\177\n\025Sav" +
-      "eSmartEventRequest\022\035\n\naccount_id\030\001 \001(\005R\t" +
-      "accountId\022G\n\005event\030\002 \001(\01321.threat_protec" +
-      "tion.consumer_service.v1.SmartEventR\005eve" +
-      "nt2\301\002\n\017ConsumerService\022\233\001\n\022SaveMalicious" +
-      "Event\022@.threat_protection.consumer_servi" +
-      "ce.v1.SaveMaliciousEventRequest\032A.threat" +
-      "_protection.consumer_service.v1.SaveMali" +
-      "ciousEventResponse\"\000\022\217\001\n\016SaveSmartEvent\022" +
-      "<.threat_protection.consumer_service.v1." +
-      "SaveSmartEventRequest\032=.threat_protectio" +
-      "n.consumer_service.v1.SaveSmartEventResp" +
-      "onse\"\000B\372\001\n4com.akto.proto.threat_protect" +
-      "ion.consumer_service.v1B\024ConsumerService" +
-      "ProtoP\001\242\002\003TCX\252\002#ThreatProtection.Consume" +
-      "rService.V1\312\002#ThreatProtection\\ConsumerS" +
-      "ervice\\V1\342\002/ThreatProtection\\ConsumerSer" +
-      "vice\\V1\\GPBMetadata\352\002%ThreatProtection::" +
-      "ConsumerService::V1b\006proto3"
+      "at\030\003 \001(\003R\ndetectedAt\022\027\n\007rule_id\030\004 \001(\tR\006r" +
+      "uleId\"\346\001\n\016MaliciousEvent\022\031\n\010actor_id\030\001 \001" +
+      "(\tR\007actorId\022\033\n\tfilter_id\030\002 \001(\tR\010filterId" +
+      "\022\016\n\002ip\030\003 \001(\tR\002ip\022\034\n\ttimestamp\030\004 \001(\003R\ttim" +
+      "estamp\022\020\n\003url\030\005 \001(\tR\003url\022\026\n\006method\030\006 \001(\t" +
+      "R\006method\022*\n\021api_collection_id\030\007 \001(\005R\017api" +
+      "CollectionId\022\030\n\007payload\030\010 \001(\tR\007payload\"\211" +
+      "\001\n\031SaveMaliciousEventRequest\022\035\n\naccount_" +
+      "id\030\001 \001(\005R\taccountId\022M\n\006events\030\002 \003(\01325.th" +
+      "reat_protection.consumer_service.v1.Mali" +
+      "ciousEventR\006events\"\177\n\025SaveSmartEventRequ" +
+      "est\022\035\n\naccount_id\030\001 \001(\005R\taccountId\022G\n\005ev" +
+      "ent\030\002 \001(\01321.threat_protection.consumer_s" +
+      "ervice.v1.SmartEventR\005event2\301\002\n\017Consumer" +
+      "Service\022\233\001\n\022SaveMaliciousEvent\022@.threat_" +
+      "protection.consumer_service.v1.SaveMalic" +
+      "iousEventRequest\032A.threat_protection.con" +
+      "sumer_service.v1.SaveMaliciousEventRespo" +
+      "nse\"\000\022\217\001\n\016SaveSmartEvent\022<.threat_protec" +
+      "tion.consumer_service.v1.SaveSmartEventR" +
+      "equest\032=.threat_protection.consumer_serv" +
+      "ice.v1.SaveSmartEventResponse\"\000B\372\001\n4com." +
+      "akto.proto.threat_protection.consumer_se" +
+      "rvice.v1B\024ConsumerServiceProtoP\001\242\002\003TCX\252\002" +
+      "#ThreatProtection.ConsumerService.V1\312\002#T" +
+      "hreatProtection\\ConsumerService\\V1\342\002/Thr" +
+      "eatProtection\\ConsumerService\\V1\\GPBMeta" +
+      "data\352\002%ThreatProtection::ConsumerService" +
+      "::V1b\006proto3"
     };
     descriptor = com.google.protobuf.Descriptors.FileDescriptor
       .internalBuildGeneratedFileFrom(descriptorData,
@@ -120,7 +121,7 @@ public final class ConsumerServiceProto {
     internal_static_threat_protection_consumer_service_v1_SmartEvent_fieldAccessorTable = new
       com.google.protobuf.GeneratedMessage.FieldAccessorTable(
         internal_static_threat_protection_consumer_service_v1_SmartEvent_descriptor,
-        new java.lang.String[] { "ActorId", "FilterId", "DetectedAt", });
+        new java.lang.String[] { "ActorId", "FilterId", "DetectedAt", "RuleId", });
     internal_static_threat_protection_consumer_service_v1_MaliciousEvent_descriptor =
       getDescriptor().getMessageTypes().get(3);
     internal_static_threat_protection_consumer_service_v1_MaliciousEvent_fieldAccessorTable = new
