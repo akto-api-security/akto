@@ -71,7 +71,6 @@ public class RoleAccessInterceptor extends AbstractInterceptor {
         int timeNow = Context.now();
         try {
             HttpServletRequest request = ServletActionContext.getRequest();
-            logger.info("Entered at: " + timeNow);
             if(featureLabel == null) {
                 throw new Exception("Feature list is null or empty");
             }
@@ -87,13 +86,14 @@ public class RoleAccessInterceptor extends AbstractInterceptor {
                 throw new Exception("User not found in session, returning from interceptor");
             }
             int sessionAccId = getUserAccountId(session);
-            timeNow = Context.now();
+
             logger.info("Found sessionId in : " + (Context.now() - timeNow));
+            timeNow = Context.now();
+
+
             if(!DashboardMode.isMetered()){
                 return invocation.invoke();
             }
-
-            timeNow = Context.now();
 
             if(!(UsageMetricCalculator.isRbacFeatureAvailable(sessionAccId) || featureLabel.equalsIgnoreCase(RbacEnums.Feature.ADMIN_ACTIONS.toString()))){
                 logger.info("Time by feature label check in: " + (Context.now() - timeNow));
@@ -102,11 +102,12 @@ public class RoleAccessInterceptor extends AbstractInterceptor {
 
             logger.info("Time by feature label check in: " + (Context.now() - timeNow));
             timeNow = Context.now();
-            loggerMaker.infoAndAddToDb("Found user in interceptor: " + user.getLogin(), LogDb.DASHBOARD);
 
+            loggerMaker.infoAndAddToDb("Found user in interceptor: " + user.getLogin(), LogDb.DASHBOARD);
             int userId = user.getId();
 
             Role userRoleRecord = RBACDao.getCurrentRoleForUser(userId, sessionAccId);
+            logger.info("Found user role in: " + (Context.now() - timeNow));
             String userRole = userRoleRecord != null ? userRoleRecord.getName().toUpperCase() : "";
 
             if(userRole == null || userRole.isEmpty()) {
