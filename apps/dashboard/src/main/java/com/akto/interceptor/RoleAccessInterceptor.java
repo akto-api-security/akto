@@ -3,12 +3,9 @@ package com.akto.interceptor;
 import com.akto.audit_logs_util.AuditLogsUtil;
 import com.akto.dao.RBACDao;
 import com.akto.dao.audit_logs.ApiAuditLogsDao;
-import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.User;
 import com.akto.dto.audit_logs.ApiAuditLogs;
-import com.akto.dto.billing.FeatureAccess;
-import com.akto.dto.billing.Organization;
 import com.akto.dto.RBAC.Role;
 import com.akto.dto.rbac.RbacEnums;
 import com.akto.dto.rbac.RbacEnums.Feature;
@@ -17,23 +14,24 @@ import com.akto.filter.UserDetailsFilter;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.runtime.policies.UserAgentTypePolicy;
+import com.akto.usage.UsageMetricCalculator;
 import com.akto.util.DashboardMode;
-import com.mongodb.client.model.Filters;
 import com.opensymphony.xwork2.Action;
 import com.opensymphony.xwork2.ActionInvocation;
 import com.opensymphony.xwork2.ActionSupport;
 import com.opensymphony.xwork2.interceptor.AbstractInterceptor;
 import org.apache.struts2.ServletActionContext;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.servlet.http.HttpServletRequest;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 public class RoleAccessInterceptor extends AbstractInterceptor {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(RoleAccessInterceptor.class, LoggerMaker.LogDb.DASHBOARD);
-
+    private static final Logger logger = LoggerFactory.getLogger(RoleAccessInterceptor.class);
     String featureLabel;
     String accessType;
     String actionDescription;
@@ -52,18 +50,6 @@ public class RoleAccessInterceptor extends AbstractInterceptor {
 
     public final static String FORBIDDEN = "FORBIDDEN";
     private final static String USER = "user";
-    private final static String FEATURE_LABEL_STRING = "RBAC_FEATURE";
-
-    private boolean checkForPaidFeature(int accountId){
-        Organization organization = OrganizationsDao.instance.findOne(Filters.in(Organization.ACCOUNTS, accountId));
-        if(organization == null || organization.getFeatureWiseAllowed() == null || organization.getFeatureWiseAllowed().isEmpty()){
-            return true;
-        }
-
-        HashMap<String, FeatureAccess> featureWiseAllowed = organization.getFeatureWiseAllowed();
-        FeatureAccess featureAccess = featureWiseAllowed.getOrDefault(FEATURE_LABEL_STRING, FeatureAccess.noAccess);
-        return featureAccess.getIsGranted();
-    }
 
     private int getUserAccountId (Map<String, Object> session) throws Exception{
         try {
@@ -82,9 +68,9 @@ public class RoleAccessInterceptor extends AbstractInterceptor {
     @Override
     public String intercept(ActionInvocation invocation) throws Exception {
         ApiAuditLogs apiAuditLogs = null;
+        int timeNow = Context.now();
         try {
             HttpServletRequest request = ServletActionContext.getRequest();
-
             if(featureLabel == null) {
                 throw new Exception("Feature list is null or empty");
             }
@@ -101,24 +87,33 @@ public class RoleAccessInterceptor extends AbstractInterceptor {
             }
             int sessionAccId = getUserAccountId(session);
 
+            logger.info("Found sessionId in : " + (Context.now() - timeNow));
+            timeNow = Context.now();
+
+
             if(!DashboardMode.isMetered()){
                 return invocation.invoke();
             }
 
-            if(!(checkForPaidFeature(sessionAccId) || featureLabel.equalsIgnoreCase(RbacEnums.Feature.ADMIN_ACTIONS.toString()))){
+            if(!(UsageMetricCalculator.isRbacFeatureAvailable(sessionAccId) || featureLabel.equalsIgnoreCase(RbacEnums.Feature.ADMIN_ACTIONS.toString()))){
+                logger.info("Time by feature label check in: " + (Context.now() - timeNow));
                 return invocation.invoke();
             }
 
-            loggerMaker.infoAndAddToDb("Found user in interceptor: " + user.getLogin(), LogDb.DASHBOARD);
+            logger.info("Time by feature label check in: " + (Context.now() - timeNow));
+            timeNow = Context.now();
 
+            loggerMaker.infoAndAddToDb("Found user in interceptor: " + user.getLogin(), LogDb.DASHBOARD);
             int userId = user.getId();
 
             Role userRoleRecord = RBACDao.getCurrentRoleForUser(userId, sessionAccId);
+            logger.info("Found user role in: " + (Context.now() - timeNow));
             String userRole = userRoleRecord != null ? userRoleRecord.getName().toUpperCase() : "";
 
             if(userRole == null || userRole.isEmpty()) {
                 throw new Exception("User role not found");
             }
+
             Feature featureType = Feature.valueOf(this.featureLabel.toUpperCase());
 
             ReadWriteAccess accessGiven = userRoleRecord.getReadWriteAccessForFeature(featureType);
