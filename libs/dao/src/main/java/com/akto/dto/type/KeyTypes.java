@@ -241,7 +241,7 @@ public class KeyTypes {
 
     public static SubType findSubType(Object o,String key, ParamId paramId, boolean executeCheckForSubtypes){
         if(executeCheckForSubtypes){
-            return getSubtype(o, key, true, true);
+            return getSubtype(o, key, true, paramId == null ? false: paramId.isHeader());
         }else{
             return findSubType(o, key, paramId);
         }
@@ -260,7 +260,7 @@ public class KeyTypes {
             checkForSubtypes = checkForSubtypesTest(paramId, ignoreData);
         }
 
-        return getSubtype(o, key, checkForSubtypes, true);
+        return getSubtype(o, key, checkForSubtypes, paramId == null ? false: paramId.isHeader());
     }
 
     public Map<SubType,SingleTypeInfo> getOccurrences() {
