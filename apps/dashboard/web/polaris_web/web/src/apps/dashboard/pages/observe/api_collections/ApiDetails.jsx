@@ -16,14 +16,10 @@ import PersistStore from "../../../../main/PersistStore";
 import values from "@/util/values";
 
 import { HorizontalDotsMinor, FileMinor } from "@shopify/polaris-icons"
-import LocalStore from "../../../../main/LocalStorageStore";
 
 function ApiDetails(props) {
 
     const { showDetails, setShowDetails, apiDetail, headers, getStatus, isGptActive } = props
-
-    const localCategoryMap = LocalStore.getState().categoryMap
-    const localSubCategoryMap = LocalStore.getState().subCategoryMap
 
     const [sampleData, setSampleData] = useState([])
     const [paramList, setParamList] = useState([])
@@ -35,8 +31,6 @@ function ApiDetails(props) {
     const [showMoreActions, setShowMoreActions] = useState(false)
     const setSelectedSampleApi = PersistStore(state => state.setSelectedSampleApi)
     const [disabledTabs, setDisabledTabs] = useState([])
-
-    const [useLocalSubCategoryData, setUseLocalSubCategoryData] = useState(false)
 
     const statusFunc = getStatus ? getStatus : (x) => {
         try {
@@ -136,13 +130,6 @@ function ApiDetails(props) {
     }
 
     useEffect(() => {
-        if (
-            (localCategoryMap && Object.keys(localCategoryMap).length > 0) &&
-            (localSubCategoryMap && Object.keys(localSubCategoryMap).length > 0)
-        ) {
-            setUseLocalSubCategoryData(true)
-        }
-
         fetchData();
     }, [apiDetail])
 
@@ -260,7 +247,7 @@ function ApiDetails(props) {
                     apiCollectionId={apiDetail["apiCollectionId"]}
                     endpoints={[apiDetail]}
                     filtered={true}
-                    useLocalSubCategoryData={useLocalSubCategoryData}
+                    useLocalData={true}
                 />
                 <Box>
                     <Tooltip content="Open URL in test editor" dismissOnMouseOut>

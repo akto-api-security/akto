@@ -22,6 +22,11 @@ let observeStore = (set)=>({
     setSelectedUrl:(selectedUrl)=>{
         set({selectedUrl: selectedUrl})
     },
+
+    runTestModalData: {},
+    setRunTestModalData: (runTestModalData)=>{
+        set({runTestModalData: runTestModalData})
+    }
 })
 
 observeStore = devtools(observeStore)

@@ -9,13 +9,11 @@ import func from "@/util/func"
 import { useNavigate } from "react-router-dom"
 import PersistStore from "../../../../main/PersistStore";
 import transform from "../../testing/transform";
-import LocalStore from "../../../../main/LocalStorageStore";
 import AdvancedSettingsComponent from "./component/AdvancedSettingsComponent";
-
 import {produce} from "immer"
+import ObserveStore from "../observeStore";
 
-
-function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOutside, closeRunTest, selectedResourcesForPrimaryAction, useLocalSubCategoryData }) {
+function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOutside, closeRunTest, selectedResourcesForPrimaryAction, useLocalData }) {
 
     const initialState = {
         categories: [],
@@ -70,11 +68,10 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
 
     const [testAlreadyRunning, setTestAlreadyRunning] = useState(false)
 
+    const runTestModalData = useLocalData ? ObserveStore(state => state.runTestModalData) : {}
+    const setRunTestModalData = ObserveStore(state => state.setRunTestModalData)
     const emptyCondition = {data: {key: '', value: ''}, operator: {'type': 'ADD_HEADER'}}
     const [conditions, dispatchConditions] = useReducer(produce((draft, action) => func.conditionsReducer(draft, action)), [emptyCondition]);
-
-    const localCategoryMap = LocalStore.getState().categoryMap
-    const localSubCategoryMap = LocalStore.getState().subCategoryMap
 
     function nameSuffixes(tests) {
         return Object.entries(tests)
@@ -98,29 +95,45 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
 
     async function fetchData() {
         setLoading(true)
+        let tempRunTestModalData = {}
 
-        observeApi.fetchSlackWebhooks().then((resp) => {
-            const apiTokenList = resp.apiTokenList
-            setSlackIntegrated(apiTokenList && apiTokenList.length > 0)
-        })
-
-        let metaDataObj = {
-            categories: [],
-            subCategories: [],
-            testSourceConfigs: []
-        }
-        if(!useLocalSubCategoryData) {
-            metaDataObj = await transform.getAllSubcategoriesData(true, "runTests")
+        if(runTestModalData.slackIntegrated != null) {
+            setSlackIntegrated(runTestModalData.slackIntegrated)
         } else {
-            metaDataObj = {
-                categories: Object.values(localCategoryMap),
-                subCategories: Object.values(localSubCategoryMap),
-                testSourceConfigs: []
+            observeApi.fetchSlackWebhooks().then((resp) => {
+                const apiTokenList = resp.apiTokenList
+                setSlackIntegrated(apiTokenList && apiTokenList.length > 0)
+                tempRunTestModalData = {
+                    ...tempRunTestModalData,
+                    slackIntegrated: (apiTokenList && apiTokenList.length > 0)
+                }
+            })
+        }
+
+        let metaDataObj = {}
+        if(runTestModalData.metaDataObj != null) {
+            metaDataObj = runTestModalData.metaDataObj
+        } else {
+            metaDataObj = await transform.getAllSubcategoriesData(true, "runTests")
+            tempRunTestModalData = {
+                ...tempRunTestModalData,
+                metaDataObj
             }
         }
         let categories = metaDataObj.categories
         let businessLogicSubcategories = metaDataObj.subCategories
-        const testRolesResponse = await testingApi.fetchTestRoles()
+
+
+        let testRolesResponse
+        if(runTestModalData.testRolesResponse != null) {
+            testRolesResponse = runTestModalData.testRolesResponse
+        } else {
+            testRolesResponse = await testingApi.fetchTestRoles()
+            tempRunTestModalData = {
+                ...tempRunTestModalData,
+                testRolesResponse
+            }
+        }
         var testRoles = testRolesResponse.testRoles.map(testRole => {
             return {
                 "label": testRole.name,
@@ -152,7 +165,16 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
 
         //Auth Mechanism
         let authMechanismPresent = false
-        const authMechanismDataResponse = await testingApi.fetchAuthMechanismData()
+        let authMechanismDataResponse
+        if(runTestModalData.authMechanismDataResponse != null) {
+            authMechanismDataResponse = runTestModalData.authMechanismDataResponse
+        } else {
+            authMechanismDataResponse = await testingApi.fetchAuthMechanismData()
+            tempRunTestModalData = {
+                ...tempRunTestModalData,
+                authMechanismDataResponse
+            }
+        }
         if (authMechanismDataResponse.authMechanism)
             authMechanismPresent = true
 
@@ -164,6 +186,10 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
             testName: testName,
             authMechanismPresent: authMechanismPresent
         }))
+
+        if(tempRunTestModalData != null && Object.keys(tempRunTestModalData).length > 0) {
+            setRunTestModalData(tempRunTestModalData)
+        }
 
         setLoading(false)
     }
