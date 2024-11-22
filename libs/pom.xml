@@ -18,6 +18,7 @@
         <module>dao</module>
         <module>utils</module>
         <module>integrations</module>
+        <module>protobuf</module>
     </modules>
 </project>
 
