@@ -264,6 +264,32 @@ public class CustomDataTypeAction extends UserAction{
             return ERROR.toUpperCase();
         }    
 
+        Conditions keyConditions = null;
+        Conditions valueConditions = null;
+
+        try {
+            keyConditions = generateKeyConditions();
+        } catch (AktoCustomException e) {
+            addActionError(e.getMessage());
+            return ERROR.toUpperCase();
+        }
+
+        try {
+            valueConditions = generateValueConditions();
+        } catch (AktoCustomException e) {
+            addActionError(e.getMessage());
+            return ERROR.toUpperCase();
+        }
+
+        Conditions.Operator mainOperator;
+        try {
+            mainOperator = Conditions.Operator.valueOf(operator);
+        } catch (Exception ignored) {
+            addActionError("Invalid value operator");
+            return ERROR.toUpperCase();
+        }
+
+
         FindOneAndUpdateOptions options = new FindOneAndUpdateOptions();
         options.returnDocument(ReturnDocument.AFTER);
         options.upsert(false);
@@ -275,7 +301,11 @@ public class CustomDataTypeAction extends UserAction{
                 Updates.set("timestamp",Context.now()),
                 Updates.set("redacted",redacted),
                 Updates.set(AktoDataType.SAMPLE_DATA_FIXED, !redacted),
-                Updates.set(AktoDataType.CATEGORIES_LIST, Utils.getUniqueValuesOfList(categoriesList))
+                Updates.set(AktoDataType.CATEGORIES_LIST, Utils.getUniqueValuesOfList(categoriesList)),
+                Updates.set(AktoDataType.KEY_CONDITIONS, keyConditions),
+                Updates.set(AktoDataType.VALUE_CONDITIONS, valueConditions),
+                Updates.set(AktoDataType.OPERATOR, mainOperator),
+                Updates.set(AktoDataType.DATA_TYPE_PRIORITY, dataTypePriority)
             ),
             options
         );
@@ -759,20 +789,7 @@ public class CustomDataTypeAction extends UserAction{
 
     }
 
-    public CustomDataType generateCustomDataType(int userId) throws AktoCustomException {
-        // TODO: handle errors
-        if (name == null || name.length() == 0) throw new AktoCustomException("Name cannot be empty");
-        int maxChars = 25;
-        if (name.length() > maxChars) throw new AktoCustomException("Maximum length allowed is "+maxChars+" characters");
-        name = name.trim();
-        name = name.toUpperCase();
-        if (!(name.matches("[A-Z_0-9 ]+"))) throw new AktoCustomException("Name can only contain alphabets, spaces, numbers and underscores");
-
-        if (subTypeMap.containsKey(name)) {
-            throw new AktoCustomException("Data type name reserved");
-        }
-
-
+    public Conditions generateKeyConditions() throws AktoCustomException {
         Conditions keyConditions = null;
         if (keyConditionFromUsers != null && keyOperator != null) {
 
@@ -798,6 +815,10 @@ public class CustomDataTypeAction extends UserAction{
             }
         }
 
+        return keyConditions;
+    }
+
+    public Conditions generateValueConditions() throws AktoCustomException {
         Conditions valueConditions  = null;
         if (valueConditionFromUsers != null && valueOperator != null) {
             Conditions.Operator vOperator;
@@ -821,6 +842,27 @@ public class CustomDataTypeAction extends UserAction{
                 valueConditions = new Conditions(predicates, vOperator);
             }
         }
+
+        return valueConditions;
+    }
+
+    public CustomDataType generateCustomDataType(int userId) throws AktoCustomException {
+        // TODO: handle errors
+        if (name == null || name.length() == 0) throw new AktoCustomException("Name cannot be empty");
+        int maxChars = 25;
+        if (name.length() > maxChars) throw new AktoCustomException("Maximum length allowed is "+maxChars+" characters");
+        name = name.trim();
+        name = name.toUpperCase();
+        if (!(name.matches("[A-Z_0-9 ]+"))) throw new AktoCustomException("Name can only contain alphabets, spaces, numbers and underscores");
+
+        if (subTypeMap.containsKey(name)) {
+            throw new AktoCustomException("Data type name reserved");
+        }
+
+
+        Conditions keyConditions = generateKeyConditions();
+        Conditions valueConditions = generateValueConditions();
+        
 
         if ((keyConditions == null || keyConditions.getPredicates() == null || keyConditions.getPredicates().size() == 0) &&
               (valueConditions == null || valueConditions.getPredicates() ==null || valueConditions.getPredicates().size() == 0))  {
