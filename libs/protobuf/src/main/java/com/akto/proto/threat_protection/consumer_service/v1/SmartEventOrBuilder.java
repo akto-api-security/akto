@@ -38,4 +38,16 @@ public interface SmartEventOrBuilder extends
    * @return The detectedAt.
    */
   long getDetectedAt();
+
+  /**
+   * <code>string rule_id = 4 [json_name = "ruleId"];</code>
+   * @return The ruleId.
+   */
+  java.lang.String getRuleId();
+  /**
+   * <code>string rule_id = 4 [json_name = "ruleId"];</code>
+   * @return The bytes for ruleId.
+   */
+  com.google.protobuf.ByteString
+      getRuleIdBytes();
 }
