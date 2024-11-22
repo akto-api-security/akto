@@ -11,9 +11,7 @@ import java.util.function.Consumer;
 
 import org.bson.conversions.Bson;
 
-import com.akto.dao.threat_detection.CleanupAuditDao;
 import com.akto.dto.Account;
-import com.akto.dto.threat_detection.CleanupAudit;
 import com.akto.threat.protection.db.CleanupAuditModel;
 import com.akto.threat.protection.db.MaliciousEventModel;
 import com.akto.util.AccountTask;
@@ -117,7 +115,9 @@ public class CleanupTask {
 
             // TODO: For any given filter, only keep last 1000 requests
 
-            CleanupAuditDao.instance.insertOne(new CleanupAudit(start, now));
+            this.mongoClient.getDatabase(accountId + "")
+                    .getCollection("cleanup_malicious_requests_audit", CleanupAuditModel.class)
+                    .insertOne(new CleanupAuditModel(start, now));
         }
     }
 }
