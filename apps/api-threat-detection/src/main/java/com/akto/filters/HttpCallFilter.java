@@ -8,6 +8,9 @@ import com.akto.dao.monitoring.FilterYamlTemplateDao;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.ApiInfo.ApiInfoKey;
+import com.akto.dto.api_protection_parse_layer.AggregationRules;
+import com.akto.dto.api_protection_parse_layer.Condition;
+import com.akto.dto.api_protection_parse_layer.Rule;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.RawApi;
 import com.akto.dto.monitoring.FilterConfig;
@@ -101,6 +104,11 @@ public class HttpCallFilter {
                     // But regardless of whether request falls in aggregation or not,
                     // we still push malicious requests to kafka
 
+                    // todo: modify fetch yaml and read aggregate rules from it
+                    List<Rule> rules = new ArrayList<>();
+                    rules.add(new Rule("Lfi Rule 1", new Condition(100, 10)));
+                    AggregationRules aggRules = new AggregationRules();
+
                     SourceIPKeyGenerator.instance
                             .generate(responseParam)
                             .ifPresent(
@@ -123,26 +131,30 @@ public class HttpCallFilter {
                                                 new Message(
                                                         responseParam.getAccountId(),
                                                         maliciousEvent));
+                                        
+                                        for (Rule rule: aggRules.getRule()) {
+                                            WindowBasedThresholdNotifier.Result result = this.windowBasedThresholdNotifier
+                                                    .shouldNotify(
+                                                            aggKey, maliciousEvent, rule);
 
-                                        WindowBasedThresholdNotifier.Result result = this.windowBasedThresholdNotifier
-                                                .shouldNotify(
-                                                        aggKey, maliciousEvent);
-
-                                        if (result.shouldNotify()) {
-                                            this.consumerServiceBlockingStub.saveSmartEvent(
-                                                    SaveSmartEventRequest
-                                                            .newBuilder()
-                                                            .setAccountId(
-                                                                    Integer.parseInt(responseParam.getAccountId()))
-                                                            .setEvent(
-                                                                    SmartEvent.newBuilder()
-                                                                            .setFilterId(apiFilter.getId())
-                                                                            .setActorId(actor)
-                                                                            .setDetectedAt(responseParam.getTime())
-                                                                            .build())
-                                                            .build());
+                                            if (result.shouldNotify()) {
+                                                this.consumerServiceBlockingStub.saveSmartEvent(
+                                                        SaveSmartEventRequest
+                                                                .newBuilder()
+                                                                .setAccountId(
+                                                                        Integer.parseInt(responseParam.getAccountId()))
+                                                                .setEvent(
+                                                                        SmartEvent.newBuilder()
+                                                                                .setFilterId(apiFilter.getId())
+                                                                                .setActorId(actor)
+                                                                                .setDetectedAt(responseParam.getTime())
+                                                                                .setRuleId(actor)
+                                                                                .build())
+                                                                .build());
+                                            }
                                         }
-                                    });
+                                        });
+                                    
                 }
             }
         }
