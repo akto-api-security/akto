@@ -139,6 +139,7 @@ public class DbAction extends ActionSupport {
     List<YamlTemplate> activeAdvancedFilters;
     List<TestingRunResultSummary> currentlyRunningTests;
     String state;
+    Bson filter;
 
     public BasicDBList getIssuesIds() {
         return issuesIds;
@@ -1691,10 +1692,15 @@ public class DbAction extends ActionSupport {
     public String fetchTestScript() {
         try {
             testScript = DbLayer.fetchTestScript();
+            return SUCCESS.toUpperCase();
         } catch (Exception e) {
             System.out.println("Error in fetchTestScript " + e.toString());
             return Action.ERROR.toUpperCase();
         }
+    }
+    
+    public String countTestingRunResultSummaries() {
+        count = DbLayer.countTestingRunResultSummaries(filter);
         return Action.SUCCESS.toUpperCase();
     }
 
@@ -2610,6 +2616,10 @@ public class DbAction extends ActionSupport {
 
     public TestScript getTestScript() {
         return testScript;
+    }
+
+    public void setFilter(Bson filter) {
+        this.filter = filter;
     }
 
 }
