@@ -538,4 +538,8 @@ public class DbActor extends DataActor {
         return DbLayer.fetchNodesForCollectionIds(apiCollectionsIds, removeZeroLevel, skip);
     }
 
+    public long countTestingRunResultSummaries(Bson filter){
+        return DbLayer.countTestingRunResultSummaries(filter);
+    }
+
 }

@@ -3436,4 +3436,30 @@ public class ClientActor extends DataActor {
         return nodeList;
     }
 
+    public long countTestingRunResultSummaries(Bson filter) {
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("filter", filter);
+        Map<String, List<String>> headers = buildHeaders();
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/countTestingRunResultSummaries", "", "POST",  obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in countTestingRunResultSummaries", LoggerMaker.LogDb.TESTING);
+                return 0;
+            }
+            BasicDBObject payloadObj;
+            try {
+                payloadObj =  BasicDBObject.parse(responsePayload);
+                int cnt = Integer.parseInt((String) payloadObj.get("count").toString());
+                return Long.valueOf(cnt);
+            } catch(Exception e) {
+                return 0;
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in countTestingRunResultSummaries" + e, LoggerMaker.LogDb.RUNTIME);
+            return 0;
+        }
+    }
+
 }
