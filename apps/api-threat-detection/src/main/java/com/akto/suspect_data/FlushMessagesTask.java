@@ -1,15 +1,11 @@
 package com.akto.suspect_data;
 
 import java.time.Duration;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Properties;
+import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import com.akto.auth.grpc.AuthToken;
 import com.akto.proto.threat_protection.consumer_service.v1.ConsumerServiceGrpc;
 import com.akto.proto.threat_protection.consumer_service.v1.ConsumerServiceGrpc.ConsumerServiceStub;
 import com.akto.proto.threat_protection.consumer_service.v1.MaliciousEvent;
@@ -21,7 +17,6 @@ import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 
-import com.akto.dao.context.Context;
 import com.akto.runtime.utils.Utils;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.util.JsonFormat;
@@ -45,11 +40,13 @@ public class FlushMessagesTask {
     this.consumer = new KafkaConsumer<>(properties);
 
     String target = System.getenv("AKTO_THREAT_PROTECTION_BACKEND_URL");
-    // TODO: Secure this connection
     ManagedChannel channel =
         Grpc.newChannelBuilder(target, InsecureChannelCredentials.create()).build();
 
-    this.asyncStub = ConsumerServiceGrpc.newStub(channel);
+    this.asyncStub =
+        ConsumerServiceGrpc.newStub(channel)
+            .withCallCredentials(
+                new AuthToken(System.getenv("AKTO_THREAT_PROTECTION_BACKEND_TOKEN")));
   }
 
   public static FlushMessagesTask instance = new FlushMessagesTask();
@@ -66,7 +63,6 @@ public class FlushMessagesTask {
                 processRecords(records);
               } catch (Exception e) {
                 e.printStackTrace();
-                consumer.close();
               }
             }
           }
@@ -78,9 +74,14 @@ public class FlushMessagesTask {
     for (ConsumerRecord<String, String> record : records) {
       try {
         MaliciousEvent.Builder builder = MaliciousEvent.newBuilder();
-        JsonFormat.parser().merge(record.value(), builder);
+        KafkaMessage m = KafkaMessage.unmarshal(record.value()).orElse(null);
+        if (m == null) {
+          continue;
+        }
+
+        JsonFormat.parser().merge(m.getData(), builder);
         MaliciousEvent event = builder.build();
-        accWiseMessages.computeIfAbsent(record.key(), k -> new ArrayList<>()).add(event);
+        accWiseMessages.computeIfAbsent(m.getAccountId(), k -> new ArrayList<>()).add(event);
       } catch (InvalidProtocolBufferException e) {
         e.printStackTrace();
       }
@@ -89,7 +90,6 @@ public class FlushMessagesTask {
     for (Map.Entry<String, List<MaliciousEvent>> entry : accWiseMessages.entrySet()) {
       int accountId = Integer.parseInt(entry.getKey());
       List<MaliciousEvent> events = entry.getValue();
-      Context.accountId.set(accountId);
 
       this.asyncStub.saveMaliciousEvent(
           SaveMaliciousEventRequest.newBuilder().addAllEvents(events).build(),
