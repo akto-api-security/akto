@@ -2,6 +2,7 @@ package com.akto.filters;
 
 import java.util.*;
 
+import com.akto.auth.grpc.AuthToken;
 import com.akto.cache.RedisBackedCounterCache;
 import com.akto.dao.context.Context;
 import com.akto.dao.monitoring.FilterYamlTemplateDao;
@@ -22,13 +23,9 @@ import com.akto.hybrid_parsers.HttpCallParser;
 import com.akto.kafka.Kafka;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-import com.akto.proto.threat_protection.consumer_service.v1.ConsumerServiceGrpc.ConsumerServiceBlockingStub;
-import com.akto.proto.threat_protection.consumer_service.v1.ConsumerServiceGrpc;
-import com.akto.proto.threat_protection.consumer_service.v1.MaliciousEvent;
-import com.akto.proto.threat_protection.consumer_service.v1.SaveSmartEventRequest;
-import com.akto.proto.threat_protection.consumer_service.v1.SmartEvent;
+import com.akto.proto.threat_protection.consumer_service.v1.*;
 import com.akto.rules.TestPlugin;
-import com.akto.suspect_data.Message;
+import com.akto.suspect_data.KafkaMessage;
 import com.akto.test_editor.execution.VariableResolver;
 import com.akto.test_editor.filter.data_operands_impl.ValidationResult;
 import com.google.protobuf.InvalidProtocolBufferException;
@@ -37,6 +34,7 @@ import com.google.protobuf.util.JsonFormat;
 import io.grpc.Grpc;
 import io.grpc.InsecureChannelCredentials;
 import io.grpc.ManagedChannel;
+import io.grpc.stub.StreamObserver;
 import io.lettuce.core.RedisClient;
 
 public class HttpCallFilter {
@@ -58,7 +56,7 @@ public class HttpCallFilter {
 
   private final WindowBasedThresholdNotifier windowBasedThresholdNotifier;
 
-  private final ConsumerServiceBlockingStub consumerServiceBlockingStub;
+  private final ConsumerServiceGrpc.ConsumerServiceStub consumerServiceStub;
 
   public HttpCallFilter(
       RedisClient redisClient, int sync_threshold_count, int sync_threshold_time) {
@@ -76,7 +74,10 @@ public class HttpCallFilter {
     String target = "localhost:8980";
     ManagedChannel channel =
         Grpc.newChannelBuilder(target, InsecureChannelCredentials.create()).build();
-    this.consumerServiceBlockingStub = ConsumerServiceGrpc.newBlockingStub(channel);
+    this.consumerServiceStub =
+        ConsumerServiceGrpc.newStub(channel)
+            .withCallCredentials(
+                new AuthToken(System.getenv("AKTO_THREAT_PROTECTION_BACKEND_TOKEN")));
   }
 
   public void filterFunction(List<HttpResponseParams> responseParams) {
@@ -93,7 +94,7 @@ public class HttpCallFilter {
       return;
     }
 
-    List<Message> maliciousSamples = new ArrayList<>();
+    List<KafkaMessage> maliciousSamples = new ArrayList<>();
     for (HttpResponseParams responseParam : responseParams) {
       for (FilterConfig apiFilter : apiFilters.values()) {
         boolean hasPassedFilter = validateFilterForRequest(responseParam, apiFilter);
@@ -110,6 +111,7 @@ public class HttpCallFilter {
           List<Rule> rules = new ArrayList<>();
           rules.add(new Rule("Lfi Rule 1", new Condition(100, 10)));
           AggregationRules aggRules = new AggregationRules();
+          aggRules.setRule(rules);
 
           SourceIPKeyGenerator.instance
               .generate(responseParam)
@@ -131,7 +133,13 @@ public class HttpCallFilter {
                             .setTimestamp(responseParam.getTime())
                             .build();
 
-                    maliciousSamples.add(new Message(responseParam.getAccountId(), maliciousEvent));
+                    try {
+                      String data = JsonFormat.printer().print(maliciousEvent);
+                      maliciousSamples.add(new KafkaMessage(responseParam.getAccountId(), data));
+                    } catch (InvalidProtocolBufferException e) {
+                      e.printStackTrace();
+                      return;
+                    }
 
                     for (Rule rule : aggRules.getRule()) {
                       WindowBasedThresholdNotifier.Result result =
@@ -146,8 +154,24 @@ public class HttpCallFilter {
                                 .setDetectedAt(responseParam.getTime())
                                 .setRuleId(rule.getName())
                                 .build();
-                        this.consumerServiceBlockingStub.saveSmartEvent(
-                            SaveSmartEventRequest.newBuilder().setEvent(smartEvent).build());
+                        this.consumerServiceStub.saveSmartEvent(
+                            SaveSmartEventRequest.newBuilder().setEvent(smartEvent).build(),
+                            new StreamObserver<SaveSmartEventResponse>() {
+                              @Override
+                              public void onNext(SaveSmartEventResponse value) {
+                                // Do nothing
+                              }
+
+                              @Override
+                              public void onError(Throwable t) {
+                                t.printStackTrace();
+                              }
+
+                              @Override
+                              public void onCompleted() {
+                                // Do nothing
+                              }
+                            });
                       }
                     }
                   });
@@ -160,12 +184,12 @@ public class HttpCallFilter {
     try {
       maliciousSamples.forEach(
           sample -> {
-            try {
-              String data = JsonFormat.printer().print(null);
-              kafka.send(data, KAFKA_MALICIOUS_TOPIC);
-            } catch (InvalidProtocolBufferException e) {
-              e.printStackTrace();
-            }
+            sample
+                .marshal()
+                .ifPresent(
+                    data -> {
+                      kafka.send(data, KAFKA_MALICIOUS_TOPIC);
+                    });
           });
     } catch (Exception e) {
       e.printStackTrace();
