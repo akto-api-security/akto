@@ -44,7 +44,7 @@ public class RawApi {
             reqBody = "{\"json\": "+reqBody+"}";
         }
         try {
-             payload = BasicDBObject.parse(reqBody);
+            payload = BasicDBObject.parse(reqBody);
         } catch (Exception e) {
             payload = new BasicDBObject();
         }

@@ -81,6 +81,7 @@ public class Main {
         return ret;
     }
     private static final int LAST_TEST_RUN_EXECUTION_DELTA = 5 * 60;
+    private static final int MAX_RETRIES_FOR_FAILED_SUMMARIES = 3;
 
     private static void setTestingRunConfig(TestingRun testingRun, TestingRunResultSummary trrs) {
         long timestamp = testingRun.getId().getTimestamp();
@@ -235,6 +236,8 @@ public class Main {
                 }
                 setTestingRunConfig(testingRun, trrs);
 
+                boolean maxRetriesReached = false;
+
                 if (isSummaryRunning || isTestingRunRunning) {
                     loggerMaker.infoAndAddToDb("TRRS or TR is in running state, checking if it should run it or not");
                     TestingRunResultSummary testingRunResultSummary;
@@ -244,7 +247,6 @@ public class Main {
                         Map<ObjectId, TestingRunResultSummary> objectIdTestingRunResultSummaryMap = dataActor.fetchTestingRunResultSummaryMap(testingRun.getId().toHexString());
                         testingRunResultSummary = objectIdTestingRunResultSummaryMap.get(testingRun.getId());
                     }
-
                     if (testingRunResultSummary != null) {
                         List<TestingRunResult> testingRunResults = dataActor.fetchLatestTestingRunResult(testingRunResultSummary.getId().toHexString());
                         if (testingRunResults != null && !testingRunResults.isEmpty()) {
@@ -256,13 +258,29 @@ public class Main {
                             } else {
                                 loggerMaker.infoAndAddToDb("Test run was executed long ago, TRR_ID:"
                                         + testingRunResult.getHexId() + ", TRRS_ID:" + testingRunResultSummary.getHexId() + " TR_ID:" + testingRun.getHexId(), LogDb.TESTING);
-                                TestingRunResultSummary summary = dataActor.markTestRunResultSummaryFailed(testingRunResultSummary.getId().toHexString());
+                                int maxRunTime = testingRun.getTestRunTime() <= 0 ? 30*60 : testingRun.getTestRunTime(); 
+                                Bson filterQ = Filters.and(
+                                    Filters.gte(TestingRunResultSummary.START_TIMESTAMP, (Context.now() - ((MAX_RETRIES_FOR_FAILED_SUMMARIES + 1) * maxRunTime))),
+                                    Filters.eq(TestingRunResultSummary.TESTING_RUN_ID, testingRun.getId()),
+                                    Filters.eq(TestingRunResultSummary.STATE, State.FAILED)
+                                );
+
+                                int countFailedSummaries = (int) dataActor.countTestingRunResultSummaries(filterQ);
+                                TestingRunResultSummary runResultSummary = dataActor.fetchTestingRunResultSummary(testingRunResultSummary.getId().toHexString());
+                                TestingRunResultSummary summary;
+                                if(countFailedSummaries >= (MAX_RETRIES_FOR_FAILED_SUMMARIES - 1)){
+                                    summary = dataActor.updateIssueCountInSummary(testingRunResultSummary.getId().toHexString(), runResultSummary.getCountIssues());
+                                    loggerMaker.infoAndAddToDb("Max retries level reached for TRR_ID: " + testingRun.getHexId(), LogDb.TESTING);
+                                    maxRetriesReached = true;
+                                }else{
+                                    summary = dataActor.markTestRunResultSummaryFailed(testingRunResultSummary.getId().toHexString());
+                                }
+    
+                                runResultSummary = dataActor.fetchTestingRunResultSummary(testingRunResultSummary.getId().toHexString());
                                 if (summary == null) {
                                     loggerMaker.infoAndAddToDb("Skipping because some other thread picked it up, TRRS_ID:" + testingRunResultSummary.getHexId() + " TR_ID:" + testingRun.getHexId(), LogDb.TESTING);
                                     return;
                                 }
-
-                                TestingRunResultSummary runResultSummary = dataActor.fetchTestingRunResultSummary(testingRunResultSummary.getId().toHexString());
                                 GithubUtils.publishGithubComments(runResultSummary);
                             }
                         } else {
@@ -275,15 +293,19 @@ public class Main {
                         }
 
                         // insert new summary based on old summary
-                        if (summaryId != null) {
-                            trrs.setId(new ObjectId());
-                            trrs.setStartTimestamp(start);
-                            trrs.setState(State.RUNNING);
-                            dataActor.insertTestingRunResultSummary(trrs);
-                            summaryId = trrs.getId();
-                        } else {
-                            trrs = dataActor.createTRRSummaryIfAbsent(testingRun.getHexId(), start);
-                            summaryId = trrs.getId();
+                        if(maxRetriesReached){
+                            loggerMaker.infoAndAddToDb("Exiting out as maxRetries have been reached for testingRun: " + testingRun.getHexId(), LogDb.TESTING);
+                        }else{
+                            if (summaryId != null) {
+                                trrs.setId(new ObjectId());
+                                trrs.setStartTimestamp(start);
+                                trrs.setState(State.RUNNING);
+                                dataActor.insertTestingRunResultSummary(trrs);
+                                summaryId = trrs.getId();
+                            } else {
+                                trrs = dataActor.createTRRSummaryIfAbsent(testingRun.getHexId(), start);
+                                summaryId = trrs.getId();
+                            }
                         }
                     } else {
                         loggerMaker.infoAndAddToDb("No summary found. Let's run it as usual");
@@ -303,8 +325,10 @@ public class Main {
 
                     }
                 }
-                testExecutor.init(testingRun, summaryId);
-                AllMetrics.instance.setTestingRunCount(1);
+                if(!maxRetriesReached){
+                    testExecutor.init(testingRun, summaryId);
+                    AllMetrics.instance.setTestingRunCount(1);
+                }
                 //raiseMixpanelEvent(summaryId, testingRun, accountId);
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb(e, "Error in init " + e);
