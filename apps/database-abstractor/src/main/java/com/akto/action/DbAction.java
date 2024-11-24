@@ -16,18 +16,8 @@ import com.akto.dto.settings.DataControlSettings;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
-import com.akto.dto.testing.AccessMatrixTaskInfo;
-import com.akto.dto.testing.AccessMatrixUrlToRole;
-import com.akto.dto.testing.CollectionWiseTestingEndpoints;
-import com.akto.dto.testing.CustomTestingEndpoints;
-import com.akto.dto.testing.EndpointLogicalGroup;
-import com.akto.dto.testing.TestRoles;
-import com.akto.dto.testing.TestingRun;
-import com.akto.dto.testing.TestingRunConfig;
-import com.akto.dto.testing.TestingRunResult;
-import com.akto.dto.testing.TestingRunResultSummary;
-import com.akto.dto.testing.WorkflowTest;
-import com.akto.dto.testing.WorkflowTestResult;
+import com.akto.dto.testing.*;
+import com.akto.dto.testing.config.TestScript;
 import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.traffic.TrafficInfo;
@@ -86,6 +76,7 @@ public class DbAction extends ActionSupport {
     List<BulkUpdates> writesForTrafficMetrics;
     List<BulkUpdates> writesForTestingRunIssues;
     List<DependencyNode> dependencyNodeList;
+    TestScript testScript;
 
     public List<BulkUpdates> getWritesForTestingRunIssues() {
         return writesForTestingRunIssues;
@@ -1698,6 +1689,16 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
+    public String fetchTestScript() {
+        try {
+            testScript = DbLayer.fetchTestScript();
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            System.out.println("Error in fetchTestScript " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+    }
+    
     public String countTestingRunResultSummaries() {
         count = DbLayer.countTestingRunResultSummaries(filter);
         return Action.SUCCESS.toUpperCase();
@@ -2611,6 +2612,10 @@ public class DbAction extends ActionSupport {
 
     public void setVpcId(String vpcId) {
         this.vpcId = vpcId;
+    }
+
+    public TestScript getTestScript() {
+        return testScript;
     }
 
     public void setFilter(Bson filter) {
