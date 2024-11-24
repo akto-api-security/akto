@@ -1,10 +1,14 @@
 package com.akto.testing;
 
 import com.akto.dao.context.Context;
+import com.akto.dao.testing.config.TestScriptsDao;
+import com.akto.data_actor.DataActor;
+import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.testing.TestingRunConfig;
 import com.akto.dto.testing.TestingRunResult;
+import com.akto.dto.testing.config.TestScript;
 import com.akto.dto.testing.rate_limit.RateLimitHandler;
 import com.akto.dto.type.URLMethods;
 import com.akto.log.LoggerMaker;
@@ -27,12 +31,22 @@ import java.net.URISyntaxException;
 import java.net.URL;
 import java.util.*;
 
+import javax.script.ScriptContext;
+import javax.script.ScriptEngine;
+import javax.script.ScriptEngineManager;
+import javax.script.SimpleScriptContext;
+import jdk.nashorn.api.scripting.ScriptObjectMirror;
+
 public class ApiExecutor {
     private static final LoggerMaker loggerMaker = new LoggerMaker(ApiExecutor.class);
     private static final Logger logger = LoggerFactory.getLogger(ApiExecutor.class);
 
     // Load only first 1 MiB of response body into memory.
     private static final int MAX_RESPONSE_SIZE = 1024*1024;
+    private static Map<Integer, Integer> lastFetchedMap = new HashMap<>();
+    private static Map<Integer, TestScript> testScriptMap = new HashMap<>();
+
+    private static final DataActor dataActor = DataActorFactory.fetchInstance();
     
     private static OriginalHttpResponse common(Request request, boolean followRedirects, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck, boolean nonTestingContext) throws Exception {
 
@@ -268,6 +282,8 @@ public class ApiExecutor {
         URLMethods.Method method = URLMethods.Method.fromString(request.getMethod());
 
         builder = builder.url(request.getFullUrlWithParams());
+        boolean executeScript = testingRunConfig != null;
+        calculateHashAndAddAuth(request, executeScript);
 
         boolean nonTestingContext = false;
         if (testingRunConfig == null) {
@@ -375,6 +391,74 @@ public class ApiExecutor {
         }
         
     }
+
+    private static void calculateHashAndAddAuth(OriginalHttpRequest originalHttpRequest, boolean executeScript) {
+        if (!executeScript) {
+            return;
+        }
+        int accountId = Context.accountId.get();
+        try {
+            String script;
+            TestScript testScript = testScriptMap.getOrDefault(accountId, null);
+            int lastTestScriptFetched = lastFetchedMap.getOrDefault(accountId, 0);
+            if (Context.now() - lastTestScriptFetched > 5 * 60) {
+                testScript = dataActor.fetchTestScript();
+                lastTestScriptFetched = Context.now();
+                testScriptMap.put(accountId, testScript);
+                lastFetchedMap.put(accountId, Context.now());
+            }
+            if (testScript != null && testScript.getJavascript() != null) {
+                script = testScript.getJavascript();
+            } else {
+                // loggerMaker.infoAndAddToDb("returning from calculateHashAndAddAuth, no test script present");
+                return;
+            }
+            loggerMaker.infoAndAddToDb("Starting calculateHashAndAddAuth");
+
+            ScriptEngineManager manager = new ScriptEngineManager();
+            ScriptEngine engine = manager.getEngineByName("nashorn");
+
+            SimpleScriptContext sctx = ((SimpleScriptContext) engine.get("context"));
+            sctx.setAttribute("method", originalHttpRequest.getMethod(), ScriptContext.ENGINE_SCOPE);
+            sctx.setAttribute("headers", originalHttpRequest.getHeaders(), ScriptContext.ENGINE_SCOPE);
+            sctx.setAttribute("url", originalHttpRequest.getPath(), ScriptContext.ENGINE_SCOPE);
+            sctx.setAttribute("payload", originalHttpRequest.getBody(), ScriptContext.ENGINE_SCOPE);
+            sctx.setAttribute("queryParams", originalHttpRequest.getQueryParams(), ScriptContext.ENGINE_SCOPE);
+            engine.eval(script);
+
+            String method = (String) sctx.getAttribute("method");
+            Map<String, Object> headers = (Map) sctx.getAttribute("headers");
+            String url = (String) sctx.getAttribute("url");
+            String payload = (String) sctx.getAttribute("payload");
+            String queryParams = (String) sctx.getAttribute("queryParams");
+
+            Map<String, List<String>> hs = new HashMap<>();
+            for (String key: headers.keySet()) {
+                try {
+                    ScriptObjectMirror scm = ((ScriptObjectMirror) headers.get(key));
+                    List<String> val = new ArrayList<>();
+                    for (int i = 0; i < scm.size(); i++) {
+                        val.add((String) scm.get(Integer.toString(i)));
+                    }
+                    hs.put(key, val);
+                } catch (Exception e) {
+                    hs.put(key, (List) headers.get(key));
+                }
+            }
+
+            originalHttpRequest.setBody(payload);
+            originalHttpRequest.setMethod(method);
+            originalHttpRequest.setUrl(url);
+            originalHttpRequest.setHeaders(hs);
+            originalHttpRequest.setQueryParams(queryParams);
+
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in calculateHashAndAddAuth " + e.getMessage() + " url " + originalHttpRequest.getUrl());
+            e.printStackTrace();
+            return;
+        }
+    }
+
 
 
 
