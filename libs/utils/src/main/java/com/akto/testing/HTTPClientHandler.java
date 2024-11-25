@@ -26,6 +26,24 @@ public class HTTPClientHandler {
                 .connectionPool(new ConnectionPool(256, 5L, TimeUnit.MINUTES))
                 .sslSocketFactory(CoreHTTPClient.trustAllSslSocketFactory, (X509TrustManager)CoreHTTPClient.trustAllCerts[0])
                 .hostnameVerifier((hostname, session) -> true)
+                .addInterceptor(new Interceptor() {
+                    @Override
+                    public Response intercept(Chain chain) throws IOException {
+                        Request request = chain.request();
+                        Response response = chain.proceed(request);
+
+                        // Get the TLS version from the handshake
+                        Handshake handshake = response.handshake();
+                        if (handshake != null) {
+                            TlsVersion tlsVersion = handshake.tlsVersion();
+                            System.out.println("TLS Version: " + tlsVersion);
+                        } else {
+                            System.out.println("No TLS handshake available (non-secure connection?)");
+                        }
+
+                        return response;
+                    }
+                })
                 .followRedirects(followRedirects);
     }
 

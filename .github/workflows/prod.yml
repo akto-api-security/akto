@@ -58,10 +58,10 @@ jobs:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           ECR_REPOSITORY: akto-api-security
           REGISTRY_ALIAS: p7q3h0z2
-          IMAGE_TAG: latest
-          IMAGE_TAG1: testruntime
-          IMAGE_TAG2: local
-          IMAGE_TAG3: 1.42.2_local
+          IMAGE_TAG: latest_test
+          IMAGE_TAG1: testruntime_test
+          IMAGE_TAG2: local_test
+          IMAGE_TAG3: 1.42.2_local_test
         run: |
           docker buildx create --use
           # Build a docker container and push it to DockerHub 
@@ -83,10 +83,10 @@ jobs:
         env:
           ECR_REGISTRY: aktosecurity
           ECR_REPOSITORY: akto-api-security
-          IMAGE_TAG: latest
-          IMAGE_TAG1: testruntime
-          IMAGE_TAG2: local
-          IMAGE_TAG3: 1.42.2_local
+          IMAGE_TAG: latest_test
+          IMAGE_TAG1: testruntime_test
+          IMAGE_TAG2: local_test
+          IMAGE_TAG3: 1.42.2_local_test
         run: |
           echo $IMAGE_TAG >> $GITHUB_STEP_SUMMARY
           docker buildx create --use

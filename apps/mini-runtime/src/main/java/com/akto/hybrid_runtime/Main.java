@@ -21,6 +21,7 @@ import com.akto.sql.SampleDataAltDb;
 import com.akto.hybrid_parsers.HttpCallParser;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
+import com.akto.testing.ApiExecutor;
 import com.akto.util.DashboardMode;
 import com.akto.util.filter.DictionaryFilter;
 import com.google.gson.Gson;
@@ -150,8 +151,14 @@ public class Main {
         return topicName;
     }
 
+    public static void main(String[] args) throws Exception {
+        OriginalHttpRequest originalHttpRequest = new OriginalHttpRequest("https://blogbuster.idodopeshit.me/", "", "GET", "", new HashMap<>(), "");
+        OriginalHttpResponse originalHttpResponse = ApiExecutor.sendRequest(originalHttpRequest, true, null, false, new ArrayList<>());
+        System.out.println(originalHttpResponse.getBody());
+    }
+
     // REFERENCE: https://www.oreilly.com/library/view/kafka-the-definitive/9781491936153/ch04.html (But how do we Exit?)
-    public static void main(String[] args) {
+    public static void main1(String[] args) {
         //String mongoURI = System.getenv("AKTO_MONGO_CONN");;
         String configName = System.getenv("AKTO_CONFIG_NAME");
         String topicName = getTopicName();
