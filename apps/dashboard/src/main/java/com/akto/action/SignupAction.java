@@ -829,7 +829,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                     throw new IllegalStateException("The account doesn't exist.");
                 }
             } else {
-                if(!isSSOLogin){
+                if(!isSSOLogin && invitedRole != null && accountId != 0){
                     RBACDao.instance.insertOne(
                         new RBAC(user.getId(), invitedRole, accountId)
                     );
