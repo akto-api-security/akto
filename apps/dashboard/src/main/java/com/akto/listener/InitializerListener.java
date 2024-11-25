@@ -2532,7 +2532,7 @@ public class InitializerListener implements ServletContextListener {
             hotjarSiteId = OrganizationUtils.fetchHotjarSiteId(metaData);
             boolean expired = OrganizationUtils.fetchExpired(metaData);
             boolean telemetryEnabled = OrganizationUtils.fetchTelemetryEnabled(metaData);
-            setTelemetrySettings(organization, telemetryEnabled);
+            // setTelemetrySettings(organization, telemetryEnabled);
             boolean testTelemetryEnabled = OrganizationUtils.fetchTestTelemetryEnabled(metaData);
             organization.setTestTelemetryEnabled(testTelemetryEnabled);
 
