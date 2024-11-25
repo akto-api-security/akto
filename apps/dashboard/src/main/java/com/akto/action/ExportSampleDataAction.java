@@ -284,9 +284,11 @@ public class ExportSampleDataAction extends UserAction {
         try {
             String payload = httpRequestParams.getPayload();
             if (payload == null) payload = "";
+            payload = payload.trim();
             boolean curlyBracesCond = payload.startsWith("{") && payload.endsWith("}");
             boolean squareBracesCond = payload.startsWith("[") && payload.endsWith("]");
-            if (curlyBracesCond || squareBracesCond) {
+            boolean htmlPayloadCond = payload.startsWith("<") && payload.endsWith(">");
+            if (curlyBracesCond || squareBracesCond || htmlPayloadCond) {
                 if (!Objects.equals(httpRequestParams.getMethod(), "GET")) {
                     String escapedPayload = payload.replace("'", "'\\''");
                     builder.append("-d '").append(escapedPayload).append("' \\\n  ");
