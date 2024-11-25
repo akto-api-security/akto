@@ -1,5 +1,6 @@
 package com.akto.threat.detection.tasks;
 
+import com.akto.dao.context.Context;
 import com.akto.threat.detection.actor.SourceIPActorGenerator;
 import com.akto.threat.detection.cache.RedisBackedCounterCache;
 import com.akto.threat.detection.config.kafka.KafkaConfig;
@@ -98,7 +99,7 @@ public class MaliciousTrafficDetectorTask {
   }
 
   public void run() {
-    this.kafkaConsumer.subscribe(Collections.singletonList(this.kafkaConfig.getTopic()));
+    this.kafkaConsumer.subscribe(Collections.singletonList("akto.api.logs"));
     pollingExecutor.execute(
         new Runnable() {
           @Override
@@ -168,12 +169,13 @@ public class MaliciousTrafficDetectorTask {
   }
 
   private void processRecord(ConsumerRecord<String, String> record) {
+    HttpResponseParams responseParam = HttpCallParser.parseKafkaMessage(record.value());
+    Context.accountId.set(Integer.parseInt(responseParam.getAccountId()));
     Map<String, FilterConfig> filters = this.getFilters();
     if (filters.isEmpty()) {
       return;
     }
 
-    HttpResponseParams responseParam = HttpCallParser.parseKafkaMessage(record.value());
     List<MaliciousMessageEnvelope> maliciousMessages = new ArrayList<>();
 
     for (FilterConfig apiFilter : apiFilters.values()) {
