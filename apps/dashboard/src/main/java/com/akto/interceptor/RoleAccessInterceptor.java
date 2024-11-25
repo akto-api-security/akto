@@ -76,6 +76,9 @@ public class RoleAccessInterceptor extends AbstractInterceptor {
             }
 
             Map<String, Object> session = invocation.getInvocationContext().getSession();
+            logger.info("Found session from request in : " + (Context.now() - timeNow));
+            timeNow = Context.now();
+            
             if(session == null){
                 throw new Exception("Found session null, returning from interceptor");
             }
