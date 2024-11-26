@@ -33,7 +33,7 @@ public class Main {
     Connection postgres = createPostgresConnection();
 
     new MaliciousTrafficDetectorTask(trafficKafka, createRedisClient()).run();
-    new FlushSampleDataTask(postgres, trafficKafka).run();
+    new FlushSampleDataTask(postgres, trafficKafka, "akto,malicious").run();
   }
 
   public static RedisClient createRedisClient() {

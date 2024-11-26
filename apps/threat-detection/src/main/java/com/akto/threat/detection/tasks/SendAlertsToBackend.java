@@ -20,16 +20,15 @@ import java.util.concurrent.Executors;
 /*
 This will read sample malicious data from kafka topic and save it to DB.
  */
-public class FlushSampleDataTask extends AbstractKafkaConsumerTask {
+public class SendAlertsToBackend extends AbstractKafkaConsumerTask {
 
   private final MaliciousEventDao maliciousEventDao;
 
-  public FlushSampleDataTask(Connection conn, KafkaConfig trafficConfig, String topic) {
+  public SendAlertsToBackend(Connection conn, KafkaConfig trafficConfig, String topic) {
     super(trafficConfig, topic);
     this.maliciousEventDao = new MaliciousEventDao(conn);
   }
 
-  @Override
   ExecutorService getPollingExecutor() {
     return Executors.newSingleThreadExecutor();
   }
