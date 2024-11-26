@@ -68,8 +68,14 @@ public class StiggReporterClient {
 
         // Execute the request and get the response
         try (Response response = client.newCall(request).execute()) {
-            String[] queryTypes = query.split("(");
-            String queryString = queryTypes[0];
+            String queryString = query;
+            try {
+                String[] queryTypes = query.split("\\(");
+                queryString = queryTypes[0];
+            } catch (Exception e) {
+                loggerMaker.logger.info("Error in splitting regex");
+            }
+            
 
             if (!response.isSuccessful()) {
                 throw new IOException("Unexpected response code: " + response);
