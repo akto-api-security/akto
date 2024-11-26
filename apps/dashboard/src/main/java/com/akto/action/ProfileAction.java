@@ -118,7 +118,7 @@ public class ProfileAction extends UserAction {
         if(currAccount != null && !currAccount.getTimezone().isEmpty()){
             timeZone = currAccount.getTimezone();
         }
-        String dashboardVersion = "";
+        String dashboardVersion = InitializerListener.aktoVersion;
         if(accountSettings != null){
             dashboardVersion = accountSettings.getDashboardVersion();
         }
