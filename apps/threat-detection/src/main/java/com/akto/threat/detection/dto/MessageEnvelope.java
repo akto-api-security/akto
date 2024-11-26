@@ -5,15 +5,15 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.Optional;
 
 // Kafka Message Wrapper for suspect data
-public class MaliciousMessageEnvelope {
+public class MessageEnvelope {
   private String accountId;
   private String data;
 
   private static final ObjectMapper objectMapper = new ObjectMapper();
 
-  public MaliciousMessageEnvelope() {}
+  public MessageEnvelope() {}
 
-  public MaliciousMessageEnvelope(String accountId, String data) {
+  public MessageEnvelope(String accountId, String data) {
     this.accountId = accountId;
     this.data = data;
   }
@@ -44,9 +44,9 @@ public class MaliciousMessageEnvelope {
     return Optional.empty();
   }
 
-  public static Optional<MaliciousMessageEnvelope> unmarshal(String message) {
+  public static Optional<MessageEnvelope> unmarshal(String message) {
     try {
-      return Optional.ofNullable(objectMapper.readValue(message, MaliciousMessageEnvelope.class));
+      return Optional.ofNullable(objectMapper.readValue(message, MessageEnvelope.class));
     } catch (Exception e) {
       e.printStackTrace();
     }
