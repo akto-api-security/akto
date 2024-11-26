@@ -86,7 +86,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
     public static final String BUSINESS_EMAIL_REQUIRED_ERROR = "BUSINESS_EMAIL_REQUIRED";
     public static final String ERROR_STR = "error";
     public static final String ERROR_DESCRIPTION = "error_description";
-    private static final Logger logger = LoggerFactory.getLogger(ProfileAction.class);
+    private static final Logger logger = LoggerFactory.getLogger(SignupAction.class);
     private static final LoggerMaker loggerMaker = new LoggerMaker(SignupAction.class);
 
     public String getCode() {
