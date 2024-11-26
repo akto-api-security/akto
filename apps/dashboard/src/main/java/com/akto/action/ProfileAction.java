@@ -118,7 +118,10 @@ public class ProfileAction extends UserAction {
         if(currAccount != null && !currAccount.getTimezone().isEmpty()){
             timeZone = currAccount.getTimezone();
         }
-        String dashboardVersion = accountSettings.getDashboardVersion();
+        String dashboardVersion = "";
+        if(accountSettings != null){
+            dashboardVersion = accountSettings.getDashboardVersion();
+        }
         String[] versions = dashboardVersion.split(" - ");
         User userFromDB = UsersDao.instance.findOne(Filters.eq(Constants.ID, user.getId()));
         RBAC.Role userRole = RBACDao.getCurrentRoleForUser(user.getId(), Context.accountId.get());
