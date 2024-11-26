@@ -9,7 +9,7 @@ import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.HttpResponseParams;
-import com.akto.threat.detection.dto.MaliciousMessageEnvelope;
+import com.akto.threat.detection.dto.MessageEnvelope;
 import com.akto.dto.RawApi;
 import com.akto.dto.api_protection_parse_layer.AggregationRules;
 import com.akto.dto.api_protection_parse_layer.Condition;
@@ -129,10 +129,10 @@ public class MaliciousTrafficDetectorTask {
     return apiFilters;
   }
 
-  private MaliciousMessageEnvelope generateKafkaMessage(
-      String accountId, MaliciousEvent maliciousEvent) throws InvalidProtocolBufferException {
+  private MessageEnvelope generateKafkaMessage(String accountId, MaliciousEvent maliciousEvent)
+      throws InvalidProtocolBufferException {
     String data = JsonFormat.printer().print(maliciousEvent);
-    return new MaliciousMessageEnvelope(accountId, data);
+    return new MessageEnvelope(accountId, data);
   }
 
   private boolean validateFilterForRequest(
@@ -176,7 +176,7 @@ public class MaliciousTrafficDetectorTask {
       return;
     }
 
-    List<MaliciousMessageEnvelope> maliciousMessages = new ArrayList<>();
+    List<MessageEnvelope> maliciousMessages = new ArrayList<>();
 
     for (FilterConfig apiFilter : apiFilters.values()) {
       boolean hasPassedFilter = validateFilterForRequest(responseParam, apiFilter);
