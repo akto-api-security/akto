@@ -222,42 +222,42 @@ public class KafkaUtils {
         return System.getenv("KAFKA_WRITE_ENABLED").equalsIgnoreCase("true");
     }
 
-    String topicName = System.getenv("AKTO_KAFKA_TOPIC_NAME");
     public void insertData(List<BulkUpdates> writes, String triggerMethod, int accountId) {
-        try {
-            if (topicName == null) {
-                throw new Exception("AKTO_KAFKA_TOPIC_NAME is null");
-            }
-            String payloadStr = gson.toJson(writes);
-            insertDataCore(payloadStr, triggerMethod, accountId, topicName);
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "Error in kafka insertData " + e.toString());
-        }
+        insertDataCore(writes, triggerMethod, accountId, "AKTO_KAFKA_TOPIC_NAME", null, "kafka insertData");
     }
 
-    public void insertDataCore(String payloadStr, String triggerMethod, int accountId, String topic) {
+    public void insertDataSecondary(Object writes, String triggerMethod, int accountId) {
+        insertDataCore(writes, triggerMethod, accountId, "AKTO_KAFKA_TOPIC_NAME_SECONDARY", "akto.secondary.trafficdata", "kafka insertDataSecondary");
+    }
+
+    /*
+     * By default, traffic Metrics and traffic Info are sent to the same kafka topic.
+     * In case of high load, we send them to a different topic
+     * and add a separate consumer for the topic.
+     */
+    public void insertDataTraffic(List<BulkUpdates> writes, String triggerMethod, int accountId) {
+        insertDataCore(writes, triggerMethod, accountId, "AKTO_KAFKA_TOPIC_NAME_TRAFFIC", "akto.trafficdata", "kafka insertDataTraffic");
+    }
+
+    public void insertDataCore(Object writes, String triggerMethod, int accountId, String topicEnvVar, String defaultTopic, String errorContext) {
         try {
+            // Retrieve topic name from environment variable or use default if specified
+            String topicName = System.getenv(topicEnvVar);
+            if (topicName == null) {
+                if (defaultTopic != null) {
+                    topicName = defaultTopic;
+                } else {
+                    throw new Exception(topicEnvVar + " is null and no default topic provided");
+                }
+            }
+            String payloadStr = gson.toJson(writes);
             BasicDBObject obj = new BasicDBObject();
             obj.put("triggerMethod", triggerMethod);
             obj.put("payload", payloadStr);
             obj.put("accountId", accountId);
-            kafkaProducer.send(obj.toString(), topic);
+            kafkaProducer.send(obj.toString(), topicName);
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "Error in kafka insertDataCore " + e.toString());
-        }
-    }
-
-    String topicNameSecondary = System.getenv("AKTO_KAFKA_TOPIC_NAME_SECONDARY");
-
-    public void insertDataSecondary(Object writes, String triggerMethod, int accountId) {
-        try {
-            if (topicNameSecondary == null) {
-                topicNameSecondary = "akto.secondary.trafficdata";
-            }
-            String payloadStr = gson.toJson(writes);
-            insertDataCore(payloadStr, triggerMethod, accountId, topicNameSecondary);
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "Error in kafka insertDataSecondary " + e.toString());
+            loggerMaker.errorAndAddToDb(e, "Error in " + errorContext + " " + e.toString());
         }
     }
 

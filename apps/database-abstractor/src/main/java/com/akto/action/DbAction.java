@@ -786,7 +786,7 @@ public class DbAction extends ActionSupport {
     public String bulkWriteTrafficInfo() {
         if (kafkaUtils.isWriteEnabled()) {
             int accId = Context.accountId.get();
-            kafkaUtils.insertData(writesForTrafficInfo, "bulkWriteTrafficInfo", accId);
+            kafkaUtils.insertDataTraffic(writesForTrafficInfo, "bulkWriteTrafficInfo", accId);
         } else {
             try {
                 loggerMaker.infoAndAddToDb("bulkWriteTrafficInfo called");
@@ -830,7 +830,7 @@ public class DbAction extends ActionSupport {
     public String bulkWriteTrafficMetrics() {
         if (kafkaUtils.isWriteEnabled()) {
             int accId = Context.accountId.get();
-            kafkaUtils.insertData(writesForTrafficMetrics, "bulkWriteTrafficMetrics", accId);
+            kafkaUtils.insertDataTraffic(writesForTrafficMetrics, "bulkWriteTrafficMetrics", accId);
         } else {
             try {
                 loggerMaker.infoAndAddToDb("bulkWriteTrafficInfo called");
