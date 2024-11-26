@@ -68,7 +68,7 @@ public class StiggReporterClient {
 
         // Execute the request and get the response
         try (Response response = client.newCall(request).execute()) {
-            String queryString = query;
+            String queryString = "";
             try {
                 String[] queryTypes = query.split("\\(");
                 queryString = queryTypes[0];
