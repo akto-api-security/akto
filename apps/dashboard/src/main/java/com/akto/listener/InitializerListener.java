@@ -690,7 +690,7 @@ public class InitializerListener implements ServletContextListener {
         }, 0, 5, TimeUnit.MINUTES);
     }
 
-    private <T> void deleteApisPerDao(List<Key> toBeDeleted, AccountsContextDao<T> dao, String prefix) {
+    private <T> void deleteApisPerDao(List<Key> toBeDeleted, AccountsContextDaoWithRbac<T> dao, String prefix) {
         if (toBeDeleted == null || toBeDeleted.isEmpty()) return;
         List<WriteModel<T>> stiList = new ArrayList<>();
 

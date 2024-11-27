@@ -1,7 +1,9 @@
 package com.akto.dao;
 
+import java.util.ArrayList;
 import java.util.List;
 
+import com.akto.dto.type.SingleTypeInfo;
 import org.bson.conversions.Bson;
 
 import com.akto.dao.context.Context;
@@ -26,6 +28,8 @@ public abstract class AccountsContextDaoWithRbac<T> extends MCollection<T>{
             List<Integer> apiCollectionIds = RBACDao.instance.getUserCollectionsById(Context.userId.get(), accountId);
             if(apiCollectionIds != null){
                 rbacFilter = Filters.in(getFilterKeyString(), apiCollectionIds);
+
+                rbacFilter = Filters.or(rbacFilter, Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionIds));
             }
         }
         if (originalQuery != null) {

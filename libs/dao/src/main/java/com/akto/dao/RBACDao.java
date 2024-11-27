@@ -11,6 +11,7 @@ import com.mongodb.client.model.Filters;
 
 import java.util.HashMap;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 import static com.mongodb.client.model.Filters.*;
@@ -114,7 +115,7 @@ public class RBACDao extends CommonContextDao<RBAC> {
         return collectionList;
     }
 
-    public static void updateApiCollectionAccess(int userId, int accountId, List<Integer> apiCollectionList) {
+    public static void updateApiCollectionAccess(int userId, int accountId, Set<Integer> apiCollectionList) {
         RBACDao.instance.updateOne(Filters.and(eq(RBAC.USER_ID, userId), eq(RBAC.ACCOUNT_ID, accountId)),
                 set(RBAC.API_COLLECTIONS_ID, apiCollectionList));
     }
