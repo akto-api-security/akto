@@ -113,10 +113,10 @@ export default function Header() {
     const getColorForIcon = () => {
         switch (window.DASHBOARD_MODE){
             case "ON_PREM":
-                return "primary";
+                return "onprem_icon";
             case "LOCAL_DEPLOY":
                 if(window.IS_SAAS !== "true") 
-                    return "highlight"
+                    return "local_icon"
                 return "";
             default:
                 return ""
