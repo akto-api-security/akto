@@ -9,7 +9,7 @@ import api from '../../../../signup/api';
 import func from '@/util/func';
 import SemiCircleProgress from '../../shared/SemiCircleProgress';
 import { usePolling } from '../../../../main/PollingProvider';
-import { debounce } from 'lodash';
+import { debounce, get } from 'lodash';
 import LocalStore from '../../../../main/LocalStorageStore';
 import homeFunctions from '../../../../dashboard/pages/home/module';
 
@@ -108,6 +108,19 @@ export default function Header() {
           resetStore();
           window.location.href="/dashboard/onboarding"
         })
+    }
+
+    const getColorForIcon = () => {
+        switch (window.DASHBOARD_MODE){
+            case "ON_PREM":
+                return "onprem_icon";
+            case "LOCAL_DEPLOY":
+                if(window.IS_SAAS !== "true") 
+                    return "local_icon"
+                return "";
+            default:
+                return ""
+        }
     }
 
     const userMenuMarkup = (
@@ -209,8 +222,8 @@ export default function Header() {
             </HorizontalStack> : null}
              <TopBar.Menu
                 activatorContent={
-                    <span id="beamer-btn">
-                        <Icon source={NotificationMajor} />
+                    <span id="beamer-btn" className={getColorForIcon()}>
+                        <Icon source={NotificationMajor}/> 
                     </span>
                 }
                 actions={[]}
