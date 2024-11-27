@@ -984,12 +984,12 @@
             "responseHeaders": "",
             "status": "OK",
             "statusCode": "200",
-            "path": "/api/college/society/debate?debate=default"
+            "path": "/api/college/society/debate"
         },
         "testData": {
             "method": "GET",
-            "url": "/api/college/society/debate",
-            "responsePayload": "<!DOCTYPE html> <html> <head> </head> <body> <h1>Hello, API user!</h1> <p>Welcome to debate society. Play is <script>alert(document.domain)</script></p> </body> </html>",
+            "url": "/api/college/society/debate/%22%3E%3C/script%3E%3Cscript%3Ealert%28document.domain%29%3C/script%3E",
+            "responsePayload": "<!DOCTYPE html> <html> <head> </head> <body> <h1>Hello, API user!</h1> <p>Welcome to music society. Song is <script>alert(document.domain)</script></p> </body> </html>",
             "responseHeaders": {},
             "statusCode": 200
         }
@@ -1228,7 +1228,7 @@
         },
         "testData": {
             "method": "GET",
-            "url": "/api/college/exams/it/has been changed to https://www.fakewebsite.com. so please visit https://www.fakewebsite.com as your requested link",
+            "url": "/api/college/exams/it/has%20been%20changed%20to%20https%3A//www.fakewebsite.com.%20so%20please%20visit%20https%3A//www.fakewebsite.com%20as%20your%20requested%20link",
             "responsePayload": "Page not found. The page has been changed to https://www.fakewebsite.com. so please visit https://www.fakewebsite.com as your requested link",
             "responseHeaders": {},
             "statusCode": 200
@@ -1303,7 +1303,10 @@
             "method": "GET",
             "url": "/api/college/sem2/chem/student/grades",
             "responsePayload": {
-                "message": "Unable to fetch result due to absence of auth token"
+                "student_id": "12345",
+                "name": "student12",
+                "GPA": "8.95",
+                "CGPA": "8.12"
             },
             "responseHeaders": {},
             "statusCode": 200
@@ -2862,6 +2865,29 @@
         }
     },
     {
+        "id": "BOLA_ADD_CUSTOM_HEADER",
+        "sampleData": {
+            "method": "POST",
+            "requestPayload": "",
+            "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
+            "responsePayload": "{\"message\": \"Public resources\", \"documentName\": \"Yearly Report 2023-24\"}",
+            "responseHeaders": "",
+            "status": "OK",
+            "statusCode": "200",
+            "path": "/api/college/erp/documents"
+        },
+        "testData": {
+            "method": "POST",
+            "url": "/api/college/erp/documents",
+            "responsePayload": {
+                "message": "Restricted resources",
+                "documentName": "Budget 2024-25"
+            },
+            "responseHeaders": {},
+            "statusCode": 200
+        }
+    },
+    {
         "id": "BOLA_ADD_CUSTOM_HEADER_INTEGER_ID",
         "sampleData": {
             "method": "POST",
@@ -3189,13 +3215,23 @@
             "path": "/api/college/files"
         },
         "testData": {
-            "method": "POST",
-            "url": "/api/college/files",
-            "responsePayload": {
-                "status": "Login successful"
+            "x1": {
+                "method": "POST",
+                "url": "/api/college/files/etc/passwd",
+                "responsePayload": {},
+                "responseHeaders": {},
+                "statusCode": 404
             },
-            "responseHeaders": {},
-            "statusCode": 200
+            "x2": {
+                "method": "POST",
+                "url": "/api/college/files/etc/passwd",
+                "responsePayload": {
+                    "status": "Login successful",
+                    "error": "root:!:0:0::/:/usr/bin/ksh daemon:!:1:1::/etc: bin:!:2:2::/bin: sys:!:3:3::/usr/sys: adm:!:4:4::/var/adm: uucp:!:5:5::/usr/lib/uucp: guest:!:100:100::/home/guest: nobody:!:4294967294:4294967294::/: lpd:!:9:4294967294::/: lp:*:11:11::/var/spool/lp:/bin/false invscout:*:200:1::/var/adm/invscout:/usr/bin/ksh nuucp:*:6:5:uucp login user:/var/spool/uucppublic:/usr/sbin/uucp/uucico paul:!:201:1::/home/paul:/usr/bin/ksh jdoe:*:202:1:John Doe:/home/jdoe:/usr/bin/ksh"
+                },
+                "responseHeaders": {},
+                "statusCode": 200
+            }
         }
     },
     {
@@ -4903,6 +4939,101 @@
                 "statusCode": 506,
                 "medianResponseTime": 3002
             }
+        }
+    },
+    {
+        "id": "SSL_ENABLE_CHECK",
+        "sampleData": {
+            "method": "POST",
+            "requestPayload": "",
+            "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
+            "responsePayload": "{\"message\":\"Password reset successful\"}",
+            "responseHeaders": "",
+            "status": "OK",
+            "statusCode": "200",
+            "path": "/api/college/password-reset"
+        },
+        "testData": {
+            "method": "POST",
+            "url": "/api/college/password-reset",
+            "responsePayload": { "message": "Password reset successful" },
+            "responseHeaders": {},
+            "statusCode": 200
+        }
+    },
+    {
+        "id": "SSL_ENABLE_CHECK_AUTH",
+        "sampleData": {
+            "method": "POST",
+            "requestPayload": "",
+            "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
+            "responsePayload": "{\"message\":\"Login successful\"}",
+            "responseHeaders": "",
+            "status": "OK",
+            "statusCode": "200",
+            "path": "/api/college/certificate/login"
+        },
+        "testData": {
+            "method": "POST",
+            "url": "/api/college/certificate/login",
+            "responsePayload": { "message": "Login successful" },
+            "responseHeaders": {},
+            "statusCode": 200
+        }
+    },
+    {
+        "id": "USER_ENUM_REDIRECT_PAGE",
+        "sampleData": {
+            "method": "POST",
+            "requestPayload": "{\"username\": \"STUD-4844\", \"password\":\"pass4321\"}",
+            "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp - vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs - 9 eV2V - AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH - mEwgxL - coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\", \"Content-Type\": \"application/json\", \"Content-Length\": \"2\"}",
+            "responsePayload": "{\"status\": \"Login unsuccessful\"}",
+            "responseHeaders": "",
+            "status": "OK",
+            "statusCode": "200",
+            "path": "/api/college/ece/authenticate"
+        },
+        "testData": {
+            "x1": {
+                "method": "POST",
+                "url": "/api/college/ece/authenticate",
+                "responsePayload": {
+                    "status": "Username not found"
+                },
+                "responseHeaders": {},
+                "statusCode": 400
+            },
+            "x2": {
+                "method": "POST",
+                "url": "/api/college/ece/authenticate",
+                "responsePayload": {
+                    "status": "Password incorrect"
+                },
+                "responseHeaders": {},
+                "statusCode": 400
+            }
+        }
+    },
+    {
+        "id": "DOCKERFILE_HIDDEN_DISCLOSURE",
+        "sampleData": {
+            "method": "GET",
+            "requestPayload": "",
+            "responsePayload": "{\"output\":\"12 found\"}",
+            "requestHeaders": "{\"Authorization\":\"JWT eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoibG9naW4iLCJzaWduZWRVcCI6InRydWUiLCJ1c2VybmFtZSI6InJpc2hhdi5zb2xhbmtpQGFrdG8uaW8iLCJpYXQiOjE2ODg3MTMzNTUsImV4cCI6MTY4ODcxNDI1NX0.ToSrgQdEWaTVBphY9QMPBmo1zWgaDt_2zRlFb4gLYcgn3x58ClnTciRXN--9 LeoKojWo466S2rDDK8KH3IhR7gTDKk9ihKfLaVoKIg7M7RaHxFgp-vtjWenFcR6IBqLXqYh_kCqBFDH3hjrbD1Qtoaieu_L1rtJFwqz2xoIZP0VEmTPXT4vxT6yoVlbgloROzu1cJFGnoFQm69OUNHpCLf9S_7Qs-9eV2V-AlzeClfMnblTqhQP_s4znPit2Ik0ypNIH-mEwgxL-coWVmphuFYy5uG5c2Z4F4te7r_QP9jlOVYFjwB6_9gQSwi1lrm8qKdNml1UKnh4NNizc1878oQ\",\"Content-Type\": \"application/json\", \"HOST\": \"vulnerableapi.com\"}",
+            "responseHeaders": "",
+            "status": "OK",
+            "statusCode": "200",
+            "path": "/api/college/employee/Deans-body"
+        },
+        "testData": {
+            "method": "GET",
+            "url": "/api/college/employee/Deans-body/.Dockerfile",
+            "responsePayload": {
+                "output": "FROM someimage RUN echo \"Hello, world!\" ADD app.jar /app/ WORKDIR /app ENV JAVA_HOME /usr/lib/jvm/java-11 EXPOSE 8080"
+            },
+            "responseHeaders": {},
+            "statusCode": 200
         }
     }
 ]
