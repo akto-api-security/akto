@@ -36,6 +36,24 @@ public class DependencyAction extends UserAction {
     private Collection<Node> result;
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(DependencyAction.class);
+    private boolean dependencyGraphExists = false;
+    public String checkIfDependencyGraphAvailable() {
+
+        long start = System.currentTimeMillis();
+        Node node = DependencyFlowNodesDao.instance.findOne(
+                Filters.and(
+                        Filters.eq("apiCollectionId", apiCollectionId + ""),
+                        Filters.eq("url", url),
+                        Filters.eq("method", method),
+                        Filters.ne("maxDepth", 0)
+                ), Projections.include("_id")
+        );
+        long end = System.currentTimeMillis();
+        loggerMaker.infoAndAddToDb("checkIfDependencyGraphAvailable db call took: " + (end - start) + " ms");
+
+        dependencyGraphExists = node != null;
+        return SUCCESS.toUpperCase();
+    }
 
     @Override
     public String execute()  {
@@ -286,4 +304,14 @@ public class DependencyAction extends UserAction {
     public int getNewCollectionId() {
         return newCollectionId;
     }
+
+    public boolean isDependencyGraphExists() {
+        return dependencyGraphExists;
+    }
+
+    public boolean getDependencyGraphExists() {
+        return dependencyGraphExists;
+    }
+
+    
 }

@@ -1,5 +1,5 @@
-import { Box, Button, DataTable, Divider, Modal, Text, TextField, Icon, Checkbox, ButtonGroup, Badge, Banner,HorizontalGrid, HorizontalStack, Link } from "@shopify/polaris";
-import { TickMinor, CancelMajor } from "@shopify/polaris-icons"
+import { Box, Button, DataTable, Divider, Modal, Text, TextField, Icon, Checkbox, Badge, Banner,HorizontalGrid, HorizontalStack, Link, VerticalStack, Tooltip, Popover, ActionMenu, OptionList } from "@shopify/polaris";
+import { TickMinor, CancelMajor, SearchMinor } from "@shopify/polaris-icons"
 import { useEffect, useRef, useState } from "react";
 import { default as observeApi } from "../api";
 import { default as testingApi } from "../../testing/api";
@@ -8,25 +8,30 @@ import Dropdown from "../../../components/layouts/Dropdown";
 import func from "@/util/func"
 import { useNavigate } from "react-router-dom"
 import PersistStore from "../../../../main/PersistStore";
+import transform from "../../testing/transform";
+import LocalStore from "../../../../main/LocalStorageStore";
 
-function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOutside, closeRunTest }) {
+function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOutside, closeRunTest, selectedResourcesForPrimaryAction, useLocalSubCategoryData }) {
 
     const initialState = {
         categories: [],
         tests: {},
-        selectedCategory: "",
+        selectedCategory: "BOLA",
         recurringDaily: false,
+        continuousTesting: false,
         overriddenTestAppUrl: "",
         hasOverriddenTestAppUrl: false,
         startTimestamp: func.timeNow(),
         hourlyLabel: "Now",
         testRunTime: -1,
-        testRunTimeLabel: "Till complete",
+        testRunTimeLabel: "30 minutes",
+        runTypeLabel: "Now",
         maxConcurrentRequests: -1,
         testName: "",
         authMechanismPresent: false,
         testRoleLabel: "No test role selected",
         testRoleId: "",
+        sendSlackAlert: false
     }
 
     const navigate = useNavigate()
@@ -40,6 +45,27 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
     const [active, setActive] = useState(runTestFromOutside || false);
 
     const runTestRef = useRef(null);
+    const [searchValue, setSearchValue] = useState('')
+    const [showSearch, setShowSearch] = useState(false)
+    const [showFiltersOption, setShowFiltersOption] = useState(false);
+    const sectionsForFilters = [
+        {
+            title: 'Author',
+            filterKey: 'author',
+            options: [
+                {value: 'akto', label: 'Akto default'},
+                {value: 'custom', label: 'Custom tests'}
+            ]
+        }
+    ]
+
+    const initialArr = ['akto','custom']
+
+    const [optionsSelected, setOptionsSelected] = useState(initialArr)
+    const [slackIntegrated, setSlackIntegrated] = useState(false)
+
+    const localCategoryMap = LocalStore.getState().categoryMap
+    const localSubCategoryMap = LocalStore.getState().subCategoryMap
 
     function nameSuffixes(tests) {
         return Object.entries(tests)
@@ -64,7 +90,27 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
     async function fetchData() {
         setLoading(true)
 
-        const allSubCategoriesResponse = await testingApi.fetchAllSubCategories(true, "runTests")
+        observeApi.fetchSlackWebhooks().then((resp) => {
+            const apiTokenList = resp.apiTokenList
+            setSlackIntegrated(apiTokenList && apiTokenList.length > 0)
+        })
+
+        let metaDataObj = {
+            categories: [],
+            subCategories: [],
+            testSourceConfigs: []
+        }
+        if(!useLocalSubCategoryData) {
+            metaDataObj = await transform.getAllSubcategoriesData(true, "runTests")
+        } else {
+            metaDataObj = {
+                categories: Object.values(localCategoryMap),
+                subCategories: Object.values(localSubCategoryMap),
+                testSourceConfigs: []
+            }
+        }
+        let categories = metaDataObj.categories
+        let businessLogicSubcategories = metaDataObj.subCategories
         const testRolesResponse = await testingApi.fetchTestRoles()
         var testRoles = testRolesResponse.testRoles.map(testRole => {
             return {
@@ -74,15 +120,14 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         })
         testRoles.unshift({"label": "No test role selected", "value": ""})
         setTestRolesArr(testRoles)
-        const businessLogicSubcategories = allSubCategoriesResponse.subCategories
-        const categories = allSubCategoriesResponse.categories
         const { selectedCategory, mapCategoryToSubcategory } = populateMapCategoryToSubcategory(businessLogicSubcategories)
-
         // Store all tests
         const processMapCategoryToSubcategory = {}
-        Object.keys(mapCategoryToSubcategory).map(category => {
-            processMapCategoryToSubcategory[category] = [...mapCategoryToSubcategory[category]["all"]]
-        })
+        if(Object.keys(businessLogicSubcategories).length > 0){
+            Object.keys(mapCategoryToSubcategory).map(category => {
+                processMapCategoryToSubcategory[category] = [...mapCategoryToSubcategory[category]["all"]]
+            })
+        }
 
         // Set if a test is selected or not
         Object.keys(processMapCategoryToSubcategory).map(category => {
@@ -106,7 +151,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
             ...prev,
             categories: categories,
             tests: processMapCategoryToSubcategory,
-            selectedCategory: Object.keys(processMapCategoryToSubcategory)[0],
+            selectedCategory: Object.keys(processMapCategoryToSubcategory).length > 0 ? Object.keys(processMapCategoryToSubcategory)[0] : "",
             testName: testName,
             authMechanismPresent: authMechanismPresent
         }))
@@ -143,7 +188,6 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
             ret[x.superCategory.name].all.push(obj)
             ret[x.superCategory.name].selected.push(obj)
         })
-
         //store this
         return {
             selectedCategory: Object.keys(ret)[0],
@@ -153,16 +197,80 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
 
     const activator = (
         <div ref={runTestRef}>
-            <Button onClick={toggleRunTest} primary disabled={disabled} ><div data-testid="run_test_button">Run test</div></Button>
+            <Button onClick={toggleRunTest} primary disabled={disabled || testRun.selectedCategory.length === 0} ><div data-testid="run_test_button">Run test</div></Button>
         </div>
     );
 
+    const filterFunc = (test, selectedVal = []) => {
+        const useFilterArr = selectedVal.length > 0 ? selectedVal : optionsSelected
+        let ans = false;
+        sectionsForFilters.forEach((filter) => {
+            const filterKey = filter.filterKey;
+            if(filterKey === 'author'){
+                if(useFilterArr.includes('custom')){
+                    ans = useFilterArr.includes(test[filterKey].toLowerCase()) || test[filterKey].toLowerCase() !== 'akto'
+                }else{
+                    ans = useFilterArr.length > 0 && useFilterArr.includes(test[filterKey].toLowerCase())
+                }
+            }
+            else if(useFilterArr.includes(test[filterKey].toLowerCase())){
+                ans = true
+            }
+        })
+        return ans;
+    }
+
+    const resetSearchFunc = () => {
+        setShowSearch(false);
+        setSearchValue('');
+    }
+
     let categoryRows = [], testRows = []
+
+    const handleTestsSelected = (test) => {
+        let localCopy = JSON.parse(JSON.stringify(testRun.tests))
+        localCopy[testRun.selectedCategory] = localCopy[testRun.selectedCategory].map(curTest =>
+            curTest.label === test.label ?
+            {
+                ...curTest,
+                selected: !curTest.selected
+            } : curTest
+        ) 
+        const testName = convertToLowerCaseWithUnderscores(apiCollectionName) + "_" + nameSuffixes(localCopy).join("_")
+        setTestRun(prev => ({
+            ...prev,
+            tests: {
+                ...prev.tests,
+                [testRun.selectedCategory]: prev.tests[testRun.selectedCategory].map(curTest =>
+                    curTest.label === test.label ?
+                        {
+                            ...curTest,
+                            selected: !curTest.selected
+                        } : curTest)
+            },
+            testName:testName
+        }))
+    }
+
+    const selectOnlyFilteredTests = (selected) => {
+        const filteredTests = testRun.selectedCategory.length > 0 ? testRun.tests[testRun.selectedCategory].filter(x => filterFunc(x, selected)).map(item => item.value) : []
+        setTestRun(prev => ({
+            ...prev,
+            tests: {
+                ...prev.tests,
+                [testRun.selectedCategory]: prev.tests[testRun.selectedCategory].map((curTest) => {
+                    return {
+                        ...curTest,
+                        selected: filteredTests.length > 0 && filteredTests.includes(curTest.value)
+                    }
+                })
+            }
+        }))
+    }
 
     if (!loading) {
         categoryRows = testRun.categories.map(category => {
             const tests = testRun.tests[category.name]
-
             if (tests) {
                 let selected = 0
                 const total = tests.length
@@ -175,9 +283,9 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                 return ([(
                     <div
                         style={{ display: "grid", gridTemplateColumns: "auto max-content", alignItems: "center" }}
-                        onClick={() => setTestRun(prev => ({ ...prev, selectedCategory: category.name }))}>
+                        onClick={() => { setTestRun(prev => ({ ...prev, selectedCategory: category.name })); resetSearchFunc(); setOptionsSelected(initialArr)}}>
                         <div>
-                            <Text variany="headingMd" fontWeight="bold" color={category.name === testRun.selectedCategory ? "success" : ""}>{category.displayName}</Text>
+                            <Text variant="headingMd" fontWeight="bold" color={category.name === testRun.selectedCategory ? "success" : ""}>{category.displayName}</Text>
                             <Text>{selected} out of {total} selected</Text>
                         </div>
                         {selected > 0 && <Icon source={TickMinor} color="base" />}
@@ -189,32 +297,8 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
 
         })
 
-        const handleTestsSelected = (test) => {
-            let localCopy = JSON.parse(JSON.stringify(testRun.tests))
-            localCopy[testRun.selectedCategory] = localCopy[testRun.selectedCategory].map(curTest =>
-                curTest.label === test.label ?
-                {
-                    ...curTest,
-                    selected: !curTest.selected
-                } : curTest
-            ) 
-            const testName = convertToLowerCaseWithUnderscores(apiCollectionName) + "_" + nameSuffixes(localCopy).join("_")
-            setTestRun(prev => ({
-                ...prev,
-                tests: {
-                    ...prev.tests,
-                    [testRun.selectedCategory]: prev.tests[testRun.selectedCategory].map(curTest =>
-                        curTest.label === test.label ?
-                            {
-                                ...curTest,
-                                selected: !curTest.selected
-                            } : curTest)
-                },
-                testName:testName
-            }))
-        }
-
-        testRows = testRun.tests[testRun.selectedCategory].map(test => {
+        const filteredTests = testRun.selectedCategory.length > 0 ? testRun.tests[testRun.selectedCategory].filter(x => (x.label.toLowerCase().includes(searchValue.toLowerCase()) && filterFunc(x))) : []
+        testRows = filteredTests.map(test => {
             const isCustom = test?.author !== "AKTO"
             const label = (
                 <span style={{display: 'flex', gap: '4px', alignItems: 'flex-start'}}>
@@ -262,7 +346,9 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         return abc
     }, [])
 
-    const testRunTimeOptions = [{ label: "Till complete", value: "Till complete" }, ...runTimeMinutes, ...runTimeHours]
+    const testRunTimeOptions = [ ...runTimeMinutes, ...runTimeHours]
+
+    const runTypeOptions = [{ label: "Daily", value: "Daily" }, { label: "Continuously", value: "Continuously" }, { label: "Now", value: "Now" }]
 
     const maxRequests = hours.reduce((abc, x) => {
         if (x < 11) {
@@ -278,6 +364,8 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         if (testRun.hourlyLabel === "Now") {
             if (testRun.recurringDaily) {
                 return <div data-testid="schedule_run_button">Run daily at this time</div>
+            } else if (testRun.continuousTesting) {
+                return <div data-testid="schedule_run_button">Run continuous testing</div>
             } else {
                 return <div data-testid="schedule_run_button">Run once now</div>
             }
@@ -318,7 +406,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
     }
 
     async function handleRun() {
-        const { startTimestamp, recurringDaily, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId } = testRun
+        const { startTimestamp, recurringDaily, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert } = testRun
         const collectionId = parseInt(apiCollectionId)
 
         const tests = testRun.tests
@@ -330,16 +418,33 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
             })
         })
 
-        const apiInfoKeyList = endpoints.map(endpoint => ({
-            apiCollectionId: endpoint.apiCollectionId,
-            method: endpoint.method,
-            url: endpoint.endpoint
-        }))
-
-        if (filtered) {
-            await observeApi.scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, "TESTING_UI", testRoleId)
+        let apiInfoKeyList;
+        if(!selectedResourcesForPrimaryAction || selectedResourcesForPrimaryAction.length === 0) {
+            apiInfoKeyList = endpoints.map(endpoint => ({
+                apiCollectionId: endpoint.apiCollectionId,
+                method: endpoint.method,
+                url: endpoint.endpoint
+            }))
         } else {
-            await observeApi.scheduleTestForCollection(collectionId, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId)
+            apiInfoKeyList = selectedResourcesForPrimaryAction.map(str => {
+                const parts = str.split('###')
+                
+                const method = parts[0]
+                const url = parts[1]
+                const apiCollectionId = parseInt(parts[2], 10)
+
+                return {
+                  apiCollectionId: apiCollectionId,
+                  method: method,
+                  url: url
+                }
+            })
+        }
+
+        if (filtered || selectedResourcesForPrimaryAction.length > 0) {
+            await observeApi.scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, "TESTING_UI", testRoleId, continuousTesting, sendSlackAlert)
+        } else {
+            await observeApi.scheduleTestForCollection(collectionId, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert)
         }
 
         setActive(false)
@@ -385,6 +490,21 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         setTestRun(prev => {
             return { ...prev, tests: copyTestRun.tests, testName: convertToLowerCaseWithUnderscores(apiCollectionName) + "_" + nameSuffixes(copyTestRun.tests).join("_") }
         })
+    }
+
+    const handleInputValue = (val) => {
+        setSearchValue(val);
+    }
+
+    function generateLabelForSlackIntegration() {
+        return <HorizontalStack gap={1}>
+            <Link url='/dashboard/settings/integrations/slack' target="_blank" rel="noopener noreferrer" style={{ color: "#3385ff", textDecoration: 'none' }}>
+                Enable
+            </Link>
+            <Text>
+                Slack integration to send alerts post completion
+            </Text>
+        </HorizontalStack>
     }
 
     return (
@@ -464,13 +584,34 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                                 </div>
                             </div>
                             <div>
-                                <div style={{ padding: "15px", alignItems: "center" }}>
+                                <div style={{ padding: !showSearch ? "13px" : "9px", alignItems: "center", justifyContent: 'space-between', display: 'flex' }}>
                                     <HorizontalStack gap={"2"}>
                                         <Checkbox
                                             checked={allTestsSelectedOfCategory}
                                             onChange={(val) => toggleTestsSelection(val)}
                                         />
                                         <Text variant="headingMd">Tests</Text>
+                                    </HorizontalStack>
+                                    <HorizontalStack gap={"2"}>
+                                        <Popover
+                                            activator={<Button plain size="slim" onClick={() => setShowFiltersOption(!showFiltersOption)}>More filters</Button>}
+                                            onClose={() => setShowFiltersOption(false)}
+                                            active={showFiltersOption}
+                                        >
+                                            <Popover.Pane fixed>
+                                                <OptionList
+                                                    onChange={(x) => {setOptionsSelected(x); selectOnlyFilteredTests(x);}}
+                                                    allowMultiple
+                                                    sections={sectionsForFilters}
+                                                    selected={optionsSelected}
+                                                />
+                                            </Popover.Pane>
+                                        </Popover>
+                                        {showSearch ? <TextField onChange={handleInputValue} value={searchValue} autoFocus
+                                    focused /> : null}
+                                        <Tooltip content={"Click to search"} dismissOnMouseOut>
+                                            <Button size="slim" icon={SearchMinor} onClick={() => setShowSearch(!showSearch)}/>
+                                        </Tooltip>
                                     </HorizontalStack>
                                 </div>
                                 <Divider />
@@ -490,56 +631,52 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
 
                         <br />
 
-                        <HorizontalGrid columns="2">
-                            <Box>
-                                <ButtonGroup>
-                                    <Text>Select time:</Text>
+                        <VerticalStack gap={"4"}>
+                            <HorizontalGrid gap={"4"} columns={"3"}>
                                     <Dropdown
-                                        menuItems={hourlyTimes}
-                                        initial={testRun.hourlyLabel}
-                                        selected={(hour) => {
-                                            let startTimestamp
+                                        label="Run Type"
+                                        menuItems={runTypeOptions}
+                                        initial={testRun.runTypeLabel}
+                                        selected={(runType) => {
+                                            let recurringDaily = false
+                                            let continuousTesting = false
 
-                                            if (hour === "Now") startTimestamp = func.timeNow()
-                                            else {
-                                                const dayStart = +func.dayStart(+new Date());
-                                                startTimestamp = parseInt(dayStart / 1000) + parseInt(hour) * 60 * 60
+                                            if(runType === 'Continuously'){
+                                                continuousTesting = true;
+                                            }else if(runType === 'Daily'){
+                                                recurringDaily = true;
                                             }
-
-                                            const hourlyTime = getLabel(hourlyTimes, hour)
-                                            setTestRun(prev => ({
-                                                ...prev,
-                                                startTimestamp,
-                                                hourlyLabel: hourlyTime ? hourlyTime.label : ""
-                                            }))
+                                           setTestRun(prev => ({
+                                                   ...prev,
+                                                   recurringDaily,
+                                                   continuousTesting,
+                                                   runTypeLabel: runType.label
+                                               }))
                                         }} />
-                                </ButtonGroup>
-                                <br />
 
-                                <ButtonGroup>
-                                    <Checkbox
-                                        label="Run daily"
-                                        checked={testRun.recurringDaily}
-                                        onChange={() => setTestRun(prev => ({ ...prev, recurringDaily: !prev.recurringDaily }))}
-                                    />
-                                    <Checkbox
-                                        label="Use different target for testing"
-                                        checked={testRun.hasOverriddenTestAppUrl}
-                                        onChange={() => setTestRun(prev => ({ ...prev, hasOverriddenTestAppUrl: !prev.hasOverriddenTestAppUrl }))}
-                                    />
-                                    {testRun.hasOverriddenTestAppUrl &&
-                                        <TextField
-                                            placeholder="Override test app host"
-                                            value={testRun.overriddenTestAppUrl}
-                                            onChange={(overriddenTestAppUrl) => setTestRun(prev => ({ ...prev, overriddenTestAppUrl: overriddenTestAppUrl }))}
-                                        />
-                                    }
-                                </ButtonGroup>
-                                </Box>
-                            <Box>
-                                <ButtonGroup>
-                                    <Text>Test run time:</Text>
+                                <Dropdown
+                                    label="Select Time:"
+                                    disabled={testRun.continuousTesting === true}
+                                    menuItems={hourlyTimes}
+                                    initial={testRun.hourlyLabel}
+                                    selected={(hour) => {
+                                        let startTimestamp
+
+                                        if (hour === "Now") startTimestamp = func.timeNow()
+                                        else {
+                                            const dayStart = +func.dayStart(+new Date());
+                                            startTimestamp = parseInt(dayStart / 1000) + parseInt(hour) * 60 * 60
+                                        }
+
+                                        const hourlyTime = getLabel(hourlyTimes, hour)
+                                        setTestRun(prev => ({
+                                            ...prev,
+                                            startTimestamp,
+                                            hourlyLabel: hourlyTime ? hourlyTime.label : ""
+                                        }))
+                                    }} />
                                     <Dropdown
+                                        label="Test run time:"
                                         menuItems={testRunTimeOptions}
                                         initial={testRun.testRunTimeLabel}
                                         selected={(timeInSeconds) => {
@@ -555,33 +692,10 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                                                 testRunTimeLabel: testRunTimeOption.label
                                             }))
                                         }} />
-                                </ButtonGroup>
-
-                                <br />
-                                <ButtonGroup>
-                                    <Text>Max concurrent requests:</Text>
-                                    <Dropdown
-                                        menuItems={maxConcurrentRequestsOptions}
-                                        initial={"Default"}
-                                        selected={(requests) => {
-                                            let maxConcurrentRequests
-                                            if (requests === "Default") maxConcurrentRequests = -1
-                                            else maxConcurrentRequests = requests
-
-                                            const maxConcurrentRequestsOption = getLabel(maxConcurrentRequestsOptions, requests)
-
-                                            setTestRun(prev => ({
-                                                ...prev,
-                                                maxConcurrentRequests: maxConcurrentRequests,
-                                                maxConcurrentRequestsLabel: maxConcurrentRequestsOption.label
-                                            }))
-                                        }} />
-                                </ButtonGroup>
-                                
-                            </Box>
-                            <Box>
-                            <ButtonGroup>
-                                    <Text>Select test role:</Text>
+                            </HorizontalGrid>
+                            <HorizontalGrid gap={"4"} columns={"2"}>
+                                <div style={{marginTop: '-10px'}}>
+                                    <Text>Select Test Role</Text>
                                     <Dropdown
                                         menuItems={testRolesArr}
                                         initial={"No test role selected"}
@@ -596,9 +710,57 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                                                 testRoleLabel: testRoleOption.label
                                             }))
                                         }} />
-                                </ButtonGroup>
-                                </Box>
-                        </HorizontalGrid>
+                                </div>
+                                        
+                                <div style={{marginTop: '-10px'}}>
+                                <Text>Max Concurrent Requests</Text>
+                                <Dropdown
+                                    menuItems={maxConcurrentRequestsOptions}
+                                    initial={"Default"}
+                                    selected={(requests) => {
+                                        let maxConcurrentRequests
+                                        if (requests === "Default") maxConcurrentRequests = -1
+                                        else maxConcurrentRequests = requests
+
+                                        const maxConcurrentRequestsOption = getLabel(maxConcurrentRequestsOptions, requests)
+
+                                        setTestRun(prev => ({
+                                            ...prev,
+                                            maxConcurrentRequests: maxConcurrentRequests,
+                                            maxConcurrentRequestsLabel: maxConcurrentRequestsOption.label
+                                        }))
+                                    }} />
+                            </div>
+
+                            </HorizontalGrid>
+
+                            <Checkbox
+                                label={slackIntegrated ? "Send slack alert post test completion" : generateLabelForSlackIntegration()}
+                                checked={testRun.sendSlackAlert}
+                                onChange={() => setTestRun(prev => ({ ...prev, sendSlackAlert: !prev.sendSlackAlert}))}
+                                disabled={!slackIntegrated}
+                            />
+
+                            <HorizontalGrid columns={2}>
+                                <Checkbox
+                                    label="Use different target for testing"
+                                    checked={testRun.hasOverriddenTestAppUrl}
+                                    onChange={() => setTestRun(prev => ({ ...prev, hasOverriddenTestAppUrl: !prev.hasOverriddenTestAppUrl }))}
+                                />
+                                {testRun.hasOverriddenTestAppUrl &&
+                                    <div style={{ width: '400px'}}> 
+                                        <TextField
+                                            placeholder="Override test app host"
+                                            value={testRun.overriddenTestAppUrl}
+                                            onChange={(overriddenTestAppUrl) => setTestRun(prev => ({ ...prev, overriddenTestAppUrl: overriddenTestAppUrl }))}
+                                        />
+                                    </div>
+                                }
+                            </HorizontalGrid>
+
+
+                        </VerticalStack>
+
                     </Modal.Section>
                 }
             </Modal>

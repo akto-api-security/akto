@@ -27,6 +27,7 @@ import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.Constants;
+import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.TestErrorSource;
 import com.akto.utils.DeleteTestRunUtils;
 import com.akto.utils.Utils;
@@ -70,9 +71,10 @@ public class StartTestAction extends UserAction {
     private Map<ObjectId, TestingRunResultSummary> latestTestingRunResultSummaries;
     private Map<String, String> sampleDataVsCurlMap;
     private String overriddenTestAppUrl;
-    private static final LoggerMaker loggerMaker = new LoggerMaker(StartTestAction.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(StartTestAction.class, LogDb.DASHBOARD);
     private TestingRunType testingRunType;
     private String searchString;
+    private boolean continuousTesting;
 
     private Map<String,Long> allTestsCountMap = new HashMap<>();
     private Map<String,Integer> issuesSummaryInfoMap = new HashMap<>();
@@ -104,6 +106,7 @@ public class StartTestAction extends UserAction {
     }
 
     private CallSource source;
+    private boolean sendSlackAlert = false;
 
     private TestingRun createTestingRun(int scheduleTimestamp, int periodInSeconds) {
         User user = getSUser();
@@ -117,7 +120,7 @@ public class StartTestAction extends UserAction {
             }
         }
 
-        AuthMechanism authMechanism = TestRolesDao.instance.fetchAttackerToken(0);
+        AuthMechanism authMechanism = TestRolesDao.instance.fetchAttackerToken(0, null);
         if (authMechanism == null && testIdConfig == 0) {
             addActionError("Please set authentication mechanism before you test any APIs");
             return null;
@@ -157,7 +160,7 @@ public class StartTestAction extends UserAction {
 
         return new TestingRun(scheduleTimestamp, user.getLogin(),
                 testingEndpoints, testIdConfig, State.SCHEDULED, periodInSeconds, testName, this.testRunTime,
-                this.maxConcurrentRequests);
+                this.maxConcurrentRequests, this.sendSlackAlert);
     }
 
     private List<String> selectedTests;
@@ -186,6 +189,10 @@ public class StartTestAction extends UserAction {
         if (localTestingRun == null) {
             try {
                 localTestingRun = createTestingRun(scheduleTimestamp, this.recurringDaily ? 86400 : 0);
+                // pass boolean from ui, which will tell if testing is coniinuous on new endpoints
+                if (this.continuousTesting) {
+                    localTestingRun.setPeriodInSeconds(-1);
+                }
                 if (triggeredBy != null && !triggeredBy.isEmpty()) {
                     localTestingRun.setTriggeredBy(triggeredBy);
                 }
@@ -201,12 +208,13 @@ public class StartTestAction extends UserAction {
             }
             this.testIdConfig = 0;
         } else {
-            TestingRunDao.instance.updateOne(
+            if(this.metadata == null || this.metadata.isEmpty()){
+                TestingRunDao.instance.updateOne(
                     Filters.eq(Constants.ID, localTestingRun.getId()),
                     Updates.combine(
                             Updates.set(TestingRun.STATE, TestingRun.State.SCHEDULED),
                             Updates.set(TestingRun.SCHEDULE_TIMESTAMP, scheduleTimestamp)));
-
+            }
             if (this.overriddenTestAppUrl != null || this.selectedTests != null) {
                 int id = UUID.randomUUID().hashCode() & 0xfffffff ;
                 TestingRunConfig testingRunConfig = new TestingRunConfig(id, null, this.selectedTests, null, this.overriddenTestAppUrl, this.testRoleId);
@@ -343,7 +351,12 @@ public class StartTestAction extends UserAction {
             case RECURRING:
                 return Filters.and(
                     Filters.nin(Constants.ID, getCicdTests()),
-                    Filters.ne(TestingRun.PERIOD_IN_SECONDS,0
+                    Filters.ne(TestingRun.PERIOD_IN_SECONDS,0),
+                    Filters.ne(TestingRun.PERIOD_IN_SECONDS, -1));
+            case CONTINUOUS_TESTING:
+                return Filters.and(
+                    Filters.nin(Constants.ID, getCicdTests()),
+                    Filters.eq(TestingRun.PERIOD_IN_SECONDS,-1
                 ));
             default:
                 return Filters.empty();
@@ -382,7 +395,7 @@ public class StartTestAction extends UserAction {
 
     public String retrieveAllCollectionTests() {
 
-        this.authMechanism = TestRolesDao.instance.fetchAttackerToken(0);
+        this.authMechanism = TestRolesDao.instance.fetchAttackerToken(0, null);
 
         ArrayList<Bson> testingRunFilters = new ArrayList<>();
         Bson testingRunTypeFilter = getTestingRunTypeFilter(testingRunType);
@@ -493,7 +506,7 @@ public class StartTestAction extends UserAction {
     List<TestingRunResult> testingRunResults;
     private boolean fetchOnlyVulnerable;
     public enum QueryMode {
-        VULNERABLE, SECURED, SKIPPED_EXEC_NEED_CONFIG, SKIPPED_EXEC_NO_ACTION, SKIPPED_EXEC, ALL;
+        VULNERABLE, SECURED, SKIPPED_EXEC_NEED_CONFIG, SKIPPED_EXEC_NO_ACTION, SKIPPED_EXEC, ALL, SKIPPED_EXEC_API_REQUEST_FAILED;
     }
     private QueryMode queryMode;
 
@@ -507,7 +520,8 @@ public class StartTestAction extends UserAction {
             addActionError("Invalid test summary id");
             return ERROR.toUpperCase();
         }
-
+        if (testingRunResultSummaryHexId != null) loggerMaker.infoAndAddToDb("fetchTestingRunResults called for hexId=" + testingRunResultSummaryHexId);
+        if (queryMode != null) loggerMaker.infoAndAddToDb("fetchTestingRunResults called for queryMode="+queryMode);
         List<Bson> testingRunResultFilters = new ArrayList<>();
 
         testingRunResultFilters.add(Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, testingRunResultSummaryId));
@@ -521,17 +535,24 @@ public class StartTestAction extends UserAction {
                 case VULNERABLE:
                     testingRunResultFilters.add(Filters.eq(TestingRunResult.VULNERABLE, true));
                     break;
+                case SKIPPED_EXEC_API_REQUEST_FAILED:
+                    testingRunResultFilters.add(Filters.eq(TestingRunResult.VULNERABLE, false));
+                    testingRunResultFilters.add(Filters.in(TestingRunResultDao.ERRORS_KEY, TestResult.API_CALL_FAILED_ERROR_STRING, TestResult.API_CALL_FAILED_ERROR_STRING_UNREACHABLE));
+                    break;
                 case SKIPPED_EXEC:
                     testingRunResultFilters.add(Filters.eq(TestingRunResult.VULNERABLE, false));
                     testingRunResultFilters.add(Filters.in(TestingRunResultDao.ERRORS_KEY, TestResult.TestError.getErrorsToSkipTests()));
                     break;
                 case SECURED:
                     testingRunResultFilters.add(Filters.eq(TestingRunResult.VULNERABLE, false));
+                    List<String> errorsToSkipTest = TestResult.TestError.getErrorsToSkipTests();
+                    errorsToSkipTest.add(TestResult.API_CALL_FAILED_ERROR_STRING);
+                    errorsToSkipTest.add(TestResult.API_CALL_FAILED_ERROR_STRING_UNREACHABLE);
                     testingRunResultFilters.add(
                         Filters.or(
                             Filters.exists(WorkflowTestingEndpoints._WORK_FLOW_TEST),
                             Filters.and(
-                                Filters.nin(TestingRunResultDao.ERRORS_KEY, TestResult.TestError.getErrorsToSkipTests()),
+                                Filters.nin(TestingRunResultDao.ERRORS_KEY, errorsToSkipTest),
                                 Filters.ne(TestingRunResult.REQUIRES_CONFIG, true)
                             )
                         )
@@ -549,9 +570,16 @@ public class StartTestAction extends UserAction {
                 this.errorEnums.put(testError, testError.getMessage());
             }
         }
+        if(queryMode == QueryMode.SKIPPED_EXEC_API_REQUEST_FAILED){
+            this.errorEnums.put(TestError.NO_API_REQUEST, TestError.NO_API_REQUEST.getMessage());
+        }
 
-        this.testingRunResults = TestingRunResultDao.instance
-                .fetchLatestTestingRunResult(Filters.and(testingRunResultFilters));
+        try {
+            this.testingRunResults = TestingRunResultDao.instance
+                    .fetchLatestTestingRunResult(Filters.and(testingRunResultFilters));
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "error in fetchLatestTestingRunResult: " + e);
+        }
 
         return SUCCESS.toUpperCase();
     }
@@ -560,9 +588,12 @@ public class StartTestAction extends UserAction {
         ObjectId testingRunResultSummaryId;
         try {
             testingRunResultSummaryId = new ObjectId(testingRunResultSummaryHexId);
+
             Bson filters = Filters.and(
                     Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, testingRunResultSummaryId),
-                    Filters.eq(TestingRunResult.VULNERABLE, true));
+                    Filters.eq(TestingRunResult.VULNERABLE, true)
+            );
+
             List<TestingRunResult> testingRunResultList = TestingRunResultDao.instance.findAll(filters, skip, 50, null);
             Map<String, String> sampleDataVsCurlMap = new HashMap<>();
             for (TestingRunResult runResult: testingRunResultList) {
@@ -755,13 +786,22 @@ public class StartTestAction extends UserAction {
 
         long oneTimeCount = TestingRunDao.instance.getMCollection().countDocuments(Filters.and(filters));
 
-        long scheduleCount = totalCount - oneTimeCount - cicdCount;
+        ArrayList<Bson> continuousTestsFilter = new ArrayList<>(); // Create a copy of filters
+        continuousTestsFilter.add(getTestingRunTypeFilter(TestingRunType.CONTINUOUS_TESTING));
+        continuousTestsFilter.add(Filters.gte(TestingRun.SCHEDULE_TIMESTAMP, startTimestamp));
+
+        long continuousTestsCount = TestingRunDao.instance.getMCollection().countDocuments(Filters.and(continuousTestsFilter));
+
+        System.out.println("cont count" + continuousTestsCount);
+
+        long scheduleCount = totalCount - oneTimeCount - cicdCount - continuousTestsCount;
 
         
         result.put("allTestRuns", totalCount);
         result.put("oneTime", oneTimeCount);
         result.put("scheduled", scheduleCount);
         result.put("cicd", cicdCount);
+        result.put("continuous", continuousTestsCount);
 
         this.allTestsCountMap = result;
         return SUCCESS.toUpperCase();
@@ -1212,5 +1252,17 @@ public class StartTestAction extends UserAction {
 
     public Map<TestError, String> getErrorEnums() {
         return errorEnums;
+    }
+
+    public boolean getContinuousTesting() {
+        return continuousTesting;
+    }
+
+    public void setContinuousTesting(boolean continuousTesting) {
+        this.continuousTesting = continuousTesting;
+    }
+
+    public void setSendSlackAlert(boolean sendSlackAlert) {
+        this.sendSlackAlert = sendSlackAlert;
     }
 }

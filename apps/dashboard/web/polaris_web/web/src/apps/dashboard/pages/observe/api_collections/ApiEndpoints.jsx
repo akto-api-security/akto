@@ -4,7 +4,7 @@ import api from "../api"
 import { useEffect, useState } from "react"
 import func from "@/util/func"
 import GithubSimpleTable from "../../../components/tables/GithubSimpleTable";
-import {useLocation, useParams } from "react-router-dom"
+import {useLocation, useNavigate, useParams } from "react-router-dom"
 import { saveAs } from 'file-saver'
 
 import "./api_inventory.css"
@@ -73,10 +73,10 @@ const headings = [
         tooltipContent: "Authentication type of the API."
     },
     {
-        text: 'Sensitive Params',
+        text: 'Sensitive params in response',
         title: 'Sensitive params',
         value: 'sensitiveTagsComp',
-        filterKey: 'sensitiveTags',
+        filterKey: 'sensitiveInResp',
         showFilter: true,
         textValue: "sensitiveDataTags"
     },
@@ -117,6 +117,20 @@ headers.push({
     sortActive: true
 })
 
+headers.push({
+    text: 'Sensitive params in request',
+    value: 'sensitiveInReq',
+    filterKey: 'sensitiveInReq',
+    showFilter: true,
+})
+
+headers.push({
+    text: 'Response codes',
+    value: 'responseCodes',
+    filterKey: 'responseCodes',
+    showFilter: true,
+})
+
 
 const sortOptions = [
     { label: 'Risk Score', value: 'riskScore asc', directionLabel: 'Highest', sortKey: 'riskScore', columnIndex: 2},
@@ -129,11 +143,12 @@ const sortOptions = [
     { label: 'Last seen', value: 'lastSeenTs desc', directionLabel: 'Oldest', sortKey: 'lastSeenTs', columnIndex: 7 }
 ];
 
-function ApiEndpoints() {
-
+function ApiEndpoints(props) {
+    const { endpointListFromConditions, sensitiveParamsForQuery, isQueryPage } = props
     const params = useParams()
     const location = useLocation()
     const apiCollectionId = params.apiCollectionId
+    const navigate = useNavigate()
 
     const showDetails = ObserveStore(state => state.inventoryFlyout)
     const setShowDetails = ObserveStore(state => state.setInventoryFlyout)
@@ -148,9 +163,10 @@ function ApiEndpoints() {
     const [showEmptyScreen, setShowEmptyScreen] = useState(false)
     const [runTests, setRunTests ] = useState(false)
 
-    const [endpointData, setEndpointData] = useState([])
+    const [endpointData, setEndpointData] = useState({"all":[], 'sensitive': [], 'new': [], 'high_risk': [], 'no_auth': [], 'shadow': []})
     const [selectedTab, setSelectedTab] = useState("all")
     const [selected, setSelected] = useState(0)
+    const [selectedResourcesForPrimaryAction, setSelectedResourcesForPrimaryAction] = useState([])
     const [loading, setLoading] = useState(true)
     const [apiDetail, setApiDetail] = useState({})
     const [exportOpen, setExportOpen] = useState(false)
@@ -171,29 +187,67 @@ function ApiEndpoints() {
     const selectedMethod = queryParams.get('selected_method')
 
     // the values used here are defined at the server.
-    const definedTableTabs = apiCollectionId == 111111999 ? ['All', 'New', 'High risk', 'No auth', 'Shadow'] : ( apiCollectionId == 111111120 ? ['All', 'New', 'Sensitive', 'High risk', 'Shadow'] : ['All', 'New', 'Sensitive', 'High risk', 'No auth', 'Shadow'] )
+    const definedTableTabs = apiCollectionId === 111111999 ? ['All', 'New', 'High risk', 'No auth', 'Shadow'] : ( apiCollectionId === 111111120 ? ['All', 'New', 'Sensitive', 'High risk', 'Shadow'] : ['All', 'New', 'Sensitive', 'High risk', 'No auth', 'Shadow'] )
 
-    const isApiGroup = allCollections.filter(x => {
-        return x.id == apiCollectionId && x.type == "API_GROUP"
-    }).length > 0
 
     const { tabsInfo } = useTable()
     const tableCountObj = func.getTabsCount(definedTableTabs, endpointData)
     const tableTabs = func.getTableTabsContent(definedTableTabs, tableCountObj, setSelectedTab, selectedTab, tabsInfo)
-
     async function fetchData() {
         setLoading(true)
-        let apiCollectionData = await api.fetchAPICollection(apiCollectionId)
-        setShowEmptyScreen(apiCollectionData.data.endpoints.length === 0)
-        setIsRedacted(apiCollectionData.redacted)
-        let apiEndpointsInCollection = apiCollectionData.data.endpoints.map(x => { return { ...x._id, startTs: x.startTs, changesCount: x.changesCount, shadow: x.shadow ? x.shadow : false } })
-        let apiInfoListInCollection = apiCollectionData.data.apiInfoList
-        let unusedEndpointsInCollection = apiCollectionData.unusedEndpoints
-        let sensitiveParamsResp = await api.loadSensitiveParameters(apiCollectionId)
+        let apiEndpointsInCollection;
+        let apiInfoListInCollection;
+        let unusedEndpointsInCollection;
+        let sensitiveParamsResp;
+        let sourceCodeData = {};
+        if (isQueryPage) {
+            let apiCollectionData = endpointListFromConditions
+            if (Object.keys(endpointListFromConditions).length === 0) {
+                apiCollectionData = {
+                    data: {
+                        endpoints: [],
+                        apiInfoList: []
+                    }
+                }
+            }
+            setShowEmptyScreen(apiCollectionData.data.endpoints.length === 0)
+            setIsRedacted(apiCollectionData.redacted)
+            apiEndpointsInCollection = apiCollectionData.data.endpoints.map(x => { return { ...x._id, startTs: x.startTs, changesCount: x.changesCount, shadow: x.shadow ? x.shadow : false } })
+            apiInfoListInCollection = apiCollectionData.data.apiInfoList
+            unusedEndpointsInCollection = apiCollectionData.unusedEndpoints
+            sensitiveParamsResp = sensitiveParamsForQuery
+            if (Object.keys(sensitiveParamsForQuery).length === 0) {
+                sensitiveParamsResp = {
+                    data: {
+                        endpoints: [],
+                        apiInfoList: []
+                    }
+                }
+            }
+        } else {
+            let apiPromises = [
+                api.fetchApisFromStis(apiCollectionId),
+                api.fetchApiInfosForCollection(apiCollectionId),
+                api.fetchAPIsFromSourceCode(apiCollectionId),
+                api.loadSensitiveParameters(apiCollectionId)
+            ];
+            let results = await Promise.allSettled(apiPromises);
+            let stisEndpoints =  results[0].status === 'fulfilled' ? results[0].value : {};
+            let apiInfosData = results[1].status === 'fulfilled' ? results[1].value : {};
+            sourceCodeData = results[2].status === 'fulfilled' ? results[2].value : {};
+            sensitiveParamsResp =  results[3].status === 'fulfilled' ? results[3].value : {};
+            setShowEmptyScreen(stisEndpoints?.list !== undefined && stisEndpoints?.list?.length === 0)
+            apiEndpointsInCollection = stisEndpoints?.list !== undefined && stisEndpoints.list.map(x => { return { ...x._id, startTs: x.startTs, changesCount: x.changesCount, shadow: x.shadow ? x.shadow : false } })
+            apiInfoListInCollection = apiInfosData.apiInfoList
+            unusedEndpointsInCollection = stisEndpoints.unusedEndpoints
+            setIsRedacted(apiInfosData.redacted)
+        }
+
         let sensitiveParams = sensitiveParamsResp.data.endpoints
 
         let sensitiveParamsMap = {}
         sensitiveParams.forEach(p => {
+            let position = p.responseCode > -1 ? "response" : "request";
             let key = p.method + " " + p.url + " " + p.apiCollectionId
             if (!sensitiveParamsMap[key]) sensitiveParamsMap[key] = new Set()
 
@@ -201,21 +255,33 @@ function ApiEndpoints() {
                 p.subType = { name: "CUSTOM" }
             }
 
-            sensitiveParamsMap[key].add(p.subType)
+            sensitiveParamsMap[key].add({ name: p.subType, position: position})
         })
 
         apiEndpointsInCollection.forEach(apiEndpoint => {
-            apiEndpoint.sensitive = sensitiveParamsMap[apiEndpoint.method + " " + apiEndpoint.url + " " +apiEndpoint.apiCollectionId] || new Set()
+            const key = apiEndpoint.method + " " + apiEndpoint.url + " " + apiEndpoint.apiCollectionId;
+            const allSensitive = new Set(), sensitiveInResp = [], sensitiveInReq = [];
+
+            sensitiveParamsMap[key]?.forEach(({ name, position }) => {
+                allSensitive.add(name);
+                (position === 'response' ? sensitiveInResp : sensitiveInReq).push(name);
+            });
+
+            Object.assign(apiEndpoint, {
+                sensitive: allSensitive,
+                sensitiveInReq,
+                sensitiveInResp
+            });
         })
 
         let data = {}
         let allEndpoints = func.mergeApiInfoAndApiCollection(apiEndpointsInCollection, apiInfoListInCollection, collectionsMap)
 
         // handle code analysis endpoints
-        const codeAnalysisCollectionInfo = apiCollectionData.codeAnalysisCollectionInfo
-        const codeAnalysisApisMap = codeAnalysisCollectionInfo.codeAnalysisApisMap
+        const codeAnalysisCollectionInfo = sourceCodeData.codeAnalysisCollectionInfo
+        const codeAnalysisApisMap = codeAnalysisCollectionInfo?.codeAnalysisApisMap
         let shadowApis = []
-
+        setLoading(false)
         if (codeAnalysisApisMap) {
             // Don't show empty screen if there are codeanalysis endpoints present
             if (codeAnalysisApisMap && Object.keys(codeAnalysisApisMap).length > 0) {
@@ -246,16 +312,22 @@ function ApiEndpoints() {
             })
 
             shadowApis = Object.entries(shadowApis).map(([ codeAnalysisApiKey, codeAnalysisApi ]) => {
-                const { method, endpoint, location } = codeAnalysisApi
+                const {id, lastSeenTs, discoveredTs, location,  } = codeAnalysisApi
+                const { method, endpoint} = id
 
                 return {
                     id: codeAnalysisApiKey,
                     endpointComp: <GetPrettifyEndpoint method={method} url={endpoint} isNew={false} />,
                     method: method,
                     endpoint: endpoint,
+                    apiCollectionId: apiCollectionId,
                     codeAnalysisEndpoint: true,
                     sourceLocation: location.filePath, 
                     sourceLocationComp: <SourceLocation location={location} />,
+                    parameterisedEndpoint: method + " " + endpoint,
+                    apiCollectionName: collectionsMap[apiCollectionId],
+                    last_seen: func.prettifyEpoch(lastSeenTs),
+                    added: func.prettifyEpoch(discoveredTs)
                 }
             })
         }
@@ -269,7 +341,6 @@ function ApiEndpoints() {
         data['new'] = prettifyData.filter(x=> x.isNew)
         data['no_auth'] = prettifyData.filter(x => x.open)
         data['shadow'] = [ ...shadowApis ]
-
         setEndpointData(data)
         setSelectedTab("all")
         setSelected(0)
@@ -278,7 +349,6 @@ function ApiEndpoints() {
         setApiInfoList(apiInfoListInCollection)
         setUnusedEndpoints(unusedEndpointsInCollection)
 
-        setLoading(false)
     }
 
     useEffect(() => {
@@ -305,9 +375,11 @@ function ApiEndpoints() {
     }
 
     useEffect(() => {
+        if (!isQueryPage) {
+            checkGptActive()
+        }
         fetchData()
-        checkGptActive()
-    }, [apiCollectionId])
+    }, [apiCollectionId, endpointListFromConditions])
 
     const resourceName = {
         singular: 'endpoint',
@@ -319,9 +391,6 @@ function ApiEndpoints() {
     }
 
     function handleRowClick(data) {
-        // Don't show api details for Code analysis endpoints
-        if (data.codeAnalysisEndpoint) 
-            return
         
         let tmp = { ...data, endpointComp: "", sensitiveTagsComp: "" }
         
@@ -339,7 +408,7 @@ function ApiEndpoints() {
         })
     }
 
-
+    
 
     function handleRefresh() {
         fetchData()
@@ -369,6 +438,25 @@ function ApiEndpoints() {
         })
     }
 
+    function deleteApisAction() {
+        setShowDeleteApiModal(false)
+        var apiObjects = apis.map((x) => {
+            let tmp = x.split("###");
+            return {
+                method: tmp[0],
+                url: tmp[1],
+                apiCollectionId: parseInt(tmp[2])
+            }
+        }) 
+    
+    
+        api.deleteApis(apiObjects).then(resp => {
+            func.setToast(true, false, "APIs deleted successfully. Refresh to see the changes.")
+        }).catch (err => {
+            func.setToast(true, true, "There was some error deleting the APIs. Please contact support@akto.io for assistance")
+        })
+    }
+
     async function exportOpenApi() {
         let lastFetchedUrl = null;
         let lastFetchedMethod = null;
@@ -389,14 +477,49 @@ function ApiEndpoints() {
         func.setToast(true, false, <div data-testid="openapi_spec_download_message">OpenAPI spec downloaded successfully</div>)
     }
 
-    function exportCsv() {
+    async function exportOpenApiForSelectedApi() {
+        const apiInfoKeyList = selectedResourcesForPrimaryAction.map(str => {
+            const parts = str.split('###')
+
+            const method = parts[0]
+            const url = parts[1]
+            const apiCollectionId = parseInt(parts[2], 10)
+
+            return {
+                apiCollectionId: apiCollectionId,
+                method: method,
+                url: url
+            }
+        })
+        let result = await api.downloadOpenApiFileForSelectedApis(apiInfoKeyList, apiCollectionId)
+        let openApiString = result["openAPIString"]
+        let blob = new Blob([openApiString], {
+            type: "application/json",
+        });
+        const fileName = "open_api_" + collectionsMap[apiCollectionId] + ".json";
+        saveAs(blob, fileName);
+
+        func.setToast(true, false, <div data-testid="openapi_spec_download_message">OpenAPI spec downloaded successfully</div>)
+    }
+
+    function deleteApis(selectedResources){
+
+            setActionOperation(Operation.REMOVE)
+            setApis(selectedResources)
+            setShowDeleteApiModal(true);
+    }
+
+    function exportCsv(selectedResources = []) {
+        const selectedResourcesSet = new Set(selectedResources)
         if (!loading) {
             let headerTextToValueMap = Object.fromEntries(headers.map(x => [x.text, x.type === CellType.TEXT ? x.value : x.textValue]).filter(x => x[0].length > 0));
 
             let csv = Object.keys(headerTextToValueMap).join(",") + "\r\n"
             const allEndpoints = endpointData['all']
             allEndpoints.forEach(i => {
-                csv += Object.values(headerTextToValueMap).map(h => (i[h] || "-")).join(",") + "\r\n"
+                if(selectedResources.length === 0 || selectedResourcesSet.has(i.id)){
+                    csv += Object.values(headerTextToValueMap).map(h => (i[h] || "-")).join(",") + "\r\n"
+                }
             })
             let blob = new Blob([csv], {
                 type: "application/csvcharset=UTF-8"
@@ -407,7 +530,27 @@ function ApiEndpoints() {
     }
 
     async function exportPostman() {
-        const result = await api.exportToPostman(apiCollectionId)
+        let result;
+        if(selectedResourcesForPrimaryAction && selectedResourcesForPrimaryAction.length > 0) {
+            const apiInfoKeyList = selectedResourcesForPrimaryAction.map(str => {
+                const parts = str.split('###')
+
+                const method = parts[0]
+                const url = parts[1]
+                const apiCollectionId = parseInt(parts[2], 10)
+
+                return {
+                    apiCollectionId: apiCollectionId,
+                    method: method,
+                    url: url
+                }
+            })
+
+            result = await api.exportToPostmanForSelectedApis(apiInfoKeyList, apiCollectionId)
+        } else {
+            result = await api.exportToPostman(apiCollectionId)
+        }
+
         if (result)
         func.setToast(true, false, "We have initiated export to Postman, checkout API section on your Postman app in sometime.")
     }
@@ -488,6 +631,9 @@ function ApiEndpoints() {
         const activePrompts = dashboardFunc.getPrompts(requestObj)
         setPrompts(activePrompts)
     }
+    const collectionsObj = (allCollections && allCollections.length > 0) ? allCollections.filter(x => Number(x.id) === Number(apiCollectionId))[0] : {}
+    const isApiGroup = collectionsObj?.type === 'API_GROUP'
+
     const secondaryActionsComponent = (
         <HorizontalStack gap="2">
 
@@ -509,17 +655,13 @@ function ApiEndpoints() {
                                 <Text fontWeight="regular" variant="bodyMd">Refresh</Text>
                             </div>
                             {
-                                allCollections.filter(x => {
-                                    return x.id == apiCollectionId && x.type == "API_GROUP"
-                                }).length > 0 ?
+                                isApiGroup ?
                                     <div onClick={computeApiGroup} style={{ cursor: 'pointer' }}>
                                         <Text fontWeight="regular" variant="bodyMd">Re-compute api group</Text>
                                     </div> :
                                     null
                             }
-                            { allCollections.filter(x => {
-                                    return x.id == apiCollectionId && x.type == "API_GROUP"
-                                }).length == 0 ?
+                            { !isApiGroup && !(collectionsObj?.hostName && collectionsObj?.hostName?.length > 0) ?
                                 <UploadFile
                                 fileFormat=".har"
                                 fileChanged={file => handleFileChange(file)}
@@ -534,13 +676,13 @@ function ApiEndpoints() {
                         <VerticalStack gap={2}>
                             <Text>Export as</Text>
                                 <VerticalStack gap={1}>
-                                <div data-testid="openapi_spec_option" onClick={exportOpenApi} style={{cursor: 'pointer'}}>
+                                <div data-testid="openapi_spec_option" onClick={(selectedResourcesForPrimaryAction && selectedResourcesForPrimaryAction.length > 0) ? exportOpenApiForSelectedApi : exportOpenApi} style={{cursor: 'pointer'}}>
                                     <Text fontWeight="regular" variant="bodyMd">OpenAPI spec</Text>
                                 </div>
                                 <div data-testid="postman_option" onClick={exportPostman} style={{cursor: 'pointer'}}>
                                     <Text fontWeight="regular" variant="bodyMd">Postman</Text>
                                 </div>
-                                <div data-testid="csv_option" onClick={exportCsv} style={{cursor: 'pointer'}}>
+                                <div data-testid="csv_option" onClick={() =>exportCsv()} style={{cursor: 'pointer'}}>
                                     <Text fontWeight="regular" variant="bodyMd">CSV</Text>
                                 </div>
                             </VerticalStack>
@@ -570,6 +712,8 @@ function ApiEndpoints() {
                 </Popover.Pane>
             </Popover>
 
+            {isApiGroup &&collectionsObj?.automated !== true ? <Button onClick={() => navigate("/dashboard/observe/query_mode?collectionId=" + apiCollectionId)}>Edit conditions</Button> : null}
+
             {isGptActive ? <Button onClick={displayGPT} disabled={showEmptyScreen}>Ask AktoGPT</Button>: null}
                     
             <RunTest
@@ -579,6 +723,7 @@ function ApiEndpoints() {
                 runTestFromOutside={runTests}
                 closeRunTest={() => setRunTests(false)}
                 disabled={showEmptyScreen}
+                selectedResourcesForPrimaryAction={selectedResourcesForPrimaryAction}
             />
         </HorizontalStack>
     )
@@ -590,7 +735,8 @@ function ApiEndpoints() {
             setTableLoading(false)
         },200)
     }
-
+    
+    const [showDeleteApiModal, setShowDeleteApiModal] = useState(false)
     const [showApiGroupModal, setShowApiGroupModal] = useState(false)
     const [apis, setApis] = useState([])
     const [actionOperation, setActionOperation] = useState(Operation.ADD)
@@ -608,11 +754,12 @@ function ApiEndpoints() {
 
     const promotedBulkActions = (selectedResources) => {
 
-        let isApiGroup = allCollections.filter(x => {
-            return x.id == apiCollectionId && x.type == "API_GROUP"
-        }).length > 0
-
-        let ret = []
+        let ret = [
+            {
+                content: 'Export as CSV',
+                onAction: () => exportCsv(selectedResources)
+            }
+        ]
         if (isApiGroup) {
             ret.push(
                 {
@@ -626,6 +773,14 @@ function ApiEndpoints() {
                 onAction: () => handleApiGroupAction(selectedResources, Operation.ADD)
             })
         }
+
+        if (window.USER_NAME && window.USER_NAME.endsWith("@akto.io")) {
+            ret.push({
+                content: 'Delete APIs',
+                onAction: () => deleteApis(selectedResources)
+            })
+        }
+
         return ret;
     }
 
@@ -638,7 +793,7 @@ function ApiEndpoints() {
                 content: 'Enable',
                 onAction: redactCollection
             }}
-            key="redact-modal"
+            key="redact-modal-1"
         >
             <Modal.Section>
                 <Text>When enabled, existing sample payload values for this collection will be deleted, and data in all the future payloads for this collection will be redacted. Please note that your API Inventory, Sensitive data etc. will be intact. We will simply be deleting the sample payload values.</Text>
@@ -646,74 +801,95 @@ function ApiEndpoints() {
         </Modal>
     )
 
-      const components = [
+    let deleteApiModal = (
+        <Modal
+            open={showDeleteApiModal}
+            onClose={() => setShowApiGroupModal(false)}
+            title="Confirm"
+            primaryAction={{
+                content: 'Yes',
+                onAction: deleteApisAction
+            }}
+            key="redact-modal-1"
+        >
+            <Modal.Section>
+                <Text>Are you sure you want to delete {(apis || []).length} API(s)?</Text>
+            </Modal.Section>
+        </Modal>
+    )
+
+    const apiEndpointTable = [<GithubSimpleTable
+        key="api-endpoint-table"
+        pageLimit={50}
+        data={endpointData[selectedTab]}
+        sortOptions={sortOptions}
+        resourceName={resourceName}
+        filters={[]}
+        disambiguateLabel={disambiguateLabel}
+        headers={headers.filter(x => {
+            if (!isApiGroup && x.text === 'Collection') {
+                return false;
+            }
+            return true;
+        })}
+        getStatus={() => { return "warning" }}
+        selected={selected}
+        onRowClick={handleRowClick}
+        onSelect={handleSelectedTab}
+        getFilteredItems={getFilteredItems}
+        mode={IndexFiltersMode.Default}
+        headings={headings.filter(x => {
+            if (!isApiGroup && x.text === 'Collection') {
+                return false;
+            }
+            return true;
+        })}
+        useNewRow={true}
+        condensedHeight={true}
+        tableTabs={tableTabs}
+        selectable={true}
+        promotedBulkActions={promotedBulkActions}
+        loading={tableLoading || loading}
+        setSelectedResourcesForPrimaryAction={setSelectedResourcesForPrimaryAction}
+    />,
+    <ApiDetails
+        key="api-details"
+        showDetails={showDetails && apiDetail && Object.keys(apiDetail).length > 0}
+        setShowDetails={setShowDetails}
+        apiDetail={apiDetail}
+        headers={transform.getDetailsHeaders()}
+        isGptActive={isGptActive}
+    />,
+    ]
+
+
+    const components = [
         loading ? [<SpinnerCentered key="loading" />] : (
             showWorkflowTests ? [
                 <WorkflowTests
-                key={"workflow-tests"}
-                apiCollectionId={apiCollectionId}
-                endpointsList={loading ? [] : endpointData["all"]}
-            />
-             ] : showEmptyScreen ? [
+                    key={"workflow-tests"}
+                    apiCollectionId={apiCollectionId}
+                    endpointsList={loading ? [] : endpointData["all"]}
+                />
+            ] : showEmptyScreen ? [
                 <EmptyScreensLayout key={"emptyScreen"}
-                            iconSrc={"/public/file_plus.svg"}
-                            headingText={"Discover APIs to get started"}
-                            description={"Your API collection is currently empty. Import APIs from other collections now."}
-                            buttonText={"Import from other collections"}
-                            redirectUrl={"/dashboard/observe/inventory"}
-                            learnText={"inventory"}
-                            docsUrl={ENDPOINTS_PAGE_DOCS_URL}
-                />] :[
-                    (coverageInfo[apiCollectionId] === 0  || !(coverageInfo.hasOwnProperty(apiCollectionId))? <TestrunsBannerComponent key={"testrunsBanner"} onButtonClick={() => setRunTests(true)} isInventory={true} /> : null),
+                    iconSrc={"/public/file_plus.svg"}
+                    headingText={"Discover APIs to get started"}
+                    description={"Your API collection is currently empty. Import APIs from other collections now."}
+                    buttonText={"Import from other collections"}
+                    redirectUrl={"/dashboard/observe/inventory"}
+                    learnText={"inventory"}
+                    docsUrl={ENDPOINTS_PAGE_DOCS_URL}
+                />] : [
+                (coverageInfo[apiCollectionId] === 0 || !(coverageInfo.hasOwnProperty(apiCollectionId)) ? <TestrunsBannerComponent key={"testrunsBanner"} onButtonClick={() => setRunTests(true)} isInventory={true} /> : null),
                 <div className="apiEndpointsTable" key="table">
-                      <GithubSimpleTable
-                          key="table"
-                          pageLimit={50}
-                          data={endpointData[selectedTab]}
-                          sortOptions={sortOptions}
-                          resourceName={resourceName}
-                          filters={[]}
-                          disambiguateLabel={disambiguateLabel}
-                          headers={headers.filter(x => {
-                            if(!isApiGroup && x.text==='Collection'){
-                                return false;
-                            }
-                            return true;
-                          })}
-                          getStatus={() => { return "warning" }}
-                          selected={selected}
-                          onRowClick={handleRowClick}
-                          onSelect={handleSelectedTab}
-                          getFilteredItems={getFilteredItems}
-                          mode={IndexFiltersMode.Default}
-                          headings={headings.filter(x => {
-                            if(!isApiGroup && x.text==='Collection'){
-                                return false;
-                            }
-                            return true;
-                          })}
-                          useNewRow={true}
-                          condensedHeight={true}
-                          tableTabs={tableTabs}
-                          selectable={true}
-                          promotedBulkActions={promotedBulkActions}
-                          loading={tableLoading || loading}
-                      />
+                    {apiEndpointTable}
                       <Modal large open={isGptScreenActive} onClose={() => setIsGptScreenActive(false)} title="Akto GPT">
                           <Modal.Section flush>
                               <AktoGptLayout prompts={prompts} closeModal={() => setIsGptScreenActive(false)} />
                           </Modal.Section>
                       </Modal>
                   </div>,
-                  <ApiDetails
-                      key="details"
-                      showDetails={showDetails && apiDetail && Object.keys(apiDetail).length > 0}
-                      setShowDetails={setShowDetails}
-                      apiDetail={apiDetail}
-                      headers={transform.getDetailsHeaders()}
-                      getStatus={() => { return "warning" }}
-                      isGptActive={isGptActive}
-                  />,
                   <ApiGroupModal
                       key="api-group-modal"
                       showApiGroupModal={showApiGroupModal}
@@ -723,22 +899,28 @@ function ApiEndpoints() {
                       currentApiGroupName={pageTitle}
                       fetchData={fetchData}
                   />,
-                  modal
+                  modal,
+                  deleteApiModal
             ]
         )
       ]
 
     return (
-        <PageWithMultipleCards
-            title={
-                <Box maxWidth="35vw">
-                    <TooltipText tooltip={pageTitle} text={pageTitle} textProps={{variant:'headingLg'}} />
-                </Box>
+        <div>
+            {isQueryPage ? apiEndpointTable :
+                <PageWithMultipleCards
+                    title={
+                        <Box maxWidth="35vw">
+                            <TooltipText tooltip={pageTitle} text={pageTitle} textProps={{ variant: 'headingLg' }} />
+                        </Box>
+                    }
+                    backUrl="/dashboard/observe/inventory"
+                    secondaryActions={secondaryActionsComponent}
+                    components={components}
+                />
             }
-            backUrl="/dashboard/observe/inventory"
-            secondaryActions={secondaryActionsComponent}
-            components={components}
-        />
+        </div>
+
     )
 }
 

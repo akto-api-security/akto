@@ -1,9 +1,9 @@
 import HomePage from "../dashboard/pages/home/HomePage"
 import TestRunsPage from "../dashboard/pages/testing/TestRunsPage/TestRunsPage";
 import SingleTestRunPage from "../dashboard/pages/testing/SingleTestRunPage/SingleTestRunPage"
-import TestRunResultPage from "../dashboard/pages/testing/TestRunResultPage/TestRunResultPage";
 import AllSensitiveData from "../dashboard/pages/observe/AllSensitiveData/AllSensitiveData";
 import ApiCollections from "../dashboard/pages/observe/api_collections/ApiCollections";
+import ApiQuery from "../dashboard/pages/observe/api_collections/APIQuery";
 import ApiEndpoints from  "../dashboard/pages/observe/api_collections/ApiEndpoints";
 import SensitiveDataExposure from "../dashboard/pages/observe/SensitiveDataExposure/SensitiveDataExposure";
 import SingleRequest from "../dashboard/pages/observe/SingleRequest/SingleRequest";
@@ -47,7 +47,6 @@ import Onboarding from "../dashboard/pages/onboarding/Onboarding";
 import Dashboard from "../dashboard/pages/Dashboard";
 import Slack from "../dashboard/pages/settings/integrations/Slack";
 import ApiChanges from "../dashboard/pages/observe/api_collections/ApiChanges";
-import ExportHtml from "../dashboard/pages/testing/ExportHtml/ExportHtml";
 
 import Store from "../dashboard/store";
 import { generateSearchData } from "@/util/searchItems"
@@ -55,7 +54,7 @@ import { useEffect } from "react";
 import CICD from "../dashboard/pages/settings/integrations/CICD";
 import ErrorComponent from "../dashboard/components/shared/ErrorComponent";
 import OktaIntegration from "../dashboard/pages/settings/integrations/OktaIntegration";
-import AzureSso from "../dashboard/pages/settings/integrations/AzureSso";
+import AzureSso from "../dashboard/pages/settings/integrations/sso/AzureSso";
 
 import HomeDashboard from "../dashboard/pages/dashboard/HomeDashboard";
 import TestLibrary from "../dashboard/pages/settings/test_library/TestLibrary";
@@ -68,6 +67,17 @@ import PageBusinessEmail from "../signup/pages/PageBusinessEmail"
 import TokenValidator from "./TokenValidator"
 import { TableContextProvider } from "@/apps/dashboard/components/tables/TableContext";
 import VulnerabilityReport from "../dashboard/pages/testing/vulnerability_report/VulnerabilityReport";
+import ThreatDetectionPage from "../dashboard/pages/threat_detection/ThreatDetectionPage";
+
+import { PollingProvider } from "./PollingProvider";
+import Help from "../dashboard/pages/settings/help_and_support/Help";
+import AdvancedTrafficFilters from "../dashboard/pages/settings/traffic-conditions/AdvancedTrafficFilters";
+import GoogleSamlSso from "../dashboard/pages/settings/integrations/sso/GoogleSamlSso";
+import SignUpWithSSO from "../signup/components/SignUpWithSSO";
+
+import TeamsWebhooks from "../dashboard/pages/settings/integrations/teamsWebhooks/TeamsWebhooks";
+import TeamsWebhook from "../dashboard/pages/settings/integrations/teamsWebhooks/TeamsWebhook";
+import AuditLogs from "../dashboard/pages/settings/audit_logs/AuditLogs";
 
 // if you add a component in a new path, please verify the search implementation in function -> 'getSearchItemsArr' in func.js
 
@@ -97,10 +107,6 @@ const router = createBrowserRouter([
               {
                 path: ":hexId",
                 element: <SingleTestRunPage />
-              },
-              {
-                path: ":hexId/result/:hexId2",
-                element: <TestRunResultPage />
               },
               {
                 path:"roles",
@@ -137,6 +143,10 @@ const router = createBrowserRouter([
                 element: <ApiCollections/>
               },
               {
+                path: "query_mode",
+                element: <ApiQuery/>
+              },
+              {
                 path: "changes",
                 element: <ApiChanges/>
               },
@@ -166,6 +176,10 @@ const router = createBrowserRouter([
             path: "quick-start",
             element: <QuickStart/>,
           },
+          {
+            path:"threat-detection",
+            element:<ThreatDetectionPage/>
+          },
         ]
       },
       {
@@ -175,6 +189,10 @@ const router = createBrowserRouter([
           {
             path: "users",
             element: <Users />
+          },
+          {
+            path: "Help",
+            element: <Help />
           },
           {
             path: "integrations",
@@ -225,6 +243,10 @@ const router = createBrowserRouter([
             element: <AzureSso />
           },
           {
+            path: "integrations/google_workspace_sso",
+            element: <GoogleSamlSso />
+          },
+          {
             path: "integrations/github_app",
             element: <GithubAppIntegration />
           },
@@ -245,6 +267,19 @@ const router = createBrowserRouter([
             element: <Webhook />,
           },
           {
+            path: "integrations/teamsWebhooks",
+            element: <TeamsWebhooks />,
+          },
+          {
+            path: "integrations/teamsWebhooks/:webhookId",
+            element: <TeamsWebhook />,
+          },
+          {
+            path: "integrations/teamsWebhooks/create_custom_webhook",
+            element: <TeamsWebhook />,
+          },
+
+          {
             path: "logs",
             element: <HealthLogs />,
           },
@@ -255,6 +290,10 @@ const router = createBrowserRouter([
           {
             path: "default-payloads",
             element:<DefaultPayloads/>
+          },
+          {
+            path: 'advanced-filters',
+            element: <AdvancedTrafficFilters />
           },
           {
             path: "auth-types/details",
@@ -279,6 +318,10 @@ const router = createBrowserRouter([
           {
             path: "self-hosted",
             element: <SelfHosted/>
+          },
+          {
+            path: 'audit-logs',
+            element: <AuditLogs/>
           }
         ]
       },
@@ -325,6 +368,10 @@ const router = createBrowserRouter([
     path: "/business-email",
     element: <PageBusinessEmail />
   },
+  {
+    path: "/sso-login",
+    element: <SignUpWithSSO />
+  },
   // catches all undefined paths and redirects to homepage.
   {
     path: "*",
@@ -360,9 +407,11 @@ function App() {
   }, [])
 
   return (
+    <PollingProvider>
     <TableContextProvider>
       <RouterProvider router={router} />
     </TableContextProvider>
+    </PollingProvider>
   );
 }
 

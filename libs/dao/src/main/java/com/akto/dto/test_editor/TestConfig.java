@@ -28,6 +28,9 @@ public class TestConfig {
     private boolean inactive;
     private String author;
 
+    final public static String DYNAMIC_SEVERITY = "dynamic_severity";
+    private List<SeverityParserResult> dynamicSeverityList;
+
     public TestConfig(String id, Info info, Auth auth, ConfigParserResult apiSelectionFilters, Map<String, List<String>> wordlists, ExecutorConfigParserResult execute, 
         ConfigParserResult validation, Strategy strategy) {
         
@@ -43,6 +46,19 @@ public class TestConfig {
     }
 
     public TestConfig() { }
+
+    public static boolean isTestMultiNode(TestConfig testConfig){
+        if(testConfig == null || testConfig.getExecute() == null){
+            return false;
+        }
+        try {
+            return testConfig.getExecute().getNode().getChildNodes().get(0).getValues().equals("multiple");
+        } catch (Exception e) {
+            e.printStackTrace();
+            return false;
+        }
+        
+    }
 
     public String getId() {
         return id;
@@ -151,4 +167,13 @@ public class TestConfig {
     public boolean isInactive() {
         return inactive;
     }
+    
+    public List<SeverityParserResult> getDynamicSeverityList() {
+        return dynamicSeverityList;
+    }
+
+    public void setDynamicSeverityList(List<SeverityParserResult> dynamicSeverityList) {
+        this.dynamicSeverityList = dynamicSeverityList;
+    }
+
 }

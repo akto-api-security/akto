@@ -7,7 +7,7 @@ function IntegrationsLayout(props) {
 
   const components = [      
       <LegacyCard title="About the Integration" sectioned key="aboutSection">
-        <p>{props.cardContent}</p>
+        {(typeof (props.cardContent) === 'string') ? <p>{props.cardContent}</p> : props.cardContent}
       </LegacyCard>,
       <div key="primaryComponent">{props.component}</div>,
       <div key="secondaryComponent">{props.secondaryComponent}</div>,

@@ -5,11 +5,13 @@ import HybridSaasSource from "./components/HybridSaasSource"
 import AwsSource from "./components/AwsSource"
 import FargateSource from "./components/FargateSource"
 import Kubernetes from "./components/Kubernetes"
-import FutureConnection from "./components/shared/FutureConnection"
 import BannerComponent from "./components/shared/BannerComponent"
 import OpenApiSource from "./components/OpenApiSource"
 import ApiInventoryFromSourceCode from "./components/ApiInventoryFromSourceCode"
 import func from "@/util/func"
+import AddOnComponenet from "./components/shared/AddOnComponenet"
+import BitBucketSource from "./components/BitBucketSource"
+import GithubSource from "./components/GithubSource"
 
 const mirroringObj = {
     icon: '/public/aws.svg',
@@ -20,12 +22,147 @@ const mirroringObj = {
     component: <AwsSource />
 }
 
+const apigeeObj = {
+    icon: '/public/apigee.svg',
+    label: "Apigee",
+    text: "Apigee setup is recommended if you are using Google's Apigee API Management platform to design, secure, and scale your APIs.",
+    docsUrl: 'https://docs.akto.io/traffic-connections',
+    key: "Apigee",
+    component: <AddOnComponenet/>
+}
+
+const githubObj = {
+    icon: '/public/github.svg',
+    label: "GitHub",
+    text: "We recommend setting up GitHub if you want to connect and retrieve APIs directly from your source code hosted on GitHub.",
+    docsUrl: 'https://docs.akto.io/traffic-connections',
+    key: "GitHub",
+    component: <GithubSource/>
+}
+
+const gitlabObj = {
+    icon: '/public/gitlab.svg',
+    label: "GitLab",
+    text: "We recommend setting up GitLab if you want to connect and retrieve APIs directly from your source code hosted on GitLab.",
+    docsUrl: 'https://docs.akto.io/traffic-connections',
+    key: "GitLab",
+    component: <AddOnComponenet/>
+}
+
+const bitbucketObj = {
+    icon: '/public/bitbucket.svg',
+    label: "Bitbucket",
+    text: "We recommend setting up Bitbucket if you want to connect and retrieve APIs directly from your source code hosted on Bitbucket.",
+    docsUrl: 'https://docs.akto.io/traffic-connections',
+    key: "Bitbucket",
+    component: <BitBucketSource/>
+}
+
+const azureObj = {
+    icon: '/public/azure.svg',
+    label: "Azure API Gateway",
+    text: "Azure API Gateway setup is recommended if you are using Azure's API Management service to manage, secure, and analyze your APIs.",
+    docsUrl: 'https://docs.akto.io/traffic-connections',
+    key: "Azure",
+    component: <AddOnComponenet/>
+}
+
+const cloudflareObj = {
+    icon: '/public/cloudflare.svg',
+    label: "Cloudflare",
+    text: "You should use Cloudflare as a traffic connector if you are leveraging Cloudflare's CDN and security features to manage and optimize your API traffic.",
+    docsUrl: 'https://docs.akto.io/traffic-connections',
+    key: "Cloudflare",
+    component: <AddOnComponenet/>
+}
+
+const f5Obj = {
+    icon: '/public/f5.svg',
+    label: "F5",
+    text: "F5 setup is recommended if you are using F5's BIG-IP as an API gateway or load balancer to manage and control your API traffic.",
+    docsUrl: 'https://docs.akto.io/traffic-connections',
+    key: "F5",
+    component: <AddOnComponenet/>
+}
+
+const goObj = {
+    icon: '/public/go.svg',
+    label: "Go",
+    text: "Use where Go-based services are deployed.",
+    docsUrl: 'https://docs.akto.io/traffic-connections',
+    key: "Go",
+    component: <AddOnComponenet/>
+}
+
+const haproxyObj = {
+    icon: '/public/haproxy.svg',
+    label: "HA Proxy",
+    text: "HA Proxy should be used as a traffic connector if you are leveraging HA Proxy for load balancing, high availability, and proxying HTTP and TCP-based applications.",
+    docsUrl: 'https://docs.akto.io/traffic-connections',
+    key: "HAproxy",
+    component: <AddOnComponenet/>
+}
+
+const javaObj = {
+    icon: '/public/java.svg',
+    label: "Java",
+    text: "You can use Akto's Java agent to capture API traffic directly from your Java applications.",
+    docsUrl: 'https://docs.akto.io/traffic-connections',
+    key: "Java",
+    component: <AddOnComponenet/>
+}
+
+const kongmeshObj = {
+    icon: '/public/kongmesh.svg',
+    label: "Kong Mesh",
+    text: "Use this set-up if you are utilizing Kong's service mesh capabilities to manage and secure your microservices and APIs.",
+    docsUrl: 'https://docs.akto.io/traffic-connections',
+    key: "Kong Mesh",
+    component: <AddOnComponenet/>
+}
+
+const layer7Obj = {
+    icon: '/public/layer7.svg',
+    label: "Layer 7",
+    text: "Layer7 is recommended if you are using CA Technologies' Layer7 API Management for securing and managing your APIs.",
+    docsUrl: 'https://docs.akto.io/traffic-connections',
+    key: "Layer 7",
+    component: <AddOnComponenet/>
+}
+
+const nodejsObj = {
+    icon: '/public/nodejs.svg',
+    label: "NodeJS",
+    text: "This setup is ideal for environments where NodeJS-based services are deployed, ensuring seamless integration and real-time traffic monitoring.",
+    docsUrl: 'https://docs.akto.io/traffic-connections',
+    key: "NodeJS",
+    component: <AddOnComponenet/>
+}
+
+const openshiftObj = {
+    icon: '/public/openshift.svg',
+    label: "OpenShift",
+    text: "OpenShift should be used as a traffic connector if you are deploying and managing containerized applications using OpenShift.",
+    docsUrl: 'https://docs.akto.io/traffic-connections',
+    key: "OpenShift",
+    component: <AddOnComponenet/>
+}
+
+const threescaleObj = {
+    icon: '/public/threescale.svg',
+    label: "3Scale",
+    text: "This setup is recommended if your APIs are managed by 3scale.",
+    docsUrl: 'https://docs.akto.io/traffic-connections',
+    key: "3Scale",
+    component: <AddOnComponenet/>
+}
+
 const beanStalkObj = {
     icon: '/public/beanstalk.svg',
     label: "AWS Beanstalk",
     text: "You can deploy Akto in AWS and collect traffic through mirroring on your AWS Beanstalk setup.",
     docsUrl: 'https://docs.akto.io/traffic-connections/aws-beanstalk',
-    component: <FutureConnection />,
+    component: <AddOnComponenet/>,
     key: "Bean Stalk",
 }
 
@@ -78,7 +215,6 @@ const gcpObj = {
     icon: '/public/gcp.svg',
     label: 'GCP Mirroring',
     text: 'This setup only takes ten minutes. Once you connect GCP, Akto will process GCP traffic to create an API Inventory in real time.',
-    badge: "Recommended",
     docsUrl: 'https://docs.akto.io/traffic-connections/google-cloud-gcp',
     key: "GCP",
     component: <BannerComponent title="Setup using GCP Mirroring" docsUrl="https://docs.akto.io/traffic-connections/google-cloud-gcp"
@@ -101,13 +237,12 @@ const kongObj = {
     text: 'Kong Gateway is an open source API gateway, built for multi-cloud and hybrid, and optimized for microservices and distributed architectures.',
     docsUrl: 'https://docs.akto.io/traffic-connections/kong',
     key: "KONG",
-    component: <FutureConnection/>
+    component: <AddOnComponenet/>
 }
 
 const kubernetesObj = {
     icon: '/public/kubernetes.svg',
     label: 'Kubernetes Daemonset',
-    badge: "Recommended",
     text: 'You can deploy Akto in Kubernetes and collect traffic through a daemonset on your Kubernetes configuration.',
     docsUrl: 'https://docs.akto.io/traffic-connections/kubernetes',
     key: "KUBERNETES",
@@ -172,6 +307,7 @@ const apiInventoryFromSourceCodeObj = {
 const ebpfObj = {
     icon: '/public/ebpf.svg',
     label: 'eBPF',
+    badge: "Recommended",
     text: 'Akto-eBPF setup is recommended for mTLS systems when TLS termination happens at a proxy.',
     docsUrl: 'https://docs.akto.io/traffic-connections/traffic-data-sources/ebpf',
     key: "EBPF",
@@ -196,13 +332,13 @@ const istioObj = {
     component: <FargateSource docsUrl="https://docs.akto.io/traffic-connections/traffic-data-sources/envoy-1" bannerTitle="Setup using Istio" innerUrl="https://docs.akto.io/traffic-connections/traffic-data-sources/envoy-1#adding-akto-traffic-collector"/>,
 }
 
-const aktoSdkObj = {
-    icon: '/public/favicon.svg',
-    label: 'Akto SDK',
-    text: 'Use our SDKs to create a data pipeline.',
-    docsUrl: 'https://docs.akto.io/traffic-connections/traffic-data-sources/akto-sdk',
-    component: <BannerComponent title="Setup SDK" docsUrl="https://docs.akto.io/traffic-connections/traffic-data-sources/akto-sdk" content="Use our SDKs to create a data pipeline." />,
-    key: "AKTO_SDK"
+const pythonObj = {
+    icon: '/public/python.svg',
+    label: 'Python',
+    text: 'Use where Python-based services are deployed.',
+    docsUrl: 'https://docs.akto.io/traffic-connections/',
+    component: <AddOnComponenet/>,
+    key: "Python"
 }
 
 const awsApiGatewayObj = {
@@ -210,9 +346,118 @@ const awsApiGatewayObj = {
     label: "AWS API Gateway",
     text: "Akto-AWS-API-Gateway setup is recommended if you are using AWS API Gateway.",
     docsUrl: 'https://docs.akto.io/traffic-connections/traffic-data-sources/aws-api-gateway',
-    component: <FutureConnection />,
+    component: <AddOnComponenet/>,
     key: "AWS_API_GATEWAY",
 }
+
+const ecsObj = {
+    icon: '/public/ecs.svg',
+    label: "AWS ECS",
+    text: "You can deploy Akto in AWS and collect traffic through containers on your AWS ECS cluster.",
+    docsUrl: 'https://docs.akto.io/traffic-connector/aws-services/aws-ecs',
+    component: <AddOnComponenet/>,
+    key: "ECS",
+}
+
+const mulesoftObj = {
+    icon: '/public/mulesoft.svg',
+    label: "MuleSoft",
+    text: "Mulesoft setup is recommended if you are using API management and ESB capabilities to manage, secure, and analyze your APIs.",
+    docsUrl: 'https://docs.akto.io/traffic-connector/api-gateways/mulesoft-flex',
+    component: <AddOnComponenet/>,
+    key: "mulesoft",
+}
+
+const citrixObj = {
+    icon: '/public/citrix.svg',
+    label: "Citrix",
+    text: "Citrix setup is recommended if you are using ADC (NetScaler) to manage, secure, and optimize your API traffic.",
+    docsUrl: 'https://docs.akto.io/traffic-connector/api-gateways/mulesoft-flex',
+    component: <AddOnComponenet/>,
+    key: "citrix",
+}
+
+const azureappserviceObj = {
+    icon: '/public/azureappservice.svg',
+    label: "Azure App Services",
+    text: "Azure App Services setup is recommended if you are using Microsoft's web app service with sidecar containers to collect and analyze your API traffic.",
+    docsUrl: 'https://docs.akto.io/traffic-connector/azure-services/azure-app-service',
+    component: <AddOnComponenet/>,
+    key: "azureappservice",
+}
+
+const ibmapiconnectObj = {
+    icon: '/public/ibmapiconnect.svg',
+    label: "IBM API Connect",
+    text: "This setup is recommended if your APIs are managed by IBM API Connect",
+    docsUrl: 'https://docs.akto.io/traffic-connector/api-gateways/connect-akto-with-ibm-connect',
+    component: <AddOnComponenet/>,
+    key: "IBM API connect",
+}
+
+const gcrfuncObj = {
+    icon: '/public/gcrfunc.svg',
+    label: "Google Cloud Run Functions",
+    text: "This setup is recommended if your applications are deployed using Google Cloud Run Functions.",
+    docsUrl: 'https://docs.akto.io/traffic-connector/gcp-services/connect-akto-with-google-cloud-run-functions',
+    component: <AddOnComponenet/>,
+    key: "Google Cloud Run Functions",
+}
+
+const gcrObj = {
+    icon: '/public/gcr.svg',
+    label: "Google Cloud Run",
+    text: "Google Cloud Run setup is recommended if you are using Google's serverless platform.",
+    docsUrl: 'https://docs.akto.io/traffic-connector/gcp-services/connect-akto-with-google-cloud-run',
+    component: <AddOnComponenet/>,
+    key: "Google Cloud Run",
+}
+
+const gkeObj = {
+    icon: '/public/gke.svg',
+    label: "GKE",
+    text: "This setup is recommended if you are running containerized applications on Google Kubernetes Engine.",
+    docsUrl: 'https://docs.akto.io/traffic-connector/gcp-services/connect-akto-with-gke',
+    component: <AddOnComponenet/>,
+    key: "GKE",
+}
+
+const aksObj = {
+    icon: '/public/aks.svg',
+    label: "AKS",
+    text: "This setup is recommended if you are deploying applications on Azure Kubernetes Service.",
+    docsUrl: 'https://docs.akto.io/traffic-connector/azure-services/connect-akto-with-aks',
+    component: <AddOnComponenet/>,
+    key: "AKS",
+}
+
+const azureopenshiftObj = {
+    icon: '/public/openshift.svg',
+    label: "Azure Openshift",
+    text: "Azure OpenShift setup is recommended if your containerized applications are running on Azure Red Hat OpenShift.",
+    docsUrl: 'https://docs.akto.io/traffic-connector/azure-services/connect-akto-with-azure-openshift',
+    component: <AddOnComponenet/>,
+    key: "Azure Openshift",
+}
+
+const azurecontainerappObj = {
+    icon: '/public/aca.svg',
+    label: "Azure Container App",
+    text: "This setup is recommended if your applications are deployed using Azure Container Apps.",
+    docsUrl: 'https://docs.akto.io/traffic-connector/azure-services/connect-akto-with-azure-container-app',
+    component: <AddOnComponenet/>,
+    key: "Azure Container App",
+}
+
+const azurefuncObj = {
+    icon: '/public/af.svg',
+    label: "Azure Functions",
+    text: "Azure Functions setup is recommended if you are using Azure's serverless compute service.",
+    docsUrl: 'https://docs.akto.io/traffic-connector/azure-services/connect-akto-with-azure-functions',
+    component: <AddOnComponenet/>,
+    key: "Azure Functions",
+}
+
 
 const quick_start_policy_lines= [
     `{`,
@@ -743,17 +988,100 @@ const yaml_kubernetes = [
     `            value: "<AKTO_MONGO_CONN>"`,
 ]
 
+
+
 const quickStartFunc = {
+
+    getConnectorsListCategorized: function () {
+        // Virtual Machines
+        const vm = [
+            dockerObj, tcpObj
+        ];
+        
+        // Source code
+        const sourceCode = [
+            apiInventoryFromSourceCodeObj, githubObj, gitlabObj, bitbucketObj
+        ];
+
+        // Hybrid Saas
+        const hybridSaas = [
+            hybridSaasObj
+        ];
+
+        // Kubernetes
+        const kubernetes = [
+            kubernetesObj, openshiftObj, ebpfObj, ebpfMTLSObj
+        ];
+
+        // API Gateways
+        const apiGateways = [
+            apigeeObj, azureObj, cloudflareObj, f5Obj, kongmeshObj, layer7Obj, threescaleObj, nginxObj, haproxyObj, envoyObj, istioObj, kongObj, ibmapiconnectObj, citrixObj, azureappserviceObj, mulesoftObj
+        ];
+
+        // Mirroring
+        const mirroring = [
+            mirroringObj, gcpObj
+        ];
+
+        // AWS Services
+        const awsServices = [
+            awsApiGatewayObj, eksObj, fargateObj, beanStalkObj, ecsObj
+        ];
+
+        // GCP Services
+        const gcpServices = [
+            gcpObj, apigeeObj, gcrObj, gcrfuncObj, gkeObj
+        ];
+
+        // Azure Services
+        const azureServices = [
+            azureappserviceObj, aksObj, azureopenshiftObj, azurefuncObj, azurecontainerappObj, azureObj
+        ];
+
+        // Manual
+        const manual = [
+            burpObj, postmanObj, harFileUploadObj, openApiObj
+        ];
+
+        // Akto SDK
+        const aktoSdk = [
+            goObj, javaObj, nodejsObj, pythonObj
+        ];
+
+        if(func.checkLocal()){
+            return {
+                "Manual": manual
+            }
+        }
+
+        return {
+            "Hybrid SaaS": hybridSaas,
+            "Kubernetes": kubernetes,
+            "API Gateways": apiGateways,
+            "Mirroring": mirroring,
+            "AWS Services": awsServices,
+            "GCP Services": gcpServices,
+            "Azure Services": azureServices,
+            "Manual": manual,
+            "Akto SDK": aktoSdk,
+            "Virtual Machines": vm,
+            "Source Code": sourceCode,
+        }
+    },
+
     getConnectorsList: function () {
 
         if(func.checkLocal()){
             return [burpObj, postmanObj, openApiObj, harFileUploadObj]
         }
 
-        const connectorsList = [gcpObj, kubernetesObj, fargateObj, nginxObj, burpObj, postmanObj,
+        // Combine all categories into connectorsList
+        const connectorsList = [
+            gcpObj, kubernetesObj, fargateObj, nginxObj, burpObj, postmanObj,
             openApiObj, beanStalkObj, eksObj, dockerObj, envoyObj,
             harFileUploadObj, kongObj, tcpObj, mirroringObj, hybridSaasObj, apiInventoryFromSourceCodeObj,
-            ebpfObj, ebpfMTLSObj, istioObj, aktoSdkObj, awsApiGatewayObj
+            ebpfObj, ebpfMTLSObj, istioObj, pythonObj, awsApiGatewayObj,
+            apigeeObj, azureObj, cloudflareObj, f5Obj, goObj, haproxyObj, javaObj, kongmeshObj, layer7Obj, nodejsObj, openshiftObj, threescaleObj, githubObj, gitlabObj, bitbucketObj
         ]
         return connectorsList
     },
@@ -775,21 +1103,6 @@ const quickStartFunc = {
         })
 
         return arr
-    },
-
-    getConnectionsObject: function(configuredItems, allItems){
-        let moreConnections = []
-        let myConnections = []
-
-        allItems.forEach(element => {
-            if(element.key && configuredItems.includes(element.key)){
-                myConnections.push(element)
-            }else{
-                moreConnections.push(element)
-            }
-        });
-
-        return {moreConnections,myConnections}
     },
 
     getPolicyLines: function(key){

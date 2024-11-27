@@ -34,11 +34,11 @@ export default {
         })
         return resp        
     },
-    async fetchAllSubCategories(fetchOnlyActive, mode) {
+    async fetchAllSubCategories(fetchOnlyActive, mode, skip, limit) {
         const resp = await request({
             url: 'api/fetchAllSubCategories',
             method: 'post',
-            data: { fetchOnlyActive, mode }
+            data: { fetchOnlyActive, mode, skip, limit }
         })
         return resp
     },
@@ -83,12 +83,12 @@ export default {
             }
         })
     },
-    createJiraTicket(hostStr, endPointStr, issueUrl, issueDescription, issueTitle, testingIssueId) {
+    createJiraTicket(jiraMetaData, projId, issueType) {
         return request({
             url: '/api/createJiraIssue',
             method: 'post',
             data: {
-                hostStr, endPointStr, issueUrl, issueDescription, issueTitle, testingIssueId
+                jiraMetaData, issueType, projId
             }
         })
     },
@@ -245,6 +245,13 @@ export default {
             url: '/api/deleteAuthFromRole',
             method: 'post',
             data: {roleName, index}
+        })
+    },
+    updateAuthInRole(roleName, apiCond ,index, authParamData, authAutomationType) {
+        return request({
+            url: '/api/updateAuthInRole',
+            method: 'post',
+            data: {roleName, apiCond, index, authParamData, authAutomationType}
         })
     },
     deleteTestRuns(testRunIds){
@@ -406,4 +413,39 @@ export default {
             data: {reportId, organizationName, reportDate, reportUrl}
         })
     },
+    fetchScript() {
+        return request({
+            url: '/api/fetchScript',
+            method: 'post',
+            data: {}
+        })
+    },
+    addScript({javascript}) {
+        return request({
+            url: '/api/addScript',
+            method: 'post',
+            data: {testScript:{javascript}}
+        })
+    },
+    updateScript(id, javascript) {
+        return request({
+            url: '/api/updateScript',
+            method: 'post',
+            data: {testScript:{id, javascript}}
+        })
+    },
+    updateDeltaTimeForSummaries(deltaTimeForScheduledSummaries){
+        return request({
+            url: '/api/updateIgnoreTimeForSummaries',
+            method: 'post',
+            data: {deltaTimeForScheduledSummaries}
+        })
+    },
+    fetchIssuesByStatusAndSummaryId(latestTestingRunSummaryId, issueStatusQuery) {
+        return request({
+            url: '/api/fetchIssuesByStatusAndSummaryId',
+            method: 'post',
+            data: { latestTestingRunSummaryId, issueStatusQuery }
+        })
+    }
 }

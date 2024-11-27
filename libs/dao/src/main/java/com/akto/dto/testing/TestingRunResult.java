@@ -52,6 +52,7 @@ public class TestingRunResult implements Comparable<TestingRunResult> {
 
     public static final String REQUIRES_CONFIG = TEST_RESULTS + ".0." + TestResult.REQUIRES_CONFIG;
 
+    public static final String WORKFLOW_TEST = "workflowTest";
     private WorkflowTest workflowTest;
 
     @BsonIgnore

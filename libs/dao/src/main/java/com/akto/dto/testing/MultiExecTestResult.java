@@ -11,6 +11,7 @@ import com.akto.dto.testing.WorkflowTestResult.NodeResult;
 
 public class MultiExecTestResult extends GenericTestResult {
 
+    public static final String NODE_RESULT_MAP = "nodeResultMap";
     Map<String, NodeResult> nodeResultMap;
     private List<String> executionOrder;
 
@@ -65,6 +66,11 @@ public class MultiExecTestResult extends GenericTestResult {
                     error_messages = errors;
                 } else {
                     error_messages.add(TestError.NO_API_REQUEST.getMessage());
+                    /*
+                     * In case no API requests are created,
+                     * do not store the original message
+                     */
+                    originalMessage = "";
                 }
                 runResults.add(new TestResult(null, originalMessage, error_messages, 0, false, TestResult.Confidence.HIGH, null));
             }

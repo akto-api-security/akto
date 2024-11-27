@@ -1,10 +1,7 @@
 import {
-  CalendarMinor,
-  ClockMinor,
-  CircleAlertMajor,
-  DynamicSourceMinor, LockMinor, KeyMajor, ProfileMinor, PasskeyMinor, InviteMinor, CreditCardMajor, IdentityCardMajor, LocationsMinor,
-  PhoneMajor, FileMinor, ImageMajor, BankMajor, HashtagMinor, ReceiptMajor, MobileMajor, CalendarTimeMinor
-
+  CalendarMinor,ClockMinor,CircleAlertMajor,DynamicSourceMinor, LockMinor, KeyMajor, ProfileMinor, PasskeyMinor,
+  EmailMajor, CreditCardMajor, IdentityCardMajor, LocationsMinor,PhoneMajor, FileMinor, ImageMajor, BankMajor, HashtagMinor, 
+  ReceiptMajor, MobileMajor, CalendarTimeMinor, LocationMajor,  IdentityCardFilledMajor, CalendarMajor
 } from '@shopify/polaris-icons';
 import { saveAs } from 'file-saver'
 import inventoryApi from "../apps/dashboard/pages/observe/api"
@@ -16,6 +13,12 @@ import { tokens } from "@shopify/polaris-tokens"
 import PersistStore from '../apps/main/PersistStore';
 
 import { circle_cancel, circle_tick_minor } from "@/apps/dashboard/components/icons";
+
+const iconsUsedMap = {
+  CalendarMinor,ClockMinor,CircleAlertMajor,DynamicSourceMinor, LockMinor, KeyMajor, ProfileMinor, PasskeyMinor,
+  EmailMajor, CreditCardMajor, IdentityCardMajor, LocationsMinor,PhoneMajor, FileMinor, ImageMajor, BankMajor, HashtagMinor, 
+  ReceiptMajor, MobileMajor, CalendarTimeMinor,LocationMajor, IdentityCardFilledMajor, CalendarMajor
+}
 
 const func = {
   setToast (isActive, isError, message) {
@@ -57,6 +60,38 @@ const func = {
   prettifyShort(num) {
     return new Intl.NumberFormat( 'en-US', { maximumFractionDigits: 1,notation: "compact" , compactDisplay: "short" }).format(num)
   },
+
+
+
+  timeDifference(startTimestamp, endTimestamp) {
+    const diffMs = endTimestamp - startTimestamp;
+    if(startTimestamp === 0) {
+      return 'in total'
+    }
+
+    // Convert seconds to days
+    const days = diffMs / (60 * 60 * 24);
+
+    if (days <= 1) {
+        return "yesterday";
+    } else if (days < 7) {
+        const dayCount = Math.ceil(days);
+        return `in ${dayCount} day${dayCount === 1 ? '' : 's'}`;
+    } else if (days <= 29) {
+        const weekCount = Math.ceil(days / 7);
+        return `in ${weekCount} week${weekCount === 1 ? '' : 's'}`;
+    } else {
+        const monthCount = Math.ceil(days / 31);
+        const years = Math.floor(monthCount / 12);
+
+        if (years > 0) {
+            return `in ${years} year${years === 1 ? '' : 's'}`;
+        } else {
+            return `in ${monthCount} month${monthCount === 1 ? '' : 's'}`;
+        }
+    }
+  },
+
 prettifyEpoch(epoch) {
     if(epoch === 0){
       return "Never" ;
@@ -285,6 +320,15 @@ prettifyEpoch(epoch) {
   },
 
   getRunResultSeverity(runResult, subCategoryMap) {
+    try {
+      if (runResult?.testResults?.[0]?.confidence._name) {
+        return runResult?.testResults?.[0]?.confidence._name
+      } else if (runResult?.testResults?.[0]?.confidence) {
+        return runResult?.testResults?.[0]?.confidence
+      }
+    } catch(e){
+    }
+
     let testSubType = subCategoryMap[runResult.testSubType]
     if (!testSubType) {
       return "HIGH"
@@ -309,19 +353,19 @@ prettifyEpoch(epoch) {
       return;
     }
 
-    // Using the Clipboard API for modern browsers
-    navigator.clipboard.writeText(text)
-      .then(() => {
-        // Add toast here
+    setTimeout(() => {
+      navigator.clipboard.writeText(text).then(() => {
         this.setToast(true,false, toastMessage ? toastMessage : 'Text copied to clipboard successfully!');
       })
       .catch((err) => {
         this.setToast(true,true,`Failed to copy text to clipboard: ${err}`);
       });
+    }, 0)
+      
   },
   epochToDateTime(timestamp) {
     var date = new Date(timestamp * 1000);
-    return date.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' });
+    return date.toLocaleString('en-US',{timeZone: window.TIME_ZONE === 'Us/Pacific' ? 'America/Los_Angeles' : window.TIME_ZONE});
   },
 
   getListOfHosts(apiCollections) {
@@ -360,6 +404,18 @@ prettifyEpoch(epoch) {
       return []
     }
     let localFilters = filters;
+    let filtersHaveChoices = true;
+    for(var x in filtersHaveChoices){
+      if(x.choices !== undefined || x.choices.length === 0){
+        filtersHaveChoices = false;
+        break;
+      }
+    }
+
+    if(filtersHaveChoices){
+      return filters;
+    }
+
     localFilters.forEach((filter, index) => {
       localFilters[index].availableChoices = new Set()
       localFilters[index].choices = []
@@ -393,7 +449,7 @@ prettifyEpoch(epoch) {
   },
   requestJson: function (message, highlightPaths) {
 
-    if(message==undefined){
+    if(!message || typeof message !== "object" || Object.keys(message).length === 0){
       return {}
     }
     let result = {}
@@ -408,8 +464,8 @@ prettifyEpoch(epoch) {
       requestPayloadString = message["request"]["body"] || "{}"
     } else {
       let url = message["path"]
-      let urlSplit = url.split("?")
-      queryParamsString = urlSplit.length > 1 ? urlSplit[1] : ""
+      let urlSplit = (typeof url === "string") ? url?.split("?") : []
+      queryParamsString = urlSplit?.length > 1 ? urlSplit[1] : ""
 
       requestHeadersString = message["requestHeaders"] || "{}"
       requestPayloadString = message["requestPayload"] || "{}"
@@ -459,7 +515,7 @@ prettifyEpoch(epoch) {
   },
   responseJson: function (message, highlightPaths) {
 
-    if(message==undefined){
+    if(!message || typeof message !== "object" || Object.keys(message).length === 0){
       return {}
     }
     let result = {}
@@ -544,14 +600,65 @@ prettifyEpoch(epoch) {
     }, {});
   },
   
-sortFunc: (data, sortKey, sortOrder) => {
-  return data.sort((a, b) => {
+sortFunc: (data, sortKey, sortOrder, treeView) => {
+  if(sortKey === 'displayName'){
+    let finalArr = data.sort((a, b) => {
+        let nameA = ""
+        if(a?.displayName?.length > 0){
+          nameA = a?.displayName.toLowerCase() ;
+        }else if(a?.name?.length > 0){
+          nameA = a?.name.toLowerCase();
+        }
+        let nameB = ""
+        if(b?.displayName?.length > 0){
+          nameB = b?.displayName.toLowerCase() ;
+        }else if(b?.name?.length > 0){
+          nameB = b?.name.toLowerCase();
+        }
+    
+        // Define a regex to check if the name starts with a digit
+        const startsWithDigitA = /^\d/.test(nameA);
+        const startsWithDigitB = /^\d/.test(nameB);
+    
+        // Alphabetical names should come first
+        if (startsWithDigitA && !startsWithDigitB) return 1;
+        if (!startsWithDigitA && startsWithDigitB) return -1;
+    
+        // If both names either start with a digit or both don't, compare them directly
+        return nameA.localeCompare(nameB);
+    });
+    if(sortOrder > 0){
+      finalArr.reverse()
+    }
+    return finalArr
+  }
+  data.sort((a, b) => {
     if(typeof a[sortKey] ==='number')
     return (sortOrder) * (a[sortKey] - b[sortKey]);
     if(typeof a[sortKey] ==='string')
     return (sortOrder) * (b[sortKey].localeCompare(a[sortKey]));
   })
+  if(treeView){
+    func.recursiveSort(data, sortKey, sortOrder)
+  }
+  return data
 },
+recursiveSort(data, sortKey, sortOrder = 1) {
+  data.sort((a, b) => {
+      if (typeof a[sortKey] === 'number') {
+          return sortOrder * (a[sortKey] - b[sortKey]);
+      } else if (typeof a[sortKey] === 'string') {
+          return sortOrder * b[sortKey].localeCompare(a[sortKey]);
+      }
+      return 0;
+  });
+  data.forEach(item => {
+      if (item.children && !item.isTerminal) {
+          func.recursiveSort(item.children, sortKey, sortOrder);
+      }
+  });
+},
+
 async copyRequest(type, completeData) {
   let copyString = "";
   let snackBarMessage = ""
@@ -761,6 +868,8 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName) {
                   access_type = "Public"
               } else if (access_types.indexOf("PARTNER") !== -1){
                   access_type = "Partner"
+              } else if (access_types.indexOf("THIRD_PARTY") !== -1){
+                  access_type = "Third-party"
               }else{
                   access_type = "Private"
               }
@@ -769,7 +878,7 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName) {
           let authType = apiInfoMap[key] ? apiInfoMap[key]["actualAuthType"].join(", ") : ""
           let authTypeTag = authType.replace(",", "");
           let riskScore = apiInfoMap[key] ? apiInfoMap[key]?.riskScore : 0
-          let isSensitive = apiInfoMap[key] ? apiInfoMap[key]?.isSensitive : false
+          let responseCodesArr = apiInfoMap[key] ? apiInfoMap[key]?.responseCodes : [] 
 
           ret[key] = {
               id: x.method + "###" + x.url + "###" + x.apiCollectionId + "###" + Math.random(),
@@ -799,8 +908,10 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName) {
               }).map( x => {
                 return apiGroupsMap[x]
               }) : [],
-              isSensitive: isSensitive,
-              riskScore: riskScore
+              riskScore: riskScore,
+              sensitiveInReq: [...this.convertSensitiveTags(x.sensitiveInReq)],
+              sensitiveInResp: [...this.convertSensitiveTags(x.sensitiveInResp)],
+              responseCodes: responseCodesArr
           }
 
       }
@@ -1243,7 +1354,7 @@ mapCollectionIdToHostName(apiCollections){
         case "JWT":
           return KeyMajor;
         case "EMAIL":
-          return InviteMinor;
+          return EmailMajor;
         case "CREDIT_CARD":
           return CreditCardMajor;
         case "SSN":
@@ -1456,7 +1567,9 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
     return key.replace(/[\s/]+/g, '_').toLowerCase();
   },
   showTestSampleData(selectedTestRunResult){
-
+    if(selectedTestRunResult?.vulnerable === true){
+      return true;
+    }
     let skipList = [
       "skipping execution",
       "deactivated"
@@ -1485,7 +1598,21 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
     }
     return false;
   },
+  checkForRbacFeature(){
+    const stiggFeatures = window.STIGG_FEATURE_WISE_ALLOWED
+    let rbacAccess = false;
+    if (!stiggFeatures || Object.keys(stiggFeatures).length === 0) {
+        rbacAccess = true
+    } else if(stiggFeatures && stiggFeatures['RBAC_FEATURE']){
+        rbacAccess = stiggFeatures['RBAC_FEATURE'].isGranted
+    }
+    return rbacAccess;
+  },
   checkUserValidForIntegrations(){
+    const rbacAccess = this.checkForRbacFeature();
+    if(!rbacAccess){
+      return true;
+    }
     const userRole = window.USER_ROLE
     return !(userRole === "GUEST" || userRole === "MEMBER")
   },
@@ -1511,7 +1638,89 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
   },
   sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
-  }
+  },
+  getAktoSeverities(){
+    return ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW']
+  },
+
+  getIconFromString(iconString){
+    if(iconsUsedMap[iconString] !== undefined){
+      return iconsUsedMap[iconString]
+    } return null
+  },
+  formatEndpoint(endpoint) {
+    const trimmedEndpoint = endpoint.replace(/^api\//, '')
+    const spacedEndpoint = trimmedEndpoint.replace(/([a-z])([A-Z])/g, '$1 $2')
+    const finalEndpoint = spacedEndpoint.replace(/[_-]/g, ' ')
+    const capitalizedEndpoint = finalEndpoint
+        .split(' ')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ')
+
+    return capitalizedEndpoint
+  },
+  validatePassword(password, confirmPassword) {
+    if (password.length < 8) {
+        func.setToast(true, true, "Minimum of 8 characters required")
+        return false
+    }
+
+    if (password.length >= 40) {
+        func.setToast(true, true, "Maximum of 40 characters allowed")
+        return false
+    }
+
+    if (password !== confirmPassword) {
+        func.setToast(true, true, "Passwords do not match")
+        return false
+    }
+
+    let numbersFlag = false
+    let lettersFlag = false
+
+    const allowedSpecialChars = new Set([
+        "+", "@", "*", "#", "$", "%", "&", "/", "(", ")", "=", "?", "^", "!",
+        "[", "]", "{", "}", "-", "_", ":", ";", ">", "<", "|", ",", "."
+    ])
+
+    for (let i = 0; i < password.length; i++) {
+        const ch = password.charAt(i)
+        const upperCaseCh = ch.toUpperCase()
+
+        if (ch >= '0' && ch <= '9') {
+            numbersFlag = true
+        } else if (upperCaseCh >= 'A' && upperCaseCh <= 'Z') {
+            lettersFlag = true
+        } else if (!allowedSpecialChars.has(ch)) {
+            func.setToast(true, true,  "Invalid character")
+            return false
+        }
+    }
+
+    if (!numbersFlag || !lettersFlag) {
+        func.setToast(true, true, "Must contain letters and numbers")
+        return false
+    }
+
+    return true
+  },
+
+  trimContentFromSubCategory(subcategory) {
+      subcategory["content"] = ""
+  },
+
+  getTableTabIndexById(defaultTabIndex, definedTableTabs, selectedTabId) {
+    let initialIdx = defaultTabIndex;
+    for(let x = 0; x < definedTableTabs.length; x++) {
+        const tempId = func.getKeyFromName(definedTableTabs[x]);
+        if (tempId === selectedTabId) {
+            initialIdx = x;
+            break;
+        }
+    }
+    return initialIdx
+  },
+
 }
 
 export default func

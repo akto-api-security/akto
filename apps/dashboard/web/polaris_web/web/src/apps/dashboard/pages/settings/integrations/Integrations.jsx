@@ -54,6 +54,11 @@ function Integrations() {
         name:'Webhooks',
         source: '/public/webhooks_logo.svg'
     }
+    let teamsWebhooksObj={
+      id: 'teamsWebhooks',
+      name:'Microsoft Teams Webhooks',
+      source: '/public/ms_teams.svg'
+  }
     let githubSsoObj={
       id: 'github_sso',
       name:'Github SSO',
@@ -63,6 +68,30 @@ function Integrations() {
       id: 'jira',
       name:'Jira',
       source: '/public/logo_jira.svg'
+    }
+    let jenkinsObj={
+      id: `jenkins`,
+      name: "Jenkins",
+      source: '/public/logo_jenkins.svg',
+      link: "https://docs.akto.io/ci-cd/jenkins"
+    }
+    let gitlabObj={
+      id: `gitlab`,
+      name: "Gitlab",
+      source: '/public/logo_gitlab.svg',
+      link: "https://docs.akto.io/ci-cd/gitlab"
+    }
+    let azuredevopsObj={
+      id: `azuredevops`,
+      name: "Azure DevOps",
+      source: '/public/logo_azuredevops.svg',
+      link: "https://docs.akto.io/ci-cd/azure-devops"
+    }
+    let githubactionsObj={
+      id: `github_actions`,
+      name: "GitHub Actions",
+      source: '/public/logo_githubactions.svg',
+      link: "https://docs.akto.io/ci-cd/github-actions"
     }
 
     let oktaSsoObj={
@@ -81,13 +110,13 @@ function Integrations() {
       source: '/public/github_icon.svg'
     }
 
-    let ssoItems = [githubSsoObj, oktaSsoObj, azureAdSsoObj, githubAppObj]
-
-    let allItems = [burpSuiteObj,postmanObj,aktoApiObj,ciCdObj,aktoGptObj,slackObj,webhooksObj, jiraObj]
-    if (window.DASHBOARD_MODE === "ON_PREM") {
-        allItems = [...allItems, ...ssoItems]
+    let googleWorkSpaceObj={
+      id: 'google_workspace_sso',
+      name: 'Google Workspace SSO',
+      source: '/public/gcp.svg'
     }
-    let currObjs = allItems
+
+    let ssoItems = [githubSsoObj, oktaSsoObj, azureAdSsoObj, googleWorkSpaceObj]
     const [currItems , setCurrentItems] = useState(getTabItems('all'))
     const tabs = [
         {
@@ -124,27 +153,37 @@ function Integrations() {
             id: 'automation',
             content: <span>Automation <Badge status='new'>{getTabItems('automation').length}</Badge></span>,
             component: <TabsList />
-        }
+        },
+        {
+          id: 'cicd',
+          content: <span>CI/CD <Badge status='new'>{getTabItems('cicd').length}</Badge></span>,
+          component: <TabsList />
+      },
     ]
 
   function getTabItems(tabId) {
     const emptyItem = [];
     const trafficItems = [burpSuiteObj, postmanObj];
     const reportingItems = [githubAppObj];
+    const cicdItems = [jenkinsObj, azuredevopsObj, gitlabObj, githubactionsObj, ciCdObj];
     const aiItems = [aktoGptObj];
-    const ssoItems = [githubSsoObj, oktaSsoObj, azureAdSsoObj];
-    const alertsItems = [slackObj, webhooksObj];
+    const alertsItems = [slackObj, webhooksObj, teamsWebhooksObj];
     const automationItems = [aktoApiObj, ciCdObj, jiraObj];
     switch (tabId) {
       case 'traffic':
         return trafficItems;
       case 'reporting':
-        if (func.checkLocal()) {
+        if (!func.checkOnPrem()) {
           return emptyItem;
         }
         return reportingItems;
       case 'ai':
         return aiItems;
+      case 'cicd':
+        if (func.checkLocal()) {
+          return emptyItem;
+        }
+        return cicdItems;
       case 'sso':
         if (func.checkLocal()) {
           return emptyItem;
@@ -163,10 +202,10 @@ function Integrations() {
       default:
         let allItems = [...trafficItems, ...aiItems]
         if (!func.checkLocal()){
-          allItems = [...allItems, ...alertsItems, ...automationItems]
+          allItems = [...allItems, ...alertsItems, ...automationItems, ...ssoItems,  ...cicdItems]
         }
         if(func.checkOnPrem()){
-          allItems = [...allItems, ...ssoItems, ...reportingItems]
+          allItems = [...allItems, ...reportingItems]
         }
         return allItems;
     }
@@ -175,18 +214,22 @@ function Integrations() {
     const handleCurrTab = (tab) =>{
       setCurrentItems(getTabItems(tab.id))
     }
-    const handleTab = (tab)=>{
-        navigate(tab)
+    const handleTab = (tab, link)=>{
+        if(link!=undefined){
+          window.open(link, "_blank")
+        } else{
+          navigate(tab)
+        }
     }
 
     function renderItem(item) {
-        const {id, source, name} = item;
+        const {id, source, name, link} = item;
         const media = <Avatar customer size="medium" name={name} source={source}/>;
         const sourceActions = (item) => {
             return [
               {
                 content: <div data-testid={`configure_${id}`}>Configure</div>,
-                onClick: () => handleTab(item),
+                onClick: () => handleTab(item, link),
               },
             ];
           };

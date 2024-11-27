@@ -1,9 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react'
+import {Modal, Text} from "@shopify/polaris"
 import * as monaco from "monaco-editor"
 import "./style.css";
 import func from "@/util/func"
 import editorSetup from './customEditor';
 import yamlEditorSetup from "../../pages/test_editor/components/editor_config/editorSetup"
+import keywords from "../../pages/test_editor/components/editor_config/keywords"
+import authTypesApi from "@/apps/dashboard/pages/settings/auth_types/api";
 
 function highlightPaths(highlightPathMap, ref){
   highlightPathMap && Object.keys(highlightPathMap).forEach((key) => {
@@ -135,11 +138,15 @@ function highlightHeaders(data, ref, getLineNumbers){
 
 function SampleData(props) {
 
-    let {showDiff, data, minHeight, editorLanguage, currLine, getLineNumbers, readOnly, getEditorData} = props;
+    let {showDiff, data, minHeight, editorLanguage, currLine, getLineNumbers, readOnly, getEditorData, wordWrap} = props;
 
     const ref = useRef(null);
     const [instance, setInstance] = useState(undefined);
     const [editorData, setEditorData] = useState(data);
+    const [showActionsModal, setShowActionsModal] = useState(false);
+    const [showErrorModal, setShowErrorModal] = useState(false);
+    const [selectedWord, setSelectedWord] = useState("");
+    const [dynamicHeight, setDynamicHeight] = useState(minHeight || '300px');
 
     if(minHeight==undefined){
       minHeight="300px";
@@ -153,11 +160,26 @@ function SampleData(props) {
       readOnly = true
     }
 
+    if (wordWrap == undefined) {
+      wordWrap = true
+    }
+
     useEffect(() => {
       if (instance===undefined) {
         createInstance();
       }
     }, [])
+
+    useEffect(() => {
+      if (instance && props?.useDynamicHeight) {
+          const disposeOnContentSizeChange = instance.onDidContentSizeChange((e) => {
+            const contentHeight = e.contentHeight > 900 ? 900 : e.contentHeight // 3600 means 200 lines (18 == 1 line)
+            setDynamicHeight(`${contentHeight}px`)
+          })
+          return () => disposeOnContentSizeChange.dispose()
+      }
+
+  }, [instance])
 
     if (instance){
       if (!readOnly) {
@@ -202,7 +224,7 @@ function SampleData(props) {
         const options = {
             language: editorLanguage,
             minimap: { enabled: false },
-            wordWrap: true,
+            wordWrap: wordWrap,
             automaticLayout: true,
             colorDecorations: true,
             scrollBeyondLastLine: false,
@@ -218,17 +240,44 @@ function SampleData(props) {
             fixedOverflowWidgets: true 
         }
         let instance = "";
-        if(editorLanguage.includes("custom")){
+        if(editorLanguage.includes("custom_http")){
           options['theme']= "customTheme"
           editorSetup.registerLanguage()
           editorSetup.setTokenizer()
           yamlEditorSetup.setEditorTheme()
         }
+        if(editorLanguage.includes("custom_yaml")){
+          options['theme']= "customTheme"
+          yamlEditorSetup.registerLanguage()
+          yamlEditorSetup.setTokenizer()
+          yamlEditorSetup.setEditorTheme()
+          yamlEditorSetup.setAutoComplete(keywords)
+        }
         if(showDiff){
           instance = monaco.editor.createDiffEditor(ref.current, options)
         } else {
           instance = monaco.editor.create(ref.current, options) 
+          instance.addAction({
+            id: "add_auth_type",
+            label: "Add as Header auth type",
+            keybindings: [],
+            precondition: null,
+            keybindingContext: null,
+            contextMenuGroupId: "1_modification",
+            contextMenuOrder: 1,
+            run: function (ed) {
+              var textSelected = ed.getModel().getValueInRange(ed.getSelection())
+              setSelectedWord(textSelected)
+              if (textSelected && textSelected.length > 0) {
+                setShowActionsModal(true)
+              } else {
+                setShowErrorModal(true)
+              }
+            },
+          });
+          
         }
+        instance.updateOptions({ tabSize: 2 })
         setInstance(instance)
 
     }
@@ -251,8 +300,51 @@ function SampleData(props) {
       }
     }
 
+    function createAuthTypeHeader(selectedWord) {
+      authTypesApi.addCustomAuthType(selectedWord, [selectedWord], [], true).then((res) => {
+        func.setToast(true, false, "Auth type added successfully");
+        setSelectedWord("")
+        setShowActionsModal(false)
+      }).catch((err) => {
+        func.setToast(true, true, "Unable to add auth type");
+        setSelectedWord("")
+        setShowActionsModal(false)
+      });
+    }
+
     return (
-      <div ref={ref} style={{height:minHeight}} className={'editor ' + (data.headersMap ? 'new-diff' : '')}/>
+      <div>
+        <div ref={ref} style={{height:dynamicHeight}} className={'editor ' + (data.headersMap ? 'new-diff' : '')}/>
+        <Modal
+            open={showActionsModal}
+            onClose={() => setShowActionsModal(false)}
+            title="Are you sure?"
+            primaryAction={{
+                content: 'Create',
+                onAction: () => createAuthTypeHeader(selectedWord)
+            }}
+            key="redact-modal-2"
+        >
+            <Modal.Section>
+                <Text>Are you sure you want to add the header (or cookie) key: <b>{selectedWord.toLowerCase()}</b> as an auth type?</Text>
+            </Modal.Section>
+        </Modal>
+        <Modal
+            open={showErrorModal}
+            onClose={() => setShowErrorModal(false)}
+            title="Incorrect data"
+            primaryAction={{
+                content: 'OK',
+                onAction: () => setShowErrorModal(false)
+            }}
+            key="redact-modal-3"
+        >
+            <Modal.Section>
+                <Text>Invalid auth type: <b>{(selectedWord && selectedWord.length>0) ? selectedWord.toLowerCase(): "blank"}</b></Text>
+            </Modal.Section>
+        </Modal>
+      </div>
+      
     )
 }
 

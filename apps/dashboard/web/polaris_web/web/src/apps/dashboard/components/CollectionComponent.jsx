@@ -24,7 +24,10 @@ function CollectionComponent(props) {
 
     const { condition, index, dispatch, operatorComponent } = props
     const [apiEndpoints, setApiEndpoints] = useState({})
-    const [regexText, setRegexText] = useState('')
+    const initialRegexText = (condition && condition?.type === 'REGEX') ? (condition?.data?.regex || '') : ''
+    const initialHostRegexText = (condition && condition?.type === 'HOST_REGEX') ? (condition?.data?.host_regex || '') : ''
+    const [regexText, setRegexText] = useState(initialRegexText)
+    const [hostRegexText, setHostRegexText] = useState(initialHostRegexText)
 
     useEffect(() => {
         fetchApiEndpoints(condition.data)
@@ -144,6 +147,8 @@ function CollectionComponent(props) {
                 return {method:"GET"}
             case "REGEX":
                 return {}
+            case "HOST_REGEX":
+                return {}
             default:
                 return {}
         }
@@ -161,9 +166,13 @@ function CollectionComponent(props) {
                 value: 'METHOD'
             },
             {
-                label: 'Matches regex',
+                label: 'Path matches regex',
                 value: 'REGEX'
             },
+            {
+                label: 'Host name matches regex',
+                value: 'HOST_REGEX'
+            }
         ]}
             initial={condition.type}
             selected={(value) => {
@@ -175,6 +184,11 @@ function CollectionComponent(props) {
     const handleRegexText = (val) => {
         setRegexText(val)
         dispatch({ type: "overwrite", index: index, key: "data", obj: {"regex":val } })
+    }
+
+    const handleHostRegexText = (val) => {
+        setHostRegexText(val)
+        dispatch({ type: "overwrite", index: index, key: "data", obj: {"host_regex":val } })
     }
 
     const component = (condition, index) => {
@@ -197,7 +211,12 @@ function CollectionComponent(props) {
                 return(
                     <TextField onChange={(val) => handleRegexText(val)} value={regexText} />
                 )
-            default: break;
+            case "HOST_REGEX":
+                return(
+                    <TextField onChange={(val) => handleHostRegexText(val)} value={hostRegexText} />
+                )
+            default:
+                break;
         }
     }
 

@@ -8,6 +8,7 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.parsers.HttpCallParser;
 import com.akto.runtime.policies.AuthPolicy;
+import com.akto.test_editor.Utils;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -16,11 +17,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.databind.node.TextNode;
-import com.mongodb.BasicDBObject;
 
 import java.util.*;
 
 import static com.akto.dto.RawApi.convertHeaders;
+import static com.akto.runtime.utils.Utils.parseCookie;
 
 public class RedactSampleData {
     static ObjectMapper mapper = new ObjectMapper();
@@ -32,8 +33,8 @@ public class RedactSampleData {
     public static String redactIfRequired(String sample, boolean accountLevelRedact, boolean apiCollectionLevelRedact) throws Exception {
         HttpResponseParams httpResponseParams = HttpCallParser.parseKafkaMessage(sample);
         HttpResponseParams.Source source = httpResponseParams.getSource();
-        if(source.equals(HttpResponseParams.Source.HAR) || source.equals(HttpResponseParams.Source.PCAP)) return sample;
-        return redact(httpResponseParams, accountLevelRedact || apiCollectionLevelRedact);
+        if(source.equals(HttpResponseParams.Source.PCAP)) return sample;
+        return redact(httpResponseParams, (accountLevelRedact && !source.equals(HttpResponseParams.Source.HAR)) || apiCollectionLevelRedact);
     }
 
     public static String redactDataTypes(String sample) throws Exception{
@@ -43,7 +44,7 @@ public class RedactSampleData {
     public static String redactCookie(Map<String, List<String>> headers, String header) {
         String cookie = "";
         List<String> cookieList = headers.getOrDefault(header, new ArrayList<>());
-        Map<String, String> cookieMap = AuthPolicy.parseCookie(cookieList);
+        Map<String, String> cookieMap = parseCookie(cookieList);
         for (String cookieKey : cookieMap.keySet()) {
             cookie += cookieKey + "=" + redactValue + ";";
         }
@@ -128,7 +129,9 @@ public class RedactSampleData {
                 responsePayload = "{}";
             }
         } catch (Exception e) {
-            responsePayload = "{}";
+            if (Utils.isJsonPayload(responsePayload)) {
+                responsePayload = "{}";
+            }
         }
 
         httpResponseParams.setPayload(responsePayload);
@@ -164,7 +167,9 @@ public class RedactSampleData {
                 requestPayload = "{}";
             }
         } catch (Exception e) {
-            requestPayload = "{}";
+            if (Utils.isJsonPayload(requestPayload)) {
+                requestPayload = "{}";
+            }
         }
 
         httpResponseParams.requestParams.setPayload(requestPayload);
@@ -204,7 +209,7 @@ public class RedactSampleData {
                 String f = fieldNames.next();
                 JsonNode fieldValue = parent.get(f);
                 if (fieldValue.isValueNode()) {
-                    if(redactAll && !(isGraphqlModified && f.equalsIgnoreCase(GraphQLUtils.QUERY))){
+                    if(redactAll && !(isGraphqlModified && f.equalsIgnoreCase(HttpResponseParams.QUERY))){
                         ((ObjectNode) parent).put(f, newValue);
                     }
                     else {
@@ -221,32 +226,6 @@ public class RedactSampleData {
         }
 
     }
-
-    public static String convertOriginalReqRespToString(OriginalHttpRequest request, OriginalHttpResponse response)  {
-        BasicDBObject req = new BasicDBObject();
-        if (request != null) {
-            req.put("url", request.getUrl());
-            req.put("method", request.getMethod());
-            req.put("type", request.getType());
-            req.put("queryParams", request.getQueryParams());
-            req.put("body", request.getBody());
-            req.put("headers", convertHeaders(request.getHeaders()));
-        }
-
-        BasicDBObject resp = new BasicDBObject();
-        if (response != null) {
-            resp.put("statusCode", response.getStatusCode());
-            resp.put("body", response.getBody());
-            resp.put("headers", convertHeaders(response.getHeaders()));
-        }
-
-        BasicDBObject ret = new BasicDBObject();
-        ret.put("request", req);
-        ret.put("response", resp);
-
-        return ret.toString();
-    }
-
     public static String convertHttpRespToOriginalString(HttpResponseParams httpResponseParams) throws JsonProcessingException {
         Map<String,Object> m = new HashMap<>();
         HttpRequestParams httpRequestParams = httpResponseParams.getRequestParams();
@@ -266,6 +245,8 @@ public class RedactSampleData {
         m.put("time", httpResponseParams.getTime() + "");
         m.put("akto_account_id", httpResponseParams.getAccountId() + "");
         m.put("ip", httpResponseParams.getSourceIP());
+        m.put("destIp", httpResponseParams.getDestIP());
+        m.put("direction", httpResponseParams.getDirection());
         m.put("is_pending", httpResponseParams.getIsPending() + "");
         m.put("source", httpResponseParams.getSource());
 

@@ -11,6 +11,7 @@
                 <title>Akto</title>
                 <link rel="shortcut icon" href="/public/favicon.svg" type="image/svg" />
                 <link rel="manifest" href="/public/manifest.json" />
+                <link href="https://cdn.jsdelivr.net/npm/vscode-codicons@0.0.16/dist/codicon.min.css" rel="stylesheet">
             </head>
 
             <body>
@@ -68,6 +69,10 @@
                     window.STIGG_CLIENT_KEY='${requestScope.stiggClientKey}'
                     window.JIRA_INTEGRATED ='${requestScope.jiraIntegrated}'
                     window.USER_ROLE ='${requestScope.userRole}'
+                    window.TIME_ZONE = '${requestScope.currentTimeZone}'
+                    window.USER_FULL_NAME = '${requestScope.userFullName}'
+                    window.ORGANIZATION_NAME = '${requestScope.organizationName}'
+                    window.GOOGLE_SSO_URL=atob('${requestScope.googleSsoUrl}')
 
                     window.STIGG_IS_OVERAGE='${requestScope.stiggIsOverage}'
                     window.USAGE_PAUSED=JSON.parse('${requestScope.usagePaused}' || '{}');
@@ -81,6 +86,14 @@
                         window.STIGG_CLIENT_KEY='invalid-key'
                     }
 
+                    if(window.IS_SAAS == 'true'){
+                        (function(c,l,a,r,i,t,y){
+                            c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
+                            t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
+                            y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
+                        })(window, document, "clarity", "script", "ndaz2ukzvd");
+                    }
+
                     window.EXPIRED = '${requestScope.expired}'
 
                     // Enabling the debug mode flag is useful during implementation,
@@ -88,6 +101,9 @@
 
                     if (window.USER_NAME.length > 0) {
                         // Initialize mixpanel
+                        if(window.IS_SAAS == 'true'){
+                            clarity("set", "userEmail", window.USER_NAME)
+                        }
                         mixpanel.init('c403d0b00353cc31d7e33d68dc778806', { debug: false, ignore_dnt: true });
                         let distinct_id = window.USER_NAME + '_' + (window.IS_SAAS === 'true' ? "SAAS" : window.DASHBOARD_MODE);
                         mixpanel.identify(distinct_id);
@@ -100,8 +116,6 @@
                         })
 
                         mixpanel.track('login');
-
-                        //Initialize intercom
                         (function () { var w = window; var ic = w.Intercom; if (typeof ic === "function") { ic('reattach_activator'); ic('update', w.intercomSettings); } else { var d = document; var i = function () { i.c(arguments); }; i.q = []; i.c = function (args) { i.q.push(args); }; w.Intercom = i; var l = function () { var s = d.createElement('script'); s.type = 'text/javascript'; s.async = true; s.src = 'https://widget.intercom.io/widget/e9w9wkdk'; var x = d.getElementsByTagName('script')[0]; x.parentNode.insertBefore(s, x); }; if (document.readyState === 'complete') { l(); } else if (w.attachEvent) { w.attachEvent('onload', l); } else { w.addEventListener('load', l, false); } } })();
                         window.intercomSettings = {
                             api_base: "https://api-iam.intercom.io",
@@ -131,9 +145,6 @@
                 <script type="text/javascript" src="https://app.getbeamer.com/js/beamer-embed.js" defer="defer"></script>                
                 <script>
                     var script = document.createElement('script');
-
-                    // since release_version is not available till a user login, 
-                    // the user will always see the old login screen
                     script.type = "text/javascript"
                     if (window.RELEASE_VERSION_GLOBAL == '' || window.RELEASE_VERSION_GLOBAL == 'akto-release-version') {// Case when akto version is not available
                         script.src = "/polaris_web/web/dist/main.js";

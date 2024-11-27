@@ -3,7 +3,8 @@ import { Badge, Box, HorizontalStack, Icon, Text, Tooltip } from "@shopify/polar
 import PersistStore from "../../../main/PersistStore";
 import TooltipText from "../../components/shared/TooltipText";
 import StyledEndpoint from "./api_collections/component/StyledEndpoint"
-import { SearchMinor, InfoMinor, LockMinor, ClockMinor, PasskeyMinor, LinkMinor, DynamicSourceMinor, GlobeMinor, LocationsMinor, PriceLookupMinor } from "@shopify/polaris-icons"
+import CopyEndpoint from "./api_collections/component/CopyEndpoint"
+import { SearchMinor, InfoMinor, LockMinor, ClockMinor, PasskeyMinor, LinkMinor, DynamicSourceMinor, GlobeMinor, LocationsMinor, PriceLookupMinor, ArrowUpMinor, ArrowDownMinor } from "@shopify/polaris-icons"
 import api from "./api";
 import GetPrettifyEndpoint from "./GetPrettifyEndpoint";
 
@@ -105,6 +106,17 @@ const apiDetailsHeaders = [
         icon: InfoMinor,
         itemOrder: 3,
         iconTooltip: "Changes in API"
+    },
+    {
+        text: "",
+        value: "parameterisedEndpoint",
+        itemOrder: 1,
+        component: (data) => CopyEndpoint(data)
+    },
+    {
+        text: 'Non-Sensitive Params',
+        value: 'nonSensitiveTags',
+        itemOrder: 4,
     }
 ]
 
@@ -227,7 +239,8 @@ const transform = {
         let currDate = twoMonthsAgo
         let ret = []
         let dateToCount = resp.reduce((m, e) => {
-            let detectDate = func.toYMD(new Date(e._id * 86400 * 1000))
+
+            let detectDate = func.toYMD(new Date((e._id+1) * 86400 * 1000))
             m[detectDate] = (m[detectDate] || 0) + e.count
             newParametersCount += e.count
             return m
@@ -282,6 +295,9 @@ const transform = {
         }
     },
     formatNumberWithCommas(number) {
+        if(number === undefined){
+            return 0;
+        }
         const numberString = number.toString();
         return numberString.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
     },
@@ -335,13 +351,35 @@ const transform = {
         return { sensitiveSampleData: sensitiveSampleData };
     },
 
-    getColor(key){
+    getColor(key, isSensitiveBadge=false){
         switch(key.toUpperCase()){
-            case "HIGH" : return "critical";
-            case "MEDIUM": return "attention";
-            case "LOW": return "info";
+            case "CRITICAL": return "critical-strong-experimental"
+            case "HIGH" : {
+                if(isSensitiveBadge){
+                    return "warning"
+                }
+                return "critical"
+            }
+            case "MEDIUM": return "attention"
+            case "LOW": {
+                if(isSensitiveBadge){
+                    return "success"
+                }
+                return "info"
+            }
             default:
                 return "bg";
+        }
+    },
+
+    getColorForSensitiveData(key){
+        switch(key.toUpperCase()){
+            case "CRITICAL": return "#E45357"
+            case "HIGH" : return "#EF864C"
+            case "MEDIUM": return "#F6C564"
+            case "LOW": return "#6FD1A6"
+            default:
+                return "#6FD1A6";
         }
     },
 
@@ -390,7 +428,7 @@ const transform = {
             <Box maxWidth="200px">
                 <HorizontalStack gap={1} wrap={false}>
                     {sensitiveTags.map((item,index)=>{
-                        return (index < 4 ? <Tooltip dismissOnMouseOut content={item} key={index}><Box>
+                        return (index < 4 ? <Tooltip dismissOnMouseOut content={item} key={index + item}><Box>
                             <div className={deactivated ? "icon-deactivated" : ""}>
                                 <Icon color={deactivated ? "" : "subdued"} source={func.getSensitiveIcons(item)} />
                             </div>
@@ -405,11 +443,11 @@ const transform = {
     prettifyCollectionsData(newData, isLoading){
         const prettifyData = newData.map((c)=>{
             let calcCoverage = '0%';
-            if(c.endpoints > 0){
-                if(c.endpoints < c.testedEndpoints){
+            if(c.urlsCount > 0){
+                if(c.urlsCount < c.testedEndpoints){
                     calcCoverage= '100%'
                 }else{
-                    calcCoverage =  Math.ceil((c.testedEndpoints * 100)/c.endpoints) + '%'
+                    calcCoverage =  Math.ceil((c.testedEndpoints * 100)/c.urlsCount) + '%'
                 }
             }
             const loadingComp = <Text color="subdued" variant="bodyMd">...</Text>
@@ -419,7 +457,6 @@ const transform = {
                 nextUrl: '/dashboard/observe/inventory/' + c.id,
                 displayName: c.displayName,
                 displayNameComp: c.displayNameComp,
-                endpoints: c.endpoints,
                 riskScoreComp: isLoading ? loadingComp : <Badge key={c?.id} status={this.getStatus(c.riskScore)} size="small">{c.riskScore}</Badge>,
                 coverage: isLoading ? '...' : calcCoverage,
                 issuesArr: isLoading ? loadingComp : this.getIssuesList(c.severityInfo),
@@ -447,8 +484,10 @@ const transform = {
             if (c.hasOwnProperty('type') && c.type === 'API_GROUP') {
                 return
             }
-
-            totalUrl += c.endpoints ;
+            if (c.deactivated) {
+                return
+            }
+            totalUrl += c.urlsCount ;
             totalTested += c.testedEndpoints;
         })
 
@@ -589,9 +628,56 @@ const transform = {
             
         }
         return tempSensitiveInfo; 
-    }
+    },
 
-      
+    convertToPrettifyData(c){
+        return{
+            riskScoreComp:<Badge key={c.level} status={this.getStatus(c.riskScore)} size="small">{c.riskScore}</Badge>,
+            coverage: c.urlsCount !== 0 ? Math.min( Math.floor((c.testedEndpoints * 100)/c.urlsCount), 100) + "%": '0%',
+            issuesArr: this.getIssuesList(c.severityInfo),
+            sensitiveSubTypes: this.prettifySubtypes(c?.sensitiveInRespTypes || []),
+            lastTraffic: func.prettifyEpoch(c.detectedTimestamp),
+            discovered: func.prettifyEpoch(c.startTs),
+        }
+    },
+    generateByLineComponent: (val, time) => {
+        if (!val || isNaN(val)) return null
+        if (val === 0 ) {
+            return <Text>No change in {time}</Text>
+        }
+        const source = val > 0 ? ArrowUpMinor : ArrowDownMinor
+        return (
+            <HorizontalStack gap={1}>
+                <Box>
+                    <Icon source={source} color='subdued' />
+                </Box>
+                <Text color='subdued' fontWeight='medium'>{Math.abs(val)}</Text>
+                <Text color='subdued' fontWeight='semibold'>{time}</Text>
+            </HorizontalStack>
+        )
+    },
+    getCumulativeData: (data) => {
+        let cumulative = []
+        data.reduce((acc, val, i) => cumulative[i] = acc + val, 0)
+        return cumulative
+    },
+    setIssuesState: (data, setState, setDelta, useCumulative) => {
+        if(useCumulative) {
+            data = transform.getCumulativeData(data)
+        }
+
+        if (data == null || data.length === 0) {
+            setState([0, 0])
+            setDelta(0)
+        } else if (data.length === 1) {
+            setState([0, data[0]])
+            setDelta(data[0])
+        } else {
+            setState(data)
+            
+            setDelta(data[data.length-1] - data[0])
+        }
+    }
 }
 
 export default transform

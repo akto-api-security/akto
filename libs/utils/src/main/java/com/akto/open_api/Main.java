@@ -1,15 +1,11 @@
 package com.akto.open_api;
 
-import com.akto.dao.ApiCollectionsDao;
-import com.akto.dao.SingleTypeInfoDao;
-import com.akto.dto.ApiCollection;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.introspect.AnnotatedMember;
 import com.fasterxml.jackson.databind.introspect.JacksonAnnotationIntrospector;
-import com.mongodb.client.model.Filters;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.PathItem;
 import io.swagger.v3.oas.models.Paths;
@@ -21,7 +17,6 @@ import io.swagger.v3.oas.models.servers.Server;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.*;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -29,7 +24,7 @@ import org.slf4j.LoggerFactory;
 import static com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL;
 
 public class Main {
-    private static final LoggerMaker loggerMaker = new LoggerMaker(Main.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(Main.class, LogDb.DASHBOARD);
     private static final Logger logger = LoggerFactory.getLogger(Main.class);
 
     private static final ObjectMapper mapper = new ObjectMapper();
@@ -99,38 +94,63 @@ public class Main {
         }
         List<Parameter> headerParameters = new ArrayList<>();
         try{
-            headerParameters = buildHeaders(singleTypeInfoList);
+            headerParameters = buildParams(singleTypeInfoList, ParamLocation.HEADER);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("ERROR in building headers in addPathItems " + e, LogDb.DASHBOARD);
         }
+
+        List<Parameter> queryParameters = new ArrayList<>();
+        try{
+            queryParameters = buildParams(singleTypeInfoList, ParamLocation.QUERY);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("ERROR in building query params in addPathItems " + e, LogDb.DASHBOARD);
+        }
         
-        PathBuilder.addPathItem(paths, url, method, responseCode, schema, headerParameters, includeHeaders);
+        PathBuilder.addPathItem(paths, url, method, responseCode, schema, headerParameters, queryParameters, includeHeaders);
     }
 
-    public static List<Parameter> buildHeaders(List<SingleTypeInfo> singleTypeInfoList) throws Exception{
-        List<Parameter> headerParameters = new ArrayList<>();
+    // Ref: https://github.com/OAI/OpenAPI-Specification/blob/3.0.1/versions/3.0.1.md#parameter-locations
+    public enum ParamLocation {
+        HEADER, QUERY, PATH, COOKIE
+    }
+
+    public static List<Parameter> buildParams(List<SingleTypeInfo> singleTypeInfoList, ParamLocation location) throws Exception{
+        List<Parameter> parameters = new ArrayList<>();
         ObjectSchema schema =new ObjectSchema();
-        for (SingleTypeInfo singleTypeInfo: singleTypeInfoList) {
-            if(singleTypeInfo.isIsHeader()){
-                List<SchemaBuilder.CustomSchema> cc = SchemaBuilder.getCustomSchemasFromSingleTypeInfo(singleTypeInfo);
-                SchemaBuilder.build(schema, cc);
+        for (SingleTypeInfo singleTypeInfo : singleTypeInfoList) {
+            switch (location) {
+                case HEADER:
+                    if (singleTypeInfo.isIsHeader()) {
+                        List<SchemaBuilder.CustomSchema> cc = SchemaBuilder.getCustomSchemasFromSingleTypeInfo(singleTypeInfo);
+                        SchemaBuilder.build(schema, cc);
+                    }
+                    break;
+                case QUERY:
+                    if (singleTypeInfo.isQueryParam()) {
+                        List<SchemaBuilder.CustomSchema> cc = SchemaBuilder.getCustomSchemasFromSingleTypeInfo(singleTypeInfo);
+                        SchemaBuilder.build(schema, cc);
+                    }
+                    break;
+                default:
+                    break;
             }
         }
-        if (schema.getProperties() == null) return headerParameters;
-        for(String header:schema.getProperties().keySet()){
-            Parameter head = new Parameter();
-            head.setName(header);
-            head.setIn("header");
-            head.setSchema(schema.getProperties().get(header));
-            headerParameters.add(head);
+
+        if (schema.getProperties() == null) return parameters;
+        for(String param:schema.getProperties().keySet()){
+            Parameter parameter = new Parameter();
+            parameter.setName(param);
+            parameter.setIn(location.name().toLowerCase());
+            parameter.setSchema(schema.getProperties().get(param));
+            parameters.add(parameter);
         }
-        return headerParameters;
+        return parameters;
     }
 
     public static Schema<?> buildSchema(List<SingleTypeInfo> singleTypeInfoList) throws Exception {
         ObjectSchema schema =new ObjectSchema();
         for (SingleTypeInfo singleTypeInfo: singleTypeInfoList) {
-            if(singleTypeInfo.isIsHeader()){
+            if(singleTypeInfo.isIsHeader() || singleTypeInfo.isQueryParam() || singleTypeInfo.getIsUrlParam()){
                 continue;
             }
             List<SchemaBuilder.CustomSchema> cc = SchemaBuilder.getCustomSchemasFromSingleTypeInfo(singleTypeInfo);

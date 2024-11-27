@@ -31,6 +31,42 @@ const learnMoreObject = {
             }
         ]
     },
+    dashboard_observe_query_mode: {
+        title: "Explore Mode",
+        description: "Convenient way manage APIs and create collections",
+        docsLink: [
+            {
+                content:"What is an API Collection?",
+                value:"https://docs.akto.io/api-inventory/concepts/api-collection#what-is-an-api-collection"
+            },
+            {
+                content:"How to connect API traffic source",
+                value:"https://docs.akto.io/traffic-connections/traffic-data-sources"
+            },
+            {
+                content:"How to export an API Collection to Postman",
+                value:"https://docs.akto.io/api-inventory/how-to/export-an-api-collection-to-postman"
+            },
+            {
+                content:"How to export an API Collection to Burp",
+                value:"https://docs.akto.io/api-inventory/how-to/export-an-api-collection-to-burp"
+            },
+            {
+                content:"How to create Swagger File using Akto",
+                value:"https://docs.akto.io/api-inventory/how-to/create-swagger-file-using-akto"
+            },
+            {
+                content:"How to delete an API Collection",
+                value:"https://docs.akto.io/api-inventory/how-to/delete-an-api-collection"
+            }
+        ],
+        videoLink: [
+            {
+                content: "Watch Akto demo" , 
+                value: "https://www.youtube.com/watch?v=fRyusl8ppdY"
+            }
+        ]
+    },
     dashboard_observe_inventory: {
         title: "API Inventory",
         description: "Convenient way to access and manage APIs",
@@ -58,6 +94,10 @@ const learnMoreObject = {
             {
                 content:"How to delete an API Collection",
                 value:"https://docs.akto.io/api-inventory/how-to/delete-an-api-collection"
+            },
+            {
+                content: 'What is risk score',
+                value: 'https://docs.akto.io/api-discovery/concepts/risk-score'
             }
         ],
         videoLink: [
@@ -94,6 +134,9 @@ const learnMoreObject = {
             {
                 content:"How to create Swagger File using Akto",
                 value:"https://docs.akto.io/api-inventory/how-to/create-swagger-file-using-akto"
+            }, {
+                content: 'What is risk score',
+                value: 'https://docs.akto.io/api-discovery/concepts/risk-score'
             }
         ],
         videoLink: [

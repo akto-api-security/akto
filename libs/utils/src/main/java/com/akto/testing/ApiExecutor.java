@@ -1,10 +1,12 @@
 package com.akto.testing;
 
 import com.akto.dao.context.Context;
+import com.akto.dao.testing.config.TestScriptsDao;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.testing.TestingRunConfig;
 import com.akto.dto.testing.TestingRunResult;
+import com.akto.dto.testing.config.TestScript;
 import com.akto.dto.testing.rate_limit.RateLimitHandler;
 import com.akto.dto.type.URLMethods;
 import com.akto.log.LoggerMaker;
@@ -12,11 +14,11 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.Constants;
 import com.akto.util.HttpRequestResponseUtils;
 import com.akto.util.grpc.ProtoBufUtils;
+
 import kotlin.Pair;
 import okhttp3.*;
 import okio.BufferedSink;
 import org.apache.commons.lang3.StringUtils;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
@@ -24,11 +26,19 @@ import java.net.URISyntaxException;
 import java.net.URL;
 import java.util.*;
 
+import javax.script.ScriptContext;
+import javax.script.ScriptEngine;
+import javax.script.ScriptEngineManager;
+import javax.script.SimpleScriptContext;
+import jdk.nashorn.api.scripting.ScriptObjectMirror;
+
 public class ApiExecutor {
     private static final LoggerMaker loggerMaker = new LoggerMaker(ApiExecutor.class);
 
     // Load only first 1 MiB of response body into memory.
     private static final int MAX_RESPONSE_SIZE = 1024*1024;
+    private static Map<Integer, Integer> lastFetchedMap = new HashMap<>();
+    private static Map<Integer, TestScript> testScriptMap = new HashMap<>();
     
     private static OriginalHttpResponse common(Request request, boolean followRedirects, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck, String requestProtocol) throws Exception {
 
@@ -38,14 +48,22 @@ public class ApiExecutor {
             boolean rateLimitHit = true;
             while (RateLimitHandler.getInstance(accountId).shouldWait(request)) {
                 if(rateLimitHit){
-                    loggerMaker.infoAndAddToDb("Rate limit hit, sleeping", LogDb.TESTING);
+                    if (!(request.url().toString().contains("insertRuntimeLog") || request.url().toString().contains("insertTestingLog") || request.url().toString().contains("insertProtectionLog"))) {
+                        loggerMaker.infoAndAddToDb("Rate limit hit, sleeping", LogDb.TESTING);
+                    }else {
+                        System.out.println("Rate limit hit, sleeping");
+                    }
                 }
                 rateLimitHit = false;
                 Thread.sleep(1000);
                 i++;
 
                 if (i%30 == 0) {
-                    loggerMaker.infoAndAddToDb("waiting for rate limit availability", LogDb.TESTING);
+                    if (!(request.url().toString().contains("insertRuntimeLog") || request.url().toString().contains("insertTestingLog") || request.url().toString().contains("insertProtectionLog"))) {
+                        loggerMaker.infoAndAddToDb("waiting for rate limit availability", LogDb.TESTING);
+                    }else{
+                        System.out.println("waiting for rate limit availability");
+                    }                
                 }
             }
         }
@@ -67,6 +85,7 @@ public class ApiExecutor {
         Call call = client.newCall(request);
         Response response = null;
         String body;
+        byte[] grpcBody = null;
         try {
             response = call.execute();
             ResponseBody responseBody = response.peekBody(MAX_RESPONSE_SIZE);
@@ -74,13 +93,42 @@ public class ApiExecutor {
                 throw new Exception("Couldn't read response body");
             }
             try {
-                body = responseBody.string();
+                if (requestProtocol != null && requestProtocol.contains(HttpRequestResponseUtils.GRPC_CONTENT_TYPE)) {//GRPC request
+                    grpcBody = responseBody.bytes();
+                    StringBuilder builder = new StringBuilder();
+                    builder.append("grpc response binary array: ");
+                    for (byte b : grpcBody) {
+                        builder.append(b).append(",");
+                    }
+                    if (!(request.url().toString().contains("insertRuntimeLog") || request.url().toString().contains("insertTestingLog") || request.url().toString().contains("insertProtectionLog"))) {
+                        loggerMaker.infoAndAddToDb(builder.toString(), LogDb.TESTING);
+                    }else {
+                        System.out.println(builder.toString());
+                    }
+                    String responseBase64Encoded = Base64.getEncoder().encodeToString(grpcBody);
+                    if (!(request.url().toString().contains("insertRuntimeLog") || request.url().toString().contains("insertTestingLog") || request.url().toString().contains("insertProtectionLog"))) {
+                        loggerMaker.infoAndAddToDb("grpc response base64 encoded:" + responseBase64Encoded, LogDb.TESTING);
+                    }else {
+                        System.out.println("grpc response base64 encoded:" + responseBase64Encoded);
+                    }
+                    body = HttpRequestResponseUtils.convertGRPCEncodedToJson(grpcBody);
+                } else {
+                    body = responseBody.string();
+                }
             } catch (IOException e) {
-                loggerMaker.errorAndAddToDb("Error while parsing response body: " + e, LogDb.TESTING);
+                if (!(request.url().toString().contains("insertRuntimeLog") || request.url().toString().contains("insertTestingLog") || request.url().toString().contains("insertProtectionLog"))) {
+                    loggerMaker.errorAndAddToDb("Error while parsing response body: " + e, LogDb.TESTING);
+                } else {
+                    System.out.println("Error while parsing response body: " + e);
+                }
                 body = "{}";
             }
         } catch (IOException e) {
-            loggerMaker.errorAndAddToDb("Error while executing request " + request.url() + ": " + e, LogDb.TESTING);
+            if (!(request.url().toString().contains("insertRuntimeLog") || request.url().toString().contains("insertTestingLog") || request.url().toString().contains("insertProtectionLog"))) {
+                loggerMaker.errorAndAddToDb("Error while executing request " + request.url() + ": " + e, LogDb.TESTING);
+            } else {
+                System.out.println("Error while executing request " + request.url() + ": " + e);
+            }
             throw new Exception("Api Call failed");
         } finally {
             if (response != null) {
@@ -92,14 +140,7 @@ public class ApiExecutor {
         Headers headers = response.headers();
 
         Map<String, List<String>> responseHeaders = generateHeadersMapFromHeadersObject(headers);
-        OriginalHttpResponse originalHttpResponse = new OriginalHttpResponse(body, responseHeaders, statusCode);
-        if (requestProtocol != null && requestProtocol.contains(HttpRequestResponseUtils.GRPC_CONTENT_TYPE)) {//GRPC request
-            //body will be binary,
-            String responseBase64Encoded = Base64.getEncoder().encodeToString(body.getBytes());
-            loggerMaker.infoAndAddToDb("grpc response base64 encoded:" + responseBase64Encoded, LogDb.TESTING);
-            originalHttpResponse.setBody(HttpRequestResponseUtils.convertGRPCEncodedToJson(responseBase64Encoded));
-        }
-        return originalHttpResponse;
+        return new OriginalHttpResponse(body, responseHeaders, statusCode);
     }
 
     public static Map<String, List<String>> generateHeadersMapFromHeadersObject(Headers headers) {
@@ -207,16 +248,31 @@ public class ApiExecutor {
         return replaceHostFromConfig(url, testingRunConfig);
     }
 
-    public static OriginalHttpResponse sendRequest(OriginalHttpRequest request, boolean followRedirects, TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck) throws Exception {
-        // don't lowercase url because query params will change and will result in incorrect request
+    public static OriginalHttpResponse sendRequest(OriginalHttpRequest request, boolean followRedirects, TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck, boolean useTestingRunConfig) throws Exception {
+        if(useTestingRunConfig) {
+            return sendRequest(request, followRedirects, testingRunConfig, debug, testLogs, skipSSRFCheck);
+        }else{
+            TestingRunConfig runConfig = new TestingRunConfig();
+            runConfig.setOverriddenTestAppUrl("");
+            return sendRequest(request, followRedirects, runConfig, debug, testLogs, skipSSRFCheck);
+        }
 
+        
+    }
+
+    public static Request buildRequest(OriginalHttpRequest request, TestingRunConfig testingRunConfig) throws Exception{
         String url = prepareUrl(request, testingRunConfig);
-
-        loggerMaker.infoAndAddToDb("Final url is: " + url, LogDb.TESTING);
         request.setUrl(url);
-
         Request.Builder builder = new Request.Builder();
-        String type = request.findContentType();
+        addHeaders(request, builder);
+        builder = builder.url(request.getFullUrlWithParams());
+        boolean executeScript = testingRunConfig != null;
+        calculateHashAndAddAuth(request, executeScript);
+        Request okHttpRequest = builder.build();
+        return okHttpRequest;
+    }
+
+    private static void addHeaders(OriginalHttpRequest request, Request.Builder builder){
         // add headers
         List<String> forbiddenHeaders = Arrays.asList("content-length", "accept-encoding");
         Map<String, List<String>> headersMap = request.getHeaders();
@@ -232,11 +288,32 @@ public class ApiExecutor {
                 builder.addHeader(headerName, headerValue);
             }
         }
+    }
+
+    public static OriginalHttpResponse sendRequest(OriginalHttpRequest request, boolean followRedirects, TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck) throws Exception {
+        // don't lowercase url because query params will change and will result in incorrect request
+
+        String url = prepareUrl(request, testingRunConfig);
+
+        if (!(url.contains("insertRuntimeLog") || url.contains("insertTestingLog") || url.contains("insertProtectionLog"))) {
+            loggerMaker.infoAndAddToDb("Final url is: " + url, LogDb.TESTING);
+        }
+        request.setUrl(url);
+
+        Request.Builder builder = new Request.Builder();
+        addHeaders(request, builder);
+
+        String type = request.findContentType();
         URLMethods.Method method = URLMethods.Method.fromString(request.getMethod());
 
         builder = builder.url(request.getFullUrlWithParams());
 
+        boolean executeScript = testingRunConfig != null;
+        calculateHashAndAddAuth(request, executeScript);
+
         OriginalHttpResponse response = null;
+        HostValidator.validate(url);
+
         switch (method) {
             case GET:
             case HEAD:
@@ -254,7 +331,9 @@ public class ApiExecutor {
             case OTHER:
                 throw new Exception("Invalid method name");
         }
-        loggerMaker.infoAndAddToDb("Received response from: " + url, LogDb.TESTING);
+        if (!(url.contains("insertRuntimeLog") || url.contains("insertTestingLog") || url.contains("insertProtectionLog"))) {
+            loggerMaker.infoAndAddToDb("Received response from: " + url, LogDb.TESTING);
+        }
 
         return response;
     }
@@ -308,7 +387,72 @@ public class ApiExecutor {
         
     }
 
+    private static void calculateHashAndAddAuth(OriginalHttpRequest originalHttpRequest, boolean executeScript) {
+        if (!executeScript) {
+            return;
+        }
+        int accountId = Context.accountId.get();
+        try {
+            String script;
+            TestScript testScript = testScriptMap.getOrDefault(accountId, null);
+            int lastTestScriptFetched = lastFetchedMap.getOrDefault(accountId, 0);
+            if (Context.now() - lastTestScriptFetched > 5 * 60) {
+                testScript = TestScriptsDao.instance.fetchTestScript();
+                lastTestScriptFetched = Context.now();
+                testScriptMap.put(accountId, testScript);
+                lastFetchedMap.put(accountId, Context.now());
+            }
+            if (testScript != null && testScript.getJavascript() != null) {
+                script = testScript.getJavascript();
+            } else {
+                // loggerMaker.infoAndAddToDb("returning from calculateHashAndAddAuth, no test script present");
+                return;
+            }
+            loggerMaker.infoAndAddToDb("Starting calculateHashAndAddAuth");
 
+            ScriptEngineManager manager = new ScriptEngineManager();
+            ScriptEngine engine = manager.getEngineByName("nashorn");
+
+            SimpleScriptContext sctx = ((SimpleScriptContext) engine.get("context"));
+            sctx.setAttribute("method", originalHttpRequest.getMethod(), ScriptContext.ENGINE_SCOPE);
+            sctx.setAttribute("headers", originalHttpRequest.getHeaders(), ScriptContext.ENGINE_SCOPE);
+            sctx.setAttribute("url", originalHttpRequest.getPath(), ScriptContext.ENGINE_SCOPE);
+            sctx.setAttribute("payload", originalHttpRequest.getBody(), ScriptContext.ENGINE_SCOPE);
+            sctx.setAttribute("queryParams", originalHttpRequest.getQueryParams(), ScriptContext.ENGINE_SCOPE);
+            engine.eval(script);
+
+            String method = (String) sctx.getAttribute("method");
+            Map<String, Object> headers = (Map) sctx.getAttribute("headers");
+            String url = (String) sctx.getAttribute("url");
+            String payload = (String) sctx.getAttribute("payload");
+            String queryParams = (String) sctx.getAttribute("queryParams");
+
+            Map<String, List<String>> hs = new HashMap<>();
+            for (String key: headers.keySet()) {
+                try {
+                    ScriptObjectMirror scm = ((ScriptObjectMirror) headers.get(key));
+                    List<String> val = new ArrayList<>();
+                    for (int i = 0; i < scm.size(); i++) {
+                        val.add((String) scm.get(Integer.toString(i)));
+                    }
+                    hs.put(key, val);
+                } catch (Exception e) {
+                    hs.put(key, (List) headers.get(key));
+                }
+            }
+
+            originalHttpRequest.setBody(payload);
+            originalHttpRequest.setMethod(method);
+            originalHttpRequest.setUrl(url);
+            originalHttpRequest.setHeaders(hs);
+            originalHttpRequest.setQueryParams(queryParams);
+
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in calculateHashAndAddAuth " + e.getMessage() + " url " + originalHttpRequest.getUrl());
+            e.printStackTrace();
+            return;
+        }
+    }
 
     private static OriginalHttpResponse sendWithRequestBody(OriginalHttpRequest request, Request.Builder builder, boolean followRedirects, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck, String requestProtocol) throws Exception {
         Map<String,List<String>> headers = request.getHeaders();
@@ -338,6 +482,11 @@ public class ApiExecutor {
             if (payload == null) payload = "{}";
             payload = payload.trim();
             if (!payload.startsWith("[") && !payload.startsWith("{")) payload = "{}";
+        } else if (contentType.contains(HttpRequestResponseUtils.FORM_URL_ENCODED_CONTENT_TYPE)) {
+            if(payload.startsWith("{")) {
+                payload = HttpRequestResponseUtils.jsonToFormUrlEncoded(payload);
+                body = RequestBody.create(payload, MediaType.parse(contentType));
+            }
         } else if (contentType.contains(HttpRequestResponseUtils.GRPC_CONTENT_TYPE)) {
             try {
                 loggerMaker.infoAndAddToDb("encoding to grpc payload:" + payload, LogDb.TESTING);
@@ -357,7 +506,12 @@ public class ApiExecutor {
 
         if (payload == null) payload = "";
         if (body == null) {// body not created by GRPC block yet
-            body = RequestBody.create(payload, MediaType.parse(contentType));
+            if (request.getHeaders().containsKey("charset")) {
+                body = RequestBody.create(payload, null);
+                request.getHeaders().remove("charset");
+            } else {
+                body = RequestBody.create(payload, MediaType.parse(contentType));
+            }
         }
         builder = builder.method(request.getMethod(), body);
         Request okHttpRequest = builder.build();

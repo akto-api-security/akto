@@ -9,11 +9,13 @@ import java.util.List;
 import java.util.Map;
 
 public class User {
+    public static final String NAME = "name";
     private String name;
     private String login;
     public static final String LOGIN = "login";
     private int id;
     public static final String ID = "_id";
+    public static final String REFRESH_TOKEN = "refreshTokens";
     private List<String> refreshTokens;
     public static final String LAST_LOGIN_TS = "lastLoginTs";
     private int lastLoginTs;
@@ -25,6 +27,15 @@ public class User {
     public static final String SIGNUP_INFO_MAP = "signupInfoMap";
     public static final String AKTO_UI_MODE = "aktoUIMode";
     private AktoUIMode aktoUIMode;
+    public static final String NAME_LAST_UPDATE = "nameLastUpdate";
+    private int nameLastUpdate;
+
+    public static final String PASSWORD_RESET_TOKEN = "passwordResetToken";
+    private String passwordResetToken;
+    public static final String LAST_PASSWORD_RESET_TOKEN = "lastPasswordResetToken";
+    private int lastPasswordResetToken;
+    public static final String LAST_PASSWORD_RESET = "lastPasswordReset";
+    private int lastPasswordReset;
 
     public enum AktoUIMode {
         VERSION_1,//
@@ -138,5 +149,37 @@ public class User {
 
     public void setAktoUIMode(AktoUIMode aktoUIMode) {
         this.aktoUIMode = aktoUIMode;
+    }
+
+    public int getNameLastUpdate() {
+        return nameLastUpdate;
+    }
+
+    public void setNameLastUpdate(int nameLastUpdate) {
+        this.nameLastUpdate = nameLastUpdate;
+    }
+
+    public String getPasswordResetToken() {
+        return passwordResetToken;
+    }
+
+    public void setPasswordResetToken(String passwordResetToken) {
+        this.passwordResetToken = passwordResetToken;
+    }
+
+    public int getLastPasswordResetToken() {
+        return lastPasswordResetToken;
+    }
+
+    public void setLastPasswordResetToken(int lastPasswordResetToken) {
+        this.lastPasswordResetToken = lastPasswordResetToken;
+    }
+
+    public int getLastPasswordReset() {
+        return lastPasswordReset;
+    }
+
+    public void setLastPasswordReset(int lastPasswordReset) {
+        this.lastPasswordReset = lastPasswordReset;
     }
 }

@@ -7,6 +7,7 @@ import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.AccountSettings;
 import com.akto.dto.Config;
 import com.akto.dto.Log;
+import com.akto.util.DashboardMode;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
@@ -64,8 +65,12 @@ public class LoggerMaker  {
 
     private LogDb db;
 
+    public void setDb(LogDb db) {
+        this.db = db;
+    }
+
     public enum LogDb {
-        TESTING,RUNTIME,DASHBOARD,BILLING, ANALYSER
+        TESTING,RUNTIME,DASHBOARD,BILLING, ANALYSER, THREAT_DETECTION
     }
 
     private static AccountSettings accountSettings = null;
@@ -145,7 +150,7 @@ public class LoggerMaker  {
 
     public void errorAndAddToDb(String err, LogDb db) {
         try {
-            basicError(err, db);
+            err = basicError(err, db);
 
             if (db.equals(LogDb.BILLING) || db.equals(LogDb.DASHBOARD)) {
                 sendToSlack(err);
@@ -213,11 +218,13 @@ public class LoggerMaker  {
     private void insert(String info, String key, LogDb db) {
         String text = aClass + " : " + info;
         Log log = new Log(text, key, Context.now());
-        
+        if(DashboardMode.isSaasDeployment()) {
+            return;
+        }
         if(checkUpdate() && db!=null){
             switch(db){
                 case TESTING: 
-                    LogsDao.instance.insertOne(log);
+                    dataActor.insertTestingLog(log);
                     break;
                 case RUNTIME: 
                     dataActor.insertRuntimeLog(log);
@@ -230,6 +237,9 @@ public class LoggerMaker  {
                     break;
                 case BILLING:
                     BillingLogsDao.instance.insertOne(log);
+                    break;
+                case THREAT_DETECTION:
+                    dataActor.insertProtectionLog(log);
                     break;
                 default:
                     break;

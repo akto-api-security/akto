@@ -15,6 +15,11 @@ import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.TestingEndpoints;
+import com.akto.dao.test_editor.YamlTemplateDao;
+import com.akto.dto.test_editor.YamlTemplate;
+import com.akto.dto.test_run_findings.TestingIssuesId;
+import com.akto.dto.test_run_findings.TestingRunIssues;
+import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.MongoDBEnums;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
@@ -149,6 +154,58 @@ public class TestingRunIssuesDao extends AccountsContextDaoWithRbac<TestingRunIs
         pipeline.add(Aggregates.group("$_id.dayOfYear", Accumulators.addToSet("issuesTrend", bd)));
 
         return pipeline;
+    }
+
+    public Map<String,Integer> countIssuesMapForPrivilegeEscalations(int timestamp){
+        Map<String,Integer> finalMap = new HashMap<>();
+
+        List<String> highSeverityList = new ArrayList<>();
+        highSeverityList.add(GlobalEnums.TestCategory.BFLA.getName());
+        highSeverityList.add(GlobalEnums.TestCategory.BOLA.getName());
+        highSeverityList.add(GlobalEnums.TestCategory.NO_AUTH.getName());
+
+        List<Bson> pipeline = new ArrayList<>();
+        pipeline.add(
+            Aggregates.match(
+                Filters.and(
+                    Filters.eq(YamlTemplate.AUTHOR, "AKTO"),
+                    Filters.in(YamlTemplate.INFO + ".name", highSeverityList)
+                )
+            )
+        );
+        pipeline.add(
+            Aggregates.project(
+                Projections.fields(Projections.include("_id"), Projections.computed("categoryName", "$info.category.name"))
+            )
+        );
+        Map<String, List<String>> categoryMap = new HashMap<>();
+
+        MongoCursor<BasicDBObject> cursor = YamlTemplateDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
+        while (cursor.hasNext()) {
+            BasicDBObject bdObject = (BasicDBObject) cursor.next();
+            String testId = bdObject.getString("_id");
+            List<String> currentList = categoryMap.getOrDefault(testId, new ArrayList<>());
+            currentList.add(bdObject.getString("categoryName"));
+            categoryMap.put(testId, currentList);
+        }
+
+
+        for(Map.Entry<String, List<String>> it: categoryMap.entrySet()){
+            if(!it.getValue().isEmpty()){
+                int countOfIssues = (int) TestingRunIssuesDao.instance.count(
+                    Filters.and(
+                        Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS, GlobalEnums.TestRunIssueStatus.OPEN.name()),
+                        Filters.gte(TestingRunIssues.CREATION_TIME, timestamp),
+                        Filters.in("_id." + TestingIssuesId.TEST_SUB_CATEGORY, it.getValue())
+                    )
+                );
+                if(countOfIssues > 0){
+                    finalMap.put(it.getKey(), countOfIssues);
+                }
+            }
+        }
+
+        return finalMap;
     }
 
     private TestingRunIssuesDao() {}

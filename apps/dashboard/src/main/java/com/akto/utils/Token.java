@@ -29,8 +29,8 @@ public class Token {
                 claims,
                 "Akto",
                 "login",
-                Calendar.MINUTE,
-                15
+                Calendar.HOUR,
+                2
         );
         
     }

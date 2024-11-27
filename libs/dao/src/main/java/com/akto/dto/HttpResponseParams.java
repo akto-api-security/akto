@@ -3,9 +3,7 @@ package com.akto.dto;
 
 import com.akto.dao.context.Context;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 public class HttpResponseParams {
 
@@ -25,12 +23,21 @@ public class HttpResponseParams {
     Source source = Source.OTHER;
     String orig;
     String sourceIP;
+    String destIP;
+    String direction;
 
     public HttpResponseParams() {}
 
     public HttpResponseParams(String type, int statusCode, String status, Map<String, List<String>> headers, String payload,
                               HttpRequestParams requestParams, int time, String accountId, boolean isPending, Source source, 
                               String orig, String sourceIP) {
+        this(type, statusCode, status, headers, payload, requestParams, time, accountId, isPending, source, orig,
+                sourceIP, "", "");
+    }
+
+    public HttpResponseParams(String type, int statusCode, String status, Map<String, List<String>> headers, String payload,
+                              HttpRequestParams requestParams, int time, String accountId, boolean isPending, Source source,
+                              String orig, String sourceIP, String destIP, String direction) {
         this.type = type;
         this.statusCode = statusCode;
         this.status = status;
@@ -43,6 +50,8 @@ public class HttpResponseParams {
         this.source = source;
         this.orig = orig;
         this.sourceIP = sourceIP;
+        this.destIP = destIP;
+        this.direction = direction;
     }
 
     public static boolean validHttpResponseCode(int statusCode)  {
@@ -64,6 +73,29 @@ public class HttpResponseParams {
                 this.orig,
                 this.sourceIP
         );
+    }
+
+    private static final Set<String> allowedPath = new HashSet<>();
+
+    static {
+        allowedPath.add("graphql");
+        allowedPath.add("graph");
+    }
+    public static final String QUERY = "query";
+
+
+    public static boolean isGraphql(HttpResponseParams responseParams) {
+        boolean isAllowedForParse = false;
+        String path = responseParams.getRequestParams().getURL();
+        String requestPayload = responseParams.getRequestParams().getPayload();
+
+        for (String graphqlPath : allowedPath) {
+            if (path != null && path.contains(graphqlPath)) {
+                isAllowedForParse = true;
+                break;
+            }
+        }
+        return isAllowedForParse && requestPayload.contains(QUERY);
     }
 
     public int getTimeOrNow() {
@@ -129,5 +161,25 @@ public class HttpResponseParams {
 
     public void setSourceIP(String sourceIP) {
         this.sourceIP = sourceIP;
+    }
+
+    public String getDestIP() {
+        return destIP;
+    }
+
+    public void setDestIP(String destIP) {
+        this.destIP = destIP;
+    }
+
+    public String getDirection() {
+        return direction;
+    }
+
+    public void setDirection(String direction) {
+        this.direction = direction;
+    }
+
+    public void setRequestParams(HttpRequestParams requestParams) {
+        this.requestParams = requestParams;
     }
 }

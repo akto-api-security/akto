@@ -1,9 +1,9 @@
-import PersistStore from "../../../main/PersistStore";
 import func from "@/util/func";
 import observeFunc from "../observe/transform"
 import { Badge, Button, Text , HorizontalStack, Box} from "@shopify/polaris";
+import LocalStore from "../../../main/LocalStorageStore";
 
-const subCategoryMap = PersistStore.getState().subCategoryMap;
+const subCategoryMap = LocalStore.getState().subCategoryMap;
 
 const transform = {
 
@@ -114,16 +114,19 @@ const transform = {
     },
 
     getCountInfo: (collectionsArr, coverageObject) => {
-        let urlsCount = 0 ;
-        let coverageCount = 0 ;
-        collectionsArr.forEach((x) =>{
+        let urlsCount = 0;
+        let coverageCount = 0;
+        collectionsArr.forEach((x) => {
             if (x.hasOwnProperty('type') && x.type === 'API_GROUP') {
-                return
+                return;
             }
-
-            urlsCount += x.urlsCount;
-            coverageCount += coverageObject[x.id] || 0 ;
-        })
+            
+            // Only count active collections
+            if (!x.deactivated) {
+                urlsCount += x.urlsCount;
+                coverageCount += coverageObject[x.id] || 0;
+            }
+        });
         return {
             totalUrls: urlsCount,
             coverage: urlsCount === 0 ? "0%" : Math.ceil((coverageCount * 100) / urlsCount) + '%'

@@ -41,7 +41,7 @@ import com.mongodb.client.model.Updates;
 
 public class Utils {
     
-    private static final LoggerMaker loggerMaker = new LoggerMaker(Utils.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(Utils.class, LogDb.TESTING);
     private static final Gson gson = new Gson();
 
     public static WorkflowTestResult.NodeResult processOtpNode(Node node, Map<String, Object> valuesMap) {
@@ -52,7 +52,7 @@ public class Utils {
         BasicDBObject data = new BasicDBObject();
         String message;
 
-        OtpTestData otpTestData = fetchOtpTestData(node, 4);
+        OtpTestData otpTestData = fetchOtpTestData(node, 10);
         WorkflowNodeDetails workflowNodeDetails = node.getWorkflowNodeDetails();
         String uuid = workflowNodeDetails.getOtpRefUuid();
 
@@ -128,15 +128,13 @@ public class Utils {
         return verificationCode;
     }
 
-    public static WorkflowTestResult.NodeResult processRecorderNode(Node node, Map<String, Object> valuesMap) {
+    public static WorkflowTestResult.NodeResult processRecorderNode(Node node, Map<String, Object> valuesMap, RecordedLoginFlowInput recordedLoginFlowInput) {
 
         List<String> testErrors = new ArrayList<>();
         BasicDBObject resp = new BasicDBObject();
         BasicDBObject body = new BasicDBObject();
         BasicDBObject data = new BasicDBObject();
         String message;
-
-        RecordedLoginFlowInput recordedLoginFlowInput = RecordedLoginInputDao.instance.findOne(new BasicDBObject());
         
         String token = fetchToken(recordedLoginFlowInput, 5);
 
@@ -149,8 +147,17 @@ public class Utils {
             return new WorkflowTestResult.NodeResult(resp.toString(), false, testErrors);
         }
 
-        valuesMap.put(node.getId() + ".response.body.token", token);
+        // valuesMap.put(node.getId() + ".response.body.token", token);
         
+
+        BasicDBObject flattened = JSONUtils.flattenWithDots(BasicDBObject.parse(token));
+
+        for (String param: flattened.keySet()) {
+            String key = node.getId() + ".response.body" + "." + param;
+            valuesMap.put(key, flattened.get(param));
+	        loggerMaker.infoAndAddToDb("kv pair: " + key + " " + flattened.get(param));
+        }	
+
         data.put("token", token);
         body.put("body", data);
         resp.put("response", body);
@@ -190,8 +197,17 @@ public class Utils {
     }
 
     public static WorkflowTestResult.NodeResult processNode(Node node, Map<String, Object> valuesMap, Boolean allowAllStatusCodes, boolean debug, List<TestingRunResult.TestLog> testLogs, Memory memory) {
+        RecordedLoginFlowInput recordedLoginFlowInput = RecordedLoginInputDao.instance.findOne(new BasicDBObject());
+        return processNode(node, valuesMap, allowAllStatusCodes, debug, testLogs, memory, recordedLoginFlowInput);
+    }
+
+    public static WorkflowTestResult.NodeResult processNode(Node node, Map<String, Object> valuesMap, Boolean allowAllStatusCodes, boolean debug, List<TestingRunResult.TestLog> testLogs, Memory memory, AuthMechanism authMechanism) {
+        return processNode(node, valuesMap, allowAllStatusCodes, debug, testLogs, memory, authMechanism.getRecordedLoginFlowInput());
+    }
+
+    public static WorkflowTestResult.NodeResult processNode(Node node, Map<String, Object> valuesMap, Boolean allowAllStatusCodes, boolean debug, List<TestingRunResult.TestLog> testLogs, Memory memory, RecordedLoginFlowInput recordedLoginFlowInput) {
         if (node.getWorkflowNodeDetails().getType() == WorkflowNodeDetails.Type.RECORDED) {
-            return processRecorderNode(node, valuesMap);
+            return processRecorderNode(node, valuesMap, recordedLoginFlowInput);
         }
         else if (node.getWorkflowNodeDetails().getType() == WorkflowNodeDetails.Type.OTP) {
             return processOtpNode(node, valuesMap);
@@ -200,7 +216,6 @@ public class Utils {
             return processApiNode(node, valuesMap, allowAllStatusCodes, debug, testLogs, memory);
         }
     }
-
 
     public static WorkflowTestResult.NodeResult processApiNode(Node node, Map<String, Object> valuesMap, Boolean allowAllStatusCodes, boolean debug, List<TestingRunResult.TestLog> testLogs, Memory memory) {
         
@@ -246,7 +261,7 @@ public class Utils {
                 if (authMechanism.getRequestData() != null && authMechanism.getRequestData().size() > 0 && authMechanism.getRequestData().get(index).getAllowAllStatusCodes()) {
                     allowAllStatusCodes = authMechanism.getRequestData().get(0).getAllowAllStatusCodes();
                 }
-                nodeResult = processNode(node, valuesMap, allowAllStatusCodes, false, new ArrayList<>(), null);
+                nodeResult = processNode(node, valuesMap, allowAllStatusCodes, false, new ArrayList<>(), null, authMechanism);
             } catch (Exception e) {
                 ;
                 List<String> testErrors = new ArrayList<>();
@@ -257,8 +272,20 @@ public class Utils {
             JSONObject respString = new JSONObject();
             Map<String, Map<String, Object>> json = gson.fromJson(nodeResult.getMessage(), Map.class);
 
-            respString.put("headers", json.get("response").get("headers"));
-            respString.put("body", json.get("response").get("body"));
+            if (json.get("response").get("headers") != null) {
+                String jsonString = gson.toJson(json.get("response").get("headers"));
+                respString.put("headers", jsonString);
+            } else {
+                String hStr = "{}";
+                respString.put("headers", hStr);
+            }
+            if (json.get("response").get("body") != null) {
+                String jsonString = gson.toJson(json.get("response").get("body"));
+                respString.put("body", jsonString);
+            } else {
+                respString.put("body", json.get("response").get("body"));
+            }
+            // respString.put("body", json.get("response").get("body").toString());
             responses.add(respString.toString());
             
             if (nodeResult.getErrors().size() > 0) {
@@ -506,7 +533,7 @@ public class Utils {
 
 
     public static String replaceVariables(String payload, Map<String, Object> valuesMap, boolean escapeString) throws Exception {
-        String regex = "\\$\\{(x\\d+\\.[\\w\\-\\[\\].]+|AKTO\\.changes_info\\..*?)\\}"; 
+        String regex = "\\$\\{((x|step)\\d+\\.[\\w\\-\\[\\].]+|AKTO\\.changes_info\\..*?)\\}"; 
         Pattern p = Pattern.compile(regex);
 
         // replace with values

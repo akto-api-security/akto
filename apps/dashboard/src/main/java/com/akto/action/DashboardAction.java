@@ -1,29 +1,30 @@
 package com.akto.action;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+import java.util.regex.Pattern;
 
+
+import com.akto.dao.*;
+import com.akto.dao.billing.OrganizationsDao;
+import com.akto.dto.*;
+import com.akto.dto.billing.Organization;
+import com.akto.dto.test_run_findings.TestingRunIssues;
+import com.akto.listener.RuntimeListener;
+import com.akto.util.enums.GlobalEnums;
+import com.mongodb.client.model.*;
+import org.bouncycastle.util.test.Test;
 import org.bson.conversions.Bson;
 
-import com.akto.dao.AccountSettingsDao;
-import com.akto.dao.ActivitiesDao;
-import com.akto.dao.ApiInfoDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
-import com.akto.dto.AccountSettings;
-import com.akto.dto.Activity;
-import com.akto.dto.ApiInfo;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.usage.UsageMetricCalculator;
 import com.akto.util.ConnectionInfo;
 import com.akto.util.IssueTrendType;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
-import com.mongodb.client.model.Projections;
-import com.mongodb.client.model.Updates;
 import com.opensymphony.xwork2.Action;
 
 public class DashboardAction extends UserAction {
@@ -67,6 +68,116 @@ public class DashboardAction extends UserAction {
         this.riskScoreCountMap = riskScoreCounts;
 
         return Action.SUCCESS.toUpperCase();
+    }
+
+    Set<Integer> deactivatedCollections = UsageMetricCalculator.getDeactivated();
+
+    private long totalIssuesCount = 0;
+    private long oldOpenCount = 0;
+    public String findTotalIssues() {
+        Set<Integer> demoCollections = new HashSet<>();
+        demoCollections.addAll(deactivatedCollections);
+        demoCollections.add(RuntimeListener.LLM_API_COLLECTION_ID);
+        demoCollections.add(RuntimeListener.VULNERABLE_API_COLLECTION_ID);
+
+        ApiCollection juiceshopCollection = ApiCollectionsDao.instance.findByName("juice_shop_demo");
+        if (juiceshopCollection != null) demoCollections.add(juiceshopCollection.getId());
+
+
+        if (startTimeStamp == 0) startTimeStamp = Context.now() - 24 * 1 * 60 * 60;
+        // totoal issues count = issues that were created before endtimestamp and are either still open or fixed but last updated is after endTimestamp
+        totalIssuesCount = TestingRunIssuesDao.instance.count(
+            Filters.and(
+                Filters.lte(TestingRunIssues.CREATION_TIME, endTimeStamp),
+                Filters.nin("_id.apiInfoKey.apiCollectionId", demoCollections),
+                Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS,  GlobalEnums.TestRunIssueStatus.OPEN))       
+            );
+
+        // issues that have been created till start timestamp
+        oldOpenCount = TestingRunIssuesDao.instance.count(
+                Filters.and(
+                        Filters.nin("_id.apiInfoKey.apiCollectionId", demoCollections),
+                        Filters.lte(TestingRunIssues.CREATION_TIME, startTimeStamp),
+                        Filters.ne(TestingRunIssues.TEST_RUN_ISSUES_STATUS,  GlobalEnums.TestRunIssueStatus.IGNORED)
+                )
+        );
+
+        return SUCCESS.toUpperCase();
+    }
+
+
+    private List<HistoricalData> finalHistoricalData = new ArrayList<>();
+    private List<HistoricalData> initialHistoricalData = new ArrayList<>();
+    public String fetchHistoricalData() {
+        if (endTimeStamp != 0) {
+            this.finalHistoricalData = HistoricalDataDao.instance.findAll(
+                    Filters.and(
+                            Filters.gte(HistoricalData.TIME, endTimeStamp),
+                            Filters.lte(HistoricalData.TIME, endTimeStamp + 24 * 60 * 60)
+                    )
+            );
+        }
+
+        this.initialHistoricalData = HistoricalDataDao.instance.findAll(
+                Filters.and(
+                        Filters.gte(HistoricalData.TIME, startTimeStamp),
+                        Filters.lte(HistoricalData.TIME, startTimeStamp + 24 * 60 * 60)
+                )
+        );
+
+        return SUCCESS.toUpperCase();
+    }
+
+    private List<String> severityToFetch;
+    private final Map<Integer, Integer> trendData = new HashMap<>();
+    public String fetchCriticalIssuesTrend(){
+        if(endTimeStamp == 0) endTimeStamp = Context.now();
+        if (severityToFetch == null || severityToFetch.isEmpty()) severityToFetch = Arrays.asList("CRITICAL", "HIGH");
+
+        Set<Integer> demoCollections = new HashSet<>();
+        demoCollections.addAll(deactivatedCollections);
+        demoCollections.add(RuntimeListener.LLM_API_COLLECTION_ID);
+        demoCollections.add(RuntimeListener.VULNERABLE_API_COLLECTION_ID);
+
+        ApiCollection juiceshopCollection = ApiCollectionsDao.instance.findByName("juice_shop_demo");
+        if (juiceshopCollection != null) demoCollections.add(juiceshopCollection.getId());
+        
+        List<GlobalEnums.TestRunIssueStatus> allowedStatus = Arrays.asList(GlobalEnums.TestRunIssueStatus.OPEN, GlobalEnums.TestRunIssueStatus.FIXED);
+        Bson issuesFilter = Filters.and(
+                Filters.in(TestingRunIssues.KEY_SEVERITY, severityToFetch),
+                Filters.gte(TestingRunIssues.CREATION_TIME, startTimeStamp),
+                Filters.lte(TestingRunIssues.CREATION_TIME, endTimeStamp),
+                Filters.in(TestingRunIssues.TEST_RUN_ISSUES_STATUS, allowedStatus),
+                Filters.nin("_id.apiInfoKey.apiCollectionId", demoCollections)
+        );
+
+        String dayOfYearFloat = "dayOfYearFloat";
+        String dayOfYear = "dayOfYear";
+
+        List<Bson> pipeline = new ArrayList<>();
+        pipeline.add(Aggregates.match(issuesFilter));
+
+        pipeline.add(Aggregates.project(Projections.computed(dayOfYearFloat, new BasicDBObject("$divide", new Object[]{"$" + TestingRunIssues.CREATION_TIME, 86400}))));
+
+        pipeline.add(Aggregates.project(Projections.computed(dayOfYear, new BasicDBObject("$floor", new Object[]{"$" + dayOfYearFloat}))));
+
+        BasicDBObject groupedId = new BasicDBObject(dayOfYear, "$"+dayOfYear)
+                                                    .append("url", "$_id.apiInfoKey.url")
+                                                    .append("method", "$_id.apiInfoKey.method")
+                                                    .append("apiCollectionId", "$_id.apiInfoKey.apiCollectionId");
+        pipeline.add(Aggregates.group(groupedId, Accumulators.sum("count", 1)));
+
+        MongoCursor<BasicDBObject> issuesCursor = TestingRunIssuesDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
+
+        while(issuesCursor.hasNext()){
+            BasicDBObject basicDBObject = issuesCursor.next();
+            BasicDBObject o = (BasicDBObject) basicDBObject.get("_id");
+            int date = o.getInt(dayOfYear);
+            int count = trendData.getOrDefault(date,0);
+            trendData.put(date, count+1);
+        }
+
+        return SUCCESS.toUpperCase();
     }
 
     public String fetchIssuesTrend(){
@@ -132,6 +243,70 @@ public class DashboardAction extends UserAction {
         }
     }
 
+    private String username;
+    private String organization;
+    private final Pattern usernamePattern = Pattern.compile("^[\\w\\s-]{1,}$");
+    private final Pattern organizationPattern = Pattern.compile("^[\\w\\s.&-]{1,}$");
+    public String updateUsernameAndOrganization() {
+        if(username == null || username.trim().isEmpty()) {
+            addActionError("Username cannot be empty");
+            return Action.ERROR.toUpperCase();
+        }
+        this.setUsername(username.trim());
+
+        if(!usernamePattern.matcher(username).matches()) {
+            addActionError("Username is not valid");
+            return Action.ERROR.toUpperCase();
+        }
+
+        if(username.length() > 24) {
+            addActionError("Username can't be longer than 24 characters");
+            return Action.ERROR.toUpperCase();
+        }
+
+        User userFromSession = getSUser();
+        if (userFromSession == null) {
+            addActionError("Invalid user");
+            return Action.ERROR.toUpperCase();
+        }
+
+        String email = userFromSession.getLogin();
+
+        User user = UsersDao.instance.updateOneNoUpsert(Filters.in(User.LOGIN, email), Updates.combine(
+                Updates.set(User.NAME, username),
+                Updates.set(User.NAME_LAST_UPDATE, Context.now())
+        ));
+        RBAC.Role currentRoleForUser = RBACDao.getCurrentRoleForUser(user.getId(), Context.accountId.get());
+
+        if(currentRoleForUser != null && currentRoleForUser.getName().equals(RBAC.Role.ADMIN.getName())) {
+            if(organization == null || organization.trim().isEmpty()) {
+                addActionError("Organization cannot be empty");
+                return Action.ERROR.toUpperCase();
+            }
+
+            setOrganization(organization.trim());
+
+            if(!organizationPattern.matcher(organization).matches()) {
+                addActionError("Organization is not valid");
+                return Action.ERROR.toUpperCase();
+            }
+
+            if(organization.length() > 24) {
+                addActionError("Organization name can't be longer than 24 characters");
+                return Action.ERROR.toUpperCase();
+            }
+
+            OrganizationsDao.instance.updateOneNoUpsert(Filters.in(Organization.ACCOUNTS, Context.accountId.get()), Updates.combine(
+                    Updates.set(Organization.NAME, organization),
+                    Updates.set(Organization.NAME_LAST_UPDATE, Context.now())
+            ));
+        }
+
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    private String userEmail;
+
     public Map<Integer, Integer> getRiskScoreCountMap() {
         return riskScoreCountMap;
     }
@@ -191,5 +366,48 @@ public class DashboardAction extends UserAction {
     public void setConnectionSkipped(String connectionSkipped) {
         this.connectionSkipped = connectionSkipped;
     }
-    
+
+    public void setSeverityToFetch(List<String> severityToFetch) {
+        this.severityToFetch = severityToFetch;
+    }
+
+    public Map<Integer, Integer> getTrendData() {
+        return trendData;
+    }
+
+    public long getTotalIssuesCount() {
+        return totalIssuesCount;
+    }
+
+    public long getOldOpenCount() {
+        return oldOpenCount;
+    }
+
+    public List<HistoricalData> getFinalHistoricalData() {
+        return finalHistoricalData;
+    }
+
+    public List<HistoricalData> getInitialHistoricalData() {
+        return initialHistoricalData;
+    }
+
+    public String getUsername() {
+        return username;
+    }
+
+    public void setUsername(String username) {
+        this.username = username;
+    }
+
+    public String getOrganization() {
+        return organization;
+    }
+
+    public void setOrganization(String organization) {
+        this.organization = organization;
+    }
+
+    public void setUserEmail(String userEmail) {
+        this.userEmail = userEmail;
+    }
 }

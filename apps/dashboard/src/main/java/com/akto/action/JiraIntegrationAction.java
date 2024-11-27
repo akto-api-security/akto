@@ -2,11 +2,15 @@ package com.akto.action;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Base64;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.io.FileUtils;
 import org.bson.conversions.Bson;
@@ -15,15 +19,15 @@ import com.akto.dao.JiraIntegrationDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.HttpResponseParams;
-import com.akto.dto.JiraIntegration;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
-import com.akto.dto.test_run_findings.TestingIssuesId;
-import com.akto.dto.test_run_findings.TestingRunIssues;
+import com.akto.dto.jira_integration.JiraIntegration;
+import com.akto.dto.jira_integration.JiraMetaData;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.parsers.HttpCallParser;
 import com.akto.testing.ApiExecutor;
+import com.akto.util.Constants;
 import com.akto.util.http_util.CoreHTTPClient;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
@@ -32,6 +36,7 @@ import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
 import com.opensymphony.xwork2.Action;
 
+import okhttp3.Call;
 import okhttp3.MediaType;
 import okhttp3.MultipartBody;
 import okhttp3.OkHttpClient;
@@ -47,111 +52,134 @@ public class JiraIntegrationAction extends UserAction {
     private String apiToken;
     private String issueType;
     private JiraIntegration jiraIntegration;
-    
-    private String issueTitle;
-    private String hostStr;
-    private String endPointStr;
-    private String issueUrl;
-    private String issueDescription;
-    private String jiraTicketUrl;
+    private JiraMetaData jiraMetaData;
+
     private String jiraTicketKey;
-    private TestingIssuesId testingIssueId;
 
     private String origReq;
     private String testReq;
     private String issueId;
 
+    private Map<String,List<BasicDBObject>> projectAndIssueMap;
+
     private final String META_ENDPOINT = "/rest/api/3/issue/createmeta";
     private final String CREATE_ISSUE_ENDPOINT = "/rest/api/3/issue";
     private final String ATTACH_FILE_ENDPOINT = "/attachments";
     private static final LoggerMaker loggerMaker = new LoggerMaker(ApiExecutor.class);
-    private static final OkHttpClient client = CoreHTTPClient.client.newBuilder().build();
+    private static final OkHttpClient client = CoreHTTPClient.client.newBuilder()
+            .connectTimeout(60, TimeUnit.SECONDS)
+            .readTimeout(60, TimeUnit.SECONDS)
+            .writeTimeout(60, TimeUnit.SECONDS)
+            .build();
 
     public String testIntegration() {
 
         String url = baseUrl + META_ENDPOINT;
+        if(apiToken.contains("******")){
+            JiraIntegration jiraIntegration = JiraIntegrationDao.instance.findOne(Filters.empty());
+            if(jiraIntegration != null){
+                setApiToken(jiraIntegration.getApiToken());
+            }
+        }
         String authHeader = Base64.getEncoder().encodeToString((userEmail + ":" + apiToken).getBytes());
-
-        Map<String, List<String>> headers = new HashMap<>();
-        headers.put("Authorization", Collections.singletonList("Basic " + authHeader));
-        OriginalHttpRequest request = new OriginalHttpRequest(url, "", "GET", null, headers, "");
         try {
-            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, new ArrayList<>());
-            String responsePayload = response.getBody();
-            loggerMaker.errorAndAddToDb("triggered meta api for test integration step, requestbody " + request.getBody() + " ,responsebody " + response.getBody() + " ,responsestatus " + response.getStatusCode() + " ,url " + url, LoggerMaker.LogDb.DASHBOARD);
-            if (response.getStatusCode() != 200 || responsePayload == null) {
-                loggerMaker.errorAndAddToDb("error while testing jira integration, url not accessible", LoggerMaker.LogDb.DASHBOARD);
+
+            Request.Builder builder = new Request.Builder();
+            builder.addHeader("Authorization", "Basic " + authHeader);
+            builder = builder.url(url);
+            Request okHttpRequest = builder.build();
+            Call call = client.newCall(okHttpRequest);
+            Response response = null;
+            String responsePayload = null;
+            try {
+                response = call.execute();
+                responsePayload = response.body().string();
+                if (responsePayload == null) {
+                    addActionError("Error while testing jira integration, received null response");
+                    loggerMaker.errorAndAddToDb("error while testing jira integration, received null response", LoggerMaker.LogDb.DASHBOARD);
+                    return Action.ERROR.toUpperCase();
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+                addActionError("Error while testing jira integration, error making call\"");
+                loggerMaker.errorAndAddToDb("error while testing jira integration, error making call" + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
                 return Action.ERROR.toUpperCase();
+            } finally {
+                if (response != null) {
+                    response.close();
+                }
             }
             BasicDBObject payloadObj;
+            setProjId(projId.replaceAll("\\s+", ""));
+            Set<String> inputProjectIds = new HashSet(Arrays.asList(this.projId.split(",")));
+            this.projectAndIssueMap = new HashMap<>();
             try {
                 payloadObj =  BasicDBObject.parse(responsePayload);
                 BasicDBList projects = (BasicDBList) payloadObj.get("projects");
                 for (Object projObj: projects) {
                     BasicDBObject obj = (BasicDBObject) projObj;
                     String key = obj.getString("key");
-                    loggerMaker.errorAndAddToDb("evaluating issuetype for project key " + key + " ,actualProjId " + projId, LoggerMaker.LogDb.DASHBOARD);
-                    if (!key.equalsIgnoreCase(projId)) {
+                    if (!inputProjectIds.contains(key)) {
                         continue;
                     }
-                    loggerMaker.errorAndAddToDb("evaluating issuetype for project key " + key + ", project json obj " + obj, LoggerMaker.LogDb.DASHBOARD);
+                    loggerMaker.infoAndAddToDb("evaluating issuetype for project key " + key + ", project json obj " + obj, LoggerMaker.LogDb.DASHBOARD);
                     BasicDBList issueTypes = (BasicDBList) obj.get("issuetypes");
-                    issueType = determineIssueType(issueTypes, "TASK");
-                    loggerMaker.infoAndAddToDb("evaluated issue type for TASK type " + issueType, LoggerMaker.LogDb.DASHBOARD);
-                    if (issueType == null) {
-                        issueType = determineIssueType(issueTypes, "BUG");
-                        loggerMaker.infoAndAddToDb("evaluated issue type for BUG type " + issueType, LoggerMaker.LogDb.DASHBOARD);
-                    }
-                    if (issueType == null) {
-                        issueType = determineIssueType(issueTypes, "");
-                        loggerMaker.infoAndAddToDb("evaluated issue type for ANY type " + issueType, LoggerMaker.LogDb.DASHBOARD);
-                    }
+                    List<BasicDBObject> issueIdPairs = getIssueTypesWithIds(issueTypes);
+                    this.projectAndIssueMap.put(key, issueIdPairs);
                 }
-                if (issueType == null) {
-                    loggerMaker.errorAndAddToDb("error while testing jira integration, unable to resolve issue type id", LoggerMaker.LogDb.DASHBOARD);
+                if (this.projectAndIssueMap.isEmpty()) {
+                    addActionError("Error while testing jira integration, unable to resolve issue type id");
+                    loggerMaker.errorAndAddToDb("Error while testing jira integration, unable to resolve issue type id", LoggerMaker.LogDb.DASHBOARD);
                     return Action.ERROR.toUpperCase();
                 }
             } catch(Exception e) {
-                return null;
+                return Action.ERROR.toUpperCase();
             }
         } catch (Exception e) {
+            addActionError("Error while testing jira integration");
             loggerMaker.errorAndAddToDb("error while testing jira integration, " + e, LoggerMaker.LogDb.DASHBOARD);
-            return null;
+            return Action.ERROR.toUpperCase();
         }
 
         return Action.SUCCESS.toUpperCase();
     }
 
-    public String determineIssueType(BasicDBList issueTypes, String jiraIssueType) {
+    private List<BasicDBObject> getIssueTypesWithIds(BasicDBList issueTypes) {
 
-        String issueType = null;
+        List<BasicDBObject> idPairs = new ArrayList<>();
         for (Object issueObj: issueTypes) {
             BasicDBObject obj2 = (BasicDBObject) issueObj;
             String issueName = obj2.getString("name");
-            if (!jiraIssueType.equals("") && !issueName.equalsIgnoreCase(jiraIssueType)) {
-                continue;
-            }
-            issueType = obj2.getString("id");
+            String issueId = obj2.getString("id");
+            BasicDBObject finalObj = new BasicDBObject();
+            finalObj.put("issueId", issueId);
+            finalObj.put("issueType", issueName);
+            idPairs.add(finalObj);
         }
-        return issueType;
+        return idPairs;
     }
 
     public String addIntegration() {
 
         UpdateOptions updateOptions = new UpdateOptions();
         updateOptions.upsert(true);
+        Bson tokenUpdate = Updates.set("apiToken", apiToken);
+        Bson integrationUpdate = Updates.combine(
+            Updates.set("baseUrl", baseUrl),
+            Updates.set("projId", projId),
+            Updates.set("userEmail", userEmail),
+            Updates.set("issueType", issueType),
+            Updates.setOnInsert("createdTs", Context.now()),
+            Updates.set("updatedTs", Context.now()),
+            Updates.set("projectIdsMap", projectAndIssueMap)
+        );
+        if(!apiToken.contains("******")){
+            integrationUpdate = Updates.combine(integrationUpdate, tokenUpdate);
+        }
 
         JiraIntegrationDao.instance.getMCollection().updateOne(
                 new BasicDBObject(),
-                Updates.combine(
-                        Updates.set("baseUrl", baseUrl),
-                        Updates.set("projId", projId),
-                        Updates.set("userEmail", userEmail),
-                        Updates.set("apiToken", apiToken),
-                        Updates.set("issueType", issueType),
-                        Updates.setOnInsert("createdTs", Context.now()),
-                        Updates.set("updatedTs", Context.now())
-                ),
+                integrationUpdate,
                 updateOptions
         );
 
@@ -172,25 +200,17 @@ public class JiraIntegrationAction extends UserAction {
         BasicDBObject fields = new BasicDBObject();
 
         // issue title
-        fields.put("summary", "Akto Report - " + issueTitle);
+        fields.put("summary", "Akto Report - " + jiraMetaData.getIssueTitle());
         jiraIntegration = JiraIntegrationDao.instance.findOne(new BasicDBObject());
-        Bson filters = Filters.and(
-            Filters.eq("_id.apiInfoKey.apiCollectionId", testingIssueId.getApiInfoKey().getApiCollectionId()),
-            Filters.eq("_id.apiInfoKey.method", testingIssueId.getApiInfoKey().getMethod()),
-            Filters.eq("_id.apiInfoKey.url", testingIssueId.getApiInfoKey().getUrl()),
-            Filters.eq("_id" + "." + TestingIssuesId.TEST_SUB_CATEGORY, testingIssueId.getTestSubCategory()),
-            Filters.in("_id" + "." + TestingIssuesId.TEST_CATEGORY_FROM_SOURCE_CONFIG, testingIssueId.getTestCategoryFromSourceConfig())
-        );
-        TestingRunIssues testingRunIssues = TestingRunIssuesDao.instance.findOne(filters);
 
         // issue type (TASK)
-        BasicDBObject issueType = new BasicDBObject();
-        issueType.put("id", jiraIntegration.getIssueType());
-        fields.put("issuetype", issueType);
+        BasicDBObject issueTypeObj = new BasicDBObject();
+        issueTypeObj.put("id", this.issueType);
+        fields.put("issuetype", issueTypeObj);
 
         // project id
         BasicDBObject project = new BasicDBObject();
-        project.put("key", jiraIntegration.getProjId());
+        project.put("key", this.projId);
         fields.put("project", project);
 
         // issue description
@@ -198,10 +218,10 @@ public class JiraIntegrationAction extends UserAction {
         description.put("type", "doc");
         description.put("version", 1);
         BasicDBList contentList = new BasicDBList();
-        contentList.add(buildContentDetails(hostStr, null));
-        contentList.add(buildContentDetails(endPointStr, null));
-        contentList.add(buildContentDetails("Issue link - Akto dashboard", issueUrl));
-        contentList.add(buildContentDetails(issueDescription, null));
+        contentList.add(buildContentDetails(jiraMetaData.getHostStr(), null));
+        contentList.add(buildContentDetails(jiraMetaData.getEndPointStr(), null));
+        contentList.add(buildContentDetails("Issue link - Akto dashboard", jiraMetaData.getIssueUrl()));
+        contentList.add(buildContentDetails(jiraMetaData.getIssueDescription(), null));
         description.put("content", contentList);
 
         fields.put("description", description);
@@ -211,6 +231,7 @@ public class JiraIntegrationAction extends UserAction {
         String url = jiraIntegration.getBaseUrl() + CREATE_ISSUE_ENDPOINT;
         String authHeader = Base64.getEncoder().encodeToString((jiraIntegration.getUserEmail() + ":" + jiraIntegration.getApiToken()).getBytes());
 
+        String jiraTicketUrl = "";
         Map<String, List<String>> headers = new HashMap<>();
         headers.put("Authorization", Collections.singletonList("Basic " + authHeader));
         OriginalHttpRequest request = new OriginalHttpRequest(url, "", "POST", reqPayload.toString(), headers, "");
@@ -240,27 +261,28 @@ public class JiraIntegrationAction extends UserAction {
             BasicDBObject payloadObj;
             try {
                 payloadObj =  BasicDBObject.parse(responsePayload);
-                jiraTicketKey = payloadObj.getString("key");
-                jiraTicketUrl = jiraIntegration.getBaseUrl() + "/browse/" + jiraTicketKey;
+                this.jiraTicketKey = payloadObj.getString("key");
+                jiraTicketUrl = jiraIntegration.getBaseUrl() + "/browse/" + this.jiraTicketKey;
             } catch(Exception e) {
                 loggerMaker.errorAndAddToDb(e, "error making jira issue url " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
-                return null;
+                return Action.ERROR.toUpperCase();
             }
         } catch(Exception e) {
-            return null;
+            return Action.ERROR.toUpperCase();
         }
 
         UpdateOptions updateOptions = new UpdateOptions();
         updateOptions.upsert(false);
 
-        TestingRunIssuesDao.instance.getMCollection().updateOne(
-                filters,
+        if(jiraTicketUrl.length() > 0){
+            TestingRunIssuesDao.instance.getMCollection().updateOne(
+                Filters.eq(Constants.ID, jiraMetaData.getTestingIssueId()),
                 Updates.combine(
                         Updates.set("jiraIssueUrl", jiraTicketUrl)
                 ),
                 updateOptions
-        );
-
+            );
+        }
         return Action.SUCCESS.toUpperCase();
     }
 
@@ -270,7 +292,6 @@ public class JiraIntegrationAction extends UserAction {
 
         try {
             jiraIntegration = JiraIntegrationDao.instance.findOne(new BasicDBObject());
-            // issueId = "KAN-34";
             String url = jiraIntegration.getBaseUrl() + CREATE_ISSUE_ENDPOINT + "/" + issueId + ATTACH_FILE_ENDPOINT;
             String authHeader = Base64.getEncoder().encodeToString((jiraIntegration.getUserEmail() + ":" + jiraIntegration.getApiToken()).getBytes());
 
@@ -399,62 +420,6 @@ public class JiraIntegrationAction extends UserAction {
         this.jiraIntegration = jiraIntegration;
     }
 
-    public String getIssueTitle() {
-        return issueTitle;
-    }
-
-    public void setIssueTitle(String issueTitle) {
-        this.issueTitle = issueTitle;
-    }
-
-    public String getHostStr() {
-        return hostStr;
-    }
-
-    public void setHostStr(String hostStr) {
-        this.hostStr = hostStr;
-    }
-
-    public String getEndPointStr() {
-        return endPointStr;
-    }
-
-    public void setEndPointStr(String endPointStr) {
-        this.endPointStr = endPointStr;
-    }
-
-    public String getIssueUrl() {
-        return issueUrl;
-    }
-
-    public void setIssueUrl(String issueUrl) {
-        this.issueUrl = issueUrl;
-    }
-
-    public String getIssueDescription() {
-        return issueDescription;
-    }
-
-    public void setIssueDescription(String issueDescription) {
-        this.issueDescription = issueDescription;
-    }
-
-    public String getJiraTicketUrl() {
-        return jiraTicketUrl;
-    }
-
-    public void setJiraTicketUrl(String jiraTicketUrl) {
-        this.jiraTicketUrl = jiraTicketUrl;
-    }
-
-    public TestingIssuesId getTestingIssueId() {
-        return testingIssueId;
-    }
-
-    public void setTestingIssueId(TestingIssuesId testingIssueId) {
-        this.testingIssueId = testingIssueId;
-    }
-
     public String getOrigReq() {
         return origReq;
     }
@@ -479,6 +444,22 @@ public class JiraIntegrationAction extends UserAction {
         this.issueId = issueId;
     }
 
+    public Map<String, List<BasicDBObject>> getProjectAndIssueMap() {
+        return projectAndIssueMap;
+    }
+
+    public void setProjectAndIssueMap(Map<String, List<BasicDBObject>> projectAndIssueMap) {
+        this.projectAndIssueMap = projectAndIssueMap;
+    }
+
+    public JiraMetaData getJiraMetaData() {
+        return jiraMetaData;
+    }
+
+    public void setJiraMetaData(JiraMetaData jiraMetaData) {
+        this.jiraMetaData = jiraMetaData;
+    }
+
     public String getJiraTicketKey() {
         return jiraTicketKey;
     }
@@ -486,6 +467,5 @@ public class JiraIntegrationAction extends UserAction {
     public void setJiraTicketKey(String jiraTicketKey) {
         this.jiraTicketKey = jiraTicketKey;
     }
-
     
 }

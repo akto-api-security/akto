@@ -1,4 +1,4 @@
-import { Autocomplete, Avatar, Checkbox, Icon, TextContainer } from '@shopify/polaris';
+import { Autocomplete, Avatar, Checkbox, HorizontalStack, Icon, Link, Text, TextContainer } from '@shopify/polaris';
 import { SearchMinor, ChevronDownMinor } from '@shopify/polaris-icons';
 import React, { useState, useCallback, useEffect } from 'react';
 import func from "@/util/func";
@@ -6,7 +6,7 @@ function DropdownSearch(props) {
 
     const id = props.id ? props.id : "dropdown-search"
 
-    const { disabled, label, placeholder, optionsList, setSelected, value , avatarIcon, preSelected, allowMultiple, itemName, dropdownSearchKey, isNested} = props
+    const { disabled, label, placeholder, optionsList, setSelected, value , avatarIcon, preSelected, allowMultiple, itemName, dropdownSearchKey, isNested, sliceMaxVal} = props
 
     const deselectedOptions = optionsList
     const [selectedOptions, setSelectedOptions] = useState(preSelected ? preSelected : []);
@@ -174,7 +174,7 @@ function DropdownSearch(props) {
     );
 
     const showSelectAll = (allowMultiple && optionsList.length > 5)
-    const checkboxLabel = checked ? "Deselect all" : "Select all"
+    const checkboxLabel = checked ? <Link removeUnderline>Deselect all</Link> : <Link removeUnderline>Select all</Link>
 
     const emptyState = (
         <React.Fragment>
@@ -188,7 +188,7 @@ function DropdownSearch(props) {
     return (
             <Autocomplete
                 {...(allowMultiple ? {allowMultiple:true} : {} )}
-                options={options}
+                options={options.slice(0,sliceMaxVal || 20)}
                 selected={selectedOptions}
                 onSelect={updateSelection}
                 emptyState={emptyState}
@@ -196,10 +196,11 @@ function DropdownSearch(props) {
                 textField={textField}
                 preferredPosition='below'
                 {...(showSelectAll ? {actionBefore:{
-                    content:(<Checkbox label={checkboxLabel} checked={checked} onChange={() => selectAllFunc()}/>),
+                    content: checkboxLabel,
                     onAction: () => selectAllFunc(),
                 }} : {})}
-            />
+            >
+            </Autocomplete>
     );
 }
 

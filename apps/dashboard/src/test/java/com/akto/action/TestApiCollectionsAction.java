@@ -2,9 +2,13 @@ package com.akto.action;
 
 import com.akto.MongoBasedTest;
 import com.akto.dao.ApiCollectionsDao;
+import com.akto.dao.ApiInfoDao;
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dto.ApiCollection;
+import com.akto.dto.ApiInfo;
+import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.dto.type.URLMethods.Method;
 import com.akto.types.CappedSet;
 import com.mongodb.BasicDBObject;
 import org.junit.Test;
@@ -95,6 +99,21 @@ public class TestApiCollectionsAction extends MongoBasedTest {
         apiCollectionList.add(new ApiCollection(3000, "three", 3000, urls3, null,0, false, true));
 
         ApiCollectionsDao.instance.insertMany(apiCollectionList);
+        Method method = Method.GET;
+
+        List<ApiInfo> apiInfos = new ArrayList<>();
+        for (int c=1; c<4; c++) {
+            int apiCollectionId = c*1000;
+            for (int i = 0; i < 100; i++) {
+                String url = "/api/v1" + i;
+                ApiInfo apiInfo= new ApiInfo(
+                    new ApiInfoKey(apiCollectionId, url, method)
+                );
+                apiInfos.add(apiInfo);
+            }
+        }
+
+        ApiInfoDao.instance.insertMany(apiInfos);
 
         List<SingleTypeInfo> singleTypeInfos = new ArrayList<>();
         for (int c=1; c<4; c++) {
@@ -129,5 +148,35 @@ public class TestApiCollectionsAction extends MongoBasedTest {
         assertEquals(3, apiCollectionMap.get(2000).getUrlsCount()); // because burp collection we use count from urls stored in set
         assertEquals(4, apiCollectionMap.get(3000).getUrlsCount()); // because burp collection we use count from urls stored in set
 
+    }
+
+    @Test
+    public void testTagsForCollections(){
+        ApiCollectionsDao.instance.getMCollection().drop();
+        ApiCollection collection1 = new ApiCollection();
+        collection1.setId(1);
+        collection1.setHostName("akto.demo.io");
+
+        ApiCollection collection2 = new ApiCollection();
+        collection2.setId(2);
+        collection2.setHostName("akto.svc.local");
+
+        ApiCollection collection3 = new ApiCollection();
+        collection3.setId(3);
+        collection3.setHostName("locahost:3000");
+
+        ApiCollection collection4 = new ApiCollection();
+        collection4.setId(4);
+        collection4.setHostName("akto.localnet");
+
+        ApiCollection collection5 = new ApiCollection();
+        collection5.setId(5);
+        collection5.setHostName("kubernetes-121212-akto.io");
+
+        assertEquals(ApiCollection.ENV_TYPE.STAGING.name().toString(), collection1.getEnvType());
+        assertEquals(ApiCollection.ENV_TYPE.STAGING.name().toString(), collection2.getEnvType());
+        assertNotEquals(ApiCollection.ENV_TYPE.STAGING.name().toString(), collection3.getEnvType());
+        assertEquals(ApiCollection.ENV_TYPE.STAGING.name().toString(), collection4.getEnvType());
+        assertEquals(ApiCollection.ENV_TYPE.STAGING.name().toString(), collection5.getEnvType());
     }
 }

@@ -10,8 +10,7 @@ import com.akto.dao.UsersDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.CustomAuthType;
 import com.akto.log.LoggerMaker;
-import com.akto.testing.ApiExecutor;
-import com.akto.util.AccountTask;
+import com.akto.log.LoggerMaker.LogDb;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
@@ -33,7 +32,7 @@ public class CustomAuthTypeAction extends UserAction{
     private CustomAuthType customAuthType;
 
     private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
-    private static final LoggerMaker loggerMaker = new LoggerMaker(CustomAuthTypeAction.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(CustomAuthTypeAction.class, LogDb.DASHBOARD);
 
     public String fetchCustomAuthTypes(){
         customAuthTypes = CustomAuthTypeDao.instance.findAll(new BasicDBObject());
@@ -71,13 +70,9 @@ public class CustomAuthTypeAction extends UserAction{
     }
 
     public String updateCustomAuthType(){
-        User user = getSUser();
         customAuthType = CustomAuthTypeDao.instance.findOne(CustomAuthType.NAME,name);
         if(customAuthType==null){
             addActionError("Custom Auth Type does not exist");
-            return ERROR.toUpperCase();
-        } else if(user.getId()!=customAuthType.getCreatorId()){
-            addActionError("Unautherized Request");
             return ERROR.toUpperCase();
         } else {
             CustomAuthTypeDao.instance.updateOne(Filters.eq(CustomAuthType.NAME, name),
@@ -104,15 +99,11 @@ public class CustomAuthTypeAction extends UserAction{
     }
 
     public String updateCustomAuthTypeStatus(){
-        User user = getSUser();
         customAuthType = CustomAuthTypeDao.instance.findOne(CustomAuthType.NAME,name);
         if(customAuthType==null){
             addActionError("Custom Auth Type does not exist");
             return ERROR.toUpperCase();
-        } else if(user.getId()!=customAuthType.getCreatorId()){
-            addActionError("Unautherized Request");
-            return ERROR.toUpperCase();
-        }  else {
+        } else {
             CustomAuthTypeDao.instance.updateOne(Filters.eq(CustomAuthType.NAME, name),
                     Updates.combine(
                         Updates.set(CustomAuthType.ACTIVE, active),

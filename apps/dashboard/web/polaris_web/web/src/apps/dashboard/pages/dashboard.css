@@ -1,6 +1,36 @@
 .dashboard {
     overflow-x: hidden;
 }
+.custom-color .Polaris-Text--success {
+    color: rgb(0, 127, 95) !important;
+}
+
+.custom-badge-color .Polaris-Badge--statusCritical {
+    background-color: #E45357;
+    color: white;
+}
+
+.custom-badge-color .Polaris-Badge--statusAttention{
+    background-color: #EF864C;
+    color: white;
+}
+
+.custom-badge-color .Polaris-Badge--statusWarning{
+    background-color: #F6C564;
+}
+
+.custom-badge-color .Polaris-Badge--statusInfo {
+    background-color: #F5D8A1;
+}
+
+.custom-badge-color .Polaris-Badge--statusNew {
+    background-color: #A4E8F2;
+}
+
+.custom-badge-color .Polaris-Badge--statusSuccess {
+    background-color: #6FD1A6;
+    color: white;
+}
 
 .aktoButton {
     z-index: 518;
@@ -26,6 +56,39 @@
 }
 .Polaris-TopBar{
     border-bottom: 1px solid #E1E3E5;
+}
+
+.call-banner {
+    width: 200px;
+    position: fixed;
+    left: 1.2vw;
+    z-index: 100;
+    bottom: 8vh;
+}
+
+.call-banner .Polaris-Text--headingMd {
+    font-size: 14px !important;
+}
+
+.call-banner .Polaris-Banner--withinPage {
+    background: #EDEEEF !important;
+}
+
+.alerts-banner {
+    width: 400px;
+    position: fixed;
+    right: 24px;
+    z-index: 100;
+    bottom: 80px;
+}
+
+.alerts-banner .Polaris-Banner--withinPage{
+    padding: 8px !important;
+    margin-top: unset !important;
+}
+
+.alerts-banner .Polaris-Banner__Dismiss{
+    top: 12px !important;
 }
 
 :root {
@@ -124,4 +187,13 @@
 
 .form-class .Polaris-Label{
     color: #202223 !important;
+}
+
+.welcome-back-modal-title {
+    width: 95%;
+    position: absolute;
+    z-index: 2;
+    background: white;
+    margin-top: -20px;
+    padding-block: 10px;
 }

@@ -2,8 +2,10 @@ package com.akto.hybrid_runtime.policies;
 
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
+import com.akto.dao.filter.MergedUrlsDao;
 import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
+import com.akto.dto.filter.MergedUrls;
 import com.akto.dto.runtime_filters.RuntimeFilter;
 import com.akto.dto.type.APICatalog;
 import com.akto.dto.type.SingleTypeInfo;
@@ -20,7 +22,7 @@ import com.mongodb.client.model.*;
 import org.bson.conversions.Bson;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
+import com.akto.runtime.policies.ApiAccessTypePolicy;
 
 import java.util.*;
 
@@ -128,12 +130,12 @@ public class AktoPolicyNew {
 
     }
 
-    public void main(List<HttpResponseParams> httpResponseParamsList) throws Exception {
+    public void main(List<HttpResponseParams> httpResponseParamsList, List<String> partnerIpsList) throws Exception {
         if (httpResponseParamsList == null) httpResponseParamsList = new ArrayList<>();
         loggerMaker.infoAndAddToDb("AktoPolicy main: httpResponseParamsList size: " + httpResponseParamsList.size(), LogDb.RUNTIME);
         for (HttpResponseParams httpResponseParams: httpResponseParamsList) {
             try {
-                process(httpResponseParams);
+                process(httpResponseParams, partnerIpsList);
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb(e.toString(), LogDb.RUNTIME);
                 ;
@@ -155,19 +157,12 @@ public class AktoPolicyNew {
         return new ApiInfo.ApiInfoKey(apiCollectionId, url, method);
     }
 
-    public void process(HttpResponseParams httpResponseParams) throws Exception {
+    public void process(HttpResponseParams httpResponseParams, List<String> partnerIpsList) throws Exception {
         List<CustomAuthType> customAuthTypes = SingleTypeInfo.getCustomAuthType(Integer.parseInt(httpResponseParams.getAccountId()));
         ApiInfo.ApiInfoKey apiInfoKey = generateFromHttpResponseParams(httpResponseParams);
         PolicyCatalog policyCatalog = getApiInfoFromMap(apiInfoKey);
         policyCatalog.setSeenEarlier(true);
         ApiInfo apiInfo = policyCatalog.getApiInfo();
-
-        List<String> partnerIpsList = new ArrayList<>();
-
-        AccountSettings accountSettings = dataActor.fetchAccountSettings();
-        if(accountSettings != null){
-            partnerIpsList = accountSettings.getPartnerIpList();
-        }
 
         Map<Integer, FilterSampleData> filterSampleDataMap = policyCatalog.getFilterSampleDataMap();
         if (filterSampleDataMap == null) {
@@ -213,8 +208,17 @@ public class AktoPolicyNew {
             }
         }
 
+        if (apiInfo.getDiscoveredTimestamp() == 0) {
+            apiInfo.setDiscoveredTimestamp(httpResponseParams.getTimeOrNow());
+        }
+
         apiInfo.setLastSeen(httpResponseParams.getTimeOrNow());
 
+        if (apiInfo.getResponseCodes() == null) apiInfo.setResponseCodes(new ArrayList<>());
+        if (!apiInfo.getResponseCodes().contains(statusCode)) apiInfo.getResponseCodes().add(statusCode);
+
+        ApiInfo.ApiType apiType = ApiInfo.findApiTypeFromResponseParams(httpResponseParams);
+        if (apiType != null) apiInfo.setApiType(apiType);
     }
 
     public PolicyCatalog getApiInfoFromMap(ApiInfo.ApiInfoKey apiInfoKey) {
@@ -267,7 +271,15 @@ public class AktoPolicyNew {
         for (ApiInfoCatalog apiInfoCatalog: apiInfoCatalogMap.values()) {
 
             Map<URLStatic, PolicyCatalog> strictURLToMethods = apiInfoCatalog.getStrictURLToMethods();
-            Map<URLTemplate, PolicyCatalog> templateURLToMethods = apiInfoCatalog.getTemplateURLToMethods();
+            Map<URLTemplate, PolicyCatalog> templateURLToMethods = new HashMap<>();
+
+            Set<MergedUrls> mergedUrls = MergedUrlsDao.instance.getMergedUrls();
+            for(Map.Entry<URLTemplate, PolicyCatalog> templateURLToMethodEntry : apiInfoCatalog.getTemplateURLToMethods().entrySet()) {
+                ApiInfoKey apiInfoKey = templateURLToMethodEntry.getValue().getApiInfo().getId();
+                if(!mergedUrls.contains(new MergedUrls(apiInfoKey.getUrl(), apiInfoKey.getMethod().name(), apiInfoKey.getApiCollectionId()))) {
+                    templateURLToMethods.put(templateURLToMethodEntry.getKey(), templateURLToMethodEntry.getValue());
+                }
+            }
 
             List<PolicyCatalog> policyCatalogList = new ArrayList<>();
             policyCatalogList.addAll(strictURLToMethods.values());
@@ -339,7 +351,7 @@ public class AktoPolicyNew {
             subUpdates.add(Updates.set(ApiInfo.LAST_SEEN, apiInfo.getLastSeen()));
 
             subUpdates.add(Updates.setOnInsert(SingleTypeInfo._COLLECTION_IDS, Arrays.asList(apiInfo.getId().getApiCollectionId())));
-
+            
             updates.add(
                     new UpdateOneModel<>(
                             ApiInfoDao.getFilter(apiInfo.getId()),

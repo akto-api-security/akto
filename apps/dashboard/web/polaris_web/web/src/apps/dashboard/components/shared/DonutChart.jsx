@@ -4,9 +4,10 @@ import Highcharts from "highcharts"
 import { useRef } from "react";
 import { useNavigate } from "react-router-dom"
 import PersistStore from '../../../main/PersistStore';
+import observeFunc from "../../pages/observe/transform"
 
 
-function DonutChart({data, title, size,type,navUrl}) {
+function DonutChart({data, title, size,type,navUrl, isRequest, pieInnerSize}) {
     const chartComponentRef = useRef(null)
     const navigate = useNavigate()
     const filtersMap = PersistStore(state => state.filtersMap)
@@ -44,14 +45,16 @@ function DonutChart({data, title, size,type,navUrl}) {
                 ]
             },
             headerFormat: '',
-            pointFormat: '<b>{point.name} </b> {point.y}',
+            formatter: function() {
+                return `<b>${this.point.name} </b> ${observeFunc.formatNumberWithCommas(this.point.y)}`;
+            },
             borderWidth: 1,
             borderColor: '#AAA'
         },
         plotOptions: {
             pie: {
               size: (size+'px'),
-              innerSize: '60%',
+              innerSize: pieInnerSize ? pieInnerSize : '60%',
               dataLabels: {
                 enabled: false
               }
@@ -63,6 +66,15 @@ function DonutChart({data, title, size,type,navUrl}) {
                         click: (event) => {
                             const { point } = event;
                             if(navUrl && navUrl ==='/dashboard/observe/sensitive/'){
+                                if(isRequest){
+                                    const filterUrl = `${navUrl}${point.name}`
+                                    let updatedFiltersMap = { ...filtersMap };
+                                    updatedFiltersMap[filterUrl] = {}
+                                    const filterObj = [{key: "isRequest", label: "In request", value: [true]}]
+                                    updatedFiltersMap[filterUrl]['filters'] = filterObj;
+                                    updatedFiltersMap[filterUrl]['sort'] = [];
+                                    setFiltersMap(updatedFiltersMap)
+                                }
                                 navigate(`${navUrl}${point.name}`);
                             }
                             else if( navUrl && navUrl==='/dashboard/issues/'){

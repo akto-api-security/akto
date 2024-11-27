@@ -7,10 +7,12 @@ import com.akto.dao.context.Context;
 import com.akto.dto.PendingInviteCode;
 import com.akto.dto.RBAC;
 import com.akto.dto.User;
+import com.akto.log.LoggerMaker;
 import com.akto.notifications.email.SendgridEmail;
 import com.akto.util.DashboardMode;
 import com.akto.utils.JWT;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Updates;
 import com.opensymphony.xwork2.Action;
 import com.sendgrid.helpers.mail.Mail;
 
@@ -49,7 +51,13 @@ public class InviteUserAction extends UserAction{
         String domain = loginArr[1];
         String inviteeEmailDomain = inviteeEmailArr[1];
 
-        if (!isSameDomain(inviteeEmailDomain, domain) && !inviteeEmailDomain.equals(AKTO_DOMAIN))  {
+        loggerMaker.infoAndAddToDb("inviteeEmailDomain: " + inviteeEmailDomain);
+        loggerMaker.infoAndAddToDb("admin domain: " + domain);
+
+        boolean isSameDomainVal = isSameDomain(inviteeEmailDomain, domain);
+        loggerMaker.infoAndAddToDb("is same domain: " + isSameDomainVal);
+
+        if (!isSameDomainVal && !inviteeEmailDomain.equals(AKTO_DOMAIN))  {
             return DIFFERENT_ORG_EMAIL_ERROR;
         }
 
@@ -58,25 +66,38 @@ public class InviteUserAction extends UserAction{
 
     private static boolean isSameDomain(String inviteeDomain, String adminDomain) {
         if (inviteeDomain == null || adminDomain == null) return false;
+        if (inviteeDomain.equalsIgnoreCase(adminDomain)) return true;
 
         String inviteeOrg = commonOrganisationsMap.get(inviteeDomain);
         String adminOrg = commonOrganisationsMap.get(adminDomain);
 
+        loggerMaker.infoAndAddToDb("inviteeOrg: " + inviteeOrg);
+        loggerMaker.infoAndAddToDb("adminOrg: " + adminOrg);
         if (inviteeOrg == null || adminOrg == null) return false;
 
         if (inviteeOrg.equalsIgnoreCase(adminOrg)) return true;
 
-        return inviteeDomain.equalsIgnoreCase(adminDomain);
+        loggerMaker.infoAndAddToDb("inviteeOrg and adminOrg different");
+        return false;
     }
 
     private String finalInviteCode;
     private RBAC.Role inviteeRole;
 
+    private static final LoggerMaker loggerMaker = new LoggerMaker(InviteUserAction.class, LoggerMaker.LogDb.DASHBOARD);
+
     @Override
     public String execute() {
         int user_id = getSUser().getId();
+        loggerMaker.infoAndAddToDb(user_id + " inviting " + inviteeEmail);
 
         User admin = UsersDao.instance.getFirstUser(Context.accountId.get());
+        if (admin == null) {
+            loggerMaker.infoAndAddToDb("admin not found for organization");
+            return ERROR.toUpperCase();
+        }
+
+        loggerMaker.infoAndAddToDb("admin user: " + admin.getLogin());
         String code = validateEmail(this.inviteeEmail, admin.getLogin());
 
         if (code != null) {
@@ -114,8 +135,21 @@ public class InviteUserAction extends UserAction{
 
         try {
             Jws<Claims> jws = JWT.parseJwt(inviteCode,"");
-            PendingInviteCodesDao.instance.insertOne(
-                    new PendingInviteCode(inviteCode, user_id, inviteeEmail,jws.getBody().getExpiration().getTime(),Context.accountId.get(), this.inviteeRole)
+            /*
+             * There should only be one invite code per user per account.
+             * So if we update with upsert:true per account-inviteeEmail
+             */
+            PendingInviteCodesDao.instance.updateOne(
+                    Filters.and(
+                        Filters.eq(PendingInviteCode.ACCOUNT_ID, Context.accountId.get()),
+                        Filters.eq(PendingInviteCode.INVITEE_EMAIL_ID, inviteeEmail)
+                    ),
+                    Updates.combine(
+                        Updates.set(PendingInviteCode.INVITEE_ROLE, this.inviteeRole),
+                        Updates.set(PendingInviteCode.INVITE_CODE, inviteCode),
+                        Updates.set(PendingInviteCode._EXPIRY, jws.getBody().getExpiration().getTime()),
+                        Updates.set(PendingInviteCode._ISSUER, user_id)
+                    )
             );
         } catch (NoSuchAlgorithmException | InvalidKeySpecException | IOException e) {
             e.printStackTrace();
@@ -130,8 +164,9 @@ public class InviteUserAction extends UserAction{
         try {
             SendgridEmail.getInstance().send(email);
         } catch (IOException e) {
+            loggerMaker.errorAndAddToDb("invite email sending failed" + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
             e.printStackTrace();
-            return ERROR.toUpperCase();
+//            return ERROR.toUpperCase();
         }
 
         return Action.SUCCESS.toUpperCase();

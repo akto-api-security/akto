@@ -54,14 +54,6 @@ function TestRolesPage(){
         return [{
             items: [
                 {
-                    content: 'Edit',
-                    onAction: () => navigate("details", {state: {
-                        name: item.name,
-                        endpoints: item.endpointLogicalGroup.testingEndpoints,
-                        authWithCondList: item.authWithCondList
-                    }})
-                },
-                {
                     content: 'Access matrix',
                     onAction: () => navigate("access-matrix", {state: {
                         name: item.name,
@@ -90,6 +82,12 @@ function TestRolesPage(){
         fetchData();
     }, [])
 
+    const onTestRoleClick = (item) => navigate("details", {state: {
+        name: item.name,
+        endpoints: item.endpointLogicalGroup.testingEndpoints,
+        authWithCondList: item.authWithCondList
+    }})
+
     return (
         <PageWithMultipleCards
         title={"Test roles"}
@@ -114,6 +112,7 @@ function TestRolesPage(){
                     resourceName={resourceName} 
                     headers={headers}
                     loading={loading}
+                    onRowClick={onTestRoleClick}
                     getActions={getActions}
                     hasRowActions={true}
                 />

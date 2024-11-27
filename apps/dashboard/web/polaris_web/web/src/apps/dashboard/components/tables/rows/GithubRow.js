@@ -12,7 +12,7 @@ import {
     Icon
 } from '@shopify/polaris';
 import {
-    HorizontalDotsMinor, ChevronDownMinor, ChevronUpMinor
+    HorizontalDotsMinor, ChevronDownMinor, ChevronUpMinor, ChevronRightMinor
 } from '@shopify/polaris-icons';
 import { useNavigate } from "react-router-dom";
 import { useState, useEffect } from 'react';
@@ -35,7 +35,9 @@ function GithubRow(props) {
     const [collapsibleActive, setCollapsibleActive] = useState("none")
 
     const togglePopoverActive = (e,index) => {
-        e.stopPropagation();
+        if(e.stopPropagation){
+            e.stopPropagation();
+        }
         setPopoverActive((prev) => {
             if(prev === index)
                 return -1
@@ -54,7 +56,7 @@ function GithubRow(props) {
             return;
         }
 
-        if(data?.collapsibleRow){
+        if(data?.collapsibleRow || (props?.treeView && data?.isTerminal !== true)){
             setCollapsibleActive((prev) => {
                 if(prev===data?.name){
                     return "none";
@@ -142,10 +144,11 @@ function GithubRow(props) {
         )
     }
 
-    function LinkCell(cellData, header) {
+    function LinkCell(cellData, header, cellWidth) {
+        const boxWidth = cellWidth !== undefined ? cellWidth: ''
         return (
             <IndexTable.Cell key={header.title}>
-                <div className={`linkClass ${data.deactivated ? "text-subdued" : ""}`} >
+                <div className={`linkClass ${data.deactivated ? "text-subdued" : ""}`} style={{width: boxWidth}}>
                     <Link
                         dataPrimaryLink
                         monochrome
@@ -188,29 +191,40 @@ function GithubRow(props) {
         )
     }
 
-    function CollapsibleCell() {
+    function CollapsibleCell(treeView, value) {
+        let iconSource = ChevronRightMinor
+        if(collapsibleActive === data?.name){
+            iconSource = ChevronDownMinor
+        }
         return (
             <IndexTable.Cell key={"collapsible"}>
-                <HorizontalStack align='end'>
-                    <Icon source={collapsibleActive === data?.name ? ChevronUpMinor : ChevronDownMinor} />
-                </HorizontalStack>
+                <Box maxWidth={treeView ? "180px": ''} >
+                    <HorizontalStack align={treeView ? "start" : "end"} wrap={false} gap={"2"}>
+                        <Box><Icon source={iconSource} /></Box>
+                        {treeView ? value : null} 
+                    </HorizontalStack>
+                </Box>
             </IndexTable.Cell>
         )
     }
 
     function getHeader(header){
         let type = header?.type;
-
         switch(type){
 
             case CellType.ACTION : 
                 return hasRowActions ? ActionCell() : null;
             case CellType.COLLAPSIBLE :
-                return CollapsibleCell();
+                if(props?.treeView){
+                    if(data?.isTerminal === true){
+                        return header.value ? LinkCell(data[header.value], header, undefined) : null
+                    }
+                }
+                return CollapsibleCell(props?.treeView, data[header?.value]);
             case CellType.TEXT :
-                return header.value ? LinkCell(TextCell(header), header) : null;
+                return header.value ? LinkCell(TextCell(header), header, header?.boxWidth) : null;
             default :
-                return header.value ? LinkCell(data[header.value], header) : null;
+                return header.value ? LinkCell(data[header.value], header, header?.boxWidth) : null;
         }
     }
 
@@ -236,7 +250,7 @@ function GithubRow(props) {
                 {props?.newRow ? <NewCell /> :<OldCell/>}   
             </IndexTable.Row>
             
-            {collapsibleActive === data?.name ? data.collapsibleRow : null}
+            {collapsibleActive === data?.name ? ( props?.treeView ? data?.makeTree(data) : data?.collapsibleRow) : null}
             
         </>
     )

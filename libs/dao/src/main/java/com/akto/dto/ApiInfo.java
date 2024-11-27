@@ -2,8 +2,6 @@ package com.akto.dto;
 
 import com.akto.dao.context.Context;
 import com.akto.dto.type.URLMethods;
-import com.akto.dto.type.URLStatic;
-import com.akto.dto.type.URLTemplate;
 import com.akto.util.Util;
 
 import org.bson.codecs.pojo.annotations.BsonIgnore;
@@ -48,12 +46,25 @@ public class ApiInfo {
     public static final String LAST_CALCULATED_TIME = "lastCalculatedTime";
     private int lastCalculatedTime;
 
+    private ApiType apiType;
+    public static final String API_TYPE = "apiType";
+
+    public static final String RESPONSE_CODES = "responseCodes";
+    private List<Integer> responseCodes;
+
+    public static final String DISCOVERED_TIMESTAMP = "discoveredTimestamp";
+    private int discoveredTimestamp;
+
+    public enum ApiType {
+        REST, GRAPHQL, GRPC, SOAP
+    }
+
     public enum AuthType {
         UNAUTHENTICATED, BASIC, AUTHORIZATION_HEADER, JWT, API_TOKEN, BEARER, CUSTOM
     }
 
     public enum ApiAccessType {
-        PUBLIC, PRIVATE, PARTNER
+        PUBLIC, PRIVATE, PARTNER, THIRD_PARTY
     }
 
     public static class ApiInfoKey {
@@ -144,6 +155,45 @@ public class ApiInfo {
         if(apiInfoKey != null){
             this.collectionIds = Arrays.asList(apiInfoKey.getApiCollectionId());
         }
+        this.responseCodes = new ArrayList<>();
+    }
+
+    public static boolean isRestContentType(String contentType) {
+        return contentType.contains("application/json")
+                || contentType.contains("application/xml")
+                || contentType.contains("application/x-www-form-urlencoded")
+                || contentType.contains("multipart/form-data");
+    }
+
+    public static boolean isSoapContentType(String contentType) {
+        return contentType.contains("soap");
+    }
+
+    public static boolean isGrpcContentType(String contentType) {
+        return contentType.contains("grpc");
+    }
+
+    public static ApiType findApiTypeFromResponseParams(HttpResponseParams responseParams) {
+        if (HttpResponseParams.isGraphql(responseParams)) return ApiType.GRAPHQL;
+
+        HttpRequestParams requestParams = responseParams.requestParams;
+        Map<String, List<String>> requestHeaders = requestParams.getHeaders();
+        List<String> contentTypes = requestHeaders.getOrDefault("content-type", new ArrayList<>());
+        for (String contentType: contentTypes) {
+            if (isRestContentType(contentType)) return ApiType.REST;
+            if (isSoapContentType(contentType)) return ApiType.SOAP;
+            if (isGrpcContentType(contentType)) return ApiType.GRPC;
+        }
+
+        return ApiType.REST;
+
+        // String requestBody = requestParams.getPayload();
+        // String responseBody = responseParams.getPayload();
+        // boolean requestBodyIsJson = (requestBody.startsWith("{") && requestBody.endsWith("}")) || (requestBody.startsWith("[") && requestBody.endsWith("]"));
+        // boolean responseBodyIsJson = (responseBody.startsWith("{") && responseBody.endsWith("}")) || (responseBody.startsWith("[") && responseBody.endsWith("]"));
+
+        // if (requestBodyIsJson || responseBodyIsJson) return ApiType.REST;
+        // return null;
     }
 
     public ApiInfo(HttpResponseParams httpResponseParams) {
@@ -234,6 +284,35 @@ public class ApiInfo {
 
         this.actualAuthType = result;
 
+    }
+
+    public ApiAccessType findActualAccessType() {
+        if (apiAccessTypes == null || apiAccessTypes.isEmpty()) return null;
+        if (this.apiAccessTypes.contains(ApiAccessType.PUBLIC)) return ApiAccessType.PUBLIC;
+        if (this.apiAccessTypes.contains(ApiAccessType.PARTNER)) return ApiAccessType.PARTNER;
+        if (this.apiAccessTypes.contains(ApiAccessType.THIRD_PARTY)) return ApiAccessType.THIRD_PARTY;
+        return new ArrayList<>(apiAccessTypes).get(0);
+    }
+
+    public void addStats(ApiStats apiStats) {
+        this.calculateActualAuth();
+        List<ApiInfo.AuthType> actualAuthTypes = this.actualAuthType;
+        if (actualAuthTypes != null && !actualAuthTypes.isEmpty()) apiStats.addAuthType(actualAuthTypes.get(0));
+
+        apiStats.addRiskScore(Math.round(this.riskScore));
+
+        apiStats.addAccessType(this.findActualAccessType());
+
+        apiStats.addApiType(this.apiType);
+    }
+
+    public String findSeverity() {
+        if (this.severityScore >= 1000) return "CRTICAL";
+        if (this.severityScore >= 100) return "HIGH";
+        if (this.severityScore >= 10) return "MEDIUM";
+        if (this.severityScore > 1) return "LOW";
+
+        return null;
     }
 
     @Override
@@ -343,4 +422,27 @@ public class ApiInfo {
         this.lastCalculatedTime = lastCalculatedTime;
     }
 
+    public ApiType getApiType() {
+        return apiType;
+    }
+
+    public void setApiType(ApiType apiType) {
+        this.apiType = apiType;
+    }
+
+    public List<Integer> getResponseCodes() {
+        return responseCodes;
+    }
+
+    public void setResponseCodes(List<Integer> responseCodes) {
+        this.responseCodes = responseCodes;
+    }
+
+    public int getDiscoveredTimestamp() {
+        return discoveredTimestamp;
+    }
+
+    public void setDiscoveredTimestamp(int discoveredTimestamp) {
+        this.discoveredTimestamp = discoveredTimestamp;
+    }
 }

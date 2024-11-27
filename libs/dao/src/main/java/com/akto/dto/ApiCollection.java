@@ -1,6 +1,7 @@
 package com.akto.dto;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
@@ -36,6 +37,7 @@ public class ApiCollection {
 
     public static final String SAMPLE_COLLECTIONS_DROPPED = "sampleCollectionsDropped";
 
+    public static final String URLS_COUNT = "urlsCount";
     @BsonIgnore
     int urlsCount;
 
@@ -46,6 +48,24 @@ public class ApiCollection {
 
     public static final String AUTOMATED = "automated";
     boolean automated;
+
+    private boolean runDependencyAnalyser;
+    public static final String RUN_DEPENDENCY_ANALYSER = "runDependencyAnalyser";
+
+    private boolean matchDependencyWithOtherCollections;
+    public static final String MATCH_DEPENDENCY_WITH_OTHER_COLLECTIONS = "matchDependencyWithOtherCollections";
+
+    private static final List<String> ENV_KEYWORDS_WITH_DOT = Arrays.asList(
+        "staging", "preprod", "qa", "demo", "dev", "test", "svc", 
+        "localhost", "local", "intranet", "lan", "example", "invalid", 
+        "home", "corp", "priv", "localdomain", "localnet", "network", 
+        "int", "private"
+    );
+
+    private static final List<String> ENV_KEYWORDS_WITHOUT_DOT = Arrays.asList(
+        "kubernetes", "internal"
+    );
+
 
     public enum Type {
         API_GROUP
@@ -58,7 +78,7 @@ public class ApiCollection {
     Type type;
     public static final String _TYPE = "type";
     
-    ENV_TYPE userSetEnvType;
+    String userSetEnvType;
 
 	public static final String USER_ENV_TYPE = "userSetEnvType";
 
@@ -121,12 +141,21 @@ public class ApiCollection {
         this.urls = urls;
     }
 
-    public ENV_TYPE getEnvType(){
+    public String getEnvType(){
         if(this.type != null && this.type == Type.API_GROUP) return null;
         
         if(this.userSetEnvType == null){
-            if(this.hostName != null && this.hostName.matches(".*(staging|preprod|qa|demo|dev|test\\.).*")){
-                return ENV_TYPE.STAGING;
+            if (this.hostName != null) {
+                for (String keyword : ENV_KEYWORDS_WITH_DOT) {
+                    if (this.hostName.contains("." + keyword)) {
+                        return "STAGING";
+                    }
+                }
+                for (String keyword : ENV_KEYWORDS_WITHOUT_DOT) {
+                    if (this.hostName.contains(keyword)) {
+                        return "STAGING";
+                    }
+                }
             }
             return null;
         }else{
@@ -270,11 +299,11 @@ public class ApiCollection {
         this.sampleCollectionsDropped = sampleCollectionsDropped;
     }
 
-    public ENV_TYPE getUserSetEnvType() {
+    public String getUserSetEnvType() {
 		return userSetEnvType;
 	}
 
-	public void setUserSetEnvType(ENV_TYPE userSetEnvType) {
+	public void setUserSetEnvType(String userSetEnvType) {
 		this.userSetEnvType = userSetEnvType;
 	}
 
@@ -285,5 +314,24 @@ public class ApiCollection {
     public void setAutomated(boolean automated) {
         this.automated = automated;
     }
-    
+
+    public boolean isMatchDependencyWithOtherCollections() {
+        return matchDependencyWithOtherCollections;
+    }
+
+    public void setMatchDependencyWithOtherCollections(boolean matchDependencyWithOtherCollections) {
+        this.matchDependencyWithOtherCollections = matchDependencyWithOtherCollections;
+    }
+
+    public boolean isRunDependencyAnalyser() {
+        return runDependencyAnalyser;
+    }
+
+    public boolean getRunDependencyAnalyser() {
+        return runDependencyAnalyser;
+    }
+
+    public void setRunDependencyAnalyser(boolean runDependencyAnalyser) {
+        this.runDependencyAnalyser = runDependencyAnalyser;
+    }
 }

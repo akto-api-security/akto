@@ -1,7 +1,9 @@
 package com.akto.dto.testing;
 
-import com.akto.dto.HttpRequestParams;
 import com.akto.dto.OriginalHttpRequest;
+import com.akto.dto.RecordedLoginFlowInput;
+
+import org.bson.codecs.pojo.annotations.BsonIgnore;
 import org.bson.types.ObjectId;
 
 import java.util.ArrayList;
@@ -19,6 +21,10 @@ public class AuthMechanism {
 
     private String uuid;
     private List<Integer> apiCollectionIds;
+
+    @BsonIgnore
+    private RecordedLoginFlowInput recordedLoginFlowInput;
+
     public AuthMechanism() {
     }
 
@@ -106,5 +112,13 @@ public class AuthMechanism {
 
     public void setApiCollectionIds(List<Integer> apiCollectionIds) {
         this.apiCollectionIds = apiCollectionIds;
+    }
+
+    public RecordedLoginFlowInput getRecordedLoginFlowInput() {
+        return recordedLoginFlowInput;
+    }
+
+    public void setRecordedLoginFlowInput(RecordedLoginFlowInput recordedLoginFlowInput) {
+        this.recordedLoginFlowInput = recordedLoginFlowInput;
     }
 }

@@ -2,6 +2,13 @@ package com.akto.listener;
 
 import javax.servlet.ServletContextEvent;
 import javax.servlet.ServletContextListener;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.akto.dao.context.Context;
+import com.akto.utils.jobs.JobUtils;
+
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -9,6 +16,7 @@ import java.util.concurrent.TimeUnit;
 public abstract class AfterMongoConnectListener implements ServletContextListener {
 
     private boolean ranOnce = false;
+    private static final Logger logger = LoggerFactory.getLogger(AfterMongoConnectListener.class);
 
     private final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
 
@@ -29,8 +37,24 @@ public abstract class AfterMongoConnectListener implements ServletContextListene
                         continue;
                     }
 
+                    boolean runJobFunctions = JobUtils.getRunJobFunctions();
+                    boolean runJobFunctionsAnyway = JobUtils.getRunJobFunctionsAnyway();
+
                     try {
-                        runMainFunction();
+
+                        int now = Context.now();
+                        if (runJobFunctions || runJobFunctionsAnyway) {
+                            logger.info("Starting runtime init functions at " + now);
+                            runMainFunction();
+                            int now2 = Context.now();
+                            int diffNow = now2 - now;
+                            logger.info(String.format(
+                                    "Completed runtime init functions at %d , time taken : %d", now2,
+                                    diffNow));
+                        } else {
+                            logger.info("Skipping runtime init functions at " + now);
+                        }
+    
                         ranOnce = true;
                     } catch (Exception e) {
                         e.printStackTrace();

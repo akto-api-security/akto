@@ -7,13 +7,16 @@ import com.akto.dto.type.CollectionReplaceDetails;
 import com.akto.dto.*;
 import com.akto.dto.billing.Organization;
 import com.akto.runtime.Main;
+import com.akto.runtime.policies.ApiAccessTypePolicy;
+import com.akto.util.Constants;
 import com.akto.util.DashboardMode;
+import com.akto.utils.libs.utils.src.main.java.com.akto.runtime.policies.ApiAccessTypePolicyUtil;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
 
 import com.opensymphony.xwork2.Action;
-import org.apache.kafka.common.protocol.types.Field.Str;
 import org.bson.conversions.Bson;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -21,8 +24,8 @@ import org.slf4j.LoggerFactory;
 import java.util.Map;
 import java.util.Set;
 
-import org.checkerframework.checker.units.qual.C;
-
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -44,10 +47,18 @@ public class AdminSettingsAction extends UserAction {
     private static final String CIDR_REGEX = "^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)/(3[0-2]|[12]?[0-9])$";
     private static final Pattern CIDR_PATTERN = Pattern.compile(CIDR_REGEX);
 
+    Account currentAccount;
+
     @Override
     public String execute() throws Exception {
         accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
         organization = OrganizationsDao.instance.findOne(Filters.empty());
+        if(Context.accountId.get() != null && Context.accountId.get() != 0){
+            currentAccount = AccountsDao.instance.findOne(
+                Filters.eq(Constants.ID, Context.accountId.get()),
+                Projections.include("name", "timezone")
+            );
+        }
         return SUCCESS.toUpperCase();
     }
 
@@ -59,6 +70,7 @@ public class AdminSettingsAction extends UserAction {
 
 	private Set<String> partnerIpList;
     private List<String> allowRedundantEndpointsList;
+    private boolean toggleCaseSensitiveApis;
 
     public String updateSetupType() {
         AccountSettingsDao.instance.getMCollection().updateOne(
@@ -243,9 +255,44 @@ public class AdminSettingsAction extends UserAction {
             AccountSettingsDao.instance.getMCollection().updateOne(
                 AccountSettingsDao.generateFilter(), Updates.set(AccountSettings.PRIVATE_CIDR_LIST, privateCidrList)
             );
+
             return SUCCESS.toUpperCase();
         } catch (Exception e) {
             return ERROR.toUpperCase();
+        }
+    }
+
+    public String applyAccessType(){
+        try {
+            int accountId = Context.accountId.get();
+            accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+            List<String> privateCidrList = new ArrayList<>();
+            if (accountSettings != null &&
+                    accountSettings.getPrivateCidrList() != null &&
+                    !accountSettings.getPrivateCidrList().isEmpty()) {
+                privateCidrList = accountSettings.getPrivateCidrList();
+            }
+            ApiAccessTypePolicy policy = new ApiAccessTypePolicy(privateCidrList);
+
+            executorService.schedule(new Runnable() {
+                public void run() {
+                    try {
+                        Context.accountId.set(accountId);
+                        List<String> partnerIpList = new ArrayList<>();
+                        if (accountSettings != null &&
+                                accountSettings.getPartnerIpList() != null &&
+                                !accountSettings.getPartnerIpList().isEmpty()) {
+                            partnerIpList = accountSettings.getPartnerIpList();
+                        }
+                        ApiAccessTypePolicyUtil.calcApiAccessType(policy, partnerIpList);
+                    } catch (Exception e){
+                        logger.error("Error in applyAccessType", e);
+                    }
+                }
+            }, 0, TimeUnit.SECONDS);
+            return Action.SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            return Action.ERROR.toUpperCase();
         }
 
     }
@@ -285,6 +332,7 @@ public class AdminSettingsAction extends UserAction {
             AccountSettingsDao.instance.getMCollection().updateOne(
                 AccountSettingsDao.generateFilter(), Updates.set(AccountSettings.PARTNER_IP_LIST, partnerIpList)
             );
+
             return SUCCESS.toUpperCase();
         } catch (Exception e) {
             return ERROR.toUpperCase();
@@ -311,6 +359,109 @@ public class AdminSettingsAction extends UserAction {
             return ERROR.toUpperCase();
         }
         
+    }
+
+    private boolean updateFiltersFlag;
+    private String permissionValue;
+
+    Map<String,Boolean> advancedFilterPermission;
+
+    
+
+    public String getAdvancedFilterFlagsForAccount(){
+        AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+        advancedFilterPermission = new HashMap<>();
+        advancedFilterPermission.put(AccountSettings.ALLOW_FILTER_LOGS, accountSettings.getAllowFilterLogs());
+        advancedFilterPermission.put(AccountSettings.ALLOW_DELETION_OF_REDUNDANT_URLS, accountSettings.getAllowDeletionOfUrls());
+
+        return SUCCESS.toUpperCase();
+    }
+
+    public String updatePermissionsForAdvancedFilters(){
+        if(this.permissionValue.equals(AccountSettings.ALLOW_DELETION_OF_REDUNDANT_URLS) || this.permissionValue.equals(AccountSettings.ALLOW_FILTER_LOGS)){
+            AccountSettingsDao.instance.updateOne(
+                AccountSettingsDao.generateFilter(),
+                Updates.set(this.permissionValue, this.updateFiltersFlag)
+            );
+            return SUCCESS.toUpperCase();
+        }else{
+            addActionError("invalid permission");
+            return ERROR.toUpperCase();
+        }
+    }
+
+    public String accountPermission;
+    public String modifiedValueForAccount;
+
+    public String modifyAccountSettings () {
+        if(accountPermission.equals("name") || accountPermission.equals("timezone")){
+            if(Context.accountId.get() != null && Context.accountId.get() != 0){
+                AccountsDao.instance.updateOne(
+                    Filters.eq(Constants.ID, Context.accountId.get()),
+                    Updates.set(accountPermission, modifiedValueForAccount)
+                );
+                if(accountPermission.equals("name")){
+                    UsersDao.instance.updateManyNoUpsert(
+                        Filters.exists(User.ACCOUNTS + "." + Context.accountId.get()),
+                        Updates.set(User.ACCOUNTS + "." + Context.accountId.get() + ".name", modifiedValueForAccount)
+                    );
+                }
+                return SUCCESS.toUpperCase();
+            }else{
+                addActionError("Account id cannot be null");
+                return ERROR.toUpperCase();
+            }
+        }else{
+            addActionError("Permission not modifiable");
+            return ERROR.toUpperCase();
+        }
+    }
+
+    private int deltaTimeForScheduledSummaries;
+
+    public String updateDeltaTimeForIgnoringSummaries () {
+        if(this.deltaTimeForScheduledSummaries < 1200){
+            addActionError("Value cannot be less than 20 minutes");
+            return ERROR.toUpperCase();
+        }
+        if(this.deltaTimeForScheduledSummaries > 14400){
+            addActionError("Value cannot be greater than 4 hours");
+            return ERROR.toUpperCase();
+        }
+        AccountSettingsDao.instance.getMCollection().updateOne(
+                AccountSettingsDao.generateFilter(),
+                Updates.set(AccountSettings.DELTA_IGNORE_TIME_FOR_SCHEDULED_SUMMARIES, this.deltaTimeForScheduledSummaries));
+        return SUCCESS.toUpperCase();
+    }
+
+    public String toggleCaseSensitiveURLs() {
+        AccountSettingsDao.instance.getMCollection().updateOne(
+                AccountSettingsDao.generateFilter(),
+                Updates.set(AccountSettings.HANDLE_APIS_CASE_INSENSITIVE, this.toggleCaseSensitiveApis),
+                new UpdateOptions().upsert(false)
+        );
+
+        return SUCCESS.toUpperCase();
+    }
+
+    public void setAccountPermission(String accountPermission) {
+        this.accountPermission = accountPermission;
+    }
+
+    public void setModifiedValueForAccount(String modifiedValueForAccount) {
+        this.modifiedValueForAccount = modifiedValueForAccount;
+    }
+
+    public void setUpdateFiltersFlag(boolean updateFiltersFlag) {
+        this.updateFiltersFlag = updateFiltersFlag;
+    }
+
+    public void setPermissionValue(String permissionValue) {
+        this.permissionValue = permissionValue;
+    }
+
+    public Map<String, Boolean> getAdvancedFilterPermission() {
+        return advancedFilterPermission;
     }
 
     public AccountSettings getAccountSettings() {
@@ -405,4 +556,20 @@ public class AdminSettingsAction extends UserAction {
     public void setAllowRedundantEndpointsList(List<String> allowRedundantEndpointsList) {
         this.allowRedundantEndpointsList = allowRedundantEndpointsList;
     }   
+
+    public Account getCurrentAccount() {
+        return currentAccount;
+    }
+
+    public void setCurrentAccount(Account currentAccount) {
+        this.currentAccount = currentAccount;
+    }
+
+    public void setDeltaTimeForScheduledSummaries(int deltaTimeForScheduledSummaries) {
+        this.deltaTimeForScheduledSummaries = deltaTimeForScheduledSummaries;
+    }
+
+    public void setToggleCaseSensitiveApis(boolean toggleCaseSensitiveApis) {
+        this.toggleCaseSensitiveApis = toggleCaseSensitiveApis;
+    }
 }

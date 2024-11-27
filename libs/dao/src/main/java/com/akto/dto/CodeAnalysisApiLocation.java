@@ -16,6 +16,16 @@ public class CodeAnalysisApiLocation {
         this.lineNo = lineNo;
     }
 
+    @Override
+    public String toString() {
+        return "CodeAnalysisApiLocation{" +
+                "filePath='" + filePath + '\'' +
+                ", fileName='" + fileName + '\'' +
+                ", fileLink='" + fileLink + '\'' +
+                ", lineNo=" + lineNo +
+                '}';
+    }
+
     public String getFilePath() {
         return filePath;
     }

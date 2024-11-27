@@ -1,14 +1,19 @@
-import { Outlet, useLocation, useNavigate } from "react-router-dom"
+import { Outlet, useLocation, useNavigate} from "react-router-dom"
 import { history } from "@/util/history";
 import Store from "../store";
 import homeFunctions from "./home/module";
-import { useEffect } from "react";
-import { Frame, Toast } from "@shopify/polaris";
+import { useEffect, useState, useRef} from "react";
+import { Frame, Toast, VerticalStack, Banner, Button, Text } from "@shopify/polaris";
 import "./dashboard.css"
 import func from "@/util/func"
 import transform from "./testing/transform";
 import PersistStore from "../../main/PersistStore";
+import LocalStore from "../../main/LocalStorageStore";
 import ConfirmationModal from "../components/shared/ConfirmationModal";
+import AlertsBanner from "./AlertsBanner";
+import dashboardFunc from "./transform";
+import homeRequests from "./home/api";
+import WelcomeBackDetailsModal from "../components/WelcomeBackDetailsModal";
 
 function Dashboard() {
 
@@ -19,11 +24,16 @@ function Dashboard() {
     const setCollectionsMap = PersistStore(state => state.setCollectionsMap)
     const setHostNameMap = PersistStore(state => state.setHostNameMap)
 
+    const navigate = useNavigate();
+
     const allCollections = PersistStore(state => state.allCollections)
     const collectionsMap = PersistStore(state => state.collectionsMap)
 
-    const subCategoryMap = PersistStore(state => state.subCategoryMap)
-
+    const subCategoryMap = LocalStore(state => state.subCategoryMap)
+    const [eventForUser, setEventForUser] = useState({})
+    
+    const sendEventOnLogin = LocalStore(state => state.sendEventOnLogin)
+    const setSendEventOnLogin = LocalStore(state => state.setSendEventOnLogin)
     const fetchAllCollections = async () => {
         let apiCollections = await homeFunctions.getAllCollections()
         const allCollectionsMap = func.mapCollectionIdToName(apiCollections)
@@ -32,10 +42,36 @@ function Dashboard() {
         setCollectionsMap(allCollectionsMap)
         setAllCollections(apiCollections)
     }
+    const trafficAlerts = PersistStore(state => state.trafficAlerts)
+    const setTrafficAlerts = PersistStore(state => state.setTrafficAlerts)
+    const [displayItems, setDisplayItems] = useState([])
+
+    const timeoutRef = useRef(null);
+    const inactivityTime = 10 * 60 * 1000;
 
     const fetchMetadata = async () => {
         await transform.setTestMetadata();
     };
+
+    const getEventForIntercom = async() => {
+        let resp = await homeRequests.getEventForIntercom();
+        if(resp !== null){
+            setEventForUser(resp)
+        }
+    }
+
+    useEffect(() => {
+        if(trafficAlerts == null && window.USER_NAME.length > 0 && window.USER_NAME.includes('akto.io')){
+            homeRequests.getTrafficAlerts().then((resp) => {
+                setDisplayItems(dashboardFunc.sortAndFilterAlerts(resp))
+                setTrafficAlerts(resp)
+            })
+        }else{
+            setDisplayItems((prev) => {
+                return dashboardFunc.sortAndFilterAlerts(trafficAlerts)
+            })
+        }
+    },[trafficAlerts.length])
 
     useEffect(() => {
         if((allCollections && allCollections.length === 0) || (Object.keys(collectionsMap).length === 0)){
@@ -46,6 +82,15 @@ function Dashboard() {
         }
         if(window.Beamer){
             window.Beamer.init();
+        }
+        if(window?.Intercom){
+            if(!sendEventOnLogin){
+                setSendEventOnLogin(true)
+                getEventForIntercom()
+                if(Object.keys(eventForUser).length > 0){
+                    window?.Intercom("trackEvent","metrics", eventForUser)
+                }
+            }
         }
     }, [])
 
@@ -71,13 +116,87 @@ function Dashboard() {
         primaryActionContent={confirmationModalConfig.primaryActionContent}
         primaryAction={confirmationModalConfig.primaryAction}
     />
+    const handleOnDismiss = async(index) => {
+        let alert = displayItems[index];
+        let newTrafficFilters = []
+        trafficAlerts.forEach((a) => {
+            if(func.deepComparison(a, alert)){
+                a.lastDismissed = func.timeNow()
+            }
+            newTrafficFilters.push(a);
+        })
+        setDisplayItems(dashboardFunc.sortAndFilterAlerts(newTrafficFilters));
+        setTrafficAlerts(newTrafficFilters)
+        alert.lastDismissed = func.timeNow();
+        await homeRequests.markAlertAsDismissed(alert);
+    }
+
+    const refreshFunc = () => {
+        if(document.visibilityState === 'hidden'){
+            PersistStore.getState().resetAll();
+            LocalStore.getState().resetStore();
+            navigate("/dashboard/observe/inventory")
+            window.location.reload();
+        }
+    }
+
+    const initializeTimer = () => {
+        if (timeoutRef.current) {
+            clearTimeout(timeoutRef.current); // Clear existing timeout to prevent duplicates
+          }
+          timeoutRef.current = setTimeout(refreshFunc, inactivityTime);
+    }
+
+    const handleVisibilityChange = () => {
+        if (document.visibilityState === 'hidden') {
+          initializeTimer(); 
+        } else {
+          clearTimeout(timeoutRef.current);
+        }
+    };
+
+    useEffect(() => {
+        initializeTimer();
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        return () => {
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+            clearTimeout(timeoutRef.current);
+        };
+
+    },[])
+
+    // const shouldShowWelcomeBackModal = !func.checkLocal() && window?.USER_NAME?.length > 0 && (window?.USER_FULL_NAME?.length === 0 || (window?.USER_ROLE === 'ADMIN' && window?.ORGANIZATION_NAME?.length === 0))
 
     return (
         <div className="dashboard">
         <Frame>
             <Outlet />
+            {/* {shouldShowWelcomeBackModal && <WelcomeBackDetailsModal isAdmin={window.USER_ROLE === 'ADMIN'} />} */}
             {toastMarkup}
             {ConfirmationModalMarkup}
+            {displayItems.length > 0 ? <div className="alerts-banner">
+                    <VerticalStack gap={"2"}>
+                        {displayItems.map((alert, index) => {
+                            return(
+                                <AlertsBanner key={index} 
+                                    type={dashboardFunc.getAlertMessageFromType(alert.alertType)} 
+                                    content={dashboardFunc.replaceEpochWithFormattedDate(alert.content)}
+                                    severity={dashboardFunc.getBannerStatus(alert.severity)}
+                                    onDismiss= {handleOnDismiss}
+                                    index={index}
+                                />
+                            )
+                        })}
+                    </VerticalStack>
+            </div> : null}
+            {func.checkLocal() && !(location.pathname.includes("test-editor") || location.pathname.includes("settings") || location.pathname.includes("onboarding") || location.pathname.includes("summary")) ?<div className="call-banner">
+                <Banner hideIcon={true}> 
+                    <Text variant="headingMd">Need a 1:1 experience?</Text>
+                    <Button plain monochrome onClick={() => {
+                        window.open("https://akto.io/api-security-demo", "_blank")
+                    }}><Text variant="bodyMd">Book a call</Text></Button>
+                </Banner>
+            </div> : null}
         </Frame>
         </div>
     )

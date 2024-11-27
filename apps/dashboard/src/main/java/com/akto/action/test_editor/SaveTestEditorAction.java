@@ -29,6 +29,7 @@ import com.akto.dto.testing.AuthMechanism;
 import com.akto.dto.testing.GenericTestResult;
 import com.akto.dto.testing.MultiExecTestResult;
 import com.akto.dto.testing.TestResult;
+import com.akto.dto.testing.TestingRunConfig;
 import com.akto.dto.testing.TestResult.Confidence;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.WorkflowNodeDetails;
@@ -46,6 +47,7 @@ import com.akto.test_editor.execution.VariableResolver;
 import com.akto.testing.TestExecutor;
 import com.akto.util.Constants;
 import com.akto.util.enums.GlobalEnums;
+import com.akto.util.enums.GlobalEnums.Severity;
 import com.akto.util.enums.GlobalEnums.YamlTemplateSource;
 import com.akto.utils.GithubSync;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -288,7 +290,9 @@ public class SaveTestEditorAction extends UserAction {
         }
 
         try {
-            GlobalEnums.Severity.valueOf(testConfig.getInfo().getSeverity());
+            if (!TestConfig.DYNAMIC_SEVERITY.equals(testConfig.getInfo().getSeverity())) {
+                GlobalEnums.Severity.valueOf(testConfig.getInfo().getSeverity());
+            }
         } catch (Exception e) {
             addActionError("invalid severity, please choose from " + Arrays.toString(GlobalEnums.Severity.values()));
             return ERROR.toUpperCase();
@@ -301,7 +305,7 @@ public class SaveTestEditorAction extends UserAction {
                 apiInfoKey.getString(ApiInfo.ApiInfoKey.URL),
                 URLMethods.Method.valueOf(apiInfoKey.getString(ApiInfo.ApiInfoKey.METHOD)));
 
-        AuthMechanism authMechanism = TestRolesDao.instance.fetchAttackerToken(0);
+        AuthMechanism authMechanism = TestRolesDao.instance.fetchAttackerToken(0, null);
         Map<ApiInfo.ApiInfoKey, List<String>> sampleDataMap = new HashMap<>();
         Map<ApiInfo.ApiInfoKey, List<String>> newSampleDataMap = new HashMap<>();
         
@@ -329,7 +333,8 @@ public class SaveTestEditorAction extends UserAction {
         List<TestingRunResult.TestLog> testLogs = new ArrayList<>();
         int lastSampleIndex = sampleDataList.get(0).getSamples().size() - 1;
         
-        testingRunResult = executor.runTestNew(infoKey, null, testingUtil, null, testConfig, null, true, testLogs);
+        TestingRunConfig testingRunConfig = new TestingRunConfig();
+        testingRunResult = executor.runTestNew(infoKey, null, testingUtil, null, testConfig, testingRunConfig, true, testLogs);
         if (testingRunResult == null) {
             testingRunResult = new TestingRunResult(
                     new ObjectId(), infoKey, testConfig.getInfo().getCategory().getName(), testConfig.getInfo().getSubCategory() ,Collections.singletonList(new TestResult(null, sampleDataList.get(0).getSamples().get(lastSampleIndex),
@@ -342,7 +347,8 @@ public class SaveTestEditorAction extends UserAction {
         testingRunResult.setId(new ObjectId());
         if (testingRunResult.isVulnerable()) {
             TestingIssuesId issuesId = new TestingIssuesId(infoKey, GlobalEnums.TestErrorSource.TEST_EDITOR, testConfig.getId(), null);
-            testingRunIssues = new TestingRunIssues(issuesId, GlobalEnums.Severity.valueOf(testConfig.getInfo().getSeverity()), GlobalEnums.TestRunIssueStatus.OPEN, Context.now(), Context.now(),null, null, Context.now());
+            Severity severity = TestExecutor.getSeverityFromTestingRunResult(testingRunResult);
+            testingRunIssues = new TestingRunIssues(issuesId, severity, GlobalEnums.TestRunIssueStatus.OPEN, Context.now(), Context.now(),null, null, Context.now());
         }
         BasicDBObject infoObj = IssuesAction.createSubcategoriesInfoObj(testConfig);
         subCategoryMap = new HashMap<>();

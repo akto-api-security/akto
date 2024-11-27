@@ -18,6 +18,7 @@ function prepareTableData (data, handleBadgeClick) {
     data.forEach((element,index) => {
         let paramText = element.param.replaceAll("#", ".").replaceAll(".$", "")
         let isSensitive = func.isSubTypeSensitive(element)
+        let nonSensitiveDataType = element?.nonSensitiveDataType
         let comp = [(<HorizontalStack gap={"2"} key={index}>
             <Text fontWeight="regular" variant="bodyMd">
                 {paramText}
@@ -28,7 +29,13 @@ function prepareTableData (data, handleBadgeClick) {
                         <Badge status="warning">
                             {element.subType.name}
                         </Badge>
-                    </Button> : null
+                    </Button> : (nonSensitiveDataType ?
+                        <Button plain monochrome onClick={() => { handleBadgeClick(element.subType.name, "") }}>
+                            <Badge status="info">
+                                {element.subType.name}
+                            </Badge>
+                        </Button> : null)
+
             }
             </HorizontalStack>), <Text variant="bodySm" fontWeight="regular" color="subdued">{func.prepareValuesTooltip(element)}</Text>
         ]
@@ -106,7 +113,7 @@ function ApiSingleSchema(props) {
                             <Box paddingBlockStart="05" paddingBlockEnd="05"> 
                                 <HorizontalStack gap="2">
                                     <Text variant="bodyMd">Header</Text>
-                                    <span style={{padding: '4px 8px', width: '30px', color: '#202223', background:(isHeader ? "#ECEBFF" : "#E4E5E7"), borderRadius: '4px'}}>
+                                    <span style={{padding: '4px 8px', width: 'fit-content', color: '#202223', background:(isHeader ? "#ECEBFF" : "#E4E5E7"), borderRadius: '4px'}}>
                                         {headerCount}
                                     </span>
                                 </HorizontalStack>
@@ -116,7 +123,7 @@ function ApiSingleSchema(props) {
                             <Box paddingBlockStart="05" paddingBlockEnd="05"> 
                                 <HorizontalStack gap="2">
                                     <Text variant="bodyMd">Payload</Text>
-                                    <span style={{padding: '4px 8px', width: '30px', color: '#202223', background:(!isHeader ? "#ECEBFF" : "#E4E5E7"), borderRadius: '4px'}}>
+                                    <span style={{padding: '4px 8px', width: 'fit-content', color: '#202223', background:(!isHeader ? "#ECEBFF" : "#E4E5E7"), borderRadius: '4px'}}>
                                         {payloadCount}
                                     </span>
                                 </HorizontalStack>
@@ -144,14 +151,14 @@ function ApiSingleSchema(props) {
 
 function ApiSchema(props) {
 
-    const { data, badgeActive, setBadgeActive } = props
+    const { data, badgeActive, setBadgeActive, apiInfo } = props
     const navigate = useNavigate()
 
     let reqData = data.filter((item) => item.responseCode === -1)
     let resData = data.filter((item) => item.responseCode !== -1)
 
     const handleBadgeClick = (datatype, position) => {
-        const navUrl = "/dashboard/observe/sensitive/" + datatype.toUpperCase()
+        const navUrl = "/dashboard/observe/sensitive/" + datatype.toUpperCase() + "/" + apiInfo.apiCollectionId + "/" + btoa(apiInfo.url + " " + apiInfo.method)
         navigate(navUrl)
     }
 

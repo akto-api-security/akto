@@ -19,8 +19,13 @@ import TooltipText from "../../components/shared/TooltipText";
 import TestingStore from "./testingStore";
 
 import { CellType } from "@/apps/dashboard/components/tables/rows/GithubRow";
+import LocalStore from "../../../main/LocalStorageStore";
 
 let headers = [
+    {
+      title: '',
+      type: CellType.COLLAPSIBLE
+    },
     {
       value: "nameComp",
       title: 'Issue name',
@@ -52,10 +57,6 @@ let headers = [
       title: 'Scanned',
       sortActive: true
     },
-    {
-      title: '',
-      type: CellType.COLLAPSIBLE
-    }
 ]
 
 const MAX_SEVERITY_THRESHOLD = 100000;
@@ -252,8 +253,8 @@ const transform = {
       testingRunResultSummary.countIssues = transform.prepareCountIssues(testingRunResultSummary.countIssues);
     }
 
-    let state = data.state;
-    if (checkTestFailure(testingRunResultSummary.state, state)) {
+    let state = cicd ? testingRunResultSummary.state : data.state ;
+    if (cicd !== true && checkTestFailure(testingRunResultSummary.state, state)) {
       state = 'FAIL'
     }
 
@@ -277,10 +278,10 @@ const transform = {
       obj['name'] = data.name || "Test"
       obj['number_of_tests'] = data.testIdConfig == 1 ? "-" : getTestsInfo(testingRunResultSummary?.testResultsCount, state)
       obj['run_type'] = getTestingRunType(data, testingRunResultSummary, cicd);
-      obj['run_time_epoch'] = Math.max(data.scheduleTimestamp,data.endTimestamp)
+      obj['run_time_epoch'] = Math.max(data.scheduleTimestamp, (cicd ? testingRunResultSummary.endTimestamp : data.endTimestamp))
       obj['scheduleTimestamp'] = data.scheduleTimestamp
       obj['pickedUpTimestamp'] = data.pickedUpTimestamp
-      obj['run_time'] = getRuntime(data.scheduleTimestamp ,data.endTimestamp, state)
+      obj['run_time'] = getRuntime(data.scheduleTimestamp , (cicd ? testingRunResultSummary.endTimestamp : data.endTimestamp), state)
       obj['severity'] = func.getSeverity(testingRunResultSummary.countIssues)
       obj['total_severity'] = getTotalSeverity(testingRunResultSummary.countIssues);
       obj['severityStatus'] = func.getSeverityStatus(testingRunResultSummary.countIssues)
@@ -292,6 +293,8 @@ const transform = {
       obj['endTimestamp'] = testingRunResultSummary?.endTimestamp
       obj['metadata'] = func.flattenObject(testingRunResultSummary?.metadata)
       obj['apiCollectionId'] = apiCollectionId
+      obj['userEmail'] = data.userEmail
+      obj['total_apis'] = testingRunResultSummary.totalApis
       if(prettified){
         
         const prettifiedTest={
@@ -331,7 +334,7 @@ const transform = {
       obj['errors'] = obj['testResults'].filter((res) => (res.errors && res.errors.length > 0)).map((res) => res.errors.join(", "))
       obj['singleTypeInfos'] = data['singleTypeInfos'] || []
       obj['vulnerable'] = data['vulnerable'] || false
-      obj['nextUrl'] = "/dashboard/testing/"+ hexId + "/result/" + data.hexId;
+      obj['nextUrl'] = "/dashboard/testing/"+ hexId + "?result=" + data.hexId;
       obj['cwe'] = subCategoryMap[data.testSubType]?.cwe ? subCategoryMap[data.testSubType]?.cwe : []
       obj['cweDisplay'] = minimizeTagList(obj['cwe'])
       obj['cve'] = subCategoryMap[data.testSubType]?.cve ? subCategoryMap[data.testSubType]?.cve : []
@@ -590,10 +593,46 @@ const transform = {
     }
     return conditions;
   },
+  async getAllSubcategoriesData(fetchActive,type){
+    let finalDataSubCategories = [], promises = [], categories = [];
+    let testSourceConfigs = []
+    const limit = 50;
+    for(var i = 0 ; i < 20; i++){
+      promises.push(
+        api.fetchAllSubCategories(fetchActive, type, i * limit, limit)
+      )
+    }
+    const allResults = await Promise.allSettled(promises);
+    for (const result of allResults) {
+      if (result.status === "fulfilled"){
+        if(result?.value?.subCategories && result?.value?.subCategories !== undefined && result?.value?.subCategories.length > 0){
+          finalDataSubCategories.push(...result.value.subCategories);
+        }
+
+        if(result?.value?.categories && result?.value?.categories !== undefined && result?.value?.categories.length > 0){
+          if(categories.length === 0){
+            categories.push(...result.value.categories);
+          }
+        }
+
+        if (result?.value?.testSourceConfigs &&
+          result?.value?.testSourceConfigs !== undefined &&
+          result?.value?.testSourceConfigs.length > 0) {
+          testSourceConfigs = result?.value?.testSourceConfigs
+        }
+      }
+    }
+    return {
+      categories: categories,
+      subCategories: finalDataSubCategories,
+      testSourceConfigs: testSourceConfigs
+    }
+  },
   async setTestMetadata() {
-    const resp = await api.fetchAllSubCategories(true, "Dashboard");
+    const resp = await this.getAllSubcategoriesData(false, "Dashboard")
     let subCategoryMap = {};
     resp.subCategories.forEach((x) => {
+      func.trimContentFromSubCategory(x)
       subCategoryMap[x.name] = x;
     });
     let subCategoryFromSourceConfigMap = {};
@@ -604,9 +643,9 @@ const transform = {
     resp.categories.forEach((category) => {
       categoryMap[category.name] = category;
     });
-    PersistStore.getState().setSubCategoryMap(subCategoryMap);
+    LocalStore.getState().setSubCategoryMap(subCategoryMap);
     PersistStore.getState().setSubCategoryFromSourceConfigMap(subCategoryFromSourceConfigMap);
-    PersistStore.getState().setCategoryMap(categoryMap);
+    LocalStore.getState().setCategoryMap(categoryMap);
   },
   prettifySummaryTable(summaries) {
     summaries = summaries.map((obj) => {
@@ -614,7 +653,7 @@ const transform = {
       return{
         ...obj,
         prettifiedSeverities: observeFunc.getIssuesList(obj.countIssues || {"HIGH" : 0, "MEDIUM": 0, "LOW": 0}),
-        startTime: date.toLocaleTimeString() + " on " +  date.toLocaleDateString(),
+        startTime: date.toLocaleString('en-US',{timeZone: window.TIME_ZONE === 'Us/Pacific' ? 'America/Los_Angeles' : window.TIME_ZONE}) + " on " +  date.toLocaleDateString('en-US',{timeZone: window.TIME_ZONE === 'Us/Pacific' ? 'America/Los_Angeles' : window.TIME_ZONE}),
         id: obj.hexId
       }
     })
@@ -675,7 +714,7 @@ convertSubIntoSubcategory(resp){
     MEDIUM: 0,
     LOW: 0,
   }
-  const subCategoryMap = PersistStore.getState().subCategoryMap
+  const subCategoryMap = LocalStore.getState().subCategoryMap
   Object.keys(resp).forEach((key)=>{
     const objectKey = subCategoryMap[key] ? subCategoryMap[key].superCategory.shortName : key;
     const objectKeyName = subCategoryMap[key] ? subCategoryMap[key].superCategory.name : key;
@@ -771,7 +810,7 @@ getPrettifiedTestRunResults(testRunResults){
   const errorsObject = TestingStore.getState().errorsObject
   let testRunResultsObj = {}
   testRunResults.forEach((test)=>{
-    let key = test.name + ': ' + test.vulnerable
+    let key = test.name + ': ' + test.vulnerable + ": " + test.severity
     let error_message = ""
     if(test?.errorsList.length > 0){
       const errorType = this.getTestErrorType(test.errorsList[0])
@@ -855,14 +894,18 @@ getTestingRunResultUrl(testingResult){
   return methodObj.method + " " + truncatedUrl
   
 },
-getRowInfo(severity, apiInfo,jiraIssueUrl, sensitiveData){
+getRowInfo(severity, apiInfo,jiraIssueUrl, sensitiveData, isIgnored){
   let auth_type = apiInfo["allAuthTypesFound"].join(", ")
   let access_type = null
   let access_types = apiInfo["apiAccessTypes"]
   if (!access_types || access_types.length == 0) {
-      access_type = "none"
+      access_type = "No access type"
   } else if (access_types.indexOf("PUBLIC") !== -1) {
       access_type = "Public"
+  } else if (access_types.indexOf("PARTNER") !== -1) {
+      access_type = "Partner"
+  } else if (access_types.indexOf("THIRD_PARTY") !== -1) {
+      access_type = "Third-party"
   } else {
       access_type = "Private"
   }
@@ -889,7 +932,7 @@ getRowInfo(severity, apiInfo,jiraIssueUrl, sensitiveData){
   const rowItems = [
     {
       title: 'Severity',
-      value: <Text fontWeight="semibold" color={observeFunc.getColor(severity)}>{severity}</Text>,
+      value: isIgnored ? <Text fontWeight="semibold">Ignored</Text> : <Text fontWeight="semibold"><span style={{color: observeFunc.getColor(severity)}}>{severity}</span></Text>,
       tooltipContent: "Severity of the test run result"
     },
     {

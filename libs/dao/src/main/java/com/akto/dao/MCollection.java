@@ -1,6 +1,8 @@
 package com.akto.dao;
 
+import com.akto.util.DbMode;
 import com.mongodb.BasicDBObject;
+import com.mongodb.CreateIndexCommitQuorum;
 import com.mongodb.bulk.BulkWriteResult;
 import com.mongodb.client.*;
 import com.mongodb.client.model.*;
@@ -8,7 +10,6 @@ import com.mongodb.client.result.DeleteResult;
 import com.mongodb.client.result.InsertManyResult;
 import com.mongodb.client.result.InsertOneResult;
 
-import com.mongodb.BasicDBObject;
 import org.bson.Document;
 import com.mongodb.client.result.UpdateResult;
 
@@ -21,6 +22,7 @@ import java.util.*;
 import java.util.concurrent.TimeUnit;
 
 import static com.mongodb.client.model.Filters.*;
+import static java.util.Collections.singletonList;
 
 public abstract class MCollection<T> {
     private Logger logger = LoggerFactory.getLogger(getClassT());
@@ -29,6 +31,8 @@ public abstract class MCollection<T> {
     public static final String ID = "_id";
     public static final String NAME = "name";
     public static final String ROOT_ELEMENT = "$$ROOT";
+    public static final String _COUNT = "count";
+    public static final String _SIZE = "size";
     abstract public String getDBName();
     abstract public String getCollName();
     abstract public Class<T> getClassT();
@@ -149,6 +153,10 @@ public abstract class MCollection<T> {
 
     public long count(Bson q) {
         return (int)this.getMCollection().countDocuments(q);
+    }
+
+    public long estimatedDocumentCount(){
+        return this.getMCollection().estimatedDocumentCount();
     }
 
     public T findLatestOne(Bson q) {
@@ -279,8 +287,15 @@ public abstract class MCollection<T> {
                 }
             }
 
-            db.getCollection(collName).createIndex(idx, options);
+            IndexModel indexModel = new IndexModel(idx, options);
 
+            CreateIndexOptions createIndexOptions = new CreateIndexOptions();
+            createIndexOptions.maxTime(5, TimeUnit.MINUTES);
+            if (DbMode.setupType.equals(DbMode.SetupType.CLUSTER)) {
+                createIndexOptions.commitQuorum(CreateIndexCommitQuorum.create(1));
+            }
+
+            db.getCollection(collName).createIndexes(singletonList(indexModel), createIndexOptions);
         } catch (Exception e){
             return false;
         }
@@ -346,5 +361,14 @@ public abstract class MCollection<T> {
         logger.info("Trimmed : " + deleteResult.getDeletedCount());
     }
 
+    public Document getCollectionStats(){
+        MongoDatabase mongoDatabase = clients[0].getDatabase(getDBName());
+        return mongoDatabase.runCommand(new Document("collStats",getCollName()));
+    }
+
+    public Document compactCollection() {
+        MongoDatabase mongoDatabase = clients[0].getDatabase(getDBName());
+        return mongoDatabase.runCommand(new Document("compact", getCollName()));
+    }
 
 }

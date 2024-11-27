@@ -54,6 +54,15 @@ public class ApiInfoBulkUpdate {
 
             subUpdates.add(Updates.setOnInsert(SingleTypeInfo._COLLECTION_IDS, Arrays.asList(apiInfo.getId().getApiCollectionId())));
 
+            // discovered timestamp
+            subUpdates.add(Updates.setOnInsert(ApiInfo.DISCOVERED_TIMESTAMP, apiInfo.getDiscoveredTimestamp()));
+
+            // response codes
+            subUpdates.add(Updates.addEachToSet(ApiInfo.RESPONSE_CODES, apiInfo.getResponseCodes()));
+
+            // api type
+            subUpdates.add(Updates.setOnInsert(ApiInfo.API_TYPE, apiInfo.getApiType()));
+
             updates.add(
                     new UpdateOneModel<>(
                             ApiInfoDao.getFilter(apiInfo.getId()),

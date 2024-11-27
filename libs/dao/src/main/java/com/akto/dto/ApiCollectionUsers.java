@@ -10,6 +10,8 @@ import java.util.concurrent.TimeUnit;
 
 import org.bson.conversions.Bson;
 import java.util.Collections;
+import java.util.logging.Filter;
+
 import org.bson.types.ObjectId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -68,13 +70,27 @@ public class ApiCollectionUsers {
             });
         }});
 
-    public static int getApisCountFromConditions(List<TestingEndpoints> conditions) {
+    public static List<BasicDBObject> getSingleTypeInfoListFromConditions(List<TestingEndpoints> conditions, int skip, int limit, int deltaPeriodValue, List<Integer> deactivatedCollections) {
+        if(conditions == null || conditions.isEmpty()){
+            return new ArrayList<>();
+        }
+        Bson singleTypeInfoFilters = getFilters(conditions, CollectionType.ApiCollectionId);
+        if (deactivatedCollections != null && !deactivatedCollections.isEmpty()) {
+            singleTypeInfoFilters = Filters.and(singleTypeInfoFilters, Filters.nin(SingleTypeInfo._API_COLLECTION_ID, deactivatedCollections));
+        }
+        return ApiCollectionsDao.fetchEndpointsInCollection(singleTypeInfoFilters, skip, limit, deltaPeriodValue);
+    }
+    public static int getApisCountFromConditions(List<TestingEndpoints> conditions, List<Integer> deactivatedCollections) {
 
         if(conditions == null || conditions.isEmpty()){
             return 0;
         }
 
         Bson apiInfoFilters = getFilters(conditions, CollectionType.Id_ApiCollectionId);
+
+        if ( deactivatedCollections != null && !deactivatedCollections.isEmpty()) {
+            apiInfoFilters = Filters.and(apiInfoFilters, Filters.nin("_id.apiCollectionId", deactivatedCollections));
+        }
 
         return (int) ApiInfoDao.instance.count(apiInfoFilters);
     }
@@ -188,11 +204,7 @@ public class ApiCollectionUsers {
 
     private static void updateCollections(MCollection<?>[] collections, Bson filter, Bson update) {
         for (MCollection<?> collection : collections) {
-            long now = System.currentTimeMillis();
-            UpdateResult res = collection.getMCollection().updateMany(filter, update);
-            long diff = System.currentTimeMillis() - now;
-            logger.info(String.format("acc: %d Updated collection for API group %s update: %s in %d ms matched: %d modified: %d", Context.accountId.get(), 
-            collection.getCollName(), update.toString(), diff, res.getMatchedCount(), res.getModifiedCount()));
+            collection.getMCollection().updateMany(filter, update);
         }
     }
 

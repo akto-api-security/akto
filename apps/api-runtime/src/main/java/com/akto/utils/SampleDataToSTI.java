@@ -2,8 +2,10 @@ package com.akto.utils;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.SingleTypeInfo;
@@ -13,8 +15,11 @@ import com.akto.parsers.HttpCallParser;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.SensitiveSampleData;
 import com.akto.dto.type.APICatalog;
+import com.akto.dto.type.RequestTemplate;
 import com.akto.runtime.APICatalogSync;
 import com.akto.runtime.URLAggregator;
+import com.mongodb.BasicDBObject;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -124,6 +129,15 @@ public class SampleDataToSTI {
             return singleTypeInfos;
         }
 
+        Set<String> queryParamSet = new HashSet<>();
+        try {
+            String urlWithParams = httpResponseParams.getRequestParams().getURL();
+            BasicDBObject queryParams = RequestTemplate.getQueryJSON(urlWithParams);
+            queryParamSet = new HashSet<>(queryParams.keySet());
+        } catch (Exception e){
+            logger.error(e.getMessage());
+        }
+
         List<HttpResponseParams> responseParams = new ArrayList<>();
         responseParams.add(httpResponseParams);
         Map<Integer, URLAggregator> aggregatorMap = new HashMap<>();
@@ -131,7 +145,7 @@ public class SampleDataToSTI {
         APICatalogSync apiCatalogSync = new APICatalogSync("0",0, true,false);
         for (int apiCollectionId : aggregatorMap.keySet()) {
             URLAggregator aggregator = aggregatorMap.get(apiCollectionId);
-            apiCatalogSync.computeDelta(aggregator, false, apiCollectionId);
+            apiCatalogSync.computeDelta(aggregator, false, apiCollectionId, false);
             for (Integer key : apiCatalogSync.delta.keySet()) {
                 APICatalog apiCatalog = apiCatalogSync.delta.get(key);
                 singleTypeInfos.addAll(apiCatalog.getAllTypeInfo());
@@ -140,6 +154,9 @@ public class SampleDataToSTI {
 
         for (int i = 0; i < singleTypeInfos.size(); i++) {
             singleTypeInfos.get(i).setUrl(url);
+            if(queryParamSet.contains(singleTypeInfos.get(i).getParam())){
+                singleTypeInfos.get(i).setQueryParam(true);
+            }
         }
 
         return singleTypeInfos;

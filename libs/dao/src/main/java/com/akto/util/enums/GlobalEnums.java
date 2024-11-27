@@ -44,6 +44,8 @@ public class GlobalEnums {
         LFI("LFI", Severity.HIGH, "Local File Inclusion (LFI)", "Local File Inclusion"),
         XSS("XSS", Severity.HIGH, "Cross-site scripting (XSS)", "Cross-site scripting"),
         IIM("IIM", Severity.HIGH, "Improper Inventory Management (IIM)", "Improper Inventory Management"),
+        INJECT("INJECT", Severity.MEDIUM, "Injection Attacks (INJECT)", "Injection Attacks"),
+        INPUT("INPUT", Severity.MEDIUM, "Input Validation (INPUT)", "Input Validation"),
         LLM("LLM",Severity.HIGH,"LLM (Large Language Models) Top 10","LLM");
 
         private final String name;

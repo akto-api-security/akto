@@ -13,13 +13,14 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import com.mongodb.client.model.Sorts;
 import org.bson.conversions.Bson;
 
 public class YamlTemplateDao extends AccountsContextDao<YamlTemplate> {
 
     public static final YamlTemplateDao instance = new YamlTemplateDao();
 
-    public Map<String, TestConfig> fetchTestConfigMap(boolean includeYamlContent, boolean fetchOnlyActive) {
+    public Map<String, TestConfig> fetchTestConfigMap(boolean includeYamlContent, boolean fetchOnlyActive, int skip, int limit) {
         Map<String, TestConfig> testConfigMap = new HashMap<>();
         List<Bson> filters = new ArrayList<>();
         if (fetchOnlyActive) {
@@ -28,7 +29,7 @@ public class YamlTemplateDao extends AccountsContextDao<YamlTemplate> {
         } else {
             filters.add(new BasicDBObject());
         }
-        List<YamlTemplate> yamlTemplates = YamlTemplateDao.instance.findAll(Filters.or(filters));
+        List<YamlTemplate> yamlTemplates = YamlTemplateDao.instance.findAll(Filters.or(filters), skip, limit, Sorts.ascending("_id"));
         for (YamlTemplate yamlTemplate: yamlTemplates) {
             try {
                 TestConfig testConfig = TestConfigYamlParser.parseTemplate(yamlTemplate.getContent());
@@ -56,6 +57,16 @@ public class YamlTemplateDao extends AccountsContextDao<YamlTemplate> {
         }
 
         return ret;
+    }
+
+    public int getNewCustomTemplates(int timestamp){
+        int countOfTemplates = (int) YamlTemplateDao.instance.count(
+            Filters.and(
+                Filters.gt(YamlTemplate.CREATED_AT, timestamp),
+                Filters.ne(YamlTemplate.AUTHOR, "AKTO")
+            )
+        );
+        return countOfTemplates;
     }
 
     @Override

@@ -16,12 +16,13 @@ import com.akto.dto.billing.SyncLimit;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.*;
 import com.akto.dto.billing.Organization;
-import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.*;
+import com.akto.dto.testing.TestingEndpoints.Operator;
 import com.akto.dto.testing.TestingRun.State;
 import com.akto.dto.testing.rate_limit.ApiRateLimit;
 import com.akto.dto.testing.rate_limit.GlobalApiRateLimit;
 import com.akto.dto.testing.rate_limit.RateLimitHandler;
+import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.usage.MetricTypes;
 import com.akto.github.GithubUtils;
 import com.akto.log.LoggerMaker;
@@ -33,14 +34,22 @@ import com.akto.notifications.slack.NewIssuesModel;
 import com.akto.notifications.slack.SlackAlerts;
 import com.akto.notifications.slack.SlackSender;
 import com.akto.rules.RequiredConfigs;
+import com.akto.task.Cluster;
+import com.akto.test_editor.execution.Executor;
 import com.akto.util.AccountTask;
 import com.akto.util.Constants;
 import com.akto.util.DashboardMode;
+import com.akto.util.DbMode;
 import com.akto.util.EmailAccountName;
+import com.akto.util.Util;
 import com.akto.util.enums.GlobalEnums;
+import com.akto.util.enums.GlobalEnums.Severity;
 import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.model.*;
+import com.mongodb.client.result.DeleteResult;
+
+import org.bson.Document;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 import org.json.JSONObject;
@@ -54,12 +63,13 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
 public class Main {
-    private static final LoggerMaker loggerMaker = new LoggerMaker(Main.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(Main.class, LogDb.TESTING);
 
     private static final Logger logger = LoggerFactory.getLogger(Main.class);
 
 
     public static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
+    public static final ScheduledExecutorService deleteScheduler = Executors.newScheduledThreadPool(1);
 
     public static final ScheduledExecutorService testTelemetryScheduler = Executors.newScheduledThreadPool(2);
 
@@ -67,6 +77,14 @@ public class Main {
 
     public static boolean SKIP_SSRF_CHECK = ("true".equalsIgnoreCase(System.getenv("SKIP_SSRF_CHECK")) || !DashboardMode.isSaasDeployment());
     public static final boolean IS_SAAS = "true".equalsIgnoreCase(System.getenv("IS_SAAS"));
+
+    private static Map<String, Integer> emptyCountIssuesMap = new HashMap<>();
+
+    static {
+        emptyCountIssuesMap.put(Severity.HIGH.toString(), 0);
+        emptyCountIssuesMap.put(Severity.MEDIUM.toString(), 0);
+        emptyCountIssuesMap.put(Severity.LOW.toString(), 0);
+    }
 
     private static TestingRunResultSummary createTRRSummaryIfAbsent(TestingRun testingRun, int start){
         ObjectId testingRunId = new ObjectId(testingRun.getHexId());
@@ -78,7 +96,9 @@ public class Main {
                 ),
                 Updates.combine(
                         Updates.set(TestingRunResultSummary.STATE, TestingRun.State.RUNNING),
-                        Updates.setOnInsert(TestingRunResultSummary.START_TIMESTAMP, start)
+                        Updates.setOnInsert(TestingRunResultSummary.START_TIMESTAMP, start),
+                        Updates.set(TestingRunResultSummary.TEST_RESULTS_COUNT, 0),
+                        Updates.set(TestingRunResultSummary.COUNT_ISSUES, emptyCountIssuesMap)
                 ),
                 new FindOneAndUpdateOptions().upsert(true).returnDocument(ReturnDocument.AFTER)
         );
@@ -115,9 +135,12 @@ public class Main {
         return ret;
     }
     private static final int LAST_TEST_RUN_EXECUTION_DELTA = 5 * 60;
+    private static final int DEFAULT_DELTA_IGNORE_TIME = 2*60*60;
+    private static final int MAX_RETRIES_FOR_FAILED_SUMMARIES = 3;
 
-    private static TestingRun findPendingTestingRun() {
-        int delta = Context.now() - 20*60;
+    private static TestingRun findPendingTestingRun(int userDeltaTime) {
+        int deltaPeriod = userDeltaTime == 0 ? DEFAULT_DELTA_IGNORE_TIME : userDeltaTime;
+        int delta = Context.now() - deltaPeriod;
 
         Bson filter1 = Filters.and(Filters.eq(TestingRun.STATE, TestingRun.State.SCHEDULED),
                 Filters.lte(TestingRun.SCHEDULE_TIMESTAMP, Context.now())
@@ -137,11 +160,12 @@ public class Main {
                 Filters.or(filter1,filter2), update);
     }
 
-    private static TestingRunResultSummary findPendingTestingRunResultSummary() {
+    private static TestingRunResultSummary findPendingTestingRunResultSummary(int userDeltaTime) {
 
         // if you change this delta, update this delta in method getCurrentRunningTestsSummaries
         int now = Context.now();
-        int delta = now - 20*60;
+        int deltaPeriod = userDeltaTime == 0 ? DEFAULT_DELTA_IGNORE_TIME : userDeltaTime;
+        int delta = now - deltaPeriod;
 
         Bson filter1 = Filters.and(
             Filters.eq(TestingRun.STATE, TestingRun.State.SCHEDULED),
@@ -151,7 +175,7 @@ public class Main {
 
         Bson filter2 = Filters.and(
             Filters.eq(TestingRun.STATE, TestingRun.State.RUNNING),
-            Filters.lte(TestingRunResultSummary.START_TIMESTAMP, now - 5*60),
+            Filters.lte(TestingRunResultSummary.START_TIMESTAMP, now - 20*60),
             Filters.gt(TestingRunResultSummary.START_TIMESTAMP, delta)
         );
 
@@ -238,17 +262,24 @@ public class Main {
         loggerMaker.infoAndAddToDb("os.arch: " + System.getProperty("os.arch"), LogDb.TESTING);
         loggerMaker.infoAndAddToDb("os.version: " + System.getProperty("os.version"), LogDb.TESTING);
 
+        SingleTypeInfo.init();
         while (true) {
             AccountTask.instance.executeTaskForNonHybridAccounts(account -> {
                 int accountId = account.getId();
-
+                AccountSettings accountSettings = AccountSettingsDao.instance.findOne(
+                    Filters.eq(Constants.ID, accountId), Projections.include(AccountSettings.DELTA_IGNORE_TIME_FOR_SCHEDULED_SUMMARIES)
+                );
                 int start = Context.now();
-                TestingRunResultSummary trrs = findPendingTestingRunResultSummary();
+                int defaultTime = DEFAULT_DELTA_IGNORE_TIME;
+                if(accountSettings != null){
+                    defaultTime =  accountSettings.getTimeForScheduledSummaries();
+                }
+                TestingRunResultSummary trrs = findPendingTestingRunResultSummary(defaultTime);
                 boolean isSummaryRunning = trrs != null && trrs.getState().equals(State.RUNNING);
                 TestingRun testingRun;
                 ObjectId summaryId = null;
                 if (trrs == null) {
-                    testingRun = findPendingTestingRun();
+                    testingRun = findPendingTestingRun(defaultTime);
                 } else {
                     summaryId = trrs.getId();
                     loggerMaker.infoAndAddToDb("Found trrs " + trrs.getHexId() +  " for account: " + accountId);
@@ -294,9 +325,31 @@ public class Main {
                 // saving the initial usageLeft, to calc delta later.
                 int usageLeft = syncLimit.getUsageLeft();
 
-                try {
-                    setTestingRunConfig(testingRun, trrs);
+                /*
+                 * Since the role cache is static
+                 * so to prevent it from being shared across accounts.
+                 */
+                Executor.clearRoleCache();
 
+                try {
+                    fillTestingEndpoints(testingRun);
+                    // continuous testing condition
+                    if (testingRun.getPeriodInSeconds() == -1) {
+                        CustomTestingEndpoints eps = (CustomTestingEndpoints) testingRun.getTestingEndpoints();
+                        if (eps.getApisList().size() == 0) {
+                            Bson completedUpdate = Updates.combine(
+                                Updates.set(TestingRun.STATE, TestingRun.State.SCHEDULED),
+                                Updates.set(TestingRun.END_TIMESTAMP, Context.now()),
+                                Updates.set(TestingRun.SCHEDULE_TIMESTAMP, Context.now() + 5 * 60)
+                            );
+                            TestingRunDao.instance.getMCollection().findOneAndUpdate(
+                                Filters.eq("_id", testingRun.getId()),  completedUpdate
+                            );
+                            return;
+                        }
+                    }
+                    setTestingRunConfig(testingRun, trrs);
+                    boolean maxRetriesReached = false;
                     if (isSummaryRunning || isTestingRunRunning) {
                         loggerMaker.infoAndAddToDb("TRRS or TR is in running state, checking if it should run it or not");
                         TestingRunResultSummary testingRunResultSummary;
@@ -305,7 +358,7 @@ public class Main {
                         } else {
                             Map<ObjectId, TestingRunResultSummary> objectIdTestingRunResultSummaryMap = TestingRunResultSummariesDao.instance.fetchLatestTestingRunResultSummaries(Collections.singletonList(testingRun.getId()));
                             testingRunResultSummary = objectIdTestingRunResultSummaryMap.get(testingRun.getId());
-                        }
+                        }                   
 
                         if (testingRunResultSummary != null) {
                             List<TestingRunResult> testingRunResults = TestingRunResultDao.instance.fetchLatestTestingRunResult(Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, testingRunResultSummary.getId()), 1);
@@ -318,12 +371,31 @@ public class Main {
                                 } else {
                                     loggerMaker.infoAndAddToDb("Test run was executed long ago, TRR_ID:"
                                             + testingRunResult.getHexId() + ", TRRS_ID:" + testingRunResultSummary.getHexId() + " TR_ID:" + testingRun.getHexId(), LogDb.TESTING);
+
+                                    int maxRunTime = testingRun.getTestRunTime() <= 0 ? 30*60 : testingRun.getTestRunTime(); 
+                                    Bson filterQ = Filters.and(
+                                        Filters.gte(TestingRunResultSummary.START_TIMESTAMP, (Context.now() - ((MAX_RETRIES_FOR_FAILED_SUMMARIES + 1) * maxRunTime))),
+                                        Filters.eq(TestingRunResultSummary.TESTING_RUN_ID, testingRun.getId()),
+                                        Filters.eq(TestingRunResultSummary.STATE, State.FAILED)
+                                    );
+
+                                    int countFailedSummaries = (int) TestingRunResultSummariesDao.instance.count(filterQ);
+                                    Bson updateForSummary = Updates.set(TestingRunResultSummary.STATE, State.FAILED);
+                                    if(countFailedSummaries >= (MAX_RETRIES_FOR_FAILED_SUMMARIES - 1)){
+                                        updateForSummary = Updates.combine(
+                                            Updates.set(TestingRunResultSummary.STATE, State.COMPLETED),
+                                            Updates.set(TestingRunResultSummary.END_TIMESTAMP, Context.now())
+                                        );
+                                        loggerMaker.infoAndAddToDb("Max retries level reached for TRR_ID: " + testingRun.getHexId(), LogDb.TESTING);
+                                        maxRetriesReached = true;
+                                    }
+
                                     TestingRunResultSummary summary = TestingRunResultSummariesDao.instance.updateOneNoUpsert(
                                             Filters.and(
                                                     Filters.eq(TestingRunResultSummary.ID, testingRunResultSummary.getId()),
                                                     Filters.eq(TestingRunResultSummary.STATE, State.RUNNING)
                                             ),
-                                            Updates.set(TestingRunResultSummary.STATE, State.FAILED)
+                                            updateForSummary
                                     );
                                     if (summary == null) {
                                         loggerMaker.infoAndAddToDb("Skipping because some other thread picked it up, TRRS_ID:" + testingRunResultSummary.getHexId() + " TR_ID:" + testingRun.getHexId(), LogDb.TESTING);
@@ -349,15 +421,22 @@ public class Main {
                             }
 
                             // insert new summary based on old summary
-                            if (summaryId != null) {
-                                trrs.setId(new ObjectId());
-                                trrs.setStartTimestamp(start);
-                                trrs.setState(State.RUNNING);
-                                TestingRunResultSummariesDao.instance.insertOne(trrs);
-                                summaryId = trrs.getId();
-                            } else {
-                                trrs = createTRRSummaryIfAbsent(testingRun, start);
-                                summaryId = trrs.getId();
+                            // add max retries here and then mark last summary as completed when results > 0
+                            if(maxRetriesReached){
+                                loggerMaker.infoAndAddToDb("Exiting out as maxRetries have been reached for testingRun: " + testingRun.getHexId(), LogDb.TESTING);
+                            }else{
+                                if (summaryId != null) {
+                                    trrs.setId(new ObjectId());
+                                    trrs.setStartTimestamp(start);
+                                    trrs.setState(State.RUNNING);
+                                    trrs.setTestResultsCount(0);
+                                    trrs.setCountIssues(emptyCountIssuesMap);
+                                    TestingRunResultSummariesDao.instance.insertOne(trrs);
+                                    summaryId = trrs.getId();
+                                } else {
+                                    trrs = createTRRSummaryIfAbsent(testingRun, start);
+                                    summaryId = trrs.getId();
+                                }
                             }
                         } else {
                             loggerMaker.infoAndAddToDb("No summary found. Let's run it as usual");
@@ -378,9 +457,12 @@ public class Main {
                         }
                     }
                     RequiredConfigs.initiate();
-                    testExecutor.init(testingRun, summaryId, syncLimit);
-                    raiseMixpanelEvent(summaryId, testingRun, accountId);
-                } catch (Exception e) {
+                    if(!maxRetriesReached){
+                        testExecutor.init(testingRun, summaryId, syncLimit);
+                        raiseMixpanelEvent(summaryId, testingRun, accountId);
+                    }
+                    
+            } catch (Exception e) {
                     loggerMaker.errorAndAddToDb(e, "Error in init " + e);
                 }
                 Bson completedUpdate = Updates.combine(
@@ -393,6 +475,12 @@ public class Main {
                             Updates.set(TestingRun.STATE, TestingRun.State.SCHEDULED),
                             Updates.set(TestingRun.END_TIMESTAMP, Context.now()),
                             Updates.set(TestingRun.SCHEDULE_TIMESTAMP, testingRun.getScheduleTimestamp() + testingRun.getPeriodInSeconds())
+                    );
+                } else if (testingRun.getPeriodInSeconds() == -1) {
+                    completedUpdate = Updates.combine(
+                            Updates.set(TestingRun.STATE, TestingRun.State.SCHEDULED),
+                            Updates.set(TestingRun.END_TIMESTAMP, Context.now()),
+                            Updates.set(TestingRun.SCHEDULE_TIMESTAMP, testingRun.getScheduleTimestamp() + 5 * 60)
                     );
                 }
 
@@ -409,10 +497,27 @@ public class Main {
 
                 loggerMaker.infoAndAddToDb("Tests completed in " + (Context.now() - start) + " seconds for account: " + accountId, LogDb.TESTING);
 
+                /*
+                 * In case the testing run results start overflowing
+                 * due to being a capped collection,
+                 * we will start deleting non-vulnerable results,
+                 * since we cap on size as well as number of documents.
+                 */
+                deleteScheduler.execute(() -> {
+                    Context.accountId.set(accountId);
+                    try {
+                        deleteNonVulnerableResults();
+                        // TODO: fix clean testing job (CleanTestingJob) for more scale and add here.
+
+                    } catch (Exception e) {
+                        loggerMaker.errorAndAddToDb(e, "Error in deleting testing run results");
+                    }
+                });
+                
                 Organization organization = OrganizationsDao.instance.findOne(
                         Filters.in(Organization.ACCOUNTS, Context.accountId.get()));
 
-                if(organization.getTestTelemetryEnabled()){
+                if(organization != null && organization.getTestTelemetryEnabled()){
                     loggerMaker.infoAndAddToDb("Test telemetry enabled for account: " + accountId + ", sending results", LogDb.TESTING);
                     ObjectId finalSummaryId = summaryId;
                     testTelemetryScheduler.execute(() -> {
@@ -439,6 +544,36 @@ public class Main {
             }, "testing");
             Thread.sleep(1000);
         }
+    }
+
+    private static void fillTestingEndpoints(TestingRun tr) {
+        if (tr.getPeriodInSeconds() != -1) {
+            return;
+        }
+        
+        int apiCollectionId;
+        if (tr.getTestingEndpoints() instanceof CollectionWiseTestingEndpoints) {
+            CollectionWiseTestingEndpoints eps = (CollectionWiseTestingEndpoints) tr.getTestingEndpoints();
+            apiCollectionId = eps.getApiCollectionId();
+        } else if (tr.getTestingEndpoints() instanceof CustomTestingEndpoints) {
+            CustomTestingEndpoints eps = (CustomTestingEndpoints) tr.getTestingEndpoints();
+            apiCollectionId = eps.getApisList().get(0).getApiCollectionId();
+        } else {
+            return;
+        }
+
+        int st = tr.getEndTimestamp();
+        int et = 0;
+        if (st == -1) {
+            st = 0;
+            et = Context.now() + 20 * 60;
+        } else {
+            et = st + 20 * 60;
+        }
+
+        List<ApiInfo.ApiInfoKey> endpoints = SingleTypeInfoDao.fetchLatestEndpointsForTesting(st, et, apiCollectionId);
+        CustomTestingEndpoints newEps = new CustomTestingEndpoints(endpoints, Operator.AND);
+        tr.setTestingEndpoints(newEps);
     }
 
     private static void raiseMixpanelEvent(ObjectId summaryId, TestingRun testingRun, int accountId) {
@@ -581,9 +716,172 @@ public class Main {
                 testingRun.getHexId(),
                 summaryId.toHexString()
         );
-        SlackSender.sendAlert(accountId, apiTestStatusAlert);
+        if (testingRun.getSendSlackAlert()) {
+            SlackSender.sendAlert(accountId, apiTestStatusAlert);
+        }
 
         AktoMixpanel aktoMixpanel = new AktoMixpanel();
         aktoMixpanel.sendEvent(distinct_id, "Test executed", props);
     }
+
+    private static void deleteNonVulnerableResults() {
+        if (shouldDeleteNonVulnerableResults()) {
+            /*
+             * Since this is a heavy job,
+             * running it for only one account on one instance at a time.
+             */
+            boolean dibs = Cluster.callDibs(Cluster.DELETE_TESTING_RUN_RESULTS, 60 * 60, 60);
+            if (!dibs) {
+                return;
+            }
+            loggerMaker.infoAndAddToDb(
+                    String.format("%s dibs acquired, starting", Cluster.DELETE_TESTING_RUN_RESULTS));
+
+            deleteNonVulnerableResultsUtil();
+            loggerMaker.infoAndAddToDb(
+                    "deleteNonVulnerableResults Completed deleting non-vulnerable TestingRunResults");
+        }
+    }
+
+    private static boolean shouldDeleteNonVulnerableResults() {
+        long count = -1;
+        long size = -1;
+
+        if (DbMode.allowCappedCollections()) {
+            Document stats = TestingRunResultDao.instance.getCollectionStats();
+            count = Util.getLongValue(stats.get(MCollection._COUNT));
+            size = Util.getLongValue(stats.get(MCollection._SIZE));
+        } else {
+            /*
+             * db.runCommand not supported for DBs excluding mongoDB
+             */
+            count = TestingRunResultDao.instance.getMCollection().estimatedDocumentCount();
+        }
+
+        loggerMaker.infoAndAddToDb(String.format(
+                "shouldDeleteNonVulnerableResults non-vulnerable TestingRunResults, current stats: size: %s count: %s",
+                size, count));
+
+        // Deleting only in case of capped collection limits about to breach
+        if ((size >= (TestingRunResultDao.CLEAN_THRESHOLD * TestingRunResultDao.sizeInBytes) / 100) ||
+                (count >= (TestingRunResultDao.CLEAN_THRESHOLD * TestingRunResultDao.maxDocuments) / 100)) {
+
+            /*
+             * We delete non-vulnerable results,
+             * per summary, starting from the oldest one.
+             */
+            return true;
+        }
+        return false;
+    }
+
+    private static void deleteNonVulnerableResultsUtil() {
+
+        final int LIMIT = 1000;
+        final int BATCH_LIMIT = 5;
+        int skip = 0;
+
+        do {
+
+            // oldest first.
+            List<TestingRunResultSummary> summaries = TestingRunResultSummariesDao.instance.findAll(
+                    Filters.empty(), skip, LIMIT, Sorts.ascending(TestingRunResultSummary.END_TIMESTAMP),
+                    Projections.exclude(TestingRunResultSummary.METADATA_STRING));
+
+            if (summaries == null || summaries.isEmpty()) {
+                break;
+            }
+
+            loggerMaker.infoAndAddToDb(String.format(
+                    "deleteNonVulnerableResultsUtil Fetched %s summaries for deleting TestingRunResults",
+                    summaries.size()));
+            List<ObjectId> ids = new ArrayList<>();
+
+            boolean done = false;
+            for (TestingRunResultSummary summary : summaries) {
+                ids.add(summary.getId());
+                if (ids.size() >= BATCH_LIMIT) {
+                    if (actuallyDeleteTestingRunResults(ids)) {
+                        done = true;
+                        break;
+                    }
+                    ids = new ArrayList<>();
+                }
+            }
+
+            if (!done && ids.size() > 0) {
+                if (actuallyDeleteTestingRunResults(ids)) {
+                    break;
+                }
+            }
+
+            skip += LIMIT;
+        } while (true);
+
+        runCompactIfPossible();
+    }
+
+    private static void runCompactIfPossible() {
+        if (!DbMode.allowCappedCollections()) {
+            /*
+             * db.runCommand not supported for DBs excluding mongoDB
+             */
+            return;
+        }
+
+        loggerMaker.infoAndAddToDb("deleteNonVulnerableResultsUtil Running compact to reclaim space");
+        Document compactResult = TestingRunResultDao.instance.compactCollection();
+        loggerMaker.infoAndAddToDb(
+                String.format("deleteNonVulnerableResultsUtil compact result: %s", compactResult.toString()));
+    }
+
+    private static boolean actuallyDeleteTestingRunResults(List<ObjectId> ids) {
+
+        if (ids == null || ids.isEmpty()) {
+            return false;
+        }
+
+        DeleteResult res = TestingRunResultDao.instance.deleteAll(
+                Filters.and(
+                        Filters.in(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, ids),
+                        Filters.eq(TestingRunResult.VULNERABLE, false)));
+
+        loggerMaker.infoAndAddToDb(String.format(
+                "actuallyDeleteTestingRunResults Deleted %s TestingRunResults",
+                res.getDeletedCount()));
+        if (deletePurposeSuccessful()) {
+            return true;
+        }
+        return false;
+    }
+
+    private static boolean deletePurposeSuccessful() {
+        long count = -1;
+        long size = -1;
+
+        if (DbMode.allowCappedCollections()) {
+            Document stats = TestingRunResultDao.instance.getCollectionStats();
+            count = Util.getLongValue(stats.get(MCollection._COUNT));
+            size = Util.getLongValue(stats.get(MCollection._SIZE));
+        } else {
+            /*
+             * db.runCommand not supported for DBs excluding mongoDB
+             */
+            count = TestingRunResultDao.instance.getMCollection().estimatedDocumentCount();
+        }
+
+        loggerMaker.infoAndAddToDb(String.format(
+                "actuallyDeleteTestingRunResults stats: size: %s count: %s",
+                size, count));
+
+        if ((size != -1 &&
+                (size <= (TestingRunResultDao.DESIRED_THRESHOLD * TestingRunResultDao.sizeInBytes) / 100)) ||
+                (count != -1 &&
+                        (count <= (TestingRunResultDao.DESIRED_THRESHOLD * TestingRunResultDao.maxDocuments) / 100))) {
+
+            return true;
+        }
+        return false;
+    }
+
 }

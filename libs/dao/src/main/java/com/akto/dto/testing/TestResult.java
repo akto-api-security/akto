@@ -7,21 +7,34 @@ import java.util.List;
 
 public class TestResult extends GenericTestResult {
 
+    public static final String _MESSAGE = "message";
     private String message;
     public static final String _ERRORS = "errors";
     private List<String> errors;
     public static final String TEST_RESULTS_ERRORS = TestingRunResult.TEST_RESULTS + "." + TestResult._ERRORS;
 
     public static final String ERRORS = "errors";
+    public static final String ORIGINAL_MESSAGE = "originalMessage";
     private String originalMessage;
     private double percentageMatch;
     private TestInfo testInfo;
 
     public static final String REQUIRES_CONFIG = "requiresConfig";
+    public static final String  API_CALL_FAILED_ERROR_STRING = "Error executing test request: Api Call failed";
+    public static final String  API_CALL_FAILED_ERROR_STRING_UNREACHABLE = "Error executing test request: Host unreachable previously";
+
     private boolean requiresConfig;
 
+    /*
+     * This field is being used as severity.
+     * Thus keeping this in sync with "enum severity".
+     */
     public enum Confidence {
-        HIGH, MEDIUM, LOW
+        CRITICAL,
+        HIGH,
+        MEDIUM,
+        LOW,
+        INFO
     }
 
     public enum TestError {
@@ -99,6 +112,15 @@ public class TestResult extends GenericTestResult {
     }
 
     public String getOriginalMessage() {
+        /*
+         Not storing original messages for passive tests,
+         as original and attempt are same for passive tests.
+
+         For any other test, there will always be original message.
+         */
+        if(originalMessage == null || originalMessage.isEmpty()){
+            return message;
+        }
         return originalMessage;
     }
 

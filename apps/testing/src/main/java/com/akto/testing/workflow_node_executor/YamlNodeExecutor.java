@@ -1,5 +1,6 @@
 package com.akto.testing.workflow_node_executor;
 
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -8,7 +9,6 @@ import java.util.List;
 import java.util.Map;
 
 import com.akto.dto.type.SingleTypeInfo;
-import com.akto.testing.Main;
 import com.akto.dto.*;
 import com.akto.dto.type.URLMethods;
 import com.akto.test_editor.execution.Memory;
@@ -42,7 +42,7 @@ import com.akto.test_editor.execution.ExecutorAlgorithm;
 import com.akto.testing.ApiExecutor;
 import com.akto.testing.TestExecutor;
 import com.akto.util.Constants;
-import com.akto.utils.RedactSampleData;
+import static com.akto.runtime.utils.Utils.convertOriginalReqRespToString;
 import com.google.gson.Gson;
 
 public class YamlNodeExecutor extends NodeExecutor {
@@ -146,13 +146,24 @@ public class YamlNodeExecutor extends NodeExecutor {
             int tsAfterReq = 0;
             try {
                 tsBeforeReq = Context.nowInMillis();
-                testResponse = ApiExecutor.sendRequest(testReq.getRequest(), followRedirect, testingRunConfig, debug, testLogs, Main.SKIP_SSRF_CHECK);
+                String url = testReq.getRequest().getUrl();
+                if (url.contains("sampl-aktol-1exannwybqov-67928726")) {
+                    try {
+                        URI uri = new URI(url);
+                        String newUrl = "https://vulnerable-server.akto.io" + uri.getPath();
+                        testReq.getRequest().setUrl(newUrl);
+                    } catch (Exception e) {
+                        // TODO: handle exception
+                    }
+                }
+                testResponse = ApiExecutor.sendRequest(testReq.getRequest(), followRedirect, testingRunConfig, debug, testLogs, com.akto.test_editor.Utils.SKIP_SSRF_CHECK);
                 if (apiInfoKey != null && memory != null) {
                     memory.fillResponse(testReq.getRequest(), testResponse, apiInfoKey.getApiCollectionId(), apiInfoKey.getUrl(), apiInfoKey.getMethod().name());
                     memory.reset(apiInfoKey.getApiCollectionId(), apiInfoKey.getUrl(), apiInfoKey.getMethod().name());
                 }
                 tsAfterReq = Context.nowInMillis();
-                responseTimeArr.add(tsAfterReq - tsBeforeReq);
+                int responseTime = tsAfterReq - tsBeforeReq;
+                responseTimeArr.add(responseTime);
                 ExecutionResult attempt = new ExecutionResult(singleReq.getSuccess(), singleReq.getErrMsg(), testReq.getRequest(), testResponse);
                 TestResult res = executor.validate(attempt, sampleRawApi, varMap, logId, validatorNode, yamlNodeDetails.getApiInfoKey());
                 if (res != null) {
@@ -160,7 +171,7 @@ public class YamlNodeExecutor extends NodeExecutor {
                 }
                 vulnerable = res.getVulnerable();
                 try {
-                    message.add(RedactSampleData.convertOriginalReqRespToString(testReq.getRequest(), testResponse));
+                    message.add(convertOriginalReqRespToString(testReq.getRequest(), testResponse, responseTime));
                 } catch (Exception e) {
                     ;
                 }
@@ -255,7 +266,7 @@ public class YamlNodeExecutor extends NodeExecutor {
     public WorkflowTestResult.NodeResult processYamlNode(Node node, Map<String, Object> valuesMap, Boolean allowAllStatusCodes, YamlNodeDetails yamlNodeDetails, boolean debug, List<TestingRunResult.TestLog> testLogs) {
 
         String testSubCategory = yamlNodeDetails.getTestId();
-        Map<String, TestConfig> testConfigMap = YamlTemplateDao.instance.fetchTestConfigMap(false, false);
+        Map<String, TestConfig> testConfigMap = YamlTemplateDao.instance.fetchTestConfigMap(false, false, 0, 10_000);
         TestConfig testConfig = testConfigMap.get(testSubCategory);
 
         ExecutorNode executorNode = yamlNodeDetails.getExecutorNode();

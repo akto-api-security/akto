@@ -15,6 +15,7 @@ import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.testing.TestingEndpoints;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
+import com.akto.util.Constants;
 import com.akto.util.Util;
 import com.akto.dto.type.URLMethods.Method;
 import com.mongodb.BasicDBObject;
@@ -65,6 +66,9 @@ public class SingleTypeInfoDao extends AccountsContextDaoWithRbac<SingleTypeInfo
         fieldNames = new String[]{SingleTypeInfo._RESPONSE_CODE, SingleTypeInfo._IS_HEADER, SingleTypeInfo._PARAM, SingleTypeInfo.SUB_TYPE, SingleTypeInfo._API_COLLECTION_ID};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
 
+        fieldNames = new String[]{SingleTypeInfo._RESPONSE_CODE, SingleTypeInfo._IS_HEADER, SingleTypeInfo._PARAM, SingleTypeInfo.SUB_TYPE, SingleTypeInfo._API_COLLECTION_ID, Constants.ID};
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
+
         fieldNames = new String[]{SingleTypeInfo.SUB_TYPE, SingleTypeInfo._RESPONSE_CODE};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
 
@@ -93,16 +97,61 @@ public class SingleTypeInfoDao extends AccountsContextDaoWithRbac<SingleTypeInfo
         );
     }
 
-    public static Bson filterForHostHeader(int apiCollectionId, boolean useApiCollectionId) {
+    public static List<Bson> filterForHostHostHeaderRaw() {
         List<Bson> filters = new ArrayList<>();
         filters.add(Filters.eq(SingleTypeInfo._RESPONSE_CODE, -1));
         filters.add(Filters.eq(SingleTypeInfo._IS_HEADER, true));
         filters.add(Filters.eq(SingleTypeInfo._PARAM, "host"));
         filters.add(Filters.eq(SingleTypeInfo.SUB_TYPE, SingleTypeInfo.GENERIC.getName()));
 
+        return filters;
+    }
+
+    public static Bson filterForHostHeader(int apiCollectionId, boolean useApiCollectionId) {
+        List<Bson> filters = filterForHostHostHeaderRaw();
         if (useApiCollectionId) filters.add(Filters.eq(SingleTypeInfo._API_COLLECTION_ID, apiCollectionId));
 
         return Filters.and(filters);
+    }
+
+    public static List<ApiInfo.ApiInfoKey> fetchLatestEndpointsForTesting(int startTimestamp, int endTimestamp, int apiCollectionId) {
+        List<ApiInfo.ApiInfoKey> endpoints = new ArrayList<>();
+        Bson hostFilterQ = SingleTypeInfoDao.filterForHostHeader(apiCollectionId, true);
+        Bson filterQWithTs = Filters.and(
+                Filters.gte(SingleTypeInfo._TIMESTAMP, startTimestamp),
+                Filters.lte(SingleTypeInfo._TIMESTAMP, endTimestamp),
+                Filters.eq(SingleTypeInfo._API_COLLECTION_ID, apiCollectionId),
+                hostFilterQ
+        );
+
+        List<SingleTypeInfo> latestHosts = SingleTypeInfoDao.instance.findAll(filterQWithTs, 0, 10000, Sorts.descending("timestamp"), Projections.exclude("values"));
+        if (latestHosts.size() == 0) {
+            List<Bson> pipeline = new ArrayList<>();
+
+            BasicDBObject groupedId = 
+                new BasicDBObject("apiCollectionId", "$apiCollectionId")
+                .append("url", "$url")
+                .append("method", "$method");
+            pipeline.add(Aggregates.match(Filters.eq("apiCollectionId", apiCollectionId)));
+            pipeline.add(Aggregates.group(groupedId, Accumulators.min("startTs", "$timestamp"),Accumulators.sum("countTs",1)));
+            pipeline.add(Aggregates.match(Filters.gte("startTs", startTimestamp)));
+            pipeline.add(Aggregates.match(Filters.lte("startTs", endTimestamp)));
+            MongoCursor<BasicDBObject> endpointsCursor = SingleTypeInfoDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
+            while(endpointsCursor.hasNext()) {
+                BasicDBObject basicDBObject = endpointsCursor.next();
+                BasicDBObject id = (BasicDBObject) basicDBObject.get("_id");
+                int collectionId = id.getInt("apiCollectionId");
+                String url = id.getString("url");
+                String method = id.getString("method");
+                endpoints.add(new ApiInfoKey(collectionId, url, URLMethods.Method.valueOf(method)));
+            }
+        } else {
+            for (SingleTypeInfo sti: latestHosts) {
+                endpoints.add(new ApiInfoKey(sti.getApiCollectionId(), sti.getUrl(), URLMethods.Method.valueOf(sti.getMethod())));
+            }
+        }
+
+        return endpoints;
     }
 
     public List<SingleTypeInfo> fetchAll() {
@@ -399,38 +448,6 @@ public class SingleTypeInfoDao extends AccountsContextDaoWithRbac<SingleTypeInfo
         return instance.getMCollection().estimatedDocumentCount();
     }
 
-    public Map<String,Map<String, Integer>> buildSubTypeCountMap(int startTimestamp, int endTimestamp) {
-
-        ArrayList<Bson> filterList = new ArrayList<>();
-        filterList.add(Filters.gt("timestamp", startTimestamp));
-        filterList.add(Filters.lt("timestamp", endTimestamp));
-
-        List<String> sensitiveInRequest = SingleTypeInfoDao.instance.sensitiveSubTypeInRequestNames();
-        sensitiveInRequest.addAll(SingleTypeInfoDao.instance.sensitiveSubTypeNames());
-        Bson sensitveSubTypeFilterRequest = Filters.in("subType",sensitiveInRequest);
-        List<Bson> requestFilterList = new ArrayList<>();
-        requestFilterList.add(sensitveSubTypeFilterRequest);
-        requestFilterList.addAll(filterList);
-        requestFilterList.add(Filters.eq("responseCode", -1));
-
-        List<String> sensitiveInResponse = SingleTypeInfoDao.instance.sensitiveSubTypeInResponseNames();
-        sensitiveInResponse.addAll(SingleTypeInfoDao.instance.sensitiveSubTypeNames());
-        Bson sensitveSubTypeFilterResponse = Filters.in("subType",sensitiveInResponse);
-        List<Bson> responseFilterList = new ArrayList<>();
-        responseFilterList.add(sensitveSubTypeFilterResponse);
-        responseFilterList.addAll(filterList);
-        responseFilterList.add(Filters.gt("responseCode", -1));
-
-        Map<String, Integer> requestResult = execute(requestFilterList);
-        Map<String, Integer> responseResult = execute(responseFilterList);
-
-        Map<String, Map<String, Integer>> resultMap = new HashMap<>();
-        resultMap.put("REQUEST", requestResult);
-        resultMap.put("RESPONSE", responseResult);
-        
-        return resultMap;
-    }
-
     public Map<String, Integer> execute(List<Bson> filterList) {
         Map<String, Integer> countMap = new HashMap<>();
         List<Bson> pipeline = new ArrayList<>();
@@ -460,12 +477,32 @@ public class SingleTypeInfoDao extends AccountsContextDaoWithRbac<SingleTypeInfo
         return countMap;
     }
 
-    private List<Bson> generateFilterForSubtypes(List<String> sensitiveParameters, BasicDBObject groupedId, Boolean inResponseOnly){
+    public List<Bson> generateFilterForSubtypes(List<String> sensitiveParameters, BasicDBObject groupedId, Boolean inResponseOnly, Bson customFilter){
         int codeValue = inResponseOnly ? 0 : -1 ;
         List<Bson> pipeline = new ArrayList<>();
         Bson filterOnResponse = Filters.gte(SingleTypeInfo._RESPONSE_CODE, codeValue);
-        Bson sensitiveSubTypeFilter = Filters.and(Filters.in(SingleTypeInfo.SUB_TYPE,sensitiveParameters), filterOnResponse);
-        pipeline.add(Aggregates.match(sensitiveSubTypeFilter));
+        Bson sensitiveSubTypeFilter = Filters.and(Filters.in(SingleTypeInfo.SUB_TYPE,sensitiveParameters), filterOnResponse, customFilter);
+
+        List<String> sensitiveInRequest = SingleTypeInfoDao.instance.sensitiveSubTypeInRequestNames();
+        sensitiveInRequest.addAll(SingleTypeInfoDao.instance.sensitiveSubTypeNames());
+        Bson sensitveSubTypeFilterRequest = Filters.in("subType",sensitiveInRequest);
+        List<Bson> requestFilterList = new ArrayList<>();
+        requestFilterList.add(sensitveSubTypeFilterRequest);
+        requestFilterList.add(customFilter);
+        requestFilterList.add(Filters.eq("responseCode", -1));
+
+        List<String> sensitiveInResponse = SingleTypeInfoDao.instance.sensitiveSubTypeInResponseNames();
+        sensitiveInResponse.addAll(SingleTypeInfoDao.instance.sensitiveSubTypeNames());
+        Bson sensitveSubTypeFilterResponse = Filters.in("subType",sensitiveInResponse);
+        List<Bson> responseFilterList = new ArrayList<>();
+        responseFilterList.add(sensitveSubTypeFilterResponse);
+        responseFilterList.add(customFilter);
+        responseFilterList.add(Filters.gt("responseCode", -1));
+
+        pipeline.add(Aggregates.match(Filters.or(
+            Filters.and(responseFilterList),
+            Filters.and(requestFilterList)
+        )));
         List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
         if(collectionIds != null && !collectionIds.isEmpty()) {
             pipeline.add(Aggregates.match(Filters.in("collectionIds", collectionIds)));
@@ -476,7 +513,7 @@ public class SingleTypeInfoDao extends AccountsContextDaoWithRbac<SingleTypeInfo
 
     public Map<Integer,List<String>> getSensitiveSubtypesDetectedForCollection(List<String> sensitiveParameters){
         BasicDBObject groupedId = new BasicDBObject(SingleTypeInfo._API_COLLECTION_ID, "$apiCollectionId");
-        List<Bson> pipeline = generateFilterForSubtypes(sensitiveParameters, groupedId, false);
+        List<Bson> pipeline = generateFilterForSubtypes(sensitiveParameters, groupedId, false, Filters.empty());
         List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
         if(collectionIds != null && !collectionIds.isEmpty()) {
             pipeline.add(Aggregates.match(Filters.in("collectionIds", collectionIds)));
@@ -496,12 +533,12 @@ public class SingleTypeInfoDao extends AccountsContextDaoWithRbac<SingleTypeInfo
         return result ;
     }
 
-    public Integer getSensitiveApisCount(List<String> sensitiveParameters){
-
+    public Integer getSensitiveApisCount(List<String> sensitiveParameters, boolean inResponseOnly, Bson customFilter){
+       
         BasicDBObject groupedId = new BasicDBObject(SingleTypeInfo._API_COLLECTION_ID, "$apiCollectionId")
                                         .append(SingleTypeInfo._URL, "$url")
                                         .append(SingleTypeInfo._METHOD, "$method");
-        List<Bson> pipeline = generateFilterForSubtypes(sensitiveParameters, groupedId, true);
+        List<Bson> pipeline = generateFilterForSubtypes(sensitiveParameters, groupedId, inResponseOnly, customFilter);
         pipeline.add(Aggregates.count("totalSensitiveApis"));
 
         MongoCursor<BasicDBObject> cursor = SingleTypeInfoDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
@@ -629,4 +666,127 @@ public class SingleTypeInfoDao extends AccountsContextDaoWithRbac<SingleTypeInfo
     public String getFilterKeyString() {
         return TestingEndpoints.getFilterPrefix(ApiCollectionUsers.CollectionType.ApiCollectionId);
     }
+    public List<String> sensitiveApisList(List<String> sensitiveSubtypes,Bson customFilter, int limit){
+        List<String> finalArrList = new ArrayList<>();
+        BasicDBObject groupedId = new BasicDBObject(SingleTypeInfo._API_COLLECTION_ID, "$apiCollectionId")
+                                    .append(SingleTypeInfo._URL, "$url")
+                                    .append(SingleTypeInfo._METHOD, "$method");
+        List<Bson> pipeline = SingleTypeInfoDao.instance.generateFilterForSubtypes(sensitiveSubtypes, groupedId, false, customFilter);
+        pipeline.add(Aggregates.limit(limit));
+        MongoCursor<BasicDBObject> cursor = SingleTypeInfoDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
+
+        while(cursor.hasNext()){
+            BasicDBObject bdObject = cursor.next();
+            BasicDBObject id = (BasicDBObject) bdObject.get("_id");
+
+            String url = id.getString("method") + " " + id.getString("url");
+            finalArrList.add(url);
+        }
+
+        return finalArrList;
+    }
+
+    public long fetchEndpointsCount(int startTimestamp, int endTimestamp, Set<Integer> deactivatedCollections) {
+        List <Integer> nonHostApiCollectionIds = ApiCollectionsDao.instance.fetchNonTrafficApiCollectionsIds();
+        nonHostApiCollectionIds.addAll(deactivatedCollections);
+
+        Bson hostFilterQ = SingleTypeInfoDao.filterForHostHeader(0, false);
+        Bson filterQWithTs = Filters.and(
+                Filters.gte(SingleTypeInfo._TIMESTAMP, startTimestamp),
+                Filters.lte(SingleTypeInfo._TIMESTAMP, endTimestamp),
+                Filters.nin(SingleTypeInfo._API_COLLECTION_ID, nonHostApiCollectionIds),
+                hostFilterQ
+        );
+
+        long count = SingleTypeInfoDao.instance.count(filterQWithTs);
+
+        nonHostApiCollectionIds.removeAll(deactivatedCollections);
+
+        if (nonHostApiCollectionIds.size() > 0){
+            List<Bson> pipeline = new ArrayList<>();
+
+            pipeline.add(Aggregates.match(Filters.in("apiCollectionId", nonHostApiCollectionIds)));
+
+            BasicDBObject groupedId = 
+                new BasicDBObject("apiCollectionId", "$apiCollectionId")
+                .append("url", "$url")
+                .append("method", "$method");
+            pipeline.add(Aggregates.group(groupedId, Accumulators.min("startTs", "$timestamp")));
+            pipeline.add(Aggregates.match(Filters.gte("startTs", startTimestamp)));
+            pipeline.add(Aggregates.match(Filters.lte("startTs", endTimestamp)));
+            pipeline.add(Aggregates.sort(Sorts.descending("startTs")));
+            MongoCursor<BasicDBObject> endpointsCursor = SingleTypeInfoDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
+            while(endpointsCursor.hasNext()) {
+                count += 1;
+                endpointsCursor.next();
+            }
+        }
+
+        return count;
+    }
+
+    public Bson getFilterForHostApis(int startTimestamp, int endTimestamp, Set<Integer> deactivatedCollections, List <Integer> nonHostApiCollectionIds){
+
+        Bson hostFilterQ = SingleTypeInfoDao.filterForHostHeader(0, false);
+        nonHostApiCollectionIds.addAll(deactivatedCollections);
+        Bson filterQWithTs = Filters.and(
+                Filters.gte(SingleTypeInfo._TIMESTAMP, startTimestamp),
+                Filters.lte(SingleTypeInfo._TIMESTAMP, endTimestamp),
+                Filters.nin(SingleTypeInfo._API_COLLECTION_ID, nonHostApiCollectionIds),
+                hostFilterQ
+        );
+        return filterQWithTs;
+    }
+
+    public List<Bson> buildPipelineForTrend(boolean isNotKubernetes){
+        List<Bson> pipeline = new ArrayList<>();
+        pipeline.add(Aggregates.project(Projections.computed("dayOfYearFloat", new BasicDBObject("$divide", new Object[]{"$timestamp", 86400}))));
+        Bson doyProj = Projections.computed("dayOfYear", new BasicDBObject("$divide", new Object[]{"$timestamp", 86400}));
+        if (isNotKubernetes) {
+            doyProj = Projections.computed("dayOfYear", new BasicDBObject("$floor", new Object[]{"$dayOfYearFloat"}));
+        }
+        pipeline.add(Aggregates.project(doyProj));
+        pipeline.add(Aggregates.group("$dayOfYear", Accumulators.sum("count", 1)));
+
+        return pipeline;
+    }
+
+    public List<BasicDBObject> fetchRecentEndpoints(int startTimestamp, int endTimestamp, Set<Integer> deactivatedCollections){
+        List <Integer> nonHostApiCollectionIds = ApiCollectionsDao.instance.fetchNonTrafficApiCollectionsIds();
+        nonHostApiCollectionIds.addAll(deactivatedCollections);
+        List<BasicDBObject> endpoints = new ArrayList<>();
+        Bson filterQWithTs = getFilterForHostApis(startTimestamp, endTimestamp, deactivatedCollections, nonHostApiCollectionIds);
+        List<SingleTypeInfo> latestHosts = SingleTypeInfoDao.instance.findAll(filterQWithTs, 0, 20_000, Sorts.descending("timestamp"), Projections.exclude("values"));
+        for(SingleTypeInfo sti: latestHosts) {
+            BasicDBObject id = 
+                new BasicDBObject("apiCollectionId", sti.getApiCollectionId())
+                .append("url", sti.getUrl())
+                .append("method", sti.getMethod());
+            BasicDBObject endpoint = 
+                new BasicDBObject("_id", id).append("startTs", sti.getTimestamp()).append("count", 1);
+            endpoints.add(endpoint);
+        }
+        
+        nonHostApiCollectionIds.removeAll(deactivatedCollections);
+
+        if (nonHostApiCollectionIds != null && nonHostApiCollectionIds.size() > 0){
+            List<Bson> pipeline = new ArrayList<>();
+
+            pipeline.add(Aggregates.match(Filters.in("apiCollectionId", nonHostApiCollectionIds)));
+            BasicDBObject groupedId = 
+                new BasicDBObject("apiCollectionId", "$apiCollectionId")
+                .append("url", "$url")
+                .append("method", "$method");
+            pipeline.add(Aggregates.group(groupedId, Accumulators.min("startTs", "$timestamp"),Accumulators.sum("countTs",1)));
+            pipeline.add(Aggregates.match(Filters.gte("startTs", startTimestamp)));
+            pipeline.add(Aggregates.match(Filters.lte("startTs", endTimestamp)));
+            pipeline.add(Aggregates.sort(Sorts.descending("startTs")));
+            MongoCursor<BasicDBObject> endpointsCursor = SingleTypeInfoDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
+            while(endpointsCursor.hasNext()) {
+                endpoints.add(endpointsCursor.next());
+            }
+        }
+        return endpoints;
+    }
+
 }

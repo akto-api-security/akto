@@ -3,7 +3,7 @@ import React, { useRef, useState } from 'react'
 import func from '@/util/func'
 import transform from '../onboarding/transform'
 import observeFunc from "./transform"
-function GetPrettifyEndpoint({method,url, isNew}){
+function GetPrettifyEndpoint({method,url, isNew, maxWidth}){
     const ref = useRef(null)
     const [copyActive, setCopyActive] = useState(false)
     return(
@@ -13,7 +13,7 @@ function GetPrettifyEndpoint({method,url, isNew}){
                     <span style={{color: transform.getTextColor(method), fontSize: "14px", fontWeight: 500, lineHeight: '20px'}}>{method}</span>
                 </HorizontalStack>
             </Box>
-            <Box width="30vw">
+            <Box width={maxWidth ? maxWidth: "30vw"}>
                 <div style={{display: "flex", justifyContent: "space-between", gap:"24px"}}>
                     <div style={{display: "flex"}}>
                         <Box>
