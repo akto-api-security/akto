@@ -59,12 +59,10 @@ public class TestingIssuesHandler {
             Bson query = Filters.eq(ID, issuesId);
             Bson updateStatusFields;
             Bson updateSeverityField;
-            if (runResult.isVulnerable()) {
-                if (status == TestRunIssueStatus.IGNORED) {
-                    updateStatusFields = Updates.set(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.IGNORED);
-                } else {
-                    updateStatusFields = Updates.set(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.OPEN);
-                }
+            if (status == TestRunIssueStatus.IGNORED) {
+                updateStatusFields = Updates.set(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.IGNORED);
+            } else if (runResult.isVulnerable()) {
+                updateStatusFields = Updates.set(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.OPEN);
             } else {
                 updateStatusFields = Updates.set(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.FIXED);
             }
