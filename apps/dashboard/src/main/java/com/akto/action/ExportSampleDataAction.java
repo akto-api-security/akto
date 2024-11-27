@@ -288,7 +288,10 @@ public class ExportSampleDataAction extends UserAction {
             boolean curlyBracesCond = payload.startsWith("{") && payload.endsWith("}");
             boolean squareBracesCond = payload.startsWith("[") && payload.endsWith("]");
             boolean htmlPayloadCond = payload.startsWith("<") && payload.endsWith(">");
-            if (curlyBracesCond || squareBracesCond || htmlPayloadCond) {
+            if(htmlPayloadCond) {
+                String escapedPayload = payload.replace("'", "'\\''");
+                builder.append("-d '").append(escapedPayload).append("' \\\n  ");
+            } else if (curlyBracesCond || squareBracesCond) {
                 if (!Objects.equals(httpRequestParams.getMethod(), "GET")) {
                     String escapedPayload = payload.replace("'", "'\\''");
                     builder.append("-d '").append(escapedPayload).append("' \\\n  ");
