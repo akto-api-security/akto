@@ -1,12 +1,8 @@
 package com.akto.threat.detection;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
-import org.apache.commons.lang3.function.FailableFunction;
+import com.akto.suspect_data.FlushMessagesTask;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.slf4j.Logger;
@@ -19,6 +15,8 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.metrics.AllMetrics;
 import com.akto.runtime.utils.Utils;
 import com.akto.traffic.KafkaRunner;
+import io.lettuce.core.RedisClient;
+
 import com.akto.filters.HttpCallFilter;
 import com.akto.parsers.HttpCallParser;
 
@@ -29,71 +27,93 @@ public class Main {
     private static final int sync_threshold_time = 120;
     private static final int sync_threshold_count = 1000;
     private static long lastSyncOffset = 0;
-    
+
+    private static final Map<String, HttpCallFilter> httpCallFilterMap = new HashMap<>();
+
+    private static final RedisClient redisClient = createRedisClient();
+
     public static void main(String[] args) {
-        
-        Map<String, HttpCallFilter> httpCallFilterMap = new HashMap<>();
+        // Flush Messages task
+        FlushMessagesTask.instance.init();
+
         String topicName = System.getenv("AKTO_KAFKA_TOPIC_NAME");
         if (topicName == null) {
             String defaultTopic = "akto.api.protection";
-            loggerMaker.infoAndAddToDb(String.format("Kafka topic is not defined, using default topic : %s", defaultTopic));
+            loggerMaker.infoAndAddToDb(
+                    String.format(
+                            "Kafka topic is not defined, using default topic : %s", defaultTopic));
             topicName = defaultTopic;
         }
-        
-        FailableFunction<ConsumerRecords<String, String>, Void, Exception> func = records -> {
 
-            long start = System.currentTimeMillis();
-            
-            // TODO: what happens if exception
-                Map<String, List<HttpResponseParams>> responseParamsToAccountMap = new HashMap<>();
-                for (ConsumerRecord<String, String> r : records) {
-                    HttpResponseParams httpResponseParams;
-                    try {
-                        Utils.printL(r.value());
-                        AllMetrics.instance.setRuntimeKafkaRecordCount(1);
-                        AllMetrics.instance.setRuntimeKafkaRecordSize(r.value().length());
-                        lastSyncOffset++;
-                        if (lastSyncOffset % 100 == 0) {
-                            logger.info("Committing offset at position: " + lastSyncOffset);
-                        }
-                        httpResponseParams = HttpCallParser.parseKafkaMessage(r.value());
-                    } catch (Exception e) {
-                        loggerMaker.errorAndAddToDb(e, "Error while parsing kafka message " + e, LogDb.RUNTIME);
-                        continue;
-                    }
-                    String accountId = httpResponseParams.getAccountId();
-                    if (!responseParamsToAccountMap.containsKey(accountId)) {
-                        responseParamsToAccountMap.put(accountId, new ArrayList<>());
-                    }
-                    responseParamsToAccountMap.get(accountId).add(httpResponseParams);
+        KafkaRunner.consume(
+                module,
+                Collections.singletonList(topicName),
+                records -> {
+                    processRecords(records);
+                    return null;
+                });
+    }
+
+    public static void processRecords(ConsumerRecords<String, String> records) {
+        long start = System.currentTimeMillis();
+
+        // TODO: what happens if exception
+        Map<String, List<HttpResponseParams>> responseParamsToAccountMap = new HashMap<>();
+        for (ConsumerRecord<String, String> r : records) {
+            HttpResponseParams httpResponseParams;
+            try {
+                Utils.printL(r.value());
+                AllMetrics.instance.setRuntimeKafkaRecordCount(1);
+                AllMetrics.instance.setRuntimeKafkaRecordSize(r.value().length());
+                lastSyncOffset++;
+                if (lastSyncOffset % 100 == 0) {
+                    logger.info("Committing offset at position: " + lastSyncOffset);
                 }
+                httpResponseParams = HttpCallParser.parseKafkaMessage(r.value());
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(
+                        e, "Error while parsing kafka message " + e, LogDb.RUNTIME);
+                continue;
+            }
+            String accountId = httpResponseParams.getAccountId();
+            if (!responseParamsToAccountMap.containsKey(accountId)) {
+                responseParamsToAccountMap.put(accountId, new ArrayList<>());
+            }
+            responseParamsToAccountMap.get(accountId).add(httpResponseParams);
+        }
 
-                for (String accountId : responseParamsToAccountMap.keySet()) {
-                    int accountIdInt;
-                    try {
-                        accountIdInt = Integer.parseInt(accountId);
-                    } catch (Exception ignored) {
-                        loggerMaker.errorAndAddToDb("Account id not string", LogDb.RUNTIME);
-                        continue;
-                    }
+        for (String accountId : responseParamsToAccountMap.keySet()) {
+            int accountIdInt;
+            try {
+                accountIdInt = Integer.parseInt(accountId);
+            } catch (Exception ignored) {
+                loggerMaker.errorAndAddToDb("Account id not string", LogDb.RUNTIME);
+                continue;
+            }
 
-                    Context.accountId.set(accountIdInt);
+            Context.accountId.set(accountIdInt);
 
-                    if (!httpCallFilterMap.containsKey(accountId)) {
-                        HttpCallFilter filter = new HttpCallFilter(sync_threshold_count, sync_threshold_time);
-                        httpCallFilterMap.put(accountId, filter);
-                        loggerMaker.infoAndAddToDb("New filter created for account: " + accountId);
-                    }
+            if (!httpCallFilterMap.containsKey(accountId)) {
+                HttpCallFilter filter = new HttpCallFilter(redisClient, sync_threshold_count, sync_threshold_time);
+                httpCallFilterMap.put(accountId, filter);
+                loggerMaker.infoAndAddToDb("New filter created for account: " + accountId);
+            }
 
-                    HttpCallFilter filter = httpCallFilterMap.get(accountId);
-                    List<HttpResponseParams> accWiseResponse = responseParamsToAccountMap.get(accountId);
-                    filter.filterFunction(accWiseResponse);
-                }
+            HttpCallFilter filter = httpCallFilterMap.get(accountId);
+            List<HttpResponseParams> accWiseResponse = responseParamsToAccountMap.get(accountId);
+            filter.filterFunction(accWiseResponse);
+        }
 
-            AllMetrics.instance.setRuntimeProcessLatency(System.currentTimeMillis()-start);
+        AllMetrics.instance.setRuntimeProcessLatency(System.currentTimeMillis() - start);
+    }
 
-            return null;
-        };
-        KafkaRunner.processKafkaRecords(module, Arrays.asList(topicName), func);
+    public static RedisClient createRedisClient() {
+        String host = System.getenv().getOrDefault("AKTO_THREAT_DETECTION_REDIS_HOST", "localhost");
+        int port = Integer.parseInt(
+                System.getenv().getOrDefault("AKTO_THREAT_DETECTION_REDIS_PORT", "6379"));
+        int database = Integer.parseInt(
+                System.getenv().getOrDefault("AKTO_THREAT_DETECTION_REDIS_DB", "0"));
+
+        return RedisClient.create("redis://" + host + ":" + port + "/" + database);
     }
 }

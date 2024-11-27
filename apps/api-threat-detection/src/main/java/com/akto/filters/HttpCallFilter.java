@@ -1,121 +1,230 @@
 package com.akto.filters;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.UUID;
+import java.util.*;
 
+import com.akto.auth.grpc.AuthToken;
+import com.akto.cache.RedisBackedCounterCache;
 import com.akto.dao.context.Context;
 import com.akto.dao.monitoring.FilterYamlTemplateDao;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.ApiInfo.ApiInfoKey;
+import com.akto.dto.api_protection_parse_layer.AggregationRules;
+import com.akto.dto.api_protection_parse_layer.Condition;
+import com.akto.dto.api_protection_parse_layer.Rule;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.RawApi;
-import com.akto.dto.bulk_updates.BulkUpdates;
-import com.akto.dto.bulk_updates.UpdatePayload;
 import com.akto.dto.monitoring.FilterConfig;
 import com.akto.dto.test_editor.YamlTemplate;
-import com.akto.dto.traffic.SuspectSampleData;
 import com.akto.dto.type.URLMethods.Method;
+import com.akto.filters.aggregators.key_generator.SourceIPKeyGenerator;
+import com.akto.filters.aggregators.window_based.WindowBasedThresholdNotifier;
 import com.akto.hybrid_parsers.HttpCallParser;
+import com.akto.kafka.Kafka;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.proto.threat_protection.consumer_service.v1.*;
 import com.akto.rules.TestPlugin;
-import com.akto.runtime.policies.ApiAccessTypePolicy;
+import com.akto.suspect_data.KafkaMessage;
 import com.akto.test_editor.execution.VariableResolver;
 import com.akto.test_editor.filter.data_operands_impl.ValidationResult;
+import com.google.protobuf.InvalidProtocolBufferException;
+import com.google.protobuf.util.JsonFormat;
+
+import io.grpc.Grpc;
+import io.grpc.InsecureChannelCredentials;
+import io.grpc.ManagedChannel;
+import io.grpc.stub.StreamObserver;
+import io.lettuce.core.RedisClient;
 
 public class HttpCallFilter {
-    private static final LoggerMaker loggerMaker = new LoggerMaker(HttpCallFilter.class, LogDb.THREAT_DETECTION);
+  private static final LoggerMaker loggerMaker =
+      new LoggerMaker(HttpCallFilter.class, LogDb.THREAT_DETECTION);
 
-    private Map<String, FilterConfig> apiFilters;
-    private List<BulkUpdates> bulkUpdates = new ArrayList<>();
-    private final int sync_threshold_count;
-    private final int sync_threshold_time;
-    private int last_synced;
-    private int sync_count;
-    private HttpCallParser httpCallParser;
+  private Map<String, FilterConfig> apiFilters;
+  private final HttpCallParser httpCallParser;
+  private final Kafka kafka;
 
-    private static final int FILTER_REFRESH_INTERVAL = 10 * 60;
-    private int lastFilterFetch;
+  private static final int KAFKA_BATCH_SIZE = 1000;
+  private static final int KAFKA_BATCH_LINGER_MS = 1000;
+  private static final String KAFKA_MALICIOUS_TOPIC = "akto.malicious";
 
-    private static final DataActor dataActor = DataActorFactory.fetchInstance();
+  private static final int FILTER_REFRESH_INTERVAL = 10 * 60;
+  private int lastFilterFetch;
 
-    public HttpCallFilter(int sync_threshold_count, int sync_threshold_time) {
-        apiFilters = new HashMap<>();
-        bulkUpdates = new ArrayList<>();
-        this.sync_threshold_count = sync_threshold_count;
-        this.sync_threshold_time = sync_threshold_time;
-        last_synced = 0;
-        sync_count = 0;
-        lastFilterFetch = 0;
-        httpCallParser = new HttpCallParser(sync_threshold_count, sync_threshold_time);
+  private static final DataActor dataActor = DataActorFactory.fetchInstance();
+
+  private final WindowBasedThresholdNotifier windowBasedThresholdNotifier;
+
+  private final ConsumerServiceGrpc.ConsumerServiceStub consumerServiceStub;
+
+  public HttpCallFilter(
+      RedisClient redisClient, int sync_threshold_count, int sync_threshold_time) {
+    this.apiFilters = new HashMap<>();
+    this.lastFilterFetch = 0;
+    this.httpCallParser = new HttpCallParser(sync_threshold_count, sync_threshold_time);
+
+    String kafkaBrokerUrl = System.getenv("AKTO_KAFKA_BROKER_URL");
+    this.kafka = new Kafka(kafkaBrokerUrl, KAFKA_BATCH_LINGER_MS, KAFKA_BATCH_SIZE);
+    this.windowBasedThresholdNotifier =
+        new WindowBasedThresholdNotifier(
+            new RedisBackedCounterCache(redisClient, "wbt"),
+            new WindowBasedThresholdNotifier.Config(100, 10 * 60));
+
+    String target = "localhost:8980";
+    ManagedChannel channel =
+        Grpc.newChannelBuilder(target, InsecureChannelCredentials.create()).build();
+    this.consumerServiceStub =
+        ConsumerServiceGrpc.newStub(channel)
+            .withCallCredentials(
+                new AuthToken(System.getenv("AKTO_THREAT_PROTECTION_BACKEND_TOKEN")));
+  }
+
+  public void filterFunction(List<HttpResponseParams> responseParams) {
+
+    int now = Context.now();
+    if ((lastFilterFetch + FILTER_REFRESH_INTERVAL) < now) {
+      // TODO: add support for only active templates.
+      List<YamlTemplate> templates = dataActor.fetchFilterYamlTemplates();
+      apiFilters = FilterYamlTemplateDao.fetchFilterConfig(false, templates, false);
+      lastFilterFetch = now;
     }
 
-    public void filterFunction(List<HttpResponseParams> responseParams) {
+    if (apiFilters == null || apiFilters.isEmpty()) {
+      return;
+    }
 
-        int now = Context.now();
-        if ((lastFilterFetch + FILTER_REFRESH_INTERVAL) < now) {
-            // TODO: add support for only active templates.
-            List<YamlTemplate> templates = dataActor.fetchFilterYamlTemplates();
-            apiFilters = FilterYamlTemplateDao.instance.fetchFilterConfig(false, templates, false);
-            lastFilterFetch = now;
-        }
+    List<KafkaMessage> maliciousSamples = new ArrayList<>();
+    for (HttpResponseParams responseParam : responseParams) {
+      for (FilterConfig apiFilter : apiFilters.values()) {
+        boolean hasPassedFilter = validateFilterForRequest(responseParam, apiFilter);
 
-        if (apiFilters != null && !apiFilters.isEmpty()) {
-            for (HttpResponseParams responseParam : responseParams) {
-                for (Entry<String, FilterConfig> apiFilterEntry : apiFilters.entrySet()) {
+        // If a request passes any of the filter, then it's a malicious request,
+        // and so we push it to kafka
+        if (hasPassedFilter) {
+          // Later we will also add aggregation support
+          // Eg: 100 4xx requests in last 10 minutes.
+          // But regardless of whether request falls in aggregation or not,
+          // we still push malicious requests to kafka
+
+          // todo: modify fetch yaml and read aggregate rules from it
+          List<Rule> rules = new ArrayList<>();
+          rules.add(new Rule("Lfi Rule 1", new Condition(100, 10)));
+          AggregationRules aggRules = new AggregationRules();
+          aggRules.setRule(rules);
+
+          SourceIPKeyGenerator.instance
+              .generate(responseParam)
+              .ifPresent(
+                  actor -> {
+                    String groupKey = apiFilter.getId();
+                    String aggKey = actor + "|" + groupKey;
+
+                    MaliciousEvent maliciousEvent =
+                        MaliciousEvent.newBuilder()
+                            .setActorId(actor)
+                            .setFilterId(apiFilter.getId())
+                            .setUrl(responseParam.getRequestParams().getURL())
+                            .setMethod(responseParam.getRequestParams().getMethod())
+                            .setPayload(responseParam.getOrig())
+                            .setIp(actor) // For now using actor as IP
+                            .setApiCollectionId(
+                                responseParam.getRequestParams().getApiCollectionId())
+                            .setTimestamp(responseParam.getTime())
+                            .build();
+
                     try {
-                        FilterConfig apiFilter = apiFilterEntry.getValue();
-                        String filterId = apiFilterEntry.getKey();
-                        String message = responseParam.getOrig();
-                        List<String> sourceIps = ApiAccessTypePolicy.getSourceIps(responseParam);
-                        RawApi rawApi = RawApi.buildFromMessage(message);
-                        int apiCollectionId = httpCallParser.createApiCollectionId(responseParam);
-                        responseParam.requestParams.setApiCollectionId(apiCollectionId);
-                        String url = responseParam.getRequestParams().getURL();
-                        Method method = Method.fromString(responseParam.getRequestParams().getMethod());
-                        ApiInfoKey apiInfoKey = new ApiInfoKey(apiCollectionId, url, method);
-                        Map<String, Object> varMap = apiFilter.resolveVarMap();
-                        VariableResolver.resolveWordList(varMap, new HashMap<ApiInfoKey, List<String>>() {
-                            {
-                                put(apiInfoKey, Arrays.asList(message));
-                            }
-                        }, apiInfoKey);
-                        String filterExecutionLogId = UUID.randomUUID().toString();
-                        ValidationResult res = TestPlugin.validateFilter(apiFilter.getFilter().getNode(), rawApi,
-                                apiInfoKey, varMap, filterExecutionLogId);
-                        if (res.getIsValid()) {
-                            now = Context.now();
-                            SuspectSampleData sampleData = new SuspectSampleData(
-                                    sourceIps, apiCollectionId, url, method,
-                                    message, now, filterId);
-                            Map<String, Object> filterMap = new HashMap<>();
-                            UpdatePayload updatePayload = new UpdatePayload("obj", sampleData, "set");
-                            ArrayList<String> updates = new ArrayList<>();
-                            updates.add(updatePayload.toString());
-                            bulkUpdates.add(new BulkUpdates(filterMap, updates));
-                        }
-                    } catch (Exception e) {
-                        loggerMaker.errorAndAddToDb(e, String.format("Error in httpCallFilter %s", e.toString()));
+                      String data = JsonFormat.printer().print(maliciousEvent);
+                      maliciousSamples.add(new KafkaMessage(responseParam.getAccountId(), data));
+                    } catch (InvalidProtocolBufferException e) {
+                      e.printStackTrace();
+                      return;
                     }
-                }
-            }
+
+                    for (Rule rule : aggRules.getRule()) {
+                      WindowBasedThresholdNotifier.Result result =
+                          this.windowBasedThresholdNotifier.shouldNotify(
+                              aggKey, maliciousEvent, rule);
+
+                      if (result.shouldNotify()) {
+                        SmartEvent smartEvent =
+                            SmartEvent.newBuilder()
+                                .setFilterId(apiFilter.getId())
+                                .setActorId(actor)
+                                .setDetectedAt(responseParam.getTime())
+                                .setRuleId(rule.getName())
+                                .build();
+                        this.consumerServiceStub.saveSmartEvent(
+                            SaveSmartEventRequest.newBuilder().setEvent(smartEvent).build(),
+                            new StreamObserver<SaveSmartEventResponse>() {
+                              @Override
+                              public void onNext(SaveSmartEventResponse value) {
+                                // Do nothing
+                              }
+
+                              @Override
+                              public void onError(Throwable t) {
+                                t.printStackTrace();
+                              }
+
+                              @Override
+                              public void onCompleted() {
+                                // Do nothing
+                              }
+                            });
+                      }
+                    }
+                  });
         }
-        sync_count = bulkUpdates.size();
-        if (sync_count > 0 && (sync_count >= sync_threshold_count ||
-                (Context.now() - last_synced) > sync_threshold_time)) {
-            List<Object> updates = new ArrayList<>();
-            updates.addAll(bulkUpdates);
-            dataActor.bulkWriteSuspectSampleData(updates);
-            loggerMaker.infoAndAddToDb(String.format("Inserting %d records in SuspectSampleData", sync_count));
-            last_synced = Context.now();
-            sync_count = 0;
-            bulkUpdates.clear();
-        }
+      }
     }
+
+    // Should we push all the messages in one go
+    // or call kafka.send for each HttpRequestParams
+    try {
+      maliciousSamples.forEach(
+          sample -> {
+            sample
+                .marshal()
+                .ifPresent(
+                    data -> {
+                      kafka.send(data, KAFKA_MALICIOUS_TOPIC);
+                    });
+          });
+    } catch (Exception e) {
+      e.printStackTrace();
+    }
+  }
+
+  private boolean validateFilterForRequest(
+      HttpResponseParams responseParam, FilterConfig apiFilter) {
+    try {
+      String message = responseParam.getOrig();
+      RawApi rawApi = RawApi.buildFromMessage(message);
+      int apiCollectionId = httpCallParser.createApiCollectionId(responseParam);
+      responseParam.requestParams.setApiCollectionId(apiCollectionId);
+      String url = responseParam.getRequestParams().getURL();
+      Method method = Method.fromString(responseParam.getRequestParams().getMethod());
+      ApiInfoKey apiInfoKey = new ApiInfoKey(apiCollectionId, url, method);
+      Map<String, Object> varMap = apiFilter.resolveVarMap();
+      VariableResolver.resolveWordList(
+          varMap,
+          new HashMap<ApiInfoKey, List<String>>() {
+            {
+              put(apiInfoKey, Collections.singletonList(message));
+            }
+          },
+          apiInfoKey);
+      String filterExecutionLogId = UUID.randomUUID().toString();
+      ValidationResult res =
+          TestPlugin.validateFilter(
+              apiFilter.getFilter().getNode(), rawApi, apiInfoKey, varMap, filterExecutionLogId);
+
+      return res.getIsValid();
+    } catch (Exception e) {
+      loggerMaker.errorAndAddToDb(e, String.format("Error in httpCallFilter %s", e.toString()));
+    }
+
+    return false;
+  }
 }
