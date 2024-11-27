@@ -1,4 +1,5 @@
 import request from "@/util/request"
+import { method } from "lodash"
 
 const settingRequests = {
     inviteUsers(apiSpec) {
@@ -142,6 +143,20 @@ const settingRequests = {
             url: '/api/fetchTrafficMetrics',
             method: 'post',
             data: {groupBy, startTimestamp, endTimestamp, names, host}
+        })
+    },
+    fetchTrafficCollectorInfos(startTimestamp, endTimestamp) {
+        return request({
+            url: '/api/fetchTrafficCollectorInfos',
+            method: 'post',
+            data: {startTimestamp, endTimestamp}
+        })
+    },
+    fetchTrafficCollectorMetrics(instanceId, startTimestamp, endTimestamp) {
+        return request({
+            url: '/api/fetchTrafficCollectorMetrics',
+            method: 'post',
+            data: {instanceId, startTimestamp, endTimestamp}
         })
     },
 
