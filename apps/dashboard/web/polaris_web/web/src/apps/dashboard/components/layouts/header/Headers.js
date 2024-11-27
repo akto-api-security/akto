@@ -110,6 +110,19 @@ export default function Header() {
         })
     }
 
+    const getColorForIcon = () => {
+        switch (window.DASHBOARD_MODE){
+            case "ON_PREM":
+                return "primary";
+            case "LOCAL_DEPLOY":
+                if(window.IS_SAAS !== "true") 
+                    return "highlight"
+                return "";
+            default:
+                return ""
+        }
+    }
+
     const userMenuMarkup = (
         <TopBar.UserMenu
             actions={[
@@ -210,7 +223,7 @@ export default function Header() {
              <TopBar.Menu
                 activatorContent={
                     <span id="beamer-btn">
-                        <Icon source={NotificationMajor} />
+                        <Icon source={NotificationMajor} color={getColorForIcon()}/> 
                     </span>
                 }
                 actions={[]}
