@@ -7,10 +7,7 @@ package threat_protection.consumer_service.v1;
 option java_outer_classname = "ConsumerServiceProto";
 option java_package = "threat_protection.v1.consumer_service";
 
-message SaveMaliciousEventResponse {
-}
-
-message SaveSmartEventResponse {
+message RecordAlertResponse {
 }
 
 message SmartEvent {
@@ -31,16 +28,12 @@ message MaliciousEvent {
   string payload = 8;
 }
 
-message SaveMaliciousEventRequest {
-  repeated MaliciousEvent events = 2;
-}
-
-message SaveSmartEventRequest {
-  SmartEvent event = 2;
+message RecordAlertRequest {
+  SmartEvent event = 1;
+  repeated MaliciousEvent sample_malicious_events = 2;
+  int32 total_events = 3;
 }
 
 service ConsumerService {
-  rpc SaveMaliciousEvent(SaveMaliciousEventRequest) returns (SaveMaliciousEventResponse) {}
-
-  rpc SaveSmartEvent(SaveSmartEventRequest) returns (SaveSmartEventResponse) {}
+  rpc RecordAlert(RecordAlertRequest) returns (RecordAlertResponse) {}
 }

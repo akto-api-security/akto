@@ -16,7 +16,6 @@ public class MaliciousEventModel {
 
   // Geo location data
   private String ip;
-  private String country;
 
   public MaliciousEventModel() {}
 
@@ -29,7 +28,6 @@ public class MaliciousEventModel {
     this.timestamp = builder.timestamp;
     this.orig = builder.orig;
     this.ip = builder.ip;
-    this.country = builder.country;
   }
 
   public static class Builder {
@@ -41,7 +39,6 @@ public class MaliciousEventModel {
     private long timestamp;
     private String orig;
     private String ip;
-    private String country;
 
     public Builder setId(String id) {
       this.id = id;
@@ -80,11 +77,6 @@ public class MaliciousEventModel {
 
     public Builder setIp(String ip) {
       this.ip = ip;
-      return this;
-    }
-
-    public Builder setCountry(String country) {
-      this.country = country;
       return this;
     }
 
@@ -129,17 +121,10 @@ public class MaliciousEventModel {
     return ip;
   }
 
-  public String getCountry() {
-    return country;
-  }
-
   @Override
   public String toString() {
     return "MaliciousEventModel{"
-        + "ip='"
-        + ip
-        + '\''
-        + ", id='"
+        + "id='"
         + id
         + '\''
         + ", actorId='"
@@ -155,8 +140,11 @@ public class MaliciousEventModel {
         + method
         + ", timestamp="
         + timestamp
-        + ", country='"
-        + country
+        + ", orig='"
+        + orig
+        + '\''
+        + ", ip='"
+        + ip
         + '\''
         + '}';
   }
