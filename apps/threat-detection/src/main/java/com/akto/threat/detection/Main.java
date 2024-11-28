@@ -6,6 +6,7 @@ import com.akto.threat.detection.config.kafka.KafkaConsumerConfig;
 import com.akto.threat.detection.config.kafka.KafkaProducerConfig;
 import com.akto.threat.detection.tasks.FlushSampleDataTask;
 import com.akto.threat.detection.tasks.MaliciousTrafficDetectorTask;
+import com.akto.threat.detection.tasks.SendAlertsToBackend;
 import com.mongodb.ConnectionString;
 import io.lettuce.core.RedisClient;
 
@@ -30,10 +31,24 @@ public class Main {
                 KafkaProducerConfig.newBuilder().setBatchSize(100).setLingerMs(100).build())
             .build();
 
+    KafkaConfig internalKafka =
+        KafkaConfig.newBuilder()
+            .setGroupId("akto.threat.detection")
+            .setBootstrapServers("localhost:29092")
+            .setConsumerConfig(
+                KafkaConsumerConfig.newBuilder()
+                    .setMaxPollRecords(100)
+                    .setPollDurationMilli(100)
+                    .build())
+            .setProducerConfig(
+                KafkaProducerConfig.newBuilder().setBatchSize(100).setLingerMs(100).build())
+            .build();
+
     Connection postgres = createPostgresConnection();
 
-    new MaliciousTrafficDetectorTask(trafficKafka, createRedisClient()).run();
-    new FlushSampleDataTask(postgres, trafficKafka, "akto,malicious").run();
+    new MaliciousTrafficDetectorTask(trafficKafka, internalKafka, createRedisClient()).run();
+    new FlushSampleDataTask(postgres, internalKafka, "akto,malicious").run();
+    new SendAlertsToBackend(postgres, internalKafka, "akto.smart_event").run();
   }
 
   public static RedisClient createRedisClient() {
