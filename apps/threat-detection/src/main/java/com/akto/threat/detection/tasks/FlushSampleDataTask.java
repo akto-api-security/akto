@@ -63,7 +63,6 @@ public class FlushSampleDataTask extends AbstractKafkaConsumerTask {
                   .setTimestamp(evt.getTimestamp())
                   .setOrig(evt.getPayload())
                   .setIp(evt.getIp())
-                  .setCountry("US") // TODO: Call maxmind to get country code for IP
                   .build());
         });
 
