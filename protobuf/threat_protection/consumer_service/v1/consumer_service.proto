@@ -11,14 +11,14 @@ message RecordAlertResponse {
 }
 
 message SmartEvent {
-  string actor_id= 1;
+  string actor= 1;
   string filter_id = 2;
   int64 detected_at = 3;
   string rule_id = 4;
 }
 
 message MaliciousEvent {
-  string actor_id= 1;
+  string actor= 1;
   string filter_id = 2;
   string ip = 3;
   int64 timestamp = 4;

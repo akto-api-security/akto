@@ -4,10 +4,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 import com.akto.proto.threat_protection.consumer_service.v1.ConsumerServiceGrpc;
-import com.akto.proto.threat_protection.consumer_service.v1.SaveMaliciousEventRequest;
-import com.akto.proto.threat_protection.consumer_service.v1.SaveMaliciousEventResponse;
-import com.akto.proto.threat_protection.consumer_service.v1.SaveSmartEventRequest;
-import com.akto.proto.threat_protection.consumer_service.v1.SaveSmartEventResponse;
+import com.akto.proto.threat_protection.consumer_service.v1.RecordAlertRequest;
+import com.akto.proto.threat_protection.consumer_service.v1.RecordAlertResponse;
 import com.akto.proto.threat_protection.consumer_service.v1.SmartEvent;
 import com.akto.threat.protection.db.MaliciousEventModel;
 import com.akto.threat.protection.db.SmartEventModel;
@@ -28,20 +26,19 @@ public class ConsumerMaliciousEventService extends ConsumerServiceGrpc.ConsumerS
   }
 
   @Override
-  public void saveMaliciousEvent(
-      SaveMaliciousEventRequest request,
-      StreamObserver<SaveMaliciousEventResponse> responseObserver) {
+  public void recordAlert(
+      RecordAlertRequest request, StreamObserver<RecordAlertResponse> responseObserver) {
 
     List<WriteModel<MaliciousEventModel>> bulkUpdates = new ArrayList<>();
     request
-        .getEventsList()
+        .getSampleMaliciousEventsList()
         .forEach(
             event -> {
               bulkUpdates.add(
                   new InsertOneModel<>(
                       new MaliciousEventModel(
                           event.getFilterId(),
-                          event.getActorId(),
+                          event.getActor(),
                           event.getIp(),
                           event.getUrl(),
                           event.getMethod(),
@@ -53,21 +50,15 @@ public class ConsumerMaliciousEventService extends ConsumerServiceGrpc.ConsumerS
         .getDatabase(accountId + "")
         .getCollection("malicious_events", MaliciousEventModel.class)
         .bulkWrite(bulkUpdates, new BulkWriteOptions().ordered(false));
-    responseObserver.onNext(SaveMaliciousEventResponse.newBuilder().build());
-    responseObserver.onCompleted();
-  }
 
-  @Override
-  public void saveSmartEvent(
-      SaveSmartEventRequest request, StreamObserver<SaveSmartEventResponse> responseObserver) {
-    SmartEvent event = request.getEvent();
-    int accountId = Constants.ACCOUNT_ID_CONTEXT_KEY.get();
+    SmartEvent smartEvt = request.getEvent();
     this.mongoClient
         .getDatabase(accountId + "")
         .getCollection("smart_events", SmartEventModel.class)
         .insertOne(
-            new SmartEventModel(event.getFilterId(), event.getActorId(), event.getDetectedAt()));
-    responseObserver.onNext(SaveSmartEventResponse.newBuilder().build());
+            new SmartEventModel(
+                smartEvt.getFilterId(), smartEvt.getActor(), smartEvt.getDetectedAt()));
+    responseObserver.onNext(RecordAlertResponse.newBuilder().build());
     responseObserver.onCompleted();
   }
 }
