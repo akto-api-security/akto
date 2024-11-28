@@ -284,7 +284,6 @@ public class ExportSampleDataAction extends UserAction {
         try {
             String payload = httpRequestParams.getPayload();
             if (payload == null) payload = "";
-            payload = payload.trim();
             boolean curlyBracesCond = payload.startsWith("{") && payload.endsWith("}");
             boolean squareBracesCond = payload.startsWith("[") && payload.endsWith("]");
             boolean htmlPayloadCond = payload.startsWith("<") && payload.endsWith(">");
