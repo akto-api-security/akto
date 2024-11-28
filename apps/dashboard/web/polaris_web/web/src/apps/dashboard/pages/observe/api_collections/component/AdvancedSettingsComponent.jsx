@@ -4,7 +4,7 @@ import { Button, HorizontalGrid, HorizontalStack, TextField, VerticalStack } fro
 import {DeleteMinor} from "@shopify/polaris-icons"
 import Dropdown from '../../../../components/layouts/Dropdown';
 
-function AdvancedSettingsComponent({dispatchConditions, conditions}) {
+function AdvancedSettingsComponent({dispatchConditions, conditions, showSave, handleSave}) {
     const emptyCondition = {data: {key: '', value: ''}, operator: {'type': 'ADD_HEADER'}}
 
     const operatorTypeOptions = [
@@ -37,6 +37,9 @@ function AdvancedSettingsComponent({dispatchConditions, conditions}) {
     };
 
     const [showAdvancedSettings, setShowAdvancedSettings] = useState(false)
+    const getLabel = (val) => {
+        return operatorTypeOptions.filter((x) => x.value === val)[0].label
+    }
 
     return (
         <VerticalStack gap={"3"}>
@@ -52,7 +55,7 @@ function AdvancedSettingsComponent({dispatchConditions, conditions}) {
                                         <Dropdown
                                             id={`operator-type-${index}`}
                                             menuItems={operatorTypeOptions} 
-                                            initial={operatorTypeOptions[0].label} 
+                                            initial={() => getLabel(condition?.operator?.type)} 
                                             selected={(type) => handleTypeSelected(type,index)} 
                                         />
                                     </HorizontalStack>
@@ -78,8 +81,9 @@ function AdvancedSettingsComponent({dispatchConditions, conditions}) {
                             </HorizontalStack>
                         )
                     })}
-                    <HorizontalStack>
+                    <HorizontalStack align="space-between">
                         <Button onClick={handleAddField}>Add condition</Button>
+                        {showSave ? <Button primary onClick={handleSave}>Save</Button> : null}
                     </HorizontalStack>
                 </VerticalStack> : null
             }

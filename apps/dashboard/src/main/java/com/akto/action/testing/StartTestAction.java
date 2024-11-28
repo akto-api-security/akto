@@ -76,6 +76,7 @@ public class StartTestAction extends UserAction {
     private TestingRunType testingRunType;
     private String searchString;
     private boolean continuousTesting;
+    private int testingRunConfigId;
 
     private Map<String,Long> allTestsCountMap = new HashMap<>();
     private Map<String,Integer> issuesSummaryInfoMap = new HashMap<>();
@@ -491,6 +492,12 @@ public class StartTestAction extends UserAction {
             this.workflowTest = WorkflowTestsDao.instance
                     .findOne(Filters.eq("_id", workflowTestingEndpoints.getWorkflowTest().getId()));
         }
+
+        TestingRunConfig runConfig = TestingRunConfigDao.instance.findOne(
+            Filters.eq("_id", this.testingRun.getTestIdConfig()), Projections.exclude("collectionWiseApiInfoKey", "testSubCategoryList")
+        );
+
+        this.testingRun.setTestingRunConfig(runConfig);
 
         return SUCCESS.toUpperCase();
     }
@@ -929,6 +936,14 @@ public class StartTestAction extends UserAction {
         return Action.SUCCESS.toUpperCase();
     }
 
+    public String modifyTestingRunConfig(){
+        TestingRunConfigDao.instance.updateOne(
+            Filters.eq(Constants.ID, this.testingRunConfigId),
+            Updates.set("configsAdvancedSettings", this.testConfigsAdvancedSettings)
+        );
+        return SUCCESS.toUpperCase();
+    }
+
 
     public void setType(TestingEndpoints.Type type) {
         this.type = type;
@@ -1274,5 +1289,9 @@ public class StartTestAction extends UserAction {
 
     public void setTestConfigsAdvancedSettings(List<TestConfigsAdvancedSettings> testConfigsAdvancedSettings) {
         this.testConfigsAdvancedSettings = testConfigsAdvancedSettings;
+    }
+
+    public void setTestingRunConfigId(int testingRunConfigId) {
+        this.testingRunConfigId = testingRunConfigId;
     }
 }
