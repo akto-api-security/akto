@@ -2,6 +2,7 @@ package com.akto.threat.protection;
 
 import com.akto.DaoInit;
 import com.akto.threat.protection.tasks.CleanupTask;
+import com.akto.threat.protection.utils.KafkaUtils;
 import com.mongodb.ConnectionString;
 import com.mongodb.ReadPreference;
 import com.mongodb.client.MongoClient;
@@ -16,6 +17,13 @@ public class Main {
         DaoInit.createMongoClient(
             new ConnectionString(System.getenv("AKTO_THREAT_PROTECTION_MONGO_CONN")),
             ReadPreference.secondary());
+    String initProducer = System.getenv("INIT_KAFKA_PRODUCER");
+    if (initProducer != null && initProducer.equalsIgnoreCase("true")) {
+      KafkaUtils.initKafkaProducer();
+    } else {
+      KafkaUtils.initMongoClient(threatProtectionMongo);
+      KafkaUtils.initKafkaConsumer();
+    }
 
     new CleanupTask(threatProtectionMongo).init();
     int port =

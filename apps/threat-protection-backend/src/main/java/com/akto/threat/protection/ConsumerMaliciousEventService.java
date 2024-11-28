@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import com.akto.proto.threat_protection.consumer_service.v1.ConsumerServiceGrpc;
+import com.akto.proto.threat_protection.consumer_service.v1.MaliciousEvent;
 import com.akto.proto.threat_protection.consumer_service.v1.SaveMaliciousEventRequest;
 import com.akto.proto.threat_protection.consumer_service.v1.SaveMaliciousEventResponse;
 import com.akto.proto.threat_protection.consumer_service.v1.SaveSmartEventRequest;
@@ -12,6 +13,7 @@ import com.akto.proto.threat_protection.consumer_service.v1.SmartEvent;
 import com.akto.threat.protection.db.MaliciousEventModel;
 import com.akto.threat.protection.db.SmartEventModel;
 import com.akto.threat.protection.interceptors.Constants;
+import com.akto.threat.protection.utils.KafkaUtils;
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.model.BulkWriteOptions;
 import com.mongodb.client.model.InsertOneModel;
@@ -32,27 +34,12 @@ public class ConsumerMaliciousEventService extends ConsumerServiceGrpc.ConsumerS
       SaveMaliciousEventRequest request,
       StreamObserver<SaveMaliciousEventResponse> responseObserver) {
 
-    List<WriteModel<MaliciousEventModel>> bulkUpdates = new ArrayList<>();
-    request
-        .getEventsList()
-        .forEach(
-            event -> {
-              bulkUpdates.add(
-                  new InsertOneModel<>(
-                      new MaliciousEventModel(
-                          event.getFilterId(),
-                          event.getActorId(),
-                          event.getIp(),
-                          event.getUrl(),
-                          event.getMethod(),
-                          event.getPayload(),
-                          event.getTimestamp())));
-            });
+    List<MaliciousEvent> maliciousEvents = request.getEventsList();
+    
     int accountId = Constants.ACCOUNT_ID_CONTEXT_KEY.get();
-    this.mongoClient
-        .getDatabase(accountId + "")
-        .getCollection("malicious_events", MaliciousEventModel.class)
-        .bulkWrite(bulkUpdates, new BulkWriteOptions().ordered(false));
+
+    KafkaUtils.insertData(maliciousEvents, "maliciousEvents", accountId);
+
     responseObserver.onNext(SaveMaliciousEventResponse.newBuilder().build());
     responseObserver.onCompleted();
   }
@@ -62,11 +49,8 @@ public class ConsumerMaliciousEventService extends ConsumerServiceGrpc.ConsumerS
       SaveSmartEventRequest request, StreamObserver<SaveSmartEventResponse> responseObserver) {
     SmartEvent event = request.getEvent();
     int accountId = Constants.ACCOUNT_ID_CONTEXT_KEY.get();
-    this.mongoClient
-        .getDatabase(accountId + "")
-        .getCollection("smart_events", SmartEventModel.class)
-        .insertOne(
-            new SmartEventModel(event.getFilterId(), event.getActorId(), event.getDetectedAt()));
+
+    KafkaUtils.insertData(new SmartEventModel(event.getFilterId(), event.getActorId(), event.getDetectedAt()), "smartEvent", accountId);
     responseObserver.onNext(SaveSmartEventResponse.newBuilder().build());
     responseObserver.onCompleted();
   }
