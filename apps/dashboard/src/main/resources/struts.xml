@@ -2460,9 +2460,11 @@
             </result>
            <result name="SUCCESS"  type="json">
            </result>
-           <result name="ERROR" type="httpheader">
-               <param name="status">401</param>
-           </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
        </action>
 
         <action name="api/fetchApiInfoList" class="com.akto.action.ApiInfoAction" method="fetchApiInfoList">
