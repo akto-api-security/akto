@@ -17,7 +17,6 @@ import com.akto.dto.api_protection_parse_layer.Rule;
 import com.akto.dto.monitoring.FilterConfig;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.type.URLMethods;
-import com.akto.threat.detection.grpc.AuthToken;
 import com.akto.hybrid_parsers.HttpCallParser;
 import com.akto.kafka.Kafka;
 import com.akto.proto.threat_protection.consumer_service.v1.*;
@@ -27,16 +26,11 @@ import com.akto.threat.detection.smart_event_detector.window_based.WindowBasedTh
 import com.akto.test_editor.execution.VariableResolver;
 import com.akto.test_editor.filter.data_operands_impl.ValidationResult;
 import com.google.protobuf.InvalidProtocolBufferException;
-import io.grpc.Grpc;
-import io.grpc.InsecureChannelCredentials;
-import io.grpc.ManagedChannel;
-import io.grpc.stub.StreamObserver;
 import io.lettuce.core.RedisClient;
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
-import com.google.protobuf.util.JsonFormat;
 
 import java.time.Duration;
 import java.util.*;
@@ -58,23 +52,24 @@ public class MaliciousTrafficDetectorTask {
   private Map<String, FilterConfig> apiFilters;
   private int filterLastUpdatedAt = 0;
 
-  private final Kafka kafka;
+  private final Kafka internalKafka;
 
   private static final String KAFKA_MALICIOUS_TOPIC = "akto.malicious";
+  private static final String KAFKA_SMART_EVENT_TOPIC = "akto.smart_event";
 
   private static final DataActor dataActor = DataActorFactory.fetchInstance();
-  private final ConsumerServiceGrpc.ConsumerServiceStub consumerServiceStub;
 
-  public MaliciousTrafficDetectorTask(KafkaConfig trafficConfig, RedisClient redisClient) {
+  public MaliciousTrafficDetectorTask(
+      KafkaConfig trafficConfig, KafkaConfig internalConfig, RedisClient redisClient) {
     this.kafkaConfig = trafficConfig;
 
     String kafkaBrokerUrl = trafficConfig.getBootstrapServers();
     String groupId = trafficConfig.getGroupId();
 
-    Properties properties =
-        Utils.configProperties(
-            kafkaBrokerUrl, groupId, trafficConfig.getConsumerConfig().getMaxPollRecords());
-    this.kafkaConsumer = new KafkaConsumer<>(properties);
+    this.kafkaConsumer =
+        new KafkaConsumer<>(
+            Utils.configProperties(
+                kafkaBrokerUrl, groupId, trafficConfig.getConsumerConfig().getMaxPollRecords()));
 
     this.httpCallParser = new HttpCallParser(120, 1000);
 
@@ -83,35 +78,24 @@ public class MaliciousTrafficDetectorTask {
             new RedisBackedCounterCache(redisClient, "wbt"),
             new WindowBasedThresholdNotifier.Config(100, 10 * 60));
 
-    String target = "localhost:8980";
-    ManagedChannel channel =
-        Grpc.newChannelBuilder(target, InsecureChannelCredentials.create()).build();
-    this.consumerServiceStub =
-        ConsumerServiceGrpc.newStub(channel)
-            .withCallCredentials(
-                new AuthToken(System.getenv("AKTO_THREAT_PROTECTION_BACKEND_TOKEN")));
-
-    this.kafka =
+    this.internalKafka =
         new Kafka(
-            kafkaBrokerUrl,
-            trafficConfig.getProducerConfig().getLingerMs(),
-            trafficConfig.getProducerConfig().getBatchSize());
+            internalConfig.getBootstrapServers(),
+            internalConfig.getProducerConfig().getLingerMs(),
+            internalConfig.getProducerConfig().getBatchSize());
   }
 
   public void run() {
     this.kafkaConsumer.subscribe(Collections.singletonList("akto.api.logs"));
     pollingExecutor.execute(
-        new Runnable() {
-          @Override
-          public void run() {
-            // Poll data from Kafka topic
-            while (true) {
-              ConsumerRecords<String, String> records =
-                  kafkaConsumer.poll(
-                      Duration.ofMillis(kafkaConfig.getConsumerConfig().getPollDurationMilli()));
-              for (ConsumerRecord<String, String> record : records) {
-                processRecord(record);
-              }
+        () -> {
+          // Poll data from Kafka topic
+          while (true) {
+            ConsumerRecords<String, String> records =
+                kafkaConsumer.poll(
+                    Duration.ofMillis(kafkaConfig.getConsumerConfig().getPollDurationMilli()));
+            for (ConsumerRecord<String, String> record : records) {
+              processRecord(record);
             }
           }
         });
@@ -127,12 +111,6 @@ public class MaliciousTrafficDetectorTask {
     apiFilters = FilterYamlTemplateDao.fetchFilterConfig(false, templates, false);
     this.filterLastUpdatedAt = now;
     return apiFilters;
-  }
-
-  private MessageEnvelope generateKafkaMessage(String accountId, MaliciousEvent maliciousEvent)
-      throws InvalidProtocolBufferException {
-    String data = JsonFormat.printer().print(maliciousEvent);
-    return new MessageEnvelope(accountId, data);
   }
 
   private boolean validateFilterForRequest(
@@ -216,7 +194,8 @@ public class MaliciousTrafficDetectorTask {
 
                   try {
                     maliciousMessages.add(
-                        generateKafkaMessage(responseParam.getAccountId(), maliciousEvent));
+                        MessageEnvelope.generateEnvelope(
+                            responseParam.getAccountId(), maliciousEvent));
                   } catch (InvalidProtocolBufferException e) {
                     return;
                   }
@@ -234,24 +213,16 @@ public class MaliciousTrafficDetectorTask {
                               .setDetectedAt(responseParam.getTime())
                               .setRuleId(rule.getName())
                               .build();
-                      this.consumerServiceStub.saveSmartEvent(
-                          SaveSmartEventRequest.newBuilder().setEvent(smartEvent).build(),
-                          new StreamObserver<SaveSmartEventResponse>() {
-                            @Override
-                            public void onNext(SaveSmartEventResponse value) {
-                              // Do nothing
-                            }
-
-                            @Override
-                            public void onError(Throwable t) {
-                              t.printStackTrace();
-                            }
-
-                            @Override
-                            public void onCompleted() {
-                              // Do nothing
-                            }
-                          });
+                      try {
+                        MessageEnvelope.generateEnvelope(responseParam.getAccountId(), smartEvent)
+                            .marshal()
+                            .ifPresent(
+                                data -> {
+                                  internalKafka.send(data, KAFKA_SMART_EVENT_TOPIC);
+                                });
+                      } catch (InvalidProtocolBufferException e) {
+                        e.printStackTrace();
+                      }
                     }
                   }
                 });
@@ -267,7 +238,7 @@ public class MaliciousTrafficDetectorTask {
                 .marshal()
                 .ifPresent(
                     data -> {
-                      kafka.send(data, KAFKA_MALICIOUS_TOPIC);
+                      internalKafka.send(data, KAFKA_MALICIOUS_TOPIC);
                     });
           });
     } catch (Exception e) {

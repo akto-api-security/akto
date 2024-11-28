@@ -1,6 +1,9 @@
 package com.akto.threat.detection.dto;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.protobuf.InvalidProtocolBufferException;
+import com.google.protobuf.Message;
+import com.google.protobuf.util.JsonFormat;
 
 import java.util.Optional;
 
@@ -52,5 +55,11 @@ public class MessageEnvelope {
     }
 
     return Optional.empty();
+  }
+
+  public static MessageEnvelope generateEnvelope(String accountId, Message msg)
+      throws InvalidProtocolBufferException {
+    String data = JsonFormat.printer().print(msg);
+    return new MessageEnvelope(accountId, data);
   }
 }
