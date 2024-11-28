@@ -3,17 +3,11 @@ package com.akto.har;
 import com.akto.dao.context.Context;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.sstoehr.harreader.HarReader;
 import de.sstoehr.harreader.HarReaderException;
 import de.sstoehr.harreader.HarReaderMode;
 import de.sstoehr.harreader.model.*;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.io.File;
-import java.net.URLDecoder;
 import java.util.*;
 
 public class HAR {
@@ -65,7 +59,11 @@ public class HAR {
         if (requestPayload == null) requestPayload = "";
 
         String akto_account_id = accountId + "";
-        String path = getPath(request);
+        String urlString = getPath(request);
+
+        String path = urlString;
+
+
         String requestHeaders = mapper.writeValueAsString(requestHeaderMap);
         String responseHeaders = mapper.writeValueAsString(responseHeaderMap);
         String method = request.getMethod().toString();

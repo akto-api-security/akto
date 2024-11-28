@@ -163,7 +163,7 @@ function ApiEndpoints(props) {
     const [showEmptyScreen, setShowEmptyScreen] = useState(false)
     const [runTests, setRunTests ] = useState(false)
 
-    const [endpointData, setEndpointData] = useState({"all":[], 'sensitive': [], 'new': [], 'high_risk': [], 'no_auth': [], 'shadow': []})
+    const [endpointData, setEndpointData] = useState({"all":[], 'sensitive': [], 'new': [], 'high_risk': [], 'no_auth': [], 'shadow': [], 'undocumented' : [], 'zombie': []})
     const [selectedTab, setSelectedTab] = useState("all")
     const [selected, setSelected] = useState(0)
     const [selectedResourcesForPrimaryAction, setSelectedResourcesForPrimaryAction] = useState([])
@@ -187,7 +187,7 @@ function ApiEndpoints(props) {
     const selectedMethod = queryParams.get('selected_method')
 
     // the values used here are defined at the server.
-    const definedTableTabs = apiCollectionId === 111111999 ? ['All', 'New', 'High risk', 'No auth', 'Shadow'] : ( apiCollectionId === 111111120 ? ['All', 'New', 'Sensitive', 'High risk', 'Shadow'] : ['All', 'New', 'Sensitive', 'High risk', 'No auth', 'Shadow'] )
+    const definedTableTabs = apiCollectionId === 111111999 ? ['All', 'New', 'High risk', 'No auth', 'Shadow'] : ( apiCollectionId === 111111120 ? ['All', 'New', 'Sensitive', 'High risk', 'Shadow'] : ['All', 'New', 'Sensitive', 'High risk', 'No auth', 'Shadow', 'Undocumented', 'Zombie'] )
 
 
     const { tabsInfo } = useTable()
@@ -334,6 +334,14 @@ function ApiEndpoints(props) {
 
         const prettifyData = transform.prettifyEndpointsData(allEndpoints)
 
+        const zombie = prettifyData.filter(
+            obj => Object.keys(obj.sources).length === 1 && obj.sources.hasOwnProperty("OPEN_API")
+        );
+
+        const undocumented = prettifyData.filter(
+            obj => Object.keys(obj.sources).length === 1 && obj.sources.hasOwnProperty("HAR")
+        );
+
         // append shadow endpoints to all endpoints
         data['all'] = [ ...prettifyData, ...shadowApis ]
         data['sensitive'] = prettifyData.filter(x => x.sensitive && x.sensitive.size > 0)
@@ -341,6 +349,8 @@ function ApiEndpoints(props) {
         data['new'] = prettifyData.filter(x=> x.isNew)
         data['no_auth'] = prettifyData.filter(x => x.open)
         data['shadow'] = [ ...shadowApis ]
+        data['undocumented'] = undocumented
+        data['zombie'] = zombie
         setEndpointData(data)
         setSelectedTab("all")
         setSelected(0)
@@ -582,8 +592,9 @@ function ApiEndpoints(props) {
                 return
             }
             let isJson = file.name.endsWith(".json")
+            let isYaml = file.name.endsWith(".yaml") || file.name.endsWith(".yml")
             let isPcap = file.name.endsWith(".pcap")
-            if (isHar || isJson) {
+            if (isHar || isJson || isYaml) {
                 reader.readAsText(file)
             } else if (isPcap) {
                 reader.readAsArrayBuffer(new Blob([file]))
@@ -620,6 +631,30 @@ function ApiEndpoints(props) {
                     var bytes = new Uint8Array(arrayBuffer);
 
                     await api.uploadTcpFile([...bytes], apiCollectionId, skipKafka)
+                } else if (isJson || isYaml) {
+                    const formData = new FormData();
+                    formData.append("openAPIString", reader.result)
+                    // formData.append("hsFile", reader.result)
+                    formData.append("skipKafka", skipKafka)
+                    formData.append("apiCollectionId", apiCollectionId);
+                    func.setToast(true, false, "We are uploading your openapi file, please dont refresh the page!")
+
+                    api.uploadOpenApiFile(formData).then(resp => {
+                        if (file.size > 2097152) {
+                            func.setToast(true, false, "We have successfully read your file")
+                        }
+                        else {
+                            func.setToast(true, false, "Your Openapi file has been successfully processed")
+                        }
+                        fetchData()
+                    }).catch(err => {
+                        if (err.message.includes(404)) {
+                            func.setToast(true, true, "Please limit the file size to less than 50 MB")
+                        } else {
+                            let message = err?.response?.data?.actionErrors?.[0] || "Something went wrong while processing the file"
+                            func.setToast(true, true, message)
+                        }
+                    })
                 }
             }
         }
@@ -670,6 +705,17 @@ function ApiEndpoints(props) {
                                 primary={false} 
                                 /> : null
                             }
+                        </VerticalStack>
+                    </Popover.Section>
+                    <Popover.Section>
+                        <VerticalStack gap={2}>
+                            <UploadFile
+                            fileFormat=".json,.yaml,.yml"
+                            fileChanged={file => handleFileChange(file)}
+                            tooltipText="Upload openapi file"
+                            label={<Text fontWeight="regular" variant="bodyMd">Upload OpenAPI file</Text>}
+                            primary={false} 
+                            />
                         </VerticalStack>
                     </Popover.Section>
                     <Popover.Section>

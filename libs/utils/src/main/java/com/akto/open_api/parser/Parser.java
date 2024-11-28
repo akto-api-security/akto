@@ -1,5 +1,6 @@
 package com.akto.open_api.parser;
 
+import java.net.URL;
 import java.util.*;
 import javax.ws.rs.core.Response.Status;
 
@@ -206,6 +207,10 @@ public class Parser {
                     }
 
                     String requestHeadersString = "";
+                    URL url = new URL(path);
+                    String urlPath = url.getPath();
+                    // Get the domain (including scheme)
+                    requestHeaders.putIfAbsent("Host", url.getHost());
                     if (requestHeaders != null && !requestHeaders.isEmpty()) {
                         try {
                             requestHeadersString = mapper.writeValueAsString(requestHeaders);
@@ -317,7 +322,7 @@ public class Parser {
                     }
 
                     messageObject.put(mKeys.akto_account_id, Context.accountId.get().toString());
-                    messageObject.put(mKeys.path, path);
+                    messageObject.put(mKeys.path, urlPath);
                     messageObject.put(mKeys.method, method.toString().toUpperCase());
                     messageObject.put(mKeys.requestHeaders, requestHeadersString);
                     messageObject.put(mKeys.requestPayload, requestString);
@@ -325,7 +330,7 @@ public class Parser {
                     messageObject.put(mKeys.time, Context.now() + "");
                     messageObject.put(mKeys.type, "HTTP");
                     // swagger uploads are treated as HAR files.
-                    messageObject.put(mKeys.source, Source.HAR.name());
+                    messageObject.put(mKeys.source, Source.OPEN_API.name());
 
                     if (responseObjectList.isEmpty()) {
                         responseObjectList.add(emptyResponseObject);
@@ -343,9 +348,8 @@ public class Parser {
                         fillDummyIfEmptyMessage(messageObject);
                         SwaggerUploadLog log = new SwaggerUploadLog();
                         log.setMethod(method.toString());
-                        log.setUrl(path);
+                        log.setUrl(urlPath);
                         log.setUploadId(uploadId);
-
                         try {
                             String s = mapper.writeValueAsString(messageObject);
                             log.setAktoFormat(s);

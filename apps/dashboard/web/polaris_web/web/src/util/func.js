@@ -879,7 +879,6 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName) {
           let authTypeTag = authType.replace(",", "");
           let riskScore = apiInfoMap[key] ? apiInfoMap[key]?.riskScore : 0
           let responseCodesArr = apiInfoMap[key] ? apiInfoMap[key]?.responseCodes : [] 
-
           ret[key] = {
               id: x.method + "###" + x.url + "###" + x.apiCollectionId + "###" + Math.random(),
               shadow: x.shadow ? x.shadow : false,
@@ -911,7 +910,8 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName) {
               riskScore: riskScore,
               sensitiveInReq: [...this.convertSensitiveTags(x.sensitiveInReq)],
               sensitiveInResp: [...this.convertSensitiveTags(x.sensitiveInResp)],
-              responseCodes: responseCodesArr
+              responseCodes: responseCodesArr,
+              sources: apiInfoMap[key]?apiInfoMap[key]['sources']:{}
           }
 
       }

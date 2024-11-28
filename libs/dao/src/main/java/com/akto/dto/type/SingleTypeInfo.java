@@ -12,7 +12,6 @@ import com.akto.util.AccountTask;
 import com.mongodb.BasicDBObject;
 import io.swagger.v3.oas.models.media.*;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.math.NumberUtils;
 import org.bson.codecs.pojo.annotations.BsonIgnore;
 import org.bson.codecs.pojo.annotations.BsonProperty;
 import org.bson.types.ObjectId;
@@ -531,6 +530,8 @@ public class SingleTypeInfo {
     long maxValue = ACCEPTED_MIN_VALUE;  // this value will be used when field doesn't exist in db
     public static final String LAST_SEEN = "lastSeen";
     long lastSeen;
+    public static final String SOURCES = "sources";
+    Map<String, Object> sources;
 
     @BsonIgnore
     private boolean isPrivate; // do not use this field anywhere else. This was added to convey if STI is private or not to frontend
@@ -776,6 +777,14 @@ public String composeKeyWithCustomSubType(SubType s) {
 
     public void setStrId(String strId) {
         this.strId = strId;
+    }
+
+    public Map<String, Object> getSources() {
+        return this.sources;
+    }
+
+    public void setSources(Map<String, Object> sources) {
+        this.sources = sources;
     }
 
     @Override
