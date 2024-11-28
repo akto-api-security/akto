@@ -1049,6 +1049,17 @@ getDeprecatedEndpoints(apiInfoList, unusedEndpoints, apiCollectionId) {
         return draft;
     }
 },
+  conditionsReducer(draft, action) {
+    switch (action.type) {
+        case "add": draft.push(action.obj); break;
+        case "overwrite": draft[action.index][action.key] = { };
+        case "update": draft[action.index][action.key] = { ...draft[action.index][action.key], ...action.obj }; break;
+        case "updateKey": draft[action.index] = { ...draft[action.index], [action.key]: action.obj }; break;
+        case "delete": return draft.filter((item, index) => index !== action.index);
+        case "clear": return [];
+        default: break;
+    }
+  },
   toYMD(date) {
     var d = date.getDate();
     var m = date.getMonth() + 1; //Month from 0 to 11
