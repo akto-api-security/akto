@@ -163,7 +163,7 @@ function ApiEndpoints(props) {
     const [showEmptyScreen, setShowEmptyScreen] = useState(false)
     const [runTests, setRunTests ] = useState(false)
 
-    const [endpointData, setEndpointData] = useState({"all":[], 'sensitive': [], 'new': [], 'high_risk': [], 'no_auth': [], 'shadow': [], 'undocumented' : [], 'zombie': []})
+    const [endpointData, setEndpointData] = useState({"all":[], 'sensitive': [], 'new': [], 'high_risk': [], 'no_auth': [], 'shadow': [], 'zombie': []})
     const [selectedTab, setSelectedTab] = useState("all")
     const [selected, setSelected] = useState(0)
     const [selectedResourcesForPrimaryAction, setSelectedResourcesForPrimaryAction] = useState([])
@@ -187,7 +187,7 @@ function ApiEndpoints(props) {
     const selectedMethod = queryParams.get('selected_method')
 
     // the values used here are defined at the server.
-    const definedTableTabs = apiCollectionId === 111111999 ? ['All', 'New', 'High risk', 'No auth', 'Shadow'] : ( apiCollectionId === 111111120 ? ['All', 'New', 'Sensitive', 'High risk', 'Shadow'] : ['All', 'New', 'Sensitive', 'High risk', 'No auth', 'Shadow', 'Undocumented', 'Zombie'] )
+    const definedTableTabs = apiCollectionId === 111111999 ? ['All', 'New', 'High risk', 'No auth', 'Shadow'] : ( apiCollectionId === 111111120 ? ['All', 'New', 'Sensitive', 'High risk', 'Shadow'] : ['All', 'New', 'Sensitive', 'High risk', 'No auth', 'Shadow', 'Zombie'] )
 
 
     const { tabsInfo } = useTable()
@@ -331,15 +331,17 @@ function ApiEndpoints(props) {
                 }
             })
         }
-
+        
         const prettifyData = transform.prettifyEndpointsData(allEndpoints)
 
         const zombie = prettifyData.filter(
-            obj => Object.keys(obj.sources).length === 1 && obj.sources.hasOwnProperty("OPEN_API")
+            obj => obj.sources && // Check that obj.sources is not null or undefined
+                   Object.keys(obj.sources).length === 1 &&
+                   obj.sources.hasOwnProperty("OPEN_API")
         );
 
         const undocumented = prettifyData.filter(
-            obj => Object.keys(obj.sources).length === 1 && obj.sources.hasOwnProperty("HAR")
+            obj => obj.sources && Object.keys(obj.sources).length === 1 && obj.sources.hasOwnProperty("HAR")
         );
 
         // append shadow endpoints to all endpoints
@@ -348,8 +350,7 @@ function ApiEndpoints(props) {
         data['high_risk'] = prettifyData.filter(x=> x.riskScore >= 4)
         data['new'] = prettifyData.filter(x=> x.isNew)
         data['no_auth'] = prettifyData.filter(x => x.open)
-        data['shadow'] = [ ...shadowApis ]
-        data['undocumented'] = undocumented
+        data['shadow'] = [ ...shadowApis, ...undocumented ]
         data['zombie'] = zombie
         setEndpointData(data)
         setSelectedTab("all")
