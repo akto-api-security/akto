@@ -447,5 +447,12 @@ export default {
             method: 'post',
             data: { latestTestingRunSummaryId, issueStatusQuery }
         })
+    },
+    modifyTestingRunConfig(testingRunConfigId, testConfigsAdvancedSettings){
+        return request({
+            url: '/api/modifyTestingRunConfig',
+            method: 'post',
+            data: { testingRunConfigId, testConfigsAdvancedSettings }
+        })
     }
 }

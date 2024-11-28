@@ -1,5 +1,6 @@
 package com.akto.testing;
 
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -14,11 +15,12 @@ import javax.script.ScriptEngineManager;
 import javax.script.ScriptException;
 
 import com.akto.dto.ApiInfo.ApiInfoKey;
+import com.akto.dto.CollectionConditions.ConditionsType;
 import com.akto.dto.OriginalHttpRequest;
-import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.RawApi;
 import com.akto.dto.test_editor.DataOperandsFilterResponse;
 import com.akto.dto.test_editor.FilterNode;
+import com.akto.dto.test_editor.Util;
 import com.akto.dto.testing.WorkflowUpdatedSampleData;
 import com.akto.dto.type.RequestTemplate;
 import com.akto.log.LoggerMaker;
@@ -26,11 +28,15 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.test_editor.filter.Filter;
 import com.akto.test_editor.filter.data_operands_impl.ValidationResult;
 import com.akto.util.JSONUtils;
+import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 
 import okhttp3.MediaType;
 
-import static com.akto.runtime.RuntimeUtil.extractAllValuesFromPayload;;
+import static com.akto.runtime.RuntimeUtil.extractAllValuesFromPayload;
+import static com.akto.test_editor.Utils.deleteKeyFromPayload;
+import static com.akto.test_editor.execution.Operations.deleteCookie;
+import static com.akto.test_editor.execution.Operations.modifyCookie;
 
 public class Utils {
 
@@ -367,6 +373,84 @@ public class Utils {
         Filter filter = new Filter();
         DataOperandsFilterResponse dataOperandsFilterResponse = filter.isEndpointValid(node, rawApi, testRawApi, apiInfoKey, null, null , false,context, varMap, logId, false);
         return new ValidationResult(dataOperandsFilterResponse.getResult(), dataOperandsFilterResponse.getValidationReason());
+    }
+
+    public static void modifyBodyOperations(OriginalHttpRequest httpRequest, List<ConditionsType> modifyOperations, List<ConditionsType> addOperations, List<ConditionsType> deleteOperations){
+        String oldReqBody = httpRequest.getBody();
+        if(oldReqBody == null || oldReqBody.isEmpty()){
+            return ;
+        }
+        BasicDBObject payload;
+
+        if (oldReqBody != null && oldReqBody.startsWith("[")) {
+            oldReqBody = "{\"json\": "+oldReqBody+"}";
+        }
+        try {
+            payload = BasicDBObject.parse(oldReqBody);
+        } catch (Exception e) {
+            payload = new BasicDBObject();
+        }
+
+        if(!modifyOperations.isEmpty()){
+            for(ConditionsType condition : modifyOperations){
+                Util.modifyValueInPayload(payload, null, condition.getKey(), condition.getValue());
+            }
+        }
+        if(!addOperations.isEmpty()){
+            for(ConditionsType condition : addOperations){
+                payload.put(condition.getKey(), condition.getValue());
+            }
+        }
+
+        if(!deleteOperations.isEmpty()){
+            for(ConditionsType condition : deleteOperations){
+                deleteKeyFromPayload(payload, null, condition.getKey());
+            }
+        }
+
+        String payloadStr = payload.toJson();
+
+        if (payload.size() == 1 && payload.containsKey("json")) {
+            Object jsonValue = payload.get("json");
+            if (jsonValue instanceof BasicDBList) {
+                payloadStr = payload.get("json").toString();
+            }
+        }
+
+
+        httpRequest.setBody(payloadStr);
+    }
+
+    public static void modifyHeaderOperations(OriginalHttpRequest httpRequest, List<ConditionsType> modifyOperations, List<ConditionsType> addOperations, List<ConditionsType> deleteOperations){
+        Map<String, List<String>> reqHeaders = httpRequest.getHeaders();
+
+        if(!addOperations.isEmpty()){
+            for(ConditionsType condition : addOperations){
+                List<String> valList = Collections.singletonList(condition.getValue());
+                reqHeaders.put(condition.getKey(), valList);
+            }
+        }
+
+        if(!deleteOperations.isEmpty()){
+            for(ConditionsType condition : deleteOperations){
+                String key = condition.getKey();
+                deleteCookie(reqHeaders, key, null);
+                if (reqHeaders.containsKey(key)) {
+                    reqHeaders.remove(key);
+                }
+            }
+        }
+
+        if(!modifyOperations.isEmpty()){
+            for(ConditionsType condition : modifyOperations){
+                String key = condition.getKey();
+                modifyCookie(reqHeaders, key, condition.getValue());
+                List<String> valList = Collections.singletonList(condition.getValue());
+                reqHeaders.put(condition.getKey(), valList);
+            }
+        }
+        
+        
     }
     
 }
