@@ -275,6 +275,9 @@ public class ApiCollectionsAction extends UserAction {
     public String deleteMultipleCollections() {
         List<Integer> apiCollectionIds = new ArrayList<>();
         for(ApiCollection apiCollection: this.apiCollections) {
+            if(apiCollection.getId() == 0) {
+                continue;
+            }
             apiCollectionIds.add(apiCollection.getId());
         }
 
