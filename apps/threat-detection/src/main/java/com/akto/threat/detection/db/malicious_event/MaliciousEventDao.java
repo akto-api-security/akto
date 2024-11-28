@@ -6,8 +6,8 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 
 public class MaliciousEventDao {
 
@@ -33,7 +33,6 @@ public class MaliciousEventDao {
       stmt.setLong(6, event.getTimestamp());
       stmt.setString(7, event.getOrig());
       stmt.setString(8, event.getIp());
-      stmt.setString(9, event.getCountry());
 
       stmt.addBatch();
 
@@ -46,11 +45,17 @@ public class MaliciousEventDao {
     conn.commit();
   }
 
-  public Optional<MaliciousEventModel> findOne(String id) throws SQLException {
-    String sql = "SELECT * FROM threat_detection.malicious_event WHERE id = ?";
+  public List<MaliciousEventModel> findGivenActorIdAndFilterId(
+      String actor, String filterId, int limit) throws SQLException {
+    String sql =
+        "SELECT * FROM threat_detection.malicious_event WHERE actor_id = ? AND filter_id = ? LIMIT ?";
     PreparedStatement stmt = this.conn.prepareStatement(sql);
+    stmt.setString(1, actor);
+    stmt.setString(2, filterId);
+    stmt.setInt(3, limit);
     try (ResultSet rs = stmt.executeQuery()) {
-      if (rs.next()) {
+      List<MaliciousEventModel> models = new ArrayList<>();
+      while (rs.next()) {
         MaliciousEventModel model =
             MaliciousEventModel.newBuilder()
                 .setId(rs.getString("id"))
@@ -61,14 +66,25 @@ public class MaliciousEventDao {
                 .setTimestamp(rs.getLong("timestamp"))
                 .setOrig(rs.getString("data"))
                 .setIp(rs.getString("ip"))
-                .setCountry(rs.getString("country"))
                 .build();
-
-        return Optional.of(model);
+        models.add(model);
       }
-    } catch (SQLException e) {
-      e.printStackTrace();
+      return models;
     }
-    return Optional.empty();
+  }
+
+  public int countTotalMaliciousEventGivenActorIdAndFilterId(String actor, String filterId)
+      throws SQLException {
+    String sql =
+        "SELECT COUNT(*) FROM threat_detection.malicious_event WHERE actor_id = ? AND filter_id = ?";
+    PreparedStatement stmt = this.conn.prepareStatement(sql);
+    stmt.setString(1, actor);
+    stmt.setString(2, filterId);
+    try (ResultSet rs = stmt.executeQuery()) {
+      if (rs.next()) {
+        return rs.getInt(1);
+      }
+    }
+    return 0;
   }
 }
