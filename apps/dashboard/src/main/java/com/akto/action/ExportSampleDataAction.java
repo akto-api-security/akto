@@ -315,6 +315,9 @@ public class ExportSampleDataAction extends UserAction {
                         }
                     }
                 }
+            } else {
+                String escapedPayload = payload.replace("'", "'\\''");
+                builder.append("-d '").append(escapedPayload).append("' \\\n  ");
             }
         } catch (Exception e) {
             throw e;
