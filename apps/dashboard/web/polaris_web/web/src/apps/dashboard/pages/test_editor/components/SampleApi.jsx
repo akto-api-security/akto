@@ -313,7 +313,7 @@ const SampleApi = () => {
                     <EmptySampleApi
                         iconSrc={"/public/file_plus.svg"}
                         headingText={"Discover APIs to get started"}
-                        description={"You don't have any active API collections. Create a new API collection now."}
+                        description={"You have an inactive API collection or one with no data. Create or populate a collection now to get started."}
                         buttonText={"Create new a API collection"}
                         redirectUrl={"/dashboard/observe/inventory"}
                     />
