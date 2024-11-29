@@ -147,10 +147,11 @@ public class CleanInventory {
             skip += limit;
             List<Key> toBeDeleted = new ArrayList<>();
             List<Key> toMove = new ArrayList<>();
+            List<String> remainingSamples = new ArrayList<>();
             for(SampleData sampleData: sampleDataList) {
                 try {
                     List<String> samples = sampleData.getSamples();
-                    List<String> remainingSamples = new ArrayList<>();
+                    remainingSamples.clear();
                     if (samples == null || samples.isEmpty()) {
                         logger.info("[BadApisRemover] No samples found for : " + sampleData.getId());
                         continue;
@@ -229,7 +230,9 @@ public class CleanInventory {
                         } else {
                             if (remainingSamples.size() != samples.size()) {
 
-                                SampleDataDao.instance.updateOneNoUpsert(Filters.eq("_id",sampleData.getId()), Updates.set(SampleData.SAMPLES,remainingSamples));
+                                if (shouldDeleteRequest) {
+                                    SampleDataDao.instance.updateOneNoUpsert(Filters.eq("_id",sampleData.getId()), Updates.set(SampleData.SAMPLES,remainingSamples));
+                                }
                                 if(saveLogsToDB){
                                     loggerMaker.infoAndAddToDb(
                                             "Deleting bad samples from sample data" + sampleData.getId(), LogDb.DASHBOARD
