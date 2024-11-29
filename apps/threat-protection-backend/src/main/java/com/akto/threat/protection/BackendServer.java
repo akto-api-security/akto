@@ -17,7 +17,7 @@ public class BackendServer {
     this.port = port;
     this.server =
         ServerBuilder.forPort(port)
-            .addService(new ConsumerMaliciousEventService(mongoClient))
+            .addService(new MaliciousAlertService(mongoClient))
             .intercept(new AuthenticationInterceptor())
             .build();
   }
