@@ -3,15 +3,15 @@ package com.akto.threat.detection.tasks;
 import com.akto.dto.type.URLMethods;
 import com.akto.proto.threat_protection.message.malicious_event.v1.MaliciousEvent;
 import com.akto.threat.detection.config.kafka.KafkaConfig;
-import com.akto.threat.detection.db.malicious_event.MaliciousEventDao;
-import com.akto.threat.detection.db.malicious_event.MaliciousEventModel;
+import com.akto.threat.detection.db.entity.MaliciousEventEntity;
 import com.akto.threat.detection.dto.MessageEnvelope;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.util.JsonFormat;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
+import org.hibernate.Session;
+import org.hibernate.SessionFactory;
+import org.hibernate.Transaction;
 
-import java.sql.Connection;
-import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
@@ -22,11 +22,11 @@ This will read sample malicious data from kafka topic and save it to DB.
  */
 public class FlushSampleDataTask extends AbstractKafkaConsumerTask {
 
-  private final MaliciousEventDao maliciousEventDao;
+  private final SessionFactory sessionFactory;
 
-  public FlushSampleDataTask(Connection conn, KafkaConfig trafficConfig, String topic) {
+  public FlushSampleDataTask(SessionFactory sessionFactory, KafkaConfig trafficConfig, String topic) {
     super(trafficConfig, topic);
-    this.maliciousEventDao = new MaliciousEventDao(conn);
+    this.sessionFactory = sessionFactory;
   }
 
   @Override
@@ -35,7 +35,7 @@ public class FlushSampleDataTask extends AbstractKafkaConsumerTask {
   }
 
   protected void processRecords(ConsumerRecords<String, String> records) {
-    List<MaliciousEventModel> events = new ArrayList<>();
+    List<MaliciousEventEntity> events = new ArrayList<>();
     records.forEach(
         r -> {
           String message = r.value();
@@ -55,8 +55,8 @@ public class FlushSampleDataTask extends AbstractKafkaConsumerTask {
           MaliciousEvent evt = builder.build();
 
           events.add(
-              MaliciousEventModel.newBuilder()
-                  .setActorId(m.getAccountId())
+              MaliciousEventEntity.newBuilder()
+                  .setActor(m.getAccountId())
                   .setFilterId(evt.getFilterId())
                   .setUrl(evt.getUrl())
                   .setMethod(URLMethods.Method.fromString(evt.getMethod()))
@@ -66,10 +66,21 @@ public class FlushSampleDataTask extends AbstractKafkaConsumerTask {
                   .build());
         });
 
-    try {
-      this.maliciousEventDao.batchInsert(events);
-    } catch (SQLException e) {
-      e.printStackTrace();
+    Session session = this.sessionFactory.openSession();
+    Transaction txn = session.beginTransaction();
+
+    txn.begin();
+
+    // Commit these events in 2 batches
+    for (int i = 0; i < events.size(); i += 2) {
+      session.persist(events.get(i));
+      if (i % 50 == 0) {
+        session.flush();
+        session.clear();
+      }
     }
+
+    txn.commit();
+    session.close();
   }
 }
