@@ -273,17 +273,14 @@ public class Utils {
             Map<String, Map<String, Object>> json = gson.fromJson(nodeResult.getMessage(), Map.class);
 
             if (json.get("response").get("headers") != null) {
-                String jsonString = gson.toJson(json.get("response").get("headers"));
-                respString.put("headers", jsonString);
+                respString.put("headers", json.get("response").get("headers"));
             } else {
-                String hStr = "{}";
-                respString.put("headers", hStr);
+                respString.put("headers", "{}");
             }
             if (json.get("response").get("body") != null) {
-                String jsonString = gson.toJson(json.get("response").get("body"));
-                respString.put("body", jsonString);
-            } else {
                 respString.put("body", json.get("response").get("body"));
+            } else {
+                respString.put("body", "{}");
             }
             // respString.put("body", json.get("response").get("body").toString());
             responses.add(respString.toString());
