@@ -167,7 +167,6 @@ public class CleanInventory {
 
                     
                     boolean isRedundant = false;
-                    boolean isAllowedFromTemplate = false;
                     boolean isNetsparkerPresent = false;
                     boolean movingApi = false;
                     for (String sample : samples) {
@@ -190,13 +189,11 @@ public class CleanInventory {
                                         break;
                                     }else if(filterType.equals(FILTER_TYPE.ALLOWED)){
                                         // filter passed and not modified
-                                        isAllowedFromTemplate = true;
                                         remainingSamples.add(sample);
                                     }else if(filterMap.size() == 1){
                                         // filter failed and id was default_delete
                                         String key = filterMap.entrySet().iterator().next().getKey();
                                         if(key.equals("DEFAULT_BLOCK_FILTER")){
-                                            isAllowedFromTemplate = true;
                                             remainingSamples.add(sample);
                                         }
                                     }
@@ -213,7 +210,7 @@ public class CleanInventory {
                         }else{
                             logger.info("[BadApisUpdater] Updating bad from template API: " + sampleData.getId(), LogDb.DASHBOARD);
                         }
-                    } else if (isRedundant || !isAllowedFromTemplate) {
+                    } else if (isRedundant || (remainingSamples.size() != samples.size())) {
                         if (remainingSamples.isEmpty()) {
                             // writer.write(sampleData.toString());
                             // if api falls under redundant url and if block filter is passed or none of the filter from any of the filters is passed, we print this block
@@ -235,7 +232,7 @@ public class CleanInventory {
                                 }
                                 if(saveLogsToDB){
                                     loggerMaker.infoAndAddToDb(
-                                            "Deleting bad samples from sample data" + sampleData.getId(), LogDb.DASHBOARD
+                                            "Deleting bad samples from sample data " + sampleData.getId(), LogDb.DASHBOARD
                                     );
                                 }else{
                                     logger.info("[BadApisRemover] " + isNetsparkerPresent + " Deleting bad API from template: " + sampleData.getId(), LogDb.DASHBOARD);
