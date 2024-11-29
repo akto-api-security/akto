@@ -19,6 +19,8 @@ import java.util.function.Function;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+import com.akto.dto.CodeAnalysisRepo;
+import com.mongodb.client.model.Updates;
 import org.bson.conversions.Bson;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -148,6 +150,7 @@ public class CleanInventory {
             for(SampleData sampleData: sampleDataList) {
                 try {
                     List<String> samples = sampleData.getSamples();
+                    List<String> remainingSamples = new ArrayList<>();
                     if (samples == null || samples.isEmpty()) {
                         logger.info("[BadApisRemover] No samples found for : " + sampleData.getId());
                         continue;
@@ -182,19 +185,20 @@ public class CleanInventory {
                                     if(filterType.equals(FILTER_TYPE.MODIFIED)){
                                         // filter passed and modified
                                         movingApi = true;
+                                        remainingSamples.add(sample);
                                         break;
                                     }else if(filterType.equals(FILTER_TYPE.ALLOWED)){
                                         // filter passed and not modified
                                         isAllowedFromTemplate = true;
+                                        remainingSamples.add(sample);
                                     }else if(filterMap.size() == 1){
                                         // filter failed and id was default_delete
                                         String key = filterMap.entrySet().iterator().next().getKey();
                                         if(key.equals("DEFAULT_BLOCK_FILTER")){
                                             isAllowedFromTemplate = true;
+                                            remainingSamples.add(sample);
                                         }
                                     }
-                                }else{
-                                    break;
                                 }
                             }
                         }
@@ -208,21 +212,33 @@ public class CleanInventory {
                         }else{
                             logger.info("[BadApisUpdater] Updating bad from template API: " + sampleData.getId(), LogDb.DASHBOARD);
                         }
-                    }
+                    } else if (isRedundant || !isAllowedFromTemplate) {
+                        if (remainingSamples.isEmpty()) {
+                            // writer.write(sampleData.toString());
+                            // if api falls under redundant url and if block filter is passed or none of the filter from any of the filters is passed, we print this block
+                            int initialCount = collectionWiseDeletionCountMap.getOrDefault(sampleData.getId().getApiCollectionId(), 0);
+                            collectionWiseDeletionCountMap.put(sampleData.getId().getApiCollectionId(),initialCount + 1);
+                            toBeDeleted.add(sampleData.getId());
+                            if(saveLogsToDB){
+                                loggerMaker.infoAndAddToDb(
+                                        "Filter passed, deleting bad api found from filter: " + sampleData.getId(), LogDb.DASHBOARD
+                                );
+                            }else{
+                                logger.info("[BadApisRemover] " + isNetsparkerPresent + " Deleting bad samples from template: " + sampleData.getId(), LogDb.DASHBOARD);
+                            }
+                        } else {
+                            if (remainingSamples.size() != samples.size()) {
 
-                    else if (isRedundant || !isAllowedFromTemplate) {                                
-                        // writer.write(sampleData.toString());
-                        // if api falls under redundant url and if block filter is passed or none of the filter from any of the filters is passed, we print this block
-                        int initialCount = collectionWiseDeletionCountMap.getOrDefault(sampleData.getId().getApiCollectionId(), 0);
-                        collectionWiseDeletionCountMap.put(sampleData.getId().getApiCollectionId(),initialCount + 1);
-                        toBeDeleted.add(sampleData.getId());  
-                        if(saveLogsToDB){
-                            loggerMaker.infoAndAddToDb(
-                                "Filter passed, deleting bad api found from filter: " + sampleData.getId(), LogDb.DASHBOARD
-                            );
-                        }else{
-                            logger.info("[BadApisRemover] " + isNetsparkerPresent + " Deleting bad API from template: " + sampleData.getId(), LogDb.DASHBOARD);
-                        }           
+                                SampleDataDao.instance.updateOneNoUpsert(Filters.eq("_id",sampleData.getId()), Updates.set(SampleData.SAMPLES,remainingSamples));
+                                if(saveLogsToDB){
+                                    loggerMaker.infoAndAddToDb(
+                                            "Deleting bad samples from sample data" + sampleData.getId(), LogDb.DASHBOARD
+                                    );
+                                }else{
+                                    logger.info("[BadApisRemover] " + isNetsparkerPresent + " Deleting bad API from template: " + sampleData.getId(), LogDb.DASHBOARD);
+                                }
+                            }
+                        }
                     } else {
                         // other cases like: => filter from advanced filter is passed || filter from block filter fails
                         if(saveLogsToDB){
