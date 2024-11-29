@@ -1,7 +1,7 @@
 package com.akto.threat.detection.tasks;
 
 import com.akto.dto.type.URLMethods;
-import com.akto.proto.threat_protection.consumer_service.v1.MaliciousEvent;
+import com.akto.proto.threat_protection.message.malicious_event.v1.MaliciousEvent;
 import com.akto.threat.detection.config.kafka.KafkaConfig;
 import com.akto.threat.detection.db.malicious_event.MaliciousEventDao;
 import com.akto.threat.detection.db.malicious_event.MaliciousEventModel;
