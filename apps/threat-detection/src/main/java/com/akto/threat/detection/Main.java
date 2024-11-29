@@ -14,35 +14,37 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 
+import org.flywaydb.core.Flyway;
+
 public class Main {
 
   public static void main(String[] args) throws Exception {
-    DaoInit.init(new ConnectionString(System.getenv("AKTO_MONGO_CONN")));
-    KafkaConfig trafficKafka =
-        KafkaConfig.newBuilder()
-            .setGroupId("akto.threat.detection")
-            .setBootstrapServers("localhost:29092")
-            .setConsumerConfig(
-                KafkaConsumerConfig.newBuilder()
-                    .setMaxPollRecords(100)
-                    .setPollDurationMilli(100)
-                    .build())
-            .setProducerConfig(
-                KafkaProducerConfig.newBuilder().setBatchSize(100).setLingerMs(100).build())
-            .build();
+    runMigrations();
 
-    KafkaConfig internalKafka =
-        KafkaConfig.newBuilder()
-            .setGroupId("akto.threat.detection")
-            .setBootstrapServers("localhost:29092")
-            .setConsumerConfig(
-                KafkaConsumerConfig.newBuilder()
-                    .setMaxPollRecords(100)
-                    .setPollDurationMilli(100)
-                    .build())
-            .setProducerConfig(
-                KafkaProducerConfig.newBuilder().setBatchSize(100).setLingerMs(100).build())
-            .build();
+    DaoInit.init(new ConnectionString(System.getenv("AKTO_MONGO_CONN")));
+    KafkaConfig trafficKafka = KafkaConfig.newBuilder()
+        .setGroupId("akto.threat.detection")
+        .setBootstrapServers("localhost:29092")
+        .setConsumerConfig(
+            KafkaConsumerConfig.newBuilder()
+                .setMaxPollRecords(100)
+                .setPollDurationMilli(100)
+                .build())
+        .setProducerConfig(
+            KafkaProducerConfig.newBuilder().setBatchSize(100).setLingerMs(100).build())
+        .build();
+
+    KafkaConfig internalKafka = KafkaConfig.newBuilder()
+        .setGroupId("akto.threat.detection")
+        .setBootstrapServers("localhost:29092")
+        .setConsumerConfig(
+            KafkaConsumerConfig.newBuilder()
+                .setMaxPollRecords(100)
+                .setPollDurationMilli(100)
+                .build())
+        .setProducerConfig(
+            KafkaProducerConfig.newBuilder().setBatchSize(100).setLingerMs(100).build())
+        .build();
 
     Connection postgres = createPostgresConnection();
 
@@ -57,6 +59,22 @@ public class Main {
 
   public static Connection createPostgresConnection() throws SQLException {
     String url = System.getenv("AKTO_THREAT_DETECTION_POSTGRES");
-    return DriverManager.getConnection(url);
+    String user = System.getenv("AKTO_THREAT_DETECTION_POSTGRES_USER");
+    String password = System.getenv("AKTO_THREAT_DETECTION_POSTGRES_PASSWORD");
+    return DriverManager.getConnection(url, user, password);
+  }
+
+  public static void runMigrations() {
+    String url = System.getenv("AKTO_THREAT_DETECTION_POSTGRES");
+    String user = System.getenv("AKTO_THREAT_DETECTION_POSTGRES_USER");
+    String password = System.getenv("AKTO_THREAT_DETECTION_POSTGRES_PASSWORD");
+    Flyway flyway = Flyway
+        .configure()
+        .dataSource(url, user, password)
+        .locations("classpath:db/migration")
+        .schemas("flyway")
+        .load();
+
+    flyway.migrate();
   }
 }
