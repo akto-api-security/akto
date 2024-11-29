@@ -20,13 +20,13 @@ public class MaliciousEventDao {
 
   public void batchInsert(List<MaliciousEventModel> events) throws SQLException {
     String sql =
-        "INSERT INTO threat_detection.malicious_event (id, actor_id, filter_id, url, method, timestamp, data, ip, country) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        "INSERT INTO threat_detection.malicious_event (id, actor, filter_id, url, method, timestamp, data, ip, country) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
     conn.setAutoCommit(false);
     for (int i = 0; i < events.size(); i++) {
       MaliciousEventModel event = events.get(i);
       PreparedStatement stmt = this.conn.prepareStatement(sql);
       stmt.setString(1, event.getId());
-      stmt.setString(2, event.getActorId());
+      stmt.setString(2, event.getActor());
       stmt.setString(3, event.getFilterId());
       stmt.setString(4, event.getUrl());
       stmt.setString(5, event.getMethod().name());
@@ -45,10 +45,10 @@ public class MaliciousEventDao {
     conn.commit();
   }
 
-  public List<MaliciousEventModel> findGivenActorIdAndFilterId(
+  public List<MaliciousEventModel> findGivenActorAndFilterId(
       String actor, String filterId, int limit) throws SQLException {
     String sql =
-        "SELECT * FROM threat_detection.malicious_event WHERE actor_id = ? AND filter_id = ? LIMIT ?";
+        "SELECT * FROM threat_detection.malicious_event WHERE actor = ? AND filter_id = ? LIMIT ?";
     PreparedStatement stmt = this.conn.prepareStatement(sql);
     stmt.setString(1, actor);
     stmt.setString(2, filterId);
@@ -59,7 +59,7 @@ public class MaliciousEventDao {
         MaliciousEventModel model =
             MaliciousEventModel.newBuilder()
                 .setId(rs.getString("id"))
-                .setActorId(rs.getString("actor_id"))
+                .setActorId(rs.getString("actor"))
                 .setFilterId(rs.getString("filter_id"))
                 .setUrl(rs.getString("url"))
                 .setMethod(URLMethods.Method.fromString(rs.getString("method")))
@@ -73,10 +73,10 @@ public class MaliciousEventDao {
     }
   }
 
-  public int countTotalMaliciousEventGivenActorIdAndFilterId(String actor, String filterId)
+  public int countTotalMaliciousEventGivenActorAndFilterId(String actor, String filterId)
       throws SQLException {
     String sql =
-        "SELECT COUNT(*) FROM threat_detection.malicious_event WHERE actor_id = ? AND filter_id = ?";
+        "SELECT COUNT(*) FROM threat_detection.malicious_event WHERE actor = ? AND filter_id = ?";
     PreparedStatement stmt = this.conn.prepareStatement(sql);
     stmt.setString(1, actor);
     stmt.setString(2, filterId);

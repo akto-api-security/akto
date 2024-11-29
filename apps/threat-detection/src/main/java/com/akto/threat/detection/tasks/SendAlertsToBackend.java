@@ -72,11 +72,11 @@ public class SendAlertsToBackend extends AbstractKafkaConsumerTask {
           // Get sample data from postgres for this alert
           try {
             List<MaliciousEventModel> sampleData =
-                this.maliciousEventDao.findGivenActorIdAndFilterId(
+                this.maliciousEventDao.findGivenActorAndFilterId(
                     evt.getActor(), evt.getFilterId(), 50);
 
             int totalEvents =
-                this.maliciousEventDao.countTotalMaliciousEventGivenActorIdAndFilterId(
+                this.maliciousEventDao.countTotalMaliciousEventGivenActorAndFilterId(
                     evt.getActor(), evt.getFilterId());
 
             this.consumerServiceStub.recordAlert(
