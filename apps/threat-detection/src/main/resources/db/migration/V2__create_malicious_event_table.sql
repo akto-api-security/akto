@@ -1,6 +1,6 @@
 -- create schema and table for malicious events
 create schema if not exists threat_detection;
-create table if not exists threat_detection.malicious_events (
+create table if not exists threat_detection.malicious_event (
     id uuid primary key default uuid_generate_v4(),
     actor varchar(255) not null,
     filter_id varchar(255) not null,
@@ -13,4 +13,4 @@ create table if not exists threat_detection.malicious_events (
 );
 
 -- add index on actor and filter_id and sort data by timestamp
-create index malicious_events_actor_filter_id_timestamp_idx on threat_detection.malicious_events(actor, filter_id, timestamp desc);
+create index malicious_events_actor_filter_id_timestamp_idx on threat_detection.malicious_event(actor, filter_id, timestamp desc);
