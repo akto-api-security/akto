@@ -1,7 +1,6 @@
 package com.akto.threat.protection;
 
 import com.akto.DaoInit;
-import com.akto.threat.protection.tasks.CleanupTask;
 import com.mongodb.ConnectionString;
 import com.mongodb.ReadPreference;
 import com.mongodb.client.MongoClient;
@@ -17,7 +16,6 @@ public class Main {
             new ConnectionString(System.getenv("AKTO_THREAT_PROTECTION_MONGO_CONN")),
             ReadPreference.secondary());
 
-    new CleanupTask(threatProtectionMongo).init();
     int port =
         Integer.parseInt(
             System.getenv().getOrDefault("AKTO_THREAT_PROTECTION_BACKEND_PORT", "8980"));
