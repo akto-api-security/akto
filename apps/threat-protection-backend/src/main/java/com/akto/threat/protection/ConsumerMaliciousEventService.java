@@ -3,10 +3,9 @@ package com.akto.threat.protection;
 import java.util.ArrayList;
 import java.util.List;
 
-import com.akto.proto.threat_protection.consumer_service.v1.ConsumerServiceGrpc;
-import com.akto.proto.threat_protection.consumer_service.v1.RecordAlertRequest;
-import com.akto.proto.threat_protection.consumer_service.v1.RecordAlertResponse;
-import com.akto.proto.threat_protection.consumer_service.v1.SmartEvent;
+import com.akto.proto.threat_protection.service.consumer_service.v1.ConsumerServiceGrpc;
+import com.akto.proto.threat_protection.service.consumer_service.v1.RecordAlertRequest;
+import com.akto.proto.threat_protection.service.consumer_service.v1.RecordAlertResponse;
 import com.akto.threat.protection.db.MaliciousEventModel;
 import com.akto.threat.protection.db.SmartEventModel;
 import com.akto.threat.protection.interceptors.Constants;
@@ -29,16 +28,18 @@ public class ConsumerMaliciousEventService extends ConsumerServiceGrpc.ConsumerS
   public void recordAlert(
       RecordAlertRequest request, StreamObserver<RecordAlertResponse> responseObserver) {
 
+    String actor = request.getActor();
+    String filterId = request.getFilterId();
     List<WriteModel<MaliciousEventModel>> bulkUpdates = new ArrayList<>();
     request
-        .getSampleMaliciousEventsList()
+        .getSampleDataList()
         .forEach(
             event -> {
               bulkUpdates.add(
                   new InsertOneModel<>(
                       new MaliciousEventModel(
-                          event.getFilterId(),
-                          event.getActor(),
+                          filterId,
+                          actor,
                           event.getIp(),
                           event.getUrl(),
                           event.getMethod(),
@@ -51,13 +52,12 @@ public class ConsumerMaliciousEventService extends ConsumerServiceGrpc.ConsumerS
         .getCollection("malicious_events", MaliciousEventModel.class)
         .bulkWrite(bulkUpdates, new BulkWriteOptions().ordered(false));
 
-    SmartEvent smartEvt = request.getEvent();
     this.mongoClient
         .getDatabase(accountId + "")
         .getCollection("smart_events", SmartEventModel.class)
         .insertOne(
             new SmartEventModel(
-                smartEvt.getFilterId(), smartEvt.getActor(), smartEvt.getDetectedAt()));
+                filterId, actor, request.getTotalEvents(), request.getDetectedAt()));
     responseObserver.onNext(RecordAlertResponse.newBuilder().build());
     responseObserver.onCompleted();
   }

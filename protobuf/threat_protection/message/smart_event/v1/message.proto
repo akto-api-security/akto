@@ -1,0 +1,13 @@
+syntax = "proto3";
+
+package threat_protection.message.smart_event.v1;
+
+option java_outer_classname = "SmartEventProto";
+option java_package = "threat_protection.v1.message.smart_event";
+
+message SmartEvent {
+  string actor= 1;
+  string filter_id = 2;
+  int64 detected_at = 3;
+  string rule_id = 4;
+}
