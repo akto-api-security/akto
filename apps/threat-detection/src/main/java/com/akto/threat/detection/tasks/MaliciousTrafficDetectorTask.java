@@ -55,9 +55,6 @@ public class MaliciousTrafficDetectorTask {
 
   private final Kafka internalKafka;
 
-  private static final String KAFKA_MALICIOUS_TOPIC = "akto.malicious";
-  private static final String KAFKA_SMART_EVENT_TOPIC = "akto.smart_event";
-
   private static final DataActor dataActor = DataActorFactory.fetchInstance();
 
   public MaliciousTrafficDetectorTask(
@@ -219,7 +216,7 @@ public class MaliciousTrafficDetectorTask {
                             .marshal()
                             .ifPresent(
                                 data -> {
-                                  internalKafka.send(data, KAFKA_SMART_EVENT_TOPIC);
+                                  internalKafka.send(data, "akto.threat_detection.alerts");
                                 });
                       } catch (InvalidProtocolBufferException e) {
                         e.printStackTrace();
@@ -239,7 +236,7 @@ public class MaliciousTrafficDetectorTask {
                 .marshal()
                 .ifPresent(
                     data -> {
-                      internalKafka.send(data, KAFKA_MALICIOUS_TOPIC);
+                      internalKafka.send(data, "akto.threat_detection.malicious");
                     });
           });
     } catch (Exception e) {
