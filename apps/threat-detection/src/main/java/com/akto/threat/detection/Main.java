@@ -5,6 +5,7 @@ import com.akto.threat.detection.config.kafka.KafkaConfig;
 import com.akto.threat.detection.config.kafka.KafkaConsumerConfig;
 import com.akto.threat.detection.config.kafka.KafkaProducerConfig;
 import com.akto.threat.detection.constants.KafkaTopic;
+import com.akto.threat.detection.tasks.CleanupTask;
 import com.akto.threat.detection.tasks.FlushSampleDataTask;
 import com.akto.threat.detection.tasks.MaliciousTrafficDetectorTask;
 import com.akto.threat.detection.tasks.SendAlertsToBackend;
@@ -54,6 +55,7 @@ public class Main {
     new MaliciousTrafficDetectorTask(trafficKafka, internalKafka, createRedisClient()).run();
     new FlushSampleDataTask(postgres, internalKafka, KafkaTopic.ThreatDetection.MALICIOUS_EVENTS).run();
     new SendAlertsToBackend(postgres, internalKafka, KafkaTopic.ThreatDetection.ALERTS).run();
+    new CleanupTask(postgres).run();
   }
 
   public static RedisClient createRedisClient() {
