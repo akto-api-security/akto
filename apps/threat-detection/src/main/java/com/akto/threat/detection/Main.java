@@ -47,8 +47,8 @@ public class Main {
     Connection postgres = createPostgresConnection();
 
     new MaliciousTrafficDetectorTask(trafficKafka, internalKafka, createRedisClient()).run();
-    new FlushSampleDataTask(postgres, internalKafka, "akto,malicious").run();
-    new SendAlertsToBackend(postgres, internalKafka, "akto.smart_event").run();
+    new FlushSampleDataTask(postgres, internalKafka, "akto.threat_detection.malicious").run();
+    new SendAlertsToBackend(postgres, internalKafka, "akto.threat_detection.alerts").run();
   }
 
   public static RedisClient createRedisClient() {
