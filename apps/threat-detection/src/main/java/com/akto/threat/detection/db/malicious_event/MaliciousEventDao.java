@@ -20,7 +20,7 @@ public class MaliciousEventDao {
 
   public void batchInsert(List<MaliciousEventModel> events) throws SQLException {
     String sql =
-        "INSERT INTO threat_detection.malicious_event (id, actor, filter_id, url, method, timestamp, data, ip, country) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        "INSERT INTO threat_detection.malicious_event (id, actor, filter_id, url, method, timestamp, orig, ip, country) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
     conn.setAutoCommit(false);
     for (int i = 0; i < events.size(); i++) {
       MaliciousEventModel event = events.get(i);
@@ -64,8 +64,9 @@ public class MaliciousEventDao {
                 .setUrl(rs.getString("url"))
                 .setMethod(URLMethods.Method.fromString(rs.getString("method")))
                 .setTimestamp(rs.getLong("timestamp"))
-                .setOrig(rs.getString("data"))
+                .setOrig(rs.getString("orig"))
                 .setIp(rs.getString("ip"))
+                .setCreatedAt(rs.getDate("created_at").toLocalDate())
                 .build();
         models.add(model);
       }
