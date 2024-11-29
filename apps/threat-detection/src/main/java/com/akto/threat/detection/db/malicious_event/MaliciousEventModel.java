@@ -2,7 +2,7 @@ package com.akto.threat.detection.db.malicious_event;
 
 import com.akto.dto.type.URLMethods;
 
-import java.util.UUID;
+import java.time.LocalDate;
 
 public class MaliciousEventModel {
 
@@ -17,10 +17,12 @@ public class MaliciousEventModel {
   // Geo location data
   private String ip;
 
+  private LocalDate createdAt;
+
   public MaliciousEventModel() {}
 
   public MaliciousEventModel(Builder builder) {
-    this.id = builder.id == null ? UUID.randomUUID().toString() : builder.id;
+    this.id = builder.id;
     this.actor = builder.actorId;
     this.filterId = builder.filterId;
     this.url = builder.url;
@@ -28,6 +30,7 @@ public class MaliciousEventModel {
     this.timestamp = builder.timestamp;
     this.orig = builder.orig;
     this.ip = builder.ip;
+    this.createdAt = builder.createdAt;
   }
 
   public static class Builder {
@@ -39,6 +42,7 @@ public class MaliciousEventModel {
     private long timestamp;
     private String orig;
     private String ip;
+    private LocalDate createdAt;
 
     public Builder setId(String id) {
       this.id = id;
@@ -83,6 +87,11 @@ public class MaliciousEventModel {
     public MaliciousEventModel build() {
       return new MaliciousEventModel(this);
     }
+
+    public Builder setCreatedAt(LocalDate createdAt) {
+      this.createdAt = createdAt;
+      return this;
+    }
   }
 
   public static Builder newBuilder() {
@@ -119,6 +128,10 @@ public class MaliciousEventModel {
 
   public String getIp() {
     return ip;
+  }
+
+  public LocalDate getCreatedAt() {
+    return createdAt;
   }
 
   @Override

@@ -4,6 +4,7 @@ import com.akto.DaoInit;
 import com.akto.threat.detection.config.kafka.KafkaConfig;
 import com.akto.threat.detection.config.kafka.KafkaConsumerConfig;
 import com.akto.threat.detection.config.kafka.KafkaProducerConfig;
+import com.akto.threat.detection.constants.KafkaTopic;
 import com.akto.threat.detection.tasks.FlushSampleDataTask;
 import com.akto.threat.detection.tasks.MaliciousTrafficDetectorTask;
 import com.akto.threat.detection.tasks.SendAlertsToBackend;
@@ -18,13 +19,15 @@ import org.flywaydb.core.Flyway;
 
 public class Main {
 
+  private static final String CONSUMER_GROUP_ID = "akto.threat_detection";
+
   public static void main(String[] args) throws Exception {
     runMigrations();
 
     DaoInit.init(new ConnectionString(System.getenv("AKTO_MONGO_CONN")));
     KafkaConfig trafficKafka = KafkaConfig.newBuilder()
-        .setGroupId("akto.threat.detection")
-        .setBootstrapServers("localhost:29092")
+        .setGroupId(CONSUMER_GROUP_ID)
+        .setBootstrapServers(System.getenv("AKTO_TRAFFIC_KAFKA_BOOTSTRAP_SERVER"))
         .setConsumerConfig(
             KafkaConsumerConfig.newBuilder()
                 .setMaxPollRecords(100)
@@ -35,8 +38,8 @@ public class Main {
         .build();
 
     KafkaConfig internalKafka = KafkaConfig.newBuilder()
-        .setGroupId("akto.threat.detection")
-        .setBootstrapServers("localhost:29092")
+        .setGroupId(CONSUMER_GROUP_ID)
+        .setBootstrapServers(System.getenv("AKTO_INTERNAL_KAFKA_BOOTSTRAP_SERVER"))
         .setConsumerConfig(
             KafkaConsumerConfig.newBuilder()
                 .setMaxPollRecords(100)
@@ -49,8 +52,8 @@ public class Main {
     Connection postgres = createPostgresConnection();
 
     new MaliciousTrafficDetectorTask(trafficKafka, internalKafka, createRedisClient()).run();
-    new FlushSampleDataTask(postgres, internalKafka, "akto.threat_detection.malicious").run();
-    new SendAlertsToBackend(postgres, internalKafka, "akto.threat_detection.alerts").run();
+    new FlushSampleDataTask(postgres, internalKafka, KafkaTopic.ThreatDetection.MALICIOUS_EVENTS).run();
+    new SendAlertsToBackend(postgres, internalKafka, KafkaTopic.ThreatDetection.ALERTS).run();
   }
 
   public static RedisClient createRedisClient() {

@@ -3,9 +3,9 @@ package com.akto.threat.protection;
 import java.util.ArrayList;
 import java.util.List;
 
-import com.akto.proto.threat_protection.service.consumer_service.v1.ConsumerServiceGrpc;
-import com.akto.proto.threat_protection.service.consumer_service.v1.RecordAlertRequest;
-import com.akto.proto.threat_protection.service.consumer_service.v1.RecordAlertResponse;
+import com.akto.proto.threat_protection.service.malicious_alert_service.v1.MaliciousAlertServiceGrpc.MaliciousAlertServiceImplBase;
+import com.akto.proto.threat_protection.service.malicious_alert_service.v1.RecordAlertRequest;
+import com.akto.proto.threat_protection.service.malicious_alert_service.v1.RecordAlertResponse;
 import com.akto.threat.protection.db.MaliciousEventModel;
 import com.akto.threat.protection.db.SmartEventModel;
 import com.akto.threat.protection.interceptors.Constants;
@@ -16,11 +16,11 @@ import com.mongodb.client.model.WriteModel;
 
 import io.grpc.stub.StreamObserver;
 
-public class ConsumerMaliciousEventService extends ConsumerServiceGrpc.ConsumerServiceImplBase {
+public class MaliciousAlertService extends MaliciousAlertServiceImplBase {
 
   private final MongoClient mongoClient;
 
-  public ConsumerMaliciousEventService(MongoClient mongoClient) {
+  public MaliciousAlertService(MongoClient mongoClient) {
     this.mongoClient = mongoClient;
   }
 
