@@ -1,0 +1,43 @@
+syntax = "proto3";
+
+package threat_protection.service.dashboard_service.v1;
+
+// This is a consumer service for recording malicious alerts
+// For dashboard purposes we will have a separate service to retrieve these events.
+option java_outer_classname = "DashboardServiceProto";
+option java_package = "threat_protection.service.dashboard_service.v1";
+
+message SampleMaliciousEvent {
+    string url = 1;
+    string method = 2;
+    string orig = 3;
+    string ip = 4;
+    string country = 5;
+    int64 timestamp = 6;
+}
+
+message DashboardAlert {
+    string actor = 1;
+    string filter_id = 2;
+    int64 detected_at = 3;
+    int64 total_events = 4;
+    repeated SampleMaliciousEvent sample_events = 5;
+}
+
+message ListAlertsResponse {
+    repeated DashboardAlert alerts = 1;
+    int32 total = 2;
+    int32 page = 3;
+}
+
+message ListAlertsRequest {
+    // The number of alerts to return
+    string actor = 1;
+    string filter_id = 2;
+    int32 limit = 3;
+    int32 page = 4;
+}
+
+service DashboardService {
+    rpc ListAlerts(ListAlertsRequest) returns (ListAlertsResponse);
+}

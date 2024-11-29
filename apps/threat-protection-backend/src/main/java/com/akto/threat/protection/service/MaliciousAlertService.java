@@ -1,4 +1,4 @@
-package com.akto.threat.protection;
+package com.akto.threat.protection.service;
 
 import java.util.ArrayList;
 import java.util.List;
