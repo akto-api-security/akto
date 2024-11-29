@@ -4,54 +4,63 @@ import java.util.UUID;
 
 public class SmartEventModel {
 
-    private String id;
+  private String id;
 
-    private String filterId;
+  private String filterId;
 
-    private long detectedAt;
+  private String actor;
 
-    private String actor;
+  private long totalHits;
 
-    public SmartEventModel() {
-    }
+  private long detectedAt;
 
-    public SmartEventModel(String filterId, String actor, long detectedAt) {
-        this.id = UUID.randomUUID().toString();
-        this.filterId = filterId;
-        this.detectedAt = detectedAt;
-        this.actor = actor;
-    }
+  public SmartEventModel() {}
 
-    public String getId() {
-        return id;
-    }
+  public SmartEventModel(String filterId, String actor, long totalHits, long detectedAt) {
+    this.id = UUID.randomUUID().toString();
+    this.filterId = filterId;
+    this.detectedAt = detectedAt;
+    this.totalHits = totalHits;
+    this.actor = actor;
+  }
 
-    public void setId(String id) {
-        this.id = id;
-    }
+  public String getId() {
+    return id;
+  }
 
-    public String getFilterId() {
-        return filterId;
-    }
+  public void setId(String id) {
+    this.id = id;
+  }
 
-    public void setFilterId(String filterId) {
-        this.filterId = filterId;
-    }
+  public String getFilterId() {
+    return filterId;
+  }
 
-    public long getDetectedAt() {
-        return detectedAt;
-    }
+  public void setFilterId(String filterId) {
+    this.filterId = filterId;
+  }
 
-    public void setDetectedAt(long detectedAt) {
-        this.detectedAt = detectedAt;
-    }
+  public long getDetectedAt() {
+    return detectedAt;
+  }
 
-    public String getActor() {
-        return actor;
-    }
+  public void setDetectedAt(long detectedAt) {
+    this.detectedAt = detectedAt;
+  }
 
-    public void setActor(String actor) {
-        this.actor = actor;
-    }
+  public String getActor() {
+    return actor;
+  }
 
+  public void setActor(String actor) {
+    this.actor = actor;
+  }
+
+  public long getTotalHits() {
+    return totalHits;
+  }
+
+  public void setTotalHits(long totalHits) {
+    this.totalHits = totalHits;
+  }
 }
