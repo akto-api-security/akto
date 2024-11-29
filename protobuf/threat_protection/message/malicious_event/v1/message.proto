@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package threat_protection.message.malicious_event.v1;
+
+option java_outer_classname = "MaliciousEventProto";
+option java_package = "threat_protection.v1.message.malicious_event";
+
+message MaliciousEvent {
+  string actor= 1;
+  string filter_id = 2;
+  string ip = 3;
+  int64 timestamp = 4;
+  string url = 5;
+  string method = 6;
+  int32 api_collection_id = 7;
+  string payload = 8;
+}
