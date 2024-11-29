@@ -4,7 +4,7 @@ import org.hibernate.SessionFactory;
 import org.hibernate.boot.registry.StandardServiceRegistryBuilder;
 import org.hibernate.cfg.Configuration;
 
-import com.akto.threat.detection.db.entity.MaliciousEvent;
+import com.akto.threat.detection.db.entity.MaliciousEventEntity;
 
 public class SessionFactoryUtils {
 
@@ -22,7 +22,7 @@ public class SessionFactoryUtils {
         cfg.setProperty("show_sql", "true");
         cfg.setProperty("format_sql", "true");
 
-        cfg.addAnnotatedClass(MaliciousEvent.class);
+        cfg.addAnnotatedClass(MaliciousEventEntity.class);
 
         return cfg.buildSessionFactory(new StandardServiceRegistryBuilder().applySettings(cfg.getProperties()).build());
     }

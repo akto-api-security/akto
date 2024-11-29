@@ -7,9 +7,7 @@ import com.akto.proto.threat_protection.service.malicious_alert_service.v1.Recor
 import com.akto.proto.threat_protection.service.malicious_alert_service.v1.RecordAlertResponse;
 import com.akto.proto.threat_protection.service.malicious_alert_service.v1.SampleMaliciousEvent;
 import com.akto.threat.detection.config.kafka.KafkaConfig;
-import com.akto.threat.detection.db.entity.MaliciousEvent;
-import com.akto.threat.detection.db.malicious_event.MaliciousEventDao;
-import com.akto.threat.detection.db.malicious_event.MaliciousEventModel;
+import com.akto.threat.detection.db.entity.MaliciousEventEntity;
 import com.akto.threat.detection.dto.MessageEnvelope;
 import com.akto.threat.detection.grpc.AuthToken;
 import com.google.protobuf.InvalidProtocolBufferException;
@@ -23,9 +21,6 @@ import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.hibernate.Session;
 import org.hibernate.SessionFactory;
 import org.hibernate.Transaction;
-import org.hibernate.query.Query;
-
-import java.sql.Connection;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -55,13 +50,15 @@ public class SendAlertsToBackend extends AbstractKafkaConsumerTask {
     return Executors.newSingleThreadExecutor();
   }
 
-  private List<MaliciousEvent> getSampleMaliciousEvents(String actor, String filterId) {
+  private List<MaliciousEventEntity> getSampleMaliciousEvents(String actor, String filterId) {
     Session session = this.sessionFactory.openSession();
     Transaction txn = session.beginTransaction();
     try {
       return session
-          .createQuery("from MaliciousEvent m where m.actor = :actor and m.filterid = :filterId order by m.createdAt desc limit 50", MaliciousEvent.class)
-          .setParameter("actor", actor).setParameter("filterId", filterId).getResultList();
+          .createQuery("from MaliciousEventEntity m where m.actor = :actor and m.filterId = :filterId order by m.createdAt desc", MaliciousEventEntity.class)
+          .setParameter("actor", actor).setParameter("filterId", filterId)
+          .setMaxResults(50)
+          .getResultList();
     } finally {
       txn.commit();
       session.close();
@@ -73,8 +70,8 @@ public class SendAlertsToBackend extends AbstractKafkaConsumerTask {
     Transaction txn = session.beginTransaction();
     try {
       return session
-          .createQuery("select count(m) from MaliciousEvent m where m.actor = :actor and m.filterId = :filterId", MaliciousEvent.class)
-          .setParameter("actor", actor).setParameter("filterId", filterId).getFetchSize();
+          .createQuery("select count(m) from MaliciousEventEntity m where m.actor = :actor and m.filterId = :filterId", Long.class)
+          .setParameter("actor", actor).setParameter("filterId", filterId).uniqueResult();
     } finally {
       txn.commit();
       session.close();
@@ -102,7 +99,7 @@ public class SendAlertsToBackend extends AbstractKafkaConsumerTask {
 
           // Get sample data from postgres for this alert
           try {
-            List<MaliciousEvent> sampleData = this.getSampleMaliciousEvents(evt.getActor(), evt.getFilterId());
+            List<MaliciousEventEntity> sampleData = this.getSampleMaliciousEvents(evt.getActor(), evt.getFilterId());
 
             long totalEvents = this.getTotalEvents(evt.getActor(), evt.getFilterId());
 
