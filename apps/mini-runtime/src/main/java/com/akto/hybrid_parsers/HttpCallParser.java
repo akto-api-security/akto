@@ -1,7 +1,5 @@
 package com.akto.hybrid_parsers;
 
-import com.akto.dao.ApiCollectionsDao;
-import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.traffic_metrics.TrafficMetricsDao;
 import com.akto.hybrid_dependency.DependencyAnalyser;
@@ -29,7 +27,6 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.*;
 import okhttp3.*;
 import org.apache.commons.lang3.math.NumberUtils;
-import org.bson.conversions.Bson;
 import com.alibaba.fastjson2.*;
 
 import java.io.IOException;
