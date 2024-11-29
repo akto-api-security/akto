@@ -28,6 +28,7 @@ import com.akto.test_editor.execution.ParseAndExecute;
 import com.akto.util.AccountTask;
 import com.akto.util.DashboardMode;
 import com.akto.util.Pair;
+import com.akto.utils.Utils;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Sorts;
@@ -136,6 +137,29 @@ public class CleanInventory {
     }
   }
 
+  private static void moveApisFromSampleData(List<Key> sampleDataIds) {
+    if (sampleDataIds.isEmpty()) return;
+
+    List<SampleData> allSamples =
+        SampleDataDao.instance.findAll(
+            Filters.or(SampleDataDao.filterForMultipleSampleData(sampleDataIds)));
+    List<String> messages = new ArrayList<>();
+    for (SampleData sampleData : allSamples) {
+      messages.addAll(sampleData.getSamples());
+    }
+
+    if (allSamples.isEmpty() || messages.isEmpty()) return;
+
+    try {
+      Utils.pushDataToKafka(
+          allSamples.get(0).getId().getApiCollectionId(), "", messages, new ArrayList<>(), true);
+      loggerMaker.infoAndAddToDb("Successfully moved APIs.");
+    } catch (Exception e) {
+      loggerMaker.errorAndAddToDb("Error during move APIs: " + e.getMessage());
+      e.printStackTrace();
+    }
+  }
+
   public static void cleanFilteredSampleDataFromAdvancedFilters(
       List<ApiCollection> apiCollections,
       List<YamlTemplate> yamlTemplates,
@@ -157,7 +181,7 @@ public class CleanInventory {
     Map<Integer, Integer> collectionWiseDeletionCountMap = new HashMap<>();
 
     Map<String, FilterConfig> filterMap =
-        FilterYamlTemplateDao.fetchFilterConfig(false, yamlTemplates, true);
+        FilterYamlTemplateDao.instance.fetchFilterConfig(false, yamlTemplates, true);
     Pattern pattern = createRegexPatternFromList(redundantUrlList);
     do {
       sampleDataList = SampleDataDao.instance.findAll(filters, skip, limit, sort);
@@ -203,8 +227,8 @@ public class CleanInventory {
                 FILTER_TYPE filterType = temp.getSecond();
 
                 if (param != null) {
-                  // comes when Filter_Block is not valid {Remaining => Unchanged,
-                  // Modified, Allowed}
+                  // comes when Filter_Block is not valid {Remaining => Unchanged, Modified,
+                  // Allowed}
                   if (filterType.equals(FILTER_TYPE.MODIFIED)) {
                     // filter passed and modified
                     movingApi = true;
@@ -283,8 +307,8 @@ public class CleanInventory {
               }
             }
           } else {
-            // other cases like: => filter from advanced filter is passed || filter from
-            // block filter fails
+            // other cases like: => filter from advanced filter is passed || filter from block
+            // filter fails
             if (saveLogsToDB) {
               loggerMaker.infoAndAddToDb(
                   "Filter did not pass, keeping api found from filter: " + sampleData.getId(),

@@ -8,5 +8,5 @@ if ! command -v buf >/dev/null 2>&1; then
 fi
 
 buf lint protobuf
-rm -rf libs/protobuf/src/main/java/com/akto/proto/generated/
+rm -rf ./libs/protobuf/src
 buf generate protobuf
