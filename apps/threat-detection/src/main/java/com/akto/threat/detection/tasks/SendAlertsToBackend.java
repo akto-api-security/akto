@@ -7,6 +7,7 @@ import com.akto.proto.threat_protection.service.malicious_alert_service.v1.Recor
 import com.akto.proto.threat_protection.service.malicious_alert_service.v1.RecordAlertResponse;
 import com.akto.proto.threat_protection.service.malicious_alert_service.v1.SampleMaliciousEvent;
 import com.akto.threat.detection.config.kafka.KafkaConfig;
+import com.akto.threat.detection.db.entity.MaliciousEvent;
 import com.akto.threat.detection.db.malicious_event.MaliciousEventDao;
 import com.akto.threat.detection.db.malicious_event.MaliciousEventModel;
 import com.akto.threat.detection.dto.MessageEnvelope;
@@ -17,7 +18,12 @@ import io.grpc.Grpc;
 import io.grpc.InsecureChannelCredentials;
 import io.grpc.ManagedChannel;
 import io.grpc.stub.StreamObserver;
+
 import org.apache.kafka.clients.consumer.ConsumerRecords;
+import org.hibernate.Session;
+import org.hibernate.SessionFactory;
+import org.hibernate.Transaction;
+import org.hibernate.query.Query;
 
 import java.sql.Connection;
 import java.util.List;
@@ -30,25 +36,49 @@ This will send alerts to threat detection backend
  */
 public class SendAlertsToBackend extends AbstractKafkaConsumerTask {
 
-  private final MaliciousEventDao maliciousEventDao;
+  private final SessionFactory sessionFactory;
 
   private final MaliciousAlertServiceStub consumerServiceStub;
 
-  public SendAlertsToBackend(Connection conn, KafkaConfig trafficConfig, String topic) {
+  public SendAlertsToBackend(SessionFactory sessionFactory, KafkaConfig trafficConfig, String topic) {
     super(trafficConfig, topic);
-    this.maliciousEventDao = new MaliciousEventDao(conn);
+    this.sessionFactory = sessionFactory;
 
     String target = "localhost:8980";
-    ManagedChannel channel =
-        Grpc.newChannelBuilder(target, InsecureChannelCredentials.create()).build();
-    this.consumerServiceStub =
-        MaliciousAlertServiceGrpc.newStub(channel)
-            .withCallCredentials(
-                new AuthToken(System.getenv("AKTO_THREAT_PROTECTION_BACKEND_TOKEN")));
+    ManagedChannel channel = Grpc.newChannelBuilder(target, InsecureChannelCredentials.create()).build();
+    this.consumerServiceStub = MaliciousAlertServiceGrpc.newStub(channel)
+        .withCallCredentials(
+            new AuthToken(System.getenv("AKTO_THREAT_PROTECTION_BACKEND_TOKEN")));
   }
 
   ExecutorService getPollingExecutor() {
     return Executors.newSingleThreadExecutor();
+  }
+
+  private List<MaliciousEvent> getSampleMaliciousEvents(String actor, String filterId) {
+    Session session = this.sessionFactory.openSession();
+    Transaction txn = session.beginTransaction();
+    try {
+      return session
+          .createQuery("from MaliciousEvent m where m.actor = :actor and m.filterid = :filterId order by m.createdAt desc limit 50", MaliciousEvent.class)
+          .setParameter("actor", actor).setParameter("filterId", filterId).getResultList();
+    } finally {
+      txn.commit();
+      session.close();
+    }
+  }
+
+  private long getTotalEvents(String actor, String filterId) {
+    Session session = this.sessionFactory.openSession();
+    Transaction txn = session.beginTransaction();
+    try {
+      return session
+          .createQuery("select count(m) from MaliciousEvent m where m.actor = :actor and m.filterId = :filterId", MaliciousEvent.class)
+          .setParameter("actor", actor).setParameter("filterId", filterId).getFetchSize();
+    } finally {
+      txn.commit();
+      session.close();
+    }
   }
 
   protected void processRecords(ConsumerRecords<String, String> records) {
@@ -72,13 +102,9 @@ public class SendAlertsToBackend extends AbstractKafkaConsumerTask {
 
           // Get sample data from postgres for this alert
           try {
-            List<MaliciousEventModel> sampleData =
-                this.maliciousEventDao.findGivenActorAndFilterId(
-                    evt.getActor(), evt.getFilterId(), 50);
+            List<MaliciousEvent> sampleData = this.getSampleMaliciousEvents(evt.getActor(), evt.getFilterId());
 
-            int totalEvents =
-                this.maliciousEventDao.countTotalMaliciousEventGivenActorAndFilterId(
-                    evt.getActor(), evt.getFilterId());
+            long totalEvents = this.getTotalEvents(evt.getActor(), evt.getFilterId());
 
             this.consumerServiceStub.recordAlert(
                 RecordAlertRequest.newBuilder()
@@ -88,14 +114,13 @@ public class SendAlertsToBackend extends AbstractKafkaConsumerTask {
                     .addAllSampleData(
                         sampleData.stream()
                             .map(
-                                d ->
-                                    SampleMaliciousEvent.newBuilder()
-                                        .setUrl(d.getUrl())
-                                        .setMethod(d.getMethod().name())
-                                        .setTimestamp(d.getTimestamp())
-                                        .setPayload(d.getOrig())
-                                        .setIp(d.getIp())
-                                        .build())
+                                d -> SampleMaliciousEvent.newBuilder()
+                                    .setUrl(d.getUrl())
+                                    .setMethod(d.getMethod().name())
+                                    .setTimestamp(d.getTimestamp())
+                                    .setPayload(d.getOrig())
+                                    .setIp(d.getIp())
+                                    .build())
                             .collect(Collectors.toList()))
                     .build(),
                 new StreamObserver<RecordAlertResponse>() {
