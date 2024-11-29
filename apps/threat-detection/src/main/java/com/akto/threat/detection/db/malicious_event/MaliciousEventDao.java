@@ -6,6 +6,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -87,5 +88,12 @@ public class MaliciousEventDao {
       }
     }
     return 0;
+  }
+
+  public void deleteEventsBefore(LocalDate date) throws SQLException {
+    String sql = "DELETE FROM threat_detection.malicious_event WHERE created_at < ?";
+    PreparedStatement stmt = this.conn.prepareStatement(sql);
+    stmt.setDate(1, java.sql.Date.valueOf(date));
+    stmt.executeUpdate();
   }
 }
