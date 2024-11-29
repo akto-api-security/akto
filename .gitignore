@@ -13,7 +13,7 @@
 **/.settings
 **/dist
 **/gen
-libs/protobuf/src/main/java/com/akto/proto
+libs/protobuf/src
 libawesome.dylib
 temp_*
 *.templates-config.json

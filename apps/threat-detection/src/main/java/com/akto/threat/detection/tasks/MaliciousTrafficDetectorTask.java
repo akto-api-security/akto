@@ -6,6 +6,7 @@ import com.akto.proto.threat_protection.message.smart_event.v1.SmartEvent;
 import com.akto.threat.detection.actor.SourceIPActorGenerator;
 import com.akto.threat.detection.cache.RedisBackedCounterCache;
 import com.akto.threat.detection.config.kafka.KafkaConfig;
+import com.akto.threat.detection.constants.KafkaTopic;
 import com.akto.dao.monitoring.FilterYamlTemplateDao;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
@@ -216,7 +217,7 @@ public class MaliciousTrafficDetectorTask {
                             .marshal()
                             .ifPresent(
                                 data -> {
-                                  internalKafka.send(data, "akto.threat_detection.alerts");
+                                  internalKafka.send(data, KafkaTopic.ThreatDetection.ALERTS);
                                 });
                       } catch (InvalidProtocolBufferException e) {
                         e.printStackTrace();
@@ -236,7 +237,7 @@ public class MaliciousTrafficDetectorTask {
                 .marshal()
                 .ifPresent(
                     data -> {
-                      internalKafka.send(data, "akto.threat_detection.malicious");
+                      internalKafka.send(data, KafkaTopic.ThreatDetection.MALICIOUS_EVENTS);
                     });
           });
     } catch (Exception e) {
