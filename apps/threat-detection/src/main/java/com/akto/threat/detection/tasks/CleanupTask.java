@@ -1,6 +1,6 @@
 package com.akto.threat.detection.tasks;
 
-import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -28,8 +28,8 @@ public class CleanupTask implements Task {
     private void cleanup() {
         Session session = this.sessionFactory.openSession();
         Transaction txn = session.beginTransaction();
-        int deletedCount = session.createQuery("delete from MaliciousEvent m where m.createdAt < :startDate")
-                .setParameter("startDate", LocalDate.now(ZoneOffset.UTC).minusDays(7))
+        int deletedCount = session.createQuery("delete from MaliciousEventEntity m where m.createdAt < :startDate")
+                .setParameter("startDate", LocalDateTime.now(ZoneOffset.UTC).minusDays(7))
                 .executeUpdate();
 
         txn.commit();

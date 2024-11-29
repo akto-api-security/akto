@@ -2,22 +2,29 @@ package com.akto.threat.detection.db.entity;
 
 import com.akto.dto.type.URLMethods;
 
-import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
+import java.util.UUID;
 
 import javax.persistence.Column;
 import javax.persistence.Entity;
+import javax.persistence.EnumType;
+import javax.persistence.Enumerated;
 import javax.persistence.GeneratedValue;
-import javax.persistence.GenerationType;
 import javax.persistence.Id;
+import javax.persistence.PrePersist;
 import javax.persistence.Table;
+
+import org.hibernate.annotations.GenericGenerator;
 
 @Entity
 @Table(name = "malicious_event", schema = "threat_detection")
-public class MaliciousEvent {
+public class MaliciousEventEntity {
 
     @Id
-    @GeneratedValue(strategy =  GenerationType.AUTO)
-    private String id;
+    @GeneratedValue(generator = "UUID")
+    @GenericGenerator(name = "UUID", strategy = "org.hibernate.id.UUIDGenerator")
+    private UUID id;
 
     @Column(name = "actor")
     private String actor;
@@ -29,6 +36,7 @@ public class MaliciousEvent {
     private String url;
 
     @Column(name = "method")
+    @Enumerated(EnumType.STRING)
     private URLMethods.Method method;
 
     @Column(name = "timestamp")
@@ -41,13 +49,18 @@ public class MaliciousEvent {
     @Column(name = "ip")
     private String ip;
 
-    @Column(name = "created_at")
-    private LocalDate createdAt;
+    @Column(name = "created_at", updatable = false)
+    private LocalDateTime createdAt;
 
-    public MaliciousEvent() {
+    public MaliciousEventEntity() {
     }
 
-    public MaliciousEvent(Builder builder) {
+    @PrePersist
+    protected void onCreate() {
+        this.createdAt = LocalDateTime.now(ZoneOffset.UTC);
+    }
+
+    public MaliciousEventEntity(Builder builder) {
         this.actor = builder.actorId;
         this.filterId = builder.filterId;
         this.url = builder.url;
@@ -66,7 +79,7 @@ public class MaliciousEvent {
         private String orig;
         private String ip;
 
-        public Builder setActorId(String actorId) {
+        public Builder setActor(String actorId) {
             this.actorId = actorId;
             return this;
         }
@@ -100,13 +113,17 @@ public class MaliciousEvent {
             this.ip = ip;
             return this;
         }
+
+        public MaliciousEventEntity build() {
+            return new MaliciousEventEntity(this);
+        }
     }
 
     public static Builder newBuilder() {
         return new Builder();
     }
 
-    public String getId() {
+    public UUID getId() {
         return id;
     }
 
@@ -138,7 +155,7 @@ public class MaliciousEvent {
         return ip;
     }
 
-    public LocalDate getCreatedAt() {
+    public LocalDateTime getCreatedAt() {
         return createdAt;
     }
 

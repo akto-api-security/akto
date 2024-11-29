@@ -3,7 +3,7 @@ package com.akto.threat.detection.tasks;
 import com.akto.dto.type.URLMethods;
 import com.akto.proto.threat_protection.message.malicious_event.v1.MaliciousEvent;
 import com.akto.threat.detection.config.kafka.KafkaConfig;
-import com.akto.threat.detection.db.malicious_event.MaliciousEventModel;
+import com.akto.threat.detection.db.entity.MaliciousEventEntity;
 import com.akto.threat.detection.dto.MessageEnvelope;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.util.JsonFormat;
@@ -35,7 +35,7 @@ public class FlushSampleDataTask extends AbstractKafkaConsumerTask {
   }
 
   protected void processRecords(ConsumerRecords<String, String> records) {
-    List<MaliciousEventModel> events = new ArrayList<>();
+    List<MaliciousEventEntity> events = new ArrayList<>();
     records.forEach(
         r -> {
           String message = r.value();
@@ -55,8 +55,8 @@ public class FlushSampleDataTask extends AbstractKafkaConsumerTask {
           MaliciousEvent evt = builder.build();
 
           events.add(
-              MaliciousEventModel.newBuilder()
-                  .setActorId(m.getAccountId())
+              MaliciousEventEntity.newBuilder()
+                  .setActor(m.getAccountId())
                   .setFilterId(evt.getFilterId())
                   .setUrl(evt.getUrl())
                   .setMethod(URLMethods.Method.fromString(evt.getMethod()))
