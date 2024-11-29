@@ -7,7 +7,7 @@ import java.util.UUID;
 public class MaliciousEventModel {
 
   private String id;
-  private String actorId;
+  private String actor;
   private String filterId;
   private String url;
   private URLMethods.Method method;
@@ -21,7 +21,7 @@ public class MaliciousEventModel {
 
   public MaliciousEventModel(Builder builder) {
     this.id = builder.id == null ? UUID.randomUUID().toString() : builder.id;
-    this.actorId = builder.actorId;
+    this.actor = builder.actorId;
     this.filterId = builder.filterId;
     this.url = builder.url;
     this.method = builder.method;
@@ -93,8 +93,8 @@ public class MaliciousEventModel {
     return id;
   }
 
-  public String getActorId() {
-    return actorId;
+  public String getActor() {
+    return actor;
   }
 
   public String getFilterId() {
@@ -128,7 +128,7 @@ public class MaliciousEventModel {
         + id
         + '\''
         + ", actorId='"
-        + actorId
+        + actor
         + '\''
         + ", filterId='"
         + filterId
