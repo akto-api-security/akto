@@ -19,6 +19,7 @@ public abstract class AbstractKafkaConsumerTask implements Task {
 
   public AbstractKafkaConsumerTask(KafkaConfig kafkaConfig, String kafkaTopic) {
     this.kafkaTopic = kafkaTopic;
+    this.kafkaConfig = kafkaConfig;
 
     String kafkaBrokerUrl = kafkaConfig.getBootstrapServers();
     String groupId = kafkaConfig.getGroupId();

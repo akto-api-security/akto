@@ -1,6 +1,8 @@
 package com.akto.threat.detection.tasks;
 
 import com.akto.dao.context.Context;
+import com.akto.proto.threat_protection.message.malicious_event.v1.MaliciousEvent;
+import com.akto.proto.threat_protection.message.smart_event.v1.SmartEvent;
 import com.akto.threat.detection.actor.SourceIPActorGenerator;
 import com.akto.threat.detection.cache.RedisBackedCounterCache;
 import com.akto.threat.detection.config.kafka.KafkaConfig;
@@ -19,7 +21,6 @@ import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.type.URLMethods;
 import com.akto.hybrid_parsers.HttpCallParser;
 import com.akto.kafka.Kafka;
-import com.akto.proto.threat_protection.consumer_service.v1.*;
 import com.akto.rules.TestPlugin;
 import com.akto.runtime.utils.Utils;
 import com.akto.threat.detection.smart_event_detector.window_based.WindowBasedThresholdNotifier;
@@ -182,7 +183,7 @@ public class MaliciousTrafficDetectorTask {
 
                   MaliciousEvent maliciousEvent =
                       MaliciousEvent.newBuilder()
-                          .setActorId(actor)
+                          .setActor(actor)
                           .setFilterId(apiFilter.getId())
                           .setUrl(responseParam.getRequestParams().getURL())
                           .setMethod(responseParam.getRequestParams().getMethod())
@@ -209,7 +210,7 @@ public class MaliciousTrafficDetectorTask {
                       SmartEvent smartEvent =
                           SmartEvent.newBuilder()
                               .setFilterId(apiFilter.getId())
-                              .setActorId(actor)
+                              .setActor(actor)
                               .setDetectedAt(responseParam.getTime())
                               .setRuleId(rule.getName())
                               .build();
