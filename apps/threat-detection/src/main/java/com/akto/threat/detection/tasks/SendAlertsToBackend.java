@@ -1,6 +1,10 @@
 package com.akto.threat.detection.tasks;
 
-import com.akto.proto.threat_protection.consumer_service.v1.*;
+import com.akto.proto.threat_protection.message.smart_event.v1.SmartEvent;
+import com.akto.proto.threat_protection.service.consumer_service.v1.ConsumerServiceGrpc;
+import com.akto.proto.threat_protection.service.consumer_service.v1.RecordAlertRequest;
+import com.akto.proto.threat_protection.service.consumer_service.v1.RecordAlertResponse;
+import com.akto.proto.threat_protection.service.consumer_service.v1.SampleMaliciousEvent;
 import com.akto.threat.detection.config.kafka.KafkaConfig;
 import com.akto.threat.detection.db.malicious_event.MaliciousEventDao;
 import com.akto.threat.detection.db.malicious_event.MaliciousEventModel;
@@ -15,14 +19,13 @@ import io.grpc.stub.StreamObserver;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 
 import java.sql.Connection;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 
 /*
-This will read sample malicious data from kafka topic and save it to DB.
+This will send alerts to threat detection backend
  */
 public class SendAlertsToBackend extends AbstractKafkaConsumerTask {
 
@@ -48,7 +51,6 @@ public class SendAlertsToBackend extends AbstractKafkaConsumerTask {
   }
 
   protected void processRecords(ConsumerRecords<String, String> records) {
-    List<MaliciousEventModel> events = new ArrayList<>();
     records.forEach(
         r -> {
           String message = r.value();
@@ -71,21 +73,22 @@ public class SendAlertsToBackend extends AbstractKafkaConsumerTask {
           try {
             List<MaliciousEventModel> sampleData =
                 this.maliciousEventDao.findGivenActorIdAndFilterId(
-                    evt.getActorId(), evt.getFilterId(), 50);
+                    evt.getActor(), evt.getFilterId(), 50);
 
             int totalEvents =
                 this.maliciousEventDao.countTotalMaliciousEventGivenActorIdAndFilterId(
-                    evt.getActorId(), evt.getFilterId());
+                    evt.getActor(), evt.getFilterId());
 
             this.consumerServiceStub.recordAlert(
                 RecordAlertRequest.newBuilder()
-                    .setEvent(evt)
+                    .setActor(evt.getActor())
+                    .setFilterId(evt.getFilterId())
                     .setTotalEvents(totalEvents)
-                    .addAllSampleMaliciousEvents(
+                    .addAllSampleData(
                         sampleData.stream()
                             .map(
                                 d ->
-                                    MaliciousEvent.newBuilder()
+                                    SampleMaliciousEvent.newBuilder()
                                         .setUrl(d.getUrl())
                                         .setMethod(d.getMethod().name())
                                         .setTimestamp(d.getTimestamp())
