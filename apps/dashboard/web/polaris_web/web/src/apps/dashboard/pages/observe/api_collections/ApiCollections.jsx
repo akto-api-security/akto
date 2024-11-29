@@ -398,10 +398,13 @@ function ApiCollections() {
     }
     async function handleCollectionsAction(collectionIdList, apiFunction, toastContent){
         const collectionIdListObj = collectionIdList.map(collectionId => ({ id: collectionId.toString() }))
-        await apiFunction(collectionIdListObj)
+        await apiFunction(collectionIdListObj).then(() => {
+            func.setToast(true, false, `${collectionIdList.length} API collection${func.addPlurality(collectionIdList.length)} ${toastContent} successfully`)
+        }).catch((error) => {
+            func.setToast(true, true, error.message || 'Something went wrong!')
+        })
         resetResourcesSelected();
         fetchData()
-        func.setToast(true, false, `${collectionIdList.length} API collection${func.addPlurality(collectionIdList.length)} ${toastContent} successfully`)
     }
 
     const exportCsv = (selectedResources = []) =>{
@@ -434,10 +437,6 @@ function ApiCollections() {
         }
         let actions = [
             {
-                content: `Remove collection${func.addPlurality(selectedResources.length)}`,
-                onAction: () => handleCollectionsAction(selectedResources, api.deleteMultipleCollections, "deleted")
-            },
-            {
                 content: 'Export as CSV',
                 onAction: () => exportCsv(selectedResources)
             }
@@ -445,6 +444,7 @@ function ApiCollections() {
 
         const deactivated = allCollections.filter(x => { return x.deactivated }).map(x => x.id);
         const activated = allCollections.filter(x => { return !x.deactivated }).map(x => x.id);
+        const apiGrous = allCollections.filter(x => { return x?.type === 'API_GROUP' }).map(x => x?.id)
         if (selectedResources.every(v => { return activated.includes(v) })) {
             actions.push(
                 {
@@ -463,6 +463,14 @@ function ApiCollections() {
                         const message = "Please sync the usage data via Settings > billing after reactivating a collection to resume data ingestion and testing."
                         func.showConfirmationModal(message, "Activate collection", () => handleCollectionsAction(selectedResources, collectionApi.activateCollections, "activated"))
                     }
+                }
+            )
+        }
+        if (selectedResources.every(v => { return !apiGrous.includes(v) })) {
+            actions.push(
+                {
+                    content: `Remove collection${func.addPlurality(selectedResources.length)}`,
+                    onAction: () => handleCollectionsAction(selectedResources, api.deleteMultipleCollections, "deleted")
                 }
             )
         }
