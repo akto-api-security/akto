@@ -25,6 +25,7 @@ public class InternalAction extends UserAction {
 
     boolean actuallyDelete;
     int count;
+    int timestamp;
 
     public String deleteApisWithoutHost() {
 
@@ -46,10 +47,14 @@ public class InternalAction extends UserAction {
             int apiCollectionId = apiCollection.getId();
             if (demosAndDeactivated.contains(apiCollectionId)) {
                 loggerMaker.infoAndAddToDb("Skipping deleteApisBasedOnHeader for apiCollectionId " + apiCollectionId);
+                continue;
             }
             
             List<Bson> pipeline = Arrays.asList(new Document("$match",
-                    new Document("apiCollectionId", apiCollectionId)),
+                    new Document("$and", Arrays.asList(new Document("$or", Arrays.asList(
+                            new Document("lastSeen", new Document("$gt", timestamp)),
+                            new Document("timestamp", new Document("$gt", timestamp)))),
+                            new Document("apiCollectionId", apiCollectionId)))),
                     new Document("$group",
                             new Document("_id",
                                     new Document("apiCollectionId", "$apiCollectionId")
@@ -117,5 +122,13 @@ public class InternalAction extends UserAction {
 
     public void setCount(int count) {
         this.count = count;
+    }
+
+    public int getTimestamp() {
+        return timestamp;
+    }
+
+    public void setTimestamp(int timestamp) {
+        this.timestamp = timestamp;
     }
 }
