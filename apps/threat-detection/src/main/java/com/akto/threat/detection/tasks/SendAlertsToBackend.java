@@ -1,10 +1,11 @@
 package com.akto.threat.detection.tasks;
 
 import com.akto.proto.threat_protection.message.smart_event.v1.SmartEvent;
-import com.akto.proto.threat_protection.service.consumer_service.v1.ConsumerServiceGrpc;
-import com.akto.proto.threat_protection.service.consumer_service.v1.RecordAlertRequest;
-import com.akto.proto.threat_protection.service.consumer_service.v1.RecordAlertResponse;
-import com.akto.proto.threat_protection.service.consumer_service.v1.SampleMaliciousEvent;
+import com.akto.proto.threat_protection.service.malicious_alert_service.v1.MaliciousAlertServiceGrpc;
+import com.akto.proto.threat_protection.service.malicious_alert_service.v1.MaliciousAlertServiceGrpc.MaliciousAlertServiceStub;
+import com.akto.proto.threat_protection.service.malicious_alert_service.v1.RecordAlertRequest;
+import com.akto.proto.threat_protection.service.malicious_alert_service.v1.RecordAlertResponse;
+import com.akto.proto.threat_protection.service.malicious_alert_service.v1.SampleMaliciousEvent;
 import com.akto.threat.detection.config.kafka.KafkaConfig;
 import com.akto.threat.detection.db.malicious_event.MaliciousEventDao;
 import com.akto.threat.detection.db.malicious_event.MaliciousEventModel;
@@ -31,7 +32,7 @@ public class SendAlertsToBackend extends AbstractKafkaConsumerTask {
 
   private final MaliciousEventDao maliciousEventDao;
 
-  private final ConsumerServiceGrpc.ConsumerServiceStub consumerServiceStub;
+  private final MaliciousAlertServiceStub consumerServiceStub;
 
   public SendAlertsToBackend(Connection conn, KafkaConfig trafficConfig, String topic) {
     super(trafficConfig, topic);
@@ -41,7 +42,7 @@ public class SendAlertsToBackend extends AbstractKafkaConsumerTask {
     ManagedChannel channel =
         Grpc.newChannelBuilder(target, InsecureChannelCredentials.create()).build();
     this.consumerServiceStub =
-        ConsumerServiceGrpc.newStub(channel)
+        MaliciousAlertServiceGrpc.newStub(channel)
             .withCallCredentials(
                 new AuthToken(System.getenv("AKTO_THREAT_PROTECTION_BACKEND_TOKEN")));
   }
