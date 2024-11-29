@@ -1,4 +1,8 @@
 proto-gen:
-	buf lint protobuf && \
-	rm -rf ./libs/protobuf/src/main/java/com/akto && \
-	buf generate protobuf
+	sh ./scripts/proto-gen.sh
+
+build: proto-gen
+	mvn install -DskipTests
+
+build-clean: proto-gen
+	mvn clean install -DskipTests

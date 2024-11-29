@@ -59,46 +59,36 @@ import static com.akto.runtime.utils.Utils.createRegexPatternFromList;
 
 public class CleanInventory {
 
-    private static final LoggerMaker loggerMaker =
-            new LoggerMaker(CleanInventory.class, LogDb.DASHBOARD);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(CleanInventory.class, LogDb.DASHBOARD);
     private static final Logger logger = LoggerFactory.getLogger(CleanInventory.class);
 
-    static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
+    final static ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
 
     public static void cleanInventoryJobRunner() {
 
-        scheduler.scheduleAtFixedRate(
-                new Runnable() {
-                    public void run() {
+        scheduler.scheduleAtFixedRate(new Runnable() {
+            public void run() {
 
-                        int now = Context.now();
-                        logger.info("Starting cleanInventoryJob for all accounts at " + now);
+                int now = Context.now();
+                logger.info("Starting cleanInventoryJob for all accounts at " + now);
 
-                        AccountTask.instance.executeTask(
-                                new Consumer<Account>() {
-                                    @Override
-                                    public void accept(Account t) {
-                                        try {
-                                            cleanInventoryJob();
-                                        } catch (Exception e) {
-                                            loggerMaker.errorAndAddToDb(
-                                                    e, "Error in cleanInventoryJob");
-                                        }
-                                    }
-                                },
-                                "clean-inventory-job");
-
-                        int now2 = Context.now();
-                        int diffNow = now2 - now;
-                        logger.info(
-                                String.format(
-                                        "Completed cleanInventoryJob for all accounts at %d , time taken : %d",
-                                        now2, diffNow));
+                AccountTask.instance.executeTask(new Consumer<Account>() {
+                    @Override
+                    public void accept(Account t) {
+                        try {
+                            cleanInventoryJob();
+                        } catch (Exception e) {
+                            loggerMaker.errorAndAddToDb(e, "Error in cleanInventoryJob");
+                        }
                     }
-                },
-                0,
-                5,
-                TimeUnit.HOURS);
+                }, "clean-inventory-job");
+
+                int now2 = Context.now();
+                int diffNow = now2-now;
+                logger.info(String.format("Completed cleanInventoryJob for all accounts at %d , time taken : %d", now2, diffNow));
+            }
+        }, 0, 5, TimeUnit.HOURS);
+
     }
 
     private static Set<String> methodSet = new HashSet<>();
@@ -109,14 +99,10 @@ public class CleanInventory {
             return methodSet;
         }
 
-        List<String> lowerCaseMethods =
-                Arrays.asList(URLMethods.Method.getValuesArray()).stream()
-                        .map(s -> s.name().toLowerCase())
-                        .collect(Collectors.toList());
-        List<String> upperCaseMethods =
-                Arrays.asList(URLMethods.Method.getValuesArray()).stream()
-                        .map(s -> s.name().toUpperCase())
-                        .collect(Collectors.toList());
+        List<String> lowerCaseMethods = Arrays.asList(URLMethods.Method.getValuesArray()).stream()
+                .map(s -> s.name().toLowerCase()).collect(Collectors.toList());
+        List<String> upperCaseMethods = Arrays.asList(URLMethods.Method.getValuesArray()).stream()
+                .map(s -> s.name().toUpperCase()).collect(Collectors.toList());
         methodSet.addAll(upperCaseMethods);
         methodSet.addAll(lowerCaseMethods);
         return methodSet;
@@ -138,33 +124,23 @@ public class CleanInventory {
         int diff = now2 - now;
 
         if (diff >= 2) {
-            loggerMaker.infoAndAddToDb(
-                    String.format("cleanInventoryJob finished, time taken: %d ", diff));
+            loggerMaker.infoAndAddToDb(String.format("cleanInventoryJob finished, time taken: %d ", diff));
         }
+
     }
+    
+    public static void cleanFilteredSampleDataFromAdvancedFilters(List<ApiCollection> apiCollections, List<YamlTemplate> yamlTemplates, List<String> redundantUrlList, String filePath, boolean shouldDeleteRequest, boolean saveLogsToDB) throws IOException{
 
-    public static void cleanFilteredSampleDataFromAdvancedFilters(
-            List<ApiCollection> apiCollections,
-            List<YamlTemplate> yamlTemplates,
-            List<String> redundantUrlList,
-            String filePath,
-            boolean shouldDeleteRequest,
-            boolean saveLogsToDB)
-            throws IOException {
-
-        Map<Integer, ApiCollection> apiCollectionMap =
-                apiCollections.stream()
-                        .collect(Collectors.toMap(ApiCollection::getId, Function.identity()));
+        Map<Integer, ApiCollection> apiCollectionMap = apiCollections.stream().collect(Collectors.toMap(ApiCollection::getId, Function.identity()));
         // BufferedWriter writer = new BufferedWriter(new FileWriter(new File(filePath)));
         List<SampleData> sampleDataList = new ArrayList<>();
         Bson filters = Filters.empty();
         int skip = 0;
         int limit = 100;
         Bson sort = Sorts.ascending("_id.apiCollectionId", "_id.url", "_id.method");
-        Map<Integer, Integer> collectionWiseDeletionCountMap = new HashMap<>();
+        Map<Integer,Integer> collectionWiseDeletionCountMap = new HashMap<>();
 
-        Map<String, FilterConfig> filterMap =
-                FilterYamlTemplateDao.fetchFilterConfig(false, yamlTemplates, true);
+        Map<String,FilterConfig> filterMap = FilterYamlTemplateDao.instance.fetchFilterConfig(false, yamlTemplates, true);
         Pattern pattern = createRegexPatternFromList(redundantUrlList);
         do {
             sampleDataList = SampleDataDao.instance.findAll(filters, skip, limit, sort);
@@ -177,52 +153,41 @@ public class CleanInventory {
                     List<String> samples = sampleData.getSamples();
                     remainingSamples.clear();
                     if (samples == null || samples.isEmpty()) {
-                        logger.info(
-                                "[BadApisRemover] No samples found for : " + sampleData.getId());
+                        logger.info("[BadApisRemover] No samples found for : " + sampleData.getId());
                         continue;
                     }
 
-                    ApiCollection apiCollection =
-                            apiCollectionMap.get(sampleData.getId().getApiCollectionId());
+                    ApiCollection apiCollection = apiCollectionMap.get(sampleData.getId().getApiCollectionId());
                     if (apiCollection == null) {
-                        if (!DashboardMode.isMetered()) {
-                            logger.info(
-                                    "[BadApisRemover] No apiCollection found for : "
-                                            + sampleData.getId());
+                        if(!DashboardMode.isMetered()){
+                            logger.info("[BadApisRemover] No apiCollection found for : " + sampleData.getId());
                         }
                         continue;
                     }
 
+                    
                     boolean isRedundant = false;
                     boolean isNetsparkerPresent = false;
                     boolean movingApi = false;
                     for (String sample : samples) {
-                        HttpResponseParams httpResponseParams =
-                                HttpCallParser.parseKafkaMessage(sample);
+                        HttpResponseParams httpResponseParams = HttpCallParser.parseKafkaMessage(sample);
                         isNetsparkerPresent |= sample.toLowerCase().contains("netsparker");
-                        if (httpResponseParams != null) {
-                            isRedundant =
-                                    HttpCallParser.isRedundantEndpoint(
-                                            httpResponseParams.getRequestParams().getURL(),
-                                            pattern);
-                            if (!isRedundant) {
-                                Map<String, List<ExecutorNode>> executorNodesMap =
-                                        ParseAndExecute.createExecutorNodeMap(filterMap);
-                                Pair<HttpResponseParams, FILTER_TYPE> temp =
-                                        HttpCallParser.applyAdvancedFilters(
-                                                httpResponseParams, executorNodesMap, filterMap);
+                        if(httpResponseParams != null){
+                            isRedundant =  HttpCallParser.isRedundantEndpoint(httpResponseParams.getRequestParams().getURL(), pattern);
+                            if(!isRedundant){
+                                Map<String, List<ExecutorNode>> executorNodesMap = ParseAndExecute.createExecutorNodeMap(filterMap);
+                                Pair<HttpResponseParams,FILTER_TYPE> temp = HttpCallParser.applyAdvancedFilters(httpResponseParams, executorNodesMap, filterMap);
                                 HttpResponseParams param = temp.getFirst();
                                 FILTER_TYPE filterType = temp.getSecond();
 
-                                if (param != null) {
-                                    // comes when Filter_Block is not valid {Remaining => Unchanged,
-                                    // Modified, Allowed}
-                                    if (filterType.equals(FILTER_TYPE.MODIFIED)) {
+                                if(param != null){
+                                    // comes when Filter_Block is not valid {Remaining => Unchanged, Modified, Allowed}
+                                    if(filterType.equals(FILTER_TYPE.MODIFIED)){
                                         // filter passed and modified
                                         movingApi = true;
                                         remainingSamples.add(sample);
                                         break;
-                                    } else if (filterType.equals(FILTER_TYPE.ALLOWED)) {
+                                    }else if(filterType.equals(FILTER_TYPE.ALLOWED)){
                                         // filter passed and not modified
                                         remainingSamples.add(sample);
                                     }else if(filterMap.size() == 1){
@@ -237,7 +202,7 @@ public class CleanInventory {
                         }
                     }
 
-                    if (movingApi) {
+                    if(movingApi){
                         // any 1 of the sample is modifiable, we print this block
                         toMove.add(sampleData.getId());
                         if(saveLogsToDB){
@@ -275,28 +240,18 @@ public class CleanInventory {
                             }
                         }
                     } else {
-                        // other cases like: => filter from advanced filter is passed || filter from
-                        // block filter fails
-                        if (saveLogsToDB) {
+                        // other cases like: => filter from advanced filter is passed || filter from block filter fails
+                        if(saveLogsToDB){
                             loggerMaker.infoAndAddToDb(
-                                    "Filter did not pass, keeping api found from filter: "
-                                            + sampleData.getId(),
-                                    LogDb.DASHBOARD);
-                        } else {
-                            logger.info(
-                                    "[BadApisRemover] "
-                                            + isNetsparkerPresent
-                                            + " Keeping API from template: "
-                                            + sampleData.getId(),
-                                    LogDb.DASHBOARD);
-                        }
+                                "Filter did not pass, keeping api found from filter: " + sampleData.getId(), LogDb.DASHBOARD
+                            );
+                        }else{
+                            logger.info("[BadApisRemover] " + isNetsparkerPresent + " Keeping API from template: " + sampleData.getId(), LogDb.DASHBOARD);
+                        } 
+                        
                     }
                 } catch (Exception e) {
-                    loggerMaker.errorAndAddToDb(
-                            "[BadApisRemover] Couldn't delete an api for default payload: "
-                                    + sampleData.getId()
-                                    + e.getMessage(),
-                            LogDb.DASHBOARD);
+                    loggerMaker.errorAndAddToDb("[BadApisRemover] Couldn't delete an api for default payload: " + sampleData.getId() + e.getMessage(), LogDb.DASHBOARD);
                 }
             }
             if (shouldDeleteRequest) {
@@ -308,15 +263,13 @@ public class CleanInventory {
 
         } while (!sampleDataList.isEmpty());
 
-        for (Map.Entry<Integer, Integer> iterator : collectionWiseDeletionCountMap.entrySet()) {
+        for(Map.Entry<Integer,Integer> iterator: collectionWiseDeletionCountMap.entrySet()){
             int collId = iterator.getKey();
             int deletionCount = iterator.getValue();
             String name = apiCollectionMap.get(collId).getDisplayName();
 
-            if (saveLogsToDB) {
-                loggerMaker.infoAndAddToDb(
-                        "Total apis deleted from collection: " + name + " are: " + deletionCount,
-                        LogDb.DASHBOARD);
+            if(saveLogsToDB){
+                loggerMaker.infoAndAddToDb("Total apis deleted from collection: " + name + " are: " + deletionCount, LogDb.DASHBOARD);
             }
         }
 
@@ -324,29 +277,22 @@ public class CleanInventory {
         // writer.close();
     }
 
-    public static void removeUnnecessaryEndpoints(
-            List<ApiCollection> apiCollections, boolean shouldDeleteRequest) {
+    public static void removeUnnecessaryEndpoints(List<ApiCollection> apiCollections,  boolean shouldDeleteRequest){
         try {
-            for (ApiCollection apiCollection : apiCollections) {
+            for (ApiCollection apiCollection: apiCollections) {
                 List<Key> toBeDeleted = new ArrayList<>();
                 if (apiCollection.getHostName() == null) {
                     continue;
                 }
-                List<BasicDBObject> endpoints =
-                        com.akto.action.observe.Utils.fetchEndpointsInCollectionUsingHost(
-                                apiCollection.getId(), 0);
+                List<BasicDBObject> endpoints = com.akto.action.observe.Utils.fetchEndpointsInCollectionUsingHost(apiCollection.getId(), 0);
 
                 if (endpoints == null || endpoints.isEmpty()) {
                     continue;
                 }
 
-                logger.info(
-                        "[BadApisRemover] Starting for APICollection: " + apiCollection.getId(),
-                        LogDb.DASHBOARD);
-                for (BasicDBObject singleTypeInfo : endpoints) {
-                    singleTypeInfo =
-                            (BasicDBObject)
-                                    (singleTypeInfo.getOrDefault("_id", new BasicDBObject()));
+                logger.info("[BadApisRemover] Starting for APICollection: " + apiCollection.getId(), LogDb.DASHBOARD);
+                for (BasicDBObject singleTypeInfo: endpoints) {
+                    singleTypeInfo = (BasicDBObject) (singleTypeInfo.getOrDefault("_id", new BasicDBObject()));
                     int apiCollectionId = singleTypeInfo.getInt("apiCollectionId");
                     String url = singleTypeInfo.getString("url");
                     String method = singleTypeInfo.getString("method");
@@ -354,60 +300,41 @@ public class CleanInventory {
                     Key key = new Key(apiCollectionId, url, Method.fromString(method), -1, 0, 0);
 
                     if (method.equalsIgnoreCase("options")) {
-                        logger.info(
-                                "[BadApisRemover] OPTIONS Deleting bad API: " + key,
-                                LogDb.DASHBOARD);
+                        logger.info("[BadApisRemover] OPTIONS Deleting bad API: " + key, LogDb.DASHBOARD);
                         toBeDeleted.add(key);
                         continue;
                     }
 
                     if (!method.equalsIgnoreCase("get")) {
-                        logger.info(
-                                "[BadApisRemover] Non-get Deleting bad API: " + key,
-                                LogDb.DASHBOARD);
+                        logger.info("[BadApisRemover] Non-get Deleting bad API: " + key, LogDb.DASHBOARD);
                         continue;
                     }
 
                     Bson filter = ApiInfoDao.getFilter(url, method, apiCollectionId);
-
+        
                     SampleData sampleData = SampleDataDao.instance.findOne(filter);
-                    if (sampleData == null
-                            || sampleData.getSamples() == null
-                            || sampleData.getSamples().isEmpty()) {
-                        Bson stiFilterReq =
-                                Filters.and(
-                                        Filters.eq("url", url),
-                                        Filters.eq("method", method),
-                                        Filters.in(
-                                                "responseCode",
-                                                new Integer[] {-1, 200, 201, 204, 302}),
-                                        Filters.eq("isHeader", false),
-                                        Filters.or(
-                                                Filters.eq("isUrlParam", false),
-                                                Filters.exists("isUrlParam", false)),
-                                        Filters.eq("apiCollectionId", apiCollectionId));
-                        SingleTypeInfo singleTypeInfoForApi =
-                                SingleTypeInfoDao.instance.findOne(stiFilterReq);
+                    if (sampleData == null || sampleData.getSamples() == null || sampleData.getSamples().isEmpty()) {
+                        Bson stiFilterReq = Filters.and(
+                            Filters.eq("url", url),
+                            Filters.eq("method", method),
+                            Filters.in("responseCode", new Integer[]{-1, 200, 201, 204, 302}),
+                            Filters.eq("isHeader", false),
+                            Filters.or(Filters.eq("isUrlParam", false), Filters.exists("isUrlParam", false)), 
+                            Filters.eq("apiCollectionId", apiCollectionId)
+                        );
+                        SingleTypeInfo singleTypeInfoForApi = SingleTypeInfoDao.instance.findOne(stiFilterReq);
                         if (singleTypeInfoForApi == null) {
-                            logger.info(
-                                    "[BadApisRemover] no-sample Deleting bad API: " + key,
-                                    LogDb.DASHBOARD);
-                            toBeDeleted.add(key);
+                            logger.info("[BadApisRemover] no-sample Deleting bad API: " + key, LogDb.DASHBOARD);
+                            toBeDeleted.add(key);    
                         } else {
-                            logger.info(
-                                    "[BadApisRemover] yes-sti Deleting bad API: "
-                                            + key
-                                            + " "
-                                            + singleTypeInfoForApi.composeKey(),
-                                    LogDb.DASHBOARD);
+                            logger.info("[BadApisRemover] yes-sti Deleting bad API: " + key + " " + singleTypeInfoForApi.composeKey(), LogDb.DASHBOARD);
                         }
                     } else {
-                        logger.info(
-                                "[BadApisRemover] yes-sample Deleting bad API: " + key,
-                                LogDb.DASHBOARD);
+                        logger.info("[BadApisRemover] yes-sample Deleting bad API: " + key, LogDb.DASHBOARD);
                     }
                 }
 
+                
                 if (shouldDeleteRequest) {
                     logger.info("starting deletion of apis");
                     deleteApis(toBeDeleted);
@@ -415,28 +342,24 @@ public class CleanInventory {
             }
 
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(
-                    "Couldn't complete scan for APIs remover: " + e.getMessage(), LogDb.DASHBOARD);
+            loggerMaker.errorAndAddToDb("Couldn't complete scan for APIs remover: " + e.getMessage(), LogDb.DASHBOARD);
             e.printStackTrace();
         }
     }
 
-    public static void deleteOptionsAPIs(List<ApiCollection> apiCollections) {
-        for (ApiCollection apiCollection : apiCollections) {
+    public static void deleteOptionsAPIs(List<ApiCollection> apiCollections){
+        for (ApiCollection apiCollection: apiCollections) {
             List<Key> toBeDeleted = new ArrayList<>();
             if (apiCollection.getHostName() == null) {
                 continue;
             }
-            List<BasicDBObject> endpoints =
-                    com.akto.action.observe.Utils.fetchEndpointsInCollectionUsingHost(
-                            apiCollection.getId(), 0);
+            List<BasicDBObject> endpoints = com.akto.action.observe.Utils.fetchEndpointsInCollectionUsingHost(apiCollection.getId(), 0);
 
             if (endpoints == null || endpoints.isEmpty()) {
                 continue;
             }
-            for (BasicDBObject singleTypeInfo : endpoints) {
-                singleTypeInfo =
-                        (BasicDBObject) (singleTypeInfo.getOrDefault("_id", new BasicDBObject()));
+            for (BasicDBObject singleTypeInfo: endpoints) {
+                singleTypeInfo = (BasicDBObject) (singleTypeInfo.getOrDefault("_id", new BasicDBObject()));
                 int apiCollectionId = singleTypeInfo.getInt("apiCollectionId");
                 String url = singleTypeInfo.getString("url");
                 String method = singleTypeInfo.getString("method");
@@ -451,4 +374,5 @@ public class CleanInventory {
             deleteApis(toBeDeleted);
         }
     }
+
 }
