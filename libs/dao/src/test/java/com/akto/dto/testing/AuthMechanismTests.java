@@ -1,6 +1,5 @@
 package com.akto.dto.testing;
 
-import com.akto.dto.HttpRequestParams;
 import com.akto.dto.OriginalHttpRequest;
 import org.junit.Test;
 
@@ -28,7 +27,6 @@ public class AuthMechanismTests {
 
     private void validateBodyAuthOperations(OriginalHttpRequest request, String key, String modifiedValue, String removeExpectedValue, Boolean modified, Boolean hardcoded) {
         String value = "Value";
-        String finalKey = key.toLowerCase().trim();
         AuthMechanism authMechanism = new AuthMechanism();
         if (hardcoded) {
             authMechanism.setAuthParams(Collections.singletonList(new HardcodedAuthParam(AuthParam.Location.BODY, key, value, false)));
