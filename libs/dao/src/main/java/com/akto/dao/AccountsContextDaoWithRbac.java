@@ -90,7 +90,7 @@ public abstract class AccountsContextDaoWithRbac<T> extends MCollection<T>{
     @Override
     public T updateOne(Bson q, Bson obj){
         Bson filteredQuery = addRbacFilter(q);
-        return super.updateOneNoUpsert(filteredQuery, obj);
+        return super.updateOne(filteredQuery, obj);
     }
 
     @Override
@@ -102,7 +102,7 @@ public abstract class AccountsContextDaoWithRbac<T> extends MCollection<T>{
     @Override
     public UpdateResult updateMany (Bson q, Bson obj) {
         Bson filteredQuery = addRbacFilter(q);
-        return super.updateManyNoUpsert(filteredQuery, obj);
+        return super.updateMany(filteredQuery, obj);
     }
 
     @Override

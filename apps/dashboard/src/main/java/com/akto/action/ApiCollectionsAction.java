@@ -172,9 +172,12 @@ public class ApiCollectionsAction extends UserAction {
             Projections.include(ApiCollection.ID, ApiCollection.NAME, ApiCollection.HOST_NAME, ApiCollection._TYPE, ApiCollection.USER_ENV_TYPE, ApiCollection._DEACTIVATED,ApiCollection.START_TS, ApiCollection.AUTOMATED)
         )));
 
-        List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(),Context.accountId.get());
-        if (collectionIds != null) {
-            pipeLine.add(Aggregates.match(Filters.in(Constants.ID, collectionIds)));
+        try {
+            List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+            if(collectionIds != null) {
+                pipeLine.add(Aggregates.match(Filters.in(Constants.ID, collectionIds)));
+            }
+        } catch(Exception e){
         }
         MongoCursor<BasicDBObject> cursor = ApiCollectionsDao.instance.getMCollection().aggregate(pipeLine, BasicDBObject.class).cursor();
         while(cursor.hasNext()){
@@ -263,23 +266,26 @@ public class ApiCollectionsAction extends UserAction {
         this.apiCollections = new ArrayList<>();
         this.apiCollections.add(apiCollection);
 
-        int userId = Context.userId.get();
-        int accountId = Context.accountId.get();
-
-        /*
-         * Since admin has all access, we don't update any collections for them.
-         */
-        RBACDao.instance.getMCollection().updateOne(
-                Filters.and(
-                        Filters.eq(RBAC.USER_ID, userId),
-                        Filters.eq(RBAC.ACCOUNT_ID, accountId),
-                        Filters.ne(RBAC.ROLE, RBAC.Role.ADMIN.getName())
-                ),
-                Updates.addToSet(RBAC.API_COLLECTIONS_ID, apiCollection.getId()),
-                new UpdateOptions().upsert(false)
-        );
-
-        UsersCollectionsList.deleteCollectionIdsFromCache(userId, accountId);
+        try {
+            int userId = Context.userId.get();
+            int accountId = Context.accountId.get();
+    
+            /*
+             * Since admin has all access, we don't update any collections for them.
+             */
+            RBACDao.instance.getMCollection().updateOne(
+                    Filters.and(
+                            Filters.eq(RBAC.USER_ID, userId),
+                            Filters.eq(RBAC.ACCOUNT_ID, accountId),
+                            Filters.ne(RBAC.ROLE, RBAC.Role.ADMIN.getName())
+                    ),
+                    Updates.addToSet(RBAC.API_COLLECTIONS_ID, apiCollection.getId()),
+                    new UpdateOptions().upsert(false)
+            );
+    
+            UsersCollectionsList.deleteCollectionIdsFromCache(userId, accountId);
+        } catch(Exception e){
+        }
         
         ActivitiesDao.instance.insertActivity("Collection created", "new Collection " + this.collectionName + " created");
 
@@ -593,9 +599,12 @@ public class ApiCollectionsAction extends UserAction {
         Map<Integer, Double> riskScoreMap = new HashMap<>();
         List<Bson> pipeline = new ArrayList<>();
 
-        List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
-        if(collectionIds != null) {
-            pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
+        try {
+            List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+            if(collectionIds != null) {
+                pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
+            }
+        } catch(Exception e){
         }
 
         /*
@@ -741,14 +750,17 @@ public class ApiCollectionsAction extends UserAction {
             FindOneAndUpdateOptions updateOptions = new FindOneAndUpdateOptions();
             updateOptions.upsert(false);
 
-            List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
             /*
-             * User can only update collections which they have access to.
-             * so we remove entries which are not in the collections access list.
-             */
-            if(collectionIds != null) {
-                apiCollectionIds.removeIf(apiCollectionId -> !collectionIds.contains(apiCollectionId));
-                filter =  Filters.in(Constants.ID, apiCollectionIds);
+            * User can only update collections which they have access to.
+            * so we remove entries which are not in the collections access list.
+            */
+            try {
+                List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+                if(collectionIds != null) {
+                    apiCollectionIds.removeIf(apiCollectionId -> !collectionIds.contains(apiCollectionId));
+                    filter =  Filters.in(Constants.ID, apiCollectionIds);
+                }
+            } catch(Exception e){
             }
 
             UpdateResult result = ApiCollectionsDao.instance.getMCollection().updateMany(filter,

@@ -457,9 +457,12 @@ public class SingleTypeInfoDao extends AccountsContextDaoWithRbac<SingleTypeInfo
 
         pipeline.add(Aggregates.match(Filters.and(filterList)));
 
-        List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
-        if(collectionIds != null) {
-            pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
+        try {
+            List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+            if(collectionIds != null) {
+                pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
+            }
+        } catch(Exception e){
         }
 
         BasicDBObject groupedId = new BasicDBObject("subType", "$subType");
@@ -504,9 +507,12 @@ public class SingleTypeInfoDao extends AccountsContextDaoWithRbac<SingleTypeInfo
             Filters.and(requestFilterList)
         )));
 
-        List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
-        if(collectionIds != null && !collectionIds.isEmpty()) {
-            pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
+        try {
+            List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+            if(collectionIds != null) {
+                pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
+            }
+        } catch(Exception e){
         }
 
         pipeline.add(Aggregates.group(groupedId,Accumulators.addToSet("subTypes", "$subType")));
@@ -597,9 +603,12 @@ public class SingleTypeInfoDao extends AccountsContextDaoWithRbac<SingleTypeInfo
 
         pipeline.add(Aggregates.match(Filters.or(filters)));
 
-        List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
-        if(collectionIds != null) {
-            pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
+        try {
+            List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+            if(collectionIds != null) {
+                pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
+            }
+        } catch(Exception e){
         }
 
         BasicDBObject groupedId = new BasicDBObject("apiCollectionId", "$apiCollectionId")
@@ -637,9 +646,12 @@ public class SingleTypeInfoDao extends AccountsContextDaoWithRbac<SingleTypeInfo
         );
 
         pipeline.add(Aggregates.match(filter));
-        List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
-        if(collectionIds != null) {
-            pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
+        try {
+            List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+            if(collectionIds != null) {
+                pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
+            }
+        } catch(Exception e){
         }
         pipeline.add(Aggregates.project(Projections.include(SingleTypeInfo._URL)));
 

@@ -459,9 +459,12 @@ public class InventoryAction extends UserAction {
 
         int pageLimit = Math.min(limit == 0 ? 50 : limit, 200);
         Bson filter = Filters.and(prepareFilters("API_INFO"), searchFilter);
-        List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
-        if (collectionIds != null) {
-            filter = Filters.and(filter, Filters.in(ApiInfo.COLLECTION_IDS, collectionIds));
+        try {
+            List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+            if(collectionIds != null) {
+                filter = Filters.and(filter, Filters.in(ApiInfo.COLLECTION_IDS, collectionIds));
+            }
+        } catch(Exception e){
         }
         List<ApiInfo> list = ApiInfoDao.instance.findAll(filter, skip, pageLimit, Sorts.descending(ApiInfo.DISCOVERED_TIMESTAMP));
         for(ApiInfo apiInfo: list){
@@ -531,9 +534,12 @@ public class InventoryAction extends UserAction {
         List<Bson> pipeline = new ArrayList<>();
         pipeline.add(Aggregates.sort(Sorts.descending(SingleTypeInfo._TIMESTAMP)));
         pipeline.add(Aggregates.match(filterQWithTs));
-        List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
-        if(collectionIds != null) {
-            pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
+        try {
+            List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+            if(collectionIds != null) {
+                pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
+            }
+        } catch(Exception e){
         }
         pipeline.addAll(SingleTypeInfoDao.instance.buildPipelineForTrend(InitializerListener.isNotKubernetes()));
         getResponseForTrendApis(pipeline);
@@ -558,9 +564,12 @@ public class InventoryAction extends UserAction {
 
         pipeline.add(Aggregates.sort(Sorts.descending(SingleTypeInfo._TIMESTAMP)));
         pipeline.add(Aggregates.match(nonHostFilterWithTs));
-        List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
-        if(collectionIds != null) {
-            pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
+        try {
+            List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+            if(collectionIds != null) {
+                pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
+            }
+        } catch(Exception e){
         }
 
         pipeline.add(Aggregates.group(_id, Accumulators.last(SingleTypeInfo._TIMESTAMP, "$" + SingleTypeInfo._TIMESTAMP)));
@@ -575,9 +584,12 @@ public class InventoryAction extends UserAction {
         pipeline.add(Aggregates.match(Filters.gte("timestamp", startTimestamp)));
         pipeline.add(Aggregates.match(Filters.lte("timestamp", endTimestamp)));
         pipeline.add(Aggregates.match(Filters.nin(SingleTypeInfo._API_COLLECTION_ID, deactivatedCollections)));
-        List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
-        if(collectionIds != null) {
-            pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
+        try {
+            List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+            if(collectionIds != null) {
+                pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
+            }
+        } catch(Exception e){
         }
         pipeline.add(Aggregates.limit(100_000));
         pipeline.addAll(SingleTypeInfoDao.instance.buildPipelineForTrend(InitializerListener.isNotKubernetes()));
@@ -884,9 +896,12 @@ public class InventoryAction extends UserAction {
             )
         ));
 
-        List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
-        if(collectionIds != null) {
-            pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
+        try {
+            List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+            if(collectionIds != null) {
+                pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
+            }
+        } catch(Exception e){
         }
 
         pipeline.add(Aggregates.project(Projections.exclude(SingleTypeInfo._VALUES)));

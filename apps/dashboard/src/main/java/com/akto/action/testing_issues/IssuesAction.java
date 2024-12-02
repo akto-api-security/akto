@@ -122,9 +122,12 @@ public class IssuesAction extends UserAction {
 
         List<Bson> pipeline = new ArrayList<>();
         pipeline.add(Aggregates.match(filters));
-        List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
-        if(collectionIds != null) {
-            pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
+        try {
+            List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+            if(collectionIds != null) {
+                pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
+            }
+        } catch(Exception e){
         }
         if (TestingRunIssues.KEY_SEVERITY.equals(sortKey)) {
             Bson addSeverityValueStage = Aggregates.addFields(
@@ -199,9 +202,13 @@ public class IssuesAction extends UserAction {
         ));
 
         pipeline.add(totalIssuesMatchStage);
-        List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
-        if(collectionIds != null) {
-            pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
+        List<Integer> collectionIds = null;
+        try {
+            collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+            if(collectionIds != null) {
+                pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
+            }
+        } catch(Exception e){
         }
         totalIssuesCountDayWise = new ArrayList<>();
         filterIssuesDataByTimeRange(daysBetween, pipeline, totalIssuesCountDayWise);

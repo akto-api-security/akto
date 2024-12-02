@@ -96,6 +96,7 @@ public class TestHarAction extends MongoBasedTest{
         user.setLogin("test@akto.io");
         session.put("user",user);
         harAction.setSession(session);
+        Context.userId.set(null);
         harAction.setHarString(harString);
         harAction.setApiCollectionId(0);
 

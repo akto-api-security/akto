@@ -133,7 +133,12 @@ public class TestStartTestAction extends MongoBasedTest {
         assertEquals(1,TestingRunDao.instance.findAll(new BasicDBObject()).size());
 
         StartTestAction startTestAction = new StartTestAction();
-        startTestAction.setSession(new HashMap<>());
+        Map<String,Object> session = new HashMap<>();
+        User user = new User();
+        user.setLogin("test@akto.io");
+        session.put("user",user);
+        startTestAction.setSession(session);
+        Context.userId.set(null);
         startTestAction.setTestingRunHexId(testingRunHexId);
         startTestAction.startTest();
 
@@ -243,6 +248,7 @@ public class TestStartTestAction extends MongoBasedTest {
         Map<String,Object> testSession = new HashMap<>();
         testSession.put("utility", Utility.CICD.toString());
         startTestAction.setSession(testSession);
+        Context.userId.set(null);
         startTestAction.setTestingRunHexId(testingRunHexId);
         Map<String, String> metadata = new HashMap<>();
         metadata.put("test", "test");

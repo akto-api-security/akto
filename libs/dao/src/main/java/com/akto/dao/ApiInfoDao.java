@@ -101,9 +101,12 @@ public class ApiInfoDao extends AccountsContextDaoWithRbac<ApiInfo>{
         int oneMonthAgo = Context.now() - Constants.ONE_MONTH_TIMESTAMP ;
         pipeline.add(Aggregates.match(Filters.gte("lastTested", oneMonthAgo)));
 
-        List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
-        if(collectionIds != null) {
-            pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
+        try {
+            List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+            if(collectionIds != null) {
+                pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
+            }
+        } catch(Exception e){
         }
 
         UnwindOptions unwindOptions = new UnwindOptions();
@@ -135,9 +138,12 @@ public class ApiInfoDao extends AccountsContextDaoWithRbac<ApiInfo>{
         Map<Integer,Integer> result = new HashMap<>();
         List<Bson> pipeline = new ArrayList<>();
 
-        List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
-        if(collectionIds != null) {
-            pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
+        try {
+            List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+            if(collectionIds != null) {
+                pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
+            }
+        } catch(Exception e){
         }
 
         UnwindOptions unwindOptions = new UnwindOptions();

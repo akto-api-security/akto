@@ -1045,9 +1045,12 @@ public class CustomDataTypeAction extends UserAction{
         do {
             idsToDelete = new ArrayList<>();
             Bson collectionFilter = Filters.empty();
-            List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
-            if(collectionIds != null) {
-                collectionFilter = Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds);
+            try {
+                List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+                if(collectionIds != null) {
+                    collectionFilter = Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds);
+                }
+            } catch(Exception e){
             }
             cursor = SensitiveSampleDataDao.instance.getMCollection().find(Filters.and(filterSsdQ, collectionFilter)).projection(Projections.exclude(SensitiveSampleData.SAMPLE_DATA)).skip(currMarker).limit(BATCH_SIZE).cursor();
             currMarker += BATCH_SIZE;
