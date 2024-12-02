@@ -330,7 +330,7 @@ const Users = () => {
                                                 {role === 'ADMIN' || userRole !== 'ADMIN' ? undefined :
                                                     <ResourceListModal
                                                         title={"Collection list"}
-                                                        activatorPlaceaholder={`${(usersCollection[id] || []).length} Collections accessible`}
+                                                        activatorPlaceaholder={`${(usersCollection[id] || []).length} collections accessible`}
                                                         isColoredActivator={true}
                                                         component={userCollectionsModalComp}
                                                         primaryAction={userCollectionsHandler}
