@@ -262,7 +262,6 @@ public class DaoInit {
         ClassModel<OrganizationFlags> OrganizationFlagsClassModel = ClassModel.builder(OrganizationFlags.class).enableDiscriminator(true).build();
         ClassModel<SensitiveDataEndpoints> sensitiveDataEndpointsClassModel = ClassModel.builder(SensitiveDataEndpoints.class).enableDiscriminator(true).build();
         ClassModel<AllAPIsGroup> allApisGroupClassModel = ClassModel.builder(AllAPIsGroup.class).enableDiscriminator(true).build();
-        ClassModel<UserAccountEntry> userAccountEntryClassModel = ClassModel.builder(UserAccountEntry.class).enableDiscriminator(true).build();
 
         ClassModel<RuntimeMetrics> RuntimeMetricsClassModel = ClassModel.builder(RuntimeMetrics.class).enableDiscriminator(true).build();
         ClassModel<CodeAnalysisApi>  codeAnalysisApiModel = ClassModel.builder(CodeAnalysisApi.class).enableDiscriminator(true).build();
