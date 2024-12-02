@@ -9,6 +9,7 @@ import com.akto.dto.RBAC;
 import com.akto.dto.RBAC.Role;
 import com.mongodb.client.model.Filters;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Set;
@@ -90,13 +91,20 @@ public class RBACDao extends CommonContextDao<RBAC> {
     public List<Integer> getUserCollectionsById(int userId, int accountId) {
         RBAC rbac = RBACDao.instance.findOne(
                 Filters.and(
-                    eq(RBAC.USER_ID, userId),
-                    eq(RBAC.ACCOUNT_ID, accountId)
-                ),
-                Projections.include(RBAC.API_COLLECTIONS_ID));
+                        eq(RBAC.USER_ID, userId),
+                        eq(RBAC.ACCOUNT_ID, accountId)),
+                Projections.include(RBAC.API_COLLECTIONS_ID, RBAC.ROLE));
 
-        if(rbac == null) {
+        if (rbac == null) {
+            return new ArrayList<>();
+        }
+
+        if (RBAC.Role.ADMIN.equals(rbac.getRole())) {
             return null;
+        }
+
+        if (rbac.getApiCollectionsId() == null) {
+            return new ArrayList<>();
         }
 
         return rbac.getApiCollectionsId();

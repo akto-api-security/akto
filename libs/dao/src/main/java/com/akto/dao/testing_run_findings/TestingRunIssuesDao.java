@@ -18,7 +18,6 @@ import com.akto.dto.testing.TestingEndpoints;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.test_run_findings.TestingIssuesId;
-import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.MongoDBEnums;
 import com.mongodb.BasicDBObject;
@@ -68,14 +67,14 @@ public class TestingRunIssuesDao extends AccountsContextDaoWithRbac<TestingRunIs
         List<Bson> pipeline = new ArrayList<>();
         pipeline.add(Aggregates.match(Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS, "OPEN")));
 
+        List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+        if(collectionIds != null) {
+            pipeline.add(Aggregates.match(Filters.in("collectionIds", collectionIds)));
+        }
+
         UnwindOptions unwindOptions = new UnwindOptions();
         unwindOptions.preserveNullAndEmptyArrays(false);  
         pipeline.add(Aggregates.unwind("$collectionIds", unwindOptions));
-
-        List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
-        if(collectionIds != null && !collectionIds.isEmpty()) {
-            pipeline.add(Aggregates.match(Filters.in("collectionIds", collectionIds)));
-        }
 
         BasicDBObject groupedId = new BasicDBObject("apiCollectionId", "$collectionIds")
                                                 .append("severity", "$severity") ;
@@ -116,7 +115,7 @@ public class TestingRunIssuesDao extends AccountsContextDaoWithRbac<TestingRunIs
         ));
 
         List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
-        if(collectionIds != null && !collectionIds.isEmpty()) {
+        if(collectionIds != null) {
             pipeline.add(Aggregates.match(Filters.in("collectionIds", collectionIds)));
         }
 
@@ -144,6 +143,10 @@ public class TestingRunIssuesDao extends AccountsContextDaoWithRbac<TestingRunIs
         List<Bson> pipeline = new ArrayList<>();
         pipeline.add(Aggregates.match(Filters.gte(TestingRunIssues.LAST_SEEN, startTimestamp)));
         pipeline.add(Aggregates.match(Filters.lte(TestingRunIssues.LAST_SEEN, endTimestamp)));
+        List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+        if(collectionIds != null) {
+            pipeline.add(Aggregates.match(Filters.in("collectionIds", collectionIds)));
+        }
         pipeline.add(Aggregates.project(Projections.computed("dayOfYearFloat", new BasicDBObject("$divide", new Object[]{"$lastSeen", 86400}))));
         pipeline.add(Aggregates.project(Projections.computed("dayOfYear", new BasicDBObject("$floor", new Object[]{"$dayOfYearFloat"}))));
 

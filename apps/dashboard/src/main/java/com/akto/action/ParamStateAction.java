@@ -36,6 +36,11 @@ public class ParamStateAction extends UserAction {
 
         pipeline.add(Aggregates.match(Filters.gt(SingleTypeInfo._UNIQUE_COUNT,0)));
 
+        List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+        if(collectionIds != null) {
+            pipeline.add(Aggregates.match(Filters.in("collectionIds", collectionIds)));
+        }
+
         Bson projections = Projections.fields(
                 Projections.include(
                         SingleTypeInfo._API_COLLECTION_ID, SingleTypeInfo._URL, SingleTypeInfo._METHOD,
@@ -53,11 +58,6 @@ public class ParamStateAction extends UserAction {
         pipeline.add(Aggregates.match(Filters.lte(computedFieldName,SingleTypeInfo.THRESHOLD)));
 
         pipeline.add(Aggregates.limit(3000));
-
-        List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
-        if(collectionIds != null && !collectionIds.isEmpty()) {
-            pipeline.add(Aggregates.match(Filters.in("collectionIds", collectionIds)));
-        }
 
         MongoCursor<SingleTypeInfo> cursor = SingleTypeInfoDao.instance.getMCollection().aggregate(pipeline, SingleTypeInfo.class).cursor();
 

@@ -10,7 +10,6 @@ import java.util.concurrent.TimeUnit;
 
 import org.bson.conversions.Bson;
 import java.util.Collections;
-import java.util.logging.Filter;
 
 import org.bson.types.ObjectId;
 import org.slf4j.Logger;

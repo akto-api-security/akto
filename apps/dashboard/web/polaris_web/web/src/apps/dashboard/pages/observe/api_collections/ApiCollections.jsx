@@ -2,6 +2,7 @@ import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleC
 import { Text, Button, IndexFiltersMode, Box, Badge, Popover, ActionList, Link, Tooltip, Modal, Checkbox, LegacyCard, ResourceList, ResourceItem, Avatar, Filters, Card, HorizontalStack, Icon} from "@shopify/polaris"
 import { HideMinor, ViewMinor,FileMinor } from '@shopify/polaris-icons';
 import api from "../api"
+import dashboardApi from "../../dashboard/api"
 import settingRequests from "../../settings/api"
 import { useEffect,useState, useRef } from "react"
 import func from "@/util/func"
@@ -265,6 +266,7 @@ function ApiCollections() {
     const setLastFetchedResp = PersistStore.getState().setLastFetchedResp
     const setLastFetchedSeverityResp = PersistStore.getState().setLastFetchedSeverityResp
     const setLastFetchedSensitiveResp = PersistStore.getState().setLastFetchedSensitiveResp
+    const [totalAPIs, setTotalAPIs] = useState(0)
 
     // as riskScore cron runs every 5 min, we will cache the data and refresh in 5 mins
     // similarly call sensitive and severityInfo
@@ -308,7 +310,8 @@ function ApiCollections() {
         let apiPromises = [
             api.getCoverageInfoForCollections(),
             api.getLastTrafficSeen(),
-            collectionApi.fetchCountForHostnameDeactivatedCollections()
+            collectionApi.fetchCountForHostnameDeactivatedCollections(),
+            dashboardApi.fetchEndpointsCount(0, 0)
         ];
         if(shouldCallHeavyApis){
             apiPromises = [
@@ -329,30 +332,34 @@ function ApiCollections() {
         // let coverageInfo = dummyData.coverageMap
         let trafficInfo = results[1].status === 'fulfilled' ? results[1].value : {};
         let deactivatedCountInfo = results[2].status === 'fulfilled' ? results[2].value : {};
+        let fetchEndpointsCountResp = results[3].status === 'fulfilled' ? results[3].value : {}
 
         let riskScoreObj = lastFetchedResp
         let sensitiveInfo = lastFetchedSensitiveResp
         let severityObj = lastFetchedSeverityResp
+        if (fetchEndpointsCountResp && fetchEndpointsCountResp.newCount) {
+            setTotalAPIs(fetchEndpointsCountResp.newCount)
+        }
 
         if(shouldCallHeavyApis){
-            if(results[3]?.status === "fulfilled"){
-                const res = results[3].value
+            if(results[4]?.status === "fulfilled"){
+                const res = results[4].value
                 riskScoreObj = {
                     criticalUrls: res.criticalEndpointsCount,
                     riskScoreMap: res.riskScoreOfCollectionsMap
                 }
             }
 
-            if(results[4]?.status === "fulfilled"){
-                const res = results[4].value
+            if(results[5]?.status === "fulfilled"){
+                const res = results[5].value
                 sensitiveInfo ={ 
                     sensitiveUrls: res.sensitiveUrlsInResponse,
                     sensitiveInfoMap: res.sensitiveSubtypesInCollection
                 }
             }
 
-            if(results[5]?.status === "fulfilled"){
-                const res = results[5].value
+            if(results[6]?.status === "fulfilled"){
+                const res = results[6].value
                 severityObj = res
             }
 
@@ -378,6 +385,14 @@ function ApiCollections() {
             if(results[index+1]?.status === "fulfilled") {
                 const res = results[index+1].value
                 userList = res
+                if (userList) {
+                    userList = userList.filter(x => {
+                        if (x?.role === "ADMIN") {
+                            return false;
+                        }
+                        return true
+                    })
+                }
             }
         }
 
@@ -664,7 +679,7 @@ function ApiCollections() {
       const summaryItems = [
         {
             title: "Total APIs",
-            data: transform.formatNumberWithCommas(summaryData.totalEndpoints),
+            data: transform.formatNumberWithCommas(totalAPIs),
         },
         {
             title: "Critical APIs",

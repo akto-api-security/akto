@@ -9,10 +9,8 @@ import com.akto.dto.type.URLMethods;
 import com.akto.dto.type.SingleTypeInfo;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.Indexes;
 import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Sorts;
-import org.bson.Document;
 import org.bson.conversions.Bson;
 
 import java.util.ArrayList;

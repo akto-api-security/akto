@@ -405,6 +405,9 @@ public class InitializerListener implements ServletContextListener {
 
 
                 SampleData commonSampleData = SampleDataDao.instance.findOne(filterCommonSampleData);
+                if (commonSampleData == null) {
+                    continue;
+                }
                 List<String> commonPayloads = commonSampleData.getSamples();
 
                 if (!isSimilar(ssdId.getParam(), commonPayloads)) {
@@ -828,36 +831,6 @@ public class InitializerListener implements ServletContextListener {
             }
         }, 0, 5, TimeUnit.MINUTES);
     }
-
-    private <T> void deleteApisPerDao(List<Key> toBeDeleted, AccountsContextDaoWithRbac<T> dao, String prefix) {
-        if (toBeDeleted == null || toBeDeleted.isEmpty()) return;
-        List<WriteModel<T>> stiList = new ArrayList<>();
-
-        for(Key key: toBeDeleted) {
-            stiList.add(new DeleteManyModel<>(Filters.and(
-                    Filters.eq(prefix + "apiCollectionId", key.getApiCollectionId()),
-                    Filters.eq(prefix + "method", key.getMethod()),
-                    Filters.eq(prefix + "url", key.getUrl())
-            )));
-        }
-
-        dao.bulkWrite(stiList, new BulkWriteOptions().ordered(false));
-    }
-
-    private void deleteApis(List<Key> toBeDeleted) {
-
-        String id = "_id.";
-
-        deleteApisPerDao(toBeDeleted, SingleTypeInfoDao.instance, "");
-        deleteApisPerDao(toBeDeleted, ApiInfoDao.instance, id);
-        deleteApisPerDao(toBeDeleted, SampleDataDao.instance, id);
-        deleteApisPerDao(toBeDeleted, TrafficInfoDao.instance, id);
-        deleteApisPerDao(toBeDeleted, SensitiveSampleDataDao.instance, id);
-        deleteApisPerDao(toBeDeleted, SensitiveParamInfoDao.instance, "");
-        deleteApisPerDao(toBeDeleted, FilterSampleDataDao.instance, id);
-
-    }
-    
 
     private void setUpDailyScheduler() {
         scheduler.scheduleAtFixedRate(new Runnable() {
@@ -2435,13 +2408,21 @@ public class InitializerListener implements ServletContextListener {
         clear(AnalyserLogsDao.instance, AnalyserLogsDao.maxDocuments);
         clear(ActivitiesDao.instance, ActivitiesDao.maxDocuments);
         clear(BillingLogsDao.instance, BillingLogsDao.maxDocuments);
-        clear(TestingRunResultDao.instance, TestingRunResultDao.maxDocuments);
+        clearRbacCollection(TestingRunResultDao.instance, TestingRunResultDao.maxDocuments);
         clear(SuspectSampleDataDao.instance, SuspectSampleDataDao.maxDocuments);
         clear(RuntimeMetricsDao.instance, RuntimeMetricsDao.maxDocuments);
         clear(ProtectionLogsDao.instance, ProtectionLogsDao.maxDocuments);
     }
 
     public static void clear(AccountsContextDao mCollection, int maxDocuments) {
+        try {
+            mCollection.trimCollection(maxDocuments);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error while trimming collection " + mCollection.getCollName() + " : " + e.getMessage(), LogDb.DASHBOARD);
+        }
+    }
+
+    public static void clearRbacCollection(AccountsContextDaoWithRbac mCollection, int maxDocuments) {
         try {
             mCollection.trimCollection(maxDocuments);
         } catch (Exception e) {

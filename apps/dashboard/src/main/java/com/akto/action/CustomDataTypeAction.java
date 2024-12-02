@@ -1046,7 +1046,7 @@ public class CustomDataTypeAction extends UserAction{
             idsToDelete = new ArrayList<>();
             Bson collectionFilter = Filters.empty();
             List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
-            if(collectionIds != null && !collectionIds.isEmpty()) {
+            if(collectionIds != null) {
                 collectionFilter = Filters.in("collectionIds", collectionIds);
             }
             cursor = SensitiveSampleDataDao.instance.getMCollection().find(Filters.and(filterSsdQ, collectionFilter)).projection(Projections.exclude(SensitiveSampleData.SAMPLE_DATA)).skip(currMarker).limit(BATCH_SIZE).cursor();

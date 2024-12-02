@@ -15,7 +15,7 @@ import java.util.List;
 
 public class FilterSampleDataDao extends AccountsContextDaoWithRbac<FilterSampleData>{
 
-    public static FilterSampleDataDao instance = new FilterSampleDataDao();
+    public static final FilterSampleDataDao instance = new FilterSampleDataDao();
 
     public List<ApiInfo.ApiInfoKey> getApiInfoKeys() {
         Bson projection = Projections.fields(Projections.include());

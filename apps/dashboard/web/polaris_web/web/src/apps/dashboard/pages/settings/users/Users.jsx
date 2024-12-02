@@ -1,13 +1,9 @@
-import { ActionList, Avatar, Banner, Box, Button, HorizontalStack, Icon, LegacyCard, Link, Page, Popover, ResourceItem, ResourceList, Text } from "@shopify/polaris"
-import { DeleteMajor, TickMinor } from "@shopify/polaris-icons"
-import { useEffect, useState } from "react";
-import { ActionList, Avatar, Banner, Box, Button, Icon, LegacyCard, Link, Modal, Page, Popover, ResourceItem, ResourceList, Text, TextField } from "@shopify/polaris"
+import { ActionList, Avatar, Banner, Box, Button, HorizontalStack, Icon, LegacyCard, Link, Page, Popover, ResourceItem, ResourceList, Text, Modal, TextField } from "@shopify/polaris"
 import { DeleteMajor, TickMinor, PasskeyMajor } from "@shopify/polaris-icons"
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import settingRequests from "../api";
 import func from "@/util/func";
 import InviteUserModal from "./InviteUserModal";
-import Store from "../../../store";
 import PersistStore from "../../../../main/PersistStore";
 import SearchableResourceList from "../../../components/shared/SearchableResourceList";
 import ResourceListModal from "../../../components/shared/ResourceListModal";
@@ -30,7 +26,7 @@ const Users = () => {
     const [roleHierarchy, setRoleHierarchy] = useState([])
     const [allCollections, setAllCollections] = useState([])
     const stiggFeatures = window.STIGG_FEATURE_WISE_ALLOWED
-    let rbacAccess = false;
+    let rbacAccess = func.checkForRbacFeature();
 
     const collectionsMap = PersistStore(state => state.collectionsMap)
 
@@ -49,7 +45,6 @@ const Users = () => {
     } else if(stiggFeatures && stiggFeatures['RBAC_FEATURE']){
         rbacAccess = stiggFeatures['RBAC_FEATURE'].isGranted
     }
-    const rbacAccess = func.checkForRbacFeature();
 
     const [roleSelectionPopup, setRoleSelectionPopup] = useState({})
 

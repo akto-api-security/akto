@@ -91,18 +91,6 @@ public abstract class MCollection<T> {
         return this.findAll(and(eq(key1, value1), eq(key2, value2)));
     }
 
-    public<V> List<T> findAll(String key, Collection<V> values) {
-        MongoCursor<T> cursor = this.getMCollection().find(in(key, values)).cursor();
-
-        ArrayList<T> ret = new ArrayList<T>();
-
-        while(cursor.hasNext()) {
-            T elem = cursor.next();
-            ret.add(elem);
-        }
-
-        return ret;
-    }
     public List<T> findAll(Bson q) {
         return findAll(q, null);
     }

@@ -1,9 +1,7 @@
 package com.akto.dao;
 
-import com.akto.dto.ApiCollectionUsers;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.SensitiveParamInfo;
-import com.akto.dto.testing.TestingEndpoints;
 import com.mongodb.client.model.Filters;
 import org.bson.conversions.Bson;
 
@@ -76,6 +74,6 @@ public class SensitiveParamInfoDao extends AccountsContextDaoWithRbac<SensitiveP
 
     @Override
     public String getFilterKeyString() {
-        return TestingEndpoints.getFilterPrefix(ApiCollectionUsers.CollectionType.Id_ApiCollectionId) + ApiInfo.ApiInfoKey.API_COLLECTION_ID;
+        return ApiInfo.ApiInfoKey.API_COLLECTION_ID;
     }
 }

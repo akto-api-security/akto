@@ -293,7 +293,7 @@ public class DbLayer {
         );
 
         List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
-        if(collectionIds != null && !collectionIds.isEmpty()) {
+        if(collectionIds != null) {
             pipeline.add(Aggregates.match(Filters.in("collectionIds", collectionIds)));
         }
 

@@ -122,6 +122,10 @@ public class IssuesAction extends UserAction {
 
         List<Bson> pipeline = new ArrayList<>();
         pipeline.add(Aggregates.match(filters));
+        List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+        if(collectionIds != null) {
+            pipeline.add(Aggregates.match(Filters.in("collectionIds", collectionIds)));
+        }
         if (TestingRunIssues.KEY_SEVERITY.equals(sortKey)) {
             Bson addSeverityValueStage = Aggregates.addFields(
                     new Field<>("severityValue", new BasicDBObject("$switch",
@@ -195,16 +199,26 @@ public class IssuesAction extends UserAction {
         ));
 
         pipeline.add(totalIssuesMatchStage);
+        List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+        if(collectionIds != null) {
+            pipeline.add(Aggregates.match(Filters.in("collectionIds", collectionIds)));
+        }
         totalIssuesCountDayWise = new ArrayList<>();
         filterIssuesDataByTimeRange(daysBetween, pipeline, totalIssuesCountDayWise);
         pipeline.clear();
 
         pipeline.add(openIssuesMatchStage);
+        if(collectionIds != null) {
+            pipeline.add(Aggregates.match(Filters.in("collectionIds", collectionIds)));
+        }
         openIssuesCountDayWise = new ArrayList<>();
         filterIssuesDataByTimeRange(daysBetween, pipeline, openIssuesCountDayWise);
         pipeline.clear();
 
         pipeline.add(criticalIssuesMatchStage);
+        if(collectionIds != null) {
+            pipeline.add(Aggregates.match(Filters.in("collectionIds", collectionIds)));
+        }
         criticalIssuesCountDayWise = new ArrayList<>();
         filterIssuesDataByTimeRange(daysBetween, pipeline, criticalIssuesCountDayWise);
         pipeline.clear();

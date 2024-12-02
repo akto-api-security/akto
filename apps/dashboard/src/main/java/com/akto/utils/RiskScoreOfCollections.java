@@ -19,7 +19,6 @@ import com.akto.dto.ApiInfo;
 import com.akto.dto.AktoDataType;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.CustomDataType;
-import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.RiskScoreTestingEndpoints;
@@ -187,10 +186,6 @@ public class RiskScoreOfCollections {
         );
         List<Bson> pipeline = new ArrayList<>();
         pipeline.add(Aggregates.match(sensitiveSubTypeFilter));
-        List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
-        if(collectionIds != null && !collectionIds.isEmpty()) {
-            pipeline.add(Aggregates.match(Filters.in("collectionIds", collectionIds)));
-        }
         BasicDBObject groupedId =  new BasicDBObject("apiCollectionId", "$apiCollectionId")
                                         .append("url", "$url")
                                         .append("method", "$method");

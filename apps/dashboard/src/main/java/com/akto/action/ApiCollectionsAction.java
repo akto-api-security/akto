@@ -8,11 +8,9 @@ import com.akto.dto.*;
 import com.akto.util.Pair;
 import org.bson.conversions.Bson;
 
-import com.akto.DaoInit;
 import com.akto.action.observe.Utils;
 import com.akto.dao.*;
 import com.akto.billing.UsageMetricUtils;
-import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.usage.MetricTypes;
@@ -24,7 +22,6 @@ import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.testing.CustomTestingEndpoints;
 import com.akto.dto.CollectionConditions.ConditionUtils;
-import com.akto.dto.billing.Organization;
 import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.listener.RuntimeListener;
@@ -41,16 +38,16 @@ import com.mongodb.client.model.FindOneAndUpdateOptions;
 import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Updates;
 import com.mongodb.BasicDBObject;
-import com.mongodb.ConnectionString;
 import com.mongodb.client.result.DeleteResult;
 import com.mongodb.client.result.UpdateResult;
 import com.mongodb.client.model.Sorts;
 import com.mongodb.client.model.UnwindOptions;
+import com.mongodb.client.model.UpdateOptions;
 import com.opensymphony.xwork2.Action;
 
 public class ApiCollectionsAction extends UserAction {
 
-    private static final LoggerMaker loggerMaker = new LoggerMaker(ApiCollectionsAction.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(ApiCollectionsAction.class, LogDb.DASHBOARD);
 
     List<ApiCollection> apiCollections = new ArrayList<>();
     Map<Integer,Integer> testedEndpointsMaps = new HashMap<>();
@@ -174,6 +171,11 @@ public class ApiCollectionsAction extends UserAction {
             Projections.computed(ApiCollection.URLS_COUNT, new BasicDBObject("$size", new BasicDBObject("$ifNull", Arrays.asList("$urls", Collections.emptyList())))),
             Projections.include(ApiCollection.ID, ApiCollection.NAME, ApiCollection.HOST_NAME, ApiCollection._TYPE, ApiCollection.USER_ENV_TYPE, ApiCollection._DEACTIVATED,ApiCollection.START_TS, ApiCollection.AUTOMATED)
         )));
+
+        List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(),Context.accountId.get());
+        if (collectionIds != null) {
+            pipeLine.add(Aggregates.match(Filters.in(Constants.ID, collectionIds)));
+        }
         MongoCursor<BasicDBObject> cursor = ApiCollectionsDao.instance.getMCollection().aggregate(pipeLine, BasicDBObject.class).cursor();
         while(cursor.hasNext()){
             try {
@@ -264,12 +266,17 @@ public class ApiCollectionsAction extends UserAction {
         int userId = Context.userId.get();
         int accountId = Context.accountId.get();
 
-        RBACDao.instance.updateOne(
+        /*
+         * Since admin has all access, we don't update any collections for them.
+         */
+        RBACDao.instance.getMCollection().updateOne(
                 Filters.and(
                         Filters.eq("userId", userId),
-                        Filters.eq("accountId", accountId)
+                        Filters.eq("accountId", accountId),
+                        Filters.ne(RBAC.ROLE, RBAC.Role.ADMIN.getName())
                 ),
-                Updates.addToSet("apiCollectionsId", apiCollection.getId())
+                Updates.addToSet("apiCollectionsId", apiCollection.getId()),
+                new UpdateOptions().upsert(false)
         );
 
         UsersCollectionsList.deleteCollectionIdsFromCache(userId, accountId);
@@ -571,17 +578,17 @@ public class ApiCollectionsAction extends UserAction {
         Map<Integer, Double> riskScoreMap = new HashMap<>();
         List<Bson> pipeline = new ArrayList<>();
 
+        List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+        if(collectionIds != null) {
+            pipeline.add(Aggregates.match(Filters.in("collectionIds", collectionIds)));
+        }
+
         /*
          * Use Unwind to unwind the collectionIds field resulting in a document for each collectionId in the collectionIds array
          */
         UnwindOptions unwindOptions = new UnwindOptions();
         unwindOptions.preserveNullAndEmptyArrays(false);  
         pipeline.add(Aggregates.unwind("$collectionIds", unwindOptions));
-
-        List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
-        if(collectionIds != null && !collectionIds.isEmpty()) {
-            pipeline.add(Aggregates.match(Filters.in("collectionIds", collectionIds)));
-        }
 
         BasicDBObject groupId = new BasicDBObject("apiCollectionId", "$collectionIds");
         pipeline.add(Aggregates.sort(
@@ -719,15 +726,19 @@ public class ApiCollectionsAction extends UserAction {
             FindOneAndUpdateOptions updateOptions = new FindOneAndUpdateOptions();
             updateOptions.upsert(false);
 
-            Bson collectionFilter = Filters.empty();
             List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
-            if(collectionIds != null && !collectionIds.isEmpty()) {
-                collectionFilter = Filters.in("collectionIds", collectionIds);
+            /*
+             * User can only update collections which they have access to.
+             * so we remove entries which are not in the collections access list.
+             */
+            if(collectionIds != null) {
+                apiCollectionIds.removeIf(apiCollectionId -> !collectionIds.contains(apiCollectionId));
+                filter =  Filters.in(Constants.ID, apiCollectionIds);
             }
 
-            UpdateResult result = ApiCollectionsDao.instance.getMCollection().updateMany(Filters.and(filter, collectionFilter),
+            UpdateResult result = ApiCollectionsDao.instance.getMCollection().updateMany(filter,
                                             Updates.set(ApiCollection.USER_ENV_TYPE,envType)
-                                    );;
+                                    );
             if(result == null){
                 return Action.ERROR.toUpperCase();
             }
@@ -748,6 +759,7 @@ public class ApiCollectionsAction extends UserAction {
             Set<Integer> apiCollections = new HashSet<>(entry.getValue());
 
             RBACDao.updateApiCollectionAccess(userId, accountId, apiCollections);
+            UsersCollectionsList.deleteCollectionIdsFromCache(userId, accountId);
         }
 
         return SUCCESS.toUpperCase();

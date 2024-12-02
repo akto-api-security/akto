@@ -1,21 +1,12 @@
 package com.akto.dao;
 
-import com.akto.DaoInit;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiCollection;
-import com.akto.dto.ApiCollectionUsers;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.util.Constants;
-import com.akto.dto.testing.TestingEndpoints;
-import com.akto.dto.ApiInfo.ApiInfoKey;
-import com.akto.dto.CodeAnalysisCollection;
-import com.akto.dto.testing.CollectionWiseTestingEndpoints;
-import com.akto.dto.type.SingleTypeInfo;
-import com.akto.util.Constants;
 import com.mongodb.BasicDBObject;
-import com.mongodb.ConnectionString;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.model.*;
@@ -45,7 +36,7 @@ public class ApiCollectionsDao extends AccountsContextDaoWithRbac<ApiCollection>
 
     @Override
     public String getFilterKeyString(){
-        return TestingEndpoints.getFilterPrefix(ApiCollectionUsers.CollectionType.ApiCollectionId) + ApiCollection.ID;
+        return ApiCollection.ID;
     }
 
     public void createIndicesIfAbsent() {
@@ -159,12 +150,13 @@ public class ApiCollectionsDao extends AccountsContextDaoWithRbac<ApiCollection>
                 filter
             )
         ));
-        BasicDBObject groupedId = new BasicDBObject(SingleTypeInfo._COLLECTION_IDS, "$" + SingleTypeInfo._COLLECTION_IDS);
-        pipeline.add(Aggregates.unwind("$" + SingleTypeInfo._COLLECTION_IDS));
         List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
-        if(collectionIds != null && !collectionIds.isEmpty()) {
+        if(collectionIds != null) {
             pipeline.add(Aggregates.match(Filters.in("collectionIds", collectionIds)));
         }
+
+        BasicDBObject groupedId = new BasicDBObject(SingleTypeInfo._COLLECTION_IDS, "$" + SingleTypeInfo._COLLECTION_IDS);
+        pipeline.add(Aggregates.unwind("$" + SingleTypeInfo._COLLECTION_IDS));
         pipeline.add(Aggregates.group(groupedId, Accumulators.sum("count",1)));
 
         MongoCursor<BasicDBObject> endpointsCursor = SingleTypeInfoDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
@@ -206,6 +198,11 @@ public class ApiCollectionsDao extends AccountsContextDaoWithRbac<ApiCollection>
                         .append(ApiInfoKey.METHOD, "$method");
 
         pipeline.add(Aggregates.match(filter));
+
+        List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+        if(collectionIds != null) {
+            pipeline.add(Aggregates.match(Filters.in("collectionIds", collectionIds)));
+        }
 
         int recentEpoch = Context.now() - deltaPeriodValue;
 

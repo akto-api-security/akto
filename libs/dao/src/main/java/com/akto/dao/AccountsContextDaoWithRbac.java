@@ -3,12 +3,16 @@ package com.akto.dao;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.akto.dto.rbac.UsersCollectionsList;
+import com.akto.dto.traffic.Key;
 import com.akto.dto.type.SingleTypeInfo;
 import org.bson.conversions.Bson;
 
 import com.akto.dao.context.Context;
+import com.mongodb.client.model.BulkWriteOptions;
+import com.mongodb.client.model.DeleteManyModel;
 import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.ReplaceOptions;
+import com.mongodb.client.model.WriteModel;
 import com.mongodb.client.result.DeleteResult;
 import com.mongodb.client.result.UpdateResult;
 
@@ -19,18 +23,38 @@ public abstract class AccountsContextDaoWithRbac<T> extends MCollection<T>{
         return Context.accountId.get()+"";
     }
 
+    public static <T> void deleteApisPerDao(List<Key> toBeDeleted, AccountsContextDaoWithRbac<T> dao, String prefix) {
+        if (toBeDeleted == null || toBeDeleted.isEmpty()) return;
+        List<WriteModel<T>> stiList = new ArrayList<>();
+
+        for(Key key: toBeDeleted) {
+            stiList.add(new DeleteManyModel<>(Filters.and(
+                    Filters.eq(prefix + "apiCollectionId", key.getApiCollectionId()),
+                    Filters.eq(prefix + "method", key.getMethod()),
+                    Filters.eq(prefix + "url", key.getUrl())
+            )));
+        }
+        dao.bulkWrite(stiList, new BulkWriteOptions().ordered(false));
+    }
+
     abstract public String getFilterKeyString();
 
     protected Bson addRbacFilter(Bson originalQuery) {
-        int accountId = Context.accountId.get();
         Bson rbacFilter = Filters.empty();
-        if(Context.userId.get() != null){
-            List<Integer> apiCollectionIds = RBACDao.instance.getUserCollectionsById(Context.userId.get(), accountId);
-            if(apiCollectionIds != null){
-                rbacFilter = Filters.in(getFilterKeyString(), apiCollectionIds);
-
-                rbacFilter = Filters.or(rbacFilter, Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionIds));
+        try {
+            if (Context.userId.get() != null) {
+                List<Integer> apiCollectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(),
+                        Context.accountId.get());
+                if (apiCollectionIds != null) {
+                    List<Bson> filters = new ArrayList<>();
+                    filters.add(Filters.and(Filters.exists(getFilterKeyString()),
+                            Filters.in(getFilterKeyString(), apiCollectionIds)));
+                    filters.add(Filters.and(Filters.exists(SingleTypeInfo._COLLECTION_IDS),
+                            Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionIds)));
+                    rbacFilter = Filters.or(filters);
+                }
             }
+        } catch (Exception e) {
         }
         if (originalQuery != null) {
             return Filters.and(originalQuery, rbacFilter);
@@ -84,13 +108,19 @@ public abstract class AccountsContextDaoWithRbac<T> extends MCollection<T>{
     @Override
     public UpdateResult replaceOne(Bson q, T obj) {
         Bson filteredQuery = addRbacFilter(q);
-        return this.getMCollection().replaceOne(filteredQuery, obj, new ReplaceOptions().upsert(false));
+        return super.replaceOne(filteredQuery, obj);
     }
 
     @Override
     public DeleteResult deleteAll(Bson q) {
         Bson filteredQuery = addRbacFilter(q);
         return super.deleteAll(filteredQuery);
+    }
+
+    @Override
+    public long count(Bson q) {
+        Bson filteredQuery = addRbacFilter(q);
+        return super.count(filteredQuery);
     }
 
 }
