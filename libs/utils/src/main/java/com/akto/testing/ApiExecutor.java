@@ -288,7 +288,7 @@ public class ApiExecutor {
         boolean executeScript = testingRunConfig != null;
         calculateHashAndAddAuth(request, executeScript);
 
-        if(testingRunConfig.getConfigsAdvancedSettings() != null && !testingRunConfig.getConfigsAdvancedSettings().isEmpty()){
+        if(testingRunConfig != null && testingRunConfig.getConfigsAdvancedSettings() != null && !testingRunConfig.getConfigsAdvancedSettings().isEmpty()){
             calculateFinalRequestFromAdvancedSettings(request, testingRunConfig.getConfigsAdvancedSettings());
         }
 
