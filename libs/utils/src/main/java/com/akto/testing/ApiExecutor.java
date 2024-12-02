@@ -1,11 +1,14 @@
 package com.akto.testing;
 
 import com.akto.dao.context.Context;
+import com.akto.dao.test_editor.TestEditorEnums;
 import com.akto.dao.testing.config.TestScriptsDao;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
+import com.akto.dto.CollectionConditions.ConditionsType;
+import com.akto.dto.CollectionConditions.TestConfigsAdvancedSettings;
 import com.akto.dto.testing.TestingRunConfig;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.config.TestScript;
@@ -285,6 +288,10 @@ public class ApiExecutor {
         boolean executeScript = testingRunConfig != null;
         calculateHashAndAddAuth(request, executeScript);
 
+        if(testingRunConfig.getConfigsAdvancedSettings() != null && !testingRunConfig.getConfigsAdvancedSettings().isEmpty()){
+            calculateFinalRequestFromAdvancedSettings(request, testingRunConfig.getConfigsAdvancedSettings());
+        }
+
         boolean nonTestingContext = false;
         if (testingRunConfig == null) {
             nonTestingContext = true;
@@ -390,6 +397,32 @@ public class ApiExecutor {
             return null;
         }
         
+    }
+
+    private static void calculateFinalRequestFromAdvancedSettings(OriginalHttpRequest originalHttpRequest, List<TestConfigsAdvancedSettings> advancedSettings){
+        Map<String,List<ConditionsType>> headerConditions = new HashMap<>();
+        Map<String,List<ConditionsType>> payloadConditions = new HashMap<>();
+
+        for(TestConfigsAdvancedSettings settings: advancedSettings){
+            if(settings.getOperatorType().toLowerCase().contains("header")){
+                headerConditions.put(settings.getOperatorType(), settings.getOperationsGroupList());
+            }else{
+                payloadConditions.put(settings.getOperatorType(), settings.getOperationsGroupList());
+            }
+        }
+        List<ConditionsType> emptyList = new ArrayList<>();
+
+        Utils.modifyHeaderOperations(originalHttpRequest, 
+            headerConditions.getOrDefault(TestEditorEnums.NonTerminalExecutorDataOperands.MODIFY_HEADER.name(), emptyList), 
+            headerConditions.getOrDefault(TestEditorEnums.NonTerminalExecutorDataOperands.ADD_HEADER.name(), emptyList),
+            headerConditions.getOrDefault(TestEditorEnums.TerminalExecutorDataOperands.DELETE_HEADER.name(), emptyList)
+        );
+
+        Utils.modifyBodyOperations(originalHttpRequest, 
+            payloadConditions.getOrDefault(TestEditorEnums.NonTerminalExecutorDataOperands.MODIFY_BODY_PARAM.name(), emptyList), 
+            payloadConditions.getOrDefault(TestEditorEnums.NonTerminalExecutorDataOperands.ADD_BODY_PARAM.name(), emptyList),
+            payloadConditions.getOrDefault(TestEditorEnums.TerminalExecutorDataOperands.DELETE_BODY_PARAM.name(), emptyList)
+        );
     }
 
     private static void calculateHashAndAddAuth(OriginalHttpRequest originalHttpRequest, boolean executeScript) {
