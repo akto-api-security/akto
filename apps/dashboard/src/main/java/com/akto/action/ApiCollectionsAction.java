@@ -271,11 +271,11 @@ public class ApiCollectionsAction extends UserAction {
          */
         RBACDao.instance.getMCollection().updateOne(
                 Filters.and(
-                        Filters.eq("userId", userId),
-                        Filters.eq("accountId", accountId),
+                        Filters.eq(RBAC.USER_ID, userId),
+                        Filters.eq(RBAC.ACCOUNT_ID, accountId),
                         Filters.ne(RBAC.ROLE, RBAC.Role.ADMIN.getName())
                 ),
-                Updates.addToSet("apiCollectionsId", apiCollection.getId()),
+                Updates.addToSet(RBAC.API_COLLECTIONS_ID, apiCollection.getId()),
                 new UpdateOptions().upsert(false)
         );
 
@@ -595,7 +595,7 @@ public class ApiCollectionsAction extends UserAction {
 
         List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
         if(collectionIds != null) {
-            pipeline.add(Aggregates.match(Filters.in("collectionIds", collectionIds)));
+            pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
         }
 
         /*

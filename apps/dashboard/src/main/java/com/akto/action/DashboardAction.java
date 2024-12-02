@@ -10,6 +10,7 @@ import com.akto.dto.*;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.dto.test_run_findings.TestingRunIssues;
+import com.akto.dto.type.SingleTypeInfo;
 import com.akto.listener.RuntimeListener;
 import com.akto.util.enums.GlobalEnums;
 import com.mongodb.client.model.*;
@@ -129,7 +130,7 @@ public class DashboardAction extends UserAction {
 
         List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
         if(collectionIds != null) {
-            pipeline.add(Aggregates.match(Filters.in("collectionIds", collectionIds)));
+            pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
         }
         pipeline.add(Aggregates.project(Projections.computed(dayOfYearFloat, new BasicDBObject("$divide", new Object[]{"$" + TestingRunIssues.CREATION_TIME, 86400}))));
 

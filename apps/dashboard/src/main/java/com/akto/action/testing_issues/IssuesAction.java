@@ -124,7 +124,7 @@ public class IssuesAction extends UserAction {
         pipeline.add(Aggregates.match(filters));
         List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
         if(collectionIds != null) {
-            pipeline.add(Aggregates.match(Filters.in("collectionIds", collectionIds)));
+            pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
         }
         if (TestingRunIssues.KEY_SEVERITY.equals(sortKey)) {
             Bson addSeverityValueStage = Aggregates.addFields(
@@ -201,7 +201,7 @@ public class IssuesAction extends UserAction {
         pipeline.add(totalIssuesMatchStage);
         List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
         if(collectionIds != null) {
-            pipeline.add(Aggregates.match(Filters.in("collectionIds", collectionIds)));
+            pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
         }
         totalIssuesCountDayWise = new ArrayList<>();
         filterIssuesDataByTimeRange(daysBetween, pipeline, totalIssuesCountDayWise);
@@ -209,7 +209,7 @@ public class IssuesAction extends UserAction {
 
         pipeline.add(openIssuesMatchStage);
         if(collectionIds != null) {
-            pipeline.add(Aggregates.match(Filters.in("collectionIds", collectionIds)));
+            pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
         }
         openIssuesCountDayWise = new ArrayList<>();
         filterIssuesDataByTimeRange(daysBetween, pipeline, openIssuesCountDayWise);
@@ -217,7 +217,7 @@ public class IssuesAction extends UserAction {
 
         pipeline.add(criticalIssuesMatchStage);
         if(collectionIds != null) {
-            pipeline.add(Aggregates.match(Filters.in("collectionIds", collectionIds)));
+            pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
         }
         criticalIssuesCountDayWise = new ArrayList<>();
         filterIssuesDataByTimeRange(daysBetween, pipeline, criticalIssuesCountDayWise);

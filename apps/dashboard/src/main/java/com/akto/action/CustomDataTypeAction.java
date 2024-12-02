@@ -1047,7 +1047,7 @@ public class CustomDataTypeAction extends UserAction{
             Bson collectionFilter = Filters.empty();
             List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
             if(collectionIds != null) {
-                collectionFilter = Filters.in("collectionIds", collectionIds);
+                collectionFilter = Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds);
             }
             cursor = SensitiveSampleDataDao.instance.getMCollection().find(Filters.and(filterSsdQ, collectionFilter)).projection(Projections.exclude(SensitiveSampleData.SAMPLE_DATA)).skip(currMarker).limit(BATCH_SIZE).cursor();
             currMarker += BATCH_SIZE;

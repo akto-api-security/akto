@@ -15,6 +15,7 @@ import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.TestingEndpoints;
+import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.test_run_findings.TestingIssuesId;
@@ -69,7 +70,7 @@ public class TestingRunIssuesDao extends AccountsContextDaoWithRbac<TestingRunIs
 
         List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
         if(collectionIds != null) {
-            pipeline.add(Aggregates.match(Filters.in("collectionIds", collectionIds)));
+            pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
         }
 
         UnwindOptions unwindOptions = new UnwindOptions();
@@ -116,7 +117,7 @@ public class TestingRunIssuesDao extends AccountsContextDaoWithRbac<TestingRunIs
 
         List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
         if(collectionIds != null) {
-            pipeline.add(Aggregates.match(Filters.in("collectionIds", collectionIds)));
+            pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
         }
 
         BasicDBObject groupedId = new BasicDBObject("subCategory", "$_id.testSubCategory");
@@ -145,7 +146,7 @@ public class TestingRunIssuesDao extends AccountsContextDaoWithRbac<TestingRunIs
         pipeline.add(Aggregates.match(Filters.lte(TestingRunIssues.LAST_SEEN, endTimestamp)));
         List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
         if(collectionIds != null) {
-            pipeline.add(Aggregates.match(Filters.in("collectionIds", collectionIds)));
+            pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
         }
         pipeline.add(Aggregates.project(Projections.computed("dayOfYearFloat", new BasicDBObject("$divide", new Object[]{"$lastSeen", 86400}))));
         pipeline.add(Aggregates.project(Projections.computed("dayOfYear", new BasicDBObject("$floor", new Object[]{"$dayOfYearFloat"}))));

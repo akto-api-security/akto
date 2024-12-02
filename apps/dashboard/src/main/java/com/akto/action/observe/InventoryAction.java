@@ -533,7 +533,7 @@ public class InventoryAction extends UserAction {
         pipeline.add(Aggregates.match(filterQWithTs));
         List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
         if(collectionIds != null) {
-            pipeline.add(Aggregates.match(Filters.in("collectionIds", collectionIds)));
+            pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
         }
         pipeline.addAll(SingleTypeInfoDao.instance.buildPipelineForTrend(InitializerListener.isNotKubernetes()));
         getResponseForTrendApis(pipeline);
@@ -560,7 +560,7 @@ public class InventoryAction extends UserAction {
         pipeline.add(Aggregates.match(nonHostFilterWithTs));
         List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
         if(collectionIds != null) {
-            pipeline.add(Aggregates.match(Filters.in("collectionIds", collectionIds)));
+            pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
         }
 
         pipeline.add(Aggregates.group(_id, Accumulators.last(SingleTypeInfo._TIMESTAMP, "$" + SingleTypeInfo._TIMESTAMP)));
@@ -577,7 +577,7 @@ public class InventoryAction extends UserAction {
         pipeline.add(Aggregates.match(Filters.nin(SingleTypeInfo._API_COLLECTION_ID, deactivatedCollections)));
         List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
         if(collectionIds != null) {
-            pipeline.add(Aggregates.match(Filters.in("collectionIds", collectionIds)));
+            pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
         }
         pipeline.add(Aggregates.limit(100_000));
         pipeline.addAll(SingleTypeInfoDao.instance.buildPipelineForTrend(InitializerListener.isNotKubernetes()));
@@ -886,7 +886,7 @@ public class InventoryAction extends UserAction {
 
         List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
         if(collectionIds != null) {
-            pipeline.add(Aggregates.match(Filters.in("collectionIds", collectionIds)));
+            pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
         }
 
         pipeline.add(Aggregates.project(Projections.exclude(SingleTypeInfo._VALUES)));
