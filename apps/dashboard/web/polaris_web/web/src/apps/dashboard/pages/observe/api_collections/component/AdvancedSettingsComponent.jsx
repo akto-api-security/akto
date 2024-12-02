@@ -4,7 +4,7 @@ import { Button, HorizontalGrid, HorizontalStack, TextField, VerticalStack } fro
 import {DeleteMinor} from "@shopify/polaris-icons"
 import Dropdown from '../../../../components/layouts/Dropdown';
 
-function AdvancedSettingsComponent({dispatchConditions, conditions, showSave, handleSave}) {
+function AdvancedSettingsComponent({dispatchConditions, conditions, hideButton}) {
     const emptyCondition = {data: {key: '', value: ''}, operator: {'type': 'ADD_HEADER'}}
 
     const operatorTypeOptions = [
@@ -36,14 +36,14 @@ function AdvancedSettingsComponent({dispatchConditions, conditions, showSave, ha
         dispatchConditions({type:"add", obj: emptyCondition})
     };
 
-    const [showAdvancedSettings, setShowAdvancedSettings] = useState(false)
+    const [showAdvancedSettings, setShowAdvancedSettings] = useState(hideButton ? hideButton : false)
     const getLabel = (val) => {
         return operatorTypeOptions.filter((x) => x.value === val)[0].label
     }
 
     return (
         <VerticalStack gap={"3"}>
-            <Button fullWidth={false} plain removeUnderline onClick={() => setShowAdvancedSettings(!showAdvancedSettings)}>Advanced configurations</Button>
+            {hideButton ? null : <Button fullWidth={false} plain removeUnderline onClick={() => setShowAdvancedSettings(!showAdvancedSettings)}>Advanced configurations</Button>}
             {showAdvancedSettings ?
                 <VerticalStack gap={"2"}>
                     {conditions.map((condition, index) => {
@@ -83,7 +83,6 @@ function AdvancedSettingsComponent({dispatchConditions, conditions, showSave, ha
                     })}
                     <HorizontalStack align="space-between">
                         <Button onClick={handleAddField}>Add condition</Button>
-                        {showSave ? <Button primary onClick={handleSave}>Save</Button> : null}
                     </HorizontalStack>
                 </VerticalStack> : null
             }
