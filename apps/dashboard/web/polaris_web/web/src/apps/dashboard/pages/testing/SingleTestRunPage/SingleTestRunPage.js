@@ -15,7 +15,8 @@ import {
   Card,
   ProgressBar,
   Tooltip,
-  Banner
+  Banner,
+  Modal
 } from '@shopify/polaris';
 
 import {
@@ -503,17 +504,31 @@ const handleModifyConfig = async() => {
   const settings = transform.prepareConditionsForTesting(conditions)
   await api.modifyTestingRunConfig(testingRunConfigId, settings).then(() =>{
     func.setToast(true, false, "Modified testing run config successfully")
+    setShowEditableSettings(false)
   })
 }
 
 const editableConfigsComp = (
-  showEditableSettings ? <AdvancedSettingsComponent 
-    key={"configSettings"} 
-    conditions={conditions} 
-    dispatchConditions={dispatchConditions} 
-    showSave={true}
-    handleSave={handleModifyConfig}
-    /> : null
+  <Modal
+    large
+    fullScreen
+    open={showEditableSettings}
+    onClose={() => setShowEditableSettings(false)}
+    title={"Edit test configurations"}
+    primaryAction={{
+        content: 'Save',
+        onAction: () => handleModifyConfig()
+    }}
+    >
+    <Modal.Section>
+        <AdvancedSettingsComponent 
+          key={"configSettings"} 
+          conditions={conditions} 
+          dispatchConditions={dispatchConditions} 
+          hideButton={true}
+        /> 
+    </Modal.Section>
+  </Modal>
 )
 
   const components = [ 
@@ -526,13 +541,15 @@ const editableConfigsComp = (
   }
 
   const handleAddSettings = () => {
-    testingRunConfigSettings.forEach((condition) => {
-      const operatorType = condition.operatorType
-      condition.operationsGroupList.forEach((obj) => {
-        const finalObj = {'data': obj, 'operator': {'type': operatorType}}
-        dispatchConditions({type:"add", obj: finalObj})
+    if(conditions.length === 0  && testingRunConfigSettings.length > 0){
+      testingRunConfigSettings.forEach((condition) => {
+        const operatorType = condition.operatorType
+        condition.operationsGroupList.forEach((obj) => {
+          const finalObj = {'data': obj, 'operator': {'type': operatorType}}
+          dispatchConditions({type:"add", obj: finalObj})
+        })
       })
-    })
+    }
   }
 
   const EmptyData = () => {
