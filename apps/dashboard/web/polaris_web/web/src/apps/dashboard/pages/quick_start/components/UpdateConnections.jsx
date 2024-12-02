@@ -53,7 +53,7 @@ function UpdateConnections(props) {
                         return (
                             <BlockStack gap="400" key={key}>
                                 <InlineStack gap={"300"}>
-                                    <Text variant="headingMd" as="h6" color=""> {key} </Text>
+                                    <Text variant="headingMd" as="h6" tone=""> {key} </Text>
                                     <Tag>{obj[key].length.toString()}</Tag>
                                 </InlineStack>
                                 <Divider/>

@@ -198,7 +198,7 @@ function AdvancedTrafficFilters() {
             title={"Add advanced filters"}
         >
             <Modal.Section>
-                <Text variant="bodyMd" color="subdued">
+                <Text variant="bodyMd" tone="subdued">
                     Adding an filter will stop/modify traffic ingestion in the dashboard.
                     Are you sure you want to add the filter?
                 </Text>

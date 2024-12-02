@@ -45,7 +45,7 @@ function RiskScoreTrend({riskScoreRangeMap, riskScoreRanges}) {
                                                 removeUnderline
                                                 onClick={() => navigate(`/dashboard/observe/inventory/${range.apiCollectionId}`)}
                                                 variant="monochromePlain">
-                                                    <Text variant="bodyMd" color="semibold" >{range.text}</Text>
+                                                    <Text variant="bodyMd" tone="semibold" >{range.text}</Text>
                                             </Button>
                                             <Badge tone={range.status}>{range.range}</Badge>
                                         </InlineStack>

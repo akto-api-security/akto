@@ -25,7 +25,7 @@ function RowCard(props) {
                 <BlockStack gap="100">
                     <Text variant="headingMd" as="h5">{cardObj.label}</Text>
                     <Box minHeight="80px">
-                        <Text variant="bodyMd" color='subdued'>{cardObj.text}</Text>
+                        <Text variant="bodyMd" tone='subdued'>{cardObj.text}</Text>
                     </Box>
                 </BlockStack>
                 <InlineStack gap={"400"} align='start'>

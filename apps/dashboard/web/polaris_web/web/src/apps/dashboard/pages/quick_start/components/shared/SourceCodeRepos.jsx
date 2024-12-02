@@ -118,7 +118,7 @@ function SourceCodeRepos({type, typeName, orgName}) {
                     <TextField onChange={(val) => setProjectName(val)} value={projectName} helpText={`Name of your ${orgName}`} label={`${orgName} Name`} />
                     <br />
                     <TextField onChange={(val) => setrepoNames(val)} value={repoNames} label="Repository Name" helpText="This accepts comma separated values" />
-                    {!isUniqueCombination() && <Text color="critical" variant="bodySm" style={{ marginTop: '8px' }}>{errorMessage}</Text>}
+                    {!isUniqueCombination() && <Text tone="critical" variant="bodySm" style={{ marginTop: '8px' }}>{errorMessage}</Text>}
 
                 </LegacyCard.Section>
             </LegacyCard>

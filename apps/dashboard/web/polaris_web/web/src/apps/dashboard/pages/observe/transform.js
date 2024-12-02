@@ -419,7 +419,7 @@ const transform = {
                             <Badge size="small" tone={this.getColor(key)} key={index}>{severityInfo[key].toString()}</Badge>
                         )
                     }):
-                    <Text fontWeight="regular" variant="bodyMd" color="subdued">-</Text>
+                    <Text fontWeight="regular" variant="bodyMd" tone="subdued">-</Text>
                 }
             </InlineStack>
         );
@@ -463,7 +463,7 @@ const transform = {
                     calcCoverage =  Math.ceil((c.testedEndpoints * 100)/c.urlsCount) + '%'
                 }
             }
-            const loadingComp = <Text color="subdued" variant="bodyMd">...</Text>
+            const loadingComp = <Text tone="subdued" variant="bodyMd">...</Text>
             return{
                 ...c,
                 id: c.id,
@@ -664,8 +664,8 @@ const transform = {
                 <Box>
                     <Icon source={source} tone='subdued' />
                 </Box>
-                <Text color='subdued' fontWeight='medium'>{Math.abs(val)}</Text>
-                <Text color='subdued' fontWeight='semibold'>{time}</Text>
+                <Text tone='subdued' fontWeight='medium'>{Math.abs(val)}</Text>
+                <Text tone='subdued' fontWeight='semibold'>{time}</Text>
             </InlineStack>
         );
     },

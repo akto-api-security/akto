@@ -34,7 +34,7 @@ function ActivityTracker({ latestActivity }) {
                     <Box key={dateIndex}>
                         <InlineStack gap={400}>
                             <Box borderColor='border-secondary' borderInlineEndWidth='2' width='0' paddingInlineStart={300} minHeight='44px' />
-                            <Text variant="bodySm" color="subdued" style={{ marginBottom: '10px' }}>
+                            <Text variant="bodySm" tone="subdued" style={{ marginBottom: '10px' }}>
                                 {date}
                             </Text>
                         </InlineStack>
@@ -52,7 +52,7 @@ function ActivityTracker({ latestActivity }) {
                                     </Box>
                                 </InlineStack>
                                 <div style={{marginBlock: '5px'}}>
-                                    <Text variant="bodySm" color="subdued">
+                                    <Text variant="bodySm" tone="subdued">
                                         {formatDate(event.timestamp)[1]}
                                     </Text>
                                 </div>

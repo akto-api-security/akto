@@ -27,7 +27,7 @@ function CollectionsPageBanner() {
                     );
                 })}
             </InlineStack>
-            <Text color="subdued" variant="bodyMd">{`+${Math.max(connectorsList.length - 4, 18)} more`}</Text>
+            <Text tone="subdued" variant="bodyMd">{`+${Math.max(connectorsList.length - 4, 18)} more`}</Text>
         </InlineStack>
     )
 

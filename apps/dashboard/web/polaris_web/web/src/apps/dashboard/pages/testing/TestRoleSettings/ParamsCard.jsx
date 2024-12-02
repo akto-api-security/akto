@@ -21,7 +21,7 @@ function ParamsCard({dataObj, handleDelete, showEdit}) {
                 <Box maxWidth='200px'>
                     <TooltipText tooltip={title} text={title} textProps={{variant:"bodyMd", fontWeight: "medium"}} />
                 </Box>
-                <Text breakWord truncate alignment="start" variant="bodyMd" color="subdued">{value}</Text>
+                <Text breakWord truncate alignment="start" variant="bodyMd" tone="subdued">{value}</Text>
             </div>
         )
     }

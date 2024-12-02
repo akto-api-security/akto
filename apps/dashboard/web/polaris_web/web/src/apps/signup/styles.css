@@ -16,3 +16,8 @@
     font-size: var(--p-font-size-800);
     line-height: var(--p-font-line-height-1000);
 }
+
+.Polaris-Button--sizeLarge {
+    min-height: var(--p-height-1000) !important;
+    min-width: var(--p-width-1000) !important;
+}

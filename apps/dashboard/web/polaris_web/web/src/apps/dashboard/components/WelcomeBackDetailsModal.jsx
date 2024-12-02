@@ -39,7 +39,7 @@ const WelcomeBackDetailsModal = ({ isAdmin }) => {
         >
             <Modal.Section>
                 <BlockStack gap={400}>
-                    <Text variant="bodyMd" color="subdued">
+                    <Text variant="bodyMd" tone="subdued">
                         Tell us more about yourself.
                     </Text>
                     <TextField

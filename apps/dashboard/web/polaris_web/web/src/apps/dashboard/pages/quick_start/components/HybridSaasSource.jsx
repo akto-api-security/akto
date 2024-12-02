@@ -109,13 +109,13 @@ function HybridSaasSource() {
         //         <Box paddingInlineStart={2}>
         //             <VerticalStack gap={1}>
         //                 <HorizontalStack gap={1}>
-        //                     <Text variant="bodyMd" fontWeight="medium" color="subdued">AKTO_IP:</Text>
+        //                     <Text variant="bodyMd" fontWeight="medium" tone="subdued">AKTO_IP:</Text>
         //                     <Button onClick={() => copyText(aktoIp, "AKTO_IP")} plain>
         //                         <div style={{maxWidth: "260px"}} className='overflow-text'>{aktoIp}</div>
         //                     </Button>
         //                 </HorizontalStack>
         //                 <HorizontalStack gap={1}>
-        //                     <Text variant="bodyMd" fontWeight="medium" color="subdued">AKTO_TOKEN:</Text>
+        //                     <Text variant="bodyMd" fontWeight="medium" tone="subdued">AKTO_TOKEN:</Text>
         //                     <Button onClick={() => copyText(aktoToken, "AKTO_TOKEN")} plain>
         //                         <div style={{maxWidth: "210px"}} className='overflow-text'>{aktoToken}</div>
         //                     </Button>

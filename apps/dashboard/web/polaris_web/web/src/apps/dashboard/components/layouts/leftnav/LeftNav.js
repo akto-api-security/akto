@@ -11,7 +11,7 @@ import {
 } from "@shopify/polaris-icons";
 import {useLocation, useNavigate} from "react-router-dom"
 
-import './LeftNav.css'
+import "./LeftNav.css"
 import PersistStore from "../../../../main/PersistStore"
 import { useState } from "react"
 import func from "@/util/func"
@@ -49,7 +49,7 @@ export default function LeftNav(){
                 key: '1',
               },
               {
-                label: 'API Security Posture',
+                label:<Text variant="bodyMd" fontWeight="medium">API Security Posture</Text>,
                 icon: SearchResourceIcon,
                 onClick: ()=>{
                   handleSelect("dashboard_home")

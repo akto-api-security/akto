@@ -25,7 +25,7 @@ if (expired) {
   window.mixpanel.track("DASHBOARD_EXPIRED")
 
   root.render(
-    <AppProvider i18n={en}>
+    <AppProvider i18n={en} theme="light">
       <ExpiredApp />
     </AppProvider>
   )
@@ -33,7 +33,7 @@ if (expired) {
 } else {
   root.render(
     <StiggProvider apiKey={window.STIGG_CLIENT_KEY}>
-      <AppProvider i18n={en}>
+      <AppProvider i18n={en} theme="light">
         <App />
       </AppProvider>
     </StiggProvider>

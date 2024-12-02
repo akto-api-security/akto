@@ -10,6 +10,7 @@
     "@fortawesome/react-fontawesome": "^0.2.0",
     "@mui/material": "^5.9.2",
     "@mui/x-date-pickers": "^5.0.0",
+    "@shopify/app-bridge-react": "^4.1.5",
     "@shopify/polaris": "^12.27.0",
     "@stigg/react-sdk": "^4.8.0",
     "@testing-library/jest-dom": "^5.16.5",

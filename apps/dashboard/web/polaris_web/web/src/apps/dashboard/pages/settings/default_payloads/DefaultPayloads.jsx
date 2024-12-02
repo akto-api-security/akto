@@ -1,4 +1,4 @@
-import { Page, LegacyCard, TextField, BlockStack, Button } from '@shopify/polaris'
+import { Page, LegacyCard, TextField, BlockStack, Button, Divider } from '@shopify/polaris'
 import Dropdown from '../../../components/layouts/Dropdown'
 import DropdownSearch from '../../../components/shared/DropdownSearch'
 import PersistStore from '@/apps/main/PersistStore';
@@ -95,6 +95,7 @@ function DefaultPayloads() {
     return (
         <Page title='Default payloads'>
             <LegacyCard>
+                <Divider borderColor="border" />
                 <LegacyCard.Section>
                     <BlockStack gap={"400"}>
                         <DropdownSearch

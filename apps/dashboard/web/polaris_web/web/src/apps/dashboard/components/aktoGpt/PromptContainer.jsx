@@ -23,7 +23,7 @@ function PromptContainer({itemObj, activePrompt, setActivePrompt}) {
                             <Icon source={itemObj.icon} tone="subdued"/>
                         </Box>
                         <Box maxWidth="10vw">
-                            <Text truncate variant="bodyMd" fontWeight="semibold" color="subdued">{(itemObj.label).split("${input}")[0]}</Text>
+                            <Text truncate variant="bodyMd" fontWeight="semibold" tone="subdued">{(itemObj.label).split("${input}")[0]}</Text>
                         </Box>
                     </InlineStack>
                 </Box>

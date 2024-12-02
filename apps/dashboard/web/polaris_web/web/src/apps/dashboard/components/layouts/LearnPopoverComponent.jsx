@@ -37,7 +37,7 @@ function LearnPopoverComponent({learnMoreObj}) {
                     <Text>
                         {learnMoreObj?.title}
                     </Text>
-                    <Text color="subdued">
+                    <Text tone="subdued">
                         {learnMoreObj?.description}
                     </Text>
                 </BlockStack>

@@ -12,11 +12,11 @@ function TestSummaryCard({ summaryItem }) {
                             <Box maxWidth='260px'>
                                 <TooltipText tooltip={summaryItem.testName} text={summaryItem.testName} textProps={{fontWeight: "semibold"}}/>
                             </Box>
-                            <Text variant="headingSm" color='subdued' fontWeight='regular'>{summaryItem.time}</Text>
+                            <Text variant="headingSm" tone='subdued' fontWeight='regular'>{summaryItem.time}</Text>
                         </BlockStack>
                         <InlineStack align='space-between'>
                             <BlockStack gap={200}>
-                                <Text color='subdued' variant="headingSm" fontWeight='semibold'>Issues Found</Text>
+                                <Text tone='subdued' variant="headingSm" fontWeight='semibold'>Issues Found</Text>
                                 <InlineStack gap={200}>
                                     <Badge size="small" tone="critical">{summaryItem.highCount}</Badge>
                                     <Badge size="small" tone="warning">{summaryItem.mediumCount}</Badge>
@@ -24,7 +24,7 @@ function TestSummaryCard({ summaryItem }) {
                                 </InlineStack>
                             </BlockStack>
                             <BlockStack gap={200}>
-                                <Text color='subdued' variant="headingSm" fontWeight='semibold'>APIs Tested</Text>
+                                <Text tone='subdued' variant="headingSm" fontWeight='semibold'>APIs Tested</Text>
                                 <Text variant='headingSm' fontWeight='medium'>{summaryItem.totalApis}</Text>
                             </BlockStack>
                         </InlineStack>

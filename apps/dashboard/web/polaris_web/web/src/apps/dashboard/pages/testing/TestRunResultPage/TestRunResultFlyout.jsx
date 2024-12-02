@@ -180,9 +180,9 @@ function TestRunResultFlyout(props) {
                         </div>
                     </Box>
                     <InlineStack gap={"200"}>
-                        <Text color="subdued" variant="bodySm">{transform.getTestingRunResultUrl(selectedTestRunResult)}</Text>
-                        <Box width="1px" borderColor="border-secondary" borderInlineStartWidth="1" minHeight='16px'/>
-                        <Text color="subdued" variant="bodySm">{selectedTestRunResult?.testCategory}</Text>
+                        <Text tone="subdued" variant="bodySm">{transform.getTestingRunResultUrl(selectedTestRunResult)}</Text>
+                        <Box width="1px" bordertone="border-secondary" borderInlineStartWidth="1" minHeight='16px'/>
+                        <Text tone="subdued" variant="bodySm">{selectedTestRunResult?.testCategory}</Text>
                     </InlineStack>
                 </BlockStack>
                 <InlineStack gap={200} wrap={false}>

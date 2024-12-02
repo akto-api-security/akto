@@ -164,7 +164,7 @@ function About() {
             {objArr.map((item)=>(
                 <Box key={item.title} >
                     <BlockStack gap={100}>
-                        <Text fontWeight='semi-bold' color='subdued'>{item.title}</Text>
+                        <Text fontWeight='semi-bold' tone='subdued'>{item.title}</Text>
                         <Text fontWeight='bold'>{item.text}</Text>
                     </BlockStack>
                 </Box>
@@ -241,7 +241,7 @@ function About() {
     function ToggleComponent({text,onToggle,initial}){
         return (
             <BlockStack gap={100}>
-                <Text color="subdued">{text}</Text>
+                <Text tone="subdued">{text}</Text>
                 <ButtonGroup variant="segmented">
                     <Button size="slim" onClick={() => onToggle(true)} pressed={initial === true}>
                         True
@@ -340,7 +340,7 @@ function About() {
     
     const filterHeaderComponent = (
         <BlockStack gap={500}>
-            <Text color="subdued">Traffic filters</Text>
+            <Text tone="subdued">Traffic filters</Text>
             <Scrollable horizontal={false} style={{maxHeight: '100px'}} shadow>
                 <BlockStack gap={100}>
                     {Object.keys(trafficFiltersMap).map((key)=> {
@@ -382,7 +382,7 @@ function About() {
 
     const replaceCollectionComponent = (
         <BlockStack gap={500}>
-            <Text color="subdued">Replace collection</Text>
+            <Text tone="subdued">Replace collection</Text>
             <Scrollable horizontal={false} style={{maxHeight: '100px'}} shadow>
                 <BlockStack gap={100}>
                     {Object.keys(apiCollectionNameMapper).map((key)=> {
@@ -448,7 +448,7 @@ function About() {
                           <div style={{ flex: "1" }}>
                               <BlockStack gap={500}>
                                   <BlockStack gap={100}>
-                                      <Text color="subdued">Setup type</Text>
+                                      <Text tone="subdued">Setup type</Text>
                                       <Box width='120px'>
                                           <Dropdown
                                               selected={handleSelect}
@@ -462,7 +462,7 @@ function About() {
                                   <ToggleComponent text={"Enable telemetry"} initial={enableTelemetry} onToggle={toggleTelemetry} />
                                   {redundantUrlComp}
                                   <BlockStack gap={100}>
-                                      <Text color="subdued">Traffic alert threshold</Text>
+                                      <Text tone="subdued">Traffic alert threshold</Text>
                                       <Box width='120px'>
                                           <Dropdown
                                               selected={handleSelectTraffic}
@@ -531,7 +531,7 @@ function About() {
                 <LegacyCard.Section>
                     <BlockStack gap={"200"}>
                         <Form onSubmit={() => onFormSubmit(value)}>
-                            <TextField onChange={setValue} value={value} label={<Text color="subdued" fontWeight="medium" variant="bodySm">{labelText}</Text>} {...isError ? {error: "Invalid address"} : {}}/>
+                            <TextField onChange={setValue} value={value} label={<Text tone="subdued" fontWeight="medium" variant="bodySm">{labelText}</Text>} {...isError ? {error: "Invalid address"} : {}}/>
                         </Form>
                         <InlineStack gap={"200"}>
                             {ipsList && ipsList.length > 0 && ipsList.map((ip, index) => {

@@ -215,13 +215,13 @@ export default function Header() {
                 </Button>
                 <BlockStack gap={"0"}>
                     <Text fontWeight="medium">Test run status</Text>
-                    <Text color="subdued" variant="bodySm">{`${currentTestsObj.totalTestsQueued} tests queued`}</Text>
+                    <Text tone="subdued" variant="bodySm">{`${currentTestsObj.totalTestsQueued} tests queued`}</Text>
                 </BlockStack>
             </InlineStack> : null}
             <TopBar.Menu
                activatorContent={
-                   <span id="beamer-btn">
-                       <Icon source={NotificationIcon} />
+                   <span  id="beamer-btn">
+                       <Icon tone="primary" source={NotificationIcon} />
                    </span>
                }
                actions={[]}

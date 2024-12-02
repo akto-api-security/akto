@@ -264,7 +264,7 @@ function DataTypes() {
           <InlineGrid gap={"400"} columns={['twoThirds', 'oneThird']}>
             <BlockStack gap={"200"}>
               <Form onSubmit={() => handleTagsChange(tagValue, 'add')}>
-                  <TextField onChange={setTagValue} value={tagValue} label={<Text color="subdued" fontWeight="medium" variant="bodySm">Datatype Tags</Text>}/>
+                  <TextField onChange={setTagValue} value={tagValue} label={<Text tone="subdued" fontWeight="medium" variant="bodySm">Datatype Tags</Text>}/>
               </Form>
               <InlineStack gap={"200"}>
                 {currState.categoriesList && currState.categoriesList.length > 0 && currState.categoriesList.map((tag, index) => {

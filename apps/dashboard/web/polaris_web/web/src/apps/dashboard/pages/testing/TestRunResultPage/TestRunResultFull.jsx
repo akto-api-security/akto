@@ -64,7 +64,7 @@ function TestRunResultFull(props) {
       const iconSource = testLogsCollapsibleOpen ? ChevronUpIcon : ChevronDownIcon
       const testLogsComponent = (
         <LegacyCard key="testLogsComponent">
-          <LegacyCard.Section title={<Text fontWeight="regular" variant="bodySm" color="subdued"></Text>}>
+          <LegacyCard.Section title={<Text fontWeight="regular" variant="bodySm" tone="subdued"></Text>}>
             <InlineStack align="space-between">
               <Text fontWeight="semibold" variant="bodyMd">Test Logs</Text>
               <Button

@@ -45,7 +45,7 @@ function prepareTableData (data, handleBadgeClick) {
                         </Button> : null)
 
             }
-        </InlineStack>), <Text variant="bodySm" fontWeight="regular" color="subdued">{func.prepareValuesTooltip(element)}</Text>
+        </InlineStack>), <Text variant="bodySm" fontWeight="regular" tone="subdued">{func.prepareValuesTooltip(element)}</Text>
         ]
         if(element.isHeader){
             if(isSensitive){

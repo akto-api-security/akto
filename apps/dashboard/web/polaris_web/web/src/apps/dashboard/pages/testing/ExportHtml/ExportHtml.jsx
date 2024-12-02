@@ -190,7 +190,7 @@ function ExportHtml() {
                                 <div style={{ background: "#666666", borderRight: '2px solid white', borderBottom: '2px solid white' }}>
                                     <InlineStack align="center">
                                         <Box padding="100">
-                                            <Text variant="bodyLg" fontWeight="medium" color="text-inverse">
+                                            <Text variant="bodyLg" fontWeight="medium" tone="text-inverse">
                                                 Severity
                                             </Text>
                                         </Box>
@@ -199,7 +199,7 @@ function ExportHtml() {
                                 <div style={{ background: "#666666", borderBottom: '2px solid white' }}>
                                     <InlineStack align="center">
                                         <Box padding="100">
-                                            <Text variant="bodyLg" fontWeight="medium" color="text-inverse">
+                                            <Text variant="bodyLg" fontWeight="medium" tone="text-inverse">
                                                 Vulnerable APIs
                                             </Text>
                                         </Box>

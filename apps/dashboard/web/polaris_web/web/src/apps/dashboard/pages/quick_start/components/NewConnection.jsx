@@ -86,7 +86,7 @@ function NewConnection() {
                     </Button>
                     </div>
                 </div>
-                <Text variant='bodySm' color="subdued">{text}</Text>
+                <Text variant='bodySm' tone="subdued">{text}</Text>
             </ResourceItem>
         );
     }
@@ -139,7 +139,7 @@ function NewConnection() {
                     <BlockStack gap="500">
                         <p>Use this personalized guide to get your traffic and start testing.</p>
                         <InlineStack gap="300">
-                            <Text variant='bodyMd' color='subdued' fontWeight="medium">{tasksCompleted} of {totalTasks} tasks completed</Text>
+                            <Text variant='bodyMd' tone='subdued' fontWeight="medium">{tasksCompleted} of {totalTasks} tasks completed</Text>
                             <Box width='36vw'>
                                 <ProgressBar tone='success' progress={calculateWidth()} size='small'/>
                             </Box>

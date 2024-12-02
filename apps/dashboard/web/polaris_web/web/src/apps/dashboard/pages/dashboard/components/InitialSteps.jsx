@@ -84,7 +84,7 @@ function InitialSteps({initialSteps}) {
                     />
                     <Box width="85%">
                         <InlineStack align="space-between">
-                            <Text variant="bodyMd" color={isCompleted(step.id) ? 'subdued' : ''} fontWeight={isCompleted(step.id) ? "" : 'medium'}>
+                            <Text variant="bodyMd" tone={isCompleted(step.id) ? 'subdued' : ''} fontWeight={isCompleted(step.id) ? "" : 'medium'}>
                                 {step.title}
                             </Text>
                             <Button
@@ -122,7 +122,7 @@ function InitialSteps({initialSteps}) {
                             <Box width='85%'>
                                 <ProgressBar size="small" progress={((stepsCompleted * 100) / 5)} tone="primary" />
                             </Box>
-                            <Text color="subdued" variant="bodyMd">{((stepsCompleted * 100) / 5)}%</Text>
+                            <Text tone="subdued" variant="bodyMd">{((stepsCompleted * 100) / 5)}%</Text>
                         </InlineStack>
                     </BlockStack>
                 </Box>

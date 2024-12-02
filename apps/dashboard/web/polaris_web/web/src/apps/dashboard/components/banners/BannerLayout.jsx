@@ -13,10 +13,10 @@ function BannerLayout({title, text, buttonText, buttonUrl, bodyComponent, videoT
                     <Box width="400px">
                         <BlockStack gap={400}>
                             <Text variant="headingLg">{title}</Text>
-                            <Text color="subdued" variant="bodyMd">{text}</Text>
+                            <Text tone="subdued" variant="bodyMd">{text}</Text>
                             {bodyComponent}
                             {buttonText ? <Box paddingBlockStart={200}>
-                                <Button {...properties} onClick={() => {handleRedirect(); onClick()}}>{buttonText}</Button>
+                                <Button {...properties} onClick={() => {handleRedirect(); onClick()}} variant="primary">{buttonText}</Button>
                             </Box> : null}
                         </BlockStack>
                     </Box>

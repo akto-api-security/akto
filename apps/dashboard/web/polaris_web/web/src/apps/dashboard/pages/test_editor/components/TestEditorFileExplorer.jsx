@@ -138,7 +138,7 @@ const TestEditorFileExplorer = ({addCustomTest}) => {
                             <div className={item.label === selectedTest.label ? "active-left-test" : ""}>
                                 <Text 
                                     variant={item.label === selectedTest.label ? "headingSm" : "bodyMd"} as="h4" 
-                                    color={item.label === selectedTest.label ? "default" : "subdued"} truncate
+                                    tone={item.label === selectedTest.label ? "default" : "subdued"} truncate
                                 >
                                     {item.label} 
                                 </Text>

@@ -41,7 +41,7 @@ function SelectCollectionComponent() {
                     />
                 </Box>
             </Popover.Pane>
-        </Popover>: <Text color="subdued" variant="bodyMd" fontWeight="medium">No endpoints exist, go to inventory page to upload traffic.</Text>
+        </Popover>: <Text tone="subdued" variant="bodyMd" fontWeight="medium">No endpoints exist, go to inventory page to upload traffic.</Text>
     )
 }
 

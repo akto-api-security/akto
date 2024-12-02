@@ -89,7 +89,7 @@ function SignUp() {
                 <SSOTextfield onClickFunc={sso.onClickFunc} logos={[sso.logo]} text={sso.text} />
                 <InlineStack gap={300}>
                   <div style={{ flexGrow: 1, borderBottom: '1px solid #c9cccf' }}></div>
-                  <Text variant="bodySm" color="subdued">or</Text>
+                  <Text variant="bodySm" tone="subdued">or</Text>
                   <div style={{ flexGrow: 1, borderBottom: '1px solid #c9cccf' }}></div>
                 </InlineStack>
               </BlockStack>
@@ -196,7 +196,7 @@ function SignUp() {
               onChange={(email) => setEmail(email)}
               autoComplete="off"
           />
-          <Text variant="bodyMd" color="subdued">We'll use this email to send a password reset link.</Text>
+          <Text variant="bodyMd" tone="subdued">We'll use this email to send a password reset link.</Text>
       </Modal.Section>
     </Modal>
   )

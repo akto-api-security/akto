@@ -9,7 +9,7 @@ function BannerRow(props) {
 
     const titleComp = (
         <InlineStack gap={100}>
-            <Text fontWeight="semibold" color="subdued">{title}</Text>
+            <Text fontWeight="semibold" tone="subdued">{title}</Text>
             {showRedirect ? <Box><Icon source={ChevronRightIcon} tone="subdued"/></Box> : null}
         </InlineStack>
     )
@@ -26,7 +26,7 @@ function BannerRow(props) {
                 : <Box>
                     {titleComp}
                 </Box>}
-                <Text color="subdued">
+                <Text tone="subdued">
                     {description}
                 </Text>
             </BlockStack>

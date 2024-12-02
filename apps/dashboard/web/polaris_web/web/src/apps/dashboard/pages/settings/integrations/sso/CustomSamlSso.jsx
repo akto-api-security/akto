@@ -66,7 +66,7 @@ function CustomSamlSso({ssoType,entityTitle, entityId, loginURL,pageTitle, signi
                                         <Button onClick={() => setFiles(null)}  icon={XIcon} variant="plain" />
                                     </InlineStack>
                                 </Tag>
-                            : <Text variant="bodyLg" fontWeight="medium" color="subdued">{"Drop your " + certificateName + " file here."}</Text>}
+                            : <Text variant="bodyLg" fontWeight="medium" tone="subdued">{"Drop your " + certificateName + " file here."}</Text>}
                             <FileUpload fileType="file" acceptString=".xml" setSelectedFile={setFilesCheck} allowMultiple={false} />
                         </InlineStack>
                         <InlineStack align="end">

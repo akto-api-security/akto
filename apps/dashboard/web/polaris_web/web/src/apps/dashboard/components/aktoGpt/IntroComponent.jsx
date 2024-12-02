@@ -11,7 +11,7 @@ function IntroComponent() {
                     <Text variant='headingXl' as='h3'>AktoGPT</Text>
                 </div>
                 <Box padding="200">
-                    <Text variant="headingMd" as="h5" color="subdued">{introText}</Text>
+                    <Text variant="headingMd" as="h5" tone="subdued">{introText}</Text>
                 </Box>
             </BlockStack>
         </Box>

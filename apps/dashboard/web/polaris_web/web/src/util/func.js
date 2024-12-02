@@ -1301,11 +1301,11 @@ mapCollectionIdToHostName(apiCollections){
   getColorForCharts(key){
     switch(key){
       case "HIGH":
-        return themes.color["color-icon-critical"]
+        return themes.light.color["color-icon-critical"]
       case "MEDIUM":
-        return themes.color["color-icon-warning"]
+        return themes.light.color["color-icon-warning"]
       case "LOW":
-        return themes.color["color-icon-info"]
+        return themes.light.color["color-icon-info"]
       case "BOLA":
         return "#800000"
       case "NO_AUTH":

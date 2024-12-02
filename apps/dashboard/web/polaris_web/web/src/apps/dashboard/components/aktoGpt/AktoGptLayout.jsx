@@ -136,7 +136,7 @@ function AktoGptLayout({prompts,closeModal, runCustomTests}) {
                         <Box padding="500" maxWidth="65vw">
                             <InlineStack gap="600">
                                 <Avatar name={username} initials={func.initials(username)} size="md"/>
-                                <Text variant="bodyMd" fontWeight="semibold" color="subdued">{activePrompt.split("${input}")[0] + inputPrompt}</Text>
+                                <Text variant="bodyMd" fontWeight="semibold" tone="subdued">{activePrompt.split("${input}")[0] + inputPrompt}</Text>
                             </InlineStack>
                         </Box>
                         <Scrollable shadow style={{height: '35vh'}} focusable>
@@ -180,7 +180,7 @@ function AktoGptLayout({prompts,closeModal, runCustomTests}) {
                 </div>
                 <div className='input-gpt'>
                     <TextField 
-                        prefix={<Text color="subdued">{activePrompt.split("${input}")[0]}</Text>} 
+                        prefix={<Text tone="subdued">{activePrompt.split("${input}")[0]}</Text>} 
                         suffix={
                             <div {...checkQuery() ? null : {style: {background: "#19C37D", padding: "4px", borderRadius: "4px"}}}>
                                 <Button

@@ -51,7 +51,7 @@ export default function ApiDependencyEdge({ id,
                             <Card padding={300}>
                                 <BlockStack gap={100}>
                                     <Box width='150px'>
-                                        <Text color='subdued' variant='bodySm'>
+                                        <Text tone='subdued' variant='bodySm'>
                                             Dependencies
                                         </Text>
                                     </Box>

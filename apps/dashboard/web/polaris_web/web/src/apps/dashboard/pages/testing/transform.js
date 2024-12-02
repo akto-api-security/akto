@@ -427,7 +427,7 @@ const transform = {
           return;
         }
           sectionLocal.content = (
-            <Text color='subdued'>
+            <Text tone='subdued'>
               {transform.replaceTags(category?.issueDetails, category?.vulnerableTestingRunResults) || "No impact found"}
             </Text>
           )
@@ -769,7 +769,7 @@ getUrlComp(url){
     <InlineStack gap={100}>
       <Box width="54px">
         <InlineStack align="end">
-          <Text variant="bodyMd" fontWeight="medium" color="subdued">{method}</Text>
+          <Text variant="bodyMd" fontWeight="medium" tone="subdued">{method}</Text>
         </InlineStack>
       </Box>
       <div style={{fontSize: '14px', lineHeight: '20px', color: '#202223'}} data-testid="affected_endpoints">{endpoint}</div>
@@ -942,7 +942,7 @@ getRowInfo(severity, apiInfo,jiraIssueUrl, sensitiveData, isIgnored){
       title: "API",
       value: (
         <InlineStack gap={"100"}>
-          <Text color="subdued" fontWeight="semibold">{apiInfo.id.method}</Text>
+          <Text tone="subdued" fontWeight="semibold">{apiInfo.id.method}</Text>
           <TextComp value={observeFunc.getTruncatedUrl(apiInfo.id.url)} />
         </InlineStack>
       ),

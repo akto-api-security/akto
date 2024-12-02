@@ -272,7 +272,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                         style={{ display: "grid", gridTemplateColumns: "auto max-content", alignItems: "center" }}
                         onClick={() => { setTestRun(prev => ({ ...prev, selectedCategory: category.name })); resetSearchFunc(); setOptionsSelected(initialArr)}}>
                         <div>
-                            <Text variant="headingMd" fontWeight="bold" color={category.name === testRun.selectedCategory ? "success" : ""}>{category.displayName}</Text>
+                            <Text variant="headingMd" fontWeight="bold" tone={category.name === testRun.selectedCategory ? "success" : ""}>{category.displayName}</Text>
                             <Text>{selected} out of {total} selected</Text>
                         </div>
                         {selected > 0 && <Icon source={CheckIcon} tone="base" />}

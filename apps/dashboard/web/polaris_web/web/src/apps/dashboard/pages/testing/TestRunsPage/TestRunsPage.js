@@ -280,7 +280,7 @@ const SummaryCardComponent = () =>{
   let totalVulnerabilities = severityCountMap?.HIGH?.text + severityCountMap?.MEDIUM?.text +  severityCountMap?.LOW?.text 
   return (
     <LegacyCard>
-      <LegacyCard.Section title={<Text fontWeight="regular" variant="bodySm" color="subdued">Vulnerabilities</Text>}>
+      <LegacyCard.Section title={<Text fontWeight="regular" variant="bodySm" tone="subdued">Vulnerabilities</Text>}>
         <InlineStack align="space-between">
           <Text fontWeight="semibold" variant="bodyMd">Found {totalVulnerabilities} vulnerabilities in total</Text>
           <Button

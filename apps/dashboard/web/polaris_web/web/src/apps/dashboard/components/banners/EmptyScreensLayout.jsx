@@ -24,7 +24,7 @@ function EmptyScreensLayout({iconSrc,headingText,description, buttonText, redire
                                   <InlineStack align='center'>
                                       <Text variant="headingLg" alignment={"center"}>{headingText}</Text>
                                   </InlineStack>
-                                  <Text color="subdued" variant="bodyMd" alignment="center">{description}</Text>
+                                  <Text tone="subdued" variant="bodyMd" alignment="center">{description}</Text>
                                   <InlineStack align='center'>
                                       {redirectUrl ? <Box paddingBlockStart={200}>
                                           <Button  onClick={() => navigate(redirectUrl)} variant="primary">{buttonText}</Button>

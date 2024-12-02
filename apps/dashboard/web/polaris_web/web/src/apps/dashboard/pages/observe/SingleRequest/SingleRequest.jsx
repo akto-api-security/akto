@@ -83,7 +83,7 @@ function SingleRequest(){
                                     <div style={{ maxWidth: "0.875rem", maxHeight: "0.875rem" }}>
                                       <Icon source={header.icon} tone="subdued" />
                                     </div>
-                                    <Text as="div" variant="bodySm" color="subdued" fontWeight='regular'>
+                                    <Text as="div" variant="bodySm" tone="subdued" fontWeight='regular'>
                                       {endpointData[header.value]}
                                     </Text>
                                 </InlineStack>

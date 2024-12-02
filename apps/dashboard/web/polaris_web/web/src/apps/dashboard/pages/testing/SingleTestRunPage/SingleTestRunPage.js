@@ -482,7 +482,7 @@ const runningTestsComp = useMemo(() => (
               <Text variant="headingSm">{`Running ${currentTestObj.testsInitiated} tests`}</Text>
               <div style={{ display: "flex", gap: '4px', alignItems: 'center' }}>
                   <ProgressBar progress={progress} tone="primary" size="small" />
-                  <Text color="subdued">{`${progress}%`}</Text>
+                  <Text tone="subdued">{`${progress}%`}</Text>
               </div>
             </BlockStack>
         </Card>
@@ -554,20 +554,20 @@ const runningTestsComp = useMemo(() => (
         <InlineStack gap={"200"}>
           <InlineStack gap={"100"}>
             <Box><Icon tone="subdued" source={PersonIcon}/></Box>
-            <Text color="subdued" fontWeight="medium" variant="bodyMd">created by:</Text>
-            <Text color="subdued" variant="bodyMd">{selectedTestRun.userEmail}</Text>
+            <Text tone="subdued" fontWeight="medium" variant="bodyMd">created by:</Text>
+            <Text tone="subdued" variant="bodyMd">{selectedTestRun.userEmail}</Text>
           </InlineStack>
           <Box width="1px" borderColor="border-secondary" borderInlineStartWidth="1" minHeight='16px'/>
           <Link monochrome target="_blank" url={"/dashboard/observe/inventory/" + selectedTestRun?.apiCollectionId} removeUnderline>
             <InlineStack gap={"100"}>
               <Box><Icon tone="subdued" source={ArchiveIcon}/></Box>
-              <Text color="subdued" variant="bodyMd">{collectionsMap[selectedTestRun?.apiCollectionId]}</Text>
+              <Text tone="subdued" variant="bodyMd">{collectionsMap[selectedTestRun?.apiCollectionId]}</Text>
             </InlineStack>
           </Link>
           <Box width="1px" borderColor="border-secondary" borderInlineStartWidth="1" minHeight='16px'/>
           <InlineStack gap={"100"}>
             <Box><Icon tone="subdued" source={SearchListIcon}/></Box>
-            <Text color="subdued" variant="bodyMd">{getHeadingStatus(selectedTestRun)}</Text>
+            <Text tone="subdued" variant="bodyMd">{getHeadingStatus(selectedTestRun)}</Text>
           </InlineStack>
         </InlineStack>
       </BlockStack>

@@ -262,7 +262,7 @@ const Users = () => {
                                     }
                                 ] : [
                                     {
-                                        content: <Text color="subdued">{func.toSentenceCase(getRoleDisplayName(role))}</Text>,
+                                        content: <Text tone="subdued">{func.toSentenceCase(getRoleDisplayName(role))}</Text>,
                                         url: '#',
                                     }
                                 ]

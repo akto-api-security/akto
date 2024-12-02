@@ -24,7 +24,7 @@ function SummaryCard({ summaryItems }) {
                                         <BlockStack gap={400}>
                                             {item?.isComp ? item.data : 
                                             <div className='custom-color'>
-                                                <Text variant={item.variant ? item.variant : 'bodyLg'} color={item.color ? item.color : ""}>
+                                                <Text variant={item.variant ? item.variant : 'bodyLg'} tone={item.color ? item.color : ""}>
                                                     {item.data}
                                                 </Text>
                                             </div>

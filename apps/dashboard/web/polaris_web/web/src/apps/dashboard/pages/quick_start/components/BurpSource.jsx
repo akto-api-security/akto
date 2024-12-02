@@ -81,13 +81,13 @@ function BurpSource() {
                     <BlockStack gap={100}>
                         <div ref={ref}/>
                         <InlineStack gap={100}>
-                            <Text variant="bodyMd" fontWeight="medium" color="subdued">AKTO_IP:</Text>
+                            <Text variant="bodyMd" fontWeight="medium" tone="subdued">AKTO_IP:</Text>
                             <Button onClick={() => copyText(aktoIp, "AKTO_IP")}  variant="plain">
                                 <div style={{maxWidth: "260px"}} className='overflow-text'>{aktoIp}</div>
                             </Button>
                         </InlineStack>
                         <InlineStack gap={100}>
-                            <Text variant="bodyMd" fontWeight="medium" color="subdued">AKTO_TOKEN:</Text>
+                            <Text variant="bodyMd" fontWeight="medium" tone="subdued">AKTO_TOKEN:</Text>
                             <Button onClick={() => copyText(aktoToken, "AKTO_TOKEN")}  variant="plain">
                                 <div style={{maxWidth: "210px"}} className='overflow-text'>{aktoToken}</div>
                             </Button>

@@ -249,13 +249,13 @@ function HomeDashboard() {
             (<InlineStack wrap={false}>
                 <Icon source={source} tone={color} />
                 <div className='custom-color'>
-                    <Text color={color}>{Math.abs(val)}</Text>
+                    <Text tone={color}>{Math.abs(val)}</Text>
                 </div>
             </InlineStack>)
         );
     }
 
-    const runTestEmptyCardComponent = <Text alignment='center' color='subdued'>There’s no data to show. <Link url="/dashboard/testing" target='_blank'>Run test</Link> to get data populated. </Text>
+    const runTestEmptyCardComponent = <Text alignment='center' tone='subdued'>There’s no data to show. <Link url="/dashboard/testing" target='_blank'>Run test</Link> to get data populated. </Text>
 
     function mapAccessTypes(apiStats) {
         if (!apiStats) return
@@ -486,7 +486,7 @@ function HomeDashboard() {
                     <Box maxWidth='287px'>
                         <TooltipText tooltip={collection.name} text={collection.name}/>
                     </Box>
-                    <Text variant='bodySm' color='subdued'>{(collection.totalApis === 0 ? 0 : Math.floor(100.0 * collection.apisTested / collection.totalApis))}% test coverage</Text>
+                    <Text variant='bodySm' tone='subdued'>{(collection.totalApis === 0 ? 0 : Math.floor(100.0 * collection.apisTested / collection.totalApis))}% test coverage</Text>
                 </InlineStack>
                 <Text>{collection.totalApis}</Text>
             </InlineStack>
@@ -517,7 +517,7 @@ function HomeDashboard() {
         titleToolTip="Breakdown of vulnerable APIs categorized by severity level (Critical, High, Medium, Low). Click to see details for each category."
         linkText="Fix critical issues"
         linkUrl="/dashboard/issues"
-    /> : <EmptyCard title="Vulnerable APIs by Severity" subTitleComponent={showTestingComponents ? <Text alignment='center' color='subdued'>No vulnerable APIs found</Text>: runTestEmptyCardComponent}/>
+    /> : <EmptyCard title="Vulnerable APIs by Severity" subTitleComponent={showTestingComponents ? <Text alignment='center' tone='subdued'>No vulnerable APIs found</Text>: runTestEmptyCardComponent}/>
 
     const criticalUnsecuredAPIsOverTime = <CriticalUnsecuredAPIsOverTimeGraph linkText={"Fix critical issues"} linkUrl={"/dashboard/issues"} />
 

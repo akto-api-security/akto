@@ -56,7 +56,7 @@ function Auth0Redirects({bodyText, errorText}) {
                                 </InlineStack>
                                 <BlockStack gap={"200"}>
                                     <Text alignment="center" variant="headingLg">{errorText}</Text>
-                                    <Text alignment="center" variant="bodyMd" color="subdued">{bodyText}</Text>
+                                    <Text alignment="center" variant="bodyMd" tone="subdued">{bodyText}</Text>
                                 </BlockStack>
                             </BlockStack>
                             <Button fullWidth onClick={handleLogout}>
