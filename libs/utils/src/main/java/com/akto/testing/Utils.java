@@ -15,6 +15,7 @@ import com.akto.dto.type.RequestTemplate;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.JSONUtils;
+import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 
 import okhttp3.MediaType;
