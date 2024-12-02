@@ -272,7 +272,7 @@ public class ApiExecutor {
         addHeaders(request, builder);
         builder = builder.url(request.getFullUrlWithParams());
         boolean executeScript = testingRunConfig != null;
-        calculateHashAndAddAuth(request, executeScript);
+        //calculateHashAndAddAuth(request, executeScript);
         Request okHttpRequest = builder.build();
         return okHttpRequest;
     }
@@ -314,7 +314,7 @@ public class ApiExecutor {
         builder = builder.url(request.getFullUrlWithParams());
 
         boolean executeScript = testingRunConfig != null;
-        calculateHashAndAddAuth(request, executeScript);
+        //calculateHashAndAddAuth(request, executeScript);
 
         if(testingRunConfig != null && testingRunConfig.getConfigsAdvancedSettings() != null && !testingRunConfig.getConfigsAdvancedSettings().isEmpty()){
             calculateFinalRequestFromAdvancedSettings(request, testingRunConfig.getConfigsAdvancedSettings());
