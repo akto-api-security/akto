@@ -302,6 +302,16 @@ public class ApiCollectionsAction extends UserAction {
             apiCollectionIds.add(apiCollection.getId());
         }
 
+        boolean hasApiGroups = false;
+
+        List<ApiCollection> apiGroupsList = ApiCollectionsDao.instance.fetchApiGroups();
+        for(ApiCollection apiGroup : apiGroupsList) {
+            if(apiCollectionIds.contains(apiGroup.getId())) {
+                hasApiGroups = true;
+                apiCollectionIds.remove(Integer.valueOf(apiGroup.getId()));
+            }
+        }
+
         ApiCollectionsDao.instance.deleteAll(Filters.in("_id", apiCollectionIds));
 
         Bson filter = Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionIds);
@@ -341,6 +351,11 @@ public class ApiCollectionsAction extends UserAction {
                 }
             }
             ApiCollectionUsers.updateApiCollection(collection.getConditions(), collection.getId());
+        }
+
+        if(hasApiGroups) {
+            addActionError("API groups cannot be deleted!");
+            return ERROR.toUpperCase();
         }
 
         return SUCCESS.toUpperCase();

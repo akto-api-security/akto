@@ -15,7 +15,7 @@ import PersistStore from "../../../../main/PersistStore";
 import collectionsApi from "./api"
 
 function APIQuery() {
-    const [conditions, dispatchConditions] = useReducer(produce((draft, action) => conditionsReducer(draft, action)), []);
+    const [conditions, dispatchConditions] = useReducer(produce((draft, action) => func.conditionsReducer(draft, action)), []);
     const [endpointListFromConditions, setEndpointListFromConditions] = useState({})
     const [sensitiveParams, setSensitiveParams] = useState({})
     const [open, setOpen] = useState(true);
@@ -33,18 +33,6 @@ function APIQuery() {
     }
 
     const emptyCondition = getEmptyCondition('CUSTOM')
-
-    function conditionsReducer(draft, action) {
-        switch (action.type) {
-            case "add": draft.push(action.obj); break;
-            case "overwrite": draft[action.index][action.key] = {};
-            case "update": draft[action.index][action.key] = { ...draft[action.index][action.key], ...action.obj }; break;
-            case "updateKey": draft[action.index] = { ...draft[action.index], [action.key]: action.obj }; break;
-            case "delete": return draft.filter((item, index) => index !== action.index);
-            case "clear": return [];
-            default: break;
-        }
-    }
 
     const handleAddField = useCallback(() => {
         dispatchConditions({ type: "add", obj: emptyCondition });

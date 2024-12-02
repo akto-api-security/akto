@@ -1,6 +1,6 @@
 import { Box, Button, DataTable, Divider, Modal, Text, TextField, Icon, Checkbox, Badge, Banner,HorizontalGrid, HorizontalStack, Link, VerticalStack, Tooltip, Popover, ActionMenu, OptionList } from "@shopify/polaris";
 import { TickMinor, CancelMajor, SearchMinor } from "@shopify/polaris-icons"
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useReducer, useRef, useState } from "react";
 import { default as observeApi } from "../api";
 import { default as testingApi } from "../../testing/api";
 import SpinnerCentered from "../../../components/progress/SpinnerCentered"
@@ -10,6 +10,10 @@ import { useNavigate } from "react-router-dom"
 import PersistStore from "../../../../main/PersistStore";
 import transform from "../../testing/transform";
 import LocalStore from "../../../../main/LocalStorageStore";
+import AdvancedSettingsComponent from "./component/AdvancedSettingsComponent";
+
+import {produce} from "immer"
+
 
 function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOutside, closeRunTest, selectedResourcesForPrimaryAction, useLocalSubCategoryData }) {
 
@@ -63,6 +67,9 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
 
     const [optionsSelected, setOptionsSelected] = useState(initialArr)
     const [slackIntegrated, setSlackIntegrated] = useState(false)
+
+    const emptyCondition = {data: {key: '', value: ''}, operator: {'type': 'ADD_HEADER'}}
+    const [conditions, dispatchConditions] = useReducer(produce((draft, action) => func.conditionsReducer(draft, action)), [emptyCondition]);
 
     const localCategoryMap = LocalStore.getState().categoryMap
     const localSubCategoryMap = LocalStore.getState().subCategoryMap
@@ -440,11 +447,16 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                 }
             })
         }
+        let finalAdvancedConditions = []
+
+        if(conditions.length > 0 && conditions[0]?.data?.key?.length > 0){
+            finalAdvancedConditions = transform.prepareConditionsForTesting(conditions)
+        }
 
         if (filtered || selectedResourcesForPrimaryAction.length > 0) {
-            await observeApi.scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, "TESTING_UI", testRoleId, continuousTesting, sendSlackAlert)
+            await observeApi.scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, "TESTING_UI", testRoleId, continuousTesting, sendSlackAlert, finalAdvancedConditions)
         } else {
-            await observeApi.scheduleTestForCollection(collectionId, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert)
+            await observeApi.scheduleTestForCollection(collectionId, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, finalAdvancedConditions)
         }
 
         setActive(false)
@@ -524,6 +536,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
             >
                 {loading ? <SpinnerCentered /> :
                     <Modal.Section>
+                        <VerticalStack gap={"3"}>
                         {!testRun.authMechanismPresent &&
                             <div>
                                 <Banner
@@ -563,8 +576,6 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
 
                             <Button icon={CancelMajor} destructive onClick={handleRemoveAll} disabled={checkRemoveAll()}><div data-testid="remove_all_tests">Remove All</div></Button>
                         </div>
-
-                        <br />
                         <div style={{ display: "grid", gridTemplateColumns: "50% 50%", border: "1px solid #C9CCCF" }}>
                             <div style={{ borderRight: "1px solid #C9CCCF" }}>
                                 <div style={{ padding: "15px", alignItems: "center" }}>
@@ -628,8 +639,6 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                                 </div>
                             </div>
                         </div>
-
-                        <br />
 
                         <VerticalStack gap={"4"}>
                             <HorizontalGrid gap={"4"} columns={"3"}>
@@ -760,6 +769,8 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
 
 
                         </VerticalStack>
+                        </VerticalStack>
+                        <AdvancedSettingsComponent dispatchConditions={dispatchConditions} conditions={conditions}/>
 
                     </Modal.Section>
                 }

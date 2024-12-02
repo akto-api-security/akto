@@ -1099,7 +1099,24 @@ getMissingConfigs(testResults){
   })
 
   return [...configsSet]
-}
+},
+  prepareConditionsForTesting(conditions){
+    let tempObj = {};
+    conditions.forEach((condition) => {
+      if(tempObj.hasOwnProperty(condition?.operator?.type)){
+        tempObj[condition?.operator?.type].push(condition.data)
+      }else{
+        tempObj[condition?.operator?.type] = [condition.data]
+      }
+    })
+
+    return Object.keys(tempObj).map((key) => {
+      return {
+        operatorType: key,
+        operationsGroupList: tempObj[key],
+      };
+    });
+  }
 }
 
 export default transform
