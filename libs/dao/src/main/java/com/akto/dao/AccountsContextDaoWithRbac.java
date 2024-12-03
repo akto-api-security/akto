@@ -40,9 +40,8 @@ public abstract class AccountsContextDaoWithRbac<T> extends MCollection<T>{
     abstract public String getFilterKeyString();
 
     protected Bson addRbacFilter(Bson originalQuery) {
-        Bson rbacFilter = Filters.empty();
         try {
-            if (Context.userId.get() != null) {
+            if (Context.userId.get() != null && Context.accountId.get() != null) {
                 List<Integer> apiCollectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(),
                         Context.accountId.get());
                 if (apiCollectionIds != null) {
@@ -51,7 +50,7 @@ public abstract class AccountsContextDaoWithRbac<T> extends MCollection<T>{
                             Filters.in(getFilterKeyString(), apiCollectionIds)));
                     filters.add(Filters.and(Filters.exists(SingleTypeInfo._COLLECTION_IDS),
                             Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionIds)));
-                    rbacFilter = Filters.or(filters);
+                    Bson rbacFilter = Filters.or(filters);
                     return Filters.and(originalQuery, rbacFilter);
                 }
             }
