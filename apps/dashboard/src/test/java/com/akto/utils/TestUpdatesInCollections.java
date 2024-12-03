@@ -94,6 +94,7 @@ public class TestUpdatesInCollections extends MongoBasedTest {
         AktoDataTypeDao.instance.getMCollection().drop();
         CustomDataTypeDao.instance.getMCollection().drop();
         SampleDataDao.instance.getMCollection().drop();
+        Context.userId.set(null);
 
         InitializerListener.addAktoDataTypes(new BackwardCompatibility());
         SingleTypeInfo.fetchCustomDataTypes(MongoBasedTest.ACCOUNT_ID);
@@ -155,6 +156,7 @@ public class TestUpdatesInCollections extends MongoBasedTest {
         CustomDataTypeDao.instance.getMCollection().drop();
         SampleDataDao.instance.getMCollection().drop();
         TestingRunIssuesDao.instance.getMCollection().drop();
+        Context.userId.set(null);
 
         InitializerListener.addAktoDataTypes(new BackwardCompatibility());
         SingleTypeInfo.fetchCustomDataTypes(MongoBasedTest.ACCOUNT_ID);
