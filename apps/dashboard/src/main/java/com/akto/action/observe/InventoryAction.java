@@ -381,7 +381,7 @@ public class InventoryAction extends UserAction {
         response.put("apiInfoList", apiInfos);
         if(apiCollectionId != -1){
             ApiCollection apiCollection = ApiCollectionsDao.instance.findOne(Filters.eq(Constants.ID, apiCollectionId));
-            response.put("redacted", apiCollection.getRedact());
+             response.put("redacted", apiCollection.getRedact());
         }
         return Action.SUCCESS.toUpperCase();
     }

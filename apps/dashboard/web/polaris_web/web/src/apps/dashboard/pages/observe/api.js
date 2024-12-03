@@ -204,6 +204,13 @@ export default {
             data: formData,
         })
     },
+    uploadOpenApiFile(formData) {
+        return request({
+            url: '/api/importDataFromOpenApiSpec',
+            method: 'post',
+            data: formData,
+        })
+    },
     uploadTcpFile(content, apiCollectionId, skipKafka) {
         return request({
             url: '/api/uploadTcp',
