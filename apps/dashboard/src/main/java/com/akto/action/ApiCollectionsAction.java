@@ -359,6 +359,13 @@ public class ApiCollectionsAction extends UserAction {
             ApiCollectionUsers.updateApiCollection(collection.getConditions(), collection.getId());
         }
 
+        try {
+            int userId = Context.userId.get();
+            int accountId = Context.accountId.get();
+            UsersCollectionsList.deleteCollectionIdsFromCache(userId, accountId);
+        } catch (Exception e) {
+        }
+
         if(hasApiGroups) {
             addActionError("API groups cannot be deleted!");
             return ERROR.toUpperCase();
