@@ -10,11 +10,6 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import javax.script.ScriptEngine;
-import javax.script.ScriptEngineManager;
-import javax.script.ScriptException;
-
-import com.akto.dto.ApiInfo;
 import com.akto.dto.testing.*;
 import com.akto.test_editor.execution.Memory;
 import org.apache.commons.lang3.StringUtils;
@@ -501,31 +496,7 @@ public class Utils {
 
 
     public static String executeCode(String ogPayload, Map<String, Object> valuesMap) throws Exception {
-        ScriptEngineManager factory = new ScriptEngineManager();
-        String variablesReplacedPayload = replaceVariables(ogPayload,valuesMap, true);
-
-        String regex = "\\#\\[(.*?)]#";
-        Pattern p = Pattern.compile(regex);
-        Matcher matcher = p.matcher(variablesReplacedPayload);
-        StringBuffer sb = new StringBuffer();
-
-        // create a Nashorn script engine
-        ScriptEngine engine = factory.getEngineByName("nashorn");
-
-        while (matcher.find()) {
-            String code = matcher.group(1);
-            code = code.trim();
-            if (!code.endsWith(";")) code = code+";";
-            try {
-                Object val = engine.eval(code);
-                matcher.appendReplacement(sb, val.toString());
-            } catch (final ScriptException se) {
-            }
-
-        }
-
-        matcher.appendTail(sb); 
-        return sb.toString();
+        return replaceVariables(ogPayload,valuesMap, true);
     }
 
 
