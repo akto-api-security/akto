@@ -52,15 +52,12 @@ public abstract class AccountsContextDaoWithRbac<T> extends MCollection<T>{
                     filters.add(Filters.and(Filters.exists(SingleTypeInfo._COLLECTION_IDS),
                             Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionIds)));
                     rbacFilter = Filters.or(filters);
+                    return Filters.and(originalQuery, rbacFilter);
                 }
             }
         } catch (Exception e) {
         }
-        if (originalQuery != null) {
-            return Filters.and(originalQuery, rbacFilter);
-        } else {
-            return rbacFilter;
-        }
+        return originalQuery;
     }
 
     @Override
