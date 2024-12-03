@@ -20,9 +20,9 @@ public class ContainsPredicate extends Predicate{
     public boolean validate(Object value) {
         if (value instanceof ApiInfo.ApiInfoKey) {
             ApiInfo.ApiInfoKey infoKey = (ApiInfo.ApiInfoKey) value;
-            return infoKey.getUrl() != null && infoKey.getUrl().contains(this.value);
+            return infoKey.getUrl() != null && (infoKey.getUrl().contains(this.value) || infoKey.getUrl().matches(this.value));
         } else if (value instanceof String) {
-            return ((String) value).contains(this.value);
+            return ((String) value).contains(this.value) || ((String) value).matches(this.value);
         }
         return false;
     }
