@@ -132,6 +132,7 @@ import okhttp3.OkHttpClient;
 import org.apache.commons.csv.CSVRecord;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.bouncycastle.jcajce.provider.asymmetric.dsa.DSASigner.stdDSA;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 import org.json.JSONObject;
@@ -2772,7 +2773,7 @@ public class InitializerListener implements ServletContextListener {
     }
 
     private static void makeFirstUserAdmin(BackwardCompatibility backwardCompatibility){
-        if(backwardCompatibility.getAddAdminRoleIfAbsent() == 0){
+        if(backwardCompatibility.getAddAdminRoleIfAbsent() < 1733228772){
            
             User firstUser = UsersDao.instance.getFirstUser(Context.accountId.get());
 
@@ -2787,6 +2788,11 @@ public class InitializerListener implements ServletContextListener {
                     Filters.eq(RBAC.USER_ID, firstUser.getId()),
                     Filters.eq(RBAC.ROLE, Role.MEMBER.name())
                 ));
+            }else{
+                loggerMaker.infoAndAddToDb("Found non-admin rbac for first user: " + firstUser.getLogin() + " , thus inserting admin role", LogDb.DASHBOARD);
+                RBACDao.instance.insertOne(
+                    new RBAC(firstUser.getId(), Role.ADMIN, Context.accountId.get())
+                );
             }
 
             BackwardCompatibilityDao.instance.updateOne(
