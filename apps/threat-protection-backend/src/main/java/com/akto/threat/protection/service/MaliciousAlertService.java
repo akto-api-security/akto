@@ -1,8 +1,6 @@
 package com.akto.threat.protection.service;
 
-import java.util.ArrayList;
-import java.util.List;
-
+import com.akto.dto.type.URLMethods.Method;
 import com.akto.proto.threat_protection.service.malicious_alert_service.v1.MaliciousAlertServiceGrpc.MaliciousAlertServiceImplBase;
 import com.akto.proto.threat_protection.service.malicious_alert_service.v1.RecordAlertRequest;
 import com.akto.proto.threat_protection.service.malicious_alert_service.v1.RecordAlertResponse;
@@ -13,8 +11,9 @@ import com.mongodb.client.MongoClient;
 import com.mongodb.client.model.BulkWriteOptions;
 import com.mongodb.client.model.InsertOneModel;
 import com.mongodb.client.model.WriteModel;
-
 import io.grpc.stub.StreamObserver;
+import java.util.ArrayList;
+import java.util.List;
 
 public class MaliciousAlertService extends MaliciousAlertServiceImplBase {
 
@@ -37,14 +36,16 @@ public class MaliciousAlertService extends MaliciousAlertServiceImplBase {
             event -> {
               bulkUpdates.add(
                   new InsertOneModel<>(
-                      new MaliciousEventModel(
-                          filterId,
-                          actor,
-                          event.getIp(),
-                          event.getUrl(),
-                          event.getMethod(),
-                          event.getPayload(),
-                          event.getTimestamp())));
+                      MaliciousEventModel.newBuilder()
+                          .setActor(actor)
+                          .setFilterId(filterId)
+                          .setIp(event.getIp())
+                          .setCountry("India")
+                          .setOrig(event.getPayload())
+                          .setUrl(event.getUrl())
+                          .setMethod(Method.fromString(event.getMethod()))
+                          .setRequestTime(event.getTimestamp())
+                          .build()));
             });
     int accountId = Constants.ACCOUNT_ID_CONTEXT_KEY.get();
     this.mongoClient

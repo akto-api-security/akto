@@ -7,37 +7,30 @@ package threat_protection.service.dashboard_service.v1;
 option java_outer_classname = "DashboardServiceProto";
 option java_package = "threat_protection.service.dashboard_service.v1";
 
-message SampleMaliciousEvent {
-    string url = 1;
-    string method = 2;
-    string orig = 3;
-    string ip = 4;
-    string country = 5;
-    int64 timestamp = 6;
+message MaliciousRequest {
+    string id = 1;
+    string actor = 2;
+    string filter_id = 3;
+    string url = 4;
+    string method = 5;
+    string orig = 6;
+    string ip = 7;
+    string country = 8;
+    int64 timestamp = 9;
 }
 
-message DashboardAlert {
-    string actor = 1;
-    string filter_id = 2;
-    int64 detected_at = 3;
-    int64 total_events = 4;
-    repeated SampleMaliciousEvent sample_events = 5;
-}
-
-message ListAlertsResponse {
-    repeated DashboardAlert alerts = 1;
+message ListMaliciousRequestsResponse {
+    repeated MaliciousRequest malicious_requests = 1;
     int32 total = 2;
     int32 page = 3;
 }
 
-message ListAlertsRequest {
+message ListMaliciousRequestsRequest {
     // The number of alerts to return
-    string actor = 1;
-    string filter_id = 2;
     int32 limit = 3;
-    int32 page = 4;
+    optional int32 page = 4;
 }
 
 service DashboardService {
-    rpc ListAlerts(ListAlertsRequest) returns (ListAlertsResponse);
+    rpc ListMaliciousRequests(ListMaliciousRequestsRequest) returns (ListMaliciousRequestsResponse);
 }
