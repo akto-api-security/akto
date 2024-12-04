@@ -20,7 +20,7 @@ public class BackendServer {
     this.port = port;
     this.server =
         ServerBuilder.forPort(port)
-            .addService(new MaliciousAlertService(mongoClient))
+            .addService(new MaliciousAlertService())
             .addService(new DashboardService(mongoClient))
             .intercept(new AuthenticationInterceptor())
             .build();
