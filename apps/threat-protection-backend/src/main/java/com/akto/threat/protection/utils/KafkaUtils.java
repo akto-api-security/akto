@@ -46,7 +46,7 @@ public class KafkaUtils {
     private static long lastSyncOffset = 0;
 
     public static void initKafkaProducer() {
-        String kafkaBrokerUrl = System.getenv("AKTO_KAFKA_BROKER_URL");
+        String kafkaBrokerUrl = System.getenv("THREAT_EVENTS_KAFKA_BROKER_URL");
         int batchSize = Integer.parseInt(System.getenv("AKTO_KAFKA_PRODUCER_BATCH_SIZE"));
         int kafkaLingerMS = Integer.parseInt(System.getenv("AKTO_KAFKA_PRODUCER_LINGER_MS"));
         kafkaProducer = new Kafka(kafkaBrokerUrl, kafkaLingerMS, batchSize);

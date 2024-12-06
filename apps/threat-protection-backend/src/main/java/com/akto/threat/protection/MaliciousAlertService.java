@@ -35,21 +35,6 @@ public class MaliciousAlertService extends MaliciousAlertServiceImplBase {
     String actor = request.getActor();
     String filterId = request.getFilterId();
     List<WriteModel<MaliciousEventModel>> bulkUpdates = new ArrayList<>();
-    request
-        .getSampleDataList()
-        .forEach(
-            event -> {
-              bulkUpdates.add(
-                  new InsertOneModel<>(
-                      new MaliciousEventModel(
-                          filterId,
-                          actor,
-                          event.getIp(),
-                          event.getUrl(),
-                          event.getMethod(),
-                          event.getPayload(),
-                          event.getTimestamp())));
-            });
     int accountId = Constants.ACCOUNT_ID_CONTEXT_KEY.get();
 
     List<SampleMaliciousEvent> maliciousEvents = request.getSampleDataList();
