@@ -2248,7 +2248,7 @@ public class InitializerListener implements ServletContextListener {
                 ReadPreference readPreference = ReadPreference.primary();
                 WriteConcern writeConcern = WriteConcern.ACKNOWLEDGED;
                 if (runJobFunctions || DashboardMode.isSaasDeployment()) {
-                    readPreference = ReadPreference.secondary();
+                    readPreference = ReadPreference.primary();
                     writeConcern = WriteConcern.W1;
                 }
                 DaoInit.init(new ConnectionString(mongoURI), readPreference, writeConcern);
