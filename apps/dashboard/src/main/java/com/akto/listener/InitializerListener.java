@@ -118,6 +118,7 @@ import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import com.mongodb.ReadPreference;
+import com.mongodb.WriteConcern;
 import com.mongodb.bulk.BulkWriteResult;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.*;
@@ -2245,10 +2246,12 @@ public class InitializerListener implements ServletContextListener {
             public void run() {
 
                 ReadPreference readPreference = ReadPreference.primary();
+                WriteConcern writeConcern = WriteConcern.ACKNOWLEDGED;
                 if (runJobFunctions || DashboardMode.isSaasDeployment()) {
                     readPreference = ReadPreference.secondary();
+                    writeConcern = WriteConcern.W1;
                 }
-                DaoInit.init(new ConnectionString(mongoURI), readPreference);
+                DaoInit.init(new ConnectionString(mongoURI), readPreference, writeConcern);
 
                 connectedToMongo = false;
                 do {
