@@ -2,8 +2,7 @@ syntax = "proto3";
 
 package threat_protection.service.dashboard_service.v1;
 
-// This is a consumer service for recording malicious alerts
-// For dashboard purposes we will have a separate service to retrieve these events.
+// Dashboard service which the dashboard actions will call instead of directly calling DB
 option java_outer_classname = "DashboardServiceProto";
 option java_package = "threat_protection.service.dashboard_service.v1";
 
@@ -31,6 +30,14 @@ message ListMaliciousRequestsRequest {
     optional int32 page = 4;
 }
 
+message FetchAlertFiltersRequest {}
+
+message FetchAlertFiltersResponse {
+  repeated string actors = 1;
+  repeated string urls = 2;
+}
+
 service DashboardService {
     rpc ListMaliciousRequests(ListMaliciousRequestsRequest) returns (ListMaliciousRequestsResponse);
+    rpc FetchAlertFilters(FetchAlertFiltersRequest) returns (FetchAlertFiltersResponse) {}
 }
