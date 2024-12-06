@@ -1,25 +1,26 @@
 package com.akto.action.threat_detection;
 
-import java.util.ArrayList;
-import java.util.HashSet;
+import com.akto.action.UserAction;
+import com.akto.dto.traffic.SuspectSampleData;
+import com.akto.dto.type.URLMethods;
+import com.akto.grpc.AuthToken;
+import com.akto.proto.threat_protection.service.dashboard_service.v1.DashboardServiceGrpc;
+import com.akto.proto.threat_protection.service.dashboard_service.v1.DashboardServiceGrpc.DashboardServiceBlockingStub;
+import com.akto.proto.threat_protection.service.dashboard_service.v1.FetchAlertFiltersRequest;
+import com.akto.proto.threat_protection.service.dashboard_service.v1.FetchAlertFiltersResponse;
+import com.akto.proto.threat_protection.service.dashboard_service.v1.ListMaliciousRequestsRequest;
+import com.akto.proto.threat_protection.service.dashboard_service.v1.MaliciousRequest;
+import io.grpc.Grpc;
+import io.grpc.InsecureChannelCredentials;
+import io.grpc.ManagedChannel;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Set;
-
-import org.bson.conversions.Bson;
-
-import com.akto.action.UserAction;
-import com.akto.dao.SuspectSampleDataDao;
-import com.akto.dao.context.Context;
-import com.akto.dto.traffic.SuspectSampleData;
-import com.akto.util.Constants;
-import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.Sorts;
+import java.util.stream.Collectors;
 
 public class SuspectSampleDataAction extends UserAction {
 
   List<SuspectSampleData> sampleData;
+  List<DashboardMaliciousRequest> maliciousRequests;
   int skip;
   static final int LIMIT = 50;
   List<String> ips;
@@ -29,87 +30,51 @@ public class SuspectSampleDataAction extends UserAction {
   Map<String, Integer> sort;
   int startTimestamp, endTimestamp;
 
-  public String fetchSampleDataV2() {
-    throw new UnsupportedOperationException("Not implemented yet");
+  private final DashboardServiceBlockingStub dsServiceStub;
+
+  public SuspectSampleDataAction() {
+    super();
+
+    String target = "localhost:8980";
+    ManagedChannel channel =
+        Grpc.newChannelBuilder(target, InsecureChannelCredentials.create()).build();
+    this.dsServiceStub =
+        DashboardServiceGrpc.newBlockingStub(channel)
+            .withCallCredentials(
+                new AuthToken(System.getenv("AKTO_THREAT_PROTECTION_BACKEND_TOKEN")));
   }
 
-  public String fetchSuspectSampleData() {
+  public String fetchSampleDataV2() {
+    List<MaliciousRequest> maliciousRequests =
+        this.dsServiceStub
+            .listMaliciousRequests(
+                ListMaliciousRequestsRequest.newBuilder().setPage(0).setLimit(500).build())
+            .getMaliciousRequestsList();
 
-    List<Bson> filterList = new ArrayList<>();
-
-    /*
-     * In case time filters are empty,
-     * using default filter as 2 months.
-     */
-
-    if (startTimestamp <= 0) {
-      startTimestamp = Context.now() - 2 * 30 * 24 * 60 * 60;
-    }
-    if (endTimestamp <= 0) {
-      endTimestamp = Context.now() + 10 * 60;
-    }
-
-    filterList.add(Filters.gte(SuspectSampleData._DISCOVERED, startTimestamp));
-    filterList.add(Filters.lte(SuspectSampleData._DISCOVERED, endTimestamp));
-
-    if (ips != null && !ips.isEmpty()) {
-      filterList.add(Filters.in(SuspectSampleData.SOURCE_IPS, ips));
-    }
-    if (urls != null && !urls.isEmpty()) {
-      filterList.add(Filters.in(SuspectSampleData.MATCHING_URL, urls));
-    }
-    if (apiCollectionIds != null && !apiCollectionIds.isEmpty()) {
-      filterList.add(Filters.in(SuspectSampleData.API_COLLECTION_ID, apiCollectionIds));
-    }
-
-    Bson finalFilter = Filters.empty();
-
-    finalFilter = Filters.and(filterList);
-
-    String sortKey = SuspectSampleData._DISCOVERED;
-    int sortDirection = -1;
-    /*
-     * add any new sort key here,
-     * for validation and sanity.
-     */
-    Set<String> sortKeys = new HashSet<>();
-    sortKeys.add(SuspectSampleData._DISCOVERED);
-
-    if (sort != null && !sort.isEmpty()) {
-      Entry<String, Integer> sortEntry = sort.entrySet().iterator().next();
-      sortKey = sortEntry.getKey();
-      if (!sortKeys.contains(sortKey)) {
-        sortKey = SuspectSampleData._DISCOVERED;
-      }
-      sortDirection = sortEntry.getValue();
-      if (!(sortDirection == -1 || sortDirection == 1)) {
-        sortDirection = -1;
-      }
-    }
-
-    /*
-     * In case timestamp is same, then id acts as tie-breaker,
-     * to avoid repeating the same documents again.
-     */
-    Bson sort =
-        sortDirection == -1
-            ? Sorts.descending(sortKey, Constants.ID)
-            : Sorts.ascending(sortKey, Constants.ID);
-    sampleData = SuspectSampleDataDao.instance.findAll(finalFilter, skip, LIMIT, sort);
-    total = SuspectSampleDataDao.instance.count(finalFilter);
+    this.maliciousRequests =
+        maliciousRequests.stream()
+            .map(
+                mr ->
+                    new DashboardMaliciousRequest(
+                        mr.getId(),
+                        mr.getActor(),
+                        mr.getFilterId(),
+                        mr.getUrl(),
+                        URLMethods.Method.fromString(mr.getMethod()),
+                        mr.getIp(),
+                        mr.getCountry(),
+                        mr.getTimestamp()))
+            .collect(Collectors.toList());
 
     return SUCCESS.toUpperCase();
   }
 
-  public String fetchFilters() {
-    ips =
-        new ArrayList<>(
-            SuspectSampleDataDao.instance.findDistinctFields(
-                SuspectSampleData.SOURCE_IPS, String.class, Filters.empty()));
-    urls =
-        new ArrayList<>(
-            SuspectSampleDataDao.instance.findDistinctFields(
-                SuspectSampleData.MATCHING_URL, String.class, Filters.empty()));
+  public String fetchFiltersV2() {
+    FetchAlertFiltersResponse filters =
+        this.dsServiceStub.fetchAlertFilters(FetchAlertFiltersRequest.newBuilder().build());
+    ips = filters.getActorsList();
+    urls = filters.getUrlsList();
+
     return SUCCESS.toUpperCase();
   }
 
