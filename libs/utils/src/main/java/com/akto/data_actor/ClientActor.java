@@ -70,9 +70,17 @@ public class ClientActor extends DataActor {
     }
 
     public static boolean checkAccount() {
+        /*
+            token == null => x = false and normal code continues
+            token != null && token is JWT => x = false and normal continues
+            token != null && token is not JWT (dashboard api key) => x = true and return true
+            This is done to handle client actor to make calls to dashboard or database-abstractor based on service
+         */
+        String token = System.getenv("DATABASE_ABSTRACTOR_SERVICE_TOKEN");
+        boolean validTokenCheck = token != null && !token.isEmpty();
         try {
-            String token = System.getenv("DATABASE_ABSTRACTOR_SERVICE_TOKEN");
             DecodedJWT jwt = JWT.decode(token);
+            validTokenCheck = false;
             String payload = jwt.getPayload();
             byte[] decodedBytes = Base64.getUrlDecoder().decode(payload);
             String decodedPayload = new String(decodedBytes);
@@ -81,6 +89,7 @@ public class ClientActor extends DataActor {
             System.out.println("checkaccount accountId log " + accId);
             return accId == 1000000;
         } catch (Exception e) {
+            if (validTokenCheck) return true;
             System.out.println("checkaccount error" + e.getStackTrace());
         }
         return false;
@@ -1271,7 +1280,12 @@ public class ClientActor extends DataActor {
 
     public Map<String, List<String>> buildHeaders() {
         Map<String, List<String>> headers = new HashMap<>();
-        headers.put("Authorization", Collections.singletonList(System.getenv("DATABASE_ABSTRACTOR_SERVICE_TOKEN")));
+        String databaseAbstractorServiceHeaderKey = System.getenv("DATABASE_ABSTRACTOR_SERVICE_HEADER_KEY");
+        String headerKey = "Authorization";
+        if (databaseAbstractorServiceHeaderKey != null && !databaseAbstractorServiceHeaderKey.isEmpty()) {
+            headerKey = databaseAbstractorServiceHeaderKey;
+        }
+        headers.put(headerKey, Collections.singletonList(System.getenv("DATABASE_ABSTRACTOR_SERVICE_TOKEN")));
         return headers;
     }
 
