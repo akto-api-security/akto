@@ -27,6 +27,7 @@ public class TestFixMultiSTIs extends MongoBasedTest {
     public void testRun() {
         ApiCollectionsDao.instance.getMCollection().drop();
         SingleTypeInfoDao.instance.getMCollection().drop();
+        Context.userId.set(null);
 
         int urlsCount = 100;
         int paramCountWithoutHost = 9;

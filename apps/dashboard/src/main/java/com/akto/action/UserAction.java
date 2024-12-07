@@ -1,5 +1,6 @@
 package com.akto.action;
 
+import com.akto.dao.context.Context;
 import com.akto.dto.User;
 import com.opensymphony.xwork2.ActionSupport;
 import org.apache.struts2.interceptor.SessionAware;
@@ -17,6 +18,9 @@ public abstract class UserAction extends ActionSupport implements SessionAware {
     public void setSession(Map<String, Object> session) {
         this.session = session;
         this.user = (User)(session.get("user"));
+        if (this.user != null) {
+            Context.userId.set(this.user.getId());
+        }
     }
 
     public User getSUser() {
