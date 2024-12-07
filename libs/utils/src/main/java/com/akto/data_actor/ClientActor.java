@@ -59,9 +59,7 @@ public class ClientActor extends DataActor {
 
     public static String buildDbAbstractorUrl() {
         String dbAbsHost = CYBORG_URL;
-        if (checkAccount()) {
-            dbAbsHost = System.getenv("DATABASE_ABSTRACTOR_SERVICE_URL");
-        }
+        dbAbsHost = System.getenv("DATABASE_ABSTRACTOR_SERVICE_URL");
         System.out.println("dbHost value " + dbAbsHost);
         if (dbAbsHost.endsWith("/")) {
             dbAbsHost = dbAbsHost.substring(0, dbAbsHost.length() - 1);

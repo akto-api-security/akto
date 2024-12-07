@@ -368,12 +368,12 @@ public class CodeAnalysisAction extends ActionSupport {
         this.projectName = projectName;
     }
 
-    public boolean isLastBatch() {
+    public boolean getIsLastBatch() {
         return isLastBatch;
     }
 
-    public void setLastBatch(boolean lastBatch) {
-        isLastBatch = lastBatch;
+    public void setIsLastBatch(boolean isLastBatch) {
+        this.isLastBatch = isLastBatch;
     }
 
     public CodeAnalysisRepo getCodeAnalysisRepo() {
