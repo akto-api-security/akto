@@ -147,6 +147,7 @@ public class UserDetailsFilter implements Filter {
             Token token = AccessTokenAction.generateAccessTokenFromServletRequest(httpServletRequest);
             if (token == null) {
                 Cookie cookie = AccessTokenAction.generateDeleteCookie();
+                logger.info("resetting refresh token cookie");
                 httpServletResponse.addCookie(cookie);
                 if (accessTokenFromRequest != null) {
                     httpServletResponse.sendError(403);
@@ -206,6 +207,8 @@ public class UserDetailsFilter implements Filter {
                         redirectIfNotLoginURI(filterChain, httpServletRequest, httpServletResponse);
                         return ;
                     }
+                }else{
+                    logger.info("Logout object not found");
                 }
             } catch (Exception ignored) {
                 redirectIfNotLoginURI(filterChain, httpServletRequest, httpServletResponse);
