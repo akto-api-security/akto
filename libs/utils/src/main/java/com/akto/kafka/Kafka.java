@@ -1,6 +1,5 @@
 package com.akto.kafka;
 
-import com.akto.dao.context.Context;
 import org.apache.kafka.clients.producer.*;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.slf4j.Logger;
@@ -8,8 +7,6 @@ import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
 import java.util.Properties;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Future;
 
 public class Kafka {
     private static final Logger logger = LoggerFactory.getLogger(Kafka.class);
@@ -25,10 +22,10 @@ public class Kafka {
         }
     }
 
-    public void send(String message,String topic) {
+    public void send(String message, String topic) {
         if (!this.producerReady) return;
 
-        ProducerRecord<String, String> record = new ProducerRecord<>(topic,message);
+        ProducerRecord<String, String> record = new ProducerRecord<>(topic, message);
         producer.send(record, new DemoProducerCallback());
     }
 
@@ -73,7 +70,4 @@ public class Kafka {
             }
         }
     }
-
 }
-
-

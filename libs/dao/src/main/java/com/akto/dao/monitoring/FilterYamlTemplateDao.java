@@ -13,17 +13,23 @@ public class FilterYamlTemplateDao extends AccountsContextDao<YamlTemplate> {
 
     public static final FilterYamlTemplateDao instance = new FilterYamlTemplateDao();
 
-    public Map<String, FilterConfig> fetchFilterConfig(boolean includeYamlContent, boolean shouldParseExecutor) {
+    public Map<String, FilterConfig> fetchFilterConfig(
+            boolean includeYamlContent, boolean shouldParseExecutor) {
         List<YamlTemplate> yamlTemplates = FilterYamlTemplateDao.instance.findAll(Filters.empty());
         return fetchFilterConfig(includeYamlContent, yamlTemplates, shouldParseExecutor);
     }
 
-    public Map<String, FilterConfig> fetchFilterConfig(boolean includeYamlContent, List<YamlTemplate> yamlTemplates, boolean shouldParseExecutor) {
+    public static Map<String, FilterConfig> fetchFilterConfig(
+            boolean includeYamlContent,
+            List<YamlTemplate> yamlTemplates,
+            boolean shouldParseExecutor) {
         Map<String, FilterConfig> filterConfigMap = new HashMap<>();
         for (YamlTemplate yamlTemplate : yamlTemplates) {
             try {
                 if (yamlTemplate != null) {
-                    FilterConfig filterConfig = FilterConfigYamlParser.parseTemplate(yamlTemplate.getContent(), shouldParseExecutor);
+                    FilterConfig filterConfig =
+                            FilterConfigYamlParser.parseTemplate(
+                                    yamlTemplate.getContent(), shouldParseExecutor);
                     filterConfig.setAuthor(yamlTemplate.getAuthor());
                     filterConfig.setCreatedAt(yamlTemplate.getCreatedAt());
                     filterConfig.setUpdatedAt(yamlTemplate.getUpdatedAt());
