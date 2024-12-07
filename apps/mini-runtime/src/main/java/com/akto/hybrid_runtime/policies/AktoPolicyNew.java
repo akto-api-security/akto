@@ -4,6 +4,7 @@ import com.akto.dao.*;
 import com.akto.dao.context.Context;
 import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
+import com.akto.dto.filter.MergedUrls;
 import com.akto.dto.runtime_filters.RuntimeFilter;
 import com.akto.runtime.policies.*;
 import com.akto.dto.type.APICatalog;
@@ -35,7 +36,7 @@ public class AktoPolicyNew {
     ApiAccessTypePolicy apiAccessTypePolicy = new ApiAccessTypePolicy(null, null);
     boolean redact = false;
 
-    private DataActor dataActor = DataActorFactory.fetchInstance();
+    private static DataActor dataActor = DataActorFactory.fetchInstance();
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(AktoPolicyNew.class);
 
@@ -257,7 +258,15 @@ public class AktoPolicyNew {
         for (ApiInfoCatalog apiInfoCatalog: apiInfoCatalogMap.values()) {
 
             Map<URLStatic, PolicyCatalog> strictURLToMethods = apiInfoCatalog.getStrictURLToMethods();
-            Map<URLTemplate, PolicyCatalog> templateURLToMethods = apiInfoCatalog.getTemplateURLToMethods();
+            Map<URLTemplate, PolicyCatalog> templateURLToMethods = new HashMap<>();
+
+            Set<MergedUrls> mergedUrls = dataActor.fetchMergedUrls();
+            for(Map.Entry<URLTemplate, PolicyCatalog> templateURLToMethodEntry : apiInfoCatalog.getTemplateURLToMethods().entrySet()) {
+                ApiInfoKey apiInfoKey = templateURLToMethodEntry.getValue().getApiInfo().getId();
+                if(!mergedUrls.contains(new MergedUrls(apiInfoKey.getUrl(), apiInfoKey.getMethod().name(), apiInfoKey.getApiCollectionId()))) {
+                    templateURLToMethods.put(templateURLToMethodEntry.getKey(), templateURLToMethodEntry.getValue());
+                }
+            }
 
             List<PolicyCatalog> policyCatalogList = new ArrayList<>();
             policyCatalogList.addAll(strictURLToMethods.values());

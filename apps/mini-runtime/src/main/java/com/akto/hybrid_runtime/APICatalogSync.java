@@ -804,9 +804,12 @@ public class APICatalogSync {
     }
 
     Map<String, SingleTypeInfo> convertToMap(List<SingleTypeInfo> l) {
+        Set<MergedUrls> mergedUrls = dataActor.fetchMergedUrls();
         Map<String, SingleTypeInfo> ret = new HashMap<>();
         for(SingleTypeInfo e: l) {
-            ret.put(e.composeKey(), e);
+            if(!mergedUrls.contains(new MergedUrls(e.getUrl(), e.getMethod(), e.getApiCollectionId()))) {
+                ret.put(e.composeKey(), e);
+            }
         }
 
         return ret;
