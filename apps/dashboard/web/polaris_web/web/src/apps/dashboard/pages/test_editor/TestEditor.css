@@ -76,3 +76,7 @@
 .Polaris-TopBar{
     display: flex;
 }
+
+.Polaris-Text--regular{
+    width: 100%;
+}

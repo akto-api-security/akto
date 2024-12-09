@@ -170,7 +170,7 @@ const TestEditorFileExplorer = ({addCustomTest}) => {
                         <Button
                             id={"create-custom-test-button"}
 
-
+                            textAlign="start"
                             onClick={()=> toggleFunc("CUSTOM")}
                             removeUnderline
                             fullWidth
@@ -200,7 +200,7 @@ const TestEditorFileExplorer = ({addCustomTest}) => {
                     <Box>
                         <Button
 
-
+                            textAlign="start"
                             onClick={() => toggleFunc("Akto")}
                             removeUnderline
                             fullWidth
