@@ -12,11 +12,12 @@ const testEditorRequests = {
             }
         })
     },
-    fetchAllSubCategories(mode) {
+
+    fetchVulnerableRequests(skip, limit) {
         return request({
-            url: 'api/fetchAllSubCategories',
+            url: 'api/fetchVulnerableRequests',
             method: 'post',
-            data: { mode }
+            data: { skip, limit }
         })
     },
     

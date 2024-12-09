@@ -451,11 +451,6 @@ function HomeDashboard() {
         const countMap = apiStats ? apiStats.criticalMap : {};
 
         const result = {
-            "Critical": {
-                "text": countMap.CRITICAL || 0,
-                "color": "#E45357",
-                "filterKey": "Critical",
-            },
             "High": {
                 "text": countMap.HIGH || 0,
                 "color": "#EF864C",
@@ -514,7 +509,7 @@ function HomeDashboard() {
             </div>
         }
         title="Vulnerable APIs by Severity"
-        titleToolTip="Breakdown of vulnerable APIs categorized by severity level (Critical, High, Medium, Low). Click to see details for each category."
+        titleToolTip="Breakdown of vulnerable APIs categorized by severity level (High, Medium, Low). Click to see details for each category."
         linkText="Fix critical issues"
         linkUrl="/dashboard/issues"
     /> : <EmptyCard title="Vulnerable APIs by Severity" subTitleComponent={showTestingComponents ? <Text alignment='center' color='subdued'>No vulnerable APIs found</Text>: runTestEmptyCardComponent}/>

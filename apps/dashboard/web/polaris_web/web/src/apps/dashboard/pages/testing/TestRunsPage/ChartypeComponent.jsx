@@ -5,7 +5,7 @@ import ConcentricCirclesChart from '../../../components/shared/ConcentricCircles
 import observeFunc from "../../observe/transform"
 import TooltipText from '../../../components/shared/TooltipText'
 
-function ChartypeComponent({data, title,charTitle, chartSubtitle, reverse, isNormal, boxHeight, navUrl, isRequest, chartOnLeft, dataTableWidth, boxPadding, pieInnerSize}) {
+function ChartypeComponent({data, title,charTitle, chartSubtitle, reverse, isNormal, boxHeight, navUrl, isRequest, chartOnLeft, dataTableWidth, boxPadding, pieInnerSize, chartSize, spaceBetween}) {
     let tableRows = []
     if(data && Object.keys(data).length > 0)
     {
@@ -37,12 +37,12 @@ function ChartypeComponent({data, title,charTitle, chartSubtitle, reverse, isNor
 
     const chartComponent = (
 
-        isNormal ? <DonutChart navUrl={navUrl} data={chartData}  title=""  type={title} size={210} isRequest={isRequest} pieInnerSize={pieInnerSize}/> : <ConcentricCirclesChart data={chartData} title={charTitle} size={210} subtitle={chartSubtitle} />
+        isNormal ? <DonutChart navUrl={navUrl} data={chartData}  title=""  type={title} size={chartSize || 210} isRequest={isRequest} pieInnerSize={pieInnerSize}/> : <ConcentricCirclesChart data={chartData} title={charTitle} size={210} subtitle={chartSubtitle} />
     )
 
     return (
         <Box padding={boxPadding != undefined ? boxPadding : 4}>
-            <HorizontalStack gap={8}>
+            <HorizontalStack gap={8} align={spaceBetween || ''}>
                 {chartOnLeft ? chartComponent: null}
                 <VerticalStack gap="2">
                     <Text fontWeight="semibold" variant="bodySm">{title}</Text>

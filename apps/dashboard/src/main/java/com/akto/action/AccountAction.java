@@ -276,8 +276,7 @@ private static final LoggerMaker loggerMaker = new LoggerMaker(AccountAction.cla
     }
 
     public static User initializeAccount(String email, int newAccountId, String newAccountName, boolean isNew, RBAC.Role role) {
-        UsersDao.addAccount(email, newAccountId, newAccountName);
-        User user = UsersDao.instance.findOne(eq(User.LOGIN, email));
+        User user = UsersDao.addAccount(email, newAccountId, newAccountName);
         RBACDao.instance.insertOne(new RBAC(user.getId(), role, newAccountId));
         Context.accountId.set(newAccountId);
         try {

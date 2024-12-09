@@ -338,18 +338,33 @@ export default {
             data: {}
         })
     },
-    async loadRecentEndpoints (startTimestamp, endTimestamp) {
+    async loadRecentEndpoints (startTimestamp, endTimestamp, skip, limit, filters, filterOperators, searchString) {
         const resp = await request({
             url: '/api/loadRecentEndpoints',
+            method: 'post',
+            data: { startTimestamp, endTimestamp, skip, limit, filters, filterOperators, searchString}
+        })
+        return resp
+    },
+    async getSummaryInfoForChanges (startTimestamp, endTimestamp) {
+        const resp = await request({
+            url: '/api/getSummaryInfoForChanges',
             method: 'post',
             data: { startTimestamp, endTimestamp }
         })
         return resp
     },
-
-    async loadRecentApiInfos (startTimestamp, endTimestamp) {
+    async fetchNewEndpointsTrendForHostCollections (startTimestamp, endTimestamp) {
         const resp = await request({
-            url: '/api/loadRecentApiInfos',
+            url: '/api/fetchNewEndpointsTrendForHostCollections',
+            method: 'post',
+            data: { startTimestamp, endTimestamp }
+        })
+        return resp
+    },
+    async fetchNewEndpointsTrendForNonHostCollections (startTimestamp, endTimestamp) {
+        const resp = await request({
+            url: '/api/fetchNewEndpointsTrendForNonHostCollections',
             method: 'post',
             data: { startTimestamp, endTimestamp }
         })
@@ -539,20 +554,20 @@ export default {
             data: {}
         })
     },
-    scheduleTestForCollection(apiCollectionId, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert) {
+    scheduleTestForCollection(apiCollectionId, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, testConfigsAdvancedSettings) {
         return request({
             url: '/api/startTest',
             method: 'post',
-            data: { apiCollectionId, type: "COLLECTION_WISE", startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert}
+            data: { apiCollectionId, type: "COLLECTION_WISE", startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, testConfigsAdvancedSettings}
         }).then((resp) => {
             return resp
         })
     },
-    scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, source, testRoleId, continuousTesting, sendSlackAlert) {
+    scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, source, testRoleId, continuousTesting, sendSlackAlert, testConfigsAdvancedSettings) {
         return request({
             url: '/api/startTest',
             method: 'post',
-            data: {apiInfoKeyList, type: "CUSTOM", startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, source, testRoleId, continuousTesting, sendSlackAlert}
+            data: {apiInfoKeyList, type: "CUSTOM", startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, source, testRoleId, continuousTesting, sendSlackAlert, testConfigsAdvancedSettings}
         }).then((resp) => {
             return resp
         })        

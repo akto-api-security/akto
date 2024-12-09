@@ -26,6 +26,7 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.usage.UsageMetricCalculator;
+import com.akto.util.Constants;
 import com.akto.util.GroupByTimeRange;
 import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.Severity;
@@ -410,8 +411,12 @@ public class IssuesAction extends UserAction {
     private boolean fetchOnlyActive;
     private String mode;
 
-    public String fetchAllSubCategories() {
+    public String fetchVulnerableRequests() {
+        vulnerableRequests = VulnerableRequestForTemplateDao.instance.findAll(Filters.empty(), skip, limit, Sorts.ascending("_id"));
+        return SUCCESS.toUpperCase();
+    }
 
+    public String fetchAllSubCategories() {
         boolean includeYamlContent = false;
 
         switch (mode) {
@@ -420,17 +425,15 @@ public class IssuesAction extends UserAction {
                 break;
             case "testEditor":
                 includeYamlContent = true;
-                vulnerableRequests = VulnerableRequestForTemplateDao.instance.findAll(Filters.empty());
                 break;
             default:
                 includeYamlContent = true;
                 categories = GlobalEnums.TestCategory.values();
-                vulnerableRequests = VulnerableRequestForTemplateDao.instance.findAll(Filters.empty());
                 testSourceConfigs = TestSourceConfigsDao.instance.findAll(Filters.empty());
         }
 
         Map<String, TestConfig> testConfigMap = YamlTemplateDao.instance.fetchTestConfigMap(includeYamlContent,
-                fetchOnlyActive);
+                fetchOnlyActive, skip, limit);
         subCategories = new ArrayList<>();
         for (Map.Entry<String, TestConfig> entry : testConfigMap.entrySet()) {
             try {
@@ -499,6 +502,18 @@ public class IssuesAction extends UserAction {
                 Filters.in(TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_ID, new ObjectId(latestTestingRunSummaryId))
         );
         issues = TestingRunIssuesDao.instance.findAll(filters);
+        return SUCCESS.toUpperCase();
+    }
+
+    List<TestingIssuesId> issuesIds;
+
+    public String fetchIssuesFromResultIds(){
+        issues = TestingRunIssuesDao.instance.findAll(
+            Filters.and(
+                Filters.in(Constants.ID, issuesIds),
+                Filters.in(TestingRunIssues.TEST_RUN_ISSUES_STATUS, issueStatusQuery)
+            ), Projections.include("_id", TestingRunIssues.TEST_RUN_ISSUES_STATUS)
+        );
         return SUCCESS.toUpperCase();
     }
 
@@ -719,5 +734,9 @@ public class IssuesAction extends UserAction {
 
     public void setIssueStatusQuery(List<String> issueStatusQuery) {
         this.issueStatusQuery = issueStatusQuery;
+    }
+
+    public void setIssuesIds(List<TestingIssuesId> issuesIds) {
+        this.issuesIds = issuesIds;
     }
 }

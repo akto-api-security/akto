@@ -1,11 +1,15 @@
 package com.akto.dao;
 
+import com.akto.dao.context.Context;
 import com.akto.dto.*;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.FindOneAndUpdateOptions;
+import com.mongodb.client.model.ReturnDocument;
 import com.mongodb.client.model.Sorts;
+import com.mongodb.client.model.Updates;
 
 import java.util.Collection;
 import java.util.HashMap;
@@ -40,9 +44,14 @@ public class UsersDao extends CommonContextDao<User> {
         return null;
     }
 
-    public static void addAccount(String login, int accountId, String name) {
+    public static User addAccount(String login, int accountId, String name) {
         BasicDBObject setQ = new BasicDBObject(User.ACCOUNTS + "." + accountId,new UserAccountEntry(accountId, name));
-        UsersDao.instance.getMCollection().updateOne(eq(User.LOGIN, login), new BasicDBObject(SET, setQ));
+
+        User tempUser = UsersDao.instance.getMCollection().findOneAndUpdate(
+            eq(User.LOGIN, login), new BasicDBObject(SET, setQ),
+            new FindOneAndUpdateOptions().returnDocument(ReturnDocument.AFTER)
+        );
+        return tempUser;
     }
 
     public static void addNewAccount(String login, Account account){

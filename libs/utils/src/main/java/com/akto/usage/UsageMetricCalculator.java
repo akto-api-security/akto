@@ -1,6 +1,7 @@
 package com.akto.usage;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 import com.akto.dao.ApiCollectionsDao;
@@ -11,6 +12,7 @@ import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo;
+import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.testing.TestResult;
@@ -20,6 +22,7 @@ import com.akto.dto.usage.MetricTypes;
 import com.akto.dto.usage.UsageMetric;
 import com.akto.dto.usage.metadata.ActiveAccounts;
 import com.akto.log.LoggerMaker;
+import com.akto.util.Pair;
 import com.akto.util.enums.GlobalEnums.YamlTemplateSource;
 import com.google.gson.Gson;
 import com.mongodb.client.model.Filters;
@@ -43,9 +46,13 @@ public class UsageMetricCalculator {
     /*
      * to handle multiple accounts using static maps.
      */
+    private final static String FEATURE_LABEL_STRING = "RBAC_FEATURE";
     private static Map<Integer, Integer> lastDeactivatedFetchedMap = new HashMap<>();
     private static final int REFRESH_INTERVAL = 60 * 2; // 2 minutes.
+    private static final int REFRESH_INTERVAL_RBAC = 60 * 60; // 1 hour.
     private static Map<Integer, Set<Integer>> deactivatedCollectionsMap = new HashMap<>();
+
+    private static final ConcurrentHashMap<Integer, Pair<Boolean, Integer>> hasRbacFeatureEnabledMap = new ConcurrentHashMap<>();
 
     public static Set<Integer> getDeactivated() {
         int accountId = Context.accountId.get();
@@ -58,6 +65,29 @@ public class UsageMetricCalculator {
         deactivatedCollectionsMap.put(accountId, getDeactivatedLatest());
         lastDeactivatedFetchedMap.put(accountId, Context.now());
         return deactivatedCollectionsMap.get(accountId);
+    }
+
+    private static boolean checkForPaidFeature(int accountId){
+        Organization organization = OrganizationsDao.instance.findOne(Filters.in(Organization.ACCOUNTS, accountId));
+        if(organization == null || organization.getFeatureWiseAllowed() == null || organization.getFeatureWiseAllowed().isEmpty()){
+            return true;
+        }
+
+        HashMap<String, FeatureAccess> featureWiseAllowed = organization.getFeatureWiseAllowed();
+        FeatureAccess featureAccess = featureWiseAllowed.getOrDefault(FEATURE_LABEL_STRING, FeatureAccess.noAccess);
+        return featureAccess.getIsGranted();
+    }
+
+    public static boolean isRbacFeatureAvailable(int accountId){
+        int timeNow = Context.now();
+        Pair<Boolean, Integer> prevVal = hasRbacFeatureEnabledMap.getOrDefault(accountId, new Pair<>(false, timeNow));
+        boolean ans = prevVal.getFirst();
+        int lastCalTime = prevVal.getSecond();
+        if(!hasRbacFeatureEnabledMap.contains(accountId) || (lastCalTime + REFRESH_INTERVAL_RBAC < timeNow)){
+            ans = checkForPaidFeature(accountId);
+            hasRbacFeatureEnabledMap.put(accountId, new Pair<>(ans, timeNow));
+        }
+        return ans;
     }
 
     public static Set<Integer> getDeactivatedLatest(){

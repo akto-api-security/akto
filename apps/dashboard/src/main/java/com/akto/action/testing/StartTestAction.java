@@ -10,6 +10,7 @@ import com.akto.dao.testing.*;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.User;
 import com.akto.dto.ApiToken.Utility;
+import com.akto.dto.CollectionConditions.TestConfigsAdvancedSettings;
 import com.akto.dto.test_editor.Info;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
@@ -75,6 +76,7 @@ public class StartTestAction extends UserAction {
     private TestingRunType testingRunType;
     private String searchString;
     private boolean continuousTesting;
+    private int testingRunConfigId;
 
     private Map<String,Long> allTestsCountMap = new HashMap<>();
     private Map<String,Integer> issuesSummaryInfoMap = new HashMap<>();
@@ -120,7 +122,7 @@ public class StartTestAction extends UserAction {
             }
         }
 
-        AuthMechanism authMechanism = TestRolesDao.instance.fetchAttackerToken(0);
+        AuthMechanism authMechanism = TestRolesDao.instance.fetchAttackerToken(0, null);
         if (authMechanism == null && testIdConfig == 0) {
             addActionError("Please set authentication mechanism before you test any APIs");
             return null;
@@ -154,6 +156,10 @@ public class StartTestAction extends UserAction {
         if (this.selectedTests != null) {
             int id = UUID.randomUUID().hashCode() & 0xfffffff;
             TestingRunConfig testingRunConfig = new TestingRunConfig(id, null, this.selectedTests, authMechanism.getId(), this.overriddenTestAppUrl, this.testRoleId);
+            // add advanced setting here
+            if(this.testConfigsAdvancedSettings != null && !this.testConfigsAdvancedSettings.isEmpty()){
+                testingRunConfig.setConfigsAdvancedSettings(this.testConfigsAdvancedSettings);
+            }
             this.testIdConfig = testingRunConfig.getId();
             TestingRunConfigDao.instance.insertOne(testingRunConfig);
         }
@@ -164,6 +170,7 @@ public class StartTestAction extends UserAction {
     }
 
     private List<String> selectedTests;
+    private List<TestConfigsAdvancedSettings> testConfigsAdvancedSettings;
 
     public String startTest() {
 
@@ -395,7 +402,7 @@ public class StartTestAction extends UserAction {
 
     public String retrieveAllCollectionTests() {
 
-        this.authMechanism = TestRolesDao.instance.fetchAttackerToken(0);
+        this.authMechanism = TestRolesDao.instance.fetchAttackerToken(0, null);
 
         ArrayList<Bson> testingRunFilters = new ArrayList<>();
         Bson testingRunTypeFilter = getTestingRunTypeFilter(testingRunType);
@@ -486,6 +493,12 @@ public class StartTestAction extends UserAction {
                     .findOne(Filters.eq("_id", workflowTestingEndpoints.getWorkflowTest().getId()));
         }
 
+        TestingRunConfig runConfig = TestingRunConfigDao.instance.findOne(
+            Filters.eq("_id", this.testingRun.getTestIdConfig()), Projections.exclude("collectionWiseApiInfoKey", "testSubCategoryList")
+        );
+
+        this.testingRun.setTestingRunConfig(runConfig);
+
         return SUCCESS.toUpperCase();
     }
 
@@ -547,6 +560,7 @@ public class StartTestAction extends UserAction {
                     testingRunResultFilters.add(Filters.eq(TestingRunResult.VULNERABLE, false));
                     List<String> errorsToSkipTest = TestResult.TestError.getErrorsToSkipTests();
                     errorsToSkipTest.add(TestResult.API_CALL_FAILED_ERROR_STRING);
+                    errorsToSkipTest.add(TestResult.API_CALL_FAILED_ERROR_STRING_UNREACHABLE);
                     testingRunResultFilters.add(
                         Filters.or(
                             Filters.exists(WorkflowTestingEndpoints._WORK_FLOW_TEST),
@@ -922,6 +936,14 @@ public class StartTestAction extends UserAction {
         return Action.SUCCESS.toUpperCase();
     }
 
+    public String modifyTestingRunConfig(){
+        TestingRunConfigDao.instance.updateOne(
+            Filters.eq(Constants.ID, this.testingRunConfigId),
+            Updates.set("configsAdvancedSettings", this.testConfigsAdvancedSettings)
+        );
+        return SUCCESS.toUpperCase();
+    }
+
 
     public void setType(TestingEndpoints.Type type) {
         this.type = type;
@@ -1263,5 +1285,13 @@ public class StartTestAction extends UserAction {
 
     public void setSendSlackAlert(boolean sendSlackAlert) {
         this.sendSlackAlert = sendSlackAlert;
+    }
+
+    public void setTestConfigsAdvancedSettings(List<TestConfigsAdvancedSettings> testConfigsAdvancedSettings) {
+        this.testConfigsAdvancedSettings = testConfigsAdvancedSettings;
+    }
+
+    public void setTestingRunConfigId(int testingRunConfigId) {
+        this.testingRunConfigId = testingRunConfigId;
     }
 }

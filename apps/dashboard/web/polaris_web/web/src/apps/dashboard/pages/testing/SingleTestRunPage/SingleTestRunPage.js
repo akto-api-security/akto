@@ -15,7 +15,8 @@ import {
   Card,
   ProgressBar,
   Tooltip,
-  Banner
+  Banner,
+  Modal
 } from '@shopify/polaris';
 
 import {
@@ -24,12 +25,13 @@ import {
   PriceLookupMinor,
   ReportMinor,
   RefreshMajor,
-  CustomersMinor
+  CustomersMinor,
+  EditMajor
 } from '@shopify/polaris-icons';
 import api from "../api";
 import func from '@/util/func';
 import { useParams } from 'react-router';
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useReducer } from 'react';
 import transform from "../transform";
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards";
 import WorkflowTestBuilder from "../workflow_test/WorkflowTestBuilder";
@@ -44,6 +46,8 @@ import { useSearchParams } from "react-router-dom";
 import TestRunResultPage from "../TestRunResultPage/TestRunResultPage";
 import { usePolling } from "../../../../main/PollingProvider";
 import LocalStore from "../../../../main/LocalStorageStore";
+import {produce} from "immer"
+import AdvancedSettingsComponent from "../../observe/api_collections/component/AdvancedSettingsComponent";
 
 const sortOptions = [
   { label: 'Severity', value: 'severity asc', directionLabel: 'Highest severity', sortKey: 'total_severity', columnIndex: 2},
@@ -126,9 +130,14 @@ function SingleTestRunPage() {
   const initialTestingObj = {testsInitiated: 0,testsInsertedInDb: 0,testingRunId: -1}
   const [currentTestObj, setCurrentTestObj] = useState(initialTestingObj)
   const [missingConfigs, setMissingConfigs] = useState([])
+  const [showEditableSettings, setShowEditableSettings] = useState(false) ;
+  const [testingRunConfigSettings, setTestingRunConfigSettings] = useState([])
+  const [testingRunConfigId, setTestingRunConfigId] = useState(-1)
 
   const refreshId = useRef(null);
   const hexId = params.hexId;
+  const [conditions, dispatchConditions] = useReducer(produce((draft, action) => func.conditionsReducer(draft, action)), []);
+
 
   const [searchParams, setSearchParams] = useSearchParams();
   const resultId = searchParams.get("result")
@@ -268,15 +277,17 @@ function SingleTestRunPage() {
         return b.startTimestamp - a.startTimestamp;
       })
       localSelectedTestRun = transform.prepareTestRun(testingRun, testingRunResultSummaries[0], cicd, false);
+      setTestingRunConfigSettings(testingRun.testingRunConfig?.configsAdvancedSettings || [])
+      setTestingRunConfigId(testingRun.testingRunConfig?.id || -1)
 
       if(setData){
         setSelectedTestRun(localSelectedTestRun);
       }
       if((localSelectedTestRun.testingRunResultSummaryHexId) && ((testRunResults[selectedTab].length === 0) || setData)) {
         await fetchTestingRunResultsData(localSelectedTestRun.testingRunResultSummaryHexId);
-        }
-      }) 
-      setLoading(false);
+      }
+    })  
+    setLoading(false);
     return localSelectedTestRun;
 }
 
@@ -488,13 +499,57 @@ const runningTestsComp = useMemo(() => (
         </Card>
     ) : null
 ), [currentTestObj, progress]);
+
+const handleModifyConfig = async() => {
+  const settings = transform.prepareConditionsForTesting(conditions)
+  await api.modifyTestingRunConfig(testingRunConfigId, settings).then(() =>{
+    func.setToast(true, false, "Modified testing run config successfully")
+    setShowEditableSettings(false)
+  })
+}
+
+const editableConfigsComp = (
+  <Modal
+    large
+    fullScreen
+    open={showEditableSettings}
+    onClose={() => setShowEditableSettings(false)}
+    title={"Edit test configurations"}
+    primaryAction={{
+        content: 'Save',
+        onAction: () => handleModifyConfig()
+    }}
+    >
+    <Modal.Section>
+        <AdvancedSettingsComponent 
+          key={"configSettings"} 
+          conditions={conditions} 
+          dispatchConditions={dispatchConditions} 
+          hideButton={true}
+        /> 
+    </Modal.Section>
+  </Modal>
+)
+
   const components = [ 
     runningTestsComp,<TrendChart key={tempLoading.running} hexId={hexId} setSummary={setSummary} show={selectedTestRun.run_type && selectedTestRun.run_type!=='One-time'}/> , 
-    metadataComponent(), loading ? <SpinnerCentered key="loading"/> : (!workflowTest ? resultTable : workflowTestBuilder)];
+    metadataComponent(), loading ? <SpinnerCentered key="loading"/> : (!workflowTest ? resultTable : workflowTestBuilder), editableConfigsComp];
 
   const openVulnerabilityReport = () => {
     let summaryId = selectedTestRun.testingRunResultSummaryHexId
     window.open('/dashboard/testing/summary/' + summaryId, '_blank');
+  }
+
+  const handleAddSettings = () => {
+    if(conditions.length === 0  && testingRunConfigSettings.length > 0){
+      testingRunConfigSettings.forEach((condition) => {
+        const operatorType = condition.operatorType
+        condition.operationsGroupList.forEach((obj) => {
+          const finalObj = {'data': obj, 'operator': {'type': operatorType}}
+          dispatchConditions({type:"add", obj: finalObj})
+        })
+      })
+    }
   }
 
   const EmptyData = () => {
@@ -580,6 +635,13 @@ const runningTestsComp = useMemo(() => (
      content: 'Export vulnerability report', 
      icon: ReportMinor, 
      onAction: () => openVulnerabilityReport()
+    }
+  ]})
+  moreActionsList.push({title: 'Update', items:[
+    {
+      content: 'Edit testing config settings',
+      icon: EditMajor,
+      onAction: () => { setShowEditableSettings(true); handleAddSettings(); }
     }
   ]})
   const moreActionsComp = (

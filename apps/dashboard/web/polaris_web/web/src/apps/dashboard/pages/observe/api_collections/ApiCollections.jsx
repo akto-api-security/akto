@@ -192,11 +192,11 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
 function ApiCollections() {
 
     const navigate = useNavigate();
-    const [data, setData] = useState({'hostname':[]})
+    const [data, setData] = useState({'all': [], 'hostname':[], 'groups': [], 'custom': [], 'deactivated': []})
     const [active, setActive] = useState(false);
     const [loading, setLoading] = useState(false)
-    const [selectedTab, setSelectedTab] = useState("hostname")
-    const [selected, setSelected] = useState(1)
+    
+   
     const [summaryData, setSummaryData] = useState({totalEndpoints:0 , totalTestedEndpoints: 0, totalSensitiveEndpoints: 0, totalCriticalEndpoints: 0})
     const [hasUsageEndpoints, setHasUsageEndpoints] = useState(true)
     const [envTypeMap, setEnvTypeMap] = useState({})
@@ -211,6 +211,12 @@ function ApiCollections() {
     const definedTableTabs = ['All', 'Hostname', 'Groups', 'Custom', 'Deactivated']
 
     const { tabsInfo, selectItems } = useTable()
+    const tableSelectedTab = PersistStore.getState().tableSelectedTab[window.location.pathname]
+    const initialSelectedTab = tableSelectedTab || "hostname";
+    const [selectedTab, setSelectedTab] = useState(initialSelectedTab)
+    let initialTabIdx = func.getTableTabIndexById(1, definedTableTabs, initialSelectedTab)
+    const [selected, setSelected] = useState(initialTabIdx)
+    
     const tableCountObj = func.getTabsCount(definedTableTabs, data)
     const tableTabs = func.getTableTabsContent(definedTableTabs, tableCountObj, setSelectedTab, selectedTab, tabsInfo)
 
@@ -273,7 +279,7 @@ function ApiCollections() {
         res.groups = dataObj.prettify.filter((c) => c.type === "API_GROUP" && !c.deactivated)
         res.custom = res.all.filter(x => !res.hostname.includes(x) && !x.deactivated && !res.groups.includes(x));
         setData(res);
-        if (res.hostname.length === 0) {
+        if (res.hostname.length === 0 && (tableSelectedTab === undefined || tableSelectedTab.length === 0)) {
             setTimeout(() => {
                 setSelectedTab("custom");
                 setSelected(3);
@@ -392,10 +398,13 @@ function ApiCollections() {
     }
     async function handleCollectionsAction(collectionIdList, apiFunction, toastContent){
         const collectionIdListObj = collectionIdList.map(collectionId => ({ id: collectionId.toString() }))
-        await apiFunction(collectionIdListObj)
+        await apiFunction(collectionIdListObj).then(() => {
+            func.setToast(true, false, `${collectionIdList.length} API collection${func.addPlurality(collectionIdList.length)} ${toastContent} successfully`)
+        }).catch((error) => {
+            func.setToast(true, true, error.message || 'Something went wrong!')
+        })
         resetResourcesSelected();
         fetchData()
-        func.setToast(true, false, `${collectionIdList.length} API collection${func.addPlurality(collectionIdList.length)} ${toastContent} successfully`)
     }
 
     const exportCsv = (selectedResources = []) =>{
@@ -428,10 +437,6 @@ function ApiCollections() {
         }
         let actions = [
             {
-                content: `Remove collection${func.addPlurality(selectedResources.length)}`,
-                onAction: () => handleCollectionsAction(selectedResources, api.deleteMultipleCollections, "deleted")
-            },
-            {
                 content: 'Export as CSV',
                 onAction: () => exportCsv(selectedResources)
             }
@@ -439,6 +444,7 @@ function ApiCollections() {
 
         const deactivated = allCollections.filter(x => { return x.deactivated }).map(x => x.id);
         const activated = allCollections.filter(x => { return !x.deactivated }).map(x => x.id);
+        const apiGrous = allCollections.filter(x => { return x?.type === 'API_GROUP' }).map(x => x?.id)
         if (selectedResources.every(v => { return activated.includes(v) })) {
             actions.push(
                 {
@@ -457,6 +463,14 @@ function ApiCollections() {
                         const message = "Please sync the usage data via Settings > billing after reactivating a collection to resume data ingestion and testing."
                         func.showConfirmationModal(message, "Activate collection", () => handleCollectionsAction(selectedResources, collectionApi.activateCollections, "activated"))
                     }
+                }
+            )
+        }
+        if (selectedResources.every(v => { return !apiGrous.includes(v) })) {
+            actions.push(
+                {
+                    content: `Remove collection${func.addPlurality(selectedResources.length)}`,
+                    onAction: () => handleCollectionsAction(selectedResources, api.deleteMultipleCollections, "deleted")
                 }
             )
         }

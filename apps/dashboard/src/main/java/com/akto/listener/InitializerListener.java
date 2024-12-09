@@ -118,6 +118,7 @@ import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import com.mongodb.ReadPreference;
+import com.mongodb.WriteConcern;
 import com.mongodb.bulk.BulkWriteResult;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.*;
@@ -132,6 +133,7 @@ import okhttp3.OkHttpClient;
 import org.apache.commons.csv.CSVRecord;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.bouncycastle.jcajce.provider.asymmetric.dsa.DSASigner.stdDSA;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 import org.json.JSONObject;
@@ -590,11 +592,17 @@ public class InitializerListener implements ServletContextListener {
                 CustomDataType existingCDT = customDataTypesMap.getOrDefault(piiKey, null);
                 CustomDataType newCDT = getCustomDataTypeFromPiiType(piiSource, piiType, false);
 
-                if (currTypes.containsKey(piiKey) &&
+                boolean hasNotChangedCondition = currTypes.containsKey(piiKey) &&
                         (currTypes.get(piiKey).equals(piiType) && dt.getBoolean(PIISource.ACTIVE, true)) &&
                         (existingCDT != null && existingCDT.getDataTypePriority() != null)
-                        && (existingCDT.getCategoriesList() != null && !existingCDT.getCategoriesList().isEmpty())
-                ) {
+                        && (existingCDT.getCategoriesList() != null && !existingCDT.getCategoriesList().isEmpty());
+
+                boolean userHasChangedCondition = false;
+                if(existingCDT != null && existingCDT.getUserModifiedTimestamp() > 0){
+                    userHasChangedCondition = true;
+                }
+                
+                if (userHasChangedCondition || hasNotChangedCondition) {
                     continue;
                 } else {
                     Severity dtSeverity = null;
@@ -2238,10 +2246,12 @@ public class InitializerListener implements ServletContextListener {
             public void run() {
 
                 ReadPreference readPreference = ReadPreference.primary();
-                if (runJobFunctions) {
-                    readPreference = ReadPreference.secondary();
+                WriteConcern writeConcern = WriteConcern.ACKNOWLEDGED;
+                if (runJobFunctions || DashboardMode.isSaasDeployment()) {
+                    readPreference = ReadPreference.primary();
+                    writeConcern = WriteConcern.W1;
                 }
-                DaoInit.init(new ConnectionString(mongoURI), readPreference);
+                DaoInit.init(new ConnectionString(mongoURI), readPreference, writeConcern);
 
                 connectedToMongo = false;
                 do {
@@ -2448,26 +2458,24 @@ public class InitializerListener implements ServletContextListener {
 
     static boolean executedOnce = false;
 
-    private final static int REFRESH_INTERVAL = 60 * 1; // 1 minute
+    private final static int REFRESH_INTERVAL = 60 * 15; // 15 minute
 
     public static Organization fetchAndSaveFeatureWiseAllowed(Organization organization) {
-
+        
+        int lastFeatureMapUpdate = organization.getLastFeatureMapUpdate();
+        if((lastFeatureMapUpdate + REFRESH_INTERVAL) >= Context.now()){
+            return organization;
+        }
         HashMap<String, FeatureAccess> featureWiseAllowed = new HashMap<>();
 
         try {
             int gracePeriod = organization.getGracePeriod();
             String hotjarSiteId = organization.getHotjarSiteId();
             String organizationId = organization.getId();
-
-            int lastFeatureMapUpdate = organization.getLastFeatureMapUpdate();
-
             /*
              * This ensures, we don't fetch feature wise allowed from akto too often.
              * This helps the dashboard to be more responsive.
              */
-            if(lastFeatureMapUpdate + REFRESH_INTERVAL > Context.now()){
-                return organization;
-            }
 
             HashMap<String, FeatureAccess> initialFeatureWiseAllowed = organization.getFeatureWiseAllowed();
             if (initialFeatureWiseAllowed == null) {
@@ -2529,7 +2537,7 @@ public class InitializerListener implements ServletContextListener {
             hotjarSiteId = OrganizationUtils.fetchHotjarSiteId(metaData);
             boolean expired = OrganizationUtils.fetchExpired(metaData);
             boolean telemetryEnabled = OrganizationUtils.fetchTelemetryEnabled(metaData);
-            setTelemetrySettings(organization, telemetryEnabled);
+            // setTelemetrySettings(organization, telemetryEnabled);
             boolean testTelemetryEnabled = OrganizationUtils.fetchTestTelemetryEnabled(metaData);
             organization.setTestTelemetryEnabled(testTelemetryEnabled);
 
@@ -2768,7 +2776,7 @@ public class InitializerListener implements ServletContextListener {
     }
 
     private static void makeFirstUserAdmin(BackwardCompatibility backwardCompatibility){
-        if(backwardCompatibility.getAddAdminRoleIfAbsent() == 0){
+        if(backwardCompatibility.getAddAdminRoleIfAbsent() < 1733228772){
            
             User firstUser = UsersDao.instance.getFirstUser(Context.accountId.get());
 
@@ -2783,6 +2791,11 @@ public class InitializerListener implements ServletContextListener {
                     Filters.eq(RBAC.USER_ID, firstUser.getId()),
                     Filters.eq(RBAC.ROLE, Role.MEMBER.name())
                 ));
+            }else{
+                loggerMaker.infoAndAddToDb("Found non-admin rbac for first user: " + firstUser.getLogin() + " , thus inserting admin role", LogDb.DASHBOARD);
+                RBACDao.instance.insertOne(
+                    new RBAC(firstUser.getId(), Role.ADMIN, Context.accountId.get())
+                );
             }
 
             BackwardCompatibilityDao.instance.updateOne(
@@ -2850,6 +2863,18 @@ public class InitializerListener implements ServletContextListener {
         }
     }
 
+    private static void deleteOptionsAPIs(BackwardCompatibility backwardCompatibility){
+        if(backwardCompatibility.getDeleteOptionsAPIs() == 0){
+            List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(Filters.nin(Constants.ID,UsageMetricCalculator.getDeactivated()),
+                                Projections.include(Constants.ID, ApiCollection.NAME, ApiCollection.HOST_NAME));
+            CleanInventory.deleteOptionsAPIs(apiCollections);
+            BackwardCompatibilityDao.instance.updateOne(
+                Filters.eq("_id", backwardCompatibility.getId()),
+                Updates.set(BackwardCompatibility.DELETE_OPTIONS_API, Context.now())
+            );
+        }
+    }
+
     public static void setBackwardCompatibilities(BackwardCompatibility backwardCompatibility){
         if (DashboardMode.isMetered()) {
             initializeOrganizationAccountBelongsTo(backwardCompatibility);
@@ -2871,6 +2896,7 @@ public class InitializerListener implements ServletContextListener {
         createRiskScoreGroups(backwardCompatibility);
         setApiCollectionAutomatedField(backwardCompatibility);
         createAutomatedAPIGroups(backwardCompatibility);
+        deleteOptionsAPIs(backwardCompatibility);
         deleteAccessListFromApiToken(backwardCompatibility);
         deleteNullSubCategoryIssues(backwardCompatibility);
         enableNewMerging(backwardCompatibility);
@@ -3047,6 +3073,7 @@ public class InitializerListener implements ServletContextListener {
 
                 int countTotalTemplates = 0;
                 int countUnchangedTemplates = 0;
+                Set<String> multiNodesIds = new HashSet<>();
 
                 while ((entry = zipInputStream.getNextEntry()) != null) {
                     if (!entry.isDirectory()) {
@@ -3070,16 +3097,20 @@ public class InitializerListener implements ServletContextListener {
 
                         TestConfig testConfig = null;
                         countTotalTemplates++;
+                        List<YamlTemplate> existingTemplatesInDb = new ArrayList<>();
                         try {
                             testConfig = TestConfigYamlParser.parseTemplate(templateContent);
                             String testConfigId = testConfig.getId();
 
-                            List<YamlTemplate> existingTemplatesInDb = mapIdToHash.get(testConfigId);
+                            existingTemplatesInDb = mapIdToHash.get(testConfigId);
 
                             if (existingTemplatesInDb != null && existingTemplatesInDb.size() == 1) {
                                 int existingTemplateHash = existingTemplatesInDb.get(0).getHash();
                                 if (existingTemplateHash == templateContent.hashCode()) {
                                     countUnchangedTemplates++;
+                                    if(TestConfig.isTestMultiNode(testConfig)){
+                                        multiNodesIds.add(testConfigId);
+                                    }
                                     continue;
                                 } else {
                                     loggerMaker.infoAndAddToDb("Updating test yaml: " + testConfigId, LogDb.DASHBOARD);
@@ -3092,10 +3123,19 @@ public class InitializerListener implements ServletContextListener {
                                     LogDb.DASHBOARD);
                         }
 
+                        // new or updated template
                         if (testConfig != null) {
                             String id = testConfig.getId();
                             int createdAt = Context.now();
                             int updatedAt = Context.now();
+
+                            if (TestConfig.isTestMultiNode(testConfig)) {
+                                if(existingTemplatesInDb != null && existingTemplatesInDb.size() == 1){
+                                    multiNodesIds.add(id);
+                                }else if(!DashboardMode.isMetered()){
+                                    continue;
+                                }
+                            }
 
                             List<Bson> updates = new ArrayList<>(
                                     Arrays.asList(
@@ -3146,6 +3186,13 @@ public class InitializerListener implements ServletContextListener {
 
                     // Close the current entry to proceed to the next one
                     zipInputStream.closeEntry();
+                }
+
+                if(!DashboardMode.isMetered()){
+                    loggerMaker.infoAndAddToDb("Deleting " + multiNodesIds.size() + " templates for local deployment", LogDb.DASHBOARD);
+                    YamlTemplateDao.instance.deleteAll(
+                        Filters.in(Constants.ID, multiNodesIds)
+                    );
                 }
 
                 if (countTotalTemplates != countUnchangedTemplates) {

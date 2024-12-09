@@ -350,6 +350,115 @@ const awsApiGatewayObj = {
     key: "AWS_API_GATEWAY",
 }
 
+const ecsObj = {
+    icon: '/public/ecs.svg',
+    label: "AWS ECS",
+    text: "You can deploy Akto in AWS and collect traffic through containers on your AWS ECS cluster.",
+    docsUrl: 'https://docs.akto.io/traffic-connector/aws-services/aws-ecs',
+    component: <AddOnComponenet/>,
+    key: "ECS",
+}
+
+const mulesoftObj = {
+    icon: '/public/mulesoft.svg',
+    label: "MuleSoft",
+    text: "Mulesoft setup is recommended if you are using API management and ESB capabilities to manage, secure, and analyze your APIs.",
+    docsUrl: 'https://docs.akto.io/traffic-connector/api-gateways/mulesoft-flex',
+    component: <AddOnComponenet/>,
+    key: "mulesoft",
+}
+
+const citrixObj = {
+    icon: '/public/citrix.svg',
+    label: "Citrix",
+    text: "Citrix setup is recommended if you are using ADC (NetScaler) to manage, secure, and optimize your API traffic.",
+    docsUrl: 'https://docs.akto.io/traffic-connector/api-gateways/mulesoft-flex',
+    component: <AddOnComponenet/>,
+    key: "citrix",
+}
+
+const azureappserviceObj = {
+    icon: '/public/azureappservice.svg',
+    label: "Azure App Services",
+    text: "Azure App Services setup is recommended if you are using Microsoft's web app service with sidecar containers to collect and analyze your API traffic.",
+    docsUrl: 'https://docs.akto.io/traffic-connector/azure-services/azure-app-service',
+    component: <AddOnComponenet/>,
+    key: "azureappservice",
+}
+
+const ibmapiconnectObj = {
+    icon: '/public/ibmapiconnect.svg',
+    label: "IBM API Connect",
+    text: "This setup is recommended if your APIs are managed by IBM API Connect",
+    docsUrl: 'https://docs.akto.io/traffic-connector/api-gateways/connect-akto-with-ibm-connect',
+    component: <AddOnComponenet/>,
+    key: "IBM API connect",
+}
+
+const gcrfuncObj = {
+    icon: '/public/gcrfunc.svg',
+    label: "Google Cloud Run Functions",
+    text: "This setup is recommended if your applications are deployed using Google Cloud Run Functions.",
+    docsUrl: 'https://docs.akto.io/traffic-connector/gcp-services/connect-akto-with-google-cloud-run-functions',
+    component: <AddOnComponenet/>,
+    key: "Google Cloud Run Functions",
+}
+
+const gcrObj = {
+    icon: '/public/gcr.svg',
+    label: "Google Cloud Run",
+    text: "Google Cloud Run setup is recommended if you are using Google's serverless platform.",
+    docsUrl: 'https://docs.akto.io/traffic-connector/gcp-services/connect-akto-with-google-cloud-run',
+    component: <AddOnComponenet/>,
+    key: "Google Cloud Run",
+}
+
+const gkeObj = {
+    icon: '/public/gke.svg',
+    label: "GKE",
+    text: "This setup is recommended if you are running containerized applications on Google Kubernetes Engine.",
+    docsUrl: 'https://docs.akto.io/traffic-connector/gcp-services/connect-akto-with-gke',
+    component: <AddOnComponenet/>,
+    key: "GKE",
+}
+
+const aksObj = {
+    icon: '/public/aks.svg',
+    label: "AKS",
+    text: "This setup is recommended if you are deploying applications on Azure Kubernetes Service.",
+    docsUrl: 'https://docs.akto.io/traffic-connector/azure-services/connect-akto-with-aks',
+    component: <AddOnComponenet/>,
+    key: "AKS",
+}
+
+const azureopenshiftObj = {
+    icon: '/public/openshift.svg',
+    label: "Azure Openshift",
+    text: "Azure OpenShift setup is recommended if your containerized applications are running on Azure Red Hat OpenShift.",
+    docsUrl: 'https://docs.akto.io/traffic-connector/azure-services/connect-akto-with-azure-openshift',
+    component: <AddOnComponenet/>,
+    key: "Azure Openshift",
+}
+
+const azurecontainerappObj = {
+    icon: '/public/aca.svg',
+    label: "Azure Container App",
+    text: "This setup is recommended if your applications are deployed using Azure Container Apps.",
+    docsUrl: 'https://docs.akto.io/traffic-connector/azure-services/connect-akto-with-azure-container-app',
+    component: <AddOnComponenet/>,
+    key: "Azure Container App",
+}
+
+const azurefuncObj = {
+    icon: '/public/af.svg',
+    label: "Azure Functions",
+    text: "Azure Functions setup is recommended if you are using Azure's serverless compute service.",
+    docsUrl: 'https://docs.akto.io/traffic-connector/azure-services/connect-akto-with-azure-functions',
+    component: <AddOnComponenet/>,
+    key: "Azure Functions",
+}
+
+
 const quick_start_policy_lines= [
     `{`,
     `    "Version": "2012-10-17",`,
@@ -906,7 +1015,7 @@ const quickStartFunc = {
 
         // API Gateways
         const apiGateways = [
-            apigeeObj, azureObj, cloudflareObj, f5Obj, kongmeshObj, layer7Obj, threescaleObj, nginxObj, haproxyObj, envoyObj, istioObj, kongObj
+            apigeeObj, azureObj, cloudflareObj, f5Obj, kongmeshObj, layer7Obj, threescaleObj, nginxObj, haproxyObj, envoyObj, istioObj, kongObj, ibmapiconnectObj, citrixObj, azureappserviceObj, mulesoftObj
         ];
 
         // Mirroring
@@ -916,7 +1025,17 @@ const quickStartFunc = {
 
         // AWS Services
         const awsServices = [
-            awsApiGatewayObj, eksObj, fargateObj, beanStalkObj
+            awsApiGatewayObj, eksObj, fargateObj, beanStalkObj, ecsObj
+        ];
+
+        // GCP Services
+        const gcpServices = [
+            gcpObj, apigeeObj, gcrObj, gcrfuncObj, gkeObj
+        ];
+
+        // Azure Services
+        const azureServices = [
+            azureappserviceObj, aksObj, azureopenshiftObj, azurefuncObj, azurecontainerappObj, azureObj
         ];
 
         // Manual
@@ -941,6 +1060,8 @@ const quickStartFunc = {
             "API Gateways": apiGateways,
             "Mirroring": mirroring,
             "AWS Services": awsServices,
+            "GCP Services": gcpServices,
+            "Azure Services": azureServices,
             "Manual": manual,
             "Akto SDK": aktoSdk,
             "Virtual Machines": vm,

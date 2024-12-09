@@ -365,6 +365,12 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
         return processPipelineForEndpoint(pipeline);
     }
 
+    public List<ApiInfo.ApiInfoKey> fetchEndpointsInCollection(Bson filter) {
+        List<Bson> pipeline = getPipelineForEndpoints(filter);
+        pipeline.add(Aggregates.limit(SingleTypeInfoDao.LARGE_LIMIT));
+        return processPipelineForEndpoint(pipeline);
+    }
+
     public List<ApiInfo.ApiInfoKey> fetchEndpointsInCollection(Method method) {
         Bson filter = null;
         if (method == null) {
@@ -695,18 +701,37 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
         return count;
     }
 
-    public List<BasicDBObject> fetchRecentEndpoints(int startTimestamp, int endTimestamp, Set<Integer> deactivatedCollections){
-        List<BasicDBObject> endpoints = new ArrayList<>();
-        List <Integer> nonHostApiCollectionIds = ApiCollectionsDao.instance.fetchNonTrafficApiCollectionsIds();
-        nonHostApiCollectionIds.addAll(deactivatedCollections);
+    public Bson getFilterForHostApis(int startTimestamp, int endTimestamp, Set<Integer> deactivatedCollections, List <Integer> nonHostApiCollectionIds){
 
         Bson hostFilterQ = SingleTypeInfoDao.filterForHostHeader(0, false);
+        nonHostApiCollectionIds.addAll(deactivatedCollections);
         Bson filterQWithTs = Filters.and(
                 Filters.gte(SingleTypeInfo._TIMESTAMP, startTimestamp),
                 Filters.lte(SingleTypeInfo._TIMESTAMP, endTimestamp),
                 Filters.nin(SingleTypeInfo._API_COLLECTION_ID, nonHostApiCollectionIds),
                 hostFilterQ
         );
+        return filterQWithTs;
+    }
+
+    public List<Bson> buildPipelineForTrend(boolean isNotKubernetes){
+        List<Bson> pipeline = new ArrayList<>();
+        pipeline.add(Aggregates.project(Projections.computed("dayOfYearFloat", new BasicDBObject("$divide", new Object[]{"$timestamp", 86400}))));
+        Bson doyProj = Projections.computed("dayOfYear", new BasicDBObject("$divide", new Object[]{"$timestamp", 86400}));
+        if (isNotKubernetes) {
+            doyProj = Projections.computed("dayOfYear", new BasicDBObject("$floor", new Object[]{"$dayOfYearFloat"}));
+        }
+        pipeline.add(Aggregates.project(doyProj));
+        pipeline.add(Aggregates.group("$dayOfYear", Accumulators.sum("count", 1)));
+
+        return pipeline;
+    }
+
+    public List<BasicDBObject> fetchRecentEndpoints(int startTimestamp, int endTimestamp, Set<Integer> deactivatedCollections){
+        List <Integer> nonHostApiCollectionIds = ApiCollectionsDao.instance.fetchNonTrafficApiCollectionsIds();
+        nonHostApiCollectionIds.addAll(deactivatedCollections);
+        List<BasicDBObject> endpoints = new ArrayList<>();
+        Bson filterQWithTs = getFilterForHostApis(startTimestamp, endTimestamp, deactivatedCollections, nonHostApiCollectionIds);
         List<SingleTypeInfo> latestHosts = SingleTypeInfoDao.instance.findAll(filterQWithTs, 0, 20_000, Sorts.descending("timestamp"), Projections.exclude("values"));
         for(SingleTypeInfo sti: latestHosts) {
             BasicDBObject id = 

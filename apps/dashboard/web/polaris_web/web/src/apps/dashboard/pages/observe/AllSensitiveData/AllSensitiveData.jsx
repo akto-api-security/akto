@@ -135,7 +135,7 @@ const convertToDataTypesData = (type, collectionsMap, countMap, subtypeToApiColl
 
 function AllSensitiveData() {
 
-    const [data, setData] = useState({"enabled":[]})
+    const [data, setData] = useState({'all': [], "enabled":[], 'disabled': []})
     const [mapData, setMapData] = useState({})
     const [prompts, setPrompts] = useState([])
     const [isGptScreenActive, setIsGptScreenActive] = useState(false)
@@ -149,12 +149,14 @@ function AllSensitiveData() {
     })
     const [countMap, setCountMap] = useState({})
     const [severityCountMap, setSeverityCountMap] = useState([])
-
-    const [selectedTab, setSelectedTab] = useState("enabled")
-    const [selected, setSelected] = useState(1)
     const [loading, setLoading] = useState(false)
 
     const definedTableTabs = ["All", "Enabled", "Disabled"]
+    const tableSelectedTab = PersistStore.getState().tableSelectedTab[window.location.pathname]
+    const initialSelectedTab = tableSelectedTab || "enabled"
+    const [selectedTab, setSelectedTab] = useState(initialSelectedTab)
+    let initialTabIdx = func.getTableTabIndexById(1, definedTableTabs, initialSelectedTab)
+    const [selected, setSelected] = useState(initialTabIdx)
 
     const { tabsInfo } = useTable()
     const tableCountObj = func.getTabsCount(definedTableTabs, data)

@@ -16,6 +16,13 @@ export default {
             data: filters
         })
     },
+    fetchIssuesFromResultIds(issuesIds, issueStatusQuery) {
+        return request({
+            url: 'api/fetchIssuesFromResultIds',
+            method: 'post',
+            data: {issuesIds, issueStatusQuery}
+        })
+    },
     bulkUpdateIssueStatus (issueIdArray, statusToBeUpdated, ignoreReason) {
         return request({
             url: 'api/bulkUpdateIssueStatus',

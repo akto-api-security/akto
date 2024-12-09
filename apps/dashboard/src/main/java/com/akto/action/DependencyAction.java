@@ -39,6 +39,7 @@ public class DependencyAction extends UserAction {
     private boolean dependencyGraphExists = false;
     public String checkIfDependencyGraphAvailable() {
 
+        long start = System.currentTimeMillis();
         Node node = DependencyFlowNodesDao.instance.findOne(
                 Filters.and(
                         Filters.eq("apiCollectionId", apiCollectionId + ""),
@@ -47,6 +48,8 @@ public class DependencyAction extends UserAction {
                         Filters.ne("maxDepth", 0)
                 ), Projections.include("_id")
         );
+        long end = System.currentTimeMillis();
+        loggerMaker.infoAndAddToDb("checkIfDependencyGraphAvailable db call took: " + (end - start) + " ms");
 
         dependencyGraphExists = node != null;
         return SUCCESS.toUpperCase();

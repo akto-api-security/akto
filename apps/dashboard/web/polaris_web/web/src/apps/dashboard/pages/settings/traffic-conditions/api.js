@@ -29,11 +29,11 @@ const trafficFiltersRequest = {
             data: {templateId: id, inactive: inactive}
         })
     },
-    dryRunAdvancedFilters(yamlContent){
+    dryRunAdvancedFilters(yamlContent, deleteAPIsInstantly){
         return request({
             url: '/api/dryRunAdvancedFilters',
             method: 'post',
-            data: {yamlContent}
+            data: {yamlContent, deleteAPIsInstantly}
         })
     },
     getAdvancedFiltersPermissions(){

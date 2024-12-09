@@ -45,6 +45,9 @@ public class CustomDataType {
     public static final String ICON_STRING = "iconString";
     private String iconString;
 
+    public static final String  USER_MODIFIED_TIMESTAMP = "userModifiedTimestamp";
+    private int userModifiedTimestamp;
+
     public CustomDataType() { }
 
     public CustomDataType(String name, boolean sensitiveAlways, List<SingleTypeInfo.Position> sensitivePosition, int creatorId, boolean active, Conditions keyConditions, Conditions valueConditions, Conditions.Operator operator, IgnoreData ignoreData, boolean redacted, boolean sampleDataFixed) {
@@ -78,21 +81,26 @@ public class CustomDataType {
     }
 
     public boolean validateRaw(Object value, Object key) throws Exception {
-        if (this.keyConditions == null && this.valueConditions==null) return false;
+        return validateRawUtility(value, key, this.keyConditions, this.valueConditions, this.operator);
+    }
+
+
+    public static boolean validateRawUtility(Object value, Object key, Conditions keyConditions, Conditions valueConditions, Conditions.Operator operator) {
+        if (keyConditions == null && valueConditions==null) return false;
         boolean keyResult = true;
-        if (this.keyConditions != null) {
-            keyResult = this.keyConditions.validate(key);
+        if (keyConditions != null) {
+            keyResult = keyConditions.validate(key);
         }
 
         boolean valueResult = true;
-        if (this.valueConditions != null) {
-            valueResult = this.valueConditions.validate(value);
+        if (valueConditions != null) {
+            valueResult = valueConditions.validate(value);
         }
 
-        if (this.valueConditions ==null || this.keyConditions == null) {
+        if (valueConditions ==null || keyConditions == null) {
             return keyResult && valueResult;
         } else {
-            switch (this.operator) {
+            switch (operator) {
                 case AND:
                     return keyResult && valueResult;
                 case OR:
@@ -103,7 +111,7 @@ public class CustomDataType {
             }
         }
     }
-        
+
     public ObjectId getId() {
         return id;
     }
@@ -257,4 +265,16 @@ public class CustomDataType {
     public void setIconString(String iconString) {
         this.iconString = iconString;
     }
+
+    public int getUserModifiedTimestamp() {
+        return userModifiedTimestamp;
+    }
+
+    public void setUserModifiedTimestamp(int userModifiedTimestamp) {
+        this.userModifiedTimestamp = userModifiedTimestamp;
+    }
+
+   
+    
+    
 }

@@ -96,7 +96,7 @@ export default function LeftNav(){
                 label: <Text variant="bodyMd" fontWeight="medium" color={leftNavSelected.includes("testing") ? (active === 'active' ? "subdued" : ""): ""}>Testing</Text>,
                 icon: MarketingFilledMinor,
                 onClick: ()=>{
-                  navigate('/dashboard/testing')
+                  navigate('/dashboard/testing/')
                   handleSelect('dashboard_testing')
                   setActive("normal")
                 },
@@ -105,7 +105,7 @@ export default function LeftNav(){
                   {
                     label: 'Results',
                     onClick: ()=>{
-                      navigate('/dashboard/testing')
+                      navigate('/dashboard/testing/')
                       handleSelect('dashboard_testing')
                       setActive('active')
                     },

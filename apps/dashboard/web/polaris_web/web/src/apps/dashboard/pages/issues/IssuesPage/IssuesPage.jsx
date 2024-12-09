@@ -25,7 +25,6 @@ import useTable from "../../../components/tables/TableContext.js";
 import values from "@/util/values";
 import SpinnerCentered from "../../../components/progress/SpinnerCentered.jsx";
 import TableStore from "../../../components/tables/TableStore.js";
-import observeFunc from "../../../pages/observe/transform.js"
 import CriticalFindingsGraph from "./CriticalFindingsGraph.jsx";
 import CriticalUnsecuredAPIsOverTimeGraph from "./CriticalUnsecuredAPIsOverTimeGraph.jsx";
 

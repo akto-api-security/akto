@@ -20,6 +20,9 @@ import com.akto.utils.Token;
 import com.akto.utils.JWT;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.FindOneAndUpdateOptions;
+import com.mongodb.client.model.PushOptions;
+import com.mongodb.client.model.ReturnDocument;
 import com.mongodb.client.model.Updates;
 import com.opensymphony.xwork2.Action;
 
@@ -42,7 +45,6 @@ import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-import static com.akto.filter.UserDetailsFilter.LOGIN_URI;
 import static com.akto.util.Constants.TWO_HOURS_TIMESTAMP;
 
 // Validates user from the supplied username and password
@@ -149,6 +151,8 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
         }
     }
 
+    private final static int REFRESH_INTERVAL = 24 * 60 * 60; // one day.
+
     public static String loginUser(User user, HttpServletResponse servletResponse, boolean signedUp, HttpServletRequest servletRequest) {
         String refreshToken;
         Map<String,Object> claims = new HashMap<>();
@@ -190,33 +194,36 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
             session.setAttribute("user", user);
             session.setAttribute("login", Context.now());
             if (signedUp) {
-                UsersDao.instance.getMCollection().findOneAndUpdate(
+                User tempUser = UsersDao.instance.getMCollection().findOneAndUpdate(
                         Filters.eq("_id", user.getId()),
                         Updates.combine(
-                                Updates.set("refreshTokens", refreshTokens),
+                                Updates.pushEach("refreshTokens", Collections.singletonList(refreshToken), new PushOptions().slice(-10)),
                                 Updates.set(User.LAST_LOGIN_TS, Context.now())
-                        )
+                        ),
+                        new FindOneAndUpdateOptions().returnDocument(ReturnDocument.BEFORE)
                 );
                 /*
                  * Creating datatype to template on user login.
                  * TODO: Remove this job once templates for majority users are created.
                  */
-                service.submit(() -> {
-                    try {
-                        for (String accountIdStr : user.getAccounts().keySet()) {
-                            int accountId = Integer.parseInt(accountIdStr);
-                            Context.accountId.set(accountId);
-                            SingleTypeInfo.fetchCustomDataTypes(accountId);
-                            logger.info("updating data type test templates for account " + accountId);
-                            InitializerListener.executeDataTypeToTemplate();
+                if ((tempUser.getLastLoginTs() + REFRESH_INTERVAL) < Context.now()) {
+                    service.submit(() -> {
+                        try {
+                            for (String accountIdStr : user.getAccounts().keySet()) {
+                                int accountId = Integer.parseInt(accountIdStr);
+                                Context.accountId.set(accountId);
+                                SingleTypeInfo.fetchCustomDataTypes(accountId);
+                                logger.info("updating data type test templates for account " + accountId);
+                                InitializerListener.executeDataTypeToTemplate();
+                            }
+                        } catch (Exception e) {
                         }
-                    } catch (Exception e) {
-                    }
-                });
+                    });
+                    service.submit(() ->{
+                        triggerVulnColUpdation(user);
+                    });
+                }
             }
-            service.submit(() ->{
-                triggerVulnColUpdation(user);
-            });
             return Action.SUCCESS.toUpperCase();
         } catch (NoSuchAlgorithmException | InvalidKeySpecException | IOException e) {
             e.printStackTrace();

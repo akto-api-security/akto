@@ -145,7 +145,7 @@ public class SampleDataToSTI {
         APICatalogSync apiCatalogSync = new APICatalogSync("0",0, true,false);
         for (int apiCollectionId : aggregatorMap.keySet()) {
             URLAggregator aggregator = aggregatorMap.get(apiCollectionId);
-            apiCatalogSync.computeDelta(aggregator, false, apiCollectionId);
+            apiCatalogSync.computeDelta(aggregator, false, apiCollectionId, false);
             for (Integer key : apiCatalogSync.delta.keySet()) {
                 APICatalog apiCatalog = apiCatalogSync.delta.get(key);
                 singleTypeInfos.addAll(apiCatalog.getAllTypeInfo());

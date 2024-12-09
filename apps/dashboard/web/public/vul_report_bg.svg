@@ -1,0 +1,22 @@
+<svg width="595" height="842" viewBox="0 0 595 842" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g clip-path="url(#clip0_16602_56581)">
+<rect width="595" height="842" fill="#6200EA"/>
+<line x1="390.5" y1="2.18557e-08" x2="390.5" y2="842" stroke="white" stroke-opacity="0.3"/>
+<rect x="392" y="36" width="179" height="2" transform="rotate(90 392 36)" fill="#FDCA34"/>
+<line x1="483.5" y1="2.18557e-08" x2="483.5" y2="842" stroke="white" stroke-opacity="0.3"/>
+<line x1="298.5" y1="2.18557e-08" x2="298.5" y2="842" stroke="white" stroke-opacity="0.3"/>
+<line x1="113.5" y1="2.18557e-08" x2="113.5" y2="842" stroke="white" stroke-opacity="0.3"/>
+<line x1="205.5" y1="2.18557e-08" x2="205.5" y2="842" stroke="white" stroke-opacity="0.3"/>
+<line x1="575.5" y1="2.18557e-08" x2="575.5" y2="842" stroke="white" stroke-opacity="0.3"/>
+<line x1="20.5" y1="1" x2="20.5" y2="843" stroke="white" stroke-opacity="0.3"/>
+<rect x="115" y="362" width="179" height="1.99999" transform="rotate(90 115 362)" fill="#FDCA34"/>
+<rect x="207" y="495" width="179" height="2" transform="rotate(90 207 495)" fill="#FDCA34"/>
+<rect x="392" y="625" width="179" height="2" transform="rotate(90 392 625)" fill="#FDCA34"/>
+<rect x="577" y="247" width="179" height="2" transform="rotate(90 577 247)" fill="#FDCA34"/>
+</g>
+<defs>
+<clipPath id="clip0_16602_56581">
+<rect width="595" height="842" fill="white"/>
+</clipPath>
+</defs>
+</svg>

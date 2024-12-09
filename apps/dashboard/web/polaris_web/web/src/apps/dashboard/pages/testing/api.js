@@ -34,11 +34,11 @@ export default {
         })
         return resp        
     },
-    async fetchAllSubCategories(fetchOnlyActive, mode) {
+    async fetchAllSubCategories(fetchOnlyActive, mode, skip, limit) {
         const resp = await request({
             url: 'api/fetchAllSubCategories',
             method: 'post',
-            data: { fetchOnlyActive, mode }
+            data: { fetchOnlyActive, mode, skip, limit }
         })
         return resp
     },
@@ -446,6 +446,13 @@ export default {
             url: '/api/fetchIssuesByStatusAndSummaryId',
             method: 'post',
             data: { latestTestingRunSummaryId, issueStatusQuery }
+        })
+    },
+    modifyTestingRunConfig(testingRunConfigId, testConfigsAdvancedSettings){
+        return request({
+            url: '/api/modifyTestingRunConfig',
+            method: 'post',
+            data: { testingRunConfigId, testConfigsAdvancedSettings }
         })
     }
 }

@@ -278,10 +278,10 @@ const transform = {
       obj['name'] = data.name || "Test"
       obj['number_of_tests'] = data.testIdConfig == 1 ? "-" : getTestsInfo(testingRunResultSummary?.testResultsCount, state)
       obj['run_type'] = getTestingRunType(data, testingRunResultSummary, cicd);
-      obj['run_time_epoch'] = Math.max(data.scheduleTimestamp,data.endTimestamp)
+      obj['run_time_epoch'] = Math.max(data.scheduleTimestamp, (cicd ? testingRunResultSummary.endTimestamp : data.endTimestamp))
       obj['scheduleTimestamp'] = data.scheduleTimestamp
       obj['pickedUpTimestamp'] = data.pickedUpTimestamp
-      obj['run_time'] = getRuntime(data.scheduleTimestamp ,data.endTimestamp, state)
+      obj['run_time'] = getRuntime(data.scheduleTimestamp , (cicd ? testingRunResultSummary.endTimestamp : data.endTimestamp), state)
       obj['severity'] = func.getSeverity(testingRunResultSummary.countIssues)
       obj['total_severity'] = getTotalSeverity(testingRunResultSummary.countIssues);
       obj['severityStatus'] = func.getSeverityStatus(testingRunResultSummary.countIssues)
@@ -593,8 +593,43 @@ const transform = {
     }
     return conditions;
   },
+  async getAllSubcategoriesData(fetchActive,type){
+    let finalDataSubCategories = [], promises = [], categories = [];
+    let testSourceConfigs = []
+    const limit = 50;
+    for(var i = 0 ; i < 20; i++){
+      promises.push(
+        api.fetchAllSubCategories(fetchActive, type, i * limit, limit)
+      )
+    }
+    const allResults = await Promise.allSettled(promises);
+    for (const result of allResults) {
+      if (result.status === "fulfilled"){
+        if(result?.value?.subCategories && result?.value?.subCategories !== undefined && result?.value?.subCategories.length > 0){
+          finalDataSubCategories.push(...result.value.subCategories);
+        }
+
+        if(result?.value?.categories && result?.value?.categories !== undefined && result?.value?.categories.length > 0){
+          if(categories.length === 0){
+            categories.push(...result.value.categories);
+          }
+        }
+
+        if (result?.value?.testSourceConfigs &&
+          result?.value?.testSourceConfigs !== undefined &&
+          result?.value?.testSourceConfigs.length > 0) {
+          testSourceConfigs = result?.value?.testSourceConfigs
+        }
+      }
+    }
+    return {
+      categories: categories,
+      subCategories: finalDataSubCategories,
+      testSourceConfigs: testSourceConfigs
+    }
+  },
   async setTestMetadata() {
-    const resp = await api.fetchAllSubCategories(false, "Dashboard");
+    const resp = await this.getAllSubcategoriesData(false, "Dashboard")
     let subCategoryMap = {};
     resp.subCategories.forEach((x) => {
       func.trimContentFromSubCategory(x)
@@ -1064,7 +1099,24 @@ getMissingConfigs(testResults){
   })
 
   return [...configsSet]
-}
+},
+  prepareConditionsForTesting(conditions){
+    let tempObj = {};
+    conditions.forEach((condition) => {
+      if(tempObj.hasOwnProperty(condition?.operator?.type)){
+        tempObj[condition?.operator?.type].push(condition.data)
+      }else{
+        tempObj[condition?.operator?.type] = [condition.data]
+      }
+    })
+
+    return Object.keys(tempObj).map((key) => {
+      return {
+        operatorType: key,
+        operationsGroupList: tempObj[key],
+      };
+    });
+  }
 }
 
 export default transform

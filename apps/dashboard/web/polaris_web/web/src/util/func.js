@@ -353,15 +353,15 @@ prettifyEpoch(epoch) {
       return;
     }
 
-    // Using the Clipboard API for modern browsers
-    navigator.clipboard.writeText(text)
-      .then(() => {
-        // Add toast here
+    setTimeout(() => {
+      navigator.clipboard.writeText(text).then(() => {
         this.setToast(true,false, toastMessage ? toastMessage : 'Text copied to clipboard successfully!');
       })
       .catch((err) => {
         this.setToast(true,true,`Failed to copy text to clipboard: ${err}`);
       });
+    }, 0)
+      
   },
   epochToDateTime(timestamp) {
     var date = new Date(timestamp * 1000);
@@ -449,7 +449,7 @@ prettifyEpoch(epoch) {
   },
   requestJson: function (message, highlightPaths) {
 
-    if(message==undefined){
+    if(!message || typeof message !== "object" || Object.keys(message).length === 0){
       return {}
     }
     let result = {}
@@ -464,8 +464,8 @@ prettifyEpoch(epoch) {
       requestPayloadString = message["request"]["body"] || "{}"
     } else {
       let url = message["path"]
-      let urlSplit = url.split("?")
-      queryParamsString = urlSplit.length > 1 ? urlSplit[1] : ""
+      let urlSplit = (typeof url === "string") ? url?.split("?") : []
+      queryParamsString = urlSplit?.length > 1 ? urlSplit[1] : ""
 
       requestHeadersString = message["requestHeaders"] || "{}"
       requestPayloadString = message["requestPayload"] || "{}"
@@ -515,7 +515,7 @@ prettifyEpoch(epoch) {
   },
   responseJson: function (message, highlightPaths) {
 
-    if(message==undefined){
+    if(!message || typeof message !== "object" || Object.keys(message).length === 0){
       return {}
     }
     let result = {}
@@ -1049,6 +1049,17 @@ getDeprecatedEndpoints(apiInfoList, unusedEndpoints, apiCollectionId) {
         return draft;
     }
 },
+  conditionsReducer(draft, action) {
+    switch (action.type) {
+        case "add": draft.push(action.obj); break;
+        case "overwrite": draft[action.index][action.key] = { };
+        case "update": draft[action.index][action.key] = { ...draft[action.index][action.key], ...action.obj }; break;
+        case "updateKey": draft[action.index] = { ...draft[action.index], [action.key]: action.obj }; break;
+        case "delete": return draft.filter((item, index) => index !== action.index);
+        case "clear": return [];
+        default: break;
+    }
+  },
   toYMD(date) {
     var d = date.getDate();
     var m = date.getMonth() + 1; //Month from 0 to 11
@@ -1707,6 +1718,18 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
 
   trimContentFromSubCategory(subcategory) {
       subcategory["content"] = ""
+  },
+
+  getTableTabIndexById(defaultTabIndex, definedTableTabs, selectedTabId) {
+    let initialIdx = defaultTabIndex;
+    for(let x = 0; x < definedTableTabs.length; x++) {
+        const tempId = func.getKeyFromName(definedTableTabs[x]);
+        if (tempId === selectedTabId) {
+            initialIdx = x;
+            break;
+        }
+    }
+    return initialIdx
   },
 
 }

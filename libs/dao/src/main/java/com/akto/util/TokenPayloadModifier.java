@@ -1,14 +1,13 @@
 package com.akto.util;
 
 import java.util.ArrayList;
-import java.util.Collections;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.testing.AuthParam;
 
-import okhttp3.Cookie;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -34,7 +33,7 @@ public class TokenPayloadModifier {
                 CookieTransformer.modifyCookie(cookieList, key, value);
             } else {
                 if (headers.containsKey(k)) {
-                    headers.put(k, Collections.singletonList(value));
+                    headers.put(k, Arrays.asList(value));
                 }
                 if (CookieTransformer.isKeyPresentInCookie(cookieList, key)) {
                     CookieTransformer.modifyCookie(cookieList, key, value);

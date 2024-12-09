@@ -214,8 +214,8 @@ public class TestRedactSampleData {
 
         assertEquals(2, redactedHttpResponseParams.requestParams.getHeaders().size());
         assertEquals(1, redactedHttpResponseParams.getHeaders().size());
-        assertEquals("{}", redactedHttpResponseParams.requestParams.getPayload());
-        assertEquals("{}", redactedHttpResponseParams.getPayload());
+        assertEquals("something random", redactedHttpResponseParams.requestParams.getPayload());
+        assertEquals("random response payload", redactedHttpResponseParams.getPayload());
         assertEquals(200, redactedHttpResponseParams.statusCode);
 
     }

@@ -5,7 +5,7 @@ import { AppsMinor, MarketingMinor, ResetMinor, CustomersMinor, EditMinor, NoteM
 import GridRows from '../../../components/shared/GridRows'
 import BannerRow from './BannerRow'
 import { HOMEDASHBOARD_VIDEO_LENGTH, HOMEDASHBOARD_VIDEO_THUMBNAIL, HOMEDASHBOARD_VIDEO_URL } from '../../../../main/onboardingData'
-
+import LocalStore from '../../../../main/LocalStorageStore'
 function InfoComponent({title, items})  {
     return(
         <VerticalStack gap={4}>
@@ -16,6 +16,9 @@ function InfoComponent({title, items})  {
 }
 
 function DashboardBanner() {
+    const subCategoryMap = LocalStore.getState().subCategoryMap;
+    let defaultCount = Math.max(Object.keys(subCategoryMap).length,850);
+    defaultCount = Math.floor(defaultCount / 50) * 50
 
     const productGuides = [
         {
@@ -29,7 +32,7 @@ function DashboardBanner() {
             title: "Start testing",
             icon: MarketingMinor,
             showRedirect: true,
-            description: "400+ built-in tests covering OWASP Top 10, HackerOne top 10 and all the business logic vulnerabilities for your API Security testing needs.",
+            description: defaultCount + "+ built-in tests covering OWASP Top 10, HackerOne top 10 and all the business logic vulnerabilities for your API Security testing needs.",
             redirectUrl: "/dashboard/testing",
         },
         {

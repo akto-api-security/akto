@@ -19,6 +19,8 @@ import com.akto.util.enums.GlobalEnums.Severity;
 import com.akto.util.enums.GlobalEnums.TestRunIssueStatus;
 import com.mongodb.bulk.BulkWriteResult;
 import com.mongodb.client.model.*;
+
+import org.bson.BsonDocument;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 import org.slf4j.Logger;
@@ -59,12 +61,10 @@ public class TestingIssuesHandler {
             Bson query = Filters.eq(ID, issuesId);
             Bson updateStatusFields;
             Bson updateSeverityField;
-            if (runResult.isVulnerable()) {
-                if (status == TestRunIssueStatus.IGNORED) {
-                    updateStatusFields = Updates.set(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.IGNORED);
-                } else {
-                    updateStatusFields = Updates.set(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.OPEN);
-                }
+            if (status == TestRunIssueStatus.IGNORED) {
+                updateStatusFields = new BsonDocument();
+            } else if (runResult.isVulnerable()) {
+                updateStatusFields = Updates.set(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.OPEN);
             } else {
                 updateStatusFields = Updates.set(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.FIXED);
             }

@@ -24,7 +24,8 @@ const initialState = {
     filtersMap:{},
     tableInitialState: {},
     trafficAlerts: [],
-    sendEventOnLogin: false
+    sendEventOnLogin: false,
+    tableSelectedTab: {}
 };
 
 let persistStore = (set) => ({
@@ -47,6 +48,7 @@ let persistStore = (set) => ({
     setFiltersMap: (filtersMap) => set({ filtersMap }),
     setTableInitialState: (tableInitialState) => set({ tableInitialState }),
     setTrafficAlerts: (trafficAlerts) =>set ({trafficAlerts}),
+    setTableSelectedTab: (tableSelectedTab) => set({tableSelectedTab}),
 
     resetAll: () => set(initialState), // Reset function
 })

@@ -80,12 +80,13 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
     public static final String CHECK_INBOX_URI = "/check-inbox";
     public static final String BUSINESS_EMAIL_URI = "/business-email";
     public static final String TEST_EDITOR_URL = "/tools/test-editor";
+    public static final String SSO_URL = "/sso-login";
     public static final String ACCESS_DENIED_ERROR = "access_denied";
     public static final String VERIFY_EMAIL_ERROR = "VERIFY_EMAIL";
     public static final String BUSINESS_EMAIL_REQUIRED_ERROR = "BUSINESS_EMAIL_REQUIRED";
     public static final String ERROR_STR = "error";
     public static final String ERROR_DESCRIPTION = "error_description";
-    private static final Logger logger = LoggerFactory.getLogger(ProfileAction.class);
+    private static final Logger logger = LoggerFactory.getLogger(SignupAction.class);
     private static final LoggerMaker loggerMaker = new LoggerMaker(SignupAction.class);
 
     public String getCode() {
@@ -561,17 +562,21 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
         String emailId = Util.getValueFromQueryString(queryString, "email");
         if(emailId.length() == 0){
             code = "Error, user email cannot be empty";
+            logger.error(code);
             servletResponse.sendRedirect("/login");
             return ERROR.toUpperCase();
         }
+        logger.info("Trying to sign in for: " + emailId);
         setUserEmail(emailId);
         SAMLConfig samlConfig = SSOConfigsDao.instance.getSSOConfig(userEmail);
         if(samlConfig == null){
             code = "Error, cannot login via SSO, redirecting to login";
+            logger.error(code);
             servletResponse.sendRedirect("/login");
             return ERROR.toUpperCase();
         }
         int tempAccountId = Integer.parseInt(samlConfig.getId());
+        logger.info("Account id: " + tempAccountId + " found for " + emailId);
         setAccountId(tempAccountId);
 
         Saml2Settings settings = null;
@@ -579,12 +584,14 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
 
         if(settings == null){
             code= "Error, cannot find sso for this organization, redirecting to login";
+            logger.error(code);
             return ERROR.toUpperCase();
         }
         try {
             Auth auth = new Auth(settings, servletRequest, servletResponse);
             String relayState = String.valueOf(tempAccountId);
             auth.login(relayState);
+            logger.info("Initiated login from saml of " + userEmail);
         } catch (Exception e) {
             servletResponse.sendRedirect("/login");
             return ERROR.toUpperCase();
@@ -596,6 +603,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
         Auth auth;
         try {
             String tempAccountId = servletRequest.getParameter("RelayState");
+            logger.info("Account id found in registerViaAzure: " + tempAccountId);
             if(tempAccountId == null || tempAccountId.isEmpty()){
                 loggerMaker.errorAndAddToDb("Account id not found");
                 return ERROR.toUpperCase();
@@ -603,8 +611,10 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             setAccountId(Integer.parseInt(tempAccountId));
             Saml2Settings settings = CustomSamlSettings.getSamlSettings(ConfigType.AZURE, this.accountId);
             HttpServletRequest wrappedRequest = SsoUtils.getWrappedRequest(servletRequest,ConfigType.AZURE, this.accountId);
+            logger.info("Before sending request to Azure Idp");
             auth = new Auth(settings, wrappedRequest, servletResponse);
             auth.processResponse();
+            logger.info("After processing response from Azure Idp");
             if (!auth.isAuthenticated()) {
                 loggerMaker.errorAndAddToDb("Error reason: " + auth.getLastErrorReason(), LogDb.DASHBOARD);
                 servletResponse.sendRedirect("/login");
@@ -619,6 +629,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             } else {
                 Map<String, List<String>> attributes = auth.getAttributes();
                 if (attributes.isEmpty()) {
+                    logger.error("Returning as attributes were not found");
                     return ERROR.toUpperCase();
                 }
                 String nameId = auth.getNameId();
@@ -626,6 +637,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                 username = nameId;
             }
             shouldLogin = "true";
+            logger.info("Successful signing with Azure Idp for: "+ useremail);
             SignupInfo.SamlSsoSignupInfo signUpInfo = new SignupInfo.SamlSsoSignupInfo(username, useremail, Config.ConfigType.AZURE);
             createUserAndRedirect(useremail, username, signUpInfo, this.accountId, Config.ConfigType.AZURE.toString(), RBAC.Role.MEMBER);
         } catch (Exception e1) {
@@ -785,7 +797,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             }
 
             boolean isSSOLogin = Config.isConfigSSOType(signupInfo.getConfigType());
-
+            logger.info("Is sso login: " + isSSOLogin);
             if (user == null) {
 
                 if (accountId == 0) {
@@ -813,10 +825,11 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
 
             } else if (StringUtils.isEmpty(code) && !isSSOLogin) {
                 if (accountId == 0) {
+                    logger.info("Returning as accountId was found 0");
                     throw new IllegalStateException("The account doesn't exist.");
                 }
             } else {
-                if(!isSSOLogin){
+                if(!isSSOLogin && invitedRole != null && accountId != 0){
                     RBACDao.instance.insertOne(
                         new RBAC(user.getId(), invitedRole, accountId)
                     );
