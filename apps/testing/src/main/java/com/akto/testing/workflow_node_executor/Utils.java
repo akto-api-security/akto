@@ -6,6 +6,7 @@ import static org.mockito.Answers.values;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -318,13 +319,17 @@ public class Utils {
                 }
                 if(KeyTypes.isJWT(tempVal)){
                     try {
-                        Jws<Claims> jws = Jwts.parserBuilder()
-                        .build()
-                        .parseClaimsJws(tempVal);
-
-                        if(jws.getBody() != null &&  jws.getBody().getExpiration() != null && jws.getBody().getExpiration().getTime() != 0){
-                            int newExpiryTime = (int) jws.getBody().getExpiration().getTime();
+                        String[] parts = tempVal.split("\\.");
+                        if (parts.length != 3) {
+                            throw new IllegalArgumentException("Invalid JWT token format");
+                        }
+                        String payload = new String(Base64.getUrlDecoder().decode(parts[1]));
+                        JSONObject payloadJson = new JSONObject(payload);
+                        if (payloadJson.has("exp")) {
+                            int newExpiryTime = payloadJson.getInt("exp");
                             TestExecutor.setExpiryTimeOfAuthToken(newExpiryTime);
+                        } else {
+                            throw new IllegalArgumentException("JWT does not have an 'exp' claim");
                         }
                     } catch (Exception e) {
                         e.printStackTrace();
