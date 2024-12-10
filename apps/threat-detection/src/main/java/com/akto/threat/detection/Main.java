@@ -9,7 +9,7 @@ import com.akto.threat.detection.session_factory.SessionFactoryUtils;
 import com.akto.threat.detection.tasks.CleanupTask;
 import com.akto.threat.detection.tasks.FlushSampleDataTask;
 import com.akto.threat.detection.tasks.MaliciousTrafficDetectorTask;
-import com.akto.threat.detection.tasks.SendAlertsToBackend;
+import com.akto.threat.detection.tasks.SendMaliciousRequestsToBackend;
 import com.mongodb.ConnectionString;
 import io.lettuce.core.RedisClient;
 
@@ -26,33 +26,39 @@ public class Main {
     SessionFactory sessionFactory = SessionFactoryUtils.createFactory();
 
     DaoInit.init(new ConnectionString(System.getenv("AKTO_MONGO_CONN")));
-    KafkaConfig trafficKafka = KafkaConfig.newBuilder()
-        .setGroupId(CONSUMER_GROUP_ID)
-        .setBootstrapServers(System.getenv("AKTO_TRAFFIC_KAFKA_BOOTSTRAP_SERVER"))
-        .setConsumerConfig(
-            KafkaConsumerConfig.newBuilder()
-                .setMaxPollRecords(100)
-                .setPollDurationMilli(100)
-                .build())
-        .setProducerConfig(
-            KafkaProducerConfig.newBuilder().setBatchSize(100).setLingerMs(100).build())
-        .build();
+    KafkaConfig trafficKafka =
+        KafkaConfig.newBuilder()
+            .setGroupId(CONSUMER_GROUP_ID)
+            .setBootstrapServers(System.getenv("AKTO_TRAFFIC_KAFKA_BOOTSTRAP_SERVER"))
+            .setConsumerConfig(
+                KafkaConsumerConfig.newBuilder()
+                    .setMaxPollRecords(100)
+                    .setPollDurationMilli(100)
+                    .build())
+            .setProducerConfig(
+                KafkaProducerConfig.newBuilder().setBatchSize(100).setLingerMs(100).build())
+            .build();
 
-    KafkaConfig internalKafka = KafkaConfig.newBuilder()
-        .setGroupId(CONSUMER_GROUP_ID)
-        .setBootstrapServers(System.getenv("AKTO_INTERNAL_KAFKA_BOOTSTRAP_SERVER"))
-        .setConsumerConfig(
-            KafkaConsumerConfig.newBuilder()
-                .setMaxPollRecords(100)
-                .setPollDurationMilli(100)
-                .build())
-        .setProducerConfig(
-            KafkaProducerConfig.newBuilder().setBatchSize(100).setLingerMs(100).build())
-        .build();
+    KafkaConfig internalKafka =
+        KafkaConfig.newBuilder()
+            .setGroupId(CONSUMER_GROUP_ID)
+            .setBootstrapServers(System.getenv("AKTO_INTERNAL_KAFKA_BOOTSTRAP_SERVER"))
+            .setConsumerConfig(
+                KafkaConsumerConfig.newBuilder()
+                    .setMaxPollRecords(100)
+                    .setPollDurationMilli(100)
+                    .build())
+            .setProducerConfig(
+                KafkaProducerConfig.newBuilder().setBatchSize(100).setLingerMs(100).build())
+            .build();
 
     new MaliciousTrafficDetectorTask(trafficKafka, internalKafka, createRedisClient()).run();
-    new FlushSampleDataTask(sessionFactory, internalKafka, KafkaTopic.ThreatDetection.MALICIOUS_EVENTS).run();
-    new SendAlertsToBackend(sessionFactory, internalKafka, KafkaTopic.ThreatDetection.ALERTS).run();
+    new FlushSampleDataTask(
+            sessionFactory, internalKafka, KafkaTopic.ThreatDetection.MALICIOUS_EVENTS)
+        .run();
+    new SendMaliciousRequestsToBackend(
+            sessionFactory, internalKafka, KafkaTopic.ThreatDetection.ALERTS)
+        .run();
     new CleanupTask(sessionFactory).run();
   }
 
@@ -64,12 +70,12 @@ public class Main {
     String url = System.getenv("AKTO_THREAT_DETECTION_POSTGRES");
     String user = System.getenv("AKTO_THREAT_DETECTION_POSTGRES_USER");
     String password = System.getenv("AKTO_THREAT_DETECTION_POSTGRES_PASSWORD");
-    Flyway flyway = Flyway
-        .configure()
-        .dataSource(url, user, password)
-        .locations("classpath:db/migration")
-        .schemas("flyway")
-        .load();
+    Flyway flyway =
+        Flyway.configure()
+            .dataSource(url, user, password)
+            .locations("classpath:db/migration")
+            .schemas("flyway")
+            .load();
 
     flyway.migrate();
   }
