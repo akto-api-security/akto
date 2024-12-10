@@ -3,7 +3,7 @@
     overflow-x: hidden !important;
 }
 
-.editor-navbar .Polaris-HorizontalStack{
+.editor-navbar .Polaris-InlineStack{
     flex-wrap: unset !important;
 }
 .editor-navbar .Polaris-Navigation__ItemInnerWrapper{
@@ -71,4 +71,12 @@
 
 .req-resp-tabs .Polaris-Box{
     border: none !important;
+}
+
+.Polaris-TopBar{
+    display: flex;
+}
+
+.Polaris-Text--regular{
+    width: 100%;
 }

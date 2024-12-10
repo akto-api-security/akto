@@ -1,5 +1,5 @@
 import { Button, Tooltip } from "@shopify/polaris"
-import { UploadMajor } from '@shopify/polaris-icons';
+import { UploadIcon } from "@shopify/polaris-icons";
 import { useRef } from "react"
 
 
@@ -23,12 +23,21 @@ function UploadFile({ fileFormat, fileChanged, tooltipText, label, primary, plai
 
 
     return (
-        <Tooltip content={tooltipText}>
+        (<Tooltip content={tooltipText}>
             <Button 
                 // icon={UploadMajor} 
-                primary={primary !== undefined ? primary : true}
-                plain={plain === undefined ? true: plain}
-                monochrome removeUnderline
+                {
+                    ...(
+                      ((primary === undefined || primary === true) && (plain === undefined || plain === true))
+                        ? { variant: "tertiary" }
+                        : (
+                            (primary === false && plain === false)
+                              ? {}
+                              : (primary === false ? { variant: "monochromePlain" } : { variant: "primary" })
+                          )
+                    )
+                  }
+                removeUnderline
                 onClick={onPickFile}>
                 {label}
                 <input
@@ -39,8 +48,8 @@ function UploadFile({ fileFormat, fileChanged, tooltipText, label, primary, plai
                     onChange={onFilePicked} 
                 />
             </Button>
-        </Tooltip>
-    )
+        </Tooltip>)
+    );
 }
 
 export default UploadFile

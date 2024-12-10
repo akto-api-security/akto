@@ -1,37 +1,37 @@
 import React from 'react'
 import transform from '../transform'
-import { Box, Card, Divider, HorizontalStack, ProgressBar, Scrollable, Text, VerticalStack } from '@shopify/polaris'
+import { Box, Card, Divider, InlineStack, ProgressBar, Scrollable, Text, BlockStack } from '@shopify/polaris'
 
 function CoverageCard({coverageObj, collections, collectionsMap}) {
 
     const sortedCollectionElements = transform.formatCoverageData(coverageObj,collections)
     return (
         <Card>
-            <VerticalStack gap={5}>
+            <BlockStack gap={500}>
                 <Text variant="bodyLg" fontWeight="semibold">Test coverage</Text>
                 <Scrollable style={{maxHeight: '400px'}} shadow> 
                     <Box>
                     {sortedCollectionElements.map((collectionObj,index)=> (
-                        <Box padding={2} key={collectionObj.id}>
-                            <VerticalStack gap={2}>
+                        <Box padding={200} key={collectionObj.id}>
+                            <BlockStack gap={200}>
                                 <Text variant="bodyMd" breakWord truncate>
                                     {collectionsMap[collectionObj.id]}
                                 </Text>
-                                <HorizontalStack gap={2}>
+                                <InlineStack gap={200}>
                                     <Box width='85%'>
-                                        <ProgressBar size="small" color={collectionObj.status} progress={collectionObj.coverage} />
+                                        <ProgressBar size="small" tone={collectionObj.status} progress={collectionObj.coverage} />
                                     </Box>
-                                    <Text breakWord color="subdued" variant="bodyMd">{collectionObj.coverage}%</Text>
-                                </HorizontalStack>
+                                    <Text breakWord tone="subdued" variant="bodyMd">{collectionObj.coverage}%</Text>
+                                </InlineStack>
                                 {index < (collections.length - 1) ? <Divider/> : null }
-                            </VerticalStack>
+                            </BlockStack>
                         </Box>
                     ))}
                     </Box>
                 </Scrollable>
-            </VerticalStack>
-        </Card>        
-    )
+            </BlockStack>
+        </Card>
+    );
 }
 
 export default CoverageCard

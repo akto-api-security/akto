@@ -1,5 +1,5 @@
 import { ActionList, Avatar, Banner, Box, Button, Icon, LegacyCard, Link, Modal, Page, Popover, ResourceItem, ResourceList, Text, TextField } from "@shopify/polaris"
-import { DeleteMajor, TickMinor, PasskeyMajor } from "@shopify/polaris-icons"
+import { DeleteIcon, CheckIcon, PasskeyIcon } from "@shopify/polaris-icons";
 import { useEffect, useRef, useState } from "react";
 import settingRequests from "../api";
 import func from "@/util/func";
@@ -89,13 +89,13 @@ const Users = () => {
                     destructive: false,
                     content: 'Reset Password',
                     role: 'RESET_PASSWORD',
-                    icon: PasskeyMajor
+                    icon: PasskeyIcon
                 },
                 {
                     destructive: true,
                     content: 'Remove',
                     role: 'REMOVE',
-                    icon: DeleteMajor
+                    icon: DeleteIcon
                 }
             ]
         }
@@ -156,7 +156,7 @@ const Users = () => {
             ...section,
             items: section.items.filter((c) => roleHierarchy.includes(c.role)).map(item => ({
                 ...item,
-                prefix: item.role === "REMOVE"?  <Box><Icon source={DeleteMajor}/></Box> : item.role === "RESET_PASSWORD" ? <Box><Icon source={PasskeyMajor}/></Box> : item.role === currentRole ? <Box><Icon source={TickMinor}/></Box> : <div style={{padding: "10px"}}/>
+                prefix: item.role === "REMOVE"?  <Box><Icon source={DeleteIcon}/></Box> : item.role === "RESET_PASSWORD" ? <Box><Icon source={PasskeyIcon}/></Box> : item.role === currentRole ? <Box><Icon source={CheckIcon}/></Box> : <div style={{padding: "10px"}}/>
             }))
         }));
         return tempArr
@@ -219,7 +219,7 @@ const Users = () => {
                         url: 'https://docs.akto.io/getting-started/quick-start-with-akto-cloud',
                         target: "_blank"
                     }}
-                    status="info"
+                    tone="info"
                 >
                     <p>Inviting team members is disabled in local. Collaborate with your team by using Akto cloud or AWS/GCP deploy.</p>
                 </Banner>
@@ -239,7 +239,7 @@ const Users = () => {
                         renderItem={(item) => {
                             const { id, name, login, role } = item;
                             const initials = func.initials(login)
-                            const media = <Avatar user size="medium" name={login} initials={initials} />
+                            const media = <Avatar user size="md" name={login} initials={initials} />
                             const shortcutActions = (username !== login && roleHierarchy.includes(role.toUpperCase())) ? 
                                 [
                                     {
@@ -262,7 +262,7 @@ const Users = () => {
                                     }
                                 ] : [
                                     {
-                                        content: <Text color="subdued">{func.toSentenceCase(getRoleDisplayName(role))}</Text>,
+                                        content: <Text tone="subdued">{func.toSentenceCase(getRoleDisplayName(role))}</Text>,
                                         url: '#',
                                     }
                                 ]
@@ -296,7 +296,7 @@ const Users = () => {
                     rolesOptions={rolesOptions}
                 />
                 <Modal
-                    small
+                    size="small"
                     open={passwordResetState.confirmPasswordResetActive}
                     onClose={() => setPasswordResetStateHelper("confirmPasswordResetActive", false)}
                     title="Password Reset"
@@ -317,7 +317,7 @@ const Users = () => {
                 </Modal>
 
                 <Modal
-                    small
+                    size="small"
                     open={passwordResetState.passwordResetLinkActive}
                     onClose={closePasswordResetToggle}
                     title="Password Reset"
@@ -344,8 +344,7 @@ const Users = () => {
             </div>}
 
         </Page>
-
-    )
+    );
 }
 
 export default Users

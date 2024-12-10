@@ -1,6 +1,6 @@
 import React from 'react'
 import SignUp from "../components/SignUp"
-import { Box, Text, VerticalStack } from '@shopify/polaris'
+import { Box, Text, BlockStack } from '@shopify/polaris'
 
 function SignupPage() {
 
@@ -13,17 +13,19 @@ function SignupPage() {
     return (
         <div style={{display: 'flex', height: '100vh', overflow: 'hidden'}}>
             <div style={{flex: '4', overflow: "hidden", boxShadow: "-1px 0px 0px 0px #E4E5E7 inset"}}>
-                <Box paddingBlockStart={"24"} paddingInlineStart={"20"} paddingInlineEnd={"8"}>
-                    <VerticalStack gap="6">
-                        <Text variant="heading3xl" fontWeight="medium">
-                            {`"It's truly a game-changer and we highly recommend Akto to anyone looking to effortlessly secure their API endpoints."`}
-                        </Text>
+                <Box paddingBlockStart={"2400"} paddingInlineStart={"2000"} paddingInlineEnd={"800"}>
+                    <BlockStack gap="600">
+                        <div className='akto-heading'>
+                            <Text variant="heading2xl" fontWeight="medium">
+                                {`"It's truly a game-changer and we highly recommend Akto to anyone looking to effortlessly secure their API endpoints."`}
+                            </Text>
+                        </div>
                         <Box>
                             <Text variant="headingLg">— Security team</Text>
-                            <Text fontWeight="medium" color="subdued">Enterprise SaaS customer</Text>
+                            <Text fontWeight="medium" tone="subdued">Enterprise SaaS customer</Text>
                         </Box>
                         <img  src="/public/productss.png" alt='ss' style={{...imageStyle}}/>
-                    </VerticalStack>
+                    </BlockStack>
                 </Box>
             </div>
             <div style={{flex: '3'}}>

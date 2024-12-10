@@ -1,5 +1,5 @@
-import { Box, Button, Divider, Frame, HorizontalStack, LegacyTabs, Modal, Text, Tooltip} from "@shopify/polaris"
-import {ChevronUpMinor } from "@shopify/polaris-icons"
+import { Box, Button, Divider, Frame, InlineStack, LegacyTabs, Modal, Text, Tooltip} from "@shopify/polaris"
+import { ChevronUpIcon } from "@shopify/polaris-icons";
 
 import { useEffect, useState } from "react";
 import DropdownSearch from "../../../components/shared/DropdownSearch";
@@ -278,10 +278,15 @@ const SampleApi = () => {
     }
 
     const resultComponent = (
-        <Box background={getColor()} width="100%" padding={"2"}>
-            <Button id={"test-results"} removeUnderline monochrome plain 
-            onClick={testResult ? showResults : () => {}}
-            icon={testResult ? ChevronUpMinor : undefined}>
+        <Box background={getColor()} width="100%" padding={"200"}>
+            <Button
+                id={"test-results"}
+                removeUnderline
+
+
+                onClick={testResult ? showResults : () => {}}
+                icon={testResult ? ChevronUpIcon : undefined}
+                variant="monochromePlain">
                 {getResultDescription()}
             </Button>
         </Box>
@@ -294,7 +299,7 @@ const SampleApi = () => {
                 <div className="req-resp-tabs">
                     <LegacyTabs tabs={tabs} selected={selected} onSelect={handleTabChange} fitted />
                 </div>
-                <HorizontalStack gap={2}>
+                <InlineStack gap={200}>
                     <Button id={"select-sample-api"} onClick={toggleSelectApiActive} size="slim">
                         <Box maxWidth="200px">
                             <Tooltip content={copySelectedApiEndpoint} hoverDelay={"100"}>
@@ -302,8 +307,15 @@ const SampleApi = () => {
                             </Tooltip>
                         </Box>
                     </Button>
-                    <Button id={"run-test"} disabled={showEmptyLayout || editorData?.message?.length === 0} loading={loading} primary onClick={runTest} size="slim">Run Test</Button>
-                </HorizontalStack>
+                    <Button
+                        id={"run-test"}
+                        disabled={showEmptyLayout || editorData?.message?.length === 0}
+                        loading={loading}
+
+                        onClick={runTest}
+                        size="slim"
+                        variant="primary">Run Test</Button>
+                </InlineStack>
             </div>
 
             <Divider />
@@ -329,10 +341,10 @@ const SampleApi = () => {
                 open={showTestResult}
                 onClose={() => closeModal()}
                 title="Results"
-                large
+                size="large"
             >
                 <Frame >
-                <Box paddingBlockEnd={"8"}>
+                <Box paddingBlockEnd={"800"}>
                 <TestRunResultPage
                     testingRunResult={testResult?.testingRunResult}
                     runIssues={testResult?.testingRunIssues}
@@ -387,7 +399,7 @@ const SampleApi = () => {
                 </Modal.Section>
             </Modal>
         </div>
-    )
+    );
 }
 
 export default SampleApi

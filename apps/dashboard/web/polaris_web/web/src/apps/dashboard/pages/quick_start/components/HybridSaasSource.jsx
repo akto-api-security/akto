@@ -1,4 +1,4 @@
-import { Box, Button, ButtonGroup, HorizontalStack, Text, VerticalStack } from '@shopify/polaris'
+import { Box, Button, ButtonGroup, InlineStack, Text, BlockStack } from '@shopify/polaris'
 import React, { useEffect, useState, useRef } from 'react'
 import {useNavigate} from "react-router-dom"
 import api from '../api'
@@ -66,39 +66,34 @@ function HybridSaasSource() {
     }
 
     const hybridSaasComponent = (
-        <VerticalStack gap="2">
-          <div ref = {ref}/>
-
-          <span>1. Run the below command to add akto helm repo. </span>
-
-          <VerticalStack gap="1">
-            <JsonComponent title="Add akto helm repo" toolTipContent="Copy command" onClickFunc={()=> copyCommandUtil(helmAddCommand)} dataString={helmAddCommand} language="text" minHeight="60px" />
-          </VerticalStack>
-
-          <span>2. Run the below command to setup Akto Runtime service. Change the namespace according to your requirements. </span>
-
-          <VerticalStack gap="1">
-            <JsonComponent title="Runtime Service Command" toolTipContent="Copy command" onClickFunc={()=> rcopyCommand()} dataString={runtimeSvcCommand} language="text" minHeight="450px" />
-          </VerticalStack>
-
-          {/* <VerticalStack gap="1">
-            <span>2. Replace the following values:</span>
-            <VerticalStack gap="1">
-              <span>a. {'{' + 'NAMESPACE' + '}'} : With the namespace of your app</span>
-              <span>b. {'{' + 'APP_NAME' + '}'} : Replace with the name of the app where daemonset will be deployed. Note that this has to be done at 3 places in the config</span>
+        <BlockStack gap="200">
+            <div ref = {ref}/>
+            <span>1. Run the below command to add akto helm repo. </span>
+            <BlockStack gap="100">
+                <JsonComponent title="Add akto helm repo" toolTipContent="Copy command" onClickFunc={()=> copyCommandUtil(helmAddCommand)} dataString={helmAddCommand} language="text" minHeight="60px" />
+            </BlockStack>
+            <span>2. Run the below command to setup Akto Runtime service. Change the namespace according to your requirements. </span>
+            <BlockStack gap="100">
+                <JsonComponent title="Runtime Service Command" toolTipContent="Copy command" onClickFunc={()=> rcopyCommand()} dataString={runtimeSvcCommand} language="text" minHeight="450px" />
+            </BlockStack>
+            {/* <VerticalStack gap="1">
+              <span>2. Replace the following values:</span>
+              <VerticalStack gap="1">
+                <span>a. {'{' + 'NAMESPACE' + '}'} : With the namespace of your app</span>
+                <span>b. {'{' + 'APP_NAME' + '}'} : Replace with the name of the app where daemonset will be deployed. Note that this has to be done at 3 places in the config</span>
+              </VerticalStack>
             </VerticalStack>
-          </VerticalStack>
-  
-          <VerticalStack gap="1">
-            <span>3. Run the following command with appropriate namespace:</span>
-            <JsonComponent title="Command" toolTipContent="Copy the command" onClickFunc={()=> copyText()} dataString="kubectl apply -f akto-daemonset-deploy.yaml -n <NAMESPACE>" language="text/plain" minHeight="50px"/>
-          </VerticalStack>
-  
-          <HorizontalStack gap="1">
-            <span>4. Add traffic sources from our docs. Click</span>
-            <a href='dashboard/observe/inventory'>here</a>
-          </HorizontalStack> */}
-        </VerticalStack>
+    
+            <VerticalStack gap="1">
+              <span>3. Run the following command with appropriate namespace:</span>
+              <JsonComponent title="Command" toolTipContent="Copy the command" onClickFunc={()=> copyText()} dataString="kubectl apply -f akto-daemonset-deploy.yaml -n <NAMESPACE>" language="text/plain" minHeight="50px"/>
+            </VerticalStack>
+    
+            <HorizontalStack gap="1">
+              <span>4. Add traffic sources from our docs. Click</span>
+              <a href='dashboard/observe/inventory'>here</a>
+            </HorizontalStack> */}
+        </BlockStack>
       )
 
     const steps = [
@@ -114,13 +109,13 @@ function HybridSaasSource() {
         //         <Box paddingInlineStart={2}>
         //             <VerticalStack gap={1}>
         //                 <HorizontalStack gap={1}>
-        //                     <Text variant="bodyMd" fontWeight="medium" color="subdued">AKTO_IP:</Text>
+        //                     <Text variant="bodyMd" fontWeight="medium" tone="subdued">AKTO_IP:</Text>
         //                     <Button onClick={() => copyText(aktoIp, "AKTO_IP")} plain>
         //                         <div style={{maxWidth: "260px"}} className='overflow-text'>{aktoIp}</div>
         //                     </Button>
         //                 </HorizontalStack>
         //                 <HorizontalStack gap={1}>
-        //                     <Text variant="bodyMd" fontWeight="medium" color="subdued">AKTO_TOKEN:</Text>
+        //                     <Text variant="bodyMd" fontWeight="medium" tone="subdued">AKTO_TOKEN:</Text>
         //                     <Button onClick={() => copyText(aktoToken, "AKTO_TOKEN")} plain>
         //                         <div style={{maxWidth: "210px"}} className='overflow-text'>{aktoToken}</div>
         //                     </Button>

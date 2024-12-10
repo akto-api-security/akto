@@ -182,9 +182,9 @@ function JsonRecording({extractInformation, showOnlyApi, setStoreData}) {
             <AuthParams authParams={authParams} setAuthParams={setAuthParams}/>
 
             <br />
-            { showOnlyApi ? null : <Button id={"save-token"} onClick={handleSave} primary>Save changes</Button> }
+            { showOnlyApi ? null : <Button id={"save-token"} onClick={handleSave}  variant="primary">Save changes</Button> }
         </div>
-    )
+    );
 }
 
 export default JsonRecording

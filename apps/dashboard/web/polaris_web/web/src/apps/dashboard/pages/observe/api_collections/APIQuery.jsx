@@ -1,13 +1,13 @@
 import CollectionComponent from "../../../components/CollectionComponent"
 import OperatorDropdown from "../../../components/layouts/OperatorDropdown";
-import { VerticalStack, Card, Button, HorizontalStack, Collapsible, Text, Box, Icon } from "@shopify/polaris";
+import { BlockStack, Card, Button, InlineStack, Collapsible, Text, Box, Icon } from "@shopify/polaris";
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards";
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo"
 import React, { useState, useReducer, useCallback, useMemo, useEffect } from 'react'
 import { produce } from "immer"
 import ApiEndpoints from "./ApiEndpoints";
 import api from "../api"
-import { ChevronDownMinor, ChevronUpMinor } from "@shopify/polaris-icons"
+import { ChevronDownIcon, ChevronUpIcon } from "@shopify/polaris-icons";
 import func from "@/util/func";
 import SaveAsCollectionModal from "./api_query_component/SaveAsCollectionModal";
 import { useSearchParams } from "react-router-dom";
@@ -164,16 +164,16 @@ function APIQuery() {
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
     const collapsibleComponent =
-        <VerticalStack gap={"0"} key="conditions-filters">
-            <Box background={"bg-subdued"} width="100%" padding={"2"} onClick={handleToggle} key="collapsible-component-header">
-                <HorizontalStack align="space-between">
+        <BlockStack gap={"0"} key="conditions-filters">
+            <Box background={"bg-subdued"} width="100%" padding={"200"} onClick={handleToggle} key="collapsible-component-header">
+                <InlineStack align="space-between">
                     <Text variant="headingSm">
                         {endpointListFromConditions.data ? apiCount > 200 ? `Listing 200 sample endpoints out of total ` + apiCount + ` endpoints` : `Listing total ` + apiCount + ` endpoints` : "Select filters to see endpoints"}
                     </Text>
                     <Box>
-                        <Icon source={open ? ChevronDownMinor : ChevronUpMinor} />
+                        <Icon source={open ? ChevronDownIcon : ChevronUpIcon} />
                     </Box>
-                </HorizontalStack>
+                </InlineStack>
             </Box>
             <Collapsible
                 key="basic-collapsible"
@@ -181,9 +181,9 @@ function APIQuery() {
                 id="basic-collapsible"
                 transition={{ duration: '200ms', timingFunction: 'ease-in-out' }}
             >
-                <VerticalStack gap={"0"} key="conditions-component">
+                <BlockStack gap={"0"} key="conditions-component">
                     <Card>
-                        <VerticalStack gap="4">
+                        <BlockStack gap="400">
                             {
                                 conditions.length > 0 && conditions.map((condition, index) => (
                                     <CollectionComponent
@@ -207,20 +207,20 @@ function APIQuery() {
                                     />
                                 ))
                             }
-                            <HorizontalStack gap={4} align="start">
+                            <InlineStack gap={400} align="start">
                                 <Button onClick={handleAddField}>Add condition</Button>
                                 {
-                                    conditions.length > 0 ? <Button plain destructive onClick={handleClearFunction}>Clear all</Button> : null
+                                    conditions.length > 0 ? <Button   onClick={handleClearFunction} variant="plain" tone="critical">Clear all</Button> : null
                                 }
-                            </HorizontalStack>
-                            <HorizontalStack gap={4} align="end">
+                            </InlineStack>
+                            <InlineStack gap={400} align="end">
                                 <Button onClick={exploreEndpoints}>Explore endpoints</Button>
-                            </HorizontalStack>
-                        </VerticalStack>
+                            </InlineStack>
+                        </BlockStack>
                     </Card>
-                </VerticalStack>
+                </BlockStack>
             </Collapsible>
-        </VerticalStack>
+        </BlockStack>
 
     const components = useMemo(() => [
         modalComponent,
@@ -258,11 +258,16 @@ function APIQuery() {
                     titleText={"Explore Mode"}
                 />
             }
-            primaryAction={<Button id={"explore-mode-query-page"} primary secondaryActions onClick={handleClick}>{primaryActionLabel}</Button>}
+            primaryAction={<Button
+                id={"explore-mode-query-page"}
+
+                secondaryActions
+                onClick={handleClick}
+                variant="primary">{primaryActionLabel}</Button>}
             components={components}
             backUrl="/dashboard/observe/inventory"
         />
-    )
+    );
 }
 
 export default APIQuery

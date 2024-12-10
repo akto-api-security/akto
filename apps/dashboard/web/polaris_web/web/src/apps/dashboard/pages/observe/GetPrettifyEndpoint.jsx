@@ -1,4 +1,4 @@
-import { Badge, Box, HorizontalStack, Text, Tooltip } from '@shopify/polaris'
+import { Badge, Box, InlineStack, Text, Tooltip } from '@shopify/polaris'
 import React, { useRef, useState } from 'react'
 import func from '@/util/func'
 import transform from '../onboarding/transform'
@@ -6,12 +6,12 @@ import observeFunc from "./transform"
 function GetPrettifyEndpoint({method,url, isNew, maxWidth}){
     const ref = useRef(null)
     const [copyActive, setCopyActive] = useState(false)
-    return(
+    return (
         <div style={{display: 'flex', gap: '4px'}} ref={ref} onMouseEnter={() => setCopyActive(true)} onMouseLeave={() => setCopyActive(false)}>
             <Box width="54px">
-                <HorizontalStack align="end">
+                <InlineStack align="end">
                     <span style={{color: transform.getTextColor(method), fontSize: "14px", fontWeight: 500, lineHeight: '20px'}}>{method}</span>
-                </HorizontalStack>
+                </InlineStack>
             </Box>
             <Box width={maxWidth ? maxWidth: "30vw"}>
                 <div style={{display: "flex", justifyContent: "space-between", gap:"24px"}}>
@@ -35,8 +35,8 @@ function GetPrettifyEndpoint({method,url, isNew, maxWidth}){
                     </Box>
                 </div>
             </Box>
-        </div> 
-    )
+        </div>
+    );
 }
 
 

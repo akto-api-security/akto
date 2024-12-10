@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import {CircleTickMajor,ArchiveMinor,LinkMinor} from '@shopify/polaris-icons';
+import { CheckCircleIcon, ArchiveIcon, LinkIcon } from "@shopify/polaris-icons";
 import TestingStore from '../testingStore';
 import api from '../api';
 import transform from '../transform';
@@ -35,21 +35,21 @@ let headerDetails = [
     value: "detected_time",
     itemOrder:3,
     dataProps:{fontWeight:'regular'},
-    icon: CircleTickMajor,
+    icon: CheckCircleIcon,
   },
   {
     text: 'Test category',
     value: 'testCategory',
     itemOrder:3,
     dataProps:{fontWeight:'regular'},
-    icon: ArchiveMinor
+    icon: ArchiveIcon
   },
   {
     text: 'url',
     value: 'url',
     itemOrder:3,
     dataProps:{fontWeight:'regular'},
-    icon: LinkMinor
+    icon: LinkIcon
   },
 ]
 

@@ -1,15 +1,14 @@
-import { Badge, Button, ButtonGroup, Checkbox, HorizontalStack, RadioButton, Text, VerticalStack, Modal, DescriptionList, Tooltip, Icon } from '@shopify/polaris'
+import { Badge, Button, ButtonGroup, Checkbox, InlineStack, RadioButton, Text, BlockStack, Modal, DescriptionList, Tooltip, Icon } from '@shopify/polaris'
 import React, { useCallback, useEffect, useState } from 'react'
 import Dropdown from '../../../components/layouts/Dropdown'
 import settingFunctions from '../../settings/module'
 import PasswordTextField from '../../../components/layouts/PasswordTextField';
 import FileUpload from '../../../components/shared/FileUpload';
-import {CancelMajor} from "@shopify/polaris-icons"
+import { XIcon, QuestionCircleIcon } from "@shopify/polaris-icons";
 import api from '../api';
 import Store from '../../../store';
 import InformationBannerComponent from "./shared/InformationBannerComponent";
-import SpinnerCentered from "../../../components/progress/SpinnerCentered"
-import { QuestionMarkMinor } from "@shopify/polaris-icons"
+import SpinnerCentered from "../../../components/progress/SpinnerCentered";
 
 
 function PostmanSource() {
@@ -107,14 +106,14 @@ function PostmanSource() {
 
     const apiActionComponent = (
         <div>
-            <VerticalStack gap="1" >
+            <BlockStack gap="100">
                 <span>4. Paste your postman key here: </span>
                 <PasswordTextField setField={setPostmanKey} onFunc={true} field={postmanKey}/>
-            </VerticalStack>
-            <VerticalStack gap="1">
+            </BlockStack>
+            <BlockStack gap="100">
                 <span>5. Select workspace you wish to import:  </span>
                 <Dropdown menuItems={workspaces} selected={handleSelectChange} initial={selected}/>
-            </VerticalStack>
+            </BlockStack>
         </div>
     )
 
@@ -128,19 +127,18 @@ function PostmanSource() {
 
     const collectionComponent = (
         <div>
-            <VerticalStack gap="1">
+            <BlockStack gap="100">
                 <span>4. Upload postman collection:</span>
-                
-                <HorizontalStack gap="2" >
+                <InlineStack gap="200">
                     {files ? 
-                        <Badge size='medium' status='success'>
+                        <Badge size='medium' tone='success'>
                             {files.name}
-                            <Button icon={CancelMajor} plain onClick={() => setFiles(null)} />
+                            <Button icon={XIcon}  onClick={() => setFiles(null)} variant="plain" />
                         </Badge> 
                     : null}
                     <FileUpload fileType="file" acceptString=".json" setSelectedFile={setFilesCheck} allowMultiple={false} allowedSize={20*1024*1024}/>
-                </HorizontalStack>
-            </VerticalStack>
+                </InlineStack>
+            </BlockStack>
         </div>
     )
 
@@ -230,7 +228,7 @@ function PostmanSource() {
                             <RadioButton id="forceImport" label="Force import all APIs" checked={importType === "ALL_APIS"} onChange={()=>toggleImport("ALL_APIS")} />
                             <div style={{margin: "auto 12px"}}>
                                 <Tooltip content={`We will import ${uploadObj.correctlyParsedApis + uploadObj.apisWithErrorsAndParsed} apis i.e. all the apis that have been correctly parsed and apis which have errors and can still be imported`} dismissOnMouseOut width="wide">
-                                    <Icon source={QuestionMarkMinor} color="base" />
+                                    <Icon source={QuestionCircleIcon} tone="base" />
                                 </Tooltip>
                             </div>
                         </div>
@@ -238,7 +236,7 @@ function PostmanSource() {
                             <RadioButton id="successFulApis" label="Import only correctly formatted APIs" checked={importType === "ONLY_SUCCESSFUL_APIS"} onChange={()=>toggleImport("ONLY_SUCCESSFUL_APIS")}/>
                             <div style={{margin: "auto 12px"}}>
                                 <Tooltip content={`We will import ${uploadObj.correctlyParsedApis} apis i.e. all the apis that have been correctly parsed only`} dismissOnMouseOut width="wide">
-                                    <Icon source={QuestionMarkMinor} color="base" />
+                                    <Icon source={QuestionCircleIcon} tone="base" />
                                 </Tooltip>
                             </div>
                         </div>
@@ -293,40 +291,48 @@ function PostmanSource() {
                 Use postman to send traffic to Akto and realize quick value. If you like what you see, we highly recommend using AWS or GCP traffic mirroring to get real user data for a smooth, automated and minimum false positive experience.
             </Text>
 
-            <VerticalStack gap="1">
+            <BlockStack gap="100">
                 <RadioButton id="api" label="Import using postman API key" checked={type === "api"} onChange={()=>handleChange("api")}/>
                 <RadioButton id="collection" label="Import using postman collection file" checked={type === "collection"} onChange={()=>handleChange("collection")}/>
-            </VerticalStack>
+            </BlockStack>
             <InformationBannerComponent docsUrl="https://docs.akto.io/traffic-connections/traffic-data-sources/postman#pre-requisites-for-akto-postman-connection"
                     content="Please ensure the pre-requisites " 
             />
 
-            <VerticalStack gap="1">
+            <BlockStack gap="100">
                 {steps.map((element,index) => (
-                    <HorizontalStack gap="1" wrap={false} key={element.text}>
+                    <InlineStack gap="100" wrap={false} key={element.text}>
                         <span>{index + 1}.</span>
                         <span>{element.text}</span>
-                    </HorizontalStack>
+                    </InlineStack>
                 ))}
                 {type === "api" ? 
                    apiActionComponent
                     : collectionComponent
                 }
-            </VerticalStack>
+            </BlockStack>
 
-            <VerticalStack gap="2">
+            <BlockStack gap="200">
                 <Checkbox label="Allow Akto to replay API requests if responses are not found." checked={allowResponses} onChange={toggleResponse} />
                 <ButtonGroup>
-                    <Button onClick={primaryAction} primary disabled={!buttonActive} loading={loading}>{primaryText}</Button>
+                    <Button
+                        onClick={primaryAction}
+
+                        disabled={!buttonActive}
+                        loading={loading}
+                        variant="primary">{primaryText}</Button>
                     <Button onClick={goToDocs}>Go to docs</Button>
                 </ButtonGroup>
                 <ButtonGroup>
-                    <Button plain onClick={(event) => { 
-                                event.stopPropagation(); 
-                                window.open('https://docs.akto.io/traffic-connections/traffic-data-sources/postman#troubleshooting-guide')
-                            }}>postman trouble-shooting guide</Button>
+                    <Button
+
+                        onClick={(event) => { 
+                                    event.stopPropagation(); 
+                                    window.open('https://docs.akto.io/traffic-connections/traffic-data-sources/postman#troubleshooting-guide')
+                                }}
+                        variant="plain">postman trouble-shooting guide</Button>
                 </ButtonGroup>
-            </VerticalStack>
+            </BlockStack>
             <Modal
                 open={showImportDetailsModal}
                 onClose={() => {closeModal()}}
@@ -354,7 +360,7 @@ function PostmanSource() {
                 </Modal.Section>
             </Modal>
         </div>
-    )
+    );
 }
 
 export default PostmanSource

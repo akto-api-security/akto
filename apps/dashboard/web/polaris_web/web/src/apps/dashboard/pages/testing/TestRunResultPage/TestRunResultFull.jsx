@@ -1,16 +1,16 @@
-import { Box, Button, Collapsible, Divider, HorizontalStack, Icon, LegacyCard, Scrollable, Text, VerticalStack } from '@shopify/polaris'
+import { Box, Button, Collapsible, Divider, InlineStack, Icon, LegacyCard, Scrollable, Text, BlockStack } from '@shopify/polaris'
 import React, { useState } from 'react'
 import SpinnerCentered from '../../../components/progress/SpinnerCentered'
-import {ChevronDownMinor ,ChevronUpMinor} from '@shopify/polaris-icons';
+import { ChevronDownIcon, ChevronUpIcon } from "@shopify/polaris-icons";
 import SampleDataList from '../../../components/shared/SampleDataList';
-import { tokens } from "@shopify/polaris-tokens"
+import { useTheme } from "@shopify/polaris"
 import GithubCell from '../../../components/tables/cells/GithubCell';
 import PageWithMultipleCards from '../../../components/layouts/PageWithMultipleCards';
 import func from  "@/util/func"
 
 function MoreInformationComponent(props) {
     return (
-      <VerticalStack gap={"4"}>
+      <BlockStack gap={"400"}>
         <Text variant='headingMd'>
           More information
         </Text>
@@ -18,28 +18,31 @@ function MoreInformationComponent(props) {
           <LegacyCard.Section>
             {
               props?.sections?.map((section) => {
-                return (<LegacyCard.Subsection key={section.title}>
-                  <VerticalStack gap="3">
-                    <HorizontalStack gap="2" align="start" blockAlign='start'>
-                      <div style={{ maxWidth: "0.875rem", maxHeight: "0.875rem" }}>
-                        {section?.icon && <Icon source={section.icon}></Icon>}
-                      </div>
-                      <Text variant='headingSm'>
-                        {section?.title || "Heading"}
-                      </Text>
-                    </HorizontalStack>
-                    {section.content}
-                  </VerticalStack>
-                </LegacyCard.Subsection>)
+                return (
+                  <LegacyCard.Subsection key={section.title}>
+                    <BlockStack gap="300">
+                      <InlineStack gap="200" align="start" blockAlign='start'>
+                        <div style={{ maxWidth: "0.875rem", maxHeight: "0.875rem" }}>
+                          {section?.icon && <Icon source={section.icon}></Icon>}
+                        </div>
+                        <Text variant='headingSm'>
+                          {section?.title || "Heading"}
+                        </Text>
+                      </InlineStack>
+                      {section.content}
+                    </BlockStack>
+                  </LegacyCard.Subsection>
+                );
               })
             }
           </LegacyCard.Section>
         </LegacyCard>
-      </VerticalStack>
-    )
+      </BlockStack>
+    );
   }
 
 function TestRunResultFull(props) {
+    const theme = useTheme();
 
     const { selectedTestRunResult, testingRunResult, loading, issueDetails ,getDescriptionText, infoState, headerDetails, createJiraTicket, jiraIssueUrl, hexId, source} = props
 
@@ -58,25 +61,29 @@ function TestRunResultFull(props) {
       )
 
       const [testLogsCollapsibleOpen, setTestLogsCollapsibleOpen] = useState(false)
-      const iconSource = testLogsCollapsibleOpen ? ChevronUpMinor : ChevronDownMinor
+      const iconSource = testLogsCollapsibleOpen ? ChevronUpIcon : ChevronDownIcon
       const testLogsComponent = (
         <LegacyCard key="testLogsComponent">
-          <LegacyCard.Section title={<Text fontWeight="regular" variant="bodySm" color="subdued"></Text>}>
-            <HorizontalStack align="space-between">
+          <LegacyCard.Section title={<Text fontWeight="regular" variant="bodySm" tone="subdued"></Text>}>
+            <InlineStack align="space-between">
               <Text fontWeight="semibold" variant="bodyMd">Test Logs</Text>
-              <Button plain monochrome icon={iconSource} onClick={() => setTestLogsCollapsibleOpen(!testLogsCollapsibleOpen)} />
-            </HorizontalStack>
+              <Button
+
+
+                icon={iconSource}
+                onClick={() => setTestLogsCollapsibleOpen(!testLogsCollapsibleOpen)}
+                variant="monochromePlain" />
+            </InlineStack>
               <Collapsible open={testLogsCollapsibleOpen} transition={{ duration: '500ms', timingFunction: 'ease-in-out' }}>
                 <LegacyCard.Subsection>
-                  <Box paddingBlockStart={3}><Divider /></Box>
+                  <Box paddingBlockStart={300}><Divider /></Box>
     
                 <Scrollable style={{maxHeight: '40vh'}}>
-                  <VerticalStack gap={1}>
-                      
-                        {testingRunResult && testingRunResult["testLogs"] && testingRunResult["testLogs"].map((x) => <div style={{fontFamily:tokens.font["font-family-mono"], fontWeight: tokens.font["font-weight-medium"],fontSize: '12px', letterSpacing: "0px", textAlign: "left"}}>
-                          {"[" + x["timestamp"] + "] [" + x["testLogType"] + "] " +x["message"]}
-                          </div>)}
-                  </VerticalStack>
+                  <BlockStack gap={100}>
+                    {testingRunResult && testingRunResult["testLogs"] && testingRunResult["testLogs"].map((x) => <div style={{fontFamily:theme.font["font-family-mono"], fontWeight: theme.font["font-weight-medium"],fontSize: '12px', letterSpacing: "0px", textAlign: "left"}}>
+                      {"[" + x["timestamp"] + "] [" + x["testLogType"] + "] " +x["message"]}
+                      </div>)}
+                  </BlockStack>
                 </Scrollable>
                 </LegacyCard.Subsection>
               </Collapsible>
@@ -90,7 +97,7 @@ function TestRunResultFull(props) {
             {
               getDescriptionText(fullDescription) 
             }
-            <Button plain onClick={() => setFullDescription(!fullDescription)}> {fullDescription ? "Less" : "More"} information</Button>
+            <Button  onClick={() => setFullDescription(!fullDescription)} variant="plain"> {fullDescription ? "Less" : "More"} information</Button>
           </LegacyCard>
         ,
         (testingRunResult && testingRunResult["testLogs"] && testingRunResult["testLogs"].length > 0) ?  testLogsComponent : null,
@@ -114,25 +121,29 @@ function TestRunResultFull(props) {
       ] 
 
     return (
-        <PageWithMultipleCards
-            title = {
-                <GithubCell
-                key="heading"
-                width="65vw"
-                nameWidth="50vw"
-                data={selectedTestRunResult}
-                headers={headerDetails}
-                getStatus={func.getTestResultStatus}
-                divWrap={true}
-                />
-            }
-            divider= {true}
-            backUrl = {source === "editor" ? undefined : (hexId ==="issues" ? "/dashboard/issues" : `/dashboard/testing/${hexId}`)}
-            isFirstPage = {source === "editor"}
-            primaryAction = {<Button primary onClick={()=>createJiraTicket(issueDetails)} disabled={jiraIssueUrl !== "" || window.JIRA_INTEGRATED !== "true"} >Create Jira Ticket</Button>} 
-            components = {components}
-        />
-    )
+      <PageWithMultipleCards
+          title = {
+              <GithubCell
+              key="heading"
+              width="65vw"
+              nameWidth="50vw"
+              data={selectedTestRunResult}
+              headers={headerDetails}
+              getStatus={func.getTestResultStatus}
+              divWrap={true}
+              />
+          }
+          divider= {true}
+          backUrl = {source === "editor" ? undefined : (hexId ==="issues" ? "/dashboard/issues" : `/dashboard/testing/${hexId}`)}
+          isFirstPage = {source === "editor"}
+          primaryAction = {<Button
+
+            onClick={()=>createJiraTicket(issueDetails)}
+            disabled={jiraIssueUrl !== "" || window.JIRA_INTEGRATED !== "true"}
+            variant="primary">Create Jira Ticket</Button>} 
+          components = {components}
+      />
+    );
 }
 
 export default TestRunResultFull

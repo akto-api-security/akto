@@ -1,4 +1,4 @@
-import { Page, LegacyCard, TextField, VerticalStack, Button } from '@shopify/polaris'
+import { Page, LegacyCard, TextField, BlockStack, Button, Divider } from '@shopify/polaris'
 import Dropdown from '../../../components/layouts/Dropdown'
 import DropdownSearch from '../../../components/shared/DropdownSearch'
 import PersistStore from '@/apps/main/PersistStore';
@@ -93,10 +93,11 @@ function DefaultPayloads() {
     }
 
     return (
-        <Page title='Default payloads' divider>
+        <Page title='Default payloads'>
             <LegacyCard>
+                <Divider borderColor="border" />
                 <LegacyCard.Section>
-                    <VerticalStack gap={"4"}>
+                    <BlockStack gap={"400"}>
                         <DropdownSearch
                             id={"select-domain-name"}
                             placeholder="Select domain name"
@@ -105,7 +106,6 @@ function DefaultPayloads() {
                             preSelected={allOptions[0].label}
                             value={findSelectedDomainLabel()}
                         />
-
                         {
                             isAddYourOwnDomain() &&
                             <TextField
@@ -116,7 +116,6 @@ function DefaultPayloads() {
                                  autoComplete="off"
                              />
                         }
-
                         {
                             isDomainSelected() &&
                             <TextField
@@ -129,14 +128,18 @@ function DefaultPayloads() {
                         }
                         {
                             <div className='footer-save'>
-                                <Button primary onClick={savePattern} disabled={patternText === '' || selectedDDefaultPayload === patternText}>Save</Button>
+                                <Button
+
+                                    onClick={savePattern}
+                                    disabled={patternText === '' || selectedDDefaultPayload === patternText}
+                                    variant="primary">Save</Button>
                             </div>
                         }
-                    </VerticalStack>
+                    </BlockStack>
                 </LegacyCard.Section>
             </LegacyCard>
         </Page>
-    )
+    );
 }
 
 export default DefaultPayloads

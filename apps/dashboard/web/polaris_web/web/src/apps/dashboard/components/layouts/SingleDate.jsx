@@ -1,6 +1,6 @@
-import { Box, Card, DatePicker, Popover, TextField, VerticalStack, Icon } from "@shopify/polaris";
+import { Box, Card, DatePicker, Popover, TextField, BlockStack, Icon } from "@shopify/polaris";
 import React, { useState, useEffect } from "react";
-import { CalendarMinor } from "@shopify/polaris-icons";
+import { CalendarIcon } from "@shopify/polaris-icons";
 
 function SingleDate(props) {
 
@@ -76,7 +76,7 @@ function SingleDate(props) {
       }
     }, [data]);
     return (
-      <VerticalStack inlineAlign="center" gap="400">
+      <BlockStack inlineAlign="center" gap="400">
         <Box minWidth="276px" padding={{ xs: 200 }}>
           <Popover
             active={popoverActive}
@@ -89,7 +89,7 @@ function SingleDate(props) {
             activator={
               <TextField
                 role="combobox"
-                prefix={<Icon source={CalendarMinor} />}
+                prefix={<Icon source={CalendarIcon} />}
                 value={inputValue}
                 onFocus={() => setPopoverActive(true)}
                 onChange={handleInputValueChange}
@@ -108,8 +108,8 @@ function SingleDate(props) {
             </Card>
           </Popover>
         </Box>
-      </VerticalStack>
-    )
+      </BlockStack>
+    );
   }
 
   export default SingleDate

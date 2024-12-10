@@ -1,4 +1,4 @@
-import { Modal, VerticalStack } from "@shopify/polaris"
+import { Modal, BlockStack } from "@shopify/polaris"
 import { useRef, useState } from "react";
 import EditTextField from "./EditTextField";
 
@@ -19,11 +19,11 @@ function EditModal(props) {
             }}
         >
             <Modal.Section>
-                <VerticalStack gap={2}>
+                <BlockStack gap={200}>
                     {editData.map((ele, index) => {
                         return EditTextField(ele, modifyEditData)
                     })}
-                </VerticalStack>
+                </BlockStack>
             </Modal.Section>
         </Modal>
     )

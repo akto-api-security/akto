@@ -1,6 +1,6 @@
 import func from "@/util/func"
 import ShowListInBadge from "../../components/shared/ShowListInBadge"
-import { Badge, Box, HorizontalStack, Link, Tag, Text } from "@shopify/polaris"
+import { Badge, Box, InlineStack, Link, Tag, Text } from "@shopify/polaris"
 import api from "./api"
 import testingTransform from "../testing/transform.js"
 import { history } from "@/util/history";
@@ -26,28 +26,28 @@ const transform = {
         history.navigate(hexId)
     },
     getIssuesPageCollapsibleRow(urls) {
-        return(
-        <tr style={{background: "#FAFBFB", padding: '0px !important', borderTop: '1px solid #dde0e4'}}>
-            <td colSpan={'100%'} style={{padding: '0px !important'}}>
-                {urls.map((ele,index)=>{
-                const borderStyle = index < (urls.length - 1) ? {borderBlockEndWidth : 1} : {}
-                return( 
-                    <Box padding={"2"} paddingInlineEnd={"4"} paddingInlineStart={"3"} key={index}
-                    borderColor="border-subdued" {...borderStyle}>
-                    <HorizontalStack gap={24} wrap={false}>
-                        <Box paddingInlineStart={10}>
-                        <IssuesCheckbox id={ele.id}/>
+        return (
+            <tr style={{background: "#FAFBFB", padding: '0px !important', borderTop: '1px solid #dde0e4'}}>
+                <td colSpan={'100%'} style={{padding: '0px !important'}}>
+                    {urls.map((ele,index)=>{
+                    const borderStyle = index < (urls.length - 1) ? {borderBlockEndWidth : 1} : {}
+                    return (
+                        <Box padding={"200"} paddingInlineEnd={"400"} paddingInlineStart={"300"} key={index}
+                        borderColor="border-secondary" {...borderStyle}>
+                        <InlineStack gap={24} wrap={false}>
+                            <Box paddingInlineStart={1000}>
+                            <IssuesCheckbox id={ele.id}/>
+                            </Box>
+                            <Link monochrome onClick={() => this.getNextUrl(JSON.parse(ele.id))} removeUnderline >
+                                {testingTransform.getUrlComp(ele.url)}
+                            </Link>
+                        </InlineStack>
                         </Box>
-                        <Link monochrome onClick={() => this.getNextUrl(JSON.parse(ele.id))} removeUnderline >
-                            {testingTransform.getUrlComp(ele.url)}
-                        </Link>
-                    </HorizontalStack>
-                    </Box>
-                )
-                })}
-            </td>
-        </tr>
-        )
+                    );
+                    })}
+                </td>
+            </tr>
+        );
     },
     convertToIssueTableData: async (rawData, subCategoryMap) => {
         const processedData = await Promise.all(

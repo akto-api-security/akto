@@ -1,4 +1,4 @@
-import { Box, Button, Spinner, Text, VerticalStack } from "@shopify/polaris"
+import { Box, Button, Spinner, Text, BlockStack } from "@shopify/polaris"
 import { useState } from "react";
 import api from "../api";
 
@@ -38,8 +38,8 @@ function TableExpand({ data, childApiCollectionId, childUrl, childMethod, showEd
         <tr style={{ background: "#EDEEEF" }}>
             <td></td>
             <td colSpan={4}>
-                <Box paddingInlineStart={4} paddingBlockEnd={2} paddingBlockStart={2}>
-                    <VerticalStack gap={2}>
+                <Box paddingInlineStart={400} paddingBlockEnd={200} paddingBlockStart={200}>
+                    <BlockStack gap={200}>
                         {data && data.map((ele, index) => {
                             return (
                                 <Text key={convertToText(ele)}>
@@ -47,7 +47,7 @@ function TableExpand({ data, childApiCollectionId, childUrl, childMethod, showEd
                                 </Text>
                             )
                         })}
-                    </VerticalStack>
+                    </BlockStack>
                 </Box>
             </td>
             <td style={{ width: '20%', verticalAlign: 'top', textAlign: 'right', padding: '10px' }}>

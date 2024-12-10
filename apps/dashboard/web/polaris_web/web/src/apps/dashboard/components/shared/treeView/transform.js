@@ -1,4 +1,4 @@
-import { Badge, Box, HorizontalStack } from "@shopify/polaris";
+import { Badge, Box, InlineStack } from "@shopify/polaris";
 import transform from "../../../pages/observe/transform";
 import PrettifyChildren from "./PrettifyChildren";
 import TooltipText from "../TooltipText";
@@ -198,7 +198,7 @@ const treeViewFunc = {
     },
     prettifyTreeViewData(normalData, headers){
         return normalData.map((c) => {
-            return{
+            return {
                 ...c,
                 id: c.apiCollectionIds || c.id,
                 displayNameComp: c?.isTerminal ? (
@@ -207,16 +207,16 @@ const treeViewFunc = {
                     </Box>
                 )
                 : (
-                        <HorizontalStack gap={"1"} align="space-between" wrap={false}>
+                        <InlineStack gap={"100"} align="space-between" wrap={false}>
                             <Box maxWidth="200px">
                                 <TooltipText tooltip={c.level} text={c.level} textProps={{variant: 'headingSm'}} />
                             </Box>
-                            <Badge size="small" status="new">{c?.apiCollectionIds?.length}</Badge>
-                        </HorizontalStack>),
+                            <Badge size="small" tone="new">{c?.apiCollectionIds?.length}</Badge>
+                        </InlineStack>),
                 ...transform.convertToPrettifyData(c),
                 makeTree: (data) => <PrettifyChildren data={data?.children} headers={headers} />
-            }
-        })
+            };
+        });
     }
 }
 

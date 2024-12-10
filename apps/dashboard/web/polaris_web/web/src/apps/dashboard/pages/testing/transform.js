@@ -1,17 +1,19 @@
 import func from "@/util/func";
 import api from "./api";
-import {ResourcesMajor,
-  CollectionsMajor,
-  CreditCardSecureMajor,
-  MarketingMajor,
-  FraudProtectMajor, RiskMajor,
-  CircleCancelMajor,
-  CalendarMinor,
-  ReplayMinor,
-  PlayMinor,
-} from '@shopify/polaris-icons';
+import {
+  EyeglassesIcon,
+  CollectionIcon,
+  CreditCardSecureIcon,
+  TargetIcon,
+  ShieldPersonIcon,
+  AlertTriangleIcon,
+  XCircleIcon,
+  CalendarIcon,
+  ReplayIcon,
+  PlayIcon,
+} from "@shopify/polaris-icons";
 import React from 'react'
-import { Text,HorizontalStack, Badge, Link, List, Box, Icon, Avatar, Tag, Tooltip} from '@shopify/polaris';
+import { Text,InlineStack, Badge, Link, List, Box, Icon, Avatar, Tag, Tooltip} from '@shopify/polaris';
 import { history } from "@/util/history";
 import PersistStore from "../../../main/PersistStore";
 import observeFunc from "../observe/transform";
@@ -221,16 +223,17 @@ const transform = {
       return obj;
     },
     prettifyTestName: (testName, icon, iconColor, iconToolTipContent)=>{
-      return(
-        <HorizontalStack gap={4}>
+      return (
+        <InlineStack gap={400}>
           <Tooltip content={iconToolTipContent} hoverDelay={"300"} dismissOnMouseOut>
-            <Box><Icon source={icon} color={iconColor}/></Box>
+            <Box>
+              <Icon source={icon} tone={iconColor}/></Box>
           </Tooltip>
           <Box maxWidth="350px">
             <TooltipText text={testName} tooltip={testName} textProps={{fontWeight: 'medium'}} />
           </Box>
-        </HorizontalStack>
-      )
+        </InlineStack>
+      );
     },
     filterObjectByValueGreaterThanZero: (obj)=> {
       const result = {};
@@ -394,7 +397,7 @@ const transform = {
         }
       })
     })
-    return details.replace(/{{percentageMatch}}/g, func.prettifyShort(percentageMatch))
+    return details.replace(/{{percentageMatch}}/g, func.prettifyShort(percentageMatch));
   },
 
   fillMoreInformation(category, moreInfoSections, affectedEndpoints, jiraIssueUrl, createJiraTicket) {
@@ -402,14 +405,14 @@ const transform = {
     const jiraComponent = jiraIssueUrl?.length > 0 ? (
       <Box>
               <Tag>
-                  <HorizontalStack gap={1}>
-                    <Avatar size="extraSmall" shape='round' source="/public/logo_jira.svg" />
+                  <InlineStack gap={100}>
+                    <Avatar size="xs" shape='round' source="/public/logo_jira.svg" />
                     <Link url={jiraIssueUrl}>
                       <Text>
                         {key}
                       </Text>
                     </Link>
-                  </HorizontalStack>
+                  </InlineStack>
                 </Tag>
           </Box>
     ) : <Text> No Jira ticket created. Click on the top right button to create a new ticket.</Text>
@@ -424,7 +427,7 @@ const transform = {
           return;
         }
           sectionLocal.content = (
-            <Text color='subdued'>
+            <Text tone='subdued'>
               {transform.replaceTags(category?.issueDetails, category?.vulnerableTestingRunResults) || "No impact found"}
             </Text>
           )
@@ -444,11 +447,11 @@ const transform = {
             return;
           }
           sectionLocal.content = (
-            <HorizontalStack gap="2">
+            <InlineStack gap="200">
               {
                 transform.tagList(category?.issueTags)
               }
-            </HorizontalStack>
+            </InlineStack>
           )
           break;
         case "CWE":
@@ -456,11 +459,11 @@ const transform = {
             return;
           }
           sectionLocal.content = (
-            <HorizontalStack gap="2">
+            <InlineStack gap="200">
               {
                 transform.tagList(category?.cwe, "CWE")
               }
-            </HorizontalStack>
+            </InlineStack>
           )
           break;
         case "CVE":
@@ -468,11 +471,11 @@ const transform = {
             return;
           }
           sectionLocal.content = (
-            <HorizontalStack gap="2">
+            <InlineStack gap="200">
               {
                 transform.tagList(category?.cve, "CVE")
               }
-            </HorizontalStack>
+            </InlineStack>
           )
           break;
         case "References":
@@ -480,7 +483,7 @@ const transform = {
             return;
           }
           sectionLocal.content = (
-            <List type='bullet' spacing="extraTight">
+            <List type='bullet' gap="extraTight">
               {
                 category?.references?.map((reference) => {
                   return (
@@ -663,43 +666,43 @@ const transform = {
 getInfoSectionsHeaders(){
   let moreInfoSections = [
     {
-      icon: RiskMajor,
+      icon: AlertTriangleIcon,
       title: "Impact",
       content: "",
       tooltipContent: 'The impact of the test on apis in general scenario.'
     },
     {
-      icon: CollectionsMajor,
+      icon: CollectionIcon,
       title: "Tags",
       content: "",
       tooltipContent: 'Category info about the test.'
     },
     {
-      icon: CreditCardSecureMajor,
+      icon: CreditCardSecureIcon,
       title: "CWE",
       content: "",
       tooltipContent: "CWE tags associated with the test from akto's test library"
     },
     {
-      icon: FraudProtectMajor,
+      icon: ShieldPersonIcon,
       title: "CVE",
       content: "",
       tooltipContent: "CVE tags associated with the test from akto's test library"
     },
     {
-      icon: MarketingMajor,
+      icon: TargetIcon,
       title: "API endpoints affected",
       content: "",
       tooltipContent: "Affecting endpoints in your inventory for the same test"
     },
     {
-      icon: ResourcesMajor,
+      icon: EyeglassesIcon,
       title: "References",
       content: "",
       tooltipContent: "References for the above test."
     },
     {
-      icon: ResourcesMajor,
+      icon: EyeglassesIcon,
       title: "Jira",
       content: "",
       tooltipContent: "Jira ticket number attached to the testing run issue"
@@ -762,16 +765,16 @@ getUrlComp(url){
   const method = arr[0]
   const endpoint = arr[1]
 
-  return(
-    <HorizontalStack gap={1}>
+  return (
+    <InlineStack gap={100}>
       <Box width="54px">
-        <HorizontalStack align="end">
-          <Text variant="bodyMd" fontWeight="medium" color="subdued">{method}</Text>
-        </HorizontalStack>
+        <InlineStack align="end">
+          <Text variant="bodyMd" fontWeight="medium" tone="subdued">{method}</Text>
+        </InlineStack>
       </Box>
       <div style={{fontSize: '14px', lineHeight: '20px', color: '#202223'}} data-testid="affected_endpoints">{endpoint}</div>
-    </HorizontalStack>
-  )
+    </InlineStack>
+  );
 },
 
 getCollapsibleRow(urls, severity){
@@ -782,8 +785,8 @@ getCollapsibleRow(urls, severity){
           {urls.map((ele,index)=>{
             const borderStyle = index < (urls.length - 1) ? {borderBlockEndWidth : 1} : {}
             return( 
-              <Box padding={"2"} paddingInlineEnd={"4"} paddingInlineStart={"4"} key={index}
-                  borderColor="border-subdued" {...borderStyle}
+              <Box padding={"200"} paddingInlineEnd={"400"} paddingInlineStart={"400"} key={index}
+                  borderColor="border-secondary" {...borderStyle}
               >
                 <Link monochrome onClick={() => history.navigate(ele.nextUrl)} removeUnderline >
                   {this.getUrlComp(ele.url)}
@@ -819,7 +822,7 @@ getPrettifiedTestRunResults(testRunResults){
         const baseUrl = window.location.origin+"/dashboard/testing/roles/details?system="
         const missingConfigs = func.toSentenceCase(test.errorsList[0].split(errorsObject["ROLE_NOT_FOUND"])[0]).split(" ");
         error_message = (
-          <HorizontalStack gap={"1"}>
+          <InlineStack gap={"100"}>
             {missingConfigs.map((config, index) => {
               return(
                 config.length > 0 ?
@@ -829,7 +832,7 @@ getPrettifiedTestRunResults(testRunResults){
                 : null
               )
             })}
-          </HorizontalStack>
+          </InlineStack>
         )
       }else{
         error_message = errorsObject[errorType]
@@ -869,14 +872,14 @@ getPrettifiedTestRunResults(testRunResults){
     let prettifiedObj = {
       ...obj,
       nameComp: <div data-testid={obj.name}><Box maxWidth="250px"><TooltipText tooltip={obj.name} text={obj.name} textProps={{fontWeight: 'medium'}}/></Box></div>,
-      severityComp: obj?.vulnerable === true ? <Badge size="small" status={func.getTestResultStatus(obj?.severity[0])}>{obj?.severity[0]}</Badge> : <Text>-</Text>,
-      cweDisplayComp: obj?.cweDisplay?.length > 0 ? <HorizontalStack gap={1} wrap={false}>
+      severityComp: obj?.vulnerable === true ? <Badge size="small" tone={func.getTestResultStatus(obj?.severity[0])}>{obj?.severity[0]}</Badge> : <Text>-</Text>,
+      cweDisplayComp: obj?.cweDisplay?.length > 0 ? <InlineStack gap={100} wrap={false}>
         {obj.cweDisplay.map((ele,index)=>{
           return(
-            <Badge size="small" status={func.getTestResultStatus(ele)} key={index}>{ele}</Badge>
+            <Badge size="small" tone={func.getTestResultStatus(ele)} key={index}>{ele}</Badge>
           )
         })}
-      </HorizontalStack> : <Text>-</Text>,
+      </InlineStack> : <Text>-</Text>,
       totalUrls: obj.urls.length,
       scanned_time_comp: <Text variant="bodyMd">{func.prettifyEpoch(obj?.endTimestamp)}</Text>,
       collapsibleRow: this.getCollapsibleRow(obj.urls, obj?.severity[0]),
@@ -917,14 +920,14 @@ getRowInfo(severity, apiInfo,jiraIssueUrl, sensitiveData, isIgnored){
   const jiraComponent = jiraIssueUrl?.length > 0 ? (
     <Box>
       <Tag>
-          <HorizontalStack gap={1}>
-            <Avatar size="extraSmall" shape='round' source="/public/logo_jira.svg" />
+          <InlineStack gap={100}>
+            <Avatar size="xs" shape='round' source="/public/logo_jira.svg" />
             <Link url={jiraIssueUrl}>
               <Text>
                 {key}
               </Text>
             </Link>
-          </HorizontalStack>
+          </InlineStack>
         </Tag>
     </Box>
   ) : null
@@ -938,10 +941,10 @@ getRowInfo(severity, apiInfo,jiraIssueUrl, sensitiveData, isIgnored){
     {
       title: "API",
       value: (
-        <HorizontalStack gap={"1"}>
-          <Text color="subdued" fontWeight="semibold">{apiInfo.id.method}</Text>
+        <InlineStack gap={"100"}>
+          <Text tone="subdued" fontWeight="semibold">{apiInfo.id.method}</Text>
           <TextComp value={observeFunc.getTruncatedUrl(apiInfo.id.url)} />
-        </HorizontalStack>
+        </InlineStack>
       ),
       tooltipContent: "Name of the api on which test is run"
     },
@@ -1010,27 +1013,27 @@ getActionsList(hexId){
   return [
   {
       content: 'Schedule test',
-      icon: CalendarMinor,
+      icon: CalendarIcon,
       onAction: () => {console.log("schedule test function")},
   },
   {
       content: 'Re-run',
-      icon: ReplayMinor,
+      icon: ReplayIcon,
       onAction: () => TestingStore.getState().setRerunModal(true),
   },
   {
       content: 'Add to CI/CD pipeline',
-      icon: PlayMinor,
+      icon: PlayIcon,
       onAction: () => {window.open('https://docs.akto.io/testing/run-tests-in-cicd', '_blank');},
   },
   {
       content: 'Stop',
-      icon: CircleCancelMajor,
+      icon: XCircleIcon,
       destructive:true,
       onAction: () => {this.stopTest(hexId || ""); window.location.reload();},
       disabled: true,
   }
-]},
+];},
 getActions(item){
   let arr = []
   let section1 = {title: 'Actions', items:[]}

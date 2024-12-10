@@ -1,6 +1,6 @@
 import GithubServerTable from "../../../components/tables/GithubServerTable";
-import {Text,IndexFiltersMode, LegacyCard, HorizontalStack, Button, Collapsible, HorizontalGrid, Box, Divider} from '@shopify/polaris';
-import { ChevronDownMinor , ChevronUpMinor } from '@shopify/polaris-icons';
+import {Text,IndexFiltersMode, LegacyCard, InlineStack, Button, Collapsible, InlineGrid, Box, Divider} from '@shopify/polaris';
+import { ChevronDownIcon, ChevronUpIcon } from "@shopify/polaris-icons";
 import api from "../api";
 import { useEffect, useReducer, useState } from 'react';
 import transform from "../transform";
@@ -279,31 +279,36 @@ function processData(testingRuns, latestTestingRunResultSummaries, cicd){
     },200)
 }
 
-const iconSource = collapsible ? ChevronUpMinor : ChevronDownMinor
+const iconSource = collapsible ? ChevronUpIcon : ChevronDownIcon
 const SummaryCardComponent = () =>{
   let totalVulnerabilities = severityCountMap?.HIGH?.text + severityCountMap?.MEDIUM?.text +  severityCountMap?.LOW?.text 
-  return(
+  return (
     <LegacyCard>
-      <LegacyCard.Section title={<Text fontWeight="regular" variant="bodySm" color="subdued">Vulnerabilities</Text>}>
-        <HorizontalStack align="space-between">
+      <LegacyCard.Section title={<Text fontWeight="regular" variant="bodySm" tone="subdued">Vulnerabilities</Text>}>
+        <InlineStack align="space-between">
           <Text fontWeight="semibold" variant="bodyMd">Found {totalVulnerabilities} vulnerabilities in total</Text>
-          <Button plain monochrome icon={iconSource} onClick={() => setCollapsible(!collapsible)} />
-        </HorizontalStack>
+          <Button
+
+
+            icon={iconSource}
+            onClick={() => setCollapsible(!collapsible)}
+            variant="monochromePlain" />
+        </InlineStack>
         {totalVulnerabilities > 0 ? 
         <Collapsible open={collapsible} transition={{duration: '500ms', timingFunction: 'ease-in-out'}}>
           <LegacyCard.Subsection>
-            <Box paddingBlockStart={3}><Divider/></Box>
-            <HorizontalGrid columns={2} gap={6}>
+            <Box paddingBlockStart={300}><Divider/></Box>
+            <InlineGrid columns={2} gap={600}>
               <ChartypeComponent navUrl={"/dashboard/issues/"} data={subCategoryInfo} title={"Categories"} isNormal={true} boxHeight={'250px'}/>
               <ChartypeComponent data={severityCountMap} reverse={true} title={"Severity"} charTitle={totalVulnerabilities} chartSubtitle={"Total Vulnerabilities"}/>
-            </HorizontalGrid>
+            </InlineGrid>
 
           </LegacyCard.Subsection>
         </Collapsible>
         : null }
       </LegacyCard.Section>
     </LegacyCard>
-  )
+  );
 }
   const promotedBulkActions = (selectedTestRuns) => { 
     return [

@@ -1,4 +1,4 @@
-import { Modal, Text, TextField, VerticalStack } from '@shopify/polaris'
+import { Modal, Text, TextField, BlockStack } from '@shopify/polaris'
 import React, { useState } from 'react'
 import func from '@/util/func'
 import homeRequests from "../pages/home/api"
@@ -38,11 +38,10 @@ const WelcomeBackDetailsModal = ({ isAdmin }) => {
             }}
         >
             <Modal.Section>
-                <VerticalStack gap={4}>
-                    <Text variant="bodyMd" color="subdued">
+                <BlockStack gap={400}>
+                    <Text variant="bodyMd" tone="subdued">
                         Tell us more about yourself.
                     </Text>
-
                     <TextField
                         label="Name"
                         value={username}
@@ -55,7 +54,6 @@ const WelcomeBackDetailsModal = ({ isAdmin }) => {
                             <Text>{username.length}/24</Text>
                         )}
                     />
-
                     {
                         isAdmin && <TextField
                             label="Organization name"
@@ -70,10 +68,10 @@ const WelcomeBackDetailsModal = ({ isAdmin }) => {
                             )}
                         />
                     }
-                </VerticalStack>
+                </BlockStack>
             </Modal.Section>
         </Modal>
-    )
+    );
 }
 
 export default WelcomeBackDetailsModal

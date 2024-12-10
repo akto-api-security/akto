@@ -1,22 +1,19 @@
-import { Avatar, Button, HorizontalStack, Text } from '@shopify/polaris'
+import { Avatar, Button, InlineStack, Text } from '@shopify/polaris'
 import React from 'react'
 
 function SSOTextfield({onClickFunc, logos , text}) {
     return (
         <Button onClick={onClickFunc}>
-            <HorizontalStack align="center" gap={"3"}>
-                <HorizontalStack gap={"2"}>
+            <InlineStack align="center" gap={"300"}>
+                <InlineStack gap={"200"}>
                     {logos.map((logo, index) => {
-                        return(
-                            <Avatar size="extraSmall" source={logo} key={index}/>
-                        )
+                        return <Avatar size="xs" source={logo} key={index}/>;
                     })}
-                </HorizontalStack>
-                
+                </InlineStack>
                 <Text variant="bodyLg" fontWeight="semibold">{text}</Text>
-            </HorizontalStack>
+            </InlineStack>
         </Button>
-    )
+    );
 }
 
 export default SSOTextfield

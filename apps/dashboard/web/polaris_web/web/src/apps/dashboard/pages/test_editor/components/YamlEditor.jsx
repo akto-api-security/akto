@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { Box, Button, Divider, HorizontalStack, Icon, Text, Tooltip, VerticalStack } from "@shopify/polaris"
-import { InfoMinor, ClipboardMinor, CircleTickMinor, CircleCancelMinor } from "@shopify/polaris-icons"
+import { Box, Button, Divider, InlineStack, Icon, Text, Tooltip, BlockStack } from "@shopify/polaris"
+import { InfoIcon, ClipboardIcon, CheckCircleIcon, XCircleIcon } from "@shopify/polaris-icons";
 
 import Store from "../../../store";
 import TestEditorStore from "../testEditorStore";
@@ -141,33 +141,34 @@ const YamlEditor = ({ fetchAllTests }) => {
     }
 
     return (
-        <VerticalStack>
+        <BlockStack>
             <div className="editor-header">
-                <HorizontalStack gap={"1"}>
+                <InlineStack gap={"100"}>
                     <div ref={ref} />
                     <Tooltip content={selectedTest.label + '.yaml'} width="wide">
                         <Text variant="headingSm" as="h5" truncate>{selectedTest.label + '.yaml'}</Text>
                     </Tooltip>
                     <Tooltip content={`Last Updated ${testsObj.mapTestToData[selectedTest.label].lastUpdated}`} preferredPosition="below" dismissOnMouseOut>
-                        <Icon source={InfoMinor}/> 
+                        <Icon source={InfoIcon}/> 
                     </Tooltip>
                     <Tooltip content="Copy Content" dismissOnMouseOut preferredPosition="below">
-                        <Button icon={ClipboardMinor} plain onClick={copyTestName} />
-                    </Tooltip>  
+                        <Button icon={ClipboardIcon}  onClick={copyTestName} variant="plain" />
+                    </Tooltip>
                     <Tooltip content={`Set as ${selectedTest.inactive ? "active" : "inactive" }`} dismissOnMouseOut preferredPosition="below">
-                        <Button icon={selectedTest.inactive ? CircleTickMinor : CircleCancelMinor} plain onClick={setTestInactive} />
-                    </Tooltip>  
-                </HorizontalStack>
+                        <Button
+                            icon={selectedTest.inactive ? CheckCircleIcon : XCircleIcon}
+
+                            onClick={setTestInactive}
+                            variant="plain" />
+                    </Tooltip>
+                </InlineStack>
         
                 <Button id={"save-button"} disabled={!isEdited} onClick={handleSave} size="slim">Save</Button>
             </div>
-
             <Divider />
-
             <div style={{height: '92.7%', borderRight: '1px solid' , borderColor: '#E1E3E5'}} id={"yaml-editor"} ref={yamlEditorRef} />
-        </VerticalStack>
-
-    )
+        </BlockStack>
+    );
 }
 
 export default YamlEditor

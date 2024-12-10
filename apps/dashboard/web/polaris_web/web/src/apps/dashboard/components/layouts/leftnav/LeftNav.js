@@ -1,8 +1,17 @@
 import {Navigation, Text} from "@shopify/polaris"
-import {SettingsFilledMinor,AppsFilledMajor, InventoryFilledMajor, MarketingFilledMinor, FileFilledMinor, AnalyticsFilledMinor, ReportFilledMinor, DiamondAlertMinor} from "@shopify/polaris-icons"
+import {
+  SettingsFilledIcon,
+  AppsFilledIcon,
+  InventoryFilledIcon,
+  TargetFilledIcon,
+  FileFilledIcon,
+  ChartVerticalFilledIcon,
+  SearchResourceIcon,
+  AlertDiamondIcon,
+} from "@shopify/polaris-icons";
 import {useLocation, useNavigate} from "react-router-dom"
 
-import './LeftNav.css'
+import "./LeftNav.css"
 import PersistStore from "../../../../main/PersistStore"
 import { useState } from "react"
 import func from "@/util/func"
@@ -30,7 +39,7 @@ export default function LeftNav(){
             items={[
               {
                 label: <Text variant="bodyMd" fontWeight="medium">Quick Start</Text>,
-                icon: AppsFilledMajor,
+                icon: AppsFilledIcon,
                 onClick: ()=>{
                   handleSelect("dashboard_quick_start")
                   setActive("normal")
@@ -40,8 +49,8 @@ export default function LeftNav(){
                 key: '1',
               },
               {
-                label: 'API Security Posture',
-                icon: ReportFilledMinor,
+                label:<Text variant="bodyMd" fontWeight="medium">API Security Posture</Text>,
+                icon: SearchResourceIcon,
                 onClick: ()=>{
                   handleSelect("dashboard_home")
                   navigate("/dashboard/home")
@@ -53,7 +62,7 @@ export default function LeftNav(){
               {   
                 url: '#',
                 label: <Text variant="bodyMd" fontWeight="medium" color={leftNavSelected.includes("observe") ? (active === 'active' ? "subdued" : ""): ""}>API Discovery</Text>,
-                icon: InventoryFilledMajor,
+                icon: InventoryFilledIcon,
                 onClick: ()=>{
                   handleSelect("dashboard_observe_inventory")
                   navigate('/dashboard/observe/inventory')
@@ -94,7 +103,7 @@ export default function LeftNav(){
               {
                 url: '#',
                 label: <Text variant="bodyMd" fontWeight="medium" color={leftNavSelected.includes("testing") ? (active === 'active' ? "subdued" : ""): ""}>Testing</Text>,
-                icon: MarketingFilledMinor,
+                icon: TargetFilledIcon,
                 onClick: ()=>{
                   navigate('/dashboard/testing/')
                   handleSelect('dashboard_testing')
@@ -134,7 +143,7 @@ export default function LeftNav(){
               },
               {
                 label: <Text variant="bodyMd" fontWeight="medium">Test Editor</Text>,
-                icon: FileFilledMinor,
+                icon: FileFilledIcon,
                 onClick: ()=>{ 
                   handleSelect("dashboard_test_editor")
                   navigate("/dashboard/test-editor/REMOVE_TOKENS")
@@ -145,7 +154,7 @@ export default function LeftNav(){
               },
               {
                 label: <Text variant="bodyMd" fontWeight="medium">Issues</Text>,
-                icon: AnalyticsFilledMinor,
+                icon: ChartVerticalFilledIcon,
                 onClick: ()=>{ 
                     handleSelect("dashboard_issues")
                     navigate("/dashboard/issues")
@@ -157,7 +166,7 @@ export default function LeftNav(){
               window?.STIGG_FEATURE_WISE_ALLOWED?.THREAT_DETECTION?.isGranted ?
                 {
                   label: <Text variant="bodyMd" fontWeight="medium">API Runtime Threats</Text>,
-                  icon: DiamondAlertMinor,
+                  icon: AlertDiamondIcon,
                   onClick: () => {
                     handleSelect("dashboard_threat_detection")
                     navigate("/dashboard/threat-detection")
@@ -172,7 +181,7 @@ export default function LeftNav(){
                items={[
                 {
                   label:<Text variant="bodyMd" fontWeight="medium">Settings</Text>,
-                  icon: SettingsFilledMinor,
+                  icon: SettingsFilledIcon,
                   onClick: ()=>{
                     navigate("/dashboard/settings/about")
                     setActive("normal")

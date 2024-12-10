@@ -1,17 +1,17 @@
-import { Banner, Box, Text, VerticalStack } from '@shopify/polaris'
+import { Banner, Box, Text, BlockStack } from '@shopify/polaris'
 import React from 'react'
 
 function AlertsBanner({severity, content, type, onDismiss, index}) {
     return (
-        <Banner status={severity} onDismiss={() => onDismiss(index)}>
+        <Banner tone={severity} onDismiss={() => onDismiss(index)}>
             <Box width="280px">
-                <VerticalStack>
+                <BlockStack>
                     <Text variant="headingMd">{type}</Text>
                     <Text variant="bodySm">{content}</Text>
-                </VerticalStack>
+                </BlockStack>
             </Box>
         </Banner>
-    )
+    );
 }
 
 export default AlertsBanner

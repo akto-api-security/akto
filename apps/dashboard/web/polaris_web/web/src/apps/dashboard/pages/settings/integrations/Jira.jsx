@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react'
-import {Box, Button, Collapsible, Divider, HorizontalStack, Icon, LegacyCard, List, Scrollable, Text, TextField, VerticalStack} from '@shopify/polaris';
+import {Box, Button, Collapsible, Divider, InlineStack, Icon, LegacyCard, List, Scrollable, Text, TextField, BlockStack} from '@shopify/polaris';
 import settingFunctions from '../module';
 import IntegrationsLayout from './IntegrationsLayout';
 import PasswordTextField from '../../../components/layouts/PasswordTextField';
-import { ChevronDownMinor, ChevronUpMinor } from "@shopify/polaris-icons"
+import { ChevronDownIcon, ChevronUpIcon } from "@shopify/polaris-icons";
 import func from "@/util/func"
 
 function Jira() {
@@ -31,16 +31,20 @@ function Jira() {
         <Scrollable
             style={{maxHeight: '250px'}}
         >
-            <VerticalStack gap={"4"}>
+            <BlockStack gap={"400"}>
                 <Box>
-                    <Button plain monochrome removeUnderline onClick={() => setCollapsibleOpen(!collapsibleOpen)}>
-                        <HorizontalStack gap={"4"}>
+                    <Button
+
+
+                        removeUnderline
+                        onClick={() => setCollapsibleOpen(!collapsibleOpen)}
+                        variant="monochromePlain">
+                        <InlineStack gap={"400"}>
                             <Text variant="headingSm">Found {Object.keys(projectIssueMap).length} projects out of {projId.split(',').length}</Text>
-                            <Box><Icon source={collapsibleOpen ? ChevronUpMinor : ChevronDownMinor} /></Box>
-                        </HorizontalStack>
+                            <Box><Icon source={collapsibleOpen ? ChevronUpIcon : ChevronDownIcon} /></Box>
+                        </InlineStack>
                     </Button>
                 </Box>
-                
                 <Collapsible
                     open={collapsibleOpen}
                     transition={{ duration: '200ms', timingFunction: 'ease-in-out' }}
@@ -51,8 +55,7 @@ function Jira() {
                         })}
                     </List>
                 </Collapsible>
-
-            </VerticalStack>
+            </BlockStack>
         </Scrollable>
     )
 
@@ -79,12 +82,12 @@ function Jira() {
           </LegacyCard.Section>
 
           <LegacyCard.Section>
-                <VerticalStack gap={"2"}>
+                <BlockStack gap={"200"}>
                     <TextField label="Base Url" value={baseUrl} helpText="Specify the base url of your jira project(for ex - https://jiraintegloc.atlassian.net)"  placeholder='Base Url' requiredIndicator onChange={setBaseUrl} />
                     <TextField label="Email" value={userEmail} helpText="Specify your email id for which api token will be generated" placeholder='Email' requiredIndicator onChange={setUserEmail} />
                     <PasswordTextField label="Api Token" helpText="Specify the api token created for your user email" field={apiToken} onFunc={true} setField={setApiToken} />
                     <TextField label="Add project ids" helpText="Specify the projects ids in comma separated string" value={projId} placeholder='Project Names' requiredIndicator onChange={setProjId} />
-                </VerticalStack>
+                </BlockStack>
           </LegacyCard.Section> 
           {Object.keys(projectIssueMap).length > 0 ? <LegacyCard.Section>
               {projectsComponent} 

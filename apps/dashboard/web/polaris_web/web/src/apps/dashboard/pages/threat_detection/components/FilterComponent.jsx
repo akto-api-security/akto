@@ -1,4 +1,4 @@
-import { Box, Button, HorizontalStack, LegacyCard, Text } from "@shopify/polaris";
+import { Box, Button, InlineStack, LegacyCard, Text } from "@shopify/polaris";
 import { useEffect, useState } from "react";
 import SampleData from "../../../components/shared/SampleData";
 import api from "../api"
@@ -35,13 +35,11 @@ function FilterComponent() {
     return (
         <LegacyCard>
             <LegacyCard.Section flush>
-                <Box padding={"2"}>
-                    <HorizontalStack padding="2" align='space-between'>
-                        Threat detection filter
-                        <Button plain monochrome removeUnderline onClick={onSave}>
+                <Box padding={"200"}>
+                    <InlineStack padding="2" align='space-between'>Threat detection filter<Button   removeUnderline onClick={onSave} variant="monochromePlain">
                             Save
                         </Button>
-                    </HorizontalStack>
+                    </InlineStack>
                 </Box>
             </LegacyCard.Section>
             <LegacyCard.Section>
@@ -72,7 +70,7 @@ function FilterComponent() {
                 <SampleData data={ogData} editorLanguage="custom_yaml" minHeight="240px" readOnly={false} getEditorData={setData} />
             </LegacyCard.Section>
         </LegacyCard>
-    )
+    );
 
 }
 

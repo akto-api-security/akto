@@ -1,5 +1,5 @@
 import { Button, TextField } from '@shopify/polaris';
-import { DeleteMinor } from "@shopify/polaris-icons"
+import { DeleteIcon } from "@shopify/polaris-icons";
 import React, { useState, useEffect } from 'react'
 import DropdownSearch from './shared/DropdownSearch';
 import func from "@/util/func"
@@ -229,9 +229,9 @@ function CollectionComponent(props) {
             {operatorComponent}
             {prefixLeft(condition, index)}
             {component(condition, index)}
-            <Button icon={DeleteMinor} onClick={() => handleDelete(index)} />
+            <Button icon={DeleteIcon} onClick={() => handleDelete(index)} />
         </div>
-    )
+    );
 
 }
 

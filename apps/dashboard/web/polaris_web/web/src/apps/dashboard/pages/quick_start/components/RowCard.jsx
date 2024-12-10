@@ -1,4 +1,4 @@
-import { Avatar, Button, Card, Text, VerticalStack, HorizontalStack, Badge, Box } from '@shopify/polaris';
+import { Avatar, Button, Card, Text, BlockStack, InlineStack, Badge, Box } from '@shopify/polaris';
 
 function RowCard(props) {
 
@@ -13,28 +13,28 @@ function RowCard(props) {
 
     return (
         <Card>
-            <VerticalStack gap="5">
+            <BlockStack gap="500">
                 <div style={{display: 'flex' , justifyContent: 'space-between'}}>
-                    <Box padding={"2"} borderWidth='1' borderColor='border-subdued' borderRadius='2'>
-                    <Avatar customer size="extraSmall" name={cardObj.label} source={cardObj.icon} shape='square'/>
+                    <Box padding={"200"} borderWidth='025' borderColor='border-secondary' borderRadius='200'>
+                    <Avatar customer size="xs" name={cardObj.label} source={cardObj.icon}/>
                     </Box>
-                    <Box paddingBlockStart="1">
-                        {cardObj.badge ? <Badge size='small' status='info'>{cardObj.badge}</Badge> : null}
+                    <Box paddingBlockStart="100">
+                        {cardObj.badge ? <Badge size='small' tone='info'>{cardObj.badge}</Badge> : null}
                     </Box>
                 </div>
-                <VerticalStack gap="1">
+                <BlockStack gap="100">
                     <Text variant="headingMd" as="h5">{cardObj.label}</Text>
                     <Box minHeight="80px">
-                        <Text variant="bodyMd" color='subdued'>{cardObj.text}</Text>
+                        <Text variant="bodyMd" tone='subdued'>{cardObj.text}</Text>
                     </Box>
-                </VerticalStack>
-                <HorizontalStack gap={"4"} align='start'>
+                </BlockStack>
+                <InlineStack gap={"400"} align='start'>
                     <Button onClick={handleAction}>{buttonText}</Button>
-                    <Button plain onClick={goToDocs} size='medium'>See Docs</Button>
-                </HorizontalStack>
-            </VerticalStack>
+                    <Button  onClick={goToDocs} size='medium' variant="plain">See Docs</Button>
+                </InlineStack>
+            </BlockStack>
         </Card>
-    )
+    );
 }
 
 export default RowCard

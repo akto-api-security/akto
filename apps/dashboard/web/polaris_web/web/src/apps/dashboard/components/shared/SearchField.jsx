@@ -1,5 +1,5 @@
 import { Box, Icon, TextField } from '@shopify/polaris'
-import {SearchMinor} from "@shopify/polaris-icons"
+import { SearchIcon } from "@shopify/polaris-icons";
 import React, { useState } from 'react'
 
 function SearchField(props) {
@@ -7,7 +7,7 @@ function SearchField(props) {
     const [searchValue, setSearchValue] = useState("")
     const SearchIcon =  (
         <Box>
-            <Icon source={SearchMinor} />   
+            <Icon source={SearchIcon} />   
         </Box>
     )
 

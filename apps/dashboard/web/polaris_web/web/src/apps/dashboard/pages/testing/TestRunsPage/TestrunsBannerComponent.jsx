@@ -34,7 +34,7 @@ function SelectCollectionComponent() {
             preferredAlignment="left"
         >
             <Popover.Pane fixed>
-                <Box padding={"1"}>
+                <Box padding={"100"}>
                     <DropdownSearch
                         placeholder="Search collection"
                         optionsList={allCollectionsOptions}
@@ -42,7 +42,7 @@ function SelectCollectionComponent() {
                     />
                 </Box>
             </Popover.Pane>
-        </Popover>: <Text color="subdued" variant="bodyMd" fontWeight="medium">No endpoints exist, go to inventory page to upload traffic.</Text>
+        </Popover>: <Text tone="subdued" variant="bodyMd" fontWeight="medium">No endpoints exist, go to inventory page to upload traffic.</Text>
     )
 }
 

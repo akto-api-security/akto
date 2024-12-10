@@ -1,4 +1,4 @@
-import { LegacyCard, HorizontalGrid, TextField } from "@shopify/polaris";
+import { LegacyCard, InlineGrid, TextField } from "@shopify/polaris";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useState, useEffect, useReducer } from "react";
 import authTypesApi from "./api";
@@ -100,7 +100,7 @@ function AuthTypeDetails() {
     const descriptionCard = (
         <LegacyCard title="Details" key="desc">
             <LegacyCard.Section>
-                <HorizontalGrid gap="4" columns={2}>
+                <InlineGrid gap="400" columns={2}>
                     <TextField
                         id={"name-field"} 
                         label="Name" value={currState.name}
@@ -113,8 +113,8 @@ function AuthTypeDetails() {
                     <Dropdown id={"active-dropdown"} 
                     menuItems={activeItems} placeHolder={"Auth type active status"}
                     selected={(val) => { handleChange({ active: val }) }} 
-                    initial={currState.active} label= "Active" /> } 
-                </HorizontalGrid>
+                    initial={currState.active} label= "Active" /> }
+                </InlineGrid>
             </LegacyCard.Section>
         </LegacyCard>
     )

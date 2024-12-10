@@ -1,7 +1,20 @@
 import { Navigation } from "@shopify/polaris"
-import { StoreDetailsFilledMinor, IdentityCardFilledMajor, AutomationFilledMajor, AppsFilledMajor, ComposeMajor} from "@shopify/polaris-icons"
-import { ListFilledMajor, ReportFilledMinor, LockFilledMajor, CollectionsFilledMajor, PlanMajor, ChatMajor} from "@shopify/polaris-icons"
-import { VariantMajor, VocabularyMajor, AdjustMinor } from "@shopify/polaris-icons"
+import {
+    TextInRowsFilledIcon,
+    IdentityCardFilledIcon,
+    AutomationFilledIcon,
+    AppsFilledIcon,
+    ComposeIcon,
+    ListBulletedFilledIcon,
+    SearchResourceIcon,
+    LockFilledIcon,
+    CollectionFilledIcon,
+    PlanIcon,
+    ChatIcon,
+    VariantIcon,
+    BookOpenIcon,
+    AdjustIcon,
+} from "@shopify/polaris-icons";
 import { useLocation, useNavigate } from "react-router-dom"
 import func from "@/util/func"
 
@@ -14,46 +27,46 @@ const SettingsLeftNav = () => {
 
     const usersArr = window.USER_ROLE !== 'GUEST' ? [{
         label: 'Users',
-        icon: IdentityCardFilledMajor,
+        icon: IdentityCardFilledIcon,
         selected: page === "users",
         onClick: () => navigate("/dashboard/settings/users")
     }] : []
     const logsArr = window?.IS_SAAS !== 'true' ||
         (window?.USER_NAME && window?.USER_NAME.includes("akto")) ? [{
             label: 'Logs',
-            icon: ListFilledMajor,
+            icon: ListBulletedFilledIcon,
             selected: page === "logs",
             onClick: () => navigate("/dashboard/settings/logs")
         }] : []
     const metricsArr = window.IS_SAAS === 'true' ? [] : [{
         label: 'Metrics',
-        icon: ReportFilledMinor,
+        icon: SearchResourceIcon,
         selected: page === "metrics",
         onClick: () => navigate("/dashboard/settings/metrics")
     }]
     const selfHostedArr = window.IS_SAAS === 'true' ? [{
         label: 'Self hosted',
-        icon: PlanMajor,
+        icon: PlanIcon,
         selected: page === "self-hosted",
         onClick: () => navigate("/dashboard/settings/self-hosted")
     }] : []
     const auditLogsArr = ((window.IS_SAAS === 'true' || window.DASHBOARD_MODE === 'ON_PREM') && window.USER_ROLE === 'ADMIN') ? [{
         label: 'Audit logs',
-        icon: ComposeMajor,
+        icon: ComposeIcon,
         selected: page === 'audit-logs',
         onClick: () => navigate("/dashboard/settings/audit-logs")
     }] : []
 
     const billingArr = window.IS_SAAS === 'true' || window.DASHBOARD_MODE === 'ON_PREM' ? [{
         label: 'Billing',
-        icon: PlanMajor,
+        icon: PlanIcon,
         selected: page === "billing",
         onClick: () => navigate("/dashboard/settings/billing")
      }] : [];
 
     const cicdArr = !func.checkLocal() ? [{
         label: 'CI/CD',
-        icon: AutomationFilledMajor,
+        icon: AutomationFilledIcon,
         selected: page === "ci-cd",
         onClick: () => navigate("/dashboard/settings/integrations/ci-cd")
     }] : [];
@@ -64,7 +77,7 @@ const SettingsLeftNav = () => {
                 items={[
                     {
                         label: 'About',
-                        icon: StoreDetailsFilledMinor,
+                        icon: TextInRowsFilledIcon,
                         selected: page === "about",
                         onClick: () => navigate("/dashboard/settings/about")
                     },
@@ -78,7 +91,7 @@ const SettingsLeftNav = () => {
                     ...cicdArr,
                     {
                         label: 'Integrations',
-                        icon: AppsFilledMajor,
+                        icon: AppsFilledIcon,
                         selected: page === "integrations",
                         onClick: () => navigate("/dashboard/settings/integrations")
                     },
@@ -87,31 +100,31 @@ const SettingsLeftNav = () => {
                     ...metricsArr,
                     {
                         label: 'Auth types',
-                        icon: LockFilledMajor,
+                        icon: LockFilledIcon,
                         selected: page === "auth-types",
                         onClick: () => navigate("/dashboard/settings/auth-types")
                     },
                     {
                         label: 'Default payloads',
-                        icon: VariantMajor,
+                        icon: VariantIcon,
                         selected: page === "default-payloads",
                         onClick: () => navigate("/dashboard/settings/default-payloads")
                     },
                     {
                         label: 'Advanced traffic filters',
-                        icon: AdjustMinor,
+                        icon: AdjustIcon,
                         selected: page === "advanced-filters",
                         onClick: () => navigate("/dashboard/settings/advanced-filters")
                     }, 
                     {
                         label: 'Tags',
-                        icon: CollectionsFilledMajor,
+                        icon: CollectionFilledIcon,
                         selected: page === "tags",
                         onClick: () => navigate("/dashboard/settings/tags")
                     },
                     {
                         label: 'Test library',
-                        icon: VocabularyMajor,
+                        icon: BookOpenIcon,
                         selected: page === "test-library",
                         onClick: () => navigate("/dashboard/settings/test-library")
                     },
@@ -120,14 +133,14 @@ const SettingsLeftNav = () => {
                     ...auditLogsArr,
                     {
                         label: 'Help & Support',
-                        icon: ChatMajor,
+                        icon: ChatIcon,
                         selected: page === "help",
                         onClick: () => navigate("/dashboard/settings/help")
                     }
                 ]}
             />
         </Navigation>
-    )
+    );
 }
 
 export default SettingsLeftNav

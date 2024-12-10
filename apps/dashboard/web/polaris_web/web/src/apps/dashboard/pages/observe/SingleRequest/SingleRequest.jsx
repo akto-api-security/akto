@@ -1,14 +1,11 @@
 
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
 import { useParams } from "react-router-dom"
-import { Button, Text, Box, Popover, ActionList, VerticalStack, HorizontalStack, Icon } from "@shopify/polaris"
+import { Button, Text, Box, Popover, ActionList, BlockStack, InlineStack, Icon } from "@shopify/polaris"
 import api from "../api";
 import { useEffect, useState } from "react";
 import SampleDataList from "../../../components/shared/SampleDataList";
-import {
-    SearchMinor,
-    FraudProtectMinor
-  } from '@shopify/polaris-icons';
+import { SearchIcon, ShieldPersonIcon } from "@shopify/polaris-icons";
 import transform from "../transform";
 import PersistStore from "../../../../main/PersistStore";
 
@@ -16,17 +13,17 @@ let headerDetails = [
     {
         text: "Collection",
         value: "collection",
-        icon: FraudProtectMinor,
+        icon: ShieldPersonIcon,
     },
     {
         text: "Discovered",
         value: "detected_timestamp",
-        icon: SearchMinor,
+        icon: SearchIcon,
     },
     {
         text: "Location",
         value: "location",
-        icon: SearchMinor,
+        icon: SearchIcon,
     },
   ]
 
@@ -70,31 +67,31 @@ function SingleRequest(){
     return (
         <PageWithMultipleCards
             title={
-                <VerticalStack gap="3">
-                <HorizontalStack gap="2" align="start" blockAlign='start'>
-                    <Box maxWidth="50vw">
-                        <Text variant='headingLg' truncate>
-                            {`${subType} in ${method} ${url}`}
-                        </Text>
-                    </Box>
-                </HorizontalStack>
-                <HorizontalStack gap='2' align="start" >
-                  {
-                    headerDetails?.map((header) => {
-                      return (
-                        <HorizontalStack key={header.value} gap="1">
-                          <div style={{ maxWidth: "0.875rem", maxHeight: "0.875rem" }}>
-                            <Icon source={header.icon} color="subdued" />
-                          </div>
-                          <Text as="div" variant="bodySm" color="subdued" fontWeight='regular'>
-                            {endpointData[header.value]}
-                          </Text>
-                        </HorizontalStack>
-                      )
-                    })
-                  }
-                </HorizontalStack>
-              </VerticalStack>
+                <BlockStack gap="300">
+                    <InlineStack gap="200" align="start" blockAlign='start'>
+                        <Box maxWidth="50vw">
+                            <Text variant='headingLg' truncate>
+                                {`${subType} in ${method} ${url}`}
+                            </Text>
+                        </Box>
+                    </InlineStack>
+                    <InlineStack gap='200' align="start">
+                        {
+                          headerDetails?.map((header) => {
+                            return (
+                                <InlineStack key={header.value} gap="100">
+                                    <div style={{ maxWidth: "0.875rem", maxHeight: "0.875rem" }}>
+                                      <Icon source={header.icon} tone="subdued" />
+                                    </div>
+                                    <Text as="div" variant="bodySm" tone="subdued" fontWeight='regular'>
+                                      {endpointData[header.value]}
+                                    </Text>
+                                </InlineStack>
+                            );
+                          })
+                        }
+                    </InlineStack>
+                </BlockStack>
                 
             }
             backUrl={`/dashboard/observe/sensitive/${subType}`}
@@ -137,7 +134,7 @@ function SingleRequest(){
               />,
             ]}
         />
-    )
+    );
 }
 
 export default SingleRequest

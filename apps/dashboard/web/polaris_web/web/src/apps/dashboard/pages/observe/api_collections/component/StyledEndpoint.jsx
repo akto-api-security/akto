@@ -51,12 +51,12 @@ const StyledEndpoint = (data, fontSize, variant, shouldNotTruncate, showWithoutH
                 {
                     arr?.map((item, index) => {
                         return (
-                            <Box key={index} as={"span"} color={colored.includes(index) ? "text-critical-active" : ""}>
+                            (<Box key={index} as={"span"} color={colored.includes(index) ? "text-critical-active" : ""}>
                                 <Text as="span" variant={finalVariant}>
                                 {item + "/"}
                             </Text>
-                            </Box>
-                        )
+                            </Box>)
+                        );
                     })
                 }
             </div>

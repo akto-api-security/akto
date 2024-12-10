@@ -4,7 +4,7 @@ import SpinnerCentered from "../../../components/progress/SpinnerCentered"
 import api from "../api"
 import onFunc from '../transform'
 import TestSuitesCard from "./TestSuitesCard"
-import { Badge, Button, ButtonGroup, HorizontalStack, Spinner, Text, VerticalStack } from '@shopify/polaris'
+import { Badge, Button, ButtonGroup, InlineStack, Spinner, Text, BlockStack } from '@shopify/polaris'
 import testingApi from "../../testing/api"
 import GridRows from '../../../components/shared/GridRows'
 import PersistStore from '../../../../main/PersistStore'
@@ -80,27 +80,25 @@ function ResultsSummary() {
         fetchTestsSummary()
     },[testingRunHexId])
 
-    return (
-        loading ? <SpinnerCentered /> :   
-        <VerticalStack gap="5">
-            {fetchTests ? <div style={{margin : "auto"}}> <Spinner size="small" /> </div> : null}
-            <ButtonGroup segmented>
-                {severities.map((item,index)=> {
-                    return(
-                        <Button onClick={()=> setActiveTab(item)} key={index} pressed={item === activeTab}>
-                            <div style={{display: "flex", justifyContent: "center", width: "9.4vw"}}>
-                                <HorizontalStack gap="2">
-                                    <Text variant="bodyLg" fontWeight="medium">{item}</Text>
-                                    <Badge>{countIssues[item.toUpperCase()]?.toString()}</Badge>
-                                </HorizontalStack>
-                            </div>
-                        </Button>
-                    )
-                })}
-            </ButtonGroup>
-            <GridRows columns={1} items={groupedResults[activeTab]?.items} CardComponent={TestSuitesCard} />
-        </VerticalStack>
-    )
+    return loading ? <SpinnerCentered /> :   
+    <BlockStack gap="500">
+        {fetchTests ? <div style={{margin : "auto"}}> <Spinner size="small" /> </div> : null}
+        <ButtonGroup variant="segmented">
+            {severities.map((item,index)=> {
+                return (
+                    <Button onClick={()=> setActiveTab(item)} key={index} pressed={item === activeTab}>
+                        <div style={{display: "flex", justifyContent: "center", width: "9.4vw"}}>
+                            <InlineStack gap="200">
+                                <Text variant="bodyLg" fontWeight="medium">{item}</Text>
+                                <Badge>{countIssues[item.toUpperCase()]?.toString()}</Badge>
+                            </InlineStack>
+                        </div>
+                    </Button>
+                );
+            })}
+        </ButtonGroup>
+        <GridRows columns={1} items={groupedResults[activeTab]?.items} CardComponent={TestSuitesCard} />
+    </BlockStack>;
 }
 
 export default ResultsSummary

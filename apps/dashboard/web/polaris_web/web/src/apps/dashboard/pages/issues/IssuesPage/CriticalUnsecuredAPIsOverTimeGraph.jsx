@@ -41,7 +41,7 @@ const CriticalUnsecuredAPIsOverTimeGraph = ({ linkText, linkUrl }) => {
         },
     }
 
-    const runTestEmptyCardComponent = <Text alignment='center' color='subdued'>There’s no data to show. <Link url="/dashboard/testing" target='_blank'>Run test</Link> to get data populated. </Text>
+    const runTestEmptyCardComponent = <Text alignment='center' tone='subdued'>There’s no data to show. <Link url="/dashboard/testing" target='_blank'>Run test</Link> to get data populated. </Text>
 
     const criticalUnsecuredAPIsOverTime = (unsecuredAPIs && unsecuredAPIs.length > 0 && unsecuredAPIs[0].data && unsecuredAPIs[0].data.length > 0) ? <InfoCard
         component={
@@ -65,7 +65,7 @@ const CriticalUnsecuredAPIsOverTimeGraph = ({ linkText, linkUrl }) => {
         titleToolTip="Chart showing the number of APIs detected(risk score >= 4) each month over the past year. Helps track security trends over time."
         linkText={linkText}
         linkUrl={linkUrl}
-    /> : <EmptyCard title="Critical Unsecured APIs Over Time" subTitleComponent={showTestingComponents ? <Text alignment='center' color='subdued'>No Unsecured APIs found</Text>: runTestEmptyCardComponent} />
+    /> : <EmptyCard title="Critical Unsecured APIs Over Time" subTitleComponent={showTestingComponents ? <Text alignment='center' tone='subdued'>No Unsecured APIs found</Text>: runTestEmptyCardComponent} />
 
     return (
         {...criticalUnsecuredAPIsOverTime}

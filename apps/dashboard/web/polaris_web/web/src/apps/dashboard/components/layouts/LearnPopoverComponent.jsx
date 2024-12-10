@@ -1,5 +1,5 @@
-import { ActionList, Box, Button, Icon, Popover, Text, VerticalStack } from '@shopify/polaris'
-import { PlayMinor, NoteMinor } from "@shopify/polaris-icons"
+import { ActionList, Box, Button, Icon, Popover, Text, BlockStack } from '@shopify/polaris'
+import { PlayIcon, NoteIcon } from "@shopify/polaris-icons";
 import React, { useState } from 'react'
 
 function LearnPopoverComponent({learnMoreObj}) {
@@ -7,14 +7,14 @@ function LearnPopoverComponent({learnMoreObj}) {
     if(learnMoreObj){
         if (learnMoreObj?.docsLink !== undefined) {
             learnMoreObj.docsLink.forEach((doc) => {
-                doc.prefix = <Box><Icon source={NoteMinor} /></Box>;
+                doc.prefix = <Box><Icon source={NoteIcon} /></Box>;
                 doc.onAction = () => window.open(doc.value, "_blank")
             });
         }
 
         if (learnMoreObj?.videoLink !== undefined) {
             learnMoreObj.videoLink.forEach((doc) => {
-                doc.prefix = <Box><Icon source={PlayMinor} /></Box>;
+                doc.prefix = <Box><Icon source={PlayIcon} /></Box>;
                 doc.onAction = () => window.open(doc.value, "_blank")
             });
         }
@@ -32,20 +32,20 @@ function LearnPopoverComponent({learnMoreObj}) {
             preferredAlignment="right"
         >
             {(learnMoreObj?.title !==undefined ||  learnMoreObj.description !== undefined) ?
-            <Box width="230px" padding={4} paddingBlockEnd={"0"}>
-                <VerticalStack gap={1}>
+            <Box width="230px" padding={400} paddingBlockEnd={"0"}>
+                <BlockStack gap={100}>
                     <Text>
                         {learnMoreObj?.title}
                     </Text>
-                    <Text color="subdued">
+                    <Text tone="subdued">
                         {learnMoreObj?.description}
                     </Text>
-                </VerticalStack>
+                </BlockStack>
             </Box> : null}
             <ActionList items={[...learnMoreObj?.docsLink, ...learnMoreObj?.videoLink]} />
             
         </Popover>
-    )
+    );
 }
 
 export default LearnPopoverComponent

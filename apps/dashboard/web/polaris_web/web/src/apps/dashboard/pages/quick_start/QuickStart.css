@@ -39,7 +39,7 @@
     gap: 20px;
 }
 
-.card-items .Polaris-HorizontalStack{
+.card-items .Polaris-InlineStack{
     align-items: flex-start !important;
 }
 

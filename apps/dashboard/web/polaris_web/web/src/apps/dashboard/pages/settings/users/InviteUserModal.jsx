@@ -65,7 +65,7 @@ const InviteUserModal = ({ inviteUser, setInviteUser, toggleInviteUserModal, rol
     if (inviteUser.state !== "success") {
         return (
             <Modal
-                small
+                size="small"
                 open={inviteUser.isActive}
                 onClose={toggleInviteUserModal}
                 title="Add team member"
@@ -89,7 +89,7 @@ const InviteUserModal = ({ inviteUser, setInviteUser, toggleInviteUserModal, rol
                         onChange={(email) => setInviteEmail(email)}
                         autoComplete="off"
                     />
-                    <Text variant="bodyMd" color="subdued">
+                    <Text variant="bodyMd" tone="subdued">
                         We'll use this address if we need to contact you about your account.
                     </Text>
 
@@ -105,7 +105,7 @@ const InviteUserModal = ({ inviteUser, setInviteUser, toggleInviteUserModal, rol
     } else {
         return (
             <Modal
-                small
+                size="small"
                 open={inviteUser.isActive}
                 onClose={toggleInviteUserModal}
                 title="Add team member"
@@ -127,7 +127,7 @@ const InviteUserModal = ({ inviteUser, setInviteUser, toggleInviteUserModal, rol
                         disabled={true}
                         value={inviteUser.inviteLink}
                     />
-                     <Text variant="bodyMd" color="subdued">
+                     <Text variant="bodyMd" tone="subdued">
                         Alternatively, you can copy the invite link and share it with your invitee directly.
                     </Text>
                     <div ref={ref} />

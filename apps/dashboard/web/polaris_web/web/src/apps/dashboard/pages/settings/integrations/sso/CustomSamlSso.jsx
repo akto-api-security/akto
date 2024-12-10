@@ -1,13 +1,13 @@
 import React, { useEffect, useState } from 'react'
 import StepsComponent from '../components/StepsComponent';
-import { Button, Form, FormLayout, HorizontalStack, LegacyCard, Link, Tag, Text, TextField, VerticalStack } from '@shopify/polaris';
+import { Button, Form, FormLayout, InlineStack, LegacyCard, Link, Tag, Text, TextField, BlockStack } from '@shopify/polaris';
 import FileUpload from '../../../../components/shared/FileUpload';
 import SpinnerCentered from '../../../../components/progress/SpinnerCentered';
 import IntegrationsLayout from '../IntegrationsLayout';
 import DeleteModal from '../components/DeleteModal';
 import func from "@/util/func"
 import Details from '../components/Details';
-import { CancelMajor } from "@shopify/polaris-icons"
+import { XIcon } from "@shopify/polaris-icons";
 
 function CustomSamlSso({ssoType,entityTitle, entityId, loginURL,pageTitle, signinUrl, integrationSteps, cardContent, handleSubmitOutSide, handleDeleteOutside, samlUrlDocs, loading, showCustomInputs, certificateName}) {
     const [componentType, setComponentType] = useState(0) ;
@@ -43,9 +43,9 @@ function CustomSamlSso({ssoType,entityTitle, entityId, loginURL,pageTitle, signi
         <LegacyCard.Section>
             <Form onSubmit={handleSubmit}>
                 <FormLayout>
-                    <VerticalStack gap={"4"}>
+                    <BlockStack gap={"400"}>
                         {showCustomInputs ? 
-                            <VerticalStack gap={"3"}>
+                            <BlockStack gap={"300"}>
                                 <TextField label={<Text fontWeight="medium" variant="bodySm">Enter sso url</Text>} 
                                     placeholder='Enter your SSO url'
                                     onChange={setSSOUrl}
@@ -56,23 +56,23 @@ function CustomSamlSso({ssoType,entityTitle, entityId, loginURL,pageTitle, signi
                                     onChange={setIdentifier}
                                     value={identifier}
                                 />
-                            </VerticalStack> : null
+                            </BlockStack> : null
                         }
-                        <HorizontalStack gap="3">
+                        <InlineStack gap="300">
                             {files ? 
                                 <Tag>
-                                    <HorizontalStack gap={1}>
+                                    <InlineStack gap={100}>
                                         <Text variant="bodyMd" fontWeight="medium">{files.name}</Text>
-                                        <Button onClick={() => setFiles(null)} plain icon={CancelMajor} />
-                                    </HorizontalStack>
+                                        <Button onClick={() => setFiles(null)}  icon={XIcon} variant="plain" />
+                                    </InlineStack>
                                 </Tag>
-                            : <Text variant="bodyLg" fontWeight="medium" color="subdued">{"Drop your " + certificateName + " file here."}</Text>}
+                            : <Text variant="bodyLg" fontWeight="medium" tone="subdued">{"Drop your " + certificateName + " file here."}</Text>}
                             <FileUpload fileType="file" acceptString=".xml" setSelectedFile={setFilesCheck} allowMultiple={false} />
-                        </HorizontalStack>
-                        <HorizontalStack align="end">
-                            <Button submit primary size="medium">Submit</Button>
-                        </HorizontalStack>
-                    </VerticalStack>
+                        </InlineStack>
+                        <InlineStack align="end">
+                            <Button submit  size="medium" variant="primary">Submit</Button>
+                        </InlineStack>
+                    </BlockStack>
                 </FormLayout>
             </Form>
         </LegacyCard.Section>
@@ -108,14 +108,14 @@ function CustomSamlSso({ssoType,entityTitle, entityId, loginURL,pageTitle, signi
     )
 
     const useCardContent = (
-        <VerticalStack gap={"2"}>
+        <BlockStack gap={"200"}>
             <Text>{cardContent}</Text>
-            <HorizontalStack gap={"1"}>
+            <InlineStack gap={"100"}>
                 <Text>Use</Text>
                 <Link>https://app.akto.io/sso-login</Link>
                 <Text>for signing into AKTO dashboard via SSO.</Text>
-            </HorizontalStack>
-        </VerticalStack>
+            </InlineStack>
+        </BlockStack>
     )
     
     return (

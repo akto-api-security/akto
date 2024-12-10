@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
 
-import { Badge, Box, Button, HorizontalStack, Icon, Navigation, Text, TextField, Tooltip, VerticalStack } from "@shopify/polaris"
-import {ChevronDownMinor, ChevronRightMinor, SearchMinor, CirclePlusMinor} from "@shopify/polaris-icons"
+import { Badge, Box, Button, InlineStack, Icon, Navigation, Text, TextField, Tooltip, BlockStack } from "@shopify/polaris"
+import { ChevronDownIcon, ChevronRightIcon, SearchIcon, PlusCircleIcon } from "@shopify/polaris-icons";
 
 import TestEditorStore from "../testEditorStore"
 
@@ -130,7 +130,7 @@ const TestEditorFileExplorer = ({addCustomTest}) => {
         const arr = aktoItems.map(obj => ({
             ...obj,
             selected: selectedCategory === (obj.key+obj.param),
-            icon: selectedCategory === (obj.key+obj.param) ? ChevronDownMinor : ChevronRightMinor,
+            icon: selectedCategory === (obj.key+obj.param) ? ChevronDownIcon : ChevronRightIcon,
             subNavigationItems: obj.subNavigationItems.map((item)=>{
                 return{
                     label: (
@@ -138,7 +138,7 @@ const TestEditorFileExplorer = ({addCustomTest}) => {
                             <div className={item.label === selectedTest.label ? "active-left-test" : ""}>
                                 <Text 
                                     variant={item.label === selectedTest.label ? "headingSm" : "bodyMd"} as="h4" 
-                                    color={item.label === selectedTest.label ? "default" : "subdued"} truncate
+                                    tone={item.label === selectedTest.label ? "default" : "subdued"} truncate
                                 >
                                     {item.label} 
                                 </Text>
@@ -150,7 +150,7 @@ const TestEditorFileExplorer = ({addCustomTest}) => {
                         setSelectedTest(item)                        
                     }),
                     key: item.value
-                }
+                };
             })
         }))
         return arr
@@ -158,23 +158,27 @@ const TestEditorFileExplorer = ({addCustomTest}) => {
     return (
         <div className="editor-navbar" style={{'overflowY' : 'scroll', overflowX: 'hidden', width: '18rem'}}>
             <Navigation location="/">
-                <VerticalStack gap="4">
+                <BlockStack gap="400">
                     <TextField  
                         id={"test-search"}
-                        prefix={<Icon source={SearchMinor} />} 
+                        prefix={<Icon source={SearchIcon} />} 
                         onChange={searchResult} 
                         value={searchText}
                         placeholder={`Search for Tests`}
                     />
-
                     <Box>
-                        <Button id={"create-custom-test-button"}
-                            plain monochrome onClick={()=> toggleFunc("CUSTOM")} removeUnderline fullWidth
-                        >
-                            <HorizontalStack align="space-between">
-                                <HorizontalStack gap={"1"}>
+                        <Button
+                            id={"create-custom-test-button"}
+
+                            textAlign="start"
+                            onClick={()=> toggleFunc("CUSTOM")}
+                            removeUnderline
+                            fullWidth
+                            variant="monochromePlain">
+                            <InlineStack align="space-between">
+                                <InlineStack gap={"100"}>
                                     <Box>
-                                        <Icon source={showCustom ? ChevronDownMinor : ChevronRightMinor}/>
+                                        <Icon source={showCustom ? ChevronDownIcon : ChevronRightIcon}/>
                                     </Box>
                                     <TitleWithInfo 
                                         tooltipContent={"Custom tests"} 
@@ -182,23 +186,29 @@ const TestEditorFileExplorer = ({addCustomTest}) => {
                                         textProps={{variant: 'headingMd'}} 
                                         docsUrl={"https://docs.akto.io/test-editor/concepts/custom-test"}
                                     />
-                                </HorizontalStack>
+                                </InlineStack>
                                 <div style={{marginRight: '-2px'}}>
-                                    <Badge size="small" status="new">{customItems.count.toString()}</Badge>
+                                    <Badge size="small" tone="new">{customItems.count.toString()}</Badge>
                                 </div>
                                 {/* <Box onClick={(e) => addCustomTest(e)}>
                                     <Icon source={CirclePlusMinor} />
                                 </Box> */}
-                            </HorizontalStack>
+                            </InlineStack>
                         </Button>
                         {showCustom ? <Navigation.Section items={getItems(customItems.items)} /> : null}
                     </Box>
                     <Box>
-                        <Button plain monochrome onClick={() => toggleFunc("Akto")} removeUnderline fullWidth>
-                            <HorizontalStack align="space-between">
-                                <HorizontalStack gap="1">
+                        <Button
+
+                            textAlign="start"
+                            onClick={() => toggleFunc("Akto")}
+                            removeUnderline
+                            fullWidth
+                            variant="monochromePlain">
+                            <InlineStack align="space-between">
+                                <InlineStack gap="100">
                                     <Box>
-                                        <Icon source={showAkto ? ChevronDownMinor : ChevronRightMinor}/>
+                                        <Icon source={showAkto ? ChevronDownIcon : ChevronRightIcon}/>
                                     </Box>
                                     <TitleWithInfo 
                                         tooltipContent={"Akto's test library"} 
@@ -206,18 +216,18 @@ const TestEditorFileExplorer = ({addCustomTest}) => {
                                         textProps={{variant: 'headingMd'}} 
                                         docsUrl={"https://docs.akto.io/test-editor/concepts/test-library"}
                                     />
-                                </HorizontalStack>
+                                </InlineStack>
                                 <div style={{marginRight: '-2px'}}>
-                                    <Badge size="small" status="new">{aktoItems.count.toString()}</Badge>
+                                    <Badge size="small" tone="new">{aktoItems.count.toString()}</Badge>
                                 </div>
-                            </HorizontalStack>
+                            </InlineStack>
                         </Button>
                         {showAkto ? <Navigation.Section items={getItems(aktoItems.items)} /> : null}
                     </Box>
-                </VerticalStack>
+                </BlockStack>
             </Navigation>
         </div>
-    )
+    );
 }
 
 export default TestEditorFileExplorer

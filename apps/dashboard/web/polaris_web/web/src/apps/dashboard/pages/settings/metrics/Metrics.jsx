@@ -139,7 +139,7 @@ function Metrics() {
     )
 
     return (
-        <Page title='Metrics' divider>
+        <Page title='Metrics'>
             <LegacyCard >
                 <LegacyCard.Section>
                     <LegacyCard.Header title="Metrics">

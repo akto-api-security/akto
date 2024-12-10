@@ -1,10 +1,23 @@
 import func from "@/util/func";
-import { Badge, Box, HorizontalStack, Icon, Text, Tooltip } from "@shopify/polaris";
+import { Badge, Box, InlineStack, Icon, Text, Tooltip } from "@shopify/polaris";
 import PersistStore from "../../../main/PersistStore";
 import TooltipText from "../../components/shared/TooltipText";
 import StyledEndpoint from "./api_collections/component/StyledEndpoint"
 import CopyEndpoint from "./api_collections/component/CopyEndpoint"
-import { SearchMinor, InfoMinor, LockMinor, ClockMinor, PasskeyMinor, LinkMinor, DynamicSourceMinor, GlobeMinor, LocationsMinor, PriceLookupMinor, ArrowUpMinor, ArrowDownMinor } from "@shopify/polaris-icons"
+import {
+    SearchIcon,
+    InfoIcon,
+    LockIcon,
+    ClockIcon,
+    PasskeyIcon,
+    LinkIcon,
+    DatabaseIcon,
+    GlobeIcon,
+    LocationIcon,
+    SearchListIcon,
+    ArrowUpIcon,
+    ArrowDownIcon,
+} from "@shopify/polaris-icons";
 import api from "./api";
 import GetPrettifyEndpoint from "./GetPrettifyEndpoint";
 
@@ -48,7 +61,7 @@ const apiDetailsHeaders = [
         text: 'Collection name',
         value: 'apiCollectionName',
         itemOrder: 3,
-        icon: DynamicSourceMinor,
+        icon: DatabaseIcon,
         iconTooltip: "Api collection name"
     },
     {
@@ -67,20 +80,20 @@ const apiDetailsHeaders = [
         text: 'hostname',
         itemOrder: 3,
         value: 'hostName',
-        icon: GlobeMinor,
+        icon: GlobeIcon,
         iconTooltip: "Hostname of the api collection"
     },
     {
         text: 'Last Seen',
         value: 'last_seen',
-        icon: SearchMinor,
+        icon: SearchIcon,
         itemOrder: 3,
         iconTooltip: "Last seen traffic"
     },
     {
         text: 'Access Type',
         value: 'access_type',
-        icon: InfoMinor,
+        icon: InfoIcon,
         itemOrder: 3,
         showFilter: true, 
         iconTooltip: "Access type of the API"
@@ -88,7 +101,7 @@ const apiDetailsHeaders = [
     {
         text: 'Auth Type',
         value: 'auth_type',
-        icon: LockMinor,
+        icon: LockIcon,
         itemOrder: 3,
         showFilter: true,
         iconTooltip: "Auth type of the API"
@@ -96,14 +109,14 @@ const apiDetailsHeaders = [
     {
         text: "Discovered",
         value: 'added',
-        icon: ClockMinor,
+        icon: ClockIcon,
         itemOrder: 3,
         iconTooltip: "Discovered time of API"
     },
     {
         text: 'Changes',
         value: 'changes',
-        icon: InfoMinor,
+        icon: InfoIcon,
         itemOrder: 3,
         iconTooltip: "Changes in API"
     },
@@ -129,13 +142,13 @@ const paramHeaders = [
     {
         text: 'Type',
         value: 'subType',
-        icon: PasskeyMinor,
+        icon: PasskeyIcon,
         itemOrder: 3
     },
     {
         text: 'Endpoint',
         value: 'endpoint',
-        icon: LinkMinor,
+        icon: LinkIcon,
         itemOrder: 3,
         sortKey: 'url',
         showFilterMenu: true
@@ -143,7 +156,7 @@ const paramHeaders = [
     {
         text: 'Collection',
         value: 'apiCollectionName',
-        icon: DynamicSourceMinor,
+        icon: DatabaseIcon,
         itemOrder: 3,
         sortKey: 'apiCollectionId',
         showFilterMenu: true
@@ -151,7 +164,7 @@ const paramHeaders = [
     {
         text: 'Method',
         value: 'method',
-        icon: GlobeMinor,
+        icon: GlobeIcon,
         itemOrder: 3,
         sortKey: 'method',
         showFilterMenu: true
@@ -159,7 +172,7 @@ const paramHeaders = [
     {
         text: 'Location',
         value: 'location',
-        icon: LocationsMinor,
+        icon: LocationIcon,
         itemOrder: 3,
         sortKey: 'isHeader',
         showFilterMenu: true
@@ -167,7 +180,7 @@ const paramHeaders = [
     {
         text: "Discovered",
         value: 'added',
-        icon: ClockMinor,
+        icon: ClockIcon,
         itemOrder: 3,
         sortKey: 'timestamp',
         showFilterMenu: true
@@ -175,7 +188,7 @@ const paramHeaders = [
     {
         text: 'Values',
         value: 'domain',
-        icon: PriceLookupMinor,
+        icon: SearchListIcon,
         itemOrder: 3,
         showFilterMenu: true
     }
@@ -399,17 +412,17 @@ const transform = {
 
     getIssuesList(severityInfo){
         return (
-            <HorizontalStack gap="1" wrap={false}>
+            <InlineStack gap="100" wrap={false}>
                 {
                     Object.keys(severityInfo).length > 0 ? Object.keys(severityInfo).map((key,index)=>{
                         return(
-                            <Badge size="small" status={this.getColor(key)} key={index}>{severityInfo[key].toString()}</Badge>
+                            <Badge size="small" tone={this.getColor(key)} key={index}>{severityInfo[key].toString()}</Badge>
                         )
                     }):
-                    <Text fontWeight="regular" variant="bodyMd" color="subdued">-</Text>
+                    <Text fontWeight="regular" variant="bodyMd" tone="subdued">-</Text>
                 }
-            </HorizontalStack>
-        )
+            </InlineStack>
+        );
     },
 
     getIssuesListText(severityInfo){
@@ -424,20 +437,20 @@ const transform = {
     },
 
     prettifySubtypes(sensitiveTags, deactivated){
-        return(
+        return (
             <Box maxWidth="200px">
-                <HorizontalStack gap={1} wrap={false}>
+                <InlineStack gap={100} wrap={false}>
                     {sensitiveTags.map((item,index)=>{
-                        return (index < 4 ? <Tooltip dismissOnMouseOut content={item} key={index + item}><Box>
+                        return index < 4 ? <Tooltip dismissOnMouseOut content={item} key={index + item}><Box>
                             <div className={deactivated ? "icon-deactivated" : ""}>
-                                <Icon color={deactivated ? "" : "subdued"} source={func.getSensitiveIcons(item)} />
+                                <Icon tone={deactivated ? "" : "subdued"} source={func.getSensitiveIcons(item)} />
                             </div>
-                        </Box></Tooltip> : null)
+                        </Box></Tooltip> : null;
                     })}
-                    {sensitiveTags.length > 4 ? <Badge size="small" status="warning" key={"more"}>{'+' + (sensitiveTags.length - 4).toString() + 'more'}</Badge> : null}
-                </HorizontalStack>
+                    {sensitiveTags.length > 4 ? <Badge size="small" tone="warning" key={"more"}>{'+' + (sensitiveTags.length - 4).toString() + 'more'}</Badge> : null}
+                </InlineStack>
             </Box>
-        )
+        );
     },
 
     prettifyCollectionsData(newData, isLoading){
@@ -450,14 +463,14 @@ const transform = {
                     calcCoverage =  Math.ceil((c.testedEndpoints * 100)/c.urlsCount) + '%'
                 }
             }
-            const loadingComp = <Text color="subdued" variant="bodyMd">...</Text>
+            const loadingComp = <Text tone="subdued" variant="bodyMd">...</Text>
             return{
                 ...c,
                 id: c.id,
                 nextUrl: '/dashboard/observe/inventory/' + c.id,
                 displayName: c.displayName,
                 displayNameComp: c.displayNameComp,
-                riskScoreComp: isLoading ? loadingComp : <Badge key={c?.id} status={this.getStatus(c.riskScore)} size="small">{c.riskScore}</Badge>,
+                riskScoreComp: isLoading ? loadingComp : <Badge key={c?.id} tone={this.getStatus(c.riskScore)} size="small">{c.riskScore}</Badge>,
                 coverage: isLoading ? '...' : calcCoverage,
                 issuesArr: isLoading ? loadingComp : this.getIssuesList(c.severityInfo),
                 issuesArrVal: this.getIssuesListText(c.severityInfo),
@@ -466,7 +479,7 @@ const transform = {
                 riskScore: c.riskScore,
                 deactivatedRiskScore: c.deactivated ? (c.riskScore - 10 ) : c.riskScore,
                 activatedRiskScore: -1 * (c.deactivated ? c.riskScore : (c.riskScore - 10 )),
-                envTypeComp: isLoading ? loadingComp : c.envType ? <Badge size="small" status="info">{func.toSentenceCase(c.envType)}</Badge> : null,
+                envTypeComp: isLoading ? loadingComp : c.envType ? <Badge size="small" tone="info">{func.toSentenceCase(c.envType)}</Badge> : null,
                 sensitiveSubTypesVal: c?.sensitiveInRespTypes.join(" ") ||  "-"
             }
         })
@@ -531,7 +544,7 @@ const transform = {
                 auth_type: url.auth_type,
                 endpointComp: <GetPrettifyEndpoint method={url.method} url={url.endpoint} isNew={this.isNewEndpoint(url.lastSeenTs)} />,
                 sensitiveTagsComp: this.prettifySubtypes(url.sensitiveTags),
-                riskScoreComp: <Badge status={this.getStatus(url.riskScore)} size="small">{url?.riskScore.toString()}</Badge>,
+                riskScoreComp: <Badge tone={this.getStatus(url.riskScore)} size="small">{url?.riskScore.toString()}</Badge>,
                 isNew: this.isNewEndpoint(url.lastSeenTs),
                 sensitiveDataTags: url?.sensitiveTags.join(" "),
                 codeAnalysisEndpoint: false,
@@ -632,7 +645,7 @@ const transform = {
 
     convertToPrettifyData(c){
         return{
-            riskScoreComp:<Badge key={c.level} status={this.getStatus(c.riskScore)} size="small">{c.riskScore}</Badge>,
+            riskScoreComp:<Badge key={c.level} tone={this.getStatus(c.riskScore)} size="small">{c.riskScore}</Badge>,
             coverage: c.urlsCount !== 0 ? Math.min( Math.floor((c.testedEndpoints * 100)/c.urlsCount), 100) + "%": '0%',
             issuesArr: this.getIssuesList(c.severityInfo),
             sensitiveSubTypes: this.prettifySubtypes(c?.sensitiveInRespTypes || []),
@@ -645,16 +658,16 @@ const transform = {
         if (val === 0 ) {
             return <Text>No change in {time}</Text>
         }
-        const source = val > 0 ? ArrowUpMinor : ArrowDownMinor
+        const source = val > 0 ? ArrowUpIcon : ArrowDownIcon
         return (
-            <HorizontalStack gap={1}>
+            <InlineStack gap={100}>
                 <Box>
-                    <Icon source={source} color='subdued' />
+                    <Icon source={source} tone='subdued' />
                 </Box>
-                <Text color='subdued' fontWeight='medium'>{Math.abs(val)}</Text>
-                <Text color='subdued' fontWeight='semibold'>{time}</Text>
-            </HorizontalStack>
-        )
+                <Text tone='subdued' fontWeight='medium'>{Math.abs(val)}</Text>
+                <Text tone='subdued' fontWeight='semibold'>{time}</Text>
+            </InlineStack>
+        );
     },
     getCumulativeData: (data) => {
         let cumulative = []

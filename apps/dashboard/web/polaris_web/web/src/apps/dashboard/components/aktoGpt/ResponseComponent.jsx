@@ -1,6 +1,6 @@
 import React, { useRef, useState } from 'react'
 import BotResponse from './BotResponse'
-import { VerticalStack } from '@shopify/polaris'
+import { BlockStack } from '@shopify/polaris'
 
 function ResponseComponent({response,chatLogRef,onCompletion}) {
 
@@ -45,7 +45,7 @@ function ResponseComponent({response,chatLogRef,onCompletion}) {
     }
 
     return (
-        <VerticalStack gap="2">
+        <BlockStack gap="200">
             {response.responses ?
                 response.responses[0].functionality ?
                     [...pre.current, component(response?.responses, currentItemIndex, currentResponseIndex, chatLogRef, handleResponseComplete,onCompletion)]
@@ -55,7 +55,7 @@ function ResponseComponent({response,chatLogRef,onCompletion}) {
                 [...pre.current, errorComp(response?.message, singlePrint, chatLogRef, handleString,onCompletion)]
                 :null
             }
-        </VerticalStack>
+        </BlockStack>
     );
 }
 

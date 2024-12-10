@@ -8,12 +8,11 @@ function OperatorDropdown(props) {
     const togglePopoverActive = () => setPopoverActive((popoverActive) => !popoverActive);
 
     return (
-
         <div style={{ display: "flex", justifyContent: "center", alignItems: "center" }}>
             <Popover
                 active={popoverActive}
                 activator={
-                    <Button onClick={togglePopoverActive} disclosure plain removeUnderline>{label}</Button>
+                    <Button onClick={togglePopoverActive} disclosure  removeUnderline variant="plain">{label}</Button>
                 }
                 onClose={togglePopoverActive}
             >
@@ -30,7 +29,7 @@ function OperatorDropdown(props) {
                 />
             </Popover>
         </div>
-    )
+    );
 
 }
 
