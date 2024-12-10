@@ -526,10 +526,10 @@ public class StartTestAction extends UserAction {
                         break;
                     case "apiCollectionId":
                     case "collectionIds":
-                        filterList.add(Filters.in(TestingRunResult.API_INFO_KEY+'.'+ ApiInfo.ApiInfoKey.API_COLLECTION_ID, filterEntry.getValue()));
+                        filterList.add(Filters.in(TestingRunResult.API_INFO_KEY+"."+ApiInfo.ApiInfoKey.API_COLLECTION_ID, filterEntry.getValue()));
                         break;
                     case "method":
-                        filterList.add(Filters.in(TestingRunResult.API_INFO_KEY+'.'+ ApiInfo.ApiInfoKey.METHOD, filterEntry.getValue()));
+                        filterList.add(Filters.in(TestingRunResult.API_INFO_KEY+"."+ApiInfo.ApiInfoKey.METHOD, filterEntry.getValue()));
                         break;
                     case "categoryFilter":
                         filterList.add(Filters.in(TestingRunResult.TEST_SUPER_TYPE, filterEntry.getValue()));

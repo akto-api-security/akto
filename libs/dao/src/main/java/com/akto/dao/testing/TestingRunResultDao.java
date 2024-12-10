@@ -206,18 +206,16 @@ public class TestingRunResultDao extends AccountsContextDao<TestingRunResult> {
         fieldNames = new String[]{TestingRunResult.REQUIRES_CONFIG};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
 
-        fieldNames = new String[]{TestingRunResult.TEST_SUB_TYPE};
+        fieldNames = new String[]{TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, TestingRunResult.API_INFO_KEY+"."+ApiInfoKey.API_COLLECTION_ID};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
 
-        fieldNames = new String[]{TestingRunResult.TEST_SUPER_TYPE};
+        fieldNames = new String[]{TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, TestingRunResult.TEST_RESULTS+"."+GenericTestResult._CONFIDENCE};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
 
-        fieldNames = new String[]{TestingRunResult.TEST_RESULTS+"."+GenericTestResult._CONFIDENCE};
+        fieldNames = new String[]{TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, TestingRunResult.API_INFO_KEY+"."+ApiInfoKey.METHOD};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
 
-        fieldNames = new String[]{TestingRunResult.API_INFO_KEY+"."+ApiInfoKey.METHOD};
-        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
-        fieldNames = new String[]{TestingRunResult.API_INFO_KEY+"."+ApiInfoKey.API_COLLECTION_ID};
+        fieldNames = new String[]{TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, TestingRunResult.TEST_SUPER_TYPE};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
     }
 
