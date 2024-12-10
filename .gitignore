@@ -13,6 +13,7 @@
 **/.settings
 **/dist
 **/gen
+libs/protobuf/src
 libawesome.dylib
 temp_*
 *.templates-config.json
