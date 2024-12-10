@@ -9,6 +9,7 @@ create table if not exists threat_detection.malicious_event (
     method varchar(255),
     timestamp bigint not null,
     orig text not null,
+    api_collection_id int not null,
     created_at timestamp default (timezone('utc', now()))
 );
 
