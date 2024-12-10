@@ -46,14 +46,18 @@ public class KafkaUtils {
 
   public static void initKafkaProducer() {
     String kafkaBrokerUrl = System.getenv("THREAT_EVENTS_KAFKA_BROKER_URL");
-    int batchSize = Integer.parseInt(System.getenv("AKTO_KAFKA_PRODUCER_BATCH_SIZE"));
-    int kafkaLingerMS = Integer.parseInt(System.getenv("AKTO_KAFKA_PRODUCER_LINGER_MS"));
+    int batchSize =
+        Integer.parseInt(System.getenv().getOrDefault("AKTO_KAFKA_PRODUCER_BATCH_SIZE", "100"));
+    int kafkaLingerMS =
+        Integer.parseInt(System.getenv().getOrDefault("AKTO_KAFKA_PRODUCER_LINGER_MS", "1000"));
     kafkaProducer = new Kafka(kafkaBrokerUrl, kafkaLingerMS, batchSize);
     logger.info("Kafka Producer Init " + Context.now());
   }
 
   public static void insertData(Object writes, String eventType, int accountId) {
-    String topicName = System.getenv("THREAT_EVENTS_KAFKA_TOPIC");
+    String topicName =
+        System.getenv()
+            .getOrDefault("THREAT_EVENTS_KAFKA_TOPIC", "akto.threat_protection.internal_events");
     BasicDBObject obj = new BasicDBObject();
     obj.put("eventType", eventType);
     String payloadStr = gson.toJson(writes);
@@ -68,15 +72,18 @@ public class KafkaUtils {
 
   public static void initKafkaConsumer() {
     System.out.println("Kafka Init consumer called");
-    String topicName = System.getenv("THREAT_EVENTS_KAFKA_TOPIC");
+    String topicName =
+        System.getenv()
+            .getOrDefault("THREAT_EVENTS_KAFKA_TOPIC", "akto.threat_protection.internal_events");
     String kafkaBrokerUrl = System.getenv("THREAT_EVENTS_KAFKA_BROKER_URL"); // kafka1:19092
-    String isKubernetes = System.getenv("IS_KUBERNETES");
+    String isKubernetes = System.getenv().getOrDefault("IS_KUBERNETES", "false");
     if (isKubernetes != null && isKubernetes.equalsIgnoreCase("true")) {
       kafkaBrokerUrl = "127.0.0.1:29092";
     }
     String groupIdConfig = System.getenv("THREAT_EVENTS_KAFKA_GROUP_ID_CONFIG");
     int maxPollRecordsConfig =
-        Integer.parseInt(System.getenv("THREAT_EVENTS_KAFKA_MAX_POLL_RECORDS_CONFIG"));
+        Integer.parseInt(
+            System.getenv().getOrDefault("THREAT_EVENTS_KAFKA_MAX_POLL_RECORDS_CONFIG", "100"));
 
     Properties properties = configProperties(kafkaBrokerUrl, groupIdConfig, maxPollRecordsConfig);
     consumer = new KafkaConsumer<>(properties);
