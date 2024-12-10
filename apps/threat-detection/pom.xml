@@ -107,6 +107,24 @@
             <version>9.22.3</version>
         </dependency>
 
+        <dependency>
+            <groupId>org.hibernate</groupId>
+            <artifactId>hibernate-core</artifactId>
+            <version>5.6.15.Final</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.logging.log4j</groupId>
+            <artifactId>log4j-core</artifactId>
+            <version>2.24.2</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.logging.log4j</groupId>
+            <artifactId>log4j-api</artifactId>
+            <version>2.24.2</version>
+        </dependency>
+
 
     </dependencies>
     <build>
@@ -142,11 +160,12 @@
         <resources>
             <resource>
                 <directory>src/main/resources</directory>
-                <filtering>true</filtering>
-                <includes>
+                <filtering>false</filtering>
+                <!-- <includes>
                     <include>**/version.txt</include>
                     <include>**/db/migration/*.sql</include>
-                </includes>
+                    <include>**/log4j2.properties</include>
+                </includes> -->
             </resource>
         </resources>
     </build>

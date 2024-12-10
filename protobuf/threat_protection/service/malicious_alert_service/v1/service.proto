@@ -22,7 +22,7 @@ message SampleMaliciousEvent {
 message RecordAlertRequest {
   string actor = 1;
   string filter_id = 2;
-  int32 total_events = 3;
+  int64 total_events = 3;
   int64 detected_at = 4;
   repeated SampleMaliciousEvent sample_data = 5;
 }
