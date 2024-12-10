@@ -2294,6 +2294,12 @@ public class InitializerListener implements ServletContextListener {
                         }
                     }, "context-initializer-secondary");
 
+                    executorService.schedule(new Runnable() {
+                        public void run() {
+                            crons.testingAlertsScheduler();
+                        }
+                    }, 0, TimeUnit.SECONDS);
+
                     crons.trafficAlertsScheduler();
                     crons.insertHistoricalDataJob();
                     if(DashboardMode.isOnPremDeployment()){

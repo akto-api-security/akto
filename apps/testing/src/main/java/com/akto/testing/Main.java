@@ -290,6 +290,12 @@ public class Main {
                     return;
                 }
 
+                Bson updates = Updates.combine(
+                    Updates.set("updatedTs", Context.now()),
+                    Updates.set("status", State.RUNNING)
+                );
+                TestingAlertsDao.instance.getMCollection().findOneAndUpdate(Filters.eq("testRunId", testingRun.getId()), updates, new FindOneAndUpdateOptions());
+
                 if (testingRun.getState().equals(State.STOPPED)) {
                     loggerMaker.infoAndAddToDb("Testing run stopped");
                     if (trrs != null) {
@@ -470,17 +476,26 @@ public class Main {
                         Updates.set(TestingRun.END_TIMESTAMP, Context.now())
                 );
 
+                Bson alertUpdates = null;
                 if (testingRun.getPeriodInSeconds() > 0 ) {
                     completedUpdate = Updates.combine(
                             Updates.set(TestingRun.STATE, TestingRun.State.SCHEDULED),
                             Updates.set(TestingRun.END_TIMESTAMP, Context.now()),
                             Updates.set(TestingRun.SCHEDULE_TIMESTAMP, testingRun.getScheduleTimestamp() + testingRun.getPeriodInSeconds())
                     );
+                    alertUpdates = Updates.combine(
+                        Updates.set("updatedTs", Context.now()),
+                        Updates.set("status", TestingRun.State.SCHEDULED)
+                    );
                 } else if (testingRun.getPeriodInSeconds() == -1) {
                     completedUpdate = Updates.combine(
                             Updates.set(TestingRun.STATE, TestingRun.State.SCHEDULED),
                             Updates.set(TestingRun.END_TIMESTAMP, Context.now()),
                             Updates.set(TestingRun.SCHEDULE_TIMESTAMP, testingRun.getScheduleTimestamp() + 5 * 60)
+                    );
+                    alertUpdates = Updates.combine(
+                        Updates.set("updatedTs", Context.now()),
+                        Updates.set("status", TestingRun.State.SCHEDULED)
                     );
                 }
 
@@ -489,6 +504,9 @@ public class Main {
                     TestingRunDao.instance.getMCollection().findOneAndUpdate(
                             Filters.eq("_id", testingRun.getId()),  completedUpdate
                     );
+                    if (alertUpdates != null) {
+                        TestingAlertsDao.instance.getMCollection().findOneAndUpdate(Filters.eq("testRunId", testingRun.getId()), alertUpdates, new FindOneAndUpdateOptions());
+                    }
                 }
 
                 if(summaryId != null && testingRun.getTestIdConfig() != 1){
