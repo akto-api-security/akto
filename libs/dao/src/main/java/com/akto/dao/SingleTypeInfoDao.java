@@ -365,12 +365,6 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
         return processPipelineForEndpoint(pipeline);
     }
 
-    public List<ApiInfo.ApiInfoKey> fetchEndpointsInCollection(Bson filter) {
-        List<Bson> pipeline = getPipelineForEndpoints(filter);
-        pipeline.add(Aggregates.limit(SingleTypeInfoDao.LARGE_LIMIT));
-        return processPipelineForEndpoint(pipeline);
-    }
-
     public List<ApiInfo.ApiInfoKey> fetchEndpointsInCollection(Method method) {
         Bson filter = null;
         if (method == null) {
@@ -412,7 +406,7 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
         return pipeline;
     }
 
-    private List<ApiInfoKey> processPipelineForEndpoint(List<Bson> pipeline){
+    public List<ApiInfoKey> processPipelineForEndpoint(List<Bson> pipeline){
         MongoCursor<BasicDBObject> endpointsCursor = instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
 
         List<ApiInfo.ApiInfoKey> endpoints = new ArrayList<>();
