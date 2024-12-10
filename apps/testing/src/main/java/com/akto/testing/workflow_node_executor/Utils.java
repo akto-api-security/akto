@@ -1,7 +1,11 @@
 package com.akto.testing.workflow_node_executor;
 
+import static com.akto.runtime.utils.Utils.parseCookie;
+import static org.mockito.Answers.values;
+
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -12,6 +16,9 @@ import java.util.regex.Pattern;
 
 import com.akto.dto.testing.*;
 import com.akto.test_editor.execution.Memory;
+import com.akto.test_editor.filter.data_operands_impl.CookieExpireFilter;
+import com.akto.testing.TestExecutor;
+
 import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
 import org.json.JSONObject;
@@ -24,6 +31,7 @@ import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.RecordedLoginFlowInput;
 import com.akto.dto.api_workflow.Graph;
 import com.akto.dto.api_workflow.Node;
+import com.akto.dto.type.KeyTypes;
 import com.akto.dto.type.RequestTemplate;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -33,6 +41,10 @@ import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
+
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.Jws;
+import io.jsonwebtoken.Jwts;
 
 public class Utils {
     
@@ -298,6 +310,39 @@ public class Utils {
                     return new LoginFlowResponse(responses, "auth param not found at specified path " + 
                     param.getValue(), false);
                 }
+
+                // checking on the value of if this is valid jwt token or valid cookie which has expiry time
+                String tempVal = new String(value);
+                if(tempVal.contains("Bearer")){
+                    tempVal = value.split("Bearer ")[1];
+                }
+                if(KeyTypes.isJWT(tempVal)){
+                    try {
+                        Jws<Claims> jws = Jwts.parserBuilder()
+                        .build()
+                        .parseClaimsJws(tempVal);
+
+                        if(jws.getBody() != null &&  jws.getBody().getExpiration() != null && jws.getBody().getExpiration().getTime() != 0){
+                            int newExpiryTime = (int) jws.getBody().getExpiration().getTime();
+                            TestExecutor.setExpiryTimeOfAuthToken(newExpiryTime);
+                        }
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                }else{
+                    // check if this cookie with max-age or expiry time
+                    try {
+                        Map<String,String> cookieMap = parseCookie(Arrays.asList(value));
+                        int expiryTsEpoch = CookieExpireFilter.getMaxAgeFromCookie(cookieMap);
+                        if(expiryTsEpoch > 0){
+                            int newExpiryTime = Context.now() + expiryTsEpoch;
+                            TestExecutor.setExpiryTimeOfAuthToken(newExpiryTime);
+                        }
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                }
+
                 param.setValue(value);
             } catch(Exception e) {
                 return new LoginFlowResponse(responses, "error resolving auth param " + param.getValue(), false);
