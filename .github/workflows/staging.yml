@@ -3,9 +3,13 @@ name: Staging
 # Controls when the workflow will run
 on:
   push:
-    branches: [ master ]
+    branches: [master]
   pull_request:
   workflow_dispatch:
+
+concurrency:
+  group: "staging${{ github.head_ref }}"
+  cancel-in-progress: true
 
 jobs:
   build:
@@ -16,12 +20,12 @@ jobs:
       - uses: actions/checkout@v2
       - uses: actions/setup-java@v2
         with:
-          distribution: 'adopt'
-          java-version: '8'
+          distribution: "adopt"
+          java-version: "8"
           architecture: x64
       - uses: actions/setup-node@v2
         with:
-          node-version: '17'
+          node-version: "17"
       - name: Convert github branch name to be compatible with docker tag name convention and generate tag name
         id: docker_tag
         run: echo "IMAGE_TAG=a-$(echo ${{ github.ref_name }} | sed 's/[^a-zA-Z0-9]/-/g')" >> $GITHUB_OUTPUT
