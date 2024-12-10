@@ -1,6 +1,7 @@
 package com.akto.threat.protection.db;
 
-import com.akto.dto.type.URLMethods.Method;
+import com.akto.dto.type.URLMethods;
+
 import java.util.UUID;
 
 public class MaliciousEventModel {
@@ -9,35 +10,46 @@ public class MaliciousEventModel {
   private String filterId;
   private String actor;
   private String ip;
-  private String url;
+  private String latestApiEndpoint;
   private String country;
-  private Method method;
-  private String orig;
-  private long requestTime;
+  private URLMethods.Method latestApiMethod;
+  private String latestApiOrig;
+  private long detectedAt;
+  private int latestApiCollectionId;
+  private EventType eventType;
+
+  public enum EventType {
+    SINGLE,
+    AGGREGATED
+  }
 
   public MaliciousEventModel() {}
 
-  private MaliciousEventModel(Builder builder) {
+  public MaliciousEventModel(Builder builder) {
     this.id = UUID.randomUUID().toString();
     this.filterId = builder.filterId;
     this.actor = builder.actor;
     this.ip = builder.ip;
     this.country = builder.country;
-    this.method = builder.method;
-    this.orig = builder.orig;
-    this.requestTime = builder.requestTime;
-    this.url = builder.url;
+    this.latestApiEndpoint = builder.latestApiEndpoint;
+    this.latestApiMethod = builder.latestApiMethod;
+    this.latestApiOrig = builder.latestApiOrig;
+    this.latestApiCollectionId = builder.latestApiCollectionId;
+    this.detectedAt = builder.detectedAt;
+    this.eventType = builder.eventType;
   }
 
   public static class Builder {
+    public EventType eventType;
     private String filterId;
     private String actor;
     private String ip;
     private String country;
-    private String url;
-    private Method method;
-    private String orig;
-    private long requestTime;
+    private String latestApiEndpoint;
+    private URLMethods.Method latestApiMethod;
+    private String latestApiOrig;
+    private int latestApiCollectionId;
+    private long detectedAt;
 
     public Builder setFilterId(String filterId) {
       this.filterId = filterId;
@@ -59,23 +71,33 @@ public class MaliciousEventModel {
       return this;
     }
 
-    public Builder setUrl(String url) {
-      this.url = url;
+    public Builder setLatestApiEndpoint(String latestApiEndpoint) {
+      this.latestApiEndpoint = latestApiEndpoint;
       return this;
     }
 
-    public Builder setMethod(Method method) {
-      this.method = method;
+    public Builder setLatestApiMethod(URLMethods.Method latestApiMethod) {
+      this.latestApiMethod = latestApiMethod;
       return this;
     }
 
-    public Builder setOrig(String orig) {
-      this.orig = orig;
+    public Builder setLatestApiOrig(String latestApiOrig) {
+      this.latestApiOrig = latestApiOrig;
       return this;
     }
 
-    public Builder setRequestTime(long requestTime) {
-      this.requestTime = requestTime;
+    public Builder setDetectedAt(long detectedAt) {
+      this.detectedAt = detectedAt;
+      return this;
+    }
+
+    public Builder setLatestApiCollectionId(int latestApiCollectionId) {
+      this.latestApiCollectionId = latestApiCollectionId;
+      return this;
+    }
+
+    public Builder setEventType(EventType eventType) {
+      this.eventType = eventType;
       return this;
     }
 
@@ -100,24 +122,32 @@ public class MaliciousEventModel {
     return ip;
   }
 
-  public String getUrl() {
-    return url;
+  public String getLatestApiEndpoint() {
+    return latestApiEndpoint;
   }
 
   public String getCountry() {
     return country;
   }
 
-  public Method getMethod() {
-    return method;
+  public URLMethods.Method getLatestApiMethod() {
+    return latestApiMethod;
   }
 
-  public String getOrig() {
-    return orig;
+  public String getLatestApiOrig() {
+    return latestApiOrig;
   }
 
-  public long getRequestTime() {
-    return requestTime;
+  public long getDetectedAt() {
+    return detectedAt;
+  }
+
+  public int getLatestApiCollectionId() {
+    return latestApiCollectionId;
+  }
+
+  public EventType getEventType() {
+    return eventType;
   }
 
   public static Builder newBuilder() {

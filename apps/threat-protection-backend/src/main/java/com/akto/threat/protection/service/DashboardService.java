@@ -6,7 +6,7 @@ import com.akto.proto.threat_protection.service.dashboard_service.v1.FetchAlertF
 import com.akto.proto.threat_protection.service.dashboard_service.v1.ListMaliciousRequestsRequest;
 import com.akto.proto.threat_protection.service.dashboard_service.v1.ListMaliciousRequestsResponse;
 import com.akto.proto.threat_protection.service.dashboard_service.v1.MaliciousRequest;
-import com.akto.threat.protection.db.MaliciousEventModel;
+import com.akto.threat.protection.db.AggregateSampleMaliciousEventModel;
 import com.akto.threat.protection.interceptors.Constants;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.DistinctIterable;
@@ -29,7 +29,10 @@ public class DashboardService extends DashboardServiceImplBase {
   }
 
   private static <T> Set<T> findDistinctFields(
-      MongoCollection<MaliciousEventModel> coll, String fieldName, Class<T> tClass, Bson filters) {
+      MongoCollection<AggregateSampleMaliciousEventModel> coll,
+      String fieldName,
+      Class<T> tClass,
+      Bson filters) {
     DistinctIterable<T> r = coll.distinct(fieldName, filters, tClass);
     Set<T> result = new HashSet<>();
     MongoCursor<T> cursor = r.cursor();
@@ -44,10 +47,10 @@ public class DashboardService extends DashboardServiceImplBase {
       FetchAlertFiltersRequest request,
       StreamObserver<FetchAlertFiltersResponse> responseObserver) {
     int accountId = Constants.ACCOUNT_ID_CONTEXT_KEY.get();
-    MongoCollection<MaliciousEventModel> coll =
+    MongoCollection<AggregateSampleMaliciousEventModel> coll =
         this.mongoClient
             .getDatabase(accountId + "")
-            .getCollection("malicious_events", MaliciousEventModel.class);
+            .getCollection("malicious_events", AggregateSampleMaliciousEventModel.class);
 
     Set<String> actors =
         DashboardService.<String>findDistinctFields(coll, "actor", String.class, Filters.empty());
@@ -70,17 +73,17 @@ public class DashboardService extends DashboardServiceImplBase {
     int limit = request.getLimit();
     int skip = (page - 1) * limit;
 
-    MongoCollection<MaliciousEventModel> coll =
+    MongoCollection<AggregateSampleMaliciousEventModel> coll =
         this.mongoClient
             .getDatabase(accountId + "")
-            .getCollection("malicious_events", MaliciousEventModel.class);
+            .getCollection("malicious_events", AggregateSampleMaliciousEventModel.class);
 
     BasicDBObject query = new BasicDBObject();
-    try (MongoCursor<MaliciousEventModel> cursor =
+    try (MongoCursor<AggregateSampleMaliciousEventModel> cursor =
         coll.find(query).skip(skip).limit(limit).cursor()) {
       List<MaliciousRequest> alerts = new ArrayList<>();
       while (cursor.hasNext()) {
-        MaliciousEventModel evt = cursor.next();
+        AggregateSampleMaliciousEventModel evt = cursor.next();
         alerts.add(
             MaliciousRequest.newBuilder()
                 .setActor(evt.getActor())

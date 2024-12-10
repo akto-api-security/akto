@@ -2,6 +2,7 @@ package com.akto.threat.detection.tasks;
 
 import com.akto.dto.type.URLMethods;
 import com.akto.proto.threat_protection.message.malicious_event.v1.MaliciousEvent;
+import com.akto.proto.threat_protection.message.sample_request.v1.SampleMaliciousRequest;
 import com.akto.threat.detection.config.kafka.KafkaConfig;
 import com.akto.threat.detection.db.entity.MaliciousEventEntity;
 import com.akto.threat.detection.dto.MessageEnvelope;
@@ -24,7 +25,8 @@ public class FlushSampleDataTask extends AbstractKafkaConsumerTask {
 
   private final SessionFactory sessionFactory;
 
-  public FlushSampleDataTask(SessionFactory sessionFactory, KafkaConfig trafficConfig, String topic) {
+  public FlushSampleDataTask(
+      SessionFactory sessionFactory, KafkaConfig trafficConfig, String topic) {
     super(trafficConfig, topic);
     this.sessionFactory = sessionFactory;
   }
@@ -39,7 +41,7 @@ public class FlushSampleDataTask extends AbstractKafkaConsumerTask {
     records.forEach(
         r -> {
           String message = r.value();
-          MaliciousEvent.Builder builder = MaliciousEvent.newBuilder();
+          SampleMaliciousRequest.Builder builder = SampleMaliciousRequest.newBuilder();
           MessageEnvelope m = MessageEnvelope.unmarshal(message).orElse(null);
           if (m == null) {
             return;
@@ -52,7 +54,7 @@ public class FlushSampleDataTask extends AbstractKafkaConsumerTask {
             return;
           }
 
-          MaliciousEvent evt = builder.build();
+          SampleMaliciousRequest evt = builder.build();
 
           events.add(
               MaliciousEventEntity.newBuilder()

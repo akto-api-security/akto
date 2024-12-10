@@ -1,6 +1,6 @@
 package com.akto.threat.detection.smart_event_detector.window_based;
 
-import com.akto.proto.threat_protection.message.malicious_event.v1.MaliciousEvent;
+import com.akto.proto.threat_protection.message.sample_request.v1.SampleMaliciousRequest;
 import com.akto.threat.detection.cache.CounterCache;
 import com.akto.dto.api_protection_parse_layer.Rule;
 import java.util.ArrayList;
@@ -66,7 +66,7 @@ public class WindowBasedThresholdNotifier {
     this.notifiedMap = new ConcurrentHashMap<>();
   }
 
-  public Result shouldNotify(String aggKey, MaliciousEvent maliciousEvent, Rule rule) {
+  public Result shouldNotify(String aggKey, SampleMaliciousRequest maliciousEvent, Rule rule) {
     int binId = (int) maliciousEvent.getTimestamp() / 60;
     String cacheKey = aggKey + "|" + binId;
     this.cache.increment(cacheKey);

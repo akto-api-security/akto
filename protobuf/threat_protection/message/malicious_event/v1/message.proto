@@ -6,12 +6,19 @@ option java_outer_classname = "MaliciousEventProto";
 option java_package = "threat_protection.v1.message.malicious_event";
 
 message MaliciousEvent {
-  string actor= 1;
+  string actor = 1;
   string filter_id = 2;
-  string ip = 3;
-  int64 timestamp = 4;
-  string url = 5;
-  string method = 6;
-  int32 api_collection_id = 7;
-  string payload = 8;
+  int64 detected_at = 3;
+  string latest_api_ip = 4;
+  string latest_api_endpoint = 5;
+  string latest_api_method = 6;
+  int32 latest_api_collection_id = 7;
+  string latest_api_payload = 8;
+  EventType event_type = 9;
+
+  enum EventType {
+    EVENT_TYPE_UNSPECIFIED = 0;
+    EVENT_TYPE_SINGLE = 1;
+    EVENT_TYPE_AGGREGATED = 2;
+  }
 }
