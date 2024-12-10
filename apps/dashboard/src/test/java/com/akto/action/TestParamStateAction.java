@@ -2,6 +2,7 @@ package com.akto.action;
 
 import com.akto.MongoBasedTest;
 import com.akto.dao.SingleTypeInfoDao;
+import com.akto.dao.context.Context;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.types.CappedSet;
 import com.mongodb.client.model.UpdateOneModel;
@@ -51,6 +52,7 @@ public class TestParamStateAction extends MongoBasedTest {
         SingleTypeInfoDao.instance.getMCollection().bulkWrite(bulkUpdates);
 
         ParamStateAction paramStateAction = new ParamStateAction();
+        Context.userId.set(null);
         String result = paramStateAction.fetchParamsStatus();
         assertEquals("SUCCESS", result);
 

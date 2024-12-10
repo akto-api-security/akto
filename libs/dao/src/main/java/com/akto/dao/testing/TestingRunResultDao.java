@@ -1,10 +1,11 @@
 package com.akto.dao.testing;
 
-import com.akto.dao.AccountsContextDao;
+import com.akto.dao.AccountsContextDaoWithRbac;
 import com.akto.dao.MCollection;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
+import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.dto.testing.GenericTestResult;
 import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.TestingRunResult;
@@ -23,7 +24,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-public class TestingRunResultDao extends AccountsContextDao<TestingRunResult> {
+public class TestingRunResultDao extends AccountsContextDaoWithRbac<TestingRunResult> {
 
     public static final TestingRunResultDao instance = new TestingRunResultDao();
     public static final int maxDocuments = 5_000_000;
@@ -42,6 +43,11 @@ public class TestingRunResultDao extends AccountsContextDao<TestingRunResult> {
     @Override
     public Class<TestingRunResult> getClassT() {
         return TestingRunResult.class;
+    }
+
+    @Override
+    public String getFilterKeyString() {
+        return TestingRunResult.API_INFO_KEY + "." + ApiInfoKey.API_COLLECTION_ID;
     }
 
     public static Bson generateFilter(ObjectId testRunId, ApiInfo.ApiInfoKey apiInfoKey) {
@@ -84,6 +90,13 @@ public class TestingRunResultDao extends AccountsContextDao<TestingRunResult> {
     public List<TestingRunResult> fetchLatestTestingRunResult(Bson filters, int limit, int skip, Bson projections) {
         List<Bson> pipeline = new ArrayList<>();
         pipeline.add(Aggregates.match(filters));
+        try {
+            List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+            if (collectionIds != null) {
+                pipeline.add(Aggregates.match(Filters.in(getFilterKeyString(), collectionIds)));
+            }
+        } catch (Exception e) {
+        }
         pipeline.add(Aggregates.project(projections));
         pipeline.add(Aggregates.sort(Sorts.descending(Constants.ID)));
         pipeline.add(Aggregates.skip(skip));
@@ -167,6 +180,9 @@ public class TestingRunResultDao extends AccountsContextDao<TestingRunResult> {
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
 
         fieldNames = new String[]{TestingRunResult.REQUIRES_CONFIG};
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
+
+        fieldNames = new String[]{getFilterKeyString()};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
     }
 

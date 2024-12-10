@@ -1,12 +1,16 @@
 package com.akto.dao.demo;
 
 import com.akto.dao.AccountsContextDao;
+import com.akto.dao.AccountsContextDaoWithRbac;
+import com.akto.dto.ApiCollectionUsers;
+import com.akto.dto.ApiInfo;
 import com.akto.dto.demo.VulnerableRequestForTemplate;
+import com.akto.dto.testing.TestingEndpoints;
 import com.akto.util.enums.MongoDBEnums;
 
 import java.util.*;
 
-public class VulnerableRequestForTemplateDao extends AccountsContextDao<VulnerableRequestForTemplate> {
+public class VulnerableRequestForTemplateDao extends AccountsContextDaoWithRbac<VulnerableRequestForTemplate> {
     private static final Map<String, List<String>> apiVsTemplateMap = new HashMap<>();
     static {
         apiVsTemplateMap.put("GET https://juiceshop.akto.io/rest/products/search", Collections.singletonList("ADD_DELETE_METHOD_IN_PARAMETER"));
@@ -35,5 +39,10 @@ public class VulnerableRequestForTemplateDao extends AccountsContextDao<Vulnerab
     @Override
     public Class<VulnerableRequestForTemplate> getClassT() {
         return VulnerableRequestForTemplate.class;
+    }
+
+    @Override
+    public String getFilterKeyString() {
+        return TestingEndpoints.getFilterPrefix(ApiCollectionUsers.CollectionType.Id_ApiCollectionId) + ApiInfo.ApiInfoKey.API_COLLECTION_ID;
     }
 }
