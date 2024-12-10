@@ -2,7 +2,7 @@ package com.akto.threat.protection;
 
 import com.akto.threat.protection.interceptors.AuthenticationInterceptor;
 import com.akto.threat.protection.service.DashboardService;
-import com.akto.threat.protection.service.MaliciousAlertService;
+import com.akto.threat.protection.service.MaliciousEventService;
 
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
@@ -20,7 +20,7 @@ public class BackendServer {
     this.port = port;
     this.server =
         ServerBuilder.forPort(port)
-            .addService(new MaliciousAlertService())
+            .addService(new MaliciousEventService())
             .addService(new DashboardService(mongoClient))
             .intercept(new AuthenticationInterceptor())
             .build();

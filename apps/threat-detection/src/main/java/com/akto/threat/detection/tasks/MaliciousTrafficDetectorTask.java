@@ -2,7 +2,7 @@ package com.akto.threat.detection.tasks;
 
 import com.akto.dao.context.Context;
 import com.akto.proto.threat_protection.message.malicious_event.v1.MaliciousEvent;
-import com.akto.proto.threat_protection.message.smart_event.v1.SmartEvent;
+import com.akto.proto.threat_protection.message.sample_request.v1.SampleMaliciousRequest;
 import com.akto.threat.detection.actor.SourceIPActorGenerator;
 import com.akto.threat.detection.cache.RedisBackedCounterCache;
 import com.akto.threat.detection.config.kafka.KafkaConfig;
@@ -172,6 +172,8 @@ public class MaliciousTrafficDetectorTask {
         AggregationRules aggRules = new AggregationRules();
         aggRules.setRule(rules);
 
+        boolean isAggFilter = aggRules != null && !aggRules.getRule().isEmpty();
+
         SourceIPActorGenerator.instance
             .generate(responseParam)
             .ifPresent(
@@ -179,49 +181,47 @@ public class MaliciousTrafficDetectorTask {
                   String groupKey = apiFilter.getId();
                   String aggKey = actor + "|" + groupKey;
 
-                  MaliciousEvent maliciousEvent =
-                      MaliciousEvent.newBuilder()
-                          .setActor(actor)
-                          .setFilterId(apiFilter.getId())
+                  SampleMaliciousRequest maliciousReq =
+                      SampleMaliciousRequest.newBuilder()
                           .setUrl(responseParam.getRequestParams().getURL())
                           .setMethod(responseParam.getRequestParams().getMethod())
                           .setPayload(responseParam.getOrig())
                           .setIp(actor) // For now using actor as IP
                           .setApiCollectionId(responseParam.getRequestParams().getApiCollectionId())
                           .setTimestamp(responseParam.getTime())
+                          .setFilterId(apiFilter.getId())
                           .build();
 
                   try {
                     maliciousMessages.add(
                         MessageEnvelope.generateEnvelope(
-                            responseParam.getAccountId(), maliciousEvent));
+                            responseParam.getAccountId(), maliciousReq));
                   } catch (InvalidProtocolBufferException e) {
                     return;
                   }
 
+                  if (!isAggFilter) {
+                    generateAndPushMaliciousEventRequest(
+                        apiFilter,
+                        actor,
+                        responseParam,
+                        maliciousReq,
+                        MaliciousEvent.EventType.EVENT_TYPE_SINGLE);
+                    return;
+                  }
+
+                  // Aggregation rules
                   for (Rule rule : aggRules.getRule()) {
                     WindowBasedThresholdNotifier.Result result =
-                        this.windowBasedThresholdNotifier.shouldNotify(
-                            aggKey, maliciousEvent, rule);
+                        this.windowBasedThresholdNotifier.shouldNotify(aggKey, maliciousReq, rule);
 
                     if (result.shouldNotify()) {
-                      SmartEvent smartEvent =
-                          SmartEvent.newBuilder()
-                              .setFilterId(apiFilter.getId())
-                              .setActor(actor)
-                              .setDetectedAt(responseParam.getTime())
-                              .setRuleId(rule.getName())
-                              .build();
-                      try {
-                        MessageEnvelope.generateEnvelope(responseParam.getAccountId(), smartEvent)
-                            .marshal()
-                            .ifPresent(
-                                data -> {
-                                  internalKafka.send(data, KafkaTopic.ThreatDetection.ALERTS);
-                                });
-                      } catch (InvalidProtocolBufferException e) {
-                        e.printStackTrace();
-                      }
+                      generateAndPushMaliciousEventRequest(
+                          apiFilter,
+                          actor,
+                          responseParam,
+                          maliciousReq,
+                          MaliciousEvent.EventType.EVENT_TYPE_AGGREGATED);
                     }
                   }
                 });
@@ -241,6 +241,36 @@ public class MaliciousTrafficDetectorTask {
                     });
           });
     } catch (Exception e) {
+      e.printStackTrace();
+    }
+  }
+
+  private void generateAndPushMaliciousEventRequest(
+      FilterConfig apiFilter,
+      String actor,
+      HttpResponseParams responseParam,
+      SampleMaliciousRequest maliciousReq,
+      MaliciousEvent.EventType eventType) {
+    MaliciousEvent maliciousEvent =
+        MaliciousEvent.newBuilder()
+            .setFilterId(apiFilter.getId())
+            .setActor(actor)
+            .setDetectedAt(responseParam.getTime())
+            .setEventType(eventType)
+            .setLatestApiCollectionId(maliciousReq.getApiCollectionId())
+            .setLatestApiIp(maliciousReq.getIp())
+            .setLatestApiPayload(maliciousReq.getPayload())
+            .setLatestApiMethod(maliciousReq.getMethod())
+            .setDetectedAt(responseParam.getTime())
+            .build();
+    try {
+      MessageEnvelope.generateEnvelope(responseParam.getAccountId(), maliciousEvent)
+          .marshal()
+          .ifPresent(
+              data -> {
+                internalKafka.send(data, KafkaTopic.ThreatDetection.ALERTS);
+              });
+    } catch (InvalidProtocolBufferException e) {
       e.printStackTrace();
     }
   }
