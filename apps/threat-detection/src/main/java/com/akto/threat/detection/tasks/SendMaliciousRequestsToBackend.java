@@ -20,6 +20,8 @@ import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.hibernate.Session;
 import org.hibernate.SessionFactory;
 import org.hibernate.Transaction;
+
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -64,10 +66,15 @@ public class SendMaliciousRequestsToBackend extends AbstractKafkaConsumerTask {
           .setParameter("filterId", filterId)
           .setMaxResults(50)
           .getResultList();
+    } catch (Exception ex) {
+      ex.printStackTrace();
+      txn.rollback();
     } finally {
       txn.commit();
       session.close();
     }
+
+    return Collections.emptyList();
   }
 
   protected void processRecords(ConsumerRecords<String, String> records) {
@@ -128,6 +135,7 @@ public class SendMaliciousRequestsToBackend extends AbstractKafkaConsumerTask {
                   @Override
                   public void onCompleted() {
                     // Do nothing
+                    System.out.println("Completed");
                   }
                 });
           } catch (Exception e) {

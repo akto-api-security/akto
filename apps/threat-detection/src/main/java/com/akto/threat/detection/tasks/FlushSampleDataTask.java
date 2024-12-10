@@ -64,25 +64,29 @@ public class FlushSampleDataTask extends AbstractKafkaConsumerTask {
                   .setMethod(URLMethods.Method.fromString(evt.getMethod()))
                   .setTimestamp(evt.getTimestamp())
                   .setOrig(evt.getPayload())
+                  .setApiCollectionId(evt.getApiCollectionId())
                   .setIp(evt.getIp())
                   .build());
         });
 
     Session session = this.sessionFactory.openSession();
     Transaction txn = session.beginTransaction();
-
-    txn.begin();
-
-    // Commit these events in 2 batches
-    for (int i = 0; i < events.size(); i += 2) {
-      session.persist(events.get(i));
-      if (i % 50 == 0) {
-        session.flush();
-        session.clear();
+    try {
+      // Commit these events in 2 batches
+      for (int i = 0; i < events.size(); i += 2) {
+        session.persist(events.get(i));
+        if (i % 50 == 0) {
+          session.flush();
+          session.clear();
+        }
       }
-    }
 
-    txn.commit();
-    session.close();
+      txn.commit();
+    } catch (Exception e) {
+      e.printStackTrace();
+      txn.rollback();
+    } finally {
+      session.close();
+    }
   }
 }

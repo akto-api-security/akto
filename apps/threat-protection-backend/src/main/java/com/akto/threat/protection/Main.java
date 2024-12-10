@@ -16,8 +16,9 @@ public class Main {
     MongoClient threatProtectionMongo =
         DaoInit.createMongoClient(
             new ConnectionString(System.getenv("AKTO_THREAT_PROTECTION_MONGO_CONN")),
-            ReadPreference.secondary(), WriteConcern.ACKNOWLEDGED);
-    String initProducer = System.getenv("INIT_KAFKA_PRODUCER");
+            ReadPreference.secondary(),
+            WriteConcern.ACKNOWLEDGED);
+    String initProducer = System.getenv().getOrDefault("INIT_KAFKA_PRODUCER", "true");
     if (initProducer != null && initProducer.equalsIgnoreCase("true")) {
       KafkaUtils.initKafkaProducer();
     } else {
