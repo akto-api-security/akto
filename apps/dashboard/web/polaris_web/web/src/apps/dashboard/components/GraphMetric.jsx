@@ -31,32 +31,16 @@ function GraphMetric(props) {
 
     const series = [
         ...dataForChart,
-        inputMetrics.length > 0 && inputMetrics.map((x, i) => {
-            return {
-                data: x.data,
-                color: '#FF4DCA',
-                name: x.name,
-                marker: {
-                    enabled: false,
-                    symbol: 'circle',
-                },
-                fillColor: {
-                    linearGradient: { x1: 0, y1: 0, x2: 0, y2: 1 },
-                    stops: [
-                        [0, '#000000'],
-                        [1, '#000000'],
-                    ],
-                },
-                yAxis: i + 1,
-            };
-        }),
     ];
 
     const chartOptions = {
         chart: {
             type,
+            zooming: {
+                type: 'x'
+            },
             height: `${height}px`,
-            backgroundColor,
+            backgroundColor: backgroundColor || '#ffffff',
         },
         credits:{
             enabled: false,

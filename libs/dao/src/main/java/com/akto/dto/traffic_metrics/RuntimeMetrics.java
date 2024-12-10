@@ -6,14 +6,16 @@ public class RuntimeMetrics {
     private int timestamp;
     private String instanceId;
     private Double val;
+    private String version;
 
     public RuntimeMetrics() {
     }
 
-    public RuntimeMetrics(String name, int timestamp, String instanceId, Double val) {
+    public RuntimeMetrics(String name, int timestamp, String instanceId, String version, Double val) {
         this.name = name;
         this.timestamp = timestamp;
         this.instanceId = instanceId;
+        this.version = version;
         this.val = val;
     }
 
@@ -39,6 +41,14 @@ public class RuntimeMetrics {
 
     public void setInstanceId(String instanceId) {
         this.instanceId = instanceId;
+    }
+
+    public String getVersion() {
+        return version;
+    }
+
+    public void setVersion(String version) {
+        this.version = version;
     }
 
     public Double getVal() {
