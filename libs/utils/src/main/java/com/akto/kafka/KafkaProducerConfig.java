@@ -1,4 +1,4 @@
-package com.akto.threat.detection.config.kafka;
+package com.akto.kafka;
 
 public class KafkaProducerConfig {
   private final int lingerMs;
