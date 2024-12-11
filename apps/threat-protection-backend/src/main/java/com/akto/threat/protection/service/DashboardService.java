@@ -1,12 +1,14 @@
 package com.akto.threat.protection.service;
 
+import com.akto.proto.threat_protection.message.malicious_event.dashboard.v1.DashboardMaliciousEventMessage;
 import com.akto.proto.threat_protection.service.dashboard_service.v1.DashboardServiceGrpc.DashboardServiceImplBase;
 import com.akto.proto.threat_protection.service.dashboard_service.v1.FetchAlertFiltersRequest;
 import com.akto.proto.threat_protection.service.dashboard_service.v1.FetchAlertFiltersResponse;
 import com.akto.proto.threat_protection.service.dashboard_service.v1.ListMaliciousRequestsRequest;
 import com.akto.proto.threat_protection.service.dashboard_service.v1.ListMaliciousRequestsResponse;
-import com.akto.proto.threat_protection.service.dashboard_service.v1.MaliciousRequest;
+import com.akto.threat.protection.constants.MongoDBCollection;
 import com.akto.threat.protection.db.AggregateSampleMaliciousEventModel;
+import com.akto.threat.protection.db.MaliciousEventModel;
 import com.akto.threat.protection.interceptors.Constants;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.DistinctIterable;
@@ -73,33 +75,38 @@ public class DashboardService extends DashboardServiceImplBase {
     int limit = request.getLimit();
     int skip = (page - 1) * limit;
 
-    MongoCollection<AggregateSampleMaliciousEventModel> coll =
+    MongoCollection<MaliciousEventModel> coll =
         this.mongoClient
             .getDatabase(accountId + "")
-            .getCollection("malicious_events", AggregateSampleMaliciousEventModel.class);
+            .getCollection(
+                MongoDBCollection.ThreatDetection.MALICIOUS_EVENTS, MaliciousEventModel.class);
 
     BasicDBObject query = new BasicDBObject();
-    try (MongoCursor<AggregateSampleMaliciousEventModel> cursor =
+    try (MongoCursor<MaliciousEventModel> cursor =
         coll.find(query).skip(skip).limit(limit).cursor()) {
-      List<MaliciousRequest> alerts = new ArrayList<>();
+      List<DashboardMaliciousEventMessage> maliciousEvents = new ArrayList<>();
       while (cursor.hasNext()) {
-        AggregateSampleMaliciousEventModel evt = cursor.next();
-        alerts.add(
-            MaliciousRequest.newBuilder()
+        MaliciousEventModel evt = cursor.next();
+        maliciousEvents.add(
+            DashboardMaliciousEventMessage.newBuilder()
                 .setActor(evt.getActor())
                 .setFilterId(evt.getFilterId())
                 .setFilterId(evt.getFilterId())
                 .setId(evt.getId())
-                .setIp(evt.getIp())
+                .setIp(evt.getLatestIp())
                 .setCountry(evt.getCountry())
-                .setOrig(evt.getOrig())
-                .setUrl(evt.getUrl())
-                .setMethod(evt.getMethod().name())
-                .setTimestamp(evt.getRequestTime())
+                .setPayload(evt.getLatestApiOrig())
+                .setEndpoint(evt.getLatestApiEndpoint())
+                .setMethod(evt.getLatestApiMethod().name())
+                .setDetectedAt(evt.getDetectedAt())
                 .build());
       }
       ListMaliciousRequestsResponse response =
-          ListMaliciousRequestsResponse.newBuilder().setPage(page).setTotal(alerts.size()).build();
+          ListMaliciousRequestsResponse.newBuilder()
+              .setPage(page)
+              .setTotal(maliciousEvents.size())
+              .addAllMaliciousEvents(maliciousEvents)
+              .build();
       responseObserver.onNext(response);
       responseObserver.onCompleted();
     }

@@ -14,7 +14,7 @@ message RecordMaliciousEventResponse {
 }
 
 message RecordMaliciousEventRequest {
-  threat_protection.message.malicious_event.v1.MaliciousEvent malicious_event = 1;
+  threat_protection.message.malicious_event.v1.MaliciousEventMessage malicious_event = 1;
   repeated threat_protection.message.sample_request.v1.SampleMaliciousRequest sample_requests = 2;
 }
 

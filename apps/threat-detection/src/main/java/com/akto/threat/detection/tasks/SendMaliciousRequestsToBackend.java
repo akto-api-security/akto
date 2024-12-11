@@ -1,7 +1,8 @@
 package com.akto.threat.detection.tasks;
 
 import com.akto.kafka.KafkaConfig;
-import com.akto.proto.threat_protection.message.malicious_event.v1.MaliciousEvent;
+import com.akto.proto.threat_protection.message.malicious_event.event_type.v1.EventType;
+import com.akto.proto.threat_protection.message.malicious_event.v1.MaliciousEventMessage;
 import com.akto.proto.threat_protection.message.sample_request.v1.SampleMaliciousRequest;
 import com.akto.proto.threat_protection.service.malicious_alert_service.v1.MaliciousEventServiceGrpc;
 import com.akto.proto.threat_protection.service.malicious_alert_service.v1.RecordMaliciousEventRequest;
@@ -81,7 +82,7 @@ public class SendMaliciousRequestsToBackend extends AbstractKafkaConsumerTask {
     records.forEach(
         r -> {
           String message = r.value();
-          MaliciousEvent.Builder builder = MaliciousEvent.newBuilder();
+          MaliciousEventMessage.Builder builder = MaliciousEventMessage.newBuilder();
           MessageEnvelope m = MessageEnvelope.unmarshal(message).orElse(null);
           if (m == null) {
             return;
@@ -94,13 +95,13 @@ public class SendMaliciousRequestsToBackend extends AbstractKafkaConsumerTask {
             return;
           }
 
-          MaliciousEvent evt = builder.build();
+          MaliciousEventMessage evt = builder.build();
 
           // Get sample data from postgres for this alert
           try {
             RecordMaliciousEventRequest.Builder reqBuilder =
                 RecordMaliciousEventRequest.newBuilder().setMaliciousEvent(evt);
-            if (MaliciousEvent.EventType.EVENT_TYPE_AGGREGATED.equals(evt.getEventType())) {
+            if (EventType.EVENT_TYPE_AGGREGATED.equals(evt.getEventType())) {
               List<MaliciousEventEntity> sampleData =
                   this.getSampleMaliciousRequests(evt.getActor(), evt.getFilterId());
 
