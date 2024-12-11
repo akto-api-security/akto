@@ -407,12 +407,23 @@ public class Main {
                                 }
                             } else {
                                 loggerMaker.infoAndAddToDb("No executions made for this test, will need to restart it, TRRS_ID:" + testingRunResultSummary.getHexId() + " TR_ID:" + testingRun.getHexId(), LogDb.TESTING);
+                                Bson tempFilter = Filters.and(
+                                    Filters.eq(TestingRunResultSummary.ID, testingRunResultSummary.getId()),
+                                    Filters.eq(TestingRunResultSummary.STATE, State.RUNNING)
+                                );
+                                int countFailedSummaries = (int) TestingRunResultSummariesDao.instance.count(tempFilter);
+                                Bson updateForSummary = Updates.set(TestingRunResultSummary.STATE, State.FAILED);
+
+                                if(countFailedSummaries >= (MAX_RETRIES_FOR_FAILED_SUMMARIES - 1)){
+                                    updateForSummary = Updates.combine(
+                                        Updates.set(TestingRunResultSummary.STATE, State.COMPLETED),
+                                        Updates.set(TestingRunResultSummary.END_TIMESTAMP, Context.now())
+                                    );
+                                    loggerMaker.infoAndAddToDb("Max retries level reached for TRR_ID: " + testingRun.getHexId(), LogDb.TESTING);
+                                    maxRetriesReached = true;
+                                }
                                 TestingRunResultSummary summary = TestingRunResultSummariesDao.instance.updateOneNoUpsert(
-                                        Filters.and(
-                                                Filters.eq(TestingRunResultSummary.ID, testingRunResultSummary.getId()),
-                                                Filters.eq(TestingRunResultSummary.STATE, State.RUNNING)
-                                        ),
-                                        Updates.set(TestingRunResultSummary.STATE, State.FAILED)
+                                    tempFilter, updateForSummary
                                 );
                                 if (summary == null) {
                                     loggerMaker.infoAndAddToDb("Skipping because some other thread picked it up, TRRS_ID:" + testingRunResultSummary.getHexId() + " TR_ID:" + testingRun.getHexId(), LogDb.TESTING);
