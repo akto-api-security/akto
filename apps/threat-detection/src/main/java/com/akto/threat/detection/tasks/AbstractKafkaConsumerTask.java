@@ -1,7 +1,7 @@
 package com.akto.threat.detection.tasks;
 
+import com.akto.kafka.KafkaConfig;
 import com.akto.runtime.utils.Utils;
-import com.akto.threat.detection.config.kafka.KafkaConfig;
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
