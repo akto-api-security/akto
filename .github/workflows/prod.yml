@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       release_version:
-        required: true  
+        required: true
       dashboard:
         type: boolean
         default: true
@@ -26,8 +26,8 @@ on:
       protection:
         type: boolean
         default: true
-        description: Protection        
-      
+        description: Protection
+
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
   # This workflow contains a single job called "build"
@@ -37,16 +37,21 @@ jobs:
 
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
-    # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - uses: actions/checkout@v2
       - uses: actions/setup-java@v2
         with:
-          distribution: 'adopt'
-          java-version: '8'
+          distribution: "adopt"
+          java-version: "8"
           architecture: x64
       - uses: actions/setup-node@v2
         with:
-          node-version: '17'
+          node-version: "17"
+      - uses: bufbuild/buf-action@v1
+        with:
+          setup_only: true
+      - name: Generate Proto files
+        run: make proto-gen
       - name: Download Akto templates zip and PII files
         working-directory: ./apps/dashboard/src/main/resources
         run: |
@@ -74,7 +79,7 @@ jobs:
           DOCKER_USERNAME: ${{secrets.DOCKER_USERNAME}}
           DOCKER_PASSWORD: ${{secrets.DOCKER_PASSWORD}}
         run: |
-          docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD 
+          docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD
 
       - name: Build, tag, and push the image to DockerHub
         id: build-image-dockerhub
@@ -92,36 +97,36 @@ jobs:
             docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/$ECR_REPOSITORY-dashboard:$IMAGE_TAG_1 -t $ECR_REGISTRY/$ECR_REPOSITORY-dashboard:$IMAGE_TAG_2 . --push
             echo "::set-output name=image::$ECR_REGISTRY/$ECR_REPOSITORY-dashboard:$IMAGE_TAG"   
           fi
-          
+
           if [[ "${{ github.event.inputs.testing }}" == "true" ]]; then
             cd apps/testing
             docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-api-testing:$IMAGE_TAG_1 -t $ECR_REGISTRY/akto-api-testing:$IMAGE_TAG_2 . --push
             echo "::set-output name=image::$ECR_REGISTRY/akto-api-testing:$IMAGE_TAG"       
           fi
-          
+
           if [[ "${{ github.event.inputs.testing }}" == "true" ]]; then
             cd apps/testing-cli
             docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-api-testing-cli:$IMAGE_TAG_1 -t $ECR_REGISTRY/akto-api-testing-cli:$IMAGE_TAG_2 . --push
             echo "::set-output name=image::$ECR_REGISTRY/akto-api-testing-cli:$IMAGE_TAG"
           fi
-          
+
           if [[ "${{ github.event.inputs.billing }}" == "true" ]]; then
             cd apps/billing
             docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-billing:$IMAGE_TAG_1 -t $ECR_REGISTRY/akto-billing:$IMAGE_TAG_2 . --push
             echo "::set-output name=image::$ECR_REGISTRY/akto-billing:$IMAGE_TAG"
           fi
-          
+
           if [[ "${{ github.event.inputs.internal }}" == "true" ]]; then
             cd apps/internal
             docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-internal:$IMAGE_TAG_1 -t $ECR_REGISTRY/akto-internal:$IMAGE_TAG_2 . --push
             echo "::set-output name=image::$ECR_REGISTRY/akto-internal:$IMAGE_TAG"
           fi
-          
+
           if [[ "${{ github.event.inputs.protection }}" == "true" ]]; then
             cd apps/api-threat-detection
             docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-api-protection:$IMAGE_TAG_1 -t $ECR_REGISTRY/akto-api-protection:$IMAGE_TAG_2 -t $ECR_REGISTRY/akto-api-protection:$IMAGE_TAG_3 . --push
             echo "::set-output name=image::$ECR_REGISTRY/akto-api-protection:$IMAGE_TAG"
-          fi  
+          fi
       - name: Configure AWS Credentials for ECR
         uses: aws-actions/configure-aws-credentials@v1
         with:
@@ -132,7 +137,7 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v1
         with:
-          mask-password: 'true'
+          mask-password: "true"
           registry-type: public
 
       - name: Build, tag, and push docker image to Amazon ECR
@@ -145,7 +150,7 @@ jobs:
         run: |
           docker buildx create --use
           # Build a docker container and push it to DockerHub 
-          cd apps/api-threat-detection
+          cd apps/threat-detection
           docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-api-protection:$IMAGE_TAG -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-api-protection:$IMAGE_TAG2 . --push
           echo "::set-output name=image::$ECR_REGISTRY/akto-api-protection:$IMAGE_TAG"
 
