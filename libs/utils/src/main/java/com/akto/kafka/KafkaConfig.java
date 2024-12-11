@@ -1,4 +1,4 @@
-package com.akto.threat.detection.config.kafka;
+package com.akto.kafka;
 
 public class KafkaConfig {
   private final String bootstrapServers;
