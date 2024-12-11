@@ -51,7 +51,7 @@ function TestRolesPage(){
 
     const getActions = (item) => {
 
-        return [{
+        const actionItems = [{
             items: [
                 {
                     content: 'Access matrix',
@@ -63,22 +63,39 @@ function TestRolesPage(){
                 }
             ]
         }]
+
+        // if(item.name !== 'ATTACKER_TOKEN_ALL') {
+        if(item.createdBy !== 'System') {
+            const removeActionItem = {
+                content: 'Remove',
+                onAction: async () => {
+                    await api.deleteTestRole(item.name)
+                    setLoading(true)
+                    fetchData()
+                    func.setToast(true, false, "Test role has been deleted successfully.")
+                },
+                destructive: true
+            }
+            actionItems[0].items.push(removeActionItem)
+        }
+
+        return actionItems
+    }
+
+    async function fetchData(){
+        await api.fetchTestRoles().then((res) => {
+            setShowEmptyScreen(res.testRoles.length === 0)
+            setTestRoles(res.testRoles.map((testRole) => {
+                testRole.timestamp = func.prettifyEpoch(testRole.lastUpdatedTs)
+                testRole.id=testRole.name;
+                return testRole;
+            }));
+            setLoading(false);
+        })
     }
 
     useEffect(() => {
         setLoading(true);
-        
-        async function fetchData(){
-            await api.fetchTestRoles().then((res) => {
-                setShowEmptyScreen(res.testRoles.length === 0)
-                setTestRoles(res.testRoles.map((testRole) => {
-                    testRole.timestamp = func.prettifyEpoch(testRole.lastUpdatedTs)
-                    testRole.id=testRole.name;
-                    return testRole;
-                }));
-                setLoading(false);
-            })
-        }
         fetchData();
     }, [])
 
