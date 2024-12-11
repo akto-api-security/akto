@@ -62,21 +62,25 @@ public class TestingRunResultDao extends AccountsContextDao<TestingRunResult> {
         return fetchLatestTestingRunResult(filters, 10_000);
     }
 
+    private Bson getLatestTestingRunResultProjections() {
+        return Projections.include(
+                TestingRunResult.TEST_RUN_ID,
+                TestingRunResult.API_INFO_KEY,
+                TestingRunResult.TEST_SUPER_TYPE,
+                TestingRunResult.TEST_SUB_TYPE,
+                TestingRunResult.VULNERABLE,
+                TestingRunResult.CONFIDENCE_PERCENTAGE,
+                TestingRunResult.START_TIMESTAMP,
+                TestingRunResult.END_TIMESTAMP,
+                TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID,
+                TestingRunResult.TEST_RESULTS + "." + GenericTestResult._CONFIDENCE,
+                TestingRunResult.TEST_RESULTS + "." + TestResult._ERRORS
+        );
+    }
+
     public List<TestingRunResult> fetchLatestTestingRunResult(Bson filters, int limit) {
         Bson projections = Projections.fields(
-                Projections.include(
-                        TestingRunResult.TEST_RUN_ID,
-                        TestingRunResult.API_INFO_KEY,
-                        TestingRunResult.TEST_SUPER_TYPE,
-                        TestingRunResult.TEST_SUB_TYPE,
-                        TestingRunResult.VULNERABLE,
-                        TestingRunResult.CONFIDENCE_PERCENTAGE,
-                        TestingRunResult.START_TIMESTAMP,
-                        TestingRunResult.END_TIMESTAMP,
-                        TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID,
-                        TestingRunResult.TEST_RESULTS + "." + GenericTestResult._CONFIDENCE,
-                        TestingRunResult.TEST_RESULTS + "." + TestResult._ERRORS
-                )
+                getLatestTestingRunResultProjections()
             );
 
         return fetchLatestTestingRunResult(filters, limit, 0, Arrays.asList(Aggregates.project(projections)));
@@ -89,19 +93,7 @@ public class TestingRunResultDao extends AccountsContextDao<TestingRunResult> {
 
         Bson projections = Projections.fields(
                 Projections.computed("confidence", Projections.computed("$first", "$testResults.confidence")),
-                Projections.include(
-                    TestingRunResult.TEST_RUN_ID,
-                    TestingRunResult.API_INFO_KEY,
-                    TestingRunResult.TEST_SUPER_TYPE,
-                    TestingRunResult.TEST_SUB_TYPE,
-                    TestingRunResult.VULNERABLE,
-                    TestingRunResult.CONFIDENCE_PERCENTAGE,
-                    TestingRunResult.START_TIMESTAMP,
-                    TestingRunResult.END_TIMESTAMP,
-                    TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID,
-                    TestingRunResult.TEST_RESULTS + "." + GenericTestResult._CONFIDENCE,
-                    TestingRunResult.TEST_RESULTS + "." + TestResult._ERRORS
-                )
+                getLatestTestingRunResultProjections()
         );
 
         Bson addSeverityValueStage = Aggregates.addFields(
