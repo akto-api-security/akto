@@ -4,12 +4,12 @@ import com.akto.action.UserAction;
 import com.akto.dto.traffic.SuspectSampleData;
 import com.akto.dto.type.URLMethods;
 import com.akto.grpc.AuthToken;
+import com.akto.proto.threat_protection.message.malicious_event.dashboard.v1.DashboardMaliciousEventMessage;
 import com.akto.proto.threat_protection.service.dashboard_service.v1.DashboardServiceGrpc;
 import com.akto.proto.threat_protection.service.dashboard_service.v1.DashboardServiceGrpc.DashboardServiceBlockingStub;
 import com.akto.proto.threat_protection.service.dashboard_service.v1.FetchAlertFiltersRequest;
 import com.akto.proto.threat_protection.service.dashboard_service.v1.FetchAlertFiltersResponse;
 import com.akto.proto.threat_protection.service.dashboard_service.v1.ListMaliciousRequestsRequest;
-import com.akto.proto.threat_protection.service.dashboard_service.v1.MaliciousRequest;
 import io.grpc.Grpc;
 import io.grpc.InsecureChannelCredentials;
 import io.grpc.ManagedChannel;
@@ -20,7 +20,7 @@ import java.util.stream.Collectors;
 public class SuspectSampleDataAction extends UserAction {
 
   List<SuspectSampleData> sampleData;
-  List<DashboardMaliciousRequest> maliciousRequests;
+  List<DashboardMaliciousEvent> maliciousRequests;
   int skip;
   static final int LIMIT = 50;
   List<String> ips;
@@ -45,25 +45,26 @@ public class SuspectSampleDataAction extends UserAction {
   }
 
   public String fetchSampleDataV2() {
-    List<MaliciousRequest> maliciousRequests =
+    List<DashboardMaliciousEventMessage> maliciousRequests =
         this.dsServiceStub
             .listMaliciousRequests(
                 ListMaliciousRequestsRequest.newBuilder().setPage(0).setLimit(500).build())
-            .getMaliciousRequestsList();
+            .getMaliciousEventsList();
 
     this.maliciousRequests =
         maliciousRequests.stream()
             .map(
                 mr ->
-                    new DashboardMaliciousRequest(
+                    new DashboardMaliciousEvent(
                         mr.getId(),
                         mr.getActor(),
                         mr.getFilterId(),
-                        mr.getUrl(),
+                        mr.getEndpoint(),
                         URLMethods.Method.fromString(mr.getMethod()),
+                        mr.getApiCollectionId(),
                         mr.getIp(),
                         mr.getCountry(),
-                        mr.getTimestamp()))
+                        mr.getDetectedAt()))
             .collect(Collectors.toList());
 
     return SUCCESS.toUpperCase();
