@@ -9,7 +9,7 @@ public class MaliciousEventModel {
   private String id;
   private String filterId;
   private String actor;
-  private String ip;
+  private String latestIp;
   private String latestApiEndpoint;
   private String country;
   private URLMethods.Method latestApiMethod;
@@ -29,7 +29,7 @@ public class MaliciousEventModel {
     this.id = UUID.randomUUID().toString();
     this.filterId = builder.filterId;
     this.actor = builder.actor;
-    this.ip = builder.ip;
+    this.latestIp = builder.ip;
     this.country = builder.country;
     this.latestApiEndpoint = builder.latestApiEndpoint;
     this.latestApiMethod = builder.latestApiMethod;
@@ -118,8 +118,8 @@ public class MaliciousEventModel {
     return actor;
   }
 
-  public String getIp() {
-    return ip;
+  public String getLatestIp() {
+    return latestIp;
   }
 
   public String getLatestApiEndpoint() {

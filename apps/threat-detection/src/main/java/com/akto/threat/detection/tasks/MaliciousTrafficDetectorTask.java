@@ -2,7 +2,8 @@ package com.akto.threat.detection.tasks;
 
 import com.akto.dao.context.Context;
 import com.akto.kafka.KafkaConfig;
-import com.akto.proto.threat_protection.message.malicious_event.v1.MaliciousEvent;
+import com.akto.proto.threat_protection.message.malicious_event.event_type.v1.EventType;
+import com.akto.proto.threat_protection.message.malicious_event.v1.MaliciousEventMessage;
 import com.akto.proto.threat_protection.message.sample_request.v1.SampleMaliciousRequest;
 import com.akto.threat.detection.actor.SourceIPActorGenerator;
 import com.akto.threat.detection.cache.RedisBackedCounterCache;
@@ -202,11 +203,7 @@ public class MaliciousTrafficDetectorTask {
 
                   if (!isAggFilter) {
                     generateAndPushMaliciousEventRequest(
-                        apiFilter,
-                        actor,
-                        responseParam,
-                        maliciousReq,
-                        MaliciousEvent.EventType.EVENT_TYPE_SINGLE);
+                        apiFilter, actor, responseParam, maliciousReq, EventType.EVENT_TYPE_SINGLE);
                     return;
                   }
 
@@ -221,7 +218,7 @@ public class MaliciousTrafficDetectorTask {
                           actor,
                           responseParam,
                           maliciousReq,
-                          MaliciousEvent.EventType.EVENT_TYPE_AGGREGATED);
+                          EventType.EVENT_TYPE_AGGREGATED);
                     }
                   }
                 });
@@ -250,9 +247,9 @@ public class MaliciousTrafficDetectorTask {
       String actor,
       HttpResponseParams responseParam,
       SampleMaliciousRequest maliciousReq,
-      MaliciousEvent.EventType eventType) {
-    MaliciousEvent maliciousEvent =
-        MaliciousEvent.newBuilder()
+      EventType eventType) {
+    MaliciousEventMessage maliciousEvent =
+        MaliciousEventMessage.newBuilder()
             .setFilterId(apiFilter.getId())
             .setActor(actor)
             .setDetectedAt(responseParam.getTime())

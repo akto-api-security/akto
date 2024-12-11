@@ -2,6 +2,8 @@ package com.akto.threat.protection.tasks;
 
 import com.akto.kafka.KafkaConfig;
 import com.akto.runtime.utils.Utils;
+import com.akto.threat.protection.constants.KafkaTopic;
+import com.akto.threat.protection.constants.MongoDBCollection;
 import com.akto.threat.protection.db.AggregateSampleMaliciousEventModel;
 import com.akto.threat.protection.db.MaliciousEventModel;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -23,14 +25,13 @@ import java.util.concurrent.Executors;
 public class FlushMessagesToDB {
 
   private final KafkaConsumer<String, String> kafkaConsumer;
-  private final String kafkaTopic;
   private final KafkaConfig kafkaConfig;
   private final MongoClient mClient;
 
   private static final ObjectMapper mapper = new ObjectMapper();
   private static final Gson gson = new Gson();
 
-  public FlushMessagesToDB(KafkaConfig kafkaConfig, String kafkaTopic, MongoClient mongoClient) {
+  public FlushMessagesToDB(KafkaConfig kafkaConfig, MongoClient mongoClient) {
     String kafkaBrokerUrl = kafkaConfig.getBootstrapServers();
     String groupId = kafkaConfig.getGroupId();
 
@@ -40,8 +41,6 @@ public class FlushMessagesToDB {
     this.kafkaConsumer = new KafkaConsumer<>(properties);
     this.kafkaConfig = kafkaConfig;
 
-    this.kafkaTopic = kafkaTopic;
-
     this.mClient = mongoClient;
   }
 
@@ -50,7 +49,8 @@ public class FlushMessagesToDB {
   }
 
   public void run() {
-    this.kafkaConsumer.subscribe(Collections.singletonList(this.kafkaTopic));
+    this.kafkaConsumer.subscribe(
+        Collections.singletonList(KafkaTopic.ThreatDetection.INTERNAL_DB_MESSAGES));
 
     getPollingExecutor()
         .execute(
@@ -92,7 +92,7 @@ public class FlushMessagesToDB {
     int accountId = accIdDouble.intValue();
 
     switch (eventType) {
-      case "maliciousEvents":
+      case MongoDBCollection.ThreatDetection.AGGREGATE_SAMPLE_MALICIOUS_REQUESTS:
         List<WriteModel<AggregateSampleMaliciousEventModel>> bulkUpdates = new ArrayList<>();
         List<AggregateSampleMaliciousEventModel> events =
             mapper.readValue(
@@ -104,16 +104,16 @@ public class FlushMessagesToDB {
 
         this.mClient
             .getDatabase(accountId + "")
-            .getCollection("malicious_events", AggregateSampleMaliciousEventModel.class)
+            .getCollection(eventType, AggregateSampleMaliciousEventModel.class)
             .bulkWrite(bulkUpdates, new BulkWriteOptions().ordered(false));
         break;
 
-      case "smartEvent":
+      case MongoDBCollection.ThreatDetection.MALICIOUS_EVENTS:
         MaliciousEventModel event =
             mapper.readValue(payload, new TypeReference<MaliciousEventModel>() {});
         this.mClient
             .getDatabase(accountId + "")
-            .getCollection("smart_events", MaliciousEventModel.class)
+            .getCollection(eventType, MaliciousEventModel.class)
             .insertOne(event);
         break;
       default:

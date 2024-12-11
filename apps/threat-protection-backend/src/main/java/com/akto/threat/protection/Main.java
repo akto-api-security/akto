@@ -36,9 +36,7 @@ public class Main {
                 KafkaProducerConfig.newBuilder().setBatchSize(100).setLingerMs(1000).build())
             .build();
 
-    new FlushMessagesToDB(
-            internalKafkaConfig, "akto.threat_protection.flush_events_db", threatProtectionMongo)
-        .run();
+    new FlushMessagesToDB(internalKafkaConfig, threatProtectionMongo).run();
 
     int port =
         Integer.parseInt(
