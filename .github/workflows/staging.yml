@@ -3,7 +3,7 @@ name: Staging
 # Controls when the workflow will run
 on:
   push:
-    branches: [master]
+    branches: [ master ]
   pull_request:
   workflow_dispatch:
 
@@ -84,8 +84,8 @@ jobs:
           docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-billing:$IMAGE_TAG . --push
           cd ../internal
           docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-internal:$IMAGE_TAG . --push
-          cd ../api-threat-detection
-          docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-api-protection:$IMAGE_TAG . --push
+          cd ../threat-detection
+          docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-threat-detection:$IMAGE_TAG . --push
           cd ../source-code-analyser
           docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/source-code-analyser:$IMAGE_TAG . --push
 
