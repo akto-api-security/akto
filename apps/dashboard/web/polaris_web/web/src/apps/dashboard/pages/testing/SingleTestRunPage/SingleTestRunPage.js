@@ -316,7 +316,11 @@ function SingleTestRunPage() {
         }
         store[superCategory.name].push(x._name);
     })
-    filters[2].choices = [].concat(result)
+    filters.forEach(filter => {
+      if (filter.key === 'categoryFilter') {
+        filter.choices = [].concat(result)
+      }
+    })
     if (resultId === null || resultId.length === 0) {
       let found = false;
         for (var ind in currentTestingRuns) {
