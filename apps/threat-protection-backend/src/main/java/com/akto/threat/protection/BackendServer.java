@@ -1,5 +1,7 @@
 package com.akto.threat.protection;
 
+import com.akto.kafka.Kafka;
+import com.akto.kafka.KafkaConfig;
 import com.akto.threat.protection.interceptors.AuthenticationInterceptor;
 import com.akto.threat.protection.service.DashboardService;
 import com.akto.threat.protection.service.MaliciousEventService;
@@ -16,11 +18,11 @@ public class BackendServer {
   private final int port;
   private final Server server;
 
-  public BackendServer(int port, MongoClient mongoClient) {
+  public BackendServer(int port, MongoClient mongoClient, KafkaConfig kafkaConfig) {
     this.port = port;
     this.server =
         ServerBuilder.forPort(port)
-            .addService(new MaliciousEventService())
+            .addService(new MaliciousEventService(kafkaConfig))
             .addService(new DashboardService(mongoClient))
             .intercept(new AuthenticationInterceptor())
             .build();

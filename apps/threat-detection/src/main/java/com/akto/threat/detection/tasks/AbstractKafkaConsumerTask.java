@@ -16,6 +16,7 @@ public abstract class AbstractKafkaConsumerTask implements Task {
   protected Consumer<String, String> kafkaConsumer;
   protected KafkaConfig kafkaConfig;
   protected String kafkaTopic;
+  private ExecutorService executorService;
 
   public AbstractKafkaConsumerTask(KafkaConfig kafkaConfig, String kafkaTopic) {
     this.kafkaTopic = kafkaTopic;
