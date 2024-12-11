@@ -187,6 +187,14 @@ export default {
         })
         return resp        
     },
+    async deleteTestRole (roleName) {
+        const resp = await request({
+            url: 'api/deleteTestRole',
+            method: 'post',
+            data: { roleName }
+        })
+        return resp
+    },
     fetchOtpData(url) {
         return request({
             url: url,

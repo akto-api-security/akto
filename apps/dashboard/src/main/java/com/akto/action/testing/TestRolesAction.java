@@ -131,6 +131,11 @@ public class TestRolesAction extends UserAction {
             return ERROR.toUpperCase();
         }
 
+        if(role.getCreatedBy().equals("System")) {
+            addActionError("The role cannot be removed.");
+            return ERROR.toUpperCase();
+        }
+
         Bson roleFilterQ = Filters.eq(TestRoles.NAME, roleName);
         DeleteResult delete = TestRolesDao.instance.deleteAll(roleFilterQ);
         loggerMaker.infoAndAddToDb("Deleted role: " + roleName + " : " + delete, LoggerMaker.LogDb.DASHBOARD);
