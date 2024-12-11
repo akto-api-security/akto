@@ -3,24 +3,26 @@ package com.akto.action.threat_detection;
 import com.akto.dto.type.URLMethods;
 import com.akto.dto.type.URLMethods.Method;
 
-public class DashboardMaliciousRequest {
+public class DashboardMaliciousEvent {
   private String id;
   private String actor;
   private String filter_id;
   private String url;
   private URLMethods.Method method;
+  private int apiCollectionId;
   private String ip;
   private String country;
   private long timestamp;
 
-  public DashboardMaliciousRequest() {}
+  public DashboardMaliciousEvent() {}
 
-  public DashboardMaliciousRequest(
+  public DashboardMaliciousEvent(
       String id,
       String actor,
       String filter,
       String url,
       Method method,
+      int apiCollectionId,
       String ip,
       String country,
       long timestamp) {
@@ -29,6 +31,7 @@ public class DashboardMaliciousRequest {
     this.filter_id = filter;
     this.url = url;
     this.method = method;
+    this.apiCollectionId = apiCollectionId;
     this.ip = ip;
     this.country = country;
     this.timestamp = timestamp;
@@ -96,5 +99,13 @@ public class DashboardMaliciousRequest {
 
   public void setTimestamp(long timestamp) {
     this.timestamp = timestamp;
+  }
+
+  public int getApiCollectionId() {
+    return apiCollectionId;
+  }
+
+  public void setApiCollectionId(int apiCollectionId) {
+    this.apiCollectionId = apiCollectionId;
   }
 }
