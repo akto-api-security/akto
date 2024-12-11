@@ -179,7 +179,7 @@ const SampleApi = () => {
 
     const fetchSampleData = async (collectionId, apiEndpointUrl, apiEndpointMethod) => {
         setShowEmptyLayout(false)
-        const sampleDataResponse = await testEditorRequests.fetchSampleData(collectionId, apiEndpointUrl, apiEndpointMethod)
+        const sampleDataResponse = await testEditorRequests.fetchSampleDataForTestEditor(collectionId, apiEndpointUrl, apiEndpointMethod)
         if (sampleDataResponse) {
             if (sampleDataResponse.sampleDataList.length > 0 && sampleDataResponse.sampleDataList[0].samples && sampleDataResponse.sampleDataList[0].samples.length > 0) {
                 const sampleDataJson = JSON.parse(sampleDataResponse.sampleDataList[0].samples[sampleDataResponse.sampleDataList[0].samples.length - 1])
