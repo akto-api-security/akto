@@ -1,9 +1,9 @@
 package com.akto.threat.detection;
 
 import com.akto.DaoInit;
-import com.akto.threat.detection.config.kafka.KafkaConfig;
-import com.akto.threat.detection.config.kafka.KafkaConsumerConfig;
-import com.akto.threat.detection.config.kafka.KafkaProducerConfig;
+import com.akto.kafka.KafkaConfig;
+import com.akto.kafka.KafkaConsumerConfig;
+import com.akto.kafka.KafkaProducerConfig;
 import com.akto.threat.detection.constants.KafkaTopic;
 import com.akto.threat.detection.session_factory.SessionFactoryUtils;
 import com.akto.threat.detection.tasks.CleanupTask;

@@ -1,11 +1,11 @@
 package com.akto.threat.detection.tasks;
 
+import com.akto.kafka.KafkaConfig;
 import com.akto.proto.threat_protection.message.malicious_event.v1.MaliciousEvent;
 import com.akto.proto.threat_protection.message.sample_request.v1.SampleMaliciousRequest;
 import com.akto.proto.threat_protection.service.malicious_alert_service.v1.MaliciousEventServiceGrpc;
 import com.akto.proto.threat_protection.service.malicious_alert_service.v1.RecordMaliciousEventRequest;
 import com.akto.proto.threat_protection.service.malicious_alert_service.v1.RecordMaliciousEventResponse;
-import com.akto.threat.detection.config.kafka.KafkaConfig;
 import com.akto.threat.detection.db.entity.MaliciousEventEntity;
 import com.akto.threat.detection.dto.MessageEnvelope;
 import com.akto.threat.detection.grpc.AuthToken;
