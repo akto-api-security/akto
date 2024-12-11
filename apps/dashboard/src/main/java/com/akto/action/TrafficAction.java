@@ -64,35 +64,6 @@ public class TrafficAction {
             Filters.gte("_id.bucketStartEpoch", 0),
             Filters.lte("_id.bucketEndEpoch", 0)
         ));
-
-        if(sampleDataList == null || sampleDataList.isEmpty()) {
-            sampleDataList = new ArrayList<>();
-            ApiCollection randomActiveCollection = ApiCollectionsDao.instance.findOne(Filters.and(
-                    Filters.eq(ApiCollection._DEACTIVATED, false),
-                    Filters.not(
-                            Filters.size(ApiCollection.URLS_STRING, 0)
-                    ),
-                    Filters.ne(ApiCollection.ID, 0)
-            ));
-
-            if(randomActiveCollection == null) {
-                return Action.SUCCESS.toUpperCase();
-            }
-
-            int activeCollectionId = randomActiveCollection.getId();
-            List<String> endpointsList = new ArrayList<>(randomActiveCollection.getUrls());
-            String[] endpointAndMethod = endpointsList.get(0).split(" ");
-
-            sampleDataList = SampleDataDao.instance.findAll(Filters.and(
-                    Filters.eq("_id.url", endpointAndMethod[0]),
-                    Filters.in(SingleTypeInfo._COLLECTION_IDS, activeCollectionId),
-                    Filters.eq("_id.responseCode", -1),
-                    Filters.eq("_id.method", endpointAndMethod[1]),
-                    Filters.gte("_id.bucketStartEpoch", 0),
-                    Filters.lte("_id.bucketEndEpoch", 0)
-            ));
-        }
-
         return Action.SUCCESS.toUpperCase();
     }
 
