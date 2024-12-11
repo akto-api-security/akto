@@ -21,3 +21,7 @@
     min-height: var(--p-height-1000) !important;
     min-width: var(--p-width-1000) !important;
 }
+
+.Polaris-TextField__Input{
+    min-height: 2.25rem !important;
+}
