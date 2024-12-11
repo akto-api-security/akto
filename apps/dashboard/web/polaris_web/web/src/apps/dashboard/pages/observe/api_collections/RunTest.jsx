@@ -1,6 +1,6 @@
-import { Box, Button, DataTable, Divider, Modal, Text, TextField, Icon, Checkbox, Badge, Banner,HorizontalGrid, HorizontalStack, Link, VerticalStack, Tooltip, Popover, ActionMenu, OptionList } from "@shopify/polaris";
-import { TickMinor, CancelMajor, SearchMinor } from "@shopify/polaris-icons"
-import { useEffect, useReducer, useRef, useState } from "react";
+import { Box, Button, DataTable, Divider, Modal, Text, TextField, Icon, Checkbox, Badge, Banner,InlineGrid, InlineStack, Link, BlockStack, Tooltip, Popover, ActionMenu, OptionList } from "@shopify/polaris";
+import { CheckIcon, XIcon, SearchIcon } from "@shopify/polaris-icons";
+import { useEffect,useReducer, useRef, useState } from "react";
 import { default as observeApi } from "../api";
 import { default as testingApi } from "../../testing/api";
 import SpinnerCentered from "../../../components/progress/SpinnerCentered"
@@ -90,7 +90,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
     const convertToLowerCaseWithUnderscores = (inputString) => {
         if(!inputString)
             return ""
-        return inputString?.toLowerCase()?.replace(/\s+/g, '_')
+        return inputString?.toLowerCase()?.replace(/\s+/g, '_');
     }
     const apiCollectionName = collectionsMap[apiCollectionId]
 
@@ -204,7 +204,11 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
 
     const activator = (
         <div ref={runTestRef}>
-            <Button onClick={toggleRunTest} primary disabled={disabled || testRun.selectedCategory.length === 0} ><div data-testid="run_test_button">Run test</div></Button>
+            <Button
+                onClick={toggleRunTest}
+
+                disabled={disabled || testRun.selectedCategory.length === 0}
+                variant="primary"><div data-testid="run_test_button">Run test</div></Button>
         </div>
     );
 
@@ -287,17 +291,17 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                         selected += 1
                 })
 
-                return ([(
+                return [(
                     <div
                         style={{ display: "grid", gridTemplateColumns: "auto max-content", alignItems: "center" }}
                         onClick={() => { setTestRun(prev => ({ ...prev, selectedCategory: category.name })); resetSearchFunc(); setOptionsSelected(initialArr)}}>
                         <div>
-                            <Text variant="headingMd" fontWeight="bold" color={category.name === testRun.selectedCategory ? "success" : ""}>{category.displayName}</Text>
+                            <Text variant="headingMd" fontWeight="bold" tone={category.name === testRun.selectedCategory ? "success" : ""}>{category.displayName}</Text>
                             <Text>{selected} out of {total} selected</Text>
                         </div>
-                        {selected > 0 && <Icon source={TickMinor} color="base" />}
+                        {selected > 0 && <Icon source={CheckIcon} tone="base" />}
                     </div>
-                )])
+                )];
             } else {
                 return []
             }
@@ -310,7 +314,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
             const label = (
                 <span style={{display: 'flex', gap: '4px', alignItems: 'flex-start'}}>
                     <Text variant="bodyMd">{test.label}</Text>
-                    {isCustom ? <Box paddingBlockStart={"05"}><Badge status="warning" size="small">Custom</Badge></Box> : null}
+                    {isCustom ? <Box paddingBlockStart={"050"}><Badge tone="warning" size="small">Custom</Badge></Box> : null}
                 </span>
             )
             return ([(
@@ -461,11 +465,11 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
 
         setActive(false)
         const forwardLink = (
-            <HorizontalStack gap={1}>
+            <InlineStack gap={100}>
                 <Text> Test run created successfully. Click </Text>
                 <Link url="/dashboard/testing">here</Link>
                 <Text> to view results.</Text>
-            </HorizontalStack>
+            </InlineStack>
         )
 
         func.setToast(true, false, <div data-testid="test_run_created_message">{forwardLink}</div>)
@@ -509,14 +513,16 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
     }
 
     function generateLabelForSlackIntegration() {
-        return <HorizontalStack gap={1}>
-            <Link url='/dashboard/settings/integrations/slack' target="_blank" rel="noopener noreferrer" style={{ color: "#3385ff", textDecoration: 'none' }}>
-                Enable
-            </Link>
-            <Text>
-                Slack integration to send alerts post completion
-            </Text>
-        </HorizontalStack>
+        return (
+            <InlineStack gap={100}>
+                <Link url='/dashboard/settings/integrations/slack' target="_blank" rel="noopener noreferrer" style={{ color: "#3385ff", textDecoration: 'none' }}>
+                    Enable
+                </Link>
+                <Text>
+                    Slack integration to send alerts post completion
+                </Text>
+            </InlineStack>
+        );
     }
 
     return (
@@ -532,11 +538,11 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                     onAction: handleRun,
                     disabled: !testRun.authMechanismPresent
                 }}
-                large
+                size="large"
             >
                 {loading ? <SpinnerCentered /> :
                     <Modal.Section>
-                        <VerticalStack gap={"3"}>
+                        <BlockStack gap={"300"}>
                         {!testRun.authMechanismPresent &&
                             <div>
                                 <Banner
@@ -546,7 +552,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                                             content: 'Configure authentication mechanism',
                                             onAction: () => navigate("/dashboard/testing/user-config")
                                         }}
-                                    status="critical"
+                                    tone="critical"
                                 >
 
                                     <Text variant="bodyMd">
@@ -574,7 +580,13 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                                 />
                             </div>
 
-                            <Button icon={CancelMajor} destructive onClick={handleRemoveAll} disabled={checkRemoveAll()}><div data-testid="remove_all_tests">Remove All</div></Button>
+                            <Button
+                                icon={XIcon}
+
+                                onClick={handleRemoveAll}
+                                disabled={checkRemoveAll()}
+                                variant="primary"
+                                tone="critical"><div data-testid="remove_all_tests">Remove All</div></Button>
                         </div>
                         <div style={{ display: "grid", gridTemplateColumns: "50% 50%", border: "1px solid #C9CCCF" }}>
                             <div style={{ borderRight: "1px solid #C9CCCF" }}>
@@ -596,16 +608,20 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                             </div>
                             <div>
                                 <div style={{ padding: !showSearch ? "13px" : "9px", alignItems: "center", justifyContent: 'space-between', display: 'flex' }}>
-                                    <HorizontalStack gap={"2"}>
+                                    <InlineStack gap={"200"}>
                                         <Checkbox
                                             checked={allTestsSelectedOfCategory}
                                             onChange={(val) => toggleTestsSelection(val)}
                                         />
                                         <Text variant="headingMd">Tests</Text>
-                                    </HorizontalStack>
-                                    <HorizontalStack gap={"2"}>
+                                    </InlineStack>
+                                    <InlineStack gap={"200"}>
                                         <Popover
-                                            activator={<Button plain size="slim" onClick={() => setShowFiltersOption(!showFiltersOption)}>More filters</Button>}
+                                            activator={<Button
+
+                                                size="slim"
+                                                onClick={() => setShowFiltersOption(!showFiltersOption)}
+                                                variant="plain">More filters</Button>}
                                             onClose={() => setShowFiltersOption(false)}
                                             active={showFiltersOption}
                                         >
@@ -621,9 +637,9 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                                         {showSearch ? <TextField onChange={handleInputValue} value={searchValue} autoFocus
                                     focused /> : null}
                                         <Tooltip content={"Click to search"} dismissOnMouseOut>
-                                            <Button size="slim" icon={SearchMinor} onClick={() => setShowSearch(!showSearch)}/>
+                                            <Button size="slim" icon={SearchIcon} onClick={() => setShowSearch(!showSearch)}/>
                                         </Tooltip>
-                                    </HorizontalStack>
+                                    </InlineStack>
                                 </div>
                                 <Divider />
                                 <div style={{ maxHeight: "35vh", overflowY: "auto", paddingTop: "5px" }}>
@@ -640,29 +656,28 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                             </div>
                         </div>
 
-                        <VerticalStack gap={"4"}>
-                            <HorizontalGrid gap={"4"} columns={"3"}>
-                                    <Dropdown
-                                        label="Run Type"
-                                        menuItems={runTypeOptions}
-                                        initial={testRun.runTypeLabel}
-                                        selected={(runType) => {
-                                            let recurringDaily = false
-                                            let continuousTesting = false
+                        <BlockStack gap={"4"}>
+                            <InlineGrid gap={"400"} columns={"3"}>
+                                <Dropdown
+                                    label="Run Type"
+                                    menuItems={runTypeOptions}
+                                    initial={testRun.runTypeLabel}
+                                    selected={(runType) => {
+                                        let recurringDaily = false
+                                        let continuousTesting = false
 
-                                            if(runType === 'Continuously'){
-                                                continuousTesting = true;
-                                            }else if(runType === 'Daily'){
-                                                recurringDaily = true;
-                                            }
-                                           setTestRun(prev => ({
-                                                   ...prev,
-                                                   recurringDaily,
-                                                   continuousTesting,
-                                                   runTypeLabel: runType.label
-                                               }))
-                                        }} />
-
+                                        if(runType === 'Continuously'){
+                                            continuousTesting = true;
+                                        }else if(runType === 'Daily'){
+                                            recurringDaily = true;
+                                        }
+                                       setTestRun(prev => ({
+                                               ...prev,
+                                               recurringDaily,
+                                               continuousTesting,
+                                               runTypeLabel: runType.label
+                                           }))
+                                    }} />
                                 <Dropdown
                                     label="Select Time:"
                                     disabled={testRun.continuousTesting === true}
@@ -684,25 +699,25 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                                             hourlyLabel: hourlyTime ? hourlyTime.label : ""
                                         }))
                                     }} />
-                                    <Dropdown
-                                        label="Test run time:"
-                                        menuItems={testRunTimeOptions}
-                                        initial={testRun.testRunTimeLabel}
-                                        selected={(timeInSeconds) => {
-                                            let testRunTime
-                                            if (timeInSeconds === "Till complete") testRunTime = -1
-                                            else testRunTime = timeInSeconds
+                                <Dropdown
+                                    label="Test run time:"
+                                    menuItems={testRunTimeOptions}
+                                    initial={testRun.testRunTimeLabel}
+                                    selected={(timeInSeconds) => {
+                                        let testRunTime
+                                        if (timeInSeconds === "Till complete") testRunTime = -1
+                                        else testRunTime = timeInSeconds
 
-                                            const testRunTimeOption = getLabel(testRunTimeOptions, timeInSeconds)
+                                        const testRunTimeOption = getLabel(testRunTimeOptions, timeInSeconds)
 
-                                            setTestRun(prev => ({
-                                                ...prev,
-                                                testRunTime: testRunTime,
-                                                testRunTimeLabel: testRunTimeOption.label
-                                            }))
-                                        }} />
-                            </HorizontalGrid>
-                            <HorizontalGrid gap={"4"} columns={"2"}>
+                                        setTestRun(prev => ({
+                                            ...prev,
+                                            testRunTime: testRunTime,
+                                            testRunTimeLabel: testRunTimeOption.label
+                                        }))
+                                    }} />
+                            </InlineGrid>
+                            <InlineGrid gap={"400"} columns={"2"}>
                                 <div style={{marginTop: '-10px'}}>
                                     <Text>Select Test Role</Text>
                                     <Dropdown
@@ -720,7 +735,6 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                                             }))
                                         }} />
                                 </div>
-                                        
                                 <div style={{marginTop: '-10px'}}>
                                 <Text>Max Concurrent Requests</Text>
                                 <Dropdown
@@ -740,17 +754,14 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                                         }))
                                     }} />
                             </div>
-
-                            </HorizontalGrid>
-
+                            </InlineGrid>
                             <Checkbox
                                 label={slackIntegrated ? "Send slack alert post test completion" : generateLabelForSlackIntegration()}
                                 checked={testRun.sendSlackAlert}
                                 onChange={() => setTestRun(prev => ({ ...prev, sendSlackAlert: !prev.sendSlackAlert}))}
                                 disabled={!slackIntegrated}
                             />
-
-                            <HorizontalGrid columns={2}>
+                            <InlineGrid columns={2}>
                                 <Checkbox
                                     label="Use different target for testing"
                                     checked={testRun.hasOverriddenTestAppUrl}
@@ -765,18 +776,16 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                                         />
                                     </div>
                                 }
-                            </HorizontalGrid>
-
-
-                        </VerticalStack>
-                        </VerticalStack>
+                            </InlineGrid>
+                        </BlockStack>
+                        </BlockStack>
                         <AdvancedSettingsComponent dispatchConditions={dispatchConditions} conditions={conditions}/>
 
                     </Modal.Section>
                 }
             </Modal>
         </div>
-    )
+    );
 }
 
 export default RunTest

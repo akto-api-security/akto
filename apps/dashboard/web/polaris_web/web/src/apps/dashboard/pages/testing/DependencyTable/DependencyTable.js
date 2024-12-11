@@ -1,10 +1,10 @@
-import { Box, Button, HorizontalStack, Icon, Link, Modal, Select, Spinner, Text, TextField, VerticalStack } from "@shopify/polaris";
+import { Box, Button, InlineStack, Icon, Link, Modal, Select, Spinner, Text, TextField, BlockStack } from "@shopify/polaris";
 import { useEffect, useRef, useState } from "react";
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards";
 import GithubServerTable from "../../../components/tables/GithubServerTable";
 import { CellType } from "../../../components/tables/rows/GithubRow";
 import api from "../api";
-import { TickMinor, CancelMinor } from "@shopify/polaris-icons"
+import { CheckIcon, XIcon } from "@shopify/polaris-icons";
 import TableExpand from "./TableExpand";
 import func from "../../../../../util/func";
 import EditModal from "./EditModal";
@@ -146,9 +146,9 @@ function DependencyTable() {
             let runResult = runResults[key]
             if (runResult) {
                 if (runResult["success"]) {
-                    icon = <Icon source={TickMinor} color="success" />
+                    icon = <Icon source={CheckIcon} tone="success" />
                 } else {
-                    icon = <Icon source={CancelMinor} color="critical" />
+                    icon = <Icon source={XIcon} tone="critical" />
                 }
             }
 
@@ -271,11 +271,11 @@ function DependencyTable() {
             const url = "/dashboard/observe/inventory/" + newCollectionId
 
             const forwardLink = (
-                <HorizontalStack gap={1}>
+                <InlineStack gap={100}>
                     <Text> API collection created successfully. Click </Text>
                     <Link url={url}>here</Link>
                     <Text> to view collection.</Text>
-                </HorizontalStack>
+                </InlineStack>
             )
 
             func.setToast(true, false, forwardLink)
@@ -283,7 +283,7 @@ function DependencyTable() {
     }
 
     const secondaryActionsComponent = (
-        <Button onClick={invokeDependencyTable} primary  >
+        <Button onClick={invokeDependencyTable}  variant="primary">
             {invokeLoading ? <Spinner size="small" /> : "Invoke"}
         </Button>
     )

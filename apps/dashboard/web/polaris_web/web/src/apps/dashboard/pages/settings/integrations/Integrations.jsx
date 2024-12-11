@@ -121,37 +121,37 @@ function Integrations() {
     const tabs = [
         {
             id: 'all',
-            content: <span>All <Badge status='new'>{getTabItems('all').length}</Badge></span>,
+            content: <span>All <Badge tone='new'>{getTabItems('all').length}</Badge></span>,
             component: <TabsList />
         },
         {
             id: 'traffic',
-            content: <span>Traffic Source <Badge status='new'>{getTabItems('traffic').length}</Badge></span>,
+            content: <span>Traffic Source <Badge tone='new'>{getTabItems('traffic').length}</Badge></span>,
             component: <TabsList />
         },
         {
             id: 'reporting',
-            content: <span>Reporting <Badge status='new'>{getTabItems('reporting').length}</Badge></span>,
+            content: <span>Reporting <Badge tone='new'>{getTabItems('reporting').length}</Badge></span>,
             component: <TabsList />
         },
         {
             id: 'ai',
-            content: <span>AI <Badge status='new'>{getTabItems('ai').length}</Badge></span>,
+            content: <span>AI <Badge tone='new'>{getTabItems('ai').length}</Badge></span>,
             component: <TabsList />
         },
         {
             id: 'alerts',
-            content: <span>Alerts <Badge status='new'>{getTabItems('alerts').length}</Badge></span>,
+            content: <span>Alerts <Badge tone='new'>{getTabItems('alerts').length}</Badge></span>,
             component: <TabsList />
         },
         {
           id: 'sso',
-          content: <span>SSO <Badge status='new'>{getTabItems('sso').length}</Badge></span>,
+          content: <span>SSO <Badge tone='new'>{getTabItems('sso').length}</Badge></span>,
           component: <TabsList />
         },
         {
             id: 'automation',
-            content: <span>Automation <Badge status='new'>{getTabItems('automation').length}</Badge></span>,
+            content: <span>Automation <Badge tone='new'>{getTabItems('automation').length}</Badge></span>,
             component: <TabsList />
         },
         {
@@ -224,7 +224,7 @@ function Integrations() {
 
     function renderItem(item) {
         const {id, source, name, link} = item;
-        const media = <Avatar customer size="medium" name={name} source={source}/>;
+        const media = <Avatar customer size="md" name={name} source={source}/>;
         const sourceActions = (item) => {
             return [
               {

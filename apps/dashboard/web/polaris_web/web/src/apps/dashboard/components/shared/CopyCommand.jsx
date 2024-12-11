@@ -1,5 +1,5 @@
 import { Box, Button, TextField, Tooltip } from '@shopify/polaris'
-import { ClipboardMinor } from "@shopify/polaris-icons"
+import { ClipboardIcon } from "@shopify/polaris-icons";
 import React, { useRef } from 'react'
 
 import func from "@/util/func";
@@ -12,18 +12,18 @@ function CopyCommand({command}) {
     }
 
     return (
-        <Box background="bg-subdued" padding={2} borderRadius="1">
+        <Box background="bg-subdued" padding={200} borderRadius="1">
             <TextField 
                 connectedRight={(<Tooltip dismissOnMouseOut content="Copy URL">
                     <Box>
                         <div ref={ref} />
-                        <Button onClick={copyContent} icon={ClipboardMinor} />
+                        <Button onClick={copyContent} icon={ClipboardIcon} />
                     </Box>
                 </Tooltip>)}
                 value={command}
             />
         </Box>
-    )
+    );
 }
 
 export default CopyCommand

@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useReducer } from 'react'
-import { LegacyCard, HorizontalGrid, TextField, Divider, Collapsible, LegacyStack, Button, FormLayout, HorizontalStack, Tooltip, Icon, Text, VerticalStack, Modal, Box } from '@shopify/polaris'
+import { LegacyCard, InlineGrid, TextField, Divider, Collapsible, LegacyStack, Button, FormLayout, InlineStack, Tooltip, Icon, Text, BlockStack, Modal, Box } from '@shopify/polaris'
 import { useLocation, useNavigate } from 'react-router-dom'
 import TestRolesConditionsPicker from '../../../components/TestRolesConditionsPicker';
 import func from "@/util/func";
@@ -9,7 +9,7 @@ import DetailsPage from '../../../components/DetailsPage';
 import {produce} from "immer"
 import HardCoded from '../user_config/HardCoded';
 import LoginStepBuilder from '../user_config/LoginStepBuilder';
-import { ChevronRightMinor, ChevronDownMinor, InfoMinor } from '@shopify/polaris-icons';
+import { ChevronRightIcon, ChevronDownIcon, InfoIcon } from "@shopify/polaris-icons";
 import ParamsCard from './ParamsCard';
 import JsonRecording from '../user_config/JsonRecording';
 import Dropdown from '../../../components/layouts/Dropdown';
@@ -201,13 +201,13 @@ function TestRoleSettings() {
     const descriptionCard = (
         <LegacyCard title="Details" key="desc">
             <LegacyCard.Section>
-                <HorizontalGrid gap="4" columns={2}>
+                <InlineGrid gap="400" columns={2}>
                     <TextField
                         label="Name" value={roleName} disabled={systemRole}
                         placeholder='New test role name' onChange={isNew ? handleTextChange : () => { }}
                         requiredIndicator
                     />
-                </HorizontalGrid>
+                </InlineGrid>
             </LegacyCard.Section>
         </LegacyCard>
     )
@@ -268,13 +268,13 @@ function TestRoleSettings() {
             <br/>
             <Divider />
             <LegacyCard.Section>
-                <VerticalStack gap={6}>
+                <BlockStack gap={600}>
                     {getAuthWithCondList().map((authObj,index)=> {
                         return(
                             <ParamsCard showEdit={() => handleOpenEdit(authObj, index)} dataObj={authObj} key={JSON.stringify(authObj)} handleDelete={() => {setDeletedIndex(index); setShowAuthDeleteModal(true)}}/>
                         )
                     })}
-                </VerticalStack>
+                </BlockStack>
             </LegacyCard.Section>
             {deleteModalComp}
         </LegacyCard>
@@ -294,9 +294,9 @@ function TestRoleSettings() {
     }
 
     const addAuthButton = (
-        <HorizontalStack align="end" key="auth-button">
-            {isNew ? <Tooltip content= "Save the role first"><Button disabled>Add auth</Button></Tooltip> : <Button primary onClick={() => setShowAuthComponent(true)}><div data-testid="add_auth_button">Add auth</div></Button>}
-        </HorizontalStack>
+        <InlineStack align="end" key="auth-button">
+            {isNew ? <Tooltip content= "Save the role first"><Button disabled>Add auth</Button></Tooltip> : <Button  onClick={() => setShowAuthComponent(true)} variant="primary"><div data-testid="add_auth_button">Add auth</div></Button>}
+        </InlineStack>
     )
 
     const handleCancel = () => {
@@ -348,7 +348,7 @@ function TestRoleSettings() {
                             id={"hardcoded-token-expand-button"}
                             onClick={handleToggleHardcodedOpen}
                             ariaExpanded={hardcodedOpen}
-                            icon={hardcodedOpen ? ChevronDownMinor : ChevronRightMinor}
+                            icon={hardcodedOpen ? ChevronDownIcon : ChevronRightIcon}
                             ariaControls="hardcoded"
                         >
                             Hard coded
@@ -368,7 +368,7 @@ function TestRoleSettings() {
                             id={"automated-token-expand-button"}
                             onClick={handleToggleHardcodedOpen}
                             ariaExpanded={!hardcodedOpen}
-                            icon={!hardcodedOpen ? ChevronDownMinor : ChevronRightMinor}
+                            icon={!hardcodedOpen ? ChevronDownIcon : ChevronRightIcon}
                             ariaControls="automated"
                         >
                             Automated
@@ -396,7 +396,7 @@ function TestRoleSettings() {
                     </LegacyStack>
                 </LegacyCard.Section>
                 <LegacyCard.Section title="More settings">
-                    <VerticalStack gap={"2"}>
+                    <BlockStack gap={"200"}>
                         <Box>
                             <Button disclosure={advancedHeaderSettingsOpen ? "up" : "down"} onClick={() => setAdvancedHeaderSettingsOpen(!advancedHeaderSettingsOpen)}>
                                 Advanced Settings
@@ -406,19 +406,19 @@ function TestRoleSettings() {
                             open={advancedHeaderSettingsOpen}
                             transition={{ duration: '300ms', timingFunction: 'ease-in-out' }}
                         >
-                            <VerticalStack gap={"2"}>
+                            <BlockStack gap={"200"}>
                                 <Text variant="headingMd">Api header conditions</Text>
                                 <FormLayout>
                                     <FormLayout.Group>
                                     <TextField
                                         id={"auth-header-key-field"}
                                         label={(
-                                            <HorizontalStack gap="2">
+                                            <InlineStack gap="200">
                                                 <Text>Header key</Text>
                                                 <Tooltip content="Please enter name of the header which contains your auth token. This field is case-sensitive. eg Authorization" dismissOnMouseOut width="wide" preferredPosition="below">
-                                                    <Icon source={InfoMinor} color="base" />
+                                                    <Icon source={InfoIcon} tone="base" />
                                                 </Tooltip>
-                                            </HorizontalStack>
+                                            </InlineStack>
                                         )}
                                         value={headerKey}
                                         onChange={setHeaderKey}
@@ -426,21 +426,21 @@ function TestRoleSettings() {
                                     <TextField 
                                         id={"auth-header-value-field"}
                                         label={(
-                                            <HorizontalStack gap="2">
+                                            <InlineStack gap="200">
                                                 <Text>Header value</Text>
                                                 <Tooltip content="Please enter the value of the auth token." dismissOnMouseOut width="wide" preferredPosition="below">
-                                                    <Icon source={InfoMinor} color="base" />
+                                                    <Icon source={InfoIcon} tone="base" />
                                                 </Tooltip>
-                                            </HorizontalStack>
+                                            </InlineStack>
                                         )}
                                         value={headerValue}
                                         onChange={setHeaderValue}
                                         />
                                     </FormLayout.Group>
                                 </FormLayout>
-                            </VerticalStack>
+                            </BlockStack>
                         </Collapsible>
-                    </VerticalStack>
+                    </BlockStack>
                 </LegacyCard.Section>
             </LegacyCard>
     )

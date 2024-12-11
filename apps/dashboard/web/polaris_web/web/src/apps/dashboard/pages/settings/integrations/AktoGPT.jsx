@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import IntegrationsLayout from './IntegrationsLayout'
 import { Box, Button, Icon, LegacyCard, ResourceItem, ResourceList, Text, TextField } from '@shopify/polaris'
-import {SortMinor, SearchMinor} from "@shopify/polaris-icons"
+import { SortIcon, SearchIcon } from "@shopify/polaris-icons";
 import "../settings.css"
 import settingFunctions from '../module'
 import func from "@/util/func"
@@ -76,7 +76,7 @@ function AktoGPT() {
         }, 0)
     }
     const sortFunc = (
-        <Button icon={SortMinor} onClick={sortItems}>Sort</Button>
+        <Button icon={SortIcon} onClick={sortItems}>Sort</Button>
     )
 
     const debouncedSearch = debounce((searchQuery) => {
@@ -100,7 +100,7 @@ function AktoGPT() {
 
     const SearchIcon =  (
         <Box>
-            <Icon source={SearchMinor} />   
+            <Icon source={SearchIcon} />   
         </Box>
     )
 

@@ -1,11 +1,10 @@
-import { HorizontalStack, Text, Badge, VerticalStack, ButtonGroup, Button, Modal, DescriptionList, RadioButton, Icon, Tooltip } from "@shopify/polaris";
-import { CancelMajor } from "@shopify/polaris-icons"
+import { InlineStack, Text, Badge, BlockStack, ButtonGroup, Button, Modal, DescriptionList, RadioButton, Icon, Tooltip } from "@shopify/polaris";
+import { XIcon, QuestionCircleIcon } from "@shopify/polaris-icons";
 import { useState } from "react";
 import FileUpload from "../../../components/shared/FileUpload";
 import api from "../api";
 import func from "@/util/func";
-import SpinnerCentered from "../../../components/progress/SpinnerCentered"
-import { QuestionMarkMinor } from "@shopify/polaris-icons"
+import SpinnerCentered from "../../../components/progress/SpinnerCentered";
 
 function OpenApiSource() {
 
@@ -95,7 +94,7 @@ function OpenApiSource() {
                             <RadioButton id="forceImport" label="Force import all APIs" checked={importType === "ALL_APIS"} onChange={()=>toggleImport("ALL_APIS")} />
                             <div style={{margin: "auto 12px"}}>
                                 <Tooltip content={`We will import ${uploadObj.correctlyParsedApis + uploadObj.apisWithErrorsAndParsed} apis i.e. all the apis that have been correctly parsed and apis which have errors and can still be imported`} dismissOnMouseOut width="wide">
-                                    <Icon source={QuestionMarkMinor} color="base" />
+                                    <Icon source={QuestionCircleIcon} tone="base" />
                                 </Tooltip>
                             </div>
                         </div>
@@ -103,7 +102,7 @@ function OpenApiSource() {
                             <RadioButton id="successFulApis" label="Import only correctly formatted APIs" checked={importType === "ONLY_SUCCESSFUL_APIS"} onChange={()=>toggleImport("ONLY_SUCCESSFUL_APIS")}/>
                             <div style={{margin: "auto 12px"}}>
                                 <Tooltip content={`We will import ${uploadObj.correctlyParsedApis} apis i.e. all the apis that have been correctly parsed only`} dismissOnMouseOut width="wide">
-                                    <Icon source={QuestionMarkMinor} color="base" />
+                                    <Icon source={QuestionCircleIcon} tone="base" />
                                 </Tooltip>
                             </div>
                         </div>
@@ -146,33 +145,33 @@ function OpenApiSource() {
                 Use openAPI/swagger file to add API endpoints. If you like what you see, we highly recommend using AWS or GCP traffic mirroring to get real user data for a smooth, automated and minimum false positive experience.
             </Text>
 
-            <HorizontalStack gap="2" >
+            <InlineStack gap="200">
                 {files ?
-                    <Badge size='medium' status='success'>
+                    <Badge size='medium' tone='success'>
                         {files.name}
-                        <Button icon={CancelMajor} plain onClick={() => setFiles(null)} />
+                        <Button icon={XIcon}  onClick={() => setFiles(null)} variant="plain" />
                     </Badge>
-                    : null}
-                File: <FileUpload
-                    fileType="file"
-                    acceptString=".json , .yaml, .yml"
-                    setSelectedFile={setFilesCheck}
-                    allowMultiple={false}
-                    allowedSize={5*1024*1024} />
-            </HorizontalStack>
+                    : null}File:<FileUpload
+                        fileType="file"
+                        acceptString=".json , .yaml, .yml"
+                        setSelectedFile={setFilesCheck}
+                        allowMultiple={false}
+                        allowedSize={5*1024*1024} />
+            </InlineStack>
 
-            <VerticalStack gap="2">
+            <BlockStack gap="200">
                 <ButtonGroup>
-                    <Button 
-                    onClick={uploadFile} 
-                    primary 
-                    disabled={files === null} 
-                    loading={loading}>
+                    <Button
+                        onClick={uploadFile}
+
+                        disabled={files === null}
+                        loading={loading}
+                        variant="primary">
                         Upload
                     </Button>
                     <Button onClick={goToDocs}>Go to docs</Button>
                 </ButtonGroup>
-            </VerticalStack>
+            </BlockStack>
             <Modal
                 open={showImportDetailsModal}
                 onClose={() => {closeModal()}}
@@ -200,7 +199,7 @@ function OpenApiSource() {
                 </Modal.Section>
             </Modal>
         </div>
-    )
+    );
 }
 
 export default OpenApiSource;

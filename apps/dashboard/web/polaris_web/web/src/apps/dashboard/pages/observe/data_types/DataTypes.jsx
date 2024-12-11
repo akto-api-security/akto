@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useReducer } from 'react'
-import { LegacyCard, HorizontalGrid, TextField, VerticalStack, Text, Form, HorizontalStack, Tag, Button, Box, Checkbox } from '@shopify/polaris'
+import { LegacyCard, InlineGrid, TextField, BlockStack, Text, Form, InlineStack, Tag, Button, Box, Checkbox } from '@shopify/polaris'
 import Dropdown from '../../../components/layouts/Dropdown'
 import "./DataTypes.css"
 import ConditionsPicker from '../../../components/ConditionsPicker'
@@ -11,7 +11,15 @@ import {produce} from "immer"
 import DetailsPage from '../../../components/DetailsPage'
 import InformationBannerComponent from '../../quick_start/components/shared/InformationBannerComponent'
 import TitleWithInfo from '@/apps/dashboard/components/shared/TitleWithInfo'
-import { EmailMajor, CreditCardMajor, IdentityCardFilledMajor, PhoneMajor, CalendarMajor, LocationMajor, KeyMajor } from "@shopify/polaris-icons"
+import {
+  EmailIcon,
+  CreditCardIcon,
+  IdentityCardFilledIcon,
+  PhoneIcon,
+  CalendarIcon,
+  LocationIcon,
+  KeyIcon,
+} from "@shopify/polaris-icons";
 
 const severitiesArr = func.getAktoSeverities()
 
@@ -95,7 +103,7 @@ const requestItems = [
   }
 ]
 
-const defaultIcons = [ EmailMajor, CreditCardMajor, IdentityCardFilledMajor, PhoneMajor, CalendarMajor, LocationMajor, KeyMajor]
+const defaultIcons = [ EmailIcon, CreditCardIcon, IdentityCardFilledIcon, PhoneIcon, CalendarIcon, LocationIcon, KeyIcon]
 
 function conditionStateReducer(draft, action) {
   try {
@@ -242,8 +250,8 @@ function DataTypes() {
   const descriptionCard = (
     <LegacyCard title="Details" key="desc">
       <LegacyCard.Section>
-        <VerticalStack gap={"5"}>
-          <HorizontalGrid gap="4" columns={columnsForGrid}>
+        <BlockStack gap={"500"}>
+          <InlineGrid gap="400" columns={columnsForGrid}>
             <TextField id={"name-field"} label="Name" helpText="Name the data type"
               value={currState.name} placeholder='NEW_CUSTOM_DATA_TYPE'
               {...pageTitle === "Add data type" ? {onChange: (val) => handleChange({name: val})} : {}}
@@ -261,40 +269,38 @@ function DataTypes() {
               selected={(val) => {handleChange({priority: val})}}
               label={"Select severity of data type"}
             />
-          </HorizontalGrid>
-
-          <HorizontalGrid gap={"4"} columns={['twoThirds', 'oneThird']}>
-            <VerticalStack gap={"2"}>
-                <Form onSubmit={() => handleTagsChange(tagValue, 'add')}>
-                    <TextField onChange={setTagValue} value={tagValue} label={<Text color="subdued" fontWeight="medium" variant="bodySm">Datatype Tags</Text>}/>
-                </Form>
-                <HorizontalStack gap={"2"}>
-                    {currState.categoriesList && currState.categoriesList.length > 0 && currState.categoriesList.map((tag, index) => {
-                        return(
-                            <Tag key={index} onRemove={() => handleTagsChange(tagValue, 'remove')}>
-                                <Text>{tag}</Text>
-                            </Tag>
-                        )
-                    })}
-                </HorizontalStack>
-            </VerticalStack>
+          </InlineGrid>
+          <InlineGrid gap={"400"} columns={['twoThirds', 'oneThird']}>
+            <BlockStack gap={"200"}>
+              <Form onSubmit={() => handleTagsChange(tagValue, 'add')}>
+                  <TextField onChange={setTagValue} value={tagValue} label={<Text tone="subdued" fontWeight="medium" variant="bodySm">Datatype Tags</Text>}/>
+              </Form>
+              <InlineStack gap={"200"}>
+                {currState.categoriesList && currState.categoriesList.length > 0 && currState.categoriesList.map((tag, index) => {
+                    return(
+                        <Tag key={index} onRemove={() => handleTagsChange(tagValue, 'remove')}>
+                            <Text>{tag}</Text>
+                        </Tag>
+                    )
+                })}
+              </InlineStack>
+            </BlockStack>
             {currState.dataType === 'Custom' && <Box>
               <Text variant="bodyMd">
                 Choose Icon
               </Text>
-              <HorizontalStack gap={2}>
+              <InlineStack gap={200}>
                 {displayIcons.map((icon, index) => {
-                  return(
+                  return (
                     <div className="tag-button" key={index}>
-                      <Button monochrome icon={icon} onClick={() => handleChange({iconString: icon})} pressed={(currState?.iconString === icon || currState?.iconString === icon?.displayName)} />
+                      <Button  icon={icon} onClick={() => handleChange({iconString: icon})} pressed={(currState?.iconString === icon || currState?.iconString === icon?.displayName)} />
                     </div>
-                  )
+                  );
                 })}
-                
-              </HorizontalStack>
+              </InlineStack>
             </Box>}
-          </HorizontalGrid>
-        </VerticalStack>
+          </InlineGrid>
+        </BlockStack>
         
       </LegacyCard.Section>
     </LegacyCard>
@@ -349,7 +355,7 @@ function DataTypes() {
   }
 
   const requestCard = (
-    <VerticalStack gap="5" key="sensitive">
+    <BlockStack gap="500" key="sensitive">
       <LegacyCard title={
           <TitleWithInfo 
             textProps={{variant: 'headingMd'}} 
@@ -360,17 +366,17 @@ function DataTypes() {
         <LegacyCard.Section>
           <p>Mark the location where you want the data type to be sensitive</p>
           <br/>
-          <HorizontalGrid columns="4">
+          <InlineGrid columns="4">
             <Dropdown id={"sensitive-position"} menuItems = {requestItems} initial={currState.sensitiveState} 
             selected={(val) => { handleChange({ sensitiveState: val }) }}/>
-          </HorizontalGrid >
+          </InlineGrid>
         </LegacyCard.Section>
       </LegacyCard>
-    </VerticalStack>
+    </BlockStack>
   )
 
   const redactCard = (
-    <VerticalStack gap="5" key="redact">
+    <BlockStack gap="500" key="redact">
       <LegacyCard title={
           <TitleWithInfo 
             textProps={{variant: 'headingMd'}} 
@@ -386,17 +392,17 @@ function DataTypes() {
         <LegacyCard.Section>
           <p>Redact this data type</p>
           <br/>
-          <HorizontalGrid columns="4">
+          <InlineGrid columns="4">
             <Dropdown id={"redact-position"} menuItems = {statusItems} initial={currState.redacted}
             selected={(val) => { handleChange({ redacted: val }) }}/>
-          </HorizontalGrid >
+          </InlineGrid>
         </LegacyCard.Section>
       </LegacyCard>
-    </VerticalStack>
+    </BlockStack>
   )
 
   const TestTemplateCard = (
-    <VerticalStack gap="5" key="testTemplate">
+    <BlockStack gap="500" key="testTemplate">
       <LegacyCard title={
         <TitleWithInfo
           textProps={{ variant: 'headingMd' }}
@@ -414,7 +420,7 @@ function DataTypes() {
           }} />
         </LegacyCard.Section>
       </LegacyCard>
-    </VerticalStack>
+    </BlockStack>
   )
 
   let components = (!isNew && currState.dataType === 'Akto') ? [descriptionCard, conditionsCard, requestCard, redactCard] : [descriptionCard, conditionsCard, requestCard, redactCard, TestTemplateCard]

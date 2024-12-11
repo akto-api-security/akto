@@ -1,11 +1,10 @@
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
-import { Text, Button, IndexFiltersMode, Box, Badge, Popover, ActionList, HorizontalStack, Icon} from "@shopify/polaris"
-import { HideMinor, ViewMinor,FileMinor } from '@shopify/polaris-icons';
+import { Text, Button, IndexFiltersMode, Box, Badge, Popover, ActionList, InlineStack, Icon} from "@shopify/polaris"
+import { HideIcon, ViewIcon, FileIcon, CheckCircleIcon } from "@shopify/polaris-icons";
 import api from "../api"
 import { useEffect,useState, useRef } from "react"
 import func from "@/util/func"
 import GithubSimpleTable from "@/apps/dashboard/components/tables/GithubSimpleTable";
-import { CircleTickMajor } from '@shopify/polaris-icons';
 import ObserveStore from "../observeStore"
 import PersistStore from "../../../../main/PersistStore"
 import transform from "../transform"
@@ -160,9 +159,9 @@ function convertToCollectionData(c) {
     return {
         ...c,
         detected: func.prettifyEpoch(c.startTs),
-        icon: CircleTickMajor,
+        icon: CheckCircleIcon,
         nextUrl: "/dashboard/observe/inventory/"+ c.id
-    }    
+    };    
 }
 
 const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, coverageMap, trafficInfoMap, riskScoreMap, isLoading) => {
@@ -510,7 +509,7 @@ function ApiCollections() {
         Object.keys(copyObj).forEach((key) => {
             data[key].length > 0 && data[key].forEach((c) => {
                 c['envType'] = dataMap[c.id]
-                c['envTypeComp'] = dataMap[c.id] ? <Badge size="small" status="info">{func.toSentenceCase(dataMap[c.id])}</Badge> : null
+                c['envTypeComp'] = dataMap[c.id] ? <Badge size="small" tone="info">{func.toSentenceCase(dataMap[c.id])}</Badge> : null
             })
         })
         setData(copyObj)
@@ -566,7 +565,7 @@ function ApiCollections() {
     ]
 
     const secondaryActionsComp = (
-        <HorizontalStack gap={2}>
+        <InlineStack gap={200}>
             <Popover
                 active={moreActions}
                 activator={(
@@ -580,25 +579,27 @@ function ApiCollections() {
             >
                 <Popover.Pane fixed>
                     <Popover.Section>
-                        <Button plain monochrome onClick={() =>exportCsv()} removeUnderline>
-                            <HorizontalStack gap={"2"}>
-                                <Box><Icon source={FileMinor} /></Box>
+                        <Button  onClick={() =>exportCsv()} variant="monochromePlain">
+                            <InlineStack gap={"200"}>
+                                <Box><Icon source={FileIcon} /></Box>
                                 <Text>Export as CSV</Text>
-                            </HorizontalStack>
+                            </InlineStack>
                         </Button>
                         </Popover.Section>
                     <Popover.Section>
-                        <Button plain monochrome onClick={() => setTreeView(!treeView)} removeUnderline>
-                            <HorizontalStack gap={"2"}>
-                                <Box><Icon source={treeView ? HideMinor : ViewMinor} /></Box>
+                        <Button
+                            onClick={() => setTreeView(!treeView)}
+                            variant="monochromePlain">
+                            <InlineStack gap={"200"}>
+                                <Box><Icon source={treeView ? HideIcon : ViewIcon} /></Box>
                                 <Text>{treeView ? "Hide tree view": "Display tree view"}</Text>
-                            </HorizontalStack>
+                            </InlineStack>
                         </Button>
                     </Popover.Section>
                 </Popover.Pane>
             </Popover>
             <Button id={"create-new-collection-popup"} secondaryActions onClick={showCreateNewCollectionPopup}>Create new collection</Button>
-        </HorizontalStack>
+        </InlineStack>
     )
 
 
@@ -639,7 +640,7 @@ function ApiCollections() {
 
     const components = loading ? [<SpinnerCentered key={"loading"}/>]: [<SummaryCardInfo summaryItems={summaryItems} key="summary"/>, (!hasUsageEndpoints ? <CollectionsPageBanner key="page-banner" /> : null) ,modalComponent, tableComponent]
 
-    return(
+    return (
         <PageWithMultipleCards
             title={
                 <TitleWithInfo 
@@ -648,12 +649,17 @@ function ApiCollections() {
                     docsUrl={"https://docs.akto.io/api-inventory/concepts"}
                 />
             }
-            primaryAction={<Button id={"explore-mode-query-page"} primary secondaryActions onClick={navigateToQueryPage}>Explore mode</Button>}
+            primaryAction={<Button
+                id={"explore-mode-query-page"}
+
+                secondaryActions
+                onClick={navigateToQueryPage}
+                variant="primary">Explore mode</Button>}
             isFirstPage={true}
             components={components}
             secondaryActions={secondaryActionsComp}
         />
-    )
+    );
 }
 
 export default ApiCollections 

@@ -1,4 +1,4 @@
-import { LegacyCard, HorizontalGrid, TextField } from "@shopify/polaris";
+import { LegacyCard, InlineGrid, TextField } from "@shopify/polaris";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useState, useEffect, useReducer } from "react";
 import ConditionsPicker from "../../../components/ConditionsPicker";
@@ -88,7 +88,7 @@ function TagDetails() {
     const descriptionCard = (
         <LegacyCard title="Details" key="desc">
             <LegacyCard.Section>
-                <HorizontalGrid gap="4" columns={2}>
+                <InlineGrid gap="400" columns={2}>
                     <TextField
                         id={"name-field"} 
                         label="Name" value={currState.name}
@@ -101,7 +101,7 @@ function TagDetails() {
                         <Dropdown menuItems={activeItems} placeHolder={"Tag active status"}
                             selected={(val) => { handleChange({ active: val }) }} 
                             initial={currState.active} label="Active" />}
-                </HorizontalGrid>
+                </InlineGrid>
             </LegacyCard.Section>
         </LegacyCard>
     )

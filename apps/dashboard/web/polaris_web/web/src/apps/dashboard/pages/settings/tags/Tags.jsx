@@ -5,10 +5,7 @@ import { Button } from "@shopify/polaris";
 import GithubSimpleTable from "../../../components/tables/GithubSimpleTable";
 import func from "@/util/func";
 import tagsApi from "./api";
-import {
-    ProfileMinor,
-    CalendarMinor
-  } from '@shopify/polaris-icons';
+import { ProfileIcon, CalendarIcon } from "@shopify/polaris-icons";
 import EmptyScreensLayout from "../../../components/banners/EmptyScreensLayout";
 import { TAGS_PAGE_DOCS_URL } from "../../../../main/onboardingData";
 
@@ -24,13 +21,13 @@ function Tags(){
             text: "Last updated",
             value: "updatedTimestamp",
             itemOrder: 3,
-            icon:CalendarMinor
+            icon:CalendarIcon
         },
         {
             text: "Created by",
             value: "createdBy",
             itemOrder: 3,
-            icon:ProfileMinor
+            icon:ProfileIcon
         }
     ]
 
@@ -79,7 +76,7 @@ function Tags(){
     return (
         <PageWithMultipleCards
         title={"Tags"}
-        primaryAction={<Button primary onClick={handleRedirect}>Create new tags</Button>}
+        primaryAction={<Button  onClick={handleRedirect} variant="primary">Create new tags</Button>}
         isFirstPage={true}
         components={[
 
@@ -106,7 +103,7 @@ function Tags(){
             />
         ]}
     />
-    )
+    );
 }
 
 export default Tags

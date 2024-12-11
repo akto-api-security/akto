@@ -4,9 +4,9 @@ import { useReducer, useState } from "react";
 import api from "../api"
 import Store from "../../../store";
 import func from "@/util/func";
-import { MarkFulfilledMinor, ReportMinor, ExternalMinor } from '@shopify/polaris-icons';
+import { OrderFulfilledIcon, SearchResourceIcon, ExternalIcon } from "@shopify/polaris-icons";
 import PersistStore from "../../../../main/PersistStore";
-import { Button, HorizontalGrid, HorizontalStack, IndexFiltersMode } from "@shopify/polaris";
+import { Button, InlineGrid, InlineStack, IndexFiltersMode } from "@shopify/polaris";
 import EmptyScreensLayout from "../../../components/banners/EmptyScreensLayout";
 import { ISSUES_PAGE_DOCS_URL } from "../../../../main/onboardingData";
 import {SelectCollectionComponent} from "../../testing/TestRunsPage/TestrunsBannerComponent"
@@ -295,17 +295,17 @@ function IssuesPage() {
     const infoItems = [
         {
             title: "Triage",
-            icon: MarkFulfilledMinor,
+            icon: OrderFulfilledIcon,
             description: "Prioritize, assign them to team members and manage API issues effectively.",
         },
         {
             title: "Download vulnerability report",
-            icon: ReportMinor,
+            icon: SearchResourceIcon,
             description: "Export and share detailed report of vulnerabilities in your APIs.",
         },
         {
             title: "Send them to GitHub",
-            icon: ExternalMinor,
+            icon: ExternalIcon,
             description: "Integrate Akto with GitHub to send all issues to your developers on GitHub."
         }
     ]
@@ -408,10 +408,10 @@ function IssuesPage() {
                 endTimestamp={endTimestamp}
             />
 
-            <HorizontalGrid gap={5} columns={2} key={"critical-issues-graph-detail"}>
+            <InlineGrid gap={500} columns={2} key={"critical-issues-graph-detail"}>
                 <CriticalUnsecuredAPIsOverTimeGraph linkText={""} linkUrl={""} />
                 <CriticalFindingsGraph linkText={""} linkUrl={""} />
-            </HorizontalGrid>
+            </InlineGrid>
 
             <GithubServerTable
                 key={key}
@@ -441,41 +441,43 @@ function IssuesPage() {
         </>
     )
     
-    return (
-        <>
-        <PageWithMultipleCards
-            title={
-                <HorizontalStack gap={4}>
-                    <TitleWithInfo
-                        titleText={"Issues"}
-                        tooltipContent={"Issues are created when a test from test library has passed validation and thus a potential vulnerability is found."}
-                    />
-                </HorizontalStack>
-            }
-            isFirstPage={true}
-            components = {loading ? [<SpinnerCentered />] : [
-                showEmptyScreen ? 
-                <EmptyScreensLayout key={"emptyScreen"}
-                    iconSrc={"/public/alert_hexagon.svg"}
-                    headingText={"No issues yet!"}
-                    description={"There are currently no issues with your APIs. Haven't run your tests yet? Start testing now to prevent any potential issues."}
-                    buttonText={"Run test"}
-                    infoItems={infoItems}
-                    infoTitle={"Once you have issues:"}
-                    learnText={"issues"}
-                    docsUrl={ISSUES_PAGE_DOCS_URL}
-                    bodyComponent={<SelectCollectionComponent />}
+    return <>
+    <PageWithMultipleCards
+        title={
+            <InlineStack gap={400}>
+                <TitleWithInfo
+                    titleText={"Issues"}
+                    tooltipContent={"Issues are created when a test from test library has passed validation and thus a potential vulnerability is found."}
                 />
+            </InlineStack>
+        }
+        isFirstPage={true}
+        components = {loading ? [<SpinnerCentered />] : [
+            showEmptyScreen ? 
+            <EmptyScreensLayout key={"emptyScreen"}
+                iconSrc={"/public/alert_hexagon.svg"}
+                headingText={"No issues yet!"}
+                description={"There are currently no issues with your APIs. Haven't run your tests yet? Start testing now to prevent any potential issues."}
+                buttonText={"Run test"}
+                infoItems={infoItems}
+                infoTitle={"Once you have issues:"}
+                learnText={"issues"}
+                docsUrl={ISSUES_PAGE_DOCS_URL}
+                bodyComponent={<SelectCollectionComponent />}
+            />
 
-            
-            : components
-            ]}
-            primaryAction={<Button primary onClick={() => openVulnerabilityReport()} disabled={showEmptyScreen}>Export results</Button>}
-            secondaryActions={<DateRangeFilter initialDispatch={currDateRange} dispatch={(dateObj) => dispatchCurrDateRange({ type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias })} />}
-        />
-            {(resultId !== null && resultId.length > 0) ? <TestRunResultPage /> : null}
-        </>
-    )
+        
+        : components
+        ]}
+        primaryAction={<Button
+
+            onClick={() => openVulnerabilityReport()}
+            disabled={showEmptyScreen}
+            variant="primary">Export results</Button>}
+        secondaryActions={<DateRangeFilter initialDispatch={currDateRange} dispatch={(dateObj) => dispatchCurrDateRange({ type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias })} />}
+    />
+        {(resultId !== null && resultId.length > 0) ? <TestRunResultPage /> : null}
+    </>;
 }
 
 export default IssuesPage

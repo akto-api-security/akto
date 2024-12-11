@@ -41,7 +41,7 @@ const CriticalFindingsGraph = ({ linkText, linkUrl }) => {
         },
     }
 
-    const runTestEmptyCardComponent = <Text alignment='center' color='subdued'>There’s no data to show. <Link url="/dashboard/testing" target='_blank'>Run test</Link> to get data populated. </Text>
+    const runTestEmptyCardComponent = <Text alignment='center' tone='subdued'>There’s no data to show. <Link url="/dashboard/testing" target='_blank'>Run test</Link> to get data populated. </Text>
 
     const criticalFindings = (criticalFindingsData && criticalFindingsData.length > 0) ?
     <InfoCard
@@ -62,7 +62,7 @@ const CriticalFindingsGraph = ({ linkText, linkUrl }) => {
         titleToolTip="Overview of the most critical security issues detected, including the number of issues and APIs affected for each type of vulnerability."
         linkText={linkText}
         linkUrl={linkUrl}
-    /> : <EmptyCard title="Vulnerabilities findings" subTitleComponent={showTestingComponents ? <Text alignment='center' color='subdued'>No Vulnerabilities found</Text>: runTestEmptyCardComponent} />
+    /> : <EmptyCard title="Vulnerabilities findings" subTitleComponent={showTestingComponents ? <Text alignment='center' tone='subdued'>No Vulnerabilities found</Text>: runTestEmptyCardComponent} />
 
     return (
         {...criticalFindings}

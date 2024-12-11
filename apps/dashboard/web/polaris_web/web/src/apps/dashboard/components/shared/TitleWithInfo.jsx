@@ -1,4 +1,4 @@
-import { Avatar, Box, HorizontalStack, Link, Popover, Text, Tooltip } from '@shopify/polaris'
+import { Avatar, Box, InlineStack, Link, Popover, Text, Tooltip } from '@shopify/polaris'
 import React, { useState } from 'react'
 
 function TitleWithInfo({titleComp, textProps, titleText, tooltipContent, docsUrl}) {
@@ -13,7 +13,7 @@ function TitleWithInfo({titleComp, textProps, titleText, tooltipContent, docsUrl
     const [active, setActive] = useState(false)
     const [contentActive,setContentActive] = useState(false)
     return (
-        <HorizontalStack gap={"1"}>
+        <InlineStack gap={"100"}>
             {titleComp ? titleComp : <Text variant="headingLg" {...textProps}>{titleText}</Text>}
             {docsUrl ?<Popover 
                 active={active || contentActive}
@@ -27,7 +27,7 @@ function TitleWithInfo({titleComp, textProps, titleText, tooltipContent, docsUrl
                         },100)}
                     > 
                         <div className='reduce-size'>
-                            <Avatar shape="round" size="extraSmall" source='/public/info_filled_icon.svg'/>
+                            <Avatar shape="round" size="xs" source='/public/info_filled_icon.svg'/>
                         </div> 
                     </div>
                 }
@@ -43,11 +43,11 @@ function TitleWithInfo({titleComp, textProps, titleText, tooltipContent, docsUrl
                     </div>
                 </div>
             </Popover> : tooltipContent ? <Tooltip content={tooltipContent} dismissOnMouseOut><div className='reduce-size'>
-                            <Avatar shape="round" size="extraSmall" source='/public/info_filled_icon.svg'/>
+                            <Avatar shape="round" size="xs" source='/public/info_filled_icon.svg'/>
                         </div> </Tooltip> : null
             }
-        </HorizontalStack>
-    )
+        </InlineStack>
+    );
 }
 
 export default TitleWithInfo

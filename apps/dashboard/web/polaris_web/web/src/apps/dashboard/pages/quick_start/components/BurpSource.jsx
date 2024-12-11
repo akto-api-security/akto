@@ -1,4 +1,4 @@
-import { Box, Button, ButtonGroup, HorizontalStack, Link, Text, VerticalStack } from '@shopify/polaris'
+import { Box, Button, ButtonGroup, InlineStack, Link, Text, BlockStack } from '@shopify/polaris'
 import React, { useEffect, useState, useRef } from 'react'
 import {useNavigate} from "react-router-dom"
 import api from '../api'
@@ -77,33 +77,33 @@ function BurpSource() {
         {
             text: "Copy the AKTO_IP and AKTO_TOKEN and paste in the options tab.",
             component: (
-                <Box paddingInlineStart={2}>
-                    <VerticalStack gap={1}>
+                <Box paddingInlineStart={200}>
+                    <BlockStack gap={100}>
                         <div ref={ref}/>
-                        <HorizontalStack gap={1}>
-                            <Text variant="bodyMd" fontWeight="medium" color="subdued">AKTO_IP:</Text>
-                            <Button onClick={() => copyText(aktoIp, "AKTO_IP")} plain>
+                        <InlineStack gap={100}>
+                            <Text variant="bodyMd" fontWeight="medium" tone="subdued">AKTO_IP:</Text>
+                            <Button onClick={() => copyText(aktoIp, "AKTO_IP")}  variant="plain">
                                 <div style={{maxWidth: "260px"}} className='overflow-text'>{aktoIp}</div>
                             </Button>
-                        </HorizontalStack>
-                        <HorizontalStack gap={1}>
-                            <Text variant="bodyMd" fontWeight="medium" color="subdued">AKTO_TOKEN:</Text>
-                            <Button onClick={() => copyText(aktoToken, "AKTO_TOKEN")} plain>
+                        </InlineStack>
+                        <InlineStack gap={100}>
+                            <Text variant="bodyMd" fontWeight="medium" tone="subdued">AKTO_TOKEN:</Text>
+                            <Button onClick={() => copyText(aktoToken, "AKTO_TOKEN")}  variant="plain">
                                 <div style={{maxWidth: "210px"}} className='overflow-text'>{aktoToken}</div>
                             </Button>
-                        </HorizontalStack>
-                    </VerticalStack>
+                        </InlineStack>
+                    </BlockStack>
                 </Box>
             )
         },
         {
             text: "Start Burp proxy and browse any website.",
             component: (
-                <HorizontalStack gap={1}>
+                <InlineStack gap={100}>
                     <Text variant="bodyMd">You will see traffic in</Text>
-                    {burpCollectionURL.length > 0 ? <Button plain onClick={()=> navigate(burpCollectionURL)}>Burp</Button> : <Text>Burp</Text>}
+                    {burpCollectionURL.length > 0 ? <Button  onClick={()=> navigate(burpCollectionURL)} variant="plain">Burp</Button> : <Text>Burp</Text>}
                     <Text>collection.</Text>
-                </HorizontalStack>
+                </InlineStack>
             )
         }
     ]
@@ -122,10 +122,10 @@ function BurpSource() {
     },[])
 
     const content = (
-        <HorizontalStack gap={1}>
+        <InlineStack gap={100}>
             <Text variant="bodyMd">Akto Burp plugin will work post</Text>
             <Link target="_blank" url='https://portswigger.net/burp/releases/professional-community-2024-1-1-1'>v2024.1.1.1</Link>
-        </HorizontalStack>
+        </InlineStack>
     )
 
     return (
@@ -136,30 +136,30 @@ function BurpSource() {
 
             <InformationBannerComponent content={content} docsUrl={""}/>
 
-            <VerticalStack gap="1">
+            <BlockStack gap="100">
                 {steps.map((element,index) => (
-                    <VerticalStack gap="1" key={index}>
-                        <HorizontalStack gap="1" wrap={false} key={element.text}>
+                    <BlockStack gap="1" key={index}>
+                        <InlineStack gap="1" wrap={false} key={element.text}>
                             {element?.text ?<Text>{index + 1}.</Text> : null}
                             {element?.text ?<Text variant="bodyMd">{element?.text}</Text> : null}
                             {element?.textComponent}
-                        </HorizontalStack>
-                        <Box paddingInlineStart={2}>
+                        </InlineStack>
+                        <Box paddingInlineStart={200}>
                             {element?.component}
                         </Box>
-                    </VerticalStack>
+                    </BlockStack>
                 ))}
-            </VerticalStack>
+            </BlockStack>
 
-            <VerticalStack gap="2">
+            <BlockStack gap="200">
                 <ButtonGroup>
-                    <Button onClick={primaryAction} primary>Check Connection</Button>
+                    <Button onClick={primaryAction}  variant="primary">Check Connection</Button>
                     <Button onClick={goToDocs}>Go to docs</Button>
                 </ButtonGroup>
-            </VerticalStack>
+            </BlockStack>
 
         </div>
-    )
+    );
 }
 
 export default BurpSource

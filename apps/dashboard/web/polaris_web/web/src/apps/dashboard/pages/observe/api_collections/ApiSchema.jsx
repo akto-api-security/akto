@@ -1,6 +1,6 @@
-import { VerticalStack, Box, Button, ButtonGroup, HorizontalStack, Icon, Text, Collapsible, Scrollable, DataTable, Badge } from "@shopify/polaris"
+import { BlockStack, Box, Button, ButtonGroup, InlineStack, Icon, Text, Collapsible, Scrollable, DataTable, Badge } from "@shopify/polaris"
 import { useCallback, useEffect, useState } from "react";
-import { ChevronDownMinor, ChevronUpMinor } from "@shopify/polaris-icons"
+import { ChevronDownIcon, ChevronUpIcon } from "@shopify/polaris-icons";
 import func from "@/util/func"
 import transform from "../transform";
 import { useNavigate } from "react-router-dom";
@@ -19,25 +19,33 @@ function prepareTableData (data, handleBadgeClick) {
         let paramText = element.param.replaceAll("#", ".").replaceAll(".$", "")
         let isSensitive = func.isSubTypeSensitive(element)
         let nonSensitiveDataType = element?.nonSensitiveDataType
-        let comp = [(<HorizontalStack gap={"2"} key={index}>
+        let comp = [(<InlineStack gap={"200"} key={index}>
             <Text fontWeight="regular" variant="bodyMd">
                 {paramText}
             </Text>
             {
                 isSensitive ?
-                    <Button plain monochrome onClick={() => {handleBadgeClick(element.subType.name, "")}}>
-                        <Badge status="warning">
+                    <Button
+
+
+                        onClick={() => {handleBadgeClick(element.subType.name, "")}}
+                        variant="monochromePlain">
+                        <Badge tone="warning">
                             {element.subType.name}
                         </Badge>
                     </Button> : (nonSensitiveDataType ?
-                        <Button plain monochrome onClick={() => { handleBadgeClick(element.subType.name, "") }}>
-                            <Badge status="info">
+                        <Button
+
+
+                            onClick={() => { handleBadgeClick(element.subType.name, "") }}
+                            variant="monochromePlain">
+                            <Badge tone="info">
                                 {element.subType.name}
                             </Badge>
                         </Button> : null)
 
             }
-            </HorizontalStack>), <Text variant="bodySm" fontWeight="regular" color="subdued">{func.prepareValuesTooltip(element)}</Text>
+        </InlineStack>), <Text variant="bodySm" fontWeight="regular" tone="subdued">{func.prepareValuesTooltip(element)}</Text>
         ]
         if(element.isHeader){
             if(isSensitive){
@@ -90,16 +98,16 @@ function ApiSingleSchema(props) {
     const activeTab = badgeActive ? (dataObj.tabSensitive === "Header") : isHeader
 
     return (
-        <VerticalStack gap={"2"}>
-            <Box background={"bg-subdued"} width="100%" padding={"2"} onClick={handleToggle}>
-                <HorizontalStack align="space-between">
+        <BlockStack gap={"200"}>
+            <Box background={"bg-subdued"} width="100%" padding={"200"} onClick={handleToggle}>
+                <InlineStack align="space-between">
                     <Text variant="headingSm">
                         {title}
                     </Text>
                     <Box>
-                        <Icon source={open ? ChevronDownMinor : ChevronUpMinor} />
+                        <Icon source={open ? ChevronDownIcon : ChevronUpIcon} />
                     </Box>
-                </HorizontalStack>
+                </InlineStack>
             </Box>
             <Collapsible
                 open={open}
@@ -107,26 +115,26 @@ function ApiSingleSchema(props) {
                 transition={{ duration: '200ms', timingFunction: 'ease-in-out' }}
                 expandOnPrint
             >
-                <VerticalStack gap={"2"}>
-                    <ButtonGroup segmented>
-                        <Button primarySuccess={activeTab} onClick={() => {setBadgeActive(false); setIsHeader(true)}} size="slim">
-                            <Box paddingBlockStart="05" paddingBlockEnd="05"> 
-                                <HorizontalStack gap="2">
+                <BlockStack gap={"200"}>
+                    <ButtonGroup variant="segmented">
+                        <Button {...(activeTab? {variant:"primary", tone:"success" } : {})} onClick={() => {setBadgeActive(false); setIsHeader(true)}} size="slim">
+                            <Box paddingBlockStart="050" paddingBlockEnd="050"> 
+                                <InlineStack gap="200">
                                     <Text variant="bodyMd">Header</Text>
                                     <span style={{padding: '4px 8px', width: 'fit-content', color: '#202223', background:(isHeader ? "#ECEBFF" : "#E4E5E7"), borderRadius: '4px'}}>
                                         {headerCount}
                                     </span>
-                                </HorizontalStack>
+                                </InlineStack>
                             </Box>
                         </Button>
-                        <Button primarySuccess={!activeTab} onClick={() => {setBadgeActive(false); setIsHeader(false)}} size="slim">
-                            <Box paddingBlockStart="05" paddingBlockEnd="05"> 
-                                <HorizontalStack gap="2">
+                        <Button {...(!activeTab? {variant:"primary", tone:"success" } : {})} onClick={() => {setBadgeActive(false); setIsHeader(false)}} size="slim">
+                            <Box paddingBlockStart="050" paddingBlockEnd="050"> 
+                                <InlineStack gap="200">
                                     <Text variant="bodyMd">Payload</Text>
                                     <span style={{padding: '4px 8px', width: 'fit-content', color: '#202223', background:(!isHeader ? "#ECEBFF" : "#E4E5E7"), borderRadius: '4px'}}>
                                         {payloadCount}
                                     </span>
-                                </HorizontalStack>
+                                </InlineStack>
                             </Box>
                         </Button>
                     </ButtonGroup>
@@ -143,10 +151,10 @@ function ApiSingleSchema(props) {
                         >
                         </DataTable>
                     </Scrollable>
-                </VerticalStack>
+                </BlockStack>
             </Collapsible>
-        </VerticalStack>
-    )
+        </BlockStack>
+    );
 }
 
 function ApiSchema(props) {
@@ -163,15 +171,14 @@ function ApiSchema(props) {
     }
 
     return (
-        <VerticalStack gap="2">
+        <BlockStack gap="200">
             {
                 ['Request', 'Response'].map((type, index) => {
                     return <ApiSingleSchema handleBadgeClick={handleBadgeClick} title={type} key={type} data={index == 0 ? reqData : resData} badgeActive={badgeActive} setBadgeActive={setBadgeActive}/>
                 })
             }
-
-        </VerticalStack>
-    )
+        </BlockStack>
+    );
 
 }
 

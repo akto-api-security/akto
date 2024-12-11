@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 
-import { Button, HorizontalGrid, HorizontalStack, TextField, VerticalStack } from '@shopify/polaris';
-import {DeleteMinor} from "@shopify/polaris-icons"
+import { Button, InlineGrid, InlineStack, TextField, BlockStack } from '@shopify/polaris';
+import {DeleteIcon} from "@shopify/polaris-icons"
 import Dropdown from '../../../../components/layouts/Dropdown';
 
 function AdvancedSettingsComponent({dispatchConditions, conditions, hideButton}) {
@@ -42,15 +42,15 @@ function AdvancedSettingsComponent({dispatchConditions, conditions, hideButton})
     }
 
     return (
-        <VerticalStack gap={"3"}>
+        <BlockStack gap={"3"}>
             {hideButton ? null : <Button fullWidth={false} plain removeUnderline onClick={() => setShowAdvancedSettings(!showAdvancedSettings)}>Advanced configurations</Button>}
             {showAdvancedSettings ?
-                <VerticalStack gap={"2"}>
+                <BlockStack gap={"200"}>
                     {conditions.map((condition, index) => {
                         return(
-                            <HorizontalStack gap={"1"} key={index} wrap={false}>
+                            <InlineStack gap={"100"} key={index} wrap={false}>
                                 <div style={{flex: 1}}>
-                                    <HorizontalStack gap={"2"} wrap={false}>
+                                    <InlineStack gap={"200"} wrap={false}>
                                         <Button plain removeUnderline size="medium">AND</Button>
                                         <Dropdown
                                             id={`operator-type-${index}`}
@@ -58,10 +58,10 @@ function AdvancedSettingsComponent({dispatchConditions, conditions, hideButton})
                                             initial={() => getLabel(condition?.operator?.type)} 
                                             selected={(type) => handleTypeSelected(type,index)} 
                                         />
-                                    </HorizontalStack>
+                                    </InlineStack>
                                 </div>
                                 <div style={{flex: 3}}>
-                                    <HorizontalGrid columns={2} gap={"2"}>
+                                    <InlineGrid columns={2} gap={"200"}>
                                         <TextField
                                             id={`keyname-${index}`}
                                             placeholder={"Enter key name"}
@@ -75,18 +75,18 @@ function AdvancedSettingsComponent({dispatchConditions, conditions, hideButton})
                                             onChange={(newValue) => handleValueChange(index,newValue)}
                                             disabled={condition?.operator?.type.toLowerCase().includes("delete")}
                                         />
-                                    </HorizontalGrid>
+                                    </InlineGrid>
                                 </div>
-                                <Button icon={DeleteMinor} onClick={() => handleDelete(index)} />
-                            </HorizontalStack>
+                                <Button icon={DeleteIcon} onClick={() => handleDelete(index)} />
+                            </InlineStack>
                         )
                     })}
-                    <HorizontalStack align="space-between">
+                    <InlineStack align="space-between">
                         <Button onClick={handleAddField}>Add condition</Button>
-                    </HorizontalStack>
-                </VerticalStack> : null
+                    </InlineStack>
+                </BlockStack> : null
             }
-        </VerticalStack>
+        </BlockStack>
     )
 }
 

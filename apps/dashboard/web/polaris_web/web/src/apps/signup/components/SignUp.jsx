@@ -1,4 +1,4 @@
-import { Button, Form,  HorizontalStack, Modal, Text, TextField, VerticalStack } from '@shopify/polaris'
+import { Button, Form,  InlineStack, Modal, Text, TextField, BlockStack } from '@shopify/polaris'
 import React, { useEffect, useState } from 'react'
 import SSOTextfield from './SSOTextfield'
 import PasswordTextField from '../../dashboard/components/layouts/PasswordTextField'
@@ -81,22 +81,22 @@ function SignUp() {
 
   const ssoCard = (
     ssoList.length === 0 ? null :
-      <VerticalStack gap={5}>
+      <BlockStack gap={500}>
         {
           ssoList.map((sso, index) => {
             return (
-              <VerticalStack gap={5} key={index}>
+              <BlockStack gap={500} key={index}>
                 <SSOTextfield onClickFunc={sso.onClickFunc} logos={[sso.logo]} text={sso.text} />
-                <HorizontalStack gap={3}>
+                <InlineStack gap={300}>
                   <div style={{ flexGrow: 1, borderBottom: '1px solid #c9cccf' }}></div>
-                  <Text variant="bodySm" color="subdued">or</Text>
+                  <Text variant="bodySm" tone="subdued">or</Text>
                   <div style={{ flexGrow: 1, borderBottom: '1px solid #c9cccf' }}></div>
-                </HorizontalStack>
-              </VerticalStack>
-            )
+                </InlineStack>
+              </BlockStack>
+            );
           })
         }
-      </VerticalStack>
+      </BlockStack>
   )
 
   const loginFunc = async() => {
@@ -163,10 +163,13 @@ function SignUp() {
 
   const forgotPasswordComp = (
     <Modal
-      small
+      size="small"
       activator={
         <div style={{textAlign: 'end'}}>
-          <Button plain onClick={() => setForgotPasswordStateHelper("isForgotPasswordActive", true)}>Forgot Password?</Button>
+          <Button
+
+            onClick={() => setForgotPasswordStateHelper("isForgotPasswordActive", true)}
+            variant="plain">Forgot Password?</Button>
         </div>
       }
       open={forgotPasswordState.isForgotPasswordActive}
@@ -193,7 +196,7 @@ function SignUp() {
               onChange={(email) => setEmail(email)}
               autoComplete="off"
           />
-          <Text variant="bodyMd" color="subdued">We'll use this email to send a password reset link.</Text>
+          <Text variant="bodyMd" tone="subdued">We'll use this email to send a password reset link.</Text>
       </Modal.Section>
     </Modal>
   )
@@ -216,7 +219,7 @@ function SignUp() {
 
   const resetPasswordComp = (
     <Modal
-      small
+      size="small"
       open={forgotPasswordState.passwordResetActive}
       onClose={() => setForgotPasswordStateHelper("passwordResetActive", false)}
       title="Reset Password"
@@ -255,9 +258,9 @@ function SignUp() {
   const isOnPrem = websiteHostName && !notOnPremHostnames.includes(window.location.hostname)
 
   const signupEmailCard = (
-    <VerticalStack gap={4}>
+    <BlockStack gap={400}>
       <Form onSubmit={loginFunc}>
-        <VerticalStack gap={4}>
+        <BlockStack gap={400}>
           <div className='form-class'>
             <TextField onChange={setEmail} inputMode='email' value={forgotPasswordState.isForgotPasswordActive ? "" : email} label="Email" placeholder="name@workemail.com" monospaced={true}/>
           </div>
@@ -265,26 +268,35 @@ function SignUp() {
             <PasswordTextField setField={(val) => setPassword(val)} onFunc={true} field={password} label="Password" monospaced={true}/>
             {loginActive && isOnPrem && forgotPasswordComp}
           </div>
-          <Button fullWidth primary onClick={loginFunc} size="large" loading={loading}><div data-testid="signin_signup_button">{activeObject.buttonText}</div></Button>
-        </VerticalStack>
+          <Button
+            fullWidth
+
+            onClick={loginFunc}
+            size="large"
+            loading={loading}
+            variant="primary"><div data-testid="signin_signup_button">{activeObject.buttonText}</div></Button>
+        </BlockStack>
       </Form>
-      <HorizontalStack align="center" gap={1}>
+      <InlineStack align="center" gap={100}>
         <Text>{activeObject.descriptionText}</Text>
-        <Button plain onClick={() => {setLoginActive(!loginActive); navigate(activeObject.targetUrl)}}>{activeObject.linkText}</Button>
-      </HorizontalStack>
-    </VerticalStack>
+        <Button
+
+          onClick={() => {setLoginActive(!loginActive); navigate(activeObject.targetUrl)}}
+          variant="plain">{activeObject.linkText}</Button>
+      </InlineStack>
+    </BlockStack>
   )
 
   const customComponent = (
-    <VerticalStack gap={8}>
+    <BlockStack gap={800}>
       <Text alignment="center" variant="heading2xl">{activeObject.headingText}</Text>
-      <VerticalStack gap={5}>
+      <BlockStack gap={500}>
         {ssoCard}
         {!func.checkLocal() ? <SSOTextfield onClickFunc={() => window.location.href="/sso-login"} logos={['/public/azure_logo.svg', '/public/gcp.svg']} text={"Sign in with SSO"} /> : null}
         {signupEmailCard}
         {loginActive && isOnPrem && resetPasswordComp}
-      </VerticalStack>
-    </VerticalStack>
+      </BlockStack>
+    </BlockStack>
   )
 
   return (

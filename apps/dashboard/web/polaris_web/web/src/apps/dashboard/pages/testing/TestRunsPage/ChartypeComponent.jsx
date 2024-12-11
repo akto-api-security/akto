@@ -1,4 +1,4 @@
-import {Box, DataTable,HorizontalStack, Scrollable, Text, VerticalStack } from '@shopify/polaris'
+import {Box, DataTable,InlineStack, Scrollable, Text, BlockStack } from '@shopify/polaris'
 import React from 'react'
 import DonutChart from '../../../components/shared/DonutChart'
 import ConcentricCirclesChart from '../../../components/shared/ConcentricCirclesChart'
@@ -19,12 +19,12 @@ function ChartypeComponent({data, title,charTitle, chartSubtitle, reverse, isNor
                         </div>
                     </Box>
                 ),
-                <HorizontalStack gap={1} wrap={false}>
+                <InlineStack gap={100} wrap={false}>
                     <Box width='30px'>
                         <Text>{observeFunc.formatNumberWithCommas(data[key]?.text)}</Text>
                     </Box>
                     {data[key].dataTableComponent ? data[key].dataTableComponent : null}
-                </HorizontalStack>
+                </InlineStack>
             ]
             tableRows.push(comp)
         })
@@ -41,10 +41,10 @@ function ChartypeComponent({data, title,charTitle, chartSubtitle, reverse, isNor
     )
 
     return (
-        <Box padding={boxPadding != undefined ? boxPadding : 4}>
-            <HorizontalStack gap={8} align={spaceBetween || ''}>
+        <Box padding={boxPadding != undefined ? boxPadding : 400}>
+            <InlineStack gap={800} align={spaceBetween || ''}>
                 {chartOnLeft ? chartComponent: null}
-                <VerticalStack gap="2">
+                <BlockStack gap="200">
                     <Text fontWeight="semibold" variant="bodySm">{title}</Text>
                     <Scrollable style={{maxHeight: boxHeight}} focusable shadow>
                         <Box width={dataTableWidth ? dataTableWidth : '260px'}>
@@ -59,11 +59,11 @@ function ChartypeComponent({data, title,charTitle, chartSubtitle, reverse, isNor
                             />
                         </Box>
                     </Scrollable>
-                </VerticalStack>
+                </BlockStack>
                 {!chartOnLeft ? chartComponent: null}
-            </HorizontalStack>
+            </InlineStack>
         </Box>
-    )
+    );
 }
 
 export default ChartypeComponent

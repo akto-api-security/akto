@@ -1,4 +1,4 @@
-import { HorizontalGrid, VerticalStack } from '@shopify/polaris';
+import { InlineGrid, BlockStack } from '@shopify/polaris';
 import React from 'react'
 
 function GridRows(props) {
@@ -11,9 +11,12 @@ function GridRows(props) {
 
     return (
         <div style={{width: widthChanged }}>
-            <VerticalStack gap="5">
+            <BlockStack gap="500">
                 {Array.from({length: rows}).map((_,index)=>(
-                    <HorizontalGrid columns={{xs: 1, sm: Math.max(usedColumns - 2,1) , md: usedColumns - 1 , lg:usedColumns, xl: usedColumns}} gap="5" key={(index + 1) * 1000}>
+                    <InlineGrid
+                        columns={{xs: 1, sm: Math.max(usedColumns - 2,1) , md: usedColumns - 1 , lg:usedColumns, xl: usedColumns}}
+                        gap="500"
+                        key={(index + 1) * 1000}>
                         {Array.from({ length: usedColumns }).map((_, col) => {
                             const itemIndex = index * usedColumns + col;
                             const item = items[itemIndex];
@@ -21,11 +24,11 @@ function GridRows(props) {
                                 return <CardComponent cardObj={item} buttonText={buttonText} key={itemIndex} onButtonClick={onButtonClick}/>;
                             }
                         })}
-                    </HorizontalGrid>
+                    </InlineGrid>
                 ))}
-            </VerticalStack>
+            </BlockStack>
         </div>
-    )
+    );
 }
 
 export default GridRows

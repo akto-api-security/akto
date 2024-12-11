@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react"
 import api from "../api"
 import { Button, ButtonGroup, Card, LegacyCard, Page, Text } from "@shopify/polaris"
-import {  MobileBackArrowMajor } from "@shopify/polaris-icons"
+import { ArrowLeftIcon } from "@shopify/polaris-icons";
 import GithubSimpleTable from "../../../components/tables/GithubSimpleTable"
 import func from "../../../../../util/func"
 import WorkflowTestBuilder from "../../testing/workflow_test/WorkflowTestBuilder"
@@ -112,11 +112,14 @@ function WorkflowTests({ apiCollectionId, endpointsList }) {
             <LegacyCard.Header 
             title={
                 <ButtonGroup>
-                    <Button icon={MobileBackArrowMajor} plain onClick={() => {
-                            setShowWorkflowbuilder(false)
-                            setWorkflowTest(null)
-                        }}
-                    />
+                    <Button
+                        icon={ArrowLeftIcon}
+
+                        onClick={() => {
+                                setShowWorkflowbuilder(false)
+                                setWorkflowTest(null)
+                            }}
+                        variant="plain" />
                     <Text variant="headingMd">
                         { workflowTest ? workflowTest.id : "Create workflow" }
                     </Text>

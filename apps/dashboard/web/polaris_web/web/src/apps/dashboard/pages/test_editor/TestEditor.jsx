@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
 
-import { Box, Button, Frame, HorizontalGrid, HorizontalStack, TopBar } from "@shopify/polaris"
-import { ExitMajor } from "@shopify/polaris-icons"
+import { Box, Button, Frame, InlineGrid, InlineStack, TopBar } from "@shopify/polaris"
+import { ExitIcon } from "@shopify/polaris-icons";
 
 import TestEditorFileExplorer from "./components/TestEditorFileExplorer"
 import YamlEditor from "./components/YamlEditor"
@@ -118,12 +118,12 @@ const TestEditor = () => {
 
     const headerComp = (
         <div className="header-css">
-            <HorizontalStack gap="5">
-                <Button onClick={handleExit} icon={ExitMajor} plain/>
-                <HorizontalStack gap={"2"}>
+            <InlineStack gap="500">
+                <Button onClick={handleExit} icon={ExitIcon}  variant="plain" />
+                <InlineStack gap={"200"}>
                     <TitleWithInfo docsUrl={"https://docs.akto.io/test-editor/concepts"} tooltipContent={"Test editor playground"} titleText={"Test Editor"} />
-                </HorizontalStack>
-            </HorizontalStack>
+                </InlineStack>
+            </InlineStack>
 
             <LearnPopoverComponent learnMoreObj={learnMoreObjEditor} />
         </div>
@@ -148,24 +148,22 @@ const TestEditor = () => {
         fetchAllTests()
     }, [])
 
-    return (
-        loading ?
-            <SpinnerCentered />
-        : 
-        <Frame topBar={
-            headerEditor
-        }
-            navigation={ <TestEditorFileExplorer addCustomTest={(e) => addCustomTest(e)}/> }
-        >
-            <Box paddingInlineStart={12}>
-                <HorizontalGrid columns={2}>
-                    <YamlEditor fetchAllTests={fetchAllTests} />
-                    <SampleApi />
-                </HorizontalGrid>
-            </Box>
+    return loading ?
+        <SpinnerCentered />
+    : 
+    <Frame topBar={
+        headerEditor
+    }
+        navigation={ <TestEditorFileExplorer addCustomTest={(e) => addCustomTest(e)}/> }
+    >
+        <Box paddingInlineStart={1200}>
+            <InlineGrid columns={2}>
+                <YamlEditor fetchAllTests={fetchAllTests} />
+                <SampleApi />
+            </InlineGrid>
+        </Box>
 
-        </Frame>
-    )
+    </Frame>;
 }
 
 export default TestEditor

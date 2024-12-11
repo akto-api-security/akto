@@ -1,5 +1,5 @@
 import { TextField, Button, Collapsible, Divider, LegacyCard, LegacyStack, Text, Box } from "@shopify/polaris"
-import { ChevronRightMinor, ChevronDownMinor } from '@shopify/polaris-icons';
+import { ChevronRightIcon, ChevronDownIcon } from "@shopify/polaris-icons";
 import { useState } from "react";
 import api from "../api"
 import { useEffect } from "react";
@@ -115,7 +115,7 @@ function UserConfig() {
                         id={"hardcoded-token-expand-button"}
                         onClick={handleToggleHardcodedOpen}
                         ariaExpanded={hardcodedOpen}
-                        icon={hardcodedOpen ? ChevronDownMinor : ChevronRightMinor}
+                        icon={hardcodedOpen ? ChevronDownIcon : ChevronRightIcon}
                         ariaControls="hardcoded"
                     >
                         Hard coded
@@ -138,7 +138,7 @@ function UserConfig() {
                         id={"automated-token-expand-button"}
                         onClick={handleToggleHardcodedOpen}
                         ariaExpanded={!hardcodedOpen}
-                        icon={!hardcodedOpen ? ChevronDownMinor : ChevronRightMinor}
+                        icon={!hardcodedOpen ? ChevronDownIcon : ChevronRightIcon}
                         ariaControls="automated"
                     >
                         Automated

@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react'
 import api from "../../testing/api"
 import OnboardingStore from '../OnboardingStore'
 import TextFieldWithInfo from "../../../components/shared/TextFieldWithInfo"
-import { Spinner, VerticalStack } from '@shopify/polaris'
+import { Spinner, BlockStack } from '@shopify/polaris'
 
 function SetConfig() {
 
@@ -39,20 +39,19 @@ function SetConfig() {
     }
 
     const formLayout = (
-        <VerticalStack gap="4">
+        <BlockStack gap="400">
             <TextFieldWithInfo  value={authObject?.key} 
                                 labelTooltip="Attacker token header key" 
                                 labelText="Auth header key" 
                                 setValue={(val) => updateObj(val,"key")} 
             />
-
             <TextFieldWithInfo  value={authObject?.value} 
                                 labelTooltip="Attacker token value" 
                                 labelText="Auth token value" 
                                 setValue={(val) => updateObj(val,"value")}
                                 type="text" 
             />
-        </VerticalStack>
+        </BlockStack>
     )
 
     return (

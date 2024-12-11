@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { Avatar, Box, Button, HorizontalStack, Icon, Scrollable, Spinner,Text,TextField, Tooltip, VerticalStack } from "@shopify/polaris"
-import { SendMajor } from "@shopify/polaris-icons"
+import { Avatar, Box, Button, InlineStack, Icon, Scrollable, Spinner,Text,TextField, Tooltip, BlockStack } from "@shopify/polaris"
+import { SendIcon, ClipboardIcon } from "@shopify/polaris-icons";
 import PromptContainer from './PromptContainer'
 import "./style.css"
 import Store from '../../store'
@@ -9,7 +9,6 @@ import IntroComponent from './IntroComponent'
 import api from './api'
 import ResponseComponent from './ResponseComponent'
 import { useNavigate } from 'react-router-dom'
-import {ClipboardMinor} from '@shopify/polaris-icons';
 
 function AktoGptLayout({prompts,closeModal, runCustomTests}) {
 
@@ -119,56 +118,56 @@ function AktoGptLayout({prompts,closeModal, runCustomTests}) {
     return (
         <div style={{display:"flex"}}>
             <div className='left-nav-gpt'>
-                <Box padding="3">
+                <Box padding="300">
                     <Text variant="bodyLg" fontWeight="semibold">Select any prompt</Text>
                 </Box>
                 <br/>
 
-                <VerticalStack gap="2">
+                <BlockStack gap="200">
                     {prompts.map((item)=>(
                         <PromptContainer itemObj={item} activePrompt={activePrompt} setActivePrompt={(item) => setSelectedObj(item)} key={item.label}/>
                     ))}
-                </VerticalStack>
+                </BlockStack>
             </div>
 
             <div className='message-container'>
                 <div style={{flex: 6.5}}>
                     {buttonState > 0 ? <Box ref={chatLogRef}>
-                        <Box padding="5" maxWidth="65vw">
-                            <HorizontalStack gap="6">
-                                <Avatar name={username} initials={func.initials(username)} size="medium"/>
-                                <Text variant="bodyMd" fontWeight="semibold" color="subdued">{activePrompt.split("${input}")[0] + inputPrompt}</Text>
-                            </HorizontalStack>
+                        <Box padding="500" maxWidth="65vw">
+                            <InlineStack gap="600">
+                                <Avatar name={username} initials={func.initials(username)} size="md"/>
+                                <Text variant="bodyMd" fontWeight="semibold" tone="subdued">{activePrompt.split("${input}")[0] + inputPrompt}</Text>
+                            </InlineStack>
                         </Box>
                         <Scrollable shadow style={{height: '35vh'}} focusable>
-                            <Box padding="5" maxWidth="65vw" background="bg-subdued">
+                            <Box padding="500" maxWidth="65vw" background="bg-subdued">
                                 <div className="response-message">
-                                    <HorizontalStack gap="6" align="start">
-                                        <Avatar name="Akto" source='/public/akto_colored.svg' size="medium"/>
+                                    <InlineStack gap="600" align="start">
+                                        <Avatar name="Akto" source='/public/akto_colored.svg' size="md"/>
                                         {loading ? <Spinner size="small" /> 
                                             : <ResponseComponent response={func.getResponse(response,queryType)} chatLogRef={chatLogRef} onCompletion={() => handleCompletion()}/>
                                         }
-                                    </HorizontalStack>
+                                    </InlineStack>
                                 </div>
                             </Box>
                             {buttonState === 2 ? 
                                 queryType === "generate_regex" && response?.responses[0]?.regex ?
                                     <div style={{margin: "auto", marginTop: '10px', width: "30%"}}>
-                                        <Button primary onClick={addRegex}>Add Regex to Akto</Button>
+                                        <Button  onClick={addRegex} variant="primary">Add Regex to Akto</Button>
                                     </div>
                                 : queryType === "suggest_tests" && response?.responses[0]?.tests ?
                                 <div style={{margin: "auto", marginTop: '10px', width: "30%"}}>
-                                    <Button primary onClick={runTests}>Run tests via Akto</Button>
+                                    <Button  onClick={runTests} variant="primary">Run tests via Akto</Button>
                                 </div>
                                 : queryType === "find_auth_related_tokens" && response?.responses?.length>0 ?
                                 <div style={{margin: "auto", marginTop: '10px', width: "30%"}}>
-                                    <Button primary onClick={() => addAuthTypes("", response.responses)}>Add above Auth Types</Button>
+                                    <Button  onClick={() => addAuthTypes("", response.responses)} variant="primary">Add above Auth Types</Button>
                                 </div>
                                 : queryType === "generate_curl_for_test" && response?.responses[0]?.curl ?
                                 <div style={{margin: "auto", marginTop: '10px', width: "30%"}}>
                                     <div ref={ref}/>
                                     <Tooltip content="Copy curl command">
-                                        <Button icon={ClipboardMinor} onClick={()=> func.copyToClipboard(response.responses[0].curl, ref)} />
+                                        <Button icon={ClipboardIcon} onClick={()=> func.copyToClipboard(response.responses[0].curl, ref)} />
                                     </Tooltip>
                                 </div>
                                 :null
@@ -181,10 +180,15 @@ function AktoGptLayout({prompts,closeModal, runCustomTests}) {
                 </div>
                 <div className='input-gpt'>
                     <TextField 
-                        prefix={<Text color="subdued">{activePrompt.split("${input}")[0]}</Text>} 
+                        prefix={<Text tone="subdued">{activePrompt.split("${input}")[0]}</Text>} 
                         suffix={
                             <div {...checkQuery() ? null : {style: {background: "#19C37D", padding: "4px", borderRadius: "4px"}}}>
-                                <Button plain disabled={checkQuery()} onClick={handleClick} icon={SendMajor}/>
+                                <Button
+
+                                    disabled={checkQuery()}
+                                    onClick={handleClick}
+                                    icon={SendIcon}
+                                    variant="plain" />
                             </div>
                         } 
                         placeholder={placeHolderText}
@@ -194,7 +198,7 @@ function AktoGptLayout({prompts,closeModal, runCustomTests}) {
                 </div>
             </div>
         </div>
-    )
+    );
 }
 
 export default AktoGptLayout

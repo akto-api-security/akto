@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import NullData from './NullData'
-import { Badge, Box, Button, Card, Divider, HorizontalGrid, HorizontalStack, Link, Text, VerticalStack } from '@shopify/polaris'
+import { Badge, Box, Button, Card, Divider, InlineGrid, InlineStack, Link, Text, BlockStack } from '@shopify/polaris'
 import HighchartsReact from 'highcharts-react-official'
 import transform from '../transform'
 import Highcharts from "highcharts"
@@ -20,39 +20,43 @@ function RiskScoreTrend({riskScoreRangeMap, riskScoreRanges}) {
 
     const dataComponent = (
         <Card key="scoreTrend">
-            <VerticalStack gap={5}>
+            <BlockStack gap={500}>
                 <TitleWithInfo
                     titleText={"APIs by risk score"}
                     tooltipContent={"All your endpoints grouped on the basis of their risk score."}
                     textProps={{variant: "headingMd"}}
                     docsUrl={"https://docs.akto.io/api-inventory/concepts/risk-score"}
                 />
-                <HorizontalGrid columns={2} gap={5}>
-                <HighchartsReact
-                    highcharts={Highcharts}
-                    options={transform.getRiskScoreTrendOptions(riskScoreRangeMap, riskScoreRanges, navigate)}
-                    ref={riskScoreTrendRef}
-                />
-                <Box paddingInlineEnd={4} paddingInlineStart={4} paddingBlockEnd={2} paddingBlockStart={2}>
-                    <VerticalStack gap={3}>
-                        {riskScoreRanges.map((range)=>{
-                            return(
-                                <VerticalStack gap={1} key={range.text} >
-                                    <HorizontalStack align="space-between">
-                                        <Button plain monochrome removeUnderline 
-                                            onClick={() => navigate(`/dashboard/observe/inventory/${range.apiCollectionId}`)}>
-                                                <Text variant="bodyMd" color="semibold" >{range.text}</Text>
-                                        </Button>
-                                        <Badge status={range.status}>{range.range}</Badge>  
-                                    </HorizontalStack>
-                                    <Divider />
-                                </VerticalStack>
-                            )
-                        })}
-                    </VerticalStack>
-                </Box>
-                </HorizontalGrid>
-            </VerticalStack>
+                <InlineGrid columns={2} gap={500}>
+                    <HighchartsReact
+                        highcharts={Highcharts}
+                        options={transform.getRiskScoreTrendOptions(riskScoreRangeMap, riskScoreRanges, navigate)}
+                        ref={riskScoreTrendRef}
+                    />
+                    <Box paddingInlineEnd={400} paddingInlineStart={400} paddingBlockEnd={200} paddingBlockStart={200}>
+                        <BlockStack gap={300}>
+                            {riskScoreRanges.map((range)=>{
+                                return (
+                                    <BlockStack gap={100} key={range.text}>
+                                        <InlineStack align="space-between">
+                                            <Button
+
+
+                                                removeUnderline
+                                                onClick={() => navigate(`/dashboard/observe/inventory/${range.apiCollectionId}`)}
+                                                variant="monochromePlain">
+                                                    <Text variant="bodyMd" tone="semibold" >{range.text}</Text>
+                                            </Button>
+                                            <Badge tone={range.status}>{range.range}</Badge>
+                                        </InlineStack>
+                                        <Divider />
+                                    </BlockStack>
+                                );
+                            })}
+                        </BlockStack>
+                    </Box>
+                </InlineGrid>
+            </BlockStack>
         </Card>
     )
 

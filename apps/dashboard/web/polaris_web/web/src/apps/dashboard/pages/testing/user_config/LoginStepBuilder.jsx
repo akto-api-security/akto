@@ -1,4 +1,4 @@
-import { LegacyCard, Tabs, Text, Button, ButtonGroup, Divider, HorizontalStack, Checkbox } from '@shopify/polaris';
+import { LegacyCard, Tabs, Text, Button, ButtonGroup, Divider, InlineStack, Checkbox } from '@shopify/polaris';
 import { useState, useEffect } from 'react';
 import SpinnerCentered from '../../../components/progress/SpinnerCentered';
 import DropdownSearch from '../../../components/shared/DropdownSearch';
@@ -176,14 +176,14 @@ function LoginStepBuilder({extractInformation, showOnlyApi, setStoreData}) {
                     <LegacyCard>
                         <div style={{ display: "grid", gridTemplateColumns: "auto max-content", alignItems: "center", padding: "10px" }}>
                             <Tabs tabs={stepsTabs} selected={selectedStep} onSelect={handleStepChange}></Tabs>
-                            <HorizontalStack gap={"2"}>
+                            <InlineStack gap={"200"}>
                                 <Checkbox
                                     label='Allow All Status codes'
                                     checked={steps[selectedStep].allowAllStatusCodes}
                                     onChange={() => handleStatusCodeToggle(!steps[selectedStep].allowAllStatusCodes)}
                                 />
-                                <Button id={"add-step-button"} primary onClick={handleAddStep}>Add step</Button>
-                            </HorizontalStack>
+                                <Button id={"add-step-button"}  onClick={handleAddStep} variant="primary">Add step</Button>
+                            </InlineStack>
                         </div>
 
                         <Divider />
@@ -206,7 +206,12 @@ function LoginStepBuilder({extractInformation, showOnlyApi, setStoreData}) {
                                 {steps[selectedStep].type === "LOGIN_FORM" && <LoginForm step={steps[selectedStep]} setSteps={setSteps}/>}
                                 {steps[selectedStep].type === "OTP_VERIFICATION" && <OtpVerification step={steps[selectedStep]} setSteps={setSteps}/>}
                                 <br />
-                                <Button id={"remove-step-button"} destructive onClick={handleRemoveStep}>Remove step</Button>
+                                <Button
+                                    id={"remove-step-button"}
+
+                                    onClick={handleRemoveStep}
+                                    variant="primary"
+                                    tone="critical">Remove step</Button>
                             </div>
                         </LegacyCard.Section>
 
@@ -215,12 +220,12 @@ function LoginStepBuilder({extractInformation, showOnlyApi, setStoreData}) {
                     <AuthParams authParams={authParams} setAuthParams={setAuthParams}/>
 
                     <br />
-                    {showOnlyApi ? null :<Button id={"save-token"} primary onClick={handleSave}><div data-testid="save_token_automated">Save changes</div></Button>}
+                    {showOnlyApi ? null :<Button id={"save-token"}  onClick={handleSave} variant="primary"><div data-testid="save_token_automated">Save changes</div></Button>}
 
                 </div>
             }
         </div>
-    )
+    );
 }
 
 export default LoginStepBuilder

@@ -1,5 +1,5 @@
 import LayoutWithTabs from "../../../components/layouts/LayoutWithTabs"
-import { Box, Button, Popover, Modal, Tooltip, VerticalStack } from "@shopify/polaris"
+import { Box, Button, Popover, Modal, Tooltip, BlockStack } from "@shopify/polaris"
 import FlyLayout from "../../../components/layouts/FlyLayout";
 import GithubCell from "../../../components/tables/cells/GithubCell";
 import SampleDataList from "../../../components/shared/SampleDataList";
@@ -15,7 +15,7 @@ import RunTest from "./RunTest";
 import PersistStore from "../../../../main/PersistStore";
 import values from "@/util/values";
 
-import { HorizontalDotsMinor, FileMinor } from "@shopify/polaris-icons"
+import { MenuHorizontalIcon, FileIcon } from "@shopify/polaris-icons";
 import LocalStore from "../../../../main/LocalStorageStore";
 
 function ApiDetails(props) {
@@ -180,7 +180,7 @@ function ApiDetails(props) {
     const SchemaTab = {
         id: 'schema',
         content: "Schema",
-        component: paramList.length > 0 && <Box paddingBlockStart={"4"}> 
+        component: paramList.length > 0 && <Box paddingBlockStart={"400"}> 
         <ApiSchema
             data={paramList} 
             badgeActive={badgeActive}
@@ -198,7 +198,7 @@ function ApiDetails(props) {
     const ValuesTab = {
         id: 'values',
         content: "Values",
-        component: sampleData.length > 0 && <Box paddingBlockStart={"4"}>
+        component: sampleData.length > 0 && <Box paddingBlockStart={"400"}>
             <SampleDataList
                 key="Sample values"
                 sampleData={sampleData}
@@ -211,7 +211,7 @@ function ApiDetails(props) {
     const DependencyTab = {
         id: 'dependency',
         content: "Dependency Graph",
-        component: <Box paddingBlockStart={"2"}>
+        component: <Box paddingBlockStart={"200"}>
             <ApiDependency
                 apiCollectionId={apiDetail['apiCollectionId']}
                 endpoint={apiDetail['endpoint']}
@@ -264,24 +264,41 @@ function ApiDetails(props) {
                 />
                 <Box>
                     <Tooltip content="Open URL in test editor" dismissOnMouseOut>
-                        <Button monochrome onClick={() => openTest()} icon={FileMinor} />
+                        <Button  onClick={() => openTest()} icon={FileIcon} />
                     </Tooltip>
                 </Box>
                 {
                     isGptActive || isDemergingActive ? <Popover
                         active={showMoreActions}
                         activator={
-                            <Tooltip content="More actions" dismissOnMouseOut ><Button plain monochrome icon={HorizontalDotsMinor} onClick={() => setShowMoreActions(!showMoreActions)} /></Tooltip>
+                            <Tooltip content="More actions" dismissOnMouseOut ><Button
+
+
+                                icon={MenuHorizontalIcon}
+                                onClick={() => setShowMoreActions(!showMoreActions)}
+                                variant="monochromePlain" /></Tooltip>
                         }
                         autofocusTarget="first-node"
                         onClose={() => setShowMoreActions(false)}
                     >
                         <Popover.Pane fixed>
                             <Popover.Section>
-                                <VerticalStack gap={"2"}>
-                                    {isGptActive ? <Button plain monochrome removeUnderline onClick={displayGPT} size="slim">Ask AktoGPT</Button> : null}
-                                    {isDemergingActive ? <Button plain monochrome removeUnderline size="slim" onClick={deMergeApis}>De merge</Button> : null}
-                                </VerticalStack>
+                                <BlockStack gap={"200"}>
+                                    {isGptActive ? <Button
+
+
+                                        removeUnderline
+                                        onClick={displayGPT}
+                                        size="slim"
+                                        variant="monochromePlain">Ask AktoGPT</Button> : null}
+                                    {isDemergingActive ? <Button
+
+
+                                        removeUnderline
+                                        size="slim"
+                                        onClick={deMergeApis}
+                                        variant="monochromePlain">De merge</Button> : null}
+                                </BlockStack>
                             </Popover.Section>
                         </Popover.Pane>
                     </Popover> : null
@@ -311,13 +328,13 @@ function ApiDetails(props) {
                 components={components}
                 loading={loading}
             />
-            <Modal large open={isGptScreenActive} onClose={() => setIsGptScreenActive(false)} title="Akto GPT">
+            <Modal size="large" open={isGptScreenActive} onClose={() => setIsGptScreenActive(false)} title="Akto GPT">
                 <Modal.Section flush>
                     <AktoGptLayout prompts={prompts} closeModal={() => setIsGptScreenActive(false)} runCustomTests={(tests) => runTests(tests)} />
                 </Modal.Section>
             </Modal>
         </div>
-    )
+    );
 }
 
 export default ApiDetails

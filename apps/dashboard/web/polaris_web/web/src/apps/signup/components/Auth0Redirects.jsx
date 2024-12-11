@@ -1,5 +1,5 @@
 import React from 'react'
-import { Avatar, Box, Button, HorizontalStack, Page, Text, VerticalStack } from '@shopify/polaris'
+import { Avatar, Box, Button, InlineStack, Page, Text, BlockStack } from '@shopify/polaris'
 import { useSearchParams } from 'react-router-dom' 
 import "../styles.css"
 import axios from 'axios'
@@ -31,17 +31,17 @@ function Auth0Redirects({bodyText, errorText}) {
 
     return (
         <Page fullWidth>
-            <Box padding={"20"} paddingBlockEnd={"0"}>
-                <HorizontalStack align='center'>
+            <Box padding={"2000"} paddingBlockEnd={"0"}>
+                <InlineStack align='center'>
                     <Box width='400px'>
-                        <VerticalStack gap={"8"}>
-                            <HorizontalStack align="center">
+                        <BlockStack gap={"800"}>
+                            <InlineStack align="center">
                                 <div className="akto-logo">
-                                    <Avatar source="/public/akto_name_with_logo.svg" shape="round" size="2xl-experimental" />
+                                    <Avatar source="/public/akto_name_with_logo.svg" shape="round" size="xl" />
                                 </div>
-                            </HorizontalStack>
-                            <VerticalStack gap={"6"}>
-                                <HorizontalStack align='center'>
+                            </InlineStack>
+                            <BlockStack gap={"600"}>
+                                <InlineStack align='center'>
                                     <svg xmlns="http://www.w3.org/2000/svg" width="64" height="65" viewBox="0 0 64 65" fill="none">
                                         <g clipPath="url(#clip0_7639_55607)">
                                             <path d="M0 17.4927V50.0545C0 52.7055 2.14903 54.8545 4.8 54.8545H59.2C61.851 54.8545 64 52.7055 64 50.0545V17.4924L33.6121 35.2187C32.6158 35.7999 31.3837 35.7999 30.3874 35.2187L0 17.4927Z" fill="#5C5F62"/>
@@ -53,28 +53,34 @@ function Auth0Redirects({bodyText, errorText}) {
                                             </clipPath>
                                         </defs>
                                     </svg>
-                                </HorizontalStack>
-                                <VerticalStack gap={"2"}>
+                                </InlineStack>
+                                <BlockStack gap={"200"}>
                                     <Text alignment="center" variant="headingLg">{errorText}</Text>
-                                    <Text alignment="center" variant="bodyMd" color="subdued">{bodyText}</Text>
-                                </VerticalStack>
-                            </VerticalStack>
+                                    <Text alignment="center" variant="bodyMd" tone="subdued">{bodyText}</Text>
+                                </BlockStack>
+                            </BlockStack>
                             <Button fullWidth onClick={handleLogout}>
                                 Redirect to login
                             </Button>
-                        </VerticalStack>
+                        </BlockStack>
                     </Box>
-                </HorizontalStack>
+                </InlineStack>
                 <div style={{position: 'absolute' , bottom: '3vh', width: '84%'}}>
-                    <HorizontalStack gap={3} align="center">
-                        <Button plain onClick={() => window.open("https://www.akto.io/terms-and-policies","_blank")}>Terms of use</Button>
-                            <div style={{width: '1px', height: '24px', background: "#E1E3E5"}} />
-                        <Button plain onClick={() => window.open("https://www.akto.io/terms/privacy","_blank")}>Privacy policy</Button>
-                    </HorizontalStack>
+                    <InlineStack gap={300} align="center">
+                        <Button
+
+                            onClick={() => window.open("https://www.akto.io/terms-and-policies","_blank")}
+                            variant="plain">Terms of use</Button>
+                        <div style={{width: '1px', height: '24px', background: "#E1E3E5"}} />
+                        <Button
+
+                            onClick={() => window.open("https://www.akto.io/terms/privacy","_blank")}
+                            variant="plain">Privacy policy</Button>
+                    </InlineStack>
                 </div>
             </Box>
         </Page>
-    )
+    );
 }
 
 export default Auth0Redirects

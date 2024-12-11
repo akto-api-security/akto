@@ -1,5 +1,5 @@
 import React from 'react'
-import { Avatar, HorizontalStack, Text } from "@shopify/polaris"
+import { Avatar, InlineStack, Text } from "@shopify/polaris"
 import BannerLayout from '../../../../components/banners/BannerLayout'
 import { COLLECTIONS_VIDEO_LENGTH, COLLECTIONS_VIDEO_THUMBNAIL, COLLECTIONS_VIDEO_URL } from '../../../../../main/onboardingData'
 import quickStartFunc from "../../../quick_start/transform"
@@ -17,18 +17,18 @@ function CollectionsPageBanner() {
     const connectorsList = quickStartFunc.getConnectorsList()
     
     const iconComponent = (
-        <HorizontalStack gap={"2"} align="start">
-            <HorizontalStack>
+        <InlineStack gap={"200"} align="start">
+            <InlineStack>
                 {iconsList.map((iconUrl, index) => {
-                    return(
+                    return (
                         <div className="icons-style" style={{zIndex: `${index + 5}`,...(index > 0 ? {marginLeft: '-10px'} : {})}} key={iconUrl}>
-                            <Avatar shape="square" source={iconUrl} size="extraSmall" />
+                            <Avatar shape="square" source={iconUrl} size="xs" />
                         </div>
-                    )
+                    );
                 })}
-            </HorizontalStack>
-            <Text color="subdued" variant="bodyMd">{`+${Math.max(connectorsList.length - 4, 18)} more`}</Text>
-        </HorizontalStack>
+            </InlineStack>
+            <Text tone="subdued" variant="bodyMd">{`+${Math.max(connectorsList.length - 4, 18)} more`}</Text>
+        </InlineStack>
     )
 
     return(

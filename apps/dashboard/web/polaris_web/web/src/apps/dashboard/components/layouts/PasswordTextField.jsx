@@ -1,4 +1,4 @@
-import { HideMinor, ViewMinor } from '@shopify/polaris-icons';
+import { HideIcon, ViewIcon } from "@shopify/polaris-icons";
 import { useState } from 'react';
 import { Button, TextField } from '@shopify/polaris';
 
@@ -17,10 +17,10 @@ function PasswordTextField(props) {
     };
 
     let type = isTextVisible ? 'string' : 'password'
-    let buttonIcon = isTextVisible ? HideMinor : ViewMinor
+    let buttonIcon = isTextVisible ? HideIcon : ViewIcon
 
     const toggleButton = (
-        <Button icon={buttonIcon} onClick={toggleTextVisibility} plain />
+        <Button icon={buttonIcon} onClick={toggleTextVisibility}  variant="plain" />
     )
 
     return (

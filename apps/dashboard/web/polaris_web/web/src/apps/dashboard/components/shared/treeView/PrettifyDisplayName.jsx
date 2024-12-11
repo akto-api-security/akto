@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import TableStore from '../../tables/TableStore'
-import { ChevronRightMinor, ChevronDownMinor } from "@shopify/polaris-icons"
-import { Badge, Box, Checkbox, HorizontalStack, Icon, Text, Tooltip } from '@shopify/polaris';
+import { ChevronRightIcon, ChevronDownIcon } from "@shopify/polaris-icons";
+import { Badge, Box, Checkbox, InlineStack, Icon, Text, Tooltip } from '@shopify/polaris';
 
 function PrettifyDisplayName({name, level, isTerminal, isOpen, selectItems, collectionIds}) {
     const selectedItems = TableStore.getState().selectedItems.flat()
@@ -32,28 +32,28 @@ function PrettifyDisplayName({name, level, isTerminal, isOpen, selectItems, coll
     if(level !== undefined || level.length > 0){
         displayName = level.split("#")[len];
     }
-    const icon = isOpen ? ChevronDownMinor : ChevronRightMinor
-    return(
+    const icon = isOpen ? ChevronDownIcon : ChevronRightIcon
+    return (
         <Box width='230px'>
             <div className="styled-name">
-                <HorizontalStack gap={"2"} wrap={false}>
+                <InlineStack gap={"200"} wrap={false}>
                     {spacingWidth > 0 ? <Box width={`${spacingWidth}px`} /> : null}
                     {len !== 0 ? <Checkbox checked={checkedVal} onChange={() => handleChange(collectionIds, selectItems)}/> : null}
                     {!isTerminal ? <Box><Icon source={icon} /></Box> : null}
                     <Box maxWidth="160px">
                         <Tooltip content={name || displayName} dismissOnMouseOut>
-                            <HorizontalStack align="space-between" wrap={false} gap={"2"}>
+                            <InlineStack align="space-between" wrap={false} gap={"200"}>
                                 <Box maxWidth="130px">
                                     <Text variant="headingSm" truncate>{displayName}</Text>
                                 </Box>
-                                {collectionIds.length > 1 ? <Badge size="small" status="new">{collectionIds.length}</Badge> : null}
-                            </HorizontalStack>
+                                {collectionIds.length > 1 ? <Badge size="small" tone="new">{collectionIds.length}</Badge> : null}
+                            </InlineStack>
                         </Tooltip>
                     </Box>
-                </HorizontalStack>
+                </InlineStack>
             </div>
         </Box>
-    )
+    );
 }
 
 export default PrettifyDisplayName

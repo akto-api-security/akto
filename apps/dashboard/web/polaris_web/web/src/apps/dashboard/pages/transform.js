@@ -1,9 +1,9 @@
-import { DynamicSourceMinor , MagicMinor, PasskeyMinor } from "@shopify/polaris-icons"
+import { DatabaseIcon, MagicIcon, PasskeyIcon } from "@shopify/polaris-icons";
 import func from "@/util/func"
 
 const dataTypesPrompt = [
     {
-      icon: DynamicSourceMinor,
+      icon: DatabaseIcon,
       label: "Write regex to find ${input}",
       prepareQuery: (filterApi) => { return {
           type: "generate_regex",
@@ -20,7 +20,7 @@ const dashboardFunc = {
     getCollectionsPrompts : function(filteredItems,apiCollectionId){
         const collectionsGptPrompts = [
             {
-                icon: MagicMinor,
+                icon: MagicIcon,
                 label: "Find auth-related tokens",
                 prepareQuery: () => { return {
                     type: "find_auth_related_tokens",
@@ -31,7 +31,7 @@ const dashboardFunc = {
                 callback: (data) => console.log("callback Find auth-related tokens", data)
             },
             {
-                icon: MagicMinor,
+                icon: MagicIcon,
                 label: "Create API groups",
                 prepareQuery: () => { return {
                     type: "group_apis_by_functionality",
@@ -43,7 +43,7 @@ const dashboardFunc = {
                 callback: (data) => console.log("callback create api groups", data)
             },
             {
-                icon: DynamicSourceMinor,
+                icon: DatabaseIcon,
                 label: "Tell me APIs related to ${input}",
                 prepareQuery: (filterApi) => { return {
                     type: "list_apis_by_type",
@@ -91,7 +91,7 @@ const dashboardFunc = {
     getParameterPrompts: function(jsonStr,apiCollectionId){
         const parameterPrompts= [
             {
-                icon: PasskeyMinor,
+                icon: PasskeyIcon,
                 label: "Fetch Sensitive Params",
                 prepareQuery: () => { return {
                     type: "list_sensitive_params",
@@ -103,7 +103,7 @@ const dashboardFunc = {
                 callback: (data) => console.log("callback create api groups", data)
             },
             {
-                icon: PasskeyMinor,
+                icon: PasskeyIcon,
                 label: "Generate curl for testing SSRF vulnerability",
                 prepareQuery: () => { return {
                     type: "generate_curl_for_test",
@@ -117,7 +117,7 @@ const dashboardFunc = {
                 callback: (data) => console.log("callback create api groups", data)
             },
             {
-                icon: PasskeyMinor,
+                icon: PasskeyIcon,
                 label: "Generate curl for testing SQLI vulnerability",
                 prepareQuery: () => { return {
                     type: "generate_curl_for_test",
@@ -131,7 +131,7 @@ const dashboardFunc = {
                 callback: (data) => console.log("callback create api groups", data)
             },
             {
-                icon: PasskeyMinor,
+                icon: PasskeyIcon,
                 label: "Suggest API Security tests for this API",
                 prepareQuery: () => { return {
                     type: "suggest_tests",

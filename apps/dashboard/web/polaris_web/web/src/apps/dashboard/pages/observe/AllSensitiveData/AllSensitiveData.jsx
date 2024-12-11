@@ -1,5 +1,5 @@
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
-import { Button, Modal, HorizontalStack, IndexFiltersMode, Text, Badge, Thumbnail, HorizontalGrid, Box } from "@shopify/polaris"
+import { Button, Modal, InlineStack, IndexFiltersMode, Text, Badge, Thumbnail, InlineGrid, Box } from "@shopify/polaris"
 import api from "../api"
 import { useEffect,useState } from "react"
 import func from "@/util/func"
@@ -104,7 +104,7 @@ const convertToDataTypesData = (type, collectionsMap, countMap, subtypeToApiColl
         avatarComp: <Thumbnail source={iconSource} size="small" />,
         priorityVal: priorityText.length > 1 ? severityOrder[priorityText] : 0,
         priorityText: priorityText,
-        priorityComp: priorityText.length > 1 ? <Badge status={transform.getColor(priorityText, true)}>{func.toSentenceCase(priorityText)}</Badge> : "-",
+        priorityComp: priorityText.length > 1 ? <Badge tone={transform.getColor(priorityText, true)}>{func.toSentenceCase(priorityText)}</Badge> : "-",
         categoriesArr: categoriesList,
         categoryComp: categoriesList.length > 0 ?  (
             <ShowListInBadge 
@@ -307,14 +307,14 @@ function AllSensitiveData() {
     }
 
     const secondaryActionsComp = (
-        <HorizontalStack gap={"2"}>
+        <InlineStack gap={"200"}>
             { (func.checkOnPrem() && window?.USER_NAME !== undefined && window.USER_NAME.includes("razorpay")) ? <Button onClick={resetSampleData}>Reset Sample Data</Button> : <></>}
             <Button onClick={displayGPT}>Ask AktoGPT</Button>
-        </HorizontalStack>
+        </InlineStack>
     )
 
     const graphComponents = (
-        <HorizontalGrid key={"graphs"} gap={"5"} columns={2}>
+        <InlineGrid key={"graphs"} gap={"500"} columns={2}>
             <InfoCard
                 title={"APIs by Sensitive data severity"}
                 titleToolTip={"Number of APIs per each category"}
@@ -340,7 +340,7 @@ function AllSensitiveData() {
                 title={"Top 5 sensitive datatype"}
                 titleToolTip={"Numbers of APIs having the corresponding data type in request or response"}
                 component={
-                    <Box paddingBlockStart={"6"}>
+                    <Box paddingBlockStart={"600"}>
                         <ChartypeComponent
                             data={countMap}
                             isNormal={true} 
@@ -353,7 +353,7 @@ function AllSensitiveData() {
                     </Box>
                 }
             />
-        </HorizontalGrid>
+        </InlineGrid>
     )
 
     const componentsArr = [
@@ -381,7 +381,7 @@ function AllSensitiveData() {
             selected={selected}
             lastColumnSticky={true}
         />,
-        <Modal key="modal" large open={isGptScreenActive} onClose={()=> setIsGptScreenActive(false)} title="Akto GPT">
+        <Modal key="modal" size="large" open={isGptScreenActive} onClose={()=> setIsGptScreenActive(false)} title="Akto GPT">
             <Modal.Section flush>
                 <AktoGptLayout prompts={prompts} closeModal={()=> setIsGptScreenActive(false)} />
             </Modal.Section>
@@ -397,15 +397,14 @@ function AllSensitiveData() {
                     docsUrl="https://docs.akto.io/api-inventory/concepts/sensitive-data" 
                 />
             }
-            primaryAction={<Button id={"all-data-types"} primary onClick={handleRedirect}>Create custom data types</Button>}
+            primaryAction={<Button id={"all-data-types"}  onClick={handleRedirect} variant="primary">Create custom data types</Button>}
             secondaryActions={secondaryActionsComp}
             isFirstPage={true}
             components={
                 loading ? [<SpinnerCentered key={"spinner"}/>] : componentsArr
             }
         />
-
-    )
+    );
 }
 
 export default AllSensitiveData

@@ -3,7 +3,7 @@ import api from './api';
 import func from '@/util/func';
 import observeFunc from "../observe/transform"
 import PageWithMultipleCards from "../../components/layouts/PageWithMultipleCards"
-import { Box, DataTable, HorizontalGrid, HorizontalStack, Icon, Link, Scrollable, Text, VerticalStack } from '@shopify/polaris';
+import { Box, DataTable, InlineGrid, InlineStack, Icon, Link, Scrollable, Text, BlockStack } from '@shopify/polaris';
 import observeApi from "../observe/api"
 import testingTransform from "../testing/transform"
 import StackedChart from '../../components/charts/StackedChart';
@@ -12,7 +12,7 @@ import testingApi from "../testing/api"
 import PersistStore from '../../../main/PersistStore';
 import { DashboardBanner } from './components/DashboardBanner';
 import SummaryCard from './new_components/SummaryCard';
-import { ArrowUpMinor, ArrowDownMinor } from '@shopify/polaris-icons';
+import { ArrowUpIcon, ArrowDownIcon } from "@shopify/polaris-icons";
 import TestSummaryCardsList from './new_components/TestSummaryCardsList';
 import InfoCard from './new_components/InfoCard';
 import ProgressBarChart from './new_components/ProgressBarChart';
@@ -242,20 +242,20 @@ function HomeDashboard() {
 
     function generateChangeComponent(val, invertColor) {
         if (!val) return null
-        const source = val > 0 ? ArrowUpMinor : ArrowDownMinor
+        const source = val > 0 ? ArrowUpIcon : ArrowDownIcon
         if (val === 0) return null
         const color = !invertColor && val > 0 ? "success" : "critical"
         return (
-            <HorizontalStack wrap={false}>
-                <Icon source={source} color={color} />
+            (<InlineStack wrap={false}>
+                <Icon source={source} tone={color} />
                 <div className='custom-color'>
-                    <Text color={color}>{Math.abs(val)}</Text>
+                    <Text tone={color}>{Math.abs(val)}</Text>
                 </div>
-            </HorizontalStack>
-        )
+            </InlineStack>)
+        );
     }
 
-    const runTestEmptyCardComponent = <Text alignment='center' color='subdued'>There’s no data to show. <Link url="/dashboard/testing" target='_blank'>Run test</Link> to get data populated. </Text>
+    const runTestEmptyCardComponent = <Text alignment='center' tone='subdued'>There’s no data to show. <Link url="/dashboard/testing" target='_blank'>Run test</Link> to get data populated. </Text>
 
     function mapAccessTypes(apiStats) {
         if (!apiStats) return
@@ -476,15 +476,15 @@ function HomeDashboard() {
 
     const genreateDataTableRows = (collections) => {
         return collections.map((collection, index) => ([
-            <HorizontalStack align='space-between'>
-                <HorizontalStack gap={2}>
+            <InlineStack align='space-between'>
+                <InlineStack gap={200}>
                     <Box maxWidth='287px'>
                         <TooltipText tooltip={collection.name} text={collection.name}/>
                     </Box>
-                    <Text variant='bodySm' color='subdued'>{(collection.totalApis === 0 ? 0 : Math.floor(100.0 * collection.apisTested / collection.totalApis))}% test coverage</Text>
-                </HorizontalStack>
+                    <Text variant='bodySm' tone='subdued'>{(collection.totalApis === 0 ? 0 : Math.floor(100.0 * collection.apisTested / collection.totalApis))}% test coverage</Text>
+                </InlineStack>
                 <Text>{collection.totalApis}</Text>
-            </HorizontalStack>
+            </InlineStack>
         ]
         ));
     }
@@ -512,7 +512,7 @@ function HomeDashboard() {
         titleToolTip="Breakdown of vulnerable APIs categorized by severity level (High, Medium, Low). Click to see details for each category."
         linkText="Fix critical issues"
         linkUrl="/dashboard/issues"
-    /> : <EmptyCard title="Vulnerable APIs by Severity" subTitleComponent={showTestingComponents ? <Text alignment='center' color='subdued'>No vulnerable APIs found</Text>: runTestEmptyCardComponent}/>
+    /> : <EmptyCard title="Vulnerable APIs by Severity" subTitleComponent={showTestingComponents ? <Text alignment='center' tone='subdued'>No vulnerable APIs found</Text>: runTestEmptyCardComponent}/>
 
     const criticalUnsecuredAPIsOverTime = <CriticalUnsecuredAPIsOverTimeGraph linkText={"Fix critical issues"} linkUrl={"/dashboard/issues"} />
 
@@ -609,19 +609,19 @@ function HomeDashboard() {
         [apisByRiskscoreComponent, apisByAccessTypeComponent, apisByAuthTypeComponent, apisByTypeComponent, newDomainsComponent, criticalUnsecuredAPIsOverTime, vulnerableApisBySeverityComponent, criticalFindings]
 
     const gridComponent = (
-        <HorizontalGrid gap={5} columns={2}>
+        <InlineGrid gap={500} columns={2}>
             {gridComponents}
-        </HorizontalGrid>
+        </InlineGrid>
     )
 
     const components = [summaryComp, testSummaryCardsList, gridComponent]
 
     const dashboardComp = (
-        <VerticalStack gap={4}>
+        <BlockStack gap={400}>
             {components.map((component) => {
                 return component
             })}
-        </VerticalStack>
+        </BlockStack>
     )
 
     const pageComponents = [showBannerComponent ? <DashboardBanner key="dashboardBanner" /> : dashboardComp]

@@ -2,8 +2,8 @@ import GithubSimpleTable from "../../../components/tables/GithubSimpleTable";
 import {
   Text,
   Button,
-  VerticalStack,
-  HorizontalStack,
+  BlockStack,
+  InlineStack,
   Icon,
   Badge,
   Box,
@@ -20,14 +20,13 @@ import {
 } from '@shopify/polaris';
 
 import {
-  CircleInformationMajor,
-  ArchiveMinor,
-  PriceLookupMinor,
-  ReportMinor,
-  RefreshMajor,
-  CustomersMinor,
-  EditMajor
-} from '@shopify/polaris-icons';
+  InfoIcon,
+  ArchiveIcon,
+  SearchListIcon,
+  SearchResourceIcon,
+  RefreshIcon,
+  PersonIcon,
+} from "@shopify/polaris-icons";
 import api from "../api";
 import func from '@/util/func';
 import { useParams } from 'react-router';
@@ -384,21 +383,21 @@ const promotedBulkActions = (selectedDataHexIds) => {
   const bannerComp = (
     missingConfigs.length > 0 ? 
     <div className="banner-wrapper">
-      <Banner status="critical">
-        <HorizontalStack gap={3}>
+      <Banner tone="critical">
+        <InlineStack gap={300}>
           <Box>
             <Text fontWeight="semibold">
               {`${missingConfigs.length} configuration${missingConfigs.length > 1 ? 's' : ''} missing: `}  
             </Text>
           </Box>
-          <HorizontalStack gap={2}>
+          <InlineStack gap={200}>
             {missingConfigs.map((config) => {
               return(<Link url={baseUrl + config.toUpperCase()} key={config} target="_blank">
                 {config}
               </Link>) 
             })}
-          </HorizontalStack>
-        </HorizontalStack>
+          </InlineStack>
+        </InlineStack>
       </Banner>
     </div> : null
   )
@@ -472,14 +471,14 @@ const promotedBulkActions = (selectedDataHexIds) => {
       {
         selectedTestRun.metadata ? Object.keys(selectedTestRun.metadata).map((key) => {
           return (
-            <HorizontalStack key={key} spacing="tight">
+            <InlineStack key={key} spacing="tight">
               <Text>{key} : {selectedTestRun.metadata[key]}</Text>
-            </HorizontalStack>
-          )
+            </InlineStack>
+          );
         }) : ""
       }
     </LegacyCard>
-    )
+    );
   }
 
   const progress = useMemo(() => {
@@ -489,13 +488,13 @@ const promotedBulkActions = (selectedDataHexIds) => {
 const runningTestsComp = useMemo(() => (
     currentTestObj.testingRunId !== -1 ? (
         <Card key={"test-progress"}>
-            <VerticalStack gap={"3"}>
-                <Text variant="headingSm">{`Running ${currentTestObj.testsInitiated} tests`}</Text>
-                <div style={{ display: "flex", gap: '4px', alignItems: 'center' }}>
-                    <ProgressBar progress={progress} color="primary" size="small" />
-                    <Text color="subdued">{`${progress}%`}</Text>
-                </div>
-            </VerticalStack>
+            <BlockStack gap={"300"}>
+              <Text variant="headingSm">{`Running ${currentTestObj.testsInitiated} tests`}</Text>
+              <div style={{ display: "flex", gap: '4px', alignItems: 'center' }}>
+                  <ProgressBar progress={progress} tone="primary" size="small" />
+                  <Text tone="subdued">{`${progress}%`}</Text>
+              </div>
+            </BlockStack>
         </Card>
     ) : null
 ), [currentTestObj, progress]);
@@ -553,39 +552,39 @@ const editableConfigsComp = (
   }
 
   const EmptyData = () => {
-    return(
+    return (
       <div style={{margin: 'auto', marginTop: '20vh'}}>
-        <Box width="300px" padding={4}>
-          <VerticalStack gap={5}>
-            <HorizontalStack align="center">
+        <Box width="300px" padding={400}>
+          <BlockStack gap={500}>
+            <InlineStack align="center">
               <div style={{borderRadius: '50%', border: '6px solid white', padding: '4px', display: 'flex', alignItems: 'center', height: '50px', width: '50px'}}>
-                <Icon source={CircleInformationMajor} />
+                <Icon source={InfoIcon} />
               </div>
-            </HorizontalStack>
-            <VerticalStack gap={2}>
-            <HorizontalStack align="center">
+            </InlineStack>
+            <BlockStack gap={200}>
+              <InlineStack align="center">
                 <Text variant="bodyLg" fontWeight="semibold">
                   No test run data found
                 </Text>
-              </HorizontalStack>
+              </InlineStack>
               <Text variant="bodyMd" alignment="center">
                 The next summary will be ready with the upcoming test.
               </Text>
-            </VerticalStack>
-          </VerticalStack>
+            </BlockStack>
+          </BlockStack>
         </Box>
       </div>
-    )
+    );
   }
 
   const allResultsLength = testRunResults.skipped.length + testRunResults.need_configurations.length + testRunResults.no_vulnerability_found.length + testRunResults.vulnerable.length + testRunResults.ignored_issues.length + progress
   const useComponents = (!workflowTest && allResultsLength === 0 && (selectedTestRun.run_type && selectedTestRun.run_type ==='One-time')) ? [<EmptyData key="empty"/>] : components
   const headingComp = (
-    <Box paddingBlockStart={1}>
-      <VerticalStack gap="2">
-        <HorizontalStack gap="2" align="start">
+    <Box paddingBlockStart={100}>
+      <BlockStack gap="200">
+        <InlineStack gap="200" align="start">
           { selectedTestRun?.icon && <Box>
-            <Icon color={selectedTestRun.iconColor} source={selectedTestRun.icon }></Icon>
+            <Icon tone={selectedTestRun.iconColor} source={selectedTestRun.icon }></Icon>
           </Box>
           }
           <Box maxWidth="35vw">
@@ -598,34 +597,34 @@ const editableConfigsComp = (
             selectedTestRun?.severity && 
             selectedTestRun.severity
             .map((item) =>
-            <Badge key={item} status={func.getTestResultStatus(item)}>
+            <Badge key={item} tone={func.getTestResultStatus(item)}>
               <Text fontWeight="regular">
                 {item}
               </Text>
             </Badge>
             )}
-            <Button plain monochrome onClick={() => fetchData(true)}><Tooltip content="Refresh page" dismissOnMouseOut> <Icon source={RefreshMajor} /></Tooltip></Button>
-        </HorizontalStack>
-        <HorizontalStack gap={"2"}>
-          <HorizontalStack gap={"1"}>
-            <Box><Icon color="subdued" source={CustomersMinor}/></Box>
-            <Text color="subdued" fontWeight="medium" variant="bodyMd">created by:</Text>
-            <Text color="subdued" variant="bodyMd">{selectedTestRun.userEmail}</Text>
-          </HorizontalStack>
-          <Box width="1px" borderColor="border-subdued" borderInlineStartWidth="1" minHeight='16px'/>
+          <Button   onClick={() => fetchData(true)} variant="monochromePlain"><Tooltip content="Refresh page" dismissOnMouseOut> <Icon source={RefreshIcon} /></Tooltip></Button>
+        </InlineStack>
+        <InlineStack gap={"200"}>
+          <InlineStack gap={"100"}>
+            <Box><Icon tone="subdued" source={PersonIcon}/></Box>
+            <Text tone="subdued" fontWeight="medium" variant="bodyMd">created by:</Text>
+            <Text tone="subdued" variant="bodyMd">{selectedTestRun.userEmail}</Text>
+          </InlineStack>
+          <Box width="1px" borderColor="border-secondary" borderInlineStartWidth="1" minHeight='16px'/>
           <Link monochrome target="_blank" url={"/dashboard/observe/inventory/" + selectedTestRun?.apiCollectionId} removeUnderline>
-            <HorizontalStack gap={"1"}>
-              <Box><Icon color="subdued" source={ArchiveMinor}/></Box>
-              <Text color="subdued" variant="bodyMd">{collectionsMap[selectedTestRun?.apiCollectionId]}</Text>
-            </HorizontalStack>
+            <InlineStack gap={"100"}>
+              <Box><Icon tone="subdued" source={ArchiveIcon}/></Box>
+              <Text tone="subdued" variant="bodyMd">{collectionsMap[selectedTestRun?.apiCollectionId]}</Text>
+            </InlineStack>
           </Link>
-          <Box width="1px" borderColor="border-subdued" borderInlineStartWidth="1" minHeight='16px'/>
-          <HorizontalStack gap={"1"}>
-            <Box><Icon color="subdued" source={PriceLookupMinor}/></Box>
-            <Text color="subdued" variant="bodyMd">{getHeadingStatus(selectedTestRun)}</Text>
-          </HorizontalStack>
-        </HorizontalStack>
-      </VerticalStack>
+          <Box width="1px" borderColor="border-secondary" borderInlineStartWidth="1" minHeight='16px'/>
+          <InlineStack gap={"100"}>
+            <Box><Icon tone="subdued" source={SearchListIcon}/></Box>
+            <Text tone="subdued" variant="bodyMd">{getHeadingStatus(selectedTestRun)}</Text>
+          </InlineStack>
+        </InlineStack>
+      </BlockStack>
     </Box>
   )
 
@@ -633,7 +632,7 @@ const editableConfigsComp = (
   moreActionsList.push({title: 'Export', items: [
     {
      content: 'Export vulnerability report', 
-     icon: ReportMinor, 
+     icon: SearchResourceIcon, 
      onAction: () => openVulnerabilityReport()
     }
   ]})
@@ -659,21 +658,22 @@ const editableConfigsComp = (
     </Popover>
   )
 
-  return (
-    <>
-      <PageWithMultipleCards
-        title={headingComp}
-        backUrl={`/dashboard/testing/`}
-        primaryAction={!workflowTest ? <Box paddingInlineEnd={1}><Button primary onClick={() => 
+  return <>
+    <PageWithMultipleCards
+      title={headingComp}
+      backUrl={`/dashboard/testing/`}
+      primaryAction={!workflowTest ? <Box paddingInlineEnd={100}><Button
+
+        onClick={() => 
           func.downloadAsCSV((testRunResultsText[selectedTab]), selectedTestRun)
-          }>Export results</Button></Box>: undefined}
-        secondaryActions={!workflowTest ? moreActionsComp: undefined}
-        components={useComponents}
-      />
-      <ReRunModal selectedTestRun={selectedTestRun} shouldRefresh={false}/>
-      {(resultId !== null && resultId.length > 0) ? <TestRunResultPage /> : null}
-    </>
-  );
+          }
+        variant="primary">Export results</Button></Box>: undefined}
+      secondaryActions={!workflowTest ? moreActionsComp: undefined}
+      components={useComponents}
+    />
+    <ReRunModal selectedTestRun={selectedTestRun} shouldRefresh={false}/>
+    {(resultId !== null && resultId.length > 0) ? <TestRunResultPage /> : null}
+  </>;
 }
 
 export default SingleTestRunPage

@@ -1,4 +1,4 @@
-import { Box, Card, HorizontalStack, Icon, Text, VerticalStack } from '@shopify/polaris';
+import { Box, Card, InlineStack, Icon, Text, BlockStack } from '@shopify/polaris';
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import ReactFlow, {
     Background,
@@ -8,7 +8,7 @@ import { Handle, Position } from 'react-flow-renderer';
 import PersistStore from '../../../../main/PersistStore';
 import TooltipText from '../../../components/shared/TooltipText';
 import StyledEndpoint from './component/StyledEndpoint';
-import { ArrowUpMinor } from "@shopify/polaris-icons"
+import { ArrowUpIcon } from "@shopify/polaris-icons";
 
 
 function ApiDependencyNode({ data }) {
@@ -19,34 +19,31 @@ function ApiDependencyNode({ data }) {
     const collectionsMap = PersistStore(state => state.collectionsMap)
     const apiCollectionName = collectionsMap[apiCollectionId]
 
-    return (
-        <>
-            {!isFirstNode ? <Handle type="target" position={Position.Top} /> : null}
-            <div onClick={() => { !isCurrentNode && openTargetUrl(apiCollectionId, endpoint, method) }} style={isCurrentNode ? { "cursor": "default" } : { "cursor": "pointer" }}>
-                <VerticalStack gap={2}>
-                    <Card padding={0}>
-                        <Box padding={3}>
-                            <VerticalStack gap={1}>
-                                <Box width='250px'>
-                                    <TooltipText tooltip={apiCollectionName} text={apiCollectionName} textProps={{ color: "subdued", variant: "bodySm" }} />
+    return <>
+        {!isFirstNode ? <Handle type="target" position={Position.Top} /> : null}
+        <div onClick={() => { !isCurrentNode && openTargetUrl(apiCollectionId, endpoint, method) }} style={isCurrentNode ? { "cursor": "default" } : { "cursor": "pointer" }}>
+            <BlockStack gap={200}>
+                <Card padding={0}>
+                    <Box padding={300}>
+                        <BlockStack gap={100}>
+                            <Box width='250px'>
+                                <TooltipText tooltip={apiCollectionName} text={apiCollectionName} textProps={{ color: "subdued", variant: "bodySm" }} />
+                            </Box>
+                            <InlineStack gap={100}>
+                                <Box width='230px'>
+                                    {StyledEndpoint(methodPlusUrl, "12px", "bodySm")}
                                 </Box>
-                                <HorizontalStack gap={1}>
-                                    <Box width='230px'>
-                                        {StyledEndpoint(methodPlusUrl, "12px", "bodySm")}
-                                    </Box>
-                                    <div style={{ transform: 'rotate(45deg)', width: "20px" }}>
-                                        {!isCurrentNode && <Icon source={ArrowUpMinor} color="subdued" />}
-                                    </div>
-
-                                </HorizontalStack>
-                            </VerticalStack>
-                        </Box>
-                    </Card>
-                </VerticalStack>
-            </div>
-            {!isCurrentNode ? <Handle type="source" position={Position.Bottom} id="b" /> : null}
-        </>
-    );
+                                <div style={{ transform: 'rotate(45deg)', width: "20px" }}>
+                                    {!isCurrentNode && <Icon source={ArrowUpIcon} tone="subdued" />}
+                                </div>
+                            </InlineStack>
+                        </BlockStack>
+                    </Box>
+                </Card>
+            </BlockStack>
+        </div>
+        {!isCurrentNode ? <Handle type="source" position={Position.Bottom} id="b" /> : null}
+    </>;
 }
 
 function openTargetUrl(apiCollectionId, url, method) {

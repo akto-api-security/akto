@@ -1,9 +1,9 @@
-import { Scrollable, Spinner, VerticalStack } from "@shopify/polaris";
+import { Scrollable, Spinner, BlockStack } from "@shopify/polaris";
 import func from "@/util/func";
-import { tokens } from "@shopify/polaris-tokens"
+import { useTheme } from "@shopify/polaris"
 
 const LogsContainer = ({ logs }) => {
-
+    const theme = useTheme();
     const logsFetchBetween = () => {
         let d1 = func.epochToDateTime(Math.floor(logs.startTime / 1000))
         let d2 = func.epochToDateTime(Math.floor(logs.endTime / 1000))
@@ -11,9 +11,9 @@ const LogsContainer = ({ logs }) => {
         return (
             <span>
                 <span>Fetched logs from </span>
-                <span style={{color: tokens.color["color-bg-success-strong"]}}>{d1}</span>
+                <span style={{color: theme.color["color-bg-fill-success"]}}>{d1}</span>
                 <span > to </span>
-                <span style={{color: tokens.color["color-bg-success-strong"]}}>{d2}</span>
+                <span style={{color: theme.color["color-bg-fill-success"]}}>{d2}</span>
             </span>
         )
     }
@@ -34,15 +34,15 @@ const LogsContainer = ({ logs }) => {
 
             <Scrollable style={{maxHeight: '40vh'}}>
                {logContent.map((logText, idx) => (
-                <VerticalStack gap={1} key={idx}>
-                    <div style={{fontFamily:tokens.font["font-family-mono"], fontWeight: tokens.font["font-weight-medium"],fontSize: '12px', letterSpacing: "0px", textAlign: "left"}}>
+                <BlockStack gap={100} key={idx}>
+                    <div style={{fontFamily:theme.font["font-family-mono"], fontWeight: theme.font["font-weight-medium"],fontSize: '12px', letterSpacing: "0px", textAlign: "left"}}>
                         {logText}
                     </div>
-                </VerticalStack>
+                </BlockStack>
                ))}
             </Scrollable>
         </div>
-    )
+    );
 }
 
 export default LogsContainer

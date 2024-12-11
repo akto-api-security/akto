@@ -60,7 +60,7 @@ function ApiGroupModal(props){
         id: 'existing',
         content: 'Existing API group',
         component: (
-            <Box padding={5} key={"existing"}>
+            <Box padding={500} key={"existing"}>
                 <DropdownSearch
                     id={"select-api-group"}
                     label="Select API group"
@@ -82,7 +82,7 @@ function ApiGroupModal(props){
         id: 'new',
         content: 'New API group',
         component: (
-            <Box padding={5} key={"new"}>
+            <Box padding={500} key={"new"}>
                 <TextField
                     id="create-api-group"
                     label="Name"

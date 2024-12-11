@@ -1,5 +1,5 @@
 import { Button, DropZone } from '@shopify/polaris'
-import {UploadMajor} from "@shopify/polaris-icons"
+import { UploadIcon } from "@shopify/polaris-icons";
 import React, { useCallback } from 'react'
 import "./style.css"
 import func from "@/util/func"
@@ -31,10 +31,10 @@ function FileUpload(props) {
                 allowMultiple={allowMultiple}
                 validates={(file) => file.size <= limitSize}
             >
-                <Button plain icon={UploadMajor} />
+                <Button  icon={UploadIcon} variant="plain" />
             </DropZone>
         </div>
-    )
+    );
 }
 
 export default FileUpload

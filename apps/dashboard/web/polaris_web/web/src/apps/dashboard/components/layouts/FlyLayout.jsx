@@ -1,7 +1,5 @@
-import { Button, HorizontalStack, Text, VerticalStack, Box, Spinner, Divider, Scrollable } from "@shopify/polaris"
-import {
-    CancelMajor
-} from '@shopify/polaris-icons';
+import { Button, InlineStack, Text, BlockStack, Box, Spinner, Divider, Scrollable } from "@shopify/polaris"
+import { XIcon } from "@shopify/polaris-icons";
 import "./style.css"
 
 function FlyLayout(props) {
@@ -17,49 +15,49 @@ function FlyLayout(props) {
     return (
         <div className={"flyLayout " + (show ? "show" : "")} style={{width: divWidth}}>
             <div className="innerFlyLayout">
-                <Box borderColor="border-subdued" borderWidth="1" background="bg" width={divWidth} minHeight="100%">
+                <Box borderColor="border-secondary" borderWidth="1" background="bg" width={divWidth} minHeight="100%">
                     { loading ? <div style={{position: "absolute", right: "25vw" , top: "50vh"}}><Spinner size="large" /></div>:
-                    <VerticalStack gap={"5"}>
-                        <Box padding={"4"} paddingBlockEnd={"0"} >
-                            <HorizontalStack align="space-between">
+                    <BlockStack gap={"500"}>
+                        <Box padding={"400"} paddingBlockEnd={"0"} >
+                            <InlineStack align="space-between">
                                 {titleComp ? titleComp : 
                                     <Text variant="headingMd">
                                         {title}
                                     </Text>
                                 }
-                                <Button icon={CancelMajor} onClick={() => { handleExit()}} plain></Button>
-                            </HorizontalStack>
+                                <Button icon={XIcon} onClick={() => { handleExit()}}  variant="plain"></Button>
+                            </InlineStack>
                         </Box>
                         <Scrollable style={{ height: "92vh" }} shadow>
-                        <Box paddingBlockEnd={"20"}>
-                        <VerticalStack>
-                        {
-                            show ?
-                                components.map((component, index) => {
-                                    return (
-                                        <Box key={index}>                                        
-                                            {newComp ? <Box>
-                                                {component}
-                                            </Box>:
-                                            <Box paddingInlineEnd={"4"} paddingInlineStart={"4"}>
-                                                {component}
+                        <Box paddingBlockEnd={"2000"}>
+                        <BlockStack>
+                            {
+                                show ?
+                                    components.map((component, index) => {
+                                        return (
+                                            <Box key={index}>                                        
+                                                {newComp ? <Box>
+                                                    {component}
+                                                </Box>:
+                                                <Box paddingInlineEnd={"400"} paddingInlineStart={"400"}>
+                                                    {component}
+                                                </Box>
+                                                }
+                                                {(showDivider && index !== components.length - 1) ? <Divider /> : null}
                                             </Box>
-                                            }
-                                            {(showDivider && index !== components.length - 1) ? <Divider /> : null}
-                                        </Box>
-                                    )
-                                })
-                                :null
-                        }
-                        </VerticalStack>
+                                        )
+                                    })
+                                    :null
+                            }
+                        </BlockStack>
                         </Box>
                         </Scrollable>
-                    </VerticalStack>
+                    </BlockStack>
                     }
                 </Box>      
             </div>
         </div>
-    )
+    );
 }
 
 export default FlyLayout

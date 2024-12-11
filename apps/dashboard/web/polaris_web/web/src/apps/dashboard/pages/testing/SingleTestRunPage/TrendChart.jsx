@@ -7,7 +7,7 @@ import {
     LegacyCard,
     ChoiceList,
     Collapsible,
-    HorizontalStack, 
+    InlineStack, 
     Text,
     Button,
     Box,
@@ -17,7 +17,7 @@ import DateRangePicker from "../../../components/layouts/DateRangePicker"
 import func from '@/util/func';
 import { produce } from "immer"
 import "./style.css"
-import { ChevronDownMinor, ChevronUpMinor } from "@shopify/polaris-icons"
+import { ChevronDownIcon, ChevronUpIcon } from "@shopify/polaris-icons";
 import SummaryTable from "./SummaryTable";
 
 function TrendChart(props) {
@@ -74,17 +74,17 @@ function TrendChart(props) {
         return [
             {
                 data: retH,
-                color: "var(--p-color-bg-critical-strong)",
+                color: "var(--p-color-bg-fill-critical)",
                 name: "High"
             },
             {
                 data: retM,
-                color: "var(--p-color-bg-critical)",
+                color: "var(--p-color-bg-fill-critical-secondary)",
                 name: "Medium"
             },
             {
                 data: retL,
-                color: "var(--p-color-bg-caution)",
+                color: "var(--p-color-bg-fill-caution-secondary)",
                 name: "Low"
             }
         ]
@@ -297,17 +297,22 @@ function TrendChart(props) {
         return <></>
     }
 
-    const iconSource = collapsible ? ChevronUpMinor : ChevronDownMinor
+    const iconSource = collapsible ? ChevronUpIcon : ChevronDownIcon
 
     return (
         <LegacyCard>
-            <LegacyCard.Section title={<Text fontWeight="regular" variant="bodySm" color="subdued">Vulnerabilities</Text>}>
-                <HorizontalStack align="space-between">
+            <LegacyCard.Section title={<Text fontWeight="regular" variant="bodySm" tone="subdued">Vulnerabilities</Text>}>
+                <InlineStack align="space-between">
                     <Text fontWeight="semibold" variant="bodyMd">Found {totalVulnerabilities} vulnerabilities in total</Text>
-                    <Button plain monochrome icon={iconSource} onClick={() => setCollapsible(!collapsible)} />
-                </HorizontalStack>
+                    <Button
+
+
+                        icon={iconSource}
+                        onClick={() => setCollapsible(!collapsible)}
+                        variant="monochromePlain" />
+                </InlineStack>
                 <Collapsible open={collapsible} transition={{duration: '500ms', timingFunction: 'ease-in-out'}}>
-                    <Box paddingBlockStart={3}><Divider/></Box>
+                    <Box paddingBlockStart={300}><Divider/></Box>
                     <LegacyCard.Section flush>
                         <div className="filterClass">
                             <Filters
@@ -344,7 +349,7 @@ function TrendChart(props) {
                 <SummaryTable setSummary={setSummary} testingRunResultSummaries={testingRunResultSummaries} />
             </LegacyCard.Section>
         </LegacyCard>
-    )
+    );
 
 }
 

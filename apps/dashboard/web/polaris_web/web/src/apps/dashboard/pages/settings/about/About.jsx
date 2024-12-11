@@ -1,10 +1,10 @@
-import { Box, Button, ButtonGroup, Divider, LegacyCard, Text, VerticalStack, HorizontalGrid, HorizontalStack, Scrollable, TextField, Tag, Form, Tooltip } from '@shopify/polaris'
+import { Box, Button, ButtonGroup, Divider, LegacyCard, Text, BlockStack, InlineGrid, InlineStack, Scrollable, TextField, Tag, Form, Tooltip } from '@shopify/polaris'
 import React, { useEffect, useState } from 'react'
 import settingFunctions from '../module'
 import Dropdown from '../../../components/layouts/Dropdown'
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
 import settingRequests from '../api'
-import { DeleteMajor, FileFilledMinor } from "@shopify/polaris-icons"
+import { DeleteIcon, FileFilledIcon } from "@shopify/polaris-icons";
 import TooltipText from "../../../components/shared/TooltipText"
 import { isIP } from "is-ip"
 import isCidr from "is-cidr"
@@ -81,9 +81,9 @@ function About() {
 
     function TitleComponent ({title,description}) {
         return(
-            <Box paddingBlockEnd="4">
+            <Box paddingBlockEnd="400">
                 <Text variant="headingMd">{title}</Text>
-                <Box paddingBlockStart="2">
+                <Box paddingBlockStart="200">
                     <Text variant="bodyMd">{description}</Text>
                 </Box>
             </Box>
@@ -139,13 +139,13 @@ function About() {
     
 
     const infoComponent = (
-        <VerticalStack gap={4}>
-            <HorizontalGrid columns={"2"} gap={"3"}>
+        <BlockStack gap={400}>
+            <InlineGrid columns={"2"} gap={"300"}>
                 <TextField 
                     disabled={window.USER_ROLE !== 'ADMIN'} 
                     connectedRight={(
                         <Tooltip content="Save account name" dismissOnMouseOut>
-                            <Button disabled={window.USER_ROLE !== 'ADMIN'} icon={FileFilledMinor} onClick={() => handleSaveSettings("name", accountName)} />
+                            <Button disabled={window.USER_ROLE !== 'ADMIN'} icon={FileFilledIcon} onClick={() => handleSaveSettings("name", accountName)} />
                         </Tooltip>
                     )} 
                     onChange={setAccountName} 
@@ -160,16 +160,16 @@ function About() {
                     value={currentTimeZone}
                     sliceMaxVal={40}
                 />
-            </HorizontalGrid>
+            </InlineGrid>
             {objArr.map((item)=>(
                 <Box key={item.title} >
-                    <VerticalStack gap={1}>
-                        <Text fontWeight='semi-bold' color='subdued'>{item.title}</Text>
+                    <BlockStack gap={100}>
+                        <Text fontWeight='semi-bold' tone='subdued'>{item.title}</Text>
                         <Text fontWeight='bold'>{item.text}</Text>
-                    </VerticalStack>
+                    </BlockStack>
                 </Box>
             ))}
-        </VerticalStack>
+        </BlockStack>
     )
 
     const handleSelect = async(selected) => {
@@ -239,10 +239,10 @@ function About() {
     }
 
     function ToggleComponent({text,onToggle,initial}){
-        return(
-            <VerticalStack gap={1}>
-                <Text color="subdued">{text}</Text>
-                <ButtonGroup segmented>
+        return (
+            <BlockStack gap={100}>
+                <Text tone="subdued">{text}</Text>
+                <ButtonGroup variant="segmented">
                     <Button size="slim" onClick={() => onToggle(true)} pressed={initial === true}>
                         True
                     </Button>
@@ -250,8 +250,8 @@ function About() {
                         False
                     </Button>
                 </ButtonGroup>
-            </VerticalStack>
-        )
+            </BlockStack>
+        );
     }
 
 
@@ -320,7 +320,7 @@ function About() {
     }
 
     const redundantUrlComp = (
-        <VerticalStack gap={"4"}>
+        <BlockStack gap={"400"}>
             <Box width='220px'>
                 <DropdownSearch
                     label="Select redundant url types"
@@ -335,26 +335,30 @@ function About() {
                 />
             </Box>
             <ToggleComponent text={"Treat URLs as case insensitive"} onToggle={handleApisCaseInsensitive} initial={toggleCaseSensitiveApis} />
-        </VerticalStack>
+        </BlockStack>
     )
     
     const filterHeaderComponent = (
-        <VerticalStack gap={5}>
-            <Text color="subdued">Traffic filters</Text>
+        <BlockStack gap={500}>
+            <Text tone="subdued">Traffic filters</Text>
             <Scrollable horizontal={false} style={{maxHeight: '100px'}} shadow>
-                <VerticalStack gap={1}>
+                <BlockStack gap={100}>
                     {Object.keys(trafficFiltersMap).map((key)=> {
-                        return(
-                            <HorizontalGrid gap={2} columns={3} key={key}>
+                        return (
+                            <InlineGrid gap={200} columns={3} key={key}>
                                 <TooltipText textProps={{variant:"bodyMd", fontWeight:"medium"}} tooltip={key} text={key}/>
                                 <TooltipText textProps={{variant:"bodyMd", color: "subdued"}} tooltip={trafficFiltersMap[key]} text={trafficFiltersMap[key]}/>
-                                <Button plain icon={DeleteMajor} onClick={() => deleteFilterHeader(key)}/>
-                            </HorizontalGrid>
-                        )
+                                <Button
+
+                                    icon={DeleteIcon}
+                                    onClick={() => deleteFilterHeader(key)}
+                                    variant="plain" />
+                            </InlineGrid>
+                        );
                     })}
-                </VerticalStack>
+                </BlockStack>
             </Scrollable>
-            <HorizontalGrid gap={2} columns={3} alignItems="center">
+            <InlineGrid gap={200} columns={3} alignItems="center">
                 <TextFieldWithInfo 
                     labelText="Header key"
                     labelTextColor="subdued"
@@ -371,31 +375,35 @@ function About() {
                     value={headerValue}
                     setValue={setHeaderValue}
                 />
-            {checkSaveActive('filterHeader') ? <Box paddingBlockStart={5} width="100px"><Button onClick={saveFilterHeader} size="medium" primary>Save</Button></Box> : null}
-            </HorizontalGrid>
-        </VerticalStack>
+                {checkSaveActive('filterHeader') ? <Box paddingBlockStart={500} width="100px"><Button onClick={saveFilterHeader} size="medium"  variant="primary">Save</Button></Box> : null}
+            </InlineGrid>
+        </BlockStack>
     )
 
     const replaceCollectionComponent = (
-        <VerticalStack gap={5}>
-            <Text color="subdued">Replace collection</Text>
+        <BlockStack gap={500}>
+            <Text tone="subdued">Replace collection</Text>
             <Scrollable horizontal={false} style={{maxHeight: '100px'}} shadow>
-                <VerticalStack gap={1}>
+                <BlockStack gap={100}>
                     {Object.keys(apiCollectionNameMapper).map((key)=> {
                         const { headerName, newName, regex } = apiCollectionNameMapper[key]
                         const headerLine = headerName + "=" + regex
 
-                        return(
-                            <HorizontalGrid gap={2} columns={3} key={key}>
+                        return (
+                            <InlineGrid gap={200} columns={3} key={key}>
                                 <TooltipText textProps={{variant:"bodyMd", fontWeight:"medium"}} tooltip={headerLine} text={headerLine}/>
                                 <TooltipText textProps={{variant:"bodyMd", color: "subdued"}} tooltip={newName} text={newName}/>
-                                <Button plain icon={DeleteMajor} onClick={() => deleteApiCollectionNameMapper(regex)}/>
-                            </HorizontalGrid>
-                        )
+                                <Button
+
+                                    icon={DeleteIcon}
+                                    onClick={() => deleteApiCollectionNameMapper(regex)}
+                                    variant="plain" />
+                            </InlineGrid>
+                        );
                     })}
-                </VerticalStack>
+                </BlockStack>
             </Scrollable>
-            <HorizontalGrid gap={2} columns={3} alignItems="center">
+            <InlineGrid gap={200} columns={3} alignItems="center">
                 <TextFieldWithInfo 
                     labelText="Header key"
                     labelTextColor="subdued"
@@ -420,9 +428,9 @@ function About() {
                     value={replaceNewCollectionName}
                     setValue={setReplaceNewCollectionName}
                 />
-            {checkSaveActive('replaceCollection') ? <Box paddingBlockStart={5} width="100px"><Button onClick={addApiCollectionNameMapper} size="medium" primary>Save</Button></Box> : null}
-            </HorizontalGrid>
-        </VerticalStack>
+                {checkSaveActive('replaceCollection') ? <Box paddingBlockStart={5} width="100px"><Button onClick={addApiCollectionNameMapper} size="medium"  variant="primary">Save</Button></Box> : null}
+            </InlineGrid>
+        </BlockStack>
     )
 
     const accountInfoComponent = (
@@ -438,9 +446,9 @@ function About() {
                   <LegacyCard.Section title={<Text variant="headingMd">More settings</Text>}>
                       <div style={{ display: 'flex' }}>
                           <div style={{ flex: "1" }}>
-                              <VerticalStack gap={5}>
-                                  <VerticalStack gap={1}>
-                                      <Text color="subdued">Setup type</Text>
+                              <BlockStack gap={500}>
+                                  <BlockStack gap={100}>
+                                      <Text tone="subdued">Setup type</Text>
                                       <Box width='120px'>
                                           <Dropdown
                                               selected={handleSelect}
@@ -448,13 +456,13 @@ function About() {
                                               initial={setupType}
                                           />
                                       </Box>
-                                  </VerticalStack>
+                                  </BlockStack>
                                   <ToggleComponent text={"Redact sample data"} initial={redactPayload} onToggle={handleRedactPayload} />
                                   <ToggleComponent text={"Activate regex matching in merging"} initial={newMerging} onToggle={handleNewMerging} />
                                   <ToggleComponent text={"Enable telemetry"} initial={enableTelemetry} onToggle={toggleTelemetry} />
                                   {redundantUrlComp}
-                                  <VerticalStack gap={1}>
-                                      <Text color="subdued">Traffic alert threshold</Text>
+                                  <BlockStack gap={100}>
+                                      <Text tone="subdued">Traffic alert threshold</Text>
                                       <Box width='120px'>
                                           <Dropdown
                                               selected={handleSelectTraffic}
@@ -462,8 +470,8 @@ function About() {
                                               initial={trafficThreshold}
                                           />
                                       </Box>
-                                  </VerticalStack>
-                              </VerticalStack>
+                                  </BlockStack>
+                              </BlockStack>
                           </div>
                           <div style={{ flex: '2' }}>
                               {filterHeaderComponent}
@@ -513,7 +521,7 @@ function About() {
         }
 
         const isError = checkError(value, type)
-        return(
+        return (
             <LegacyCard title={<TitleComponent title={title} description={description} />}
                 actions={[
                     { content: 'Apply', onAction: onApply }
@@ -521,11 +529,11 @@ function About() {
             >
                 <Divider />
                 <LegacyCard.Section>
-                    <VerticalStack gap={"2"}>
+                    <BlockStack gap={"200"}>
                         <Form onSubmit={() => onFormSubmit(value)}>
-                            <TextField onChange={setValue} value={value} label={<Text color="subdued" fontWeight="medium" variant="bodySm">{labelText}</Text>} {...isError ? {error: "Invalid address"} : {}}/>
+                            <TextField onChange={setValue} value={value} label={<Text tone="subdued" fontWeight="medium" variant="bodySm">{labelText}</Text>} {...isError ? {error: "Invalid address"} : {}}/>
                         </Form>
-                        <HorizontalStack gap={"2"}>
+                        <InlineStack gap={"200"}>
                             {ipsList && ipsList.length > 0 && ipsList.map((ip, index) => {
                                 return(
                                     <Tag key={index} onRemove={() => onRemove(ip)}>
@@ -533,11 +541,11 @@ function About() {
                                     </Tag>
                                 )
                             })}
-                        </HorizontalStack>
-                    </VerticalStack>
+                        </InlineStack>
+                    </BlockStack>
                 </LegacyCard.Section>
             </LegacyCard>
-        )
+        );
     }
 
     const components = [accountInfoComponent, 

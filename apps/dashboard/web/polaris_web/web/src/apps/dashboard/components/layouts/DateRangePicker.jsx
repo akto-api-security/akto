@@ -1,6 +1,6 @@
-import { Box, Button, ButtonGroup, DatePicker, HorizontalGrid, HorizontalStack, Icon, OptionList, Popover, Scrollable, Select, TextField, VerticalStack, useBreakpoints } from "@shopify/polaris";
+import { Box, Button, ButtonGroup, DatePicker, InlineGrid, InlineStack, Icon, OptionList, Popover, Scrollable, Select, TextField, BlockStack, useBreakpoints } from "@shopify/polaris";
 import {useRef, useState } from "react";
-import { CalendarMinor, ArrowRightMinor } from "@shopify/polaris-icons"
+import { CalendarIcon, ArrowRightIcon } from "@shopify/polaris-icons";
 
 function DateRangePicker(props) {
       const { mdDown, lgUp } = useBreakpoints();
@@ -141,19 +141,18 @@ function DateRangePicker(props) {
       return (
         <Box>
           <Popover.Pane fixed>
-            <HorizontalGrid
+            <InlineGrid
               columns={{
                 xs: "1fr",
                 mdDown: "1fr",
                 md: "max-content max-content",
               }}
-              gap={0}
-            >
+              gap={0}>
               <Box
                 maxWidth={mdDown ? "516px" : "212px"}
                 width={mdDown ? "100%" : "212px"}
-                padding={{ xs: 5, md: 0 }}
-                paddingBlockEnd={{ xs: 1, md: 0 }}
+                padding={{ xs: 500, md: 0 }}
+                paddingBlockEnd={{ xs: 100, md: 0 }}
               >
                 {mdDown ? (
                   <Select
@@ -185,35 +184,35 @@ function DateRangePicker(props) {
                   </Scrollable>
                 )}
               </Box>
-              <Box padding={{ xs: 5 }} maxWidth={mdDown ? "320px" : "516px"}>
-                <VerticalStack gap="4">
-                  <HorizontalStack gap="2">
+              <Box padding={{ xs: 500 }} maxWidth={mdDown ? "320px" : "516px"}>
+                <BlockStack gap="400">
+                  <InlineStack gap="200">
                     <div style={{ flexGrow: 1 }}>
                       <TextField
                         role="combobox"
                         label={"Since"}
                         labelHidden
-                        prefix={<Icon source={CalendarMinor} />}
+                        prefix={<Icon source={CalendarIcon} />}
                         value={inputValues.since}
                         onChange={handleStartInputValueChange}
                         onBlur={handleInputBlur}
                         autoComplete="off"
                       />
                     </div>
-                    <Icon source={ArrowRightMinor} />
+                    <Icon source={ArrowRightIcon} />
                     <div style={{ flexGrow: 1 }}>
                       <TextField
                         role="combobox"
                         label={"Until"}
                         labelHidden
-                        prefix={<Icon source={CalendarMinor} />}
+                        prefix={<Icon source={CalendarIcon} />}
                         value={inputValues.until}
                         onChange={handleEndInputValueChange}
                         onBlur={handleInputBlur}
                         autoComplete="off"
                       />
                     </div>
-                  </HorizontalStack>
+                  </InlineStack>
                   <div>
                     <DatePicker
                       month={month}
@@ -228,20 +227,20 @@ function DateRangePicker(props) {
                       allowRange
                     />
                   </div>
-                </VerticalStack>
+                </BlockStack>
               </Box>
-            </HorizontalGrid>
+            </InlineGrid>
           </Popover.Pane>
           <Popover.Pane fixed>
             <Popover.Section>
-              <HorizontalStack align="end">
+              <InlineStack align="end">
                 <ButtonGroup>
                 <Button onClick={cancel}>Cancel</Button>
-                <Button primary onClick={apply}>
+                <Button  onClick={apply} variant="primary">
                   Apply
                 </Button>
                 </ButtonGroup>
-              </HorizontalStack>
+              </InlineStack>
             </Popover.Section>
           </Popover.Pane>
           </Box>

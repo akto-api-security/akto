@@ -1,5 +1,16 @@
-import { TopBar, Icon, Text, ActionList, Modal, TextField, HorizontalStack, Box, Avatar, VerticalStack, Button, Scrollable } from '@shopify/polaris';
-import { NotificationMajor, CustomerPlusMajor, LogOutMinor, NoteMinor, ResourcesMajor, UpdateInventoryMajor, PageMajor, DynamicSourceMajor, PhoneMajor, ChatMajor } from '@shopify/polaris-icons';
+import { TopBar, Icon, Text, ActionList, Modal, TextField, InlineStack, Box, Avatar, BlockStack, Button, Scrollable } from '@shopify/polaris';
+import {
+    NotificationIcon,
+    PersonAddIcon,
+    ExitIcon,
+    NoteIcon,
+    EyeglassesIcon,
+    InventoryUpdatedIcon,
+    PageIcon,
+    DatabaseIcon,
+    PhoneIcon,
+    ChatIcon,
+} from "@shopify/polaris-icons";
 import { useState, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Store from '../../../store';
@@ -14,15 +25,15 @@ import LocalStore from '../../../../main/LocalStorageStore';
 import homeFunctions from '../../../../dashboard/pages/home/module';
 
 function ContentWithIcon({icon,text, isAvatar= false}) {
-    return(
-        <HorizontalStack gap={2}>
+    return (
+        <InlineStack gap={200}>
             <Box width='20px'>
-                {isAvatar ? <div className='reduce-size'><Avatar size="extraSmall" source={icon} /> </div>:
-                <Icon source={icon} color="base" />}
+                {isAvatar ? <div className='reduce-size'><Avatar size="xs" source={icon} /> </div>:
+                <Icon source={icon} tone="base" />}
             </Box>
             <Text>{text}</Text>
-        </HorizontalStack>
-    )
+        </InlineStack>
+    );
 }
 
 export default function Header() {
@@ -132,22 +143,22 @@ export default function Header() {
                 {
                     items: [
                         (window.IS_SAAS !== "true" && (window?.DASHBOARD_MODE === 'LOCAL_DEPLOY' || window?.DASHBOARD_MODE === "ON_PREM")) ? {} :
-                        { id: "create_account", content: <ContentWithIcon icon={CustomerPlusMajor} text={"Create account"} />, onAction: () => setShowCreateAccount(true)},
+                        { id: "create_account", content: <ContentWithIcon icon={PersonAddIcon} text={"Create account"} />, onAction: () => setShowCreateAccount(true)},
                         // { id: "manage", content: 'Manage account' },
-                        { id: "log-out", content: <ContentWithIcon icon={LogOutMinor} text={"Logout"} /> , onAction: handleLogOut }
+                        { id: "log-out", content: <ContentWithIcon icon={ExitIcon} text={"Logout"} /> , onAction: handleLogOut }
                     ],
                 },
                 {
                     items: [
-                        { content: <ContentWithIcon text={"Documentation"} icon={NoteMinor} />, onAction: () => { window.open("https://docs.akto.io/readme") } },
-                        { content: <ContentWithIcon text={"Book a call"} icon={PhoneMajor}/>, onAction: () => { window.open("https://akto.io/api-security-demo") } },
-                        { content: <ContentWithIcon text={"Contact Us"} icon={ChatMajor}/>, onAction: () => { 
+                        { content: <ContentWithIcon text={"Documentation"} icon={NoteIcon} />, onAction: () => { window.open("https://docs.akto.io/readme") } },
+                        { content: <ContentWithIcon text={"Book a call"} icon={PhoneIcon}/>, onAction: () => { window.open("https://akto.io/api-security-demo") } },
+                        { content: <ContentWithIcon text={"Contact Us"} icon={ChatIcon}/>, onAction: () => { 
                             if (window?.Intercom) {
                                 window.Intercom('show');
                             }
                         } },
-                        { content: <ContentWithIcon text={"Tutorials"} icon={ResourcesMajor}/>, onAction: () => { window.open("https://www.youtube.com/@aktodotio") } },
-                        { content: <ContentWithIcon icon={UpdateInventoryMajor} text={"Changelog"} />, onAction: () => { window.open("https://app.getbeamer.com/akto/en") } },
+                        { content: <ContentWithIcon text={"Tutorials"} icon={EyeglassesIcon}/>, onAction: () => { window.open("https://www.youtube.com/@aktodotio") } },
+                        { content: <ContentWithIcon icon={InventoryUpdatedIcon} text={"Changelog"} />, onAction: () => { window.open("https://app.getbeamer.com/akto/en") } },
                         { content: <ContentWithIcon icon="/public/discord.svg" text={"Discord Support"} isAvatar={true}/>, onAction: () => { window.open("https://discord.com/invite/Wpc6xVME4s") } },
                         { content: <ContentWithIcon icon="/public/github_icon.svg" text={"Star On Github"} isAvatar={true}/>, onAction: () => { window.open("https://github.com/akto-api-security/akto") } }
                     ],
@@ -170,7 +181,7 @@ export default function Header() {
     }
 
     const searchItems = filteredItemsArr.slice(0,20).map((item) => {
-        const icon = item.type === 'page' ? PageMajor : DynamicSourceMajor;
+        const icon = item.type === 'page' ? PageIcon : DatabaseIcon;
         return {
             value: item.content,
             content: <ContentWithIcon text={item.content} icon={icon} />,
@@ -209,26 +220,26 @@ export default function Header() {
 
 
     const secondaryMenuMarkup = (
-        <HorizontalStack gap={"4"}>
+        <InlineStack gap={"400"}>
             {(Object.keys(currentTestsObj).length > 0 && currentTestsObj?.testRunsArr?.length !== 0 && currentTestsObj?.totalTestsCompleted > 0) ? 
-            <HorizontalStack gap={"2"}>
-                <Button plain monochrome onClick={() => {handleTestingNavigate()}}>
+            <InlineStack gap={"200"}>
+                <Button   onClick={() => {handleTestingNavigate()}} variant="monochromePlain">
                  <SemiCircleProgress key={"progress"} progress={progress} size={60} height={55} width={75}/>
                 </Button>
-                <VerticalStack gap={"0"}>
+                <BlockStack gap={"0"}>
                     <Text fontWeight="medium">Test run status</Text>
-                    <Text color="subdued" variant="bodySm">{`${currentTestsObj.totalTestsQueued} tests queued`}</Text>
-                </VerticalStack>
-            </HorizontalStack> : null}
-             <TopBar.Menu
-                activatorContent={
-                    <span id="beamer-btn" className={getColorForIcon()}>
-                        <Icon source={NotificationMajor}/> 
-                    </span>
-                }
-                actions={[]}
-            />
-        </HorizontalStack>
+                    <Text tone="subdued" variant="bodySm">{`${currentTestsObj.totalTestsQueued} tests queued`}</Text>
+                </BlockStack>
+            </InlineStack> : null}
+            <TopBar.Menu
+               activatorContent={
+                   <span  id="beamer-btn"  className={getColorForIcon()}>
+                       <Icon tone="primary" source={NotificationIcon} />
+                   </span>
+               }
+               actions={[]}
+           />
+        </InlineStack>
         
     );
 

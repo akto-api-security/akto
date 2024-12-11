@@ -1,5 +1,5 @@
 import React from 'react'
-import { Box, Button, Card, Text, VerticalStack, VideoThumbnail } from "@shopify/polaris"
+import { Box, Button, Card, Text, BlockStack, VideoThumbnail } from "@shopify/polaris"
 import { useNavigate } from 'react-router-dom';
 
 function BannerLayout({title, text, buttonText, buttonUrl, bodyComponent, videoThumbnail, videoLink, videoLength, linkButton, containerComp, newTab, onClick}) {
@@ -7,18 +7,18 @@ function BannerLayout({title, text, buttonText, buttonUrl, bodyComponent, videoT
     const navigate = useNavigate();
     const handleRedirect = () =>{ newTab ? window.open(buttonUrl, "_blank") :navigate(buttonUrl)}
     return (
-        <Card padding={"10"}>
-            <VerticalStack gap={8}>
+        <Card padding={"1000"}>
+            <BlockStack gap={800}>
                 <div style={{display: "flex", justifyContent: 'space-between'}}>
                     <Box width="400px">
-                        <VerticalStack gap={4}>
+                        <BlockStack gap={400}>
                             <Text variant="headingLg">{title}</Text>
-                            <Text color="subdued" variant="bodyMd">{text}</Text>
+                            <Text tone="subdued" variant="bodyMd">{text}</Text>
                             {bodyComponent}
-                            {buttonText ? <Box paddingBlockStart={2}>
-                                <Button {...properties} onClick={() => {handleRedirect(); onClick()}}>{buttonText}</Button>
+                            {buttonText ? <Box paddingBlockStart={200}>
+                                <Button {...properties} onClick={() => {handleRedirect(); onClick()}} variant="primary">{buttonText}</Button>
                             </Box> : null}
-                        </VerticalStack>
+                        </BlockStack>
                     </Box>
                     {videoLink ? <Box width='340px'>
                         <VideoThumbnail
@@ -29,9 +29,9 @@ function BannerLayout({title, text, buttonText, buttonUrl, bodyComponent, videoT
                     </Box> : null}
                 </div>
                 {containerComp}
-            </VerticalStack>
+            </BlockStack>
         </Card>
-    )
+    );
 }
 
 export default BannerLayout

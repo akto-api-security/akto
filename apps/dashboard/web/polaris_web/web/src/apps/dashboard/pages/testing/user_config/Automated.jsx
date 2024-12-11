@@ -1,4 +1,4 @@
-import { Divider, FormLayout, HorizontalGrid, HorizontalStack, Text } from "@shopify/polaris"
+import { Divider, FormLayout, InlineGrid, InlineStack, Text } from "@shopify/polaris"
 import Dropdown from "../../../components/layouts/Dropdown"
 import DropdownSearch from "../../../components/shared/DropdownSearch"
 import { useEffect, useState } from "react"

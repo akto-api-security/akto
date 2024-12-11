@@ -1,9 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react'
+import { ClipboardIcon, ArrowDownIcon, ArrowUpIcon } from "@shopify/polaris-icons";
 import {
-    ClipboardMinor,ArrowDownMinor, ArrowUpMinor
-} from '@shopify/polaris-icons';
-import {
-    HorizontalStack, Box, LegacyCard,
+    InlineStack, Box, LegacyCard,
     Button, Popover, ActionList, Icon, Text, Tooltip
 } from '@shopify/polaris';
 import SampleData from './SampleData';
@@ -203,35 +201,49 @@ function SampleDataComponent(props) {
 
         <Box id='sample-data-editor-container'>
             <LegacyCard.Section flush>
-                <Box padding={"2"}>
-                    <HorizontalStack padding="2" align='space-between'>
-                        {func.toSentenceCase(type)} 
+                <Box padding={"200"}>
+                    <InlineStack padding="2" align='space-between'>
+                        {func.toSentenceCase(type)}
                         { type=="response" && responseTime ? (` (${responseTime} ms)`) : "" }
-                        <HorizontalStack gap={2}>
-                        {isNewDiff ? <HorizontalStack gap="2">
-                                <Box borderInlineEndWidth='1' borderColor="border-subdued" padding="1">
-                                    <Text variant="bodyMd" color="subdued">{ lineNumbers[type].length } changes</Text>
+                        <InlineStack gap={200}>
+                            {isNewDiff ? <InlineStack gap="2">
+                                <Box borderInlineEndWidth='1' borderColor="border-secondary" padding="100">
+                                    <Text variant="bodyMd" tone="subdued">{ lineNumbers[type].length } changes</Text>
                                 </Box>
-                                <HorizontalStack gap="1">
-                                    <Button plain monochrome disabled={!checkButtonActive("prev")} onClick={() => changeIndex("prev")}>
-                                        <Box padding="05" borderWidth="1" borderColor="border" borderRadius="1">
-                                            <Icon source={ArrowUpMinor} />
+                                <InlineStack gap="100">
+                                    <Button
+
+
+                                        disabled={!checkButtonActive("prev")}
+                                        onClick={() => changeIndex("prev")}
+                                        variant="monochromePlain">
+                                        <Box padding="050" borderWidth="1" borderColor="border" borderRadius="1">
+                                            <Icon source={ArrowUpIcon} />
                                         </Box>
                                     </Button>
-                                    <Button plain monochrome disabled={!checkButtonActive("next")} onClick={() => changeIndex("next")}>
-                                        <Box padding="05" borderWidth="1" borderColor="border" borderRadius="1">
-                                            <Icon source={ArrowDownMinor} />
+                                    <Button
+
+
+                                        disabled={!checkButtonActive("next")}
+                                        onClick={() => changeIndex("next")}
+                                        variant="monochromePlain">
+                                        <Box padding="050" borderWidth="1" borderColor="border" borderRadius="1">
+                                            <Icon source={ArrowDownIcon} />
                                         </Box>
                                     </Button>
-                                </HorizontalStack>
-                            </HorizontalStack> 
-                            : null}
+                                </InlineStack>
+                            </InlineStack> 
+                                : null}
                             <Tooltip content={`Copy ${type}`}>
                             <Popover
                                 zIndexOverride={"600"}
                                 active={popoverActive[type]}
-                                activator={<Button icon={ClipboardMinor} plain onClick={() => 
-                                    setPopoverActive({ [type]: !popoverActive[type] })} />}
+                                activator={<Button
+                                    icon={ClipboardIcon}
+
+                                    onClick={() => 
+                                        setPopoverActive({ [type]: !popoverActive[type] })}
+                                    variant="plain" />}
                                 onClose={() => setPopoverActive(false)}
                             >
                                 <div ref={ref}/>
@@ -241,15 +253,15 @@ function SampleDataComponent(props) {
                                 />
                             </Popover>
                             </Tooltip>
-                        </HorizontalStack>
-                    </HorizontalStack>
+                        </InlineStack>
+                    </InlineStack>
                 </Box>
             </LegacyCard.Section>
             <LegacyCard.Section flush>
                 <SampleData data={sampleJsonData[type]} minHeight={minHeight || "400px"} useDynamicHeight={props?.useDynamicHeight || false} showDiff={showDiff} editorLanguage="custom_http" currLine={currentLineActive} getLineNumbers={getLineNumbers}/>
             </LegacyCard.Section>
         </Box>
-    )
+    );
 
 }
 

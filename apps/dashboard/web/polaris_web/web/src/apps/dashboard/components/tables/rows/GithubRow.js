@@ -2,8 +2,8 @@ import {
     IndexTable,
     Text,
     Badge,
-    VerticalStack,
-    HorizontalStack,
+    BlockStack,
+    InlineStack,
     Button,
     Popover,
     ActionList,
@@ -11,9 +11,7 @@ import {
     Box,
     Icon
 } from '@shopify/polaris';
-import {
-    HorizontalDotsMinor, ChevronDownMinor, ChevronUpMinor, ChevronRightMinor
-} from '@shopify/polaris-icons';
+import { MenuHorizontalIcon, ChevronDownIcon, ChevronUpIcon, ChevronRightIcon } from "@shopify/polaris-icons";
 import { useNavigate } from "react-router-dom";
 import { useState, useEffect } from 'react';
 import './row.css'
@@ -81,67 +79,69 @@ function GithubRow(props) {
     }, [dataObj,collapsibleActive])
 
     function OldCell(){
-        return(
-            <>
-            <IndexTable.Cell>
-                <div className='linkClass'>
-                    <Link
-                        monochrome
-                        removeUnderline
-                        onClick={() => handleRowClick(data)}
-                    >
-                        <GithubCell
-                            headers={headers}
-                            data={data}
-                            getStatus={getStatus}
-                            width="65vw"
-                            nameWidth="50vw"
-                        />
-                    </Link>
-                </div>
-            </IndexTable.Cell>
-            {headers?.filter((header) => {
-                return header.itemCell == 2
-            }).filter((header) => {
-                return data[header.value] != undefined
-            }).map((header) => {
-                return (
-                    <IndexTable.Cell key={header.text}>
-                        <VerticalStack gap="2">
-                            <Text variant='bodyMd' fontWeight="medium">
-                                {header.text}
-                            </Text>
-                            <HorizontalStack>
-                                <Badge key={header.text}>
-                                    {data[header.value]}
-                                </Badge>
-                            </HorizontalStack>
-                        </VerticalStack>
-                    </IndexTable.Cell>
-                )
-            })
-            }
-            {hasRowActions &&
-                <IndexTable.Cell >
-                    <HorizontalStack align='end'>
-                        {
-                            <Popover
-                                active={popoverActive === data.id}
-                                activator={<Button onClick={(e) => togglePopoverActive(e,data.id)} plain icon={HorizontalDotsMinor} />}
-                                autofocusTarget="first-node"
-                                onClose={(e) => togglePopoverActive(e,popoverActive)}
-                            >
-                                <ActionList
-                                    actionRole="menuitem"
-                                    sections={getActions(data)}
-                                />
-                            </Popover>
-                        }
-                    </HorizontalStack>
+        return <>
+        <IndexTable.Cell>
+            <div className='linkClass'>
+                <Link
+                    monochrome
+                    removeUnderline
+                    onClick={() => handleRowClick(data)}
+                >
+                    <GithubCell
+                        headers={headers}
+                        data={data}
+                        getStatus={getStatus}
+                        width="65vw"
+                        nameWidth="50vw"
+                    />
+                </Link>
+            </div>
+        </IndexTable.Cell>
+        {headers?.filter((header) => {
+            return header.itemCell == 2
+        }).filter((header) => {
+            return data[header.value] != undefined
+        }).map((header) => {
+            return (
+                <IndexTable.Cell key={header.text}>
+                    <BlockStack gap="200">
+                        <Text variant='bodyMd' fontWeight="medium">
+                            {header.text}
+                        </Text>
+                        <InlineStack>
+                            <Badge key={header.text}>
+                                {data[header.value]}
+                            </Badge>
+                        </InlineStack>
+                    </BlockStack>
                 </IndexTable.Cell>
-            }
-        </>
-        )
+            );
+        })
+        }
+        {hasRowActions &&
+            <IndexTable.Cell >
+                <InlineStack align='end'>
+                    {
+                        <Popover
+                            active={popoverActive === data.id}
+                            activator={<Button
+                                onClick={(e) => togglePopoverActive(e,data.id)}
+
+                                icon={MenuHorizontalIcon}
+                                variant="plain" />}
+                            autofocusTarget="first-node"
+                            onClose={(e) => togglePopoverActive(e,popoverActive)}
+                        >
+                            <ActionList
+                                actionRole="menuitem"
+                                sections={getActions(data)}
+                            />
+                        </Popover>
+                    }
+                </InlineStack>
+            </IndexTable.Cell>
+        }
+    </>;
     }
 
     function LinkCell(cellData, header, cellWidth) {
@@ -172,11 +172,15 @@ function GithubRow(props) {
     function ActionCell() {
         return (
             <IndexTable.Cell key={"actions"}>
-                <HorizontalStack align='end'>
+                <InlineStack align='end'>
                     {
                         <Popover
                             active={popoverActive === data.id}
-                            activator={<Button onClick={(e) => togglePopoverActive(e,data.id)} plain icon={HorizontalDotsMinor} />}
+                            activator={<Button
+                                onClick={(e) => togglePopoverActive(e,data.id)}
+
+                                icon={MenuHorizontalIcon}
+                                variant="plain" />}
                             autofocusTarget="first-node"
                             onClose={(e) => togglePopoverActive(e,popoverActive)}
                         >
@@ -186,26 +190,26 @@ function GithubRow(props) {
                             />
                         </Popover>
                     }
-                </HorizontalStack>
+                </InlineStack>
             </IndexTable.Cell>
-        )
+        );
     }
 
     function CollapsibleCell(treeView, value) {
-        let iconSource = ChevronRightMinor
+        let iconSource = ChevronRightIcon
         if(collapsibleActive === data?.name){
-            iconSource = ChevronDownMinor
+            iconSource = ChevronDownIcon
         }
         return (
             <IndexTable.Cell key={"collapsible"}>
                 <Box maxWidth={treeView ? "180px": ''} >
-                    <HorizontalStack align={treeView ? "start" : "end"} wrap={false} gap={"2"}>
+                    <InlineStack align={treeView ? "start" : "end"} wrap={false} gap={"200"}>
                         <Box><Icon source={iconSource} /></Box>
-                        {treeView ? value : null} 
-                    </HorizontalStack>
+                        {treeView ? value : null}
+                    </InlineStack>
                 </Box>
             </IndexTable.Cell>
-        )
+        );
     }
 
     function getHeader(header){
@@ -243,7 +247,7 @@ function GithubRow(props) {
                 id={data.id}
                 key={data.id}
                 position={index}
-                {...props.newRow ? {status: ((index % 2) ? "subdued" : '')} : {} }
+                {...props.newRow ? {tone: ((index % 2) ? "subdued" : '')} : {} }
                 {...props.notHighlightOnselected ? {} : {selected: selectedResources.includes(data?.id)}}
                 onClick={() => handleRowClick(data)}
             >

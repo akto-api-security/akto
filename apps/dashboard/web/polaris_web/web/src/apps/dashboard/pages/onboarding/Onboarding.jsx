@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react'
 import { Avatar, Button, ButtonGroup, Frame, TopBar } from "@shopify/polaris"
-import {ClipboardMinor} from "@shopify/polaris-icons"
+import { ClipboardIcon } from "@shopify/polaris-icons";
 import "./Onboarding.css"
 import OnboardingBuilder from './components/OnboardingBuilder'
 import transform from "../testing/transform"
@@ -11,12 +11,12 @@ function Onboarding() {
       window.open(url)
     }
     const avatar = (
-      <Avatar customer size='extraSmall' source='/public/discord.svg' name='discord' />
+      <Avatar customer size="xs" source='/public/discord.svg' name='discord' />
     )
 
     const topbarButtons = (
       <ButtonGroup>
-        <Button size="slim" onClick={() => openUrl("https://docs.akto.io")} icon={ClipboardMinor}> Docs </Button>
+        <Button size="slim" onClick={() => openUrl("https://docs.akto.io")} icon={ClipboardIcon}> Docs </Button>
         <Button size="slim" onClick={()=> openUrl("https://discord.com/invite/Wpc6xVME4s")} icon={avatar}>
           Discord
         </Button>

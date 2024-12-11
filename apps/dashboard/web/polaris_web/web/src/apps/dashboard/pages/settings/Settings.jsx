@@ -1,5 +1,5 @@
-import { Button, Frame, Icon, Text, Box, TopBar, HorizontalStack } from "@shopify/polaris"
-import { CancelMajor, SettingsMinor } from '@shopify/polaris-icons';
+import { Button, Frame, Icon, Text, Box, TopBar, InlineStack } from "@shopify/polaris"
+import { XIcon, SettingsIcon } from "@shopify/polaris-icons";
 import { Outlet, useNavigate } from "react-router-dom"
 import './settings.css'
 import SettingsLeftNav from "./nav/SettingsLeftNav";
@@ -16,13 +16,13 @@ function SettingsHeader() {
 
     const buttonComp = (
         <div className="header-css">
-            <HorizontalStack gap="2">
+            <InlineStack gap="200">
                 <Box>
-                    <Icon source={SettingsMinor}/>
+                    <Icon source={SettingsIcon}/>
                 </Box>
                 <Text variant="headingMd" as="h4">Settings</Text>
-            </HorizontalStack>
-            <Button plain icon={CancelMajor} onClick={handleSettingsClose} />
+            </InlineStack>
+            <Button  icon={XIcon} onClick={handleSettingsClose} variant="plain" />
         </div>
     )
 
@@ -35,7 +35,7 @@ const Settings = () => {
 
     return (
         <Frame navigation={<SettingsLeftNav />} topBar={<SettingsHeader />}>
-            <Box paddingBlockEnd={"20"}>
+            <Box paddingBlockEnd={"2000"}>
                 <Outlet />
             </Box>
         </Frame>

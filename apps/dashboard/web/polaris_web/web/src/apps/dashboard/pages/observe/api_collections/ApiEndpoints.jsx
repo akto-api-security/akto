@@ -1,5 +1,5 @@
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
-import { Text, HorizontalStack, Button, Popover, Modal, IndexFiltersMode, VerticalStack, Box, Checkbox } from "@shopify/polaris"
+import { Text, InlineStack, Button, Popover, Modal, IndexFiltersMode, BlockStack, Box, Checkbox } from "@shopify/polaris"
 import api from "../api"
 import { useEffect, useState } from "react"
 import func from "@/util/func"
@@ -635,8 +635,7 @@ function ApiEndpoints(props) {
     const isApiGroup = collectionsObj?.type === 'API_GROUP'
 
     const secondaryActionsComponent = (
-        <HorizontalStack gap="2">
-
+        <InlineStack gap="200">
             <Popover
                 active={exportOpen}
                 activator={(
@@ -650,7 +649,7 @@ function ApiEndpoints(props) {
             >
                 <Popover.Pane fixed>
                     <Popover.Section>
-                        <VerticalStack gap={2}>
+                        <BlockStack gap={200}>
                             <div onClick={handleRefresh} style={{cursor: 'pointer'}}>
                                 <Text fontWeight="regular" variant="bodyMd">Refresh</Text>
                             </div>
@@ -670,12 +669,12 @@ function ApiEndpoints(props) {
                                 primary={false} 
                                 /> : null
                             }
-                        </VerticalStack>
+                        </BlockStack>
                     </Popover.Section>
                     <Popover.Section>
-                        <VerticalStack gap={2}>
+                        <BlockStack gap={200}>
                             <Text>Export as</Text>
-                                <VerticalStack gap={1}>
+                            <BlockStack gap={100}>
                                 <div data-testid="openapi_spec_option" onClick={(selectedResourcesForPrimaryAction && selectedResourcesForPrimaryAction.length > 0) ? exportOpenApiForSelectedApi : exportOpenApi} style={{cursor: 'pointer'}}>
                                     <Text fontWeight="regular" variant="bodyMd">OpenAPI spec</Text>
                                 </div>
@@ -685,37 +684,34 @@ function ApiEndpoints(props) {
                                 <div data-testid="csv_option" onClick={() =>exportCsv()} style={{cursor: 'pointer'}}>
                                     <Text fontWeight="regular" variant="bodyMd">CSV</Text>
                                 </div>
-                            </VerticalStack>
-                        </VerticalStack>
+                            </BlockStack>
+                        </BlockStack>
                     </Popover.Section>
                     <Popover.Section>
-                        <VerticalStack gap={2}>
+                        <BlockStack gap={200}>
                             <Text>Others</Text>
-                                <VerticalStack gap={1}>
+                            <BlockStack gap={100}>
                                 <Checkbox
                                     label='Redact'
                                     checked={redacted}
                                     onChange={() => redactCheckBoxClicked()}
                                 />
-                            </VerticalStack>
-                        </VerticalStack>
+                            </BlockStack>
+                        </BlockStack>
                     </Popover.Section>
                     <Popover.Section>
-                        <VerticalStack gap={2}>
+                        <BlockStack gap={200}>
                             <div onClick={toggleWorkflowTests} style={{ cursor: 'pointer' }}>
                                 <Text fontWeight="regular" variant="bodyMd">
                                     {`${showWorkflowTests ? "Hide" : "Show"} workflow tests`}
                                 </Text>
                             </div>
-                        </VerticalStack>
+                        </BlockStack>
                     </Popover.Section>
                 </Popover.Pane>
             </Popover>
-
             {isApiGroup &&collectionsObj?.automated !== true ? <Button onClick={() => navigate("/dashboard/observe/query_mode?collectionId=" + apiCollectionId)}>Edit conditions</Button> : null}
-
             {isGptActive ? <Button onClick={displayGPT} disabled={showEmptyScreen}>Ask AktoGPT</Button>: null}
-                    
             <RunTest
                 apiCollectionId={apiCollectionId}
                 endpoints={filteredEndpoints}
@@ -725,7 +721,7 @@ function ApiEndpoints(props) {
                 disabled={showEmptyScreen}
                 selectedResourcesForPrimaryAction={selectedResourcesForPrimaryAction}
             />
-        </HorizontalStack>
+        </InlineStack>
     )
 
     const handleSelectedTab = (selectedIndex) => {
@@ -884,7 +880,7 @@ function ApiEndpoints(props) {
                 (coverageInfo[apiCollectionId] === 0 || !(coverageInfo.hasOwnProperty(apiCollectionId)) ? <TestrunsBannerComponent key={"testrunsBanner"} onButtonClick={() => setRunTests(true)} isInventory={true} /> : null),
                 <div className="apiEndpointsTable" key="table">
                     {apiEndpointTable}
-                      <Modal large open={isGptScreenActive} onClose={() => setIsGptScreenActive(false)} title="Akto GPT">
+                      <Modal size="large" open={isGptScreenActive} onClose={() => setIsGptScreenActive(false)} title="Akto GPT">
                           <Modal.Section flush>
                               <AktoGptLayout prompts={prompts} closeModal={() => setIsGptScreenActive(false)} />
                           </Modal.Section>

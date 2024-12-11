@@ -1,4 +1,4 @@
-import { HorizontalStack, LegacyCard, Text, TextField, VerticalStack } from "@shopify/polaris"
+import { InlineStack, LegacyCard, Text, TextField, BlockStack } from "@shopify/polaris"
 import { useEffect, useState } from "react";
 import api from "../../api";
 import func from "@/util/func";
@@ -118,13 +118,13 @@ function SourceCodeRepos({type, typeName, orgName}) {
                     <TextField onChange={(val) => setProjectName(val)} value={projectName} helpText={`Name of your ${orgName}`} label={`${orgName} Name`} />
                     <br />
                     <TextField onChange={(val) => setrepoNames(val)} value={repoNames} label="Repository Name" helpText="This accepts comma separated values" />
-                    {!isUniqueCombination() && <Text color="critical" variant="bodySm" style={{ marginTop: '8px' }}>{errorMessage}</Text>}
+                    {!isUniqueCombination() && <Text tone="critical" variant="bodySm" style={{ marginTop: '8px' }}>{errorMessage}</Text>}
 
                 </LegacyCard.Section>
             </LegacyCard>
 
 
-            <VerticalStack gap="1">
+            <BlockStack gap="100">
                 {repoList.map((repo, index) => (
                     <LegacyCard 
                         key={index} 
@@ -134,17 +134,17 @@ function SourceCodeRepos({type, typeName, orgName}) {
                             { content: "Run", onAction: () => { runRepo(repo) } },
                         ]} sectioned={true}
                     >
-                        <HorizontalStack align="space-between">
+                        <InlineStack align="space-between">
                             <Text variant="bodyMd">{repo.project}</Text>
                             <Text variant="bodyMd">
                                 {repo.lastRun >= repo.scheduleTime ? func.prettifyEpoch(repo.lastRun) : "scheduled"}
                             </Text>
-                        </HorizontalStack>
+                        </InlineStack>
                     </LegacyCard>
                 ))}
-            </VerticalStack>
+            </BlockStack>
         </div>
-    )
+    );
 }
 
 

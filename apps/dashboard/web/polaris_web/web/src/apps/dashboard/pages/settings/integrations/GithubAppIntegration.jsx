@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import {  LegacyCard, TextField, Modal, Text, HorizontalStack, VerticalStack } from '@shopify/polaris';
+import {  LegacyCard, TextField, Modal, Text, InlineStack, BlockStack } from '@shopify/polaris';
 import func from '@/util/func';
 import IntegrationsLayout from './IntegrationsLayout';
 import settingRequests from '../api';
@@ -87,28 +87,27 @@ function GithubAppIntegration() {
         <LegacyCard.Section
             title={`Github App Settings`}
         >
-            <VerticalStack gap={2}>
-            <TextField
-                label="Github App Id"
-                value={githubAppId}
-                onChange={githubAppIdPresent ? () => { } : (githubAppId) => setGithubAppId(githubAppId)}
-            />
+            <BlockStack gap={200}>
+                <TextField
+                    label="Github App Id"
+                    value={githubAppId}
+                    onChange={githubAppIdPresent ? () => { } : (githubAppId) => setGithubAppId(githubAppId)}
+                />
+                {githubAppIdPresent ? 
+                (<TextField
+                    label="Github Secret Key"
+                    value={"********************************"}
+                />) : 
+                <UploadFile
+                    fileFormat=".pem"
+                    plain={false}
+                    fileChanged={file => handleFileChange(file)}
+                    tooltipText="Upload github app secret(.pem)"
+                    label="Upload github app secret"
+                    primary={false} />
 
-            {githubAppIdPresent ? 
-            (<TextField
-                label="Github Secret Key"
-                value={"********************************"}
-            />) : 
-            <UploadFile
-                fileFormat=".pem"
-                plain={false}
-                fileChanged={file => handleFileChange(file)}
-                tooltipText="Upload github app secret(.pem)"
-                label="Upload github app secret"
-                primary={false} />
-
-            }
-            </VerticalStack>
+                }
+            </BlockStack>
 
         </LegacyCard.Section>
 

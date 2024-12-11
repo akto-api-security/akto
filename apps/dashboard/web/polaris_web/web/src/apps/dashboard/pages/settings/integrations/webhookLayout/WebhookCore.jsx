@@ -1,4 +1,4 @@
-import { Button, ButtonGroup, Card, Checkbox, ContextualSaveBar, Divider, Frame, HorizontalGrid, LegacyCard, LegacyTabs, Tabs, Text, TextField, VerticalStack} from "@shopify/polaris"
+import { Button, ButtonGroup, Card, Checkbox, ContextualSaveBar, Divider, Frame, InlineGrid, LegacyCard, LegacyTabs, Tabs, Text, TextField, BlockStack} from "@shopify/polaris"
 import PageWithMultipleCards from "../../../../components/layouts/PageWithMultipleCards"
 import { useNavigate, useParams } from "react-router-dom"
 import { useEffect, useState } from "react"
@@ -420,19 +420,16 @@ function WebhookCore(props) {
                     <Button onClick={handleDiscard} disabled={!hasChanges}>Discard</Button>
                     {webhookId ?
                         <Button
-                            primary
+
                             onClick={saveWebhook}
                             connectedDisclosure={{
                                 accessibilityLabel: 'Other save actions',
                                 actions: [{ content: 'Run once', onAction: () => runOnce() }],
                             }}
-                        >
+                            variant="primary">
                             Save
                         </Button>
-                        : <Button
-                            primary
-                            onClick={saveWebhook}
-                        >
+                        : <Button  onClick={saveWebhook} variant="primary">
                             Save
                         </Button>
                     }

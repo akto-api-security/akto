@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react'
 import transform from '../transform'
 import func from '@/util/func'
 import api from '../api'
-import { IndexTable, useIndexResourceState, LegacyCard, HorizontalStack, Pagination } from '@shopify/polaris'
+import { IndexTable, useIndexResourceState, LegacyCard, InlineStack, Pagination } from '@shopify/polaris'
 import { GithubRow } from '../../../components/tables/rows/GithubRow'
 import observeFunc from "../../observe/transform"
 
@@ -113,8 +113,7 @@ function SummaryTable({testingRunResultSummaries, setSummary}) {
                     </IndexTable>
                 </LegacyCard.Section>
                 <LegacyCard.Section>
-                    <HorizontalStack
-                        align="center">
+                    <InlineStack align="center">
                         <Pagination
                             label={
                                 total === 0 ? 'No data found' :
@@ -127,11 +126,11 @@ function SummaryTable({testingRunResultSummaries, setSummary}) {
                             hasNext={total > (page + 1) * pageLimit}
                             onNext={onPageNext}
                         />
-                    </HorizontalStack>
+                    </InlineStack>
                     </LegacyCard.Section>
             </LegacyCard>
         </div>
-    )
+    );
 }
 
 export default SummaryTable
