@@ -1,11 +1,11 @@
 package com.akto.threat.detection.tasks;
 
 import com.akto.dao.context.Context;
+import com.akto.kafka.KafkaConfig;
 import com.akto.proto.threat_protection.message.malicious_event.v1.MaliciousEvent;
 import com.akto.proto.threat_protection.message.sample_request.v1.SampleMaliciousRequest;
 import com.akto.threat.detection.actor.SourceIPActorGenerator;
 import com.akto.threat.detection.cache.RedisBackedCounterCache;
-import com.akto.threat.detection.config.kafka.KafkaConfig;
 import com.akto.threat.detection.constants.KafkaTopic;
 import com.akto.dao.monitoring.FilterYamlTemplateDao;
 import com.akto.data_actor.DataActor;

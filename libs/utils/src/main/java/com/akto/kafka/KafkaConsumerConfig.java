@@ -1,4 +1,4 @@
-package com.akto.threat.detection.config.kafka;
+package com.akto.kafka;
 
 public class KafkaConsumerConfig {
   private final int maxPollRecords;
