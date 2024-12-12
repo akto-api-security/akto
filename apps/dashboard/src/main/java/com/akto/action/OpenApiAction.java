@@ -27,7 +27,6 @@ import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 
-import com.mongodb.client.model.InsertManyOptions;
 import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
 import com.mongodb.client.result.InsertOneResult;
@@ -42,10 +41,8 @@ import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
 import javax.servlet.http.HttpServletResponse;
-import java.io.IOException;
-import java.io.PrintWriter;
+import java.io.*;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executors;
@@ -70,6 +67,7 @@ public class OpenApiAction extends UserAction implements ServletResponseAware {
     private List<ApiInfo.ApiInfoKey> apiInfoKeyList;
 
     private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
+
 
     @Override
     public String execute() {
@@ -189,17 +187,26 @@ public class OpenApiAction extends UserAction implements ServletResponseAware {
 
                     for(List<SwaggerUploadLog> chunk : chunkedLists){
                         loggerMaker.infoAndAddToDb("Inserting chunk of size " + chunk.size(), LogDb.DASHBOARD);
-                        FileUploadLogsDao.instance.getSwaggerMCollection().insertMany(chunk, new InsertManyOptions().ordered(true));
-                    }
-                    loggerMaker.infoAndAddToDb("Inserted " + chunkedLists.size() + " chunks of logs", LogDb.DASHBOARD);
 
-                    FileUploadsDao.instance.updateOne(Filters.eq(Constants.ID, new ObjectId(fileUploadId)), Updates.combine(
-                            Updates.set("uploadStatus", FileUpload.UploadStatus.SUCCEEDED),
-                            Updates.set("collectionName", title),
-                            Updates.set("errors", fileErrors),
-                            Updates.set("count",parsedSwagger.getTotalCount())
-                    ));
-                    loggerMaker.infoAndAddToDb("Finished processing openAPI file", LogDb.DASHBOARD);
+                        List<String> stringMessages = messages.stream()
+                                .map(SwaggerUploadLog::getAktoFormat)
+                                .collect(Collectors.toList());
+
+                        List<String> stringErrors = fileErrors.stream()
+                                .map(FileUploadError::getError)
+                                .collect(Collectors.toList());
+
+                        String topic = System.getenv("AKTO_KAFKA_TOPIC_NAME");
+                        if (topic == null) topic = "akto.api.logs";
+
+                        try {
+                            loggerMaker.infoAndAddToDb("Calling Utils.pushDataToKafka for openapi file, for apiCollection id " + apiCollectionId, LogDb.DASHBOARD);
+                            Utils.pushDataToKafka(apiCollectionId, topic, stringMessages, stringErrors, true);
+                        } catch (Exception e) {
+                            throw new RuntimeException(e);
+                        }
+
+                    }
 
                 } catch (Exception e) {
                     loggerMaker.errorAndAddToDb(e, "ERROR while parsing openAPI file", LogDb.DASHBOARD);

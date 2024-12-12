@@ -281,7 +281,7 @@ public class HttpCallParser {
             SyncLimit syncLimit = featureAccess.fetchSyncLimit();
 
             numberOfSyncs++;
-            apiCatalogSync.syncWithDB(syncImmediately, fetchAllSTI, syncLimit);
+            apiCatalogSync.syncWithDB(syncImmediately, fetchAllSTI, syncLimit, responseParams.get(0).getSource());
             if (DbMode.dbType.equals(DbMode.DbType.MONGO_DB)) {
                 dependencyAnalyser.dbState = apiCatalogSync.dbState;
                 dependencyAnalyser.syncWithDb();
