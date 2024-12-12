@@ -50,6 +50,16 @@ const headers = [
     {
         title: '',
         type: CellType.ACTION,
+    },
+    {
+        text: 'Actor',
+        title: 'Threat Actor',
+        value: 'actor',
+    },
+    {
+        text: 'Country',
+        title: 'Country',
+        value: 'country',
     }
 ]
 
@@ -86,13 +96,15 @@ function SusDataTable({ currDateRange, rowClicked }) {
         const sort = { [sortKey]: sortOrder }
         const res = await api.fetchSuspectSampleData(skip, sourceIpsFilter, apiCollectionIdsFilter, matchingUrlFilter, sort, startTimestamp, endTimestamp)
         let total = res.total;
-        let ret = res?.sampleData.map(x => {
+        let ret = res?.maliciousRequests.map(x => {
             return {
                 ...x,
                 endpointComp: <GetPrettifyEndpoint method={x.method} url={x.url} isNew={false} />,
                 apiCollectionName: collectionsMap[x.apiCollectionId] || '-',
                 discoveredTs: func.prettifyEpoch(x.discovered),
-                sourceIPComponent: <Text>{x?.sourceIPs ? x.sourceIPs.reduce((a, b) => a += ((a.length > 0 ? ", " : "") + b), "") : "-"}</Text>
+                sourceIPComponent: <Text>{x?.sourceIPs ? x.sourceIPs.reduce((a, b) => a += ((a.length > 0 ? ", " : "") + b), "") : "-"}</Text>,
+                matchingUrl: x.url,
+                country: x.country
             }
         })
         setLoading(false);

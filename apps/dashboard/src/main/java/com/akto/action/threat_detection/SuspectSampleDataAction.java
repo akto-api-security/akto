@@ -154,4 +154,13 @@ public class SuspectSampleDataAction extends UserAction {
   public void setEndTimestamp(int endTimestamp) {
     this.endTimestamp = endTimestamp;
   }
+
+  public List<DashboardMaliciousEvent> getMaliciousRequests() {
+    return maliciousRequests;
+  }
+
+  public void setMaliciousRequests(List<DashboardMaliciousEvent> maliciousRequests) {
+    this.maliciousRequests = maliciousRequests;
+  }
+
 }
