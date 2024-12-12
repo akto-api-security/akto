@@ -216,7 +216,7 @@ public class ApiCollectionsAction extends UserAction {
     private String collectionName;
 
     private boolean isValidApiCollectionName(){
-        if (this.collectionName == null) {
+        if (this.collectionName == null || this.collectionName.length() == 0) {
             addActionError("Invalid collection name");
             return false;
         }
@@ -711,6 +711,35 @@ public class ApiCollectionsAction extends UserAction {
             e.printStackTrace();
         }
         return Action.ERROR.toUpperCase();
+    }
+
+    public String editCollectionName() {
+        if(!isValidApiCollectionName()){
+            return ERROR.toUpperCase();
+        }
+
+        ApiCollection apiCollection = ApiCollectionsDao.instance.getMeta(apiCollectionId);
+        if (apiCollection == null) {
+            String errorMessage = "API collection not found";
+            addActionError(errorMessage);
+            return Action.ERROR.toUpperCase();
+        }
+
+        if (apiCollection.getHostName() != null) {
+            String errorMessage = "Traffic API collection can't edited";
+            addActionError(errorMessage);
+            return Action.ERROR.toUpperCase();
+        }
+
+        ApiCollectionsDao.instance.updateOne(
+            Filters.eq(ApiCollection.ID, apiCollectionId),
+            Updates.combine(
+                Updates.set(ApiCollection.NAME, collectionName),
+                Updates.set("displayName", collectionName)
+            )
+        );
+
+        return Action.SUCCESS.toUpperCase();
     }
 
     public List<ApiCollection> getApiCollections() {

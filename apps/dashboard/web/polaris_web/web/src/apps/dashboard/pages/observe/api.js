@@ -805,4 +805,14 @@ export default {
         })
     },
 
+    async editCollectionName(apiCollectionId, collectionName) {
+        return await request({
+            url: '/api/editCollectionName',
+            method: 'post',
+            data: {
+                apiCollectionId, collectionName
+            }
+        })
+    },
+
 }
