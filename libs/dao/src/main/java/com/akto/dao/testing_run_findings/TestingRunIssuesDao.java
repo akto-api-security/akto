@@ -7,13 +7,18 @@ import java.util.Map;
 
 import org.bson.conversions.Bson;
 
-import com.akto.dao.AccountsContextDao;
+import com.akto.dao.AccountsContextDaoWithRbac;
 import com.akto.dao.MCollection;
 import com.akto.dao.context.Context;
+import com.akto.dto.ApiCollectionUsers;
+import com.akto.dto.ApiInfo.ApiInfoKey;
+import com.akto.dto.rbac.UsersCollectionsList;
+import com.akto.dto.test_run_findings.TestingRunIssues;
+import com.akto.dto.testing.TestingEndpoints;
+import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.test_run_findings.TestingIssuesId;
-import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.MongoDBEnums;
 import com.mongodb.BasicDBObject;
@@ -24,7 +29,7 @@ import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.UnwindOptions;
 
-public class TestingRunIssuesDao extends AccountsContextDao<TestingRunIssues> {
+public class TestingRunIssuesDao extends AccountsContextDaoWithRbac<TestingRunIssues> {
 
     public static final TestingRunIssuesDao instance = new TestingRunIssuesDao();
 
@@ -62,6 +67,14 @@ public class TestingRunIssuesDao extends AccountsContextDao<TestingRunIssues> {
         Map<Integer,Map<String,Integer>> resultMap = new HashMap<>() ;
         List<Bson> pipeline = new ArrayList<>();
         pipeline.add(Aggregates.match(Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS, "OPEN")));
+
+        try {
+            List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+            if(collectionIds != null) {
+                pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
+            }
+        } catch(Exception e){
+        }
 
         UnwindOptions unwindOptions = new UnwindOptions();
         unwindOptions.preserveNullAndEmptyArrays(false);  
@@ -104,6 +117,15 @@ public class TestingRunIssuesDao extends AccountsContextDao<TestingRunIssues> {
                 Filters.gte(TestingRunIssues.LAST_SEEN, startTimeStamp)
             )
         ));
+
+        try {
+            List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+            if(collectionIds != null) {
+                pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
+            }
+        } catch(Exception e){
+        }
+
         BasicDBObject groupedId = new BasicDBObject("subCategory", "$_id.testSubCategory");
         pipeline.add(Aggregates.group(groupedId, Accumulators.sum("count", 1)));
 
@@ -128,6 +150,13 @@ public class TestingRunIssuesDao extends AccountsContextDao<TestingRunIssues> {
         List<Bson> pipeline = new ArrayList<>();
         pipeline.add(Aggregates.match(Filters.gte(TestingRunIssues.LAST_SEEN, startTimestamp)));
         pipeline.add(Aggregates.match(Filters.lte(TestingRunIssues.LAST_SEEN, endTimestamp)));
+        try {
+            List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+            if(collectionIds != null) {
+                pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
+            }
+        } catch(Exception e){
+        }
         pipeline.add(Aggregates.project(Projections.computed("dayOfYearFloat", new BasicDBObject("$divide", new Object[]{"$lastSeen", 86400}))));
         pipeline.add(Aggregates.project(Projections.computed("dayOfYear", new BasicDBObject("$floor", new Object[]{"$dayOfYearFloat"}))));
 
@@ -201,5 +230,10 @@ public class TestingRunIssuesDao extends AccountsContextDao<TestingRunIssues> {
     @Override
     public Class<TestingRunIssues> getClassT() {
         return TestingRunIssues.class;
+    }
+
+    @Override
+    public String getFilterKeyString(){
+        return TestingEndpoints.getFilterPrefix(ApiCollectionUsers.CollectionType.Id_ApiInfoKey_ApiCollectionId) + ApiInfoKey.API_COLLECTION_ID;
     }
 }

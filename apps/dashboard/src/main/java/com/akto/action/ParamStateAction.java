@@ -1,6 +1,8 @@
 package com.akto.action;
 
 import com.akto.dao.SingleTypeInfoDao;
+import com.akto.dao.context.Context;
+import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.log.LoggerMaker;
 import com.mongodb.client.MongoCursor;
@@ -33,6 +35,13 @@ public class ParamStateAction extends UserAction {
         String computedFieldName = "computedValue";
 
         pipeline.add(Aggregates.match(Filters.gt(SingleTypeInfo._UNIQUE_COUNT,0)));
+        try {
+            List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+            if(collectionIds != null) {
+                pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
+            }
+        } catch(Exception e){
+        }
 
         Bson projections = Projections.fields(
                 Projections.include(

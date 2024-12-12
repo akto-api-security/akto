@@ -71,11 +71,15 @@ public class GptConfigAction extends UserAction {
             if(aktoGptConfig == null) {
                 aktoGptConfig = upsertAktoConfig(apiCollectionId, DEFAULT_STATE);
             }
-            String collectionName = ApiCollectionsDao.instance.findOne(new BasicDBObject("_id", apiCollectionId)).getName();
-            currentState = Collections.singletonList(new BasicDBObject("id", aktoGptConfig.getId())
-                    .append("state", aktoGptConfig.getState().toString())
-                    .append("collectionName", collectionName != null ? collectionName : String.valueOf(apiCollectionId)));
-            logger.debug("Fetching AktoGptConfig for collectionId: {}, {}", apiCollectionId, currentState);
+            ApiCollection apiCollection = ApiCollectionsDao.instance.findOne(new BasicDBObject("_id", apiCollectionId));
+            if (apiCollection != null) {
+                String collectionName = apiCollection.getName();
+                currentState = Collections.singletonList(new BasicDBObject("id", aktoGptConfig.getId())
+                        .append("state", aktoGptConfig.getState().toString())
+                        .append("collectionName",
+                                collectionName != null ? collectionName : String.valueOf(apiCollectionId)));
+                logger.debug("Fetching AktoGptConfig for collectionId: {}, {}", apiCollectionId, currentState);
+            }
         }
         return SUCCESS.toUpperCase();
     }

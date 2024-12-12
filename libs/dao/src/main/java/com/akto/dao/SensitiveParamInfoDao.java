@@ -1,5 +1,6 @@
 package com.akto.dao;
 
+import com.akto.dto.ApiInfo;
 import com.akto.dto.SensitiveParamInfo;
 import com.mongodb.client.model.Filters;
 import org.bson.conversions.Bson;
@@ -10,7 +11,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-public class SensitiveParamInfoDao extends AccountsContextDao<SensitiveParamInfo> {
+public class SensitiveParamInfoDao extends AccountsContextDaoWithRbac<SensitiveParamInfo> {
 
     public static final SensitiveParamInfoDao instance = new SensitiveParamInfoDao();
 
@@ -71,4 +72,8 @@ public class SensitiveParamInfoDao extends AccountsContextDao<SensitiveParamInfo
     }
 
 
+    @Override
+    public String getFilterKeyString() {
+        return ApiInfo.ApiInfoKey.API_COLLECTION_ID;
+    }
 }

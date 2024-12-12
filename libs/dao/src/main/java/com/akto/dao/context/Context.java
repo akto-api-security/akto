@@ -9,9 +9,11 @@ import java.time.format.DateTimeFormatter;
 
 public class Context {
 public static ThreadLocal<Integer> accountId = new ThreadLocal<Integer>();
+public static ThreadLocal<Integer> userId = new ThreadLocal<Integer>();
 
     public static void resetContextThreadLocals() {
         accountId.remove();
+        userId.remove();
     }
 
     public static int getId() {

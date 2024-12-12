@@ -7,13 +7,13 @@ import java.util.*;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.CollectionConditions.MethodCondition;
+import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.dto.CustomDataType;
 import com.akto.dto.SensitiveParamInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
 import com.akto.util.Constants;
-import com.akto.util.Util;
 import com.akto.dto.type.URLMethods.Method;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
@@ -21,7 +21,7 @@ import com.mongodb.client.model.*;
 
 import org.bson.conversions.Bson;
 
-public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
+public class SingleTypeInfoDao extends AccountsContextDaoWithRbac<SingleTypeInfo> {
 
     public static final SingleTypeInfoDao instance = new SingleTypeInfoDao();
 
@@ -457,6 +457,14 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
 
         pipeline.add(Aggregates.match(Filters.and(filterList)));
 
+        try {
+            List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+            if(collectionIds != null) {
+                pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
+            }
+        } catch(Exception e){
+        }
+
         BasicDBObject groupedId = new BasicDBObject("subType", "$subType");
         pipeline.add(Aggregates.group(groupedId, Accumulators.sum("count",1)));
 
@@ -476,24 +484,21 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
     }
 
     public List<Bson> generateFilterForSubtypes(List<String> sensitiveParameters, BasicDBObject groupedId, Boolean inResponseOnly, Bson customFilter){
-        int codeValue = inResponseOnly ? 0 : -1 ;
         List<Bson> pipeline = new ArrayList<>();
-        Bson filterOnResponse = Filters.gte(SingleTypeInfo._RESPONSE_CODE, codeValue);
-        Bson sensitiveSubTypeFilter = Filters.and(Filters.in(SingleTypeInfo.SUB_TYPE,sensitiveParameters), filterOnResponse, customFilter);
 
         List<String> sensitiveInRequest = SingleTypeInfoDao.instance.sensitiveSubTypeInRequestNames();
         sensitiveInRequest.addAll(SingleTypeInfoDao.instance.sensitiveSubTypeNames());
-        Bson sensitveSubTypeFilterRequest = Filters.in("subType",sensitiveInRequest);
+        Bson sensitiveSubTypeFilterRequest = Filters.in("subType",sensitiveInRequest);
         List<Bson> requestFilterList = new ArrayList<>();
-        requestFilterList.add(sensitveSubTypeFilterRequest);
+        requestFilterList.add(sensitiveSubTypeFilterRequest);
         requestFilterList.add(customFilter);
         requestFilterList.add(Filters.eq("responseCode", -1));
 
         List<String> sensitiveInResponse = SingleTypeInfoDao.instance.sensitiveSubTypeInResponseNames();
         sensitiveInResponse.addAll(SingleTypeInfoDao.instance.sensitiveSubTypeNames());
-        Bson sensitveSubTypeFilterResponse = Filters.in("subType",sensitiveInResponse);
+        Bson sensitiveSubTypeFilterResponse = Filters.in("subType",sensitiveInResponse);
         List<Bson> responseFilterList = new ArrayList<>();
-        responseFilterList.add(sensitveSubTypeFilterResponse);
+        responseFilterList.add(sensitiveSubTypeFilterResponse);
         responseFilterList.add(customFilter);
         responseFilterList.add(Filters.gt("responseCode", -1));
 
@@ -501,7 +506,21 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
             Filters.and(responseFilterList),
             Filters.and(requestFilterList)
         )));
+
+        try {
+            List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+            if(collectionIds != null) {
+                pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
+            }
+        } catch(Exception e){
+        }
+
         pipeline.add(Aggregates.group(groupedId,Accumulators.addToSet("subTypes", "$subType")));
+        /*
+         * without the project stage, 
+         * the number of documents and the count of documents using aggregate do not match.
+         */
+        pipeline.add(Aggregates.project(Projections.fields(Projections.include("_id", "subTypes"))));
         return pipeline;
     }
 
@@ -584,6 +603,14 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
 
         pipeline.add(Aggregates.match(Filters.or(filters)));
 
+        try {
+            List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+            if(collectionIds != null) {
+                pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
+            }
+        } catch(Exception e){
+        }
+
         BasicDBObject groupedId = new BasicDBObject("apiCollectionId", "$apiCollectionId")
                         .append("url", "$url")
                         .append("method", "$method");
@@ -619,6 +646,13 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
         );
 
         pipeline.add(Aggregates.match(filter));
+        try {
+            List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+            if(collectionIds != null) {
+                pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
+            }
+        } catch(Exception e){
+        }
         pipeline.add(Aggregates.project(Projections.include(SingleTypeInfo._URL)));
 
         BasicDBObject groupedId =  new BasicDBObject("url", "$"+SingleTypeInfo._URL);
@@ -640,6 +674,11 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
             }
         }
         return hosts;
+    }
+
+    @Override
+    public String getFilterKeyString() {
+        return SingleTypeInfo._API_COLLECTION_ID;
     }
 
     public List<String> sensitiveApisList(List<String> sensitiveSubtypes,Bson customFilter, int limit){
@@ -667,11 +706,22 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
         nonHostApiCollectionIds.addAll(deactivatedCollections);
 
         Bson hostFilterQ = SingleTypeInfoDao.filterForHostHeader(0, false);
+        Bson userCollectionFilter = Filters.empty();
+        try {
+            List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(),
+                    Context.accountId.get());
+            if (collectionIds != null) {
+                userCollectionFilter = Filters.in("collectionIds", collectionIds);
+            }
+        } catch (Exception e) {
+        }
+
         Bson filterQWithTs = Filters.and(
                 Filters.gte(SingleTypeInfo._TIMESTAMP, startTimestamp),
                 Filters.lte(SingleTypeInfo._TIMESTAMP, endTimestamp),
                 Filters.nin(SingleTypeInfo._API_COLLECTION_ID, nonHostApiCollectionIds),
-                hostFilterQ
+                hostFilterQ,
+                userCollectionFilter
         );
 
         long count = SingleTypeInfoDao.instance.count(filterQWithTs);
@@ -682,7 +732,13 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
             List<Bson> pipeline = new ArrayList<>();
 
             pipeline.add(Aggregates.match(Filters.in("apiCollectionId", nonHostApiCollectionIds)));
-
+            try {
+                List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+                if (collectionIds != null) {
+                    pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
+                }
+            } catch (Exception e) {
+            }
             BasicDBObject groupedId = 
                 new BasicDBObject("apiCollectionId", "$apiCollectionId")
                 .append("url", "$url")
@@ -749,6 +805,13 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
             List<Bson> pipeline = new ArrayList<>();
 
             pipeline.add(Aggregates.match(Filters.in("apiCollectionId", nonHostApiCollectionIds)));
+            try {
+                List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(),Context.accountId.get());
+                if (collectionIds != null) {
+                    pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
+                }
+            } catch (Exception e) {
+            }
             BasicDBObject groupedId = 
                 new BasicDBObject("apiCollectionId", "$apiCollectionId")
                 .append("url", "$url")

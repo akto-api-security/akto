@@ -1,8 +1,10 @@
 package com.akto.dao;
 
 import com.akto.dao.context.Context;
+import com.akto.dto.ApiCollectionUsers;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.SensitiveSampleData;
+import com.akto.dto.testing.TestingEndpoints;
 import com.akto.dto.type.SingleTypeInfo;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Filters;
@@ -15,7 +17,7 @@ import org.bson.Document;
 
 import org.bson.conversions.Bson;
 
-public class SensitiveSampleDataDao extends AccountsContextDao<SensitiveSampleData>{
+public class SensitiveSampleDataDao extends AccountsContextDaoWithRbac<SensitiveSampleData>{
 
     public static final SensitiveSampleDataDao instance = new SensitiveSampleDataDao();
     @Override
@@ -74,5 +76,10 @@ public class SensitiveSampleDataDao extends AccountsContextDao<SensitiveSampleDa
 
         MCollection.createIndexIfAbsent(getDBName(), getCollName(),
                 new String[] { SingleTypeInfo._COLLECTION_IDS }, true);
+    }
+
+    @Override
+    public String getFilterKeyString() {
+        return TestingEndpoints.getFilterPrefix(ApiCollectionUsers.CollectionType.Id_ApiCollectionId) + ApiInfo.ApiInfoKey.API_COLLECTION_ID;
     }
 }

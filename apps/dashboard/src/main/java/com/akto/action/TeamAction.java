@@ -7,6 +7,7 @@ import com.akto.dao.context.Context;
 import com.akto.dto.PendingInviteCode;
 import com.akto.dto.RBAC;
 import com.akto.dto.RBAC.Role;
+import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.dto.User;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -105,7 +106,6 @@ public class TeamAction extends UserAction implements ServletResponseAware, Serv
         }
         return SUCCESS.toUpperCase();
     }
-
     private enum ActionType {
         REMOVE_USER,
         UPDATE_USER_ROLE
@@ -161,6 +161,8 @@ public class TeamAction extends UserAction implements ServletResponseAware, Serv
                             RBACDao.instance.updateOne(
                                 filterRbac,
                                 Updates.set(RBAC.ROLE, Role.valueOf(reqUserRole)));
+                                RBACDao.instance.deleteUserEntryFromCache(new Pair<>(userDetails.getId(), accId));
+                                UsersCollectionsList.deleteCollectionIdsFromCache(userDetails.getId(), accId);
                             return Action.SUCCESS.toUpperCase();
                         }else{
                             addActionError("User doesn't have access to modify this role.");
@@ -180,6 +182,7 @@ public class TeamAction extends UserAction implements ServletResponseAware, Serv
                 break;
         }
         RBACDao.instance.deleteUserEntryFromCache(new Pair<>(userDetails.getId(), accId));
+        UsersCollectionsList.deleteCollectionIdsFromCache(userDetails.getId(), accId);
         return Action.SUCCESS.toUpperCase();
     }
 
