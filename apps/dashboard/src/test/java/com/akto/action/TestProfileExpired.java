@@ -118,7 +118,7 @@ public class TestProfileExpired extends MongoBasedTest {
              */
             assertNotEquals(0, org.getLastFeatureMapUpdate());
             assertEquals(false, org.checkExpirationWithAktoSync());
-            int temp = Context.now() - 2 * 60;
+            int temp = Context.now() - 16 * 60;
             org.setLastFeatureMapUpdate(temp);
             org = InitializerListener.fetchAndSaveFeatureWiseAllowed(org);
             /*

@@ -1,10 +1,13 @@
 package com.akto.action.testing;
 
 import com.akto.action.UserAction;
+import com.akto.dao.RBACDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.testing.EndpointLogicalGroupDao;
 import com.akto.dao.testing.TestRolesDao;
 import com.akto.dao.testing.config.TestCollectionPropertiesDao;
+import com.akto.dto.RBAC;
+import com.akto.dto.User;
 import com.akto.dto.testing.config.TestCollectionProperty;
 import com.akto.dto.RecordedLoginFlowInput;
 import com.akto.dto.data_types.Conditions;
@@ -129,6 +132,27 @@ public class TestRolesAction extends UserAction {
         if (role == null) {
             addActionError("Role doesn't exists");
             return ERROR.toUpperCase();
+        }
+
+        if(role.getCreatedBy().equals("System")) {
+            addActionError("The role cannot be removed.");
+            return ERROR.toUpperCase();
+        }
+
+        User user = getSUser();
+        if(user == null) {
+            addActionError("User not found.");
+            return ERROR.toUpperCase();
+        }
+
+        boolean noAccess = !user.getLogin().equals(role.getCreatedBy());
+
+        if(noAccess) {
+            RBAC.Role currentRoleForUser = RBACDao.getCurrentRoleForUser(user.getId(), Context.accountId.get());
+            if (!currentRoleForUser.equals(RBAC.Role.ADMIN)) {
+                addActionError("You do not have permission to delete this role.");
+                return ERROR.toUpperCase();
+            }
         }
 
         Bson roleFilterQ = Filters.eq(TestRoles.NAME, roleName);

@@ -222,7 +222,7 @@ function UserConfig() {
         </LegacyCard>
     )
 
-    const components = [<TestCollectionConfiguration/>, rateLimit, updateDeltaPeriodTime ,preRequestScriptComponent]
+    const components = [<TestCollectionConfiguration/>, rateLimit, updateDeltaPeriodTime]
 
     return (
         isLoading ? <SpinnerCentered /> 

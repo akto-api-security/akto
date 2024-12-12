@@ -1,14 +1,13 @@
 package com.akto.action;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
+import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.SampleDataDao;
 import com.akto.dao.SensitiveSampleDataDao;
 import com.akto.dao.TrafficInfoDao;
 import com.akto.dao.context.Context;
+import com.akto.dto.ApiCollection;
 import com.akto.dto.SensitiveSampleData;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.traffic.SampleData;
@@ -65,7 +64,6 @@ public class TrafficAction {
             Filters.gte("_id.bucketStartEpoch", 0),
             Filters.lte("_id.bucketEndEpoch", 0)
         ));
-
         return Action.SUCCESS.toUpperCase();
     }
 

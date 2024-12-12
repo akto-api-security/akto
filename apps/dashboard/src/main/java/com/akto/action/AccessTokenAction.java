@@ -12,9 +12,6 @@ import org.slf4j.LoggerFactory;
 import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import java.io.IOException;
-import java.security.NoSuchAlgorithmException;
-import java.security.spec.InvalidKeySpecException;
 import java.util.List;
 import java.util.Objects;
 
@@ -68,6 +65,7 @@ public class AccessTokenAction implements Action, ServletResponseAware, ServletR
         }
 
         if (refreshToken == null) {
+            logger.info("Could not find refresh token in generateAccessTokenFromServletRequest.");
             return null;
         }
 
@@ -75,6 +73,7 @@ public class AccessTokenAction implements Action, ServletResponseAware, ServletR
         try {
             token = new Token(refreshToken);
         } catch (Exception e) {
+            logger.error("error in parsing refresh token in generateAccessTokenFromServletRequest");
             return null;
         }
 
@@ -85,6 +84,7 @@ public class AccessTokenAction implements Action, ServletResponseAware, ServletR
         String username = token.getUsername();
         User user = UsersDao.instance.findOne("login", username);
         if (user == null) {
+            logger.info("Returning as user not found.");
             return null;
         }
 

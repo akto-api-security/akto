@@ -34,7 +34,7 @@ const err = async (error) => {
 
   switch (status) {
     case -1:
-      func.setToast(true, true, 'No internet connection!')
+      func.setToast(true, true, "Connection error. Please try again later.")
       break;
     case 400:
       func.setToast(true, true, 'Bad Request ' + data.message);
