@@ -61,7 +61,9 @@ import com.akto.util.ConnectionInfo;
 import com.akto.util.EnumCodec;
 import com.akto.util.LastCronRunInfo;
 import com.akto.dto.Attempt.AttemptResult;
+import com.akto.dto.CollectionConditions.ConditionsType;
 import com.akto.dto.CollectionConditions.MethodCondition;
+import com.akto.dto.CollectionConditions.TestConfigsAdvancedSettings;
 import com.akto.dto.DependencyNode.ParamInfo;
 import com.akto.dto.auth.APIAuth;
 import com.akto.dto.billing.Organization;
@@ -265,7 +267,8 @@ public class DaoInit {
         ClassModel<CodeAnalysisApi>  codeAnalysisApiModel = ClassModel.builder(CodeAnalysisApi.class).enableDiscriminator(true).build();
         ClassModel<CodeAnalysisRepo> codeAnalysisRepoModel = ClassModel.builder(CodeAnalysisRepo.class).enableDiscriminator(true).build();
         ClassModel<HistoricalData> historicalDataClassModel = ClassModel.builder(HistoricalData.class).enableDiscriminator(true).build();
-
+        ClassModel<TestConfigsAdvancedSettings> configSettingClassModel = ClassModel.builder(TestConfigsAdvancedSettings.class).enableDiscriminator(true).build();
+        ClassModel<ConditionsType> configSettingsConditionTypeClassModel = ClassModel.builder(ConditionsType.class).enableDiscriminator(true).build();
         CodecRegistry pojoCodecRegistry = fromProviders(PojoCodecProvider.builder().register(
                 configClassModel, signupInfoClassModel, apiAuthClassModel, attempResultModel, urlTemplateModel,
                 pendingInviteCodeClassModel, rbacClassModel, kafkaHealthMetricClassModel, singleTypeInfoClassModel,
@@ -295,7 +298,7 @@ public class DaoInit {
                         nodeClassModel, connectionClassModel, edgeClassModel, replaceDetailClassModel, modifyHostDetailClassModel, fileUploadClassModel
                 ,fileUploadLogClassModel, codeAnalysisCollectionClassModel, codeAnalysisApiLocationClassModel, codeAnalysisApiInfoClassModel, codeAnalysisApiInfoKeyClassModel,
                 riskScoreTestingEndpointsClassModel, OrganizationFlagsClassModel, sensitiveDataEndpointsClassModel, unauthenticatedEndpointsClassModel, allApisGroupClassModel,
-                eventsExampleClassModel, RuntimeMetricsClassModel, codeAnalysisRepoModel, codeAnalysisApiModel, historicalDataClassModel).automatic(true).build());
+                eventsExampleClassModel, RuntimeMetricsClassModel, codeAnalysisRepoModel, codeAnalysisApiModel, historicalDataClassModel, configSettingClassModel, configSettingsConditionTypeClassModel).automatic(true).build());
 
         final CodecRegistry customEnumCodecs = CodecRegistries.fromCodecs(
                 new EnumCodec<>(Conditions.Operator.class),

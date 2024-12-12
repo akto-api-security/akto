@@ -270,12 +270,16 @@ public class Main {
                     Filters.eq(Constants.ID, accountId), Projections.include(AccountSettings.DELTA_IGNORE_TIME_FOR_SCHEDULED_SUMMARIES)
                 );
                 int start = Context.now();
-                TestingRunResultSummary trrs = findPendingTestingRunResultSummary(accountSettings.getTimeForScheduledSummaries());
+                int defaultTime = DEFAULT_DELTA_IGNORE_TIME;
+                if(accountSettings != null){
+                    defaultTime =  accountSettings.getTimeForScheduledSummaries();
+                }
+                TestingRunResultSummary trrs = findPendingTestingRunResultSummary(defaultTime);
                 boolean isSummaryRunning = trrs != null && trrs.getState().equals(State.RUNNING);
                 TestingRun testingRun;
                 ObjectId summaryId = null;
                 if (trrs == null) {
-                    testingRun = findPendingTestingRun(accountSettings.getTimeForScheduledSummaries());
+                    testingRun = findPendingTestingRun(defaultTime);
                 } else {
                     summaryId = trrs.getId();
                     loggerMaker.infoAndAddToDb("Found trrs " + trrs.getHexId() +  " for account: " + accountId);

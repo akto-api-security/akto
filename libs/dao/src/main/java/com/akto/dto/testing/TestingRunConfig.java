@@ -1,6 +1,8 @@
 package com.akto.dto.testing;
 
 import com.akto.dto.ApiInfo;
+import com.akto.dto.CollectionConditions.TestConfigsAdvancedSettings;
+
 import org.bson.codecs.pojo.annotations.BsonId;
 import org.bson.types.ObjectId;
 
@@ -18,6 +20,9 @@ public class TestingRunConfig {
 
     private String testRoleId;
     private String overriddenTestAppUrl;
+    
+    private List<TestConfigsAdvancedSettings> configsAdvancedSettings;
+
     public TestingRunConfig() {}
     public TestingRunConfig(int id, Map<Integer, List<ApiInfo.ApiInfoKey>> collectionWiseApiInfoKey,
                             List<String> testSubCategoryList,
@@ -102,5 +107,12 @@ public class TestingRunConfig {
 
     public void setTestRoleId(String testRoleId) {
         this.testRoleId = testRoleId;
+    }
+
+    public List<TestConfigsAdvancedSettings> getConfigsAdvancedSettings() {
+        return configsAdvancedSettings;
+    }
+    public void setConfigsAdvancedSettings(List<TestConfigsAdvancedSettings> configsAdvancedSettings) {
+        this.configsAdvancedSettings = configsAdvancedSettings;
     }
 }

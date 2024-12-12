@@ -98,37 +98,37 @@ function SingleRequest(){
                 
             }
             backUrl={`/dashboard/observe/sensitive/${subType}`}
-            secondaryActions = {
-                <Popover
-                active={popoverActive}
-                activator={<Button onClick={togglePopoverActive} disclosure>Actions</Button>}
-                onClose={togglePopoverActive}
-            >
-                <ActionList
-                    actionRole="menuitem"
-                    items={
-                        [
-                            {
-                                content: 'Ignore',
-                                onAction: () => { console.log('Todo: implement function'); togglePopoverActive() },
-                            },
-                            {
-                                content: 'Mark as false positive',
-                                onAction: () => { console.log('Todo: implement function'); togglePopoverActive() },
-                            },
-                            {
-                                content: 'Create issue',
-                                onAction: () => { console.log('Todo: implement function'); togglePopoverActive() },
-                            },
-                            {
-                                content: 'Configure data types',
-                                onAction: () => { console.log('Todo: implement function'); togglePopoverActive() },
-                            },
-                        ]
-                    }
-                />
-            </Popover>
-            }
+            // secondaryActions = {
+            //     <Popover
+            //     active={popoverActive}
+            //     activator={<Button onClick={togglePopoverActive} disclosure>Actions</Button>}
+            //     onClose={togglePopoverActive}
+            // >
+            //     <ActionList
+            //         actionRole="menuitem"
+            //         items={
+            //             [
+            //                 {
+            //                     content: 'Ignore',
+            //                     onAction: () => { console.log('Todo: implement function'); togglePopoverActive() },
+            //                 },
+            //                 {
+            //                     content: 'Mark as false positive',
+            //                     onAction: () => { console.log('Todo: implement function'); togglePopoverActive() },
+            //                 },
+            //                 {
+            //                     content: 'Create issue',
+            //                     onAction: () => { console.log('Todo: implement function'); togglePopoverActive() },
+            //                 },
+            //                 {
+            //                     content: 'Configure data types',
+            //                     onAction: () => { console.log('Todo: implement function'); togglePopoverActive() },
+            //                 },
+            //             ]
+            //         }
+            //     />
+            // </Popover>
+            // }
             components = {[
                 sampleData.length>0 && <SampleDataList
                 key="Sample values"

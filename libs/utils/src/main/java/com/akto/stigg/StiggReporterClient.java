@@ -50,6 +50,7 @@ public class StiggReporterClient {
         if (stiggConfig == null) {
             throw new IllegalStateException("Stigg config is not initialised");
         }
+        int timeNow = Context.now();
         String requestBody = String.format("{\"query\":\"%s\",\"variables\":%s}", query, vars);
 
         // Set the GraphQL endpoint URL
@@ -67,12 +68,24 @@ public class StiggReporterClient {
 
         // Execute the request and get the response
         try (Response response = client.newCall(request).execute()) {
+            String queryString = "";
+            try {
+                String[] queryTypes = query.split("\\(");
+                queryString = queryTypes[0];
+            } catch (Exception e) {
+                loggerMaker.logger.info("Error in splitting regex");
+            }
+            
+
             if (!response.isSuccessful()) {
                 throw new IOException("Unexpected response code: " + response);
             }
-
             String responseBodyStr = response.body().string();
+            loggerMaker.infoAndAddToDb("Time taken by stigg call for query: "+ queryString + " is: " + (Context.now() - timeNow));
+
+            timeNow = Context.now();
             BasicDBObject responseBodyObj = BasicDBObject.parse(responseBodyStr);
+            loggerMaker.infoAndAddToDb("Time taken by parsing response for query: "+ queryString + " is: " + (Context.now() - timeNow));
             return responseBodyObj.toJson();
         } catch (Exception e) {
             return new BasicDBObject("err", e.getMessage()).toJson();

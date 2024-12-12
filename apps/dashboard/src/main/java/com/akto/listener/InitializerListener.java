@@ -596,7 +596,10 @@ public class InitializerListener implements ServletContextListener {
                         (existingCDT != null && existingCDT.getDataTypePriority() != null)
                         && (existingCDT.getCategoriesList() != null && !existingCDT.getCategoriesList().isEmpty());
 
-                boolean userHasChangedCondition = existingCDT.getUserModifiedTimestamp() > 0;
+                boolean userHasChangedCondition = false;
+                if(existingCDT != null && existingCDT.getUserModifiedTimestamp() > 0){
+                    userHasChangedCondition = true;
+                }
                 
                 if (userHasChangedCondition || hasNotChangedCondition) {
                     continue;
@@ -2501,26 +2504,24 @@ public class InitializerListener implements ServletContextListener {
 
     static boolean executedOnce = false;
 
-    private final static int REFRESH_INTERVAL = 60 * 1; // 1 minute
+    private final static int REFRESH_INTERVAL = 60 * 15; // 15 minute
 
     public static Organization fetchAndSaveFeatureWiseAllowed(Organization organization) {
-
+        
+        int lastFeatureMapUpdate = organization.getLastFeatureMapUpdate();
+        if((lastFeatureMapUpdate + REFRESH_INTERVAL) >= Context.now()){
+            return organization;
+        }
         HashMap<String, FeatureAccess> featureWiseAllowed = new HashMap<>();
 
         try {
             int gracePeriod = organization.getGracePeriod();
             String hotjarSiteId = organization.getHotjarSiteId();
             String organizationId = organization.getId();
-
-            int lastFeatureMapUpdate = organization.getLastFeatureMapUpdate();
-
             /*
              * This ensures, we don't fetch feature wise allowed from akto too often.
              * This helps the dashboard to be more responsive.
              */
-            if(lastFeatureMapUpdate + REFRESH_INTERVAL > Context.now()){
-                return organization;
-            }
 
             HashMap<String, FeatureAccess> initialFeatureWiseAllowed = organization.getFeatureWiseAllowed();
             if (initialFeatureWiseAllowed == null) {
@@ -2582,7 +2583,7 @@ public class InitializerListener implements ServletContextListener {
             hotjarSiteId = OrganizationUtils.fetchHotjarSiteId(metaData);
             boolean expired = OrganizationUtils.fetchExpired(metaData);
             boolean telemetryEnabled = OrganizationUtils.fetchTelemetryEnabled(metaData);
-            setTelemetrySettings(organization, telemetryEnabled);
+            // setTelemetrySettings(organization, telemetryEnabled);
             boolean testTelemetryEnabled = OrganizationUtils.fetchTestTelemetryEnabled(metaData);
             organization.setTestTelemetryEnabled(testTelemetryEnabled);
 
