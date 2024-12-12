@@ -1,6 +1,17 @@
 import request from "@/util/request"
 
 const testEditorRequests = {
+    fetchSampleData(collectionId, apiEndpointUrl, apiEndpointMethod) {
+        return request({
+            url: '/api/fetchSampleData',
+            method: 'post',
+            data: {
+                apiCollectionId: collectionId, 
+                url: apiEndpointUrl, 
+                method: apiEndpointMethod
+            }
+        })
+    },
     fetchSampleDataForTestEditor(collectionId, apiEndpointUrl, apiEndpointMethod) {
         return request({
             url: '/api/fetchSampleDataForTestEditor',
