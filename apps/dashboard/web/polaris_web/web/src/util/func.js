@@ -631,6 +631,23 @@ sortFunc: (data, sortKey, sortOrder, treeView) => {
       finalArr.reverse()
     }
     return finalArr
+  }else if(sortKey === 'customGroupsSort'){
+    let arr1 = []
+    let arr2 = []; 
+    data.forEach((x) => {
+      if(x.automated){
+        arr2.push(x)
+      }else{
+        arr1.push(x)
+      }
+    })
+    arr1 = arr1.sort((a, b) => {
+      return (sortOrder) * (b['displayName'].localeCompare(a['displayName']))
+    })
+    arr2 = arr2.sort((a, b) => {
+      return (sortOrder) * (b['displayName'].localeCompare(a['displayName']))
+    })
+    return [...arr1, ...arr2]
   }
   data.sort((a, b) => {
     if(typeof a[sortKey] ==='number')
