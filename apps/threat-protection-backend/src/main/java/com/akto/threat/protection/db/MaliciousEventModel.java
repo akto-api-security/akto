@@ -1,7 +1,6 @@
 package com.akto.threat.protection.db;
 
 import com.akto.dto.type.URLMethods;
-
 import java.util.UUID;
 
 public class MaliciousEventModel {
@@ -25,7 +24,7 @@ public class MaliciousEventModel {
 
   public MaliciousEventModel() {}
 
-  public MaliciousEventModel(Builder builder) {
+  private MaliciousEventModel(Builder builder) {
     this.id = UUID.randomUUID().toString();
     this.filterId = builder.filterId;
     this.actor = builder.actor;
@@ -152,5 +151,49 @@ public class MaliciousEventModel {
 
   public static Builder newBuilder() {
     return new Builder();
+  }
+
+  public void setId(String id) {
+    this.id = id;
+  }
+
+  public void setFilterId(String filterId) {
+    this.filterId = filterId;
+  }
+
+  public void setActor(String actor) {
+    this.actor = actor;
+  }
+
+  public void setLatestIp(String latestIp) {
+    this.latestIp = latestIp;
+  }
+
+  public void setLatestApiEndpoint(String latestApiEndpoint) {
+    this.latestApiEndpoint = latestApiEndpoint;
+  }
+
+  public void setCountry(String country) {
+    this.country = country;
+  }
+
+  public void setLatestApiMethod(URLMethods.Method latestApiMethod) {
+    this.latestApiMethod = latestApiMethod;
+  }
+
+  public void setLatestApiOrig(String latestApiOrig) {
+    this.latestApiOrig = latestApiOrig;
+  }
+
+  public void setDetectedAt(long detectedAt) {
+    this.detectedAt = detectedAt;
+  }
+
+  public void setLatestApiCollectionId(int latestApiCollectionId) {
+    this.latestApiCollectionId = latestApiCollectionId;
+  }
+
+  public void setEventType(EventType eventType) {
+    this.eventType = eventType;
   }
 }
