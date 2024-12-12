@@ -145,10 +145,14 @@ public class TestRolesAction extends UserAction {
             return ERROR.toUpperCase();
         }
 
-        RBAC.Role currentRoleForUser = RBACDao.getCurrentRoleForUser(user.getId(), Context.accountId.get());
-        if(!currentRoleForUser.equals(RBAC.Role.ADMIN) && !user.getLogin().equals(role.getCreatedBy())) {
-            addActionError("You do not have permission to delete this role.");
-            return ERROR.toUpperCase();
+        boolean noAccess = !user.getLogin().equals(role.getCreatedBy());
+
+        if(noAccess) {
+            RBAC.Role currentRoleForUser = RBACDao.getCurrentRoleForUser(user.getId(), Context.accountId.get());
+            if (!currentRoleForUser.equals(RBAC.Role.ADMIN)) {
+                addActionError("You do not have permission to delete this role.");
+                return ERROR.toUpperCase();
+            }
         }
 
         Bson roleFilterQ = Filters.eq(TestRoles.NAME, roleName);
