@@ -51,4 +51,11 @@ export default {
             data: {startTimeStamp, endTimeStamp}
         })
     },
+    bulkCreateJiraTickets(issueIds){
+        return request({
+            url: 'api/bulkCreateJiraTickets',
+            method: 'post',
+            data: {issueIds}
+        })
+    }
 }
