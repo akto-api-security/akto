@@ -222,6 +222,13 @@ function IssuesPage() {
                 resetResourcesSelected()
             })
         }
+
+        function createJiraTicketBulk () {
+            api.bulkCreateJiraTickets(items).then((res) => {
+                setToast(true, false, `${items.length} jira ticket${items.length === 1 ? "" : "s"} created.`)
+                resetResourcesSelected()
+            })
+        }
         
         let issues = [{
             content: 'False positive',
@@ -234,6 +241,10 @@ function IssuesPage() {
         {
             content: 'No time to fix',
             onAction: () => { ignoreAction("No time to fix") }
+        },
+        {
+            content: 'Create jira ticket',
+            onAction: () => { createJiraTicketBulk() }
         }]
         
         let reopen =  [{
@@ -246,12 +257,12 @@ function IssuesPage() {
         
         switch (status) {
             case "OPEN": ret = [].concat(issues); break;
-            case "IGNORED": if (items.length == 1) {
-                ret = [].concat(issues);
-            }
+            case "IGNORED": 
                 ret = ret.concat(reopen);
                 break;
             case "FIXED":
+            default:
+                ret = []
         }
 
         return ret;

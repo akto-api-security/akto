@@ -200,7 +200,7 @@ function ApiCollections() {
     const userRole = window.USER_ROLE
 
     const navigate = useNavigate();
-    const [data, setData] = useState({'all': [], 'hostname':[], 'groups': [], 'custom': [], 'deactivated': []})
+    const [data, setData] = useState({'all': [], 'hostname':[], 'groups': [], 'user_groups': [] , 'custom': [], 'deactivated': []})
     const [active, setActive] = useState(false);
     const [loading, setLoading] = useState(false)
     
@@ -219,7 +219,7 @@ function ApiCollections() {
 
     // const dummyData = dummyJson;
 
-    const definedTableTabs = ['All', 'Hostname', 'Groups', 'Custom', 'Deactivated']
+    const definedTableTabs = ['All', 'Hostname', 'Groups', 'User groups' , 'Custom', 'Deactivated']
 
     const { tabsInfo, selectItems } = useTable()
     const tableSelectedTab = PersistStore.getState().tableSelectedTab[window.location.pathname]
@@ -286,6 +286,7 @@ function ApiCollections() {
         let dataObj = {}
         dataObj = convertToNewData(tmp, {}, {}, {}, {}, {}, true);
         let res = {}
+        let groupsCollections = dataObj.prettify.filter((c) => c.type === "API_GROUP" && !c.deactivated)
         res.all = dataObj.prettify
         res.hostname = dataObj.prettify.filter((c) => c.hostName !== null && c.hostName !== undefined && !c.deactivated)
         const allGroups = dataObj.prettify.filter((c) => c.type === "API_GROUP" && !c.deactivated);
@@ -295,7 +296,7 @@ function ApiCollections() {
         if (res.hostname.length === 0 && (tableSelectedTab === undefined || tableSelectedTab.length === 0)) {
             setTimeout(() => {
                 setSelectedTab("custom");
-                setSelected(3);
+                setSelected(4);
             },[100])
         }
 
@@ -426,6 +427,8 @@ function ApiCollections() {
         setCollectionsMap(func.mapCollectionIdToName(tmp))
         const allHostNameMap = func.mapCollectionIdToHostName(tmp)
         setHostNameMap(allHostNameMap)
+
+        groupsCollections = dataObj.prettify.filter((c) => c.type === "API_GROUP" && !c.deactivated)
 
         tmp = {}
         tmp.all = dataObj.prettify
@@ -763,7 +766,7 @@ function ApiCollections() {
             key={refreshData}
             pageLimit={100}
             data={data[selectedTab]} 
-            sortOptions={ selectedTab === 'groups' ? [...tempSortOptions, ...sortOptions] : sortOptions} 
+            sortOptions={ selectedTab === 'groups' ? [...tempSortOptions, ...sortOptions] : sortOptions}
             resourceName={resourceName} 
             filters={[]}
             disambiguateLabel={disambiguateLabel} 

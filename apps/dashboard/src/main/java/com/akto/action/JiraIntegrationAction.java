@@ -15,6 +15,7 @@ import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.jira_integration.JiraIntegration;
 import com.akto.dto.jira_integration.JiraMetaData;
+import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.parsers.HttpCallParser;
@@ -376,6 +377,12 @@ public class JiraIntegrationAction extends UserAction {
         return details;
     }
 
+    List<TestingIssuesId> issuesIds;
+
+    public String bulkCreateJiraTickets (){
+        
+    }
+
     public String getBaseUrl() {
         return baseUrl;
     }
@@ -466,6 +473,10 @@ public class JiraIntegrationAction extends UserAction {
 
     public void setJiraTicketKey(String jiraTicketKey) {
         this.jiraTicketKey = jiraTicketKey;
+    }
+
+    public void setIssuesIds(List<TestingIssuesId> issuesIds) {
+        this.issuesIds = issuesIds;
     }
     
 }
