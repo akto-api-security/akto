@@ -25,7 +25,7 @@
     </dependencyManagement>
 
     <dependencies>
-       <dependency>
+        <dependency>
             <groupId>com.amazonaws</groupId>
             <artifactId>aws-java-sdk-lambda</artifactId>
             <version>1.12.405</version>
@@ -107,6 +107,11 @@
         <dependency>
             <groupId>com.akto.libs.dao</groupId>
             <artifactId>dao</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.akto.libs.protobuf</groupId>
+            <artifactId>protobuf</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>
@@ -241,6 +246,12 @@
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-csv</artifactId>
             <version>1.9.0</version>
+        </dependency>
+        <dependency>
+            <artifactId>grpc-api</artifactId>
+            <groupId>io.grpc</groupId>
+            <version>1.68.1</version>
+            <scope>compile</scope>
         </dependency>
     </dependencies>
     <build>
