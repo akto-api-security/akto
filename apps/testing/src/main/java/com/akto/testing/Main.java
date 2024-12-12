@@ -361,6 +361,7 @@ public class Main {
                         }                   
 
                         if (testingRunResultSummary != null) {
+                            int maxRunTime = testingRun.getTestRunTime() <= 0 ? 30*60 : testingRun.getTestRunTime(); 
                             Bson filterCountFailed = Filters.and(
                                 Filters.gte(TestingRunResultSummary.START_TIMESTAMP, (Context.now() - ((MAX_RETRIES_FOR_FAILED_SUMMARIES + 1) * maxRunTime))),
                                 Filters.eq(TestingRunResultSummary.TESTING_RUN_ID, testingRun.getId()),
@@ -377,7 +378,6 @@ public class Main {
                                     loggerMaker.infoAndAddToDb("Test run was executed long ago, TRR_ID:"
                                             + testingRunResult.getHexId() + ", TRRS_ID:" + testingRunResultSummary.getHexId() + " TR_ID:" + testingRun.getHexId(), LogDb.TESTING);
 
-                                    int maxRunTime = testingRun.getTestRunTime() <= 0 ? 30*60 : testingRun.getTestRunTime(); 
                                     int countFailedSummaries = (int) TestingRunResultSummariesDao.instance.count(filterCountFailed);
                                     Bson updateForSummary = Updates.set(TestingRunResultSummary.STATE, State.FAILED);
                                     if(countFailedSummaries >= (MAX_RETRIES_FOR_FAILED_SUMMARIES - 1)){
