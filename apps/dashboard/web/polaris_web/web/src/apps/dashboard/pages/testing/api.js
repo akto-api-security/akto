@@ -462,5 +462,15 @@ export default {
             method: 'post',
             data: { testingRunConfigId, testConfigsAdvancedSettings }
         })
-    }
+    },
+    async fetchTestingRunResultsSummary(testingRunSummaryId) {
+        const resp = await request({
+            url: '/api/fetchTestingRunResultsSummary',
+            method: 'post',
+            data: {
+                testingRunSummaryId
+            }
+        })
+        return resp
+    },
 }
