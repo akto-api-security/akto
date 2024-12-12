@@ -1,8 +1,12 @@
 package com.akto.action.traffic_metrics;
 
 import com.akto.action.UserAction;
+import com.akto.dao.traffic_collector.TrafficCollectorInfoDao;
+import com.akto.dao.traffic_collector.TrafficCollectorMetricsDao;
 import com.akto.dao.traffic_metrics.RuntimeMetricsDao;
 import com.akto.dao.traffic_metrics.TrafficMetricsDao;
+import com.akto.dto.traffic_collector.TrafficCollectorInfo;
+import com.akto.dto.traffic_collector.TrafficCollectorMetrics;
 import com.akto.dto.traffic_metrics.RuntimeMetrics;
 import com.akto.dto.traffic_metrics.TrafficMetrics;
 import com.mongodb.BasicDBObject;
@@ -126,7 +130,7 @@ public class TrafficMetricsAction extends UserAction {
     public String fetchRuntimeInstances() {
         instanceIds = new ArrayList<>();
         Bson filters = RuntimeMetricsDao.buildFilters(startTimestamp, endTimestamp);
-        runtimeMetrics = RuntimeMetricsDao.instance.findAll(filters, 0, 0, Sorts.descending("timestamp"), Projections.include("instanceId"));
+        runtimeMetrics = RuntimeMetricsDao.instance.findAll(filters, 0, 0, Sorts.descending("timestamp"));
         for (RuntimeMetrics metric: runtimeMetrics) {
             instanceIds.add(metric.getInstanceId());
         }
@@ -149,15 +153,48 @@ public class TrafficMetricsAction extends UserAction {
             while (cursor.hasNext()) {
                 BasicDBObject basicDBObject = cursor.next();
                 BasicDBObject latestDoc = (BasicDBObject) basicDBObject.get("latestDoc");
-                runtimeMetrics.add(new RuntimeMetrics(latestDoc.getString("name"), 0, instanceId, latestDoc.getDouble("val")));
+                runtimeMetrics.add(new RuntimeMetrics(latestDoc.getString("name"), 0, instanceId, latestDoc.getString("version"), latestDoc.getDouble("val")));
             }
         }
 
         return SUCCESS.toUpperCase();
     }
 
+    public String fetchAllRuntimeMetrics() {
+        Bson filters = RuntimeMetricsDao.buildFilters(startTimestamp, endTimestamp, instanceId);
+        runtimeMetrics = new ArrayList<>();
+
+        runtimeMetrics.addAll(RuntimeMetricsDao.instance.findAll(filters));
+
+        return SUCCESS.toUpperCase();
+    }
+
     public String fetchTrafficMetricsDesciptions(){
         names = Arrays.asList(TrafficMetrics.Name.values());
+        return SUCCESS.toUpperCase();
+    }
+
+    TrafficCollectorMetrics trafficCollectorMetrics;
+    public String fetchTrafficCollectorMetrics() {
+        Bson filters = Filters.and(
+                Filters.gte("bucketStartEpoch", startTimestamp),
+                Filters.lte("bucketStartEpoch", endTimestamp),
+                Filters.in("_id", instanceId)
+        );
+        trafficCollectorMetrics = TrafficCollectorMetricsDao.instance.findOne(filters);
+
+        return SUCCESS.toUpperCase();
+    }
+
+    List<TrafficCollectorInfo> trafficCollectorInfos;
+    public String fetchTrafficCollectorInfos() {
+        trafficCollectorInfos = new ArrayList<>();
+        Bson filters = Filters.and(
+                Filters.gte("startTime", startTimestamp),
+                Filters.lte("startTime", endTimestamp)
+        );
+        trafficCollectorInfos = TrafficCollectorInfoDao.instance.findAll(filters);
+
         return SUCCESS.toUpperCase();
     }
 
@@ -217,5 +254,21 @@ public class TrafficMetricsAction extends UserAction {
 	public void setInstanceId(String instanceId) {
 		this.instanceId = instanceId;
 	}
+
+    public List<TrafficCollectorInfo> getTrafficCollectorInfos() {
+        return trafficCollectorInfos;
+    }
+
+    public void setTrafficCollectorInfos(List<TrafficCollectorInfo> trafficCollectorInfos) {
+        this.trafficCollectorInfos = trafficCollectorInfos;
+    }
+
+    public TrafficCollectorMetrics getTrafficCollectorMetrics() {
+        return trafficCollectorMetrics;
+    }
+
+    public void setTrafficCollectorMetrics(TrafficCollectorMetrics trafficCollectorMetrics) {
+        this.trafficCollectorMetrics = trafficCollectorMetrics;
+    }
 
 }
