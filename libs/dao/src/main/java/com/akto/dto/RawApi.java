@@ -1,5 +1,6 @@
 package com.akto.dto;
 
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -23,6 +24,25 @@ public class RawApi {
         this.request = request;
         this.response = response;
         this.originalMessage = originalMessage;
+    }
+
+    public static RawApi buildFromMessage(String message, boolean overrideHostHeader){
+        if(!overrideHostHeader){
+            return buildFromMessage(message);
+        }else{
+            try {
+                OriginalHttpRequest request = new OriginalHttpRequest();
+                request.buildFromSampleMessage(message, true);
+
+                OriginalHttpResponse response = new OriginalHttpResponse();
+                response.buildFromSampleMessage(message);
+
+                return new RawApi(request, response, message);
+            } catch (Exception e) {
+                e.printStackTrace();
+                return buildFromMessage(message);
+            }
+        }
     }
 
     public static RawApi buildFromMessage(String message) {
