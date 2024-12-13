@@ -154,6 +154,8 @@ function ApiEndpoints(props) {
     const setShowDetails = ObserveStore(state => state.setInventoryFlyout)
     const collectionsMap = PersistStore(state => state.collectionsMap)
     const allCollections = PersistStore(state => state.allCollections);
+    const setCollectionsMap = PersistStore(state => state.setCollectionsMap)
+    const setAllCollections = PersistStore(state => state.setAllCollections)
 
     const [ pageTitle, setPageTitle] = useState(collectionsMap[apiCollectionId])
     const [apiEndpoints, setApiEndpoints] = useState([])
@@ -907,12 +909,24 @@ function ApiEndpoints(props) {
         )
       ]
 
+    function updateCollectionName(list, apiCollectionId, newName) {
+        list.forEach(item => {
+            if (item.id === apiCollectionId) {
+                item.displayName = newName;
+                item.name = newName;
+            }
+        });
+    }
+
     
       const handleSaveClick = async () => {
         api.editCollectionName(apiCollectionId, editableTitle).then((resp) => {
             func.setToast(true, false, 'Collection name updated successfully!')
             setPageTitle(editableTitle)
             collectionsMap[apiCollectionId] = editableTitle
+            setCollectionsMap(collectionsMap)
+            updateCollectionName(allCollections, parseInt(apiCollectionId, 10), editableTitle)
+            setAllCollections(allCollections)
             setIsEditing(false);
         }).catch((err) => {
             setEditableTitle(pageTitle)

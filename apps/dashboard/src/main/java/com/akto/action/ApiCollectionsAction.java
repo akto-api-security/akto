@@ -741,7 +741,7 @@ public class ApiCollectionsAction extends UserAction {
         }
 
         if (apiCollection.getHostName() != null) {
-            String errorMessage = "Traffic API collection can't edited";
+            String errorMessage = "Unable to modify the Traffic API collection";
             addActionError(errorMessage);
             return Action.ERROR.toUpperCase();
         }
