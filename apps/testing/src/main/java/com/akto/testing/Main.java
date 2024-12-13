@@ -46,6 +46,8 @@ import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.Severity;
 import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
+import com.mongodb.ReadPreference;
+import com.mongodb.WriteConcern;
 import com.mongodb.client.model.*;
 import com.mongodb.client.result.DeleteResult;
 
@@ -219,7 +221,9 @@ public class Main {
 
     public static void main(String[] args) throws InterruptedException {
         String mongoURI = System.getenv("AKTO_MONGO_CONN");
-        DaoInit.init(new ConnectionString(mongoURI));
+        ReadPreference readPreference = ReadPreference.secondary();
+        WriteConcern writeConcern = WriteConcern.W1;
+        DaoInit.init(new ConnectionString(mongoURI), readPreference, writeConcern);
 
         boolean connectedToMongo = false;
         do {
