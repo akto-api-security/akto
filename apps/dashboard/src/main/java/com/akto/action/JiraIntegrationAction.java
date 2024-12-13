@@ -1,17 +1,10 @@
 package com.akto.action;
 
 import java.io.File;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Base64;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 
+import com.akto.utils.Utils;
 import org.apache.commons.io.FileUtils;
 import org.bson.conversions.Bson;
 
@@ -199,8 +192,11 @@ public class JiraIntegrationAction extends UserAction {
         BasicDBObject reqPayload = new BasicDBObject();
         BasicDBObject fields = new BasicDBObject();
 
+        String endpoint = jiraMetaData.getEndPointStr().replace("Endpoint - ", "");
+        String lastPartOfEndpoint = endpoint.length() > 30 ? endpoint.substring(endpoint.length() - 30) : endpoint;
+
         // issue title
-        fields.put("summary", "Akto Report - " + jiraMetaData.getIssueTitle());
+        fields.put("summary", "Akto Report - " + jiraMetaData.getIssueTitle() + " - " + lastPartOfEndpoint + " - " + Utils.generateRandomString(3));
         jiraIntegration = JiraIntegrationDao.instance.findOne(new BasicDBObject());
 
         // issue type (TASK)
