@@ -51,9 +51,11 @@ public class OriginalHttpRequest {
         buildFromSampleMessage(message);
         if(useUrlToFillHost){
             try {
-                URI uri = new URI(this.url);
-                String calculatedHost = uri.getHost() != null ? uri.getHost() : "";
-                this.headers.put("host", Arrays.asList(calculatedHost));
+                if(this.headers.getOrDefault("host", null) == null){
+                    URI uri = new URI(this.url);
+                    String calculatedHost = uri.getHost() != null ? uri.getHost() : "";
+                    this.headers.put("host", Arrays.asList(calculatedHost));
+                }
             } catch (Exception e) {
                 e.printStackTrace();
             }
