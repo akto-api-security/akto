@@ -365,6 +365,12 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
         return processPipelineForEndpoint(pipeline);
     }
 
+    public List<ApiInfo.ApiInfoKey> fetchEndpointsInCollection(Bson filter) {
+        List<Bson> pipeline = getPipelineForEndpoints(filter);
+        pipeline.add(Aggregates.limit(SingleTypeInfoDao.LARGE_LIMIT));
+        return processPipelineForEndpoint(pipeline);
+    }
+
     public List<ApiInfo.ApiInfoKey> fetchEndpointsInCollection(Method method) {
         Bson filter = null;
         if (method == null) {

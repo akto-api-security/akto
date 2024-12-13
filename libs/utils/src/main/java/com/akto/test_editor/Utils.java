@@ -406,8 +406,8 @@ public class Utils {
 
     public static double calcStructureMatchPercentage(String payload, String compareWithPayload) {
 
-        boolean isOrigPAyloadJson = isJsonPayload(payload);
-        boolean isCurPAyloadJson = isJsonPayload(compareWithPayload);
+        boolean isOrigPAyloadJson = isValidJson(payload);
+        boolean isCurPAyloadJson = isValidJson(compareWithPayload);
         if (!isOrigPAyloadJson && !isCurPAyloadJson) {
             return 100;
         }
@@ -476,6 +476,18 @@ public class Utils {
             return false;
         }
         return true;
+    }
+
+    public static boolean isValidJson(String payload) {
+        try {
+            if (payload.length() == 0) {
+                return false;
+            }
+            mapper.readTree(payload);
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     public static UrlModifierPayload fetchUrlModifyPayload(String payload) {

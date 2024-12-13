@@ -526,7 +526,7 @@ function ApiEndpoints(props) {
             let blob = new Blob([csv], {
                 type: "application/csvcharset=UTF-8"
             });
-            saveAs(blob, ("All endopints") + ".csv");
+            saveAs(blob, ("All endpoints") + ".csv");
             func.setToast(true, false, <div data-testid="csv_download_message">CSV exported successfully</div>)
         }
     }

@@ -141,6 +141,12 @@ public class UsageMetricHandler {
 
             AccountSettings accountSettings = AccountSettingsDao.instance.findOne(
                     AccountSettingsDao.generateFilter());
+
+            if (accountSettings == null) {
+                loggerMaker.errorAndAddToDb("AccountSettings not found for account: " + accountId, LogDb.DASHBOARD);
+                return;
+            }
+            
             // Get organization to which account belongs to
             Organization organization = OrganizationsDao.instance.findOne(
                     Filters.in(Organization.ACCOUNTS, accountId)

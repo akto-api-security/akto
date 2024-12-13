@@ -10,10 +10,6 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import javax.script.ScriptEngine;
-import javax.script.ScriptEngineManager;
-import javax.script.ScriptException;
-
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.CollectionConditions.ConditionsType;
 import com.akto.dto.OriginalHttpRequest;
@@ -187,35 +183,9 @@ public class Utils {
         return request;
     }
 
-    private static final ScriptEngineManager factory = new ScriptEngineManager();
-
     public static String executeCode(String ogPayload, Map<String, Object> valuesMap) throws Exception {
-        String variablesReplacedPayload = replaceVariables(ogPayload,valuesMap, true);
-
-        String regex = "\\#\\[(.*?)]#";
-        Pattern p = Pattern.compile(regex);
-        Matcher matcher = p.matcher(variablesReplacedPayload);
-        StringBuffer sb = new StringBuffer();
-
-        // create a Nashorn script engine
-        ScriptEngine engine = factory.getEngineByName("nashorn");
-
-        while (matcher.find()) {
-            String code = matcher.group(1);
-            code = code.trim();
-            if (!code.endsWith(";")) code = code+";";
-            try {
-                Object val = engine.eval(code);
-                matcher.appendReplacement(sb, val.toString());
-            } catch (final ScriptException se) {
-            }
-
-        }
-
-        matcher.appendTail(sb); 
-        return sb.toString();
+        return replaceVariables(ogPayload,valuesMap, true);
     }
-
 
     public static String replaceVariables(String payload, Map<String, Object> valuesMap, boolean escapeString) throws Exception {
         String regex = "\\$\\{((x|step)\\d+\\.[\\w\\-\\[\\].]+|AKTO\\.changes_info\\..*?)\\}"; 
@@ -258,20 +228,6 @@ public class Utils {
 
         boolean vulnerable = false;
         if (testValidatorCode.length() == 0) return false;
-
-        ScriptEngine engine = factory.getEngineByName("nashorn");
-        try {
-            String code = replaceVariables(testValidatorCode, valuesMap, true);
-            loggerMaker.infoAndAddToDb("*******************************************************************", LogDb.TESTING);
-            loggerMaker.infoAndAddToDb("TEST VALIDATOR CODE:", LogDb.TESTING);
-            loggerMaker.infoAndAddToDb(code, LogDb.TESTING);
-            Object o = engine.eval(code);
-            loggerMaker.infoAndAddToDb("TEST VALIDATOR RESULT: " + o.toString(), LogDb.TESTING);
-            loggerMaker.infoAndAddToDb("*******************************************************************", LogDb.TESTING);
-            vulnerable = ! (boolean) o;
-        } catch (Exception e) {
-            ;
-        }
 
         return vulnerable;
     }
