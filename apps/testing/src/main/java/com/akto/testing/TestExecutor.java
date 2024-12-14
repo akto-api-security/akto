@@ -45,6 +45,7 @@ import com.akto.util.enums.LoginFlowEnums;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
+import com.mongodb.WriteConcern;
 import com.mongodb.client.model.*;
 
 import org.bson.types.ObjectId;
@@ -295,7 +296,7 @@ public class TestExecutor {
 
         State updatedState = GetRunningTestsStatus.getRunningTests().isTestRunning(summaryId, true) ? State.COMPLETED : GetRunningTestsStatus.getRunningTests().getCurrentState(summaryId);
 
-        TestingRunResultSummary testingRunResultSummary = TestingRunResultSummariesDao.instance.getMCollection().findOneAndUpdate(
+        TestingRunResultSummary testingRunResultSummary = TestingRunResultSummariesDao.instance.getMCollection().withWriteConcern(WriteConcern.W1).findOneAndUpdate(
                 Filters.eq(Constants.ID, summaryId),
                 Updates.combine(
                         Updates.set(TestingRunResultSummary.END_TIMESTAMP, Context.now()),
@@ -549,7 +550,7 @@ public class TestExecutor {
             TestingRunResultDao.instance.insertMany(testingRunResults);
             loggerMaker.infoAndAddToDb("Inserted testing results", LogDb.TESTING);
 
-            TestingRunResultSummariesDao.instance.getMCollection().findOneAndUpdate(
+            TestingRunResultSummariesDao.instance.getMCollection().withWriteConcern(WriteConcern.W1).findOneAndUpdate(
                 Filters.eq(Constants.ID, testRunResultSummaryId),
                 Updates.inc(TestingRunResultSummary.TEST_RESULTS_COUNT, resultSize)
             );
