@@ -55,6 +55,9 @@ public class YamlTemplateDao extends AccountsContextDao<YamlTemplate> {
                 }
             }
             localCounter += yamlTemplates.size();
+            if(yamlTemplates.size() == 0){
+                break;
+            }
             localSkip += localLimit;
         }
 
