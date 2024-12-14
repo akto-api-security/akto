@@ -163,7 +163,10 @@ public class TestExecutor {
         List<CustomAuthType> customAuthTypes = CustomAuthTypeDao.instance.findAll(CustomAuthType.ACTIVE,true);
         TestingUtil testingUtil = new TestingUtil(authMechanism, sampleMessageStore, testRoles, testingRun.getUserEmail(), customAuthTypes);
 
+        logger.info("For account: " + accountId + " fetched test yamls and auth types");
+
         try {
+            logger.info("For account: " + accountId + " initiating login flow");
             LoginFlowResponse loginFlowResponse = triggerLoginFlow(authMechanism, 3);
             if (!loginFlowResponse.getSuccess()) {
                 loggerMaker.errorAndAddToDb("login flow failed", LogDb.TESTING);
@@ -345,6 +348,7 @@ public class TestExecutor {
         LoginFlowResponse loginFlowResponse = null;
         for (int i=0; i<retries; i++) {
             try {
+                logger.info("retry attempt: " + i + " for login flow");
                 loginFlowResponse = executeLoginFlow(authMechanism, null);
                 if (loginFlowResponse.getSuccess()) {
                     loggerMaker.infoAndAddToDb("login flow success", LogDb.TESTING);
