@@ -626,19 +626,4 @@ public class Utils {
         input.addAll(copySet);
         return input;
     }
-
-    public static String generateRandomString(int length) {
-        String characters = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
-
-        Random random = new Random();
-        StringBuilder result = new StringBuilder();
-
-        for (int i = 0; i < length; i++) {
-            int randomIndex = random.nextInt(characters.length());
-            result.append(characters.charAt(randomIndex));
-        }
-
-        return result.toString();
-    }
-
 }

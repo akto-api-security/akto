@@ -4,7 +4,6 @@ import java.io.File;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 
-import com.akto.utils.Utils;
 import org.apache.commons.io.FileUtils;
 import org.bson.conversions.Bson;
 
@@ -196,7 +195,7 @@ public class JiraIntegrationAction extends UserAction {
         String lastPartOfEndpoint = endpoint.length() > 30 ? endpoint.substring(endpoint.length() - 30) : endpoint;
 
         // issue title
-        fields.put("summary", "Akto Report - " + jiraMetaData.getIssueTitle() + " - " + lastPartOfEndpoint + " - " + Utils.generateRandomString(3));
+        fields.put("summary", "Akto Report - " + jiraMetaData.getIssueTitle() + " - " + lastPartOfEndpoint);
         jiraIntegration = JiraIntegrationDao.instance.findOne(new BasicDBObject());
 
         // issue type (TASK)
