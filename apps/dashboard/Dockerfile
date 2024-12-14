@@ -6,5 +6,5 @@ ADD ./target/dashboard.war /var/lib/jetty/webapps/root.war
 RUN echo "--module=http-forwarded" > /var/lib/jetty/start.d/http-forwarded.ini
 RUN echo "jetty.httpConfig.sendServerVersion=false" > /var/lib/jetty/start.d/server.ini
 RUN echo "org.slf4j.simpleLogger.log.org.eclipse.jetty.annotations.AnnotationParser=ERROR" >> /var/lib/jetty/start.d/server.ini
-ENV JAVA_OPTIONS="-XX:+ExitOnOutOfMemoryError"
+ENV JAVA_OPTIONS="-XX:+ExitOnOutOfMemoryError -Xmx13g"
 EXPOSE 8080
