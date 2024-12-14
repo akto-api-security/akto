@@ -5,33 +5,10 @@
     justify-content: space-between;
 }
 
-.Polaris-Navigation__Item--selected::before{
-    background-color: var(--akto-primary) !important;
-    opacity: 1 !important;
-}
-
 .active .Polaris-Navigation__Item--selected::before{
     width: 0 !important;
 }
 
-.active .Polaris-Navigation__PrimaryNavigation .Polaris-Navigation__ItemInnerWrapper--selected{
-    background-color: var(--p-color-bg-surface-selected) !important; 
-}
-
-.active .Polaris-Navigation__SecondaryNavigation .Polaris-Navigation__Item--selected{
-    background-color: transparent !important;
-}
-
-.Polaris-Navigation__SecondaryNavigation .Polaris-Navigation__Item--selected::before{
+.active .Polaris-Navigation__SecondaryNavigation .Polaris-Navigation__Item--selected::before{
     width: 0.1875rem !important;
-    left: calc(var(--p-space-200)* -1) !important;
-}
-
-.Polaris-Navigation__PrimaryNavigation:hover{
-    background-color: transparent !important;
-}
-
-
-.Polaris-Navigation__ItemInnerWrapper--selected{
-    background-color: transparent !important;
 }

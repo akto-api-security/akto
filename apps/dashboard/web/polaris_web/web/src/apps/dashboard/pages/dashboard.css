@@ -106,10 +106,9 @@
     --p-color-bg-surface-brand-hover: #ECEBFF !important;
     --p-color-bg-surface-info-hover: #F2F7FE !important;
 
-    --p-color-text:rgba(31,33,36) !important;
     --p-color-text-primary: var(--akto-primary) !important;
     --p-color-text-success: var(--akto-primary) !important;
-    --p-color-text-primary-hover: var(--akto-primary) !important;
+    --p-color-text-brand-hover: var(--akto-primary) !important;
     
     --p-color-icon-brand: var(--akto-primary) !important;
     --p-color-bg-surface-brand-selected: #F6F6F7 !important;
@@ -117,26 +116,12 @@
     --p-color-bg-surface-critical: #FED3D1 !important;
     --p-color-bg-surface-caution: #FFD79D !important;
     --p-color-bg-surface-info: #A4E8F2 !important;
-    --p-color-border-strong:rgba(171, 177, 186, 1) !important;
-    --p-shadow-sm:0rem 0.0625rem 0.0625rem rgba(31, 33, 36, 0.1) !important; 
-    --p-border-width-1:0.0625rem;
 }
 
 .Polaris-Page{
     padding: 0 32px !important;
 }
 
-.Polaris-Navigation__ItemInnerWrapper--selected .Polaris-Navigation__Text {
-    color:var(--akto-primary) !important;
-}
-
-.Polaris-Button--variantSecondary, .Polaris-Button--variantPrimary {
-    min-height: var(--p-height-900) !important;
-    min-width: var(--p-width-900) !important;
-    border-radius: var(--p-border-radius-100) !important;
-    border: var(--p-border-width-025) solid var(--p-color-border-strong) !important;
-    box-shadow: var(--p-shadow-sm)!important;
-}
 
 
 .Polaris-Frame__Main, .Polaris-Navigation {
@@ -210,20 +195,6 @@
     background: white;
     margin-top: -20px;
     padding-block: 10px;
-}
-
-.Polaris-ResourceList__HeaderWrapper{
-    padding: calc(var(--p-space-300) - var(--p-space-050)) var(--p-space-500) !important;
-    min-height: 3.5rem !important;
-}
-
-
-.Polaris-Text--medium {
-    font-weight: 500 !important;
-}
-
-.Polaris-Navigation {
-    border-right: var(--p-border-width-025) solid var(--p-color-border-secondary) !important;
 }
 
 
