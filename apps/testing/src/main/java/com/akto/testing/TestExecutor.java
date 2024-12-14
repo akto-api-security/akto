@@ -493,7 +493,13 @@ public class TestExecutor {
         loggerMaker.infoAndAddToDb("Starting test for " + apiInfoKey, LogDb.TESTING);   
         
         try {
+            if (accountId == 1665011467) {
+                logger.info("initiated startTestNew for api " + apiInfoKey.getUrl()+ " at " + Context.now());
+            }
             startTestNew(apiInfoKey, testRunId, testingRunConfig, testingUtil, testRunResultSummaryId, testConfigMap, subCategoryEndpointMap, apiInfoKeyToHostMap, debug, testLogs, startTime, maxRunTime, syncLimit, authMechanism);
+            if (accountId == 1665011467) {
+                logger.info("finished startTestNew for api " + apiInfoKey.getUrl()+ " at " + Context.now());
+            }
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "error while running tests: " + e);
         }
@@ -581,9 +587,9 @@ public class TestExecutor {
 
         int countSuccessfulTests = 0;
         for (String testSubCategory: testSubCategories) {
-            loggerMaker.infoAndAddToDb("Trying to run test for category: " + testSubCategory + " with summary state: " + GetRunningTestsStatus.getRunningTests().getCurrentState(testRunResultSummaryId) );
+            loggerMaker.infoAndAddToDb("Trying to run test for category: " + testSubCategory + " with summary state: " + GetRunningTestsStatus.getRunningTests().getCurrentState(testRunResultSummaryId) + " " + Context.now());
             if(GetRunningTestsStatus.getRunningTests().isTestRunning(testRunResultSummaryId, true)){
-                loggerMaker.infoAndAddToDb("Entered tests for api: " + apiInfoKey.toString() + " : " + testSubCategory);
+                loggerMaker.infoAndAddToDb("Entered tests for api: " + apiInfoKey.toString() + " : " + testSubCategory + " " + Context.now());
                 if (Context.now() - startTime > timeToKill) {
                     loggerMaker.infoAndAddToDb("Timed out in " + (Context.now()-startTime) + "seconds");
                     return;
@@ -620,6 +626,8 @@ public class TestExecutor {
                             Context.now(), testRunResultSummaryId, null, Collections.singletonList(new TestingRunResult.TestLog(TestingRunResult.TestLogType.INFO, "No samples messages found")));
                 }
 
+                int accountId = Context.accountId.get();
+
                 try {
                     if(testingRunResult==null){
 
@@ -630,7 +638,13 @@ public class TestExecutor {
                             checkAndUpdateAuthMechanism(Context.now(), authMechanism);
                         }
 
+                        if (accountId == 1665011467) {
+                            logger.info("initiated runTestNew for api " + apiInfoKey.getUrl()+ " at " + Context.now());
+                        }
                         testingRunResult = runTestNew(apiInfoKey,testRunId,testingUtil,testRunResultSummaryId, testConfig, testingRunConfig, debug, testLogs);
+                        if (accountId == 1665011467) {
+                            logger.info("finished runTestNew for api " + apiInfoKey.getUrl()+ " at " + Context.now());
+                        }
                     }
                 } catch (Exception e) {
                     loggerMaker.errorAndAddToDb("Error while running tests for " + testSubCategory +  ": " + e.getMessage(), LogDb.TESTING);
@@ -644,7 +658,13 @@ public class TestExecutor {
                     }
                 }
 
+                if (accountId == 1665011467) {
+                    logger.info("initiated insertResultsAndMakeIssues run for api " + apiInfoKey.getUrl()+ " at " + Context.now());
+                }
                 insertResultsAndMakeIssues(testingRunResults, testRunResultSummaryId);
+                if (accountId == 1665011467) {
+                    logger.info("finished insertResultsAndMakeIssues run for api " + apiInfoKey.getUrl()+ " at " + Context.now());
+                }
             }else{
                 if(GetRunningTestsStatus.getRunningTests().getCurrentState(testRunId) != null && GetRunningTestsStatus.getRunningTests().getCurrentState(testRunId).equals(TestingRun.State.STOPPED)){
                     logger.info("Test stopped for id: " + testRunId.toString());
@@ -729,7 +749,15 @@ public class TestExecutor {
             varMap.put("wordList_" + key, wordListsMap.get(key));
         }
 
+        int accountId = Context.accountId.get();
+
+        if (accountId == 1665011467) {
+            logger.info("initiated resolveWordList for api " + apiInfoKey.getUrl()+ " at " + Context.now());
+        }
         VariableResolver.resolveWordList(varMap, testingUtil.getSampleMessages(), apiInfoKey);
+        if (accountId == 1665011467) {
+            logger.info("finished resolveWordList for api " + apiInfoKey.getUrl()+ " at " + Context.now());
+        }
 
         String testExecutionLogId = UUID.randomUUID().toString();
         
@@ -743,7 +771,14 @@ public class TestExecutor {
         executor.overrideTestUrl(rawApi, testingRunConfig);
         YamlTestTemplate yamlTestTemplate = new YamlTestTemplate(apiInfoKey,filterNode, validatorNode, executorNode,
                 rawApi, varMap, auth, testingUtil.getAuthMechanism(), testExecutionLogId, testingRunConfig, customAuthTypes, testConfig.getStrategy());
+        
+        if (accountId == 1665011467) {
+            logger.info("initiated yamlTestTemplate run for api " + apiInfoKey.getUrl()+ " at " + Context.now());
+        }
         YamlTestResult testResults = yamlTestTemplate.run(debug, testLogs);
+        if (accountId == 1665011467) {
+            logger.info("finished yamlTestTemplate run for api " + apiInfoKey.getUrl()+ " at " + Context.now());
+        }
         if (testResults == null || testResults.getTestResults().isEmpty()) {
             List<GenericTestResult> res = new ArrayList<>();
             res.add(new TestResult(null, rawApi.getOriginalMessage(), Collections.singletonList(TestError.SOMETHING_WENT_WRONG.getMessage()), 0, false, TestResult.Confidence.HIGH, null));
