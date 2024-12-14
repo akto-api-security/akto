@@ -34,7 +34,7 @@ public abstract class MCollection<T> {
     public static final String ROOT_ELEMENT = "$$ROOT";
     public static final String _COUNT = "count";
     public static final String _SIZE = "size";
-    public static final boolean printDebugLogs = System.getenv("MONGO_DEBUG_MODE").equalsIgnoreCase("true") ? true : false;
+    private boolean printDebugLogs = (System.getenv("MONGO_DEBUG_MODE") != null && System.getenv("MONGO_DEBUG_MODE").equalsIgnoreCase("true")) ? true : false;
     abstract public String getDBName();
     abstract public String getCollName();
     abstract public Class<T> getClassT();
