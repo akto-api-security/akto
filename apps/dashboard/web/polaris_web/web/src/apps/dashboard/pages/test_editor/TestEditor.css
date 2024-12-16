@@ -80,3 +80,7 @@
 .Polaris-Text--regular{
     width: 100%;
 }
+
+.header-testeditor .Polaris-TopBar .Polaris-TopBar__Container .Polaris-TopBar__Search {
+    width:0;
+}

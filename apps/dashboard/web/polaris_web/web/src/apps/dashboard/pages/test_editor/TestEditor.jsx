@@ -20,6 +20,7 @@ import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo"
 import LocalStore from "../../../main/LocalStorageStore"
 import func from "../../../../util/func"
 import transform from "../testing/transform"
+import './TestEditor.css'
 
 const TestEditor = () => {
     const navigate = useNavigate()
@@ -131,7 +132,9 @@ const TestEditor = () => {
     
 
     const headerEditor = (
-        <TopBar secondaryMenu={headerComp} />
+        <div className="header-testeditor">
+            <TopBar secondaryMenu={headerComp} />
+        </div>
     )
 
    

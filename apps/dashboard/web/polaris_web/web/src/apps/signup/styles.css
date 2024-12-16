@@ -10,18 +10,3 @@
 .login-page .Polaris-Frame__Main{
     background: var(--white) !important;
 }
-
-.akto-heading .Polaris-Text--heading2xl{
-    font-weight: 500;
-    font-size: var(--p-font-size-800);
-    line-height: var(--p-font-line-height-1000);
-}
-
-.Polaris-Button--sizeLarge {
-    min-height: var(--p-height-1000) !important;
-    min-width: var(--p-width-1000) !important;
-}
-
-.Polaris-TextField__Input{
-    min-height: 2.25rem !important;
-}
