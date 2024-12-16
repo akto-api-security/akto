@@ -132,7 +132,7 @@ const endTimestamp = getTimeEpoch("until") + 86400
 
 
 const [loading, setLoading] = useState(true);
-const [updateTable, setUpdateTable] = useState(false);
+const [updateTable, setUpdateTable] = useState("");
 const [countMap, setCountMap] = useState({});
 
 const definedTableTabs = ['All', 'One time', 'Continuous Testing', 'Scheduled', 'CI/CD']
@@ -160,7 +160,7 @@ const [hasUserInitiatedTestRuns, setHasUserInitiatedTestRuns] = useState(false)
 
 const refreshSummaries = () =>{
   setTimeout(() => {
-    setUpdateTable(!updateTable)
+    setUpdateTable(Date.now().toString())
   }, 5000)
 }
 

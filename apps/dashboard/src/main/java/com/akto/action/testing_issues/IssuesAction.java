@@ -433,7 +433,7 @@ public class IssuesAction extends UserAction {
         }
 
         Map<String, TestConfig> testConfigMap = YamlTemplateDao.instance.fetchTestConfigMap(includeYamlContent,
-                fetchOnlyActive, skip, limit);
+                fetchOnlyActive, skip, limit, Filters.empty());
         subCategories = new ArrayList<>();
         for (Map.Entry<String, TestConfig> entry : testConfigMap.entrySet()) {
             try {

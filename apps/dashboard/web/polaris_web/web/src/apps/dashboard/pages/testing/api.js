@@ -24,12 +24,12 @@ export default {
         })
         return resp
     },
-    async fetchTestingRunResults(testingRunResultSummaryHexId, queryMode) {
+    async fetchTestingRunResults(testingRunResultSummaryHexId, queryMode, sortKey, sortOrder, skip, limit, filters, queryValue) {
         const resp = await request({
             url: '/api/fetchTestingRunResults',
             method: 'post',
             data: {
-                testingRunResultSummaryHexId, queryMode
+                testingRunResultSummaryHexId, queryMode, sortKey, sortOrder, skip, limit, filters, queryValue
             }
         })
         return resp        

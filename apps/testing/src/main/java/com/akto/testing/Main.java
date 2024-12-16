@@ -46,6 +46,8 @@ import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.Severity;
 import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
+import com.mongodb.ReadPreference;
+import com.mongodb.WriteConcern;
 import com.mongodb.client.model.*;
 import com.mongodb.client.result.DeleteResult;
 
@@ -89,7 +91,7 @@ public class Main {
     private static TestingRunResultSummary createTRRSummaryIfAbsent(TestingRun testingRun, int start){
         ObjectId testingRunId = new ObjectId(testingRun.getHexId());
 
-        return TestingRunResultSummariesDao.instance.getMCollection().findOneAndUpdate(
+        return TestingRunResultSummariesDao.instance.getMCollection().withWriteConcern(WriteConcern.W1).findOneAndUpdate(
                 Filters.and(
                         Filters.eq(TestingRunResultSummary.TESTING_RUN_ID, testingRunId),
                         Filters.eq(TestingRunResultSummary.STATE,TestingRun.State.SCHEDULED)
@@ -156,7 +158,7 @@ public class Main {
         );
 
         // returns the previous state of testing run before the update
-        return TestingRunDao.instance.getMCollection().findOneAndUpdate(
+        return TestingRunDao.instance.getMCollection().withWriteConcern(WriteConcern.W1).findOneAndUpdate(
                 Filters.or(filter1,filter2), update);
     }
 
@@ -181,7 +183,7 @@ public class Main {
 
         Bson update = Updates.set(TestingRun.STATE, TestingRun.State.RUNNING);
 
-        TestingRunResultSummary trrs = TestingRunResultSummariesDao.instance.getMCollection().findOneAndUpdate(Filters.or(filter1,filter2), update);
+        TestingRunResultSummary trrs = TestingRunResultSummariesDao.instance.getMCollection().withWriteConcern(WriteConcern.W1).findOneAndUpdate(Filters.or(filter1,filter2), update);
 
         return trrs;
     }
@@ -219,7 +221,9 @@ public class Main {
 
     public static void main(String[] args) throws InterruptedException {
         String mongoURI = System.getenv("AKTO_MONGO_CONN");
-        DaoInit.init(new ConnectionString(mongoURI));
+        ReadPreference readPreference = ReadPreference.secondary();
+        WriteConcern writeConcern = WriteConcern.W1;
+        DaoInit.init(new ConnectionString(mongoURI), readPreference, writeConcern);
 
         boolean connectedToMongo = false;
         do {
@@ -311,11 +315,11 @@ public class Main {
 
                 if (featureAccess.checkInvalidAccess()) {
                     loggerMaker.infoAndAddToDb("Test runs overage detected for account: " + accountId + ". Failing test run at " + start, LogDb.TESTING);
-                    TestingRunDao.instance.getMCollection().findOneAndUpdate(
+                    TestingRunDao.instance.getMCollection().withWriteConcern(writeConcern).findOneAndUpdate(
                             Filters.eq(Constants.ID, testingRun.getId()),
                             Updates.set(TestingRun.STATE, TestingRun.State.FAILED));
 
-                    TestingRunResultSummariesDao.instance.getMCollection().findOneAndUpdate(
+                    TestingRunResultSummariesDao.instance.getMCollection().withWriteConcern(writeConcern).findOneAndUpdate(
                             Filters.eq(Constants.ID, summaryId),
                             Updates.set(TestingRun.STATE, TestingRun.State.FAILED));
                     return;
@@ -342,7 +346,7 @@ public class Main {
                                 Updates.set(TestingRun.END_TIMESTAMP, Context.now()),
                                 Updates.set(TestingRun.SCHEDULE_TIMESTAMP, Context.now() + 5 * 60)
                             );
-                            TestingRunDao.instance.getMCollection().findOneAndUpdate(
+                            TestingRunDao.instance.getMCollection().withWriteConcern(writeConcern).findOneAndUpdate(
                                 Filters.eq("_id", testingRun.getId()),  completedUpdate
                             );
                             return;
@@ -495,7 +499,7 @@ public class Main {
 
                 if(GetRunningTestsStatus.getRunningTests().isTestRunning(testingRun.getId())){
                     loggerMaker.infoAndAddToDb("Updating status of running test to Completed.");
-                    TestingRunDao.instance.getMCollection().findOneAndUpdate(
+                    TestingRunDao.instance.getMCollection().withWriteConcern(writeConcern).findOneAndUpdate(
                             Filters.eq("_id", testingRun.getId()),  completedUpdate
                     );
                 }

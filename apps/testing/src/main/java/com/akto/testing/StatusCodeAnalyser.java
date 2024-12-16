@@ -68,6 +68,7 @@ public class StatusCodeAnalyser {
         for (ApiInfo.ApiInfoKey apiInfoKey: sampleDataMap.keySet()) {
             String host;
             try {
+                loggerMaker.infoAndAddToDb("Finding host for apiInfoKey: " + apiInfoKey.toString());
                  host = findHost(apiInfoKey, sampleDataMap, sampleMessageStore);
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb("Error while finding host in status code analyser: " + e, LogDb.TESTING);
