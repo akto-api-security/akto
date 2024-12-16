@@ -154,18 +154,17 @@ export default function LeftNav(){
                   selected: leftNavSelected === 'dashboard_issues',
                   key: '6',
               },
-              window?.STIGG_FEATURE_WISE_ALLOWED?.THREAT_DETECTION?.isGranted ?
-                {
-                  label: <Text variant="bodyMd" fontWeight="medium">API Runtime Threats</Text>,
-                  icon: DiamondAlertMinor,
-                  onClick: () => {
-                    handleSelect("dashboard_threat_detection")
-                    navigate("/dashboard/threat-detection")
-                    setActive("normal")
-                  },
-                  selected: leftNavSelected === 'dashboard_threat_detection',
-                  key: '7',
-                } : {}
+              {
+                label: <Text variant="bodyMd" fontWeight="medium">API Runtime Threats</Text>,
+                icon: DiamondAlertMinor,
+                onClick: () => {
+                  handleSelect("dashboard_threat_detection")
+                  navigate("/dashboard/threat-detection")
+                  setActive("normal")
+                },
+                selected: leftNavSelected === 'dashboard_threat_detection',
+                key: '7',
+              }
             ]}
           />
           <Navigation.Section 
