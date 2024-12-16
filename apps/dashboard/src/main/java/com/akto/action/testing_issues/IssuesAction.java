@@ -537,11 +537,6 @@ public class IssuesAction extends UserAction {
 
         testingRunResultSummary = TestingRunResultSummariesDao.instance.findOne(Filters.eq(TestingRunResultSummary.ID, testingRunSummaryObj), projection);
 
-        if(testingRunResultSummary == null) {
-            addActionError("Testing run result summary not found");
-            return ERROR.toUpperCase();
-        }
-
         return SUCCESS.toUpperCase();
     }
 
