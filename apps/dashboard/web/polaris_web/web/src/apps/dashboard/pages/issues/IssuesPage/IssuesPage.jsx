@@ -6,7 +6,7 @@ import Store from "../../../store";
 import func from "@/util/func";
 import { MarkFulfilledMinor, ReportMinor, ExternalMinor } from '@shopify/polaris-icons';
 import PersistStore from "../../../../main/PersistStore";
-import { Button, HorizontalGrid, HorizontalStack, IndexFiltersMode } from "@shopify/polaris";
+import { Button, HorizontalGrid, HorizontalStack, IndexFiltersMode, Modal, Text, VerticalStack } from "@shopify/polaris";
 import EmptyScreensLayout from "../../../components/banners/EmptyScreensLayout";
 import { ISSUES_PAGE_DOCS_URL } from "../../../../main/onboardingData";
 import {SelectCollectionComponent} from "../../testing/TestRunsPage/TestrunsBannerComponent"
@@ -27,6 +27,9 @@ import SpinnerCentered from "../../../components/progress/SpinnerCentered.jsx";
 import TableStore from "../../../components/tables/TableStore.js";
 import CriticalFindingsGraph from "./CriticalFindingsGraph.jsx";
 import CriticalUnsecuredAPIsOverTimeGraph from "./CriticalUnsecuredAPIsOverTimeGraph.jsx";
+import DropdownSearch from "../../../components/shared/DropdownSearch.jsx";
+import settingFunctions from "../../settings/module.js";
+import JiraTicketCreationModal from "../../../components/shared/JiraTicketCreationModal.jsx";
 
 const sortOptions = [
     { label: 'Severity', value: 'severity asc', directionLabel: 'Highest', sortKey: 'severity', columnIndex: 2 },
@@ -127,6 +130,12 @@ function IssuesPage() {
     const [selected, setSelected] = useState(0)
     const [tableLoading, setTableLoading] = useState(false)
     const [issuesDataCount, setIssuesDataCount] = useState([])
+    const [jiraModalActive, setJiraModalActive] = useState(false)
+    const [selectedIssuesItems, setSelectedIssuesItems] = useState([])
+    const [jiraProjectMaps,setJiraProjectMap] = useState({})
+    const [issueType, setIssueType] = useState('');
+    const [projId, setProjId] = useState('')
+    const [isCreatingTicket, setIsCreatingTicket] = useState(false)
 
     const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[5])
 
@@ -166,6 +175,7 @@ function IssuesPage() {
         TableStore.getState().setSelectedItems([])
         selectItems([])
         setKey(!key)
+        setSelectedIssuesItems([])
     }
     
     useEffect(() => {
@@ -200,6 +210,18 @@ function IssuesPage() {
 
     filtersOptions = func.getCollectionFilters(filtersOptions)
 
+    const handleSaveJiraAction = () => {
+        setToast(true, false, "Please wait while we create your Jira ticket.")
+        setIsCreatingTicket(true)
+        setJiraModalActive(false)
+        api.bulkCreateJiraTickets(selectedIssuesItems, window.location.origin, projId, issueType).then((res) => {
+            setToast(true, false, `${selectedIssuesItems.length} jira ticket${selectedIssuesItems.length === 1 ? "" : "s"} created.`)
+            resetResourcesSelected()
+        }).finally(() => {
+            setIsCreatingTicket(false)
+        })
+    }
+
     let promotedBulkActions = (selectedResources) => {
         let items
         if(selectedResources.length > 0 && typeof selectedResources[0][0] === 'string') {
@@ -224,9 +246,18 @@ function IssuesPage() {
         }
 
         function createJiraTicketBulk () {
-            api.bulkCreateJiraTickets(items).then((res) => {
-                setToast(true, false, `${items.length} jira ticket${items.length === 1 ? "" : "s"} created.`)
-                resetResourcesSelected()
+            setSelectedIssuesItems(items)
+            settingFunctions.fetchJiraIntegration().then((jirIntegration) => {
+                if(jirIntegration.projectIdsMap !== null && Object.keys(jirIntegration.projectIdsMap).length > 0){
+                    setJiraProjectMap(jirIntegration.projectIdsMap)
+                    if(Object.keys(jirIntegration.projectIdsMap).length > 0){
+                        setProjId(Object.keys(jirIntegration.projectIdsMap)[0])
+                    }
+                }else{
+                    setProjId(jirIntegration.projId)
+                    setIssueType(jirIntegration.issueType)
+                }
+                setJiraModalActive(true)
             })
         }
         
@@ -485,6 +516,17 @@ function IssuesPage() {
             secondaryActions={<DateRangeFilter initialDispatch={currDateRange} dispatch={(dateObj) => dispatchCurrDateRange({ type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias })} />}
         />
             {(resultId !== null && resultId.length > 0) ? <TestRunResultPage /> : null}
+            <JiraTicketCreationModal
+                modalActive={jiraModalActive}
+                setModalActive={setJiraModalActive}
+                handleSaveAction={handleSaveJiraAction}
+                createDisabled={(!projId || !issueType || isCreatingTicket)}
+                jiraProjectMaps={jiraProjectMaps}
+                setProjId={setProjId}
+                setIssueType={setIssueType}
+                projId={projId}
+                issueType={issueType}
+            />
         </>
     )
 }

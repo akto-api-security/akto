@@ -4,6 +4,15 @@ import java.io.File;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 
+import com.akto.dao.test_editor.YamlTemplateDao;
+import com.akto.dao.testing.TestingRunResultDao;
+import com.akto.dto.ApiInfo;
+import com.akto.dto.test_editor.Info;
+import com.akto.dto.test_editor.YamlTemplate;
+import com.akto.dto.test_run_findings.TestingRunIssues;
+import com.akto.dto.testing.TestResult;
+import com.akto.dto.testing.TestingRunResult;
+import com.mongodb.client.model.Projections;
 import org.apache.commons.io.FileUtils;
 import org.bson.conversions.Bson;
 
@@ -57,6 +66,7 @@ public class JiraIntegrationAction extends UserAction {
 
     private final String META_ENDPOINT = "/rest/api/3/issue/createmeta";
     private final String CREATE_ISSUE_ENDPOINT = "/rest/api/3/issue";
+    private final String CREATE_ISSUE_ENDPOINT_BULK = "/rest/api/3/issue/bulk";
     private final String ATTACH_FILE_ENDPOINT = "/attachments";
     private static final LoggerMaker loggerMaker = new LoggerMaker(ApiExecutor.class);
     private static final OkHttpClient client = CoreHTTPClient.client.newBuilder()
@@ -377,10 +387,217 @@ public class JiraIntegrationAction extends UserAction {
         return details;
     }
 
+    String aktoDashboardHost;
     List<TestingIssuesId> issuesIds;
-
     public String bulkCreateJiraTickets (){
-        
+        if(issuesIds == null || issuesIds.isEmpty()){
+            addActionError("Cannot create an empty jira issue.");
+            return ERROR.toUpperCase();
+        }
+
+        if((projId == null || projId.isEmpty()) || (issueType == null || issueType.isEmpty())){
+            addActionError("Project ID or Issue Type cannot be empty.");
+            return ERROR.toUpperCase();
+        }
+
+        JiraIntegration jiraInstance = JiraIntegrationDao.instance.findOne(new BasicDBObject());
+        if(jiraInstance == null) {
+            addActionError("Jira is not integrated.");
+            return ERROR.toUpperCase();
+        }
+
+        List<JiraMetaData> jiraMetaDataList = new ArrayList<>();
+        Bson projection = Projections.include(YamlTemplate.INFO);
+        List<YamlTemplate> yamlTemplateList = YamlTemplateDao.instance.findAll(Filters.empty(), projection);
+        Map<String, Info> testSubTypeToInfoMap = new HashMap<>();
+        for(YamlTemplate yamlTemplate : yamlTemplateList) {
+            Info info = yamlTemplate.getInfo();
+            testSubTypeToInfoMap.put(info.getSubCategory(), info);
+        }
+
+        List<TestingRunResult> testingRunResultList = new ArrayList<>();
+        for(TestingIssuesId testingIssuesId : issuesIds) {
+            TestingRunIssues issue = TestingRunIssuesDao.instance.findOne(Filters.and(
+                    Filters.in("_id.testSubCategory", testingIssuesId.getTestSubCategory()),
+                    Filters.in("_id.apiInfoKey." + ApiInfo.ApiInfoKey.API_COLLECTION_ID, testingIssuesId.getApiInfoKey().getApiCollectionId()),
+                    Filters.in("_id.apiInfoKey." + ApiInfo.ApiInfoKey.URL, testingIssuesId.getApiInfoKey().getUrl()),
+                    Filters.in("_id.apiInfoKey." + ApiInfo.ApiInfoKey.METHOD, testingIssuesId.getApiInfoKey().getMethod()),
+                    Filters.exists("jiraIssueUrl", true)
+            ));
+
+            if(issue != null && (issue.getJiraIssueUrl() != null || !issue.getJiraIssueUrl().isEmpty())) {
+                addActionError("One of the selected issues has a Jira issue created for it.");
+                return Action.ERROR.toUpperCase();
+            }
+
+            Info info = testSubTypeToInfoMap.get(testingIssuesId.getTestSubCategory());
+            if(info == null) {
+                loggerMaker.errorAndAddToDb("Error: Test sub category not found: " + testingIssuesId.getTestSubCategory(), LogDb.DASHBOARD);
+                continue;
+            }
+
+            TestingRunResult testingRunResult = TestingRunResultDao.instance.findOne(Filters.and(
+                    Filters.in(TestingRunResult.TEST_SUB_TYPE, testingIssuesId.getTestSubCategory()),
+                    Filters.in(TestingRunResult.API_INFO_KEY + "." + ApiInfo.ApiInfoKey.API_COLLECTION_ID, testingIssuesId.getApiInfoKey().getApiCollectionId()),
+                    Filters.in(TestingRunResult.API_INFO_KEY + "." + ApiInfo.ApiInfoKey.URL, testingIssuesId.getApiInfoKey().getUrl()),
+                    Filters.in(TestingRunResult.API_INFO_KEY + "." + ApiInfo.ApiInfoKey.METHOD, testingIssuesId.getApiInfoKey().getMethod())
+            ), Projections.include("_id", TestingRunResult.TEST_RESULTS));
+
+            if(testingRunResult == null) {
+                loggerMaker.errorAndAddToDb("Error: Testing Run Result not found", LogDb.DASHBOARD);
+                continue;
+            }
+
+            testingRunResultList.add(testingRunResult);
+
+            JiraMetaData jiraMetaData;
+            try {
+                String inputUrl = testingIssuesId.getApiInfoKey().getUrl();
+
+                URL url = new URL(inputUrl);
+                String hostname = url.getHost();
+                String endpoint = url.getPath();
+
+                jiraMetaData = new JiraMetaData(
+                        info.getName(),
+                        "Host - "+hostname,
+                        endpoint,
+                        aktoDashboardHost+"/dashboard/issues?result="+testingRunResult.getId().toHexString(),
+                        info.getDescription(),
+                        testingIssuesId
+                );
+
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("Error while parsing the url: " + e.getMessage(), LogDb.DASHBOARD);
+                continue;
+            }
+
+            jiraMetaDataList.add(jiraMetaData);
+        }
+
+
+
+        BasicDBObject reqPayload = new BasicDBObject();
+        BasicDBList issueUpdates = new BasicDBList();
+
+        for (JiraMetaData jiraMetaData : jiraMetaDataList) {
+            BasicDBObject fields = new BasicDBObject();
+
+            // Issue title
+            fields.put("summary", "Akto Report - " + jiraMetaData.getIssueTitle());
+            jiraIntegration = JiraIntegrationDao.instance.findOne(new BasicDBObject());
+
+            // Issue type (TASK)
+            BasicDBObject issueTypeObj = new BasicDBObject();
+            issueTypeObj.put("id", this.issueType);
+            fields.put("issuetype", issueTypeObj);
+
+            // Project ID
+            BasicDBObject project = new BasicDBObject();
+            project.put("key", this.projId);
+            fields.put("project", project);
+
+            // Issue description
+            BasicDBObject description = new BasicDBObject();
+            description.put("type", "doc");
+            description.put("version", 1);
+            BasicDBList contentList = new BasicDBList();
+            contentList.add(buildContentDetails(jiraMetaData.getHostStr(), null));
+            contentList.add(buildContentDetails(jiraMetaData.getEndPointStr(), null));
+            contentList.add(buildContentDetails("Issue link - Akto dashboard", jiraMetaData.getIssueUrl()));
+            contentList.add(buildContentDetails(jiraMetaData.getIssueDescription(), null));
+            description.put("content", contentList);
+
+            fields.put("description", description);
+
+            // Prepare the issue object
+            BasicDBObject issueObject = new BasicDBObject();
+            issueObject.put("fields", fields);
+            issueUpdates.add(issueObject);
+        }
+
+        // Prepare the full request payload
+        reqPayload.put("issueUpdates", issueUpdates);
+
+        // URL for bulk create issues
+        String url = jiraIntegration.getBaseUrl() + CREATE_ISSUE_ENDPOINT_BULK;
+        String authHeader = Base64.getEncoder().encodeToString((jiraIntegration.getUserEmail() + ":" + jiraIntegration.getApiToken()).getBytes());
+
+        Map<String, List<String>> headers = new HashMap<>();
+        headers.put("Authorization", Collections.singletonList("Basic " + authHeader));
+
+        OriginalHttpRequest request = new OriginalHttpRequest(url, "", "POST", reqPayload.toString(), headers, "");
+
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, new ArrayList<>());
+            String responsePayload = response.getBody();
+
+            if (response.getStatusCode() > 201 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("Error while creating Jira issues in bulk, URL not accessible, request body "
+                                + request.getBody() + " ,response body " + response.getBody() + " ,response status " + response.getStatusCode(),
+                        LoggerMaker.LogDb.DASHBOARD);
+
+                if (responsePayload != null) {
+                    try {
+                        BasicDBObject obj = BasicDBObject.parse(responsePayload);
+                        List<String> errorMessages = (List) obj.get("errorMessages");
+                        String error;
+                        if (errorMessages.size() == 0) {
+                            BasicDBObject errObj = BasicDBObject.parse(obj.getString("errors"));
+                            error = errObj.getString("project");
+                        } else {
+                            error = errorMessages.get(0);
+                        }
+                        addActionError(error);
+                    } catch (Exception e) {
+                        // Handle exception
+                    }
+                }
+
+                return Action.ERROR.toUpperCase();
+            }
+
+            BasicDBObject payloadObj;
+            try {
+                payloadObj = BasicDBObject.parse(responsePayload);
+                List<BasicDBObject> issues = (List<BasicDBObject>) payloadObj.get("issues");
+                for (BasicDBObject issue : issues) {
+                    String issueKey = issue.getString("key");
+                    String jiraTicketUrl = jiraIntegration.getBaseUrl() + "/browse/" + issueKey;
+
+                    for (JiraMetaData metaData : jiraMetaDataList) {
+                        TestingRunIssuesDao.instance.getMCollection().updateOne(
+                                Filters.eq(Constants.ID, metaData.getTestingIssueId()),
+                                Updates.combine(Updates.set("jiraIssueUrl", jiraTicketUrl)),
+                                new UpdateOptions().upsert(false)
+                        );
+                    }
+                }
+
+                for (int i = 0; i < issues.size(); i++) {
+                    BasicDBObject issue = issues.get(i);
+                    TestingRunResult testingRunResult = testingRunResultList.get(i);
+                    String issueKey = issue.getString("key");
+                    TestResult genericTestResult = (TestResult) testingRunResult.getTestResults().get(testingRunResult.getTestResults().size() - 1);
+                    setIssueId(issueKey);
+                    setOrigReq(genericTestResult.getOriginalMessage());
+                    setTestReq(genericTestResult.getMessage());
+                    String status = attachFileToIssue();
+                    if (status.equals(ERROR.toUpperCase())) {
+                        return ERROR.toUpperCase();
+                    }
+                }
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e, "Error processing Jira bulk issue response " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
+                return Action.ERROR.toUpperCase();
+            }
+
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error making Jira bulk create request: " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
+            return Action.ERROR.toUpperCase();
+        }
+
+        return Action.SUCCESS.toUpperCase();
     }
 
     public String getBaseUrl() {
@@ -478,5 +695,8 @@ public class JiraIntegrationAction extends UserAction {
     public void setIssuesIds(List<TestingIssuesId> issuesIds) {
         this.issuesIds = issuesIds;
     }
-    
+
+    public void setAktoDashboardHost(String aktoDashboardHost) {
+        this.aktoDashboardHost = aktoDashboardHost;
+    }
 }

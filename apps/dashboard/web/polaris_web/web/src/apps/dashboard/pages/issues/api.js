@@ -51,11 +51,11 @@ export default {
             data: {startTimeStamp, endTimeStamp}
         })
     },
-    bulkCreateJiraTickets(issueIds){
+    bulkCreateJiraTickets(issuesIds, aktoDashboardHost, projId, issueType){
         return request({
             url: 'api/bulkCreateJiraTickets',
             method: 'post',
-            data: {issueIds}
+            data: {issuesIds, aktoDashboardHost, projId, issueType}
         })
     }
 }
