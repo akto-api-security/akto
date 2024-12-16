@@ -1,7 +1,6 @@
 package com.akto.threat.protection.db;
 
 import com.akto.dto.type.URLMethods;
-
 import java.util.UUID;
 
 public class MaliciousEventModel {
@@ -9,7 +8,7 @@ public class MaliciousEventModel {
   private String id;
   private String filterId;
   private String actor;
-  private String latestIp;
+  private String latestApiIp;
   private String latestApiEndpoint;
   private String country;
   private URLMethods.Method latestApiMethod;
@@ -25,11 +24,11 @@ public class MaliciousEventModel {
 
   public MaliciousEventModel() {}
 
-  public MaliciousEventModel(Builder builder) {
+  private MaliciousEventModel(Builder builder) {
     this.id = UUID.randomUUID().toString();
     this.filterId = builder.filterId;
     this.actor = builder.actor;
-    this.latestIp = builder.ip;
+    this.latestApiIp = builder.latestApiIp;
     this.country = builder.country;
     this.latestApiEndpoint = builder.latestApiEndpoint;
     this.latestApiMethod = builder.latestApiMethod;
@@ -43,7 +42,7 @@ public class MaliciousEventModel {
     public EventType eventType;
     private String filterId;
     private String actor;
-    private String ip;
+    private String latestApiIp;
     private String country;
     private String latestApiEndpoint;
     private URLMethods.Method latestApiMethod;
@@ -61,8 +60,8 @@ public class MaliciousEventModel {
       return this;
     }
 
-    public Builder setIp(String ip) {
-      this.ip = ip;
+    public Builder setLatestApiIp(String ip) {
+      this.latestApiIp = ip;
       return this;
     }
 
@@ -118,8 +117,8 @@ public class MaliciousEventModel {
     return actor;
   }
 
-  public String getLatestIp() {
-    return latestIp;
+  public String getLatestApiIp() {
+    return latestApiIp;
   }
 
   public String getLatestApiEndpoint() {
@@ -152,5 +151,49 @@ public class MaliciousEventModel {
 
   public static Builder newBuilder() {
     return new Builder();
+  }
+
+  public void setId(String id) {
+    this.id = id;
+  }
+
+  public void setFilterId(String filterId) {
+    this.filterId = filterId;
+  }
+
+  public void setActor(String actor) {
+    this.actor = actor;
+  }
+
+  public void setLatestApiIp(String ip) {
+    this.latestApiIp = ip;
+  }
+
+  public void setLatestApiEndpoint(String latestApiEndpoint) {
+    this.latestApiEndpoint = latestApiEndpoint;
+  }
+
+  public void setCountry(String country) {
+    this.country = country;
+  }
+
+  public void setLatestApiMethod(URLMethods.Method latestApiMethod) {
+    this.latestApiMethod = latestApiMethod;
+  }
+
+  public void setLatestApiOrig(String latestApiOrig) {
+    this.latestApiOrig = latestApiOrig;
+  }
+
+  public void setDetectedAt(long detectedAt) {
+    this.detectedAt = detectedAt;
+  }
+
+  public void setLatestApiCollectionId(int latestApiCollectionId) {
+    this.latestApiCollectionId = latestApiCollectionId;
+  }
+
+  public void setEventType(EventType eventType) {
+    this.eventType = eventType;
   }
 }
