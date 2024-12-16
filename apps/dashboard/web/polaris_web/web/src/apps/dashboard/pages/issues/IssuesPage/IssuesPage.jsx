@@ -135,7 +135,6 @@ function IssuesPage() {
     const [jiraProjectMaps,setJiraProjectMap] = useState({})
     const [issueType, setIssueType] = useState('');
     const [projId, setProjId] = useState('')
-    const [isCreatingTicket, setIsCreatingTicket] = useState(false)
 
     const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[5])
 
@@ -212,13 +211,10 @@ function IssuesPage() {
 
     const handleSaveJiraAction = () => {
         setToast(true, false, "Please wait while we create your Jira ticket.")
-        setIsCreatingTicket(true)
         setJiraModalActive(false)
         api.bulkCreateJiraTickets(selectedIssuesItems, window.location.origin, projId, issueType).then((res) => {
             setToast(true, false, `${selectedIssuesItems.length} jira ticket${selectedIssuesItems.length === 1 ? "" : "s"} created.`)
             resetResourcesSelected()
-        }).finally(() => {
-            setIsCreatingTicket(false)
         })
     }
 
@@ -520,7 +516,6 @@ function IssuesPage() {
                 modalActive={jiraModalActive}
                 setModalActive={setJiraModalActive}
                 handleSaveAction={handleSaveJiraAction}
-                createDisabled={(!projId || !issueType || isCreatingTicket)}
                 jiraProjectMaps={jiraProjectMaps}
                 setProjId={setProjId}
                 setIssueType={setIssueType}

@@ -1,8 +1,10 @@
 import { Modal, Text, VerticalStack } from '@shopify/polaris'
-import React from 'react'
+import React, { useState } from 'react'
 import DropdownSearch from './DropdownSearch'
 
-const JiraTicketCreationModal = ({ activator, modalActive, setModalActive, handleSaveAction, createDisabled, jiraProjectMaps, setProjId, setIssueType, projId, issueType, issueId }) => {
+const JiraTicketCreationModal = ({ activator, modalActive, setModalActive, handleSaveAction, jiraProjectMaps, setProjId, setIssueType, projId, issueType, issueId }) => {
+    const [isCreatingTicket, setIsCreatingTicket] = useState(false)
+
     const getValueFromIssueType = (projId, issueId) => {
         if(Object.keys(jiraProjectMaps).length > 0 && projId.length > 0 && issueId.length > 0){
             const jiraTemp = jiraProjectMaps[projId].filter(x => x.issueId === issueId)
@@ -22,8 +24,12 @@ const JiraTicketCreationModal = ({ activator, modalActive, setModalActive, handl
             title={<Text variant="headingMd">Configure jira ticket details</Text>}
             primaryAction={{
                 content: 'Create ticket',
-                onAction: () => handleSaveAction(issueId),
-                disabled: createDisabled
+                onAction: () => {
+                    setIsCreatingTicket(true)
+                    handleSaveAction(issueId)
+                    setIsCreatingTicket(false)
+                },
+                disabled: (!projId || !issueType || isCreatingTicket)
             }}
         >
             <Modal.Section>

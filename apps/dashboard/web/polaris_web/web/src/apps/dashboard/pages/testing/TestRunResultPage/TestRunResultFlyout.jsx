@@ -29,7 +29,6 @@ function TestRunResultFlyout(props) {
     const [jiraProjectMaps,setJiraProjectMap] = useState({})
     const [issueType, setIssueType] = useState('');
     const [projId, setProjId] = useState('')
-    const [isCreatingTicket, setIsCreatingTicket] = useState(false)
     // modify testing run result and headers
     const infoStateFlyout = infoState && infoState.length > 0 ? infoState.filter((item) => item.title !== 'Jira') : []
     const fetchApiInfo = useCallback( async(apiInfoKey) => {
@@ -96,9 +95,7 @@ function TestRunResultFlyout(props) {
 
     const handleSaveAction = (id) => {
         if(projId.length > 0 && issueType.length > 0){
-            setIsCreatingTicket(true)
             createJiraTicket(id, projId, issueType)
-            setIsCreatingTicket(false)
             setModalActive(false)
         }else{
             func.setToast(true, true, "Invalid project id or issue type")
@@ -188,7 +185,6 @@ function TestRunResultFlyout(props) {
                             modalActive={modalActive}
                             setModalActive={setModalActive}
                             handleSaveAction={handleSaveAction}
-                            createDisabled={(!projId || !issueType || isCreatingTicket)}
                             jiraProjectMaps={jiraProjectMaps}
                             setProjId={setProjId}
                             setIssueType={setIssueType}
