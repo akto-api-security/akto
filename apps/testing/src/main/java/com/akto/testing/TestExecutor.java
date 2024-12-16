@@ -155,10 +155,16 @@ public class TestExecutor {
         if (apiInfoKeyList == null || apiInfoKeyList.isEmpty()) return;
         loggerMaker.infoAndAddToDb("APIs found: " + apiInfoKeyList.size(), LogDb.TESTING);
 
-        List<TestRoles> testRoles = sampleMessageStore.fetchTestRoles();
-        AuthMechanism authMechanism = authMechanismStore.getAuthMechanism();;
+        TestingRunResultSummariesDao.instance.updateOne(
+            Filters.eq("_id", summaryId),
+            Updates.set(TestingRunResultSummary.TOTAL_APIS, apiInfoKeyList.size()));
 
-        Map<String, TestConfig> testConfigMap = YamlTemplateDao.instance.fetchTestConfigMap(false, true, 0, 10_000);
+        List<TestRoles> testRoles = sampleMessageStore.fetchTestRoles();
+        AuthMechanism authMechanism = authMechanismStore.getAuthMechanism();
+
+        List<String> testingRunSubCategories = testingRun.getTestingRunConfig().getTestSubCategoryList();
+
+        Map<String, TestConfig> testConfigMap = YamlTemplateDao.instance.fetchTestConfigMap(false, true, 0, 10_000, Filters.in("_id", testingRunSubCategories));
 
         List<CustomAuthType> customAuthTypes = CustomAuthTypeDao.instance.findAll(CustomAuthType.ACTIVE,true);
         TestingUtil testingUtil = new TestingUtil(authMechanism, sampleMessageStore, testRoles, testingRun.getUserEmail(), customAuthTypes);
@@ -215,10 +221,6 @@ public class TestExecutor {
         loggerMaker.infoAndAddToDb("StatusCodeAnalyser result = " + StatusCodeAnalyser.result, LogDb.TESTING);
         loggerMaker.infoAndAddToDb("StatusCodeAnalyser defaultPayloadsMap = " + StatusCodeAnalyser.defaultPayloadsMap, LogDb.TESTING);
 
-        TestingRunResultSummariesDao.instance.updateOne(
-            Filters.eq("_id", summaryId),
-            Updates.set(TestingRunResultSummary.TOTAL_APIS, apiInfoKeyList.size()));
-
         CountDownLatch latch = new CountDownLatch(apiInfoKeyList.size());
         ExecutorService threadPool = Executors.newFixedThreadPool(maxConcurrentRequests);
         List<Future<Void>> futureTestingRunResults = new ArrayList<>();
@@ -230,7 +232,7 @@ public class TestExecutor {
 
         loggerMaker.infoAndAddToDb("Started filling hostname map with categories at :" + Context.now());
         int timeNow = Context.now();
-        for (String testSubCategory: testingRun.getTestingRunConfig().getTestSubCategoryList()) {
+        for (String testSubCategory: testingRunSubCategories) {
             TestConfig testConfig = testConfigMap.get(testSubCategory);
             if (testConfig == null || testConfig.getStrategy() == null || testConfig.getStrategy().getRunOnce() == null) {
                 continue;
@@ -328,6 +330,8 @@ public class TestExecutor {
     public static String findHost(ApiInfo.ApiInfoKey apiInfoKey, Map<ApiInfo.ApiInfoKey, List<String>> sampleMessagesMap, SampleMessageStore sampleMessageStore) throws URISyntaxException {
         List<String> sampleMessages = sampleMessagesMap.get(apiInfoKey);
         if (sampleMessages == null || sampleMessagesMap.isEmpty()) return null;
+
+        loggerMaker.infoAndAddToDb("Starting to find host for apiInfoKey: " + apiInfoKey.toString());
 
         List<RawApi> messages = sampleMessageStore.fetchAllOriginalMessages(apiInfoKey);
         if (messages.isEmpty()) return null;
