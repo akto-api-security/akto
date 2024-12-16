@@ -192,10 +192,15 @@ public class JiraIntegrationAction extends UserAction {
         BasicDBObject fields = new BasicDBObject();
 
         String endpoint = jiraMetaData.getEndPointStr().replace("Endpoint - ", "");
-        String lastPartOfEndpoint = endpoint.length() > 30 ? endpoint.substring(endpoint.length() - 30) : endpoint;
+        String truncatedEndpoint = endpoint;
+        if(endpoint.length() > 30) {
+            truncatedEndpoint = endpoint.substring(0, 15) + "..." + endpoint.substring(endpoint.length() - 15);
+        }
+
+        String endpointMethod = jiraMetaData.getTestingIssueId().getApiInfoKey().getMethod().name();
 
         // issue title
-        fields.put("summary", "Akto Report - " + jiraMetaData.getIssueTitle() + " - " + lastPartOfEndpoint);
+        fields.put("summary", "Akto Report - " + jiraMetaData.getIssueTitle() + " (" + endpointMethod + " - " + truncatedEndpoint + ")");
         jiraIntegration = JiraIntegrationDao.instance.findOne(new BasicDBObject());
 
         // issue type (TASK)
