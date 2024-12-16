@@ -7,7 +7,6 @@ import com.akto.proto.threat_protection.service.dashboard_service.v1.FetchAlertF
 import com.akto.proto.threat_protection.service.dashboard_service.v1.ListMaliciousRequestsRequest;
 import com.akto.proto.threat_protection.service.dashboard_service.v1.ListMaliciousRequestsResponse;
 import com.akto.threat.protection.constants.MongoDBCollection;
-import com.akto.threat.protection.db.AggregateSampleMaliciousEventModel;
 import com.akto.threat.protection.db.MaliciousEventModel;
 import com.akto.threat.protection.interceptors.Constants;
 import com.mongodb.BasicDBObject;
@@ -31,10 +30,7 @@ public class DashboardService extends DashboardServiceImplBase {
   }
 
   private static <T> Set<T> findDistinctFields(
-      MongoCollection<AggregateSampleMaliciousEventModel> coll,
-      String fieldName,
-      Class<T> tClass,
-      Bson filters) {
+      MongoCollection<MaliciousEventModel> coll, String fieldName, Class<T> tClass, Bson filters) {
     DistinctIterable<T> r = coll.distinct(fieldName, filters, tClass);
     Set<T> result = new HashSet<>();
     MongoCursor<T> cursor = r.cursor();
@@ -49,15 +45,16 @@ public class DashboardService extends DashboardServiceImplBase {
       FetchAlertFiltersRequest request,
       StreamObserver<FetchAlertFiltersResponse> responseObserver) {
     int accountId = Constants.ACCOUNT_ID_CONTEXT_KEY.get();
-    MongoCollection<AggregateSampleMaliciousEventModel> coll =
+    MongoCollection<MaliciousEventModel> coll =
         this.mongoClient
             .getDatabase(accountId + "")
-            .getCollection("malicious_events", AggregateSampleMaliciousEventModel.class);
+            .getCollection("malicious_events", MaliciousEventModel.class);
 
     Set<String> actors =
         DashboardService.<String>findDistinctFields(coll, "actor", String.class, Filters.empty());
     Set<String> urls =
-        DashboardService.<String>findDistinctFields(coll, "url", String.class, Filters.empty());
+        DashboardService.<String>findDistinctFields(
+            coll, "latestApiEndpoint", String.class, Filters.empty());
 
     FetchAlertFiltersResponse response =
         FetchAlertFiltersResponse.newBuilder().addAllActors(actors).addAllUrls(urls).build();
@@ -71,7 +68,7 @@ public class DashboardService extends DashboardServiceImplBase {
       StreamObserver<ListMaliciousRequestsResponse> responseObserver) {
     int accountId = Constants.ACCOUNT_ID_CONTEXT_KEY.get();
 
-    int page = request.hasPage() ? request.getPage() : 1;
+    int page = request.hasPage() && request.getPage() > 0 ? request.getPage() : 1;
     int limit = request.getLimit();
     int skip = (page - 1) * limit;
 
@@ -83,7 +80,11 @@ public class DashboardService extends DashboardServiceImplBase {
 
     BasicDBObject query = new BasicDBObject();
     try (MongoCursor<MaliciousEventModel> cursor =
-        coll.find(query).skip(skip).limit(limit).cursor()) {
+        coll.find(query)
+            .sort(new BasicDBObject("detectedAt", -1))
+            .skip(skip)
+            .limit(limit)
+            .cursor()) {
       List<DashboardMaliciousEventMessage> maliciousEvents = new ArrayList<>();
       while (cursor.hasNext()) {
         MaliciousEventModel evt = cursor.next();
@@ -93,7 +94,7 @@ public class DashboardService extends DashboardServiceImplBase {
                 .setFilterId(evt.getFilterId())
                 .setFilterId(evt.getFilterId())
                 .setId(evt.getId())
-                .setIp(evt.getLatestIp())
+                .setIp(evt.getLatestApiIp())
                 .setCountry(evt.getCountry())
                 .setPayload(evt.getLatestApiOrig())
                 .setEndpoint(evt.getLatestApiEndpoint())
