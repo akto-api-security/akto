@@ -1,8 +1,5 @@
 package com.akto.threat.protection.service;
 
-import java.util.ArrayList;
-import java.util.List;
-
 import com.akto.dto.type.URLMethods;
 import com.akto.kafka.Kafka;
 import com.akto.kafka.KafkaConfig;
@@ -20,6 +17,8 @@ import com.akto.threat.protection.interceptors.Constants;
 import com.akto.threat.protection.utils.KafkaUtils;
 import com.mongodb.client.model.WriteModel;
 import io.grpc.stub.StreamObserver;
+import java.util.ArrayList;
+import java.util.List;
 
 public class MaliciousEventService extends MaliciousEventServiceGrpc.MaliciousEventServiceImplBase {
 
@@ -57,6 +56,8 @@ public class MaliciousEventService extends MaliciousEventServiceGrpc.MaliciousEv
             .setLatestApiOrig(evt.getLatestApiPayload())
             .setLatestApiCollectionId(evt.getLatestApiCollectionId())
             .setEventType(maliciousEventType)
+            .setLatestApiIp(evt.getLatestApiIp())
+            .setCountry("US")
             .build();
 
     if (MaliciousEventModel.EventType.AGGREGATED.equals(maliciousEventType)) {
