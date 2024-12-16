@@ -1,6 +1,7 @@
 package com.akto.action;
 
 import java.io.File;
+import java.net.URL;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 
@@ -200,42 +201,7 @@ public class JiraIntegrationAction extends UserAction {
     public String createIssue() {
 
         BasicDBObject reqPayload = new BasicDBObject();
-        BasicDBObject fields = new BasicDBObject();
-
-        String endpoint = jiraMetaData.getEndPointStr().replace("Endpoint - ", "");
-        String truncatedEndpoint = endpoint;
-        if(endpoint.length() > 30) {
-            truncatedEndpoint = endpoint.substring(0, 15) + "..." + endpoint.substring(endpoint.length() - 15);
-        }
-
-        String endpointMethod = jiraMetaData.getTestingIssueId().getApiInfoKey().getMethod().name();
-
-        // issue title
-        fields.put("summary", "Akto Report - " + jiraMetaData.getIssueTitle() + " (" + endpointMethod + " - " + truncatedEndpoint + ")");
-        jiraIntegration = JiraIntegrationDao.instance.findOne(new BasicDBObject());
-
-        // issue type (TASK)
-        BasicDBObject issueTypeObj = new BasicDBObject();
-        issueTypeObj.put("id", this.issueType);
-        fields.put("issuetype", issueTypeObj);
-
-        // project id
-        BasicDBObject project = new BasicDBObject();
-        project.put("key", this.projId);
-        fields.put("project", project);
-
-        // issue description
-        BasicDBObject description = new BasicDBObject();
-        description.put("type", "doc");
-        description.put("version", 1);
-        BasicDBList contentList = new BasicDBList();
-        contentList.add(buildContentDetails(jiraMetaData.getHostStr(), null));
-        contentList.add(buildContentDetails(jiraMetaData.getEndPointStr(), null));
-        contentList.add(buildContentDetails("Issue link - Akto dashboard", jiraMetaData.getIssueUrl()));
-        contentList.add(buildContentDetails(jiraMetaData.getIssueDescription(), null));
-        description.put("content", contentList);
-
-        fields.put("description", description);
+        BasicDBObject fields = jiraTicketPayloadCreator(jiraMetaData);
 
         reqPayload.put("fields", fields);
 
@@ -389,6 +355,7 @@ public class JiraIntegrationAction extends UserAction {
 
     String aktoDashboardHost;
     List<TestingIssuesId> issuesIds;
+    private String errorMessage;
     public String bulkCreateJiraTickets (){
         if(issuesIds == null || issuesIds.isEmpty()){
             addActionError("Cannot create an empty jira issue.");
@@ -408,7 +375,11 @@ public class JiraIntegrationAction extends UserAction {
 
         List<JiraMetaData> jiraMetaDataList = new ArrayList<>();
         Bson projection = Projections.include(YamlTemplate.INFO);
-        List<YamlTemplate> yamlTemplateList = YamlTemplateDao.instance.findAll(Filters.empty(), projection);
+        List<String> testingSubCategories = new ArrayList<>();
+        for(TestingIssuesId testingIssuesId : issuesIds) {
+            testingSubCategories.add(testingIssuesId.getTestSubCategory());
+        }
+        List<YamlTemplate> yamlTemplateList = YamlTemplateDao.instance.findAll(Filters.in("_id", testingSubCategories), projection);
         Map<String, Info> testSubTypeToInfoMap = new HashMap<>();
         for(YamlTemplate yamlTemplate : yamlTemplateList) {
             Info info = yamlTemplate.getInfo();
@@ -416,25 +387,19 @@ public class JiraIntegrationAction extends UserAction {
         }
 
         List<TestingRunResult> testingRunResultList = new ArrayList<>();
+        int existingIssues = 0;
         for(TestingIssuesId testingIssuesId : issuesIds) {
             TestingRunIssues issue = TestingRunIssuesDao.instance.findOne(Filters.and(
-                    Filters.in("_id.testSubCategory", testingIssuesId.getTestSubCategory()),
-                    Filters.in("_id.apiInfoKey." + ApiInfo.ApiInfoKey.API_COLLECTION_ID, testingIssuesId.getApiInfoKey().getApiCollectionId()),
-                    Filters.in("_id.apiInfoKey." + ApiInfo.ApiInfoKey.URL, testingIssuesId.getApiInfoKey().getUrl()),
-                    Filters.in("_id.apiInfoKey." + ApiInfo.ApiInfoKey.METHOD, testingIssuesId.getApiInfoKey().getMethod()),
+                    Filters.in("_id", testingIssuesId),
                     Filters.exists("jiraIssueUrl", true)
             ));
 
             if(issue != null && (issue.getJiraIssueUrl() != null || !issue.getJiraIssueUrl().isEmpty())) {
-                addActionError("One of the selected issues has a Jira issue created for it.");
-                return Action.ERROR.toUpperCase();
+                existingIssues++;
+                continue;
             }
 
             Info info = testSubTypeToInfoMap.get(testingIssuesId.getTestSubCategory());
-            if(info == null) {
-                loggerMaker.errorAndAddToDb("Error: Test sub category not found: " + testingIssuesId.getTestSubCategory(), LogDb.DASHBOARD);
-                continue;
-            }
 
             TestingRunResult testingRunResult = TestingRunResultDao.instance.findOne(Filters.and(
                     Filters.in(TestingRunResult.TEST_SUB_TYPE, testingIssuesId.getTestSubCategory()),
@@ -475,40 +440,21 @@ public class JiraIntegrationAction extends UserAction {
             jiraMetaDataList.add(jiraMetaData);
         }
 
-
-
         BasicDBObject reqPayload = new BasicDBObject();
         BasicDBList issueUpdates = new BasicDBList();
 
+        if(existingIssues == issuesIds.size()) {
+            errorMessage = "All selected issues already have existing Jira tickets. No new tickets were created.";
+        } else if(existingIssues > 0) {
+            errorMessage = "Jira tickets created for all selected issues, except for " + existingIssues + " issues that already have tickets.";
+        }
+
+        if(jiraMetaDataList.isEmpty()) {
+            return Action.SUCCESS.toUpperCase();
+        }
+
         for (JiraMetaData jiraMetaData : jiraMetaDataList) {
-            BasicDBObject fields = new BasicDBObject();
-
-            // Issue title
-            fields.put("summary", "Akto Report - " + jiraMetaData.getIssueTitle());
-            jiraIntegration = JiraIntegrationDao.instance.findOne(new BasicDBObject());
-
-            // Issue type (TASK)
-            BasicDBObject issueTypeObj = new BasicDBObject();
-            issueTypeObj.put("id", this.issueType);
-            fields.put("issuetype", issueTypeObj);
-
-            // Project ID
-            BasicDBObject project = new BasicDBObject();
-            project.put("key", this.projId);
-            fields.put("project", project);
-
-            // Issue description
-            BasicDBObject description = new BasicDBObject();
-            description.put("type", "doc");
-            description.put("version", 1);
-            BasicDBList contentList = new BasicDBList();
-            contentList.add(buildContentDetails(jiraMetaData.getHostStr(), null));
-            contentList.add(buildContentDetails(jiraMetaData.getEndPointStr(), null));
-            contentList.add(buildContentDetails("Issue link - Akto dashboard", jiraMetaData.getIssueUrl()));
-            contentList.add(buildContentDetails(jiraMetaData.getIssueDescription(), null));
-            description.put("content", contentList);
-
-            fields.put("description", description);
+            BasicDBObject fields = jiraTicketPayloadCreator(jiraMetaData);
 
             // Prepare the issue object
             BasicDBObject issueObject = new BasicDBObject();
@@ -598,6 +544,46 @@ public class JiraIntegrationAction extends UserAction {
         }
 
         return Action.SUCCESS.toUpperCase();
+    }
+
+    private BasicDBObject jiraTicketPayloadCreator(JiraMetaData jiraMetaData) {
+        BasicDBObject fields = new BasicDBObject();
+        String endpoint = jiraMetaData.getEndPointStr().replace("Endpoint - ", "");
+        String truncatedEndpoint = endpoint;
+        if(endpoint.length() > 30) {
+            truncatedEndpoint = endpoint.substring(0, 15) + "..." + endpoint.substring(endpoint.length() - 15);
+        }
+
+        String endpointMethod = jiraMetaData.getTestingIssueId().getApiInfoKey().getMethod().name();
+
+        // issue title
+        fields.put("summary", "Akto Report - " + jiraMetaData.getIssueTitle() + " (" + endpointMethod + " - " + truncatedEndpoint + ")");
+        jiraIntegration = JiraIntegrationDao.instance.findOne(new BasicDBObject());
+
+        // Issue type (TASK)
+        BasicDBObject issueTypeObj = new BasicDBObject();
+        issueTypeObj.put("id", this.issueType);
+        fields.put("issuetype", issueTypeObj);
+
+        // Project ID
+        BasicDBObject project = new BasicDBObject();
+        project.put("key", this.projId);
+        fields.put("project", project);
+
+        // Issue description
+        BasicDBObject description = new BasicDBObject();
+        description.put("type", "doc");
+        description.put("version", 1);
+        BasicDBList contentList = new BasicDBList();
+        contentList.add(buildContentDetails(jiraMetaData.getHostStr(), null));
+        contentList.add(buildContentDetails(jiraMetaData.getEndPointStr(), null));
+        contentList.add(buildContentDetails("Issue link - Akto dashboard", jiraMetaData.getIssueUrl()));
+        contentList.add(buildContentDetails(jiraMetaData.getIssueDescription(), null));
+        description.put("content", contentList);
+
+        fields.put("description", description);
+
+        return fields;
     }
 
     public String getBaseUrl() {
@@ -698,5 +684,9 @@ public class JiraIntegrationAction extends UserAction {
 
     public void setAktoDashboardHost(String aktoDashboardHost) {
         this.aktoDashboardHost = aktoDashboardHost;
+    }
+
+    public String getErrorMessage() {
+        return errorMessage;
     }
 }

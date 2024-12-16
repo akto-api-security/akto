@@ -213,7 +213,11 @@ function IssuesPage() {
         setToast(true, false, "Please wait while we create your Jira ticket.")
         setJiraModalActive(false)
         api.bulkCreateJiraTickets(selectedIssuesItems, window.location.origin, projId, issueType).then((res) => {
-            setToast(true, false, `${selectedIssuesItems.length} jira ticket${selectedIssuesItems.length === 1 ? "" : "s"} created.`)
+            if(res?.errorMessage) {
+                setToast(true, false, res?.errorMessage)
+            } else {
+                setToast(true, false, `${selectedIssuesItems.length} jira ticket${selectedIssuesItems.length === 1 ? "" : "s"} created.`)
+            }
             resetResourcesSelected()
         })
     }
