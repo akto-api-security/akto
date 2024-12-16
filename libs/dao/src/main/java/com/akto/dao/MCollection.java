@@ -96,14 +96,14 @@ public abstract class MCollection<T> {
     public<V> List<T> findAll(String key, Collection<V> values) {
         int timeNow = Context.now();
         if(printDebugLogs){
-            logger.info("Starting find all query at: ", timeNow);
+            logger.info("Starting find all query at: " + timeNow);
         }
 
 
         MongoCursor<T> cursor = this.getMCollection().find(in(key, values)).cursor();
 
         if(printDebugLogs){
-            logger.info("Finishing find all query in: ", (Context.now() - timeNow));
+            logger.info("Finishing find all query in: " + (Context.now() - timeNow));
         }
 
         ArrayList<T> ret = new ArrayList<T>();
@@ -114,7 +114,7 @@ public abstract class MCollection<T> {
         }
 
         if(printDebugLogs){
-            logger.info("Finishing find all query and returning to call in: ", (Context.now() - timeNow));
+            logger.info("Finishing find all query and returning to call in: " + (Context.now() - timeNow));
         }
 
         return ret;
@@ -134,13 +134,13 @@ public abstract class MCollection<T> {
     public List<T> findAll(Bson q, int skip, int limit, Bson sort, Bson projection) {
         int timeNow = Context.now();
         if(printDebugLogs){
-            logger.info("Starting find all query at: ", timeNow);
+            logger.info("Starting find all query at: " + timeNow);
         }
 
         FindIterable<T> commands = this.getMCollection().find(q).skip(skip).limit(limit);
 
         if(printDebugLogs){
-            logger.info("Finishing find all query in: ", (Context.now() - timeNow));
+            logger.info("Finishing find all query in: " + (Context.now() - timeNow));
         }
         if (projection != null) {
             commands.projection(projection);
@@ -160,7 +160,7 @@ public abstract class MCollection<T> {
         }
 
         if(printDebugLogs){
-            logger.info("Finishing find all query and returning to call in: ", (Context.now() - timeNow));
+            logger.info("Finishing find all query and returning to call in: " + (Context.now() - timeNow));
         }
 
         return ret;
@@ -243,7 +243,7 @@ public abstract class MCollection<T> {
         int timeNow = Context.now();
         UpdateResult result =  this.getMCollection().updateMany(q, obj);
         if(printDebugLogs){
-            logger.info("Finishing updateMany query in: ", (Context.now() - timeNow));
+            logger.info("Finishing updateMany query in: " + (Context.now() - timeNow));
         }
         return result;
     }
@@ -251,7 +251,7 @@ public abstract class MCollection<T> {
         int timeNow = Context.now();
         UpdateResult result = this.getMCollection().updateMany(q, obj, new UpdateOptions().upsert(false));
         if(printDebugLogs){
-            logger.info("Finishing updateManyNoUpsert query in: ", (Context.now() - timeNow));
+            logger.info("Finishing updateManyNoUpsert query in: " + (Context.now() - timeNow));
         }
         return result;
     }
@@ -259,7 +259,7 @@ public abstract class MCollection<T> {
         int timeNow = Context.now();
         BulkWriteResult result =  this.getMCollection().bulkWrite(modelList, options);
         if(printDebugLogs){
-            logger.info("Finishing bulkWrite query in: ", (Context.now() - timeNow));
+            logger.info("Finishing bulkWrite query in: " + (Context.now() - timeNow));
         }
         return result;
     }
@@ -276,7 +276,7 @@ public abstract class MCollection<T> {
         int timeNow = Context.now();
         InsertManyResult result =  getMCollection().insertMany(elems);
         if(printDebugLogs){
-            logger.info("Finishing insertMany query in: ", (Context.now() - timeNow));
+            logger.info("Finishing insertMany query in: " + (Context.now() - timeNow));
         }
         return result;
     }
@@ -287,7 +287,7 @@ public abstract class MCollection<T> {
         int timeNow = Context.now();
         DeleteResult result = this.getMCollection().deleteMany(q);
         if(printDebugLogs){
-            logger.info("Finishing deleteAll query in: ", (Context.now() - timeNow));
+            logger.info("Finishing deleteAll query in: " + (Context.now() - timeNow));
         }
         return result;
     }
@@ -297,7 +297,7 @@ public abstract class MCollection<T> {
         int timeNow = Context.now();
         DistinctIterable<TResult> r = getMCollection().distinct(fieldName,filter,resultClass);
         if(printDebugLogs){
-            logger.info("Finishing findDistinctFields in: ", (Context.now() - timeNow));
+            logger.info("Finishing findDistinctFields in: " + (Context.now() - timeNow));
         }
         Set<TResult> result = new HashSet<>();
         MongoCursor<TResult> cursor = r.cursor();
@@ -305,7 +305,7 @@ public abstract class MCollection<T> {
             result.add(cursor.next());
         }
         if(printDebugLogs){
-            logger.info("Finishing findDistinctFields and returning from method in: ", (Context.now() - timeNow));
+            logger.info("Finishing findDistinctFields and returning from method in: " + (Context.now() - timeNow));
         }
         return result;
     }
