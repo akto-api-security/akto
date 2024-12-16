@@ -20,7 +20,7 @@ import java.util.stream.Collectors;
 public class SuspectSampleDataAction extends UserAction {
 
   List<SuspectSampleData> sampleData;
-  List<DashboardMaliciousEvent> maliciousRequests;
+  List<DashboardMaliciousEvent> maliciousEvents;
   int skip;
   static final int LIMIT = 50;
   List<String> ips;
@@ -45,14 +45,14 @@ public class SuspectSampleDataAction extends UserAction {
   }
 
   public String fetchSampleDataV2() {
-    List<DashboardMaliciousEventMessage> maliciousRequests =
+    List<DashboardMaliciousEventMessage> maliciousEvts =
         this.dsServiceStub
             .listMaliciousRequests(
                 ListMaliciousRequestsRequest.newBuilder().setPage(0).setLimit(500).build())
             .getMaliciousEventsList();
 
-    this.maliciousRequests =
-        maliciousRequests.stream()
+    this.maliciousEvents =
+        maliciousEvts.stream()
             .map(
                 mr ->
                     new DashboardMaliciousEvent(
@@ -153,5 +153,13 @@ public class SuspectSampleDataAction extends UserAction {
 
   public void setEndTimestamp(int endTimestamp) {
     this.endTimestamp = endTimestamp;
+  }
+
+  public List<DashboardMaliciousEvent> getMaliciousEvents() {
+    return maliciousEvents;
+  }
+
+  public void setMaliciousEvents(List<DashboardMaliciousEvent> maliciousRequests) {
+    this.maliciousEvents = maliciousRequests;
   }
 }
