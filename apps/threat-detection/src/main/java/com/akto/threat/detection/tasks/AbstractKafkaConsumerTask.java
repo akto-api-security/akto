@@ -48,6 +48,10 @@ public abstract class AbstractKafkaConsumerTask implements Task {
             }
 
             processRecords(records);
+
+            if (!records.isEmpty()) {
+              kafkaConsumer.commitSync();
+            }
           }
         });
   }
