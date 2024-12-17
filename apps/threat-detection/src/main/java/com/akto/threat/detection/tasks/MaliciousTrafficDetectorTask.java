@@ -1,19 +1,11 @@
 package com.akto.threat.detection.tasks;
 
 import com.akto.dao.context.Context;
-import com.akto.kafka.KafkaConfig;
-import com.akto.proto.threat_protection.message.malicious_event.event_type.v1.EventType;
-import com.akto.proto.threat_protection.message.malicious_event.v1.MaliciousEventMessage;
-import com.akto.proto.threat_protection.message.sample_request.v1.SampleMaliciousRequest;
-import com.akto.threat.detection.actor.SourceIPActorGenerator;
-import com.akto.threat.detection.cache.RedisBackedCounterCache;
-import com.akto.threat.detection.constants.KafkaTopic;
 import com.akto.dao.monitoring.FilterYamlTemplateDao;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.HttpResponseParams;
-import com.akto.threat.detection.dto.MessageEnvelope;
 import com.akto.dto.RawApi;
 import com.akto.dto.api_protection_parse_layer.AggregationRules;
 import com.akto.dto.api_protection_parse_layer.Condition;
@@ -23,30 +15,36 @@ import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.type.URLMethods;
 import com.akto.hybrid_parsers.HttpCallParser;
 import com.akto.kafka.Kafka;
+import com.akto.kafka.KafkaConfig;
+import com.akto.proto.threat_protection.message.malicious_event.event_type.v1.EventType;
+import com.akto.proto.threat_protection.message.malicious_event.v1.MaliciousEventMessage;
+import com.akto.proto.threat_protection.message.sample_request.v1.SampleMaliciousRequest;
 import com.akto.rules.TestPlugin;
 import com.akto.runtime.utils.Utils;
-import com.akto.threat.detection.smart_event_detector.window_based.WindowBasedThresholdNotifier;
 import com.akto.test_editor.execution.VariableResolver;
 import com.akto.test_editor.filter.data_operands_impl.ValidationResult;
+import com.akto.threat.detection.actor.SourceIPActorGenerator;
+import com.akto.threat.detection.cache.RedisBackedCounterCache;
+import com.akto.threat.detection.constants.KafkaTopic;
+import com.akto.threat.detection.dto.MessageEnvelope;
+import com.akto.threat.detection.smart_event_detector.window_based.WindowBasedThresholdNotifier;
 import com.google.protobuf.InvalidProtocolBufferException;
 import io.lettuce.core.RedisClient;
+import java.time.Duration;
+import java.util.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 
-import java.time.Duration;
-import java.util.*;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-
 /*
 Class is responsible for consuming traffic data from the Kafka topic.
 Pass data through filters and identify malicious traffic.
  */
-public class MaliciousTrafficDetectorTask {
+public class MaliciousTrafficDetectorTask implements Task {
 
-  private static final ExecutorService pollingExecutor = Executors.newSingleThreadExecutor();
   private final Consumer<String, String> kafkaConsumer;
   private final KafkaConfig kafkaConfig;
   private final HttpCallParser httpCallParser;
@@ -87,6 +85,7 @@ public class MaliciousTrafficDetectorTask {
 
   public void run() {
     this.kafkaConsumer.subscribe(Collections.singletonList("akto.api.logs"));
+    ExecutorService pollingExecutor = Executors.newSingleThreadExecutor();
     pollingExecutor.execute(
         () -> {
           // Poll data from Kafka topic
