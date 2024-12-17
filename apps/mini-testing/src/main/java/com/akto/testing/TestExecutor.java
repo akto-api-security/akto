@@ -215,6 +215,10 @@ public class TestExecutor {
 
         final int maxRunTime = testingRun.getTestRunTime() <= 0 ? 30*60 : testingRun.getTestRunTime(); // if nothing specified wait for 30 minutes
 
+        boolean runParallelTestsBasedOnApiCount = true;
+        if (apiInfoKeyList.size() < 10) {
+            runParallelTestsBasedOnApiCount = false;
+        }
         for (ApiInfo.ApiInfoKey apiInfoKey: apiInfoKeyList) {
             try {
                 hostName = findHost(apiInfoKey, testingUtil.getSampleMessages(), testingUtil.getSampleMessageStore());
@@ -225,12 +229,19 @@ public class TestExecutor {
                 loggerMaker.errorAndAddToDb("Error while finding host: " + e, LogDb.TESTING);
             }
             try {
-                 Future<Void> future = threadPool.submit(
-                         () -> startWithLatch(apiInfoKey,
-                                 testingRun.getTestIdConfig(),
-                                 testingRun.getId(),testingRun.getTestingRunConfig(), testingUtil, summaryId,
-                                 accountId, latch, now, maxRunTime, testConfigMap, testingRun, subCategoryEndpointMap, apiInfoKeyToHostMap, debug, testLogs));
-                 futureTestingRunResults.add(future);
+                if (runParallelTestsBasedOnApiCount) {
+                    Future<Void> future = threadPool.submit(
+                        () -> startWithLatch(apiInfoKey,
+                                testingRun.getTestIdConfig(),
+                                testingRun.getId(),testingRun.getTestingRunConfig(), testingUtil, summaryId,
+                                accountId, latch, now, maxRunTime, testConfigMap, testingRun, subCategoryEndpointMap, apiInfoKeyToHostMap, debug, testLogs, false));
+                    futureTestingRunResults.add(future);
+                } else {
+                    startWithLatch(apiInfoKey,
+                                testingRun.getTestIdConfig(),
+                                testingRun.getId(),testingRun.getTestingRunConfig(), testingUtil, summaryId,
+                                accountId, latch, now, maxRunTime, testConfigMap, testingRun, subCategoryEndpointMap, apiInfoKeyToHostMap, debug, testLogs, true);
+                }
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb("Error in API " + apiInfoKey + " : " + e.getMessage(), LogDb.TESTING);
             }
@@ -242,7 +253,7 @@ public class TestExecutor {
         try {
             //boolean awaitResult = latch.await(maxRunTime, TimeUnit.SECONDS);
             int waitTs = Context.now();
-            while(latch.getCount() > 0 && GetRunningTestsStatus.getRunningTests().isTestRunning(summaryId) 
+            while(runParallelTestsBasedOnApiCount && latch.getCount() > 0 && GetRunningTestsStatus.getRunningTests().isTestRunning(summaryId) 
                 && (Context.now() - waitTs < maxRunTime)) {
                     loggerMaker.infoAndAddToDb("waiting for tests to finish", LogDb.TESTING);
                     Thread.sleep(10000);
@@ -478,16 +489,18 @@ public class TestExecutor {
             TestingUtil testingUtil, ObjectId testRunResultSummaryId, int accountId, CountDownLatch latch, int startTime,
             int maxRunTime, Map<String, TestConfig> testConfigMap, TestingRun testingRun,
             ConcurrentHashMap<String, String> subCategoryEndpointMap, Map<ApiInfoKey, String> apiInfoKeyToHostMap,
-            boolean debug, List<TestingRunResult.TestLog> testLogs) {
+            boolean debug, List<TestingRunResult.TestLog> testLogs, boolean runParallel) {
 
         Context.accountId.set(accountId);
         loggerMaker.infoAndAddToDb("Starting test for " + apiInfoKey, LogDb.TESTING);   
         try {
-            startTestNew(apiInfoKey, testRunId, testingRunConfig, testingUtil, testRunResultSummaryId, testConfigMap, subCategoryEndpointMap, apiInfoKeyToHostMap, debug, testLogs, startTime, maxRunTime);
+            startTestNew(apiInfoKey, testRunId, testingRunConfig, testingUtil, testRunResultSummaryId, testConfigMap, subCategoryEndpointMap, apiInfoKeyToHostMap, debug, testLogs, startTime, maxRunTime, runParallel);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "error while running tests: " + e);
         }
-        latch.countDown();
+        if (!runParallel) {
+            latch.countDown();
+        }
         loggerMaker.infoAndAddToDb("DONE FINAL: " + latch.getCount(), LogDb.TESTING);
         return null;
     }
@@ -577,47 +590,91 @@ public class TestExecutor {
                                                TestingRunConfig testingRunConfig, TestingUtil testingUtil,
                                                ObjectId testRunResultSummaryId, Map<String, TestConfig> testConfigMap,
                                                ConcurrentHashMap<String, String> subCategoryEndpointMap, Map<ApiInfoKey, String> apiInfoKeyToHostMap,
-                                               boolean debug, List<TestingRunResult.TestLog> testLogs, int startTime, int timeToKill) {
+                                               boolean debug, List<TestingRunResult.TestLog> testLogs, int startTime, int timeToKill, boolean runParallel) {
 
         List<String> testSubCategories = testingRunConfig == null ? new ArrayList<>() : testingRunConfig.getTestSubCategoryList();
 
-        int countSuccessfulTests = 0;
+        //CountDownLatch latch = new CountDownLatch(testSubCategories.size());
+        ExecutorService threadPool = Executors.newFixedThreadPool(10);
+        List<Future<Void>> futureTestingRunResults = new ArrayList<>();
+
+        CountDownLatch latch = new CountDownLatch(testSubCategories.size());
         for (String testSubCategory: testSubCategories) {
-            if(GetRunningTestsStatus.getRunningTests().isTestRunning(testRunResultSummaryId)){
-                if (Context.now() - startTime > timeToKill) {
-                    loggerMaker.infoAndAddToDb("Timed out in " + (Context.now()-startTime) + "seconds");
-                    return;
-                }
-                List<TestingRunResult> testingRunResults = new ArrayList<>();
-
-                TestConfig testConfig = testConfigMap.get(testSubCategory);
-                
-                if (testConfig == null) continue;
-                TestingRunResult testingRunResult = null;
-                if (!applyRunOnceCheck(apiInfoKey, testConfig, subCategoryEndpointMap, apiInfoKeyToHostMap, testSubCategory)) {
-                    continue;
-                }
-                try {
-                    testingRunResult = runTestNew(apiInfoKey,testRunId,testingUtil,testRunResultSummaryId, testConfig, testingRunConfig, debug, testLogs);
-                } catch (Exception e) {
-                    loggerMaker.errorAndAddToDb("Error while running tests for " + testSubCategory +  ": " + e.getMessage(), LogDb.TESTING);
-                    e.printStackTrace();
-                }
-                if (testingRunResult != null) {
-                    testingRunResults.add(testingRunResult);
-                    countSuccessfulTests++;
-                }
-
-                insertResultsAndMakeIssues(testingRunResults, testRunResultSummaryId);
-            }else{
+            if(!GetRunningTestsStatus.getRunningTests().isTestRunning(testRunResultSummaryId)){
                 logger.info("Test stopped for id: " + testRunId.toString());
                 break;
             }
-        }
-        if(countSuccessfulTests > 0){
-            dataActor.updateLastTestedField(apiInfoKey.getApiCollectionId(), apiInfoKey.getUrl(), apiInfoKey.getMethod().toString());
+            if (runParallel) {
+                loggerMaker.infoAndAddToDb("triggerTestForApi + subcategory " + testSubCategory);
+                Future<Void> future = threadPool.submit(
+                        () -> triggerTestForApi(apiInfoKey, testRunId, testingRunConfig, testingUtil, testRunResultSummaryId, testConfigMap, subCategoryEndpointMap, apiInfoKeyToHostMap, debug, testLogs, startTime, timeToKill, testSubCategory, latch));
+                    futureTestingRunResults.add(future);
+                    
+            } else {            
+                startTestForApi(apiInfoKey, testRunId, testingRunConfig, testingUtil, testRunResultSummaryId, testConfigMap, subCategoryEndpointMap, apiInfoKeyToHostMap, debug, testLogs, startTime, timeToKill, testSubCategory);
+            }
         }
 
+        try {
+            while(runParallel && latch.getCount() > 0 && GetRunningTestsStatus.getRunningTests().isTestRunning(testRunResultSummaryId)) {
+                loggerMaker.infoAndAddToDb("sleeping for 10 sec in startTestNew " + latch.getCount());
+                Thread.sleep(10000);
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in startTestNew wait " + e.getMessage());
+        }
+            
+    }
+
+    public Void triggerTestForApi(ApiInfo.ApiInfoKey apiInfoKey, ObjectId testRunId,
+    TestingRunConfig testingRunConfig, TestingUtil testingUtil,
+    ObjectId testRunResultSummaryId, Map<String, TestConfig> testConfigMap,
+    ConcurrentHashMap<String, String> subCategoryEndpointMap, Map<ApiInfoKey, String> apiInfoKeyToHostMap,
+    boolean debug, List<TestingRunResult.TestLog> testLogs, int startTime, int timeToKill, String testSubCategory, CountDownLatch latch) {
+        
+        startTestForApi(apiInfoKey, testRunId, testingRunConfig, testingUtil, testRunResultSummaryId, testConfigMap, subCategoryEndpointMap, apiInfoKeyToHostMap, debug, testLogs, startTime, timeToKill, testSubCategory);
+        latch.countDown();
+        return null;
+    }
+
+    public Void startTestForApi(ApiInfo.ApiInfoKey apiInfoKey, ObjectId testRunId,
+        TestingRunConfig testingRunConfig, TestingUtil testingUtil,
+        ObjectId testRunResultSummaryId, Map<String, TestConfig> testConfigMap,
+        ConcurrentHashMap<String, String> subCategoryEndpointMap, Map<ApiInfoKey, String> apiInfoKeyToHostMap,
+        boolean debug, List<TestingRunResult.TestLog> testLogs, int startTime, int timeToKill, String testSubCategory) {
+        
+        loggerMaker.infoAndAddToDb("startTestForApi called for api " + apiInfoKey + " testSubCategory " + testSubCategory, LogDb.TESTING);
+
+        if(GetRunningTestsStatus.getRunningTests().isTestRunning(testRunResultSummaryId)){
+            if (Context.now() - startTime > timeToKill) {
+                loggerMaker.infoAndAddToDb("Timed out in " + (Context.now()-startTime) + "seconds");
+                return null;
+            }
+            List<TestingRunResult> testingRunResults = new ArrayList<>();
+
+            TestConfig testConfig = testConfigMap.get(testSubCategory);
+            
+            if (testConfig == null) return null;
+            TestingRunResult testingRunResult = null;
+            if (!applyRunOnceCheck(apiInfoKey, testConfig, subCategoryEndpointMap, apiInfoKeyToHostMap, testSubCategory)) {
+                return null;
+            }
+            try {
+                testingRunResult = runTestNew(apiInfoKey,testRunId,testingUtil,testRunResultSummaryId, testConfig, testingRunConfig, debug, testLogs);
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("Error while running tests for " + testSubCategory +  ": " + e.getMessage(), LogDb.TESTING);
+                e.printStackTrace();
+            }
+            if (testingRunResult != null) {
+                testingRunResults.add(testingRunResult);
+            }
+
+            insertResultsAndMakeIssues(testingRunResults, testRunResultSummaryId);
+            return null;
+        }else{
+            logger.info("Test stopped for id: " + testRunId.toString());
+            return null;
+        }
     }
 
     public boolean applyRunOnceCheck(ApiInfoKey apiInfoKey, TestConfig testConfig, ConcurrentHashMap<String, String> subCategoryEndpointMap, Map<ApiInfoKey, String> apiInfoKeyToHostMap, String testSubCategory) {
