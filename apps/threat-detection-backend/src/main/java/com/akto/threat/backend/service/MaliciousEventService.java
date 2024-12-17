@@ -1,4 +1,4 @@
-package com.akto.threat.protection.service;
+package com.akto.threat.backend.service;
 
 import com.akto.dto.type.URLMethods;
 import com.akto.kafka.Kafka;
@@ -9,13 +9,12 @@ import com.akto.proto.threat_protection.message.sample_request.v1.SampleMaliciou
 import com.akto.proto.threat_protection.service.malicious_alert_service.v1.MaliciousEventServiceGrpc;
 import com.akto.proto.threat_protection.service.malicious_alert_service.v1.RecordMaliciousEventRequest;
 import com.akto.proto.threat_protection.service.malicious_alert_service.v1.RecordMaliciousEventResponse;
-import com.akto.threat.protection.constants.KafkaTopic;
-import com.akto.threat.protection.constants.MongoDBCollection;
-import com.akto.threat.protection.db.AggregateSampleMaliciousEventModel;
-import com.akto.threat.protection.db.MaliciousEventModel;
-import com.akto.threat.protection.interceptors.Constants;
-import com.akto.threat.protection.utils.KafkaUtils;
-import com.mongodb.client.model.WriteModel;
+import com.akto.threat.backend.constants.KafkaTopic;
+import com.akto.threat.backend.constants.MongoDBCollection;
+import com.akto.threat.backend.db.AggregateSampleMaliciousEventModel;
+import com.akto.threat.backend.db.MaliciousEventModel;
+import com.akto.threat.backend.interceptors.Constants;
+import com.akto.threat.backend.utils.KafkaUtils;
 import io.grpc.stub.StreamObserver;
 import java.util.ArrayList;
 import java.util.List;
@@ -36,7 +35,6 @@ public class MaliciousEventService extends MaliciousEventServiceGrpc.MaliciousEv
     MaliciousEventMessage evt = request.getMaliciousEvent();
     String actor = evt.getActor();
     String filterId = evt.getFilterId();
-    List<WriteModel<AggregateSampleMaliciousEventModel>> bulkUpdates = new ArrayList<>();
     int accountId = Constants.ACCOUNT_ID_CONTEXT_KEY.get();
 
     EventType eventType = evt.getEventType();

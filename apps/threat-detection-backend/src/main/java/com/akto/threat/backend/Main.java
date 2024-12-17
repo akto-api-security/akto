@@ -1,4 +1,4 @@
-package com.akto.threat.protection;
+package com.akto.threat.backend;
 
 import static org.bson.codecs.configuration.CodecRegistries.fromProviders;
 import static org.bson.codecs.configuration.CodecRegistries.fromRegistries;
@@ -7,7 +7,7 @@ import com.akto.DaoInit;
 import com.akto.kafka.KafkaConfig;
 import com.akto.kafka.KafkaConsumerConfig;
 import com.akto.kafka.KafkaProducerConfig;
-import com.akto.threat.protection.tasks.FlushMessagesToDB;
+import com.akto.threat.backend.tasks.FlushMessagesToDB;
 import com.mongodb.ConnectionString;
 import com.mongodb.MongoClientSettings;
 import com.mongodb.ReadPreference;

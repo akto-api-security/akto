@@ -1,4 +1,4 @@
-package com.akto.threat.protection.db;
+package com.akto.threat.backend.db;
 
 import com.akto.dto.type.URLMethods;
 import java.util.UUID;
