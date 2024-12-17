@@ -1,4 +1,4 @@
-package com.akto.threat.protection.interceptors;
+package com.akto.threat.backend.interceptors;
 
 import com.akto.dao.ConfigsDao;
 import com.akto.dto.Config;
@@ -6,7 +6,6 @@ import io.grpc.*;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jws;
 import io.jsonwebtoken.Jwts;
-
 import java.io.IOException;
 import java.security.KeyFactory;
 import java.security.NoSuchAlgorithmException;
