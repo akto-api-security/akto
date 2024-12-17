@@ -1,18 +1,14 @@
-package com.akto.threat.protection;
+package com.akto.threat.backend;
 
-import com.akto.kafka.Kafka;
 import com.akto.kafka.KafkaConfig;
-import com.akto.threat.protection.interceptors.AuthenticationInterceptor;
-import com.akto.threat.protection.service.DashboardService;
-import com.akto.threat.protection.service.MaliciousEventService;
-
+import com.akto.threat.backend.interceptors.AuthenticationInterceptor;
+import com.akto.threat.backend.service.DashboardService;
+import com.akto.threat.backend.service.MaliciousEventService;
+import com.mongodb.client.MongoClient;
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
-
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
-
-import com.mongodb.client.MongoClient;
 
 public class BackendServer {
   private final int port;
