@@ -96,6 +96,11 @@ public class MaliciousTrafficDetectorTask implements Task {
             for (ConsumerRecord<String, String> record : records) {
               processRecord(record);
             }
+
+            if (!records.isEmpty()) {
+              // Should we commit even if there are no records ?
+              kafkaConsumer.commitSync();
+            }
           }
         });
   }
