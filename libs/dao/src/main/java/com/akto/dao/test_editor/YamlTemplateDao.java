@@ -24,9 +24,11 @@ public class YamlTemplateDao extends AccountsContextDao<YamlTemplate> {
         Map<String, TestConfig> testConfigMap = new HashMap<>();
         List<Bson> filters = new ArrayList<>();
         filters.add(customFilter);
-        if (fetchOnlyActive) {
-            filters.add(Filters.exists(YamlTemplate.INACTIVE, false));
-            filters.add(Filters.eq(YamlTemplate.INACTIVE, false));
+        if (fetchOnlyActive) {Bson filter = Filters.or(
+                Filters.exists(YamlTemplate.INACTIVE, false),
+                Filters.eq(YamlTemplate.INACTIVE, false)
+        );
+            filters.add(filter);
         } else {
             filters.add(new BasicDBObject());
         }
