@@ -1,11 +1,11 @@
-package com.akto.threat.protection.tasks;
+package com.akto.threat.backend.tasks;
 
 import com.akto.kafka.KafkaConfig;
 import com.akto.runtime.utils.Utils;
-import com.akto.threat.protection.constants.KafkaTopic;
-import com.akto.threat.protection.constants.MongoDBCollection;
-import com.akto.threat.protection.db.AggregateSampleMaliciousEventModel;
-import com.akto.threat.protection.db.MaliciousEventModel;
+import com.akto.threat.backend.constants.KafkaTopic;
+import com.akto.threat.backend.constants.MongoDBCollection;
+import com.akto.threat.backend.db.AggregateSampleMaliciousEventModel;
+import com.akto.threat.backend.db.MaliciousEventModel;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -14,13 +14,12 @@ import com.mongodb.client.MongoClient;
 import com.mongodb.client.model.BulkWriteOptions;
 import com.mongodb.client.model.InsertOneModel;
 import com.mongodb.client.model.WriteModel;
-import org.apache.kafka.clients.consumer.ConsumerRecords;
-import org.apache.kafka.clients.consumer.KafkaConsumer;
-
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import org.apache.kafka.clients.consumer.ConsumerRecords;
+import org.apache.kafka.clients.consumer.KafkaConsumer;
 
 public class FlushMessagesToDB {
 

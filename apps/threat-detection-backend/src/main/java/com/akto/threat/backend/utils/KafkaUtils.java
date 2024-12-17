@@ -1,4 +1,4 @@
-package com.akto.threat.protection.utils;
+package com.akto.threat.backend.utils;
 
 import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
