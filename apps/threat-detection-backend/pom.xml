@@ -10,8 +10,8 @@
         <version>${revision}</version>
     </parent>
 
-    <groupId>com.akto.apps.threat-protection-backend</groupId>
-    <artifactId>threat-protection-backend</artifactId>
+    <groupId>com.akto.apps.threat-detection-backend</groupId>
+    <artifactId>threat-detection-backend</artifactId>
     <packaging>jar</packaging>
 
     <dependencies>
@@ -125,7 +125,7 @@
                                     <archive>
                                         <manifest>
                                             <mainClass>
-                                                com.akto.threat.detection.Main
+                                                com.akto.threat.backend.Main
                                             </mainClass>
                                         </manifest>
                                     </archive>
@@ -152,7 +152,7 @@
                             <archive>
                                 <manifest>
                                     <addClasspath>true</addClasspath>
-                                    <mainClass>com.akto.threat.detection.Main</mainClass>
+                                    <mainClass>com.akto.threat.backend.Main</mainClass>
                                     <classpathPrefix>dependency-jars/</classpathPrefix>
                                 </manifest>
                             </archive>

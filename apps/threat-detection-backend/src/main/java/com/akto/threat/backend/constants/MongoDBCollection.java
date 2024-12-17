@@ -1,4 +1,4 @@
-package com.akto.threat.protection.constants;
+package com.akto.threat.backend.constants;
 
 public class MongoDBCollection {
   public static class ThreatDetection {
