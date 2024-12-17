@@ -138,14 +138,14 @@
             </modules>
         </profile>
         <profile>
-            <id>threat-protection-backend</id>
+            <id>threat-detection-backend</id>
             <activation>
                 <file>
-                    <exists>threat-protection-backend/pom.xml</exists>
+                    <exists>threat-detection-backend/pom.xml</exists>
                 </file>
             </activation>
             <modules>
-                <module>threat-protection-backend</module>
+                <module>threat-detection-backend</module>
             </modules>
         </profile>
     </profiles>
