@@ -18,7 +18,7 @@
     <!-- Loggers configuration -->
     <Loggers>
         <!-- Root logger configuration -->
-        <Root level="debug">
+        <Root level="info">
             <AppenderRef ref="STDOUT" />
         </Root>
 
