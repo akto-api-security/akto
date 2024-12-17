@@ -595,7 +595,25 @@ public class StartTestAction extends UserAction {
         if (testingRunResultSummaryHexId != null) loggerMaker.infoAndAddToDb("fetchTestingRunResults called for hexId=" + testingRunResultSummaryHexId);
         if (queryMode != null) loggerMaker.infoAndAddToDb("fetchTestingRunResults called for queryMode="+queryMode);
 
+        Bson ignoredIssuesFilters = Filters.and(
+                Filters.in(TestingRunIssues.TEST_RUN_ISSUES_STATUS, "IGNORED"),
+                Filters.in(TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_ID, testingRunResultSummaryId)
+        );
+        List<TestingRunIssues> issueslist = TestingRunIssuesDao.instance.findAll(ignoredIssuesFilters, Projections.include("_id"));
+        List<ApiInfo.ApiInfoKey> apiInfoKeyList = new ArrayList<>();
+        List<String> testSubCategoryList = new ArrayList<>();
+        for(TestingRunIssues issue : issueslist) {
+            apiInfoKeyList.add(issue.getId().getApiInfoKey());
+            testSubCategoryList.add(issue.getId().getTestSubCategory());
+        }
+
         List<Bson> testingRunResultFilters = prepareTestRunResultsFilters(testingRunResultSummaryId, queryMode);
+        testingRunResultFilters.add(
+            Filters.and(
+                Filters.nin(TestingRunResult.API_INFO_KEY, apiInfoKeyList),
+                Filters.nin(TestingRunResult.TEST_SUB_TYPE, testSubCategoryList)
+            )
+        );
 
         if(queryMode == QueryMode.SKIPPED_EXEC || queryMode == QueryMode.SKIPPED_EXEC_NEED_CONFIG){
             TestError[] testErrors = TestResult.TestError.values();
@@ -635,13 +653,8 @@ public class StartTestAction extends UserAction {
                 testCountMap.put(qm.toString(), count);
             }
 
-            Bson ignoredIssuesFilters = Filters.and(
-                    Filters.in(TestingRunIssues.TEST_RUN_ISSUES_STATUS, Arrays.asList("IGNORED", "FIXED")),
-                    Filters.in(TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_ID, testingRunResultSummaryId)
-            );
-            int count = (int) TestingRunIssuesDao.instance.count(ignoredIssuesFilters);
-            testCountMap.put(QueryMode.VULNERABLE.name(), Math.abs(testCountMap.getOrDefault(QueryMode.VULNERABLE.name(), 0)-count));
-            testCountMap.put("IGNORED_ISSUES", count);
+            testCountMap.put(QueryMode.VULNERABLE.name(), Math.abs(testCountMap.getOrDefault(QueryMode.VULNERABLE.name(), 0)- issueslist.size()));
+            testCountMap.put("IGNORED_ISSUES", issueslist.size());
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "error in fetchLatestTestingRunResult: " + e);
         }

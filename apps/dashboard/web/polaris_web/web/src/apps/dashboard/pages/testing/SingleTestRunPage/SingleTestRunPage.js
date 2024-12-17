@@ -261,35 +261,13 @@ function SingleTestRunPage() {
 
     setSelectedTestRun(localSelectedTestRun);
     if(localSelectedTestRun.testingRunResultSummaryHexId) {
-      if(selectedTab === 'ignored_issues' || selectedTab === 'vulnerable') {
-        let vulnerableTestingRunResults = []
-        await api.fetchTestingRunResults(localSelectedTestRun.testingRunResultSummaryHexId, "VULNERABLE", sortKey, sortOrder, skip, limit, filters, queryValue).then(({ testingRunResults, testCountMap }) => {
-          testRunCountMap = testCountMap
-          vulnerableTestingRunResults = testingRunResults
-          testRunResultsRes = transform.prepareTestRunResults(hexId, testingRunResults, subCategoryMap, subCategoryFromSourceConfigMap)
-          const orderedValues = tableTabsOrder.map(key => testCountMap[tableTabMap[key]] || 0)
-          setTestRunResultsCount(orderedValues)
-        })
+      if(selectedTab === 'ignored_issues') {
         let ignoredTestRunResults = []
-        await api.fetchIssuesByStatusAndSummaryId(localSelectedTestRun.testingRunResultSummaryHexId, ["IGNORED", "FIXED"]).then((issues) => {
-          const ignoredTestingResults = vulnerableTestingRunResults.filter(result => {
-            return issues.some(issue =>
-                issue.id.apiInfoKey.apiCollectionId === result.apiInfoKey.apiCollectionId &&
-                issue.id.apiInfoKey.method === result.apiInfoKey.method &&
-                issue.id.apiInfoKey.url === result.apiInfoKey.url &&
-                issue.id.testSubCategory === result.testSubType
-            )
-          })
-        
-          ignoredTestRunResults = transform.prepareTestRunResults(hexId, ignoredTestingResults, subCategoryMap, subCategoryFromSourceConfigMap)
+        await api.fetchIssuesByStatusAndSummaryId(localSelectedTestRun.testingRunResultSummaryHexId, ["IGNORED"]).then((resp) => {
+          const ignoredIssuesTestingResult = resp?.testingRunResultList || [];
+          ignoredTestRunResults = transform.prepareTestRunResults(hexId, ignoredIssuesTestingResult, subCategoryMap, subCategoryFromSourceConfigMap)
         })
-
-        const updatedVulnerableTestRunResults = testRunResultsRes.filter(result => {
-          return !ignoredTestRunResults.some(ignoredResult => {
-            return JSON.stringify(result) === JSON.stringify(ignoredResult)
-          })
-        })
-        testRunResultsRes = selectedTab === 'vulnerable' ? updatedVulnerableTestRunResults : ignoredTestRunResults
+        testRunResultsRes = ignoredTestRunResults
       } else {
         await api.fetchTestingRunResults(localSelectedTestRun.testingRunResultSummaryHexId, tableTabMap[selectedTab], sortKey, sortOrder, skip, limit, filters, queryValue).then(({ testingRunResults, testCountMap, errorEnums }) => {
           testRunCountMap = testCountMap

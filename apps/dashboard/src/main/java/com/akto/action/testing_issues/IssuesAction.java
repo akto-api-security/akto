@@ -527,12 +527,29 @@ public class IssuesAction extends UserAction {
 
     String latestTestingRunSummaryId;
     List<String> issueStatusQuery;
+    List<TestingRunResult> testingRunResultList;
     public String fetchIssuesByStatusAndSummaryId() {
         Bson filters = Filters.and(
                 Filters.in(TestingRunIssues.TEST_RUN_ISSUES_STATUS, issueStatusQuery),
                 Filters.in(TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_ID, new ObjectId(latestTestingRunSummaryId))
         );
-        issues = TestingRunIssuesDao.instance.findAll(filters);
+        issues = TestingRunIssuesDao.instance.findAll(filters, Projections.include("_id"));
+
+        List<ApiInfo.ApiInfoKey> apiInfoKeyList = new ArrayList<>();
+        List<String> testSubCategoryList = new ArrayList<>();
+        for(TestingRunIssues issue : issues) {
+            apiInfoKeyList.add(issue.getId().getApiInfoKey());
+            testSubCategoryList.add(issue.getId().getTestSubCategory());
+        }
+
+        Bson trsFilters = Filters.and(
+                Filters.in(TestingRunResult.API_INFO_KEY, apiInfoKeyList),
+                Filters.in(TestingRunResult.TEST_SUB_TYPE, testSubCategoryList),
+                Filters.in(TestingRunResult.VULNERABLE, true)
+        );
+
+        testingRunResultList = TestingRunResultDao.instance.findAll(trsFilters);
+
         return SUCCESS.toUpperCase();
     }
 
@@ -822,6 +839,10 @@ public class IssuesAction extends UserAction {
 
     public TestingRunResultSummary getTestingRunResultSummary() {
         return testingRunResultSummary;
+    }
+
+    public List<TestingRunResult> getTestingRunResultList() {
+        return testingRunResultList;
     }
 
     public void setReportFilterList(Map<String, List<String>> reportFilterList) {
