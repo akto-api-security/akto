@@ -16,17 +16,13 @@ import io.grpc.Grpc;
 import io.grpc.InsecureChannelCredentials;
 import io.grpc.ManagedChannel;
 import io.grpc.stub.StreamObserver;
-
+import java.util.Collections;
+import java.util.List;
+import java.util.stream.Collectors;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.hibernate.Session;
 import org.hibernate.SessionFactory;
 import org.hibernate.Transaction;
-
-import java.util.Collections;
-import java.util.List;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.stream.Collectors;
 
 /*
 This will send alerts to threat detection backend
@@ -57,7 +53,8 @@ public class SendMaliciousRequestsToBackend extends AbstractKafkaConsumerTask {
     try {
       return session
           .createQuery(
-              "from MaliciousEventEntity m where m.actor = :actor and m.filterId = :filterId order by m.createdAt desc",
+              "from MaliciousEventEntity m where m.actor = :actor and m.filterId = :filterId order"
+                  + " by m.createdAt desc",
               MaliciousEventEntity.class)
           .setParameter("actor", actor)
           .setParameter("filterId", filterId)
