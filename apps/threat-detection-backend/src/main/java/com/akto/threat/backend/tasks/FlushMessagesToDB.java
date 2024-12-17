@@ -43,30 +43,29 @@ public class FlushMessagesToDB {
     this.mClient = mongoClient;
   }
 
-  private static ExecutorService getPollingExecutor() {
-    return Executors.newSingleThreadExecutor();
-  }
-
   public void run() {
+    ExecutorService pollingExecutor = Executors.newSingleThreadExecutor();
     this.kafkaConsumer.subscribe(
         Collections.singletonList(KafkaTopic.ThreatDetection.INTERNAL_DB_MESSAGES));
 
-    getPollingExecutor()
-        .execute(
-            () -> {
-              // Poll data from Kafka topic
-              while (true) {
-                ConsumerRecords<String, String> records =
-                    kafkaConsumer.poll(
-                        Duration.ofMillis(
-                            this.kafkaConfig.getConsumerConfig().getPollDurationMilli()));
-                if (records.isEmpty()) {
-                  continue;
-                }
+    pollingExecutor.execute(
+        () -> {
+          // Poll data from Kafka topic
+          while (true) {
+            ConsumerRecords<String, String> records =
+                kafkaConsumer.poll(
+                    Duration.ofMillis(this.kafkaConfig.getConsumerConfig().getPollDurationMilli()));
+            if (records.isEmpty()) {
+              continue;
+            }
 
-                processRecords(records);
-              }
-            });
+            processRecords(records);
+
+            if (!records.isEmpty()) {
+              kafkaConsumer.commitSync();
+            }
+          }
+        });
   }
 
   private void processRecords(ConsumerRecords<String, String> records) {
