@@ -12,7 +12,6 @@ import com.akto.threat.detection.tasks.MaliciousTrafficDetectorTask;
 import com.akto.threat.detection.tasks.SendMaliciousRequestsToBackend;
 import com.mongodb.ConnectionString;
 import io.lettuce.core.RedisClient;
-
 import org.flywaydb.core.Flyway;
 import org.hibernate.SessionFactory;
 
@@ -25,6 +24,7 @@ public class Main {
 
     SessionFactory sessionFactory = SessionFactoryUtils.createFactory();
 
+    // TODO: Remove this before merging. Will be using cyborg for fetching templates
     DaoInit.init(new ConnectionString(System.getenv("AKTO_MONGO_CONN")));
     KafkaConfig trafficKafka =
         KafkaConfig.newBuilder()
