@@ -5,7 +5,6 @@ import { CellType } from "../../../components/tables/rows/GithubRow";
 import GetPrettifyEndpoint from "../../observe/GetPrettifyEndpoint";
 import PersistStore from "../../../../main/PersistStore";
 import func from "../../../../../util/func";
-import { Text } from "@shopify/polaris";
 
 const resourceName = {
     singular: 'sample',
@@ -16,12 +15,12 @@ const headers = [
     {
         text: "Endpoint",
         value: "endpointComp",
-        title: "Api endpoints",
+        title: "Endpoint",
     },
     {
-        text: "matchingUrl",
-        value: "matchingUrl",
-        title: "Affected url",
+        text: "Actor",
+        value: "actorComp",
+        title: "Actor",
     },
     {
         text: "Filter",
@@ -43,8 +42,8 @@ const headers = [
         sortActive: true
     },
     {
-        text: 'Source IPs',
-        title: 'Source IPs',
+        text: 'Source IP',
+        title: 'Source IP',
         value: 'sourceIPComponent',
     },
     {
@@ -86,13 +85,14 @@ function SusDataTable({ currDateRange, rowClicked }) {
         const sort = { [sortKey]: sortOrder }
         const res = await api.fetchSuspectSampleData(skip, sourceIpsFilter, apiCollectionIdsFilter, matchingUrlFilter, sort, startTimestamp, endTimestamp)
         let total = res.total;
-        let ret = res?.sampleData.map(x => {
+        let ret = res?.maliciousEvents.map(x => {
             return {
                 ...x,
+                actorComp: x?.actor,
                 endpointComp: <GetPrettifyEndpoint method={x.method} url={x.url} isNew={false} />,
                 apiCollectionName: collectionsMap[x.apiCollectionId] || '-',
-                discoveredTs: func.prettifyEpoch(x.discovered),
-                sourceIPComponent: <Text>{x?.sourceIPs ? x.sourceIPs.reduce((a, b) => a += ((a.length > 0 ? ", " : "") + b), "") : "-"}</Text>
+                discoveredTs: func.prettifyEpoch(x.timestamp),
+                sourceIPComponent: x?.ip || '-',
             }
         })
         setLoading(false);
@@ -168,7 +168,7 @@ function SusDataTable({ currDateRange, rowClicked }) {
         sortOptions={sortOptions}
         disambiguateLabel={disambiguateLabel}
         loading={loading}
-        onRowClick={(data) => rowClicked(data)}
+        // onRowClick={(data) => rowClicked(data)} [For now removing on row click functionality]
         fetchData={fetchData}
         filters={filters}
         selectable={false}
