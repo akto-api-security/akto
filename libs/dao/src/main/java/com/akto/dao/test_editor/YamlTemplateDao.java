@@ -40,7 +40,7 @@ public class YamlTemplateDao extends AccountsContextDao<YamlTemplate> {
         int localLimit = Math.min(100, limit);
 
         while (localCounter < limit) {
-            yamlTemplates = YamlTemplateDao.instance.findAll(Filters.or(filters), localSkip, localLimit, Sorts.ascending("_id"), proj);
+            yamlTemplates = YamlTemplateDao.instance.findAll(Filters.and(filters), localSkip, localLimit, Sorts.ascending("_id"), proj);
             for (YamlTemplate yamlTemplate: yamlTemplates) {
                 try {
                     TestConfig testConfig = TestConfigYamlParser.parseTemplate(yamlTemplate.getContent());
