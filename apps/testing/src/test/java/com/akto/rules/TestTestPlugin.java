@@ -2,7 +2,6 @@ package com.akto.rules;
 
 import com.akto.MongoBasedTest;
 import com.akto.dao.context.Context;
-import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dto.*;
 import com.akto.dto.testing.*;
 import com.akto.dto.type.SingleTypeInfo;
@@ -12,16 +11,8 @@ import com.akto.testing.ApiExecutor;
 import com.akto.types.CappedSet;
 import com.akto.util.JSONUtils;
 import com.akto.util.modifier.NoneAlgoJWTModifier;
-import com.mongodb.BasicDBObject;
-import com.mongodb.client.model.Filters;
-import com.sendgrid.Method;
-import org.bson.types.ObjectId;
 import org.junit.Test;
 
-import java.net.MalformedURLException;
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.net.URL;
 import java.util.*;
 
 import static org.junit.Assert.*;

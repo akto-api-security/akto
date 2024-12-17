@@ -1,7 +1,9 @@
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
-import { Text, Button, IndexFiltersMode, Box, Badge, Popover, ActionList, HorizontalStack, Icon} from "@shopify/polaris"
+import { Text, Button, IndexFiltersMode, Box, Badge, Popover, ActionList, Link, Tooltip, Modal, Checkbox, LegacyCard, ResourceList, ResourceItem, Avatar, Filters, Card, HorizontalStack, Icon} from "@shopify/polaris"
 import { HideMinor, ViewMinor,FileMinor } from '@shopify/polaris-icons';
 import api from "../api"
+import dashboardApi from "../../dashboard/api"
+import settingRequests from "../../settings/api"
 import { useEffect,useState, useRef } from "react"
 import func from "@/util/func"
 import GithubSimpleTable from "@/apps/dashboard/components/tables/GithubSimpleTable";
@@ -19,6 +21,8 @@ import CollectionsPageBanner from "./component/CollectionsPageBanner"
 import useTable from "@/apps/dashboard/components/tables/TableContext"
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo"
 import HeadingWithTooltip from "../../../components/shared/HeadingWithTooltip"
+import SearchableResourceList from "../../../components/shared/SearchableResourceList"
+import ResourceListModal from "../../../components/shared/ResourceListModal"
 import { saveAs } from 'file-saver'
 // import dummyJson from "../../../components/shared/treeView/dummyJson"
 import TreeViewTable from "../../../components/shared/treeView/TreeViewTable"
@@ -193,6 +197,7 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
 }
 
 function ApiCollections() {
+    const userRole = window.USER_ROLE
 
     const navigate = useNavigate();
     const [data, setData] = useState({'all': [], 'hostname':[], 'groups': [], 'custom': [], 'deactivated': []})
@@ -205,6 +210,9 @@ function ApiCollections() {
     const [envTypeMap, setEnvTypeMap] = useState({})
     const [refreshData, setRefreshData] = useState(false)
     const [popover,setPopover] = useState(false)
+    const [teamData, setTeamData] = useState([])
+    const [usersCollection, setUsersCollection] = useState([])
+    const [selectedItems, setSelectedItems] = useState([])
     const [normalData, setNormalData] = useState([])
     const [treeView, setTreeView] = useState(false);
     const [moreActions, setMoreActions] = useState(false);
@@ -261,6 +269,7 @@ function ApiCollections() {
     const setLastFetchedResp = PersistStore.getState().setLastFetchedResp
     const setLastFetchedSeverityResp = PersistStore.getState().setLastFetchedSeverityResp
     const setLastFetchedSensitiveResp = PersistStore.getState().setLastFetchedSensitiveResp
+    const [totalAPIs, setTotalAPIs] = useState(0)
 
     // as riskScore cron runs every 5 min, we will cache the data and refresh in 5 mins
     // similarly call sensitive and severityInfo
@@ -305,7 +314,8 @@ function ApiCollections() {
         let apiPromises = [
             api.getCoverageInfoForCollections(),
             api.getLastTrafficSeen(),
-            collectionApi.fetchCountForHostnameDeactivatedCollections()
+            collectionApi.fetchCountForHostnameDeactivatedCollections(),
+            dashboardApi.fetchEndpointsCount(0, 0)
         ];
         if(shouldCallHeavyApis){
             apiPromises = [
@@ -313,36 +323,47 @@ function ApiCollections() {
                 ...[api.getRiskScoreInfo(), api.getSensitiveInfoForCollections(), api.getSeverityInfoForCollections()]
             ]
         }
-        
+
+        if(userRole === 'ADMIN') {
+            apiPromises = [
+                ...apiPromises,
+                ...[api.getAllUsersCollections(), settingRequests.getTeamData()]
+            ]
+        }
+
         let results = await Promise.allSettled(apiPromises);
         let coverageInfo = results[0].status === 'fulfilled' ? results[0].value : {};
         // let coverageInfo = dummyData.coverageMap
         let trafficInfo = results[1].status === 'fulfilled' ? results[1].value : {};
         let deactivatedCountInfo = results[2].status === 'fulfilled' ? results[2].value : {};
+        let fetchEndpointsCountResp = results[3].status === 'fulfilled' ? results[3].value : {}
 
         let riskScoreObj = lastFetchedResp
         let sensitiveInfo = lastFetchedSensitiveResp
         let severityObj = lastFetchedSeverityResp
+        if (fetchEndpointsCountResp && fetchEndpointsCountResp.newCount) {
+            setTotalAPIs(fetchEndpointsCountResp.newCount)
+        }
 
         if(shouldCallHeavyApis){
-            if(results[3]?.status === "fulfilled"){
-                const res = results[3].value
+            if(results[4]?.status === "fulfilled"){
+                const res = results[4].value
                 riskScoreObj = {
                     criticalUrls: res.criticalEndpointsCount,
                     riskScoreMap: res.riskScoreOfCollectionsMap
-                } 
+                }
             }
 
-            if(results[4]?.status === "fulfilled"){
-                const res = results[4].value
+            if(results[5]?.status === "fulfilled"){
+                const res = results[5].value
                 sensitiveInfo ={ 
                     sensitiveUrls: res.sensitiveUrlsInResponse,
                     sensitiveInfoMap: res.sensitiveSubtypesInCollection
                 }
             }
 
-            if(results[5]?.status === "fulfilled"){
-                const res = results[5].value
+            if(results[6]?.status === "fulfilled"){
+                const res = results[6].value
                 severityObj = res
             }
 
@@ -353,6 +374,34 @@ function ApiCollections() {
             setLastFetchedSensitiveResp(sensitiveInfo)
 
         }
+
+        let usersCollectionList = []
+        let userList = []
+
+        const index = !shouldCallHeavyApis ? 4 : 7
+
+        if(userRole === 'ADMIN') {
+            if(results[index]?.status === "fulfilled") {
+                const res = results[index].value
+                usersCollectionList = res
+            }
+            
+            if(results[index+1]?.status === "fulfilled") {
+                const res = results[index+1].value
+                userList = res
+                if (userList) {
+                    userList = userList.filter(x => {
+                        if (x?.role === "ADMIN") {
+                            return false;
+                        }
+                        return true
+                    })
+                }
+            }
+        }
+
+        setUsersCollection(usersCollectionList)
+        setTeamData(userList)
 
         setHasUsageEndpoints(hasUserEndpoints)
         setCoverageMap(coverageInfo)
@@ -410,6 +459,18 @@ function ApiCollections() {
         })
         resetResourcesSelected();
         fetchData()
+    }
+    async function handleShareCollectionsAction(collectionIdList, userIdList, apiFunction){
+        const userCollectionMap = {};
+
+        for(const userId of userIdList) {
+            const intUserId = parseInt(userId, 10);
+            const userCollections = usersCollection[intUserId] || [];
+            userCollectionMap[intUserId] = [...new Set([...userCollections, ...collectionIdList])];
+        }
+
+        await apiFunction(userCollectionMap);
+        func.setToast(true, false, `${userIdList.length} Member${func.addPlurality(userIdList.length)}'s collections have been updated successfully`);
     }
 
     const exportCsv = (selectedResources = []) =>{
@@ -479,6 +540,84 @@ function ApiCollections() {
                 }
             )
         }
+
+        const apiCollectionShareRenderItem = (item) => {
+            const { id, name, login, role } = item;
+            const initials = func.initials(login)
+            const media = <Avatar user size="medium" name={login} initials={initials} />
+            const shortcutActions = [
+                {
+                    content: <Text color="subdued">{role}</Text>,
+                    url: '#',
+                    onAction: ((event) => event.preventDefault())
+                }
+            ]
+
+            return (
+                <ResourceItem
+                    id={id}
+                    media={media}
+                    shortcutActions={shortcutActions}
+                    persistActions
+                >
+                    <Text variant="bodyMd" fontWeight="bold" as="h3">
+                        {name}
+                    </Text>
+                    <Text variant="bodyMd">
+                        {login}
+                    </Text>
+                </ResourceItem>
+            );
+        }
+
+        const shareCollectionHandler = () => {
+            if (selectedItems.length > 0) {
+                handleShareCollectionsAction(selectedResources, selectedItems, api.updateUserCollections);
+                return true
+            } else {
+                func.setToast(true, true, "No member is selected!");
+                return false
+            }
+        };
+
+        const handleSelectedItemsChange = (items) => {
+            setSelectedItems(items);
+        };
+
+        const shareComponentChildrens = (
+            <Box>
+                <Box padding={5} background="bg-subdued-hover">
+                    <Text fontWeight="medium">{`${selectedResources.length} collection${func.addPlurality(selectedResources.length)} selected`}</Text>
+                </Box>
+                    <SearchableResourceList
+                        resourceName={'user'}
+                        items={teamData}
+                        renderItem={apiCollectionShareRenderItem}
+                        isFilterControlEnabale={true}
+                        selectable={true}
+                        onSelectedItemsChange={handleSelectedItemsChange}
+                    />
+            </Box>
+        )
+
+        const shareContent = (
+            <ResourceListModal
+                isLarge={true}
+                activatorPlaceaholder={"Share"}
+                title={"Share collections"}
+                primaryAction={shareCollectionHandler}
+                component={shareComponentChildrens}
+            />
+        )
+
+    let rbacAccess = func.checkForRbacFeature();
+    if(userRole === 'ADMIN' && rbacAccess) {
+        actions.push(
+            {
+                content: shareContent,
+            }
+        )
+    }
 
         const toggleTypeContent = (
             <Popover
@@ -554,7 +693,7 @@ function ApiCollections() {
       const summaryItems = [
         {
             title: "Total APIs",
-            data: transform.formatNumberWithCommas(summaryData.totalEndpoints),
+            data: transform.formatNumberWithCommas(totalAPIs),
         },
         {
             title: "Critical APIs",

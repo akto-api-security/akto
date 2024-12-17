@@ -170,6 +170,25 @@ export default {
             data: { apiCollections: items }
         })
     },
+    
+    async updateUserCollections(userCollectionMap) {
+        return await request({
+            url: '/api/updateUserCollections',
+            method: 'post',
+            data: {
+                userCollectionMap: userCollectionMap,
+            }
+        })
+    },
+
+    async getAllUsersCollections() {
+        return await request({
+            url: '/api/getAllUsersCollections',
+            method: 'post',
+            data: {}
+        })
+    },
+
     askAi(data) {
         return request({
             url: '/api/ask_ai',

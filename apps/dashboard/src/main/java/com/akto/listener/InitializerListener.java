@@ -407,6 +407,9 @@ public class InitializerListener implements ServletContextListener {
 
 
                 SampleData commonSampleData = SampleDataDao.instance.findOne(filterCommonSampleData);
+                if (commonSampleData == null) {
+                    continue;
+                }
                 List<String> commonPayloads = commonSampleData.getSamples();
 
                 if (!isSimilar(ssdId.getParam(), commonPayloads)) {
@@ -830,8 +833,6 @@ public class InitializerListener implements ServletContextListener {
             }
         }, 0, 5, TimeUnit.MINUTES);
     }
-
-    
 
     private void setUpDailyScheduler() {
         scheduler.scheduleAtFixedRate(new Runnable() {
@@ -2411,13 +2412,21 @@ public class InitializerListener implements ServletContextListener {
         clear(AnalyserLogsDao.instance, AnalyserLogsDao.maxDocuments);
         clear(ActivitiesDao.instance, ActivitiesDao.maxDocuments);
         clear(BillingLogsDao.instance, BillingLogsDao.maxDocuments);
-        clear(TestingRunResultDao.instance, TestingRunResultDao.maxDocuments);
+        clearRbacCollection(TestingRunResultDao.instance, TestingRunResultDao.maxDocuments);
         clear(SuspectSampleDataDao.instance, SuspectSampleDataDao.maxDocuments);
         clear(RuntimeMetricsDao.instance, RuntimeMetricsDao.maxDocuments);
         clear(ProtectionLogsDao.instance, ProtectionLogsDao.maxDocuments);
     }
 
     public static void clear(AccountsContextDao mCollection, int maxDocuments) {
+        try {
+            mCollection.trimCollection(maxDocuments);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error while trimming collection " + mCollection.getCollName() + " : " + e.getMessage(), LogDb.DASHBOARD);
+        }
+    }
+
+    public static void clearRbacCollection(AccountsContextDaoWithRbac mCollection, int maxDocuments) {
         try {
             mCollection.trimCollection(maxDocuments);
         } catch (Exception e) {

@@ -8,11 +8,12 @@ import com.akto.dao.*;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dto.*;
 import com.akto.dto.billing.Organization;
+import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.dto.test_run_findings.TestingRunIssues;
+import com.akto.dto.type.SingleTypeInfo;
 import com.akto.listener.RuntimeListener;
 import com.akto.util.enums.GlobalEnums;
 import com.mongodb.client.model.*;
-import org.bouncycastle.util.test.Test;
 import org.bson.conversions.Bson;
 
 import com.akto.dao.context.Context;
@@ -29,7 +30,6 @@ import com.opensymphony.xwork2.Action;
 
 public class DashboardAction extends UserAction {
 
-    private Map<Integer,Integer> riskScoreCountMap = new HashMap<>();
     private int startTimeStamp;
     private int endTimeStamp;
     private Map<Integer,List<IssueTrendType>> issuesTrendMap = new HashMap<>() ;
@@ -39,36 +39,7 @@ public class DashboardAction extends UserAction {
     private Map<String,ConnectionInfo> integratedConnectionsInfo = new HashMap<>();
     private String connectionSkipped;
 
-    private static final LoggerMaker loggerMaker = new LoggerMaker(DashboardAction.class);
-
-    private static boolean isBetween(int low, int high, double score){
-        return (score >= low && score < high) ;
-    }
-    
-    // function for getting number of api in between multiple ranges to show trend on dashboard pagecalculateRiskValueForSeverity
-    public String fetchRiskScoreCountMap(){
-        Map<Integer, Integer> riskScoreCounts = new HashMap<>();
-        MongoCursor<ApiInfo> apiCursor = ApiInfoDao.instance.getMCollection().find().projection(Projections.include("_id", ApiInfo.RISK_SCORE)).cursor();
-        while(apiCursor.hasNext()){
-            try {
-                ApiInfo apiInfo = apiCursor.next();
-                float riskScore = apiInfo.getRiskScore();
-                if (isBetween(0, 3, riskScore)) {
-                    riskScoreCounts.put(3, riskScoreCounts.getOrDefault(3,0) + 1);
-                } else if (isBetween(3, 4, riskScore)) {
-                    riskScoreCounts.put(4, riskScoreCounts.getOrDefault(4,0) + 1);
-                } else {
-                    riskScoreCounts.put(5, riskScoreCounts.getOrDefault(5,0) + 1);
-                }
-            }catch (Exception e) {
-                loggerMaker.errorAndAddToDb("error in calculating risk score count " + e.toString(), LogDb.DASHBOARD);
-            }
-        }
-
-        this.riskScoreCountMap = riskScoreCounts;
-
-        return Action.SUCCESS.toUpperCase();
-    }
+    private static final LoggerMaker loggerMaker = new LoggerMaker(DashboardAction.class, LogDb.DASHBOARD);
 
     Set<Integer> deactivatedCollections = UsageMetricCalculator.getDeactivated();
 
@@ -157,6 +128,13 @@ public class DashboardAction extends UserAction {
         List<Bson> pipeline = new ArrayList<>();
         pipeline.add(Aggregates.match(issuesFilter));
 
+        try {
+            List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+            if(collectionIds != null) {
+                pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
+            }
+        } catch(Exception e){
+        }
         pipeline.add(Aggregates.project(Projections.computed(dayOfYearFloat, new BasicDBObject("$divide", new Object[]{"$" + TestingRunIssues.CREATION_TIME, 86400}))));
 
         pipeline.add(Aggregates.project(Projections.computed(dayOfYear, new BasicDBObject("$floor", new Object[]{"$" + dayOfYearFloat}))));
@@ -305,12 +283,6 @@ public class DashboardAction extends UserAction {
         return Action.SUCCESS.toUpperCase();
     }
 
-    private String userEmail;
-
-    public Map<Integer, Integer> getRiskScoreCountMap() {
-        return riskScoreCountMap;
-    }
-
     public int getStartTimeStamp() {
         return startTimeStamp;
     }
@@ -405,9 +377,5 @@ public class DashboardAction extends UserAction {
 
     public void setOrganization(String organization) {
         this.organization = organization;
-    }
-
-    public void setUserEmail(String userEmail) {
-        this.userEmail = userEmail;
     }
 }

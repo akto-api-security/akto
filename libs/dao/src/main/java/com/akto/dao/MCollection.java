@@ -93,32 +93,6 @@ public abstract class MCollection<T> {
         return this.findAll(and(eq(key1, value1), eq(key2, value2)));
     }
 
-    public<V> List<T> findAll(String key, Collection<V> values) {
-        int timeNow = Context.now();
-        if(printDebugLogs){
-            logger.info("Starting find all query at: " + timeNow);
-        }
-
-
-        MongoCursor<T> cursor = this.getMCollection().find(in(key, values)).cursor();
-
-        if(printDebugLogs){
-            logger.info("Finishing find all query in: " + (Context.now() - timeNow));
-        }
-
-        ArrayList<T> ret = new ArrayList<T>();
-
-        while(cursor.hasNext()) {
-            T elem = cursor.next();
-            ret.add(elem);
-        }
-
-        if(printDebugLogs){
-            logger.info("Finishing find all query and returning to call in: " + (Context.now() - timeNow));
-        }
-
-        return ret;
-    }
     public List<T> findAll(Bson q) {
         return findAll(q, null);
     }
@@ -198,14 +172,7 @@ public abstract class MCollection<T> {
     }
 
     public T findOne(Bson q) {
-        MongoCursor<T> cursor = this.getMCollection().find(q).cursor();
-
-        while(cursor.hasNext()) {
-            T elem = cursor.next();
-            return elem;
-        }
-
-        return null;
+        return this.findOne(q, null);
     }
 
     public T findOne(Bson q, Bson projection) {

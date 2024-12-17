@@ -17,7 +17,7 @@ import com.opensymphony.xwork2.interceptor.AbstractInterceptor;
 
 public class UsageInterceptor extends AbstractInterceptor {
 
-    private static final LoggerMaker loggerMaker = new LoggerMaker(UsageInterceptor.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(UsageInterceptor.class, LogDb.DASHBOARD);
 
     String featureLabel;
 
