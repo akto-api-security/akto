@@ -58,19 +58,13 @@ jobs:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           ECR_REPOSITORY: akto-api-security
           REGISTRY_ALIAS: p7q3h0z2
-          IMAGE_TAG: latest
-          IMAGE_TAG1: testruntime
-          IMAGE_TAG2: local
-          IMAGE_TAG3: 1.42.3_local
+          IMAGE_TAG: testing_optimizations
         run: |
           docker buildx create --use
           # Build a docker container and push it to DockerHub 
-          cd apps/mini-runtime
-          docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-api-security-mini-runtime:$IMAGE_TAG -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-api-security-mini-runtime:$IMAGE_TAG1 -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-api-security-mini-runtime:$IMAGE_TAG2 -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-api-security-mini-runtime:$IMAGE_TAG3 . --push
-          echo "::set-output name=image::$ECR_REGISTRY/akto-api-security-mini-runtime:$IMAGE_TAG"
-          cd ../mini-testing
-          docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-api-security-mini-testing:$IMAGE_TAG -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-api-security-mini-testing:$IMAGE_TAG1 -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-api-security-mini-testing:$IMAGE_TAG2 -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-api-security-mini-testing:$IMAGE_TAG3 . --push
-          echo "::set-output name=image::$ECR_REGISTRY/akto-api-security-mini-testing:$IMAGE_TAG3"
+          cd apps/mini-testing
+          docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-api-security-mini-testing:$IMAGE_TAG . --push
+          echo "::set-output name=image::$ECR_REGISTRY/akto-api-security-mini-testing:$IMAGE_TAG"
 
       - name: DockerHub login
         env:
@@ -83,15 +77,10 @@ jobs:
         env:
           ECR_REGISTRY: aktosecurity
           ECR_REPOSITORY: akto-api-security
-          IMAGE_TAG: latest
-          IMAGE_TAG1: testruntime
-          IMAGE_TAG2: local
-          IMAGE_TAG3: 1.42.3_local
+          IMAGE_TAG: testing_optimizations
         run: |
           echo $IMAGE_TAG >> $GITHUB_STEP_SUMMARY
           docker buildx create --use
           # Build a docker container and push it to DockerHub 
-          cd apps/mini-runtime
-          docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/mini-runtime:$IMAGE_TAG -t $ECR_REGISTRY/mini-runtime:$IMAGE_TAG1 -t $ECR_REGISTRY/mini-runtime:$IMAGE_TAG2 -t $ECR_REGISTRY/mini-runtime:$IMAGE_TAG3 . --push
-          cd ../mini-testing
-          docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/mini-testing:$IMAGE_TAG -t $ECR_REGISTRY/mini-testing:$IMAGE_TAG1 -t $ECR_REGISTRY/mini-testing:$IMAGE_TAG2 -t $ECR_REGISTRY/mini-testing:$IMAGE_TAG3 . --push
+          cd apps/mini-testing
+          docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/mini-testing:$IMAGE_TAG . --push
