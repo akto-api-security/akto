@@ -168,11 +168,11 @@ public class TestExecutor {
             }
         }
 
-        try {
-            StatusCodeAnalyser.run(sampleDataMapForStatusCodeAnalyser, sampleMessageStore , authMechanismStore, testingRun.getTestingRunConfig());
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("Error while running status code analyser " + e.getMessage(), LogDb.TESTING);
-        }
+        // try {
+        //     StatusCodeAnalyser.run(sampleDataMapForStatusCodeAnalyser, sampleMessageStore , authMechanismStore, testingRun.getTestingRunConfig());
+        // } catch (Exception e) {
+        //     loggerMaker.errorAndAddToDb("Error while running status code analyser " + e.getMessage(), LogDb.TESTING);
+        // }
 
         loggerMaker.infoAndAddToDb("StatusCodeAnalyser result = " + StatusCodeAnalyser.result, LogDb.TESTING);
         loggerMaker.infoAndAddToDb("StatusCodeAnalyser defaultPayloadsMap = " + StatusCodeAnalyser.defaultPayloadsMap, LogDb.TESTING);
@@ -216,7 +216,7 @@ public class TestExecutor {
         final int maxRunTime = testingRun.getTestRunTime() <= 0 ? 30*60 : testingRun.getTestRunTime(); // if nothing specified wait for 30 minutes
 
         boolean runParallelTestsBasedOnApiCount = true;
-        if (apiInfoKeyList.size() < 10) {
+        if (apiInfoKeyList.size() < maxConcurrentRequests) {
             runParallelTestsBasedOnApiCount = false;
         }
         for (ApiInfo.ApiInfoKey apiInfoKey: apiInfoKeyList) {
