@@ -367,6 +367,24 @@ prettifyEpoch(epoch) {
     var date = new Date(timestamp * 1000);
     return date.toLocaleString('en-US',{timeZone: window.TIME_ZONE === 'Us/Pacific' ? 'America/Los_Angeles' : window.TIME_ZONE});
   },
+  getFormattedDate(epoch) {
+    const date = new Date(epoch * 1000)
+    const day = date.getDate()
+    const month = date.toLocaleString('default', { month: 'long' })
+    const year = date.getFullYear()
+
+    const suffix = (day) => {
+        if (day >= 11 && day <= 13) return 'th'
+        switch (day % 10) {
+            case 1: return 'st'
+            case 2: return 'nd'
+            case 3: return 'rd'
+            default: return 'th'
+        }
+    }
+
+    return `${day}${suffix(day)} ${month}, ${year}`
+  },
 
   getListOfHosts(apiCollections) {
     let result = []

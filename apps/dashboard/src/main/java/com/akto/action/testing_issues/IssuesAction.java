@@ -9,6 +9,7 @@ import com.akto.dao.context.Context;
 import com.akto.dao.demo.VulnerableRequestForTemplateDao;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing.TestingRunResultDao;
+import com.akto.dao.testing.TestingRunResultSummariesDao;
 import com.akto.dao.testing.sources.TestSourceConfigsDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.ApiInfo;
@@ -517,6 +518,28 @@ public class IssuesAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    String testingRunSummaryId;
+    private TestingRunResultSummary testingRunResultSummary;
+    public String fetchTestingRunResultsSummary() {
+        ObjectId testingRunSummaryObj;
+        try {
+            testingRunSummaryObj = new ObjectId(testingRunSummaryId);
+        } catch (Exception e) {
+            addActionError("Invalid testing run summary id");
+            return ERROR.toUpperCase();
+        }
+
+        Bson projection = Projections.include(
+                TestingRunResultSummary.STATE,
+                TestingRunResultSummary.START_TIMESTAMP,
+                TestingRunResultSummary.END_TIMESTAMP
+        );
+
+        testingRunResultSummary = TestingRunResultSummariesDao.instance.findOne(Filters.eq(TestingRunResultSummary.ID, testingRunSummaryObj), projection);
+
+        return SUCCESS.toUpperCase();
+    }
+
     public List<TestingRunIssues> getIssues() {
         return issues;
     }
@@ -738,5 +761,13 @@ public class IssuesAction extends UserAction {
 
     public void setIssuesIds(List<TestingIssuesId> issuesIds) {
         this.issuesIds = issuesIds;
+    }
+
+    public void setTestingRunSummaryId(String testingRunSummaryId) {
+        this.testingRunSummaryId = testingRunSummaryId;
+    }
+
+    public TestingRunResultSummary getTestingRunResultSummary() {
+        return testingRunResultSummary;
     }
 }
