@@ -7,15 +7,12 @@ import com.akto.threat.detection.db.entity.MaliciousEventEntity;
 import com.akto.threat.detection.dto.MessageEnvelope;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.util.JsonFormat;
+import java.util.ArrayList;
+import java.util.List;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.hibernate.Session;
 import org.hibernate.SessionFactory;
 import org.hibernate.Transaction;
-
-import java.util.ArrayList;
-import java.util.List;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 
 /*
 This will read sample malicious data from kafka topic and save it to DB.
@@ -28,11 +25,6 @@ public class FlushSampleDataTask extends AbstractKafkaConsumerTask {
       SessionFactory sessionFactory, KafkaConfig trafficConfig, String topic) {
     super(trafficConfig, topic);
     this.sessionFactory = sessionFactory;
-  }
-
-  @Override
-  ExecutorService getPollingExecutor() {
-    return Executors.newSingleThreadExecutor();
   }
 
   protected void processRecords(ConsumerRecords<String, String> records) {

@@ -51,10 +51,6 @@ public class SendMaliciousRequestsToBackend extends AbstractKafkaConsumerTask {
                 new AuthToken(System.getenv("AKTO_THREAT_PROTECTION_BACKEND_TOKEN")));
   }
 
-  ExecutorService getPollingExecutor() {
-    return Executors.newSingleThreadExecutor();
-  }
-
   private List<MaliciousEventEntity> getSampleMaliciousRequests(String actor, String filterId) {
     Session session = this.sessionFactory.openSession();
     Transaction txn = session.beginTransaction();

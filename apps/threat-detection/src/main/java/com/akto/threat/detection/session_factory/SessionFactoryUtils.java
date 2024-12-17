@@ -1,10 +1,9 @@
 package com.akto.threat.detection.session_factory;
 
+import com.akto.threat.detection.db.entity.MaliciousEventEntity;
 import org.hibernate.SessionFactory;
 import org.hibernate.boot.registry.StandardServiceRegistryBuilder;
 import org.hibernate.cfg.Configuration;
-
-import com.akto.threat.detection.db.entity.MaliciousEventEntity;
 
 public class SessionFactoryUtils {
 

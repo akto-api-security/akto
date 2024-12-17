@@ -5,7 +5,6 @@ import java.time.ZoneOffset;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-
 import org.hibernate.Session;
 import org.hibernate.SessionFactory;
 import org.hibernate.Transaction;
@@ -14,15 +13,14 @@ public class CleanupTask implements Task {
 
   private final SessionFactory sessionFactory;
 
-  private final ScheduledExecutorService cronExecutorService = Executors.newScheduledThreadPool(1);
-
   public CleanupTask(SessionFactory sessionFactory) {
     this.sessionFactory = sessionFactory;
   }
 
   @Override
   public void run() {
-    this.cronExecutorService.scheduleAtFixedRate(this::cleanup, 5, 10 * 60, TimeUnit.SECONDS);
+    ScheduledExecutorService cronExecutorService = Executors.newScheduledThreadPool(1);
+    cronExecutorService.scheduleAtFixedRate(this::cleanup, 5, 30, TimeUnit.MINUTES);
   }
 
   private void cleanup() {
