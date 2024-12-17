@@ -1,4 +1,4 @@
-package com.akto.threat.protection.service;
+package com.akto.threat.backend.service;
 
 import com.akto.proto.threat_protection.message.malicious_event.dashboard.v1.DashboardMaliciousEventMessage;
 import com.akto.proto.threat_protection.service.dashboard_service.v1.DashboardServiceGrpc.DashboardServiceImplBase;
@@ -6,9 +6,9 @@ import com.akto.proto.threat_protection.service.dashboard_service.v1.FetchAlertF
 import com.akto.proto.threat_protection.service.dashboard_service.v1.FetchAlertFiltersResponse;
 import com.akto.proto.threat_protection.service.dashboard_service.v1.ListMaliciousRequestsRequest;
 import com.akto.proto.threat_protection.service.dashboard_service.v1.ListMaliciousRequestsResponse;
-import com.akto.threat.protection.constants.MongoDBCollection;
-import com.akto.threat.protection.db.MaliciousEventModel;
-import com.akto.threat.protection.interceptors.Constants;
+import com.akto.threat.backend.constants.MongoDBCollection;
+import com.akto.threat.backend.db.MaliciousEventModel;
+import com.akto.threat.backend.interceptors.Constants;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.DistinctIterable;
 import com.mongodb.client.MongoClient;
