@@ -25,7 +25,6 @@ const Users = () => {
     const [usersCollection, setUsersCollection] = useState([])
     const [roleHierarchy, setRoleHierarchy] = useState([])
     const [allCollections, setAllCollections] = useState([])
-    const stiggFeatures = window.STIGG_FEATURE_WISE_ALLOWED
     let rbacAccess = func.checkForRbacFeature();
 
     const collectionsMap = PersistStore(state => state.collectionsMap)
@@ -37,13 +36,6 @@ const Users = () => {
             ...prevSelectedItems,
             [id]: items
         }));
-    }
-
-
-    if (!stiggFeatures || Object.keys(stiggFeatures).length === 0) {
-        rbacAccess = true
-    } else if(stiggFeatures && stiggFeatures['RBAC_FEATURE']){
-        rbacAccess = stiggFeatures['RBAC_FEATURE'].isGranted
     }
 
     const [roleSelectionPopup, setRoleSelectionPopup] = useState({})
@@ -327,7 +319,7 @@ const Users = () => {
                                     {
                                         content: (
                                             <HorizontalStack gap={4}>
-                                                {role === 'ADMIN' || userRole !== 'ADMIN' ? undefined :
+                                                { (role === 'ADMIN' || userRole !== 'ADMIN' || !rbacAccess) ? undefined :
                                                     <ResourceListModal
                                                         title={"Collection list"}
                                                         activatorPlaceaholder={`${(usersCollection[id] || []).length} collections accessible`}

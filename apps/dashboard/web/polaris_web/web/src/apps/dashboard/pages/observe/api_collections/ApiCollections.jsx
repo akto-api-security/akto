@@ -610,13 +610,14 @@ function ApiCollections() {
             />
         )
 
-        if(userRole === 'ADMIN') {
-            actions.push(
-                {
-                    content: shareContent,
-                }
-            )
-        }
+    let rbacAccess = func.checkForRbacFeature();
+    if(userRole === 'ADMIN' && rbacAccess) {
+        actions.push(
+            {
+                content: shareContent,
+            }
+        )
+    }
 
         const toggleTypeContent = (
             <Popover
