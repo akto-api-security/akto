@@ -1156,11 +1156,11 @@ public class InitializerListener implements ServletContextListener {
                 } else {
                     // in case the body is provided, then the data needs to escaped.
                     // for Microsoft teams workflow webhooks
-                    payload = Utils.replaceVariables(webhook.getBody(), valueMap, true);
+                    payload = Utils.replaceVariables(webhook.getBody(), valueMap, true, true);
                 } 
             } else {
                 // default case.
-                payload = Utils.replaceVariables(webhook.getBody(), valueMap, false);
+                payload = Utils.replaceVariables(webhook.getBody(), valueMap, false, true);
             }
         } catch (Exception e) {
             errors.add("Failed to replace variables");
