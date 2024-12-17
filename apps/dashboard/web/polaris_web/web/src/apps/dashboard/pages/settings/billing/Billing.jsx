@@ -45,6 +45,8 @@ function Billing() {
 
             default:
         }
+
+        if (window.PLAN_TYPE) { $('.stigg-subscription-plan-name').text(window.PLAN_TYPE) }
     })
 
     async function refreshUsageData(){

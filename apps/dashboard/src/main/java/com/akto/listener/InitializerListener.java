@@ -118,6 +118,7 @@ import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import com.mongodb.ReadPreference;
+import com.mongodb.WriteConcern;
 import com.mongodb.bulk.BulkWriteResult;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.*;
@@ -132,6 +133,7 @@ import okhttp3.OkHttpClient;
 import org.apache.commons.csv.CSVRecord;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.bouncycastle.jcajce.provider.asymmetric.dsa.DSASigner.stdDSA;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 import org.json.JSONObject;
@@ -2245,10 +2247,12 @@ public class InitializerListener implements ServletContextListener {
             public void run() {
 
                 ReadPreference readPreference = ReadPreference.primary();
+                WriteConcern writeConcern = WriteConcern.ACKNOWLEDGED;
                 if (runJobFunctions || DashboardMode.isSaasDeployment()) {
-                    readPreference = ReadPreference.secondary();
+                    readPreference = ReadPreference.primary();
+                    writeConcern = WriteConcern.W1;
                 }
-                DaoInit.init(new ConnectionString(mongoURI), readPreference);
+                DaoInit.init(new ConnectionString(mongoURI), readPreference, writeConcern);
 
                 connectedToMongo = false;
                 do {
@@ -2476,6 +2480,7 @@ public class InitializerListener implements ServletContextListener {
         try {
             int gracePeriod = organization.getGracePeriod();
             String hotjarSiteId = organization.getHotjarSiteId();
+            String planType = organization.getplanType();
             String organizationId = organization.getId();
             /*
              * This ensures, we don't fetch feature wise allowed from akto too often.
@@ -2540,6 +2545,7 @@ public class InitializerListener implements ServletContextListener {
             BasicDBObject metaData = OrganizationUtils.fetchOrgMetaData(organizationId, organization.getAdminEmail());
             gracePeriod = OrganizationUtils.fetchOrgGracePeriodFromMetaData(metaData);
             hotjarSiteId = OrganizationUtils.fetchHotjarSiteId(metaData);
+            planType = OrganizationUtils.fetchplanType(metaData);
             boolean expired = OrganizationUtils.fetchExpired(metaData);
             boolean telemetryEnabled = OrganizationUtils.fetchTelemetryEnabled(metaData);
             // setTelemetrySettings(organization, telemetryEnabled);
@@ -2549,6 +2555,8 @@ public class InitializerListener implements ServletContextListener {
             loggerMaker.infoAndAddToDb("Processed org metadata",LogDb.DASHBOARD);
 
             organization.setHotjarSiteId(hotjarSiteId);
+            
+            organization.setplanType(planType);
 
             organization.setGracePeriod(gracePeriod);
             organization.setFeatureWiseAllowed(featureWiseAllowed);
@@ -2571,6 +2579,7 @@ public class InitializerListener implements ServletContextListener {
                             Updates.set(Organization.GRACE_PERIOD, gracePeriod),
                             Updates.set(Organization._EXPIRED, expired),
                             Updates.set(Organization.HOTJAR_SITE_ID, hotjarSiteId),
+                            Updates.set(Organization.PLAN_TYPE, planType),
                             Updates.set(Organization.TEST_TELEMETRY_ENABLED, testTelemetryEnabled),
                             Updates.set(Organization.LAST_FEATURE_MAP_UPDATE, lastFeatureMapUpdate)));
 
@@ -2781,7 +2790,7 @@ public class InitializerListener implements ServletContextListener {
     }
 
     private static void makeFirstUserAdmin(BackwardCompatibility backwardCompatibility){
-        if(backwardCompatibility.getAddAdminRoleIfAbsent() == 0){
+        if(backwardCompatibility.getAddAdminRoleIfAbsent() < 1733228772){
            
             User firstUser = UsersDao.instance.getFirstUser(Context.accountId.get());
 
@@ -2796,6 +2805,11 @@ public class InitializerListener implements ServletContextListener {
                     Filters.eq(RBAC.USER_ID, firstUser.getId()),
                     Filters.eq(RBAC.ROLE, Role.MEMBER.name())
                 ));
+            }else{
+                loggerMaker.infoAndAddToDb("Found non-admin rbac for first user: " + firstUser.getLogin() + " , thus inserting admin role", LogDb.DASHBOARD);
+                RBACDao.instance.insertOne(
+                    new RBAC(firstUser.getId(), Role.ADMIN, Context.accountId.get())
+                );
             }
 
             BackwardCompatibilityDao.instance.updateOne(

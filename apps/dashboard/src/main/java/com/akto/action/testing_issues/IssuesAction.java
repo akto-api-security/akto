@@ -9,6 +9,7 @@ import com.akto.dao.context.Context;
 import com.akto.dao.demo.VulnerableRequestForTemplateDao;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing.TestingRunResultDao;
+import com.akto.dao.testing.TestingRunResultSummariesDao;
 import com.akto.dao.testing.sources.TestSourceConfigsDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.ApiInfo;
@@ -27,6 +28,7 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.usage.UsageMetricCalculator;
+import com.akto.util.Constants;
 import com.akto.util.GroupByTimeRange;
 import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.Severity;
@@ -454,7 +456,7 @@ public class IssuesAction extends UserAction {
         }
 
         Map<String, TestConfig> testConfigMap = YamlTemplateDao.instance.fetchTestConfigMap(includeYamlContent,
-                fetchOnlyActive, skip, limit);
+                fetchOnlyActive, skip, limit, Filters.empty());
         subCategories = new ArrayList<>();
         for (Map.Entry<String, TestConfig> entry : testConfigMap.entrySet()) {
             try {
@@ -523,6 +525,40 @@ public class IssuesAction extends UserAction {
                 Filters.in(TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_ID, new ObjectId(latestTestingRunSummaryId))
         );
         issues = TestingRunIssuesDao.instance.findAll(filters);
+        return SUCCESS.toUpperCase();
+    }
+
+    List<TestingIssuesId> issuesIds;
+
+    public String fetchIssuesFromResultIds(){
+        issues = TestingRunIssuesDao.instance.findAll(
+            Filters.and(
+                Filters.in(Constants.ID, issuesIds),
+                Filters.in(TestingRunIssues.TEST_RUN_ISSUES_STATUS, issueStatusQuery)
+            ), Projections.include("_id", TestingRunIssues.TEST_RUN_ISSUES_STATUS)
+        );
+        return SUCCESS.toUpperCase();
+    }
+
+    String testingRunSummaryId;
+    private TestingRunResultSummary testingRunResultSummary;
+    public String fetchTestingRunResultsSummary() {
+        ObjectId testingRunSummaryObj;
+        try {
+            testingRunSummaryObj = new ObjectId(testingRunSummaryId);
+        } catch (Exception e) {
+            addActionError("Invalid testing run summary id");
+            return ERROR.toUpperCase();
+        }
+
+        Bson projection = Projections.include(
+                TestingRunResultSummary.STATE,
+                TestingRunResultSummary.START_TIMESTAMP,
+                TestingRunResultSummary.END_TIMESTAMP
+        );
+
+        testingRunResultSummary = TestingRunResultSummariesDao.instance.findOne(Filters.eq(TestingRunResultSummary.ID, testingRunSummaryObj), projection);
+
         return SUCCESS.toUpperCase();
     }
 
@@ -743,5 +779,17 @@ public class IssuesAction extends UserAction {
 
     public void setIssueStatusQuery(List<String> issueStatusQuery) {
         this.issueStatusQuery = issueStatusQuery;
+    }
+
+    public void setIssuesIds(List<TestingIssuesId> issuesIds) {
+        this.issuesIds = issuesIds;
+    }
+
+    public void setTestingRunSummaryId(String testingRunSummaryId) {
+        this.testingRunSummaryId = testingRunSummaryId;
+    }
+
+    public TestingRunResultSummary getTestingRunResultSummary() {
+        return testingRunResultSummary;
     }
 }

@@ -4,7 +4,6 @@ import com.akto.dto.type.RequestTemplate;
 import com.akto.util.HttpRequestResponseUtils;
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONObject;
-import com.ctc.wstx.shaded.msv_core.util.Uri;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
@@ -46,6 +45,22 @@ public class OriginalHttpRequest {
         return new OriginalHttpRequest(
                 this.url, this.queryParams, this.method, this.body, headersCopy, this.type
         );
+    }
+
+    public void buildFromSampleMessage(String message, boolean useUrlToFillHost) {
+        buildFromSampleMessage(message);
+        if(useUrlToFillHost){
+            try {
+                if(this.headers.getOrDefault("host", null) == null){
+                    URI uri = new URI(this.url);
+                    String calculatedHost = uri.getHost() != null ? uri.getHost() : "";
+                    this.headers.put("host", Arrays.asList(calculatedHost));
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+            
+        }
     }
 
     public void buildFromSampleMessage(String message) {

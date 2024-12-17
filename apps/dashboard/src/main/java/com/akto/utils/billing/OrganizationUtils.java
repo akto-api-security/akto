@@ -287,6 +287,10 @@ public class OrganizationUtils {
         return additionalMetaData.getString("HOTJAR_SITE_ID", "");
     }
 
+    public static String fetchplanType(BasicDBObject additionalMetaData) {
+        return additionalMetaData.getString("PLAN_TYPE", "");
+    }
+
     public static boolean fetchTelemetryEnabled(BasicDBObject additionalMetaData) {
         return additionalMetaData.getString("ENABLE_TELEMETRY", "NA").equalsIgnoreCase("ENABLED");
     }

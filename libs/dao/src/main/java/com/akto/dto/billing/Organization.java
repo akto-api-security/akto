@@ -36,6 +36,9 @@ public class Organization {
 
     public String hotjarSiteId = "hotjarSiteId";
 
+    public static final String PLAN_TYPE = "planType";
+    public String planType = "planType";
+
     public static final String TEST_TELEMETRY_ENABLED = "testTelemetryEnabled";
     private boolean testTelemetryEnabled;
     private int gracePeriod;
@@ -129,6 +132,14 @@ public class Organization {
 
     public  void setHotjarSiteId(String hotjarSiteId) {
         this.hotjarSiteId = hotjarSiteId;
+    }
+
+    public  String getplanType() {
+        return planType;
+    }
+
+    public  void setplanType(String planType) {
+        this.planType = planType;
     }
 
     public int getLastFeatureMapUpdate() {

@@ -241,7 +241,7 @@ public class UsageMetricUtils {
             Organization organization = OrganizationsDao.instance.findOneByAccountId(accountId);
             featureAccess = getFeatureAccess(organization, metricType);
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "Error in fetching usage metric", LogDb.DASHBOARD);
+            loggerMaker.errorAndAddToDb(e, "Error in fetching usage metric acc: " + accountId, LogDb.DASHBOARD);
         }
         return featureAccess;
     }
@@ -264,7 +264,11 @@ public class UsageMetricUtils {
             int gracePeriod = organization.getGracePeriod();
             featureAccess.setGracePeriod(gracePeriod);
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "Error in fetching usage metric", LogDb.DASHBOARD);
+            String orgId = "";
+            if (organization != null && organization.getId() != null) {
+                orgId = organization.getId();
+            }
+            loggerMaker.errorAndAddToDb(e, "Error in fetching usage metric org: " + orgId, LogDb.DASHBOARD);
         }
         return featureAccess;
     }

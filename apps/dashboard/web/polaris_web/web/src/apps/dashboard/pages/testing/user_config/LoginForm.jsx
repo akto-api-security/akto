@@ -43,6 +43,10 @@ function LoginForm({ step, setSteps }) {
                     responseBody = testResponse.body
                 }
 
+                if(typeof responseBody === 'object' && Object.keys(responseBody).length > 0){
+                    responseBody = JSON.stringify(responseBody)
+                  }
+
                 setSteps(prev => prev.map((s) => s.id === step.id ? {
                     ...s,
                     testResponse: {

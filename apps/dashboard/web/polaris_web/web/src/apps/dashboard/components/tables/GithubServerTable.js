@@ -160,7 +160,9 @@ function GithubServerTable(props) {
   },[props?.headers])
 
   useEffect(() => {
-    fetchData(queryValue)
+    if (props?.callFromOutside) {
+      fetchData(queryValue);
+    }    
   },[props?.callFromOutside])
 
   const handleSort = (col, dir) => {
@@ -388,6 +390,7 @@ function GithubServerTable(props) {
                 {...(props.hideQueryField ? { hideQueryField: props.hideQueryField } : {})}
                 onSort={setSortSelected}
                 cancelAction={{
+                  onAction: () => {},
                   disabled: false,
                   loading: false,
                 }}

@@ -37,7 +37,6 @@ import com.akto.test_editor.execution.VariableResolver;
 import com.akto.test_editor.filter.data_operands_impl.ValidationResult;
 import com.akto.testing.yaml_tests.YamlTestTemplate;
 import com.akto.testing_issues.TestingIssuesHandler;
-import com.akto.testing_utils.TestingUtils;
 import com.akto.usage.UsageMetricCalculator;
 import com.akto.util.Constants;
 import com.akto.util.JSONUtils;
@@ -45,9 +44,8 @@ import com.akto.util.enums.GlobalEnums.Severity;
 import com.akto.util.enums.LoginFlowEnums;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
-import com.mongodb.MongoInterruptedException;
-import org.apache.commons.lang3.StringUtils;
 import com.mongodb.BasicDBObject;
+import com.mongodb.WriteConcern;
 import com.mongodb.client.model.*;
 
 import org.bson.types.ObjectId;
@@ -73,6 +71,13 @@ public class TestExecutor {
     public static final String REQUEST_HOUR = "requestHour";
     public static final String COUNT = "count";
     public static final int ALLOWED_REQUEST_PER_HOUR = 100;
+
+    private static int expiryTimeOfAuthToken = -1;
+
+    public static synchronized void setExpiryTimeOfAuthToken(int newExpiryTime) {
+        expiryTimeOfAuthToken = newExpiryTime;
+    }
+
     public void init(TestingRun testingRun, ObjectId summaryId, SyncLimit syncLimit) {
         if (testingRun.getTestIdConfig() != 1) {
             apiWiseInit(testingRun, summaryId, false, new ArrayList<>(), syncLimit);
@@ -150,15 +155,24 @@ public class TestExecutor {
         if (apiInfoKeyList == null || apiInfoKeyList.isEmpty()) return;
         loggerMaker.infoAndAddToDb("APIs found: " + apiInfoKeyList.size(), LogDb.TESTING);
 
-        List<TestRoles> testRoles = sampleMessageStore.fetchTestRoles();
-        AuthMechanism authMechanism = authMechanismStore.getAuthMechanism();;
+        TestingRunResultSummariesDao.instance.updateOne(
+            Filters.eq("_id", summaryId),
+            Updates.set(TestingRunResultSummary.TOTAL_APIS, apiInfoKeyList.size()));
 
-        Map<String, TestConfig> testConfigMap = YamlTemplateDao.instance.fetchTestConfigMap(false, true, 0, 10_000);
+        List<TestRoles> testRoles = sampleMessageStore.fetchTestRoles();
+        AuthMechanism authMechanism = authMechanismStore.getAuthMechanism();
+
+        List<String> testingRunSubCategories = testingRun.getTestingRunConfig().getTestSubCategoryList();
+
+        Map<String, TestConfig> testConfigMap = YamlTemplateDao.instance.fetchTestConfigMap(false, true, 0, 10_000, Filters.in("_id", testingRunSubCategories));
 
         List<CustomAuthType> customAuthTypes = CustomAuthTypeDao.instance.findAll(CustomAuthType.ACTIVE,true);
         TestingUtil testingUtil = new TestingUtil(authMechanism, sampleMessageStore, testRoles, testingRun.getUserEmail(), customAuthTypes);
 
+        logger.info("For account: " + accountId + " fetched test yamls and auth types");
+
         try {
+            logger.info("For account: " + accountId + " initiating login flow");
             LoginFlowResponse loginFlowResponse = triggerLoginFlow(authMechanism, 3);
             if (!loginFlowResponse.getSuccess()) {
                 loggerMaker.errorAndAddToDb("login flow failed", LogDb.TESTING);
@@ -207,10 +221,6 @@ public class TestExecutor {
         loggerMaker.infoAndAddToDb("StatusCodeAnalyser result = " + StatusCodeAnalyser.result, LogDb.TESTING);
         loggerMaker.infoAndAddToDb("StatusCodeAnalyser defaultPayloadsMap = " + StatusCodeAnalyser.defaultPayloadsMap, LogDb.TESTING);
 
-        TestingRunResultSummariesDao.instance.updateOne(
-            Filters.eq("_id", summaryId),
-            Updates.set(TestingRunResultSummary.TOTAL_APIS, apiInfoKeyList.size()));
-
         CountDownLatch latch = new CountDownLatch(apiInfoKeyList.size());
         ExecutorService threadPool = Executors.newFixedThreadPool(maxConcurrentRequests);
         List<Future<Void>> futureTestingRunResults = new ArrayList<>();
@@ -222,7 +232,7 @@ public class TestExecutor {
 
         loggerMaker.infoAndAddToDb("Started filling hostname map with categories at :" + Context.now());
         int timeNow = Context.now();
-        for (String testSubCategory: testingRun.getTestingRunConfig().getTestSubCategoryList()) {
+        for (String testSubCategory: testingRunSubCategories) {
             TestConfig testConfig = testConfigMap.get(testSubCategory);
             if (testConfig == null || testConfig.getStrategy() == null || testConfig.getStrategy().getRunOnce() == null) {
                 continue;
@@ -253,7 +263,8 @@ public class TestExecutor {
                          () -> startWithLatch(apiInfoKey,
                                  testingRun.getTestIdConfig(),
                                  testingRun.getId(), testingRun.getTestingRunConfig(), testingUtil, summaryId,
-                                 accountId, latch, now, maxRunTime, testConfigMap, testingRun, subCategoryEndpointMap, apiInfoKeyToHostMap, debug, testLogs, syncLimit));
+                                 accountId, latch, now, maxRunTime, testConfigMap, testingRun, subCategoryEndpointMap, 
+                                 apiInfoKeyToHostMap, debug, testLogs, syncLimit, authMechanism));
                  futureTestingRunResults.add(future);
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb("Error in API " + apiInfoKey + " : " + e.getMessage(), LogDb.TESTING);
@@ -290,7 +301,7 @@ public class TestExecutor {
 
         State updatedState = GetRunningTestsStatus.getRunningTests().isTestRunning(summaryId, true) ? State.COMPLETED : GetRunningTestsStatus.getRunningTests().getCurrentState(summaryId);
 
-        TestingRunResultSummary testingRunResultSummary = TestingRunResultSummariesDao.instance.getMCollection().findOneAndUpdate(
+        TestingRunResultSummary testingRunResultSummary = TestingRunResultSummariesDao.instance.getMCollection().withWriteConcern(WriteConcern.W1).findOneAndUpdate(
                 Filters.eq(Constants.ID, summaryId),
                 Updates.combine(
                         Updates.set(TestingRunResultSummary.END_TIMESTAMP, Context.now()),
@@ -320,6 +331,8 @@ public class TestExecutor {
         List<String> sampleMessages = sampleMessagesMap.get(apiInfoKey);
         if (sampleMessages == null || sampleMessagesMap.isEmpty()) return null;
 
+        loggerMaker.infoAndAddToDb("Starting to find host for apiInfoKey: " + apiInfoKey.toString());
+
         List<RawApi> messages = sampleMessageStore.fetchAllOriginalMessages(apiInfoKey);
         if (messages.isEmpty()) return null;
 
@@ -339,6 +352,7 @@ public class TestExecutor {
         LoginFlowResponse loginFlowResponse = null;
         for (int i=0; i<retries; i++) {
             try {
+                logger.info("retry attempt: " + i + " for login flow");
                 loginFlowResponse = executeLoginFlow(authMechanism, null);
                 if (loginFlowResponse.getSuccess()) {
                     loggerMaker.infoAndAddToDb("login flow success", LogDb.TESTING);
@@ -477,13 +491,13 @@ public class TestExecutor {
             TestingUtil testingUtil, ObjectId testRunResultSummaryId, int accountId, CountDownLatch latch, int startTime,
             int maxRunTime, Map<String, TestConfig> testConfigMap, TestingRun testingRun,
             ConcurrentHashMap<String, String> subCategoryEndpointMap, Map<ApiInfoKey, String> apiInfoKeyToHostMap,
-            boolean debug, List<TestingRunResult.TestLog> testLogs, SyncLimit syncLimit) {
+            boolean debug, List<TestingRunResult.TestLog> testLogs, SyncLimit syncLimit, AuthMechanism authMechanism) {
 
         Context.accountId.set(accountId);
         loggerMaker.infoAndAddToDb("Starting test for " + apiInfoKey, LogDb.TESTING);   
         
         try {
-            startTestNew(apiInfoKey, testRunId, testingRunConfig, testingUtil, testRunResultSummaryId, testConfigMap, subCategoryEndpointMap, apiInfoKeyToHostMap, debug, testLogs, startTime, maxRunTime, syncLimit);
+            startTestNew(apiInfoKey, testRunId, testingRunConfig, testingUtil, testRunResultSummaryId, testConfigMap, subCategoryEndpointMap, apiInfoKeyToHostMap, debug, testLogs, startTime, maxRunTime, syncLimit, authMechanism);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "error while running tests: " + e);
         }
@@ -530,6 +544,12 @@ public class TestExecutor {
         }
     }
 
+    private synchronized void checkAndUpdateAuthMechanism(int timeNow, AuthMechanism authMechanism){
+        if(expiryTimeOfAuthToken != -1 && expiryTimeOfAuthToken <= timeNow){
+            triggerLoginFlow(authMechanism, 3);
+        }
+    }
+
     public void insertResultsAndMakeIssues(List<TestingRunResult> testingRunResults, ObjectId testRunResultSummaryId) {
         int resultSize = testingRunResults.size();
         if (resultSize > 0) {
@@ -538,7 +558,7 @@ public class TestExecutor {
             TestingRunResultDao.instance.insertMany(testingRunResults);
             loggerMaker.infoAndAddToDb("Inserted testing results", LogDb.TESTING);
 
-            TestingRunResultSummariesDao.instance.getMCollection().findOneAndUpdate(
+            TestingRunResultSummariesDao.instance.getMCollection().withWriteConcern(WriteConcern.W1).findOneAndUpdate(
                 Filters.eq(Constants.ID, testRunResultSummaryId),
                 Updates.inc(TestingRunResultSummary.TEST_RESULTS_COUNT, resultSize)
             );
@@ -559,7 +579,7 @@ public class TestExecutor {
                                                TestingRunConfig testingRunConfig, TestingUtil testingUtil,
                                                ObjectId testRunResultSummaryId, Map<String, TestConfig> testConfigMap,
                                                ConcurrentHashMap<String, String> subCategoryEndpointMap, Map<ApiInfoKey, String> apiInfoKeyToHostMap,
-                                               boolean debug, List<TestingRunResult.TestLog> testLogs, int startTime, int timeToKill, SyncLimit syncLimit) {
+                                               boolean debug, List<TestingRunResult.TestLog> testLogs, int startTime, int timeToKill, SyncLimit syncLimit, AuthMechanism authMechanism) {
 
         List<String> testSubCategories = testingRunConfig == null ? new ArrayList<>() : testingRunConfig.getTestSubCategoryList();
 
@@ -606,6 +626,14 @@ public class TestExecutor {
 
                 try {
                     if(testingRunResult==null){
+
+                        // check and update automated auth token here
+                        int diffTimeInMinutes = (Context.now() - startTime)/60;
+                        if(diffTimeInMinutes != 0 && (diffTimeInMinutes % 10) == 0){
+                            // check for expiry in every 10 minutes
+                            checkAndUpdateAuthMechanism(Context.now(), authMechanism);
+                        }
+
                         testingRunResult = runTestNew(apiInfoKey,testRunId,testingUtil,testRunResultSummaryId, testConfig, testingRunConfig, debug, testLogs);
                     }
                 } catch (Exception e) {
@@ -679,7 +707,7 @@ public class TestExecutor {
 
         String message = messages.get(messages.size() - 1);
 
-        RawApi rawApi = RawApi.buildFromMessage(message);
+        RawApi rawApi = RawApi.buildFromMessage(message, true);
         int startTime = Context.now();
 
         try {

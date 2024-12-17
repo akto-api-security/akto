@@ -21,6 +21,7 @@ import com.akto.utils.JWT;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.FindOneAndUpdateOptions;
+import com.mongodb.client.model.PushOptions;
 import com.mongodb.client.model.ReturnDocument;
 import com.mongodb.client.model.Updates;
 import com.opensymphony.xwork2.Action;
@@ -44,7 +45,6 @@ import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-import static com.akto.filter.UserDetailsFilter.LOGIN_URI;
 import static com.akto.util.Constants.TWO_HOURS_TIMESTAMP;
 
 // Validates user from the supplied username and password
@@ -197,7 +197,7 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
                 User tempUser = UsersDao.instance.getMCollection().findOneAndUpdate(
                         Filters.eq("_id", user.getId()),
                         Updates.combine(
-                                Updates.set("refreshTokens", refreshTokens),
+                                Updates.pushEach("refreshTokens", Collections.singletonList(refreshToken), new PushOptions().slice(-10)),
                                 Updates.set(User.LAST_LOGIN_TS, Context.now())
                         ),
                         new FindOneAndUpdateOptions().returnDocument(ReturnDocument.BEFORE)

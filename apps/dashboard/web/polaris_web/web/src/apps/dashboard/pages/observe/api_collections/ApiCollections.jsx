@@ -138,12 +138,15 @@ const headers = [
     }
 ];
 
+const tempSortOptions = [
+    { label: 'Name', value: 'customGroupsSort asc', directionLabel: 'A-Z', sortKey: 'customGroupsSort', columnIndex: 1 },
+    { label: 'Name', value: 'customGroupsSort desc', directionLabel: 'Z-A', sortKey: 'customGroupsSort', columnIndex: 1 },
+]
+
 
 const sortOptions = [
     { label: 'Endpoints', value: 'urlsCount asc', directionLabel: 'More', sortKey: 'urlsCount', columnIndex: 2 },
     { label: 'Endpoints', value: 'urlsCount desc', directionLabel: 'Less', sortKey: 'urlsCount' , columnIndex: 2},
-    { label: 'Name', value: 'displayName asc', directionLabel: 'A-Z', sortKey: 'displayName' },
-    { label: 'Name', value: 'displayName desc', directionLabel: 'Z-A', sortKey: 'displayName' },
     { label: 'Activity', value: 'deactivatedScore asc', directionLabel: 'Active', sortKey: 'deactivatedRiskScore' },
     { label: 'Activity', value: 'deactivatedScore desc', directionLabel: 'Inactive', sortKey: 'activatedRiskScore' },
     { label: 'Risk Score', value: 'score asc', directionLabel: 'High risk', sortKey: 'riskScore', columnIndex: 3 },
@@ -285,7 +288,8 @@ function ApiCollections() {
         let res = {}
         res.all = dataObj.prettify
         res.hostname = dataObj.prettify.filter((c) => c.hostName !== null && c.hostName !== undefined && !c.deactivated)
-        res.groups = dataObj.prettify.filter((c) => c.type === "API_GROUP" && !c.deactivated)
+        const allGroups = dataObj.prettify.filter((c) => c.type === "API_GROUP" && !c.deactivated);
+        res.groups = allGroups;
         res.custom = res.all.filter(x => !res.hostname.includes(x) && !x.deactivated && !res.groups.includes(x));
         setData(res);
         if (res.hostname.length === 0 && (tableSelectedTab === undefined || tableSelectedTab.length === 0)) {
@@ -426,7 +430,8 @@ function ApiCollections() {
         tmp = {}
         tmp.all = dataObj.prettify
         tmp.hostname = dataObj.prettify.filter((c) => c.hostName !== null && c.hostName !== undefined && !c.deactivated)
-        tmp.groups = dataObj.prettify.filter((c) => c.type === "API_GROUP" && !c.deactivated)
+        const allGroupsForTmp = dataObj.prettify.filter((c) => c.type === "API_GROUP" && !c.deactivated);
+        tmp.groups = allGroupsForTmp;
         tmp.custom = tmp.all.filter(x => !tmp.hostname.includes(x) && !x.deactivated && !tmp.groups.includes(x));
         tmp.deactivated = deactivatedCollections
         setData(tmp);
@@ -757,7 +762,7 @@ function ApiCollections() {
             key={refreshData}
             pageLimit={100}
             data={data[selectedTab]} 
-            sortOptions={sortOptions} 
+            sortOptions={ selectedTab === 'groups' ? [...tempSortOptions, ...sortOptions] : sortOptions} 
             resourceName={resourceName} 
             filters={[]}
             disambiguateLabel={disambiguateLabel} 
