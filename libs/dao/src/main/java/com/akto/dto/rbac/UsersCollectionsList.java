@@ -40,12 +40,19 @@ public class UsersCollectionsList {
             Organization organization = OrganizationsDao.instance.findOne(
                 Filters.in(Organization.ACCOUNTS, accountId));
 
-            if (organization != null &&
+            // air-gapped environment, full access.
+            if (organization == null ||
+                    organization.getFeatureWiseAllowed() == null ||
+                    organization.getFeatureWiseAllowed().isEmpty()) {
+                collectionList = null;
+            // feature accessible
+            } else if (organization != null &&
                     organization.getFeatureWiseAllowed() != null &&
                     !organization.getFeatureWiseAllowed().isEmpty() &&
                     organization.getFeatureWiseAllowed().containsKey(RBAC_FEATURE) &&
                     organization.getFeatureWiseAllowed().get(RBAC_FEATURE).getIsGranted()) {
                 collectionList = RBACDao.instance.getUserCollectionsById(userId, accountId);
+            // feature not accessible
             } else {
                 collectionList = null;
             }
