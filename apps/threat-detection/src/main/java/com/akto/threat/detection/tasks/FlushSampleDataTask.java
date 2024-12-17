@@ -64,7 +64,7 @@ public class FlushSampleDataTask extends AbstractKafkaConsumerTask {
     Transaction txn = session.beginTransaction();
     try {
       // Commit these events in 2 batches
-      for (int i = 0; i < events.size(); i += 2) {
+      for (int i = 0; i < events.size(); i++) {
         session.persist(events.get(i));
         if (i % 50 == 0) {
           session.flush();
