@@ -306,7 +306,7 @@ public class Utils {
 
         for (AuthParam param : authMechanism.getAuthParams()) {
             try {
-                String value = executeCode(param.getValue(), valuesMap);
+                String value = executeCode(param.getValue(), valuesMap, false);
                 if (!param.getValue().equals(value) && value == null) {
                     return new LoginFlowResponse(responses, "auth param not found at specified path " + 
                     param.getValue(), false);
@@ -544,45 +544,17 @@ public class Utils {
         return request;
     }
 
+    public static String executeCode(String ogPayload, Map<String, Object> valuesMap, boolean shouldThrowException) throws Exception {
+        return replaceVariables(ogPayload,valuesMap, true, shouldThrowException);
+    }
 
     public static String executeCode(String ogPayload, Map<String, Object> valuesMap) throws Exception {
-        return replaceVariables(ogPayload,valuesMap, true);
+        return replaceVariables(ogPayload,valuesMap, true, true);
     }
 
 
-    public static String replaceVariables(String payload, Map<String, Object> valuesMap, boolean escapeString) throws Exception {
-        String regex = "\\$\\{((x|step)\\d+\\.[\\w\\-\\[\\].]+|AKTO\\.changes_info\\..*?)\\}"; 
-        Pattern p = Pattern.compile(regex);
-
-        // replace with values
-        Matcher matcher = p.matcher(payload);
-        StringBuffer sb = new StringBuffer();
-        while (matcher.find()) {
-            String key = matcher.group(1);
-            if (key == null) continue;
-            Object obj = valuesMap.get(key);
-            if (obj == null) {
-                loggerMaker.errorAndAddToDb("couldn't find: " + key, LogDb.TESTING);
-                throw new Exception("Couldn't find " + key);
-            }
-            String val = obj.toString();
-            if (escapeString) {
-                val = val.replace("\\", "\\\\")
-                        .replace("\t", "\\t")
-                        .replace("\b", "\\b")
-                        .replace("\n", "\\n")
-                        .replace("\r", "\\r")
-                        .replace("\f", "\\f")
-                        .replace("\'", "\\'")
-                        .replace("\"", "\\\"");
-            }
-            matcher.appendReplacement(sb, "");
-            sb.append(val);
-        }
-
-        matcher.appendTail(sb);
-
-        return sb.toString();
+    public static String replaceVariables(String payload, Map<String, Object> valuesMap, boolean escapeString, boolean shouldThrowException) throws Exception {
+        return com.akto.testing.Utils.replaceVariables(payload, valuesMap, escapeString, shouldThrowException);
     }
 
     public static String generateKey(String nodeId, boolean isHeader, String param, boolean isRequest) {
