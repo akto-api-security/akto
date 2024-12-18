@@ -9,9 +9,11 @@ import org.eclipse.jetty.servlet.ServletHandler;
 import org.eclipse.jetty.servlet.ServletHolder;
 
 public class HealthCheckServer {
+  public static final int PORT = 9090;
+
   public static void startHttpServer() throws Exception {
 
-    Server server = new Server(9090); // HTTP server port
+    Server server = new Server(PORT); // HTTP server port
 
     // Create and configure the servlet handler
     ServletHandler handler = new ServletHandler();
@@ -31,7 +33,7 @@ public class HealthCheckServer {
 
     // Start the HTTP server
     server.start();
-    System.out.println("HTTP Server started on port 8080");
+    System.out.println("HTTP Server started on port " + PORT);
     server.join();
   }
 }

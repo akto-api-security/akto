@@ -1,11 +1,11 @@
 syntax = "proto3";
 
-package threat_protection.message.malicious_event.v1;
+package threat_detection.message.malicious_event.v1;
 
-import "threat_protection/message/malicious_event/event_type/v1/event_type.proto";
+import "threat_detection/message/malicious_event/event_type/v1/event_type.proto";
 
 option java_outer_classname = "MaliciousEventProto";
-option java_package = "threat_protection.message.malicious_event.v1";
+option java_package = "threat_detection.message.malicious_event.v1";
 
 message MaliciousEventMessage {
   string actor = 1;
@@ -16,5 +16,5 @@ message MaliciousEventMessage {
   string latest_api_method = 6;
   int32 latest_api_collection_id = 7;
   string latest_api_payload = 8;
-  threat_protection.message.malicious_event.event_type.v1.EventType event_type = 9;
+  threat_detection.message.malicious_event.event_type.v1.EventType event_type = 9;
 }
