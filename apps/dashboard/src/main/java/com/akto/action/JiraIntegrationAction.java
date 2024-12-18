@@ -1,15 +1,7 @@
 package com.akto.action;
 
 import java.io.File;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Base64;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.io.FileUtils;
@@ -199,8 +191,16 @@ public class JiraIntegrationAction extends UserAction {
         BasicDBObject reqPayload = new BasicDBObject();
         BasicDBObject fields = new BasicDBObject();
 
+        String endpoint = jiraMetaData.getEndPointStr().replace("Endpoint - ", "");
+        String truncatedEndpoint = endpoint;
+        if(endpoint.length() > 30) {
+            truncatedEndpoint = endpoint.substring(0, 15) + "..." + endpoint.substring(endpoint.length() - 15);
+        }
+
+        String endpointMethod = jiraMetaData.getTestingIssueId().getApiInfoKey().getMethod().name();
+
         // issue title
-        fields.put("summary", "Akto Report - " + jiraMetaData.getIssueTitle());
+        fields.put("summary", "Akto Report - " + jiraMetaData.getIssueTitle() + " (" + endpointMethod + " - " + truncatedEndpoint + ")");
         jiraIntegration = JiraIntegrationDao.instance.findOne(new BasicDBObject());
 
         // issue type (TASK)
