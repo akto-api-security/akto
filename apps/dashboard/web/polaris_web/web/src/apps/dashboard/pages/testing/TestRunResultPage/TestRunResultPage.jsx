@@ -169,6 +169,9 @@ function TestRunResultPage(props) {
 
     let jiraTicketKey = ""
     await createJiraTicketApiCall("Host - "+hostName, pathname, window.location.href, description, issueTitle, issueId, projId, issueType).then(async(res)=> {
+      if(res?.errorMessage) {
+        setToast(true, true, res?.errorMessage)
+      }
       jiraTicketKey = res
       await fetchData();
       setToast(true,false,"Jira Ticket Created, scroll down to view")
