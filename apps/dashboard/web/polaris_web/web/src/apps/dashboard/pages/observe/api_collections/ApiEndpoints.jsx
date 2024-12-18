@@ -29,6 +29,7 @@ import GetPrettifyEndpoint from "../GetPrettifyEndpoint"
 import SourceLocation from "./component/SourceLocation"
 import useTable from "../../../components/tables/TableContext"
 import HeadingWithTooltip from "../../../components/shared/HeadingWithTooltip"
+import { SelectSource } from "./SelectSource"
 
 const headings = [
     {
@@ -163,6 +164,9 @@ function ApiEndpoints(props) {
     const [unusedEndpoints, setUnusedEndpoints] = useState([])
     const [showEmptyScreen, setShowEmptyScreen] = useState(false)
     const [runTests, setRunTests ] = useState(false)
+    const [showSourceDialog,  setShowSourceDialog] = useState(false)
+    const [openAPIfile, setOpenAPIfile] = useState(null)
+    const [sourcesBackfilled, setSourcesBackfilled] = useState(false)
 
     const [endpointData, setEndpointData] = useState({"all":[], 'sensitive': [], 'new': [], 'high_risk': [], 'no_auth': [], 'shadow': [], 'zombie': []})
     const [selectedTab, setSelectedTab] = useState("all")
@@ -344,9 +348,21 @@ function ApiEndpoints(props) {
                    obj.sources.hasOwnProperty("OPEN_API")
         );
 
-        const undocumented = prettifyData.filter(
-            obj => obj.sources && Object.keys(obj.sources).length === 1 && obj.sources.hasOwnProperty("HAR")
-        );
+        var hasOpenAPI = false
+        prettifyData.forEach((obj) => {
+            if (obj.sources && obj.sources.hasOwnProperty("OPEN_API")) {
+                hasOpenAPI = true
+            }
+
+            if (obj.sources && !sourcesBackfilled) {
+                setSourcesBackfilled(true)
+            }
+        })
+
+        // check if openAPI file has been uploaded or not.. else show there no shadow APIs
+        const undocumented = hasOpenAPI ? prettifyData.filter(
+            obj => obj.sources && !obj.sources.hasOwnProperty("OPEN_API")
+        ) : [];
 
         // append shadow endpoints to all endpoints
         data['all'] = [ ...prettifyData, ...shadowApis ]
@@ -587,6 +603,51 @@ function ApiEndpoints(props) {
           }          
     }
 
+    function uploadOpenApiFile(file) {
+        setOpenAPIfile(file)
+        if (!isApiGroup && !(collectionsObj?.hostName && collectionsObj?.hostName?.length > 0) && !sourcesBackfilled) {
+            setShowSourceDialog(true)
+        } else {
+            uploadOpenFileWithSource(null, file)
+        }
+    }
+
+    function uploadOpenFileWithSource(source, file) {
+        const reader = new FileReader();
+        if (!file) {
+            file = openAPIfile
+        }
+        reader.readAsText(file)
+
+        reader.onload = async () => {
+            const formData = new FormData();
+            formData.append("openAPIString", reader.result)
+            formData.append("apiCollectionId", apiCollectionId);
+            if (source) {
+                formData.append("source", source)
+            }
+            func.setToast(true, false, "We are uploading your openapi file, please dont refresh the page!")
+
+            api.uploadOpenApiFile(formData).then(resp => {
+                if (file.size > 2097152) {
+                    func.setToast(true, false, "We have successfully read your file")
+                }
+                else {
+                    func.setToast(true, false, "Your Openapi file has been successfully processed")
+                }
+                fetchData()
+            }).catch(err => {
+                console.log(err);
+                if (err.message.includes(404)) {
+                    func.setToast(true, true, "Please limit the file size to less than 50 MB")
+                } else {
+                    let message = err?.response?.data?.actionErrors?.[0] || "Something went wrong while processing the file"
+                    func.setToast(true, true, message)
+                }
+            })
+        }
+    }
+
     function handleFileChange(file) {
         if (file) {
             const reader = new FileReader();
@@ -636,30 +697,6 @@ function ApiEndpoints(props) {
                     var bytes = new Uint8Array(arrayBuffer);
 
                     await api.uploadTcpFile([...bytes], apiCollectionId, skipKafka)
-                } else if (isJson || isYaml) {
-                    const formData = new FormData();
-                    formData.append("openAPIString", reader.result)
-                    // formData.append("hsFile", reader.result)
-                    formData.append("skipKafka", skipKafka)
-                    formData.append("apiCollectionId", apiCollectionId);
-                    func.setToast(true, false, "We are uploading your openapi file, please dont refresh the page!")
-
-                    api.uploadOpenApiFile(formData).then(resp => {
-                        if (file.size > 2097152) {
-                            func.setToast(true, false, "We have successfully read your file")
-                        }
-                        else {
-                            func.setToast(true, false, "Your Openapi file has been successfully processed")
-                        }
-                        fetchData()
-                    }).catch(err => {
-                        if (err.message.includes(404)) {
-                            func.setToast(true, true, "Please limit the file size to less than 50 MB")
-                        } else {
-                            let message = err?.response?.data?.actionErrors?.[0] || "Something went wrong while processing the file"
-                            func.setToast(true, true, message)
-                        }
-                    })
                 }
             }
         }
@@ -712,17 +749,17 @@ function ApiEndpoints(props) {
                             }
                         </VerticalStack>
                     </Popover.Section>
-                    <Popover.Section>
+                    {!isApiGroup ? <Popover.Section>
                         <VerticalStack gap={2}>
                             <UploadFile
                             fileFormat=".json,.yaml,.yml"
-                            fileChanged={file => handleFileChange(file)}
+                            fileChanged={file => uploadOpenApiFile(file)}
                             tooltipText="Upload openapi file"
                             label={<Text fontWeight="regular" variant="bodyMd">Upload OpenAPI file</Text>}
                             primary={false} 
                             />
                         </VerticalStack>
-                    </Popover.Section>
+                    </Popover.Section> : null}
                     <Popover.Section>
                         <VerticalStack gap={2}>
                             <Text>Export as</Text>
@@ -775,6 +812,11 @@ function ApiEndpoints(props) {
                 closeRunTest={() => setRunTests(false)}
                 disabled={showEmptyScreen}
                 selectedResourcesForPrimaryAction={selectedResourcesForPrimaryAction}
+            />
+            <SelectSource
+                show={showSourceDialog}
+                setShow={(val) => setShowSourceDialog(val)}
+                primaryAction={(val) => uploadOpenFileWithSource(val)}
             />
         </HorizontalStack>
     )

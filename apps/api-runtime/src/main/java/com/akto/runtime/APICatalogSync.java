@@ -1310,8 +1310,10 @@ public class APICatalogSync {
             update = Updates.combine(update, Updates.max(SingleTypeInfo.LAST_SEEN, deltaInfo.getLastSeen()));
             update = Updates.combine(update, Updates.max(SingleTypeInfo.MAX_VALUE, deltaInfo.getMaxValue()));
             update = Updates.combine(update, Updates.min(SingleTypeInfo.MIN_VALUE, deltaInfo.getMinValue()));
-            Bson updateSourceMap = Updates.set(SingleTypeInfo.SOURCES + "." + source.name(), new Document("timestamp", timestamp) );
-            update = Updates.combine(update, updateSourceMap);
+            if (source != null) {
+                Bson updateSourceMap = Updates.set(SingleTypeInfo.SOURCES + "." + source.name(), new Document("timestamp", timestamp) );
+                update = Updates.combine(update, updateSourceMap);
+            }
 
             if (!Main.isOnprem) {
                 if (dbInfo != null) {

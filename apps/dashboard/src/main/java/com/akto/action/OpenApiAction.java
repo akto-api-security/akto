@@ -1,13 +1,17 @@
 package com.akto.action;
 
 import com.akto.dao.ApiCollectionsDao;
+import com.akto.dao.ApiInfoDao;
 import com.akto.dao.SampleDataDao;
+import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.file.FilesDao;
 import com.akto.dao.upload.FileUploadLogsDao;
 import com.akto.dao.upload.FileUploadsDao;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo;
+import com.akto.dto.HttpResponseParams;
+import com.akto.dto.HttpResponseParams.Source;
 import com.akto.dto.files.File;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.SingleTypeInfo;
@@ -138,6 +142,7 @@ public class OpenApiAction extends UserAction implements ServletResponseAware {
     }
 
     private static final String OPEN_API = "OpenAPI";
+    private Source source = null;
 
     public String importDataFromOpenApiSpec(){
 
@@ -153,10 +158,44 @@ public class OpenApiAction extends UserAction implements ServletResponseAware {
         InsertOneResult insertOneResult = FileUploadsDao.instance.insertOne(fileUpload);
         String fileUploadId = insertOneResult.getInsertedId().asObjectId().getValue().toString();
         this.uploadId = fileUploadId;
+        ApiCollection apiCollection = ApiCollectionsDao.instance.getMeta(apiCollectionId);
+        if (apiCollection.getHostName() != null) {
+            source = HttpResponseParams.Source.MIRRORING;
+        }
+
+        ApiInfo apiInfoWithSource = ApiInfoDao.instance.findOne(
+            Filters.and(
+                Filters.eq(ApiInfo.ID_API_COLLECTION_ID, apiCollectionId),
+                Filters.exists(ApiInfo.SOURCES, true)
+            )
+        );
+
+        if (source == null && apiInfoWithSource == null) {
+            addActionError("Source is null");
+            return ERROR.toUpperCase();
+        }
+
         executorService.schedule(new Runnable() {
             public void run() {
                 Context.accountId.set(accountId);
-                loggerMaker.infoAndAddToDb("Starting thread to process openAPI file", LogDb.DASHBOARD);
+                
+
+                if (apiInfoWithSource == null) {
+                    loggerMaker.infoAndAddToDb("Starting to add sources to existing STIs and ApiInfos", LogDb.DASHBOARD);
+
+                    Bson sourceUpdate = Updates.set(SingleTypeInfo.SOURCES + "." + source, new BasicDBObject("timestamp", Context.now()) );
+
+                    Bson apiCollectionIdFilterForStis = Filters.eq(SingleTypeInfo._API_COLLECTION_ID, apiCollectionId);
+                    SingleTypeInfoDao.instance.updateManyNoUpsert(apiCollectionIdFilterForStis, sourceUpdate);
+
+                    Bson apiCollectionIdFilterForApiInfos = Filters.eq(ApiInfo.ID_API_COLLECTION_ID, apiCollectionId);
+                    ApiInfoDao.instance.updateManyNoUpsert(apiCollectionIdFilterForApiInfos, sourceUpdate);
+
+                    loggerMaker.infoAndAddToDb("Starting to process openAPI file", LogDb.DASHBOARD);
+                } else {
+                    loggerMaker.infoAndAddToDb("No need to add sources to STIs and ApiInfos", LogDb.DASHBOARD);
+                }
+
                 SwaggerFileUpload fileUpload = FileUploadsDao.instance.getSwaggerMCollection().find(Filters.eq(Constants.ID, new ObjectId(fileUploadId))).first();
                 String title = OPEN_API + " ";
         
@@ -406,4 +445,9 @@ public class OpenApiAction extends UserAction implements ServletResponseAware {
     public void setApiInfoKeyList(List<ApiInfo.ApiInfoKey> apiInfoKeyList) {
         this.apiInfoKeyList = apiInfoKeyList;
     }
+
+    public void setSource(Source source) {
+        this.source = source;
+    }
+
 }

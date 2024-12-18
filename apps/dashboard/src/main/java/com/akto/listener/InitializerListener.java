@@ -1649,54 +1649,6 @@ public class InitializerListener implements ServletContextListener {
         }
     }
 
-    public static void addSourceToStiApiInfo(BackwardCompatibility backwardCompatibility) {
-        if (backwardCompatibility.getAddSourceToStiApiInfo() == 0) {
-            List<ApiCollection> apiCollections = ApiCollectionsDao.instance.getMetaAll();
-            List<ApiCollection> trafficList = new ArrayList<>();
-            List<ApiCollection> customList = new ArrayList<>();
-
-            for (ApiCollection apiCollection : apiCollections) {
-                if (apiCollection.getType() == ApiCollection.Type.API_GROUP) continue;
-                if(apiCollection.getHostName() != null) {
-                    trafficList.add(apiCollection);
-                } else {
-                    customList.add(apiCollection);
-                }
-            }
-
-            List<Integer> trafficIdList = trafficList.stream().map(ApiCollection::getId).collect(Collectors.toList());
-            Bson apiCollectionTrafficIdFilter = Filters.in("apiCollectionId", trafficIdList);
-            List<WriteModel<SingleTypeInfo>> updates = new ArrayList<>();
-
-            SingleTypeInfoDao.instance.getMCollection().find(apiCollectionTrafficIdFilter).forEach(action -> {
-                if (action.getSources() == null) {
-                    Bson idFilter = Filters.eq("_id", action.getId());
-                    Bson sourceUpdate = Updates.set(SingleTypeInfo.SOURCES + "." + HttpResponseParams.Source.MIRRORING, new Document("timestamp", action.getTimestamp()) );
-                    updates.add(new UpdateOneModel<>(idFilter, sourceUpdate));
-                }
-
-            });
-
-
-            List<Integer> customIdList = customList.stream().map(ApiCollection::getId).collect(Collectors.toList());
-            Bson apiCollectionCustomIdFilter = Filters.in("apiCollectionId", customIdList);
-
-            SingleTypeInfoDao.instance.getMCollection().find(apiCollectionCustomIdFilter).forEach(action -> {
-                if (action.getSources() == null) {
-                    Bson idFilter = Filters.eq("_id", action.getId());
-                    Bson sourceUpdate = Updates.set(SingleTypeInfo.SOURCES + "." + HttpResponseParams.Source.HAR, new Document("timestamp", action.getTimestamp()) );
-                    updates.add(new UpdateOneModel<>(idFilter, sourceUpdate));
-                }
-
-
-            });
-
-            // Perform bulk update
-            if (!updates.isEmpty()) {
-                SingleTypeInfoDao.instance.getMCollection().bulkWrite(updates);
-            }
-        }
-    }
 
     public static void dropWorkflowTestResultCollection(BackwardCompatibility backwardCompatibility) {
         if (backwardCompatibility.getDropWorkflowTestResult() == 0) {
@@ -2961,7 +2913,6 @@ public class InitializerListener implements ServletContextListener {
         dropSpecialCharacterApiCollections(backwardCompatibility);
         addDefaultAdvancedFilters(backwardCompatibility);
         moveAzureSamlConfig(backwardCompatibility);
-        addSourceToStiApiInfo(backwardCompatibility);
 
     }
 
