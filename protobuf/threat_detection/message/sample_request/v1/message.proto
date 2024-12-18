@@ -14,9 +14,3 @@ message SampleMaliciousRequest {
   string payload = 6;
   string filter_id = 7;
 }
-
-message SampleRequestKafkaEnvelope {
-  string account_id = 1;
-  string actor = 2;
-  SampleMaliciousRequest malicious_request = 3;
-}

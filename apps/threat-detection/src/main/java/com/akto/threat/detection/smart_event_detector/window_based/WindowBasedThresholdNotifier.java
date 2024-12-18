@@ -1,8 +1,8 @@
 package com.akto.threat.detection.smart_event_detector.window_based;
 
-import com.akto.proto.threat_protection.message.sample_request.v1.SampleMaliciousRequest;
-import com.akto.threat.detection.cache.CounterCache;
 import com.akto.dto.api_protection_parse_layer.Rule;
+import com.akto.proto.generated.threat_detection.message.sample_request.v1.SampleMaliciousRequest;
+import com.akto.threat.detection.cache.CounterCache;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;

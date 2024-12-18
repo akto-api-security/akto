@@ -17,12 +17,4 @@ message MaliciousEventMessage {
   int32 latest_api_collection_id = 7;
   string latest_api_payload = 8;
   threat_detection.message.malicious_event.event_type.v1.EventType event_type = 9;
-  string category = 10;
-  string sub_category = 11;
-}
-
-message MaliciousEventKafkaEnvelope {
-  string account_id = 1;
-  string actor = 2;
-  MaliciousEventMessage malicious_event = 3;
 }

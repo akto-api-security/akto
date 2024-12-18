@@ -1,11 +1,11 @@
 syntax = "proto3";
 
-package threat_protection.message.malicious_event.dashboard.v1;
+package threat_detection.message.malicious_event.dashboard.v1;
 
-import "threat_protection/message/malicious_event/event_type/v1/event_type.proto";
+import "threat_detection/message/malicious_event/event_type/v1/event_type.proto";
 
 option java_outer_classname = "MaliciousEventDashboardProto";
-option java_package = "threat_protection.message.malicious_event.dashboard.v1";
+option java_package = "threat_detection.message.malicious_event.dashboard.v1";
 
 message DashboardMaliciousEventMessage {
   string id = 1;
@@ -18,5 +18,5 @@ message DashboardMaliciousEventMessage {
   int32 api_collection_id = 8;
   string payload = 9;
   string country = 10;
-  threat_protection.message.malicious_event.event_type.v1.EventType event_type = 11;
+  threat_detection.message.malicious_event.event_type.v1.EventType event_type = 11;
 }
