@@ -1,5 +1,6 @@
 package com.akto.testing.yaml_tests;
 
+import com.akto.dao.context.Context;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.RawApi;
 import com.akto.dto.test_editor.Auth;
@@ -10,12 +11,16 @@ import com.akto.dto.testing.*;
 import com.akto.dto.testing.TestResult.TestError;
 import com.akto.test_editor.execution.Memory;
 import com.akto.test_editor.filter.data_operands_impl.ValidationResult;
+import com.akto.testing.TestExecutor;
 
 import java.util.Collections;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static com.akto.dto.testing.TestResult.TestError.*;
 
@@ -35,6 +40,7 @@ public abstract class SecurityTestTemplate {
     Strategy strategy;
 
     Memory memory;
+    private static final Logger logger = LoggerFactory.getLogger(TestExecutor.class);
 
     public SecurityTestTemplate(ApiInfo.ApiInfoKey apiInfoKey, FilterNode filterNode, FilterNode validatorNode, ExecutorNode executorNode ,RawApi rawApi, Map<String, Object> varMap, Auth auth, AuthMechanism authMechanism, String logId, TestingRunConfig testingRunConfig, Strategy strategy) {
         this.apiInfoKey = apiInfoKey;
@@ -86,8 +92,18 @@ public abstract class SecurityTestTemplate {
             }
             return getResultWithError(missingConfigs + " " + ROLE_NOT_FOUND.getMessage(), true);
         }
+
+        int accountId = Context.accountId.get();
         
+        if (accountId == 1665011467) {
+            logger.info("initiated filter check for api " + apiInfoKey.getUrl()+ " at " + Context.now());
+        }
+
         ValidationResult validationResult = filter();
+
+        if (accountId == 1665011467) {
+            logger.info("finished filter check for api " + apiInfoKey.getUrl()+ " at " + Context.now());
+        }
         boolean valid = validationResult.getIsValid();
         if (!valid) {
             List<String> errorList = new ArrayList<>();
@@ -95,11 +111,23 @@ public abstract class SecurityTestTemplate {
             errorList.add(validationResult.getValidationReason().replaceFirst("and:", "detailed reason for skipping execution:\n").replaceAll("\n\t","\n"));
             return getResultWithError(errorList, false);
         }
+        if (accountId == 1665011467) {
+            logger.info("initiated checkAuthBeforeExecution check for api " + apiInfoKey.getUrl()+ " at " + Context.now());
+        }
         valid = checkAuthBeforeExecution(debug, testLogs);
+        if (accountId == 1665011467) {
+            logger.info("finished checkAuthBeforeExecution check for api " + apiInfoKey.getUrl()+ " at " + Context.now());
+        }
         if (!valid) {
             return getResultWithError(SKIPPING_EXECUTION_BECAUSE_AUTH.getMessage(), false);
         }
+        if (accountId == 1665011467) {
+            logger.info("initiated executor yaml logic for api " + apiInfoKey.getUrl()+ " at " + Context.now());
+        }
         YamlTestResult attempts = executor(debug, testLogs);
+        if (accountId == 1665011467) {
+            logger.info("finished executor yaml logic for api " + apiInfoKey.getUrl()+ " at " + Context.now());
+        }
         if(attempts == null || attempts.getTestResults().isEmpty()){
             List<GenericTestResult> res = new ArrayList<>();
             res.add(new TestResult(null, rawApi.getOriginalMessage(), Collections.singletonList(TestError.EXECUTION_FAILED.getMessage()), 0, false, TestResult.Confidence.HIGH, null));
