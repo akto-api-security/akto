@@ -1,15 +1,15 @@
 package com.akto.threat.detection.tasks;
 
+import com.akto.grpc.auth.AuthToken;
 import com.akto.kafka.KafkaConfig;
-import com.akto.proto.threat_protection.message.malicious_event.event_type.v1.EventType;
-import com.akto.proto.threat_protection.message.malicious_event.v1.MaliciousEventMessage;
-import com.akto.proto.threat_protection.message.sample_request.v1.SampleMaliciousRequest;
-import com.akto.proto.threat_protection.service.malicious_alert_service.v1.MaliciousEventServiceGrpc;
-import com.akto.proto.threat_protection.service.malicious_alert_service.v1.RecordMaliciousEventRequest;
-import com.akto.proto.threat_protection.service.malicious_alert_service.v1.RecordMaliciousEventResponse;
+import com.akto.proto.generated.threat_detection.message.malicious_event.event_type.v1.EventType;
+import com.akto.proto.generated.threat_detection.message.malicious_event.v1.MaliciousEventMessage;
+import com.akto.proto.generated.threat_detection.message.sample_request.v1.SampleMaliciousRequest;
+import com.akto.proto.generated.threat_detection.service.malicious_alert_service.v1.MaliciousEventServiceGrpc;
+import com.akto.proto.generated.threat_detection.service.malicious_alert_service.v1.RecordMaliciousEventRequest;
+import com.akto.proto.generated.threat_detection.service.malicious_alert_service.v1.RecordMaliciousEventResponse;
 import com.akto.threat.detection.db.entity.MaliciousEventEntity;
 import com.akto.threat.detection.dto.MessageEnvelope;
-import com.akto.threat.detection.grpc.AuthToken;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.util.JsonFormat;
 import io.grpc.Grpc;
@@ -44,7 +44,7 @@ public class SendMaliciousRequestsToBackend extends AbstractKafkaConsumerTask {
     this.consumerServiceStub =
         MaliciousEventServiceGrpc.newStub(channel)
             .withCallCredentials(
-                new AuthToken(System.getenv("AKTO_THREAT_PROTECTION_BACKEND_TOKEN")));
+                new AuthToken(System.getenv("AKTO_threat_detection_BACKEND_TOKEN")));
   }
 
   private List<MaliciousEventEntity> getSampleMaliciousRequests(String actor, String filterId) {
