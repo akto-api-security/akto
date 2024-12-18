@@ -1,8 +1,8 @@
 package com.akto.threat.backend.router;
 
 import com.akto.proto.generated.threat_detection.service.malicious_alert_service.v1.RecordMaliciousEventRequest;
+import com.akto.proto.utils.ProtoMessageUtils;
 import com.akto.threat.backend.service.MaliciousEventService;
-import com.akto.threat.backend.utils.ProtoMessageUtils;
 import io.vertx.core.Vertx;
 import io.vertx.ext.web.RequestBody;
 import io.vertx.ext.web.Router;
@@ -21,7 +21,7 @@ public class ThreatDetectionRouter implements ARouter {
 
     router
         .post("/record_malicious_event")
-        .handler(
+        .blockingHandler(
             ctx -> {
               RequestBody reqBody = ctx.body();
               RecordMaliciousEventRequest req =

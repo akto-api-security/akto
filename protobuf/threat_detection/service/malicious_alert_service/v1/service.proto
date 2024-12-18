@@ -17,7 +17,3 @@ message RecordMaliciousEventRequest {
   threat_detection.message.malicious_event.v1.MaliciousEventMessage malicious_event = 1;
   repeated threat_detection.message.sample_request.v1.SampleMaliciousRequest sample_requests = 2;
 }
-
-service MaliciousEventService {
-  rpc RecordMaliciousEvent(RecordMaliciousEventRequest) returns (RecordMaliciousEventResponse) {}
-}

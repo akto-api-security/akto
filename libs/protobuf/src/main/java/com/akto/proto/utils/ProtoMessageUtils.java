@@ -1,18 +1,16 @@
-package com.akto.threat.backend.utils;
+package com.akto.proto.utils;
 
 import com.google.protobuf.Message;
 import com.google.protobuf.util.JsonFormat;
 import java.util.Optional;
 
 public class ProtoMessageUtils {
-
   public static Optional<String> toString(Message msg) {
     try {
       return Optional.of(JsonFormat.printer().print(msg));
     } catch (Exception e) {
       // Ignore
     }
-
     return Optional.empty();
   }
 
@@ -24,7 +22,6 @@ public class ProtoMessageUtils {
     } catch (Exception e) {
       // Ignore
     }
-
     return Optional.empty();
   }
 }

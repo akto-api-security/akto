@@ -1,24 +1,24 @@
 package com.akto.threat.detection.tasks;
 
-import com.akto.grpc.auth.AuthToken;
 import com.akto.kafka.KafkaConfig;
 import com.akto.proto.generated.threat_detection.message.malicious_event.event_type.v1.EventType;
 import com.akto.proto.generated.threat_detection.message.malicious_event.v1.MaliciousEventMessage;
 import com.akto.proto.generated.threat_detection.message.sample_request.v1.SampleMaliciousRequest;
-import com.akto.proto.generated.threat_detection.service.malicious_alert_service.v1.MaliciousEventServiceGrpc;
 import com.akto.proto.generated.threat_detection.service.malicious_alert_service.v1.RecordMaliciousEventRequest;
-import com.akto.proto.generated.threat_detection.service.malicious_alert_service.v1.RecordMaliciousEventResponse;
+import com.akto.proto.utils.ProtoMessageUtils;
 import com.akto.threat.detection.db.entity.MaliciousEventEntity;
 import com.akto.threat.detection.dto.MessageEnvelope;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.util.JsonFormat;
-import io.grpc.Grpc;
-import io.grpc.InsecureChannelCredentials;
-import io.grpc.ManagedChannel;
-import io.grpc.stub.StreamObserver;
+import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.entity.ContentType;
+import org.apache.http.entity.StringEntity;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClients;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.hibernate.Session;
 import org.hibernate.SessionFactory;
@@ -27,24 +27,16 @@ import org.hibernate.Transaction;
 /*
 This will send alerts to threat detection backend
  */
-public class SendMaliciousRequestsToBackend extends AbstractKafkaConsumerTask {
+public class SendMaliciousEventsToBackend extends AbstractKafkaConsumerTask {
 
   private final SessionFactory sessionFactory;
+  private final CloseableHttpClient httpClient;
 
-  private final MaliciousEventServiceGrpc.MaliciousEventServiceStub consumerServiceStub;
-
-  public SendMaliciousRequestsToBackend(
+  public SendMaliciousEventsToBackend(
       SessionFactory sessionFactory, KafkaConfig trafficConfig, String topic) {
     super(trafficConfig, topic);
     this.sessionFactory = sessionFactory;
-
-    String target = "localhost:8980";
-    ManagedChannel channel =
-        Grpc.newChannelBuilder(target, InsecureChannelCredentials.create()).build();
-    this.consumerServiceStub =
-        MaliciousEventServiceGrpc.newStub(channel)
-            .withCallCredentials(
-                new AuthToken(System.getenv("AKTO_threat_detection_BACKEND_TOKEN")));
+    this.httpClient = HttpClients.createDefault();
   }
 
   private List<MaliciousEventEntity> getSampleMaliciousRequests(String actor, String filterId) {
@@ -113,25 +105,25 @@ public class SendMaliciousRequestsToBackend extends AbstractKafkaConsumerTask {
                       .collect(Collectors.toList()));
             }
 
-            this.consumerServiceStub.recordMaliciousEvent(
-                reqBuilder.build(),
-                new StreamObserver<RecordMaliciousEventResponse>() {
-                  @Override
-                  public void onNext(RecordMaliciousEventResponse value) {
-                    // Do nothing
-                  }
-
-                  @Override
-                  public void onError(Throwable t) {
-                    t.printStackTrace();
-                  }
-
-                  @Override
-                  public void onCompleted() {
-                    // Do nothing
-                    System.out.println("Completed");
-                  }
-                });
+            String url = "http://localhost:9090";
+            String token = System.getenv("AKTO_THREAT_PROTECTION_BACKEND_TOKEN");
+            ProtoMessageUtils.toString(reqBuilder.build())
+                .ifPresent(
+                    msg -> {
+                      StringEntity requestEntity =
+                          new StringEntity(msg, ContentType.APPLICATION_JSON);
+                      HttpPost req =
+                          new HttpPost(
+                              String.format("%s/threat_detection/record_malicious_event", url));
+                      req.addHeader("Authorization", "Bearer " + token);
+                      req.setEntity(requestEntity);
+                      try {
+                        System.out.println("Sending request to backend: " + msg);
+                        this.httpClient.execute(req);
+                      } catch (IOException e) {
+                        e.printStackTrace();
+                      }
+                    });
           } catch (Exception e) {
             e.printStackTrace();
           }

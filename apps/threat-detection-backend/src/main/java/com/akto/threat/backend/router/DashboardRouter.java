@@ -2,8 +2,8 @@ package com.akto.threat.backend.router;
 
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchAlertFiltersRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListMaliciousRequestsRequest;
+import com.akto.proto.utils.ProtoMessageUtils;
 import com.akto.threat.backend.service.DashboardService;
-import com.akto.threat.backend.utils.ProtoMessageUtils;
 import io.vertx.core.Vertx;
 import io.vertx.ext.web.RequestBody;
 import io.vertx.ext.web.Router;
@@ -22,7 +22,7 @@ public class DashboardRouter implements ARouter {
 
     router
         .get("/fetch_filters")
-        .handler(
+        .blockingHandler(
             ctx -> {
               ProtoMessageUtils.toString(
                       dsService.fetchAlertFilters(
@@ -32,7 +32,7 @@ public class DashboardRouter implements ARouter {
 
     router
         .post("/list_malicious_requests")
-        .handler(
+        .blockingHandler(
             ctx -> {
               RequestBody reqBody = ctx.body();
               ListMaliciousRequestsRequest req =

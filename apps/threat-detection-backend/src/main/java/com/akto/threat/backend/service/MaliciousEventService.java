@@ -25,6 +25,8 @@ public class MaliciousEventService {
 
   public void recordMaliciousEvent(String accountId, RecordMaliciousEventRequest request) {
 
+    System.out.println("Received malicious event: " + request);
+
     MaliciousEventMessage evt = request.getMaliciousEvent();
     String actor = evt.getActor();
     String filterId = evt.getFilterId();
