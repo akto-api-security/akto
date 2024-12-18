@@ -232,12 +232,40 @@ const settingFunctions = {
       })
       return arr
     },
+    fetchRuntimeInstances: async function(startTimestamp, endTimestamp) {
+      let res = []
+      await settingRequests.fetchRuntimeInstances(startTimestamp, endTimestamp).then((resp) => {
+        res = resp
+      })
+      return res
+    },
+    fetchRuntimeMetrics: async function(startTimestamp, endTimestamp, instanceId) {
+      let res = []
+      await settingRequests.fetchRuntimeMetrics(startTimestamp, endTimestamp, instanceId).then((resp) => {
+        res = resp.runtimeMetrics
+      })
+      return res
+    },
     fetchGraphData: async function(groupBy, startTimestamp, endTimestamp, names, host){
       let trafficData = {}
       await settingRequests.fetchTrafficMetrics(groupBy, startTimestamp, endTimestamp, names, host).then((resp)=>{
         trafficData = resp.trafficMetricsMap
       })
       return trafficData
+    },
+    fetchTrafficCollectorInfos: async function(startTimestamp, endTimestamp) {
+      let res = []
+      await settingRequests.fetchTrafficCollectorInfos(startTimestamp, endTimestamp).then((resp) => {
+        res = resp
+      })
+      return res
+    },
+    fetchTrafficCollectorMetrics: async function(id, startTimestamp, endTimestamp) {
+      let res = []
+      await settingRequests.fetchTrafficCollectorMetrics(id, startTimestamp, endTimestamp).then((resp) => {
+        res = resp
+      })
+      return res
     },
     testJiraIntegration: async function(userEmail, apiToken, baseUrl, projId){
       let issueTypeMap = {}
