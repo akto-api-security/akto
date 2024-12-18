@@ -6,20 +6,16 @@ import com.akto.kafka.KafkaConfig;
 import com.akto.proto.generated.threat_detection.message.malicious_event.event_type.v1.EventType;
 import com.akto.proto.generated.threat_detection.message.malicious_event.v1.MaliciousEventMessage;
 import com.akto.proto.generated.threat_detection.message.sample_request.v1.SampleMaliciousRequest;
-import com.akto.proto.generated.threat_detection.service.malicious_alert_service.v1.MaliciousEventServiceGrpc;
 import com.akto.proto.generated.threat_detection.service.malicious_alert_service.v1.RecordMaliciousEventRequest;
-import com.akto.proto.generated.threat_detection.service.malicious_alert_service.v1.RecordMaliciousEventResponse;
 import com.akto.threat.backend.constants.KafkaTopic;
 import com.akto.threat.backend.constants.MongoDBCollection;
 import com.akto.threat.backend.db.AggregateSampleMaliciousEventModel;
 import com.akto.threat.backend.db.MaliciousEventModel;
-import com.akto.threat.backend.interceptors.Constants;
 import com.akto.threat.backend.utils.KafkaUtils;
-import io.grpc.stub.StreamObserver;
 import java.util.ArrayList;
 import java.util.List;
 
-public class MaliciousEventService extends MaliciousEventServiceGrpc.MaliciousEventServiceImplBase {
+public class MaliciousEventService {
 
   private final Kafka kafka;
 
@@ -27,15 +23,11 @@ public class MaliciousEventService extends MaliciousEventServiceGrpc.MaliciousEv
     this.kafka = new Kafka(kafkaConfig);
   }
 
-  @Override
-  public void recordMaliciousEvent(
-      RecordMaliciousEventRequest request,
-      StreamObserver<RecordMaliciousEventResponse> responseObserver) {
+  public void recordMaliciousEvent(String accountId, RecordMaliciousEventRequest request) {
 
     MaliciousEventMessage evt = request.getMaliciousEvent();
     String actor = evt.getActor();
     String filterId = evt.getFilterId();
-    int accountId = Constants.ACCOUNT_ID_CONTEXT_KEY.get();
 
     EventType eventType = evt.getEventType();
 
@@ -86,8 +78,5 @@ public class MaliciousEventService extends MaliciousEventServiceGrpc.MaliciousEv
         KafkaUtils.generateMsg(
             maliciousEventModel, MongoDBCollection.ThreatDetection.MALICIOUS_EVENTS, accountId),
         KafkaTopic.ThreatDetection.INTERNAL_DB_MESSAGES);
-
-    responseObserver.onNext(RecordMaliciousEventResponse.newBuilder().build());
-    responseObserver.onCompleted();
   }
 }

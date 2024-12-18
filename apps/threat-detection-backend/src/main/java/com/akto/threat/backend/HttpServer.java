@@ -8,7 +8,7 @@ import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.servlet.ServletHandler;
 import org.eclipse.jetty.servlet.ServletHolder;
 
-public class HealthCheckServer {
+public class HttpServer {
   public static final int PORT = 9090;
 
   public static void startHttpServer() throws Exception {
