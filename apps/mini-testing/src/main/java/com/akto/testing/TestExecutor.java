@@ -494,7 +494,8 @@ public class TestExecutor {
         Context.accountId.set(accountId);
         loggerMaker.infoAndAddToDb("Starting test for " + apiInfoKey, LogDb.TESTING);   
         try {
-            startTestNew(apiInfoKey, testRunId, testingRunConfig, testingUtil, testRunResultSummaryId, testConfigMap, subCategoryEndpointMap, apiInfoKeyToHostMap, debug, testLogs, startTime, maxRunTime, runParallel);
+            int maxConcurrentRequests = testingRun.getMaxConcurrentRequests() > 0 ? Math.min( testingRun.getMaxConcurrentRequests(), 100) : 10;
+            startTestNew(apiInfoKey, testRunId, testingRunConfig, testingUtil, testRunResultSummaryId, testConfigMap, subCategoryEndpointMap, apiInfoKeyToHostMap, debug, testLogs, startTime, maxRunTime, runParallel, maxConcurrentRequests);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "error while running tests: " + e);
         }
@@ -590,12 +591,14 @@ public class TestExecutor {
                                                TestingRunConfig testingRunConfig, TestingUtil testingUtil,
                                                ObjectId testRunResultSummaryId, Map<String, TestConfig> testConfigMap,
                                                ConcurrentHashMap<String, String> subCategoryEndpointMap, Map<ApiInfoKey, String> apiInfoKeyToHostMap,
-                                               boolean debug, List<TestingRunResult.TestLog> testLogs, int startTime, int timeToKill, boolean runParallel) {
+                                               boolean debug, List<TestingRunResult.TestLog> testLogs, int startTime, int timeToKill, boolean runParallel, int maxConcurrentRequests) {
 
         List<String> testSubCategories = testingRunConfig == null ? new ArrayList<>() : testingRunConfig.getTestSubCategoryList();
 
         //CountDownLatch latch = new CountDownLatch(testSubCategories.size());
-        ExecutorService threadPool = Executors.newFixedThreadPool(10);
+
+        loggerMaker.infoAndAddToDb("parallel test count " + maxConcurrentRequests);
+        ExecutorService threadPool = Executors.newFixedThreadPool(maxConcurrentRequests);
         List<Future<Void>> futureTestingRunResults = new ArrayList<>();
 
         CountDownLatch latch = new CountDownLatch(testSubCategories.size());
