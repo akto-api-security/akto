@@ -3,13 +3,12 @@ package com.akto.threat.backend;
 import com.akto.kafka.KafkaConfig;
 import com.akto.threat.backend.interceptors.AuthenticationInterceptor;
 import com.akto.threat.backend.service.DashboardService;
+import com.akto.threat.backend.service.HealthService;
 import com.akto.threat.backend.service.MaliciousEventService;
 import com.mongodb.client.MongoClient;
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
-import io.grpc.health.v1.HealthCheckResponse.ServingStatus;
-import io.grpc.protobuf.services.HealthStatusManager;
-import io.grpc.protobuf.services.ProtoReflectionServiceV1;
+import io.grpc.ServerInterceptors;
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 
@@ -18,19 +17,20 @@ public class BackendServer {
   private final Server server;
 
   public BackendServer(int port, MongoClient mongoClient, KafkaConfig kafkaConfig) {
-    HealthStatusManager health = new HealthStatusManager();
+    AuthenticationInterceptor authenticationInterceptor = new AuthenticationInterceptor();
 
     this.port = port;
+
     this.server =
         ServerBuilder.forPort(port)
-            .addService(ProtoReflectionServiceV1.newInstance())
-            .addService(new MaliciousEventService(kafkaConfig))
-            .addService(new DashboardService(mongoClient))
-            .addService(health.getHealthService())
-            .intercept(new AuthenticationInterceptor())
+            .addService(
+                ServerInterceptors.intercept(
+                    new MaliciousEventService(kafkaConfig), authenticationInterceptor))
+            .addService(
+                ServerInterceptors.intercept(
+                    new DashboardService(mongoClient), authenticationInterceptor))
+            .addService(new HealthService())
             .build();
-
-    health.setStatus("", ServingStatus.SERVING);
   }
 
   public void stop() throws InterruptedException {
