@@ -202,6 +202,10 @@ public class JiraIntegrationAction extends UserAction {
 
         BasicDBObject reqPayload = new BasicDBObject();
         jiraIntegration = JiraIntegrationDao.instance.findOne(new BasicDBObject());
+        if(jiraIntegration == null) {
+            addActionError("Jira is not integrated.");
+            return ERROR.toUpperCase();
+        }
         BasicDBObject fields = jiraTicketPayloadCreator(jiraMetaData);
 
         reqPayload.put("fields", fields);
@@ -397,16 +401,13 @@ public class JiraIntegrationAction extends UserAction {
                 Filters.in("_id", issuesIds),
                 Filters.exists("jiraIssueUrl", true)
         ));
-        for(TestingIssuesId testingIssuesId : issuesIds) {
-            TestingRunIssues issue = null;
-            for(TestingRunIssues testingRunIssues : testingRunIssuesList) {
-                if(testingIssuesId.equals(testingRunIssues.getId())) {
-                    issue = testingRunIssues;
-                    break;
-                }
-            }
+        Set<TestingIssuesId> testingRunIssueIds = new HashSet<>();
+        for (TestingRunIssues testingRunIssues : testingRunIssuesList) {
+            testingRunIssueIds.add(testingRunIssues.getId());
+        }
 
-            if(issue != null && (issue.getJiraIssueUrl() != null || !issue.getJiraIssueUrl().isEmpty())) {
+        for(TestingIssuesId testingIssuesId : issuesIds) {
+            if(testingRunIssueIds.contains(testingIssuesId)) {
                 existingIssues++;
                 continue;
             }
