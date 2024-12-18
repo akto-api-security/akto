@@ -2,7 +2,7 @@ package com.akto.threat.detection.tasks;
 
 import com.akto.dto.type.URLMethods;
 import com.akto.kafka.KafkaConfig;
-import com.akto.proto.threat_protection.message.sample_request.v1.SampleMaliciousRequest;
+import com.akto.proto.generated.threat_detection.message.sample_request.v1.SampleMaliciousRequest;
 import com.akto.threat.detection.db.entity.MaliciousEventEntity;
 import com.akto.threat.detection.dto.MessageEnvelope;
 import com.google.protobuf.InvalidProtocolBufferException;
