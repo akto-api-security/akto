@@ -2468,7 +2468,7 @@
                  <param name="includeProperties">^actionErrors.*</param>
             </result>
         </action>
-        
+
         <action name="api/fetchSampleData" class="com.akto.action.TrafficAction" method="fetchSampleData">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -2492,6 +2492,29 @@
                  <param name="statusCode">403</param>
                  <param name="ignoreHierarchy">false</param>
                  <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+        <action name="api/fetchSampleDataForTestEditor" class="com.akto.action.TrafficAction" method="fetchSampleDataForTestEditor">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">SAMPLE_DATA</param>
+                <param name="accessType">READ</param>
+            </interceptor-ref>
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <interceptor-ref name="collectionInterceptor"/>
+            <result name="SUCCESS"  type="json"/>
+            <result name="ERROR" type="httpheader">
+                <param name="status">401</param>
+            </result>
+            <result name="UNAUTHORIZED" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
             </result>
         </action>
         

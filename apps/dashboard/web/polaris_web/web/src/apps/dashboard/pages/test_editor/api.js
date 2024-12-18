@@ -12,6 +12,17 @@ const testEditorRequests = {
             }
         })
     },
+    fetchSampleDataForTestEditor(collectionId, apiEndpointUrl, apiEndpointMethod) {
+        return request({
+            url: '/api/fetchSampleDataForTestEditor',
+            method: 'post',
+            data: {
+                apiCollectionId: collectionId, 
+                url: apiEndpointUrl, 
+                method: apiEndpointMethod
+            }
+        })
+    },
 
     fetchVulnerableRequests(skip, limit) {
         return request({
