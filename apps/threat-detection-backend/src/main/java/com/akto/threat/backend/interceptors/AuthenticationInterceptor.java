@@ -2,6 +2,7 @@ package com.akto.threat.backend.interceptors;
 
 import com.akto.dao.ConfigsDao;
 import com.akto.dto.Config;
+import com.akto.grpc.auth.AuthToken;
 import io.grpc.*;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jws;
@@ -18,9 +19,9 @@ public class AuthenticationInterceptor implements ServerInterceptor {
   @Override
   public <ReqT, RespT> ServerCall.Listener<ReqT> interceptCall(
       ServerCall<ReqT, RespT> call, Metadata metadata, ServerCallHandler<ReqT, RespT> next) {
-    String value = metadata.get(Constants.AUTHORIZATION_METADATA_KEY);
+    String token = AuthToken.getBearerTokenFromMeta(metadata).orElse(null);
 
-    if (value == null) {
+    if (token == null) {
       call.close(
           Status.UNAUTHENTICATED.withDescription("Authorization token is required"), metadata);
       return null;
@@ -29,7 +30,7 @@ public class AuthenticationInterceptor implements ServerInterceptor {
     try {
       PublicKey publicKey = getPublicKey();
       Jws<Claims> claims =
-          Jwts.parserBuilder().setSigningKey(publicKey).build().parseClaimsJws(value);
+          Jwts.parserBuilder().setSigningKey(publicKey).build().parseClaimsJws(token);
       int accountId = (int) claims.getBody().get("accountId");
       Context ctx = Context.current().withValue(Constants.ACCOUNT_ID_CONTEXT_KEY, accountId);
       return Contexts.interceptCall(ctx, call, metadata, next);
