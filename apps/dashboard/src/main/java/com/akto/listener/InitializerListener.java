@@ -2820,16 +2820,49 @@ public class InitializerListener implements ServletContextListener {
     }
 
     private static void addDefaultAdvancedFilters(BackwardCompatibility backwardCompatibility){
-        if(backwardCompatibility.getAddDefaultFilters() == 0){
+        if(backwardCompatibility.getAddDefaultFilters() == 0 || backwardCompatibility.getAddDefaultFilters() < 1734502264){
             String contentAllow = "id: DEFAULT_ALLOW_FILTER\nfilter:\n    url:\n        regex: '.*'";
-            String contentBlock = "id: DEFAULT_BLOCK_FILTER\nfilter:\n    response_code:\n        gte: 400";
+            String contentBlock = "id: DEFAULT_BLOCK_FILTER\n" +
+                                    "filter:\n" +
+                                    "  or:\n" +
+                                    "    - response_code:\n" +
+                                    "        gte: 400\n" +
+                                    "    - response_headers:\n" +
+                                    "        for_one:\n" +
+                                    "          key:\n" +
+                                    "            eq: content-type\n" +
+                                    "          value:\n" +
+                                    "            contains_either:\n" +
+                                    "              - html\n" +
+                                    "              - text/html\n" +
+                                    "    - request_headers:\n" +
+                                    "        for_one:\n" +
+                                    "          key:\n" +
+                                    "            eq: host\n" +
+                                    "          value:\n" +
+                                    "            regex: .*localhost.*";
+
+            if(!DashboardMode.isMetered()){
+                contentBlock =  "id: DEFAULT_BLOCK_FILTER\nfilter:\n    response_code:\n        gte: 400";
+            }
+
 
             AdvancedTrafficFiltersAction action = new AdvancedTrafficFiltersAction();
             action.setYamlContent(contentAllow);
             action.saveYamlTemplateForTrafficFilters();
 
-            action.setYamlContent(contentBlock);
-            action.saveYamlTemplateForTrafficFilters();
+            if(backwardCompatibility.getAddDefaultFilters() != 0 && DashboardMode.isMetered()){
+                Bson defaultFilterQ = Filters.eq(Constants.ID, "DEFAULT_BLOCK_FILTER");
+                YamlTemplate blockTemplate = AdvancedTrafficFiltersDao.instance.findOne(defaultFilterQ);
+                if((blockTemplate.getUpdatedAt() - blockTemplate.getCreatedAt()) <= 10){
+                    AdvancedTrafficFiltersDao.instance.deleteAll(defaultFilterQ);
+                    action.setYamlContent(contentBlock);
+                    action.saveYamlTemplateForTrafficFilters();
+                }
+            }else{
+                action.setYamlContent(contentBlock);
+                action.saveYamlTemplateForTrafficFilters();
+            }
 
             BackwardCompatibilityDao.instance.updateOne(
                 Filters.eq("_id", backwardCompatibility.getId()),
