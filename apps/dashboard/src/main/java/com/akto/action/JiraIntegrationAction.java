@@ -201,6 +201,7 @@ public class JiraIntegrationAction extends UserAction {
     public String createIssue() {
 
         BasicDBObject reqPayload = new BasicDBObject();
+        jiraIntegration = JiraIntegrationDao.instance.findOne(new BasicDBObject());
         BasicDBObject fields = jiraTicketPayloadCreator(jiraMetaData);
 
         reqPayload.put("fields", fields);
@@ -367,8 +368,8 @@ public class JiraIntegrationAction extends UserAction {
             return ERROR.toUpperCase();
         }
 
-        JiraIntegration jiraInstance = JiraIntegrationDao.instance.findOne(new BasicDBObject());
-        if(jiraInstance == null) {
+        jiraIntegration = JiraIntegrationDao.instance.findOne(new BasicDBObject());
+        if(jiraIntegration == null) {
             addActionError("Jira is not integrated.");
             return ERROR.toUpperCase();
         }
@@ -382,17 +383,28 @@ public class JiraIntegrationAction extends UserAction {
         List<YamlTemplate> yamlTemplateList = YamlTemplateDao.instance.findAll(Filters.in("_id", testingSubCategories), projection);
         Map<String, Info> testSubTypeToInfoMap = new HashMap<>();
         for(YamlTemplate yamlTemplate : yamlTemplateList) {
+            if(yamlTemplate == null || yamlTemplate.getInfo() == null) {
+                loggerMaker.errorAndAddToDb("ERROR: YamlTemplate or YamlTemplate.info is null", LogDb.DASHBOARD);
+                continue;
+            }
             Info info = yamlTemplate.getInfo();
             testSubTypeToInfoMap.put(info.getSubCategory(), info);
         }
 
         List<TestingRunResult> testingRunResultList = new ArrayList<>();
         int existingIssues = 0;
+        List<TestingRunIssues> testingRunIssuesList = TestingRunIssuesDao.instance.findAll(Filters.and(
+                Filters.in("_id", issuesIds),
+                Filters.exists("jiraIssueUrl", true)
+        ));
         for(TestingIssuesId testingIssuesId : issuesIds) {
-            TestingRunIssues issue = TestingRunIssuesDao.instance.findOne(Filters.and(
-                    Filters.in("_id", testingIssuesId),
-                    Filters.exists("jiraIssueUrl", true)
-            ));
+            TestingRunIssues issue = null;
+            for(TestingRunIssues testingRunIssues : testingRunIssuesList) {
+                if(testingIssuesId.equals(testingRunIssues.getId())) {
+                    issue = testingRunIssues;
+                    break;
+                }
+            }
 
             if(issue != null && (issue.getJiraIssueUrl() != null || !issue.getJiraIssueUrl().isEmpty())) {
                 existingIssues++;
@@ -403,9 +415,7 @@ public class JiraIntegrationAction extends UserAction {
 
             TestingRunResult testingRunResult = TestingRunResultDao.instance.findOne(Filters.and(
                     Filters.in(TestingRunResult.TEST_SUB_TYPE, testingIssuesId.getTestSubCategory()),
-                    Filters.in(TestingRunResult.API_INFO_KEY + "." + ApiInfo.ApiInfoKey.API_COLLECTION_ID, testingIssuesId.getApiInfoKey().getApiCollectionId()),
-                    Filters.in(TestingRunResult.API_INFO_KEY + "." + ApiInfo.ApiInfoKey.URL, testingIssuesId.getApiInfoKey().getUrl()),
-                    Filters.in(TestingRunResult.API_INFO_KEY + "." + ApiInfo.ApiInfoKey.METHOD, testingIssuesId.getApiInfoKey().getMethod())
+                    Filters.in(TestingRunResult.API_INFO_KEY, testingIssuesId.getApiInfoKey())
             ), Projections.include("_id", TestingRunResult.TEST_RESULTS));
 
             if(testingRunResult == null) {
@@ -558,7 +568,6 @@ public class JiraIntegrationAction extends UserAction {
 
         // issue title
         fields.put("summary", "Akto Report - " + jiraMetaData.getIssueTitle() + " (" + endpointMethod + " - " + truncatedEndpoint + ")");
-        jiraIntegration = JiraIntegrationDao.instance.findOne(new BasicDBObject());
 
         // Issue type (TASK)
         BasicDBObject issueTypeObj = new BasicDBObject();
