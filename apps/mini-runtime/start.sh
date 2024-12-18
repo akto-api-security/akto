@@ -17,13 +17,12 @@ rotate_log() {
     fi
 }
 
-# Start monitoring in the background
-while true; do
-    rotate_log   # Check and rotate logs if necessary
-    sleep "$CHECK_INTERVAL"  # Wait for the specified interval before checking again
-done &
-
 if [[ "${ENABLE_LOGS}" == "false" ]]; then
+    # Start monitoring in the background
+    while true; do
+        rotate_log   # Check and rotate logs if necessary
+        sleep "$CHECK_INTERVAL"  # Wait for the specified interval before checking again
+    done &
     {
         exec java -XX:+ExitOnOutOfMemoryError -jar /app/mini-runtime-1.0-SNAPSHOT-jar-with-dependencies.jar
     } >> "$LOG_FILE" 2>&1 
