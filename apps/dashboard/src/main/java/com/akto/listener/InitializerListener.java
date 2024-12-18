@@ -2842,12 +2842,16 @@ public class InitializerListener implements ServletContextListener {
                                     "          value:\n" +
                                     "            regex: .*localhost.*";
 
+            if(!DashboardMode.isMetered()){
+                contentBlock =  "id: DEFAULT_BLOCK_FILTER\nfilter:\n    response_code:\n        gte: 400";
+            }
+
 
             AdvancedTrafficFiltersAction action = new AdvancedTrafficFiltersAction();
             action.setYamlContent(contentAllow);
             action.saveYamlTemplateForTrafficFilters();
 
-            if(backwardCompatibility.getAddDefaultFilters() != 0){
+            if(backwardCompatibility.getAddDefaultFilters() != 0 && DashboardMode.isMetered()){
                 Bson defaultFilterQ = Filters.eq(Constants.ID, "DEFAULT_BLOCK_FILTER");
                 YamlTemplate blockTemplate = AdvancedTrafficFiltersDao.instance.findOne(defaultFilterQ);
                 if((blockTemplate.getUpdatedAt() - blockTemplate.getCreatedAt()) <= 10){
