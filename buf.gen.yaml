@@ -1,7 +1,5 @@
 version: v2
 
-clean: true
-
 managed:
   enabled: true
 
@@ -10,10 +8,10 @@ managed:
       value: true
 
     - file_option: java_package_prefix
-      value: com.akto.proto
+      value: com.akto.proto.generated
 
 plugins:
-  - remote: buf.build/grpc/java:v1.68.1
+  - remote: buf.build/grpc/java:v1.69.0
     out: libs/protobuf/src/main/java
 
   - remote: buf.build/protocolbuffers/java:v28.3

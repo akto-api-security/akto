@@ -3,13 +3,13 @@ package com.akto.action.threat_detection;
 import com.akto.action.UserAction;
 import com.akto.dto.traffic.SuspectSampleData;
 import com.akto.dto.type.URLMethods;
-import com.akto.grpc.AuthToken;
-import com.akto.proto.threat_protection.message.malicious_event.dashboard.v1.DashboardMaliciousEventMessage;
-import com.akto.proto.threat_protection.service.dashboard_service.v1.DashboardServiceGrpc;
-import com.akto.proto.threat_protection.service.dashboard_service.v1.DashboardServiceGrpc.DashboardServiceBlockingStub;
-import com.akto.proto.threat_protection.service.dashboard_service.v1.FetchAlertFiltersRequest;
-import com.akto.proto.threat_protection.service.dashboard_service.v1.FetchAlertFiltersResponse;
-import com.akto.proto.threat_protection.service.dashboard_service.v1.ListMaliciousRequestsRequest;
+import com.akto.grpc.auth.AuthToken;
+import com.akto.proto.generated.threat_detection.message.malicious_event.dashboard.v1.DashboardMaliciousEventMessage;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.DashboardServiceGrpc;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.DashboardServiceGrpc.DashboardServiceBlockingStub;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchAlertFiltersRequest;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchAlertFiltersResponse;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListMaliciousRequestsRequest;
 import io.grpc.Grpc;
 import io.grpc.InsecureChannelCredentials;
 import io.grpc.ManagedChannel;
@@ -41,7 +41,7 @@ public class SuspectSampleDataAction extends UserAction {
     this.dsServiceStub =
         DashboardServiceGrpc.newBlockingStub(channel)
             .withCallCredentials(
-                new AuthToken(System.getenv("AKTO_THREAT_PROTECTION_BACKEND_TOKEN")));
+                new AuthToken(System.getenv("AKTO_threat_detection_BACKEND_TOKEN")));
   }
 
   public String fetchSampleDataV2() {

@@ -1,15 +1,15 @@
 syntax = "proto3";
 
-package threat_protection.service.dashboard_service.v1;
+package threat_detection.service.dashboard_service.v1;
 
-import "threat_protection/message/malicious_event/dashboard/v1/message.proto";
+import "threat_detection/message/malicious_event/dashboard/v1/message.proto";
 
 // Dashboard service which the dashboard actions will call instead of directly calling DB
 option java_outer_classname = "DashboardServiceProto";
-option java_package = "threat_protection.service.dashboard_service.v1";
+option java_package = "threat_detection.service.dashboard_service.v1";
 
 message ListMaliciousRequestsResponse {
-    repeated threat_protection.message.malicious_event.dashboard.v1.DashboardMaliciousEventMessage malicious_events = 1;
+    repeated threat_detection.message.malicious_event.dashboard.v1.DashboardMaliciousEventMessage malicious_events = 1;
     int32 total = 2;
     int32 page = 3;
 }
