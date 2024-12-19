@@ -9,7 +9,7 @@ import com.akto.threat.detection.session_factory.SessionFactoryUtils;
 import com.akto.threat.detection.tasks.CleanupTask;
 import com.akto.threat.detection.tasks.FlushSampleDataTask;
 import com.akto.threat.detection.tasks.MaliciousTrafficDetectorTask;
-import com.akto.threat.detection.tasks.SendMaliciousRequestsToBackend;
+import com.akto.threat.detection.tasks.SendMaliciousEventsToBackend;
 import com.mongodb.ConnectionString;
 import io.lettuce.core.RedisClient;
 import org.flywaydb.core.Flyway;
@@ -56,7 +56,7 @@ public class Main {
     new FlushSampleDataTask(
             sessionFactory, internalKafka, KafkaTopic.ThreatDetection.MALICIOUS_EVENTS)
         .run();
-    new SendMaliciousRequestsToBackend(
+    new SendMaliciousEventsToBackend(
             sessionFactory, internalKafka, KafkaTopic.ThreatDetection.ALERTS)
         .run();
     new CleanupTask(sessionFactory).run();

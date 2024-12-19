@@ -85,7 +85,7 @@ public class WindowBasedThresholdNotifier {
     boolean cooldownBreached =
         (now - lastNotified) >= this.config.getNotificationCooldownInSeconds();
 
-    if (thresholdBreached && cooldownBreached) {
+    if (thresholdBreached) {
       this.notifiedMap.put(aggKey, now);
       return new Result(true);
     }
