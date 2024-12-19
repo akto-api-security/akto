@@ -1,6 +1,7 @@
 package com.akto.runtime.policies;
 
 import com.akto.dao.*;
+import com.akto.dao.context.Context;
 import com.akto.dao.filter.MergedUrlsDao;
 import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
@@ -420,7 +421,7 @@ public class AktoPolicyNew {
 
             // sources
             if (source != null) {
-                subUpdates.add(Updates.set(SingleTypeInfo.SOURCES + "." + source.name(), new Document("timestamp", apiInfo.getDiscoveredTimestamp())));
+                subUpdates.add(Updates.set(SingleTypeInfo.SOURCES + "." + source.name(), new Document("timestamp", Context.now())));
             }
 
             // last seen
