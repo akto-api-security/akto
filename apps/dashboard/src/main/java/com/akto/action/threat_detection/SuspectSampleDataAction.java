@@ -3,19 +3,17 @@ package com.akto.action.threat_detection;
 import com.akto.action.UserAction;
 import com.akto.dto.traffic.SuspectSampleData;
 import com.akto.dto.type.URLMethods;
-import com.akto.grpc.auth.AuthToken;
-import com.akto.proto.generated.threat_detection.message.malicious_event.dashboard.v1.DashboardMaliciousEventMessage;
-import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.DashboardServiceGrpc;
-import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.DashboardServiceGrpc.DashboardServiceBlockingStub;
-import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchAlertFiltersRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchAlertFiltersResponse;
-import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListMaliciousRequestsRequest;
-import io.grpc.Grpc;
-import io.grpc.InsecureChannelCredentials;
-import io.grpc.ManagedChannel;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListMaliciousRequestsResponse;
+import com.akto.proto.utils.ProtoMessageUtils;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClients;
+import org.apache.http.util.EntityUtils;
 
 public class SuspectSampleDataAction extends UserAction {
 
@@ -30,51 +28,73 @@ public class SuspectSampleDataAction extends UserAction {
   Map<String, Integer> sort;
   int startTimestamp, endTimestamp;
 
-  private final DashboardServiceBlockingStub dsServiceStub;
+  private final CloseableHttpClient httpClient;
+  private final String backendUrl;
+  private final String backendToken;
 
   public SuspectSampleDataAction() {
     super();
-
-    String target = "localhost:8980";
-    ManagedChannel channel =
-        Grpc.newChannelBuilder(target, InsecureChannelCredentials.create()).build();
-    this.dsServiceStub =
-        DashboardServiceGrpc.newBlockingStub(channel)
-            .withCallCredentials(
-                new AuthToken(System.getenv("AKTO_threat_detection_BACKEND_TOKEN")));
+    this.httpClient = HttpClients.createDefault();
+    this.backendUrl = System.getenv("THREAT_DETECTION_BACKEND_URL");
+    this.backendToken = System.getenv("THREAT_DETECTION_BACKEND_TOKEN");
   }
 
   public String fetchSampleDataV2() {
-    List<DashboardMaliciousEventMessage> maliciousEvts =
-        this.dsServiceStub
-            .listMaliciousRequests(
-                ListMaliciousRequestsRequest.newBuilder().setPage(0).setLimit(500).build())
-            .getMaliciousEventsList();
+    HttpGet get =
+        new HttpGet(String.format("%s/api/dashboard/list_malicious_requests", backendUrl));
+    get.addHeader("Authorization", "Bearer " + backendToken);
+    get.addHeader("Content-Type", "application/json");
 
-    this.maliciousEvents =
-        maliciousEvts.stream()
-            .map(
-                mr ->
-                    new DashboardMaliciousEvent(
-                        mr.getId(),
-                        mr.getActor(),
-                        mr.getFilterId(),
-                        mr.getEndpoint(),
-                        URLMethods.Method.fromString(mr.getMethod()),
-                        mr.getApiCollectionId(),
-                        mr.getIp(),
-                        mr.getCountry(),
-                        mr.getDetectedAt()))
-            .collect(Collectors.toList());
+    try (CloseableHttpResponse resp = this.httpClient.execute(get)) {
+      String responseBody = EntityUtils.toString(resp.getEntity());
+
+      ProtoMessageUtils.<ListMaliciousRequestsResponse>toProtoMessage(
+              ListMaliciousRequestsResponse.class, responseBody)
+          .ifPresent(
+              msg -> {
+                this.maliciousEvents =
+                    msg.getMaliciousEventsList().stream()
+                        .map(
+                            smr ->
+                                new DashboardMaliciousEvent(
+                                    smr.getId(),
+                                    smr.getActor(),
+                                    smr.getFilterId(),
+                                    smr.getEndpoint(),
+                                    URLMethods.Method.fromString(smr.getMethod()),
+                                    smr.getApiCollectionId(),
+                                    smr.getIp(),
+                                    smr.getCountry(),
+                                    smr.getDetectedAt()))
+                        .collect(Collectors.toList());
+              });
+    } catch (Exception e) {
+      e.printStackTrace();
+      return ERROR.toUpperCase();
+    }
 
     return SUCCESS.toUpperCase();
   }
 
   public String fetchFiltersV2() {
-    FetchAlertFiltersResponse filters =
-        this.dsServiceStub.fetchAlertFilters(FetchAlertFiltersRequest.newBuilder().build());
-    ips = filters.getActorsList();
-    urls = filters.getUrlsList();
+    HttpGet get = new HttpGet(String.format("%s/api/dashboard/fetch_filters", backendUrl));
+    get.addHeader("Authorization", "Bearer " + backendToken);
+    get.addHeader("Content-Type", "application/json");
+
+    try (CloseableHttpResponse resp = this.httpClient.execute(get)) {
+      String responseBody = EntityUtils.toString(resp.getEntity());
+
+      ProtoMessageUtils.<FetchAlertFiltersResponse>toProtoMessage(
+              FetchAlertFiltersResponse.class, responseBody)
+          .ifPresent(
+              msg -> {
+                this.ips = msg.getActorsList();
+                this.urls = msg.getUrlsList();
+              });
+    } catch (Exception e) {
+      e.printStackTrace();
+      return ERROR.toUpperCase();
+    }
 
     return SUCCESS.toUpperCase();
   }
