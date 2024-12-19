@@ -114,7 +114,7 @@ public class SendMaliciousEventsToBackend extends AbstractKafkaConsumerTask {
                           new StringEntity(msg, ContentType.APPLICATION_JSON);
                       HttpPost req =
                           new HttpPost(
-                              String.format("%s/threat_detection/record_malicious_event", url));
+                              String.format("%s/api/threat_detection/record_malicious_event", url));
                       req.addHeader("Authorization", "Bearer " + token);
                       req.setEntity(requestEntity);
                       try {

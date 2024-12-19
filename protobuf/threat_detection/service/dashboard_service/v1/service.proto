@@ -26,8 +26,3 @@ message FetchAlertFiltersResponse {
   repeated string actors = 1;
   repeated string urls = 2;
 }
-
-service DashboardService {
-    rpc ListMaliciousRequests(ListMaliciousRequestsRequest) returns (ListMaliciousRequestsResponse);
-    rpc FetchAlertFilters(FetchAlertFiltersRequest) returns (FetchAlertFiltersResponse) {}
-}

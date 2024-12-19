@@ -29,26 +29,43 @@ public class BackendVerticle extends AbstractVerticle {
     // Create the router
     Router router = Router.router(vertx);
 
-    router.route().handler(BodyHandler.create());
+    Router api = Router.router(vertx);
 
-    router.route().handler(new AuthenticationInterceptor());
+    api.route().handler(BodyHandler.create());
+    api.route().handler(new AuthenticationInterceptor());
 
     Router dashboardRouter = new DashboardRouter(new DashboardService(mongoClient)).setup(vertx);
     Router threatDetectionRouter =
         new ThreatDetectionRouter(new MaliciousEventService(kafkaConfig)).setup(vertx);
 
-    router.route("/dashboard/*").subRouter(dashboardRouter);
-    router.route("/threat_detection/*").subRouter(threatDetectionRouter);
+    api.route("/dashboard/*").subRouter(dashboardRouter);
+    api.route("/threat_detection/*").subRouter(threatDetectionRouter);
+
+    router.route("/api/*").subRouter(api);
 
     // Start the HTTP server
+
+    router.route("/health").handler(ctx -> ctx.response().setStatusCode(200).end("OK"));
+
+    // 404 handler
+    router
+        .route()
+        .handler(
+            rc -> {
+              rc.response().setStatusCode(404).end("404 - Not Found: " + rc.request().uri());
+            });
+
+    int port =
+        Integer.parseInt(
+            System.getenv().getOrDefault("THREAT_DETECTION_BACKEND_SERVER_PORT", "9090"));
 
     vertx
         .createHttpServer()
         .requestHandler(router)
-        .listen(9090)
+        .listen(port)
         .onSuccess(
             server -> {
-              System.out.println("HTTP server started on port 9090");
+              System.out.println("HTTP server started on port " + port);
             })
         .onFailure(
             err -> {
