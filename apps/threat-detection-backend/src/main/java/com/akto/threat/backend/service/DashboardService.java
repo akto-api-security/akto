@@ -1,28 +1,25 @@
 package com.akto.threat.backend.service;
 
 import com.akto.proto.generated.threat_detection.message.malicious_event.dashboard.v1.DashboardMaliciousEventMessage;
-import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.DashboardServiceGrpc.DashboardServiceImplBase;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchAlertFiltersRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchAlertFiltersResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListMaliciousRequestsRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListMaliciousRequestsResponse;
 import com.akto.threat.backend.constants.MongoDBCollection;
 import com.akto.threat.backend.db.MaliciousEventModel;
-import com.akto.threat.backend.interceptors.Constants;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.DistinctIterable;
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Filters;
-import io.grpc.stub.StreamObserver;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import org.bson.conversions.Bson;
 
-public class DashboardService extends DashboardServiceImplBase {
+public class DashboardService {
   private final MongoClient mongoClient;
 
   public DashboardService(MongoClient mongoClient) {
@@ -40,14 +37,11 @@ public class DashboardService extends DashboardServiceImplBase {
     return result;
   }
 
-  @Override
-  public void fetchAlertFilters(
-      FetchAlertFiltersRequest request,
-      StreamObserver<FetchAlertFiltersResponse> responseObserver) {
-    int accountId = Constants.ACCOUNT_ID_CONTEXT_KEY.get();
+  public FetchAlertFiltersResponse fetchAlertFilters(
+      String accountId, FetchAlertFiltersRequest request) {
     MongoCollection<MaliciousEventModel> coll =
         this.mongoClient
-            .getDatabase(accountId + "")
+            .getDatabase(accountId)
             .getCollection("malicious_events", MaliciousEventModel.class);
 
     Set<String> actors =
@@ -56,25 +50,18 @@ public class DashboardService extends DashboardServiceImplBase {
         DashboardService.<String>findDistinctFields(
             coll, "latestApiEndpoint", String.class, Filters.empty());
 
-    FetchAlertFiltersResponse response =
-        FetchAlertFiltersResponse.newBuilder().addAllActors(actors).addAllUrls(urls).build();
-    responseObserver.onNext(response);
-    responseObserver.onCompleted();
+    return FetchAlertFiltersResponse.newBuilder().addAllActors(actors).addAllUrls(urls).build();
   }
 
-  @Override
-  public void listMaliciousRequests(
-      ListMaliciousRequestsRequest request,
-      StreamObserver<ListMaliciousRequestsResponse> responseObserver) {
-    int accountId = Constants.ACCOUNT_ID_CONTEXT_KEY.get();
-
+  public ListMaliciousRequestsResponse listMaliciousRequests(
+      String accountId, ListMaliciousRequestsRequest request) {
     int page = request.hasPage() && request.getPage() > 0 ? request.getPage() : 1;
     int limit = request.getLimit();
     int skip = (page - 1) * limit;
 
     MongoCollection<MaliciousEventModel> coll =
         this.mongoClient
-            .getDatabase(accountId + "")
+            .getDatabase(accountId)
             .getCollection(
                 MongoDBCollection.ThreatDetection.MALICIOUS_EVENTS, MaliciousEventModel.class);
 
@@ -102,14 +89,11 @@ public class DashboardService extends DashboardServiceImplBase {
                 .setDetectedAt(evt.getDetectedAt())
                 .build());
       }
-      ListMaliciousRequestsResponse response =
-          ListMaliciousRequestsResponse.newBuilder()
-              .setPage(page)
-              .setTotal(maliciousEvents.size())
-              .addAllMaliciousEvents(maliciousEvents)
-              .build();
-      responseObserver.onNext(response);
-      responseObserver.onCompleted();
+      return ListMaliciousRequestsResponse.newBuilder()
+          .setPage(page)
+          .setTotal(maliciousEvents.size())
+          .addAllMaliciousEvents(maliciousEvents)
+          .build();
     }
   }
 }

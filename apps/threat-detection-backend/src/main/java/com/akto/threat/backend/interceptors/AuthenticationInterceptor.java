@@ -2,11 +2,11 @@ package com.akto.threat.backend.interceptors;
 
 import com.akto.dao.ConfigsDao;
 import com.akto.dto.Config;
-import com.akto.grpc.auth.AuthToken;
-import io.grpc.*;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jws;
 import io.jsonwebtoken.Jwts;
+import io.vertx.core.Handler;
+import io.vertx.ext.web.RoutingContext;
 import java.io.IOException;
 import java.security.KeyFactory;
 import java.security.NoSuchAlgorithmException;
@@ -15,32 +15,7 @@ import java.security.spec.InvalidKeySpecException;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.Base64;
 
-public class AuthenticationInterceptor implements ServerInterceptor {
-  @Override
-  public <ReqT, RespT> ServerCall.Listener<ReqT> interceptCall(
-      ServerCall<ReqT, RespT> call, Metadata metadata, ServerCallHandler<ReqT, RespT> next) {
-    String token = AuthToken.getBearerTokenFromMeta(metadata).orElse(null);
-
-    if (token == null) {
-      call.close(
-          Status.UNAUTHENTICATED.withDescription("Authorization token is required"), metadata);
-      return null;
-    }
-
-    try {
-      PublicKey publicKey = getPublicKey();
-      Jws<Claims> claims =
-          Jwts.parserBuilder().setSigningKey(publicKey).build().parseClaimsJws(token);
-      int accountId = (int) claims.getBody().get("accountId");
-      Context ctx = Context.current().withValue(Constants.ACCOUNT_ID_CONTEXT_KEY, accountId);
-      return Contexts.interceptCall(ctx, call, metadata, next);
-    } catch (Exception e) {
-      e.printStackTrace();
-      call.close(Status.UNAUTHENTICATED.withDescription("Invalid token"), metadata);
-    }
-
-    return null;
-  }
+public class AuthenticationInterceptor implements Handler<RoutingContext> {
 
   private static PublicKey getPublicKey()
       throws NoSuchAlgorithmException, InvalidKeySpecException, IOException {
@@ -67,6 +42,28 @@ public class AuthenticationInterceptor implements ServerInterceptor {
     } catch (Exception e) {
       System.out.println(e);
       throw e;
+    }
+  }
+
+  @Override
+  public void handle(RoutingContext context) {
+    String token = context.request().getHeader("Authorization");
+    if (token == null || !token.startsWith("Bearer ")) {
+      context.response().setStatusCode(401).end("Missing or Invalid Authorization header");
+      return;
+    }
+
+    token = token.substring(7);
+
+    try {
+      PublicKey publicKey = getPublicKey();
+      Jws<Claims> claims =
+          Jwts.parserBuilder().setSigningKey(publicKey).build().parseClaimsJws(token);
+      int accountId = (int) claims.getBody().get("accountId");
+      context.put("accountId", accountId + "");
+      context.next();
+    } catch (Exception e) {
+      context.response().setStatusCode(401).end("Missing or Invalid Authorization header");
     }
   }
 }

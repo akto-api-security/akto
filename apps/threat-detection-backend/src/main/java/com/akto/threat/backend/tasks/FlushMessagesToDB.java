@@ -86,8 +86,7 @@ public class FlushMessagesToDB {
     Map<String, Object> json = gson.fromJson(message, Map.class);
     String eventType = (String) json.get("eventType");
     String payload = (String) json.get("payload");
-    Double accIdDouble = (Double) json.get("accountId");
-    int accountId = accIdDouble.intValue();
+    String accountId = (String) json.get("accountId");
 
     switch (eventType) {
       case MongoDBCollection.ThreatDetection.AGGREGATE_SAMPLE_MALICIOUS_REQUESTS:
