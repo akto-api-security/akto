@@ -1,6 +1,7 @@
 package com.akto.har;
 
 import com.akto.dao.context.Context;
+import com.akto.dto.HttpResponseParams;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -16,7 +17,7 @@ public class HAR {
     private static final LoggerMaker loggerMaker = new LoggerMaker(Har.class);
     public static final String JSON_CONTENT_TYPE = "application/json";
     public static final String FORM_URL_ENCODED_CONTENT_TYPE = "application/x-www-form-urlencoded";
-    public List<String> getMessages(String harString, int collection_id, int accountId) throws HarReaderException {
+    public List<String> getMessages(String harString, int collection_id, int accountId, HttpResponseParams.Source source) throws HarReaderException {
         HarReader harReader = new HarReader();
         Har har = harReader.readFromString(harString, HarReaderMode.LAX);
 
@@ -31,6 +32,7 @@ public class HAR {
                 Map<String,String> result = getResultMap(entry, accountId);
                 if (result != null) {
                     result.put("akto_vxlan_id", collection_id+"");
+                    result.put("source", source.name());
                     entriesList.add(mapper.writeValueAsString(result));
                 }
 

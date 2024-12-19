@@ -146,8 +146,10 @@ public class HarAction extends UserAction {
             return ERROR.toUpperCase();
         }
 
+        HttpResponseParams.Source source = HttpResponseParams.Source.HAR;
         if (getSession().getOrDefault("utility","").equals(Utility.BURP.toString())) {
             BurpPluginInfoDao.instance.updateLastDataSentTimestamp(getSUser().getLogin());
+            source = HttpResponseParams.Source.BURP;
         }
 
         try {
@@ -156,7 +158,7 @@ public class HarAction extends UserAction {
             String zippedString = GzipUtils.zipString(harString);
             com.akto.dto.files.File file = new com.akto.dto.files.File(HttpResponseParams.Source.HAR.toString(),zippedString);
             FilesDao.instance.insertOne(file);
-            List<String> messages = har.getMessages(harString, apiCollectionId, Context.accountId.get());
+            List<String> messages = har.getMessages(harString, apiCollectionId, Context.accountId.get(), source);
             harErrors = har.getErrors();
             Utils.pushDataToKafka(apiCollectionId, topic, messages, harErrors, skipKafka);
             loggerMaker.infoAndAddToDb("Har file upload processing for collectionId:" + apiCollectionId + " finished", LoggerMaker.LogDb.DASHBOARD);
