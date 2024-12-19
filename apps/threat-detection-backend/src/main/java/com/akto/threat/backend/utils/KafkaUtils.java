@@ -7,7 +7,7 @@ public class KafkaUtils {
 
   private static final Gson gson = new Gson();
 
-  public static String generateMsg(Object writes, String eventType, int accountId) {
+  public static String generateMsg(Object writes, String eventType, String accountId) {
     BasicDBObject obj = new BasicDBObject();
     obj.put("eventType", eventType);
     String payloadStr = gson.toJson(writes);

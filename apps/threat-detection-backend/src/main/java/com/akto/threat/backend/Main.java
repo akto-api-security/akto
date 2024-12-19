@@ -14,14 +14,11 @@ import com.mongodb.ReadPreference;
 import com.mongodb.WriteConcern;
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoClients;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import org.bson.codecs.configuration.CodecRegistry;
 import org.bson.codecs.pojo.PojoCodecProvider;
 
 public class Main {
   public static void main(String[] args) throws Exception {
-    ExecutorService executor = Executors.newFixedThreadPool(2);
 
     DaoInit.init(new ConnectionString(System.getenv("AKTO_MONGO_CONN")));
 
@@ -55,28 +52,6 @@ public class Main {
 
     new FlushMessagesToDB(internalKafkaConfig, threatProtectionMongo).run();
 
-    executor.submit(
-        () -> {
-          int port =
-              Integer.parseInt(
-                  System.getenv().getOrDefault("AKTO_THREAT_PROTECTION_BACKEND_PORT", "8980"));
-          BackendServer server =
-              new BackendServer(port, threatProtectionMongo, internalKafkaConfig);
-          try {
-            server.start();
-            server.blockUntilShutdown();
-          } catch (Exception e) {
-            e.printStackTrace();
-          }
-        });
-
-    executor.submit(
-        () -> {
-          try {
-            HealthCheckServer.startHttpServer();
-          } catch (Exception e) {
-            e.printStackTrace();
-          }
-        });
+    new BackendVerticle(threatProtectionMongo, internalKafkaConfig).start();
   }
 }
