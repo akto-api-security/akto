@@ -163,7 +163,7 @@ public class OpenApiAction extends UserAction implements ServletResponseAware {
             source = HttpResponseParams.Source.MIRRORING;
         }
 
-        if (apiCollection.getType().equals(ApiCollection.Type.API_GROUP)) {
+        if (apiCollection.getType() != null && apiCollection.getType().equals(ApiCollection.Type.API_GROUP)) {
             addActionError("Can't upload OpenAPI file for collection groups");
             return ERROR.toUpperCase();
         }
