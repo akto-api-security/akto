@@ -419,7 +419,9 @@ public class AktoPolicyNew {
             subUpdates.add(Updates.setOnInsert(ApiInfo.DISCOVERED_TIMESTAMP, apiInfo.getDiscoveredTimestamp()));
 
             // sources
-            subUpdates.add(Updates.set(SingleTypeInfo.SOURCES + "." + source.name(), new Document("timestamp", apiInfo.getDiscoveredTimestamp())));
+            if (source != null) {
+                subUpdates.add(Updates.set(SingleTypeInfo.SOURCES + "." + source.name(), new Document("timestamp", apiInfo.getDiscoveredTimestamp())));
+            }
 
             // last seen
             subUpdates.add(Updates.set(ApiInfo.LAST_SEEN, apiInfo.getLastSeen()));
