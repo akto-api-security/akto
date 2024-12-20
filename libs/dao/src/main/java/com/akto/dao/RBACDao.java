@@ -3,6 +3,8 @@ package com.akto.dao;
 import com.akto.util.Pair;
 import com.mongodb.client.model.Projections;
 import org.bson.conversions.Bson;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.akto.dao.context.Context;
 import com.akto.dto.RBAC;
@@ -20,6 +22,8 @@ import static com.mongodb.client.model.Updates.set;
 
 public class RBACDao extends CommonContextDao<RBAC> {
     public static final RBACDao instance = new RBACDao();
+
+    private static final Logger logger = LoggerFactory.getLogger(RBACDao.class);
 
     //Caching for RBACDAO
     private static final ConcurrentHashMap<Pair<Integer, Integer>, Pair<Role, Integer>> userRolesMap = new ConcurrentHashMap<>();
@@ -96,16 +100,21 @@ public class RBACDao extends CommonContextDao<RBAC> {
                 Projections.include(RBAC.API_COLLECTIONS_ID, RBAC.ROLE));
 
         if (rbac == null) {
+            logger.info(String.format("Rbac not found userId: %d accountId: %d", userId, accountId));
             return new ArrayList<>();
         }
 
         if (RBAC.Role.ADMIN.equals(rbac.getRole())) {
+            logger.info(String.format("Rbac is admin userId: %d accountId: %d", userId, accountId));
             return null;
         }
 
         if (rbac.getApiCollectionsId() == null) {
+            logger.info(String.format("Rbac collections not found userId: %d accountId: %d", userId, accountId));
             return new ArrayList<>();
         }
+
+        logger.info(String.format("Rbac found userId: %d accountId: %d", userId, accountId));
 
         return rbac.getApiCollectionsId();
     }
