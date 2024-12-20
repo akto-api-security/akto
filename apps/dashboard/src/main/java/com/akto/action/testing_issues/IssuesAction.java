@@ -10,6 +10,7 @@ import com.akto.dao.demo.VulnerableRequestForTemplateDao;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dao.testing.TestingRunResultSummariesDao;
+import com.akto.dao.testing.sources.TestReportsDao;
 import com.akto.dao.testing.sources.TestSourceConfigsDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.ApiInfo;
@@ -23,6 +24,7 @@ import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.*;
+import com.akto.dto.testing.sources.TestReports;
 import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -37,6 +39,8 @@ import com.akto.util.enums.GlobalEnums.TestRunIssueStatus;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.*;
+import com.mongodb.client.result.InsertOneResult;
+
 import org.bson.Document;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
@@ -562,6 +566,21 @@ public class IssuesAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    private Map<String, List<String>> reportFilterList;
+    private String generatedReportId;
+
+    public String generateTestReport () {
+        try {
+            TestReports testReport = new TestReports(reportFilterList, Context.now(), "");
+            InsertOneResult insertTResult = TestReportsDao.instance.insertOne(testReport);
+            this.generatedReportId = insertTResult.getInsertedId().toString();
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            addActionError("Error in generating pdf report");
+            return ERROR.toUpperCase();
+        }
+    }
+
     public List<TestingRunIssues> getIssues() {
         return issues;
     }
@@ -791,5 +810,13 @@ public class IssuesAction extends UserAction {
 
     public TestingRunResultSummary getTestingRunResultSummary() {
         return testingRunResultSummary;
+    }
+
+    public void setReportFilterList(Map<String, List<String>> reportFilterList) {
+        this.reportFilterList = reportFilterList;
+    }
+
+    public String getGeneratedReportId() {
+        return generatedReportId;
     }
 }
