@@ -763,7 +763,7 @@ function ApiCollections() {
             key={refreshData}
             pageLimit={100}
             data={data[selectedTab]} 
-            sortOptions={ selectedTab === 'groups' ? [...tempSortOptions, ...sortOptions] : sortOptions} 
+            sortOptions={ selectedTab === 'groups' ? [...tempSortOptions, ...sortOptions] : sortOptions}
             resourceName={resourceName} 
             filters={[]}
             disambiguateLabel={disambiguateLabel} 

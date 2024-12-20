@@ -6366,6 +6366,28 @@
             </result>
         </action>
 
+        <action name="api/bulkCreateJiraTickets" class="com.akto.action.JiraIntegrationAction" method="bulkCreateJiraTickets" >
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">ISSUES</param>
+                <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User created jira issues in bulk</param>
+            </interceptor-ref>
+
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*, ^responses.*</param>
+            </result>
+        </action>
+
         <action name="api/attachFileToIssue" class="com.akto.action.JiraIntegrationAction" method="attachFileToIssue" >
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
