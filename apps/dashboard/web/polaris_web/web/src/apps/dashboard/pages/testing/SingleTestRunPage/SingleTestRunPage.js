@@ -246,6 +246,7 @@ function SingleTestRunPage() {
   const fetchTableData = async (sortKey, sortOrder, skip, limit, filters, filterOperators, queryValue) => {
     let testRunResultsRes = []
     let testRunCountMap = []
+    let totalIgnoredIssuesCount = 0
     const { testingRun, workflowTest, testingRunType } = testingRunResultSummariesObj
     if(testingRun === undefined){
       return {value: [], total: 0}
@@ -268,6 +269,7 @@ function SingleTestRunPage() {
           ignoredTestRunResults = transform.prepareTestRunResults(hexId, ignoredIssuesTestingResult, subCategoryMap, subCategoryFromSourceConfigMap)
         })
         testRunResultsRes = ignoredTestRunResults
+        totalIgnoredIssuesCount = ignoredTestRunResults.length
       } else {
         await api.fetchTestingRunResults(localSelectedTestRun.testingRunResultSummaryHexId, tableTabMap[selectedTab], sortKey, sortOrder, skip, limit, filters, queryValue).then(({ testingRunResults, testCountMap, errorEnums }) => {
           testRunCountMap = testCountMap
@@ -283,7 +285,7 @@ function SingleTestRunPage() {
       }
     }
     fillTempData(testRunResultsRes, selectedTab)
-    return {value: transform.getPrettifiedTestRunResults(testRunResultsRes), total: testRunCountMap[tableTabMap[selectedTab]]}
+    return {value: transform.getPrettifiedTestRunResults(testRunResultsRes), total: selectedTab === 'ignored_issues' ? totalIgnoredIssuesCount : testRunCountMap[tableTabMap[selectedTab]]}
   }
 
   useEffect(() => {

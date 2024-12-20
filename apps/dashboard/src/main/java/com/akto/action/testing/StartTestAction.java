@@ -608,12 +608,14 @@ public class StartTestAction extends UserAction {
         }
 
         List<Bson> testingRunResultFilters = prepareTestRunResultsFilters(testingRunResultSummaryId, queryMode);
-        testingRunResultFilters.add(
-            Filters.and(
-                Filters.nin(TestingRunResult.API_INFO_KEY, apiInfoKeyList),
-                Filters.nin(TestingRunResult.TEST_SUB_TYPE, testSubCategoryList)
-            )
-        );
+        if(queryMode == QueryMode.VULNERABLE) {
+            testingRunResultFilters.add(
+                    Filters.and(
+                            Filters.nin(TestingRunResult.API_INFO_KEY, apiInfoKeyList),
+                            Filters.nin(TestingRunResult.TEST_SUB_TYPE, testSubCategoryList)
+                    )
+            );
+        }
 
         if(queryMode == QueryMode.SKIPPED_EXEC || queryMode == QueryMode.SKIPPED_EXEC_NEED_CONFIG){
             TestError[] testErrors = TestResult.TestError.values();
