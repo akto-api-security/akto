@@ -439,19 +439,31 @@ const transform = {
             </Text>
           )
           break;
-        case "Tags":
-          if (category?.issueTags == null || category?.issueTags == undefined || category?.issueTags.length == 0) {
-            return;
-          }
-          sectionLocal.content = (
-            <HorizontalStack gap="2">
-              {
-                transform.tagList(category?.issueTags)
-              }
-            </HorizontalStack>
-          )
+        case "Compliance Standards":
+            if (category?.complianceStandards == null || category?.complianceStandards == undefined || category?.complianceStandards.length == 0) {
+              return;
+            }
+            sectionLocal.content = (
+              <HorizontalStack gap="2">
+                {
+                  transform.tagList(category?.complianceStandards)
+                }
+              </HorizontalStack>
+            )
           break;
-        case "CWE":
+        case "Tags":
+              if (category?.issueTags == null || category?.issueTags == undefined || category?.issueTags.length == 0) {
+                return;
+              }
+              sectionLocal.content = (
+                <HorizontalStack gap="2">
+                  {
+                    transform.tagList(category?.issueTags)
+                  }
+                </HorizontalStack>
+              )
+          break;
+          case "CWE":
           if (category?.cwe == null || category?.cwe == undefined || category?.cwe.length == 0) {
             return;
           }
@@ -667,6 +679,12 @@ getInfoSectionsHeaders(){
       title: "Impact",
       content: "",
       tooltipContent: 'The impact of the test on apis in general scenario.'
+    },
+    {
+      icon: CollectionsMajor,
+      title: "Compliance Standards",
+      content: "",
+      tooltipContent: 'Compliance standards associated with this test.'
     },
     {
       icon: CollectionsMajor,

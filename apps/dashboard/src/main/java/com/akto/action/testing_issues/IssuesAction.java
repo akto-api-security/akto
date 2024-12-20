@@ -386,6 +386,8 @@ public class IssuesAction extends UserAction {
         infoObj.put("issueDetails", info.getDetails());
         infoObj.put("issueImpact", info.getImpact());
         infoObj.put("issueTags", info.getTags());
+        // infoObj.put("complianceStandards", info.getComplianceStandards());
+        infoObj.put("complianceStandards", Arrays.asList("HIPAA", "GDPR"));
         infoObj.put("testName", info.getName());
         infoObj.put("references", info.getReferences());
         infoObj.put("cwe", info.getCwe());
