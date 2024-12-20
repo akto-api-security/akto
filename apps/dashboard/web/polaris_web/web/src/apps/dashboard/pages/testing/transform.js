@@ -249,9 +249,6 @@ const transform = {
     if (testingRunResultSummary == null) {
       testingRunResultSummary = {};
     }
-    if (testingRunResultSummary.countIssues != null) {
-      testingRunResultSummary.countIssues = transform.prepareCountIssues(testingRunResultSummary.countIssues);
-    }
 
     let state = cicd ? testingRunResultSummary.state : data.state ;
     if (cicd !== true && checkTestFailure(testingRunResultSummary.state, state)) {
