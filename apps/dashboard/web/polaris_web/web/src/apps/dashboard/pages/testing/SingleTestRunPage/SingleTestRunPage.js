@@ -1,4 +1,3 @@
-import GithubSimpleTable from "../../../components/tables/GithubSimpleTable";
 import {
   Text,
   Button,
@@ -133,6 +132,7 @@ function SingleTestRunPage() {
 
   const [testingRunResultSummariesObj, setTestingRunResultSummariesObj] = useState({})
   const [allResultsLength, setAllResultsLength] = useState(undefined)
+  const [currentSummary, setCurrentSummary] = useState('')
 
   const tableTabMap = {
     vulnerable: "VULNERABLE",
@@ -185,7 +185,7 @@ function SingleTestRunPage() {
     })
   }
 
-  async function setSummary(summary){
+  async function setSummary(summary, initialCall=false){
     setTempLoading((prev) => {
       prev.running = false;
       return prev;
@@ -198,19 +198,10 @@ function SingleTestRunPage() {
 
       return {...prev};
     });
-
-    await fetchTestingRunResultsData(summary.hexId);
-  }
-  async function fetchTestingRunResultsData(summaryHexId){
-    setLoading(false);
-    setTempLoading((prev) => {
-      prev.vulnerable = true;
-      prev.no_vulnerability_found = true;
-      prev.skipped = true;
-      prev.need_configurations = true
-      prev.ignored_issues = true
-      return {...prev};
-    });
+    setCurrentSummary(summary);
+    if(!initialCall){
+      setUpdateTable(Date.now().toString())
+    }
   }
 
   useEffect(() => {
@@ -218,18 +209,34 @@ function SingleTestRunPage() {
   }, [testingRunResultSummariesObj])
 
   const fetchTestingRunResultSummaries = async () => {
-    await api.fetchTestingRunResultSummaries(hexId).then(async ({ testingRun, testingRunResultSummaries, workflowTest, testingRunType }) => {
+    let tempTestingRunResultSummaries = [];
+    await api.fetchTestingRunResultSummaries(hexId).then(({ testingRun, testingRunResultSummaries, workflowTest, testingRunType }) => {
+      tempTestingRunResultSummaries = testingRunResultSummaries
       setTestingRunResultSummariesObj({
-        testingRun, testingRunResultSummaries, workflowTest, testingRunType
+        testingRun, workflowTest, testingRunType
       })
     })
+    const timeNow = func.timeNow()
+    const defaultIgnoreTime = LocalStore.getState().defaultIgnoreSummaryTime
+      tempTestingRunResultSummaries.sort((a,b) => {
+        const isAWithinTimeAndRunning = (timeNow - defaultIgnoreTime <= a.startTimestamp) && a.state === 'RUNNING';
+        const isBWithinTimeAndRunning = (timeNow - defaultIgnoreTime <= b.startTimestamp) && b.state === 'RUNNING';
+  
+        if (isAWithinTimeAndRunning && isBWithinTimeAndRunning) {
+            return b.startTimestamp - a.startTimestamp;
+        }
+        if (isAWithinTimeAndRunning) return -1;
+        if (isBWithinTimeAndRunning) return 1;
+        return b.startTimestamp - a.startTimestamp;
+      })
+    setSummary(tempTestingRunResultSummaries[0], true)
   }
 
   const fetchTableData = async (sortKey, sortOrder, skip, limit, filters, filterOperators, queryValue) => {
     let testRunResultsRes = []
     let testRunCountMap = []
-    const { testingRun, testingRunResultSummaries, workflowTest, testingRunType } = testingRunResultSummariesObj
-    if(testingRun == undefined || testingRunResultSummaries.length === 0){
+    const { testingRun, workflowTest, testingRunType } = testingRunResultSummariesObj
+    if(testingRun === undefined){
       return {value: [], total: 0}
     }
 
@@ -237,20 +244,7 @@ function SingleTestRunPage() {
       setWorkflowTest(workflowTest);
     }
     let cicd = testingRunType === "CI_CD";
-    const timeNow = func.timeNow()
-    const defaultIgnoreTime = LocalStore.getState().defaultIgnoreSummaryTime
-    testingRunResultSummaries.sort((a,b) => {
-      const isAWithinTimeAndRunning = (timeNow - defaultIgnoreTime <= a.startTimestamp) && a.state === 'RUNNING';
-      const isBWithinTimeAndRunning = (timeNow - defaultIgnoreTime <= b.startTimestamp) && b.state === 'RUNNING';
-
-      if (isAWithinTimeAndRunning && isBWithinTimeAndRunning) {
-          return b.startTimestamp - a.startTimestamp;
-      }
-      if (isAWithinTimeAndRunning) return -1;
-      if (isBWithinTimeAndRunning) return 1;
-      return b.startTimestamp - a.startTimestamp;
-    })
-    const localSelectedTestRun = transform.prepareTestRun(testingRun, testingRunResultSummaries[0], cicd, false);
+    const localSelectedTestRun = transform.prepareTestRun(testingRun, currentSummary , cicd, false);
     setTestingRunConfigSettings(testingRun.testingRunConfig?.configsAdvancedSettings || [])
     setTestingRunConfigId(testingRun.testingRunConfig?.id || -1)
 
