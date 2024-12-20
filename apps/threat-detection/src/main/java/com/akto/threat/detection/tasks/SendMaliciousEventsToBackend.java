@@ -105,7 +105,7 @@ public class SendMaliciousEventsToBackend extends AbstractKafkaConsumerTask {
                       .collect(Collectors.toList()));
             }
 
-            String url = "http://localhost:9090";
+            String url = System.getenv("AKTO_THREAT_PROTECTION_BACKEND_URL");
             String token = System.getenv("AKTO_THREAT_PROTECTION_BACKEND_TOKEN");
             ProtoMessageUtils.toString(reqBuilder.build())
                 .ifPresent(
