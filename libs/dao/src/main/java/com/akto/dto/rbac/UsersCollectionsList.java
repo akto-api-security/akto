@@ -11,9 +11,14 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 public class UsersCollectionsList {
     private static final ConcurrentHashMap<Pair<Integer, Integer>, Pair<List<Integer>, Integer>> usersCollectionMap = new ConcurrentHashMap<>();
     private static final int EXPIRY_TIME = 15 * 60;
+
+    private static final Logger logger = LoggerFactory.getLogger(UsersCollectionsList.class);
 
     public static void deleteCollectionIdsFromCache(int userId, int accountId) {
         Pair<Integer, Integer> key = new Pair<>(userId, accountId);
@@ -44,6 +49,7 @@ public class UsersCollectionsList {
             if (organization == null ||
                     organization.getFeatureWiseAllowed() == null ||
                     organization.getFeatureWiseAllowed().isEmpty()) {
+                logger.info("UsersCollectionsList org details not available");
                 collectionList = null;
             // feature accessible
             } else if (organization != null &&
@@ -51,6 +57,7 @@ public class UsersCollectionsList {
                     !organization.getFeatureWiseAllowed().isEmpty() &&
                     organization.getFeatureWiseAllowed().containsKey(RBAC_FEATURE) &&
                     organization.getFeatureWiseAllowed().get(RBAC_FEATURE).getIsGranted()) {
+                logger.info("UsersCollectionsList rbac feature found");
                 collectionList = RBACDao.instance.getUserCollectionsById(userId, accountId);
             // feature not accessible
             } else {
