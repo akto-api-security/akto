@@ -188,6 +188,7 @@ public class Executor {
                 }
                 vulnerable = res.getVulnerable();
             } catch(Exception e) {
+                e.printStackTrace();
                 testLogs.add(new TestingRunResult.TestLog(TestingRunResult.TestLogType.ERROR, "Error executing test request: " + e.getMessage()));
                 error_messages.add("Error executing test request: " + e.getStackTrace());
                 loggerMaker.errorAndAddToDb("Error executing test request " + logId + " " + e.getMessage(), LogDb.TESTING);
@@ -407,6 +408,7 @@ public class Executor {
             ExecutorSingleOperationResp resp = runOperation(operationType, rawApi, key, value, varMap, authMechanism, customAuthTypes, apiInfoKey);
             return resp;
         } catch(Exception e) {
+            e.printStackTrace();
             return new ExecutorSingleOperationResp(false, "error executing executor operation " + operationType + " key " + key + " value " + value + e.getStackTrace());
         }
     }
