@@ -178,16 +178,18 @@ public class Executor {
             try {
                 // follow redirects = true for now
                 testResponse = ApiExecutor.sendRequest(testReq.getRequest(), followRedirect, testingRunConfig, debug, testLogs, Main.SKIP_SSRF_CHECK);
+                loggerMaker.infoAndAddToDb("successfully sent request for test url " + testReq.getRequest().getUrl(), LogDb.TESTING);
                 requestSent = true;
                 ExecutionResult attempt = new ExecutionResult(singleReq.getSuccess(), singleReq.getErrMsg(), testReq.getRequest(), testResponse);
                 TestResult res = validate(attempt, sampleRawApi, varMap, logId, validatorNode, apiInfoKey);
+                loggerMaker.infoAndAddToDb("successfully validated test request for test url " + testReq.getRequest().getUrl(), LogDb.TESTING);
                 if (res != null) {
                     result.add(res);
                 }
                 vulnerable = res.getVulnerable();
             } catch(Exception e) {
                 testLogs.add(new TestingRunResult.TestLog(TestingRunResult.TestLogType.ERROR, "Error executing test request: " + e.getMessage()));
-                error_messages.add("Error executing test request: " + e.getMessage());
+                error_messages.add("Error executing test request: " + e.getStackTrace());
                 loggerMaker.errorAndAddToDb("Error executing test request " + logId + " " + e.getMessage(), LogDb.TESTING);
             }
         }
@@ -405,7 +407,7 @@ public class Executor {
             ExecutorSingleOperationResp resp = runOperation(operationType, rawApi, key, value, varMap, authMechanism, customAuthTypes, apiInfoKey);
             return resp;
         } catch(Exception e) {
-            return new ExecutorSingleOperationResp(false, "error executing executor operation " + e.getMessage());
+            return new ExecutorSingleOperationResp(false, "error executing executor operation " + operationType + " key " + key + " value " + value + e.getStackTrace());
         }
     }
 
