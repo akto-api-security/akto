@@ -576,9 +576,21 @@ public class IssuesAction extends UserAction {
             this.generatedReportId = insertTResult.getInsertedId().toString();
             return SUCCESS.toUpperCase();
         } catch (Exception e) {
+            e.printStackTrace();
             addActionError("Error in generating pdf report");
             return ERROR.toUpperCase();
         }
+    }
+
+    public String getReportFilters () {
+        if(this.generatedReportId == null){
+            addActionError("Report id cannot be null");
+            return ERROR.toUpperCase();
+        }
+        ObjectId reportId = new ObjectId(this.generatedReportId);
+        TestReports reportDoc = TestReportsDao.instance.findOne(Filters.eq(Constants.ID, reportId));
+        this.reportFilterList = reportDoc.getFiltersForReport();
+        return SUCCESS.toUpperCase();
     }
 
     public List<TestingRunIssues> getIssues() {
@@ -818,5 +830,13 @@ public class IssuesAction extends UserAction {
 
     public String getGeneratedReportId() {
         return generatedReportId;
+    }
+
+    public void setGeneratedReportId(String generatedReportId) {
+        this.generatedReportId = generatedReportId;
+    }
+
+    public Map<String, List<String>> getReportFilterList() {
+        return reportFilterList;
     }
 }

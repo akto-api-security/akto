@@ -6,7 +6,7 @@ import Store from "../../../store";
 import func from "@/util/func";
 import { MarkFulfilledMinor, ReportMinor, ExternalMinor } from '@shopify/polaris-icons';
 import PersistStore from "../../../../main/PersistStore";
-import { Button, HorizontalGrid, HorizontalStack, IndexFiltersMode, Modal, Text, VerticalStack } from "@shopify/polaris";
+import { Button, HorizontalGrid, HorizontalStack, IndexFiltersMode } from "@shopify/polaris";
 import EmptyScreensLayout from "../../../components/banners/EmptyScreensLayout";
 import { ISSUES_PAGE_DOCS_URL } from "../../../../main/onboardingData";
 import {SelectCollectionComponent} from "../../testing/TestRunsPage/TestrunsBannerComponent"
@@ -27,9 +27,9 @@ import SpinnerCentered from "../../../components/progress/SpinnerCentered.jsx";
 import TableStore from "../../../components/tables/TableStore.js";
 import CriticalFindingsGraph from "./CriticalFindingsGraph.jsx";
 import CriticalUnsecuredAPIsOverTimeGraph from "./CriticalUnsecuredAPIsOverTimeGraph.jsx";
-import DropdownSearch from "../../../components/shared/DropdownSearch.jsx";
 import settingFunctions from "../../settings/module.js";
 import JiraTicketCreationModal from "../../../components/shared/JiraTicketCreationModal.jsx";
+import testingApi from "../../testing/api.js"
 
 const sortOptions = [
     { label: 'Severity', value: 'severity asc', directionLabel: 'Highest', sortKey: 'severity', columnIndex: 2 },
@@ -194,15 +194,12 @@ function IssuesPage() {
         } else {
             setHeaders(prevHeaders => prevHeaders.filter(header => header.value !== "issueStatus"))
         }
+        resetResourcesSelected();
     }, [selectedTab])
 
     useEffect(() => {
         setKey(!key)
     }, [startTimestamp, endTimestamp])
-
-    useEffect(() => {
-        resetResourcesSelected()
-    }, [selectedTab])
 
     const [searchParams, setSearchParams] = useSearchParams();
   const resultId = searchParams.get("result")
@@ -329,9 +326,11 @@ function IssuesPage() {
           }          
     }
 
-    const openVulnerabilityReport = () => {
-        let summaryId = btoa(JSON.stringify(issuesFilters))
-        window.open('/dashboard/issues/summary/' + summaryId, '_blank');
+    const openVulnerabilityReport = async() => {
+        await testingApi.generatePDFReport(issuesFilters).then((res) => {
+          const responseId = res.split("=")[1];
+          window.open('/dashboard/issues/summary/' + responseId.split("}")[0], '_blank');
+        })
     }
 
     const infoItems = [
@@ -373,10 +372,10 @@ function IssuesPage() {
 
         let obj = {
             'filterStatus': filterStatus,
-            'filterCollectionsId': filterCollectionsId,
+            'filterCollectionsId': [filterCollectionsId.toString()],
             'filterSeverity': filterSeverity,
             filterSubCategory: filterSubCategory,
-            startEpoch: startTimestamp
+            startEpoch: [startTimestamp.toString()]
         }
         setIssuesFilters(obj)
 

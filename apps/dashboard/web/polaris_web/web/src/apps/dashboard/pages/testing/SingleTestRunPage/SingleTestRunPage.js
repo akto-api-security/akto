@@ -130,6 +130,8 @@ function SingleTestRunPage() {
   const [testingRunConfigId, setTestingRunConfigId] = useState(-1)
   const apiCollectionMap = PersistStore(state => state.collectionsMap);
 
+  const filtersMap = PersistStore.getState().filtersMap;
+
   const [testingRunResultSummariesObj, setTestingRunResultSummariesObj] = useState({})
   const [allResultsLength, setAllResultsLength] = useState(undefined)
   const [currentSummary, setCurrentSummary] = useState('')
@@ -596,9 +598,21 @@ const editableConfigsComp = (
     runningTestsComp,<TrendChart key={tempLoading.running} hexId={hexId} setSummary={setSummary} show={selectedTestRun.run_type && selectedTestRun.run_type!=='One-time'}/> , 
     metadataComponent(), loading ? <SpinnerCentered key="loading"/> : (!workflowTest ? resultTable : workflowTestBuilder), editableConfigsComp];
 
-  const openVulnerabilityReport = () => {
-    let summaryId = selectedTestRun.testingRunResultSummaryHexId
-    window.open('/dashboard/testing/summary/' + summaryId, '_blank');
+  const openVulnerabilityReport = async() => {
+    const currentPageKey = "/dashboard/testing/" + selectedTestRun?.id + "/#" + selectedTab
+    let selectedFilters = filtersMap[currentPageKey]?.filters || [];
+    let filtersObj = {
+      testingRunResultSummaryId: [currentSummary.hexId]
+    }
+
+    selectedFilters.forEach((filter) => {
+      filtersObj[filter.key] = filter.value
+    })
+  
+    await api.generatePDFReport(filtersObj).then((res) => {
+      const responseId = res.split("=")[1];
+      window.open('/dashboard/testing/summary/' + responseId.split("}")[0], '_blank');
+    })
   }
 
   const handleAddSettings = () => {

@@ -479,5 +479,12 @@ export default {
             method: 'post',
             data: { reportFilterList }
         })
+    },
+    getReportFilters(generatedReportId){
+        return request({
+            url: '/api/getReportFilters',
+            method: 'post',
+            data: { generatedReportId }
+        })
     }
 }
