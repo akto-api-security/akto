@@ -93,13 +93,18 @@ public class MaliciousTrafficDetectorTask implements Task {
             ConsumerRecords<String, String> records =
                 kafkaConsumer.poll(
                     Duration.ofMillis(kafkaConfig.getConsumerConfig().getPollDurationMilli()));
-            for (ConsumerRecord<String, String> record : records) {
-              processRecord(record);
-            }
 
-            if (!records.isEmpty()) {
-              // Should we commit even if there are no records ?
-              kafkaConsumer.commitSync();
+            try {
+              for (ConsumerRecord<String, String> record : records) {
+                processRecord(record);
+              }
+
+              if (!records.isEmpty()) {
+                // Should we commit even if there are no records ?
+                kafkaConsumer.commitSync();
+              }
+            } catch (Exception e) {
+              e.printStackTrace();
             }
           }
         });
@@ -151,6 +156,7 @@ public class MaliciousTrafficDetectorTask implements Task {
   }
 
   private void processRecord(ConsumerRecord<String, String> record) {
+    System.out.println("Kafka record: " + record.value());
     HttpResponseParams responseParam = HttpCallParser.parseKafkaMessage(record.value());
     Context.accountId.set(Integer.parseInt(responseParam.getAccountId()));
     Map<String, FilterConfig> filters = this.getFilters();
