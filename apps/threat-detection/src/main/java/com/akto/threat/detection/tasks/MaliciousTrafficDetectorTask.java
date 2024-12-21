@@ -161,10 +161,13 @@ public class MaliciousTrafficDetectorTask implements Task {
     Context.accountId.set(Integer.parseInt(responseParam.getAccountId()));
     Map<String, FilterConfig> filters = this.getFilters();
     if (filters.isEmpty()) {
+      System.out.println("No filters found");
       return;
     }
 
     List<MessageEnvelope> maliciousMessages = new ArrayList<>();
+
+    System.out.println("Total number of filters: " + filters.size());
 
     for (FilterConfig apiFilter : apiFilters.values()) {
       boolean hasPassedFilter = validateFilterForRequest(responseParam, apiFilter);
@@ -177,9 +180,11 @@ public class MaliciousTrafficDetectorTask implements Task {
         // But regardless of whether request falls in aggregation or not,
         // we still push malicious requests to kafka
 
+        System.out.println("Filter passed: " + apiFilter.getId());
+
         // todo: modify fetch yaml and read aggregate rules from it
         List<Rule> rules = new ArrayList<>();
-        rules.add(new Rule("Lfi Rule 1", new Condition(100, 10)));
+        rules.add(new Rule("Lfi Rule 1", new Condition(10, 10)));
         AggregationRules aggRules = new AggregationRules();
         aggRules.setRule(rules);
 
@@ -206,7 +211,7 @@ public class MaliciousTrafficDetectorTask implements Task {
                   try {
                     maliciousMessages.add(
                         MessageEnvelope.generateEnvelope(
-                            responseParam.getAccountId(), maliciousReq));
+                            responseParam.getAccountId(), actor, maliciousReq));
                   } catch (InvalidProtocolBufferException e) {
                     return;
                   }
@@ -223,6 +228,7 @@ public class MaliciousTrafficDetectorTask implements Task {
                         this.windowBasedThresholdNotifier.shouldNotify(aggKey, maliciousReq, rule);
 
                     if (result.shouldNotify()) {
+                      System.out.print("Notifying for aggregation rule: " + rule);
                       generateAndPushMaliciousEventRequest(
                           apiFilter,
                           actor,
@@ -271,7 +277,8 @@ public class MaliciousTrafficDetectorTask implements Task {
             .setDetectedAt(responseParam.getTime())
             .build();
     try {
-      MessageEnvelope.generateEnvelope(responseParam.getAccountId(), maliciousEvent)
+      System.out.println("Pushing malicious event to kafka: " + maliciousEvent);
+      MessageEnvelope.generateEnvelope(responseParam.getAccountId(), actor, maliciousEvent)
           .marshal()
           .ifPresent(
               data -> {
