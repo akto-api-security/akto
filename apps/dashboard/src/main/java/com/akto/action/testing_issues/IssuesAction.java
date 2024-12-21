@@ -300,7 +300,12 @@ public class IssuesAction extends UserAction {
     public String fetchVulnerableTestingRunResultsFromIssues() {
         Bson filters = createFilters(true);
         try {
-            List<TestingRunIssues> issues =  TestingRunIssuesDao.instance.findAll(filters, skip, 50, null);
+            List<TestingRunIssues> issues = new ArrayList<>();
+            if(issuesIds != null && !issuesIds.isEmpty()){
+                issues =  TestingRunIssuesDao.instance.findAll(Filters.in(Constants.ID, issuesIds));
+            }else{
+                issues =  TestingRunIssuesDao.instance.findAll(filters, skip, 50, null);
+            }
             this.totalIssuesCount = issues.size();
             List<Bson> andFilters = new ArrayList<>();
             for (TestingRunIssues issue : issues) {
@@ -568,10 +573,12 @@ public class IssuesAction extends UserAction {
 
     private Map<String, List<String>> reportFilterList;
     private String generatedReportId;
+    private List<TestingIssuesId> issuesIdsForReport;
+    private BasicDBObject response;
 
     public String generateTestReport () {
         try {
-            TestReports testReport = new TestReports(reportFilterList, Context.now(), "");
+            TestReports testReport = new TestReports(reportFilterList, Context.now(), "", this.issuesIdsForReport);
             InsertOneResult insertTResult = TestReportsDao.instance.insertOne(testReport);
             this.generatedReportId = insertTResult.getInsertedId().toString();
             return SUCCESS.toUpperCase();
@@ -587,9 +594,11 @@ public class IssuesAction extends UserAction {
             addActionError("Report id cannot be null");
             return ERROR.toUpperCase();
         }
+        response = new BasicDBObject();
         ObjectId reportId = new ObjectId(this.generatedReportId);
         TestReports reportDoc = TestReportsDao.instance.findOne(Filters.eq(Constants.ID, reportId));
-        this.reportFilterList = reportDoc.getFiltersForReport();
+        response.put(TestReports.FILTERS_FOR_REPORT, reportDoc.getFiltersForReport());
+        response.put(TestReports.ISSUE_IDS_FOR_REPORT, reportDoc.getIssuesIdsForReport());
         return SUCCESS.toUpperCase();
     }
 
@@ -835,8 +844,11 @@ public class IssuesAction extends UserAction {
     public void setGeneratedReportId(String generatedReportId) {
         this.generatedReportId = generatedReportId;
     }
+    public void setIssuesIdsForReport(List<TestingIssuesId> issuesIdsForReport) {
+        this.issuesIdsForReport = issuesIdsForReport;
+    }
 
-    public Map<String, List<String>> getReportFilterList() {
-        return reportFilterList;
+    public BasicDBObject getResponse() {
+        return response;
     }
 }

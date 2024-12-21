@@ -609,7 +609,7 @@ const editableConfigsComp = (
       filtersObj[filter.key] = filter.value
     })
   
-    await api.generatePDFReport(filtersObj).then((res) => {
+    await api.generatePDFReport(filtersObj, []).then((res) => {
       const responseId = res.split("=")[1];
       window.open('/dashboard/testing/summary/' + responseId.split("}")[0], '_blank');
     })

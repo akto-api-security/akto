@@ -8,12 +8,12 @@ export default {
             data: {skip, limit, filterStatus, filterCollectionsId, filterSeverity, filterSubCategory, sortKey, sortOrder, startEpoch, endTimeStamp}
         })
     },
-    fetchVulnerableTestingRunResultsFromIssues(filters, skip) {
+    fetchVulnerableTestingRunResultsFromIssues(filters, issuesIds , skip) {
         filters['skip'] = skip
         return request({
             url: 'api/fetchVulnerableTestingRunResultsFromIssues',
             method: 'post',
-            data: filters
+            data: {filters, issuesIds}
         })
     },
     fetchIssuesFromResultIds(issuesIds, issueStatusQuery) {

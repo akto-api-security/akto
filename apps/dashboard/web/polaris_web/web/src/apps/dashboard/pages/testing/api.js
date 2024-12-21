@@ -473,11 +473,11 @@ export default {
         })
         return resp
     },
-    generatePDFReport(reportFilterList){
+    generatePDFReport(reportFilterList, issuesIdsForReport){
         return request({
             url: '/api/generateReportPDF',
             method: 'post',
-            data: { reportFilterList }
+            data: { reportFilterList, issuesIdsForReport }
         })
     },
     getReportFilters(generatedReportId){

@@ -271,6 +271,10 @@ function IssuesPage() {
             onAction: () => { ignoreAction("No time to fix") }
         },
         {
+            content: 'Export selected',
+            onAction: () => { openVulnerabilityReport(items) }
+        },
+        {
             content: 'Create jira ticket',
             onAction: () => { createJiraTicketBulk() }
         }]
@@ -326,8 +330,8 @@ function IssuesPage() {
           }          
     }
 
-    const openVulnerabilityReport = async() => {
-        await testingApi.generatePDFReport(issuesFilters).then((res) => {
+    const openVulnerabilityReport = async(items = []) => {
+        await testingApi.generatePDFReport(issuesFilters, items).then((res) => {
           const responseId = res.split("=")[1];
           window.open('/dashboard/issues/summary/' + responseId.split("}")[0], '_blank');
         })
