@@ -49,7 +49,7 @@ public class FlushSampleDataTask extends AbstractKafkaConsumerTask {
 
           events.add(
               MaliciousEventEntity.newBuilder()
-                  .setActor(m.getAccountId())
+                  .setActor(m.getActor())
                   .setFilterId(evt.getFilterId())
                   .setUrl(evt.getUrl())
                   .setMethod(URLMethods.Method.fromString(evt.getMethod()))
