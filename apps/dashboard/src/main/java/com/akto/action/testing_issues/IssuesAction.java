@@ -528,27 +528,25 @@ public class IssuesAction extends UserAction {
     String latestTestingRunSummaryId;
     List<String> issueStatusQuery;
     List<TestingRunResult> testingRunResultList;
+    private Map<String, List> filters;
     public String fetchIssuesByStatusAndSummaryId() {
-        Bson filters = Filters.and(
+        Bson triFilters = Filters.and(
                 Filters.in(TestingRunIssues.TEST_RUN_ISSUES_STATUS, issueStatusQuery),
                 Filters.in(TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_ID, new ObjectId(latestTestingRunSummaryId))
         );
-        issues = TestingRunIssuesDao.instance.findAll(filters, Projections.include("_id"));
+        issues = TestingRunIssuesDao.instance.findAll(triFilters, Projections.include("_id"));
 
-        List<ApiInfo.ApiInfoKey> apiInfoKeyList = new ArrayList<>();
-        List<String> testSubCategoryList = new ArrayList<>();
-        for(TestingRunIssues issue : issues) {
-            apiInfoKeyList.add(issue.getId().getApiInfoKey());
-            testSubCategoryList.add(issue.getId().getTestSubCategory());
-        }
+        List<Bson> filterList = new ArrayList<>();
+        filterList.add(Filters.and(
+                Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, new ObjectId(latestTestingRunSummaryId)),
+                Filters.eq(TestingRunResult.VULNERABLE, true)
+        ));
+        StartTestAction.prepareTestingRunResultTableFilters(filterList, filters);
+        Bson sortStage = StartTestAction.prepareTestingRunResultCustomSorting(sortKey, sortOrder);
 
-        Bson trsFilters = Filters.and(
-                Filters.in(TestingRunResult.API_INFO_KEY, apiInfoKeyList),
-                Filters.in(TestingRunResult.TEST_SUB_TYPE, testSubCategoryList),
-                Filters.in(TestingRunResult.VULNERABLE, true)
-        );
+        testingRunResultList = TestingRunResultDao.instance.fetchLatestTestingRunResultWithCustomAggregations(Filters.and(filterList), 1_000_000, 0, sortStage);
 
-        testingRunResultList = TestingRunResultDao.instance.findAll(trsFilters);
+        StartTestAction.removeTestingRunResultsByIssues(testingRunResultList, issues, true);
 
         return SUCCESS.toUpperCase();
     }
@@ -843,6 +841,10 @@ public class IssuesAction extends UserAction {
 
     public List<TestingRunResult> getTestingRunResultList() {
         return testingRunResultList;
+    }
+
+    public void setFilters(Map<String, List> filters) {
+        this.filters = filters;
     }
 
     public void setReportFilterList(Map<String, List<String>> reportFilterList) {

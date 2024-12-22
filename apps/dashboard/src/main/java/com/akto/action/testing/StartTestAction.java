@@ -510,26 +510,7 @@ public class StartTestAction extends UserAction {
         List<Bson> filterList = new ArrayList<>();
         filterList.add(Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, testingRunResultSummaryId));
 
-        if(filters != null && !filters.isEmpty()) {
-            for(Map.Entry<String, List> filterEntry : filters.entrySet()) {
-                String key = filterEntry.getKey();
-                switch (key) {
-                    case "severityStatus":
-                        filterList.add(Filters.in(TestingRunResult.TEST_RESULTS+"."+GenericTestResult._CONFIDENCE, filterEntry.getValue()));
-                        break;
-                    case "apiCollectionId":
-                    case "collectionIds":
-                        filterList.add(Filters.in(TestingRunResult.API_INFO_KEY+"."+ApiInfo.ApiInfoKey.API_COLLECTION_ID, filterEntry.getValue()));
-                        break;
-                    case "method":
-                        filterList.add(Filters.in(TestingRunResult.API_INFO_KEY+"."+ApiInfo.ApiInfoKey.METHOD, filterEntry.getValue()));
-                        break;
-                    case "categoryFilter":
-                        filterList.add(Filters.in(TestingRunResult.TEST_SUPER_TYPE, filterEntry.getValue()));
-                        break;
-                }
-            }
-        }
+        prepareTestingRunResultTableFilters(filterList, filters);
 
         if(queryMode == null) {
             if(fetchOnlyVulnerable) {
@@ -572,6 +553,44 @@ public class StartTestAction extends UserAction {
         return filterList;
     }
 
+    public static void prepareTestingRunResultTableFilters(List<Bson> filterList, Map<String, List> filters) {
+        if(filters != null && !filters.isEmpty()) {
+            for(Map.Entry<String, List> filterEntry : filters.entrySet()) {
+                String key = filterEntry.getKey();
+                switch (key) {
+                    case "severityStatus":
+                        filterList.add(Filters.in(TestingRunResult.TEST_RESULTS+"."+GenericTestResult._CONFIDENCE, filterEntry.getValue()));
+                        break;
+                    case "apiCollectionId":
+                    case "collectionIds":
+                        filterList.add(Filters.in(TestingRunResult.API_INFO_KEY+"."+ApiInfo.ApiInfoKey.API_COLLECTION_ID, filterEntry.getValue()));
+                        break;
+                    case "method":
+                        filterList.add(Filters.in(TestingRunResult.API_INFO_KEY+"."+ApiInfo.ApiInfoKey.METHOD, filterEntry.getValue()));
+                        break;
+                    case "categoryFilter":
+                        filterList.add(Filters.in(TestingRunResult.TEST_SUPER_TYPE, filterEntry.getValue()));
+                        break;
+                }
+            }
+        }
+    }
+
+    public static Bson prepareTestingRunResultCustomSorting(String sortKey, int sortOrder) {
+        Bson sortStage = null;
+        if (TestingRunIssues.KEY_SEVERITY.equals(sortKey)) {
+            sortStage = (sortOrder == 1) ?
+                    Aggregates.sort(Sorts.ascending("severityValue", TestingRunResult.END_TIMESTAMP)) :
+                    Aggregates.sort(Sorts.descending("severityValue", TestingRunResult.END_TIMESTAMP));
+        } else if ("time".equals(sortKey)) {
+            sortStage = (sortOrder == 1) ?
+                    Aggregates.sort(Sorts.ascending(TestingRunResult.END_TIMESTAMP)) :
+                    Aggregates.sort(Sorts.descending(TestingRunResult.END_TIMESTAMP));
+        }
+
+        return sortStage;
+    }
+
     String testingRunResultSummaryHexId;
     List<TestingRunResult> testingRunResults;
     private boolean fetchOnlyVulnerable;
@@ -600,22 +619,8 @@ public class StartTestAction extends UserAction {
                 Filters.in(TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_ID, testingRunResultSummaryId)
         );
         List<TestingRunIssues> issueslist = TestingRunIssuesDao.instance.findAll(ignoredIssuesFilters, Projections.include("_id"));
-        List<ApiInfo.ApiInfoKey> apiInfoKeyList = new ArrayList<>();
-        List<String> testSubCategoryList = new ArrayList<>();
-        for(TestingRunIssues issue : issueslist) {
-            apiInfoKeyList.add(issue.getId().getApiInfoKey());
-            testSubCategoryList.add(issue.getId().getTestSubCategory());
-        }
 
         List<Bson> testingRunResultFilters = prepareTestRunResultsFilters(testingRunResultSummaryId, queryMode);
-        if(queryMode == QueryMode.VULNERABLE) {
-            testingRunResultFilters.add(
-                    Filters.and(
-                            Filters.nin(TestingRunResult.API_INFO_KEY, apiInfoKeyList),
-                            Filters.nin(TestingRunResult.TEST_SUB_TYPE, testSubCategoryList)
-                    )
-            );
-        }
 
         if(queryMode == QueryMode.SKIPPED_EXEC || queryMode == QueryMode.SKIPPED_EXEC_NEED_CONFIG){
             TestError[] testErrors = TestResult.TestError.values();
@@ -629,19 +634,12 @@ public class StartTestAction extends UserAction {
 
         try {
             int pageLimit = limit <= 0 ? 150 : limit;
-            Bson sortStage = null;
-            if (TestingRunIssues.KEY_SEVERITY.equals(sortKey)) {
-                sortStage = (sortOrder == 1) ?
-                        Aggregates.sort(Sorts.ascending("severityValue", TestingRunResult.END_TIMESTAMP)) :
-                        Aggregates.sort(Sorts.descending("severityValue", TestingRunResult.END_TIMESTAMP));
-            } else if ("time".equals(sortKey)) {
-                sortStage = (sortOrder == 1) ?
-                        Aggregates.sort(Sorts.ascending(TestingRunResult.END_TIMESTAMP)) :
-                        Aggregates.sort(Sorts.descending(TestingRunResult.END_TIMESTAMP));
-            }
+            Bson sortStage = prepareTestingRunResultCustomSorting(sortKey, sortOrder);
 
             this.testingRunResults = TestingRunResultDao.instance
                     .fetchLatestTestingRunResultWithCustomAggregations(Filters.and(testingRunResultFilters), pageLimit, skip, sortStage);
+
+            removeTestingRunResultsByIssues(testingRunResults, issueslist, false);
 
             testCountMap = new HashMap<>();
             for(QueryMode qm : QueryMode.values()) {
@@ -662,6 +660,33 @@ public class StartTestAction extends UserAction {
         }
 
         return SUCCESS.toUpperCase();
+    }
+
+    public static void removeTestingRunResultsByIssues(List<TestingRunResult> testingRunResults,
+                                                       List<TestingRunIssues> testingRunIssues,
+                                                       boolean retainByIssues) {
+        Set<String> issuesSet = new HashSet<>();
+        for (TestingRunIssues issue : testingRunIssues) {
+            String apiInfoKeyString = issue.getId().getApiInfoKey().toString();
+            String key = apiInfoKeyString + "|" + issue.getId().getTestSubCategory();
+            issuesSet.add(key);
+        }
+
+        Iterator<TestingRunResult> resultIterator = testingRunResults.iterator();
+
+        while (resultIterator.hasNext()) {
+            TestingRunResult result = resultIterator.next();
+            String apiInfoKeyString = result.getApiInfoKey().toString();
+            String resultKey = apiInfoKeyString + "|" + result.getTestSubType();
+
+            boolean matchFound = issuesSet.contains(resultKey);
+
+            if (retainByIssues && !matchFound) {
+                resultIterator.remove();
+            } else if (!retainByIssues && matchFound) {
+                resultIterator.remove();
+            }
+        }
     }
 
     private Map<String, List<String>> reportFilterList;

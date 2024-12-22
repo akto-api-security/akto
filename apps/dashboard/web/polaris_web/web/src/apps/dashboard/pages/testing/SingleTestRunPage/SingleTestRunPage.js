@@ -264,7 +264,7 @@ function SingleTestRunPage() {
     if(localSelectedTestRun.testingRunResultSummaryHexId) {
       if(selectedTab === 'ignored_issues') {
         let ignoredTestRunResults = []
-        await api.fetchIssuesByStatusAndSummaryId(localSelectedTestRun.testingRunResultSummaryHexId, ["IGNORED"]).then((resp) => {
+        await api.fetchIssuesByStatusAndSummaryId(localSelectedTestRun.testingRunResultSummaryHexId, ["IGNORED"], sortKey, sortOrder, filters).then((resp) => {
           const ignoredIssuesTestingResult = resp?.testingRunResultList || [];
           ignoredTestRunResults = transform.prepareTestRunResults(hexId, ignoredIssuesTestingResult, subCategoryMap, subCategoryFromSourceConfigMap)
         })

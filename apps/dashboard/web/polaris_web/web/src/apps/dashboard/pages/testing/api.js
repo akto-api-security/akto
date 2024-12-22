@@ -450,11 +450,11 @@ export default {
             data: {deltaTimeForScheduledSummaries}
         })
     },
-    fetchIssuesByStatusAndSummaryId(latestTestingRunSummaryId, issueStatusQuery) {
+    fetchIssuesByStatusAndSummaryId(latestTestingRunSummaryId, issueStatusQuery, sortKey, sortOrder, filters) {
         return request({
             url: '/api/fetchIssuesByStatusAndSummaryId',
             method: 'post',
-            data: { latestTestingRunSummaryId, issueStatusQuery }
+            data: { latestTestingRunSummaryId, issueStatusQuery, sortKey, sortOrder, filters }
         })
     },
     modifyTestingRunConfig(testingRunConfigId, testConfigsAdvancedSettings){
