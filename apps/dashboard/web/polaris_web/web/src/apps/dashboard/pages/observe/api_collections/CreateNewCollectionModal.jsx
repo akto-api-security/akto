@@ -160,12 +160,11 @@ function CreateNewCollectionModal(props) {
                                 }
                                 <InlineStack gap={400} align="start">
                                     <Button onClick={() => handleAddField()}>Add condition</Button>
-                                    <Button
-
-
+                                    {conditions.length > 0 &&  <Button
                                         onClick={() => dispatchConditions({ type: "clear" })}
                                         variant="plain"
                                         tone="critical">Clear all</Button>
+                                    }
                                 </InlineStack>
                             </BlockStack>
                         </Card> : null

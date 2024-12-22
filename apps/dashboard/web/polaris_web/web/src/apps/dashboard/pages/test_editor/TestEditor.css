@@ -12,12 +12,11 @@
 
 .editor-navbar .Polaris-Navigation{
     max-width: 18rem !important;
-    background: white !important;
     height: auto !important;
 }
 
 .editor-navbar .Polaris-Navigation__Section{
-    padding: 0 !important;
+    padding: 0.5rem !important;
 }
 
 .editor-navbar .Polaris-Button__Content, .editor-navbar .Polaris-Button__Text.Polaris-Button--removeUnderline{
@@ -83,4 +82,28 @@
 
 .header-testeditor .Polaris-TopBar .Polaris-TopBar__Container .Polaris-TopBar__Search {
     width:0;
+}
+
+.header-testeditor .Polaris-Button--variantTertiary {
+    color:white !important;
+}
+
+.header-testeditor .Polaris-Icon__Svg {
+    fill:white !important;
+}
+
+.header-testeditor .Polaris-Button--variantTertiary:hover{
+    background-color: var(--pc-button-icon-fill) !important;
+}
+
+.header-testeditor .Polaris-Button--variantPlain .Polaris-Icon__Svg:hover{
+    fill: var(--pc-button-icon-fill) !important;
+}
+
+.editor-navbar .Polaris-Navigation__ItemWrapper, .Polaris-Navigation__SecondaryNavigation{
+    overflow-x: hidden !important;
+}
+
+.editor-navbar .Polaris-Navigation__ItemWrapper {
+    scrollbar-color: transparent transparent;
 }

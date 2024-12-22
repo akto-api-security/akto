@@ -379,7 +379,6 @@ function AllSensitiveData() {
             tableTabs={tableTabs}
             onSelect={(val) => setSelected(val)}
             selected={selected}
-            lastColumnSticky={true}
         />,
         <Modal key="modal" size="large" open={isGptScreenActive} onClose={()=> setIsGptScreenActive(false)} title="Akto GPT">
             <Modal.Section flush>

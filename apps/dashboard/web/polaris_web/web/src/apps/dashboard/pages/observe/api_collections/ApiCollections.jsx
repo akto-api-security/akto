@@ -450,7 +450,7 @@ function ApiCollections() {
                     content: `Deactivate collection${func.addPlurality(selectedResources.length)}`,
                     onAction: () => {
                         const message = "Deactivating a collection will stop traffic ingestion and testing for this collection. Please sync the usage data via Settings > billing after deactivating a collection to reflect your updated usage. Are you sure, you want to deactivate this collection ?"
-                        func.showConfirmationModal(message, "Deactivate collection", () => handleCollectionsAction(selectedResources, collectionApi.deactivateCollections, "deactivated") )
+                        func.showConfirmationModal("",message, "Deactivate collection", () => handleCollectionsAction(selectedResources, collectionApi.deactivateCollections, "deactivated") )
                     }
                 }
             )
@@ -460,7 +460,7 @@ function ApiCollections() {
                     content: `Reactivate collection${func.addPlurality(selectedResources.length)}`,
                     onAction: () =>  {
                         const message = "Please sync the usage data via Settings > billing after reactivating a collection to resume data ingestion and testing."
-                        func.showConfirmationModal(message, "Activate collection", () => handleCollectionsAction(selectedResources, collectionApi.activateCollections, "activated"))
+                        func.showConfirmationModal("",message, "Activate collection", () => handleCollectionsAction(selectedResources, collectionApi.activateCollections, "activated"))
                     }
                 }
             )
@@ -468,8 +468,12 @@ function ApiCollections() {
         if (selectedResources.every(v => { return !apiGrous.includes(v) })) {
             actions.push(
                 {
-                    content: `Remove collection${func.addPlurality(selectedResources.length)}`,
-                    onAction: () => handleCollectionsAction(selectedResources, api.deleteMultipleCollections, "deleted")
+                    content: <span style={{color:"var(--p-color-text-critical)"}}>{`Remove collection${func.addPlurality(selectedResources.length)}`}</span>,
+                    onAction: () => {
+                        const message = "This can't be undone."
+                        const modalTitle = `Remove ${selectedResources.length} collection${func.addPlurality(selectedResources.length)}?`
+                        func.showConfirmationModal(modalTitle,message,"Remove collection",()=> handleCollectionsAction(selectedResources, api.deleteMultipleCollections, "deleted"))
+                    }
                 }
             )
         }
@@ -569,7 +573,7 @@ function ApiCollections() {
             <Popover
                 active={moreActions}
                 activator={(
-                    <Button onClick={() => setMoreActions(!moreActions)} disclosure removeUnderline>
+                    <Button variant="tertiary" onClick={() => setMoreActions(!moreActions)} disclosure removeUnderline>
                         More Actions
                     </Button>
                 )}
@@ -598,7 +602,7 @@ function ApiCollections() {
                     </Popover.Section>
                 </Popover.Pane>
             </Popover>
-            <Button id={"create-new-collection-popup"} secondaryActions onClick={showCreateNewCollectionPopup}>Create new collection</Button>
+            <Button variant="secondary" id={"create-new-collection-popup"} secondaryActions onClick={showCreateNewCollectionPopup}>Create new collection</Button>
         </InlineStack>
     )
 

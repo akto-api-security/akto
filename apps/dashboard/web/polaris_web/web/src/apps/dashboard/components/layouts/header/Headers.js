@@ -165,6 +165,7 @@ export default function Header() {
                 },
             ]}
             initials={func.initials(username)}
+            name={username}
             open={isUserMenuOpen}
             onToggle={toggleIsUserMenuOpen}
         />

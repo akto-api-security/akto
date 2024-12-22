@@ -138,10 +138,9 @@ function BurpSource() {
 
             <BlockStack gap="100">
                 {steps.map((element,index) => (
-                    <BlockStack gap="1" key={index}>
-                        <InlineStack gap="1" wrap={false} key={element.text}>
-                            {element?.text ?<Text>{index + 1}.</Text> : null}
-                            {element?.text ?<Text variant="bodyMd">{element?.text}</Text> : null}
+                    <BlockStack gap="100" key={index}>
+                        <InlineStack gap="100" wrap={false} key={element.text}>
+                            {element?.text ?<Text variant="bodyMd">{index+1}. {element?.text}</Text> : null}
                             {element?.textComponent}
                         </InlineStack>
                         <Box paddingInlineStart={200}>

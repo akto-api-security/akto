@@ -11,7 +11,8 @@ import {
   ChoiceList,
   Tabs,
   Text,
-  Link} from '@shopify/polaris';
+  Link,
+  Divider} from '@shopify/polaris';
 import { GithubRow} from './rows/GithubRow';
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import "./style.css"
@@ -430,6 +431,7 @@ function GithubServerTable(props) {
               >
                 {rowMarkup}
               </IndexTable>
+              <Divider/>
             </div>
             </LegacyCard.Section>
             {(total !== 0 && !props?.hidePagination) && <LegacyCard.Section>

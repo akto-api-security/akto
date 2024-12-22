@@ -39,10 +39,6 @@
     gap: 20px;
 }
 
-.card-items .Polaris-InlineStack{
-    align-items: flex-start !important;
-}
-
 
 .card-items .Polaris-Box{
     position: unset !important;

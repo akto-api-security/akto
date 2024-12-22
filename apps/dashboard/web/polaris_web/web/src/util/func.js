@@ -1549,8 +1549,9 @@ mapCollectionIdToHostName(apiCollections){
     transformedString = transformedString.replace(/[/|-]/g, '_');
     return transformedString;
 },
-showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
+showConfirmationModal(modalTitle, modalContent, primaryActionContent, primaryAction) {
   Store.getState().setConfirmationModalConfig({
+    modalTitle: modalTitle,
     modalContent: modalContent,
     primaryActionContent: primaryActionContent,
     primaryAction: primaryAction,

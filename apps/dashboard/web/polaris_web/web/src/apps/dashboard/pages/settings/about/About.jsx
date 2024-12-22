@@ -145,7 +145,7 @@ function About() {
                     disabled={window.USER_ROLE !== 'ADMIN'} 
                     connectedRight={(
                         <Tooltip content="Save account name" dismissOnMouseOut>
-                            <Button disabled={window.USER_ROLE !== 'ADMIN'} icon={FileFilledIcon} onClick={() => handleSaveSettings("name", accountName)} />
+                            <Button variant="secondary" size="large" disabled={window.USER_ROLE !== 'ADMIN'} icon={FileFilledIcon} onClick={() => handleSaveSettings("name", accountName)} />
                         </Tooltip>
                     )} 
                     onChange={setAccountName} 

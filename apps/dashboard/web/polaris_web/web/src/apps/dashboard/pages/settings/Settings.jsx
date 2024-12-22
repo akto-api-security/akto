@@ -20,9 +20,9 @@ function SettingsHeader() {
                 <Box>
                     <Icon source={SettingsIcon}/>
                 </Box>
-                <Text variant="headingMd" as="h4">Settings</Text>
+                <Text tone="text-inverse" variant="headingMd" as="h4">Settings</Text>
             </InlineStack>
-            <Button  icon={XIcon} onClick={handleSettingsClose} variant="plain" />
+            <Button  icon={XIcon} onClick={handleSettingsClose} variant="plain" size="large" />
         </div>
     )
 

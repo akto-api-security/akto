@@ -8,8 +8,8 @@ function InformationBannerComponent({docsUrl,content}) {
     }
     return (
         <div className='card-items'>
-            <Banner tone="info">
-                <span>{content}</span>
+            <Banner onDismiss={()=>{}}>
+                <p style={{color:"var(--p-color-bg-inverse)"}}>{content}</p>
                 {docsUrl !== '' ?  <Button  onClick={() => openLink()} variant="plain">here</Button>: ""}
             </Banner>
         </div>

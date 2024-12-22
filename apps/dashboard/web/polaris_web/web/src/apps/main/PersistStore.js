@@ -4,7 +4,7 @@ import {devtools, persist, createJSONStorage} from "zustand/middleware"
 const initialState = {
     quickstartTasksCompleted: 0,
     subCategoryFromSourceConfigMap: {},
-    active: '',
+    active: 'active',
     collectionsMap: {},
     allCollections: [],
     hostNameMap: {},

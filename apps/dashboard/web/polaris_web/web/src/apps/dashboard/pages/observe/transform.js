@@ -366,7 +366,7 @@ const transform = {
 
     getColor(key, isSensitiveBadge=false){
         switch(key.toUpperCase()){
-            case "CRITICAL": return "critical-strong-experimental"
+            case "CRITICAL": return "critical"
             case "HIGH" : {
                 if(isSensitiveBadge){
                     return "warning"

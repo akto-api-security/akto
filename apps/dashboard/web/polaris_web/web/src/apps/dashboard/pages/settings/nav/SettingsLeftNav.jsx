@@ -14,6 +14,15 @@ import {
     VariantIcon,
     BookOpenIcon,
     AdjustIcon,
+    IdentityCardIcon,
+    ListBulletedIcon,
+    PlanFilledIcon,
+    AutomationIcon,
+    TextInRowsIcon,
+    AppsIcon,
+    LockIcon,
+    CollectionIcon,
+    BookIcon,
 } from "@shopify/polaris-icons";
 import { useLocation, useNavigate } from "react-router-dom"
 import func from "@/util/func"
@@ -27,14 +36,14 @@ const SettingsLeftNav = () => {
 
     const usersArr = window.USER_ROLE !== 'GUEST' ? [{
         label: 'Users',
-        icon: IdentityCardFilledIcon,
+        icon: (page === "users")? IdentityCardIcon : IdentityCardFilledIcon,
         selected: page === "users",
         onClick: () => navigate("/dashboard/settings/users")
     }] : []
     const logsArr = window?.IS_SAAS !== 'true' ||
         (window?.USER_NAME && window?.USER_NAME.includes("akto")) ? [{
             label: 'Logs',
-            icon: ListBulletedFilledIcon,
+            icon: (page === "logs")? ListBulletedIcon : ListBulletedFilledIcon,
             selected: page === "logs",
             onClick: () => navigate("/dashboard/settings/logs")
         }] : []
@@ -46,7 +55,7 @@ const SettingsLeftNav = () => {
     }]
     const selfHostedArr = window.IS_SAAS === 'true' ? [{
         label: 'Self hosted',
-        icon: PlanIcon,
+        icon: (page === "self-hosted")? PlanIcon : PlanFilledIcon,
         selected: page === "self-hosted",
         onClick: () => navigate("/dashboard/settings/self-hosted")
     }] : []
@@ -59,14 +68,14 @@ const SettingsLeftNav = () => {
 
     const billingArr = window.IS_SAAS === 'true' || window.DASHBOARD_MODE === 'ON_PREM' ? [{
         label: 'Billing',
-        icon: PlanIcon,
+        icon: (page === "billing")? PlanIcon : PlanFilledIcon,
         selected: page === "billing",
         onClick: () => navigate("/dashboard/settings/billing")
      }] : [];
 
     const cicdArr = !func.checkLocal() ? [{
         label: 'CI/CD',
-        icon: AutomationFilledIcon,
+        icon: (page === "ci-cd")? AutomationIcon : AutomationFilledIcon,
         selected: page === "ci-cd",
         onClick: () => navigate("/dashboard/settings/integrations/ci-cd")
     }] : [];
@@ -77,7 +86,7 @@ const SettingsLeftNav = () => {
                 items={[
                     {
                         label: 'About',
-                        icon: TextInRowsFilledIcon,
+                        icon: (page === "about")? TextInRowsIcon : TextInRowsFilledIcon,
                         selected: page === "about",
                         onClick: () => navigate("/dashboard/settings/about")
                     },
@@ -91,7 +100,7 @@ const SettingsLeftNav = () => {
                     ...cicdArr,
                     {
                         label: 'Integrations',
-                        icon: AppsFilledIcon,
+                        icon: (page === "integrations")? AppsIcon : AppsFilledIcon,
                         selected: page === "integrations",
                         onClick: () => navigate("/dashboard/settings/integrations")
                     },
@@ -100,7 +109,7 @@ const SettingsLeftNav = () => {
                     ...metricsArr,
                     {
                         label: 'Auth types',
-                        icon: LockFilledIcon,
+                        icon: (page === "auth-types")? LockIcon : LockFilledIcon,
                         selected: page === "auth-types",
                         onClick: () => navigate("/dashboard/settings/auth-types")
                     },
@@ -118,13 +127,13 @@ const SettingsLeftNav = () => {
                     }, 
                     {
                         label: 'Tags',
-                        icon: CollectionFilledIcon,
+                        icon: (page === "tags")? CollectionIcon : CollectionFilledIcon,
                         selected: page === "tags",
                         onClick: () => navigate("/dashboard/settings/tags")
                     },
                     {
                         label: 'Test library',
-                        icon: BookOpenIcon,
+                        icon: (page === "test-library")? BookOpenIcon : BookIcon,
                         selected: page === "test-library",
                         onClick: () => navigate("/dashboard/settings/test-library")
                     },

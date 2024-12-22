@@ -6,6 +6,10 @@
     outline: none !important;
 }
 
+.linkClass > .Polaris-Link:active {
+    outline: none !important;
+}
+
 .Polaris-IndexTable__TableCell--first{
     vertical-align: top !important;
 }
@@ -13,14 +17,6 @@
 .Polaris-IndexTable__TableCell {
     padding-top: 8px !important;
     padding-bottom: 8px !important;
-}
-
-.Polaris-IndexTable__TableCell > .text-subdued{
-    color: #8C9196 !important;
-}
-
-.Polaris-IndexTable__TableCell > .text-subdued > .Polaris-Link > .Polaris-Badge{
-    color: #8C9196 !important;
 }
 
 .icon-deactivated > .Polaris-Icon svg{

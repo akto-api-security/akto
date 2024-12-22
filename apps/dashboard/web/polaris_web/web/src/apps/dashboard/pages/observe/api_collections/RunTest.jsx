@@ -656,7 +656,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                             </div>
                         </div>
 
-                        <BlockStack gap={"4"}>
+                        <BlockStack gap={"400"}>
                             <InlineGrid gap={"400"} columns={"3"}>
                                 <Dropdown
                                     label="Run Type"

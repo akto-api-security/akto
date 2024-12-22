@@ -112,6 +112,7 @@ function Dashboard() {
     const confirmationModalConfig = Store(state => state.confirmationModalConfig)
 
     const ConfirmationModalMarkup = <ConfirmationModal
+        modalTitle={confirmationModalConfig.modalTitle}
         modalContent={confirmationModalConfig.modalContent}
         primaryActionContent={confirmationModalConfig.primaryActionContent}
         primaryAction={confirmationModalConfig.primaryAction}
@@ -198,7 +199,7 @@ function Dashboard() {
                         onClick={() => {
                             window.open("https://akto.io/api-security-demo", "_blank")
                         }}
-                        variant="monochromePlain"><Text variant="bodyMd">Book a call</Text></Button>
+                        variant="plain"><Text variant="bodyMd" tone="subdued">Book a call</Text></Button>
                 </Banner>
             </div> : null}
         </Frame>

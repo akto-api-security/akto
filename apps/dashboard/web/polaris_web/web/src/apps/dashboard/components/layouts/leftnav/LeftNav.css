@@ -5,10 +5,14 @@
     justify-content: space-between;
 }
 
-.active .Polaris-Navigation__Item--selected::before{
+/* .active .Polaris-Navigation__Item--selected::before{
     width: 0 !important;
 }
 
 .active .Polaris-Navigation__SecondaryNavigation .Polaris-Navigation__Item--selected::before{
     width: 0.1875rem !important;
+} */
+
+.active  .Polaris-Navigation__PrimaryNavigation > .Polaris-Navigation__Section > .Polaris-Navigation__ListItem > .Polaris-Navigation__ItemWrapper > .Polaris-Navigation__ItemInnerWrapper.Polaris-Navigation__ItemInnerWrapper--selected {
+    background: transparent !important;
 }

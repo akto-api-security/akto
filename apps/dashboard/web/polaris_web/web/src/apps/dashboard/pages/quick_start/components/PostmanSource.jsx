@@ -302,8 +302,7 @@ function PostmanSource() {
             <BlockStack gap="100">
                 {steps.map((element,index) => (
                     <InlineStack gap="100" wrap={false} key={element.text}>
-                        <span>{index + 1}.</span>
-                        <span>{element.text}</span>
+                        <span>{index + 1}. {element.text}</span>
                     </InlineStack>
                 ))}
                 {type === "api" ? 

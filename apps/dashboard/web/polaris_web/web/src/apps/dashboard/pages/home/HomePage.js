@@ -11,7 +11,7 @@ function HomePage() {
   const logo = {
     width: 78,
     topBarSource:
-      '/public/akto_name_with_logo.svg',
+      '/public/logo.svg',
     url: '/dashboard/observe/inventory',
     accessibilityLabel: 'Akto Icon',
   };
