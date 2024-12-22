@@ -84,13 +84,6 @@
     width:0;
 }
 
-.header-testeditor .Polaris-Button--variantTertiary {
-    color:white !important;
-}
-
-.header-testeditor .Polaris-Icon__Svg {
-    fill:white !important;
-}
 
 .header-testeditor .Polaris-Button--variantTertiary:hover{
     background-color: var(--pc-button-icon-fill) !important;

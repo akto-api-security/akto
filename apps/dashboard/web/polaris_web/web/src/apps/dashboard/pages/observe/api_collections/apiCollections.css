@@ -1,0 +1,11 @@
+.polaris-secondaryAction-button > .Polaris-Button--variantSecondary {
+    background: var(--p-color-bg-fill-tertiary) !important;
+    box-shadow: none !important;
+    border: none;
+    border-radius: var(--p-border-radius-200) !important;
+    min-height: 1.75rem;
+    --pc-button-bg_hover: #303030 !important;
+}
+.polaris-secondaryAction-button > .Polaris-Button--variantSecondary:hover{
+    background-color: #D4D4D4 !important;
+}

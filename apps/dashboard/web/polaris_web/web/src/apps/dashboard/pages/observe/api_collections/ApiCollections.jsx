@@ -23,6 +23,7 @@ import { saveAs } from 'file-saver'
 import TreeViewTable from "../../../components/shared/treeView/TreeViewTable"
 import TableStore from "../../../components/tables/TableStore";
 import { useNavigate } from "react-router-dom";
+import './apiCollections.css'
 
 
 const headers = [
@@ -573,9 +574,11 @@ function ApiCollections() {
             <Popover
                 active={moreActions}
                 activator={(
-                    <Button variant="tertiary" onClick={() => setMoreActions(!moreActions)} disclosure removeUnderline>
-                        More Actions
-                    </Button>
+                    <div className="polaris-secondaryAction-button">
+                        <Button variant="secondary" onClick={() => setMoreActions(!moreActions)} disclosure removeUnderline>
+                            More Actions
+                        </Button>
+                    </div>
                 )}
                 autofocusTarget="first-node"
                 onClose={() => { setMoreActions(false) }}
@@ -583,7 +586,7 @@ function ApiCollections() {
             >
                 <Popover.Pane fixed>
                     <Popover.Section>
-                        <Button  onClick={() =>exportCsv()} variant="monochromePlain">
+                        <Button  onClick={() =>exportCsv()} variant="tertiary">
                             <InlineStack gap={"200"}>
                                 <Box><Icon source={FileIcon} /></Box>
                                 <Text>Export as CSV</Text>
@@ -593,7 +596,7 @@ function ApiCollections() {
                     <Popover.Section>
                         <Button
                             onClick={() => setTreeView(!treeView)}
-                            variant="monochromePlain">
+                            variant="tertiary">
                             <InlineStack gap={"200"}>
                                 <Box><Icon source={treeView ? HideIcon : ViewIcon} /></Box>
                                 <Text>{treeView ? "Hide tree view": "Display tree view"}</Text>
@@ -602,7 +605,9 @@ function ApiCollections() {
                     </Popover.Section>
                 </Popover.Pane>
             </Popover>
-            <Button variant="secondary" id={"create-new-collection-popup"} secondaryActions onClick={showCreateNewCollectionPopup}>Create new collection</Button>
+            <div className="polaris-secondaryAction-button" >
+            <Button variant="secondary" id={"create-new-collection-popup"}  onClick={showCreateNewCollectionPopup}>Create new collection</Button>
+            </div>
         </InlineStack>
     )
 

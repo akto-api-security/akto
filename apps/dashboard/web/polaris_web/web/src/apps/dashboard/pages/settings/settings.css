@@ -12,9 +12,9 @@
     align-items: center;
 }
 
-.header-css .Polaris-Icon__Svg {
+/* .header-css .Polaris-Icon__Svg {
     fill:white !important;
-}
+} */
 
 .header-css .Polaris-Button--variantPlain .Polaris-Icon__Svg:hover{
     fill: var(--pc-button-icon-fill) !important;
