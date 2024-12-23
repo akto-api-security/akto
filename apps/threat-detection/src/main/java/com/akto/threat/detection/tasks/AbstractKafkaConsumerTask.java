@@ -47,10 +47,14 @@ public abstract class AbstractKafkaConsumerTask implements Task {
               continue;
             }
 
-            processRecords(records);
+            try {
+              processRecords(records);
 
-            if (!records.isEmpty()) {
-              kafkaConsumer.commitSync();
+              if (!records.isEmpty()) {
+                kafkaConsumer.commitSync();
+              }
+            } catch (Exception ex) {
+              ex.printStackTrace();
             }
           }
         });
