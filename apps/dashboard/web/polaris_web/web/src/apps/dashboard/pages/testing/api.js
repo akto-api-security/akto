@@ -231,13 +231,14 @@ export default {
             }
         })
     },
-    fetchVulnerableTestingRunResults(testingRunResultSummaryHexId, skip) {
+    fetchVulnerableTestingRunResults(testingRunResultSummaryHexId, skip, reportFilterList) {
         return request({
             url: '/api/fetchVulnerableTestRunResults',
             method: 'post',
             data: {
                 testingRunResultSummaryHexId,
-                skip
+                skip,
+                reportFilterList
             }
         })
     },
