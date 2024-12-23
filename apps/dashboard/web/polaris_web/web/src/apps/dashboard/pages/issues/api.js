@@ -13,7 +13,7 @@ export default {
         return request({
             url: 'api/fetchVulnerableTestingRunResultsFromIssues',
             method: 'post',
-            data: {filters, issuesIds}
+            data: {...filters, issuesIds}
         })
     },
     fetchIssuesFromResultIds(issuesIds, issueStatusQuery) {

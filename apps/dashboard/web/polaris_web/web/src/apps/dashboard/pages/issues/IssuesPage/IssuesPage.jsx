@@ -271,7 +271,7 @@ function IssuesPage() {
             onAction: () => { ignoreAction("No time to fix") }
         },
         {
-            content: 'Export selected',
+            content: 'Export selected Issues',
             onAction: () => { openVulnerabilityReport(items) }
         },
         {
@@ -335,6 +335,8 @@ function IssuesPage() {
           const responseId = res.split("=")[1];
           window.open('/dashboard/issues/summary/' + responseId.split("}")[0], '_blank');
         })
+
+        resetResourcesSelected();
     }
 
     const infoItems = [

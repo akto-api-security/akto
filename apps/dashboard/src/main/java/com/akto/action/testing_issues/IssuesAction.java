@@ -66,7 +66,6 @@ public class IssuesAction extends UserAction {
     private String ignoreReason;
     private int skip;
     private int limit;
-    private long totalIssuesCount;
     private List<TestRunIssueStatus> filterStatus;
     private List<Integer> filterCollectionsId;
     private List<Severity> filterSeverity;
@@ -306,7 +305,6 @@ public class IssuesAction extends UserAction {
             }else{
                 issues =  TestingRunIssuesDao.instance.findAll(filters, skip, 50, null);
             }
-            this.totalIssuesCount = issues.size();
             List<Bson> andFilters = new ArrayList<>();
             for (TestingRunIssues issue : issues) {
                 andFilters.add(Filters.and(
@@ -648,14 +646,6 @@ public class IssuesAction extends UserAction {
 
     public void setLimit(int limit) {
         this.limit = limit;
-    }
-
-    public long getTotalIssuesCount() {
-        return totalIssuesCount;
-    }
-
-    public void setTotalIssuesCount(long totalIssuesCount) {
-        this.totalIssuesCount = totalIssuesCount;
     }
 
     public List<TestRunIssueStatus> getFilterStatus() {
