@@ -44,6 +44,9 @@ public class Utils {
                     break;
             }
         }
+        if(filterList.isEmpty()){
+            return Filters.empty();
+        }
         return Filters.and(filterList);
     }
 
