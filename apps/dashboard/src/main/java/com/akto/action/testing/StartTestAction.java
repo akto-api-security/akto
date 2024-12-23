@@ -17,24 +17,17 @@ import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.*;
 import com.akto.dto.testing.TestingRun.State;
 import com.akto.dto.testing.TestingRun.TestingRunType;
-import com.akto.dto.testing.TestResult.Confidence;
 import com.akto.dto.testing.TestResult.TestError;
-import com.akto.dto.testing.TestingRun.State;
-import com.akto.dto.testing.TestingRun.TestingRunType;
-import com.akto.dto.testing.WorkflowTestResult.NodeResult;
 import com.akto.dto.testing.info.CurrentTestsStatus;
 import com.akto.dto.testing.info.CurrentTestsStatus.StatusForIndividualTest;
 import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.Constants;
-import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.TestErrorSource;
 import com.akto.utils.DeleteTestRunUtils;
 import com.akto.utils.Utils;
 import com.google.gson.Gson;
-import com.google.gson.JsonParser;
-import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.*;
 import com.mongodb.client.result.InsertOneResult;
 import com.opensymphony.xwork2.Action;
@@ -656,14 +649,17 @@ public class StartTestAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    private Map<String, List<String>> reportFilterList;
+
     public String fetchVulnerableTestRunResults() {
         ObjectId testingRunResultSummaryId;
         try {
             testingRunResultSummaryId = new ObjectId(testingRunResultSummaryHexId);
-
+            Bson filterForReport = com.akto.action.testing.Utils.createFiltersForTestingReport(reportFilterList);
             Bson filters = Filters.and(
                     Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, testingRunResultSummaryId),
-                    Filters.eq(TestingRunResult.VULNERABLE, true)
+                    Filters.eq(TestingRunResult.VULNERABLE, true),
+                    filterForReport
             );
 
             List<TestingRunResult> testingRunResultList = TestingRunResultDao.instance.findAll(filters, skip, 50, null);
@@ -1356,5 +1352,9 @@ public class StartTestAction extends UserAction {
 
     public Map<String, Integer> getTestCountMap() {
         return testCountMap;
+    }
+
+    public void setReportFilterList(Map<String, List<String>> reportFilterList) {
+        this.reportFilterList = reportFilterList;
     }
 }
