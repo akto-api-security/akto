@@ -3,7 +3,7 @@ name: Staging
 # Controls when the workflow will run
 on:
   push:
-    branches: [master]
+    branches: [ master ]
   pull_request:
   workflow_dispatch:
 
@@ -25,7 +25,12 @@ jobs:
           architecture: x64
       - uses: actions/setup-node@v2
         with:
-          node-version: "17"
+          node-version: '17'
+      - uses: bufbuild/buf-action@v1
+        with:
+          setup_only: true
+      - name: Generate Proto files
+        run: make proto-gen
       - name: Convert github branch name to be compatible with docker tag name convention and generate tag name
         id: docker_tag
         run: echo "IMAGE_TAG=a-$(echo ${{ github.ref_name }} | sed 's/[^a-zA-Z0-9]/-/g')" >> $GITHUB_OUTPUT
@@ -79,8 +84,10 @@ jobs:
           docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-billing:$IMAGE_TAG . --push
           cd ../internal
           docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-internal:$IMAGE_TAG . --push
-          cd ../api-threat-detection
-          docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-api-protection:$IMAGE_TAG . --push
+          cd ../threat-detection
+          docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-threat-detection:$IMAGE_TAG . --push
+          cd ../threat-detection-backend
+          docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-threat-detection-backend:$IMAGE_TAG . --push
           cd ../source-code-analyser
           docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/source-code-analyser:$IMAGE_TAG . --push
 
