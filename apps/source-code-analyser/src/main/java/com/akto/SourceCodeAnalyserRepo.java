@@ -38,13 +38,12 @@ abstract public class SourceCodeAnalyserRepo {
     public static final int MAX_BATCH_SIZE = 100;
     protected static final DataActor dataActor = DataActorFactory.fetchInstance();
     public static final String SOURCE_CODE_HOST = System.getenv("SOURCE_CODE_HOST");
-    public static final String SOURCE_CODE_ANALYSER_URL;
 
-    static {
+    private static String getFullUrl(String path){
         if (!StringUtils.isEmpty(SOURCE_CODE_HOST)) {
-            SOURCE_CODE_ANALYSER_URL = SOURCE_CODE_HOST + "/api/run-analyser";
+            return SOURCE_CODE_HOST + path; 
         } else {
-            SOURCE_CODE_ANALYSER_URL = null;
+            return null;
         }
     }
 
@@ -62,7 +61,11 @@ abstract public class SourceCodeAnalyserRepo {
         if (finalUrl == null) {
             return null;
         }
-        String outputFilePath = System.getenv("DOCKER_VOLUME") + repoToBeAnalysed.getRepoName()+ ".zip"; // The local file where the repository will be saved
+        String volume = System.getenv("DOCKER_VOLUME");
+        if (volume == null) {
+            volume = "";
+        }
+        String outputFilePath = volume + repoToBeAnalysed.getRepoName() + ".zip"; // The local file where the repository will be saved
         File file = new File(outputFilePath);
 
         Request.Builder builder = new Request.Builder();
@@ -72,9 +75,9 @@ abstract public class SourceCodeAnalyserRepo {
             builder.addHeader("Authorization", "Bearer " + token);
         }
         Request request = builder.build();
-
+        Response response = null;
         try {
-            Response response = client.newCall(request).execute();
+            response = client.newCall(request).execute();
             if (response.isSuccessful() && response.body() != null) {
                 // Get input stream from the response body
                 InputStream inputStream = Objects.requireNonNull(response.body()).byteStream();
@@ -99,8 +102,12 @@ abstract public class SourceCodeAnalyserRepo {
                 return null;
             }
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("Error while downloading zip file" + e.getMessage());
+            loggerMaker.errorAndAddToDb("Error while downloading zip file " + e.getMessage());
             return null;
+        } finally{
+            if (response != null) {
+                response.close();
+            }
         }
         return file.getAbsolutePath();
 
@@ -134,7 +141,7 @@ abstract public class SourceCodeAnalyserRepo {
     }
 
     public void fetchEndpointsUsingAnalyser() {
-        if (StringUtils.isEmpty(SOURCE_CODE_ANALYSER_URL)) {
+        if (StringUtils.isEmpty(getFullUrl(""))) {
             loggerMaker.infoAndAddToDb("No source-code-analyser url found, skipping");
             return;
         }
@@ -146,27 +153,84 @@ abstract public class SourceCodeAnalyserRepo {
         }
         BasicDBObject requestBody = getCodeAnalysisBody(repositoryPath);
         if (requestBody == null) {
-            loggerMaker.infoAndAddToDb("No requestbody found, skipping");
+            loggerMaker.infoAndAddToDb("No request body found, skipping");
             return;
         }
 
-        OriginalHttpRequest originalHttpRequest = new OriginalHttpRequest(SOURCE_CODE_ANALYSER_URL, "", "POST", requestBody.toJson(), null, "");
+        OriginalHttpRequest originalHttpRequest = new OriginalHttpRequest(getFullUrl("/api/run-analyser"), "", "POST", requestBody.toJson(), null, "");
         try {
             OriginalHttpResponse originalHttpResponse = ApiExecutor.sendRequest(originalHttpRequest, true, null, false, null, true);
             String responsePayload = originalHttpResponse.getBody();
+            loggerMaker.infoAndAddToDb(responsePayload);
             if (originalHttpResponse.getStatusCode() != 200 || responsePayload == null) {
-                loggerMaker.errorAndAddToDb("non 2xx response in fetching apis from sourcecode", LoggerMaker.LogDb.RUNTIME);
+                loggerMaker.errorAndAddToDb("non 2xx response in fetching apis api/run-analyser from source code", LoggerMaker.LogDb.RUNTIME);
                 return;
             }
-            syncRepoToDashboard(originalHttpResponse.getBody(), repoToBeAnalysed);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error while fetching api's from code-analysis for repository:" + repoToBeAnalysed);
-        } finally {
-            if (repositoryPath != null) {
-                File file = new File(repositoryPath);
-                if(file.delete()) {
-                    loggerMaker.infoAndAddToDb("successfully deleted the zip file", LoggerMaker.LogDb.RUNTIME);
+        }
+
+        /*
+         * path parameter from the request body is used
+         * to check the sanctity of the code analyser module
+         */
+        originalHttpRequest = new OriginalHttpRequest(getFullUrl("/api/check-analyser"), "", "POST", requestBody.toJson(), null, "");
+
+        final int DELAY = 10 * 1000; // 10 seconds
+        int MAX_TIMEOUT_CHECKS = (30 * 60 * 60) / 10;
+        try {
+            int timeout_minutes = Integer.parseInt(System.getenv("CODE_ANALYSIS_TIMEOUT"));
+            if (timeout_minutes > 0) {
+                MAX_TIMEOUT_CHECKS = (timeout_minutes * 60 * 60) / 10;
+            }
+        } catch (Exception e) {
+
+        }
+        int counter = 0;
+
+        while (true) {
+            try {
+                counter++;
+                if (counter > MAX_TIMEOUT_CHECKS) {
+                    dataActor.updateRepoLastRun(repoToBeAnalysed);
+                    break;
                 }
+                Thread.sleep(DELAY);
+                OriginalHttpResponse originalHttpResponse = ApiExecutor.sendRequest(originalHttpRequest, true, null,
+                        false, null, true);
+                String responsePayload = originalHttpResponse.getBody();
+                loggerMaker.infoAndAddToDb(responsePayload);
+                if ((originalHttpResponse.getStatusCode() < 200 || originalHttpResponse.getStatusCode() > 300)
+                        || responsePayload == null) {
+                    loggerMaker.errorAndAddToDb("non 2xx response in fetching apis api/check-analyser from source code",
+                            LoggerMaker.LogDb.RUNTIME);
+                    return;
+                }
+
+                BasicDBObject responseBody = BasicDBObject.parse(responsePayload);
+                String status = (String) responseBody.getOrDefault("status", "not found");
+                String error = (String) responseBody.get("error");
+
+                if(error!=null && error.equals("project not found")){
+                    loggerMaker.errorAndAddToDb("code-analysis module unable to find project, exiting checking");
+                    break;
+                }
+
+                if (status.equals("completed")) {
+                    syncRepoToDashboard(responsePayload, repoToBeAnalysed);
+                    break;
+                }
+                continue;
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(
+                        "Error while fetching api's from code-analysis for repository:" + repoToBeAnalysed);
+                break;
+            }
+        }
+        if (repositoryPath != null) {
+            File file = new File(repositoryPath);
+            if(file.delete()) {
+                loggerMaker.infoAndAddToDb("successfully deleted the zip file", LoggerMaker.LogDb.RUNTIME);
             }
         }
     }
