@@ -32,7 +32,8 @@ public class RedisBackedCounterCache implements CounterCache {
 
   private final Cache<String, Long> localCache;
 
-  private final ConcurrentLinkedQueue<Op> pendingOps;
+  private final ConcurrentLinkedQueue<Op> pendingIncOps;
+  private final ConcurrentMap<String, Boolean> deletedKeys;
   private final String prefix;
 
   public RedisBackedCounterCache(RedisClient redisClient, String prefix) {
@@ -44,7 +45,8 @@ public class RedisBackedCounterCache implements CounterCache {
     ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
     executor.scheduleAtFixedRate(this::syncToRedis, 60, 5, TimeUnit.SECONDS);
 
-    this.pendingOps = new ConcurrentLinkedQueue<>();
+    this.pendingIncOps = new ConcurrentLinkedQueue<>();
+    this.deletedKeys = new ConcurrentHashMap<>();
   }
 
   private String addPrefixToKey(String key) {
@@ -60,7 +62,7 @@ public class RedisBackedCounterCache implements CounterCache {
   public void incrementBy(String key, long val) {
     String _key = addPrefixToKey(key);
     localCache.asMap().merge(_key, val, Long::sum);
-    pendingOps.add(new Op(_key, val));
+    pendingIncOps.add(new Op(_key, val));
 
     this.setExpiryIfNotSet(_key, 3 * 60 * 60); // added 3 hours expiry for now
   }
@@ -77,8 +79,10 @@ public class RedisBackedCounterCache implements CounterCache {
 
   @Override
   public void clear(String key) {
-    localCache.invalidate(addPrefixToKey(key));
-    redis.async().del(addPrefixToKey(key));
+    String _key = addPrefixToKey(key);
+    localCache.invalidate(_key);
+    this.deletedKeys.put(_key, true);
+    redis.async().del(_key);
   }
 
   private void setExpiryIfNotSet(String key, long seconds) {
@@ -89,10 +93,15 @@ public class RedisBackedCounterCache implements CounterCache {
   }
 
   private void syncToRedis() {
-    while (!pendingOps.isEmpty()) {
-      Op op = pendingOps.poll();
+    while (!pendingIncOps.isEmpty()) {
+      Op op = pendingIncOps.poll();
       String key = op.getKey();
       long val = op.getValue();
+
+      if (this.deletedKeys.containsKey(key)) {
+        continue;
+      }
+
       redis
           .async()
           .incrby(key, val)
@@ -107,5 +116,7 @@ public class RedisBackedCounterCache implements CounterCache {
                 }
               });
     }
+
+    this.deletedKeys.clear();
   }
 }
