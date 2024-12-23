@@ -1,7 +1,6 @@
 package com.akto;
 
 import com.akto.dao.AccountsDao;
-import com.akto.dao.context.Context;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.CodeAnalysisRepo;
@@ -13,7 +12,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
-
 
 public class Main {
     private static final LoggerMaker loggerMaker = new LoggerMaker(Main.class, LoggerMaker.LogDb.RUNTIME);
@@ -39,9 +37,9 @@ public class Main {
                 AccountsDao.instance.getStats();
                 connectedToMongo = true;
 
-                logger.info("triggering merging cron for db abstractor " + Context.now());
+                logger.info("connected to mongo");
             } catch (Exception e) {
-                logger.error("error running initializer method for db abstractor", e);
+                logger.error("error connecting to mongo", e);
             } finally {
                 try {
                     Thread.sleep(1000);
