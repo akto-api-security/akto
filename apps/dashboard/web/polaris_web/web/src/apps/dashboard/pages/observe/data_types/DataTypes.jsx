@@ -385,7 +385,7 @@ function DataTypes() {
             docsUrl={"https://docs.akto.io/api-inventory/how-to/redact-sensitive-data"}
           />}
       >
-        <div className='card-items'>
+        <div style={{ paddingLeft: "1rem", paddingRight: "1rem" }}>
           <InformationBannerComponent docsUrl={""} content="When enabled, existing sample payload values will be deleted, and this data type will be redacted in future payloads. Please note that your API Inventory, Sensitive data etc. will be intact. We will simply be deleting the sample payload values.">
           </InformationBannerComponent>
         </div>
@@ -410,7 +410,7 @@ function DataTypes() {
           tooltipContent={"Create test template for this data type"}
         />}
       >
-        <div className='card-items'>
+        <div style={{ paddingLeft: "1rem", paddingRight: "1rem" }}>
           <InformationBannerComponent docsUrl={""} content="When enabled, test template is created and synced with this data type.">
           </InformationBannerComponent>
         </div>

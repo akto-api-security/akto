@@ -1,4 +1,4 @@
-import { Box, Button, ButtonGroup, InlineStack, Link, Text, BlockStack } from '@shopify/polaris'
+import { Box, Button, ButtonGroup, InlineStack, Link, Text, BlockStack, LegacyCard, TextContainer, Card } from '@shopify/polaris'
 import React, { useEffect, useState, useRef } from 'react'
 import {useNavigate} from "react-router-dom"
 import api from '../api'
@@ -133,8 +133,11 @@ function BurpSource() {
             <Text variant='bodyMd'>
                 Use burp plugin to send traffic to Akto and realize quick value. If you like what you see, we highly recommend using AWS or GCP traffic mirroring to get real user data for a smooth, automated and minimum false positive experience.
             </Text>
-
-            <InformationBannerComponent content={content} docsUrl={""}/>
+            <div className="connect-banner">
+            <Card padding={100}>
+                <InformationBannerComponent content={content} docsUrl={""}/>                
+            </Card>
+            </div>
 
             <BlockStack gap="100">
                 {steps.map((element,index) => (

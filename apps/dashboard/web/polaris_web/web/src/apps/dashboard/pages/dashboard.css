@@ -115,7 +115,7 @@
 
     --p-color-bg-surface-critical: #FED3D1 !important;
     --p-color-bg-surface-caution: #FFD79D !important;
-    --p-color-bg-surface-info: #A4E8F2 !important;
+    /* --p-color-bg-surface-info: #A4E8F2 !important; */
 }
 
 .Polaris-Page{

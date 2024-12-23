@@ -1,4 +1,4 @@
-import { Badge, Button, ButtonGroup, Checkbox, InlineStack, RadioButton, Text, BlockStack, Modal, DescriptionList, Tooltip, Icon } from '@shopify/polaris'
+import { Badge, Button, ButtonGroup, Checkbox, InlineStack, RadioButton, Text, BlockStack, Modal, DescriptionList, Tooltip, Icon, Card } from '@shopify/polaris'
 import React, { useCallback, useEffect, useState } from 'react'
 import Dropdown from '../../../components/layouts/Dropdown'
 import settingFunctions from '../../settings/module'
@@ -295,9 +295,14 @@ function PostmanSource() {
                 <RadioButton id="api" label="Import using postman API key" checked={type === "api"} onChange={()=>handleChange("api")}/>
                 <RadioButton id="collection" label="Import using postman collection file" checked={type === "collection"} onChange={()=>handleChange("collection")}/>
             </BlockStack>
-            <InformationBannerComponent docsUrl="https://docs.akto.io/traffic-connections/traffic-data-sources/postman#pre-requisites-for-akto-postman-connection"
-                    content="Please ensure the pre-requisites " 
-            />
+            <div className="connect-banner">
+                <Card padding={100}>
+                <InformationBannerComponent docsUrl="https://docs.akto.io/traffic-connections/traffic-data-sources/postman#pre-requisites-for-akto-postman-connection"
+                        content="Please ensure the pre-requisites " 
+                />
+                </Card>
+            </div>
+
 
             <BlockStack gap="100">
                 {steps.map((element,index) => (

@@ -9,3 +9,16 @@
 .polaris-secondaryAction-button > .Polaris-Button--variantSecondary:hover{
     background-color: #D4D4D4 !important;
 }
+
+.popover-menu-button:hover{
+    background-color: #F1F1F1 !important;
+}
+
+.popover-menu-button{
+    padding:0.3rem !important;
+    border-radius: var(--p-border-radius-200);
+}
+
+.popover-menu-button.popover-menu-button--extraMargin{
+    margin-bottom: 0.2rem !important;
+}

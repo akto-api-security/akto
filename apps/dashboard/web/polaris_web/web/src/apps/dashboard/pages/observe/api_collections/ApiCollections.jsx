@@ -466,18 +466,7 @@ function ApiCollections() {
                 }
             )
         }
-        if (selectedResources.every(v => { return !apiGrous.includes(v) })) {
-            actions.push(
-                {
-                    content: <span style={{color:"var(--p-color-text-critical)"}}>{`Remove collection${func.addPlurality(selectedResources.length)}`}</span>,
-                    onAction: () => {
-                        const message = "This can't be undone."
-                        const modalTitle = `Remove ${selectedResources.length} collection${func.addPlurality(selectedResources.length)}?`
-                        func.showConfirmationModal(modalTitle,message,"Remove collection",()=> handleCollectionsAction(selectedResources, api.deleteMultipleCollections, "deleted"))
-                    }
-                }
-            )
-        }
+        
 
         const toggleTypeContent = (
             <Popover
@@ -506,6 +495,18 @@ function ApiCollections() {
         const bulkActionsOptions = [...actions];
         if(selectedTab !== 'groups') {
             bulkActionsOptions.push(toggleEnvType)
+        }
+        if (selectedResources.every(v => { return !apiGrous.includes(v) })) {
+            bulkActionsOptions.push(
+                {
+                    content: <span style={{color:"var(--p-color-text-critical)"}}>{`Remove collection${func.addPlurality(selectedResources.length)}`}</span>,
+                    onAction: () => {
+                        const message = "This can't be undone."
+                        const modalTitle = `Remove ${selectedResources.length} collection${func.addPlurality(selectedResources.length)}?`
+                        func.showConfirmationModal(modalTitle,message,"Remove collection",()=> handleCollectionsAction(selectedResources, api.deleteMultipleCollections, "deleted"))
+                    }
+                }
+            )
         }
         return bulkActionsOptions
     }
@@ -585,23 +586,25 @@ function ApiCollections() {
                 preferredAlignment="right"
             >
                 <Popover.Pane fixed>
+                    
                     <Popover.Section>
-                        <Button  onClick={() =>exportCsv()} variant="tertiary">
-                            <InlineStack gap={"200"}>
-                                <Box><Icon source={FileIcon} /></Box>
-                                <Text>Export as CSV</Text>
-                            </InlineStack>
-                        </Button>
-                        </Popover.Section>
-                    <Popover.Section>
-                        <Button
-                            onClick={() => setTreeView(!treeView)}
-                            variant="tertiary">
-                            <InlineStack gap={"200"}>
-                                <Box><Icon source={treeView ? HideIcon : ViewIcon} /></Box>
-                                <Text>{treeView ? "Hide tree view": "Display tree view"}</Text>
-                            </InlineStack>
-                        </Button>
+                    <ActionList
+                        actionRole=""
+                        items={[
+                        {
+                            content:"Export as CSV",
+                            icon:FileIcon,
+                            onAction:exportCsv
+                        },
+                        {
+                            content:treeView ? "Hide tree view": "Display tree view",
+                            icon:treeView ? HideIcon : ViewIcon,
+                            onAction:() => setTreeView(!treeView)
+                        }
+                        
+                        ]}
+                    />
+                        
                     </Popover.Section>
                 </Popover.Pane>
             </Popover>

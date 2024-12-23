@@ -39,10 +39,18 @@
     gap: 20px;
 }
 
+.connect-banner .card-items{
+    margin-top: 0 !important;
+}
+
+.connect-banner > .Polaris-ShadowBevel > .Polaris-Box{
+    background-color: var(--p-color-bg-surface-info) !important;
+}
+
 
 .card-items .Polaris-Box{
     position: unset !important;
-    width: unset !important;
+    /* width: unset !important; */
 }
 
 .copyRequest {
