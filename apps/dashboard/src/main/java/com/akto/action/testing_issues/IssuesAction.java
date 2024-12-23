@@ -536,17 +536,27 @@ public class IssuesAction extends UserAction {
         );
         issues = TestingRunIssuesDao.instance.findAll(triFilters, Projections.include("_id"));
 
-        List<Bson> filterList = new ArrayList<>();
-        filterList.add(Filters.and(
-                Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, new ObjectId(latestTestingRunSummaryId)),
-                Filters.eq(TestingRunResult.VULNERABLE, true)
-        ));
-        StartTestAction.prepareTestingRunResultTableFilters(filterList, filters);
+        List<Bson> testingRunResultsFilterList = new ArrayList<>();
+        for(TestingRunIssues issue: issues) {
+            testingRunResultsFilterList.add(Filters.and(
+                    Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, new ObjectId(latestTestingRunSummaryId)),
+                    Filters.eq(TestingRunResult.VULNERABLE, true),
+                    Filters.eq(TestingRunResult.API_INFO_KEY, issue.getId().getApiInfoKey()),
+                    Filters.eq(TestingRunResult.TEST_SUB_TYPE, issue.getId().getTestSubCategory())
+            ));
+        }
+
+        List<Bson> filtersList = new ArrayList<>();
+        if(!testingRunResultsFilterList.isEmpty()) filtersList.add(Filters.or(testingRunResultsFilterList));
+        StartTestAction.prepareTestingRunResultTableFilters(filtersList, filters);
         Bson sortStage = StartTestAction.prepareTestingRunResultCustomSorting(sortKey, sortOrder);
 
-        testingRunResultList = TestingRunResultDao.instance.fetchLatestTestingRunResultWithCustomAggregations(Filters.and(filterList), 1_000_000, 0, sortStage);
+        if(filtersList.isEmpty()) {
+            testingRunResultList = new ArrayList<>();
+            return SUCCESS.toUpperCase();
+        }
 
-        StartTestAction.removeTestingRunResultsByIssues(testingRunResultList, issues, true);
+        testingRunResultList = TestingRunResultDao.instance.fetchLatestTestingRunResultWithCustomAggregations(Filters.and(filtersList), limit, skip, sortStage);
 
         return SUCCESS.toUpperCase();
     }

@@ -550,6 +550,10 @@ public class StartTestAction extends UserAction {
             }
         }
 
+        if(filterList.isEmpty()) {
+            filterList.add(Filters.empty());
+        }
+
         return filterList;
     }
 
@@ -636,8 +640,9 @@ public class StartTestAction extends UserAction {
             int pageLimit = limit <= 0 ? 150 : limit;
             Bson sortStage = prepareTestingRunResultCustomSorting(sortKey, sortOrder);
 
+            Bson filters = testingRunResultFilters.isEmpty() ? Filters.empty() : Filters.and(testingRunResultFilters);
             this.testingRunResults = TestingRunResultDao.instance
-                    .fetchLatestTestingRunResultWithCustomAggregations(Filters.and(testingRunResultFilters), pageLimit, skip, sortStage);
+                    .fetchLatestTestingRunResultWithCustomAggregations(filters, pageLimit, skip, sortStage);
 
             removeTestingRunResultsByIssues(testingRunResults, issueslist, false);
 
