@@ -1,11 +1,9 @@
 package com.akto.threat.detection.db.entity;
 
 import com.akto.dto.type.URLMethods;
-
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.UUID;
-
 import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.EnumType;
@@ -14,7 +12,6 @@ import javax.persistence.GeneratedValue;
 import javax.persistence.Id;
 import javax.persistence.PrePersist;
 import javax.persistence.Table;
-
 import org.hibernate.annotations.GenericGenerator;
 
 @Entity
@@ -54,6 +51,9 @@ public class MaliciousEventEntity {
 
   @Column(name = "created_at", updatable = false)
   private LocalDateTime createdAt;
+
+  @Column(name = "_alerted_to_backend")
+  private boolean alertedToBackend;
 
   public MaliciousEventEntity() {}
 
@@ -170,6 +170,10 @@ public class MaliciousEventEntity {
 
   public LocalDateTime getCreatedAt() {
     return createdAt;
+  }
+
+  public boolean isAlertedToBackend() {
+    return alertedToBackend;
   }
 
   @Override
