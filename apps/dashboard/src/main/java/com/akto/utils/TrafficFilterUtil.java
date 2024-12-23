@@ -38,8 +38,9 @@ public class TrafficFilterUtil {
     public static List<Bson> getDbUpdateForTemplate(String content, String userEmail) throws Exception{
          try {
             String author = userEmail;
-            int createdAt = Context.now();
-            int updatedAt = Context.now();
+            int timeNow = Context.now();
+            int createdAt = timeNow;
+            int updatedAt = timeNow;
 
             List<Bson> updates = new ArrayList<>(
                     Arrays.asList(

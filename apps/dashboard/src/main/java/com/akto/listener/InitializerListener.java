@@ -407,6 +407,9 @@ public class InitializerListener implements ServletContextListener {
 
 
                 SampleData commonSampleData = SampleDataDao.instance.findOne(filterCommonSampleData);
+                if (commonSampleData == null) {
+                    continue;
+                }
                 List<String> commonPayloads = commonSampleData.getSamples();
 
                 if (!isSimilar(ssdId.getParam(), commonPayloads)) {
@@ -831,8 +834,6 @@ public class InitializerListener implements ServletContextListener {
         }, 0, 5, TimeUnit.MINUTES);
     }
 
-    
-
     private void setUpDailyScheduler() {
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
@@ -1155,11 +1156,11 @@ public class InitializerListener implements ServletContextListener {
                 } else {
                     // in case the body is provided, then the data needs to escaped.
                     // for Microsoft teams workflow webhooks
-                    payload = Utils.replaceVariables(webhook.getBody(), valueMap, true);
+                    payload = Utils.replaceVariables(webhook.getBody(), valueMap, true, true);
                 } 
             } else {
                 // default case.
-                payload = Utils.replaceVariables(webhook.getBody(), valueMap, false);
+                payload = Utils.replaceVariables(webhook.getBody(), valueMap, false, true);
             }
         } catch (Exception e) {
             errors.add("Failed to replace variables");
@@ -2411,13 +2412,21 @@ public class InitializerListener implements ServletContextListener {
         clear(AnalyserLogsDao.instance, AnalyserLogsDao.maxDocuments);
         clear(ActivitiesDao.instance, ActivitiesDao.maxDocuments);
         clear(BillingLogsDao.instance, BillingLogsDao.maxDocuments);
-        clear(TestingRunResultDao.instance, TestingRunResultDao.maxDocuments);
+        clearRbacCollection(TestingRunResultDao.instance, TestingRunResultDao.maxDocuments);
         clear(SuspectSampleDataDao.instance, SuspectSampleDataDao.maxDocuments);
         clear(RuntimeMetricsDao.instance, RuntimeMetricsDao.maxDocuments);
         clear(ProtectionLogsDao.instance, ProtectionLogsDao.maxDocuments);
     }
 
     public static void clear(AccountsContextDao mCollection, int maxDocuments) {
+        try {
+            mCollection.trimCollection(maxDocuments);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error while trimming collection " + mCollection.getCollName() + " : " + e.getMessage(), LogDb.DASHBOARD);
+        }
+    }
+
+    public static void clearRbacCollection(AccountsContextDaoWithRbac mCollection, int maxDocuments) {
         try {
             mCollection.trimCollection(maxDocuments);
         } catch (Exception e) {
@@ -2471,6 +2480,7 @@ public class InitializerListener implements ServletContextListener {
         try {
             int gracePeriod = organization.getGracePeriod();
             String hotjarSiteId = organization.getHotjarSiteId();
+            String planType = organization.getplanType();
             String organizationId = organization.getId();
             /*
              * This ensures, we don't fetch feature wise allowed from akto too often.
@@ -2535,6 +2545,7 @@ public class InitializerListener implements ServletContextListener {
             BasicDBObject metaData = OrganizationUtils.fetchOrgMetaData(organizationId, organization.getAdminEmail());
             gracePeriod = OrganizationUtils.fetchOrgGracePeriodFromMetaData(metaData);
             hotjarSiteId = OrganizationUtils.fetchHotjarSiteId(metaData);
+            planType = OrganizationUtils.fetchplanType(metaData);
             boolean expired = OrganizationUtils.fetchExpired(metaData);
             boolean telemetryEnabled = OrganizationUtils.fetchTelemetryEnabled(metaData);
             // setTelemetrySettings(organization, telemetryEnabled);
@@ -2544,6 +2555,8 @@ public class InitializerListener implements ServletContextListener {
             loggerMaker.infoAndAddToDb("Processed org metadata",LogDb.DASHBOARD);
 
             organization.setHotjarSiteId(hotjarSiteId);
+            
+            organization.setplanType(planType);
 
             organization.setGracePeriod(gracePeriod);
             organization.setFeatureWiseAllowed(featureWiseAllowed);
@@ -2566,6 +2579,7 @@ public class InitializerListener implements ServletContextListener {
                             Updates.set(Organization.GRACE_PERIOD, gracePeriod),
                             Updates.set(Organization._EXPIRED, expired),
                             Updates.set(Organization.HOTJAR_SITE_ID, hotjarSiteId),
+                            Updates.set(Organization.PLAN_TYPE, planType),
                             Updates.set(Organization.TEST_TELEMETRY_ENABLED, testTelemetryEnabled),
                             Updates.set(Organization.LAST_FEATURE_MAP_UPDATE, lastFeatureMapUpdate)));
 
@@ -2806,16 +2820,49 @@ public class InitializerListener implements ServletContextListener {
     }
 
     private static void addDefaultAdvancedFilters(BackwardCompatibility backwardCompatibility){
-        if(backwardCompatibility.getAddDefaultFilters() == 0){
+        if(backwardCompatibility.getAddDefaultFilters() == 0 || backwardCompatibility.getAddDefaultFilters() < 1734502264){
             String contentAllow = "id: DEFAULT_ALLOW_FILTER\nfilter:\n    url:\n        regex: '.*'";
-            String contentBlock = "id: DEFAULT_BLOCK_FILTER\nfilter:\n    response_code:\n        gte: 400";
+            String contentBlock = "id: DEFAULT_BLOCK_FILTER\n" +
+                                    "filter:\n" +
+                                    "  or:\n" +
+                                    "    - response_code:\n" +
+                                    "        gte: 400\n" +
+                                    "    - response_headers:\n" +
+                                    "        for_one:\n" +
+                                    "          key:\n" +
+                                    "            eq: content-type\n" +
+                                    "          value:\n" +
+                                    "            contains_either:\n" +
+                                    "              - html\n" +
+                                    "              - text/html\n" +
+                                    "    - request_headers:\n" +
+                                    "        for_one:\n" +
+                                    "          key:\n" +
+                                    "            eq: host\n" +
+                                    "          value:\n" +
+                                    "            regex: .*localhost.*";
+
+            if(!DashboardMode.isMetered()){
+                contentBlock =  "id: DEFAULT_BLOCK_FILTER\nfilter:\n    response_code:\n        gte: 400";
+            }
+
 
             AdvancedTrafficFiltersAction action = new AdvancedTrafficFiltersAction();
             action.setYamlContent(contentAllow);
             action.saveYamlTemplateForTrafficFilters();
 
-            action.setYamlContent(contentBlock);
-            action.saveYamlTemplateForTrafficFilters();
+            if(backwardCompatibility.getAddDefaultFilters() != 0 && DashboardMode.isMetered()){
+                Bson defaultFilterQ = Filters.eq(Constants.ID, "DEFAULT_BLOCK_FILTER");
+                YamlTemplate blockTemplate = AdvancedTrafficFiltersDao.instance.findOne(defaultFilterQ);
+                if((blockTemplate.getUpdatedAt() - blockTemplate.getCreatedAt()) <= 10){
+                    AdvancedTrafficFiltersDao.instance.deleteAll(defaultFilterQ);
+                    action.setYamlContent(contentBlock);
+                    action.saveYamlTemplateForTrafficFilters();
+                }
+            }else{
+                action.setYamlContent(contentBlock);
+                action.saveYamlTemplateForTrafficFilters();
+            }
 
             BackwardCompatibilityDao.instance.updateOne(
                 Filters.eq("_id", backwardCompatibility.getId()),

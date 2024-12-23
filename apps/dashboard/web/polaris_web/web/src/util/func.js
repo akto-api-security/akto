@@ -367,6 +367,24 @@ prettifyEpoch(epoch) {
     var date = new Date(timestamp * 1000);
     return date.toLocaleString('en-US',{timeZone: window.TIME_ZONE === 'Us/Pacific' ? 'America/Los_Angeles' : window.TIME_ZONE});
   },
+  getFormattedDate(epoch) {
+    const date = new Date(epoch * 1000)
+    const day = date.getDate()
+    const month = date.toLocaleString('default', { month: 'long' })
+    const year = date.getFullYear()
+
+    const suffix = (day) => {
+        if (day >= 11 && day <= 13) return 'th'
+        switch (day % 10) {
+            case 1: return 'st'
+            case 2: return 'nd'
+            case 3: return 'rd'
+            default: return 'th'
+        }
+    }
+
+    return `${day}${suffix(day)} ${month}, ${year}`
+  },
 
   getListOfHosts(apiCollections) {
     let result = []
@@ -631,6 +649,23 @@ sortFunc: (data, sortKey, sortOrder, treeView) => {
       finalArr.reverse()
     }
     return finalArr
+  }else if(sortKey === 'customGroupsSort'){
+    let arr1 = []
+    let arr2 = []; 
+    data.forEach((x) => {
+      if(x.automated){
+        arr2.push(x)
+      }else{
+        arr1.push(x)
+      }
+    })
+    arr1 = arr1.sort((a, b) => {
+      return (sortOrder) * (b['displayName'].localeCompare(a['displayName']))
+    })
+    arr2 = arr2.sort((a, b) => {
+      return (sortOrder) * (b['displayName'].localeCompare(a['displayName']))
+    })
+    return [...arr1, ...arr2]
   }
   data.sort((a, b) => {
     if(typeof a[sortKey] ==='number')

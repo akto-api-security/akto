@@ -126,7 +126,7 @@ public class ApiWorkflowExecutorTest extends MongoBasedTest {
                 "}";
 
         ApiWorkflowExecutor apiWorkflowExecutor = new ApiWorkflowExecutor();
-        String payload = com.akto.testing.workflow_node_executor.Utils.replaceVariables(body, valuesMap, false);
+        String payload = com.akto.testing.workflow_node_executor.Utils.replaceVariables(body, valuesMap, false, true);
 
         BasicDBObject payloadObject = BasicDBObject.parse(payload);
 

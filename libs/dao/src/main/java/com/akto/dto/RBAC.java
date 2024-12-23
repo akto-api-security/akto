@@ -8,6 +8,9 @@ import com.akto.dto.rbac.*;
 import com.akto.dto.rbac.RbacEnums.Feature;
 import com.akto.dto.rbac.RbacEnums.ReadWriteAccess;
 
+import java.util.ArrayList;
+import java.util.List;
+
 public class RBAC {
 
     private ObjectId id;
@@ -18,6 +21,8 @@ public class RBAC {
     public static final String ROLE = "role";
     private int accountId;
     public static final String ACCOUNT_ID = "accountId";
+    private List<Integer> apiCollectionsId;
+    public static final String API_COLLECTIONS_ID = "apiCollectionsId";
 
     public enum Role {
         ADMIN("ADMIN",new AdminRoleStrategy()),
@@ -49,12 +54,14 @@ public class RBAC {
     public RBAC(int userId, Role role) {
         this.userId = userId;
         this.role = role;
+        this.apiCollectionsId = new ArrayList<>();
     }
 
     public RBAC(int userId, Role role, int accountId) {
         this.userId = userId;
         this.role = role;
         this.accountId = accountId;
+        this.apiCollectionsId = new ArrayList<>();
     }
 
     public RBAC() {
@@ -91,5 +98,12 @@ public class RBAC {
 
     public void setId(ObjectId id) {
         this.id = id;
+    }
+
+    public List<Integer> getApiCollectionsId() {
+        return apiCollectionsId;
+    }
+    public void setApiCollectionsId(List<Integer> apiCollectionsId) {
+        this.apiCollectionsId = apiCollectionsId;
     }
 }

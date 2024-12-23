@@ -46,6 +46,8 @@ import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.Severity;
 import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
+import com.mongodb.ReadPreference;
+import com.mongodb.WriteConcern;
 import com.mongodb.client.model.*;
 import com.mongodb.client.result.DeleteResult;
 
@@ -89,7 +91,7 @@ public class Main {
     private static TestingRunResultSummary createTRRSummaryIfAbsent(TestingRun testingRun, int start){
         ObjectId testingRunId = new ObjectId(testingRun.getHexId());
 
-        return TestingRunResultSummariesDao.instance.getMCollection().findOneAndUpdate(
+        return TestingRunResultSummariesDao.instance.getMCollection().withWriteConcern(WriteConcern.W1).findOneAndUpdate(
                 Filters.and(
                         Filters.eq(TestingRunResultSummary.TESTING_RUN_ID, testingRunId),
                         Filters.eq(TestingRunResultSummary.STATE,TestingRun.State.SCHEDULED)
@@ -156,7 +158,7 @@ public class Main {
         );
 
         // returns the previous state of testing run before the update
-        return TestingRunDao.instance.getMCollection().findOneAndUpdate(
+        return TestingRunDao.instance.getMCollection().withWriteConcern(WriteConcern.W1).findOneAndUpdate(
                 Filters.or(filter1,filter2), update);
     }
 
@@ -181,7 +183,7 @@ public class Main {
 
         Bson update = Updates.set(TestingRun.STATE, TestingRun.State.RUNNING);
 
-        TestingRunResultSummary trrs = TestingRunResultSummariesDao.instance.getMCollection().findOneAndUpdate(Filters.or(filter1,filter2), update);
+        TestingRunResultSummary trrs = TestingRunResultSummariesDao.instance.getMCollection().withWriteConcern(WriteConcern.W1).findOneAndUpdate(Filters.or(filter1,filter2), update);
 
         return trrs;
     }
@@ -219,7 +221,9 @@ public class Main {
 
     public static void main(String[] args) throws InterruptedException {
         String mongoURI = System.getenv("AKTO_MONGO_CONN");
-        DaoInit.init(new ConnectionString(mongoURI));
+        ReadPreference readPreference = ReadPreference.secondary();
+        WriteConcern writeConcern = WriteConcern.W1;
+        DaoInit.init(new ConnectionString(mongoURI), readPreference, writeConcern);
 
         boolean connectedToMongo = false;
         do {
@@ -311,11 +315,11 @@ public class Main {
 
                 if (featureAccess.checkInvalidAccess()) {
                     loggerMaker.infoAndAddToDb("Test runs overage detected for account: " + accountId + ". Failing test run at " + start, LogDb.TESTING);
-                    TestingRunDao.instance.getMCollection().findOneAndUpdate(
+                    TestingRunDao.instance.getMCollection().withWriteConcern(writeConcern).findOneAndUpdate(
                             Filters.eq(Constants.ID, testingRun.getId()),
                             Updates.set(TestingRun.STATE, TestingRun.State.FAILED));
 
-                    TestingRunResultSummariesDao.instance.getMCollection().findOneAndUpdate(
+                    TestingRunResultSummariesDao.instance.getMCollection().withWriteConcern(writeConcern).findOneAndUpdate(
                             Filters.eq(Constants.ID, summaryId),
                             Updates.set(TestingRun.STATE, TestingRun.State.FAILED));
                     return;
@@ -342,7 +346,7 @@ public class Main {
                                 Updates.set(TestingRun.END_TIMESTAMP, Context.now()),
                                 Updates.set(TestingRun.SCHEDULE_TIMESTAMP, Context.now() + 5 * 60)
                             );
-                            TestingRunDao.instance.getMCollection().findOneAndUpdate(
+                            TestingRunDao.instance.getMCollection().withWriteConcern(writeConcern).findOneAndUpdate(
                                 Filters.eq("_id", testingRun.getId()),  completedUpdate
                             );
                             return;
@@ -361,6 +365,12 @@ public class Main {
                         }                   
 
                         if (testingRunResultSummary != null) {
+                            int maxRunTime = testingRun.getTestRunTime() <= 0 ? 30*60 : testingRun.getTestRunTime(); 
+                            Bson filterCountFailed = Filters.and(
+                                Filters.gte(TestingRunResultSummary.START_TIMESTAMP, (Context.now() - ((MAX_RETRIES_FOR_FAILED_SUMMARIES + 1) * maxRunTime))),
+                                Filters.eq(TestingRunResultSummary.TESTING_RUN_ID, testingRun.getId()),
+                                Filters.eq(TestingRunResultSummary.STATE, State.FAILED)
+                            );
                             List<TestingRunResult> testingRunResults = TestingRunResultDao.instance.fetchLatestTestingRunResult(Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, testingRunResultSummary.getId()), 1);
                             if (testingRunResults != null && !testingRunResults.isEmpty()) {
                                 TestingRunResult testingRunResult = testingRunResults.get(0);
@@ -372,14 +382,7 @@ public class Main {
                                     loggerMaker.infoAndAddToDb("Test run was executed long ago, TRR_ID:"
                                             + testingRunResult.getHexId() + ", TRRS_ID:" + testingRunResultSummary.getHexId() + " TR_ID:" + testingRun.getHexId(), LogDb.TESTING);
 
-                                    int maxRunTime = testingRun.getTestRunTime() <= 0 ? 30*60 : testingRun.getTestRunTime(); 
-                                    Bson filterQ = Filters.and(
-                                        Filters.gte(TestingRunResultSummary.START_TIMESTAMP, (Context.now() - ((MAX_RETRIES_FOR_FAILED_SUMMARIES + 1) * maxRunTime))),
-                                        Filters.eq(TestingRunResultSummary.TESTING_RUN_ID, testingRun.getId()),
-                                        Filters.eq(TestingRunResultSummary.STATE, State.FAILED)
-                                    );
-
-                                    int countFailedSummaries = (int) TestingRunResultSummariesDao.instance.count(filterQ);
+                                    int countFailedSummaries = (int) TestingRunResultSummariesDao.instance.count(filterCountFailed);
                                     Bson updateForSummary = Updates.set(TestingRunResultSummary.STATE, State.FAILED);
                                     if(countFailedSummaries >= (MAX_RETRIES_FOR_FAILED_SUMMARIES - 1)){
                                         updateForSummary = Updates.combine(
@@ -407,12 +410,22 @@ public class Main {
                                 }
                             } else {
                                 loggerMaker.infoAndAddToDb("No executions made for this test, will need to restart it, TRRS_ID:" + testingRunResultSummary.getHexId() + " TR_ID:" + testingRun.getHexId(), LogDb.TESTING);
+                                int countFailedSummaries = (int) TestingRunResultSummariesDao.instance.count(filterCountFailed);
+                                Bson updateForSummary = Updates.set(TestingRunResultSummary.STATE, State.FAILED);
+
+                                if(countFailedSummaries >= (MAX_RETRIES_FOR_FAILED_SUMMARIES - 1)){
+                                    updateForSummary = Updates.combine(
+                                        Updates.set(TestingRunResultSummary.STATE, State.COMPLETED),
+                                        Updates.set(TestingRunResultSummary.END_TIMESTAMP, Context.now())
+                                    );
+                                    loggerMaker.infoAndAddToDb("Max retries level reached for TRR_ID: " + testingRun.getHexId(), LogDb.TESTING);
+                                    maxRetriesReached = true;
+                                }
                                 TestingRunResultSummary summary = TestingRunResultSummariesDao.instance.updateOneNoUpsert(
-                                        Filters.and(
-                                                Filters.eq(TestingRunResultSummary.ID, testingRunResultSummary.getId()),
-                                                Filters.eq(TestingRunResultSummary.STATE, State.RUNNING)
-                                        ),
-                                        Updates.set(TestingRunResultSummary.STATE, State.FAILED)
+                                    Filters.and(
+                                        Filters.eq(Constants.ID, testingRunResultSummary.getId()),
+                                        Filters.eq(TestingRunResultSummary.STATE, State.RUNNING)
+                                    ), updateForSummary
                                 );
                                 if (summary == null) {
                                     loggerMaker.infoAndAddToDb("Skipping because some other thread picked it up, TRRS_ID:" + testingRunResultSummary.getHexId() + " TR_ID:" + testingRun.getHexId(), LogDb.TESTING);
@@ -486,7 +499,7 @@ public class Main {
 
                 if(GetRunningTestsStatus.getRunningTests().isTestRunning(testingRun.getId())){
                     loggerMaker.infoAndAddToDb("Updating status of running test to Completed.");
-                    TestingRunDao.instance.getMCollection().findOneAndUpdate(
+                    TestingRunDao.instance.getMCollection().withWriteConcern(writeConcern).findOneAndUpdate(
                             Filters.eq("_id", testingRun.getId()),  completedUpdate
                     );
                 }

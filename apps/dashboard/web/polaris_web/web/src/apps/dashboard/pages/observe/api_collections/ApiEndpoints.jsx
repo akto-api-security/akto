@@ -1,5 +1,5 @@
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
-import { Text, HorizontalStack, Button, Popover, Modal, IndexFiltersMode, VerticalStack, Box, Checkbox } from "@shopify/polaris"
+import { Text, HorizontalStack, Button, Popover, Modal, IndexFiltersMode, VerticalStack, Box, Checkbox, TextField } from "@shopify/polaris"
 import api from "../api"
 import { useEffect, useState } from "react"
 import func from "@/util/func"
@@ -154,9 +154,10 @@ function ApiEndpoints(props) {
     const setShowDetails = ObserveStore(state => state.setInventoryFlyout)
     const collectionsMap = PersistStore(state => state.collectionsMap)
     const allCollections = PersistStore(state => state.allCollections);
+    const setCollectionsMap = PersistStore(state => state.setCollectionsMap)
+    const setAllCollections = PersistStore(state => state.setAllCollections)
 
-    const pageTitle = collectionsMap[apiCollectionId]
-
+    const [ pageTitle, setPageTitle] = useState(collectionsMap[apiCollectionId])
     const [apiEndpoints, setApiEndpoints] = useState([])
     const [apiInfoList, setApiInfoList] = useState([])
     const [unusedEndpoints, setUnusedEndpoints] = useState([])
@@ -185,6 +186,9 @@ function ApiEndpoints(props) {
     const queryParams = new URLSearchParams(location.search);
     const selectedUrl = queryParams.get('selected_url')
     const selectedMethod = queryParams.get('selected_method')
+    const [isEditing, setIsEditing] = useState(false);
+    const [editableTitle, setEditableTitle] = useState(pageTitle);
+
 
     // the values used here are defined at the server.
     const definedTableTabs = apiCollectionId === 111111999 ? ['All', 'New', 'High risk', 'No auth', 'Shadow'] : ( apiCollectionId === 111111120 ? ['All', 'New', 'Sensitive', 'High risk', 'Shadow'] : ['All', 'New', 'Sensitive', 'High risk', 'No auth', 'Shadow'] )
@@ -524,7 +528,7 @@ function ApiEndpoints(props) {
             let blob = new Blob([csv], {
                 type: "application/csvcharset=UTF-8"
             });
-            saveAs(blob, ("All endopints") + ".csv");
+            saveAs(blob, ("All endpoints") + ".csv");
             func.setToast(true, false, <div data-testid="csv_download_message">CSV exported successfully</div>)
         }
     }
@@ -905,20 +909,80 @@ function ApiEndpoints(props) {
         )
       ]
 
+    function updateCollectionName(list, apiCollectionId, newName) {
+        list.forEach(item => {
+            if (item.id === apiCollectionId) {
+                item.displayName = newName;
+                item.name = newName;
+            }
+        });
+    }
+
+    
+      const handleSaveClick = async () => {
+        api.editCollectionName(apiCollectionId, editableTitle).then((resp) => {
+            func.setToast(true, false, 'Collection name updated successfully!')
+            setPageTitle(editableTitle)
+            collectionsMap[apiCollectionId] = editableTitle
+            setCollectionsMap(collectionsMap)
+            updateCollectionName(allCollections, parseInt(apiCollectionId, 10), editableTitle)
+            setAllCollections(allCollections)
+            setIsEditing(false);
+        }).catch((err) => {
+            setEditableTitle(pageTitle)
+            setIsEditing(false);
+        })
+        
+      };
+    
+      const handleTitleChange = (value) => {
+        setEditableTitle(value);
+      };
+
+      const handleKeyDown = (event) => {
+        if (event.key === 'Enter') {
+          handleSaveClick();
+        } else if (event.key === 'Escape') {
+            setIsEditing(false);
+        }
+      }
+
     return (
         <div>
-            {isQueryPage ? apiEndpointTable :
+            {isQueryPage ? (
+                apiEndpointTable
+            ) : (
                 <PageWithMultipleCards
                     title={
-                        <Box maxWidth="35vw">
-                            <TooltipText tooltip={pageTitle} text={pageTitle} textProps={{ variant: 'headingLg' }} />
-                        </Box>
+                        isEditing ? (
+                            <Box maxWidth="20vw">
+                                <div onKeyDown={(e) => handleKeyDown(e)}>
+                                    <TextField
+                                        value={editableTitle}
+                                        onChange={handleTitleChange}
+                                        autoFocus
+                                        autoComplete="off"
+                                        maxLength="24"
+                                        suffix={(
+                                            <Text>{editableTitle.length}/24</Text>
+                                        )}
+                                        onKeyDown={handleKeyDown}
+                                    />
+                                </div>
+                            </Box>
+                        ) : (
+                            <div style={{ cursor: isApiGroup ? 'pointer' : 'default' }} onClick={isApiGroup ?  () => {setIsEditing(true);} : undefined}>
+                                <Box maxWidth="35vw">
+                                    <TooltipText tooltip={pageTitle} text={pageTitle} textProps={{ variant: 'headingLg' }} />
+                                </Box>
+                            </div>
+                        )
                     }
                     backUrl="/dashboard/observe/inventory"
                     secondaryActions={secondaryActionsComponent}
                     components={components}
                 />
-            }
+            )}
         </div>
 
     )

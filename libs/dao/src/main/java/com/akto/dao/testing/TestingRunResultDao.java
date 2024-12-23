@@ -1,10 +1,11 @@
 package com.akto.dao.testing;
 
-import com.akto.dao.AccountsContextDao;
+import com.akto.dao.AccountsContextDaoWithRbac;
 import com.akto.dao.MCollection;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
+import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.dto.testing.GenericTestResult;
 import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.TestingRunResult;
@@ -12,6 +13,7 @@ import com.akto.dto.testing.TestResult.Confidence;
 import com.akto.dto.type.URLMethods;
 import com.akto.util.Constants;
 import com.akto.util.DbMode;
+import com.akto.util.enums.GlobalEnums;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
@@ -23,7 +25,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-public class TestingRunResultDao extends AccountsContextDao<TestingRunResult> {
+public class TestingRunResultDao extends AccountsContextDaoWithRbac<TestingRunResult> {
 
     public static final TestingRunResultDao instance = new TestingRunResultDao();
     public static final int maxDocuments = 5_000_000;
@@ -44,6 +46,11 @@ public class TestingRunResultDao extends AccountsContextDao<TestingRunResult> {
         return TestingRunResult.class;
     }
 
+    @Override
+    public String getFilterKeyString() {
+        return TestingRunResult.API_INFO_KEY + "." + ApiInfoKey.API_COLLECTION_ID;
+    }
+
     public static Bson generateFilter(ObjectId testRunId, ApiInfo.ApiInfoKey apiInfoKey) {
         return generateFilter(testRunId, apiInfoKey.getApiCollectionId(), apiInfoKey.getUrl(), apiInfoKey.getMethod().name());
     }
@@ -61,33 +68,68 @@ public class TestingRunResultDao extends AccountsContextDao<TestingRunResult> {
         return fetchLatestTestingRunResult(filters, 10_000);
     }
 
-    public List<TestingRunResult> fetchLatestTestingRunResult(Bson filters, int limit) {
-        Bson projections = Projections.fields(
-                Projections.include(
-                        TestingRunResult.TEST_RUN_ID,
-                        TestingRunResult.API_INFO_KEY,
-                        TestingRunResult.TEST_SUPER_TYPE,
-                        TestingRunResult.TEST_SUB_TYPE,
-                        TestingRunResult.VULNERABLE,
-                        TestingRunResult.CONFIDENCE_PERCENTAGE,
-                        TestingRunResult.START_TIMESTAMP,
-                        TestingRunResult.END_TIMESTAMP,
-                        TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID,
-                        TestingRunResult.TEST_RESULTS + "." + GenericTestResult._CONFIDENCE,
-                        TestingRunResult.TEST_RESULTS + "." + TestResult._ERRORS
-                )
-            );
-
-        return fetchLatestTestingRunResult(filters, limit, 0, projections);
+    private Bson getLatestTestingRunResultProjections() {
+        return Projections.include(
+                TestingRunResult.TEST_RUN_ID,
+                TestingRunResult.API_INFO_KEY,
+                TestingRunResult.TEST_SUPER_TYPE,
+                TestingRunResult.TEST_SUB_TYPE,
+                TestingRunResult.VULNERABLE,
+                TestingRunResult.CONFIDENCE_PERCENTAGE,
+                TestingRunResult.START_TIMESTAMP,
+                TestingRunResult.END_TIMESTAMP,
+                TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID,
+                TestingRunResult.TEST_RESULTS + "." + GenericTestResult._CONFIDENCE,
+                TestingRunResult.TEST_RESULTS + "." + TestResult._ERRORS
+        );
     }
 
-    public List<TestingRunResult> fetchLatestTestingRunResult(Bson filters, int limit, int skip, Bson projections) {
+    public List<TestingRunResult> fetchLatestTestingRunResult(Bson filters, int limit) {
+        Bson projections = Projections.fields(
+                getLatestTestingRunResultProjections()
+            );
+
+        return fetchLatestTestingRunResult(filters, limit, 0, Arrays.asList(Aggregates.project(projections)));
+    }
+
+    public List<TestingRunResult> fetchLatestTestingRunResultWithCustomAggregations(Bson filters, int limit, int skip, Bson customSort) {
+        if(customSort == null) {
+            customSort = new BasicDBObject();
+        }
+
+        Bson projections = Projections.fields(
+                Projections.computed("confidence", Projections.computed("$first", "$testResults.confidence")),
+                getLatestTestingRunResultProjections()
+        );
+
+        Bson addSeverityValueStage = Aggregates.addFields(
+                new Field<>("severityValue", new BasicDBObject("$switch",
+                        new BasicDBObject("branches", Arrays.asList(
+                                new BasicDBObject("case", new BasicDBObject("$eq", Arrays.asList("$confidence", GlobalEnums.Severity.CRITICAL.name()))).append("then", 4),
+                                new BasicDBObject("case", new BasicDBObject("$eq", Arrays.asList("$confidence", GlobalEnums.Severity.HIGH.name()))).append("then", 3),
+                                new BasicDBObject("case", new BasicDBObject("$eq", Arrays.asList("$confidence", GlobalEnums.Severity.MEDIUM.name()))).append("then", 2),
+                                new BasicDBObject("case", new BasicDBObject("$eq", Arrays.asList("$confidence", GlobalEnums.Severity.LOW.name()))).append("then", 1)
+                        )).append("default", 0)
+                ))
+        );
+
+        return fetchLatestTestingRunResult(filters, limit, skip, Arrays.asList(Aggregates.project(projections), addSeverityValueStage, customSort));
+    }
+
+    public List<TestingRunResult> fetchLatestTestingRunResult(Bson filters, int limit, int skip, List<Bson> customAggregation) {
         List<Bson> pipeline = new ArrayList<>();
         pipeline.add(Aggregates.match(filters));
-        pipeline.add(Aggregates.project(projections));
+        try {
+            List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+            if (collectionIds != null) {
+                pipeline.add(Aggregates.match(Filters.in(getFilterKeyString(), collectionIds)));
+            }
+        } catch (Exception e) {
+        }
         pipeline.add(Aggregates.sort(Sorts.descending(Constants.ID)));
         pipeline.add(Aggregates.skip(skip));
         pipeline.add(Aggregates.limit(limit));
+        pipeline.addAll(customAggregation);
         MongoCursor<BasicDBObject> cursor = instance.getMCollection()
                 .aggregate(pipeline, BasicDBObject.class).cursor();
         List<TestingRunResult> testingRunResults = new ArrayList<>();
@@ -167,6 +209,21 @@ public class TestingRunResultDao extends AccountsContextDao<TestingRunResult> {
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
 
         fieldNames = new String[]{TestingRunResult.REQUIRES_CONFIG};
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
+
+        fieldNames = new String[]{getFilterKeyString()};
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
+
+        fieldNames = new String[]{TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, TestingRunResult.API_INFO_KEY+"."+ApiInfoKey.API_COLLECTION_ID};
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
+
+        fieldNames = new String[]{TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, TestingRunResult.TEST_RESULTS+"."+GenericTestResult._CONFIDENCE};
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
+
+        fieldNames = new String[]{TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, TestingRunResult.API_INFO_KEY+"."+ApiInfoKey.METHOD};
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
+
+        fieldNames = new String[]{TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, TestingRunResult.TEST_SUPER_TYPE};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
     }
 

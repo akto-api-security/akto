@@ -4,7 +4,7 @@ import com.akto.dao.ThirdPartyAccessDao;
 import com.akto.dao.TrafficInfoDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.AccountSettingsDao;
-import com.akto.dao.AccountsContextDao;
+import com.akto.dao.AccountsContextDaoWithRbac;
 import com.akto.dao.ApiInfoDao;
 import com.akto.dao.FilterSampleDataDao;
 import com.akto.dao.SampleDataDao;
@@ -12,7 +12,6 @@ import com.akto.dao.SensitiveParamInfoDao;
 import com.akto.dao.SensitiveSampleDataDao;
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dto.AccountSettings;
-import com.akto.dependency.DependencyAnalyser;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
@@ -35,11 +34,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
-import com.mongodb.client.model.BulkWriteOptions;
-import com.mongodb.client.model.DeleteManyModel;
 import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.WriteModel;
-
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 
@@ -607,13 +602,13 @@ public class Utils {
 
         String id = "_id.";
 
-        AccountsContextDao.deleteApisPerDao(toBeDeleted, SingleTypeInfoDao.instance, "");
-        AccountsContextDao.deleteApisPerDao(toBeDeleted, ApiInfoDao.instance, id);
-        AccountsContextDao.deleteApisPerDao(toBeDeleted, SampleDataDao.instance, id);
-        AccountsContextDao.deleteApisPerDao(toBeDeleted, TrafficInfoDao.instance, id);
-        AccountsContextDao.deleteApisPerDao(toBeDeleted, SensitiveSampleDataDao.instance, id);
-        AccountsContextDao.deleteApisPerDao(toBeDeleted, SensitiveParamInfoDao.instance, "");
-        AccountsContextDao.deleteApisPerDao(toBeDeleted, FilterSampleDataDao.instance, id);
+        AccountsContextDaoWithRbac.deleteApisPerDao(toBeDeleted, SingleTypeInfoDao.instance, "");
+        AccountsContextDaoWithRbac.deleteApisPerDao(toBeDeleted, ApiInfoDao.instance, id);
+        AccountsContextDaoWithRbac.deleteApisPerDao(toBeDeleted, SampleDataDao.instance, id);
+        AccountsContextDaoWithRbac.deleteApisPerDao(toBeDeleted, TrafficInfoDao.instance, id);
+        AccountsContextDaoWithRbac.deleteApisPerDao(toBeDeleted, SensitiveSampleDataDao.instance, id);
+        AccountsContextDaoWithRbac.deleteApisPerDao(toBeDeleted, SensitiveParamInfoDao.instance, "");
+        AccountsContextDaoWithRbac.deleteApisPerDao(toBeDeleted, FilterSampleDataDao.instance, id);
 
     }
 
@@ -626,5 +621,4 @@ public class Utils {
         input.addAll(copySet);
         return input;
     }
-
 }

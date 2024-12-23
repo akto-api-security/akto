@@ -16,6 +16,7 @@ import ActivityTracker from '../../dashboard/components/ActivityTracker'
 import observeFunc from "../../observe/transform.js"
 import settingFunctions from '../../settings/module.js'
 import DropdownSearch from '../../../components/shared/DropdownSearch.jsx'
+import JiraTicketCreationModal from '../../../components/shared/JiraTicketCreationModal.jsx'
 
 function TestRunResultFlyout(props) {
 
@@ -129,17 +130,6 @@ function TestRunResultFlyout(props) {
         window.open(navUrl, "_blank")
     }
 
-    const getValueFromIssueType = (projId, issueId) => {
-        if(Object.keys(jiraProjectMaps).length > 0 && projId.length > 0 && issueId.length > 0){
-            const jiraTemp = jiraProjectMaps[projId].filter(x => x.issueId === issueId)
-            if(jiraTemp.length > 0){
-                return jiraTemp[0].issueType
-            }
-        }
-        return issueType
-        
-    }
-    
     function ActionsComp (){
         const issuesActions = issueDetails?.testRunIssueStatus === "IGNORED" ? [...issues, ...reopen] : issues
         return(
@@ -190,39 +180,18 @@ function TestRunResultFlyout(props) {
                     <ActionsComp />
 
                     {selectedTestRunResult && selectedTestRunResult.vulnerable && 
-                        <Modal
+                        <JiraTicketCreationModal
                             activator={<Button id={"create-jira-ticket-button"} primary onClick={handleJiraClick} disabled={jiraIssueUrl !== "" || window.JIRA_INTEGRATED !== "true"}>Create Jira Ticket</Button>}
-                            open={modalActive}
-                            onClose={() => setModalActive(false)}
-                            size="small"
-                            title={<Text variant="headingMd">Configure jira ticket details</Text>}
-                            primaryAction={{
-                                content: 'Create ticket',
-                                onAction: () => handleSaveAction(issueDetails.id)
-                            }}
-                        >
-                            <Modal.Section>
-                                <VerticalStack gap={"3"}>
-                                    <DropdownSearch
-                                        disabled={jiraProjectMaps === undefined || Object.keys(jiraProjectMaps).length === 0}
-                                        placeholder="Select JIRA project"
-                                        optionsList={jiraProjectMaps ? Object.keys(jiraProjectMaps).map((x) => {return{label: x, value: x}}): []}
-                                        setSelected={setProjId}
-                                        preSelected={projId}
-                                        value={projId}
-                                    />
-
-                                    <DropdownSearch
-                                        disabled={Object.keys(jiraProjectMaps).length === 0 || projId.length === 0}
-                                        placeholder="Select JIRA issue type"
-                                        optionsList={jiraProjectMaps[projId] && jiraProjectMaps[projId].length > 0 ? jiraProjectMaps[projId].map((x) => {return{label: x.issueType, value: x.issueId}}) : []}
-                                        setSelected={setIssueType}
-                                        preSelected={issueType}
-                                        value={getValueFromIssueType(projId, issueType)}
-                                    />  
-                                </VerticalStack>
-                            </Modal.Section>
-                        </Modal>
+                            modalActive={modalActive}
+                            setModalActive={setModalActive}
+                            handleSaveAction={handleSaveAction}
+                            jiraProjectMaps={jiraProjectMaps}
+                            setProjId={setProjId}
+                            setIssueType={setIssueType}
+                            projId={projId}
+                            issueType={issueType}
+                            issueId={issueDetails.id}
+                        />
                     }
                 </HorizontalStack>
             </div>

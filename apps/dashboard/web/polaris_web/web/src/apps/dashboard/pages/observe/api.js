@@ -170,6 +170,25 @@ export default {
             data: { apiCollections: items }
         })
     },
+    
+    async updateUserCollections(userCollectionMap) {
+        return await request({
+            url: '/api/updateUserCollections',
+            method: 'post',
+            data: {
+                userCollectionMap: userCollectionMap,
+            }
+        })
+    },
+
+    async getAllUsersCollections() {
+        return await request({
+            url: '/api/getAllUsersCollections',
+            method: 'post',
+            data: {}
+        })
+    },
+
     askAi(data) {
         return request({
             url: '/api/ask_ai',
@@ -801,6 +820,16 @@ export default {
             method: 'post',
             data: {
                 apiCollectionId, url, method
+            }
+        })
+    },
+
+    async editCollectionName(apiCollectionId, collectionName) {
+        return await request({
+            url: '/api/editCollectionName',
+            method: 'post',
+            data: {
+                apiCollectionId, collectionName
             }
         })
     },

@@ -1,9 +1,13 @@
-import { ActionList, Avatar, Banner, Box, Button, Icon, LegacyCard, Link, Modal, Page, Popover, ResourceItem, ResourceList, Text, TextField } from "@shopify/polaris"
+import { ActionList, Avatar, Banner, Box, Button, HorizontalStack, Icon, LegacyCard, Link, Page, Popover, ResourceItem, ResourceList, Text, Modal, TextField } from "@shopify/polaris"
 import { DeleteMajor, TickMinor, PasskeyMajor } from "@shopify/polaris-icons"
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import settingRequests from "../api";
 import func from "@/util/func";
 import InviteUserModal from "./InviteUserModal";
+import PersistStore from "../../../../main/PersistStore";
+import SearchableResourceList from "../../../components/shared/SearchableResourceList";
+import ResourceListModal from "../../../components/shared/ResourceListModal";
+import observeApi from "../../observe/api";
 
 const Users = () => {
     const username = window.USER_NAME
@@ -18,8 +22,21 @@ const Users = () => {
 
     const [loading, setLoading] = useState(false)
     const [users, setUsers] = useState([])
+    const [usersCollection, setUsersCollection] = useState([])
     const [roleHierarchy, setRoleHierarchy] = useState([])
-    const rbacAccess = func.checkForRbacFeature();
+    const [allCollections, setAllCollections] = useState([])
+    let rbacAccess = func.checkForRbacFeature();
+
+    const collectionsMap = PersistStore(state => state.collectionsMap)
+
+    const [selectedItems, setSelectedItems] = useState({})
+
+    const handleSelectedItems = (id, items) => {
+        setSelectedItems(prevSelectedItems => ({
+            ...prevSelectedItems,
+            [id]: items
+        }));
+    }
 
     const [roleSelectionPopup, setRoleSelectionPopup] = useState({})
 
@@ -111,7 +128,7 @@ const Users = () => {
             roleHierarchyResp.push('RESET_PASSWORD')
         }
         setRoleHierarchy(roleHierarchyResp)
-        
+
     }
 
     useEffect(() => {
@@ -119,6 +136,11 @@ const Users = () => {
             getTeamData();
         }
         getRoleHierarchy()
+
+        setAllCollections(Object.entries(collectionsMap).map(([id, collectionName]) => ({
+            id: parseInt(id, 10),
+            collectionName
+        })));
     }, [])
 
     const handleRoleSelectChange = async (id, newRole, login) => {
@@ -176,7 +198,11 @@ const Users = () => {
     const getTeamData = async () => {
         setLoading(true);
         const usersResponse = await settingRequests.getTeamData()
-        setUsers(usersResponse.users)
+        if(userRole === 'ADMIN') {
+            const usersCollectionList = await observeApi.getAllUsersCollections()
+            setUsersCollection(usersCollectionList)
+        }
+        setUsers(usersResponse)
         setLoading(false)
     };
 
@@ -200,6 +226,10 @@ const Users = () => {
         await settingRequests.makeAdmin(login, roleVal)
         func.setToast(true, false, "Role updated for " + login + " successfully")
     }
+    
+    const getUserApiCollectionIds = (userId) => {
+        return usersCollection[userId] || [];
+    };
 
     return (
         <Page
@@ -240,14 +270,70 @@ const Users = () => {
                             const { id, name, login, role } = item;
                             const initials = func.initials(login)
                             const media = <Avatar user size="medium" name={login} initials={initials} />
-                            const shortcutActions = (username !== login && roleHierarchy.includes(role.toUpperCase())) ? 
+
+                            const usersCollectionRenderItem = (item) => {
+                                const { id, collectionName } = item;
+
+                                return (
+                                    <ResourceItem id={id}>
+                                        <Text variant="bodyMd" fontWeight="semibold" as="h3">{collectionName}</Text>
+                                    </ResourceItem>
+                                );
+                            }
+
+                            const updateUsersCollection = async () => {
+                                const collectionIdList = selectedItems[id];
+                                const userCollectionMap = {
+                                    [id]: collectionIdList
+                                };
+                                await observeApi.updateUserCollections(userCollectionMap)
+                                func.setToast(true, false, `User's ${selectedItems[id].length} collection${func.addPlurality(selectedItems[id].length)} have been updated!`)
+                                await getTeamData()
+                            }
+
+                            const userCollectionsHandler = () => {
+                                updateUsersCollection()
+                                return true
+                            }
+
+                            const handleSelectedItemsChange = (items) => {
+                                handleSelectedItems(id, items)
+                            }
+
+                            const userCollectionsModalComp = (
+                                <Box>
+                                    <SearchableResourceList
+                                        resourceName={'collection'}
+                                        items={allCollections}
+                                        renderItem={usersCollectionRenderItem}
+                                        isFilterControlEnabale={userRole === 'ADMIN'}
+                                        selectable={userRole === 'ADMIN'}
+                                        onSelectedItemsChange={handleSelectedItemsChange}
+                                        alreadySelectedItems={getUserApiCollectionIds(id)}
+                                    />
+                                </Box>
+                            )
+
+                            const shortcutActions = (username !== login && roleHierarchy.includes(role.toUpperCase())) ?
                                 [
                                     {
-                                        content: <Popover
+                                        content: (
+                                            <HorizontalStack gap={4}>
+                                                { (role === 'ADMIN' || userRole !== 'ADMIN' || !rbacAccess) ? undefined :
+                                                    <ResourceListModal
+                                                        title={"Collection list"}
+                                                        activatorPlaceaholder={`${(usersCollection[id] || []).length} collections accessible`}
+                                                        isColoredActivator={true}
+                                                        component={userCollectionsModalComp}
+                                                        primaryAction={userCollectionsHandler}
+                                                    />
+                                                }
+
+                                                <Popover
                                                     active={roleSelectionPopup[id]}
                                                     onClose={() => toggleRoleSelectionPopup(id)}
                                                     activator={<Button disclosure onClick={() => toggleRoleSelectionPopup(id)}>{getRoleDisplayName(role)}</Button>}
-                                                 >
+                                                >
                                                     <ActionList
                                                         actionRole="menuitem"
                                                         sections={getRolesOptionsWithTick(role).map(section => ({
@@ -258,7 +344,9 @@ const Users = () => {
                                                             }))
                                                         }))}
                                                     />
-                                                 </Popover>
+                                                </Popover>
+                                            </HorizontalStack>
+                                        )
                                     }
                                 ] : [
                                     {

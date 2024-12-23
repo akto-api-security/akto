@@ -96,6 +96,8 @@
 
                     window.EXPIRED = '${requestScope.expired}'
 
+                    window.PLAN_TYPE = '${requestScope.planType}'
+
                     // Enabling the debug mode flag is useful during implementation,
                     // but it's recommended you remove it for production
 

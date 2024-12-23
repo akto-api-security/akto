@@ -9,12 +9,14 @@ import com.akto.dao.context.Context;
 import com.akto.dao.demo.VulnerableRequestForTemplateDao;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing.TestingRunResultDao;
+import com.akto.dao.testing.TestingRunResultSummariesDao;
 import com.akto.dao.testing.sources.TestSourceConfigsDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.HistoricalData;
 import com.akto.dto.RBAC.Role;
 import com.akto.dto.demo.VulnerableRequestForTemplate;
+import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.dto.test_editor.Info;
 import com.akto.dto.test_editor.TestConfig;
 import com.akto.dto.test_editor.YamlTemplate;
@@ -122,6 +124,13 @@ public class IssuesAction extends UserAction {
 
         List<Bson> pipeline = new ArrayList<>();
         pipeline.add(Aggregates.match(filters));
+        try {
+            List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+            if(collectionIds != null) {
+                pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
+            }
+        } catch(Exception e){
+        }
         if (TestingRunIssues.KEY_SEVERITY.equals(sortKey)) {
             Bson addSeverityValueStage = Aggregates.addFields(
                     new Field<>("severityValue", new BasicDBObject("$switch",
@@ -195,16 +204,30 @@ public class IssuesAction extends UserAction {
         ));
 
         pipeline.add(totalIssuesMatchStage);
+        List<Integer> collectionIds = null;
+        try {
+            collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+            if(collectionIds != null) {
+                pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
+            }
+        } catch(Exception e){
+        }
         totalIssuesCountDayWise = new ArrayList<>();
         filterIssuesDataByTimeRange(daysBetween, pipeline, totalIssuesCountDayWise);
         pipeline.clear();
 
         pipeline.add(openIssuesMatchStage);
+        if(collectionIds != null) {
+            pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
+        }
         openIssuesCountDayWise = new ArrayList<>();
         filterIssuesDataByTimeRange(daysBetween, pipeline, openIssuesCountDayWise);
         pipeline.clear();
 
         pipeline.add(criticalIssuesMatchStage);
+        if(collectionIds != null) {
+            pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
+        }
         criticalIssuesCountDayWise = new ArrayList<>();
         filterIssuesDataByTimeRange(daysBetween, pipeline, criticalIssuesCountDayWise);
         pipeline.clear();
@@ -433,7 +456,7 @@ public class IssuesAction extends UserAction {
         }
 
         Map<String, TestConfig> testConfigMap = YamlTemplateDao.instance.fetchTestConfigMap(includeYamlContent,
-                fetchOnlyActive, skip, limit);
+                fetchOnlyActive, skip, limit, Filters.empty());
         subCategories = new ArrayList<>();
         for (Map.Entry<String, TestConfig> entry : testConfigMap.entrySet()) {
             try {
@@ -514,6 +537,28 @@ public class IssuesAction extends UserAction {
                 Filters.in(TestingRunIssues.TEST_RUN_ISSUES_STATUS, issueStatusQuery)
             ), Projections.include("_id", TestingRunIssues.TEST_RUN_ISSUES_STATUS)
         );
+        return SUCCESS.toUpperCase();
+    }
+
+    String testingRunSummaryId;
+    private TestingRunResultSummary testingRunResultSummary;
+    public String fetchTestingRunResultsSummary() {
+        ObjectId testingRunSummaryObj;
+        try {
+            testingRunSummaryObj = new ObjectId(testingRunSummaryId);
+        } catch (Exception e) {
+            addActionError("Invalid testing run summary id");
+            return ERROR.toUpperCase();
+        }
+
+        Bson projection = Projections.include(
+                TestingRunResultSummary.STATE,
+                TestingRunResultSummary.START_TIMESTAMP,
+                TestingRunResultSummary.END_TIMESTAMP
+        );
+
+        testingRunResultSummary = TestingRunResultSummariesDao.instance.findOne(Filters.eq(TestingRunResultSummary.ID, testingRunSummaryObj), projection);
+
         return SUCCESS.toUpperCase();
     }
 
@@ -738,5 +783,13 @@ public class IssuesAction extends UserAction {
 
     public void setIssuesIds(List<TestingIssuesId> issuesIds) {
         this.issuesIds = issuesIds;
+    }
+
+    public void setTestingRunSummaryId(String testingRunSummaryId) {
+        this.testingRunSummaryId = testingRunSummaryId;
+    }
+
+    public TestingRunResultSummary getTestingRunResultSummary() {
+        return testingRunResultSummary;
     }
 }

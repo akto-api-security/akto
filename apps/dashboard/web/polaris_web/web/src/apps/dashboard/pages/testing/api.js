@@ -24,12 +24,12 @@ export default {
         })
         return resp
     },
-    async fetchTestingRunResults(testingRunResultSummaryHexId, queryMode) {
+    async fetchTestingRunResults(testingRunResultSummaryHexId, queryMode, sortKey, sortOrder, skip, limit, filters, queryValue) {
         const resp = await request({
             url: '/api/fetchTestingRunResults',
             method: 'post',
             data: {
-                testingRunResultSummaryHexId, queryMode
+                testingRunResultSummaryHexId, queryMode, sortKey, sortOrder, skip, limit, filters, queryValue
             }
         })
         return resp        
@@ -462,5 +462,15 @@ export default {
             method: 'post',
             data: { testingRunConfigId, testConfigsAdvancedSettings }
         })
-    }
+    },
+    async fetchTestingRunResultsSummary(testingRunSummaryId) {
+        const resp = await request({
+            url: '/api/fetchTestingRunResultsSummary',
+            method: 'post',
+            data: {
+                testingRunSummaryId
+            }
+        })
+        return resp
+    },
 }

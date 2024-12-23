@@ -184,10 +184,10 @@ public class Utils {
     }
 
     public static String executeCode(String ogPayload, Map<String, Object> valuesMap) throws Exception {
-        return replaceVariables(ogPayload,valuesMap, true);
+        return replaceVariables(ogPayload,valuesMap, true, true);
     }
 
-    public static String replaceVariables(String payload, Map<String, Object> valuesMap, boolean escapeString) throws Exception {
+    public static String replaceVariables(String payload, Map<String, Object> valuesMap, boolean escapeString, boolean shouldThrowException) throws Exception {
         String regex = "\\$\\{((x|step)\\d+\\.[\\w\\-\\[\\].]+|AKTO\\.changes_info\\..*?)\\}"; 
         Pattern p = Pattern.compile(regex);
 
@@ -200,7 +200,11 @@ public class Utils {
             Object obj = valuesMap.get(key);
             if (obj == null) {
                 loggerMaker.errorAndAddToDb("couldn't find: " + key, LogDb.TESTING);
-                throw new Exception("Couldn't find " + key);
+                if(shouldThrowException){
+                    throw new Exception("Couldn't find " + key);
+                }else{
+                    continue;
+                }
             }
             String val = obj.toString();
             if (escapeString) {
