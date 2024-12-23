@@ -13,6 +13,7 @@ import com.google.protobuf.util.JsonFormat;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
+import java.util.UUID;
 import java.util.stream.Collectors;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.entity.ContentType;
@@ -39,14 +40,32 @@ public class SendMaliciousEventsToBackend extends AbstractKafkaConsumerTask {
     this.httpClient = HttpClients.createDefault();
   }
 
+  private void markSampleDataAsSent(List<UUID> ids) {
+    Session session = this.sessionFactory.openSession();
+    Transaction txn = session.beginTransaction();
+    try {
+      session
+          .createQuery(
+              "update MaliciousEventEntity m set m.alertedToBackend = true where m.id in :ids")
+          .setParameterList("ids", ids)
+          .executeUpdate();
+    } catch (Exception ex) {
+      ex.printStackTrace();
+      txn.rollback();
+    } finally {
+      txn.commit();
+      session.close();
+    }
+  }
+
   private List<MaliciousEventEntity> getSampleMaliciousRequests(String actor, String filterId) {
     Session session = this.sessionFactory.openSession();
     Transaction txn = session.beginTransaction();
     try {
       return session
           .createQuery(
-              "from MaliciousEventEntity m where m.actor = :actor and m.filterId = :filterId order"
-                  + " by m.createdAt desc",
+              "from MaliciousEventEntity m where m.actor = :actor and m.filterId = :filterId and"
+                  + " m.alertedToBackend = false order by m.createdAt desc",
               MaliciousEventEntity.class)
           .setParameter("actor", actor)
           .setParameter("filterId", filterId)
@@ -83,12 +102,13 @@ public class SendMaliciousEventsToBackend extends AbstractKafkaConsumerTask {
           MaliciousEventMessage evt = builder.build();
 
           // Get sample data from postgres for this alert
+          List<MaliciousEventEntity> sampleData =
+              this.getSampleMaliciousRequests(evt.getActor(), evt.getFilterId());
           try {
             RecordMaliciousEventRequest.Builder reqBuilder =
                 RecordMaliciousEventRequest.newBuilder().setMaliciousEvent(evt);
             if (EventType.EVENT_TYPE_AGGREGATED.equals(evt.getEventType())) {
-              List<MaliciousEventEntity> sampleData =
-                  this.getSampleMaliciousRequests(evt.getActor(), evt.getFilterId());
+              sampleData = this.getSampleMaliciousRequests(evt.getActor(), evt.getFilterId());
 
               reqBuilder.addAllSampleRequests(
                   sampleData.stream()
@@ -105,9 +125,13 @@ public class SendMaliciousEventsToBackend extends AbstractKafkaConsumerTask {
                       .collect(Collectors.toList()));
             }
 
+            List<UUID> sampleIds =
+                sampleData.stream().map(MaliciousEventEntity::getId).collect(Collectors.toList());
+
+            RecordMaliciousEventRequest maliciousEventRequest = reqBuilder.build();
             String url = System.getenv("AKTO_THREAT_PROTECTION_BACKEND_URL");
             String token = System.getenv("AKTO_THREAT_PROTECTION_BACKEND_TOKEN");
-            ProtoMessageUtils.toString(reqBuilder.build())
+            ProtoMessageUtils.toString(maliciousEventRequest)
                 .ifPresent(
                     msg -> {
                       StringEntity requestEntity =
@@ -122,6 +146,10 @@ public class SendMaliciousEventsToBackend extends AbstractKafkaConsumerTask {
                         this.httpClient.execute(req);
                       } catch (IOException e) {
                         e.printStackTrace();
+                      }
+
+                      if (!sampleIds.isEmpty()) {
+                        markSampleDataAsSent(sampleIds);
                       }
                     });
           } catch (Exception e) {
