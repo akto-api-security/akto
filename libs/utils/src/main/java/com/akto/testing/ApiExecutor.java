@@ -290,6 +290,10 @@ public class ApiExecutor {
     public static OriginalHttpResponse sendRequest(OriginalHttpRequest request, boolean followRedirects, TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck) throws Exception {
         // don't lowercase url because query params will change and will result in incorrect request
 
+        if(testingRunConfig != null && testingRunConfig.getConfigsAdvancedSettings() != null && !testingRunConfig.getConfigsAdvancedSettings().isEmpty()){
+            calculateFinalRequestFromAdvancedSettings(request, testingRunConfig.getConfigsAdvancedSettings());
+        }
+
         String url = prepareUrl(request, testingRunConfig);
 
         if (!(url.contains("insertRuntimeLog") || url.contains("insertTestingLog") || url.contains("insertProtectionLog"))) {
@@ -307,10 +311,6 @@ public class ApiExecutor {
 
         boolean executeScript = testingRunConfig != null;
         //calculateHashAndAddAuth(request, executeScript);
-
-        if(testingRunConfig != null && testingRunConfig.getConfigsAdvancedSettings() != null && !testingRunConfig.getConfigsAdvancedSettings().isEmpty()){
-            calculateFinalRequestFromAdvancedSettings(request, testingRunConfig.getConfigsAdvancedSettings());
-        }
 
         OriginalHttpResponse response = null;
         HostValidator.validate(url);
