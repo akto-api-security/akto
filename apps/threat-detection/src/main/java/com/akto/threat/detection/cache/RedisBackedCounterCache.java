@@ -1,13 +1,12 @@
 package com.akto.threat.detection.cache;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import io.lettuce.core.ExpireArgs;
 import io.lettuce.core.RedisClient;
 import io.lettuce.core.api.StatefulRedisConnection;
-
 import java.util.Optional;
 import java.util.concurrent.*;
-import com.github.benmanes.caffeine.cache.Cache;
-import com.github.benmanes.caffeine.cache.Caffeine;
 
 public class RedisBackedCounterCache implements CounterCache {
 
@@ -48,8 +47,8 @@ public class RedisBackedCounterCache implements CounterCache {
     this.pendingOps = new ConcurrentLinkedQueue<>();
   }
 
-  private String getKey(String key) {
-    return prefix + "|" + key;
+  private String addPrefixToKey(String key) {
+    return new StringBuilder().append(prefix).append("|").append(key).toString();
   }
 
   @Override
@@ -59,7 +58,7 @@ public class RedisBackedCounterCache implements CounterCache {
 
   @Override
   public void incrementBy(String key, long val) {
-    String _key = getKey(key);
+    String _key = addPrefixToKey(key);
     localCache.asMap().merge(_key, val, Long::sum);
     pendingOps.add(new Op(_key, val));
 
@@ -68,19 +67,25 @@ public class RedisBackedCounterCache implements CounterCache {
 
   @Override
   public long get(String key) {
-    return Optional.ofNullable(this.localCache.getIfPresent(getKey(key))).orElse(0L);
+    return Optional.ofNullable(this.localCache.getIfPresent(addPrefixToKey(key))).orElse(0L);
   }
 
   @Override
   public boolean exists(String key) {
-    return localCache.asMap().containsKey(getKey(key));
+    return localCache.asMap().containsKey(addPrefixToKey(key));
+  }
+
+  @Override
+  public void clear(String key) {
+    localCache.invalidate(addPrefixToKey(key));
+    redis.async().del(addPrefixToKey(key));
   }
 
   private void setExpiryIfNotSet(String key, long seconds) {
     // We only set expiry for redis entry. For local cache we have lower expiry for
     // all entries.
     ExpireArgs args = ExpireArgs.Builder.nx();
-    redis.async().expire(getKey(key), seconds, args);
+    redis.async().expire(addPrefixToKey(key), seconds, args);
   }
 
   private void syncToRedis() {

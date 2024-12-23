@@ -9,4 +9,6 @@ public interface CounterCache {
   long get(String key);
 
   boolean exists(String key);
+
+  void clear(String key);
 }

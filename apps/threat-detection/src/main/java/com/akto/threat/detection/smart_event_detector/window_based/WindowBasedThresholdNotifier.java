@@ -5,19 +5,10 @@ import com.akto.proto.generated.threat_detection.message.sample_request.v1.Sampl
 import com.akto.threat.detection.cache.CounterCache;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
 
 public class WindowBasedThresholdNotifier {
 
   private final Config config;
-
-  // We can use an in-memory cache for this, since we dont mind being notified
-  // more than once by multiple instances of the service.
-  // But on 1 instance, we should not notify more than once in the cooldown
-  // period.
-  // TODO: Move this to redis
-  private final ConcurrentMap<String, Long> notifiedMap;
 
   public static class Config {
     private final int threshold;
@@ -63,7 +54,6 @@ public class WindowBasedThresholdNotifier {
   public WindowBasedThresholdNotifier(CounterCache cache, Config config) {
     this.cache = cache;
     this.config = config;
-    this.notifiedMap = new ConcurrentHashMap<>();
   }
 
   public Result shouldNotify(String aggKey, SampleMaliciousRequest maliciousEvent, Rule rule) {
@@ -79,18 +69,11 @@ public class WindowBasedThresholdNotifier {
 
     boolean thresholdBreached = windowCount >= rule.getCondition().getMatchCount();
 
-    long now = System.currentTimeMillis() / 1000L;
-    long lastNotified = this.notifiedMap.getOrDefault(aggKey, 0L);
-
-    boolean cooldownBreached =
-        (now - lastNotified) >= this.config.getNotificationCooldownInSeconds();
-
     if (thresholdBreached) {
-      this.notifiedMap.put(aggKey, now);
-      return new Result(true);
+      this.cache.clear(cacheKey);
     }
 
-    return new Result(false);
+    return new Result(thresholdBreached);
   }
 
   public List<Bin> getBins(String aggKey, int binStart, int binEnd) {
