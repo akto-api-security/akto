@@ -10,6 +10,7 @@ import com.akto.dao.demo.VulnerableRequestForTemplateDao;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dao.testing.TestingRunResultSummariesDao;
+import com.akto.dao.testing.sources.TestReportsDao;
 import com.akto.dao.testing.sources.TestSourceConfigsDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.ApiInfo;
@@ -23,6 +24,7 @@ import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.*;
+import com.akto.dto.testing.sources.TestReports;
 import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -37,6 +39,8 @@ import com.akto.util.enums.GlobalEnums.TestRunIssueStatus;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.*;
+import com.mongodb.client.result.InsertOneResult;
+
 import org.bson.Document;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
@@ -62,7 +66,6 @@ public class IssuesAction extends UserAction {
     private String ignoreReason;
     private int skip;
     private int limit;
-    private long totalIssuesCount;
     private List<TestRunIssueStatus> filterStatus;
     private List<Integer> filterCollectionsId;
     private List<Severity> filterSeverity;
@@ -296,8 +299,12 @@ public class IssuesAction extends UserAction {
     public String fetchVulnerableTestingRunResultsFromIssues() {
         Bson filters = createFilters(true);
         try {
-            List<TestingRunIssues> issues =  TestingRunIssuesDao.instance.findAll(filters, skip, 50, null);
-            this.totalIssuesCount = issues.size();
+            List<TestingRunIssues> issues = new ArrayList<>();
+            if(issuesIds != null && !issuesIds.isEmpty()){
+                issues =  TestingRunIssuesDao.instance.findAll(Filters.in(Constants.ID, issuesIds));
+            }else{
+                issues =  TestingRunIssuesDao.instance.findAll(filters, skip, 50, null);
+            }
             List<Bson> andFilters = new ArrayList<>();
             for (TestingRunIssues issue : issues) {
                 andFilters.add(Filters.and(
@@ -562,6 +569,37 @@ public class IssuesAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    private Map<String, List<String>> reportFilterList;
+    private String generatedReportId;
+    private List<TestingIssuesId> issuesIdsForReport;
+    private BasicDBObject response;
+
+    public String generateTestReport () {
+        try {
+            TestReports testReport = new TestReports(reportFilterList, Context.now(), "", this.issuesIdsForReport);
+            InsertOneResult insertTResult = TestReportsDao.instance.insertOne(testReport);
+            this.generatedReportId = insertTResult.getInsertedId().toString();
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            e.printStackTrace();
+            addActionError("Error in generating pdf report");
+            return ERROR.toUpperCase();
+        }
+    }
+
+    public String getReportFilters () {
+        if(this.generatedReportId == null){
+            addActionError("Report id cannot be null");
+            return ERROR.toUpperCase();
+        }
+        response = new BasicDBObject();
+        ObjectId reportId = new ObjectId(this.generatedReportId);
+        TestReports reportDoc = TestReportsDao.instance.findOne(Filters.eq(Constants.ID, reportId));
+        response.put(TestReports.FILTERS_FOR_REPORT, reportDoc.getFiltersForReport());
+        response.put(TestReports.ISSUE_IDS_FOR_REPORT, reportDoc.getIssuesIdsForReport());
+        return SUCCESS.toUpperCase();
+    }
+
     public List<TestingRunIssues> getIssues() {
         return issues;
     }
@@ -608,14 +646,6 @@ public class IssuesAction extends UserAction {
 
     public void setLimit(int limit) {
         this.limit = limit;
-    }
-
-    public long getTotalIssuesCount() {
-        return totalIssuesCount;
-    }
-
-    public void setTotalIssuesCount(long totalIssuesCount) {
-        this.totalIssuesCount = totalIssuesCount;
     }
 
     public List<TestRunIssueStatus> getFilterStatus() {
@@ -791,5 +821,24 @@ public class IssuesAction extends UserAction {
 
     public TestingRunResultSummary getTestingRunResultSummary() {
         return testingRunResultSummary;
+    }
+
+    public void setReportFilterList(Map<String, List<String>> reportFilterList) {
+        this.reportFilterList = reportFilterList;
+    }
+
+    public String getGeneratedReportId() {
+        return generatedReportId;
+    }
+
+    public void setGeneratedReportId(String generatedReportId) {
+        this.generatedReportId = generatedReportId;
+    }
+    public void setIssuesIdsForReport(List<TestingIssuesId> issuesIdsForReport) {
+        this.issuesIdsForReport = issuesIdsForReport;
+    }
+
+    public BasicDBObject getResponse() {
+        return response;
     }
 }

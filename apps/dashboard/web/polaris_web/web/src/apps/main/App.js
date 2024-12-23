@@ -338,11 +338,11 @@ const router = createBrowserRouter([
         element: <Onboarding />
       },
       {
-        path: "testing/summary/:summaryId",
+        path: "testing/summary/:reportId",
         element: <VulnerabilityReport />
       },
       {
-        path: "issues/summary/:issuesFilter",
+        path: "issues/summary/:reportId",
         element: <VulnerabilityReport />
       }
     ],

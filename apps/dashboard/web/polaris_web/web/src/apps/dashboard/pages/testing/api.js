@@ -231,13 +231,14 @@ export default {
             }
         })
     },
-    fetchVulnerableTestingRunResults(testingRunResultSummaryHexId, skip) {
+    fetchVulnerableTestingRunResults(testingRunResultSummaryHexId, skip, reportFilterList) {
         return request({
             url: '/api/fetchVulnerableTestRunResults',
             method: 'post',
             data: {
                 testingRunResultSummaryHexId,
-                skip
+                skip,
+                reportFilterList
             }
         })
     },
@@ -473,4 +474,18 @@ export default {
         })
         return resp
     },
+    generatePDFReport(reportFilterList, issuesIdsForReport){
+        return request({
+            url: '/api/generateReportPDF',
+            method: 'post',
+            data: { reportFilterList, issuesIdsForReport }
+        })
+    },
+    getReportFilters(generatedReportId){
+        return request({
+            url: '/api/getReportFilters',
+            method: 'post',
+            data: { generatedReportId }
+        })
+    }
 }
