@@ -201,8 +201,9 @@ function SingleTestRunPage() {
           "MEDIUM": 0,
           "LOW": 0
         }
+      } else {
+        tmp.countIssues = transform.prepareCountIssues(tmp.countIssues);
       }
-      tmp.countIssues = transform.prepareCountIssues(tmp.countIssues);
       prev = {...prev, ...transform.prepareDataFromSummary(tmp, prev.testRunState)}
 
       return {...prev};
@@ -238,7 +239,9 @@ function SingleTestRunPage() {
         if (isBWithinTimeAndRunning) return 1;
         return b.startTimestamp - a.startTimestamp;
       })
-    setSummary(tempTestingRunResultSummaries[0], true)
+    if (tempTestingRunResultSummaries && tempTestingRunResultSummaries.length > 0) {
+      setSummary(tempTestingRunResultSummaries[0], true)
+    }
   }
 
   const fetchTableData = async (sortKey, sortOrder, skip, limit, filters, filterOperators, queryValue) => {
