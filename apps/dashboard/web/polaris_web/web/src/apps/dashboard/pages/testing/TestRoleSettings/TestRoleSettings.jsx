@@ -308,6 +308,7 @@ function TestRoleSettings() {
         setHardCodeAuthInfo({authParams:[]})
         setAuthMechanism(null)
         setHardcodedOpen(true)
+        setEditableDocs(-1)
     }
 
     const handleSaveAuthMechanism = async() => {
