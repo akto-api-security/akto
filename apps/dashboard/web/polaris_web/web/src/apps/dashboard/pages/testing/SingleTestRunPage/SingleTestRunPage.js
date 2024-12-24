@@ -201,9 +201,8 @@ function SingleTestRunPage() {
           "MEDIUM": 0,
           "LOW": 0
         }
-      } else {
-        tmp.countIssues = transform.prepareCountIssues(tmp.countIssues);
       }
+      tmp.countIssues = transform.prepareCountIssues(tmp.countIssues);
       prev = {...prev, ...transform.prepareDataFromSummary(tmp, prev.testRunState)}
 
       return {...prev};
