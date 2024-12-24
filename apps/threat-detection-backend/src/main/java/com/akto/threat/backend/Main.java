@@ -7,6 +7,9 @@ import com.akto.DaoInit;
 import com.akto.kafka.KafkaConfig;
 import com.akto.kafka.KafkaConsumerConfig;
 import com.akto.kafka.KafkaProducerConfig;
+import com.akto.threat.backend.service.MaliciousEventService;
+import com.akto.threat.backend.service.ThreatActorService;
+import com.akto.threat.backend.service.ThreatApiService;
 import com.akto.threat.backend.tasks.FlushMessagesToDB;
 import com.mongodb.ConnectionString;
 import com.mongodb.MongoClientSettings;
@@ -52,6 +55,12 @@ public class Main {
 
     new FlushMessagesToDB(internalKafkaConfig, threatProtectionMongo).run();
 
-    new BackendVerticle(threatProtectionMongo, internalKafkaConfig).start();
+    MaliciousEventService maliciousEventService =
+        new MaliciousEventService(internalKafkaConfig, threatProtectionMongo);
+
+    ThreatActorService threatActorService = new ThreatActorService(threatProtectionMongo);
+    ThreatApiService threatApiService = new ThreatApiService(threatProtectionMongo);
+
+    new BackendVerticle(maliciousEventService, threatActorService, threatApiService).start();
   }
 }

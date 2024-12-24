@@ -272,6 +272,8 @@ public class MaliciousTrafficDetectorTask implements Task {
             .setLatestApiPayload(maliciousReq.getPayload())
             .setLatestApiMethod(maliciousReq.getMethod())
             .setDetectedAt(responseParam.getTime())
+            .setCategory("CORE_RULE_SET")
+            .setSubCategory("SSRF")
             .build();
     try {
       System.out.println("Pushing malicious event to kafka: " + maliciousEvent);
