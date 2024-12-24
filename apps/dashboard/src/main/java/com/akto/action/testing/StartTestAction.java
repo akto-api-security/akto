@@ -510,8 +510,8 @@ public class StartTestAction extends UserAction {
         List<Bson> filterList = new ArrayList<>();
         filterList.add(Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, testingRunResultSummaryId));
 
-        Bson filtersForTestingRunResults = com.akto.action.testing.Utils.createFiltersForTestingReport(filters);
-        filterList.add(filtersForTestingRunResults);
+        Bson filtersForTestingRunResults = com.akto.action.testing.Utils.createFiltersForTestingReport(reportFilterList);
+        if(!filtersForTestingRunResults.equals(Filters.empty())) filterList.add(filtersForTestingRunResults);
 
         if(queryMode == null) {
             if(fetchOnlyVulnerable) {
@@ -672,7 +672,7 @@ public class StartTestAction extends UserAction {
         }
     }
 
-    private Map<String, List> reportFilterList;
+    private Map<String, List<String>> reportFilterList;
 
     public String fetchVulnerableTestRunResults() {
         ObjectId testingRunResultSummaryId;
@@ -1377,7 +1377,7 @@ public class StartTestAction extends UserAction {
         return testCountMap;
     }
 
-    public void setReportFilterList(Map<String, List> reportFilterList) {
+    public void setReportFilterList(Map<String, List<String>> reportFilterList) {
         this.reportFilterList = reportFilterList;
     }
 }

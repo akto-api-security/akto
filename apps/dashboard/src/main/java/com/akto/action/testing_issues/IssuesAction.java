@@ -2,6 +2,7 @@ package com.akto.action.testing_issues;
 
 import com.akto.action.ExportSampleDataAction;
 import com.akto.action.UserAction;
+import com.akto.action.testing.Utils;
 import com.akto.dao.HistoricalDataDao;
 import com.akto.dao.RBACDao;
 import com.akto.action.testing.StartTestAction;
@@ -528,7 +529,7 @@ public class IssuesAction extends UserAction {
     String latestTestingRunSummaryId;
     List<String> issueStatusQuery;
     List<TestingRunResult> testingRunResultList;
-    private Map<String, List> filters;
+    private Map<String, List<String>> filters;
     public String fetchIssuesByStatusAndSummaryId() {
         Bson triFilters = Filters.and(
                 Filters.in(TestingRunIssues.TEST_RUN_ISSUES_STATUS, issueStatusQuery),
@@ -548,7 +549,7 @@ public class IssuesAction extends UserAction {
 
         List<Bson> filtersList = new ArrayList<>();
         if(!testingRunResultsFilterList.isEmpty()) filtersList.add(Filters.or(testingRunResultsFilterList));
-        Bson filtersForTestingRunResults = com.akto.action.testing.Utils.createFiltersForTestingReport(filters);
+        Bson filtersForTestingRunResults = Utils.createFiltersForTestingReport(filters);
         if(!filtersForTestingRunResults.equals(Filters.empty())) filtersList.add(filtersForTestingRunResults);
         Bson sortStage = StartTestAction.prepareTestingRunResultCustomSorting(sortKey, sortOrder);
 
@@ -854,7 +855,7 @@ public class IssuesAction extends UserAction {
         return testingRunResultList;
     }
 
-    public void setFilters(Map<String, List> filters) {
+    public void setFilters(Map<String, List<String>> filters) {
         this.filters = filters;
     }
 
