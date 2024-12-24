@@ -99,6 +99,7 @@ abstract public class SourceCodeAnalyserRepo {
                     fileOutputStream.close();
                 }
             } else {
+                loggerMaker.errorAndAddToDb("Error for request, message: " + response.message() + " body: " + response.body() + " response: " + response.toString());
                 return null;
             }
         } catch (Exception e) {
