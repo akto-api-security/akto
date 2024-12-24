@@ -232,27 +232,27 @@ public class TestExecutor {
 
         loggerMaker.infoAndAddToDb("Started filling hostname map with categories at :" + Context.now());
         int timeNow = Context.now();
-        for (String testSubCategory: testingRunSubCategories) {
-            TestConfig testConfig = testConfigMap.get(testSubCategory);
-            if (testConfig == null || testConfig.getStrategy() == null || testConfig.getStrategy().getRunOnce() == null) {
-                continue;
-            }
-            for (ApiInfo.ApiInfoKey apiInfoKey: apiInfoKeyList) {
-                try {
-                    hostName = findHost(apiInfoKey, testingUtil.getSampleMessages(), testingUtil.getSampleMessageStore());
-                    if (hostName == null) {
-                        continue;
-                    }
-                    if(hostsToApiCollectionMap.get(hostName) == null) {
-                        hostsToApiCollectionMap.put(hostName, apiInfoKey.getApiCollectionId());
-                    }
-                    apiInfoKeyToHostMap.put(apiInfoKey, hostName);
-                    subCategoryEndpointMap.put(apiInfoKey.getApiCollectionId() + "_" + testSubCategory, hostName);
-                } catch (URISyntaxException e) {
-                    loggerMaker.errorAndAddToDb("Error while finding host: " + e, LogDb.TESTING);
-                }
-            }
-        }
+        // for (String testSubCategory: testingRunSubCategories) {
+        //     TestConfig testConfig = testConfigMap.get(testSubCategory);
+        //     if (testConfig == null || testConfig.getStrategy() == null || testConfig.getStrategy().getRunOnce() == null) {
+        //         continue;
+        //     }
+        //     for (ApiInfo.ApiInfoKey apiInfoKey: apiInfoKeyList) {
+        //         try {
+        //             hostName = findHost(apiInfoKey, testingUtil.getSampleMessages(), testingUtil.getSampleMessageStore());
+        //             if (hostName == null) {
+        //                 continue;
+        //             }
+        //             if(hostsToApiCollectionMap.get(hostName) == null) {
+        //                 hostsToApiCollectionMap.put(hostName, apiInfoKey.getApiCollectionId());
+        //             }
+        //             apiInfoKeyToHostMap.put(apiInfoKey, hostName);
+        //             subCategoryEndpointMap.put(apiInfoKey.getApiCollectionId() + "_" + testSubCategory, hostName);
+        //         } catch (URISyntaxException e) {
+        //             loggerMaker.errorAndAddToDb("Error while finding host: " + e, LogDb.TESTING);
+        //         }
+        //     }
+        // }
         loggerMaker.infoAndAddToDb("Completed filling hostname map with categories in :" + (Context.now() - timeNow));
 
         final int maxRunTime = testingRun.getTestRunTime() <= 0 ? 30*60 : testingRun.getTestRunTime(); // if nothing specified wait for 30 minutes
@@ -668,13 +668,12 @@ public class TestExecutor {
             return true;
         }
 
-        String host;
-        host = apiInfoKeyToHostMap.get(apiInfoKey);
-        if (host != null) {
-            String val = subCategoryEndpointMap.remove(apiInfoKey.getApiCollectionId() + "_" + testSubCategory);
-            return val != null;
+        String val = subCategoryEndpointMap.get(apiInfoKey.getApiCollectionId() + "_" + testSubCategory);
+        if (val == null) {
+            subCategoryEndpointMap.put(apiInfoKey.getApiCollectionId() + "_" + testSubCategory, "true");
+            return true;
         }
-        return true;
+        return false;
     }
 
     public TestingRunResult runTestNew(ApiInfo.ApiInfoKey apiInfoKey, ObjectId testRunId, TestingUtil testingUtil,
