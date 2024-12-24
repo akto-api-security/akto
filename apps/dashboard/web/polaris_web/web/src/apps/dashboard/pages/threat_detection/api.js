@@ -46,6 +46,15 @@ const threatDetectionRequests = {
                 skip: skip
             }
         })
+    },
+    fetchThreatApis(skip) {
+        return request({
+            url: '/api/fetchThreatApis',
+            method: 'post',
+            data: {
+                skip: skip
+            }
+        })
     }
 }
 

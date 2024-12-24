@@ -170,7 +170,12 @@ public class DashboardService {
                     new Document("endpoint", "$latestApiEndpoint")
                         .append("method", "$latestApiMethod"))
                 .append("discoveredAt", new Document("$last", "$detectedAt"))
-                .append("distinctActors", new Document("$addToSet", "$actor"))));
+                .append("distinctActors", new Document("$addToSet", "$actor"))
+                .append("requestsCount", new Document("$sum", 1))));
+    pipeline.add(
+        new Document(
+            "$addFields", new Document("actorsCount", new Document("$size", "$distinctActors"))));
+    pipeline.add(new Document("$project", new Document("distinctActors", 0)));
     pipeline.add(new Document("$skip", skip));
     pipeline.add(new Document("$limit", limit));
 
@@ -184,7 +189,8 @@ public class DashboardService {
                 .setEndpoint(agg.getString("endpoint"))
                 .setMethod(agg.getString("method"))
                 .setDiscoveredAt(doc.getLong("discoveredAt"))
-                .setActorsCount(doc.getList("distinctActors", String.class).size())
+                .setActorsCount(doc.getInteger("actorsCount", 0))
+                .setRequestsCount(doc.getInteger("requestsCount", 0))
                 .build());
       }
     } catch (Exception e) {

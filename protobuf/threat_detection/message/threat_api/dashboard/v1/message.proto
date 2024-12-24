@@ -10,4 +10,5 @@ message DashboardThreatApi {
     string method = 2;
     uint64 discovered_at = 3;
     uint32 actors_count = 4;
+    uint32 requests_count = 5;
 }

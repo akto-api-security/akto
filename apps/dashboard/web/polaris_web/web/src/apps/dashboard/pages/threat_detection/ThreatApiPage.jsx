@@ -5,8 +5,8 @@ import TitleWithInfo from "../../components/shared/TitleWithInfo";
 import values from "@/util/values";
 import { produce } from "immer";
 import func from "@/util/func";
-import ThreatActorTable from "./components/ThreatActorsTable";
-function ThreatActorPage() {
+import ThreatApisTable from "./components/ThreatApisTable";
+function ThreatApiPage() {
   const [sampleData, setSampleData] = useState([]);
   const initialVal = values.ranges[3];
   const [currDateRange, dispatchCurrDateRange] = useReducer(
@@ -14,15 +14,15 @@ function ThreatActorPage() {
     initialVal
   );
   const components = [
-    <ThreatActorTable
-      key={"threat-actor-data-table"}
+    <ThreatApisTable
+      key={"threat-api-data-table"}
       currDateRange={currDateRange}
     />,
   ];
 
   return (
     <PageWithMultipleCards
-      title={<TitleWithInfo titleText={"Threat Actor"} />}
+      title={<TitleWithInfo titleText={"Threat API"} />}
       isFirstPage={true}
       primaryAction={
         <DateRangeFilter
@@ -42,4 +42,4 @@ function ThreatActorPage() {
   );
 }
 
-export default ThreatActorPage;
+export default ThreatApiPage;
