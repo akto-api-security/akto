@@ -214,9 +214,9 @@ const transform = {
     },
     prepareCountIssues : (data) => {
       let obj={
-        'High': data['HIGH'] || 0,
-        'Medium': data['MEDIUM'] || 0,
-        'Low': data['LOW'] || 0
+        'High': (data && data['HIGH']) ? data['HIGH'] : 0,
+        'Medium':(data && data['MEDIUM']) ? data['MEDIUM'] : 0,
+        'Low': (data && data['LOW']) ? data['LOW'] : 0
       };
       return obj;
     },
