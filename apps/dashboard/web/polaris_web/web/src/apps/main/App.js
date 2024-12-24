@@ -68,6 +68,7 @@ import TokenValidator from "./TokenValidator"
 import { TableContextProvider } from "@/apps/dashboard/components/tables/TableContext";
 import VulnerabilityReport from "../dashboard/pages/testing/vulnerability_report/VulnerabilityReport";
 import ThreatDetectionPage from "../dashboard/pages/threat_detection/ThreatDetectionPage";
+import ThreatActorPage from "../dashboard/pages/threat_detection/ThreatActorPage";
 
 import { PollingProvider } from "./PollingProvider";
 import Help from "../dashboard/pages/settings/help_and_support/Help";
@@ -179,6 +180,10 @@ const router = createBrowserRouter([
           {
             path:"threat-detection",
             element:<ThreatDetectionPage/>
+          },
+          {
+            path:"threat-actor",
+            element:<ThreatActorPage/>
           },
         ]
       },

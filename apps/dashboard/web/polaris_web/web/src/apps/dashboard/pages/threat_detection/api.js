@@ -38,6 +38,15 @@ const threatDetectionRequests = {
             data: {}
         })
     },
+    fetchThreatActors(skip) {
+        return request({
+            url: '/api/fetchThreatActors',
+            method: 'post',
+            data: {
+                skip: skip
+            }
+        })
+    }
 }
 
 export default threatDetectionRequests
