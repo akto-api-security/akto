@@ -92,12 +92,26 @@ public class Main {
         TestingRunConfig baseConfig = null;
 
         if (trrs != null && trrs.getTestIdConfig() > 1) {
+            loggerMaker.infoAndAddToDb("evaluating first trrs condition");
             configFromTrrs = dataActor.findTestingRunConfig(trrs.getTestIdConfig());
             loggerMaker.infoAndAddToDb("Found testing run trrs config with id :" + configFromTrrs.getId(), LogDb.TESTING);
         }
 
         if (testingRun.getTestIdConfig() > 1) {
-            baseConfig = dataActor.findTestingRunConfig(testingRun.getTestIdConfig());
+            loggerMaker.infoAndAddToDb("evaluating second trrs condition");
+            int maxRetries = 5;
+            for (int i = 0; i < maxRetries; i++) {
+                loggerMaker.infoAndAddToDb("fetching baseconfig in second trrs condition");
+                baseConfig = dataActor.findTestingRunConfig(testingRun.getTestIdConfig());
+                if (baseConfig != null) {
+                    break;
+                }
+                try {
+                    Thread.sleep(1000);
+                } catch (Exception e) {
+                }
+            }
+
             loggerMaker.infoAndAddToDb("Found testing run base config with id :" + baseConfig.getId(), LogDb.TESTING);
         }
 
@@ -331,6 +345,7 @@ public class Main {
                 }
                 //raiseMixpanelEvent(summaryId, testingRun, accountId);
             } catch (Exception e) {
+                e.printStackTrace();
                 loggerMaker.errorAndAddToDb(e, "Error in init " + e);
             }
             int scheduleTs = 0;
