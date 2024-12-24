@@ -154,7 +154,7 @@ public class Main {
 
         Bson update = Updates.combine(
                 Updates.set(TestingRun.PICKED_UP_TIMESTAMP, Context.now()),
-                Updates.set(TestingRun.STATE, TestingRun.State.RUNNING)
+                Updates.set(TestingRun.STATE, TestingRun.State.RUNNING)xr
         );
 
         // returns the previous state of testing run before the update
@@ -202,8 +202,28 @@ public class Main {
         }
 
         if (testingRun.getTestIdConfig() > 1) {
-            baseConfig = TestingRunConfigDao.instance.findOne(Constants.ID, testingRun.getTestIdConfig());
-            loggerMaker.infoAndAddToDb("Found testing run base config with id :" + baseConfig.getId(), LogDb.TESTING);
+            int counter = 0;
+            do {
+                baseConfig = TestingRunConfigDao.instance.findOne(Constants.ID, testingRun.getTestIdConfig());
+                if (baseConfig == null) {
+                    loggerMaker.errorAndAddToDb("in loop Couldn't find testing run base config:" + testingRun.getTestIdConfig(), LogDb.TESTING);
+                } else {
+                    loggerMaker.infoAndAddToDb("in loop Found testing run base config with id :" + baseConfig.getId(), LogDb.TESTING);
+                }
+                
+                try {
+                    Thread.sleep(10000);
+                } catch (InterruptedException e) {
+
+                }
+                counter++;
+            } while (baseConfig == null && counter <= 5);
+
+            if (baseConfig == null) {
+                loggerMaker.errorAndAddToDb("Couldn't find testing run base config:" + testingRun.getTestIdConfig(), LogDb.TESTING);
+            } else {
+                loggerMaker.infoAndAddToDb("Found testing run base config with id :" + baseConfig.getId(), LogDb.TESTING);
+            }
         }
 
         if (configFromTrrs == null) {
