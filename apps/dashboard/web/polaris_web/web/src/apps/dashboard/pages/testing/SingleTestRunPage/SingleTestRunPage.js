@@ -195,6 +195,13 @@ function SingleTestRunPage() {
     clearInterval(refreshId.current);
     setSelectedTestRun((prev) => {
       let tmp = {...summary};
+      if(tmp === null || tmp?.countIssues === null || tmp?.countIssues === undefined){
+        tmp.countIssues = {
+          "HIGH": 0,
+          "MEDIUM": 0,
+          "LOW": 0
+        }
+      }
       tmp.countIssues = transform.prepareCountIssues(tmp.countIssues);
       prev = {...prev, ...transform.prepareDataFromSummary(tmp, prev.testRunState)}
 
