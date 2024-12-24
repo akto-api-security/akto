@@ -59,8 +59,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.*;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
@@ -154,7 +156,7 @@ public class Main {
 
         Bson update = Updates.combine(
                 Updates.set(TestingRun.PICKED_UP_TIMESTAMP, Context.now()),
-                Updates.set(TestingRun.STATE, TestingRun.State.RUNNING)xr
+                Updates.set(TestingRun.STATE, TestingRun.State.RUNNING)
         );
 
         // returns the previous state of testing run before the update
@@ -210,7 +212,7 @@ public class Main {
                 } else {
                     loggerMaker.infoAndAddToDb("in loop Found testing run base config with id :" + baseConfig.getId(), LogDb.TESTING);
                 }
-                
+
                 try {
                     Thread.sleep(10000);
                 } catch (InterruptedException e) {
@@ -239,6 +241,40 @@ public class Main {
         }
     }
 
+    
+    // Runnable task for monitoring memory
+    static class MemoryMonitorTask implements Runnable {
+        @Override
+        public void run() {
+            Runtime runtime = Runtime.getRuntime();
+    
+            // Loop to print memory usage every 1 second
+            while (true) {
+                // Calculate memory statistics
+                long totalMemory = runtime.totalMemory();
+                long freeMemory = runtime.freeMemory();
+                long usedMemory = totalMemory - freeMemory;
+    
+                // Print memory statistics
+                System.out.print("Used Memory: " + (usedMemory / 1024 / 1024) + " MB ");
+                System.out.print("Free Memory: " + (freeMemory / 1024 / 1024) + " MB ");
+                System.out.print("Total Memory: " + (totalMemory / 1024 / 1024) + " MB ");
+                System.out.print("Available Memory: " + ((runtime.maxMemory() - usedMemory) / 1024 / 1024) + " MB ");
+                System.out.println("-------------------------");
+    
+                // Pause for 1 second
+                try {
+                    Thread.sleep(1000);
+                } catch (InterruptedException e) {
+                    System.err.println("Memory monitor thread interrupted: " + e.getMessage());
+                    break; // Exit the loop if thread is interrupted
+                }
+            }
+        }
+    }
+
+    private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
+
     public static void main(String[] args) throws InterruptedException {
         String mongoURI = System.getenv("AKTO_MONGO_CONN");
         ReadPreference readPreference = ReadPreference.secondary();
@@ -256,6 +292,8 @@ public class Main {
         } while (!connectedToMongo);
 
         setupRateLimitWatcher();
+        
+        executorService.scheduleAtFixedRate(new Main.MemoryMonitorTask(), 0, 1, TimeUnit.SECONDS);
 
         if (!SKIP_SSRF_CHECK) {
             Setup setup = SetupDao.instance.findOne(new BasicDBObject());
