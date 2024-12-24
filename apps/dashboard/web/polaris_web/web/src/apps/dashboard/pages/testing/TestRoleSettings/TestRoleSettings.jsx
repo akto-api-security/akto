@@ -81,6 +81,7 @@ function TestRoleSettings() {
     const resetFunc = (newItems) => {
         setChange(false);
         setRoleName(newItems.name || systemRole || "");
+        setAuthMechanism(null)
         dispatchConditions({type:"replace", conditions:transform.createConditions(newItems.endpoints)})
     }
     useEffect(() => {
@@ -186,7 +187,7 @@ function TestRoleSettings() {
             setAdvancedHeaderSettingsOpen(true)
         }
         setShowAuthComponent(true)
-        setHardcodedOpen(true)
+        setHardcodedOpen(authObj?.authMechanism?.type === "HardCoded")
         setEditableDocs(index)
     }
 
@@ -305,6 +306,8 @@ function TestRoleSettings() {
         setHeaderKey('')
         setHeaderValue('')
         setHardCodeAuthInfo({authParams:[]})
+        setAuthMechanism(null)
+        setHardcodedOpen(true)
     }
 
     const handleSaveAuthMechanism = async() => {
@@ -332,8 +335,15 @@ function TestRoleSettings() {
                         errorFilePath: null,
                     }
                 }
+
+                if(editableDoc > -1) {
+                    resp = await api.updateAuthInRole(initialItems.name, apiCond, editableDoc, currentInfo.authParams, automationType, currentInfo.steps, recordedLoginFlowInput)
+                } else {
+                    resp = await api.addAuthToRole(initialItems.name, apiCond, currentInfo.authParams, automationType, currentInfo.steps, recordedLoginFlowInput)
+                }
+            } else {
+                func.setToast(true, true, "Request data cannot be empty!")
             }
-            resp = await api.addAuthToRole(initialItems.name, apiCond, currentInfo.authParams, automationType, currentInfo.steps, recordedLoginFlowInput)
         }
         handleCancel()
         await saveAction(true, resp.selectedRole.authWithCondList)

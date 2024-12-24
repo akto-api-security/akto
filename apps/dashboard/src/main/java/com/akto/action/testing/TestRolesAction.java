@@ -86,7 +86,7 @@ public class TestRolesAction extends UserAction {
 
             for (AuthParamData authParamDataElem : authParamData) {
                 AuthParam param = null;
-                if (authAutomationType.equals(LoginFlowEnums.AuthMechanismTypes.HARDCODED.toString())) {
+                if (authAutomationType.toUpperCase().equals(LoginFlowEnums.AuthMechanismTypes.HARDCODED.toString())) {
                     param = new HardcodedAuthParam(authParamDataElem.getWhere(), authParamDataElem.getKey(), authParamDataElem.getValue(), true);
                 } else {
                     param = new LoginRequestAuthParam(authParamDataElem.getWhere(), authParamDataElem.getKey(), authParamDataElem.getValue(), authParamDataElem.getShowHeader());
