@@ -55,9 +55,8 @@ public class DashboardService {
 
   public ListMaliciousRequestsResponse listMaliciousRequests(
       String accountId, ListMaliciousRequestsRequest request) {
-    int page = request.hasPage() && request.getPage() > 0 ? request.getPage() : 1;
     int limit = request.getLimit();
-    int skip = (page - 1) * limit;
+    int skip = request.hasSkip() ? request.getSkip() : 0;
 
     MongoCollection<MaliciousEventModel> coll =
         this.mongoClient
@@ -90,7 +89,6 @@ public class DashboardService {
                 .build());
       }
       return ListMaliciousRequestsResponse.newBuilder()
-          .setPage(page)
           .setTotal(maliciousEvents.size())
           .addAllMaliciousEvents(maliciousEvents)
           .build();

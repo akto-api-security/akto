@@ -11,13 +11,12 @@ option java_package = "threat_detection.service.dashboard_service.v1";
 message ListMaliciousRequestsResponse {
     repeated threat_detection.message.malicious_event.dashboard.v1.DashboardMaliciousEventMessage malicious_events = 1;
     int32 total = 2;
-    int32 page = 3;
 }
 
 message ListMaliciousRequestsRequest {
     // The number of alerts to return
-    int32 limit = 3;
-    optional int32 page = 4;
+    optional uint32 skip = 1;
+    uint32 limit = 2;
 }
 
 message FetchAlertFiltersRequest {}
