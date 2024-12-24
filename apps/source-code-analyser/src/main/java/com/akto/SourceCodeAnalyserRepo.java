@@ -69,9 +69,11 @@ abstract public class SourceCodeAnalyserRepo {
         File file = new File(outputFilePath);
 
         Request.Builder builder = new Request.Builder();
+        loggerMaker.infoAndAddToDb("downloadRepository finalUrl: " + finalUrl);
         builder.url(finalUrl);
         builder.get();
         if (token != null && !token.isEmpty()) {
+            loggerMaker.infoAndAddToDb("downloadRepository addHeader token: " + token);
             builder.addHeader("Authorization", "Bearer " + token);
         }
         Request request = builder.build();
@@ -99,7 +101,11 @@ abstract public class SourceCodeAnalyserRepo {
                     fileOutputStream.close();
                 }
             } else {
-                loggerMaker.errorAndAddToDb("Error for request, message: " + response.message() + " body: " + response.body() + " response: " + response.toString());
+                loggerMaker.errorAndAddToDb("Error for request, message: " + response.message() + " body: "
+                        + response.body().toString() + " response: " + response.toString());
+                if (response.body() != null) {
+                    loggerMaker.errorAndAddToDb("Error for request, body: " + response.body().toString());
+                }
                 return null;
             }
         } catch (Exception e) {
