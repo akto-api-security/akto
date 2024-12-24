@@ -131,7 +131,7 @@ function TestRoleSettings() {
     const saveAction = async (updatedAuth=false, authWithCondLists = null) => {
         let andConditions = transform.filterContainsConditions(conditions, 'AND')
         let orConditions = transform.filterContainsConditions(conditions, 'OR')
-        if (!(andConditions || orConditions) || roleName.length === 0) {
+        if (roleName !== 'ATTACKER_TOKEN_ALL' && !(andConditions || orConditions) || roleName.length === 0) {
             func.setToast(true, true, "Please select valid values for a test role")
         } else {
             if (isNew) {
@@ -235,7 +235,7 @@ function TestRoleSettings() {
         }
     }
 
-    const conditionsCard = (
+    const conditionsCard = roleName !== 'ATTACKER_TOKEN_ALL' ? (
         <LegacyCard title="Details" key="condition">
             <TestRolesConditionsPicker
                 title="Role endpoint conditions"
@@ -245,7 +245,7 @@ function TestRoleSettings() {
                 selectOptions={selectOptions}
             />
         </LegacyCard>
-    )
+    ) : (<></>)
 
     const deleteModalComp = (
         <Modal

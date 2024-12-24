@@ -180,8 +180,8 @@ public class TestRolesAction extends UserAction {
             isAttackerRole = role.getId().equals(attackerRole.getId());
         }
         if (isAttackerRole) {
-            addActionError("Unable to update endpoint conditions for attacker role");
-            return ERROR.toUpperCase();
+            this.orConditions = null;
+            this.andConditions = null;
         }
 
         Conditions orConditions = null;
