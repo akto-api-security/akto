@@ -4,6 +4,7 @@ package threat_detection.service.dashboard_service.v1;
 
 import "threat_detection/message/malicious_event/dashboard/v1/message.proto";
 import "threat_detection/message/threat_actor/dashboard/v1/message.proto";
+import "threat_detection/message/threat_api/dashboard/v1/message.proto";
 
 // Dashboard service which the dashboard actions will call instead of directly calling DB
 option java_outer_classname = "DashboardServiceProto";
@@ -34,5 +35,15 @@ message ListThreatActorsRequest {
 
 message ListThreatActorResponse {
   repeated threat_detection.message.threat_actor.dashboard.v1.DashboardThreatActor actors = 1;
+  int32 total = 2;
+}
+
+message ListThreatApiRequest {
+  optional uint32 skip = 1;
+  uint32 limit = 2;
+}
+
+message ListThreatApiResponse {
+  repeated threat_detection.message.threat_api.dashboard.v1.DashboardThreatApi apis = 1;
   int32 total = 2;
 }
