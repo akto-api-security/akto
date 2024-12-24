@@ -76,7 +76,8 @@ public class ThreatActorAction extends UserAction {
                                     smr.getLatestApiEndpoint(),
                                     smr.getLatestApiIp(),
                                     URLMethods.Method.fromString(smr.getLatestApiMethod()),
-                                    smr.getDiscoveredAt()))
+                                    smr.getDiscoveredAt(),
+                                    smr.getCountry()))
                         .collect(Collectors.toList());
               });
     } catch (Exception e) {

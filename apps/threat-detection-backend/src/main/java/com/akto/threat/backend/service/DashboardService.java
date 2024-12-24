@@ -120,6 +120,7 @@ public class DashboardService {
                 .append("latestApiEndpoint", new Document("$last", "$latestApiEndpoint"))
                 .append("latestApiMethod", new Document("$last", "$latestApiMethod"))
                 .append("latestApiIp", new Document("$last", "$latestApiIp"))
+                .append("country", new Document("$last", "$country"))
                 .append("discoveredAt", new Document("$last", "$detectedAt"))));
     pipeline.add(new Document("$skip", skip));
     pipeline.add(new Document("$limit", limit));
@@ -134,6 +135,7 @@ public class DashboardService {
                 .setLatestApiEndpoint(doc.getString("latestApiEndpoint"))
                 .setLatestApiMethod(doc.getString("latestApiMethod"))
                 .setLatestApiIp(doc.getString("latestApiIp"))
+                .setCountry(doc.getString("country"))
                 .setDiscoveredAt(doc.getLong("discoveredAt"))
                 .build());
       }

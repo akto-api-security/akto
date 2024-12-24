@@ -9,19 +9,22 @@ public class DashboardThreatActor {
   private String latestApiIp;
   private Method latestApiMethod;
   private long discoveredAt;
+  private String country;
 
   public DashboardThreatActor(
       String id,
       String latestApiEndpoint,
       String latestApiIp,
       Method latestApiMethod,
-      long discoveredAt) {
+      long discoveredAt,
+      String country) {
 
     this.id = id;
     this.latestApiEndpoint = latestApiEndpoint;
     this.latestApiIp = latestApiIp;
     this.latestApiMethod = latestApiMethod;
     this.discoveredAt = discoveredAt;
+    this.country = country;
   }
 
   public String getId() {
@@ -62,5 +65,13 @@ public class DashboardThreatActor {
 
   public void setDiscoveredAt(long discoveredAt) {
     this.discoveredAt = discoveredAt;
+  }
+
+  public String getCountry() {
+    return country;
+  }
+
+  public void setCountry(String country) {
+    this.country = country;
   }
 }

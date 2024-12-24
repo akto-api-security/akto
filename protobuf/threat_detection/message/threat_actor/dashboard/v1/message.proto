@@ -11,4 +11,5 @@ message DashboardThreatActor {
   string latest_api_endpoint = 3;
   string latest_api_method = 4;
   uint64 discovered_at = 5;
+  string country = 6;
 }
