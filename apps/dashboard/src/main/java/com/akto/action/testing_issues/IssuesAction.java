@@ -335,6 +335,7 @@ public class IssuesAction extends UserAction {
                             sampleDataVsCurlMap.put(testResult.getOriginalMessage(), ExportSampleDataAction.getCurl(testResult.getOriginalMessage()));
                         } else if (tr instanceof MultiExecTestResult){
                             MultiExecTestResult testResult = (MultiExecTestResult) tr;
+                            testResults.add(testResult);
                             Map<String, WorkflowTestResult.NodeResult> nodeResultMap = testResult.getNodeResultMap();
                             for (String order : nodeResultMap.keySet()) {
                                 WorkflowTestResult.NodeResult nodeResult = nodeResultMap.get(order);
