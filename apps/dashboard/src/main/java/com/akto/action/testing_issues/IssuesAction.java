@@ -548,7 +548,8 @@ public class IssuesAction extends UserAction {
 
         List<Bson> filtersList = new ArrayList<>();
         if(!testingRunResultsFilterList.isEmpty()) filtersList.add(Filters.or(testingRunResultsFilterList));
-        StartTestAction.prepareTestingRunResultTableFilters(filtersList, filters);
+        Bson filtersForTestingRunResults = com.akto.action.testing.Utils.createFiltersForTestingReport(filters);
+        if(!filtersForTestingRunResults.equals(Filters.empty())) filtersList.add(filtersForTestingRunResults);
         Bson sortStage = StartTestAction.prepareTestingRunResultCustomSorting(sortKey, sortOrder);
 
         if(filtersList.isEmpty()) {

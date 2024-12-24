@@ -510,7 +510,8 @@ public class StartTestAction extends UserAction {
         List<Bson> filterList = new ArrayList<>();
         filterList.add(Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, testingRunResultSummaryId));
 
-        prepareTestingRunResultTableFilters(filterList, filters);
+        Bson filtersForTestingRunResults = com.akto.action.testing.Utils.createFiltersForTestingReport(filters);
+        filterList.add(filtersForTestingRunResults);
 
         if(queryMode == null) {
             if(fetchOnlyVulnerable) {
@@ -555,29 +556,6 @@ public class StartTestAction extends UserAction {
         }
 
         return filterList;
-    }
-
-    public static void prepareTestingRunResultTableFilters(List<Bson> filterList, Map<String, List> filters) {
-        if(filters != null && !filters.isEmpty()) {
-            for(Map.Entry<String, List> filterEntry : filters.entrySet()) {
-                String key = filterEntry.getKey();
-                switch (key) {
-                    case "severityStatus":
-                        filterList.add(Filters.in(TestingRunResult.TEST_RESULTS+"."+GenericTestResult._CONFIDENCE, filterEntry.getValue()));
-                        break;
-                    case "apiCollectionId":
-                    case "collectionIds":
-                        filterList.add(Filters.in(TestingRunResult.API_INFO_KEY+"."+ApiInfo.ApiInfoKey.API_COLLECTION_ID, filterEntry.getValue()));
-                        break;
-                    case "method":
-                        filterList.add(Filters.in(TestingRunResult.API_INFO_KEY+"."+ApiInfo.ApiInfoKey.METHOD, filterEntry.getValue()));
-                        break;
-                    case "categoryFilter":
-                        filterList.add(Filters.in(TestingRunResult.TEST_SUPER_TYPE, filterEntry.getValue()));
-                        break;
-                }
-            }
-        }
     }
 
     public static Bson prepareTestingRunResultCustomSorting(String sortKey, int sortOrder) {
@@ -694,7 +672,7 @@ public class StartTestAction extends UserAction {
         }
     }
 
-    private Map<String, List<String>> reportFilterList;
+    private Map<String, List> reportFilterList;
 
     public String fetchVulnerableTestRunResults() {
         ObjectId testingRunResultSummaryId;
@@ -1399,7 +1377,7 @@ public class StartTestAction extends UserAction {
         return testCountMap;
     }
 
-    public void setReportFilterList(Map<String, List<String>> reportFilterList) {
+    public void setReportFilterList(Map<String, List> reportFilterList) {
         this.reportFilterList = reportFilterList;
     }
 }

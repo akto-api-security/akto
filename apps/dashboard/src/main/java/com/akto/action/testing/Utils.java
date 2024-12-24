@@ -14,26 +14,21 @@ import com.mongodb.client.model.Filters;
 
 public class Utils {
 
-    public static Bson createFiltersForTestingReport(Map<String, List<String>> filterMap){
+    public static Bson createFiltersForTestingReport(Map<String, List> filterMap){
         List<Bson> filterList = new ArrayList<>();
-        for(Map.Entry<String, List<String>> entry: filterMap.entrySet()) {
+        for(Map.Entry<String, List> entry: filterMap.entrySet()) {
             String key = entry.getKey();
-            List<String> value = entry.getValue();
+            List value = entry.getValue();
 
-            if (value.size() == 0) continue;
-            List<Integer> collectionIds = new ArrayList<>();
-            if(key.equals(SingleTypeInfo._API_COLLECTION_ID)){
-                for(String str: value){
-                    collectionIds.add(Integer.parseInt(str));
-                }
-            }
+            if (value.isEmpty()) continue;
 
             switch (key) {
                 case SingleTypeInfo._METHOD:
                     filterList.add(Filters.in(TestingRunResult.API_INFO_KEY + "." + ApiInfoKey.METHOD, value));
                     break;
+                case SingleTypeInfo._COLLECTION_IDS:
                 case SingleTypeInfo._API_COLLECTION_ID:
-                    filterList.add(Filters.in(TestingRunResult.API_INFO_KEY + "." + ApiInfoKey.API_COLLECTION_ID, collectionIds));
+                    filterList.add(Filters.in(TestingRunResult.API_INFO_KEY + "." + ApiInfoKey.API_COLLECTION_ID, value));
                     break;
                 case "categoryFilter":
                     filterList.add(Filters.in(TestingRunResult.TEST_SUPER_TYPE, value));
