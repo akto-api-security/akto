@@ -256,11 +256,11 @@ export default {
             data: {roleName, index}
         })
     },
-    updateAuthInRole(roleName, apiCond ,index, authParamData, authAutomationType) {
+    updateAuthInRole(roleName, apiCond ,index, authParamData, authAutomationType, reqData, recordedLoginFlowInput) {
         return request({
             url: '/api/updateAuthInRole',
             method: 'post',
-            data: {roleName, apiCond, index, authParamData, authAutomationType}
+            data: {roleName, apiCond, index, authParamData, authAutomationType, reqData, recordedLoginFlowInput}
         })
     },
     deleteTestRuns(testRunIds){

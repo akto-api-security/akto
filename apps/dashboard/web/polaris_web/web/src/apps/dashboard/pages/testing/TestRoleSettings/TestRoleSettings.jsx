@@ -81,6 +81,7 @@ function TestRoleSettings() {
     const resetFunc = (newItems) => {
         setChange(false);
         setRoleName(newItems.name || systemRole || "");
+        setAuthMechanism(null)
         dispatchConditions({type:"replace", conditions:transform.createConditions(newItems.endpoints)})
     }
     useEffect(() => {
@@ -130,7 +131,7 @@ function TestRoleSettings() {
     const saveAction = async (updatedAuth=false, authWithCondLists = null) => {
         let andConditions = transform.filterContainsConditions(conditions, 'AND')
         let orConditions = transform.filterContainsConditions(conditions, 'OR')
-        if (!(andConditions || orConditions) || roleName.length === 0) {
+        if (roleName !== 'ATTACKER_TOKEN_ALL' && !(andConditions || orConditions) || roleName.length === 0) {
             func.setToast(true, true, "Please select valid values for a test role")
         } else {
             if (isNew) {
@@ -186,7 +187,7 @@ function TestRoleSettings() {
             setAdvancedHeaderSettingsOpen(true)
         }
         setShowAuthComponent(true)
-        setHardcodedOpen(true)
+        setHardcodedOpen(authObj?.authMechanism?.type === "HardCoded")
         setEditableDocs(index)
     }
 
@@ -234,7 +235,7 @@ function TestRoleSettings() {
         }
     }
 
-    const conditionsCard = (
+    const conditionsCard = roleName !== 'ATTACKER_TOKEN_ALL' ? (
         <LegacyCard title="Details" key="condition">
             <TestRolesConditionsPicker
                 title="Role endpoint conditions"
@@ -244,7 +245,7 @@ function TestRoleSettings() {
                 selectOptions={selectOptions}
             />
         </LegacyCard>
-    )
+    ) : (<></>)
 
     const deleteModalComp = (
         <Modal
@@ -305,6 +306,9 @@ function TestRoleSettings() {
         setHeaderKey('')
         setHeaderValue('')
         setHardCodeAuthInfo({authParams:[]})
+        setAuthMechanism(null)
+        setHardcodedOpen(true)
+        setEditableDocs(-1)
     }
 
     const handleSaveAuthMechanism = async() => {
@@ -332,8 +336,15 @@ function TestRoleSettings() {
                         errorFilePath: null,
                     }
                 }
+
+                if(editableDoc > -1) {
+                    resp = await api.updateAuthInRole(initialItems.name, apiCond, editableDoc, currentInfo.authParams, automationType, currentInfo.steps, recordedLoginFlowInput)
+                } else {
+                    resp = await api.addAuthToRole(initialItems.name, apiCond, currentInfo.authParams, automationType, currentInfo.steps, recordedLoginFlowInput)
+                }
+            } else {
+                func.setToast(true, true, "Request data cannot be empty!")
             }
-            resp = await api.addAuthToRole(initialItems.name, apiCond, currentInfo.authParams, automationType, currentInfo.steps, recordedLoginFlowInput)
         }
         handleCancel()
         await saveAction(true, resp.selectedRole.authWithCondList)
