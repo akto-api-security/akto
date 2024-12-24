@@ -1,10 +1,13 @@
 package com.akto.threat.backend.service;
 
 import com.akto.proto.generated.threat_detection.message.malicious_event.dashboard.v1.DashboardMaliciousEventMessage;
+import com.akto.proto.generated.threat_detection.message.threat_actor.dashboard.v1.DashboardThreatActor;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchAlertFiltersRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchAlertFiltersResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListMaliciousRequestsRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListMaliciousRequestsResponse;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListThreatActorResponse;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListThreatActorsRequest;
 import com.akto.threat.backend.constants.MongoDBCollection;
 import com.akto.threat.backend.db.MaliciousEventModel;
 import com.mongodb.BasicDBObject;
@@ -17,6 +20,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import org.bson.Document;
 import org.bson.conversions.Bson;
 
 public class DashboardService {
@@ -93,5 +97,48 @@ public class DashboardService {
           .addAllMaliciousEvents(maliciousEvents)
           .build();
     }
+  }
+
+  public ListThreatActorResponse listThreatActors(
+      String accountId, ListThreatActorsRequest request) {
+    int skip = request.hasSkip() ? request.getSkip() : 0;
+    int limit = request.getLimit();
+    MongoCollection<Document> coll =
+        this.mongoClient
+            .getDatabase(accountId)
+            .getCollection(MongoDBCollection.ThreatDetection.MALICIOUS_EVENTS, Document.class);
+
+    List<Document> pipeline = new ArrayList<>();
+    pipeline.add(new Document("$sort", new Document("actor", 1).append("detectedAt", -1))); // sort
+    pipeline.add(
+        new Document(
+            "$group",
+            new Document("_id", "$actor")
+                .append("latestApiEndpoint", new Document("$last", "$latestApiEndpoint"))
+                .append("latestApiMethod", new Document("$last", "$latestApiMethod"))
+                .append("latestApiIp", new Document("$last", "$latestApiIp"))
+                .append("discoveredAt", new Document("$last", "$detectedAt"))));
+    pipeline.add(new Document("$skip", skip));
+    pipeline.add(new Document("$limit", limit));
+
+    List<DashboardThreatActor> actors = new ArrayList<>();
+    try (MongoCursor<Document> cursor = coll.aggregate(pipeline).cursor()) {
+      while (cursor.hasNext()) {
+        Document doc = cursor.next();
+        actors.add(
+            DashboardThreatActor.newBuilder()
+                .setId(doc.getString("_id"))
+                .setLatestApiEndpoint(doc.getString("latestApiEndpoint"))
+                .setLatestApiMethod(doc.getString("latestApiMethod"))
+                .setLatestApiIp(doc.getString("latestApiIp"))
+                .setDiscoveredAt(doc.getLong("discoveredAt"))
+                .build());
+      }
+    }
+
+    return ListThreatActorResponse.newBuilder()
+        .addAllActors(actors)
+        .setTotal(actors.size())
+        .build();
   }
 }

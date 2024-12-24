@@ -2,6 +2,7 @@ package com.akto.threat.backend.router;
 
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchAlertFiltersRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListMaliciousRequestsRequest;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListThreatActorsRequest;
 import com.akto.proto.utils.ProtoMessageUtils;
 import com.akto.threat.backend.service.DashboardService;
 import io.vertx.core.Vertx;
@@ -46,6 +47,25 @@ public class DashboardRouter implements ARouter {
               }
 
               ProtoMessageUtils.toString(dsService.listMaliciousRequests(ctx.get("accountId"), req))
+                  .ifPresent(s -> ctx.response().setStatusCode(200).end(s));
+            });
+
+    router
+        .post("/list_threat_actors")
+        .blockingHandler(
+            ctx -> {
+              RequestBody reqBody = ctx.body();
+              ListThreatActorsRequest req =
+                  ProtoMessageUtils.<ListThreatActorsRequest>toProtoMessage(
+                          ListThreatActorsRequest.class, reqBody.asString())
+                      .orElse(null);
+
+              if (req == null) {
+                ctx.response().setStatusCode(400).end("Invalid request");
+                return;
+              }
+
+              ProtoMessageUtils.toString(dsService.listThreatActors(ctx.get("accountId"), req))
                   .ifPresent(s -> ctx.response().setStatusCode(200).end(s));
             });
 
