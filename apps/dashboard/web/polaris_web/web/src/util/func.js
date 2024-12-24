@@ -246,7 +246,7 @@ prettifyEpoch(epoch) {
   },
   getTestingRunIconObj(state) {
     let testState = state?._name || state
-    switch(testState.toUpperCase()){
+    switch(testState?.toUpperCase()){
       case "RUNNING": 
         return {
           color: "subdued",
