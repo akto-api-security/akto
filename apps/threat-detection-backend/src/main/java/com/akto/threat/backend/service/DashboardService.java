@@ -167,7 +167,8 @@ public class DashboardService {
                     "_id",
                     new Document("endpoint", "$latestApiEndpoint")
                         .append("method", "$latestApiMethod"))
-                .append("discoveredAt", new Document("$last", "$detectedAt"))));
+                .append("discoveredAt", new Document("$last", "$detectedAt"))
+                .append("distinctActors", new Document("$addToSet", "$actor"))));
     pipeline.add(new Document("$skip", skip));
     pipeline.add(new Document("$limit", limit));
 
@@ -181,6 +182,7 @@ public class DashboardService {
                 .setEndpoint(agg.getString("endpoint"))
                 .setMethod(agg.getString("method"))
                 .setDiscoveredAt(doc.getLong("discoveredAt"))
+                .setActorsCount(doc.getList("distinctActors", String.class).size())
                 .build());
       }
     } catch (Exception e) {
