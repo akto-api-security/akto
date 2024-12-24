@@ -71,7 +71,7 @@ abstract public class SourceCodeAnalyserRepo {
         Request.Builder builder = new Request.Builder();
         builder.url(finalUrl);
         builder.get();
-        if (token != null) {
+        if (token != null && !token.isEmpty()) {
             builder.addHeader("Authorization", "Bearer " + token);
         }
         Request request = builder.build();
