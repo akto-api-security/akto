@@ -237,21 +237,21 @@ function Integrations() {
     function renderItem(item) {
         const {id, source, name, link} = item;
         const media = <Avatar customer size="md" name={name} source={source}/>;
-        const sourceActions = (item) => {
-            return [
-              {
-                content: <div data-testid={`configure_${id}`}>Configure</div>,
-                onClick: () => handleTab(item, link),
-              },
-            ];
-          };
+        // const sourceActions = (item) => {
+        //     return [
+        //       {
+        //         content: <div data-testid={`configure_${id}`}>Configure</div>,
+        //         onClick: () => handleTab(item, link),
+        //       },
+        //     ];
+        //   };
     
         return (
           <ResourceItem
             id={id}
             media={media}
-            shortcutActions={sourceActions(id)}
             persistActions
+            onClick={()=>handleTab(id, link)}
           >
             <Text fontWeight="bold" as="h3">
               {name}

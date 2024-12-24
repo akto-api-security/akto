@@ -22,3 +22,8 @@
 .popover-menu-button.popover-menu-button--extraMargin{
     margin-bottom: 0.2rem !important;
 }
+
+[aria-expanded=true]:is(.polaris-secondaryAction-button button){
+    box-shadow: var(--p-shadow-inset-200)!important;
+    background-color: var(--p-color-bg-fill-tertiary-active) !important;
+}

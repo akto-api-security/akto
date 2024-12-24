@@ -585,9 +585,7 @@ function ApiCollections() {
                 onClose={() => { setMoreActions(false) }}
                 preferredAlignment="right"
             >
-                <Popover.Pane fixed>
-                    
-                    <Popover.Section>
+               
                     <ActionList
                         actionRole=""
                         items={[
@@ -604,15 +602,32 @@ function ApiCollections() {
                         
                         ]}
                     />
-                        
-                    </Popover.Section>
-                </Popover.Pane>
+                
             </Popover>
             <div className="polaris-secondaryAction-button" >
             <Button variant="secondary" id={"create-new-collection-popup"}  onClick={showCreateNewCollectionPopup}>Create new collection</Button>
             </div>
         </InlineStack>
     )
+
+    const actionGroups = [
+        {
+            title: 'More actions',
+            actions: [
+                {
+                    content: 'Export as CSV',
+                    icon: FileIcon,
+                    onAction: exportCsv
+                },
+                {
+                    content: treeView ? 'Hide tree view' : 'Display tree view',
+                    icon: treeView ? HideIcon : ViewIcon,
+                    onAction: () => setTreeView(!treeView)
+                }
+            ]
+        },
+        
+    ];
 
 
     const handleSelectedTab = (selectedIndex) => {

@@ -265,12 +265,12 @@ function TestRunResultFlyout(props) {
     }
     const moreInfoComponent = (
         infoStateFlyout.length > 0 ?
-        <BlockStack gap={"5"}>
+        <BlockStack gap={"500"}>
             {infoStateFlyout.map((item, index) => {
                 return (
                     <BlockStack gap={"500"} key={index}>
                         <BlockStack gap={"200"}>
-                            <InlineStack gap="1_5-experimental">
+                            <InlineStack gap="150">
                                 <Box><Icon source={item.icon} tone='subdued'/></Box>
                                 <TitleWithInfo
                                     textProps={{variant:"bodyMd", fontWeight:"semibold", color:"subdued"}}
