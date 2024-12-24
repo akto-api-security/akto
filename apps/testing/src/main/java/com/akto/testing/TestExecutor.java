@@ -670,9 +670,8 @@ public class TestExecutor {
 
         String val = subCategoryEndpointMap.get(apiInfoKey.getApiCollectionId() + "_" + testSubCategory);
         if (val == null) {
-            return true;
-        } else {
             subCategoryEndpointMap.put(apiInfoKey.getApiCollectionId() + "_" + testSubCategory, "true");
+            return true;
         }
         return false;
     }
