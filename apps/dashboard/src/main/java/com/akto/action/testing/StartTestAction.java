@@ -510,26 +510,8 @@ public class StartTestAction extends UserAction {
         List<Bson> filterList = new ArrayList<>();
         filterList.add(Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, testingRunResultSummaryId));
 
-        if(filters != null && !filters.isEmpty()) {
-            for(Map.Entry<String, List> filterEntry : filters.entrySet()) {
-                String key = filterEntry.getKey();
-                switch (key) {
-                    case "severityStatus":
-                        filterList.add(Filters.in(TestingRunResult.TEST_RESULTS+"."+GenericTestResult._CONFIDENCE, filterEntry.getValue()));
-                        break;
-                    case "apiCollectionId":
-                    case "collectionIds":
-                        filterList.add(Filters.in(TestingRunResult.API_INFO_KEY+"."+ApiInfo.ApiInfoKey.API_COLLECTION_ID, filterEntry.getValue()));
-                        break;
-                    case "method":
-                        filterList.add(Filters.in(TestingRunResult.API_INFO_KEY+"."+ApiInfo.ApiInfoKey.METHOD, filterEntry.getValue()));
-                        break;
-                    case "categoryFilter":
-                        filterList.add(Filters.in(TestingRunResult.TEST_SUPER_TYPE, filterEntry.getValue()));
-                        break;
-                }
-            }
-        }
+        Bson filtersForTestingRunResults = com.akto.action.testing.Utils.createFiltersForTestingReport(reportFilterList);
+        if(!filtersForTestingRunResults.equals(Filters.empty())) filterList.add(filtersForTestingRunResults);
 
         if(queryMode == null) {
             if(fetchOnlyVulnerable) {
@@ -569,7 +551,26 @@ public class StartTestAction extends UserAction {
             }
         }
 
+        if(filterList.isEmpty()) {
+            filterList.add(Filters.empty());
+        }
+
         return filterList;
+    }
+
+    public static Bson prepareTestingRunResultCustomSorting(String sortKey, int sortOrder) {
+        Bson sortStage = null;
+        if (TestingRunIssues.KEY_SEVERITY.equals(sortKey)) {
+            sortStage = (sortOrder == 1) ?
+                    Aggregates.sort(Sorts.ascending("severityValue", TestingRunResult.END_TIMESTAMP)) :
+                    Aggregates.sort(Sorts.descending("severityValue", TestingRunResult.END_TIMESTAMP));
+        } else if ("time".equals(sortKey)) {
+            sortStage = (sortOrder == 1) ?
+                    Aggregates.sort(Sorts.ascending(TestingRunResult.END_TIMESTAMP)) :
+                    Aggregates.sort(Sorts.descending(TestingRunResult.END_TIMESTAMP));
+        }
+
+        return sortStage;
     }
 
     String testingRunResultSummaryHexId;
@@ -595,6 +596,12 @@ public class StartTestAction extends UserAction {
         if (testingRunResultSummaryHexId != null) loggerMaker.infoAndAddToDb("fetchTestingRunResults called for hexId=" + testingRunResultSummaryHexId);
         if (queryMode != null) loggerMaker.infoAndAddToDb("fetchTestingRunResults called for queryMode="+queryMode);
 
+        Bson ignoredIssuesFilters = Filters.and(
+                Filters.in(TestingRunIssues.TEST_RUN_ISSUES_STATUS, "IGNORED"),
+                Filters.in(TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_ID, testingRunResultSummaryId)
+        );
+        List<TestingRunIssues> issueslist = TestingRunIssuesDao.instance.findAll(ignoredIssuesFilters, Projections.include("_id"));
+
         List<Bson> testingRunResultFilters = prepareTestRunResultsFilters(testingRunResultSummaryId, queryMode);
 
         if(queryMode == QueryMode.SKIPPED_EXEC || queryMode == QueryMode.SKIPPED_EXEC_NEED_CONFIG){
@@ -609,19 +616,13 @@ public class StartTestAction extends UserAction {
 
         try {
             int pageLimit = limit <= 0 ? 150 : limit;
-            Bson sortStage = null;
-            if (TestingRunIssues.KEY_SEVERITY.equals(sortKey)) {
-                sortStage = (sortOrder == 1) ?
-                        Aggregates.sort(Sorts.ascending("severityValue", TestingRunResult.END_TIMESTAMP)) :
-                        Aggregates.sort(Sorts.descending("severityValue", TestingRunResult.END_TIMESTAMP));
-            } else if ("time".equals(sortKey)) {
-                sortStage = (sortOrder == 1) ?
-                        Aggregates.sort(Sorts.ascending(TestingRunResult.END_TIMESTAMP)) :
-                        Aggregates.sort(Sorts.descending(TestingRunResult.END_TIMESTAMP));
-            }
+            Bson sortStage = prepareTestingRunResultCustomSorting(sortKey, sortOrder);
 
+            Bson filters = testingRunResultFilters.isEmpty() ? Filters.empty() : Filters.and(testingRunResultFilters);
             this.testingRunResults = TestingRunResultDao.instance
-                    .fetchLatestTestingRunResultWithCustomAggregations(Filters.and(testingRunResultFilters), pageLimit, skip, sortStage);
+                    .fetchLatestTestingRunResultWithCustomAggregations(filters, pageLimit, skip, sortStage);
+
+            removeTestingRunResultsByIssues(testingRunResults, issueslist, false);
 
             testCountMap = new HashMap<>();
             for(QueryMode qm : QueryMode.values()) {
@@ -635,18 +636,40 @@ public class StartTestAction extends UserAction {
                 testCountMap.put(qm.toString(), count);
             }
 
-            Bson ignoredIssuesFilters = Filters.and(
-                    Filters.in(TestingRunIssues.TEST_RUN_ISSUES_STATUS, Arrays.asList("IGNORED", "FIXED")),
-                    Filters.in(TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_ID, testingRunResultSummaryId)
-            );
-            int count = (int) TestingRunIssuesDao.instance.count(ignoredIssuesFilters);
-            testCountMap.put(QueryMode.VULNERABLE.name(), Math.abs(testCountMap.getOrDefault(QueryMode.VULNERABLE.name(), 0)-count));
-            testCountMap.put("IGNORED_ISSUES", count);
+            testCountMap.put(QueryMode.VULNERABLE.name(), Math.abs(testCountMap.getOrDefault(QueryMode.VULNERABLE.name(), 0)- issueslist.size()));
+            testCountMap.put("IGNORED_ISSUES", issueslist.size());
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "error in fetchLatestTestingRunResult: " + e);
         }
 
         return SUCCESS.toUpperCase();
+    }
+
+    public static void removeTestingRunResultsByIssues(List<TestingRunResult> testingRunResults,
+                                                       List<TestingRunIssues> testingRunIssues,
+                                                       boolean retainByIssues) {
+        Set<String> issuesSet = new HashSet<>();
+        for (TestingRunIssues issue : testingRunIssues) {
+            String apiInfoKeyString = issue.getId().getApiInfoKey().toString();
+            String key = apiInfoKeyString + "|" + issue.getId().getTestSubCategory();
+            issuesSet.add(key);
+        }
+
+        Iterator<TestingRunResult> resultIterator = testingRunResults.iterator();
+
+        while (resultIterator.hasNext()) {
+            TestingRunResult result = resultIterator.next();
+            String apiInfoKeyString = result.getApiInfoKey().toString();
+            String resultKey = apiInfoKeyString + "|" + result.getTestSubType();
+
+            boolean matchFound = issuesSet.contains(resultKey);
+
+            if (retainByIssues && !matchFound) {
+                resultIterator.remove();
+            } else if (!retainByIssues && matchFound) {
+                resultIterator.remove();
+            }
+        }
     }
 
     private Map<String, List<String>> reportFilterList;

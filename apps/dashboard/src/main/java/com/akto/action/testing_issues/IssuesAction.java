@@ -2,6 +2,7 @@ package com.akto.action.testing_issues;
 
 import com.akto.action.ExportSampleDataAction;
 import com.akto.action.UserAction;
+import com.akto.action.testing.Utils;
 import com.akto.dao.HistoricalDataDao;
 import com.akto.dao.RBACDao;
 import com.akto.action.testing.StartTestAction;
@@ -527,12 +528,38 @@ public class IssuesAction extends UserAction {
 
     String latestTestingRunSummaryId;
     List<String> issueStatusQuery;
+    List<TestingRunResult> testingRunResultList;
+    private Map<String, List<String>> filters;
     public String fetchIssuesByStatusAndSummaryId() {
-        Bson filters = Filters.and(
+        Bson triFilters = Filters.and(
                 Filters.in(TestingRunIssues.TEST_RUN_ISSUES_STATUS, issueStatusQuery),
                 Filters.in(TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_ID, new ObjectId(latestTestingRunSummaryId))
         );
-        issues = TestingRunIssuesDao.instance.findAll(filters);
+        issues = TestingRunIssuesDao.instance.findAll(triFilters, Projections.include("_id"));
+
+        List<Bson> testingRunResultsFilterList = new ArrayList<>();
+        for(TestingRunIssues issue: issues) {
+            testingRunResultsFilterList.add(Filters.and(
+                    Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, new ObjectId(latestTestingRunSummaryId)),
+                    Filters.eq(TestingRunResult.VULNERABLE, true),
+                    Filters.eq(TestingRunResult.API_INFO_KEY, issue.getId().getApiInfoKey()),
+                    Filters.eq(TestingRunResult.TEST_SUB_TYPE, issue.getId().getTestSubCategory())
+            ));
+        }
+
+        List<Bson> filtersList = new ArrayList<>();
+        if(!testingRunResultsFilterList.isEmpty()) filtersList.add(Filters.or(testingRunResultsFilterList));
+        Bson filtersForTestingRunResults = Utils.createFiltersForTestingReport(filters);
+        if(!filtersForTestingRunResults.equals(Filters.empty())) filtersList.add(filtersForTestingRunResults);
+        Bson sortStage = StartTestAction.prepareTestingRunResultCustomSorting(sortKey, sortOrder);
+
+        if(filtersList.isEmpty()) {
+            testingRunResultList = new ArrayList<>();
+            return SUCCESS.toUpperCase();
+        }
+
+        testingRunResultList = TestingRunResultDao.instance.fetchLatestTestingRunResultWithCustomAggregations(Filters.and(filtersList), limit, skip, sortStage);
+
         return SUCCESS.toUpperCase();
     }
 
@@ -822,6 +849,14 @@ public class IssuesAction extends UserAction {
 
     public TestingRunResultSummary getTestingRunResultSummary() {
         return testingRunResultSummary;
+    }
+
+    public List<TestingRunResult> getTestingRunResultList() {
+        return testingRunResultList;
+    }
+
+    public void setFilters(Map<String, List<String>> filters) {
+        this.filters = filters;
     }
 
     public void setReportFilterList(Map<String, List<String>> reportFilterList) {

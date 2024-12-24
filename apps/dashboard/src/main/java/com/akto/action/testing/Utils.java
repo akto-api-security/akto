@@ -20,7 +20,7 @@ public class Utils {
             String key = entry.getKey();
             List<String> value = entry.getValue();
 
-            if (value.size() == 0) continue;
+            if (value.isEmpty()) continue;
             List<Integer> collectionIds = new ArrayList<>();
             if(key.equals(SingleTypeInfo._API_COLLECTION_ID)){
                 for(String str: value){
@@ -32,6 +32,7 @@ public class Utils {
                 case SingleTypeInfo._METHOD:
                     filterList.add(Filters.in(TestingRunResult.API_INFO_KEY + "." + ApiInfoKey.METHOD, value));
                     break;
+                case SingleTypeInfo._COLLECTION_IDS:
                 case SingleTypeInfo._API_COLLECTION_ID:
                     filterList.add(Filters.in(TestingRunResult.API_INFO_KEY + "." + ApiInfoKey.API_COLLECTION_ID, collectionIds));
                     break;

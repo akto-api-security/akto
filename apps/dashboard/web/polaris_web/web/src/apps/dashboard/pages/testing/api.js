@@ -24,12 +24,12 @@ export default {
         })
         return resp
     },
-    async fetchTestingRunResults(testingRunResultSummaryHexId, queryMode, sortKey, sortOrder, skip, limit, filters, queryValue) {
+    async fetchTestingRunResults(testingRunResultSummaryHexId, queryMode, sortKey, sortOrder, skip, limit, reportFilterList, queryValue) {
         const resp = await request({
             url: '/api/fetchTestingRunResults',
             method: 'post',
             data: {
-                testingRunResultSummaryHexId, queryMode, sortKey, sortOrder, skip, limit, filters, queryValue
+                testingRunResultSummaryHexId, queryMode, sortKey, sortOrder, skip, limit, reportFilterList, queryValue
             }
         })
         return resp        
@@ -450,11 +450,11 @@ export default {
             data: {deltaTimeForScheduledSummaries}
         })
     },
-    fetchIssuesByStatusAndSummaryId(latestTestingRunSummaryId, issueStatusQuery) {
+    fetchIssuesByStatusAndSummaryId(latestTestingRunSummaryId, issueStatusQuery, sortKey, sortOrder, skip, limit, filters) {
         return request({
             url: '/api/fetchIssuesByStatusAndSummaryId',
             method: 'post',
-            data: { latestTestingRunSummaryId, issueStatusQuery }
+            data: { latestTestingRunSummaryId, issueStatusQuery, sortKey, sortOrder, skip, limit, filters }
         })
     },
     modifyTestingRunConfig(testingRunConfigId, testConfigsAdvancedSettings){
