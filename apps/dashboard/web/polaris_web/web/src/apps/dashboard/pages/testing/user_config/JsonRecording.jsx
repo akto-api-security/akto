@@ -35,7 +35,7 @@ function JsonRecording({extractInformation, showOnlyApi, setStoreData}) {
         } else {
             return;
         }
-    }, [])
+    }, [authMechanism])
 
     const inputRef = useRef(null);
 

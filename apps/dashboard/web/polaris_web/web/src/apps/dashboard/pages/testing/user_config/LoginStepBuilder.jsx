@@ -65,7 +65,7 @@ function LoginStepBuilder({extractInformation, showOnlyApi, setStoreData}) {
         }else{
             return;
         }
-    }, [])
+    }, [authMechanism])
 
     const stepOptions = [
         { label: "Call API", value: "LOGIN_FORM" },
