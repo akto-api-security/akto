@@ -36,6 +36,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
+import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -593,15 +594,18 @@ public class StartTestAction extends UserAction {
             addActionError("Invalid test summary id");
             return ERROR.toUpperCase();
         }
-        if (testingRunResultSummaryHexId != null) loggerMaker.infoAndAddToDb("fetchTestingRunResults called for hexId=" + testingRunResultSummaryHexId);
-        if (queryMode != null) loggerMaker.infoAndAddToDb("fetchTestingRunResults called for queryMode="+queryMode);
+
+        long startTime = System.currentTimeMillis();
+
+        if (testingRunResultSummaryHexId != null) loggerMaker.infoAndAddToDb("[" + Instant.now() + "] fetchTestingRunResults called for hexId=" + testingRunResultSummaryHexId);
+        if (queryMode != null) loggerMaker.infoAndAddToDb("[" + Instant.now() + "] fetchTestingRunResults called for queryMode="+queryMode);
 
         Bson ignoredIssuesFilters = Filters.and(
                 Filters.in(TestingRunIssues.TEST_RUN_ISSUES_STATUS, "IGNORED"),
                 Filters.in(TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_ID, testingRunResultSummaryId)
         );
         List<TestingRunIssues> issueslist = TestingRunIssuesDao.instance.findAll(ignoredIssuesFilters, Projections.include("_id"));
-        loggerMaker.infoAndAddToDb("Fetched testing run issues of size: " + issueslist.size(), LogDb.DASHBOARD);
+        loggerMaker.infoAndAddToDb("[" + Instant.now() + "] Fetched testing run issues of size: " + issueslist.size(), LogDb.DASHBOARD);
 
         List<Bson> testingRunResultFilters = prepareTestRunResultsFilters(testingRunResultSummaryId, queryMode);
 
@@ -622,10 +626,10 @@ public class StartTestAction extends UserAction {
             Bson filters = testingRunResultFilters.isEmpty() ? Filters.empty() : Filters.and(testingRunResultFilters);
             this.testingRunResults = TestingRunResultDao.instance
                     .fetchLatestTestingRunResultWithCustomAggregations(filters, pageLimit, skip, sortStage);
-            loggerMaker.infoAndAddToDb("Fetched testing run results of size: " + testingRunResults.size(), LogDb.DASHBOARD);
+            loggerMaker.infoAndAddToDb("[" + Instant.now() + "] Fetched testing run results of size: " + testingRunResults.size(), LogDb.DASHBOARD);
 
             removeTestingRunResultsByIssues(testingRunResults, issueslist, false);
-            loggerMaker.infoAndAddToDb("Removed ignored issues from testing run results. Current size of testing run results: " + testingRunResults.size(), LogDb.DASHBOARD);
+            loggerMaker.infoAndAddToDb("[" + Instant.now() + "] Removed ignored issues from testing run results. Current size of testing run results: " + testingRunResults.size(), LogDb.DASHBOARD);
 
             testCountMap = new HashMap<>();
             for(QueryMode qm : QueryMode.values()) {
@@ -642,8 +646,12 @@ public class StartTestAction extends UserAction {
             testCountMap.put(QueryMode.VULNERABLE.name(), Math.abs(testCountMap.getOrDefault(QueryMode.VULNERABLE.name(), 0)- issueslist.size()));
             testCountMap.put("IGNORED_ISSUES", issueslist.size());
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "error in fetchLatestTestingRunResult: " + e);
+            loggerMaker.errorAndAddToDb(e, "[" + Instant.now() + "] error in fetchLatestTestingRunResult: " + e);
         }
+
+        long endTime = System.currentTimeMillis();
+        long duration = endTime - startTime;
+        loggerMaker.infoAndAddToDb("[" + Instant.now() + "] fetchTestingRunResults completed in " + duration + " ms", LogDb.DASHBOARD);
 
         return SUCCESS.toUpperCase();
     }
@@ -651,13 +659,15 @@ public class StartTestAction extends UserAction {
     public static void removeTestingRunResultsByIssues(List<TestingRunResult> testingRunResults,
                                                        List<TestingRunIssues> testingRunIssues,
                                                        boolean retainByIssues) {
+        long startTime = System.currentTimeMillis();
+
         Set<String> issuesSet = new HashSet<>();
         for (TestingRunIssues issue : testingRunIssues) {
             String apiInfoKeyString = issue.getId().getApiInfoKey().toString();
             String key = apiInfoKeyString + "|" + issue.getId().getTestSubCategory();
             issuesSet.add(key);
         }
-        loggerMaker.infoAndAddToDb("Total issues to be removed from TestingRunResults list: " + issuesSet.size(), LogDb.DASHBOARD);
+        loggerMaker.infoAndAddToDb("[" + Instant.now() + "] Total issues to be removed from TestingRunResults list: " + issuesSet.size(), LogDb.DASHBOARD);
 
         Iterator<TestingRunResult> resultIterator = testingRunResults.iterator();
 
@@ -674,6 +684,10 @@ public class StartTestAction extends UserAction {
                 resultIterator.remove();
             }
         }
+
+        long endTime = System.currentTimeMillis();
+        long duration = endTime - startTime;
+        loggerMaker.infoAndAddToDb("[" + Instant.now() + "] Removed elements from TestingRunResults list in " + duration + " ms", LogDb.DASHBOARD);
     }
 
     private Map<String, List<String>> reportFilterList;
