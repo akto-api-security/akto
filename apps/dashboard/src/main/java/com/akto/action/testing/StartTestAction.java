@@ -601,6 +601,7 @@ public class StartTestAction extends UserAction {
                 Filters.in(TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_ID, testingRunResultSummaryId)
         );
         List<TestingRunIssues> issueslist = TestingRunIssuesDao.instance.findAll(ignoredIssuesFilters, Projections.include("_id"));
+        loggerMaker.infoAndAddToDb("Fetched testing run issues of size: " + issueslist.size(), LogDb.DASHBOARD);
 
         List<Bson> testingRunResultFilters = prepareTestRunResultsFilters(testingRunResultSummaryId, queryMode);
 
@@ -621,8 +622,10 @@ public class StartTestAction extends UserAction {
             Bson filters = testingRunResultFilters.isEmpty() ? Filters.empty() : Filters.and(testingRunResultFilters);
             this.testingRunResults = TestingRunResultDao.instance
                     .fetchLatestTestingRunResultWithCustomAggregations(filters, pageLimit, skip, sortStage);
+            loggerMaker.infoAndAddToDb("Fetched testing run results of size: " + testingRunResults.size(), LogDb.DASHBOARD);
 
             removeTestingRunResultsByIssues(testingRunResults, issueslist, false);
+            loggerMaker.infoAndAddToDb("Removed ignored issues from testing run results. Current size of testing run results: " + testingRunResults.size(), LogDb.DASHBOARD);
 
             testCountMap = new HashMap<>();
             for(QueryMode qm : QueryMode.values()) {
@@ -654,6 +657,7 @@ public class StartTestAction extends UserAction {
             String key = apiInfoKeyString + "|" + issue.getId().getTestSubCategory();
             issuesSet.add(key);
         }
+        loggerMaker.infoAndAddToDb("Total issues to be removed from TestingRunResults list: " + issuesSet.size(), LogDb.DASHBOARD);
 
         Iterator<TestingRunResult> resultIterator = testingRunResults.iterator();
 
