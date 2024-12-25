@@ -12,15 +12,20 @@ import com.akto.dao.SensitiveParamInfoDao;
 import com.akto.dao.SensitiveSampleDataDao;
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dto.AccountSettings;
+import com.akto.dto.ApiInfo;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
+import com.akto.dto.SensitiveSampleData;
+import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.dependency_flow.DependencyFlow;
 import com.akto.dto.third_party_access.Credential;
 import com.akto.dto.third_party_access.PostmanCredential;
 import com.akto.dto.third_party_access.ThirdPartyAccess;
 import com.akto.dto.traffic.Key;
+import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.dto.type.URLMethods;
 import com.akto.dto.upload.FileUploadError;
 import com.akto.listener.KafkaListener;
 import com.akto.listener.RuntimeListener;
@@ -34,10 +39,17 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
+import com.mongodb.client.model.BulkWriteOptions;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.UpdateManyModel;
+import com.mongodb.client.model.Updates;
+import com.mongodb.client.model.WriteModel;
+
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
+import org.bson.conversions.Bson;
 
+import java.lang.reflect.Method;
 import java.net.MalformedURLException;
 import java.net.URISyntaxException;
 import java.net.URL;
@@ -52,6 +64,7 @@ public class Utils {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(Utils.class);
     private final static ObjectMapper mapper = new ObjectMapper();
+    private static String id = "_id.";
 
     public static Map<String, String> getAuthMap(JsonNode auth, Map<String, String> variableMap) {
         Map<String,String> result = new HashMap<>();
@@ -600,8 +613,6 @@ public class Utils {
 
     public static void deleteApis(List<Key> toBeDeleted) {
 
-        String id = "_id.";
-
         AccountsContextDaoWithRbac.deleteApisPerDao(toBeDeleted, SingleTypeInfoDao.instance, "");
         AccountsContextDaoWithRbac.deleteApisPerDao(toBeDeleted, ApiInfoDao.instance, id);
         AccountsContextDaoWithRbac.deleteApisPerDao(toBeDeleted, SampleDataDao.instance, id);
@@ -609,6 +620,107 @@ public class Utils {
         AccountsContextDaoWithRbac.deleteApisPerDao(toBeDeleted, SensitiveSampleDataDao.instance, id);
         AccountsContextDaoWithRbac.deleteApisPerDao(toBeDeleted, SensitiveParamInfoDao.instance, "");
         AccountsContextDaoWithRbac.deleteApisPerDao(toBeDeleted, FilterSampleDataDao.instance, id);
+
+    }
+
+    private static Key copy(Key oldKey) {
+        Key newKey = new Key();
+        newKey.setApiCollectionId(oldKey.getApiCollectionId());
+        newKey.setUrl(oldKey.getUrl());
+        newKey.setMethod(oldKey.getMethod());
+        newKey.setResponseCode(oldKey.getResponseCode());
+        newKey.setBucketStartEpoch(oldKey.getBucketStartEpoch());
+        newKey.setBucketEndEpoch(oldKey.getBucketEndEpoch());
+        return newKey;
+    }
+
+    public static void moveApisFromSampleData(Map<Key,Integer> sampleDataToBeMovedMap){
+
+        Map<ApiInfoKey, Key> mapApiInfoKeyToKey = new HashMap<>();
+
+        // insert new sample data
+        Bson sampleDataFilter = AccountsContextDaoWithRbac.generateCommonFilter(sampleDataToBeMovedMap, SampleDataDao.instance, id);
+        List<SampleData> sampleDataList = SampleDataDao.instance.findAll(sampleDataFilter);
+        Iterator<SampleData> sampleDataIterator = sampleDataList.iterator();
+        while(sampleDataIterator.hasNext()){
+            SampleData sampleData = sampleDataIterator.next();
+            Key key = sampleData.getId();
+            Key oldKey = copy(key);
+            int newCollId = sampleDataToBeMovedMap.getOrDefault(key, key.getApiCollectionId());
+            ApiInfoKey apiInfoKey = new ApiInfoKey(key.getApiCollectionId(), key.getUrl(), key.getMethod());
+            mapApiInfoKeyToKey.put(apiInfoKey, oldKey);
+            if(key.getApiCollectionId() != newCollId){
+                key.setApiCollectionId(newCollId);
+                sampleData.setId(key);
+            }else{
+                sampleDataIterator.remove();
+            }
+        }
+        if(!sampleDataList.isEmpty()){
+            SampleDataDao.instance.insertMany(sampleDataList);
+            loggerMaker.infoAndAddToDb("Inserted " + sampleDataList.size() + " new sample data into database.");
+        }
+
+        // insert new api info data
+        Bson apiInfoFilter = AccountsContextDaoWithRbac.generateCommonFilter(sampleDataToBeMovedMap, ApiInfoDao.instance, id);
+        List<ApiInfo> apiInfos = ApiInfoDao.instance.findAll(apiInfoFilter);
+        Iterator<ApiInfo> apiInfoIterator = apiInfos.iterator();
+        while(apiInfoIterator.hasNext()){
+            ApiInfo apiInfo = apiInfoIterator.next();
+            ApiInfoKey apiInfoKey = apiInfo.getId();
+            Key mappedKey = mapApiInfoKeyToKey.get(apiInfoKey);
+            int newCollId = sampleDataToBeMovedMap.getOrDefault(mappedKey, mappedKey.getApiCollectionId());
+            if(mappedKey.getApiCollectionId() != newCollId){
+                apiInfoKey.setApiCollectionId(newCollId);
+                apiInfo.setId(apiInfoKey);
+            }else{
+                apiInfoIterator.remove();
+            }
+        }
+        
+        if(!apiInfos.isEmpty()){
+            ApiInfoDao.instance.insertMany(apiInfos);
+            loggerMaker.infoAndAddToDb("Inserted " + apiInfos.size() + " new api infos into database.");
+        }
+        
+        // insert new sensitive sample data
+        Bson sensitiveDataFilter = AccountsContextDaoWithRbac.generateCommonFilter(sampleDataToBeMovedMap, SensitiveSampleDataDao.instance, id);
+        List<SensitiveSampleData> sensitiveSampleDataList = SensitiveSampleDataDao.instance.findAll(sensitiveDataFilter);
+        Iterator<SensitiveSampleData> sensitiveSampleDataIterator = sensitiveSampleDataList.iterator();
+        while(sensitiveSampleDataIterator.hasNext()){
+            SensitiveSampleData sampleData = sensitiveSampleDataIterator.next();
+            SingleTypeInfo.ParamId key = sampleData.getId();
+            ApiInfoKey apiInfoKey = new ApiInfoKey(key.getApiCollectionId(), key.getUrl(), URLMethods.Method.valueOf(key.getMethod()));
+            Key mappedKey = mapApiInfoKeyToKey.get(apiInfoKey);
+            int newCollId = sampleDataToBeMovedMap.getOrDefault(mappedKey, mappedKey.getApiCollectionId());
+
+            if(key.getApiCollectionId() != newCollId){
+                key.setApiCollectionId(newCollId);
+                sampleData.setId(key);
+            }else{
+                sensitiveSampleDataIterator.remove();
+            }
+        }
+        if(!sensitiveSampleDataList.isEmpty()){
+            SensitiveSampleDataDao.instance.insertMany(sensitiveSampleDataList);
+            loggerMaker.infoAndAddToDb("Inserted " + sensitiveSampleDataList.size() + " new sensitive sample data into database.");
+        }
+    
+        // update single type info data
+        ArrayList<WriteModel<SingleTypeInfo>> bulkUpdatesForSti = new ArrayList<>();
+        for(Key key: sampleDataToBeMovedMap.keySet()){
+            Bson filterQ = Filters.and(
+                Filters.eq(SingleTypeInfo._API_COLLECTION_ID, key.getApiCollectionId()),
+                Filters.eq(SingleTypeInfo._URL, key.getUrl()),
+                Filters.eq(SingleTypeInfo._METHOD, key.getMethod())
+            );
+            bulkUpdatesForSti.add(new UpdateManyModel<>(filterQ, Updates.set(SingleTypeInfo._API_COLLECTION_ID, sampleDataToBeMovedMap.get(key))));
+        }
+
+        if(!bulkUpdatesForSti.isEmpty()){
+            loggerMaker.infoAndAddToDb("Updated " + bulkUpdatesForSti.size() + " stis into database.");
+            SingleTypeInfoDao.instance.getMCollection().bulkWrite(bulkUpdatesForSti, new BulkWriteOptions().ordered(false));
+        }
 
     }
 

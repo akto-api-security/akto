@@ -1,5 +1,6 @@
 package com.akto.utils.jobs;
 
+import com.akto.dto.ApiCollection;
 import com.akto.util.DashboardMode;
 
 public class JobUtils {
@@ -18,5 +19,13 @@ public class JobUtils {
         } catch (Exception e) {
             return true;
         }
+    }
+
+    public static boolean hasHostModified(String hostNameFromParam, ApiCollection collection){
+        if(collection.getHostName() == null){
+            return true;
+        }
+
+        return collection.getHostName().equals(hostNameFromParam);
     }
 }

@@ -1,8 +1,5 @@
 package com.akto.utils.jobs;
 
-import java.io.BufferedWriter;
-import java.io.File;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -19,12 +16,12 @@ import java.util.function.Function;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
-import com.akto.dto.CodeAnalysisRepo;
 import com.mongodb.client.model.Updates;
 import org.bson.conversions.Bson;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.ApiInfoDao;
 import com.akto.dao.SampleDataDao;
 import com.akto.dao.SensitiveSampleDataDao;
@@ -52,9 +49,11 @@ import com.akto.util.DashboardMode;
 import com.akto.util.Pair;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.FindOneAndUpdateOptions;
 import com.mongodb.client.model.Sorts;
 
 import static com.akto.utils.Utils.deleteApis;
+import static com.akto.utils.Utils.moveApisFromSampleData;
 import static com.akto.runtime.utils.Utils.createRegexPatternFromList;
 
 public class CleanInventory {
@@ -139,10 +138,20 @@ public class CleanInventory {
         int limit = 100;
         Bson sort = Sorts.ascending("_id.apiCollectionId", "_id.url", "_id.method");
         Map<Integer,Integer> collectionWiseDeletionCountMap = new HashMap<>();
+        Map<Integer,Integer> moveHostCollectionWiseCountMap = new HashMap<>();
+
+        FindOneAndUpdateOptions updateOptions = new FindOneAndUpdateOptions();
+        updateOptions.upsert(true);
+
+        Bson updatesForCollection = Updates.combine(
+            Updates.setOnInsert("startTs", Context.now()),
+            Updates.setOnInsert("urls", new HashSet<>())
+        );
 
         Map<String,FilterConfig> filterMap = FilterYamlTemplateDao.instance.fetchFilterConfig(false, yamlTemplates, true);
         Pattern pattern = createRegexPatternFromList(redundantUrlList);
         do {
+            Map<Key, Integer> sampleDataToBeMovedIntoCollection = new HashMap<>();
             sampleDataList = SampleDataDao.instance.findAll(filters, skip, limit, sort);
             skip += limit;
             List<Key> toBeDeleted = new ArrayList<>();
@@ -169,6 +178,7 @@ public class CleanInventory {
                     boolean isRedundant = false;
                     boolean isNetsparkerPresent = false;
                     boolean movingApi = false;
+
                     for (String sample : samples) {
                         HttpResponseParams httpResponseParams = HttpCallParser.parseKafkaMessage(sample);
                         isNetsparkerPresent |= sample.toLowerCase().contains("netsparker");
@@ -186,6 +196,21 @@ public class CleanInventory {
                                         // filter passed and modified
                                         movingApi = true;
                                         remainingSamples.add(sample);
+
+                                        // check modification of hostname only
+                                        List<String> currentHostArr =  param.getRequestParams().getHeaders().get("host");
+                                        String hostStringFromParam = "";
+                                        if(currentHostArr != null && !currentHostArr.isEmpty()){
+                                            hostStringFromParam = currentHostArr.get(0);
+                                        }
+                                        boolean hostNameModified = JobUtils.hasHostModified(hostStringFromParam, apiCollection);
+                                        if(hostNameModified){
+                                            int collectionId = hostStringFromParam.hashCode();
+                                            // creating new ApiCollection from this id
+                                            Bson currentUpdate = Updates.combine(updatesForCollection, Updates.setOnInsert("_id", collectionId));
+                                            ApiCollectionsDao.instance.getMCollection().findOneAndUpdate(Filters.eq(ApiCollection.HOST_NAME, hostStringFromParam), currentUpdate, updateOptions);
+                                            sampleDataToBeMovedIntoCollection.put(sampleData.getId(), collectionId);
+                                        }
                                         break;
                                     }else if(filterType.equals(FILTER_TYPE.ALLOWED)){
                                         // filter passed and not modified
@@ -205,6 +230,8 @@ public class CleanInventory {
                     if(movingApi){
                         // any 1 of the sample is modifiable, we print this block
                         toMove.add(sampleData.getId());
+                        int initialCount = moveHostCollectionWiseCountMap.getOrDefault(sampleData.getId().getApiCollectionId(), 0);
+                        moveHostCollectionWiseCountMap.put(sampleData.getId().getApiCollectionId(),initialCount + 1);
                         if(saveLogsToDB){
                             loggerMaker.infoAndAddToDb("Filter passed, modify sample data of API: " + sampleData.getId(), LogDb.DASHBOARD);
                         }else{
@@ -259,7 +286,14 @@ public class CleanInventory {
                 deleteApis(toBeDeleted);
             }
 
-            // String shouldMove = System.getenv("MOVE_REDUNDANT_APIS");
+            String shouldMove = System.getenv("MOVE_REDUNDANT_APIS");
+            if(shouldMove.equals("true")){
+                if(!sampleDataToBeMovedIntoCollection.isEmpty()){
+                    moveApisFromSampleData(sampleDataToBeMovedIntoCollection);
+                    sampleDataToBeMovedIntoCollection.clear();
+                }
+                
+            }
 
         } while (!sampleDataList.isEmpty());
 
@@ -270,6 +304,16 @@ public class CleanInventory {
 
             if(saveLogsToDB){
                 loggerMaker.infoAndAddToDb("Total apis deleted from collection: " + name + " are: " + deletionCount, LogDb.DASHBOARD);
+            }
+        }
+
+        for(Map.Entry<Integer,Integer> iterator: moveHostCollectionWiseCountMap.entrySet()){
+            int collId = iterator.getKey();
+            int deletionCount = iterator.getValue();
+            String name = apiCollectionMap.get(collId).getDisplayName();
+
+            if(saveLogsToDB){
+                loggerMaker.infoAndAddToDb("Total apis moved from collection: " + name + " are: " + deletionCount, LogDb.DASHBOARD);
             }
         }
 
