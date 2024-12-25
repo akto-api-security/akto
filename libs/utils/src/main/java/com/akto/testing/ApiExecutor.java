@@ -95,6 +95,7 @@ public class ApiExecutor {
         boolean isCyborgCall = request.url().toString().contains("cyborg.akto.io");
         long start = System.currentTimeMillis();
 
+        logger.info("executing api call for request payload " + request);
         Call call = client.newCall(request);
         Response response = null;
         String body;
@@ -443,6 +444,7 @@ public class ApiExecutor {
             return common(updatedRequest, followRedirects, debug, testLogs, skipSSRFCheck, nonTestingContext);
         }
 
+        logger.info("sendWithRequestBody request payload object" + request.toString());
         String contentType = request.findContentType();
         String payload = request.getBody();
         if (contentType == null ) {
