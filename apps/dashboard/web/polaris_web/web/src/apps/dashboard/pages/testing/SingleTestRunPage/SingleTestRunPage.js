@@ -247,6 +247,7 @@ function SingleTestRunPage() {
     let testRunResultsRes = []
     let testRunCountMap = []
     let totalIgnoredIssuesCount = 0
+    let issuesList = []
     const { testingRun, workflowTest, testingRunType } = testingRunResultSummariesObj
     if(testingRun === undefined){
       return {value: [], total: 0}
@@ -271,14 +272,19 @@ function SingleTestRunPage() {
         testRunResultsRes = ignoredTestRunResults
         totalIgnoredIssuesCount = ignoredTestRunResults.length
       } else {
-        await api.fetchTestingRunResults(localSelectedTestRun.testingRunResultSummaryHexId, tableTabMap[selectedTab], sortKey, sortOrder, skip, limit, filters, queryValue).then(({ testingRunResults, testCountMap, errorEnums }) => {
-          testRunCountMap = testCountMap
+        await api.fetchTestingRunResults(localSelectedTestRun.testingRunResultSummaryHexId, tableTabMap[selectedTab], sortKey, sortOrder, skip, limit, filters, queryValue).then(({ testingRunResults, issueslist, errorEnums }) => {
+          issuesList = issueslist || []
           testRunResultsRes = transform.prepareTestRunResults(hexId, testingRunResults, subCategoryMap, subCategoryFromSourceConfigMap)
           if(selectedTab === 'domain_unreachable' || selectedTab === 'skipped' || selectedTab === 'need_configurations') {
             errorEnums['UNKNOWN_ERROR_OCCURRED'] = "OOPS! Unknown error occurred."
             setErrorsObject(errorEnums)
             setMissingConfigs(transform.getMissingConfigs(testRunResultsRes))
           }
+        })
+        await api.fetchTestRunResultsCount(localSelectedTestRun.testingRunResultSummaryHexId).then(({testCountMap}) => {
+          testRunCountMap = testCountMap || []
+          testRunCountMap['VULNERABLE'] = Math.abs(testRunCountMap['VULNERABLE']-issuesList.length)
+          testRunCountMap['IGNORED_ISSUES'] = (issuesList.length || 0)
           const orderedValues = tableTabsOrder.map(key => testCountMap[tableTabMap[key]] || 0)
           setTestRunResultsCount(orderedValues)
         })
