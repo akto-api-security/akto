@@ -18,7 +18,7 @@ function HomePage() {
 
   return (
     <Frame navigation={leftNavCollapsed? undefined:<LeftNav />} topBar={<Header />} logo={logo} >
-     <Box paddingBlockEnd={"2000"}>
+     <Box minHeight="100vh" background="bg" paddingBlockEnd={"2000"}>
       <Outlet />
      </Box>
     </Frame>

@@ -34,7 +34,7 @@ const headings = [
     {
         text: "Endpoint",
         value: "endpointComp",
-        title: "Api endpoints",
+        title: "API endpoints",
         textValue: "endpoint",
         sortActive: true
     },
@@ -640,7 +640,7 @@ function ApiEndpoints(props) {
                 active={exportOpen}
                 activator={(
                     <div className="polaris-secondaryAction-button">
-                    <Button onClick={() => setExportOpen(true)} disclosure>
+                    <Button onClick={() => setExportOpen(!exportOpen)} disclosure>
                         <div data-testid="more_actions_button">More Actions</div>
                     </Button>
                     </div>

@@ -19,3 +19,7 @@
 .header-css .Polaris-Button--variantPlain .Polaris-Icon__Svg:hover{
     fill: var(--pc-button-icon-fill) !important;
 }
+
+.Polaris-ResourceList__ResourceListWrapper {
+    --pc-resource-list-header-outer-wrapper-stacking-order: 0 !important;
+}

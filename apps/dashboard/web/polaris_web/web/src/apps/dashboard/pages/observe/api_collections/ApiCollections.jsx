@@ -610,26 +610,6 @@ function ApiCollections() {
         </InlineStack>
     )
 
-    const actionGroups = [
-        {
-            title: 'More actions',
-            actions: [
-                {
-                    content: 'Export as CSV',
-                    icon: FileIcon,
-                    onAction: exportCsv
-                },
-                {
-                    content: treeView ? 'Hide tree view' : 'Display tree view',
-                    icon: treeView ? HideIcon : ViewIcon,
-                    onAction: () => setTreeView(!treeView)
-                }
-            ]
-        },
-        
-    ];
-
-
     const handleSelectedTab = (selectedIndex) => {
         setSelected(selectedIndex)
     }

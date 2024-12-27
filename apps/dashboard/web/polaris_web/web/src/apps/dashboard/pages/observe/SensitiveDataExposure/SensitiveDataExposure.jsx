@@ -17,7 +17,7 @@ const headings = [
     {
         text: "Endpoint",
         value: "endpointComp",
-        title: "Api endpoints",
+        title: "API endpoints",
         textValue: "endpoint",
         filterKey: 'endpoint'
     },
