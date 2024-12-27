@@ -673,7 +673,7 @@ function ApiEndpoints(props) {
                             />
                             ),
                         },
-                        ]}
+                        ].filter(Boolean)}
                     />
                    
 

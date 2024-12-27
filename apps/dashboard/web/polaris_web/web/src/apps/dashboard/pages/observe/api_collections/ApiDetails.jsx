@@ -293,7 +293,7 @@ function ApiDetails(props) {
                                         content: 'De merge',
                                         onAction: deMergeApis,
                                     },
-                                ]}
+                                ].filter(Boolean)}
                             />
                         </Popover.Pane>
                     </Popover> : null
