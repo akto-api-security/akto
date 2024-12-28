@@ -35,7 +35,7 @@ const Settings = () => {
 
     return (
         <Frame navigation={<SettingsLeftNav />} topBar={<SettingsHeader />}>
-            <Box minHeight="100vh" background="bg" paddingBlockEnd={"2000"}>
+            <Box borderStartEndRadius="300" minHeight="100%" background="bg" paddingBlockEnd={"2000"}>
                 <Outlet />
             </Box>
         </Frame>

@@ -30,7 +30,7 @@ const transform = {
             <tr style={{background: "#FAFBFB", padding: '0px !important', borderTop: '1px solid #dde0e4'}}>
                 <td colSpan={'100%'} style={{padding: '0px !important'}}>
                     {urls.map((ele,index)=>{
-                    const borderStyle = index < (urls.length - 1) ? {borderBlockEndWidth : 1} : {}
+                    const borderStyle = index < (urls.length - 1) ? {borderBlockEndWidth : "025"} : {}
                     return (
                         <Box padding={"200"} paddingInlineEnd={"400"} paddingInlineStart={"300"} key={index}
                         borderColor="border-secondary" {...borderStyle}>

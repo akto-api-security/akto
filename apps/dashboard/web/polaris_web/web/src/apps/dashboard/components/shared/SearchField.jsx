@@ -5,7 +5,7 @@ import React, { useState } from 'react'
 function SearchField(props) {
 
     const [searchValue, setSearchValue] = useState("")
-    const SearchIcon =  (
+    const SearchFieldIcon =  (
         <Box>
             <Icon source={SearchIcon} />   
         </Box>
@@ -23,7 +23,7 @@ function SearchField(props) {
 
     return (
         <TextField  
-            prefix={SearchIcon} 
+            prefix={SearchFieldIcon} 
             onChange={searchResult} 
             value={searchValue}
             placeholder={props.placeholder}

@@ -110,7 +110,7 @@ export default function Header() {
             }
         }
     })
-
+    
     function createNewAccount() {
         api.saveToAccount(newAccount).then(resp => {
           setShowCreateAccount(false)
@@ -165,7 +165,7 @@ export default function Header() {
                 },
             ]}
             initials={func.initials(username)}
-            name={username}
+            name={accounts[activeAccount]}
             open={isUserMenuOpen}
             onToggle={toggleIsUserMenuOpen}
         />
