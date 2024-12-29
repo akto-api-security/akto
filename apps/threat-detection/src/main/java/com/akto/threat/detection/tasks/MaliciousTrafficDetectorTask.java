@@ -52,6 +52,7 @@ public class MaliciousTrafficDetectorTask implements Task {
 
   private Map<String, FilterConfig> apiFilters;
   private int filterLastUpdatedAt = 0;
+  private int filterUpdateIntervalSec = 300;
 
   private final Kafka internalKafka;
 
@@ -112,7 +113,7 @@ public class MaliciousTrafficDetectorTask implements Task {
 
   private Map<String, FilterConfig> getFilters() {
     int now = (int) (System.currentTimeMillis() / 1000);
-    if (now - filterLastUpdatedAt < 60) {
+    if (now - filterLastUpdatedAt < filterUpdateIntervalSec) {
       return apiFilters;
     }
 
@@ -126,7 +127,7 @@ public class MaliciousTrafficDetectorTask implements Task {
       HttpResponseParams responseParam, FilterConfig apiFilter) {
     try {
       String message = responseParam.getOrig();
-      RawApi rawApi = RawApi.buildFromMessage(message);
+      RawApi rawApi = RawApi.buildFromMessageNew(message);
       int apiCollectionId = httpCallParser.createApiCollectionId(responseParam);
       responseParam.requestParams.setApiCollectionId(apiCollectionId);
       String url = responseParam.getRequestParams().getURL();
