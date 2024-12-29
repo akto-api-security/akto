@@ -1,6 +1,8 @@
 package com.akto.dto;
 
 import com.akto.util.HttpRequestResponseUtils;
+import com.alibaba.fastjson2.JSON;
+import com.alibaba.fastjson2.JSONObject;
 import com.google.gson.Gson;
 
 import org.apache.commons.lang3.math.NumberUtils;
@@ -41,6 +43,13 @@ public class OriginalHttpResponse {
             obj = ((Double) obj).intValue();
         }
         this.statusCode = Integer.parseInt(obj.toString());
+    }
+
+    public void buildFromSampleMessageNew(JSONObject json) {
+        String responsePayload = (String) json.get("responsePayload");
+        this.body = responsePayload != null ? responsePayload.trim() : null;
+        this.headers = OriginalHttpRequest.buildHeadersMap(json, "responseHeaders");
+        this.statusCode = Integer.parseInt(json.get("statusCode").toString());
     }
 
     public void addHeaderFromLine(String line) {
