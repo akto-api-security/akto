@@ -127,6 +127,8 @@ public class MaliciousTrafficDetectorTask implements Task {
       HttpResponseParams responseParam, FilterConfig apiFilter) {
     try {
       String message = responseParam.getOrig();
+      // todo: remove
+      System.out.println("using buildFromMessageNew func");
       RawApi rawApi = RawApi.buildFromMessageNew(message);
       int apiCollectionId = httpCallParser.createApiCollectionId(responseParam);
       responseParam.requestParams.setApiCollectionId(apiCollectionId);
