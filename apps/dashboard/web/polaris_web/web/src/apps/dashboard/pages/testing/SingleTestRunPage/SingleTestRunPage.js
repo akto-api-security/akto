@@ -135,6 +135,7 @@ function SingleTestRunPage() {
   const [testingRunResultSummariesObj, setTestingRunResultSummariesObj] = useState({})
   const [allResultsLength, setAllResultsLength] = useState(undefined)
   const [currentSummary, setCurrentSummary] = useState('')
+  const [pageTotalCount, setPageTotalCount] = useState(0)
 
   const tableTabMap = {
     vulnerable: "VULNERABLE",
@@ -271,6 +272,7 @@ function SingleTestRunPage() {
         })
         testRunResultsRes = ignoredTestRunResults
         totalIgnoredIssuesCount = ignoredTestRunResults.length
+        setPageTotalCount(selectedTab === 'ignored_issues' ? totalIgnoredIssuesCount : testRunCountMap[tableTabMap[selectedTab]])
       } else {
         await api.fetchTestingRunResults(localSelectedTestRun.testingRunResultSummaryHexId, tableTabMap[selectedTab], sortKey, sortOrder, skip, limit, filters, queryValue).then(({ testingRunResults, issueslist, errorEnums }) => {
           issuesList = issueslist || []
@@ -281,12 +283,13 @@ function SingleTestRunPage() {
             setMissingConfigs(transform.getMissingConfigs(testRunResultsRes))
           }
         })
-        await api.fetchTestRunResultsCount(localSelectedTestRun.testingRunResultSummaryHexId).then(({testCountMap}) => {
+        api.fetchTestRunResultsCount(localSelectedTestRun.testingRunResultSummaryHexId).then(({testCountMap}) => {
           testRunCountMap = testCountMap || []
           testRunCountMap['VULNERABLE'] = Math.abs(testRunCountMap['VULNERABLE']-issuesList.length)
           testRunCountMap['IGNORED_ISSUES'] = (issuesList.length || 0)
           const orderedValues = tableTabsOrder.map(key => testCountMap[tableTabMap[key]] || 0)
           setTestRunResultsCount(orderedValues)
+          setPageTotalCount(testRunCountMap[tableTabMap[selectedTab]])
         })
       }
     }
@@ -505,6 +508,7 @@ const promotedBulkActions = (selectedDataHexIds) => {
         "selected": 1
       }}
       callFromOutside={updateTable}
+      pageTotalCount={pageTotalCount}
     />
   )
 

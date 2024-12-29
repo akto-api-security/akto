@@ -130,6 +130,12 @@ function GithubServerTable(props) {
     }
   }
 
+  useEffect(() => {
+    if(Number.isInteger(props?.pageTotalCount)) {
+      setTotal(props?.pageTotalCount)
+    }
+  }, [props?.pageTotalCount, data])
+
   const handleSelectedTab = (x) => {
     const tableTabs = props.tableTabs ? props.tableTabs : props.tabs
     if(tableTabs){
