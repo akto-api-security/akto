@@ -7,6 +7,8 @@ import java.util.List;
 import java.util.Map;
 
 import com.akto.dto.type.RequestTemplate;
+import com.alibaba.fastjson2.JSON;
+import com.alibaba.fastjson2.JSONObject;
 import com.mongodb.BasicDBList;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mongodb.BasicDBObject;
@@ -51,6 +53,17 @@ public class RawApi {
 
         OriginalHttpResponse response = new OriginalHttpResponse();
         response.buildFromSampleMessage(message);
+
+        return new RawApi(request, response, message);
+    }
+
+    public static RawApi buildFromMessageNew(String message) {
+        JSONObject json = JSON.parseObject(message);
+        OriginalHttpRequest request = new OriginalHttpRequest();
+        request.buildFromSampleMessageNew(json);
+
+        OriginalHttpResponse response = new OriginalHttpResponse();
+        response.buildFromSampleMessageNew(json);
 
         return new RawApi(request, response, message);
     }
