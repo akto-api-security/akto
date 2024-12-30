@@ -29,6 +29,7 @@ function TrendChart(props) {
     const [metadataFilterData, setMetadataFilterData] = useState([]);
     const [totalVulnerabilities, setTotalVulnerabilites] = useState(0);
     const [collapsible, setCollapsible] = useState(true)
+    const [hideFilter, setHideFilter] = useState(false)
 
     const dateRangeFilter =
     {
@@ -38,7 +39,12 @@ function TrendChart(props) {
             (<DateRangePicker ranges={values.ranges}
                 initialDispatch={currDateRange}
                 dispatch={(dateObj) => getDate(dateObj)}
-                setPopoverState={() => { }}
+                setPopoverState={() => {
+                    setHideFilter(true)
+                    setTimeout(() => {
+                        setHideFilter(false)
+                    }, 10)
+                }}
             />),
         pinned: true
     }
@@ -315,6 +321,7 @@ function TrendChart(props) {
                                 filters={[dateRangeFilter, ...metadataFilters]}
                                 appliedFilters={appliedFilters}
                                 onClearAll={handleFiltersClearAll}
+                                hideFilters={hideFilter}
                             />
                         </div>
                     </LegacyCard.Section>

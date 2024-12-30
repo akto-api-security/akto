@@ -14,6 +14,7 @@ import AlertsBanner from "./AlertsBanner";
 import dashboardFunc from "./transform";
 import homeRequests from "./home/api";
 import WelcomeBackDetailsModal from "../components/WelcomeBackDetailsModal";
+import useTable from "../components/tables/TableContext";
 
 function Dashboard() {
 
@@ -23,6 +24,8 @@ function Dashboard() {
     const setAllCollections = PersistStore(state => state.setAllCollections)
     const setCollectionsMap = PersistStore(state => state.setCollectionsMap)
     const setHostNameMap = PersistStore(state => state.setHostNameMap)
+
+    const { selectItems } = useTable()
 
     const navigate = useNavigate();
 
@@ -93,6 +96,10 @@ function Dashboard() {
             }
         }
     }, [])
+
+    useEffect(() => {
+        selectItems([])
+    },[location.pathname])
 
     const toastConfig = Store(state => state.toastConfig)
     const setToastConfig = Store(state => state.setToastConfig)
