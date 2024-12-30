@@ -53,12 +53,12 @@ public class Main {
             .build();
 
     new MaliciousTrafficDetectorTask(trafficKafka, internalKafka, createRedisClient()).run();
-    new FlushSampleDataTask(
-            sessionFactory, internalKafka, KafkaTopic.ThreatDetection.MALICIOUS_EVENTS)
-        .run();
-    new SendMaliciousEventsToBackend(
-            sessionFactory, internalKafka, KafkaTopic.ThreatDetection.ALERTS)
-        .run();
+    // new FlushSampleDataTask(
+    //         sessionFactory, internalKafka, KafkaTopic.ThreatDetection.MALICIOUS_EVENTS)
+    //     .run();
+    // new SendMaliciousEventsToBackend(
+    //         sessionFactory, internalKafka, KafkaTopic.ThreatDetection.ALERTS)
+    //     .run();
     new CleanupTask(sessionFactory).run();
   }
 
