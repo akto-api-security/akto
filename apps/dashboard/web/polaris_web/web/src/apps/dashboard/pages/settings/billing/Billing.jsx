@@ -47,19 +47,17 @@ function Billing() {
         }
 
         if (window.PLAN_TYPE && window.PLAN_TYPE.length > 0) {
-            const observer = new MutationObserver((mutationsList) => {
-                for (const mutation of mutationsList) {
-                    const elements = document.querySelectorAll('.stigg-subscription-plan-name');
-                    if (elements.length > 0) {
-                        elements.forEach(element => {
-                            element.textContent = window.PLAN_TYPE;
-                        });
-                        observer.disconnect(); // Stop observing once the element is found
-                    }
+            const checkForElement = () => {
+                const elements = document.querySelectorAll('.stigg-subscription-plan-name');
+                if (elements.length > 0) {
+                    elements.forEach(element => {
+                        element.textContent = window.PLAN_TYPE;
+                    });
+                } else {
+                    setTimeout(() => checkForElement(), 500);
                 }
-            });
-            observer.observe(document.body, { childList: true, subtree: true });
-            return () => observer.disconnect(); // Cleanup on unmount
+            };
+            checkForElement();
         }
     })
 
