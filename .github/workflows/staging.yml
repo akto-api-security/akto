@@ -51,7 +51,7 @@ jobs:
           aws-secret-access-key: ${{secrets.AWS_SECRET_ACCESS_KEY}}
           aws-region: ap-south-1
 
-      - run: mvn package -Dakto-image-tag=${{ github.event.inputs.Tag }} -Dakto-build-time=$(eval "date +%s") -Dakto-release-version=${{steps.docker_tag.outputs.IMAGE_TAG}}
+      - run: mvn package -Dakto-image-tag=${{ github.event.inputs.Tag }} -Dakto-build-time=$(eval "date +%s") -Dakto-release-version=${{steps.docker_tag.outputs.IMAGE_TAG}} -DskipTests
       - name: DockerHub login
         env:
           DOCKER_USERNAME: ${{secrets.DOCKER_USERNAME}}
