@@ -46,7 +46,21 @@ function Billing() {
             default:
         }
 
-        if (window.PLAN_TYPE) { $('.stigg-subscription-plan-name').text(window.PLAN_TYPE) }
+        if (window.PLAN_TYPE && window.PLAN_TYPE.length > 0) {
+            const observer = new MutationObserver((mutationsList) => {
+                for (const mutation of mutationsList) {
+                    const elements = document.querySelectorAll('.stigg-subscription-plan-name');
+                    if (elements.length > 0) {
+                        elements.forEach(element => {
+                            element.textContent = window.PLAN_TYPE;
+                        });
+                        observer.disconnect(); // Stop observing once the element is found
+                    }
+                }
+            });
+            observer.observe(document.body, { childList: true, subtree: true });
+            return () => observer.disconnect(); // Cleanup on unmount
+        }
     })
 
     async function refreshUsageData(){
