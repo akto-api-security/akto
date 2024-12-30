@@ -16,12 +16,16 @@ function ConditionComponent(props) {
         }
     },[condition])
     const allCollections = PersistStore(state => state.allCollections);
-    const allCollectionsOptions = allCollections.map(collection => {
-        return {
-            label: collection.displayName,
-            value: collection.id
+    const activatedCollections = allCollections.filter(collection => collection.deactivated === false)
+    const allCollectionsOptions = [
+        {
+            title: `Search from ${activatedCollections.length} Collection${func.addPlurality(activatedCollections.length)} (type more to refine results)`,
+            options: activatedCollections.map(collection => ({
+                label: collection.displayName,
+                value: collection.id
+            }))
         }
-    })
+    ]
     const getApiEndpointsOptions = (data) => {
         return data.map(apiEndpoint => {
             let str = func.toMethodUrlString(apiEndpoint);
@@ -115,6 +119,8 @@ function ConditionComponent(props) {
                     setSelected={(collectionId) => handleCollectionSelected(collectionId)}
                     preSelected={[Number(getCollectionId(field))]}
                     value={mapCollectionIdToName[getCollectionId(field)]}
+                    isNested={true}
+                    dynamicTitle={true}
                 />
                 </div>
                 <div style={{flexGrow:"1"}}>

@@ -6,7 +6,7 @@ function DropdownSearch(props) {
 
     const id = props.id ? props.id : "dropdown-search"
 
-    const { disabled, label, placeholder, optionsList, setSelected, value , avatarIcon, preSelected, allowMultiple, itemName, dropdownSearchKey, isNested, sliceMaxVal} = props
+    const { disabled, label, placeholder, optionsList, setSelected, value , avatarIcon, preSelected, allowMultiple, itemName, dropdownSearchKey, isNested, sliceMaxVal, dynamicTitle} = props
 
     const deselectedOptions = optionsList
     const [selectedOptions, setSelectedOptions] = useState(preSelected ? preSelected : []);
@@ -81,7 +81,7 @@ function DropdownSearch(props) {
                         );
                 
                         resultOptions.push({
-                          title: opt.title,
+                          title: dynamicTitle ? `Showing ${options.length} result${func.addPlurality(options.length)} (type more to refine results)` : opt.title,
                           options,
                         });
                       });
