@@ -410,8 +410,11 @@ public class ApiCollectionsAction extends UserAction {
             return ERROR.toUpperCase();
         }
 
+        loggerMaker.infoAndAddToDb("Started adding " + this.apiList.size() + " apis into custom collection.", LogDb.DASHBOARD);
+
         CustomTestingEndpoints condition = new CustomTestingEndpoints(apiList, CustomTestingEndpoints.Operator.OR);
         apiCollection.addToConditions(condition);
+        loggerMaker.infoAndAddToDb("Final conditions for collection: " +  apiCollection.getName() + " are: " + apiCollection.getConditions().toString());
         ApiCollectionUsers.updateApiCollection(apiCollection.getConditions(), apiCollection.getId());
         ApiCollectionUsers.addToCollectionsForCollectionId(apiCollection.getConditions(), apiCollection.getId());
 
