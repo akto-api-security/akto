@@ -218,7 +218,7 @@ public class CleanInventory {
                                     }else if(filterMap.size() == 1){
                                         // filter failed and id was default_delete
                                         String key = filterMap.entrySet().iterator().next().getKey();
-                                        if(key.equals("DEFAULT_BLOCK_FILTER")){
+                                        if(!key.equals("DEFAULT_ALLOW_FILTER")){
                                             remainingSamples.add(sample);
                                         }
                                     }

@@ -49,7 +49,6 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.bson.conversions.Bson;
 
-import java.lang.reflect.Method;
 import java.net.MalformedURLException;
 import java.net.URISyntaxException;
 import java.net.URL;
@@ -634,10 +633,16 @@ public class Utils {
         return newKey;
     }
 
+    private static List<Integer> getModifiedCollectionIds(List<Integer> oldList, int newCollId, int oldCollId){
+        oldList.remove(oldCollId);
+        oldList.add(newCollId);
+        return oldList;
+    }
+
     public static void moveApisFromSampleData(Map<Key,Integer> sampleDataToBeMovedMap){
 
         Map<ApiInfoKey, Key> mapApiInfoKeyToKey = new HashMap<>();
-
+        List<Key> toBeDeleted = new ArrayList<>();
         // insert new sample data
         Bson sampleDataFilter = AccountsContextDaoWithRbac.generateCommonFilter(sampleDataToBeMovedMap, SampleDataDao.instance, id);
         List<SampleData> sampleDataList = SampleDataDao.instance.findAll(sampleDataFilter);
@@ -652,6 +657,8 @@ public class Utils {
             if(key.getApiCollectionId() != newCollId){
                 key.setApiCollectionId(newCollId);
                 sampleData.setId(key);
+                sampleData.setCollectionIds(getModifiedCollectionIds(sampleData.getCollectionIds(), newCollId, oldKey.getApiCollectionId()));
+                toBeDeleted.add(oldKey);
             }else{
                 sampleDataIterator.remove();
             }
@@ -659,8 +666,10 @@ public class Utils {
         if(!sampleDataList.isEmpty()){
             SampleDataDao.instance.insertMany(sampleDataList);
             loggerMaker.infoAndAddToDb("Inserted " + sampleDataList.size() + " new sample data into database.");
+            AccountsContextDaoWithRbac.deleteApisPerDao(toBeDeleted, SampleDataDao.instance, id);
         }
 
+        toBeDeleted.clear();
         // insert new api info data
         Bson apiInfoFilter = AccountsContextDaoWithRbac.generateCommonFilter(sampleDataToBeMovedMap, ApiInfoDao.instance, id);
         List<ApiInfo> apiInfos = ApiInfoDao.instance.findAll(apiInfoFilter);
@@ -673,6 +682,8 @@ public class Utils {
             if(mappedKey.getApiCollectionId() != newCollId){
                 apiInfoKey.setApiCollectionId(newCollId);
                 apiInfo.setId(apiInfoKey);
+                apiInfo.setCollectionIds(getModifiedCollectionIds(apiInfo.getCollectionIds(), newCollId, mappedKey.getApiCollectionId()));
+                toBeDeleted.add(mappedKey);
             }else{
                 apiInfoIterator.remove();
             }
@@ -681,8 +692,10 @@ public class Utils {
         if(!apiInfos.isEmpty()){
             ApiInfoDao.instance.insertMany(apiInfos);
             loggerMaker.infoAndAddToDb("Inserted " + apiInfos.size() + " new api infos into database.");
+            AccountsContextDaoWithRbac.deleteApisPerDao(toBeDeleted, ApiInfoDao.instance, id);
         }
         
+        toBeDeleted.clear();
         // insert new sensitive sample data
         Bson sensitiveDataFilter = AccountsContextDaoWithRbac.generateCommonFilter(sampleDataToBeMovedMap, SensitiveSampleDataDao.instance, id);
         List<SensitiveSampleData> sensitiveSampleDataList = SensitiveSampleDataDao.instance.findAll(sensitiveDataFilter);
@@ -697,6 +710,8 @@ public class Utils {
             if(key.getApiCollectionId() != newCollId){
                 key.setApiCollectionId(newCollId);
                 sampleData.setId(key);
+                sampleData.setCollectionIds(getModifiedCollectionIds(sampleData.getCollectionIds(), newCollId, mappedKey.getApiCollectionId()));
+                toBeDeleted.add(mappedKey);
             }else{
                 sensitiveSampleDataIterator.remove();
             }
@@ -704,6 +719,7 @@ public class Utils {
         if(!sensitiveSampleDataList.isEmpty()){
             SensitiveSampleDataDao.instance.insertMany(sensitiveSampleDataList);
             loggerMaker.infoAndAddToDb("Inserted " + sensitiveSampleDataList.size() + " new sensitive sample data into database.");
+            AccountsContextDaoWithRbac.deleteApisPerDao(toBeDeleted, SensitiveSampleDataDao.instance, id);
         }
     
         // update single type info data
@@ -714,7 +730,12 @@ public class Utils {
                 Filters.eq(SingleTypeInfo._URL, key.getUrl()),
                 Filters.eq(SingleTypeInfo._METHOD, key.getMethod())
             );
-            bulkUpdatesForSti.add(new UpdateManyModel<>(filterQ, Updates.set(SingleTypeInfo._API_COLLECTION_ID, sampleDataToBeMovedMap.get(key))));
+            bulkUpdatesForSti.add(new UpdateManyModel<>(filterQ, 
+            Updates.combine(
+                Updates.set(SingleTypeInfo._API_COLLECTION_ID, sampleDataToBeMovedMap.get(key)),
+                Updates.pull(SingleTypeInfo._COLLECTION_IDS, key.getApiCollectionId()),
+                Updates.push(SingleTypeInfo._COLLECTION_IDS, sampleDataToBeMovedMap.get(key))
+            )));
         }
 
         if(!bulkUpdatesForSti.isEmpty()){
