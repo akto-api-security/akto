@@ -6,7 +6,7 @@ function DropdownSearch(props) {
 
     const id = props.id ? props.id : "dropdown-search"
 
-    const { disabled, label, placeholder, optionsList, setSelected, value , avatarIcon, preSelected, allowMultiple, itemName, dropdownSearchKey, isNested, sliceMaxVal, dynamicTitle} = props
+    const { disabled, label, placeholder, optionsList, setSelected, value , avatarIcon, preSelected, allowMultiple, itemName, dropdownSearchKey, isNested, sliceMaxVal} = props
 
     const deselectedOptions = optionsList
     const [selectedOptions, setSelectedOptions] = useState(preSelected ? preSelected : []);
@@ -78,17 +78,27 @@ function DropdownSearch(props) {
                     deselectedOptions.forEach((opt) => {
                         const options = opt.options.filter((option) =>
                           option[searchKey].match(filterRegex),
-                        ).slice(0, sliceMaxVal || 20);
+                        );
                 
                         resultOptions.push({
-                          title: dynamicTitle ? `Showing ${options.length} result${func.addPlurality(options.length)} (type more to refine results)` : opt.title,
+                          title: opt.title,
                           options,
                         });
                       });
                 }else{
+                    const defaultSliceValue = sliceMaxVal || 20
                     resultOptions = deselectedOptions.filter((option) =>
-                    option[searchKey].match(filterRegex)
-                );
+                        option[searchKey].match(filterRegex)
+                    ).slice(0, defaultSliceValue);
+
+                    const title = resultOptions.length >= defaultSliceValue
+                        ? `Showing ${resultOptions.length} result${func.addPlurality(resultOptions.length)} only. (type more to refine results)`
+                        : "Showing all results";
+
+                    resultOptions = [{
+                        title: title,
+                        options: resultOptions
+                    }]
                 }
                 setOptions(resultOptions);
                 setLoading(false);

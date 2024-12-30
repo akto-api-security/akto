@@ -67,21 +67,14 @@ function ApiGroupModal(props){
                     label="Select API group"
                     placeholder="Select API group"
                     optionsList={
-                        [
-                            {
-                                title: `Search from ${activatedGroupCollections.length} Group${func.addPlurality(activatedGroupCollections.length)} (type more to refine results)`,
-                                options: allCollections.filter((x) => { return (x.type === 'API_GROUP' && x.deactivated === false) }).map((x) => {
-                                    return {
-                                        label: x.displayName,
-                                        value: x.displayName
-                                    }
-                                })
+                        allCollections.filter((x) => { return (x.type === 'API_GROUP' && x.deactivated === false) }).map((x) => {
+                            return {
+                                label: x.displayName,
+                                value: x.displayName
                             }
-                        ]
+                        })
                     }
                     setSelected={setApiGroupName}
-                    dynamicTitle={true}
-                    isNested={true}
                 />
             </Box>
         )
