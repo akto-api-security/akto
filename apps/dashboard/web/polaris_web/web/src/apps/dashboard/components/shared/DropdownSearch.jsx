@@ -78,7 +78,7 @@ function DropdownSearch(props) {
                     deselectedOptions.forEach((opt) => {
                         const options = opt.options.filter((option) =>
                           option[searchKey].match(filterRegex),
-                        );
+                        ).slice(0, sliceMaxVal || 20);
                 
                         resultOptions.push({
                           title: dynamicTitle ? `Showing ${options.length} result${func.addPlurality(options.length)} (type more to refine results)` : opt.title,
