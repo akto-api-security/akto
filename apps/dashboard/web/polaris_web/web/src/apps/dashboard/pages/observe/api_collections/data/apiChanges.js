@@ -4,7 +4,7 @@ const endpointHeadings = [
     {
         text: "Endpoint",
         value: "endpointComp",
-        title: "Api endpoints",
+        title: "API endpoints",
         sortActive: true
     },
     {

@@ -103,19 +103,19 @@
     --p-color-bg-fill-brand: var(--akto-primary) !important;
     --p-color-bg-fill-brand-hover: #5400CB !important;
     --p-color-bg-fill-brand-active: #4700AE !important;
-    --p-color-bg-surface-brand-hover: #ECEBFF !important;
+    /* --p-color-bg-surface-brand-hover: #ECEBFF !important; */
     --p-color-bg-surface-info-hover: #F2F7FE !important;
 
     --p-color-text-primary: var(--akto-primary) !important;
-    --p-color-text-success: var(--akto-primary) !important;
+    /* --p-color-text-success: var(--akto-primary) !important; */
     --p-color-text-brand-hover: var(--akto-primary) !important;
     
-    --p-color-icon-brand: var(--akto-primary) !important;
+    /* --p-color-icon-brand: var(--akto-primary) !important; */
     --p-color-bg-surface-brand-selected: #F6F6F7 !important;
 
     --p-color-bg-surface-critical: #FED3D1 !important;
     --p-color-bg-surface-caution: #FFD79D !important;
-    --p-color-bg-surface-info: #A4E8F2 !important;
+    /* --p-color-bg-surface-info: #A4E8F2 !important; */
 }
 
 .Polaris-Page{
@@ -124,9 +124,9 @@
 
 
 
-.Polaris-Frame__Main, .Polaris-Navigation {
+/* .Polaris-Frame__Main {
     background: #F6F6F7 !important;
-}
+} */
 
 .Polaris-Tabs {
     padding: 0 !important;
@@ -197,6 +197,9 @@
     padding-block: 10px;
 }
 
+.Polaris-IndexTable__TableHeading--flush{
+    padding: 0rem !important;
+}
 
 
 

@@ -11,14 +11,14 @@ function HomePage() {
   const logo = {
     width: 78,
     topBarSource:
-      '/public/akto_name_with_logo.svg',
+      '/public/logo.svg',
     url: '/dashboard/observe/inventory',
     accessibilityLabel: 'Akto Icon',
   };
 
   return (
     <Frame navigation={leftNavCollapsed? undefined:<LeftNav />} topBar={<Header />} logo={logo} >
-     <Box paddingBlockEnd={"2000"}>
+     <Box borderStartEndRadius="300" minHeight="100%" background="bg" paddingBlockEnd={"2000"}>
       <Outlet />
      </Box>
     </Frame>

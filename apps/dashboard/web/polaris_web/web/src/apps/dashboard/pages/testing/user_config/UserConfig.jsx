@@ -161,21 +161,19 @@ function UserConfig() {
     )
 
     const rateLimit = (
-        <LegacyCard sectioned title="Configure global rate limit" key="globalRateLimit">
-            <Divider />
-            <LegacyCard.Section>
-                <div style={{ display: "grid", gridTemplateColumns: "max-content max-content", gap: "10px", alignItems: "center" }}>
+        <InfoCard
+            key="globalRateLimit"
+            title="Configure global rate limit"
+            component={
+                <Box maxWidth="200px">
                     <Dropdown
                         selected={handleSelect}
                         menuItems={dropdownItems}
                         initial={initialLimit}
                     />
-
-                </div>
-            </LegacyCard.Section>
-
-            
-        </LegacyCard>
+                </Box>
+            }
+        />
     )
 
     const updateDeltaPeriodTime = (

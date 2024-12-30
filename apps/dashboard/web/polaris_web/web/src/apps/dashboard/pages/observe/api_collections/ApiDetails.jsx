@@ -1,5 +1,5 @@
 import LayoutWithTabs from "../../../components/layouts/LayoutWithTabs"
-import { Box, Button, Popover, Modal, Tooltip, BlockStack } from "@shopify/polaris"
+import { Box, Button, Popover, Modal, Tooltip, BlockStack, ActionList } from "@shopify/polaris"
 import FlyLayout from "../../../components/layouts/FlyLayout";
 import GithubCell from "../../../components/tables/cells/GithubCell";
 import SampleDataList from "../../../components/shared/SampleDataList";
@@ -142,7 +142,7 @@ function ApiDetails(props) {
         ) {
             setUseLocalSubCategoryData(true)
         }
-
+        
         fetchData();
     }, [apiDetail])
 
@@ -271,7 +271,7 @@ function ApiDetails(props) {
                     isGptActive || isDemergingActive ? <Popover
                         active={showMoreActions}
                         activator={
-                            <Tooltip content="More actions" dismissOnMouseOut ><Button
+                            <Tooltip content="More actions" ><Button
 
 
                                 icon={MenuHorizontalIcon}
@@ -282,24 +282,19 @@ function ApiDetails(props) {
                         onClose={() => setShowMoreActions(false)}
                     >
                         <Popover.Pane fixed>
-                            <Popover.Section>
-                                <BlockStack gap={"200"}>
-                                    {isGptActive ? <Button
-
-
-                                        removeUnderline
-                                        onClick={displayGPT}
-                                        size="slim"
-                                        variant="monochromePlain">Ask AktoGPT</Button> : null}
-                                    {isDemergingActive ? <Button
-
-
-                                        removeUnderline
-                                        size="slim"
-                                        onClick={deMergeApis}
-                                        variant="monochromePlain">De merge</Button> : null}
-                                </BlockStack>
-                            </Popover.Section>
+                            <ActionList
+                                actionRole="menuitem"
+                                items={[
+                                    isGptActive && {
+                                        content: 'Ask AktoGPT',
+                                        onAction: displayGPT,
+                                    },
+                                    isDemergingActive && {
+                                        content: 'De merge',
+                                        onAction: deMergeApis,
+                                    },
+                                ].filter(Boolean)}
+                            />
                         </Popover.Pane>
                     </Popover> : null
                 }

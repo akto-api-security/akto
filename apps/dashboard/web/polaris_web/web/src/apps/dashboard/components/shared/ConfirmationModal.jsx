@@ -7,7 +7,7 @@ function ConfirmationModal(props) {
     const confirmationModalConfig = Store(state => state.confirmationModalConfig)
     const setConfirmationModalConfig = Store(state => state.setConfirmationModalConfig)
 
-    const { modalContent, primaryActionContent, primaryAction } = props
+    const {modalTitle, modalContent, primaryActionContent, primaryAction } = props
 
     function closeModal(){
         setConfirmationModalConfig({
@@ -19,22 +19,25 @@ function ConfirmationModal(props) {
     }
 
     return (
-        <Modal
-            open={confirmationModalConfig.show}
-            onClose={() => closeModal()}
-            title="Are you sure ?"
-            primaryAction={{
-                content: primaryActionContent,
-                onAction: () => {
-                    primaryAction()
-                    closeModal()
-                }
-            }}
-        >
-            <Modal.Section>
-                <Text>{modalContent}</Text>
-            </Modal.Section>
-        </Modal>
+        <div className="confirmation-model">
+            <Modal
+                open={confirmationModalConfig.show}
+                onClose={() => closeModal()}
+                title={(modalTitle==="")? "Are you sure?" : modalTitle}
+                primaryAction={{
+                    destructive:(primaryActionContent === "Remove collection")?true:false,
+                    content: primaryActionContent,
+                    onAction: () => {
+                        primaryAction()
+                        closeModal()
+                    }
+                }}
+            >
+                <Modal.Section>
+                    <Text>{modalContent}</Text>
+                </Modal.Section>
+            </Modal>
+        </div>
     )
 }
 

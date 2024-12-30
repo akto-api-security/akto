@@ -6,6 +6,7 @@ import {
     ResourceItem,
     Text,
     Badge,
+    EmptyState,
   } from '@shopify/polaris';
 import {useState} from 'react';
 import '../settings.css'
@@ -161,6 +162,17 @@ function Integrations() {
       },
     ]
 
+    const emptyStateMarkup = (
+      <EmptyState
+        heading="No integrations available at the moment."
+        image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png"
+      >
+        <p>
+          Check back later or explore other tabs for available options.
+        </p>
+      </EmptyState>
+    );
+
   function getTabItems(tabId) {
     const emptyItem = [];
     const trafficItems = [burpSuiteObj, postmanObj];
@@ -225,21 +237,21 @@ function Integrations() {
     function renderItem(item) {
         const {id, source, name, link} = item;
         const media = <Avatar customer size="md" name={name} source={source}/>;
-        const sourceActions = (item) => {
-            return [
-              {
-                content: <div data-testid={`configure_${id}`}>Configure</div>,
-                onClick: () => handleTab(item, link),
-              },
-            ];
-          };
+        // const sourceActions = (item) => {
+        //     return [
+        //       {
+        //         content: <div data-testid={`configure_${id}`}>Configure</div>,
+        //         onClick: () => handleTab(item, link),
+        //       },
+        //     ];
+        //   };
     
         return (
           <ResourceItem
             id={id}
             media={media}
-            shortcutActions={sourceActions(id)}
             persistActions
+            onClick={()=>handleTab(id, link)}
           >
             <Text fontWeight="bold" as="h3">
               {name}
@@ -251,6 +263,7 @@ function Integrations() {
     function TabsList (){
         return(
             <ResourceList
+                emptyState={emptyStateMarkup}
                 items={currItems}
                 renderItem={renderItem}
                 sortValue={sortValue}

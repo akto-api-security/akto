@@ -15,7 +15,7 @@ function FlyLayout(props) {
     return (
         <div className={"flyLayout " + (show ? "show" : "")} style={{width: divWidth}}>
             <div className="innerFlyLayout">
-                <Box borderColor="border-secondary" borderWidth="1" background="bg" width={divWidth} minHeight="100%">
+                <Box borderColor="border-secondary" borderWidth="025" background="bg-surface" width={divWidth} minHeight="100%">
                     { loading ? <div style={{position: "absolute", right: "25vw" , top: "50vh"}}><Spinner size="large" /></div>:
                     <BlockStack gap={"500"}>
                         <Box padding={"400"} paddingBlockEnd={"0"} >

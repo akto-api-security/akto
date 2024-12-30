@@ -10,8 +10,7 @@ function NoAccessComponent({steps , dataString, onClickFunc, toolTipContent, tit
             {steps.map((element,index) => (
                 <BlockStack gap="100" key={index}>
                     <InlineStack gap="100" wrap={false} key={element.text}>
-                        <span>{index + 1}.</span>
-                        <span>{element.text}</span>
+                        <span>{index + 1}. {element.text}</span>
                         <span>{element.textComponent}</span>
                     </InlineStack>
                     <InlineStack gap="300">

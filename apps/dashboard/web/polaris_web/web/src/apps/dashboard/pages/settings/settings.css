@@ -11,3 +11,15 @@
 .Polaris-LegacyCard__Header > .Polaris-LegacyStack--alignmentBaseline {
     align-items: center;
 }
+
+/* .header-css .Polaris-Icon__Svg {
+    fill:white !important;
+} */
+
+.header-css .Polaris-Button--variantPlain .Polaris-Icon__Svg:hover{
+    fill: var(--pc-button-icon-fill) !important;
+}
+
+.Polaris-ResourceList__ResourceListWrapper {
+    --pc-resource-list-header-outer-wrapper-stacking-order: 0 !important;
+}

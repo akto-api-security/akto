@@ -1,6 +1,7 @@
 import { ActionList, Box, Button, Icon, Popover, Text, BlockStack } from '@shopify/polaris'
 import { PlayIcon, NoteIcon } from "@shopify/polaris-icons";
 import React, { useState } from 'react'
+import '../../pages/observe/api_collections/apiCollections.css'
 
 function LearnPopoverComponent({learnMoreObj}) {
     const [popoverActive,setPopoverActive] = useState(false)
@@ -23,9 +24,11 @@ function LearnPopoverComponent({learnMoreObj}) {
         <Popover
             active={popoverActive}
             activator={(
-                <Button onClick={() => setPopoverActive(!popoverActive)} disclosure>
-                    Learn
-                </Button>
+                <div className="polaris-secondaryAction-button">
+                    <Button variant="secondary" onClick={() => setPopoverActive(!popoverActive)} disclosure>
+                        Learn
+                    </Button>
+                </div>
             )}
             autofocusTarget="first-node"
             onClose={() => { setPopoverActive(false) }}

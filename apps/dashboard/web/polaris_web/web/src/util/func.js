@@ -20,6 +20,8 @@ import {
   MobileIcon,
   CalendarTimeIcon,
   IdentityCardFilledIcon,
+  CheckCircleIcon,
+  XCircleIcon
 } from "@shopify/polaris-icons";
 import { saveAs } from 'file-saver'
 import inventoryApi from "../apps/dashboard/pages/observe/api"
@@ -29,8 +31,6 @@ import { current } from 'immer';
 import homeFunctions from '../apps/dashboard/pages/home/module';
 import {themes} from '@shopify/polaris-tokens'; 
 import PersistStore from '../apps/main/PersistStore';
-
-import { circle_cancel, circle_tick_minor } from "@/apps/dashboard/components/icons";
 
 const iconsUsedMap = {
   CalendarIcon,ClockIcon,AlertCircleIcon,DatabaseIcon, LockIcon, KeyIcon, ProfileIcon, PasskeyIcon,
@@ -290,12 +290,14 @@ prettifyEpoch(epoch) {
       case "STOPPED":
         return{
           tooltipContent: "Error occurred while running the test.",
-          icon: circle_cancel,
+          icon: XCircleIcon,
+          icon:"critical"
         }
       case "COMPLETED": 
         return {
           tooltipContent: "Test has been completed.",
-          icon: circle_tick_minor
+          icon: CheckCircleIcon,
+          color:"success"
         }
       default: 
         return {
@@ -1549,8 +1551,9 @@ mapCollectionIdToHostName(apiCollections){
     transformedString = transformedString.replace(/[/|-]/g, '_');
     return transformedString;
 },
-showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
+showConfirmationModal(modalTitle, modalContent, primaryActionContent, primaryAction) {
   Store.getState().setConfirmationModalConfig({
+    modalTitle: modalTitle,
     modalContent: modalContent,
     primaryActionContent: primaryActionContent,
     primaryAction: primaryAction,

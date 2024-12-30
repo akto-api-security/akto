@@ -98,7 +98,7 @@ function AktoGPT() {
         debouncedSearch(item)
     }
 
-    const SearchIcon =  (
+    const SearchIconAktoGPT =  (
         <Box>
             <Icon source={SearchIcon} />   
         </Box>
@@ -107,7 +107,7 @@ function AktoGPT() {
     const headerComponent = (
         <TextField 
             connectedRight={sortFunc} 
-            prefix={SearchIcon} 
+            prefix={SearchIconAktoGPT} 
             onChange={searchResult} 
             value={searchValue}
             placeholder={`Search within ${apiCollections.length} available`}

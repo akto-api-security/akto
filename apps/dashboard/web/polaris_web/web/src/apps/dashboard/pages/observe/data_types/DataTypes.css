@@ -7,3 +7,16 @@
     padding-bottom: 5px !important;
     padding-top: 5px !important;
 }
+
+.card-items > .card-items{
+    padding-left: 1rem;
+    padding-right:1rem;
+}
+
+.card-items  .Polaris-Box {
+    width:100% !important;
+}
+
+.card-items .Polaris-InlineStack{
+    align-items: flex-start !important;
+}

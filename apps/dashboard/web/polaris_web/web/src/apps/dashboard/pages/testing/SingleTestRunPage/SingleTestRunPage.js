@@ -26,6 +26,7 @@ import {
   SearchResourceIcon,
   RefreshIcon,
   PersonIcon,
+  EditIcon
 } from "@shopify/polaris-icons";
 import api from "../api";
 import func from '@/util/func';
@@ -639,7 +640,7 @@ const editableConfigsComp = (
   moreActionsList.push({title: 'Update', items:[
     {
       content: 'Edit testing config settings',
-      icon: EditMajor,
+      icon: EditIcon,
       onAction: () => { setShowEditableSettings(true); handleAddSettings(); }
     }
   ]})
@@ -647,7 +648,7 @@ const editableConfigsComp = (
     <Popover
       active={secondaryPopover}
       onClose={() => setSecondaryPopover(false)}
-      activator={<Button disclosure onClick={() => setSecondaryPopover(!secondaryPopover)}>More actions</Button>}
+      activator={<div className="polaris-secondaryAction-button"><Button variant="secondary" disclosure onClick={() => setSecondaryPopover(!secondaryPopover)}>More actions</Button></div>}
       autofocusTarget="first-node"
     >
       <ActionList

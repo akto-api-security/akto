@@ -122,7 +122,7 @@ const TestEditor = () => {
             <InlineStack gap="500">
                 <Button onClick={handleExit} icon={ExitIcon}  variant="plain" />
                 <InlineStack gap={"200"}>
-                    <TitleWithInfo docsUrl={"https://docs.akto.io/test-editor/concepts"} tooltipContent={"Test editor playground"} titleText={"Test Editor"} />
+                    <TitleWithInfo docsUrl={"https://docs.akto.io/test-editor/concepts"} tooltipContent={"Test editor playground"} titleText={"Test Editor"} tone="text-inverse"/>
                 </InlineStack>
             </InlineStack>
 
@@ -159,7 +159,7 @@ const TestEditor = () => {
     }
         navigation={ <TestEditorFileExplorer addCustomTest={(e) => addCustomTest(e)}/> }
     >
-        <Box paddingInlineStart={1200}>
+        <Box borderStartEndRadius="300" minHeight="100%" background="bg" paddingInlineStart={1200}>
             <InlineGrid columns={2}>
                 <YamlEditor fetchAllTests={fetchAllTests} />
                 <SampleApi />

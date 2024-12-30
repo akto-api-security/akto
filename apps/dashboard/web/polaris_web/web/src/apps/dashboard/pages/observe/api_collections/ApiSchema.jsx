@@ -99,7 +99,7 @@ function ApiSingleSchema(props) {
 
     return (
         <BlockStack gap={"200"}>
-            <Box background={"bg-subdued"} width="100%" padding={"200"} onClick={handleToggle}>
+            <Box background={"bg-surface-secondary"} width="100%" padding={"200"} onClick={handleToggle}>
                 <InlineStack align="space-between">
                     <Text variant="headingSm">
                         {title}
@@ -117,7 +117,7 @@ function ApiSingleSchema(props) {
             >
                 <BlockStack gap={"200"}>
                     <ButtonGroup variant="segmented">
-                        <Button {...(activeTab? {variant:"primary", tone:"success" } : {})} onClick={() => {setBadgeActive(false); setIsHeader(true)}} size="slim">
+                        <Button {...(activeTab? {variant:"primary"} : {})} onClick={() => {setBadgeActive(false); setIsHeader(true)}} size="slim">
                             <Box paddingBlockStart="050" paddingBlockEnd="050"> 
                                 <InlineStack gap="200">
                                     <Text variant="bodyMd">Header</Text>
@@ -127,7 +127,7 @@ function ApiSingleSchema(props) {
                                 </InlineStack>
                             </Box>
                         </Button>
-                        <Button {...(!activeTab? {variant:"primary", tone:"success" } : {})} onClick={() => {setBadgeActive(false); setIsHeader(false)}} size="slim">
+                        <Button {...(!activeTab? {variant:"primary"} : {})} onClick={() => {setBadgeActive(false); setIsHeader(false)}} size="slim">
                             <Box paddingBlockStart="050" paddingBlockEnd="050"> 
                                 <InlineStack gap="200">
                                     <Text variant="bodyMd">Payload</Text>

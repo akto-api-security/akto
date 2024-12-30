@@ -24,6 +24,7 @@ function DateRangeFilter(props){
       sectioned={false}
       fullHeight
       activator={
+        <div className="polaris-secondaryAction-button">
         <Button
           icon={CalendarIcon}
           onClick={() => setPopoverActive(!popoverActive)}
@@ -32,6 +33,7 @@ function DateRangeFilter(props){
             {func.getDateValue(initialDispatch)}
           </span>
         </Button>
+        </div>
       }
       onClose={() => setPopoverActive(false)}
     >

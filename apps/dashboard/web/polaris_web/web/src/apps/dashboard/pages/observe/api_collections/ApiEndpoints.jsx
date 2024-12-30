@@ -1,5 +1,5 @@
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
-import { Text, InlineStack, Button, Popover, Modal, IndexFiltersMode, BlockStack, Box, Checkbox } from "@shopify/polaris"
+import { Text, InlineStack, Button, Popover, Modal, IndexFiltersMode, BlockStack, Box, Checkbox, ActionList, Divider } from "@shopify/polaris"
 import api from "../api"
 import { useEffect, useState } from "react"
 import func from "@/util/func"
@@ -34,7 +34,7 @@ const headings = [
     {
         text: "Endpoint",
         value: "endpointComp",
-        title: "Api endpoints",
+        title: "API endpoints",
         textValue: "endpoint",
         sortActive: true
     },
@@ -639,76 +639,120 @@ function ApiEndpoints(props) {
             <Popover
                 active={exportOpen}
                 activator={(
-                    <Button onClick={() => setExportOpen(true)} disclosure>
+                    <div className="polaris-secondaryAction-button">
+                    <Button onClick={() => setExportOpen(!exportOpen)} disclosure>
                         <div data-testid="more_actions_button">More Actions</div>
                     </Button>
+                    </div>
                 )}
                 autofocusTarget="first-node"
                 onClose={() => { setExportOpen(false) }}
                 preferredAlignment="right"
             >
-                <Popover.Pane fixed>
-                    <Popover.Section>
-                        <BlockStack gap={200}>
-                            <div onClick={handleRefresh} style={{cursor: 'pointer'}}>
-                                <Text fontWeight="regular" variant="bodyMd">Refresh</Text>
-                            </div>
-                            {
-                                isApiGroup ?
-                                    <div onClick={computeApiGroup} style={{ cursor: 'pointer' }}>
-                                        <Text fontWeight="regular" variant="bodyMd">Re-compute api group</Text>
-                                    </div> :
-                                    null
-                            }
-                            { !isApiGroup && !(collectionsObj?.hostName && collectionsObj?.hostName?.length > 0) ?
-                                <UploadFile
+                
+                
+                    <ActionList
+                        actionRole="menuitem"
+                        items={[
+                        {
+                            content: "Refresh",
+                            onAction: handleRefresh,
+                        },
+                        isApiGroup && {
+                            content: "Re-compute api group",
+                            onAction: computeApiGroup,
+                        },
+                        !isApiGroup && !(collectionsObj?.hostName && collectionsObj?.hostName?.length > 0) && {
+                            content: (
+                            <UploadFile
                                 fileFormat=".har"
-                                fileChanged={file => handleFileChange(file)}
+                                fileChanged={(file) => handleFileChange(file)}
                                 tooltipText="Upload traffic(.har)"
                                 label={<Text fontWeight="regular" variant="bodyMd">Upload traffic</Text>}
-                                primary={false} 
-                                /> : null
-                            }
-                        </BlockStack>
-                    </Popover.Section>
-                    <Popover.Section>
-                        <BlockStack gap={200}>
-                            <Text>Export as</Text>
-                            <BlockStack gap={100}>
-                                <div data-testid="openapi_spec_option" onClick={(selectedResourcesForPrimaryAction && selectedResourcesForPrimaryAction.length > 0) ? exportOpenApiForSelectedApi : exportOpenApi} style={{cursor: 'pointer'}}>
-                                    <Text fontWeight="regular" variant="bodyMd">OpenAPI spec</Text>
-                                </div>
-                                <div data-testid="postman_option" onClick={exportPostman} style={{cursor: 'pointer'}}>
-                                    <Text fontWeight="regular" variant="bodyMd">Postman</Text>
-                                </div>
-                                <div data-testid="csv_option" onClick={() =>exportCsv()} style={{cursor: 'pointer'}}>
-                                    <Text fontWeight="regular" variant="bodyMd">CSV</Text>
-                                </div>
-                            </BlockStack>
-                        </BlockStack>
-                    </Popover.Section>
-                    <Popover.Section>
-                        <BlockStack gap={200}>
-                            <Text>Others</Text>
-                            <BlockStack gap={100}>
-                                <Checkbox
-                                    label='Redact'
-                                    checked={redacted}
-                                    onChange={() => redactCheckBoxClicked()}
-                                />
-                            </BlockStack>
-                        </BlockStack>
-                    </Popover.Section>
-                    <Popover.Section>
-                        <BlockStack gap={200}>
-                            <div onClick={toggleWorkflowTests} style={{ cursor: 'pointer' }}>
-                                <Text fontWeight="regular" variant="bodyMd">
-                                    {`${showWorkflowTests ? "Hide" : "Show"} workflow tests`}
-                                </Text>
-                            </div>
-                        </BlockStack>
-                    </Popover.Section>
-                </Popover.Pane>
+                                primary={false}
+                            />
+                            ),
+                        },
+                        ].filter(Boolean)}
+                    />
+                   
+
+                    <Divider/>
+                    
+                    <ActionList
+                        actionRole="menuitem"
+                        sections={[{
+                            title: <p style={{paddingLeft:"0.3rem", fontWeight:"550"}}>Export as</p>,
+                            items:[
+                        
+                                {
+                                    content: "OpenAPI spec",
+                                    onAction:
+                                    selectedResourcesForPrimaryAction && selectedResourcesForPrimaryAction.length > 0
+                                        ? exportOpenApiForSelectedApi
+                                        : exportOpenApi,
+                                    accessibilityLabel: "Export OpenAPI Specification",
+                                    dataTestId: "openapi_spec_option",
+                                },
+                                {
+                                    content: "Postman",
+                                    onAction: exportPostman,
+                                    accessibilityLabel: "Export to Postman",
+                                    dataTestId: "postman_option",
+                                },
+                                {
+                                    content: "CSV",
+                                    onAction: exportCsv,
+                                    accessibilityLabel: "Export to CSV",
+                                    dataTestId: "csv_option",
+                                },
+                                ]
+                        }]}
+                    />
+                    
+                    <Divider/>
+
+                    
+                    <ActionList
+                        actionRole="menuitem"
+                        sections={[{
+                            title:<p style={{paddingLeft:"0.3rem", fontWeight:"550"}}>Others</p>, 
+                            items: [{
+                                content: (
+                                    <Checkbox
+                                        label="Redact"
+                                        checked={redacted}
+                                        onChange={redactCheckBoxClicked}
+                                        helpText={
+                                            <p>
+                                                Redacts all your data
+                                                <br />
+                                                from the collection
+                                            </p>
+                                        }
+                                    />
+                                ),
+                                accessibilityLabel: "Redact Collection Data",
+                            }]
+                        }]}
+                    />
+                    
+                    <Divider/>
+                    
+                    <ActionList
+                        actionRole="menuitem"
+                        items={[
+                        {
+                            content: `${showWorkflowTests ? "Hide" : "Show"} workflow tests`,
+                            onAction: toggleWorkflowTests,
+                            accessibilityLabel: "Toggle Workflow Tests",
+                            className: "popover-menu-button--extraMargin",
+                        },
+                        ]}
+                    />
+                    
+
+                
             </Popover>
             {isApiGroup &&collectionsObj?.automated !== true ? <Button onClick={() => navigate("/dashboard/observe/query_mode?collectionId=" + apiCollectionId)}>Edit conditions</Button> : null}
             {isGptActive ? <Button onClick={displayGPT} disabled={showEmptyScreen}>Ask AktoGPT</Button>: null}

@@ -99,7 +99,9 @@ function AuthTypes() {
             title={"Auth types"}
             primaryAction={<Button  onClick={handleRedirect} variant="primary">Create new auth type</Button>}
             secondaryActions={
-                <Button onClick={() => handleResetModalChange()}>Reset</Button>
+                <div className="polaris-secondaryAction-button">
+                    <Button variant="secondary" onClick={() => handleResetModalChange()}>Reset</Button>
+                </div>
             }
             isFirstPage={true}
             components={[

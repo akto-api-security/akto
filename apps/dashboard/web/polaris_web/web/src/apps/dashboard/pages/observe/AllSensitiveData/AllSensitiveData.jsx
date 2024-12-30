@@ -309,7 +309,9 @@ function AllSensitiveData() {
     const secondaryActionsComp = (
         <InlineStack gap={"200"}>
             { (func.checkOnPrem() && window?.USER_NAME !== undefined && window.USER_NAME.includes("razorpay")) ? <Button onClick={resetSampleData}>Reset Sample Data</Button> : <></>}
-            <Button onClick={displayGPT}>Ask AktoGPT</Button>
+            <div className="polaris-secondaryAction-button">
+            <Button variant="secondary" onClick={displayGPT}>Ask AktoGPT</Button>
+            </div>
         </InlineStack>
     )
 
@@ -379,7 +381,6 @@ function AllSensitiveData() {
             tableTabs={tableTabs}
             onSelect={(val) => setSelected(val)}
             selected={selected}
-            lastColumnSticky={true}
         />,
         <Modal key="modal" size="large" open={isGptScreenActive} onClose={()=> setIsGptScreenActive(false)} title="Akto GPT">
             <Modal.Section flush>

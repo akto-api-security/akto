@@ -273,7 +273,7 @@ function DataTypes() {
           <InlineGrid gap={"400"} columns={['twoThirds', 'oneThird']}>
             <BlockStack gap={"200"}>
               <Form onSubmit={() => handleTagsChange(tagValue, 'add')}>
-                  <TextField onChange={setTagValue} value={tagValue} label={<Text tone="subdued" fontWeight="medium" variant="bodySm">Datatype Tags</Text>}/>
+                  <TextField onChange={setTagValue} value={tagValue} label={<Text tone="subdued" fontWeight="medium" variant="bodySm"><p style={{color:"#303030"}}>Datatype Tags</p></Text>}/>
               </Form>
               <InlineStack gap={"200"}>
                 {currState.categoriesList && currState.categoriesList.length > 0 && currState.categoriesList.map((tag, index) => {
@@ -287,7 +287,9 @@ function DataTypes() {
             </BlockStack>
             {currState.dataType === 'Custom' && <Box>
               <Text variant="bodyMd">
+                <p style={{paddingBottom:"0.1rem"}}>
                 Choose Icon
+                </p>
               </Text>
               <InlineStack gap={200}>
                 {displayIcons.map((icon, index) => {
@@ -364,8 +366,7 @@ function DataTypes() {
           />}
       >
         <LegacyCard.Section>
-          <p>Mark the location where you want the data type to be sensitive</p>
-          <br/>
+          <p style={{marginBottom: "0.8rem"}}>Mark the location where you want the data type to be sensitive</p>
           <InlineGrid columns="4">
             <Dropdown id={"sensitive-position"} menuItems = {requestItems} initial={currState.sensitiveState} 
             selected={(val) => { handleChange({ sensitiveState: val }) }}/>
@@ -385,13 +386,11 @@ function DataTypes() {
             docsUrl={"https://docs.akto.io/api-inventory/how-to/redact-sensitive-data"}
           />}
       >
-        <div className='card-items'>
+        <div style={{ paddingLeft: "1rem", paddingRight: "1rem" }}>
           <InformationBannerComponent docsUrl={""} content="When enabled, existing sample payload values will be deleted, and this data type will be redacted in future payloads. Please note that your API Inventory, Sensitive data etc. will be intact. We will simply be deleting the sample payload values.">
           </InformationBannerComponent>
         </div>
         <LegacyCard.Section>
-          <p>Redact this data type</p>
-          <br/>
           <InlineGrid columns="4">
             <Dropdown id={"redact-position"} menuItems = {statusItems} initial={currState.redacted}
             selected={(val) => { handleChange({ redacted: val }) }}/>
@@ -410,7 +409,7 @@ function DataTypes() {
           tooltipContent={"Create test template for this data type"}
         />}
       >
-        <div className='card-items'>
+        <div style={{ paddingLeft: "1rem", paddingRight: "1rem" }}>
           <InformationBannerComponent docsUrl={""} content="When enabled, test template is created and synced with this data type.">
           </InformationBannerComponent>
         </div>

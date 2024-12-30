@@ -110,7 +110,7 @@ export default function Header() {
             }
         }
     })
-
+    
     function createNewAccount() {
         api.saveToAccount(newAccount).then(resp => {
           setShowCreateAccount(false)
@@ -165,6 +165,7 @@ export default function Header() {
                 },
             ]}
             initials={func.initials(username)}
+            name={accounts[activeAccount]}
             open={isUserMenuOpen}
             onToggle={toggleIsUserMenuOpen}
         />
@@ -227,8 +228,8 @@ export default function Header() {
                  <SemiCircleProgress key={"progress"} progress={progress} size={60} height={55} width={75}/>
                 </Button>
                 <BlockStack gap={"0"}>
-                    <Text fontWeight="medium">Test run status</Text>
-                    <Text tone="subdued" variant="bodySm">{`${currentTestsObj.totalTestsQueued} tests queued`}</Text>
+                    <Text fontWeight="medium"><div style={{color: "#FFFFFF"}}>Test run status</div></Text>
+                    <Text variant="bodySm"><div style={{color: "#FFFFFF"}}>{`${currentTestsObj.totalTestsQueued} tests queued`}</div></Text>
                 </BlockStack>
             </InlineStack> : null}
             <TopBar.Menu

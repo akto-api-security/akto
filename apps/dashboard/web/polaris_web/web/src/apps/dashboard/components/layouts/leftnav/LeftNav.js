@@ -8,6 +8,19 @@ import {
   ChartVerticalFilledIcon,
   SearchResourceIcon,
   AlertDiamondIcon,
+  ChartVerticalIcon,
+  AppsIcon,
+  InventoryIcon,
+  TargetIcon,
+  FileIcon,
+  SearchRecentIcon,
+  CollectionIcon,
+  CollectionFilledIcon,
+  BlankFilledIcon,
+  BlankIcon,
+  LiveFilledIcon,
+  LiveIcon,
+  SettingsIcon
 } from "@shopify/polaris-icons";
 import {useLocation, useNavigate} from "react-router-dom"
 
@@ -39,7 +52,7 @@ export default function LeftNav(){
             items={[
               {
                 label: <Text variant="bodyMd" fontWeight="medium">Quick Start</Text>,
-                icon: AppsFilledIcon,
+                icon: (leftNavSelected === 'dashboard_quick_start')? AppsIcon : AppsFilledIcon,
                 onClick: ()=>{
                   handleSelect("dashboard_quick_start")
                   setActive("normal")
@@ -50,7 +63,7 @@ export default function LeftNav(){
               },
               {
                 label:<Text variant="bodyMd" fontWeight="medium">API Security Posture</Text>,
-                icon: SearchResourceIcon,
+                icon: (leftNavSelected === 'dashboard_home')? ChartVerticalIcon : ChartVerticalFilledIcon,
                 onClick: ()=>{
                   handleSelect("dashboard_home")
                   navigate("/dashboard/home")
@@ -62,11 +75,11 @@ export default function LeftNav(){
               {   
                 url: '#',
                 label: <Text variant="bodyMd" fontWeight="medium" color={leftNavSelected.includes("observe") ? (active === 'active' ? "subdued" : ""): ""}>API Discovery</Text>,
-                icon: InventoryFilledIcon,
+                icon: (leftNavSelected.includes('_observe'))? CollectionIcon : CollectionFilledIcon,
                 onClick: ()=>{
                   handleSelect("dashboard_observe_inventory")
                   navigate('/dashboard/observe/inventory')
-                  setActive("normal")
+                  setActive("active")
                 },
                 selected: leftNavSelected.includes('_observe'),
                 subNavigationItems:[
@@ -103,11 +116,11 @@ export default function LeftNav(){
               {
                 url: '#',
                 label: <Text variant="bodyMd" fontWeight="medium" color={leftNavSelected.includes("testing") ? (active === 'active' ? "subdued" : ""): ""}>Testing</Text>,
-                icon: TargetFilledIcon,
+                icon: (leftNavSelected.includes('_testing'))? TargetIcon : TargetFilledIcon,
                 onClick: ()=>{
                   navigate('/dashboard/testing/')
                   handleSelect('dashboard_testing')
-                  setActive("normal")
+                  setActive("active")
                 },
                 selected: leftNavSelected.includes('_testing'),
                 subNavigationItems:[
@@ -143,7 +156,7 @@ export default function LeftNav(){
               },
               {
                 label: <Text variant="bodyMd" fontWeight="medium">Test Editor</Text>,
-                icon: FileFilledIcon,
+                icon: (leftNavSelected.includes("dashboard_test_editor"))? FileIcon : FileFilledIcon,
                 onClick: ()=>{ 
                   handleSelect("dashboard_test_editor")
                   navigate("/dashboard/test-editor/REMOVE_TOKENS")
@@ -154,7 +167,7 @@ export default function LeftNav(){
               },
               {
                 label: <Text variant="bodyMd" fontWeight="medium">Issues</Text>,
-                icon: ChartVerticalFilledIcon,
+                icon: (leftNavSelected === 'dashboard_issues')? BlankIcon :  BlankFilledIcon,
                 onClick: ()=>{ 
                     handleSelect("dashboard_issues")
                     navigate("/dashboard/issues")
@@ -166,7 +179,7 @@ export default function LeftNav(){
               window?.STIGG_FEATURE_WISE_ALLOWED?.THREAT_DETECTION?.isGranted ?
                 {
                   label: <Text variant="bodyMd" fontWeight="medium">API Runtime Threats</Text>,
-                  icon: AlertDiamondIcon,
+                  icon: (leftNavSelected === 'dashboard_threat_detection')? LiveIcon : LiveFilledIcon,
                   onClick: () => {
                     handleSelect("dashboard_threat_detection")
                     navigate("/dashboard/threat-detection")
@@ -181,7 +194,7 @@ export default function LeftNav(){
                items={[
                 {
                   label:<Text variant="bodyMd" fontWeight="medium">Settings</Text>,
-                  icon: SettingsFilledIcon,
+                  icon: (currPathString === 'settings')? SettingsIcon : SettingsFilledIcon,
                   onClick: ()=>{
                     navigate("/dashboard/settings/about")
                     setActive("normal")

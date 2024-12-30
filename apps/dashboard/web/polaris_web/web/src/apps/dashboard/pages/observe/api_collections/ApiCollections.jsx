@@ -23,6 +23,7 @@ import { saveAs } from 'file-saver'
 import TreeViewTable from "../../../components/shared/treeView/TreeViewTable"
 import TableStore from "../../../components/tables/TableStore";
 import { useNavigate } from "react-router-dom";
+import './apiCollections.css'
 
 
 const headers = [
@@ -450,7 +451,7 @@ function ApiCollections() {
                     content: `Deactivate collection${func.addPlurality(selectedResources.length)}`,
                     onAction: () => {
                         const message = "Deactivating a collection will stop traffic ingestion and testing for this collection. Please sync the usage data via Settings > billing after deactivating a collection to reflect your updated usage. Are you sure, you want to deactivate this collection ?"
-                        func.showConfirmationModal(message, "Deactivate collection", () => handleCollectionsAction(selectedResources, collectionApi.deactivateCollections, "deactivated") )
+                        func.showConfirmationModal("",message, "Deactivate collection", () => handleCollectionsAction(selectedResources, collectionApi.deactivateCollections, "deactivated") )
                     }
                 }
             )
@@ -460,19 +461,12 @@ function ApiCollections() {
                     content: `Reactivate collection${func.addPlurality(selectedResources.length)}`,
                     onAction: () =>  {
                         const message = "Please sync the usage data via Settings > billing after reactivating a collection to resume data ingestion and testing."
-                        func.showConfirmationModal(message, "Activate collection", () => handleCollectionsAction(selectedResources, collectionApi.activateCollections, "activated"))
+                        func.showConfirmationModal("",message, "Activate collection", () => handleCollectionsAction(selectedResources, collectionApi.activateCollections, "activated"))
                     }
                 }
             )
         }
-        if (selectedResources.every(v => { return !apiGrous.includes(v) })) {
-            actions.push(
-                {
-                    content: `Remove collection${func.addPlurality(selectedResources.length)}`,
-                    onAction: () => handleCollectionsAction(selectedResources, api.deleteMultipleCollections, "deleted")
-                }
-            )
-        }
+        
 
         const toggleTypeContent = (
             <Popover
@@ -501,6 +495,18 @@ function ApiCollections() {
         const bulkActionsOptions = [...actions];
         if(selectedTab !== 'groups') {
             bulkActionsOptions.push(toggleEnvType)
+        }
+        if (selectedResources.every(v => { return !apiGrous.includes(v) })) {
+            bulkActionsOptions.push(
+                {
+                    content: <span style={{color:"var(--p-color-text-critical)"}}>{`Remove collection${func.addPlurality(selectedResources.length)}`}</span>,
+                    onAction: () => {
+                        const message = "This can't be undone."
+                        const modalTitle = `Remove ${selectedResources.length} collection${func.addPlurality(selectedResources.length)}?`
+                        func.showConfirmationModal(modalTitle,message,"Remove collection",()=> handleCollectionsAction(selectedResources, api.deleteMultipleCollections, "deleted"))
+                    }
+                }
+            )
         }
         return bulkActionsOptions
     }
@@ -569,39 +575,40 @@ function ApiCollections() {
             <Popover
                 active={moreActions}
                 activator={(
-                    <Button onClick={() => setMoreActions(!moreActions)} disclosure removeUnderline>
-                        More Actions
-                    </Button>
+                    <div className="polaris-secondaryAction-button">
+                        <Button variant="secondary" onClick={() => setMoreActions(!moreActions)} disclosure removeUnderline>
+                            More Actions
+                        </Button>
+                    </div>
                 )}
                 autofocusTarget="first-node"
                 onClose={() => { setMoreActions(false) }}
                 preferredAlignment="right"
             >
-                <Popover.Pane fixed>
-                    <Popover.Section>
-                        <Button  onClick={() =>exportCsv()} variant="monochromePlain">
-                            <InlineStack gap={"200"}>
-                                <Box><Icon source={FileIcon} /></Box>
-                                <Text>Export as CSV</Text>
-                            </InlineStack>
-                        </Button>
-                        </Popover.Section>
-                    <Popover.Section>
-                        <Button
-                            onClick={() => setTreeView(!treeView)}
-                            variant="monochromePlain">
-                            <InlineStack gap={"200"}>
-                                <Box><Icon source={treeView ? HideIcon : ViewIcon} /></Box>
-                                <Text>{treeView ? "Hide tree view": "Display tree view"}</Text>
-                            </InlineStack>
-                        </Button>
-                    </Popover.Section>
-                </Popover.Pane>
+               
+                    <ActionList
+                        actionRole=""
+                        items={[
+                        {
+                            content:"Export as CSV",
+                            icon:FileIcon,
+                            onAction:exportCsv
+                        },
+                        {
+                            content:treeView ? "Hide tree view": "Display tree view",
+                            icon:treeView ? HideIcon : ViewIcon,
+                            onAction:() => setTreeView(!treeView)
+                        }
+                        
+                        ]}
+                    />
+                
             </Popover>
-            <Button id={"create-new-collection-popup"} secondaryActions onClick={showCreateNewCollectionPopup}>Create new collection</Button>
+            <div className="polaris-secondaryAction-button" >
+            <Button variant="secondary" id={"create-new-collection-popup"}  onClick={showCreateNewCollectionPopup}>Create new collection</Button>
+            </div>
         </InlineStack>
     )
-
 
     const handleSelectedTab = (selectedIndex) => {
         setSelected(selectedIndex)

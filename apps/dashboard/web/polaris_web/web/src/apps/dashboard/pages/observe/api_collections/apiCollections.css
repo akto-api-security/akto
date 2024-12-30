@@ -1,0 +1,29 @@
+.polaris-secondaryAction-button > .Polaris-Button--variantSecondary {
+    background: var(--p-color-bg-fill-tertiary) !important;
+    box-shadow: none !important;
+    border: none;
+    border-radius: var(--p-border-radius-200) !important;
+    min-height: 1.75rem;
+    --pc-button-bg_hover: #303030 !important;
+}
+.polaris-secondaryAction-button > .Polaris-Button--variantSecondary:hover{
+    background-color: #D4D4D4 !important;
+}
+
+.popover-menu-button:hover{
+    background-color: #F1F1F1 !important;
+}
+
+.popover-menu-button{
+    padding:0.3rem !important;
+    border-radius: var(--p-border-radius-200);
+}
+
+.popover-menu-button.popover-menu-button--extraMargin{
+    margin-bottom: 0.2rem !important;
+}
+
+[aria-expanded=true]:is(.polaris-secondaryAction-button button){
+    box-shadow: var(--p-shadow-inset-200)!important;
+    background-color: var(--p-color-bg-fill-tertiary-active) !important;
+}

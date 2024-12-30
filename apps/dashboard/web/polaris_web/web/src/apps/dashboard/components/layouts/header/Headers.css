@@ -14,6 +14,13 @@
     fill: #6D3BEF !important;
 }
 
-.local_icon .Polaris-Icon__Svg {
-    fill: #2C6ECB !important;
+/* .Polaris-TopBar-Menu__Activator:not(:hover){
+    background: transparent !important;
+} */
+
+.Polaris-TopBar-Menu__Activator:hover{
+    --border-gradient-bg-hover: var(--p-color-bg-fill-hover)!important;
+    --border-gradient-border-hover: var(--p-color-border-gradient-hover)!important;
+    --border-gradient-bg-selected: var(--p-color-button-gradient-bg-fill-selected)!important;
+    --border-gradient-border-selected: var(--p-color-border-gradient-selected)!important;
 }
