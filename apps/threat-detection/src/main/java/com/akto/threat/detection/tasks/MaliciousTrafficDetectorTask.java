@@ -159,7 +159,7 @@ public class MaliciousTrafficDetectorTask implements Task {
   }
 
   private void processRecord(ConsumerRecord<String, String> record) {
-    System.out.println("Kafka record: " + record.value());
+    System.out.println("Kafka record: found ");
     HttpResponseParams responseParam = HttpCallParser.parseKafkaMessage(record.value());
     Context.accountId.set(Integer.parseInt(responseParam.getAccountId()));
     Map<String, FilterConfig> filters = this.getFilters();
@@ -211,17 +211,17 @@ public class MaliciousTrafficDetectorTask implements Task {
                           .setFilterId(apiFilter.getId())
                           .build();
 
-                  try {
-                    maliciousMessages.add(
-                        MessageEnvelope.generateEnvelope(
-                            responseParam.getAccountId(), actor, maliciousReq));
-                  } catch (InvalidProtocolBufferException e) {
-                    return;
-                  }
+                  // try {
+                  //   maliciousMessages.add(
+                  //       MessageEnvelope.generateEnvelope(
+                  //           responseParam.getAccountId(), actor, maliciousReq));
+                  // } catch (InvalidProtocolBufferException e) {
+                  //   return;
+                  // }
 
                   if (!isAggFilter) {
-                    generateAndPushMaliciousEventRequest(
-                        apiFilter, actor, responseParam, maliciousReq, EventType.EVENT_TYPE_SINGLE);
+                    // generateAndPushMaliciousEventRequest(
+                    //     apiFilter, actor, responseParam, maliciousReq, EventType.EVENT_TYPE_SINGLE);
                     return;
                   }
 
@@ -232,13 +232,13 @@ public class MaliciousTrafficDetectorTask implements Task {
 
                     if (result.shouldNotify()) {
                       System.out.print("Notifying for aggregation rule: " + rule);
-                      generateAndPushMaliciousEventRequest(
-                          apiFilter,
-                          actor,
-                          responseParam,
-                          maliciousReq,
-                          EventType.EVENT_TYPE_AGGREGATED);
-                    }
+                    //   generateAndPushMaliciousEventRequest(
+                    //       apiFilter,
+                    //       actor,
+                    //       responseParam,
+                    //       maliciousReq,
+                    //       EventType.EVENT_TYPE_AGGREGATED);
+                     }
                   }
                 });
       }
@@ -246,19 +246,19 @@ public class MaliciousTrafficDetectorTask implements Task {
 
     // Should we push all the messages in one go
     // or call kafka.send for each HttpRequestParams
-    try {
-      maliciousMessages.forEach(
-          sample -> {
-            sample
-                .marshal()
-                .ifPresent(
-                    data -> {
-                      internalKafka.send(data, KafkaTopic.ThreatDetection.MALICIOUS_EVENTS);
-                    });
-          });
-    } catch (Exception e) {
-      e.printStackTrace();
-    }
+    // try {
+    //   maliciousMessages.forEach(
+    //       sample -> {
+    //         sample
+    //             .marshal()
+    //             .ifPresent(
+    //                 data -> {
+    //                   internalKafka.send(data, KafkaTopic.ThreatDetection.MALICIOUS_EVENTS);
+    //                 });
+    //       });
+    // } catch (Exception e) {
+    //   e.printStackTrace();
+    // }
   }
 
   private void generateAndPushMaliciousEventRequest(

@@ -56,9 +56,9 @@ public class Main {
     new FlushSampleDataTask(
             sessionFactory, internalKafka, KafkaTopic.ThreatDetection.MALICIOUS_EVENTS)
         .run();
-    new SendMaliciousEventsToBackend(
-            sessionFactory, internalKafka, KafkaTopic.ThreatDetection.ALERTS)
-        .run();
+    // new SendMaliciousEventsToBackend(
+    //         sessionFactory, internalKafka, KafkaTopic.ThreatDetection.ALERTS)
+    //     .run();
     new CleanupTask(sessionFactory).run();
   }
 
