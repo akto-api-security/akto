@@ -1,5 +1,6 @@
 package com.akto.testing;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -10,6 +11,9 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.bson.conversions.Bson;
+import org.bson.types.ObjectId;
+import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.CollectionConditions.ConditionsType;
 import com.akto.dto.OriginalHttpRequest;
@@ -17,6 +21,7 @@ import com.akto.dto.RawApi;
 import com.akto.dto.test_editor.DataOperandsFilterResponse;
 import com.akto.dto.test_editor.FilterNode;
 import com.akto.dto.test_editor.Util;
+import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.WorkflowUpdatedSampleData;
 import com.akto.dto.type.RequestTemplate;
 import com.akto.log.LoggerMaker;
@@ -24,8 +29,14 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.test_editor.filter.Filter;
 import com.akto.test_editor.filter.data_operands_impl.ValidationResult;
 import com.akto.util.JSONUtils;
+import com.akto.util.enums.GlobalEnums.Severity;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
+import com.mongodb.client.MongoCursor;
+import com.mongodb.client.model.Accumulators;
+import com.mongodb.client.model.Aggregates;
+import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Projections;
 
 import okhttp3.MediaType;
 
@@ -411,6 +422,37 @@ public class Utils {
         }
         
         
+    }
+
+    public static Map<String, Integer> finalCountIssuesMap(ObjectId testingRunResultSummaryId){
+        Map<String, Integer> countIssuesMap = new HashMap<>();
+        countIssuesMap.put(Severity.HIGH.toString(), 0);
+        countIssuesMap.put(Severity.MEDIUM.toString(), 0);
+        countIssuesMap.put(Severity.LOW.toString(), 0);
+
+        Bson projection = Projections.computed("confidence", Projections.computed("$first", "$testResults.confidence"));
+        Bson filterQ = Filters.and(
+                            Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, testingRunResultSummaryId),
+                            Filters.eq(TestingRunResult.VULNERABLE, true)
+                        );
+        BasicDBObject groupId = new BasicDBObject("_id", "$confidence");
+        List<Bson> pipeline = new ArrayList<>();
+
+        pipeline.add(Aggregates.match(filterQ));
+        pipeline.add(Aggregates.project(projection));
+        pipeline.add(Aggregates.group(groupId, Accumulators.sum("count", 1)));
+
+        MongoCursor<BasicDBObject> cursor = TestingRunResultDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
+        while(cursor.hasNext()){
+            BasicDBObject dbObject = cursor.next();
+            BasicDBObject objectId = (BasicDBObject) dbObject.get("_id");
+            String id = objectId.getString("_id");
+            int val = dbObject.getInt("count");
+
+            countIssuesMap.put(id, val);
+        }
+
+        return countIssuesMap;
     }
     
 }
