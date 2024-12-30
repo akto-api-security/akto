@@ -28,6 +28,7 @@ import "./LeftNav.css"
 import PersistStore from "../../../../main/PersistStore"
 import { useState } from "react"
 import func from "@/util/func"
+import { useEffect } from "react";
 
 
 export default function LeftNav(){
@@ -44,6 +45,42 @@ export default function LeftNav(){
   const handleSelect = (selectedId) => {
     setLeftNavSelected(selectedId);
   };
+
+  
+  useEffect(() => {
+    const newPathString = func.transformString(location.pathname);
+  
+    if (leftNavSelected !== newPathString) {
+      setLeftNavSelected(newPathString);
+    }
+  }, [location.pathname]);
+  
+
+  useEffect(() => {
+    const isActive =
+      leftNavSelected.includes('_observe') || leftNavSelected.includes('_testing');
+    setActive(isActive ? "active" : "normal");
+  
+  }, [leftNavSelected]);
+
+
+  const PATH_MAPPINGS = {
+    observe: {
+      inventory: ['dashboard_observe_inventory', 'dashboard_observe_query_mode'],
+      changes: ['dashboard_observe_changes'],
+      sensitive: ['dashboard_observe_sensitive', 'dashboard_observe_data_types']
+    },
+    testing: {
+      results: ['dashboard_testing', 'dashboard_testing_id'],
+      roles: ['dashboard_testing_roles'],
+      userConfig: ['dashboard_testing_user_config']
+    }
+  };
+
+  const isPathSelected = (paths) => {
+    return paths.some(path => leftNavSelected.includes(path));
+  };
+  
   
     const navigationMarkup = (
       <div className={active}>
@@ -90,7 +127,7 @@ export default function LeftNav(){
                         handleSelect("dashboard_observe_inventory")
                         setActive('active')
                       },
-                      selected: leftNavSelected === "dashboard_observe_inventory"
+                      selected: isPathSelected(PATH_MAPPINGS.observe.inventory)
                     },
                     {
                       label: 'API Changes',
@@ -99,7 +136,7 @@ export default function LeftNav(){
                         handleSelect("dashboard_observe_changes")
                         setActive('active')
                       },
-                      selected: leftNavSelected === "dashboard_observe_changes"
+                      selected: isPathSelected(PATH_MAPPINGS.observe.changes)
                     },
                     {
                       label: 'Sensitive Data',
@@ -108,7 +145,7 @@ export default function LeftNav(){
                         handleSelect("dashboard_observe_sensitive")
                         setActive('active')
                       },
-                      selected: leftNavSelected === "dashboard_observe_sensitive"
+                      selected: isPathSelected(PATH_MAPPINGS.observe.sensitive)
                     }
                   ],
                   key: '3',
@@ -131,7 +168,7 @@ export default function LeftNav(){
                       handleSelect('dashboard_testing')
                       setActive('active')
                     },
-                    selected: leftNavSelected === 'dashboard_testing'
+                    selected: leftNavSelected === 'dashboard_testing' || leftNavSelected === 'dashboard_testing_id'
                   },
                   {
                     label: 'Test Roles',
@@ -140,7 +177,7 @@ export default function LeftNav(){
                       handleSelect('dashboard_testing_roles')
                       setActive('active')
                     },
-                    selected: leftNavSelected === 'dashboard_testing_roles'
+                    selected: isPathSelected(PATH_MAPPINGS.testing.roles)
                   },
                   {
                     label: 'User Config',
@@ -149,7 +186,7 @@ export default function LeftNav(){
                       handleSelect('dashboard_testing_user_config')
                       setActive('active')
                     },
-                    selected: leftNavSelected === 'dashboard_testing_user_config'
+                    selected: isPathSelected(PATH_MAPPINGS.testing.userConfig)
                   }
                 ],
                 key: '4',
