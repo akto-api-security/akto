@@ -123,28 +123,20 @@ public class MaliciousTrafficDetectorTask implements Task {
     return apiFilters;
   }
 
-  private boolean validateFilterForRequest(
-      HttpResponseParams responseParam, FilterConfig apiFilter) {
+  private boolean validateFilterForRequest(FilterConfig apiFilter, RawApi rawApi, ApiInfo.ApiInfoKey apiInfoKey, String message) {
     try {
-      String message = responseParam.getOrig();
-      // todo: remove
       System.out.println("using buildFromMessageNew func");
-      RawApi rawApi = RawApi.buildFromMessageNew(message);
-      int apiCollectionId = httpCallParser.createApiCollectionId(responseParam);
-      responseParam.requestParams.setApiCollectionId(apiCollectionId);
-      String url = responseParam.getRequestParams().getURL();
-      URLMethods.Method method =
-          URLMethods.Method.fromString(responseParam.getRequestParams().getMethod());
-      ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(apiCollectionId, url, method);
+
       Map<String, Object> varMap = apiFilter.resolveVarMap();
       VariableResolver.resolveWordList(
-          varMap,
-          new HashMap<ApiInfo.ApiInfoKey, List<String>>() {
-            {
-              put(apiInfoKey, Collections.singletonList(message));
-            }
-          },
-          apiInfoKey);
+        varMap,
+        new HashMap<ApiInfo.ApiInfoKey, List<String>>() {
+          {
+            put(apiInfoKey, Collections.singletonList(message));
+          }
+        },
+        apiInfoKey);
+
       String filterExecutionLogId = UUID.randomUUID().toString();
       ValidationResult res =
           TestPlugin.validateFilter(
@@ -159,7 +151,7 @@ public class MaliciousTrafficDetectorTask implements Task {
   }
 
   private void processRecord(ConsumerRecord<String, String> record) {
-    System.out.println("Kafka record: " + record.value());
+    System.out.println("Kafka record: found - ");
     HttpResponseParams responseParam = HttpCallParser.parseKafkaMessage(record.value());
     Context.accountId.set(Integer.parseInt(responseParam.getAccountId()));
     Map<String, FilterConfig> filters = this.getFilters();
@@ -172,8 +164,17 @@ public class MaliciousTrafficDetectorTask implements Task {
 
     System.out.println("Total number of filters: " + filters.size());
 
+    String message = responseParam.getOrig();
+    RawApi rawApi = RawApi.buildFromMessageNew(message);
+    int apiCollectionId = httpCallParser.createApiCollectionId(responseParam);
+    responseParam.requestParams.setApiCollectionId(apiCollectionId);
+    String url = responseParam.getRequestParams().getURL();
+    URLMethods.Method method =
+        URLMethods.Method.fromString(responseParam.getRequestParams().getMethod());
+    ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(apiCollectionId, url, method);
+
     for (FilterConfig apiFilter : apiFilters.values()) {
-      boolean hasPassedFilter = validateFilterForRequest(responseParam, apiFilter);
+      boolean hasPassedFilter = validateFilterForRequest(apiFilter, rawApi, apiInfoKey, message);
 
       // If a request passes any of the filter, then it's a malicious request,
       // and so we push it to kafka
@@ -280,7 +281,7 @@ public class MaliciousTrafficDetectorTask implements Task {
             .setDetectedAt(responseParam.getTime())
             .build();
     try {
-      System.out.println("Pushing malicious event to kafka: " + maliciousEvent);
+      System.out.println("Pushing malicious event to kafka: ");
       MessageEnvelope.generateEnvelope(responseParam.getAccountId(), actor, maliciousEvent)
           .marshal()
           .ifPresent(
