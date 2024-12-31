@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -199,11 +200,16 @@ public class Utils {
             if (key == null) continue;
             Object obj = valuesMap.get(key);
             if (obj == null) {
-                loggerMaker.errorAndAddToDb("couldn't find: " + key, LogDb.TESTING);
-                if(shouldThrowException){
-                    throw new Exception("Couldn't find " + key);
-                }else{
-                    continue;
+                if (key.toLowerCase().startsWith("x0.unique_")) {
+                    String suffix = key.substring(key.toLowerCase().indexOf("_")+1);
+                    obj = suffix+"_"+System.nanoTime();
+                } else {
+                    loggerMaker.errorAndAddToDb("couldn't find: " + key, LogDb.TESTING);
+                    if(shouldThrowException){
+                        throw new Exception("Couldn't find " + key);
+                    }else{
+                        continue;
+                    }
                 }
             }
             String val = obj.toString();
@@ -336,6 +342,7 @@ public class Utils {
     }
 
     public static void modifyBodyOperations(OriginalHttpRequest httpRequest, List<ConditionsType> modifyOperations, List<ConditionsType> addOperations, List<ConditionsType> deleteOperations){
+        System.out.println("inside modifyBodyOperations");
         String oldReqBody = httpRequest.getBody();
         if(oldReqBody == null || oldReqBody.isEmpty()){
             return ;
@@ -378,6 +385,7 @@ public class Utils {
         }
 
 
+       
         httpRequest.setBody(payloadStr);
     }
 

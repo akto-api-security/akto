@@ -2,9 +2,13 @@ package com.akto.dto.traffic;
 
 import java.util.Arrays;
 import java.util.List;
+
+import org.bson.codecs.pojo.annotations.BsonId;
+
 import com.akto.util.Util;
 
 public class SampleData {
+    @BsonId
     Key id;
 
     public static final String SAMPLES = "samples";
