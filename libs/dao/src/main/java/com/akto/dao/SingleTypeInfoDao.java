@@ -828,4 +828,11 @@ public class SingleTypeInfoDao extends AccountsContextDaoWithRbac<SingleTypeInfo
         return endpoints;
     }
 
+    public static BasicDBObject getApiInfoGroupedId() {
+        BasicDBObject groupedId = 
+                new BasicDBObject("apiCollectionId", "$apiCollectionId")
+                .append("url", "$url")
+                .append("method", "$method");
+        return groupedId;
+    }
 }
