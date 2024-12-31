@@ -527,7 +527,7 @@ public class ApiCollectionsAction extends UserAction {
         InventoryAction inventoryAction = new InventoryAction();
         inventoryAction.attachAPIInfoListInResponse(list,-1);
         this.setResponse(inventoryAction.getResponse());
-        response.put("apiCount", ApiCollectionUsers.getApisCountFromConditions(conditions, new ArrayList<>(deactivatedCollections)));
+        response.put("apiCount", ApiCollectionUsers.getApisCountFromConditionsWithStis(conditions, new ArrayList<>(deactivatedCollections)));
         return SUCCESS.toUpperCase();
     }
     public String getEndpointsFromConditions(){
