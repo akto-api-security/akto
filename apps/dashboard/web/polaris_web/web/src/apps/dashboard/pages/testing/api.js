@@ -24,12 +24,12 @@ export default {
         })
         return resp
     },
-    async fetchTestingRunResults(testingRunResultSummaryHexId, queryMode, sortKey, sortOrder, skip, limit, filters, queryValue) {
+    async fetchTestingRunResults(testingRunResultSummaryHexId, queryMode, sortKey, sortOrder, skip, limit, reportFilterList, queryValue) {
         const resp = await request({
             url: '/api/fetchTestingRunResults',
             method: 'post',
             data: {
-                testingRunResultSummaryHexId, queryMode, sortKey, sortOrder, skip, limit, filters, queryValue
+                testingRunResultSummaryHexId, queryMode, sortKey, sortOrder, skip, limit, reportFilterList, queryValue
             }
         })
         return resp        
@@ -231,13 +231,14 @@ export default {
             }
         })
     },
-    fetchVulnerableTestingRunResults(testingRunResultSummaryHexId, skip) {
+    fetchVulnerableTestingRunResults(testingRunResultSummaryHexId, skip, reportFilterList) {
         return request({
             url: '/api/fetchVulnerableTestRunResults',
             method: 'post',
             data: {
                 testingRunResultSummaryHexId,
-                skip
+                skip,
+                reportFilterList
             }
         })
     },
@@ -255,11 +256,11 @@ export default {
             data: {roleName, index}
         })
     },
-    updateAuthInRole(roleName, apiCond ,index, authParamData, authAutomationType) {
+    updateAuthInRole(roleName, apiCond ,index, authParamData, authAutomationType, reqData, recordedLoginFlowInput) {
         return request({
             url: '/api/updateAuthInRole',
             method: 'post',
-            data: {roleName, apiCond, index, authParamData, authAutomationType}
+            data: {roleName, apiCond, index, authParamData, authAutomationType, reqData, recordedLoginFlowInput}
         })
     },
     deleteTestRuns(testRunIds){
@@ -449,11 +450,11 @@ export default {
             data: {deltaTimeForScheduledSummaries}
         })
     },
-    fetchIssuesByStatusAndSummaryId(latestTestingRunSummaryId, issueStatusQuery) {
+    fetchIssuesByStatusAndSummaryId(latestTestingRunSummaryId, issueStatusQuery, sortKey, sortOrder, skip, limit, filters) {
         return request({
             url: '/api/fetchIssuesByStatusAndSummaryId',
             method: 'post',
-            data: { latestTestingRunSummaryId, issueStatusQuery }
+            data: { latestTestingRunSummaryId, issueStatusQuery, sortKey, sortOrder, skip, limit, filters }
         })
     },
     modifyTestingRunConfig(testingRunConfigId, testConfigsAdvancedSettings){
@@ -473,4 +474,25 @@ export default {
         })
         return resp
     },
+    generatePDFReport(reportFilterList, issuesIdsForReport){
+        return request({
+            url: '/api/generateReportPDF',
+            method: 'post',
+            data: { reportFilterList, issuesIdsForReport }
+        })
+    },
+    getReportFilters(generatedReportId){
+        return request({
+            url: '/api/getReportFilters',
+            method: 'post',
+            data: { generatedReportId }
+        })
+    },
+    fetchSeverityInfoForIssues(filters, issueIds, endTimeStamp) {
+        return request({
+            url: '/api/fetchSeverityInfoForIssues',
+            method: 'post',
+            data: {...filters, issueIds, endTimeStamp}
+        })
+    }
 }

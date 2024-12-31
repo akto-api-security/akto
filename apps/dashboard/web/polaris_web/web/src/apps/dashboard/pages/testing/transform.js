@@ -62,7 +62,9 @@ let headers = [
 const MAX_SEVERITY_THRESHOLD = 100000;
 
 function getStatus(state) {
-  return state._name ? state._name : (state.name ? state.name : state)
+  if (state)
+    return state._name ? state._name : (state.name ? state.name : state)
+  return "UNKNOWN"
 }
 
 function getOrderPriority(state) {
@@ -214,9 +216,9 @@ const transform = {
     },
     prepareCountIssues : (data) => {
       let obj={
-        'High': data['HIGH'] || 0,
-        'Medium': data['MEDIUM'] || 0,
-        'Low': data['LOW'] || 0
+        'High': (data && data['HIGH']) ? data['HIGH'] : 0,
+        'Medium':(data && data['MEDIUM']) ? data['MEDIUM'] : 0,
+        'Low': (data && data['LOW']) ? data['LOW'] : 0
       };
       return obj;
     },

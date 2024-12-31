@@ -246,7 +246,7 @@ prettifyEpoch(epoch) {
   },
   getTestingRunIconObj(state) {
     let testState = state?._name || state
-    switch(testState.toUpperCase()){
+    switch(testState?.toUpperCase()){
       case "RUNNING": 
         return {
           color: "subdued",
@@ -1246,9 +1246,11 @@ getDeprecatedEndpoints(apiInfoList, unusedEndpoints, apiCollectionId) {
  getSearchItemsArr(allRoutes,allCollections){
   let combinedArr = []
 
+  const activatedColections = allCollections.filter((item) => item.deactivated === false)
+
   let initialStr = "/dashboard/observe/inventory/"
 
-  allCollections.forEach((item)=> {
+  activatedColections.forEach((item)=> {
     combinedArr.push({content: item.displayName, url: initialStr + item.id, type:'collection'})
   })
 

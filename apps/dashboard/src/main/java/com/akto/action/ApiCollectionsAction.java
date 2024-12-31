@@ -84,11 +84,26 @@ public class ApiCollectionsAction extends UserAction {
             int apiCollectionId = apiCollection.getId();
             Integer count = countMap.get(apiCollectionId);
             int fallbackCount = apiCollection.getUrls()!=null ? apiCollection.getUrls().size() : apiCollection.getUrlsCount();
-		
             if (count != null && (apiCollection.getHostName() != null)) {
                 apiCollection.setUrlsCount(count);
             } else if(ApiCollection.Type.API_GROUP.equals(apiCollection.getType())){
-                if (count == null) {
+                int conditionsCount = 0;
+                if(!apiCollection.getAutomated()){
+                    ApiCollection apiCollectionWithCond = ApiCollectionsDao.instance.findOne(Filters.eq(Constants.ID, apiCollection.getId()), Projections.include("conditions"));
+                    if(apiCollectionWithCond.getConditions() != null && apiCollectionWithCond.getConditions().get(0) != null){
+                        if(apiCollectionWithCond.getConditions().get(0).getType().equals(TestingEndpoints.Type.CUSTOM)){
+                            CustomTestingEndpoints testingEndpoints = (CustomTestingEndpoints) apiCollectionWithCond.getConditions().get(0);
+                            if (testingEndpoints.getApisList() != null && !testingEndpoints.getApisList().isEmpty()) {
+                                conditionsCount = testingEndpoints.getApisList().size();
+                                loggerMaker.infoAndAddToDb("fillApiCollectionsUrlCount collection: " + apiCollectionWithCond.getDisplayName() + " count: " + conditionsCount);
+                            }
+                        }
+                    }
+                }
+                
+                if (conditionsCount != 0) {
+                    count = conditionsCount;
+                } else if (count == null) {
                     count = fallbackCount;
                 }
                 apiCollection.setUrlsCount(count);
@@ -396,8 +411,11 @@ public class ApiCollectionsAction extends UserAction {
             return ERROR.toUpperCase();
         }
 
+        loggerMaker.infoAndAddToDb("Started adding " + this.apiList.size() + " apis into custom collection.", LogDb.DASHBOARD);
+
         CustomTestingEndpoints condition = new CustomTestingEndpoints(apiList, CustomTestingEndpoints.Operator.OR);
         apiCollection.addToConditions(condition);
+        loggerMaker.infoAndAddToDb("Final conditions for collection: " +  apiCollection.getName() + " are: " + apiCollection.getConditions().toString());
         ApiCollectionUsers.updateApiCollection(apiCollection.getConditions(), apiCollection.getId());
         ApiCollectionUsers.addToCollectionsForCollectionId(apiCollection.getConditions(), apiCollection.getId());
 
@@ -510,7 +528,7 @@ public class ApiCollectionsAction extends UserAction {
         InventoryAction inventoryAction = new InventoryAction();
         inventoryAction.attachAPIInfoListInResponse(list,-1);
         this.setResponse(inventoryAction.getResponse());
-        response.put("apiCount", ApiCollectionUsers.getApisCountFromConditions(conditions, new ArrayList<>(deactivatedCollections)));
+        response.put("apiCount", ApiCollectionUsers.getApisCountFromConditionsWithStis(conditions, new ArrayList<>(deactivatedCollections)));
         return SUCCESS.toUpperCase();
     }
     public String getEndpointsFromConditions(){

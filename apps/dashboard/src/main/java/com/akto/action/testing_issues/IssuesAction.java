@@ -2,6 +2,7 @@ package com.akto.action.testing_issues;
 
 import com.akto.action.ExportSampleDataAction;
 import com.akto.action.UserAction;
+import com.akto.action.testing.Utils;
 import com.akto.dao.HistoricalDataDao;
 import com.akto.dao.RBACDao;
 import com.akto.action.testing.StartTestAction;
@@ -10,6 +11,7 @@ import com.akto.dao.demo.VulnerableRequestForTemplateDao;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dao.testing.TestingRunResultSummariesDao;
+import com.akto.dao.testing.sources.TestReportsDao;
 import com.akto.dao.testing.sources.TestSourceConfigsDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.ApiInfo;
@@ -23,6 +25,7 @@ import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.*;
+import com.akto.dto.testing.sources.TestReports;
 import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -37,6 +40,9 @@ import com.akto.util.enums.GlobalEnums.TestRunIssueStatus;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.*;
+import com.mongodb.client.result.InsertOneResult;
+import com.opensymphony.xwork2.Action;
+
 import org.bson.Document;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
@@ -50,7 +56,7 @@ import static com.akto.util.Constants.ONE_DAY_TIMESTAMP;
 
 public class IssuesAction extends UserAction {
 
-    private static final LoggerMaker loggerMaker = new LoggerMaker(IssuesAction.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(IssuesAction.class, LogDb.DASHBOARD);
     private static final Logger logger = LoggerFactory.getLogger(IssuesAction.class);
     private List<TestingRunIssues> issues;
     private TestingIssuesId issueId;
@@ -62,7 +68,6 @@ public class IssuesAction extends UserAction {
     private String ignoreReason;
     private int skip;
     private int limit;
-    private long totalIssuesCount;
     private List<TestRunIssueStatus> filterStatus;
     private List<Integer> filterCollectionsId;
     private List<Severity> filterSeverity;
@@ -70,6 +75,8 @@ public class IssuesAction extends UserAction {
     private List<TestingRunIssues> similarlyAffectedIssues;
     private int startEpoch;
     long endTimeStamp;
+    private Map<Integer,Map<String,Integer>> severityInfo = new HashMap<>();
+
     private Bson createFilters (boolean useFilterStatus) {
         Bson filters = Filters.empty();
         if (useFilterStatus && filterStatus != null && !filterStatus.isEmpty()) {
@@ -85,8 +92,12 @@ public class IssuesAction extends UserAction {
             filters = Filters.and(filters, Filters.in(ID + "."
                     + TestingIssuesId.TEST_SUB_CATEGORY, filterSubCategory));
         }
-        if (startEpoch != 0 && endTimeStamp != 0) {
+
+        if (startEpoch != 0) {
             filters = Filters.and(filters, Filters.gte(TestingRunIssues.CREATION_TIME, startEpoch));
+        }
+        
+        if(endTimeStamp != 0){
             filters = Filters.and(filters, Filters.lt(TestingRunIssues.CREATION_TIME, endTimeStamp));
         }
 
@@ -296,8 +307,12 @@ public class IssuesAction extends UserAction {
     public String fetchVulnerableTestingRunResultsFromIssues() {
         Bson filters = createFilters(true);
         try {
-            List<TestingRunIssues> issues =  TestingRunIssuesDao.instance.findAll(filters, skip, 50, null);
-            this.totalIssuesCount = issues.size();
+            List<TestingRunIssues> issues = new ArrayList<>();
+            if(issuesIds != null && !issuesIds.isEmpty()){
+                issues =  TestingRunIssuesDao.instance.findAll(Filters.in(Constants.ID, issuesIds));
+            }else{
+                issues =  TestingRunIssuesDao.instance.findAll(filters, skip, 50, null);
+            }
             List<Bson> andFilters = new ArrayList<>();
             for (TestingRunIssues issue : issues) {
                 andFilters.add(Filters.and(
@@ -328,6 +343,7 @@ public class IssuesAction extends UserAction {
                             sampleDataVsCurlMap.put(testResult.getOriginalMessage(), ExportSampleDataAction.getCurl(testResult.getOriginalMessage()));
                         } else if (tr instanceof MultiExecTestResult){
                             MultiExecTestResult testResult = (MultiExecTestResult) tr;
+                            testResults.add(testResult);
                             Map<String, WorkflowTestResult.NodeResult> nodeResultMap = testResult.getNodeResultMap();
                             for (String order : nodeResultMap.keySet()) {
                                 WorkflowTestResult.NodeResult nodeResult = nodeResultMap.get(order);
@@ -519,12 +535,38 @@ public class IssuesAction extends UserAction {
 
     String latestTestingRunSummaryId;
     List<String> issueStatusQuery;
+    List<TestingRunResult> testingRunResultList;
+    private Map<String, List<String>> filters;
     public String fetchIssuesByStatusAndSummaryId() {
-        Bson filters = Filters.and(
+        Bson triFilters = Filters.and(
                 Filters.in(TestingRunIssues.TEST_RUN_ISSUES_STATUS, issueStatusQuery),
                 Filters.in(TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_ID, new ObjectId(latestTestingRunSummaryId))
         );
-        issues = TestingRunIssuesDao.instance.findAll(filters);
+        issues = TestingRunIssuesDao.instance.findAll(triFilters, Projections.include("_id"));
+
+        List<Bson> testingRunResultsFilterList = new ArrayList<>();
+        for(TestingRunIssues issue: issues) {
+            testingRunResultsFilterList.add(Filters.and(
+                    Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, new ObjectId(latestTestingRunSummaryId)),
+                    Filters.eq(TestingRunResult.VULNERABLE, true),
+                    Filters.eq(TestingRunResult.API_INFO_KEY, issue.getId().getApiInfoKey()),
+                    Filters.eq(TestingRunResult.TEST_SUB_TYPE, issue.getId().getTestSubCategory())
+            ));
+        }
+
+        List<Bson> filtersList = new ArrayList<>();
+        if(!testingRunResultsFilterList.isEmpty()) filtersList.add(Filters.or(testingRunResultsFilterList));
+        Bson filtersForTestingRunResults = Utils.createFiltersForTestingReport(filters);
+        if(!filtersForTestingRunResults.equals(Filters.empty())) filtersList.add(filtersForTestingRunResults);
+        Bson sortStage = StartTestAction.prepareTestingRunResultCustomSorting(sortKey, sortOrder);
+
+        if(filtersList.isEmpty()) {
+            testingRunResultList = new ArrayList<>();
+            return SUCCESS.toUpperCase();
+        }
+
+        testingRunResultList = TestingRunResultDao.instance.fetchLatestTestingRunResultWithCustomAggregations(Filters.and(filtersList), limit, skip, sortStage);
+
         return SUCCESS.toUpperCase();
     }
 
@@ -561,6 +603,49 @@ public class IssuesAction extends UserAction {
 
         return SUCCESS.toUpperCase();
     }
+
+    private Map<String, List<String>> reportFilterList;
+    private String generatedReportId;
+    private List<TestingIssuesId> issuesIdsForReport;
+    private BasicDBObject response;
+
+    public String generateTestReport () {
+        try {
+            TestReports testReport = new TestReports(reportFilterList, Context.now(), "", this.issuesIdsForReport);
+            InsertOneResult insertTResult = TestReportsDao.instance.insertOne(testReport);
+            this.generatedReportId = insertTResult.getInsertedId().toString();
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            e.printStackTrace();
+            addActionError("Error in generating pdf report");
+            return ERROR.toUpperCase();
+        }
+    }
+
+    public String getReportFilters () {
+        if(this.generatedReportId == null){
+            addActionError("Report id cannot be null");
+            return ERROR.toUpperCase();
+        }
+        response = new BasicDBObject();
+        ObjectId reportId = new ObjectId(this.generatedReportId);
+        TestReports reportDoc = TestReportsDao.instance.findOne(Filters.eq(Constants.ID, reportId));
+        response.put(TestReports.FILTERS_FOR_REPORT, reportDoc.getFiltersForReport());
+        response.put(TestReports.ISSUE_IDS_FOR_REPORT, reportDoc.getIssuesIdsForReport());
+        return SUCCESS.toUpperCase();
+    }
+
+    public String fetchSeverityInfoForIssues() {
+        Bson filter = createFilters(true);
+
+        if (issuesIds != null && !issuesIds.isEmpty()) {
+            filter = Filters.and(filter, Filters.in(Constants.ID, issuesIds));
+        }
+
+        this.severityInfo = TestingRunIssuesDao.instance.getSeveritiesMapForCollections(filter, false);
+        return Action.SUCCESS.toUpperCase();
+    }
+
 
     public List<TestingRunIssues> getIssues() {
         return issues;
@@ -608,14 +693,6 @@ public class IssuesAction extends UserAction {
 
     public void setLimit(int limit) {
         this.limit = limit;
-    }
-
-    public long getTotalIssuesCount() {
-        return totalIssuesCount;
-    }
-
-    public void setTotalIssuesCount(long totalIssuesCount) {
-        this.totalIssuesCount = totalIssuesCount;
     }
 
     public List<TestRunIssueStatus> getFilterStatus() {
@@ -791,5 +868,40 @@ public class IssuesAction extends UserAction {
 
     public TestingRunResultSummary getTestingRunResultSummary() {
         return testingRunResultSummary;
+    }
+
+    public List<TestingRunResult> getTestingRunResultList() {
+        return testingRunResultList;
+    }
+
+    public void setFilters(Map<String, List<String>> filters) {
+        this.filters = filters;
+    }
+
+    public void setReportFilterList(Map<String, List<String>> reportFilterList) {
+        this.reportFilterList = reportFilterList;
+    }
+
+    public String getGeneratedReportId() {
+        return generatedReportId;
+    }
+
+    public void setGeneratedReportId(String generatedReportId) {
+        this.generatedReportId = generatedReportId;
+    }
+    public void setIssuesIdsForReport(List<TestingIssuesId> issuesIdsForReport) {
+        this.issuesIdsForReport = issuesIdsForReport;
+    }
+
+    public BasicDBObject getResponse() {
+        return response;
+    }
+
+    public Map<Integer, Map<String, Integer>> getSeverityInfo() {
+        return severityInfo;
+    }
+
+    public void setSeverityInfo(Map<Integer, Map<String, Integer>> severityInfo) {
+        this.severityInfo = severityInfo;
     }
 }

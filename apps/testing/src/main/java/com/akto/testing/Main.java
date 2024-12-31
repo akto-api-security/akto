@@ -59,8 +59,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.*;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
@@ -202,8 +204,28 @@ public class Main {
         }
 
         if (testingRun.getTestIdConfig() > 1) {
-            baseConfig = TestingRunConfigDao.instance.findOne(Constants.ID, testingRun.getTestIdConfig());
-            loggerMaker.infoAndAddToDb("Found testing run base config with id :" + baseConfig.getId(), LogDb.TESTING);
+            int counter = 0;
+            do {
+                baseConfig = TestingRunConfigDao.instance.findOne(Constants.ID, testingRun.getTestIdConfig());
+                if (baseConfig == null) {
+                    loggerMaker.errorAndAddToDb("in loop Couldn't find testing run base config:" + testingRun.getTestIdConfig(), LogDb.TESTING);
+                } else {
+                    loggerMaker.infoAndAddToDb("in loop Found testing run base config with id :" + baseConfig.getId(), LogDb.TESTING);
+                }
+
+                try {
+                    Thread.sleep(10000);
+                } catch (InterruptedException e) {
+
+                }
+                counter++;
+            } while (baseConfig == null && counter <= 5);
+
+            if (baseConfig == null) {
+                loggerMaker.errorAndAddToDb("Couldn't find testing run base config:" + testingRun.getTestIdConfig(), LogDb.TESTING);
+            } else {
+                loggerMaker.infoAndAddToDb("Found testing run base config with id :" + baseConfig.getId(), LogDb.TESTING);
+            }
         }
 
         if (configFromTrrs == null) {
@@ -219,10 +241,47 @@ public class Main {
         }
     }
 
+    
+    // Runnable task for monitoring memory
+    static class MemoryMonitorTask implements Runnable {
+        @Override
+        public void run() {
+            Runtime runtime = Runtime.getRuntime();
+    
+            // Loop to print memory usage every 1 second
+            while (true) {
+                // Calculate memory statistics
+                long totalMemory = runtime.totalMemory();
+                long freeMemory = runtime.freeMemory();
+                long usedMemory = totalMemory - freeMemory;
+    
+                // Print memory statistics
+                System.out.print("Used Memory: " + (usedMemory / 1024 / 1024) + " MB ");
+                System.out.print("Free Memory: " + (freeMemory / 1024 / 1024) + " MB ");
+                System.out.print("Total Memory: " + (totalMemory / 1024 / 1024) + " MB ");
+                System.out.print("Available Memory: " + ((runtime.maxMemory() - usedMemory) / 1024 / 1024) + " MB ");
+                System.out.println("-------------------------");
+    
+                // Pause for 1 second
+                try {
+                    Thread.sleep(1000);
+                } catch (InterruptedException e) {
+                    System.err.println("Memory monitor thread interrupted: " + e.getMessage());
+                    break; // Exit the loop if thread is interrupted
+                }
+            }
+        }
+    }
+
+    private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
+
     public static void main(String[] args) throws InterruptedException {
         String mongoURI = "mongodb://localhost:27017/admini";
         System.out.println("here/.......");
         ReadPreference readPreference = ReadPreference.secondary();
+        if(DashboardMode.isOnPremDeployment()){
+            readPreference = ReadPreference.primary();
+        }
         WriteConcern writeConcern = WriteConcern.W1;
         DaoInit.init(new ConnectionString(mongoURI), readPreference, writeConcern);
 
@@ -237,6 +296,8 @@ public class Main {
         } while (!connectedToMongo);
 
         setupRateLimitWatcher();
+        
+        executorService.scheduleAtFixedRate(new Main.MemoryMonitorTask(), 0, 1, TimeUnit.SECONDS);
 
         if (!SKIP_SSRF_CHECK) {
             Setup setup = SetupDao.instance.findOne(new BasicDBObject());
@@ -299,9 +360,16 @@ public class Main {
                     loggerMaker.infoAndAddToDb("Testing run stopped");
                     if (trrs != null) {
                         loggerMaker.infoAndAddToDb("Stopping TRRS: " + trrs.getId());
+
+                        // get count issues here
+                        Map<String,Integer> finalCountMap = Utils.finalCountIssuesMap(trrs.getId());
+                        loggerMaker.infoAndAddToDb("Final count map calculated is " + finalCountMap.toString());
                         TestingRunResultSummariesDao.instance.updateOneNoUpsert(
                                 Filters.eq(Constants.ID, trrs.getId()),
-                                Updates.set(TestingRunResultSummary.STATE, State.STOPPED)
+                                Updates.combine(
+                                    Updates.set(TestingRunResultSummary.STATE, State.STOPPED),
+                                    Updates.set(TestingRunResultSummary.COUNT_ISSUES, finalCountMap)
+                                )
                         );
                         loggerMaker.infoAndAddToDb("Stopped TRRS: " + trrs.getId());
                     }
@@ -384,10 +452,16 @@ public class Main {
                                             + testingRunResult.getHexId() + ", TRRS_ID:" + testingRunResultSummary.getHexId() + " TR_ID:" + testingRun.getHexId(), LogDb.TESTING);
 
                                     int countFailedSummaries = (int) TestingRunResultSummariesDao.instance.count(filterCountFailed);
-                                    Bson updateForSummary = Updates.set(TestingRunResultSummary.STATE, State.FAILED);
+                                    Map<String,Integer> finalCountMap = Utils.finalCountIssuesMap(testingRunResultSummary.getId());
+                                    loggerMaker.infoAndAddToDb("Final count map calculated is " + finalCountMap.toString());
+                                    Bson updateForSummary = Updates.combine(
+                                        Updates.set(TestingRunResultSummary.STATE, State.FAILED),
+                                        Updates.set(TestingRunResultSummary.COUNT_ISSUES, finalCountMap)
+                                    );
                                     if(countFailedSummaries >= (MAX_RETRIES_FOR_FAILED_SUMMARIES - 1)){
                                         updateForSummary = Updates.combine(
                                             Updates.set(TestingRunResultSummary.STATE, State.COMPLETED),
+                                            Updates.set(TestingRunResultSummary.COUNT_ISSUES, finalCountMap),
                                             Updates.set(TestingRunResultSummary.END_TIMESTAMP, Context.now())
                                         );
                                         loggerMaker.infoAndAddToDb("Max retries level reached for TRR_ID: " + testingRun.getHexId(), LogDb.TESTING);

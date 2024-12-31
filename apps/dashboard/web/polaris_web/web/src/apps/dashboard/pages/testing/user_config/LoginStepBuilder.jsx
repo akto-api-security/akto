@@ -49,7 +49,7 @@ function LoginStepBuilder({extractInformation, showOnlyApi, setStoreData}) {
 
     useEffect(() => {
         
-        if(!extractInformation){
+        if(extractInformation){
             setIsLoading(true)
             if (authMechanism && authMechanism.type === "LOGIN_REQUEST" && authMechanism.requestData[0].type !== "RECORDED_FLOW") {
                 setSteps(authMechanism.requestData.map((step, index) => ({
@@ -65,7 +65,7 @@ function LoginStepBuilder({extractInformation, showOnlyApi, setStoreData}) {
         }else{
             return;
         }
-    }, [])
+    }, [authMechanism])
 
     const stepOptions = [
         { label: "Call API", value: "LOGIN_FORM" },
