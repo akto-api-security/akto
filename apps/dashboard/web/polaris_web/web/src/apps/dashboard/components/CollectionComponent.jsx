@@ -34,7 +34,8 @@ function CollectionComponent(props) {
     }, [condition])
 
     const allCollections = PersistStore(state => state.allCollections);
-    const allCollectionsOptions = allCollections.filter(x => x.type !== "API_GROUP")
+    const activatedCollections = allCollections.filter(collection => collection.deactivated === false)
+    const allCollectionsOptions = activatedCollections.filter(x => x.type !== "API_GROUP")
         .map(collection => {
             return {
                 label: collection.displayName,
