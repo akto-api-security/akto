@@ -248,7 +248,7 @@ public class CustomDataTypeAction extends UserAction{
 
     private AktoDataType aktoDataType;
     
-    public String saveAktoDataType(){
+    public String saveAktoDataType() {
 
         aktoDataType = AktoDataTypeDao.instance.findOne("name",name);
         if(aktoDataType==null){
@@ -305,7 +305,8 @@ public class CustomDataTypeAction extends UserAction{
                 Updates.set(AktoDataType.KEY_CONDITIONS, keyConditions),
                 Updates.set(AktoDataType.VALUE_CONDITIONS, valueConditions),
                 Updates.set(AktoDataType.OPERATOR, mainOperator),
-                Updates.set(AktoDataType.DATA_TYPE_PRIORITY, dataTypePriority)
+                Updates.set(AktoDataType.DATA_TYPE_PRIORITY, dataTypePriority),
+                Updates.set(AktoDataType._INACTIVE, !active)
             ),
             options
         );
