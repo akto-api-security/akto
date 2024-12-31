@@ -135,7 +135,7 @@ function HomeDashboard() {
             api.findTotalIssues(startTimestamp, endTimestamp),
             api.fetchApiStats(startTimestamp, endTimestamp),
             api.fetchEndpointsCount(startTimestamp, endTimestamp),
-            testingApi.fetchSeverityInfoForIssues({ startEpoch: startTimestamp }, [], endTimestamp)
+            testingApi.fetchSeverityInfoForIssues({}, [], 0)
         ];
 
         let results = await Promise.allSettled(apiPromises);
