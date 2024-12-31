@@ -67,7 +67,7 @@ function ApiGroupModal(props){
                     label="Select API group"
                     placeholder="Select API group"
                     optionsList={
-                        allCollections.filter((x) => { return (x.type === 'API_GROUP' && x.deactivated === false) }).map((x) => {
+                        activatedGroupCollections.map((x) => {
                             return {
                                 label: x.displayName,
                                 value: x.displayName
