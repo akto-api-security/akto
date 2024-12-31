@@ -278,6 +278,9 @@ public class Main {
     public static void main(String[] args) throws InterruptedException {
         String mongoURI = System.getenv("AKTO_MONGO_CONN");
         ReadPreference readPreference = ReadPreference.secondary();
+        if(DashboardMode.isOnPremDeployment()){
+            readPreference = ReadPreference.primary();
+        }
         WriteConcern writeConcern = WriteConcern.W1;
         DaoInit.init(new ConnectionString(mongoURI), readPreference, writeConcern);
 
@@ -356,9 +359,16 @@ public class Main {
                     loggerMaker.infoAndAddToDb("Testing run stopped");
                     if (trrs != null) {
                         loggerMaker.infoAndAddToDb("Stopping TRRS: " + trrs.getId());
+
+                        // get count issues here
+                        Map<String,Integer> finalCountMap = Utils.finalCountIssuesMap(trrs.getId());
+                        loggerMaker.infoAndAddToDb("Final count map calculated is " + finalCountMap.toString());
                         TestingRunResultSummariesDao.instance.updateOneNoUpsert(
                                 Filters.eq(Constants.ID, trrs.getId()),
-                                Updates.set(TestingRunResultSummary.STATE, State.STOPPED)
+                                Updates.combine(
+                                    Updates.set(TestingRunResultSummary.STATE, State.STOPPED),
+                                    Updates.set(TestingRunResultSummary.COUNT_ISSUES, finalCountMap)
+                                )
                         );
                         loggerMaker.infoAndAddToDb("Stopped TRRS: " + trrs.getId());
                     }
@@ -441,10 +451,16 @@ public class Main {
                                             + testingRunResult.getHexId() + ", TRRS_ID:" + testingRunResultSummary.getHexId() + " TR_ID:" + testingRun.getHexId(), LogDb.TESTING);
 
                                     int countFailedSummaries = (int) TestingRunResultSummariesDao.instance.count(filterCountFailed);
-                                    Bson updateForSummary = Updates.set(TestingRunResultSummary.STATE, State.FAILED);
+                                    Map<String,Integer> finalCountMap = Utils.finalCountIssuesMap(testingRunResultSummary.getId());
+                                    loggerMaker.infoAndAddToDb("Final count map calculated is " + finalCountMap.toString());
+                                    Bson updateForSummary = Updates.combine(
+                                        Updates.set(TestingRunResultSummary.STATE, State.FAILED),
+                                        Updates.set(TestingRunResultSummary.COUNT_ISSUES, finalCountMap)
+                                    );
                                     if(countFailedSummaries >= (MAX_RETRIES_FOR_FAILED_SUMMARIES - 1)){
                                         updateForSummary = Updates.combine(
                                             Updates.set(TestingRunResultSummary.STATE, State.COMPLETED),
+                                            Updates.set(TestingRunResultSummary.COUNT_ISSUES, finalCountMap),
                                             Updates.set(TestingRunResultSummary.END_TIMESTAMP, Context.now())
                                         );
                                         loggerMaker.infoAndAddToDb("Max retries level reached for TRR_ID: " + testingRun.getHexId(), LogDb.TESTING);
