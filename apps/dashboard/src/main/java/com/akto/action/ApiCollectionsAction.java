@@ -93,16 +93,17 @@ public class ApiCollectionsAction extends UserAction {
                     if(apiCollectionWithCond.getConditions() != null && apiCollectionWithCond.getConditions().get(0) != null){
                         if(apiCollectionWithCond.getConditions().get(0).getType().equals(TestingEndpoints.Type.CUSTOM)){
                             CustomTestingEndpoints testingEndpoints = (CustomTestingEndpoints) apiCollectionWithCond.getConditions().get(0);
-                            if(testingEndpoints.getApisList() != null && !testingEndpoints.getApisList().isEmpty()){
+                            if (testingEndpoints.getApisList() != null && !testingEndpoints.getApisList().isEmpty()) {
                                 conditionsCount = testingEndpoints.getApisList().size();
+                                loggerMaker.infoAndAddToDb("fillApiCollectionsUrlCount collection: " + apiCollectionWithCond.getDisplayName() + " count: " + conditionsCount);
                             }
                         }
                     }
                 }
                 
-                if(conditionsCount != 0){
-                    count  = conditionsCount;
-                }else if (count == null) {
+                if (conditionsCount != 0) {
+                    count = conditionsCount;
+                } else if (count == null) {
                     count = fallbackCount;
                 }
                 apiCollection.setUrlsCount(count);
