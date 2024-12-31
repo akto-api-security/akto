@@ -32,6 +32,9 @@ public class AktoDataType {
     public static final String OPERATOR = "operator";
     Conditions.Operator operator;
 
+    public static final String _INACTIVE = "inactive";
+    private boolean inactive;
+
     public AktoDataType() {
     }
     public AktoDataType(String name, boolean sensitiveAlways, List<SingleTypeInfo.Position> sensitivePosition,int timestamp, IgnoreData ignoreData, boolean redacted, boolean sampleDataFixed) {
@@ -152,4 +155,21 @@ public class AktoDataType {
     public boolean validateRaw(Object value, Object key) throws Exception {
         return CustomDataType.validateRawUtility(value, key, this.keyConditions, this.valueConditions, this.operator);
     }
+
+    /*
+     * Default is inactive:false
+     */
+    public boolean getInactive() {
+        return inactive;
+    }
+
+    public void setInactive(boolean inactive) {
+        this.inactive = inactive;
+    }
+
+    // To send a field in frontend.
+    public boolean getActive() {
+        return !inactive;
+    }
+
 }
