@@ -10,10 +10,12 @@ import java.util.concurrent.Executors;
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
+import org.apache.kafka.clients.consumer.ConsumerConfig;
+import org.apache.kafka.common.serialization.StringDeserializer;
 
-public abstract class AbstractKafkaConsumerTask implements Task {
+public abstract class AbstractKafkaConsumerTask<V> implements Task {
 
-  protected Consumer<String, String> kafkaConsumer;
+  protected Consumer<String, V> kafkaConsumer;
   protected KafkaConfig kafkaConfig;
   protected String kafkaTopic;
 
@@ -24,9 +26,16 @@ public abstract class AbstractKafkaConsumerTask implements Task {
     String kafkaBrokerUrl = kafkaConfig.getBootstrapServers();
     String groupId = kafkaConfig.getGroupId();
 
-    Properties properties =
-        Utils.configProperties(
-            kafkaBrokerUrl, groupId, kafkaConfig.getConsumerConfig().getMaxPollRecords());
+    Properties properties = new Properties();
+    properties.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, kafkaBrokerUrl);
+    properties.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
+    properties.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG,
+        "org.apache.kafka.common.serialization.ByteArrayDeserializer");
+    properties.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, kafkaConfig.getConsumerConfig().getMaxPollRecords());
+    properties.put(ConsumerConfig.GROUP_ID_CONFIG, kafkaConfig.getGroupId());
+    properties.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
+    properties.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, false);
+
     this.kafkaConsumer = new KafkaConsumer<>(properties);
   }
 
@@ -40,9 +49,8 @@ public abstract class AbstractKafkaConsumerTask implements Task {
         () -> {
           // Poll data from Kafka topic
           while (true) {
-            ConsumerRecords<String, String> records =
-                kafkaConsumer.poll(
-                    Duration.ofMillis(kafkaConfig.getConsumerConfig().getPollDurationMilli()));
+            ConsumerRecords<String, V> records = kafkaConsumer.poll(
+                Duration.ofMillis(kafkaConfig.getConsumerConfig().getPollDurationMilli()));
             if (records.isEmpty()) {
               continue;
             }
@@ -60,5 +68,5 @@ public abstract class AbstractKafkaConsumerTask implements Task {
         });
   }
 
-  abstract void processRecords(ConsumerRecords<String, String> records);
+  abstract void processRecords(ConsumerRecords<String, V> records);
 }
