@@ -41,6 +41,7 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.*;
 import com.mongodb.client.result.InsertOneResult;
+import com.opensymphony.xwork2.Action;
 
 import org.bson.Document;
 import org.bson.conversions.Bson;
@@ -55,7 +56,7 @@ import static com.akto.util.Constants.ONE_DAY_TIMESTAMP;
 
 public class IssuesAction extends UserAction {
 
-    private static final LoggerMaker loggerMaker = new LoggerMaker(IssuesAction.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(IssuesAction.class, LogDb.DASHBOARD);
     private static final Logger logger = LoggerFactory.getLogger(IssuesAction.class);
     private List<TestingRunIssues> issues;
     private TestingIssuesId issueId;
@@ -74,6 +75,8 @@ public class IssuesAction extends UserAction {
     private List<TestingRunIssues> similarlyAffectedIssues;
     private int startEpoch;
     long endTimeStamp;
+    private Map<Integer,Map<String,Integer>> severityInfo = new HashMap<>();
+
     private Bson createFilters (boolean useFilterStatus) {
         Bson filters = Filters.empty();
         if (useFilterStatus && filterStatus != null && !filterStatus.isEmpty()) {
@@ -89,8 +92,12 @@ public class IssuesAction extends UserAction {
             filters = Filters.and(filters, Filters.in(ID + "."
                     + TestingIssuesId.TEST_SUB_CATEGORY, filterSubCategory));
         }
-        if (startEpoch != 0 && endTimeStamp != 0) {
+
+        if (startEpoch != 0) {
             filters = Filters.and(filters, Filters.gte(TestingRunIssues.CREATION_TIME, startEpoch));
+        }
+        
+        if(endTimeStamp != 0){
             filters = Filters.and(filters, Filters.lt(TestingRunIssues.CREATION_TIME, endTimeStamp));
         }
 
@@ -628,6 +635,18 @@ public class IssuesAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    public String fetchSeverityInfoForIssues() {
+        Bson filter = createFilters(true);
+
+        if (issuesIds != null && !issuesIds.isEmpty()) {
+            filter = Filters.and(filter, Filters.in(Constants.ID, issuesIds));
+        }
+
+        this.severityInfo = TestingRunIssuesDao.instance.getSeveritiesMapForCollections(filter, false);
+        return Action.SUCCESS.toUpperCase();
+    }
+
+
     public List<TestingRunIssues> getIssues() {
         return issues;
     }
@@ -876,5 +895,13 @@ public class IssuesAction extends UserAction {
 
     public BasicDBObject getResponse() {
         return response;
+    }
+
+    public Map<Integer, Map<String, Integer>> getSeverityInfo() {
+        return severityInfo;
+    }
+
+    public void setSeverityInfo(Map<Integer, Map<String, Integer>> severityInfo) {
+        this.severityInfo = severityInfo;
     }
 }

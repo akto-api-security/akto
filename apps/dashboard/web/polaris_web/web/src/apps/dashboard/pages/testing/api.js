@@ -487,5 +487,12 @@ export default {
             method: 'post',
             data: { generatedReportId }
         })
+    },
+    fetchSeverityInfoForIssues(filters, issueIds, endTimeStamp) {
+        return request({
+            url: '/api/fetchSeverityInfoForIssues',
+            method: 'post',
+            data: {...filters, issueIds, endTimeStamp}
+        })
     }
 }

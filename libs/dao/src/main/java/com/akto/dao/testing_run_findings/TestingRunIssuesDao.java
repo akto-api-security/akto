@@ -64,9 +64,17 @@ public class TestingRunIssuesDao extends AccountsContextDaoWithRbac<TestingRunIs
     }
 
     public Map<Integer,Map<String,Integer>> getSeveritiesMapForCollections(){
+        return getSeveritiesMapForCollections(null, true);
+    }
+
+    public Map<Integer,Map<String,Integer>> getSeveritiesMapForCollections(Bson filter, boolean expandApiGroups){
         Map<Integer,Map<String,Integer>> resultMap = new HashMap<>() ;
         List<Bson> pipeline = new ArrayList<>();
         pipeline.add(Aggregates.match(Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS, "OPEN")));
+
+        if(filter!=null){
+            pipeline.add(Aggregates.match(filter));
+        }
 
         try {
             List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
@@ -76,12 +84,16 @@ public class TestingRunIssuesDao extends AccountsContextDaoWithRbac<TestingRunIs
         } catch(Exception e){
         }
 
-        UnwindOptions unwindOptions = new UnwindOptions();
-        unwindOptions.preserveNullAndEmptyArrays(false);  
-        pipeline.add(Aggregates.unwind("$collectionIds", unwindOptions));
+        BasicDBObject groupedId = new BasicDBObject("apiCollectionId", "$_id.apiInfoKey.apiCollectionId")
+                .append("severity", "$severity");
 
-        BasicDBObject groupedId = new BasicDBObject("apiCollectionId", "$collectionIds")
-                                                .append("severity", "$severity") ;
+        if (expandApiGroups) {
+            UnwindOptions unwindOptions = new UnwindOptions();
+            unwindOptions.preserveNullAndEmptyArrays(false);
+            pipeline.add(Aggregates.unwind("$collectionIds", unwindOptions));
+            groupedId = new BasicDBObject("apiCollectionId", "$collectionIds")
+                    .append("severity", "$severity");
+        }
 
         pipeline.add(Aggregates.group(groupedId, Accumulators.sum("count", 1)));
 
