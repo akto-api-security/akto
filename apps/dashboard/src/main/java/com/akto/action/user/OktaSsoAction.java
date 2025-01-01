@@ -35,11 +35,12 @@ public class OktaSsoAction extends UserAction {
         oktaConfig.setAuthorisationServerId(authorisationServerId);
         oktaConfig.setOktaDomainUrl(oktaDomain);
         oktaConfig.setRedirectUri(redirectUri);
-        oktaConfig.setAccountId(Context.accountId.get());
-        String userLogin = getSUser().getLogin();
-        String domain = userLogin.split("@")[1];
-        oktaConfig.setOrganizationDomain(domain);
-
+        if(!DashboardMode.isOnPremDeployment()){
+            oktaConfig.setAccountId(Context.accountId.get());
+            String userLogin = getSUser().getLogin();
+            String domain = userLogin.split("@")[1];
+            oktaConfig.setOrganizationDomain(domain);
+        }
         ConfigsDao.instance.insertOne(oktaConfig);
 
         return SUCCESS.toUpperCase();
