@@ -2,7 +2,6 @@ package com.akto.utils;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 
 import com.akto.dao.ConfigsDao;
@@ -48,6 +47,22 @@ public class OktaLogin {
         paramMap.put("response_type", "code");
         paramMap.put("scope", "openid%20email%20profile");
         paramMap.put("state", "login");
+
+        String queryString = SsoUtils.getQueryString(paramMap);
+
+        String authUrl = "https://" + oktaConfig.getOktaDomainUrl() + "/oauth2/" + oktaConfig.getAuthorisationServerId() + "/v1/authorize?" + queryString;
+        return authUrl;
+    }
+
+    public static String getAuthorisationUrl(String email) {
+        OktaConfig oktaConfig = Config.getOktaConfig(email);
+
+        Map<String, String> paramMap = new HashMap<>();
+        paramMap.put("client_id", oktaConfig.getClientId());
+        paramMap.put("redirect_uri",oktaConfig.getRedirectUri());
+        paramMap.put("response_type", "code");
+        paramMap.put("scope", "openid%20email%20profile");
+        paramMap.put("state", String.valueOf(oktaConfig.getAccountId()));
 
         String queryString = SsoUtils.getQueryString(paramMap);
 

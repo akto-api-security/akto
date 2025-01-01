@@ -22,7 +22,7 @@ function OktaIntegration() {
     const [oktaDomain, setOktaDomain] = useState('')
     const [authorizationServerId, setAuthorizationServerId] = useState('')
     const [showDeleteModal, setShowDeleteModal] = useState(false);
-    const [nextButtonActive,setNextButtonActive] = useState(window.DASHBOARD_MODE === "ON_PREM")
+    const [nextButtonActive,setNextButtonActive] = useState(true)
 
     const redirectUri = hostname + "/authorization-code/callback"
 
