@@ -768,11 +768,13 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                                 }
                             </HorizontalGrid>
 
-                            <Checkbox
-                                label={"Clean up resources after test run. This will try to delete all resources created during test run."}
-                                checked={testRun.cleanUpTestingResources}
-                                onChange={() => setTestRun(prev => ({ ...prev, cleanUpTestingResources: !prev.cleanUpTestingResources}))}
-                            />
+                                {window.ACTIVE_ACCOUNT === 1723492815 &&
+                                    <Checkbox
+                                        label={"Clean up resources after test run. This will try to delete all resources created during test run."}
+                                        checked={testRun.cleanUpTestingResources}
+                                        onChange={() => setTestRun(prev => ({ ...prev, cleanUpTestingResources: !prev.cleanUpTestingResources }))}
+                                    />
+                                }
 
                         </VerticalStack>
                         </VerticalStack>
