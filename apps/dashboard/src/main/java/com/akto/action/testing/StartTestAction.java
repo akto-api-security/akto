@@ -74,6 +74,8 @@ public class StartTestAction extends UserAction {
     private Map<String,Integer> issuesSummaryInfoMap = new HashMap<>();
 
     private String testRoleId;
+    private boolean cleanUpTestingResources;
+
     private static final Gson gson = new Gson();
 
     private static List<ObjectId> getTestingRunListFromSummary(Bson filters){
@@ -152,6 +154,7 @@ public class StartTestAction extends UserAction {
             if(this.testConfigsAdvancedSettings != null && !this.testConfigsAdvancedSettings.isEmpty()){
                 testingRunConfig.setConfigsAdvancedSettings(this.testConfigsAdvancedSettings);
             }
+            testingRunConfig.setCleanUp(this.cleanUpTestingResources);
             this.testIdConfig = testingRunConfig.getId();
             TestingRunConfigDao.instance.insertOne(testingRunConfig);
         }
@@ -1400,5 +1403,13 @@ public class StartTestAction extends UserAction {
 
     public void setReportFilterList(Map<String, List<String>> reportFilterList) {
         this.reportFilterList = reportFilterList;
+    }
+
+    public boolean getCleanUpTestingResources() {
+        return cleanUpTestingResources;
+    }
+
+    public void setCleanUpTestingResources(boolean cleanUpTestingResources) {
+        this.cleanUpTestingResources = cleanUpTestingResources;
     }
 }

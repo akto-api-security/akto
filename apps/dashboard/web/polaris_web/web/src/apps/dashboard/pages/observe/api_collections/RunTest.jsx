@@ -35,7 +35,8 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         authMechanismPresent: false,
         testRoleLabel: "No test role selected",
         testRoleId: "",
-        sendSlackAlert: false
+        sendSlackAlert: false,
+        cleanUpTestingResources: false
     }
 
     const navigate = useNavigate()
@@ -767,6 +768,11 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                                 }
                             </HorizontalGrid>
 
+                            <Checkbox
+                                label={"Clean up resources after test run. This will try to delete all resources created during test run."}
+                                checked={testRun.cleanUpTestingResources}
+                                onChange={() => setTestRun(prev => ({ ...prev, cleanUpTestingResources: !prev.cleanUpTestingResources}))}
+                            />
 
                         </VerticalStack>
                         </VerticalStack>

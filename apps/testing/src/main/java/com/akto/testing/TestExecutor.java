@@ -949,13 +949,13 @@ public class TestExecutor {
             vulnerable,singleTypeInfos,confidencePercentage,startTime,
             endTime, testRunResultSummaryId, testResults.getWorkflowTest(), testLogs);  
 
-        // if (testingRunConfig.getCleanUp()) {
+        if (testingRunConfig!=null && testingRunConfig.getCleanUp()) {
             try {
                 cleanUpTestArtifacts(Collections.singletonList(ret), apiInfoKey, testingUtil, testingRunConfig);
             } catch(Exception e){
                 loggerMaker.errorAndAddToDb("Error while cleaning up test artifacts: " + e.getMessage(), LogDb.TESTING);
             }
-        // }
+        }
 
         return ret;
     }
