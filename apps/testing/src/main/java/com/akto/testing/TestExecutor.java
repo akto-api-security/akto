@@ -703,8 +703,9 @@ public class TestExecutor {
                         switch (apiInfoKey.getMethod()) {
                             case POST:
                                 Bson filterQ = DependencyNodeDao.generateChildrenFilter(apiInfoKey.getApiCollectionId(), apiInfoKey.getUrl(), apiInfoKey.getMethod());
-                                // Bson delFilterQ = Filters.and(filterQ, Filters.eq(DependencyNode.METHOD_REQ, Method.DELETE.name()));
-                                List<DependencyNode> children = DependencyNodeDao.instance.findAll(filterQ);
+                                // TODO: Handle cases where the delete API does not have the delete method
+                                Bson delFilterQ = Filters.and(filterQ, Filters.eq(DependencyNode.METHOD_REQ, Method.DELETE.name()));
+                                List<DependencyNode> children = DependencyNodeDao.instance.findAll(delFilterQ);
                                 
                                 if (!children.isEmpty()) {
                                     for(DependencyNode node: children) {
