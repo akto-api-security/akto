@@ -335,6 +335,10 @@ public class TemplateMapper {
             "    - CWE-319\n" +
             "  cve:\n" +
             "    - CVE-2022-0235\n" +
+            "settings:\n" +
+            "  plan: PRO\n" +
+            "  nature: NON_INTRUSIVE\n" +
+            "  duration: FAST\n" +
             "\n" + 
             "dynamic_severity:\n" +
             "- check:\n" +

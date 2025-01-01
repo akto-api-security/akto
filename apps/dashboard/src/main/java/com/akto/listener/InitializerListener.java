@@ -32,7 +32,6 @@ import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.ApiCollectionUsers.CollectionType;
 import com.akto.dto.Config.AzureConfig;
-import com.akto.dto.Config.ConfigType;
 import com.akto.dto.RBAC.Role;
 import com.akto.dto.User.AktoUIMode;
 import com.akto.dto.data_types.Conditions;
@@ -77,12 +76,14 @@ import com.akto.runtime.RuntimeUtil;
 import com.akto.stigg.StiggReporterClient;
 import com.akto.task.Cluster;
 import com.akto.telemetry.TelemetryJob;
+import com.akto.test_editor.TemplateSettingsUtil;
 import com.akto.testing.ApiExecutor;
 import com.akto.testing.HostDNSLookup;
 import com.akto.testing.TemplateMapper;
 import com.akto.usage.UsageMetricCalculator;
 import com.akto.usage.UsageMetricHandler;
 import com.akto.testing.workflow_node_executor.Utils;
+import com.akto.util.enums.GlobalEnums;
 import com.akto.util.filter.DictionaryFilter;
 import com.akto.utils.jobs.JobUtils;
 import com.akto.utils.jobs.MatchingJob;
@@ -106,7 +107,6 @@ import com.akto.utils.crons.SyncCron;
 import com.akto.utils.crons.TokenGeneratorCron;
 import com.akto.utils.crons.UpdateSensitiveInfoInApiInfo;
 import com.akto.utils.jobs.CleanInventory;
-import com.akto.utils.jobs.CleanTestingJob;
 import com.akto.utils.jobs.DeactivateCollections;
 import com.akto.utils.billing.OrganizationUtils;
 import com.akto.utils.crons.Crons;
@@ -133,7 +133,6 @@ import okhttp3.OkHttpClient;
 import org.apache.commons.csv.CSVRecord;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.bouncycastle.jcajce.provider.asymmetric.dsa.DSASigner.stdDSA;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 import org.json.JSONObject;
@@ -3122,6 +3121,19 @@ public class InitializerListener implements ServletContextListener {
                 int countUnchangedTemplates = 0;
                 Set<String> multiNodesIds = new HashSet<>();
 
+                Bson filterQ = Filters.in(Organization.ACCOUNTS, Context.accountId.get());
+                Organization organization = OrganizationsDao.instance.findOne(filterQ);
+                FeatureAccess proTemplateFeatureAccess = TemplateSettingsUtil.getFeatureAccessForTemplate(organization, GlobalEnums.TemplateFeatureAccess.PRO_TESTS);
+                FeatureAccess enterpriseTemplateFeatureAccess = TemplateSettingsUtil.getFeatureAccessForTemplate(organization, GlobalEnums.TemplateFeatureAccess.ENTERPRISE_TESTS);
+
+                GlobalEnums.TemplateFeatureAccess selectedTemplateFeature = null;
+                if(proTemplateFeatureAccess.getIsGranted()) {
+                    selectedTemplateFeature = GlobalEnums.TemplateFeatureAccess.PRO_TESTS;
+                } else if(enterpriseTemplateFeatureAccess.getIsGranted()) {
+                    selectedTemplateFeature = GlobalEnums.TemplateFeatureAccess.ENTERPRISE_TESTS;
+                }
+                List<GlobalEnums.TemplatePlan> templatePlans = TemplateSettingsUtil.getTemplatePlans(DashboardMode.getDashboardMode(), selectedTemplateFeature);
+
                 while ((entry = zipInputStream.getNextEntry()) != null) {
                     if (!entry.isDirectory()) {
                         String entryName = entry.getName();
@@ -3172,6 +3184,12 @@ public class InitializerListener implements ServletContextListener {
 
                         // new or updated template
                         if (testConfig != null) {
+                            boolean hasSettings = testConfig.getAttributes() != null;
+
+                            if (hasSettings && !templatePlans.contains(testConfig.getAttributes().getPlan())) {
+                                continue;
+                            }
+
                             String id = testConfig.getId();
                             int createdAt = Context.now();
                             int updatedAt = Context.now();
@@ -3191,7 +3209,8 @@ public class InitializerListener implements ServletContextListener {
                                             Updates.set(YamlTemplate.UPDATED_AT, updatedAt),
                                             Updates.set(YamlTemplate.HASH, templateContent.hashCode()),
                                             Updates.set(YamlTemplate.CONTENT, templateContent),
-                                            Updates.set(YamlTemplate.INFO, testConfig.getInfo())));
+                                            Updates.set(YamlTemplate.INFO, testConfig.getInfo()),
+                                            Updates.set(YamlTemplate.SETTINGS, testConfig.getAttributes())));
 
                             try {
                                 Object inactiveObject = TestConfigYamlParser.getFieldIfExists(templateContent,

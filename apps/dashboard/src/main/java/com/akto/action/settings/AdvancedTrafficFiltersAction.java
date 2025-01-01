@@ -115,7 +115,7 @@ public class AdvancedTrafficFiltersAction extends UserAction {
 
             List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(
                 Filters.nin(Constants.ID, deactivatedCollections), Projections.include(ApiCollection.HOST_NAME, ApiCollection.NAME));
-            YamlTemplate yamlTemplate = new YamlTemplate(filterConfig.getId(), Context.now(), getSUser().getLogin(), Context.now(), this.yamlContent, null);
+            YamlTemplate yamlTemplate = new YamlTemplate(filterConfig.getId(), Context.now(), getSUser().getLogin(), Context.now(), this.yamlContent, null, null);
             int accountId = Context.accountId.get();
             executorService.schedule( new Runnable() {
                 public void run() {
