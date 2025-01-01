@@ -276,8 +276,7 @@ public class Main {
     private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
 
     public static void main(String[] args) throws InterruptedException {
-        String mongoURI = "mongodb://localhost:27017/admini";
-        System.out.println("here/.......");
+        String mongoURI = System.getenv("AKTO_MONGO_CONN");
         ReadPreference readPreference = ReadPreference.secondary();
         if(DashboardMode.isOnPremDeployment()){
             readPreference = ReadPreference.primary();
