@@ -3,6 +3,7 @@ package com.akto.dto.testing;
 import com.akto.dto.testing.info.TestInfo;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 public class TestResult extends GenericTestResult {
@@ -150,5 +151,10 @@ public class TestResult extends GenericTestResult {
 
     public void setRequiresConfig(boolean requiresConfig) {
         this.requiresConfig = requiresConfig;
+    }
+
+    @Override
+    public List<String> getResponses() {
+        return Collections.singletonList(message);
     }
 }
