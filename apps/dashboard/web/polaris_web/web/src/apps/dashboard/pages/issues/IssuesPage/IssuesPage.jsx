@@ -229,7 +229,7 @@ function IssuesPage() {
         }
         
         function ignoreAction(ignoreReason){
-            api.bulkUpdateIssueStatus(items, "IGNORED", ignoreReason ).then((res) => {
+            api.bulkUpdateIssueStatus(items, "IGNORED", ignoreReason, {} ).then((res) => {
                 setToast(true, false, `Issue${items.length==1 ? "" : "s"} ignored`)
                 resetResourcesSelected()
             })

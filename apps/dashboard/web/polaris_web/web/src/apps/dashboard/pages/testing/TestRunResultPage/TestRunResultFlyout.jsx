@@ -66,7 +66,8 @@ function TestRunResultFlyout(props) {
     },[issueDetails?.id?.apiInfoKey])
 
     function ignoreAction(ignoreReason){
-        issuesApi.bulkUpdateIssueStatus([issueDetails.id], "IGNORED", ignoreReason ).then((res) => {
+        const severity = (selectedTestRunResult && selectedTestRunResult.vulnerable) ? issueDetails.severity : "";
+        issuesApi.bulkUpdateIssueStatus([issueDetails.id], "IGNORED", ignoreReason, {[selectedTestRunResult.id]: severity.toUpperCase()} ).then((res) => {
             func.setToast(true, false, `Issue ignored`)
         })
     }
