@@ -5,7 +5,9 @@ import com.akto.dao.monitoring.FilterYamlTemplateDao;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.ApiInfo;
+import com.akto.dto.HttpRequestParams;
 import com.akto.dto.HttpResponseParams;
+import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.RawApi;
 import com.akto.dto.api_protection_parse_layer.AggregationRules;
 import com.akto.dto.api_protection_parse_layer.Condition;
@@ -15,6 +17,9 @@ import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.type.URLMethods;
 import com.akto.hybrid_parsers.HttpCallParser;
 import com.akto.kafka.KafkaConfig;
+import com.akto.proto.generated.threat_detection.message.http_response_param.v1.HttpResponseParam;
+import com.akto.proto.generated.threat_detection.message.http_response_param.v1.HttpResponseParamProto;
+import com.akto.proto.generated.threat_detection.message.http_response_param.v1.StringList;
 import com.akto.proto.generated.threat_detection.message.malicious_event.event_type.v1.EventType;
 import com.akto.proto.generated.threat_detection.message.malicious_event.v1.MaliciousEventKafkaEnvelope;
 import com.akto.proto.generated.threat_detection.message.malicious_event.v1.MaliciousEventMessage;
@@ -30,12 +35,20 @@ import com.akto.threat.detection.constants.KafkaTopic;
 import com.akto.threat.detection.dto.MessageEnvelope;
 import com.akto.threat.detection.kafka.KafkaProtoProducer;
 import com.akto.threat.detection.smart_event_detector.window_based.WindowBasedThresholdNotifier;
+import com.akto.util.HttpRequestResponseUtils;
+import com.akto.util.JSONUtils;
 import com.google.protobuf.InvalidProtocolBufferException;
+import com.google.protobuf.util.JsonFormat;
+
 import io.lettuce.core.RedisClient;
+
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+
+import org.apache.commons.lang3.math.NumberUtils;
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
@@ -47,14 +60,14 @@ Pass data through filters and identify malicious traffic.
  */
 public class MaliciousTrafficDetectorTask implements Task {
 
-  private final Consumer<String, String> kafkaConsumer;
+  private final Consumer<String, byte[]> kafkaConsumer;
   private final KafkaConfig kafkaConfig;
   private final HttpCallParser httpCallParser;
   private final WindowBasedThresholdNotifier windowBasedThresholdNotifier;
 
   private Map<String, FilterConfig> apiFilters;
   private int filterLastUpdatedAt = 0;
-  private int filterUpdateIntervalSec = 300;
+  private int filterUpdateIntervalSec = 900;
 
   private final KafkaProtoProducer internalKafka;
 
@@ -89,13 +102,15 @@ public class MaliciousTrafficDetectorTask implements Task {
         () -> {
           // Poll data from Kafka topic
           while (true) {
-            ConsumerRecords<String, String> records =
+            ConsumerRecords<String, byte[]> records =
                 kafkaConsumer.poll(
                     Duration.ofMillis(kafkaConfig.getConsumerConfig().getPollDurationMilli()));
 
             try {
-              for (ConsumerRecord<String, String> record : records) {
-                processRecord(record);
+              for (ConsumerRecord<String, byte[]> record : records) {
+                System.out.println(record.value());
+                HttpResponseParam httpResponseParam = HttpResponseParam.parseFrom(record.value());
+                processRecord(httpResponseParam);
               }
 
               if (!records.isEmpty()) {
@@ -149,9 +164,27 @@ public class MaliciousTrafficDetectorTask implements Task {
     return false;
   }
 
-  private void processRecord(ConsumerRecord<String, String> record) {
+  private void processRecord(HttpResponseParam record) throws Exception {
     System.out.println("Kafka record: found - ");
-    HttpResponseParams responseParam = HttpCallParser.parseKafkaMessage(record.value());
+    HttpResponseParam.Builder builder = HttpResponseParam.newBuilder();
+
+    HttpResponseParams responseParam = buildHttpResponseParam(record);
+
+    // HttpResponseParams responseParam;
+    // try {
+    //   // Parse JSON into protobuf message
+    //   JsonFormat.parser().merge(record.value(), builder);
+      
+    //   HttpResponseParam httpResponseParamProto = builder.build();
+    //   responseParam = buildHttpResponseParam(httpResponseParamProto, record.value());
+    //   System.out.println("Parsed Protobuf Message: ");
+      
+    // } catch (Exception e) {
+    //     e.printStackTrace();
+    //     return;
+    // }
+
+    //HttpResponseParams responseParam = HttpCallParser.parseKafkaMessage(record);
     Context.accountId.set(Integer.parseInt(responseParam.getAccountId()));
     Map<String, FilterConfig> filters = this.getFilters();
     if (filters.isEmpty()) {
@@ -164,7 +197,7 @@ public class MaliciousTrafficDetectorTask implements Task {
     System.out.println("Total number of filters: " + filters.size());
 
     String message = responseParam.getOrig();
-    RawApi rawApi = RawApi.buildFromMessageNew(message);
+    RawApi rawApi = RawApi.buildFromMessageNew(responseParam);
     int apiCollectionId = httpCallParser.createApiCollectionId(responseParam);
     responseParam.requestParams.setApiCollectionId(apiCollectionId);
     String url = responseParam.getRequestParams().getURL();
@@ -290,5 +323,58 @@ public class MaliciousTrafficDetectorTask implements Task {
     } catch (InvalidProtocolBufferException e) {
       e.printStackTrace();
     }
+  }
+
+  public static HttpResponseParams buildHttpResponseParam(HttpResponseParam httpResponseParamProto) {
+
+    String apiCollectionIdStr = httpResponseParamProto.getAktoVxlanId();
+    int apiCollectionId = 0;
+    if (NumberUtils.isDigits(apiCollectionIdStr)) {
+      apiCollectionId = NumberUtils.toInt(apiCollectionIdStr, 0);
+    }
+
+    String requestPayload = HttpRequestResponseUtils.rawToJsonString(httpResponseParamProto.getRequestPayload(), null);
+
+    Map<String, List<String>> reqHeaders = new HashMap<>();
+
+    for (Map.Entry<String, StringList> entry : httpResponseParamProto.getRequestHeadersMap().entrySet()) {
+        ArrayList<String> list = new ArrayList<>(entry.getValue().getValuesList());
+        reqHeaders.put(entry.getKey(), list);
+    }
+
+    HttpRequestParams requestParams =
+        new HttpRequestParams(httpResponseParamProto.getMethod(), httpResponseParamProto.getPath(), httpResponseParamProto.getType(), 
+        reqHeaders, requestPayload, apiCollectionId);
+
+    String responsePayload = HttpRequestResponseUtils.rawToJsonString(httpResponseParamProto.getResponsePayload(), null);
+
+    String sourceStr = httpResponseParamProto.getSource();
+    if (sourceStr == null || sourceStr == "") {
+      sourceStr = HttpResponseParams.Source.OTHER.name();
+    }
+
+    HttpResponseParams.Source source = HttpResponseParams.Source.valueOf(sourceStr);
+    Map<String, List<String>> respHeaders = new HashMap<>();
+
+    for (Map.Entry<String, StringList> entry : httpResponseParamProto.getResponseHeadersMap().entrySet()) {
+      ArrayList<String> list = new ArrayList<>(entry.getValue().getValuesList());
+      respHeaders.put(entry.getKey(), list);
+    }
+
+    return new HttpResponseParams(
+      httpResponseParamProto.getType(),
+      httpResponseParamProto.getStatusCode(),
+      httpResponseParamProto.getStatus(),
+      respHeaders,
+      responsePayload,
+      requestParams,
+      httpResponseParamProto.getTime(),
+      httpResponseParamProto.getAktoAccountId(),
+      httpResponseParamProto.getIsPending(),
+      source,
+      "",
+      httpResponseParamProto.getIp(),
+      httpResponseParamProto.getDestIp(),
+      httpResponseParamProto.getDirection());
   }
 }

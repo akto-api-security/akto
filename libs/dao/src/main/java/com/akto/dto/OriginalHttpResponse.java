@@ -45,11 +45,11 @@ public class OriginalHttpResponse {
         this.statusCode = Integer.parseInt(obj.toString());
     }
 
-    public void buildFromSampleMessageNew(JSONObject json) {
-        String responsePayload = (String) json.get("responsePayload");
+    public void buildFromSampleMessageNew(HttpResponseParams responseParam) {
+        String responsePayload = responseParam.getPayload();
         this.body = responsePayload != null ? responsePayload.trim() : null;
-        this.headers = OriginalHttpRequest.buildHeadersMap(json, "responseHeaders");
-        this.statusCode = Integer.parseInt(json.get("statusCode").toString());
+        this.headers = responseParam.getHeaders();
+        this.statusCode = responseParam.getStatusCode();
     }
 
     public void addHeaderFromLine(String line) {

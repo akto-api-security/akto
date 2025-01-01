@@ -1,0 +1,33 @@
+syntax = "proto3";
+
+package threat_detection.message.http_response_param.v1;
+
+option java_outer_classname = "HttpResponseParamProto";
+
+option go_package = "protobuf/traffic_payload;trafficpb";
+
+message StringList {
+    repeated string values = 1;
+}
+  
+message HttpResponseParam {
+    string method = 1;
+    string path = 2;
+    string type = 3;
+    map<string, StringList> request_headers = 4 [json_name = "requestHeaders"];
+    string request_payload = 5 [json_name = "requestPayload"];
+    int32 api_collection_id = 6 [json_name = "apiCollectionId"];
+    int32 status_code = 7 [json_name = "statusCode"];
+    string status = 8;
+    map<string, StringList> response_headers = 9 [json_name = "responseHeaders"];
+    string response_payload = 10 [json_name = "responsePayload"];
+    int32 time = 11;
+    string akto_account_id = 12;
+    string ip = 13;
+    string dest_ip = 14 [json_name = "destIp"];
+    string direction = 15;
+    bool is_pending = 16;
+    string source = 17;
+    string akto_vxlan_id = 18;
+}
+  
