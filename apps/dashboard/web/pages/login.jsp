@@ -111,12 +111,12 @@
                         mixpanel.identify(distinct_id);
                         let mixpanelUserProps = { "$email": window.USER_NAME, "$account Name": window.ACCOUNT_NAME }
 
-                        if (window.USER_FULL_NAME) {
+                        if (window.USER_FULL_NAME?.length > 0) {
                             mixpanelUserProps["name"] = window.USER_FULL_NAME
                             mixpanelUserProps["$name"] = window.USER_FULL_NAME
                         }
 
-                        if (window.ORGANIZATION_NAME) {
+                        if (window.ORGANIZATION_NAME?.length > 0) {
                             mixpanelUserProps["company"] = window.ORGANIZATION_NAME
                             mixpanelUserProps["$company"] = window.ORGANIZATION_NAME
                         }
@@ -141,11 +141,11 @@
                             test_runs_paused: window.USAGE_PAUSED?.testRuns === 'true'
                         };
 
-                        if (window.USER_FULL_NAME) {
+                        if (window.USER_FULL_NAME?.length > 0) {
                             window.intercomSettings["name"] = window.USER_FULL_NAME
                         }
 
-                        if (window.ORGANIZATION_NAME && window.USER_NAME.indexOf("@")> 0) {
+                        if (window.ORGANIZATION_NAME?.length > 0 && window.USER_NAME.indexOf("@")> 0) {
                             let company_id = window.USER_NAME.split("@")[1];
                             window.intercomSettings["company"] = {name: window.ORGANIZATION_NAME, company_id}
                         }
