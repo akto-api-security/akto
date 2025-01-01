@@ -14,6 +14,13 @@
     <artifactId>threat-detection</artifactId>
     <packaging>jar</packaging>
 
+    <repositories>
+        <repository>
+            <id>confluent</id>
+            <url>https://packages.confluent.io/maven/</url>
+        </repository>
+    </repositories>
+
     <dependencies>
         <dependency>
             <groupId>org.apache.commons</groupId>
@@ -68,6 +75,11 @@
             <type>test-jar</type>
             <version>${project.version}</version>
             <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.confluent</groupId>
+            <artifactId>kafka-protobuf-serializer</artifactId>
+            <version>7.5.0</version> <!-- Use the version matching your Confluent platform -->
         </dependency>
 
         <dependency>

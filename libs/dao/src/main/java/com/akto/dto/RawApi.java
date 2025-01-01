@@ -57,15 +57,14 @@ public class RawApi {
         return new RawApi(request, response, message);
     }
 
-    public static RawApi buildFromMessageNew(String message) {
-        JSONObject json = JSON.parseObject(message);
+    public static RawApi buildFromMessageNew(HttpResponseParams responseParam) {
         OriginalHttpRequest request = new OriginalHttpRequest();
-        request.buildFromSampleMessageNew(json);
+        request.buildFromSampleMessageNew(responseParam);
 
         OriginalHttpResponse response = new OriginalHttpResponse();
-        response.buildFromSampleMessageNew(json);
+        response.buildFromSampleMessageNew(responseParam);
 
-        return new RawApi(request, response, message);
+        return new RawApi(request, response, "");
     }
 
     public BasicDBObject fetchReqPayload() {
