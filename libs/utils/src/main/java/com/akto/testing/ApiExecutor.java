@@ -37,6 +37,7 @@ public class ApiExecutor {
     private static Map<Integer, TestScript> testScriptMap = new HashMap<>();
     
     private static OriginalHttpResponse common(Request request, boolean followRedirects, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck, String requestProtocol) throws Exception {
+
         Integer accountId = Context.accountId.get();
         if (accountId != null) {
             int i = 0;
@@ -387,7 +388,7 @@ public class ApiExecutor {
         
     }
 
-    public static void calculateFinalRequestFromAdvancedSettings(OriginalHttpRequest originalHttpRequest, List<TestConfigsAdvancedSettings> advancedSettings){
+    private static void calculateFinalRequestFromAdvancedSettings(OriginalHttpRequest originalHttpRequest, List<TestConfigsAdvancedSettings> advancedSettings){
         Map<String,List<ConditionsType>> headerConditions = new HashMap<>();
         Map<String,List<ConditionsType>> payloadConditions = new HashMap<>();
 
@@ -414,7 +415,6 @@ public class ApiExecutor {
     }
 
     private static OriginalHttpResponse sendWithRequestBody(OriginalHttpRequest request, Request.Builder builder, boolean followRedirects, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck, String requestProtocol) throws Exception {
-        
         Map<String,List<String>> headers = request.getHeaders();
         if (headers == null) {
             headers = new HashMap<>();
@@ -465,7 +465,6 @@ public class ApiExecutor {
         }
 
         if (payload == null) payload = "";
-
         if (body == null) {// body not created by GRPC block yet
             if (request.getHeaders().containsKey("charset")) {
                 body = RequestBody.create(payload, null);
@@ -474,7 +473,6 @@ public class ApiExecutor {
                 body = RequestBody.create(payload, MediaType.parse(contentType));
             }
         }
-
         builder = builder.method(request.getMethod(), body);
         Request okHttpRequest = builder.build();
         return common(okHttpRequest, followRedirects, debug, testLogs, skipSSRFCheck, requestProtocol);

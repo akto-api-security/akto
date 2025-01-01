@@ -395,7 +395,6 @@ public class Utils {
         }
 
 
-       
         httpRequest.setBody(payloadStr);
     }
 

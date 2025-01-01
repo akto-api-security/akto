@@ -2,7 +2,6 @@ package com.akto.dto.traffic;
 
 import java.util.Arrays;
 import java.util.List;
-
 import com.akto.util.Util;
 
 public class SampleData {

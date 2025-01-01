@@ -225,7 +225,7 @@ public class TestExecutor {
         try {
             currentTime = Context.now();
             loggerMaker.infoAndAddToDb("Starting StatusCodeAnalyser at: " + currentTime, LogDb.TESTING);
-            // StatusCodeAnalyser.run(sampleDataMapForStatusCodeAnalyser, sampleMessageStore , authMechanismStore, testingRun.getTestingRunConfig(), hosts);
+            StatusCodeAnalyser.run(sampleDataMapForStatusCodeAnalyser, sampleMessageStore , authMechanismStore, testingRun.getTestingRunConfig(), hosts);
             loggerMaker.infoAndAddToDb("Completing StatusCodeAnalyser in: " + (Context.now() -  currentTime) + " at: " + Context.now(), LogDb.TESTING);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error while running status code analyser " + e.getMessage(), LogDb.TESTING);
@@ -891,26 +891,6 @@ public class TestExecutor {
         List<CustomAuthType> customAuthTypes = testingUtil.getCustomAuthTypes();
         // TestingUtil -> authMechanism
         // TestingConfig -> auth
-
-        System.out.println("reached here Test Executor:855...");
-
-        if(testingRunConfig != null && testingRunConfig.getConfigsAdvancedSettings() != null && !testingRunConfig.getConfigsAdvancedSettings().isEmpty()){
-            ApiExecutor.calculateFinalRequestFromAdvancedSettings(rawApi.getRequest(), testingRunConfig.getConfigsAdvancedSettings());
-            // try {
-            //     OriginalHttpResponse response = ApiExecutor.sendRequest(rawApi.getRequest(), false, testingRunConfig, false, new ArrayList<>());
-            //     if (response.getStatusCode() < 300) {
-            //         rawApi = new RawApi(rawApi.getRequest(), response, "");
-            //         rawApi.fillOriginalMessage(0, 0, "", "");
-            //     }
-            // } catch (Exception e) {
-            //     System.out.println("exception while making initial req: " + e.getMessage());
-            //     e.printStackTrace();
-            // }
-        }
-
-
-
-        
         com.akto.test_editor.execution.Executor executor = new Executor();
         executor.overrideTestUrl(rawApi, testingRunConfig);
         YamlTestTemplate yamlTestTemplate = new YamlTestTemplate(apiInfoKey,filterNode, validatorNode, executorNode,
