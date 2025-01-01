@@ -3,6 +3,7 @@ package com.akto.threat.detection.tasks;
 import com.akto.dto.type.URLMethods;
 import com.akto.kafka.KafkaConfig;
 import com.akto.proto.generated.threat_detection.message.sample_request.v1.SampleMaliciousRequest;
+import com.akto.proto.generated.threat_detection.message.sample_request.v1.SampleRequestKafkaEnvelope;
 import com.akto.threat.detection.db.entity.MaliciousEventEntity;
 import com.akto.threat.detection.dto.MessageEnvelope;
 import com.google.protobuf.InvalidProtocolBufferException;
@@ -17,7 +18,7 @@ import org.hibernate.Transaction;
 /*
 This will read sample malicious data from kafka topic and save it to DB.
  */
-public class FlushSampleDataTask extends AbstractKafkaConsumerTask {
+public class FlushSampleDataTask extends AbstractKafkaConsumerTask<byte[]> {
 
   private final SessionFactory sessionFactory;
 
@@ -27,37 +28,29 @@ public class FlushSampleDataTask extends AbstractKafkaConsumerTask {
     this.sessionFactory = sessionFactory;
   }
 
-  protected void processRecords(ConsumerRecords<String, String> records) {
+  protected void processRecords(ConsumerRecords<String, byte[]> records) {
     List<MaliciousEventEntity> events = new ArrayList<>();
     records.forEach(
         r -> {
-          String message = r.value();
-          SampleMaliciousRequest.Builder builder = SampleMaliciousRequest.newBuilder();
-          MessageEnvelope m = MessageEnvelope.unmarshal(message).orElse(null);
-          if (m == null) {
-            return;
-          }
-
+          SampleRequestKafkaEnvelope envelope;
           try {
-            JsonFormat.parser().merge(m.getData(), builder);
+            envelope = SampleRequestKafkaEnvelope.parseFrom(r.value());
+            SampleMaliciousRequest evt = envelope.getMaliciousRequest();
+
+            events.add(
+                MaliciousEventEntity.newBuilder()
+                    .setActor(envelope.getActor())
+                    .setFilterId(evt.getFilterId())
+                    .setUrl(evt.getUrl())
+                    .setMethod(URLMethods.Method.fromString(evt.getMethod()))
+                    .setTimestamp(evt.getTimestamp())
+                    .setOrig(evt.getPayload())
+                    .setApiCollectionId(evt.getApiCollectionId())
+                    .setIp(evt.getIp())
+                    .build());
           } catch (InvalidProtocolBufferException e) {
             e.printStackTrace();
-            return;
           }
-
-          SampleMaliciousRequest evt = builder.build();
-
-          events.add(
-              MaliciousEventEntity.newBuilder()
-                  .setActor(m.getActor())
-                  .setFilterId(evt.getFilterId())
-                  .setUrl(evt.getUrl())
-                  .setMethod(URLMethods.Method.fromString(evt.getMethod()))
-                  .setTimestamp(evt.getTimestamp())
-                  .setOrig(evt.getPayload())
-                  .setApiCollectionId(evt.getApiCollectionId())
-                  .setIp(evt.getIp())
-                  .build());
         });
 
     Session session = this.sessionFactory.openSession();

@@ -14,11 +14,12 @@ import com.akto.dto.monitoring.FilterConfig;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.type.URLMethods;
 import com.akto.hybrid_parsers.HttpCallParser;
-import com.akto.kafka.Kafka;
 import com.akto.kafka.KafkaConfig;
 import com.akto.proto.generated.threat_detection.message.malicious_event.event_type.v1.EventType;
+import com.akto.proto.generated.threat_detection.message.malicious_event.v1.MaliciousEventKafkaEnvelope;
 import com.akto.proto.generated.threat_detection.message.malicious_event.v1.MaliciousEventMessage;
 import com.akto.proto.generated.threat_detection.message.sample_request.v1.SampleMaliciousRequest;
+import com.akto.proto.generated.threat_detection.message.sample_request.v1.SampleRequestKafkaEnvelope;
 import com.akto.rules.TestPlugin;
 import com.akto.runtime.utils.Utils;
 import com.akto.test_editor.execution.VariableResolver;
@@ -27,6 +28,7 @@ import com.akto.threat.detection.actor.SourceIPActorGenerator;
 import com.akto.threat.detection.cache.RedisBackedCounterCache;
 import com.akto.threat.detection.constants.KafkaTopic;
 import com.akto.threat.detection.dto.MessageEnvelope;
+import com.akto.threat.detection.kafka.KafkaProtoProducer;
 import com.akto.threat.detection.smart_event_detector.window_based.WindowBasedThresholdNotifier;
 import com.google.protobuf.InvalidProtocolBufferException;
 import io.lettuce.core.RedisClient;
@@ -54,7 +56,7 @@ public class MaliciousTrafficDetectorTask implements Task {
   private int filterLastUpdatedAt = 0;
   private int filterUpdateIntervalSec = 300;
 
-  private final Kafka internalKafka;
+  private final KafkaProtoProducer internalKafka;
 
   private static final DataActor dataActor = DataActorFactory.fetchInstance();
 
@@ -77,11 +79,7 @@ public class MaliciousTrafficDetectorTask implements Task {
             new RedisBackedCounterCache(redisClient, "wbt"),
             new WindowBasedThresholdNotifier.Config(100, 10 * 60));
 
-    this.internalKafka =
-        new Kafka(
-            internalConfig.getBootstrapServers(),
-            internalConfig.getProducerConfig().getLingerMs(),
-            internalConfig.getProducerConfig().getBatchSize());
+    this.internalKafka = new KafkaProtoProducer(internalConfig);
   }
 
   public void run() {
@@ -123,19 +121,20 @@ public class MaliciousTrafficDetectorTask implements Task {
     return apiFilters;
   }
 
-  private boolean validateFilterForRequest(FilterConfig apiFilter, RawApi rawApi, ApiInfo.ApiInfoKey apiInfoKey, String message) {
+  private boolean validateFilterForRequest(
+      FilterConfig apiFilter, RawApi rawApi, ApiInfo.ApiInfoKey apiInfoKey, String message) {
     try {
       System.out.println("using buildFromMessageNew func");
 
       Map<String, Object> varMap = apiFilter.resolveVarMap();
       VariableResolver.resolveWordList(
-        varMap,
-        new HashMap<ApiInfo.ApiInfoKey, List<String>>() {
-          {
-            put(apiInfoKey, Collections.singletonList(message));
-          }
-        },
-        apiInfoKey);
+          varMap,
+          new HashMap<ApiInfo.ApiInfoKey, List<String>>() {
+            {
+              put(apiInfoKey, Collections.singletonList(message));
+            }
+          },
+          apiInfoKey);
 
       String filterExecutionLogId = UUID.randomUUID().toString();
       ValidationResult res =
@@ -160,7 +159,7 @@ public class MaliciousTrafficDetectorTask implements Task {
       return;
     }
 
-    List<MessageEnvelope> maliciousMessages = new ArrayList<>();
+    List<SampleRequestKafkaEnvelope> maliciousMessages = new ArrayList<>();
 
     System.out.println("Total number of filters: " + filters.size());
 
@@ -212,13 +211,12 @@ public class MaliciousTrafficDetectorTask implements Task {
                           .setFilterId(apiFilter.getId())
                           .build();
 
-                  try {
-                    maliciousMessages.add(
-                        MessageEnvelope.generateEnvelope(
-                            responseParam.getAccountId(), actor, maliciousReq));
-                  } catch (InvalidProtocolBufferException e) {
-                    return;
-                  }
+                  maliciousMessages.add(
+                      SampleRequestKafkaEnvelope.newBuilder()
+                          .setActor(actor)
+                          .setAccountId(responseParam.getAccountId())
+                          .setMaliciousRequest(maliciousReq)
+                          .build());
 
                   if (!isAggFilter) {
                     generateAndPushMaliciousEventRequest(
@@ -250,12 +248,7 @@ public class MaliciousTrafficDetectorTask implements Task {
     try {
       maliciousMessages.forEach(
           sample -> {
-            sample
-                .marshal()
-                .ifPresent(
-                    data -> {
-                      internalKafka.send(data, KafkaTopic.ThreatDetection.MALICIOUS_EVENTS);
-                    });
+            internalKafka.send(KafkaTopic.ThreatDetection.MALICIOUS_EVENTS, sample);
           });
     } catch (Exception e) {
       e.printStackTrace();
@@ -281,12 +274,18 @@ public class MaliciousTrafficDetectorTask implements Task {
             .setDetectedAt(responseParam.getTime())
             .build();
     try {
-      System.out.println("Pushing malicious event to kafka: ");
+      System.out.println("Pushing malicious event to kafka: " + maliciousEvent);
+      MaliciousEventKafkaEnvelope envelope =
+          MaliciousEventKafkaEnvelope.newBuilder()
+              .setActor(actor)
+              .setAccountId(responseParam.getAccountId())
+              .setMaliciousEvent(maliciousEvent)
+              .build();
       MessageEnvelope.generateEnvelope(responseParam.getAccountId(), actor, maliciousEvent)
           .marshal()
           .ifPresent(
               data -> {
-                internalKafka.send(data, KafkaTopic.ThreatDetection.ALERTS);
+                internalKafka.send(KafkaTopic.ThreatDetection.ALERTS, envelope);
               });
     } catch (InvalidProtocolBufferException e) {
       e.printStackTrace();

@@ -2,6 +2,7 @@ package com.akto.threat.detection.tasks;
 
 import com.akto.kafka.KafkaConfig;
 import com.akto.proto.generated.threat_detection.message.malicious_event.event_type.v1.EventType;
+import com.akto.proto.generated.threat_detection.message.malicious_event.v1.MaliciousEventKafkaEnvelope;
 import com.akto.proto.generated.threat_detection.message.malicious_event.v1.MaliciousEventMessage;
 import com.akto.proto.generated.threat_detection.message.sample_request.v1.SampleMaliciousRequest;
 import com.akto.proto.generated.threat_detection.service.malicious_alert_service.v1.RecordMaliciousEventRequest;
@@ -28,133 +29,130 @@ import org.hibernate.Transaction;
 /*
 This will send alerts to threat detection backend
  */
-public class SendMaliciousEventsToBackend extends AbstractKafkaConsumerTask {
+public class SendMaliciousEventsToBackend extends AbstractKafkaConsumerTask<byte[]> {
 
-  private final SessionFactory sessionFactory;
-  private final CloseableHttpClient httpClient;
+    private final SessionFactory sessionFactory;
+    private final CloseableHttpClient httpClient;
 
-  public SendMaliciousEventsToBackend(
-      SessionFactory sessionFactory, KafkaConfig trafficConfig, String topic) {
-    super(trafficConfig, topic);
-    this.sessionFactory = sessionFactory;
-    this.httpClient = HttpClients.createDefault();
-  }
-
-  private void markSampleDataAsSent(List<UUID> ids) {
-    Session session = this.sessionFactory.openSession();
-    Transaction txn = session.beginTransaction();
-    try {
-      session
-          .createQuery(
-              "update MaliciousEventEntity m set m.alertedToBackend = true where m.id in :ids")
-          .setParameterList("ids", ids)
-          .executeUpdate();
-    } catch (Exception ex) {
-      ex.printStackTrace();
-      txn.rollback();
-    } finally {
-      txn.commit();
-      session.close();
-    }
-  }
-
-  private List<MaliciousEventEntity> getSampleMaliciousRequests(String actor, String filterId) {
-    Session session = this.sessionFactory.openSession();
-    Transaction txn = session.beginTransaction();
-    try {
-      return session
-          .createQuery(
-              "from MaliciousEventEntity m where m.actor = :actor and m.filterId = :filterId and"
-                  + " m.alertedToBackend = false order by m.createdAt desc",
-              MaliciousEventEntity.class)
-          .setParameter("actor", actor)
-          .setParameter("filterId", filterId)
-          .setMaxResults(50)
-          .getResultList();
-    } catch (Exception ex) {
-      ex.printStackTrace();
-      txn.rollback();
-    } finally {
-      txn.commit();
-      session.close();
+    public SendMaliciousEventsToBackend(
+            SessionFactory sessionFactory, KafkaConfig trafficConfig, String topic) {
+        super(trafficConfig, topic);
+        this.sessionFactory = sessionFactory;
+        this.httpClient = HttpClients.createDefault();
     }
 
-    return Collections.emptyList();
-  }
+    private void markSampleDataAsSent(List<UUID> ids) {
+        Session session = this.sessionFactory.openSession();
+        Transaction txn = session.beginTransaction();
+        try {
+            session
+                    .createQuery(
+                            "update MaliciousEventEntity m set m.alertedToBackend = true where m.id in :ids")
+                    .setParameterList("ids", ids)
+                    .executeUpdate();
+        } catch (Exception ex) {
+            ex.printStackTrace();
+            txn.rollback();
+        } finally {
+            txn.commit();
+            session.close();
+        }
+    }
 
-  protected void processRecords(ConsumerRecords<String, String> records) {
-    records.forEach(
-        r -> {
-          String message = r.value();
-          MaliciousEventMessage.Builder builder = MaliciousEventMessage.newBuilder();
-          MessageEnvelope m = MessageEnvelope.unmarshal(message).orElse(null);
-          if (m == null) {
-            return;
-          }
+    private List<MaliciousEventEntity> getSampleMaliciousRequests(String actor, String filterId) {
+        Session session = this.sessionFactory.openSession();
+        Transaction txn = session.beginTransaction();
+        try {
+            return session
+                    .createQuery(
+                            "from MaliciousEventEntity m where m.actor = :actor and m.filterId = :filterId and"
+                                    + " m.alertedToBackend = false order by m.createdAt desc",
+                            MaliciousEventEntity.class)
+                    .setParameter("actor", actor)
+                    .setParameter("filterId", filterId)
+                    .setMaxResults(50)
+                    .getResultList();
+        } catch (Exception ex) {
+            ex.printStackTrace();
+            txn.rollback();
+        } finally {
+            txn.commit();
+            session.close();
+        }
 
-          try {
-            JsonFormat.parser().merge(m.getData(), builder);
-          } catch (InvalidProtocolBufferException e) {
-            e.printStackTrace();
-            return;
-          }
+        return Collections.emptyList();
+    }
 
-          MaliciousEventMessage evt = builder.build();
-
-          // Get sample data from postgres for this alert
-          List<MaliciousEventEntity> sampleData =
-              this.getSampleMaliciousRequests(evt.getActor(), evt.getFilterId());
-          try {
-            RecordMaliciousEventRequest.Builder reqBuilder =
-                RecordMaliciousEventRequest.newBuilder().setMaliciousEvent(evt);
-            if (EventType.EVENT_TYPE_AGGREGATED.equals(evt.getEventType())) {
-              sampleData = this.getSampleMaliciousRequests(evt.getActor(), evt.getFilterId());
-
-              reqBuilder.addAllSampleRequests(
-                  sampleData.stream()
-                      .map(
-                          d ->
-                              SampleMaliciousRequest.newBuilder()
-                                  .setUrl(d.getUrl())
-                                  .setMethod(d.getMethod().name())
-                                  .setTimestamp(d.getTimestamp())
-                                  .setPayload(d.getOrig())
-                                  .setIp(d.getIp())
-                                  .setApiCollectionId(d.getApiCollectionId())
-                                  .build())
-                      .collect(Collectors.toList()));
-            }
-
-            List<UUID> sampleIds =
-                sampleData.stream().map(MaliciousEventEntity::getId).collect(Collectors.toList());
-
-            RecordMaliciousEventRequest maliciousEventRequest = reqBuilder.build();
-            String url = System.getenv("AKTO_THREAT_PROTECTION_BACKEND_URL");
-            String token = System.getenv("AKTO_THREAT_PROTECTION_BACKEND_TOKEN");
-            ProtoMessageUtils.toString(maliciousEventRequest)
-                .ifPresent(
-                    msg -> {
-                      StringEntity requestEntity =
-                          new StringEntity(msg, ContentType.APPLICATION_JSON);
-                      HttpPost req =
-                          new HttpPost(
-                              String.format("%s/api/threat_detection/record_malicious_event", url));
-                      req.addHeader("Authorization", "Bearer " + token);
-                      req.setEntity(requestEntity);
-                      try {
-                        System.out.println("Sending request to backend: " + msg);
-                        this.httpClient.execute(req);
-                      } catch (IOException e) {
+    protected void processRecords(ConsumerRecords<String, byte[]> records) {
+        records.forEach(
+                r -> {
+                    MaliciousEventKafkaEnvelope envelope;
+                    try {
+                        envelope = MaliciousEventKafkaEnvelope.parseFrom(r.value());
+                    } catch (InvalidProtocolBufferException e) {
                         e.printStackTrace();
-                      }
+                        return;
+                    }
 
-                      if (!sampleIds.isEmpty()) {
-                        markSampleDataAsSent(sampleIds);
-                      }
-                    });
-          } catch (Exception e) {
-            e.printStackTrace();
-          }
-        });
-  }
+                    if (envelope == null) {
+                        return;
+                    }
+
+                    try {
+                        MaliciousEventMessage evt = envelope.getMaliciousEvent();
+
+                        // Get sample data from postgres for this alert
+                        List<MaliciousEventEntity> sampleData = this.getSampleMaliciousRequests(evt.getActor(),
+                                evt.getFilterId());
+                        RecordMaliciousEventRequest.Builder reqBuilder = RecordMaliciousEventRequest.newBuilder()
+                                .setMaliciousEvent(evt);
+                        if (EventType.EVENT_TYPE_AGGREGATED.equals(evt.getEventType())) {
+                            sampleData = this.getSampleMaliciousRequests(evt.getActor(), evt.getFilterId());
+
+                            reqBuilder.addAllSampleRequests(
+                                    sampleData.stream()
+                                            .map(
+                                                    d -> SampleMaliciousRequest.newBuilder()
+                                                            .setUrl(d.getUrl())
+                                                            .setMethod(d.getMethod().name())
+                                                            .setTimestamp(d.getTimestamp())
+                                                            .setPayload(d.getOrig())
+                                                            .setIp(d.getIp())
+                                                            .setApiCollectionId(d.getApiCollectionId())
+                                                            .build())
+                                            .collect(Collectors.toList()));
+                        }
+
+                        List<UUID> sampleIds = sampleData.stream().map(MaliciousEventEntity::getId)
+                                .collect(Collectors.toList());
+
+                        RecordMaliciousEventRequest maliciousEventRequest = reqBuilder.build();
+                        String url = System.getenv("AKTO_THREAT_PROTECTION_BACKEND_URL");
+                        String token = System.getenv("AKTO_THREAT_PROTECTION_BACKEND_TOKEN");
+                        ProtoMessageUtils.toString(maliciousEventRequest)
+                                .ifPresent(
+                                        msg -> {
+                                            StringEntity requestEntity = new StringEntity(msg,
+                                                    ContentType.APPLICATION_JSON);
+                                            HttpPost req = new HttpPost(
+                                                    String.format("%s/api/threat_detection/record_malicious_event",
+                                                            url));
+                                            req.addHeader("Authorization", "Bearer " + token);
+                                            req.setEntity(requestEntity);
+                                            try {
+                                                System.out.println("Sending request to backend: " + msg);
+                                                this.httpClient.execute(req);
+                                            } catch (IOException e) {
+                                                e.printStackTrace();
+                                            }
+
+                                            if (!sampleIds.isEmpty()) {
+                                                markSampleDataAsSent(sampleIds);
+                                            }
+                                        });
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                });
+    }
 }
