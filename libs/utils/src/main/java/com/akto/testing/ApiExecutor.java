@@ -37,14 +37,10 @@ public class ApiExecutor {
     private static Map<Integer, TestScript> testScriptMap = new HashMap<>();
     
     private static OriginalHttpResponse common(Request request, boolean followRedirects, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck, String requestProtocol) throws Exception {
-        debug = true;
         Integer accountId = Context.accountId.get();
         if (accountId != null) {
             int i = 0;
             boolean rateLimitHit = true;
-
-
-
             while (RateLimitHandler.getInstance(accountId).shouldWait(request)) {
                 if(rateLimitHit){
                     if (!(request.url().toString().contains("insertRuntimeLog") || request.url().toString().contains("insertTestingLog") || request.url().toString().contains("insertProtectionLog"))) {
@@ -82,9 +78,6 @@ public class ApiExecutor {
         }
 
         Call call = client.newCall(request);
-
-        System.out.println("------ACTUAL REQ-------");
-        System.out.println(request.headers());
         Response response = null;
         String body;
         byte[] grpcBody = null;
@@ -341,9 +334,7 @@ public class ApiExecutor {
         if (!(url.contains("insertRuntimeLog") || url.contains("insertTestingLog") || url.contains("insertProtectionLog"))) {
             loggerMaker.infoAndAddToDb("Received response from: " + url, LogDb.TESTING);
         }
-        System.out.println("====RESPONSE====");
-        System.out.println(response.getHeaders());
-        System.out.println(response.getBody());
+
         return response;
     }
     public static OriginalHttpResponse sendRequest(OriginalHttpRequest request, boolean followRedirects, TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs) throws Exception {
@@ -397,7 +388,6 @@ public class ApiExecutor {
     }
 
     public static void calculateFinalRequestFromAdvancedSettings(OriginalHttpRequest originalHttpRequest, List<TestConfigsAdvancedSettings> advancedSettings){
-        System.out.println("in calculateFinalRequestFromAdvancedSettings...");
         Map<String,List<ConditionsType>> headerConditions = new HashMap<>();
         Map<String,List<ConditionsType>> payloadConditions = new HashMap<>();
 
@@ -416,14 +406,11 @@ public class ApiExecutor {
             headerConditions.getOrDefault(TestEditorEnums.TerminalExecutorDataOperands.DELETE_HEADER.name(), emptyList)
         );
 
-        System.out.println("modifyBodyOperations calculateFinalRequestFromAdvancedSettings...");
         Utils.modifyBodyOperations(originalHttpRequest, 
             payloadConditions.getOrDefault(TestEditorEnums.NonTerminalExecutorDataOperands.MODIFY_BODY_PARAM.name(), emptyList), 
             payloadConditions.getOrDefault(TestEditorEnums.NonTerminalExecutorDataOperands.ADD_BODY_PARAM.name(), emptyList),
             payloadConditions.getOrDefault(TestEditorEnums.TerminalExecutorDataOperands.DELETE_BODY_PARAM.name(), emptyList)
         );
-        System.out.println("modifyBodyOperations completed calculateFinalRequestFromAdvancedSettings...");
-
     }
 
     private static OriginalHttpResponse sendWithRequestBody(OriginalHttpRequest request, Request.Builder builder, boolean followRedirects, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck, String requestProtocol) throws Exception {
@@ -479,14 +466,6 @@ public class ApiExecutor {
 
         if (payload == null) payload = "";
 
-        try {
-            System.out.println("payloadStr: " + payload);
-            payload = Utils.replaceVariables(payload, new HashMap<>(), false, false);
-            System.out.println("payloadStrFinal: " + payload);
-
-        } catch (Exception e) {
-            System.out.println("failed to replace vars in payload: " + e.getMessage());
-        }
         if (body == null) {// body not created by GRPC block yet
             if (request.getHeaders().containsKey("charset")) {
                 body = RequestBody.create(payload, null);
@@ -495,11 +474,6 @@ public class ApiExecutor {
                 body = RequestBody.create(payload, MediaType.parse(contentType));
             }
         }
-
-        System.out.println("====REQUEST====");
-        System.out.println(request.getMethod() + " " + request.getUrl() + "?" + request.getQueryParams());
-        System.out.println(request.getHeaders());
-        System.out.println(payload);
 
         builder = builder.method(request.getMethod(), body);
         Request okHttpRequest = builder.build();
