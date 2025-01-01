@@ -172,13 +172,13 @@ function Dashboard() {
 
     },[])
 
-    // const shouldShowWelcomeBackModal = !func.checkLocal() && window?.USER_NAME?.length > 0 && (window?.USER_FULL_NAME?.length === 0 || (window?.USER_ROLE === 'ADMIN' && window?.ORGANIZATION_NAME?.length === 0))
+    const shouldShowWelcomeBackModal = window.IS_SAAS === "true" && window?.USER_NAME?.length > 0 && (window.USER_NAME.indexOf("@akto.io")>0) && (window?.USER_FULL_NAME?.length === 0 || (window?.USER_ROLE === 'ADMIN' && window?.ORGANIZATION_NAME?.length === 0))
 
     return (
         <div className="dashboard">
         <Frame>
             <Outlet />
-            {/* {shouldShowWelcomeBackModal && <WelcomeBackDetailsModal isAdmin={window.USER_ROLE === 'ADMIN'} />} */}
+            {shouldShowWelcomeBackModal && <WelcomeBackDetailsModal isAdmin={window.USER_ROLE === 'ADMIN'} />}
             {toastMarkup}
             {ConfirmationModalMarkup}
             {displayItems.length > 0 ? <div className="alerts-banner">
