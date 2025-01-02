@@ -3544,4 +3544,38 @@ public class ClientActor extends DataActor {
         return testScript;
     }
 
+    public List<DependencyNode> findDependencyNodes(int apiCollectionId, String urlVar, String method, String reqMethod) {
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("apiCollectionId", apiCollectionId);
+        obj.put("url", urlVar);
+        obj.put("methodVal", method);
+        obj.put("reqMethod", reqMethod);
+        Map<String, List<String>> headers = buildHeaders();
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/findDependencyNodes", "", "POST",  obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in findDependencyNodes", LoggerMaker.LogDb.TESTING);
+                return new ArrayList<>();
+            }
+            BasicDBObject payloadObj;
+            try {
+                payloadObj = BasicDBObject.parse(responsePayload);
+                BasicDBList dependencyNodesObj = (BasicDBList) payloadObj.get("dependencyNodes");
+                List<DependencyNode> dependencyNodes = new ArrayList<>();
+                for (Object nodeObj : dependencyNodesObj) {
+                    BasicDBObject obj2 = (BasicDBObject) nodeObj;
+                    dependencyNodes.add(objectMapper.readValue(obj2.toJson(), DependencyNode.class));
+                }
+                return dependencyNodes;
+            } catch (Exception e) {
+                return new ArrayList<>();
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in findDependencyNodes" + e, LoggerMaker.LogDb.RUNTIME);
+            return new ArrayList<>();
+        }
+    }
+
 }

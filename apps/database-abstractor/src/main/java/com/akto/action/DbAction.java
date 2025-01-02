@@ -2266,6 +2266,35 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
+    List<DependencyNode> dependencyNodes;
+
+    public List<DependencyNode> getDependencyNodes() {
+        return dependencyNodes;
+    }
+
+    public void setDependencyNodes(List<DependencyNode> dependencyNodes) {
+        this.dependencyNodes = dependencyNodes;
+    }
+
+    String reqMethod;
+    
+    public String getReqMethod() {
+        return reqMethod;
+    }
+
+    public void setReqMethod(String reqMethod) {
+        this.reqMethod = reqMethod;
+    }
+
+    public String findDependencyNodes() {
+        try {
+            dependencyNodes = DbLayer.findDependencyNodes(apiCollectionId, url, methodVal, reqMethod);
+        } catch(Exception e){
+            e.printStackTrace();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
     public String fetchTestScript() {
         try {
             testScript = DbLayer.fetchTestScript();
