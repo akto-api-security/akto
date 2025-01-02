@@ -618,7 +618,7 @@ const editableConfigsComp = (
 
   const handleRefreshTableCount = async(summaryHexId) => {
     await api.handleRefreshTableCount(summaryHexId).then((res) => {
-      func.setToast("Re-calculating issues count")
+      func.setToast(true, false, "Re-calculating issues count")
       setSecondaryPopover(false)
     })
   }
