@@ -61,8 +61,8 @@ const func = {
         initialObj.iconString = dataObj?.iconString || globalFunc.getSensitiveIcons(dataObj.name)
         let state = func.convertDataToState(dataObj.sensitiveAlways, dataObj.sensitivePosition)
         initialObj.sensitiveState = state
+        initialObj.active = dataObj.active.toString()
         if(type === 'Custom'){
-          initialObj.active = dataObj.active.toString()
           initialObj.operator= dataObj.operator
           initialObj.creatorId= dataObj.creatorId
           initialObj.skipDataTypeTestTemplateMapping = dataObj.skipDataTypeTestTemplateMapping

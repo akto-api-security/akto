@@ -24,12 +24,6 @@ public class OktaSsoAction extends UserAction {
     private String redirectUri;
 
     public String addOktaSso() {
-
-        if(!DashboardMode.isOnPremDeployment()){
-            addActionError("This feature is only available in on-prem deployment");
-            return ERROR.toUpperCase();
-        }
-
         if (SsoUtils.isAnySsoActive()) {
             addActionError("A SSO Integration already exists.");
             return ERROR.toUpperCase();
@@ -41,19 +35,29 @@ public class OktaSsoAction extends UserAction {
         oktaConfig.setAuthorisationServerId(authorisationServerId);
         oktaConfig.setOktaDomainUrl(oktaDomain);
         oktaConfig.setRedirectUri(redirectUri);
-
+        if(!DashboardMode.isOnPremDeployment()){
+            oktaConfig.setAccountId(Context.accountId.get());
+            String userLogin = getSUser().getLogin();
+            String domain = userLogin.split("@")[1];
+            oktaConfig.setOrganizationDomain(domain);
+        }
         ConfigsDao.instance.insertOne(oktaConfig);
 
         return SUCCESS.toUpperCase();
     }
 
     public String deleteOktaSso() {
-        if(!DashboardMode.isOnPremDeployment()){
-            addActionError("This feature is only available in on-prem deployment");
-            return ERROR.toUpperCase();
+        DeleteResult result;
+        if(DashboardMode.isOnPremDeployment()) {
+            result = ConfigsDao.instance.deleteAll(Filters.eq("_id", "OKTA-ankush"));
+        } else {
+            result = ConfigsDao.instance.deleteAll(
+                    Filters.and(
+                        Filters.eq("_id", "OKTA-ankush"),
+                        Filters.eq(Config.OktaConfig.ACCOUNT_ID, Context.accountId.get())
+                    )
+            );
         }
-
-        DeleteResult result = ConfigsDao.instance.deleteAll(Filters.eq("_id", "OKTA-ankush"));
 
         if (result.getDeletedCount() > 0) {
             for (Object obj : UsersDao.instance.getAllUsersInfoForTheAccount(Context.accountId.get())) {
@@ -68,13 +72,13 @@ public class OktaSsoAction extends UserAction {
 
     @Override
     public String execute() throws Exception {
-
-        if(!DashboardMode.isOnPremDeployment()){
-            addActionError("This feature is only available in on-prem deployment");
-            return ERROR.toUpperCase();
+        Config.OktaConfig oktaConfig;
+        if(DashboardMode.isOnPremDeployment()) {
+            oktaConfig = (Config.OktaConfig) ConfigsDao.instance.findOne("_id", "OKTA-ankush");
+        } else {
+            String email = getSUser().getLogin();
+            oktaConfig = Config.getOktaConfig(email);
         }
-
-        Config.OktaConfig oktaConfig = (Config.OktaConfig) ConfigsDao.instance.findOne("_id", "OKTA-ankush");
         if (SsoUtils.isAnySsoActive() && oktaConfig == null) {
             addActionError("A different SSO Integration already exists.");
             return ERROR.toUpperCase();

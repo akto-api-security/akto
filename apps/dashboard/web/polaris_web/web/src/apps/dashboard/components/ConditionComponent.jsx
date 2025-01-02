@@ -16,12 +16,11 @@ function ConditionComponent(props) {
         }
     },[condition])
     const allCollections = PersistStore(state => state.allCollections);
-    const allCollectionsOptions = allCollections.map(collection => {
-        return {
-            label: collection.displayName,
-            value: collection.id
-        }
-    })
+    const activatedCollections = allCollections.filter(collection => collection.deactivated === false)
+    const allCollectionsOptions = activatedCollections.map(collection => ({
+        label: collection.displayName,
+        value: collection.id
+    }))
     const getApiEndpointsOptions = (data) => {
         return data.map(apiEndpoint => {
             let str = func.toMethodUrlString(apiEndpoint);

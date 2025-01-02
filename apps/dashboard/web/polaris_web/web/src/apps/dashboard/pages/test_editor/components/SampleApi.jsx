@@ -154,7 +154,8 @@ const SampleApi = () => {
     }
 
 
-    const allCollectionsOptions = allCollections.map(collection => {
+    const activatedCollections = allCollections.filter(collection => collection.deactivated === false)
+    const allCollectionsOptions = activatedCollections.map(collection => {
         return {
             label: collection.displayName,
             value: collection.id
