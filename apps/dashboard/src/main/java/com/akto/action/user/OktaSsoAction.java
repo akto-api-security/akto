@@ -24,7 +24,7 @@ public class OktaSsoAction extends UserAction {
     private String redirectUri;
 
     public String addOktaSso() {
-        if (SsoUtils.isAnySsoActive()) {
+        if (SsoUtils.isAnySsoActive(Context.accountId.get())) {
             addActionError("A SSO Integration already exists.");
             return ERROR.toUpperCase();
         }
@@ -79,7 +79,7 @@ public class OktaSsoAction extends UserAction {
             String email = getSUser().getLogin();
             oktaConfig = Config.getOktaConfig(email);
         }
-        if (SsoUtils.isAnySsoActive() && oktaConfig == null) {
+        if (SsoUtils.isAnySsoActive(Context.accountId.get()) && oktaConfig == null) {
             addActionError("A different SSO Integration already exists.");
             return ERROR.toUpperCase();
         }
