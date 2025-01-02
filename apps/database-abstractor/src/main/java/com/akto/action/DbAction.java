@@ -2277,8 +2277,12 @@ public class DbAction extends ActionSupport {
     }
 
     public String findDependencyNodes() {
-        if (filter != null) {
-            dependencyNodes = DbLayer.findDependencyNodes(filter);
+        try {
+            if (filter != null) {
+                dependencyNodes = DbLayer.findDependencyNodes(apiCollectionId, url, methodVal, "DELETE");
+            }
+        } catch(Exception e){
+            e.printStackTrace();
         }
         return Action.SUCCESS.toUpperCase();
     }

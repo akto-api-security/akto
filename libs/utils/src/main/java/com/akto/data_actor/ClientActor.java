@@ -3544,9 +3544,12 @@ public class ClientActor extends DataActor {
         return testScript;
     }
 
-    public List<DependencyNode> findDependencyNodes(Bson filter) {
+    public List<DependencyNode> findDependencyNodes(int apiCollectionId, String url, String method) {
         BasicDBObject obj = new BasicDBObject();
-        obj.put("filter", filter);
+        obj.put("apiCollectionId", apiCollectionId);
+        obj.put("url", url);
+        obj.put("methodVal", method);
+        // TODO: reqMethod, coming from database-abstractor
         Map<String, List<String>> headers = buildHeaders();
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/findDependencyNodes", "", "POST",  obj.toString(), headers, "");
         try {

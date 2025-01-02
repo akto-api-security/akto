@@ -273,6 +273,6 @@ public abstract class DataActor {
 
     public abstract TestScript fetchTestScript();
 
-    public abstract List<DependencyNode> findDependencyNodes(Bson filter);
+    public abstract List<DependencyNode> findDependencyNodes(int apiCollectionId, String url, String method, String reqMethod);
 
 }
