@@ -5,7 +5,9 @@ import com.github.benmanes.caffeine.cache.Caffeine;
 import io.lettuce.core.ExpireArgs;
 import io.lettuce.core.RedisClient;
 import io.lettuce.core.api.StatefulRedisConnection;
+import java.util.HashSet;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.*;
 
 public class RedisBackedCounterCache implements CounterCache {
@@ -63,8 +65,6 @@ public class RedisBackedCounterCache implements CounterCache {
     String _key = addPrefixToKey(key);
     localCache.asMap().merge(_key, val, Long::sum);
     pendingIncOps.add(new Op(_key, val));
-
-    this.setExpiryIfNotSet(_key, 3 * 60 * 60); // added 3 hours expiry for now
   }
 
   @Override
@@ -93,6 +93,7 @@ public class RedisBackedCounterCache implements CounterCache {
   }
 
   private void syncToRedis() {
+    Set<String> _keys = new HashSet<>();
     while (!pendingIncOps.isEmpty()) {
       Op op = pendingIncOps.poll();
       String key = op.getKey();
@@ -111,11 +112,15 @@ public class RedisBackedCounterCache implements CounterCache {
                   ex.printStackTrace();
                 }
 
+                _keys.add(key);
+
                 if (result != null) {
                   localCache.asMap().put(key, result);
                 }
               });
     }
+
+    _keys.forEach(key -> setExpiryIfNotSet(key, 3 * 60 * 60));
 
     this.deletedKeys.clear();
   }
