@@ -24,6 +24,7 @@ import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.Constants;
+import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.TestErrorSource;
 import com.akto.utils.DeleteTestRunUtils;
 import com.akto.utils.Utils;
@@ -36,10 +37,12 @@ import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
+import java.nio.file.DirectoryStream.Filter;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -509,23 +512,34 @@ public class StartTestAction extends UserAction {
         }
     }
 
+    private static Bson vulnerableFilter = Filters.and(
+        Filters.eq(TestingRunResult.VULNERABLE, true),
+        Filters.or(
+            Filters.exists(TestingRunResult.IS_IGNORED_RESULT, false),
+            Filters.eq(TestingRunResult.IS_IGNORED_RESULT, false)
+        )
+        
+    );
+
     private List<Bson> prepareTestRunResultsFilters(ObjectId testingRunResultSummaryId, QueryMode queryMode) {
         List<Bson> filterList = new ArrayList<>();
         filterList.add(Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, testingRunResultSummaryId));
 
         if(reportFilterList != null) {
             Bson filtersForTestingRunResults = com.akto.action.testing.Utils.createFiltersForTestingReport(reportFilterList);
-            if (!filtersForTestingRunResults.equals(Filters.empty())) filterList.add(filtersForTestingRunResults);
+            if (!filtersForTestingRunResults.equals(Filters.empty())) {
+                filterList.add(filtersForTestingRunResults);
+            }
         }
 
         if(queryMode == null) {
             if(fetchOnlyVulnerable) {
-                filterList.add(Filters.eq(TestingRunResult.VULNERABLE, true));
+                filterList.add(vulnerableFilter);
             }
         } else {
             switch (queryMode) {
                 case VULNERABLE:
-                    filterList.add(Filters.eq(TestingRunResult.VULNERABLE, true));
+                    filterList.add(vulnerableFilter);
                     break;
                 case SKIPPED_EXEC_API_REQUEST_FAILED:
                     filterList.add(Filters.eq(TestingRunResult.VULNERABLE, false));
@@ -1055,6 +1069,80 @@ public class StartTestAction extends UserAction {
             Filters.eq(Constants.ID, this.testingRunConfigId),
             Updates.set("configsAdvancedSettings", this.testConfigsAdvancedSettings)
         );
+        return SUCCESS.toUpperCase();
+    }
+
+    public String handleRefreshTableCount(){
+        if(this.testingRunResultSummaryHexId == null || this.testingRunResultSummaryHexId.isEmpty()){
+            addActionError("Invalid summary id");
+            return ERROR.toUpperCase();
+        }
+        int accountId = Context.accountId.get();
+        executorService.schedule( new Runnable() {
+            public void run() {
+                Context.accountId.set(accountId);
+                try {
+                    ObjectId summaryObjectId = new ObjectId(testingRunResultSummaryHexId);
+                    List<TestingRunResult> testingRunResults = TestingRunResultDao.instance.findAll(
+                        Filters.and(
+                            Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, summaryObjectId),
+                            vulnerableFilter
+                        ), 
+                        Projections.include(TestingRunResult.API_INFO_KEY, TestingRunResult.TEST_SUB_TYPE)
+                    );
+
+                    if(testingRunResults.isEmpty()){
+                        return;
+                    }
+            
+                    Set<TestingIssuesId> issuesIds = new HashSet<>();
+                    Map<TestingIssuesId, ObjectId> mapIssueToResultId = new HashMap<>();
+                    Set<ObjectId> ignoredResults = new HashSet<>();
+                    for(TestingRunResult runResult: testingRunResults){
+                        TestingIssuesId issuesId = new TestingIssuesId(runResult.getApiInfoKey(), TestErrorSource.AUTOMATED_TESTING , runResult.getTestSubType());
+                        issuesIds.add(issuesId);
+                        mapIssueToResultId.put(issuesId, runResult.getId());
+                        ignoredResults.add(runResult.getId());
+                    }
+            
+                    List<TestingRunIssues> issues = TestingRunIssuesDao.instance.findAll(
+                        Filters.and(
+                            Filters.in(Constants.ID, issuesIds),
+                            Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS, GlobalEnums.TestRunIssueStatus.OPEN)
+                        ), Projections.include(TestingRunIssues.KEY_SEVERITY)
+                    );
+            
+                    Map<String, Integer> totalCountIssues = new HashMap<>();
+                    totalCountIssues.put("HIGH", 0);
+                    totalCountIssues.put("MEDIUM", 0);
+                    totalCountIssues.put("LOW", 0);
+            
+                    for(TestingRunIssues runIssue: issues){
+                        int initCount = totalCountIssues.getOrDefault(runIssue.getSeverity().name(), 0);
+                        totalCountIssues.put(runIssue.getSeverity().name(), initCount + 1);
+                        if(mapIssueToResultId.containsKey(runIssue.getId())){
+                            ObjectId resId = mapIssueToResultId.get(runIssue.getId());
+                            ignoredResults.remove(resId);
+                        }
+                    }
+            
+                    // update testing run result summary
+                    TestingRunResultSummariesDao.instance.updateOne(
+                        Filters.eq(Constants.ID, summaryObjectId),
+                        Updates.set(TestingRunResultSummary.COUNT_ISSUES, totalCountIssues)
+                    );
+            
+                    // update testing run results, by setting them isIgnored true
+                    TestingRunResultDao.instance.updateMany(
+                        Filters.in(Constants.ID, ignoredResults),
+                        Updates.set(TestingRunResult.IS_IGNORED_RESULT, true)
+                    );
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+        }, 0 , TimeUnit.SECONDS);
+
         return SUCCESS.toUpperCase();
     }
 

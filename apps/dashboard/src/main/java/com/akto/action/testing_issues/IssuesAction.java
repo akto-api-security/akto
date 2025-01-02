@@ -37,6 +37,7 @@ import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.Severity;
 import com.akto.util.enums.GlobalEnums.TestCategory;
 import com.akto.util.enums.GlobalEnums.TestRunIssueStatus;
+import com.akto.utils.jobs.CleanInventory;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.*;
@@ -50,6 +51,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.*;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 import static com.akto.util.Constants.ID;
 import static com.akto.util.Constants.ONE_DAY_TIMESTAMP;
@@ -76,6 +80,9 @@ public class IssuesAction extends UserAction {
     private int startEpoch;
     long endTimeStamp;
     private Map<Integer,Map<String,Integer>> severityInfo = new HashMap<>();
+
+    private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
+
 
     private Bson createFilters (boolean useFilterStatus) {
         Bson filters = Filters.empty();
@@ -513,6 +520,8 @@ public class IssuesAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    private Map<String,String> testingRunResultHexIdsMap;
+
     public String bulkUpdateIssueStatus () {
         if (issueIdArray == null || statusToBeUpdated == null || ignoreReason == null) {
             throw new IllegalStateException();
@@ -530,6 +539,42 @@ public class IssuesAction extends UserAction {
             update = Updates.combine(update, Updates.unset(TestingRunIssues.IGNORE_REASON));
         }
         TestingRunIssuesDao.instance.updateMany(Filters.in(ID, issueIdArray), update);
+
+        int accountId = Context.accountId.get();
+        executorService.schedule( new Runnable() {
+            public void run() {
+                Context.accountId.set(accountId);
+                try {
+
+                    final Map<String, Integer> countIssuesMap = new HashMap<>();
+                    countIssuesMap.put(Severity.HIGH.toString(), 0);
+                    countIssuesMap.put(Severity.MEDIUM.toString(), 0);
+                    countIssuesMap.put(Severity.LOW.toString(), 0);
+
+                    // update summaries accordingly with issues ignored
+
+                    Map<ObjectId,String> mapSummaryToResultId = TestingRunResultDao.instance.mapSummaryIdToTestingResultHexId(testingRunResultHexIdsMap.keySet());
+                    Map<ObjectId,Map<String,Integer>> summaryWiseCountMap = new HashMap<>();
+
+                    for(ObjectId summaryId: mapSummaryToResultId.keySet()){
+                        String resultHexId = mapSummaryToResultId.get(summaryId);
+                        Map<String, Integer> countMap = summaryWiseCountMap.getOrDefault(summaryId, countIssuesMap);
+                        String severity = testingRunResultHexIdsMap.get(resultHexId);
+                        int initialCount = countMap.getOrDefault(severity, 0);
+                        countMap.put(severity, initialCount + 1);
+                        summaryWiseCountMap.put(summaryId, countMap);
+                    }
+                    if(!summaryWiseCountMap.isEmpty()){
+                        TestingRunResultSummariesDao.instance.bulkUpdateTestingRunResultSummariesCount(summaryWiseCountMap);
+                    }
+
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+        }, 0 , TimeUnit.SECONDS);
+        
+
         return SUCCESS.toUpperCase();
     }
 
@@ -903,5 +948,9 @@ public class IssuesAction extends UserAction {
 
     public void setSeverityInfo(Map<Integer, Map<String, Integer>> severityInfo) {
         this.severityInfo = severityInfo;
+    }
+
+    public void setTestingRunResultHexIdsMap(Map<String, String> testingRunResultHexIdsMap) {
+        this.testingRunResultHexIdsMap = testingRunResultHexIdsMap;
     }
 }

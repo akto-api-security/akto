@@ -626,6 +626,13 @@ const editableConfigsComp = (
     }
   }
 
+  const handleRefreshTableCount = async(summaryHexId) => {
+    await api.handleRefreshTableCount(summaryHexId).then((res) => {
+      func.setToast(true, false, "Re-calculating issues count")
+      setSecondaryPopover(false)
+    })
+  }
+
   const EmptyData = () => {
     return(
       <div style={{margin: 'auto', marginTop: '20vh'}}>
@@ -720,6 +727,11 @@ const editableConfigsComp = (
       content: 'Edit testing config settings',
       icon: EditMajor,
       onAction: () => { setShowEditableSettings(true); handleAddSettings(); }
+    },
+    {
+      content: 'Re-Calculate Issues Count',
+      icon: RefreshMajor,
+      onAction: () => {handleRefreshTableCount(currentSummary.hexId)}
     }
   ]})
   const moreActionsComp = (

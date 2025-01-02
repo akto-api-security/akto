@@ -28,6 +28,10 @@ import com.mongodb.client.model.IndexOptions;
 import com.mongodb.client.model.Indexes;
 import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Sorts;
+import com.mongodb.client.model.UpdateOneModel;
+import com.mongodb.client.model.UpdateOptions;
+import com.mongodb.client.model.Updates;
+import com.mongodb.client.model.WriteModel;
 
 public class TestingRunResultSummariesDao extends AccountsContextDao<TestingRunResultSummary> {
 
@@ -98,6 +102,28 @@ public class TestingRunResultSummariesDao extends AccountsContextDao<TestingRunR
         }
 
         return ret;
+    }
+
+    public void bulkUpdateTestingRunResultSummariesCount(Map<ObjectId,Map<String,Integer>> summaryWiseCountMap){
+
+        ArrayList<WriteModel<TestingRunResultSummary>> bulkUpdates = new ArrayList<>();
+        for(ObjectId summaryId: summaryWiseCountMap.keySet()){
+
+            Map<String,Integer> countIssuesMap = summaryWiseCountMap.get(summaryId);
+
+            Bson update = Updates.combine(
+                    Updates.inc("countIssues.HIGH", (-1 * countIssuesMap.get("HIGH"))),
+                    Updates.inc("countIssues.MEDIUM", (-1 * countIssuesMap.get("MEDIUM"))),
+                    Updates.inc("countIssues.LOW", (-1 * countIssuesMap.get("LOW")))
+                );
+
+            bulkUpdates.add(
+                new UpdateOneModel<>(Filters.eq("_id",summaryId), update, new UpdateOptions().upsert(false))
+            );
+        }
+
+        instance.getMCollection().bulkWrite(bulkUpdates);
+
     }
 
     public void createIndicesIfAbsent() {

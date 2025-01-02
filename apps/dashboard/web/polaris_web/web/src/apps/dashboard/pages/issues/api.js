@@ -23,11 +23,11 @@ export default {
             data: {issuesIds, issueStatusQuery}
         })
     },
-    bulkUpdateIssueStatus (issueIdArray, statusToBeUpdated, ignoreReason) {
+    bulkUpdateIssueStatus (issueIdArray, statusToBeUpdated, ignoreReason, testingRunResultHexIdsMap) {
         return request({
             url: 'api/bulkUpdateIssueStatus',
             method: 'post',
-            data: {issueIdArray, statusToBeUpdated, ignoreReason}
+            data: {issueIdArray, statusToBeUpdated, ignoreReason, testingRunResultHexIdsMap}
         })
     },
     fetchTestingRunResult (issueId) {
