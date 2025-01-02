@@ -37,6 +37,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
+import java.nio.file.DirectoryStream.Filter;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.Executors;
@@ -513,7 +514,11 @@ public class StartTestAction extends UserAction {
 
     private static Bson vulnerableFilter = Filters.and(
         Filters.eq(TestingRunResult.VULNERABLE, true),
-        Filters.in(TestingRunResult.IS_IGNORED_RESULT, Arrays.asList(null, false))
+        Filters.or(
+            Filters.exists(TestingRunResult.IS_IGNORED_RESULT, false),
+            Filters.eq(TestingRunResult.IS_IGNORED_RESULT, false)
+        )
+        
     );
 
     private List<Bson> prepareTestRunResultsFilters(ObjectId testingRunResultSummaryId, QueryMode queryMode) {
