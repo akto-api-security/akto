@@ -69,7 +69,7 @@ const WelcomeBackDetailsModal = ({ isAdmin }) => {
         }
 
         if (window.mixpanel) {
-            mixpanelUserProps = {
+            let mixpanelUserProps = {
                 "name": username,
                 "company": organization,
                 "$name": username,
