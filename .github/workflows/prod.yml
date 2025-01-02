@@ -7,6 +7,26 @@ on:
     inputs:
       release_version:
         required: true  
+      dashboard:
+        type: boolean
+        default: true
+        description: Dashboard
+      testing:
+        type: boolean
+        default: true
+        description: Testing
+      billing:
+        type: boolean
+        default: true
+        description: Billing
+      internal:
+        type: boolean
+        default: true
+        description: Internal
+      protection:
+        type: boolean
+        default: true
+        description: Protection        
       
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
@@ -67,24 +87,41 @@ jobs:
         run: |
           docker buildx create --use
           # Build a docker container and push it to DockerHub 
-          cd apps/dashboard
-          docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/$ECR_REPOSITORY-dashboard:$IMAGE_TAG_1 -t $ECR_REGISTRY/$ECR_REPOSITORY-dashboard:$IMAGE_TAG_2 . --push
-          echo "::set-output name=image::$ECR_REGISTRY/$ECR_REPOSITORY-dashboard:$IMAGE_TAG"   
-          cd ../testing
-          docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-api-testing:$IMAGE_TAG_1 -t $ECR_REGISTRY/akto-api-testing:$IMAGE_TAG_2 . --push
-          echo "::set-output name=image::$ECR_REGISTRY/akto-api-testing:$IMAGE_TAG"       
-          cd ../testing-cli
-          docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-api-testing-cli:$IMAGE_TAG_1 -t $ECR_REGISTRY/akto-api-testing-cli:$IMAGE_TAG_2 . --push
-          echo "::set-output name=image::$ECR_REGISTRY/akto-api-testing-cli:$IMAGE_TAG"
-          cd ../billing
-          docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-billing:$IMAGE_TAG_1 -t $ECR_REGISTRY/akto-billing:$IMAGE_TAG_2 . --push
-          echo "::set-output name=image::$ECR_REGISTRY/akto-billing:$IMAGE_TAG"
-          cd ../internal
-          docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-internal:$IMAGE_TAG_1 -t $ECR_REGISTRY/akto-internal:$IMAGE_TAG_2 . --push
-          echo "::set-output name=image::$ECR_REGISTRY/akto-internal:$IMAGE_TAG"
-          cd ../api-threat-detection
-          docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-api-protection:$IMAGE_TAG_1 -t $ECR_REGISTRY/akto-api-protection:$IMAGE_TAG_2 -t $ECR_REGISTRY/akto-api-protection:$IMAGE_TAG_3 . --push
-
+          if [[ "${{ github.event.inputs.dashboard }}" == "true" ]]; then
+            cd apps/dashboard
+            docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/$ECR_REPOSITORY-dashboard:$IMAGE_TAG_1 -t $ECR_REGISTRY/$ECR_REPOSITORY-dashboard:$IMAGE_TAG_2 . --push
+            echo "::set-output name=image::$ECR_REGISTRY/$ECR_REPOSITORY-dashboard:$IMAGE_TAG"   
+          fi
+          
+          if [[ "${{ github.event.inputs.testing }}" == "true" ]]; then
+            cd apps/testing
+            docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-api-testing:$IMAGE_TAG_1 -t $ECR_REGISTRY/akto-api-testing:$IMAGE_TAG_2 . --push
+            echo "::set-output name=image::$ECR_REGISTRY/akto-api-testing:$IMAGE_TAG"       
+          fi
+          
+          if [[ "${{ github.event.inputs.testing }}" == "true" ]]; then
+            cd apps/testing-cli
+            docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-api-testing-cli:$IMAGE_TAG_1 -t $ECR_REGISTRY/akto-api-testing-cli:$IMAGE_TAG_2 . --push
+            echo "::set-output name=image::$ECR_REGISTRY/akto-api-testing-cli:$IMAGE_TAG"
+          fi
+          
+          if [[ "${{ github.event.inputs.billing }}" == "true" ]]; then
+            cd apps/billing
+            docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-billing:$IMAGE_TAG_1 -t $ECR_REGISTRY/akto-billing:$IMAGE_TAG_2 . --push
+            echo "::set-output name=image::$ECR_REGISTRY/akto-billing:$IMAGE_TAG"
+          fi
+          
+          if [[ "${{ github.event.inputs.internal }}" == "true" ]]; then
+            cd apps/internal
+            docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-internal:$IMAGE_TAG_1 -t $ECR_REGISTRY/akto-internal:$IMAGE_TAG_2 . --push
+            echo "::set-output name=image::$ECR_REGISTRY/akto-internal:$IMAGE_TAG"
+          fi
+          
+          if [[ "${{ github.event.inputs.protection }}" == "true" ]]; then
+            cd apps/api-threat-detection
+            docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-api-protection:$IMAGE_TAG_1 -t $ECR_REGISTRY/akto-api-protection:$IMAGE_TAG_2 -t $ECR_REGISTRY/akto-api-protection:$IMAGE_TAG_3 . --push
+            echo "::set-output name=image::$ECR_REGISTRY/akto-api-protection:$IMAGE_TAG"
+          fi  
       - name: Configure AWS Credentials for ECR
         uses: aws-actions/configure-aws-credentials@v1
         with:
