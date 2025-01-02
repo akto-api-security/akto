@@ -2266,6 +2266,23 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
+    List<DependencyNode> dependencyNodes;
+
+    public List<DependencyNode> getDependencyNodes() {
+        return dependencyNodes;
+    }
+
+    public void setDependencyNodes(List<DependencyNode> dependencyNodes) {
+        this.dependencyNodes = dependencyNodes;
+    }
+
+    public String findDependencyNodes() {
+        if (filter != null) {
+            dependencyNodes = DbLayer.findDependencyNodes(filter);
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
     public String fetchTestScript() {
         try {
             testScript = DbLayer.fetchTestScript();

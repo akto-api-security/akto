@@ -1066,4 +1066,8 @@ public class DbLayer {
         return TestScriptsDao.instance.fetchTestScript();
     }
 
+    public static List<DependencyNode> findDependencyNodes(Bson filter){
+        return DependencyNodeDao.instance.findAll(filter);
+    }
+
 }
