@@ -34,6 +34,16 @@ export default {
         })
         return resp        
     },
+    async fetchTestRunResultsCount(testingRunResultSummaryHexId) {
+        const resp = await request({
+            url: '/api/fetchTestRunResultsCount',
+            method: 'post',
+            data: {
+                testingRunResultSummaryHexId
+            }
+        })
+        return resp        
+    },
     async fetchAllSubCategories(fetchOnlyActive, mode, skip, limit) {
         const resp = await request({
             url: 'api/fetchAllSubCategories',
