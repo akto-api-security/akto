@@ -3544,12 +3544,12 @@ public class ClientActor extends DataActor {
         return testScript;
     }
 
-    public List<DependencyNode> findDependencyNodes(int apiCollectionId, String url, String method, String reqMethod) {
+    public List<DependencyNode> findDependencyNodes(int apiCollectionId, String urlVar, String method, String reqMethod) {
         BasicDBObject obj = new BasicDBObject();
         obj.put("apiCollectionId", apiCollectionId);
-        obj.put("url", url);
+        obj.put("url", urlVar);
         obj.put("methodVal", method);
-        // TODO: reqMethod, coming from database-abstractor
+        obj.put("reqMethod", reqMethod);
         Map<String, List<String>> headers = buildHeaders();
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/findDependencyNodes", "", "POST",  obj.toString(), headers, "");
         try {
