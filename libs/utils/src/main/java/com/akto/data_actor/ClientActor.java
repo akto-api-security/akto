@@ -3544,7 +3544,7 @@ public class ClientActor extends DataActor {
         return testScript;
     }
 
-    public List<DependencyNode> findDependencyNodes(int apiCollectionId, String url, String method) {
+    public List<DependencyNode> findDependencyNodes(int apiCollectionId, String url, String method, String reqMethod) {
         BasicDBObject obj = new BasicDBObject();
         obj.put("apiCollectionId", apiCollectionId);
         obj.put("url", url);
