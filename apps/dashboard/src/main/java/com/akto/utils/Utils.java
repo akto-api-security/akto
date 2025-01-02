@@ -634,7 +634,7 @@ public class Utils {
     }
 
     private static List<Integer> getModifiedCollectionIds(List<Integer> oldList, int newCollId, int oldCollId){
-        oldList.remove(oldCollId);
+        oldList.removeIf(num -> num == oldCollId);
         oldList.add(newCollId);
         return oldList;
     }
@@ -733,8 +733,7 @@ public class Utils {
             bulkUpdatesForSti.add(new UpdateManyModel<>(filterQ, 
             Updates.combine(
                 Updates.set(SingleTypeInfo._API_COLLECTION_ID, sampleDataToBeMovedMap.get(key)),
-                Updates.pull(SingleTypeInfo._COLLECTION_IDS, key.getApiCollectionId()),
-                Updates.push(SingleTypeInfo._COLLECTION_IDS, sampleDataToBeMovedMap.get(key))
+                Updates.addToSet(SingleTypeInfo._COLLECTION_IDS, sampleDataToBeMovedMap.get(key))
             )));
         }
 
