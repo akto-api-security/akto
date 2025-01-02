@@ -6,11 +6,6 @@ import com.akto.dto.settings.DataControlSettings;
 import com.akto.testing.ApiExecutor;
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.interfaces.DecodedJWT;
-import com.akto.bulk_update_util.ApiInfoBulkUpdate;
-import com.akto.dao.SetupDao;
-import com.akto.dao.context.Context;
-import com.akto.dao.testing.TestingRunResultSummariesDao;
-import com.akto.database_abstractor_authenticator.JwtAuthenticator;
 import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.billing.Organization;
@@ -59,9 +54,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 
-import io.jsonwebtoken.Claims;
-import io.jsonwebtoken.Jws;
-
 import org.bson.BsonReader;
 import org.bson.Document;
 import org.bson.codecs.Codec;
@@ -83,8 +75,6 @@ import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-import org.bson.types.ObjectId;
-
 import com.google.gson.Gson;
 
 public class ClientActor extends DataActor {
@@ -95,7 +85,6 @@ public class ClientActor extends DataActor {
     private static final int maxConcurrentBatchWrites = 150;
     private static final Gson gson = new Gson();
     private static final CodecRegistry codecRegistry = DaoInit.createCodecRegistry();
-    private static final Logger logger = LoggerFactory.getLogger(ClientActor.class);
     public static final String CYBORG_URL = "https://cyborg.akto.io";
     private static ExecutorService threadPool = Executors.newFixedThreadPool(maxConcurrentBatchWrites);
     private static AccountSettings accSettings;
@@ -3488,6 +3477,40 @@ public class ClientActor extends DataActor {
             loggerMaker.errorAndAddToDb("error in fetchTestScript" + e, LoggerMaker.LogDb.RUNTIME);
         }
         return testScript;
+    }
+
+    public List<DependencyNode> findDependencyNodes(int apiCollectionId, String urlVar, String method, String reqMethod) {
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("apiCollectionId", apiCollectionId);
+        obj.put("url", urlVar);
+        obj.put("methodVal", method);
+        obj.put("reqMethod", reqMethod);
+        Map<String, List<String>> headers = buildHeaders();
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/findDependencyNodes", "", "POST",  obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in findDependencyNodes", LoggerMaker.LogDb.TESTING);
+                return new ArrayList<>();
+            }
+            BasicDBObject payloadObj;
+            try {
+                payloadObj = BasicDBObject.parse(responsePayload);
+                BasicDBList dependencyNodesObj = (BasicDBList) payloadObj.get("dependencyNodes");
+                List<DependencyNode> dependencyNodes = new ArrayList<>();
+                for (Object nodeObj : dependencyNodesObj) {
+                    BasicDBObject obj2 = (BasicDBObject) nodeObj;
+                    dependencyNodes.add(objectMapper.readValue(obj2.toJson(), DependencyNode.class));
+                }
+                return dependencyNodes;
+            } catch (Exception e) {
+                return new ArrayList<>();
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in findDependencyNodes" + e, LoggerMaker.LogDb.TESTING);
+            return new ArrayList<>();
+        }
     }
 
 }

@@ -25,16 +25,26 @@ public class TestingRunConfig {
     private String overriddenTestAppUrl;
 
     private List<TestConfigsAdvancedSettings> configsAdvancedSettings;
+    private boolean cleanUp;
+
     public TestingRunConfig() {}
+
+    public TestingRunConfig(int id, Map<Integer, List<ApiInfo.ApiInfoKey>> collectionWiseApiInfoKey,
+            List<String> testSubCategoryList, ObjectId authMechanismId, String overriddenTestAppUrl,
+            String testRoleId) {
+        this(id, collectionWiseApiInfoKey, testSubCategoryList, authMechanismId, overriddenTestAppUrl, testRoleId, false);
+    }
+
     public TestingRunConfig(int id, Map<Integer, List<ApiInfo.ApiInfoKey>> collectionWiseApiInfoKey,
                             List<String> testSubCategoryList,
-                            ObjectId authMechanismId, String overriddenTestAppUrl, String testRoleId) {
+                            ObjectId authMechanismId, String overriddenTestAppUrl, String testRoleId, boolean cleanUp) {
         this.id = id;
         this.collectionWiseApiInfoKey = collectionWiseApiInfoKey;
         this.testSubCategoryList = testSubCategoryList;
         this.authMechanismId = authMechanismId;
         this.overriddenTestAppUrl = overriddenTestAppUrl;
         this.testRoleId = testRoleId;
+        this.cleanUp = cleanUp;
     }
 
     public List<String> getTestSubCategoryList() {
@@ -101,6 +111,8 @@ public class TestingRunConfig {
         if(this.testRoleId == null) {
             this.testRoleId = that.testRoleId;
         }
+
+        this.cleanUp = that.cleanUp;
     }
     
     public String getTestRoleId() {
@@ -126,6 +138,14 @@ public class TestingRunConfig {
     }
     public void setConfigsAdvancedSettings(List<TestConfigsAdvancedSettings> configsAdvancedSettings) {
         this.configsAdvancedSettings = configsAdvancedSettings;
+    }
+
+    public boolean getCleanUp() {
+        return this.cleanUp;
+    }
+
+    public void setCleanUp(boolean cleanUp) {
+        this.cleanUp = cleanUp;
     }
 
 }

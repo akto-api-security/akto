@@ -547,4 +547,8 @@ public class DbActor extends DataActor {
         return DbLayer.fetchTestScript();
     }
 
+    public List<DependencyNode> findDependencyNodes(int apiCollectionId, String url, String method, String reqMethod){
+        return DbLayer.findDependencyNodes(apiCollectionId, url, method, reqMethod);
+    }
+
 }
