@@ -23,6 +23,11 @@ on:
         type: boolean
         default: true
         description: Internal
+      threat_detection:
+        type: boolean
+        default: true
+        description: Threat Detection Client
+
       threat_detection_backend:
         type: boolean
         default: true
@@ -130,6 +135,11 @@ jobs:
             cd ../internal
             docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-internal:$IMAGE_TAG_1 -t $ECR_REGISTRY/akto-internal:$IMAGE_TAG_2 . --push
             echo "::set-output name=image::$ECR_REGISTRY/akto-internal:$IMAGE_TAG"
+          fi
+
+          if [[ "${{ github.event.inputs.threat_detection}}" == "true" ]]; then
+            cd ../threat-detection
+            docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-threat-detection:$IMAGE_TAG_1 -t $ECR_REGISTRY/akto-threat-detection:$IMAGE_TAG_2 . --push
           fi
 
           if [[ "${{ github.event.inputs.threat_detection_backend}}" == "true" ]]; then
