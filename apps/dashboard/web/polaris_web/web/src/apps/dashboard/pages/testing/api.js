@@ -494,5 +494,12 @@ export default {
             method: 'post',
             data: {...filters, issueIds, endTimeStamp}
         })
+    },
+    handleRefreshTableCount(testingRunResultSummaryHexId) {
+        return request({
+            url: '/api/handleRefreshTableCount',
+            method: 'post',
+            data: {testingRunResultSummaryHexId}
+        })
     }
 }

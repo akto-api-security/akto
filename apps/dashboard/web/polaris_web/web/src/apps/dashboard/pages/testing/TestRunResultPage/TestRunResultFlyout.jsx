@@ -15,7 +15,6 @@ import "./style.css"
 import ActivityTracker from '../../dashboard/components/ActivityTracker'
 import observeFunc from "../../observe/transform.js"
 import settingFunctions from '../../settings/module.js'
-import DropdownSearch from '../../../components/shared/DropdownSearch.jsx'
 import JiraTicketCreationModal from '../../../components/shared/JiraTicketCreationModal.jsx'
 
 function TestRunResultFlyout(props) {

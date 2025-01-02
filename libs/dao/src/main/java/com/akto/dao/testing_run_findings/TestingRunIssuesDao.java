@@ -19,6 +19,7 @@ import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.test_run_findings.TestingIssuesId;
+import com.akto.util.Constants;
 import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.MongoDBEnums;
 import com.mongodb.BasicDBObject;
@@ -59,6 +60,9 @@ public class TestingRunIssuesDao extends AccountsContextDaoWithRbac<TestingRunIs
         fieldNames = new String[] {TestingRunIssues.TEST_RUN_ISSUES_STATUS};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
         fieldNames = new String[] {TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_ID};
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
+
+        fieldNames =  new String[] {Constants.ID, TestingRunIssues.TEST_RUN_ISSUES_STATUS};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
     
     }
