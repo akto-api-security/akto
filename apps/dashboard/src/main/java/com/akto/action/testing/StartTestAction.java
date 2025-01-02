@@ -722,46 +722,46 @@ public class StartTestAction extends UserAction {
             );
 
             List<TestingRunResult> testingRunResultList = TestingRunResultDao.instance.findAll(filters, skip, 50, null);
-            Map<String, String> sampleDataVsCurlMap = new HashMap<>();
-            for (TestingRunResult runResult: testingRunResultList) {
-                WorkflowTest workflowTest = runResult.getWorkflowTest();
-                for (GenericTestResult tr : runResult.getTestResults()) {
-                    if (tr.isVulnerable()) {
-                        if (tr instanceof TestResult) {
-                            TestResult testResult = (TestResult) tr;
-                            sampleDataVsCurlMap.put(testResult.getMessage(),
-                                    ExportSampleDataAction.getCurl(testResult.getMessage()));
-                            sampleDataVsCurlMap.put(testResult.getOriginalMessage(),
-                                    ExportSampleDataAction.getCurl(testResult.getOriginalMessage()));
-                        } else if (tr instanceof MultiExecTestResult){
-                            MultiExecTestResult testResult = (MultiExecTestResult) tr;
-                            Map<String, WorkflowTestResult.NodeResult> nodeResultMap = testResult.getNodeResultMap();
-                            for (String order : nodeResultMap.keySet()) {
-                                WorkflowTestResult.NodeResult nodeResult = nodeResultMap.get(order);
-                                String nodeResultLastMessage = getNodeResultLastMessage(nodeResult.getMessage());
-                                if (nodeResultLastMessage != null) {
-                                    nodeResult.setMessage(nodeResultLastMessage);
-                                    sampleDataVsCurlMap.put(nodeResultLastMessage,
-                                            ExportSampleDataAction.getCurl(nodeResultLastMessage));
-                                }
-                            }
-                        }
-                    }
-                }
-                if (workflowTest != null) {
-                    Map<String, WorkflowNodeDetails> nodeDetailsMap = workflowTest.getMapNodeIdToWorkflowNodeDetails();
-                    for (String nodeName: nodeDetailsMap.keySet()) {
-                        if (nodeDetailsMap.get(nodeName) instanceof YamlNodeDetails) {
-                            YamlNodeDetails details = (YamlNodeDetails) nodeDetailsMap.get(nodeName);
-                            sampleDataVsCurlMap.put(details.getOriginalMessage(),
-                                    ExportSampleDataAction.getCurl(details.getOriginalMessage()));
-                        }
+            // Map<String, String> sampleDataVsCurlMap = new HashMap<>();
+            // for (TestingRunResult runResult: testingRunResultList) {
+            //     WorkflowTest workflowTest = runResult.getWorkflowTest();
+            //     for (GenericTestResult tr : runResult.getTestResults()) {
+            //         if (tr.isVulnerable()) {
+            //             if (tr instanceof TestResult) {
+            //                 TestResult testResult = (TestResult) tr;
+            //                 // sampleDataVsCurlMap.put(testResult.getMessage(),
+            //                 //         ExportSampleDataAction.getCurl(testResult.getMessage()));
+            //                 // sampleDataVsCurlMap.put(testResult.getOriginalMessage(),
+            //                 //         ExportSampleDataAction.getCurl(testResult.getOriginalMessage()));
+            //             } else if (tr instanceof MultiExecTestResult){
+            //                 MultiExecTestResult testResult = (MultiExecTestResult) tr;
+            //                 Map<String, WorkflowTestResult.NodeResult> nodeResultMap = testResult.getNodeResultMap();
+            //                 for (String order : nodeResultMap.keySet()) {
+            //                     WorkflowTestResult.NodeResult nodeResult = nodeResultMap.get(order);
+            //                     String nodeResultLastMessage = getNodeResultLastMessage(nodeResult.getMessage());
+            //                     if (nodeResultLastMessage != null) {
+            //                         nodeResult.setMessage(nodeResultLastMessage);
+            //                         sampleDataVsCurlMap.put(nodeResultLastMessage,
+            //                                 ExportSampleDataAction.getCurl(nodeResultLastMessage));
+            //                     }
+            //                 }
+            //             }
+            //         }
+            //     }
+            //     if (workflowTest != null) {
+            //         Map<String, WorkflowNodeDetails> nodeDetailsMap = workflowTest.getMapNodeIdToWorkflowNodeDetails();
+            //         for (String nodeName: nodeDetailsMap.keySet()) {
+            //             if (nodeDetailsMap.get(nodeName) instanceof YamlNodeDetails) {
+            //                 YamlNodeDetails details = (YamlNodeDetails) nodeDetailsMap.get(nodeName);
+            //                 sampleDataVsCurlMap.put(details.getOriginalMessage(),
+            //                         ExportSampleDataAction.getCurl(details.getOriginalMessage()));
+            //             }
 
-                    }
-                }
-            }
+            //         }
+            //     }
+            // }
             this.testingRunResults = testingRunResultList;
-            this.sampleDataVsCurlMap = sampleDataVsCurlMap;
+            // this.sampleDataVsCurlMap = sampleDataVsCurlMap;
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error while executing test run summary" + e.getMessage(), LogDb.DASHBOARD);
             addActionError("Invalid test summary id");
