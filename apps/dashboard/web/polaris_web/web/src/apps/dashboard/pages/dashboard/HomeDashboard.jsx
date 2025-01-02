@@ -134,7 +134,8 @@ function HomeDashboard() {
             observeApi.getUserEndpoints(),
             api.findTotalIssues(startTimestamp, endTimestamp),
             api.fetchApiStats(startTimestamp, endTimestamp),
-            api.fetchEndpointsCount(startTimestamp, endTimestamp)
+            api.fetchEndpointsCount(startTimestamp, endTimestamp),
+            testingApi.fetchSeverityInfoForIssues({}, [], 0)
         ];
 
         let results = await Promise.allSettled(apiPromises);
@@ -143,6 +144,7 @@ function HomeDashboard() {
         let findTotalIssuesResp = results[1].status === 'fulfilled' ? results[1].value : {}
         let apisStatsResp = results[2].status === 'fulfilled' ? results[2].value : {}
         let fetchEndpointsCountResp = results[3].status === 'fulfilled' ? results[3].value : {}
+        let issueSeverityMap = results[4].status === 'fulfilled' ? results[4].value : {}
 
         setShowBannerComponent(!userEndpoints)
 
@@ -153,7 +155,7 @@ function HomeDashboard() {
         buildAuthTypesData(apisStatsResp.apiStatsEnd)
         buildSetRiskScoreData(apisStatsResp.apiStatsEnd) //todo
         getCollectionsWithCoverage()
-        buildSeverityMap(apisStatsResp.apiStatsEnd)
+        buildSeverityMap(issueSeverityMap.severityInfo)
         buildIssuesSummary(findTotalIssuesResp)
 
         const fetchHistoricalDataResp = { "finalHistoricalData": finalHistoricalData, "initialHistoricalData": initialHistoricalData }
@@ -447,8 +449,17 @@ function HomeDashboard() {
         />
     ) : null
 
-    function buildSeverityMap(apiStats) {
-        const countMap = apiStats ? apiStats.criticalMap : {};
+    function buildSeverityMap(severityInfo) {
+        const countMap = { HIGH: 0, MEDIUM: 0, LOW: 0 }
+
+        if (severityInfo && severityInfo != undefined && severityInfo != null && severityInfo instanceof Object) {
+            for (const apiCollectionId in severityInfo) {
+                let temp = severityInfo[apiCollectionId]
+                for (const key in temp) {
+                    countMap[key] += temp[key]
+                }
+            }
+        }
 
         const result = {
             "High": {
@@ -508,11 +519,11 @@ function HomeDashboard() {
                 />
             </div>
         }
-        title="Vulnerable APIs by Severity"
-        titleToolTip="Breakdown of vulnerable APIs categorized by severity level (High, Medium, Low). Click to see details for each category."
+        title="Issues by Severity"
+        titleToolTip="Breakdown of issues categorized by severity level (High, Medium, Low). Click to see details for each category."
         linkText="Fix critical issues"
         linkUrl="/dashboard/issues"
-    /> : <EmptyCard title="Vulnerable APIs by Severity" subTitleComponent={showTestingComponents ? <Text alignment='center' color='subdued'>No vulnerable APIs found</Text>: runTestEmptyCardComponent}/>
+    /> : <EmptyCard title="Issues by Severity" subTitleComponent={showTestingComponents ? <Text alignment='center' color='subdued'>No issues found for this time-frame</Text>: runTestEmptyCardComponent}/>
 
     const criticalUnsecuredAPIsOverTime = <CriticalUnsecuredAPIsOverTimeGraph linkText={"Fix critical issues"} linkUrl={"/dashboard/issues"} />
 

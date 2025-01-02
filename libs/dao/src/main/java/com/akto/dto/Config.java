@@ -4,6 +4,8 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
 
+import com.akto.dao.ConfigsDao;
+import com.mongodb.client.model.Filters;
 import org.bson.codecs.pojo.annotations.BsonDiscriminator;
 
 @BsonDiscriminator
@@ -356,7 +358,11 @@ public abstract class Config {
         private String oktaDomainUrl;
         private String authorisationServerId;
         private String redirectUri;
-        
+        public static final String ORGANIZATION_DOMAIN = "organizationDomain";
+        private String organizationDomain;
+        public static final String ACCOUNT_ID = "accountId";
+        private int accountId;
+
         public static final String CONFIG_ID = ConfigType.OKTA.name() + CONFIG_SALT;
 
         public OktaConfig() {
@@ -398,6 +404,20 @@ public abstract class Config {
 
         public void setRedirectUri(String redirectUri) {
             this.redirectUri = redirectUri;
+        }
+
+        public String getOrganizationDomain() {
+            return organizationDomain;
+        }
+        public void setOrganizationDomain(String organizationDomain) {
+            this.organizationDomain = organizationDomain;
+        }
+
+        public int getAccountId() {
+            return accountId;
+        }
+        public void setAccountId(int accountId) {
+            this.accountId = accountId;
         }
     }
 
@@ -663,5 +683,31 @@ public abstract class Config {
             return false;
         }
         return ssoConfigTypes.contains(configType);
+    }
+
+    public static OktaConfig getOktaConfig(int accountId) {
+        OktaConfig config = (OktaConfig) ConfigsDao.instance.findOne(
+                Filters.and(
+                    Filters.eq("_id", "OKTA-ankush"),
+                    Filters.eq(OktaConfig.ACCOUNT_ID, accountId)
+                )
+        );
+        return config;
+    }
+
+    public static OktaConfig getOktaConfig(String userEmail){
+        if (userEmail == null || userEmail.trim().isEmpty()) {
+            return null;
+        }
+        String[] companyKeyArr = userEmail.split("@");
+        if(companyKeyArr == null || companyKeyArr.length < 2){
+            return null;
+        }
+
+        String domain = companyKeyArr[1];
+        OktaConfig config = (OktaConfig) ConfigsDao.instance.findOne(
+                Filters.eq(OktaConfig.ORGANIZATION_DOMAIN, domain)
+        );
+        return config;
     }
 }

@@ -74,6 +74,8 @@ public class StartTestAction extends UserAction {
     private Map<String,Integer> issuesSummaryInfoMap = new HashMap<>();
 
     private String testRoleId;
+    private boolean cleanUpTestingResources;
+
     private static final Gson gson = new Gson();
 
     private static List<ObjectId> getTestingRunListFromSummary(Bson filters){
@@ -147,7 +149,7 @@ public class StartTestAction extends UserAction {
         }
         if (this.selectedTests != null) {
             int id = UUID.randomUUID().hashCode() & 0xfffffff;
-            TestingRunConfig testingRunConfig = new TestingRunConfig(id, null, this.selectedTests, authMechanism.getId(), this.overriddenTestAppUrl, this.testRoleId);
+            TestingRunConfig testingRunConfig = new TestingRunConfig(id, null, this.selectedTests, authMechanism.getId(), this.overriddenTestAppUrl, this.testRoleId, this.cleanUpTestingResources);
             // add advanced setting here
             if(this.testConfigsAdvancedSettings != null && !this.testConfigsAdvancedSettings.isEmpty()){
                 testingRunConfig.setConfigsAdvancedSettings(this.testConfigsAdvancedSettings);
@@ -1417,5 +1419,13 @@ public class StartTestAction extends UserAction {
 
     public List<TestingRunIssues> getIssueslist() {
         return issueslist;
+    }
+    
+    public boolean getCleanUpTestingResources() {
+        return cleanUpTestingResources;
+    }
+
+    public void setCleanUpTestingResources(boolean cleanUpTestingResources) {
+        this.cleanUpTestingResources = cleanUpTestingResources;
     }
 }

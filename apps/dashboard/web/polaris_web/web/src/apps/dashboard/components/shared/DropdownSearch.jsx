@@ -65,9 +65,19 @@ function DropdownSearch(props) {
                 setLoading(true);
             }
 
+            const defaultSliceValue = sliceMaxVal || 20
+
             setTimeout(() => {
                 if (value === '' && selectedOptions.length === 0) {
-                    setOptions(deselectedOptions);
+                    const options = deselectedOptions.slice(0, defaultSliceValue);
+                    const title = options.length > defaultSliceValue
+                        ? `Showing ${options.length} result${func.addPlurality(options.length)} only. (type more to refine results)`
+                        : "Showing all results";
+                    const nestedOptions = [{
+                        title: title,
+                        options: options
+                    }]
+                    setOptions(nestedOptions);
                     setLoading(false);
                     return;
                 }
@@ -87,8 +97,17 @@ function DropdownSearch(props) {
                       });
                 }else{
                     resultOptions = deselectedOptions.filter((option) =>
-                    option[searchKey].match(filterRegex)
-                );
+                        option[searchKey].match(filterRegex)
+                    ).slice(0, defaultSliceValue);
+
+                    const title = resultOptions.length >= defaultSliceValue
+                        ? `Showing ${resultOptions.length} result${func.addPlurality(resultOptions.length)} only. (type more to refine results)`
+                        : "Showing all results";
+
+                    resultOptions = [{
+                        title: title,
+                        options: resultOptions
+                    }]
                 }
                 setOptions(resultOptions);
                 setLoading(false);

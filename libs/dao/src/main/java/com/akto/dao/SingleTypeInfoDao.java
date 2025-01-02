@@ -5,6 +5,7 @@ import java.net.URISyntaxException;
 import java.util.*;
 
 import com.akto.dao.context.Context;
+import com.akto.dto.AktoDataType;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.CollectionConditions.MethodCondition;
 import com.akto.dto.rbac.UsersCollectionsList;
@@ -209,13 +210,17 @@ public class SingleTypeInfoDao extends AccountsContextDaoWithRbac<SingleTypeInfo
         // AKTO sensitive
         for (SingleTypeInfo.SubType subType: SingleTypeInfo.subTypeMap.values()) {
             if (subType.isSensitiveAlways()) {
+                AktoDataType dt = SingleTypeInfo.getAktoDataTypeMap(Context.accountId.get()).get(subType.getName());
+                if (dt != null && !dt.getActive()) {
+                    continue;
+                }
                 sensitiveSubTypes.add(subType.getName());
             }
         }
 
         // Custom data type sensitive
         for (CustomDataType customDataType: SingleTypeInfo.getCustomDataTypeMap(Context.accountId.get()).values()) {
-            if (customDataType.isSensitiveAlways()) {
+            if (customDataType.isSensitiveAlways() && customDataType.isActive()){
                 sensitiveSubTypes.add(customDataType.getName());
             }
         }
@@ -229,6 +234,11 @@ public class SingleTypeInfoDao extends AccountsContextDaoWithRbac<SingleTypeInfo
             if (subType.isSensitiveAlways() ||
                     subType.getSensitivePosition().contains(SingleTypeInfo.Position.REQUEST_HEADER)
                     || subType.getSensitivePosition().contains(SingleTypeInfo.Position.REQUEST_PAYLOAD)) {
+
+                AktoDataType dt = SingleTypeInfo.getAktoDataTypeMap(Context.accountId.get()).get(subType.getName());
+                if (dt != null && !dt.getActive()) {
+                    continue;
+                }
                 sensitiveInRequest.add(subType.getName());
             }
         }
@@ -252,6 +262,12 @@ public class SingleTypeInfoDao extends AccountsContextDaoWithRbac<SingleTypeInfo
             if (subType.isSensitiveAlways() ||
                     subType.getSensitivePosition().contains(SingleTypeInfo.Position.RESPONSE_HEADER) ||
                     subType.getSensitivePosition().contains(SingleTypeInfo.Position.RESPONSE_PAYLOAD)) {
+
+                AktoDataType dt = SingleTypeInfo.getAktoDataTypeMap(Context.accountId.get()).get(subType.getName());
+                if (dt != null && !dt.getActive()) {
+                    continue;
+                }
+
                 sensitiveInResponse.add(subType.getName());
             }
         }
@@ -828,4 +844,11 @@ public class SingleTypeInfoDao extends AccountsContextDaoWithRbac<SingleTypeInfo
         return endpoints;
     }
 
+    public static BasicDBObject getApiInfoGroupedId() {
+        BasicDBObject groupedId = 
+                new BasicDBObject("apiCollectionId", "$apiCollectionId")
+                .append("url", "$url")
+                .append("method", "$method");
+        return groupedId;
+    }
 }

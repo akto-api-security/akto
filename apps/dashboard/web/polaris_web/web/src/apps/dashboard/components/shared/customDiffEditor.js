@@ -256,7 +256,7 @@ const transform = {
                 })
             }
             finalData = finalData.split("\n").sort().join("\n");
-            const isPayloadEmpty = Object.keys(payLoad).length === 0
+            const isPayloadEmpty = payLoad === null || Object.keys(payLoad).length === 0
             const isMultiformData = data?.json?.requestHeaders?.['content-type']?.includes('multipart/form-data')
             return (localFirstLine + "\n" + finalData + (finalData.trim().length === 0 || isPayloadEmpty ? "\n" : "\n\n") + (!isPayloadEmpty ? (isMultiformData ? payLoad : this.formatJson(payLoad)) : ''))
         }

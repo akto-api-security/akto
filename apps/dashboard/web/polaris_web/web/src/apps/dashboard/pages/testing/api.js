@@ -266,11 +266,11 @@ export default {
             data: {roleName, index}
         })
     },
-    updateAuthInRole(roleName, apiCond ,index, authParamData, authAutomationType) {
+    updateAuthInRole(roleName, apiCond ,index, authParamData, authAutomationType, reqData, recordedLoginFlowInput) {
         return request({
             url: '/api/updateAuthInRole',
             method: 'post',
-            data: {roleName, apiCond, index, authParamData, authAutomationType}
+            data: {roleName, apiCond, index, authParamData, authAutomationType, reqData, recordedLoginFlowInput}
         })
     },
     deleteTestRuns(testRunIds){
@@ -496,6 +496,13 @@ export default {
             url: '/api/getReportFilters',
             method: 'post',
             data: { generatedReportId }
+        })
+    },
+    fetchSeverityInfoForIssues(filters, issueIds, endTimeStamp) {
+        return request({
+            url: '/api/fetchSeverityInfoForIssues',
+            method: 'post',
+            data: {...filters, issueIds, endTimeStamp}
         })
     }
 }
