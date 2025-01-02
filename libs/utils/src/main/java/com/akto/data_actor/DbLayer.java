@@ -71,6 +71,7 @@ import com.akto.dto.traffic.TrafficInfo;
 import com.akto.dto.traffic_metrics.TrafficMetrics;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
+import com.akto.dto.type.URLMethods.Method;
 import com.akto.dto.usage.MetricTypes;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -1022,8 +1023,11 @@ public class DbLayer {
         return TestScriptsDao.instance.fetchTestScript();
     }
 
-    public static List<DependencyNode> findDependencyNodes(Bson filter){
-        return DependencyNodeDao.instance.findAll(filter);
+    public static List<DependencyNode> findDependencyNodes(int apiCollectionId, String url, String method, String reqMethod) {
+        Bson filterQ = DependencyNodeDao.generateChildrenFilter(apiCollectionId, url, Method.valueOf(method));
+        // TODO: Handle cases where the delete API does not have the delete method
+        Bson delFilterQ = Filters.and(filterQ, Filters.eq(DependencyNode.METHOD_REQ, reqMethod));
+        return DependencyNodeDao.instance.findAll(delFilterQ);
     }
 
 }
