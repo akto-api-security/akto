@@ -1699,11 +1699,19 @@ public class DbAction extends ActionSupport {
         this.dependencyNodes = dependencyNodes;
     }
 
+    String reqMethod;
+    
+    public String getReqMethod() {
+        return reqMethod;
+    }
+
+    public void setReqMethod(String reqMethod) {
+        this.reqMethod = reqMethod;
+    }
+
     public String findDependencyNodes() {
         try {
-            if (filter != null) {
-                dependencyNodes = DbLayer.findDependencyNodes(apiCollectionId, url, methodVal, "DELETE");
-            }
+            dependencyNodes = DbLayer.findDependencyNodes(apiCollectionId, url, methodVal, reqMethod);
         } catch(Exception e){
             e.printStackTrace();
         }
