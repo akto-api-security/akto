@@ -547,4 +547,8 @@ public class DbActor extends DataActor {
         return DbLayer.fetchTestScript();
     }
 
+    public List<DependencyNode> findDependencyNodes(Bson filter){
+        return DbLayer.findDependencyNodes(filter);
+    }
+
 }

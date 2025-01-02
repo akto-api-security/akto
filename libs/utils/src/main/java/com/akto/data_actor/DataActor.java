@@ -264,4 +264,6 @@ public abstract class DataActor {
 
     public abstract TestScript fetchTestScript();
 
+    public abstract List<DependencyNode> findDependencyNodes(Bson filter);
+
 }
