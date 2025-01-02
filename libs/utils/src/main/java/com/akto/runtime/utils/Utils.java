@@ -87,6 +87,45 @@ public class Utils {
         return ret;
     }
 
+    public static String convertToSampleMessage(String message) throws Exception {
+        JSONObject jsonObject = JSON.parseObject(message);
+        JSONObject request = (JSONObject) jsonObject.get("request");
+        JSONObject response = (JSONObject) jsonObject.get("response");
+
+        JSONObject sampleMessage = new JSONObject();
+        if(request != null) {
+            if(request.get("body") != null) {
+                sampleMessage.put("requestPayload", request.get("body"));
+            }
+            if(request.get("headers") != null) {
+                sampleMessage.put("requestHeaders", request.get("headers"));
+            }
+            // TODO: add query params to url
+            if(request.get("url") != null) {
+                sampleMessage.put("path", request.get("url"));
+            }
+            if(request.get("method") != null) {
+                sampleMessage.put("method", request.get("method"));
+            }
+            if(request.get("type") != null) {
+                sampleMessage.put("type", request.get("type"));
+            }
+        }
+        if(response != null) {
+            if(response.get("body") != null) {
+                sampleMessage.put("responsePayload", response.get("body"));
+            }
+            if(response.get("headers") != null) {
+                sampleMessage.put("responseHeaders", response.get("headers"));
+            }
+            if(response.get("statusCode") != null) {
+                sampleMessage.put("statusCode", (Integer)response.getInteger("statusCode"));
+            }
+
+        }
+        return sampleMessage.toJSONString();
+    }
+
     public static Map<String,String> parseCookie(List<String> cookieList){
         Map<String,String> cookieMap = new HashMap<>();
         if(cookieList==null)return cookieMap;

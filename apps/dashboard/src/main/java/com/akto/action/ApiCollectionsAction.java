@@ -90,7 +90,7 @@ public class ApiCollectionsAction extends UserAction {
                 int conditionsCount = 0;
                 if(!apiCollection.getAutomated()){
                     ApiCollection apiCollectionWithCond = ApiCollectionsDao.instance.findOne(Filters.eq(Constants.ID, apiCollection.getId()), Projections.include("conditions"));
-                    if(apiCollectionWithCond.getConditions() != null && apiCollectionWithCond.getConditions().get(0) != null){
+                    if(apiCollectionWithCond.getConditions() != null && !apiCollectionWithCond.getConditions().isEmpty()  && apiCollectionWithCond.getConditions().get(0) != null){
                         if(apiCollectionWithCond.getConditions().get(0).getType().equals(TestingEndpoints.Type.CUSTOM)){
                             CustomTestingEndpoints testingEndpoints = (CustomTestingEndpoints) apiCollectionWithCond.getConditions().get(0);
                             if (testingEndpoints.getApisList() != null && !testingEndpoints.getApisList().isEmpty()) {

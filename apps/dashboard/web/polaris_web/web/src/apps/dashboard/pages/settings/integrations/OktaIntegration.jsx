@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import CopyCommand from '../../../components/shared/CopyCommand';
 import IntegrationsLayout from './IntegrationsLayout';
-import { Button, Form, FormLayout, HorizontalStack, LegacyCard, Text, TextField } from '@shopify/polaris';
+import { Button, Form, FormLayout, HorizontalStack, LegacyCard, Link, Text, TextField, VerticalStack } from '@shopify/polaris';
 import func from "@/util/func"
 import settingRequests from '../api';
 import SpinnerCentered from "../../../components/progress/SpinnerCentered"
@@ -22,7 +22,7 @@ function OktaIntegration() {
     const [oktaDomain, setOktaDomain] = useState('')
     const [authorizationServerId, setAuthorizationServerId] = useState('')
     const [showDeleteModal, setShowDeleteModal] = useState(false);
-    const [nextButtonActive,setNextButtonActive] = useState(window.DASHBOARD_MODE === "ON_PREM")
+    const [nextButtonActive,setNextButtonActive] = useState(true)
 
     const redirectUri = hostname + "/authorization-code/callback"
 
@@ -135,6 +135,19 @@ function OktaIntegration() {
     },[])
 
     const cardContent = "Enable login via Okta SSO in your dashboard."
+
+    const useCardContent = (
+        <VerticalStack gap={"2"}>
+            <Text>{cardContent}</Text>
+            <HorizontalStack gap={"1"}>
+                <Text>Use</Text>
+                <Link>https://app.akto.io/sso-login</Link>
+                <Text>for signing into AKTO dashboard via SSO.</Text>
+            </HorizontalStack>
+        </VerticalStack>
+    )
+
+    
     const oktaSSOComponent = (
         loading ? <SpinnerCentered /> :
         <LegacyCard title="Okta SSO">
@@ -145,7 +158,7 @@ function OktaIntegration() {
 
     return (
         <>
-            <IntegrationsLayout title="Okta SSO" cardContent={cardContent} component={oktaSSOComponent} docsUrl="https://docs.akto.io/sso/okta-oidc"/>
+            <IntegrationsLayout title="Okta SSO" cardContent={useCardContent} component={oktaSSOComponent} docsUrl="https://docs.akto.io/sso/okta-oidc"/>
             <DeleteModal showDeleteModal={showDeleteModal} setShowDeleteModal={setShowDeleteModal} SsoType={"Okta"} onAction={handleDelete} />
         </>
     )
