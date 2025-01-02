@@ -201,6 +201,21 @@
     padding: 0rem !important;
 }
 
+.Polaris-Button--variantPrimary, .Polaris-Button--variantPrimary:hover, .Polaris-Button--variantPrimary:active {
+    box-shadow: none !important;
+}
 
+.Polaris-Button--variantPrimary {
+    background-color: #6200EA !important;
+    --pc-button-bg-gradient:#6200EA !important;
+}
 
+.Polaris-Button--variantPrimary:hover{
+    background-color: #5400CB !important;
+    --pc-button-bg-gradient:#5400CB !important;
+}
 
+.Polaris-Button--variantPrimary:active{
+    background-color: #4700AE !important;
+    --pc-button-bg-gradient:#4700AE !important;
+}

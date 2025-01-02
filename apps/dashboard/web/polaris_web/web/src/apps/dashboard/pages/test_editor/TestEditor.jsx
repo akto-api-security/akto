@@ -159,7 +159,7 @@ const TestEditor = () => {
     }
         navigation={ <TestEditorFileExplorer addCustomTest={(e) => addCustomTest(e)}/> }
     >
-        <Box borderStartEndRadius="300" minHeight="100%" background="bg" paddingInlineStart={1200}>
+        <Box background="bg" paddingInlineStart={1200}>
             <InlineGrid columns={2}>
                 <YamlEditor fetchAllTests={fetchAllTests} />
                 <SampleApi />

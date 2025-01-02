@@ -199,7 +199,7 @@ function Dashboard() {
                         onClick={() => {
                             window.open("https://akto.io/api-security-demo", "_blank")
                         }}
-                        variant="plain"><Text variant="bodyMd" tone="subdued">Book a call</Text></Button>
+                        variant="tertiary" size="micro"><Text variant="bodyMd" tone="subdued">Book a call</Text></Button>
                 </Banner>
             </div> : null}
         </Frame>

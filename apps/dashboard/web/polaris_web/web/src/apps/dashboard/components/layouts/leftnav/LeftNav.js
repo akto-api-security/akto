@@ -224,8 +224,8 @@ export default function LeftNav(){
                   },
                   selected: leftNavSelected === 'dashboard_threat_detection',
                   key: '7',
-                } : {}
-            ]}
+                } : null
+            ].filter(Boolean)}
           />
           <Navigation.Section 
                items={[
