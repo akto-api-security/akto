@@ -229,8 +229,13 @@ public class Utils {
             if (key == null) continue;
             Object obj = valuesMap.get(key);
             if (obj == null) {
-                loggerMaker.errorAndAddToDb("couldn't find: " + key, LogDb.TESTING);
-                throw new Exception("Couldn't find " + key);
+                if (key.toLowerCase().startsWith("x0.unique_")) {
+                    String suffix = key.substring(key.toLowerCase().indexOf("_")+1);
+                    obj = suffix+"_"+System.nanoTime();
+                } else {
+                    loggerMaker.errorAndAddToDb("couldn't find: " + key, LogDb.TESTING);
+                    throw new Exception("Couldn't find " + key);
+                }
             }
             String val = obj.toString();
             if (escapeString) {
@@ -393,7 +398,13 @@ public class Utils {
 
         if(!modifyOperations.isEmpty()){
             for(ConditionsType condition : modifyOperations){
-                Util.modifyValueInPayload(payload, null, condition.getKey(), condition.getValue());
+                Object value = condition.getValue();
+                try {
+                    value = replaceVariables(value.toString(), new HashMap<>(), false);
+                } catch (Exception e) {
+                    ;
+                }
+                Util.modifyValueInPayload(payload, null, condition.getKey(), value);
             }
         }
         if(!addOperations.isEmpty()){
