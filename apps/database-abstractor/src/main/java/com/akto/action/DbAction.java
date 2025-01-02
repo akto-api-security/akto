@@ -2288,9 +2288,7 @@ public class DbAction extends ActionSupport {
 
     public String findDependencyNodes() {
         try {
-            if (filter != null) {
-                dependencyNodes = DbLayer.findDependencyNodes(apiCollectionId, url, methodVal, reqMethod);
-            }
+            dependencyNodes = DbLayer.findDependencyNodes(apiCollectionId, url, methodVal, reqMethod);
         } catch(Exception e){
             e.printStackTrace();
         }
