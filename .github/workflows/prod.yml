@@ -94,31 +94,31 @@ jobs:
           fi
           
           if [[ "${{ github.event.inputs.testing }}" == "true" ]]; then
-            cd apps/testing
+            cd ../testing
             docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-api-testing:$IMAGE_TAG_1 -t $ECR_REGISTRY/akto-api-testing:$IMAGE_TAG_2 . --push
             echo "::set-output name=image::$ECR_REGISTRY/akto-api-testing:$IMAGE_TAG"       
           fi
           
           if [[ "${{ github.event.inputs.testing }}" == "true" ]]; then
-            cd apps/testing-cli
+            cd ../testing-cli
             docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-api-testing-cli:$IMAGE_TAG_1 -t $ECR_REGISTRY/akto-api-testing-cli:$IMAGE_TAG_2 . --push
             echo "::set-output name=image::$ECR_REGISTRY/akto-api-testing-cli:$IMAGE_TAG"
           fi
           
           if [[ "${{ github.event.inputs.billing }}" == "true" ]]; then
-            cd apps/billing
+            cd ../billing
             docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-billing:$IMAGE_TAG_1 -t $ECR_REGISTRY/akto-billing:$IMAGE_TAG_2 . --push
             echo "::set-output name=image::$ECR_REGISTRY/akto-billing:$IMAGE_TAG"
           fi
           
           if [[ "${{ github.event.inputs.internal }}" == "true" ]]; then
-            cd apps/internal
+            cd ../internal
             docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-internal:$IMAGE_TAG_1 -t $ECR_REGISTRY/akto-internal:$IMAGE_TAG_2 . --push
             echo "::set-output name=image::$ECR_REGISTRY/akto-internal:$IMAGE_TAG"
           fi
           
           if [[ "${{ github.event.inputs.protection }}" == "true" ]]; then
-            cd apps/api-threat-detection
+            cd ../api-threat-detection
             docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-api-protection:$IMAGE_TAG_1 -t $ECR_REGISTRY/akto-api-protection:$IMAGE_TAG_2 -t $ECR_REGISTRY/akto-api-protection:$IMAGE_TAG_3 . --push
             echo "::set-output name=image::$ECR_REGISTRY/akto-api-protection:$IMAGE_TAG"
           fi  
