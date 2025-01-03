@@ -1,0 +1,28 @@
+syntax = "proto3";
+
+package threat_detection.message.malicious_event.v1;
+
+import "threat_detection/message/malicious_event/event_type/v1/event_type.proto";
+
+option java_outer_classname = "MaliciousEventProto";
+option java_package = "threat_detection.message.malicious_event.v1";
+
+message MaliciousEventMessage {
+  string actor = 1;
+  string filter_id = 2;
+  int64 detected_at = 3;
+  string latest_api_ip = 4;
+  string latest_api_endpoint = 5;
+  string latest_api_method = 6;
+  int32 latest_api_collection_id = 7;
+  string latest_api_payload = 8;
+  threat_detection.message.malicious_event.event_type.v1.EventType event_type = 9;
+  string category = 10;
+  string sub_category = 11;
+}
+
+message MaliciousEventKafkaEnvelope {
+  string account_id = 1;
+  string actor = 2;
+  MaliciousEventMessage malicious_event = 3;
+}
