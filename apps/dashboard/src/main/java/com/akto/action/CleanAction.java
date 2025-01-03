@@ -71,7 +71,7 @@ public class CleanAction extends UserAction {
                 filters.add(ApiInfoDao.getFilter(key));
             }
             loggerMaker.infoAndAddToDb("deleteExtraApiInfo Actually deleting : " + count);
-            DeleteResult res = ApiInfoDao.instance.deleteAll(Filters.eq("_id", Filters.or(filters)));
+            DeleteResult res = ApiInfoDao.instance.deleteAll(Filters.or(filters));
             loggerMaker.infoAndAddToDb("deleteExtraApiInfo Actually deleted : " + res.getDeletedCount());
         }
 
