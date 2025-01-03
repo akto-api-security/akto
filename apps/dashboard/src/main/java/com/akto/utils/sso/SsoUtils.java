@@ -36,17 +36,17 @@ public class SsoUtils {
     
     public static boolean isAnySsoActive(){
         int accountId = Context.accountId.get();
+        String oktaIdString = OktaConfig.getOktaId(accountId);
         if(DashboardMode.isMetered() && !DashboardMode.isOnPremDeployment()){
             if(!isAnySsoActive(accountId)){
                 return ConfigsDao.instance.count(Filters.and(
-                    Filters.eq(Constants.ID, "OKTA-ankush"),
+                    Filters.eq(Constants.ID, oktaIdString),
                     Filters.eq(OktaConfig.ACCOUNT_ID, accountId)
                 )) > 0;
             }else{
                 return true;
             }
         }else{
-            String oktaIdString = OktaConfig.getOktaId(accountId);
             List<String> ssoList = Arrays.asList(oktaIdString, "GITHUB-ankush", "AZURE-ankush");
             Bson filter = Filters.in("_id", ssoList);
             return ConfigsDao.instance.count(filter) > 0;

@@ -2930,13 +2930,14 @@ public class InitializerListener implements ServletContextListener {
             Config.OktaConfig oktaConfig = (Config.OktaConfig) ConfigsDao.instance.findOne(
                 Filters.eq(Constants.ID, saltId)
             );
-            int accountId = Context.accountId.get();
-            oktaConfig.setId(OktaConfig.getOktaId(accountId));
-            ConfigsDao.instance.deleteAll(
-                Filters.eq(Constants.ID, saltId)
-            );
-
-            ConfigsDao.instance.insertOne(oktaConfig);
+            if(oktaConfig != null){
+                int accountId = Context.accountId.get();
+                oktaConfig.setId(OktaConfig.getOktaId(accountId));
+                ConfigsDao.instance.insertOne(oktaConfig);
+                ConfigsDao.instance.deleteAll(
+                    Filters.eq(Constants.ID, saltId)
+                );
+            }
             BackwardCompatibilityDao.instance.updateOne(
                 Filters.eq("_id", backwardCompatibility.getId()),
                 Updates.set(BackwardCompatibility.MOVE_OKTA_OIDC_SSO, Context.now())
