@@ -1,0 +1,106 @@
+syntax = "proto3";
+
+package threat_detection.service.dashboard_service.v1;
+
+import "threat_detection/message/malicious_event/event_type/v1/event_type.proto";
+
+// Dashboard service which the dashboard actions will call instead of directly calling DB
+option java_outer_classname = "DashboardServiceProto";
+option java_package = "threat_detection.service.dashboard_service.v1";
+
+message ListMaliciousRequestsResponse {
+    message MaliciousEvent {
+      string id = 1;
+      string actor = 2;
+      string filter_id = 3;
+      int64 detected_at = 4;
+      string ip = 5;
+      string endpoint = 6;
+      string method = 7;
+      int32 api_collection_id = 8;
+      string payload = 9;
+      string country = 10;
+      threat_detection.message.malicious_event.event_type.v1.EventType event_type = 11;
+      string category = 12;
+      string sub_category = 13;
+    }
+    repeated MaliciousEvent malicious_events = 1;
+    int32 total = 2;
+}
+
+message ListMaliciousRequestsRequest {
+    // The number of alerts to return
+    optional uint32 skip = 1;
+    uint32 limit = 2;
+    map<string, int32> sort = 3;
+}
+
+message FetchAlertFiltersRequest {}
+
+message FetchAlertFiltersResponse {
+  repeated string actors = 1;
+  repeated string urls = 2;
+}
+
+message ListThreatActorsRequest {
+  optional uint32 skip = 1;
+  uint32 limit = 2;
+  map<string, int32> sort = 3;
+}
+
+message ListThreatActorResponse {
+  message ThreatActor {
+    string id = 1;
+    string latest_api_ip = 2;
+    string latest_api_endpoint = 3;
+    string latest_api_method = 4;
+    uint64 discovered_at = 5;
+    string country = 6;
+  }
+  repeated ThreatActor actors = 1;
+  int32 total = 2;
+}
+
+message ListThreatApiRequest {
+  optional uint32 skip = 1;
+  uint32 limit = 2;
+  map<string, int32> sort = 3;
+}
+
+message ListThreatApiResponse {
+  message ThreatApi {
+    string endpoint = 1;
+    string method = 2;
+    uint64 discovered_at = 3;
+    uint32 actors_count = 4;
+    uint32 requests_count = 5;
+  }
+
+  repeated ThreatApi apis = 1;
+  int32 total = 2;
+}
+
+message ThreatActorByCountryRequest {
+}
+
+message ThreatActorByCountryResponse {
+  message CountryCount {
+    string code = 1;
+    uint32 count = 2;
+  }
+
+  repeated CountryCount countries = 1;
+}
+
+message ThreatCategoryWiseCountRequest {
+}
+
+message ThreatCategoryWiseCountResponse {
+  message SubCategoryCount {
+    string category = 1;
+    string sub_category = 2;
+    uint32 count = 3;
+  }
+
+  repeated SubCategoryCount  category_wise_counts = 1;
+}

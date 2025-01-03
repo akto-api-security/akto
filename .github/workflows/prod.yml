@@ -47,6 +47,11 @@ jobs:
       - uses: actions/setup-node@v2
         with:
           node-version: '17'
+      - uses: bufbuild/buf-action@v1
+        with:
+          setup_only: true
+      - name: Generate Proto files
+        run: make proto-gen
       - name: Download Akto templates zip and PII files
         working-directory: ./apps/dashboard/src/main/resources
         run: |
