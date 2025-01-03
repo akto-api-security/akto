@@ -38,6 +38,7 @@ import com.akto.threat.detection.smart_event_detector.window_based.WindowBasedTh
 import com.akto.util.HttpRequestResponseUtils;
 import com.akto.util.JSONUtils;
 import com.google.protobuf.InvalidProtocolBufferException;
+import com.google.protobuf.ListValue;
 import com.google.protobuf.util.JsonFormat;
 
 import io.lettuce.core.RedisClient;
@@ -108,7 +109,6 @@ public class MaliciousTrafficDetectorTask implements Task {
 
             try {
               for (ConsumerRecord<String, byte[]> record : records) {
-                System.out.println(record.value());
                 HttpResponseParam httpResponseParam = HttpResponseParam.parseFrom(record.value());
                 processRecord(httpResponseParam);
               }
@@ -166,25 +166,9 @@ public class MaliciousTrafficDetectorTask implements Task {
 
   private void processRecord(HttpResponseParam record) throws Exception {
     System.out.println("Kafka record: found - ");
-    HttpResponseParam.Builder builder = HttpResponseParam.newBuilder();
 
     HttpResponseParams responseParam = buildHttpResponseParam(record);
 
-    // HttpResponseParams responseParam;
-    // try {
-    //   // Parse JSON into protobuf message
-    //   JsonFormat.parser().merge(record.value(), builder);
-      
-    //   HttpResponseParam httpResponseParamProto = builder.build();
-    //   responseParam = buildHttpResponseParam(httpResponseParamProto, record.value());
-    //   System.out.println("Parsed Protobuf Message: ");
-      
-    // } catch (Exception e) {
-    //     e.printStackTrace();
-    //     return;
-    // }
-
-    //HttpResponseParams responseParam = HttpCallParser.parseKafkaMessage(record);
     Context.accountId.set(Integer.parseInt(responseParam.getAccountId()));
     Map<String, FilterConfig> filters = this.getFilters();
     if (filters.isEmpty()) {
@@ -307,7 +291,6 @@ public class MaliciousTrafficDetectorTask implements Task {
             .setDetectedAt(responseParam.getTime())
             .build();
     try {
-      System.out.println("Pushing malicious event to kafka: " + maliciousEvent);
       MaliciousEventKafkaEnvelope envelope =
           MaliciousEventKafkaEnvelope.newBuilder()
               .setActor(actor)
@@ -335,12 +318,12 @@ public class MaliciousTrafficDetectorTask implements Task {
 
     String requestPayload = HttpRequestResponseUtils.rawToJsonString(httpResponseParamProto.getRequestPayload(), null);
 
-    Map<String, List<String>> reqHeaders = new HashMap<>();
+    Map<String, List<String>> reqHeaders = (Map) httpResponseParamProto.getRequestHeadersMap();
 
-    for (Map.Entry<String, StringList> entry : httpResponseParamProto.getRequestHeadersMap().entrySet()) {
-        ArrayList<String> list = new ArrayList<>(entry.getValue().getValuesList());
-        reqHeaders.put(entry.getKey(), list);
-    }
+    // for (Map.Entry<String, StringList> entry : httpResponseParamProto.getRequestHeadersMap().entrySet()) {
+    //     ArrayList<String> list = new ArrayList<>(entry.getValue().getValuesList());
+    //     reqHeaders.put(entry.getKey(), list);
+    // }
 
     HttpRequestParams requestParams =
         new HttpRequestParams(httpResponseParamProto.getMethod(), httpResponseParamProto.getPath(), httpResponseParamProto.getType(), 
@@ -354,12 +337,12 @@ public class MaliciousTrafficDetectorTask implements Task {
     }
 
     HttpResponseParams.Source source = HttpResponseParams.Source.valueOf(sourceStr);
-    Map<String, List<String>> respHeaders = new HashMap<>();
+    Map<String, List<String>> respHeaders = (Map) httpResponseParamProto.getResponseHeadersMap();
 
-    for (Map.Entry<String, StringList> entry : httpResponseParamProto.getResponseHeadersMap().entrySet()) {
-      ArrayList<String> list = new ArrayList<>(entry.getValue().getValuesList());
-      respHeaders.put(entry.getKey(), list);
-    }
+    // for (Map.Entry<String, StringList> entry : httpResponseParamProto.getResponseHeadersMap().entrySet()) {
+    //   ArrayList<String> list = new ArrayList<>(entry.getValue().getValuesList());
+    //   respHeaders.put(entry.getKey(), list);
+    // }
 
     return new HttpResponseParams(
       httpResponseParamProto.getType(),
