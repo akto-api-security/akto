@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package threat_detection.service.malicious_alert_service.v1;
+
+import "threat_detection/message/malicious_event/v1/message.proto";
+import "threat_detection/message/sample_request/v1/message.proto";
+
+// This is a consumer service for recording malicious alerts
+// For dashboard purposes we will have a separate service to retrieve these events.
+option java_outer_classname = "MaliciousAlertServiceProto";
+option java_package = "threat_detection.service.malicious_alert_service.v1";
+
+message RecordMaliciousEventResponse {
+}
+
+message RecordMaliciousEventRequest {
+  threat_detection.message.malicious_event.v1.MaliciousEventMessage malicious_event = 1;
+  repeated threat_detection.message.sample_request.v1.SampleMaliciousRequest sample_requests = 2;
+}
