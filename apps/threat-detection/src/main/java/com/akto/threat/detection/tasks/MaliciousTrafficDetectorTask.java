@@ -290,22 +290,13 @@ public class MaliciousTrafficDetectorTask implements Task {
             .setLatestApiMethod(maliciousReq.getMethod())
             .setDetectedAt(responseParam.getTime())
             .build();
-    try {
       MaliciousEventKafkaEnvelope envelope =
-          MaliciousEventKafkaEnvelope.newBuilder()
-              .setActor(actor)
-              .setAccountId(responseParam.getAccountId())
-              .setMaliciousEvent(maliciousEvent)
-              .build();
-      MessageEnvelope.generateEnvelope(responseParam.getAccountId(), actor, maliciousEvent)
-          .marshal()
-          .ifPresent(
-              data -> {
-                internalKafka.send(KafkaTopic.ThreatDetection.ALERTS, envelope);
-              });
-    } catch (InvalidProtocolBufferException e) {
-      e.printStackTrace();
-    }
+        MaliciousEventKafkaEnvelope.newBuilder()
+            .setActor(actor)
+            .setAccountId(responseParam.getAccountId())
+            .setMaliciousEvent(maliciousEvent)
+            .build();
+    internalKafka.send(KafkaTopic.ThreatDetection.ALERTS, envelope);
   }
 
   public static HttpResponseParams buildHttpResponseParam(HttpResponseParam httpResponseParamProto) {
