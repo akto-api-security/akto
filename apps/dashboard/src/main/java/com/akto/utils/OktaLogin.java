@@ -8,6 +8,7 @@ import com.akto.dao.ConfigsDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.Config;
 import com.akto.dto.Config.OktaConfig;
+import com.akto.util.Constants;
 import com.akto.utils.sso.SsoUtils;
 
 public class OktaLogin {
@@ -23,7 +24,7 @@ public class OktaLogin {
         }
 
         if (shouldProbeAgain) {
-            OktaConfig oktaConfig = (Config.OktaConfig) ConfigsDao.instance.findOne("_id", "OKTA-ankush");
+            OktaConfig oktaConfig = (Config.OktaConfig) ConfigsDao.instance.findOne(Constants.ID, OktaConfig.getOktaId(Context.accountId.get()));
             if (instance == null) {
                 instance = new OktaLogin();
             }

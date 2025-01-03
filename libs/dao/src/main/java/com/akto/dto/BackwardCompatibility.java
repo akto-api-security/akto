@@ -100,6 +100,9 @@ public class BackwardCompatibility {
     public static final String DELETE_OPTIONS_API = "deleteOptionsAPIs";
     private int deleteOptionsAPIs;
 
+    public static final String MOVE_OKTA_OIDC_SSO = "moveOktaOidcSSO";
+    private int moveOktaOidcSSO;
+
     public BackwardCompatibility(int id, int dropFilterSampleData, int resetSingleTypeInfoCount, int dropWorkflowTestResult,
                                  int readyForNewTestingFramework,int addAktoDataTypes, boolean deploymentStatusUpdated,
                                  int authMechanismData, boolean mirroringLambdaTriggered, int deleteAccessListFromApiToken,
@@ -109,7 +112,7 @@ public class BackwardCompatibility {
                                  int loginSignupGroups, int vulnerableApiUpdationVersionV1, int riskScoreGroups,
                                  int deactivateCollections, int disableAwsSecretPii, int apiCollectionAutomatedField, 
                                  int automatedApiGroups, int addAdminRoleIfAbsent, int dropSpecialCharacterApiCollections, int fixApiAccessType,
-                                 int addDefaultFilters, int moveAzureSamlToNormalSaml, int deleteOptionsAPIs) {
+                                 int addDefaultFilters, int moveAzureSamlToNormalSaml, int deleteOptionsAPIs, int moveOktaOidcSSO) {
         this.id = id;
         this.dropFilterSampleData = dropFilterSampleData;
         this.resetSingleTypeInfoCount = resetSingleTypeInfoCount;
@@ -141,6 +144,7 @@ public class BackwardCompatibility {
         this.fixApiAccessType = fixApiAccessType;
         this.moveAzureSamlToNormalSaml = moveAzureSamlToNormalSaml;
         this.deleteOptionsAPIs = deleteOptionsAPIs;
+        this.moveOktaOidcSSO = moveOktaOidcSSO;
     }
 
     public BackwardCompatibility() {
@@ -424,5 +428,13 @@ public class BackwardCompatibility {
 
     public void setDeleteOptionsAPIs(int deleteOptionsAPIs) {
         this.deleteOptionsAPIs = deleteOptionsAPIs;
+    }
+
+    public int getMoveOktaOidcSSO() {
+        return moveOktaOidcSSO;
+    }
+
+    public void setMoveOktaOidcSSO(int moveOktaOidcSSO) {
+        this.moveOktaOidcSSO = moveOktaOidcSSO;
     }
 }

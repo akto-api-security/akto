@@ -365,9 +365,17 @@ public abstract class Config {
 
         public static final String CONFIG_ID = ConfigType.OKTA.name() + CONFIG_SALT;
 
-        public OktaConfig() {
+        public OktaConfig(){
             this.configType = ConfigType.OKTA;
-            this.id = CONFIG_ID;
+        }
+
+        public static String getOktaId(int accountId){
+            return CONFIG_ID + "_" + accountId;
+        }
+
+        public OktaConfig(int id) {
+            this.configType = ConfigType.OKTA;
+            this.id = CONFIG_ID + "_" + id;
         }
         
         public String getClientId() {
@@ -686,9 +694,10 @@ public abstract class Config {
     }
 
     public static OktaConfig getOktaConfig(int accountId) {
+        String id =  OktaConfig.getOktaId(accountId);
         OktaConfig config = (OktaConfig) ConfigsDao.instance.findOne(
                 Filters.and(
-                    Filters.eq("_id", "OKTA-ankush"),
+                    Filters.eq("_id", id),
                     Filters.eq(OktaConfig.ACCOUNT_ID, accountId)
                 )
         );
