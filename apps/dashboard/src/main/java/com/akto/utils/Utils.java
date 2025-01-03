@@ -34,6 +34,7 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.parsers.HttpCallParser;
 import com.akto.runtime.APICatalogSync;
 import com.akto.testing.ApiExecutor;
+import com.akto.util.Constants;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -42,6 +43,8 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.BulkWriteOptions;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.UpdateManyModel;
+import com.mongodb.client.model.UpdateOneModel;
+import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
 import com.mongodb.client.model.WriteModel;
 
@@ -647,6 +650,10 @@ public class Utils {
         Bson sampleDataFilter = AccountsContextDaoWithRbac.generateCommonFilter(sampleDataToBeMovedMap, SampleDataDao.instance, id);
         List<SampleData> sampleDataList = SampleDataDao.instance.findAll(sampleDataFilter);
         Iterator<SampleData> sampleDataIterator = sampleDataList.iterator();
+        UpdateOptions upsertOptions = new UpdateOptions().upsert(true);
+
+        ArrayList<WriteModel<SampleData>> bulkUpdatesForSampleData = new ArrayList<>();
+
         while(sampleDataIterator.hasNext()){
             SampleData sampleData = sampleDataIterator.next();
             Key key = sampleData.getId();
@@ -658,18 +665,24 @@ public class Utils {
                 key.setApiCollectionId(newCollId);
                 sampleData.setId(key);
                 sampleData.setCollectionIds(getModifiedCollectionIds(sampleData.getCollectionIds(), newCollId, oldKey.getApiCollectionId()));
+                Bson update = SampleDataDao.instance.getUpdateFromSampleData(sampleData);
+                bulkUpdatesForSampleData.add(
+                    new UpdateOneModel<>(Filters.eq(Constants.ID, sampleData.getId()), update, upsertOptions)
+                );
                 toBeDeleted.add(oldKey);
             }else{
                 sampleDataIterator.remove();
             }
         }
-        if(!sampleDataList.isEmpty()){
-            SampleDataDao.instance.insertMany(sampleDataList);
+        
+        if(!bulkUpdatesForSampleData.isEmpty()){
+            SampleDataDao.instance.getMCollection().bulkWrite(bulkUpdatesForSampleData);
             loggerMaker.infoAndAddToDb("Inserted " + sampleDataList.size() + " new sample data into database.");
             AccountsContextDaoWithRbac.deleteApisPerDao(toBeDeleted, SampleDataDao.instance, id);
         }
-
         toBeDeleted.clear();
+
+        ArrayList<WriteModel<ApiInfo>> bulkUpdatesForApiInfo = new ArrayList<>();
         // insert new api info data
         Bson apiInfoFilter = AccountsContextDaoWithRbac.generateCommonFilter(sampleDataToBeMovedMap, ApiInfoDao.instance, id);
         List<ApiInfo> apiInfos = ApiInfoDao.instance.findAll(apiInfoFilter);
@@ -684,18 +697,24 @@ public class Utils {
                 apiInfo.setId(apiInfoKey);
                 apiInfo.setCollectionIds(getModifiedCollectionIds(apiInfo.getCollectionIds(), newCollId, mappedKey.getApiCollectionId()));
                 toBeDeleted.add(mappedKey);
+                Bson update = ApiInfoDao.instance.getUpdateFromApiInfo(apiInfo);
+                bulkUpdatesForSampleData.add(
+                    new UpdateOneModel<>(Filters.eq(Constants.ID, apiInfoKey), update, upsertOptions)
+                );
+                
             }else{
                 apiInfoIterator.remove();
             }
         }
         
-        if(!apiInfos.isEmpty()){
-            ApiInfoDao.instance.insertMany(apiInfos);
+        if(!bulkUpdatesForApiInfo.isEmpty()){
+            ApiInfoDao.instance.getMCollection().bulkWrite(bulkUpdatesForApiInfo);
             loggerMaker.infoAndAddToDb("Inserted " + apiInfos.size() + " new api infos into database.");
             AccountsContextDaoWithRbac.deleteApisPerDao(toBeDeleted, ApiInfoDao.instance, id);
         }
-        
         toBeDeleted.clear();
+
+        ArrayList<WriteModel<SensitiveSampleData>> bulkUpdatesForSensitiveSampleData = new ArrayList<>();
         // insert new sensitive sample data
         Bson sensitiveDataFilter = AccountsContextDaoWithRbac.generateCommonFilter(sampleDataToBeMovedMap, SensitiveSampleDataDao.instance, id);
         List<SensitiveSampleData> sensitiveSampleDataList = SensitiveSampleDataDao.instance.findAll(sensitiveDataFilter);
@@ -711,16 +730,21 @@ public class Utils {
                 key.setApiCollectionId(newCollId);
                 sampleData.setId(key);
                 sampleData.setCollectionIds(getModifiedCollectionIds(sampleData.getCollectionIds(), newCollId, mappedKey.getApiCollectionId()));
+                Bson update = SensitiveSampleDataDao.instance.getUpdateFromSampleData(sampleData);
+                bulkUpdatesForSampleData.add(
+                    new UpdateOneModel<>(Filters.eq(Constants.ID, sampleData.getId()), update, upsertOptions)
+                );
                 toBeDeleted.add(mappedKey);
             }else{
                 sensitiveSampleDataIterator.remove();
             }
         }
-        if(!sensitiveSampleDataList.isEmpty()){
-            SensitiveSampleDataDao.instance.insertMany(sensitiveSampleDataList);
+        if(!bulkUpdatesForSensitiveSampleData.isEmpty()){
+            SensitiveSampleDataDao.instance.getMCollection().bulkWrite(bulkUpdatesForSensitiveSampleData);
             loggerMaker.infoAndAddToDb("Inserted " + sensitiveSampleDataList.size() + " new sensitive sample data into database.");
             AccountsContextDaoWithRbac.deleteApisPerDao(toBeDeleted, SensitiveSampleDataDao.instance, id);
         }
+        toBeDeleted.clear();
     
         // update single type info data
         ArrayList<WriteModel<SingleTypeInfo>> bulkUpdatesForSti = new ArrayList<>();

@@ -5,10 +5,13 @@ import com.akto.dto.ApiCollectionUsers;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.SensitiveSampleData;
 import com.akto.dto.testing.TestingEndpoints;
+import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.util.Constants;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Indexes;
+import com.mongodb.client.model.Updates;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -76,6 +79,16 @@ public class SensitiveSampleDataDao extends AccountsContextDaoWithRbac<Sensitive
 
         MCollection.createIndexIfAbsent(getDBName(), getCollName(),
                 new String[] { SingleTypeInfo._COLLECTION_IDS }, true);
+    }
+
+    public Bson getUpdateFromSampleData(SensitiveSampleData sampleData){
+        Bson update = Updates.combine(
+            Updates.setOnInsert(Constants.ID, sampleData.getId()),
+            Updates.setOnInsert(SingleTypeInfo._COLLECTION_IDS, sampleData.getCollectionIds()),
+            Updates.addEachToSet(SampleData.SAMPLES, sampleData.getSampleData())
+        );
+
+        return update;
     }
 
     @Override

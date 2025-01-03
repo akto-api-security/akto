@@ -6,11 +6,14 @@ import com.akto.dto.ApiInfo;
 import com.akto.dto.testing.TestingEndpoints;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.URLMethods;
+import com.akto.util.Constants;
 import com.akto.dto.type.SingleTypeInfo;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Sorts;
+import com.mongodb.client.model.Updates;
+
 import org.bson.conversions.Bson;
 
 import java.util.ArrayList;
@@ -159,6 +162,16 @@ public class SampleDataDao extends AccountsContextDaoWithRbac<SampleData> {
         cursor.close();
 
         return sampleDataList;
+    }
+
+    public Bson getUpdateFromSampleData(SampleData sampleData){
+        Bson update = Updates.combine(
+            Updates.setOnInsert(Constants.ID, sampleData.getId()),
+            Updates.setOnInsert(SingleTypeInfo._COLLECTION_IDS, sampleData.getCollectionIds()),
+            Updates.addEachToSet(SampleData.SAMPLES, sampleData.getSamples())
+        );
+
+        return update;
     }
 
 
