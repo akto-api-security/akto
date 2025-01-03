@@ -40,21 +40,15 @@ const SampleApi = () => {
     const selectedSampleApi = PersistStore(state => state.selectedSampleApi)
     const setSelectedSampleApi = PersistStore(state => state.setSelectedSampleApi)
 
+    const [isCustomAPI, setIsCustomAPI] = useState(Object.keys(selectedSampleApi)?.length > 0 || false)
+    
     const tabs = [{ id: 'request', content: 'Request' }, { id: 'response', content: 'Response'}];
     const mapCollectionIdToName = func.mapCollectionIdToName(allCollections)
 
     useEffect(()=>{
         if(showEmptyLayout) return
         let testId = selectedTest.value
-        let sampleData = null
-        if(sampleDataList?.length > 0) {
-            sampleData = {
-                apiCollectionId: sampleDataList[0].id.apiCollectionId,
-                method: {_name: sampleDataList[0].id.method},
-                url: sampleDataList[0].id.url
-            }
-        }
-        let selectedUrl = sampleData ? sampleData : Object.keys(selectedSampleApi).length > 0 ? selectedSampleApi : vulnerableRequestsObj?.[testId]
+        let selectedUrl = Object.keys(selectedSampleApi).length > 0 ? selectedSampleApi : vulnerableRequestsObj?.[testId]
         setSelectedCollectionId(null)
         setCopyCollectionId(null)
         setTestResult(null)
@@ -123,8 +117,6 @@ const SampleApi = () => {
     useEffect(() => {
         if (selectedCollectionId && selectedApiEndpoint) {
             fetchSampleData(selectedCollectionId, func.toMethodUrlObject(selectedApiEndpoint).url, func.toMethodUrlObject(selectedApiEndpoint).method)
-        }else{
-            setEditorData({message: ''})
         }
         setTestResult(null)
     }, [selectedApiEndpoint])
@@ -163,6 +155,7 @@ const SampleApi = () => {
     })
 
     const fetchApiEndpoints = async (collectionId) => {
+        if(!collectionId) return
         const apiEndpointsResponse = await api.fetchCollectionWiseApiEndpoints(collectionId)
         if (apiEndpointsResponse) {
             setApiEndpoints(apiEndpointsResponse.listOfEndpointsInCollection)
@@ -180,7 +173,12 @@ const SampleApi = () => {
 
     const fetchSampleData = async (collectionId, apiEndpointUrl, apiEndpointMethod) => {
         setShowEmptyLayout(false)
-        const sampleDataResponse = await testEditorRequests.fetchSampleData(collectionId, apiEndpointUrl, apiEndpointMethod)
+        let sampleDataResponse
+        if(isCustomAPI) {
+            sampleDataResponse = await testEditorRequests.fetchSampleData(collectionId, apiEndpointUrl, apiEndpointMethod)
+        } else {
+            sampleDataResponse = await testEditorRequests.fetchSampleDataForTestEditor(collectionId, apiEndpointUrl, apiEndpointMethod)
+        }
         if (sampleDataResponse) {
             if (sampleDataResponse.sampleDataList.length > 0 && sampleDataResponse.sampleDataList[0].samples && sampleDataResponse.sampleDataList[0].samples.length > 0) {
                 const sampleDataJson = JSON.parse(sampleDataResponse.sampleDataList[0].samples[sampleDataResponse.sampleDataList[0].samples.length - 1])
@@ -207,6 +205,7 @@ const SampleApi = () => {
 
     const toggleSelectApiActive = () => setSelectApiActive(prev => !prev)
     const saveFunc = () =>{
+        setIsCustomAPI(true)
         setSelectedApiEndpoint(copySelectedApiEndpoint)
         const urlObj = func.toMethodUrlObject(copySelectedApiEndpoint)
         const sampleApi = {
