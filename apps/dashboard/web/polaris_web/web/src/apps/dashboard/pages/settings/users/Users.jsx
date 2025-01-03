@@ -25,7 +25,7 @@ const Users = () => {
     const [usersCollection, setUsersCollection] = useState([])
     const [roleHierarchy, setRoleHierarchy] = useState([])
     const [allCollections, setAllCollections] = useState([])
-    let rbacAccess = func.checkForRbacFeature();
+    let rbacAccess = func.checkForRbacFeatureBasic();
 
     const collectionsMap = PersistStore(state => state.collectionsMap)
 

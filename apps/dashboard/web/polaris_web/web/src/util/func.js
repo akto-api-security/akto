@@ -1646,6 +1646,16 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
     }
     return false;
   },
+  checkForRbacFeatureBasic(){
+    const stiggFeatures = window.STIGG_FEATURE_WISE_ALLOWED
+    let rbacAccess = false;
+    if (!stiggFeatures || Object.keys(stiggFeatures).length === 0) {
+        rbacAccess = true
+    } else if(stiggFeatures && stiggFeatures['RBAC_BASIC']){
+        rbacAccess = stiggFeatures['RBAC_BASIC'].isGranted
+    }
+    return rbacAccess;
+  },
   checkForRbacFeature(){
     const stiggFeatures = window.STIGG_FEATURE_WISE_ALLOWED
     let rbacAccess = false;
@@ -1657,7 +1667,7 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
     return rbacAccess;
   },
   checkUserValidForIntegrations(){
-    const rbacAccess = this.checkForRbacFeature();
+    const rbacAccess = this.checkForRbacFeatureBasic();
     if(!rbacAccess){
       return true;
     }
