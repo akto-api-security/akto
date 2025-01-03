@@ -2,6 +2,7 @@ package com.akto.dao;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.dto.traffic.Key;
@@ -29,12 +30,28 @@ public abstract class AccountsContextDaoWithRbac<T> extends MCollection<T>{
 
         for(Key key: toBeDeleted) {
             stiList.add(new DeleteManyModel<>(Filters.and(
-                    Filters.eq(prefix + "apiCollectionId", key.getApiCollectionId()),
-                    Filters.eq(prefix + "method", key.getMethod()),
-                    Filters.eq(prefix + "url", key.getUrl())
+                    Filters.eq(prefix + SingleTypeInfo._API_COLLECTION_ID, key.getApiCollectionId()),
+                    Filters.eq(prefix + SingleTypeInfo._METHOD, key.getMethod()),
+                    Filters.eq(prefix + SingleTypeInfo._URL, key.getUrl())
             )));
         }
         dao.bulkWrite(stiList, new BulkWriteOptions().ordered(false));
+    }
+
+    public static <T> Bson generateCommonFilter(Map<Key, Integer> toBeInserted,  AccountsContextDaoWithRbac<T> dao, String prefix){
+        List<Bson> filterList = new ArrayList<>();
+        for(Key key: toBeInserted.keySet()){
+            Bson filter = Filters.and(
+                Filters.eq(prefix + SingleTypeInfo._API_COLLECTION_ID, key.getApiCollectionId()),
+                Filters.eq(prefix + SingleTypeInfo._METHOD, key.getMethod()),
+                Filters.eq(prefix + SingleTypeInfo._URL, key.getUrl())
+            );
+
+            filterList.add(filter);
+        }
+
+        Bson finalFilter = Filters.or(filterList);
+        return finalFilter;
     }
 
     abstract public String getFilterKeyString();

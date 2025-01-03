@@ -263,6 +263,33 @@ public class ApiInfoDao extends AccountsContextDaoWithRbac<ApiInfo>{
         return new Pair<>(apiStatsStart, apiStatsEnd);
     }
 
+    public Bson getUpdateFromApiInfo(ApiInfo apiInfo){
+
+        Bson update = Updates.combine(
+            Updates.setOnInsert(Constants.ID, apiInfo.getId()),
+            Updates.addEachToSet(ApiInfo.ALL_AUTH_TYPES_FOUND, Arrays.asList(apiInfo.getAllAuthTypesFound().toArray())),
+            Updates.set(ApiInfo.LAST_SEEN, apiInfo.getLastSeen()),
+            Updates.set(ApiInfo.LAST_TESTED, apiInfo.getLastTested()),
+            Updates.set(ApiInfo.IS_SENSITIVE, apiInfo.getIsSensitive()),
+            Updates.set(ApiInfo.SEVERITY_SCORE, apiInfo.getSeverityScore()),
+            Updates.set(ApiInfo.RISK_SCORE, apiInfo.getRiskScore()),
+            Updates.set(ApiInfo.LAST_CALCULATED_TIME, apiInfo.getLastCalculatedTime()),
+            Updates.set(ApiInfo.API_TYPE, apiInfo.getApiType()),
+            Updates.set(ApiInfo.RESPONSE_CODES, apiInfo.getResponseCodes()),
+            Updates.addEachToSet(ApiInfo.COLLECTION_IDS, apiInfo.getCollectionIds()),
+            Updates.set(ApiInfo.DISCOVERED_TIMESTAMP, apiInfo.getDiscoveredTimestamp())
+        );
+
+        Set<ApiInfo.ApiAccessType> apiAccessTypes = apiInfo.getApiAccessTypes();
+        if (apiAccessTypes.isEmpty()) {
+            update = Updates.combine(update,Updates.setOnInsert(ApiInfo.API_ACCESS_TYPES, new HashSet<>()));
+        } else {
+            update = Updates.combine(update,Updates.addEachToSet(ApiInfo.API_ACCESS_TYPES, Arrays.asList(apiAccessTypes.toArray())));
+        }
+
+        return update;
+    }
+
     @Override
     public String getCollName() {
         return "api_info";

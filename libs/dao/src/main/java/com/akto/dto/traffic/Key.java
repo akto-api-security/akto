@@ -1,5 +1,7 @@
 package com.akto.dto.traffic;
 
+import java.util.Objects;
+
 import com.akto.dto.type.URLMethods.Method;
 
 public class Key {
@@ -72,6 +74,22 @@ public class Key {
     @Override
     public String toString() {
         return apiCollectionId + " " + url + " " + method + " " + responseCode;
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(url, method, apiCollectionId, responseCode);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        Key key = (Key) o;
+        return apiCollectionId == key.apiCollectionId
+            && responseCode == key.responseCode
+            && Objects.equals(url, key.url)
+            && method == key.method; 
     }
 
 }
