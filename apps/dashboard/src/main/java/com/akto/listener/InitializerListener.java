@@ -33,6 +33,7 @@ import com.akto.dto.billing.Organization;
 import com.akto.dto.ApiCollectionUsers.CollectionType;
 import com.akto.dto.Config.AzureConfig;
 import com.akto.dto.Config.ConfigType;
+import com.akto.dto.Config.OktaConfig;
 import com.akto.dto.RBAC.Role;
 import com.akto.dto.User.AktoUIMode;
 import com.akto.dto.data_types.Conditions;
@@ -2930,7 +2931,7 @@ public class InitializerListener implements ServletContextListener {
                 Filters.eq(Constants.ID, saltId)
             );
             int accountId = Context.accountId.get();
-            oktaConfig.setId(saltId + "_" + accountId);
+            oktaConfig.setId(OktaConfig.getOktaId(accountId));
             ConfigsDao.instance.deleteAll(
                 Filters.eq(Constants.ID, saltId)
             );

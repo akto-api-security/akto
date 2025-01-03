@@ -2,7 +2,7 @@ package com.akto.action.user;
 
 import java.util.ArrayList;
 
-import org.yaml.snakeyaml.scanner.Constant;
+import org.bson.conversions.Bson;
 
 import com.akto.action.UserAction;
 import com.akto.dao.ConfigsDao;
@@ -10,7 +10,7 @@ import com.akto.dao.UsersDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.Config;
 import com.akto.dto.User;
-import com.akto.dto.Config.ConfigType;
+import com.akto.dto.Config.OktaConfig;
 import com.akto.util.Constants;
 import com.akto.util.DashboardMode;
 import com.akto.utils.sso.SsoUtils;
@@ -33,7 +33,9 @@ public class OktaSsoAction extends UserAction {
             return ERROR.toUpperCase();
         }
 
-        Config.OktaConfig oktaConfig = new Config.OktaConfig();
+        int accountId = Context.accountId.get();
+
+        Config.OktaConfig oktaConfig = new Config.OktaConfig(accountId);
         oktaConfig.setClientId(clientId);
         oktaConfig.setClientSecret(clientSecret);
         oktaConfig.setAuthorisationServerId(authorisationServerId);
@@ -51,17 +53,9 @@ public class OktaSsoAction extends UserAction {
     }
 
     public String deleteOktaSso() {
-        DeleteResult result;
-        if(DashboardMode.isOnPremDeployment()) {
-            result = ConfigsDao.instance.deleteAll(Filters.eq("_id", "OKTA-ankush"));
-        } else {
-            result = ConfigsDao.instance.deleteAll(
-                    Filters.and(
-                        Filters.eq("_id", "OKTA-ankush"),
-                        Filters.eq(Config.OktaConfig.ACCOUNT_ID, Context.accountId.get())
-                    )
-            );
-        }
+        int accountId = Context.accountId.get();
+        Bson idFilter = Filters.eq(Constants.ID, OktaConfig.getOktaId(accountId));
+        DeleteResult result = ConfigsDao.instance.deleteAll(idFilter);
 
         if (result.getDeletedCount() > 0) {
             for (Object obj : UsersDao.instance.getAllUsersInfoForTheAccount(Context.accountId.get())) {
@@ -76,14 +70,9 @@ public class OktaSsoAction extends UserAction {
 
     @Override
     public String execute() throws Exception {
-        Config.OktaConfig oktaConfig;
-        if(DashboardMode.isOnPremDeployment()) {
-            int accountId = Context.accountId.get();
-            oktaConfig = (Config.OktaConfig) ConfigsDao.instance.findOne(Constants.ID, ConfigType.OKTA.name() + "_" + accountId);
-        } else {
-            String email = getSUser().getLogin();
-            oktaConfig = Config.getOktaConfig(email);
-        }
+        int accountId = Context.accountId.get();
+        Config.OktaConfig oktaConfig = (Config.OktaConfig) ConfigsDao.instance.findOne(Constants.ID, OktaConfig.getOktaId(accountId));
+
         if (SsoUtils.isAnySsoActive() && oktaConfig == null) {
             addActionError("A different SSO Integration already exists.");
             return ERROR.toUpperCase();
