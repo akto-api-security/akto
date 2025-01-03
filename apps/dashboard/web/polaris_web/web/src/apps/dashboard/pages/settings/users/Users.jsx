@@ -25,7 +25,8 @@ const Users = () => {
     const [usersCollection, setUsersCollection] = useState([])
     const [roleHierarchy, setRoleHierarchy] = useState([])
     const [allCollections, setAllCollections] = useState([])
-    let rbacAccess = func.checkForRbacFeature();
+    let rbacAccess = func.checkForRbacFeatureBasic();
+    let rbacAccessAdvanced =  func.checkForRbacFeature()
 
     const collectionsMap = PersistStore(state => state.collectionsMap)
 
@@ -319,7 +320,7 @@ const Users = () => {
                                     {
                                         content: (
                                             <HorizontalStack gap={4}>
-                                                { (role === 'ADMIN' || userRole !== 'ADMIN' || !rbacAccess) ? undefined :
+                                                { (role === 'ADMIN' || userRole !== 'ADMIN' || !rbacAccessAdvanced) ? undefined :
                                                     <ResourceListModal
                                                         title={"Collection list"}
                                                         activatorPlaceaholder={`${(usersCollection[id] || []).length} collections accessible`}
