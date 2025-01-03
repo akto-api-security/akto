@@ -87,8 +87,9 @@ jobs:
         run: |
           docker buildx create --use
           # Build a docker container and push it to DockerHub 
+          cd apps
           if [[ "${{ github.event.inputs.dashboard }}" == "true" ]]; then
-            cd apps/dashboard
+            cd ../dashboard
             docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/$ECR_REPOSITORY-dashboard:$IMAGE_TAG_1 -t $ECR_REGISTRY/$ECR_REPOSITORY-dashboard:$IMAGE_TAG_2 . --push
             echo "::set-output name=image::$ECR_REGISTRY/$ECR_REPOSITORY-dashboard:$IMAGE_TAG"   
           fi
