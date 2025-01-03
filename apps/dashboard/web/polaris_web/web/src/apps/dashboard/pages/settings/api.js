@@ -137,11 +137,45 @@ const settingRequests = {
             data: {}
         })
     },
+    fetchRuntimeInstances(startTimestamp, endTimestamp) {
+        return request({
+            url: '/api/fetchRuntimeInstances',
+            method: 'post',
+            data: {
+                startTimestamp,
+                endTimestamp
+            }
+        })
+    },
+    fetchRuntimeMetrics(startTimestamp, endTimestamp, instanceId) {
+        return request({
+            url: '/api/fetchAllRuntimeMetrics',
+            method: 'post',
+            data: {
+                startTimestamp, endTimestamp,
+                instanceId
+            }
+        })
+    },
     fetchTrafficMetrics(groupBy, startTimestamp, endTimestamp, names, host) {
         return request({
             url: '/api/fetchTrafficMetrics',
             method: 'post',
             data: {groupBy, startTimestamp, endTimestamp, names, host}
+        })
+    },
+    fetchTrafficCollectorInfos(startTimestamp, endTimestamp) {
+        return request({
+            url: '/api/fetchTrafficCollectorInfos',
+            method: 'post',
+            data: {startTimestamp, endTimestamp}
+        })
+    },
+    fetchTrafficCollectorMetrics(instanceId, startTimestamp, endTimestamp) {
+        return request({
+            url: '/api/fetchTrafficCollectorMetrics',
+            method: 'post',
+            data: {instanceId, startTimestamp, endTimestamp}
         })
     },
 
