@@ -1,20 +1,19 @@
 package com.akto.action;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 
 import org.bson.conversions.Bson;
 
-import com.akto.DaoInit;
 import com.akto.dao.ApiInfoDao;
 import com.akto.dao.SingleTypeInfoDao;
-import com.akto.dao.context.Context;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.dto.type.URLMethods.Method;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 import com.mongodb.client.result.DeleteResult;
@@ -33,8 +32,7 @@ public class CleanAction extends UserAction {
 
     public String deleteExtraApiInfo() {
 
-        List<ApiInfoKey> apiInfoKeys = new ArrayList<>();
-        int count = 0;
+        List<Bson> deleteFilters = new ArrayList<>();
         for (int apiCollectionId : apiCollectionIds) {
             List<ApiInfo> apiInfos = ApiInfoDao.instance.findAll(Filters.eq("_id.apiCollectionId", apiCollectionId),
                     Projections.include("_id"));
@@ -45,37 +43,56 @@ public class CleanAction extends UserAction {
             }
 
             loggerMaker.infoAndAddToDb("Checking ApiInfos count: " + apiInfos.size());
+            List<ApiInfoKey> filters = new ArrayList<>();
             for (ApiInfo apiInfo : apiInfos) {
                 ApiInfoKey key = apiInfo.getId();
 
-                SingleTypeInfo sti = SingleTypeInfoDao.instance.findOne(SingleTypeInfoDao
-                        .filterForSTIUsingURL(key.getApiCollectionId(), key.getUrl(), key.getMethod()));
+                filters.add(key);
 
-                if (sti != null) {
-                    continue;
+                if (filters.size() >= 100) {
+                    deleteFilters.addAll(checkSTIs(filters, runActually));
+                    filters.clear();
                 }
-                count++;
-
-                loggerMaker.infoAndAddToDb("No STI found for API Info: " + key.toString());
-
-                if (runActually) {
-                    apiInfoKeys.add(key);
-                }
+            }
+            if (!filters.isEmpty()) {
+                deleteFilters.addAll(checkSTIs(filters, runActually));
             }
         }
-        loggerMaker.infoAndAddToDb("Total API Info to delete: " + count);
+        loggerMaker.infoAndAddToDb("Total API Info to delete: " + deleteFilters.size());
 
-        if (runActually && apiInfoKeys.size() > 0) {
-            List<Bson> filters = new ArrayList<>();
-            for(ApiInfoKey key : apiInfoKeys) {
-                filters.add(ApiInfoDao.getFilter(key));
-            }
-            loggerMaker.infoAndAddToDb("deleteExtraApiInfo Actually deleting : " + count);
-            DeleteResult res = ApiInfoDao.instance.deleteAll(Filters.or(filters));
+        if (runActually && deleteFilters.size() > 0) {
+            loggerMaker.infoAndAddToDb("deleteExtraApiInfo Actually deleting : " + deleteFilters.size());
+            DeleteResult res = ApiInfoDao.instance.deleteAll(Filters.or(deleteFilters));
             loggerMaker.infoAndAddToDb("deleteExtraApiInfo Actually deleted : " + res.getDeletedCount());
         }
 
         return Action.SUCCESS.toUpperCase();
+    }
+
+    private static List<Bson> checkSTIs(List<ApiInfoKey> filters, boolean runActually) {
+        List<Bson> deleteFilters = new ArrayList<>();
+        List<Bson> filters2 = new ArrayList<>();
+        for(ApiInfoKey key : filters) {
+            filters2.add(SingleTypeInfoDao.filterForSTIUsingURL(key.getApiCollectionId(), key.getUrl(), key.getMethod()));
+        }
+        List<SingleTypeInfo> sti = SingleTypeInfoDao.instance.findAll(Filters.or(filters2));
+        HashSet<ApiInfoKey> stiSet = new HashSet<>();
+        if (sti != null && !sti.isEmpty()) {
+            for (SingleTypeInfo st : sti) {
+                stiSet.add(new ApiInfoKey(st.getApiCollectionId(), st.getUrl(), Method.valueOf(st.getMethod())));
+            }
+        }
+        for(ApiInfoKey key : filters) {
+            if(stiSet.contains(key)) {
+                continue;
+            }
+            loggerMaker.infoAndAddToDb("STI not found for STI: " + key.toString());
+            if (runActually) {
+                deleteFilters.add(ApiInfoDao.getFilter(key));
+            }
+        }
+
+        return deleteFilters;
     }
 
     public List<Integer> getApiCollectionIds() {
