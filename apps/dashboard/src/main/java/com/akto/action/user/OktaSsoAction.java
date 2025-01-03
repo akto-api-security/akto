@@ -2,12 +2,16 @@ package com.akto.action.user;
 
 import java.util.ArrayList;
 
+import org.yaml.snakeyaml.scanner.Constant;
+
 import com.akto.action.UserAction;
 import com.akto.dao.ConfigsDao;
 import com.akto.dao.UsersDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.Config;
 import com.akto.dto.User;
+import com.akto.dto.Config.ConfigType;
+import com.akto.util.Constants;
 import com.akto.util.DashboardMode;
 import com.akto.utils.sso.SsoUtils;
 import com.mongodb.BasicDBObject;
@@ -74,7 +78,8 @@ public class OktaSsoAction extends UserAction {
     public String execute() throws Exception {
         Config.OktaConfig oktaConfig;
         if(DashboardMode.isOnPremDeployment()) {
-            oktaConfig = (Config.OktaConfig) ConfigsDao.instance.findOne("_id", "OKTA-ankush");
+            int accountId = Context.accountId.get();
+            oktaConfig = (Config.OktaConfig) ConfigsDao.instance.findOne(Constants.ID, ConfigType.OKTA.name() + "_" + accountId);
         } else {
             String email = getSUser().getLogin();
             oktaConfig = Config.getOktaConfig(email);
