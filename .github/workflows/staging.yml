@@ -26,6 +26,11 @@ jobs:
       - uses: actions/setup-node@v2
         with:
           node-version: "17"
+      - uses: bufbuild/buf-action@v1
+        with:
+          setup_only: true
+      - name: Generate Proto files
+        run: make proto-gen
       - name: Convert github branch name to be compatible with docker tag name convention and generate tag name
         id: docker_tag
         run: echo "IMAGE_TAG=a-$(echo ${{ github.ref_name }} | sed 's/[^a-zA-Z0-9]/-/g')" >> $GITHUB_OUTPUT
