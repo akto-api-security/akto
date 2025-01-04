@@ -147,12 +147,87 @@ public class Main {
         return parameters;
     }
 
+
+    public static Set<SingleTypeInfo> removeStiWithObjectListConflict(List<SingleTypeInfo> allPayloadSti) {
+        Set<String> allPayloadObjectPaths = new HashSet<>();
+        Set<String> allPayloadListPaths = new HashSet<>();
+        Set<String> allPayloadBlacklistPaths = new HashSet<>();
+
+        Set<SingleTypeInfo> ret = new HashSet<>();
+
+        for (SingleTypeInfo singleTypeInfo : allPayloadSti) {
+            String fullParam = singleTypeInfo.getParam();
+            String[] params = fullParam.split("#");
+
+
+            if (params.length == 0) {
+                break;
+            } 
+
+            allPayloadObjectPaths.add("#"+fullParam);
+
+            String prefix = "";
+            for (int i = 0; i < params.length-1; i++) {
+                String curr = params[i];
+                String next = params[i+1];
+                prefix += ("#"+curr);
+
+                if (next.equals("$")) {
+
+                    if (allPayloadObjectPaths.contains(prefix)) {
+                        allPayloadBlacklistPaths.add(prefix + "#$");
+                    } else {
+                        allPayloadListPaths.add(prefix);
+                    }
+
+                } else {
+
+                    if (allPayloadListPaths.contains(prefix)) {
+                        allPayloadBlacklistPaths.add(prefix + "#" + next);
+                    } else {
+                        allPayloadObjectPaths.add(prefix);
+                    }
+                    
+                }
+            }
+        }
+
+        for (SingleTypeInfo singleTypeInfo: allPayloadSti) {
+            String _p = "#"+singleTypeInfo.getParam();
+
+            boolean skipThisSti = false;
+            for(String blacklist: allPayloadBlacklistPaths) {
+                if (_p.startsWith(blacklist)) {
+                    skipThisSti = true;
+                    break;
+                }
+            }
+
+            if (skipThisSti) {
+                continue;
+            } else {
+                ret.add(singleTypeInfo);
+            }
+
+        }
+
+        return ret;
+    }    
+
     public static Schema<?> buildSchema(List<SingleTypeInfo> singleTypeInfoList) throws Exception {
         ObjectSchema schema =new ObjectSchema();
+        List<SingleTypeInfo> allPayloadSti = new ArrayList<>();
+        
         for (SingleTypeInfo singleTypeInfo: singleTypeInfoList) {
             if(singleTypeInfo.isIsHeader() || singleTypeInfo.isQueryParam() || singleTypeInfo.getIsUrlParam()){
                 continue;
             }
+
+            allPayloadSti.add(singleTypeInfo);
+        }
+
+        for (SingleTypeInfo singleTypeInfo: removeStiWithObjectListConflict(allPayloadSti)) {
+            
             List<SchemaBuilder.CustomSchema> cc = SchemaBuilder.getCustomSchemasFromSingleTypeInfo(singleTypeInfo);
             SchemaBuilder.build(schema, cc);
         }

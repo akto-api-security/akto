@@ -78,6 +78,8 @@ import SignUpWithSSO from "../signup/components/SignUpWithSSO";
 import TeamsWebhooks from "../dashboard/pages/settings/integrations/teamsWebhooks/TeamsWebhooks";
 import TeamsWebhook from "../dashboard/pages/settings/integrations/teamsWebhooks/TeamsWebhook";
 import AuditLogs from "../dashboard/pages/settings/audit_logs/AuditLogs";
+import ThreatApiPage from "../dashboard/pages/threat_detection/ThreatApiPage";
+import ThreatActorPage from "../dashboard/pages/threat_detection/ThreatActorPage";
 
 // if you add a component in a new path, please verify the search implementation in function -> 'getSearchItemsArr' in func.js
 
@@ -180,6 +182,14 @@ const router = createBrowserRouter([
             path:"threat-detection",
             element:<ThreatDetectionPage/>
           },
+          {
+           path: "threat-api",
+           element: <ThreatApiPage/>
+          },
+          {
+            path: "threat-actor",
+            element: <ThreatActorPage/>
+          }
         ]
       },
       {

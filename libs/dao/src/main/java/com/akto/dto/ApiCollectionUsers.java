@@ -170,6 +170,7 @@ public class ApiCollectionUsers {
     }
 
     public static void addToCollectionsForCollectionId(List<TestingEndpoints> conditions, int apiCollectionId) {
+        logger.info("Started adding apis for in addToCollectionsForCollectionId: " + apiCollectionId);
         Bson update = Updates.addToSet(SingleTypeInfo._COLLECTION_IDS, apiCollectionId);
         Bson matchFilter = Filters.nin(SingleTypeInfo._COLLECTION_IDS, apiCollectionId);
         operationForCollectionId(conditions, apiCollectionId, update, matchFilter, false);
@@ -232,6 +233,9 @@ public class ApiCollectionUsers {
                     MCollection<?>[] collections = collectionsEntry.getValue();
                     Bson filter = filtersMap.get(type);
 
+                    // printing filter size
+                    long val = filter.toString().length();
+                    logger.info("Size of the filter in updateCollectionsForCollectionId is: " + val + "Bytes");
                     updateCollections(collections, filter, update);
                 }
 
@@ -241,7 +245,10 @@ public class ApiCollectionUsers {
 
     private static void updateCollections(MCollection<?>[] collections, Bson filter, Bson update) {
         for (MCollection<?> collection : collections) {
-            collection.getMCollection().updateMany(filter, update);
+            UpdateResult res = collection.getMCollection().updateMany(filter, update);
+            logger.info(String.format(
+                "mongo update results for updating collection groups are: {matchedCount : %d} {modifiedCount : %d} {collection: %s}",
+                res.getMatchedCount(), res.getModifiedCount(), collection.getCollName()));
         }
     }
 

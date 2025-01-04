@@ -23,13 +23,6 @@ export default {
             data: {issueId, statusToBeUpdated, ignoreReason}
         })
     },
-    bulkUpdateIssueStatus (issueIdArray, statusToBeUpdated, ignoreReason) {
-        return request({
-            url: 'api/bulkUpdateIssueStatus',
-            method: 'post',
-            data: {issueIdArray, statusToBeUpdated, ignoreReason}
-        })
-    },
     fetchTestingRunResult (issueId) {
         return request({
             url: 'api/fetchTestingRunResult',

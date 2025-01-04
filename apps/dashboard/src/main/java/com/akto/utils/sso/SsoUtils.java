@@ -11,9 +11,12 @@ import org.bson.conversions.Bson;
 
 import com.akto.dao.ConfigsDao;
 import com.akto.dao.SSOConfigsDao;
+import com.akto.dao.context.Context;
 import com.akto.dto.Config.ConfigType;
+import com.akto.dto.Config.OktaConfig;
 import com.akto.dto.sso.SAMLConfig;
 import com.akto.util.Constants;
+import com.akto.util.DashboardMode;
 import com.akto.utils.CustomHttpsWrapper;
 import com.mongodb.client.model.Filters;
 
@@ -32,9 +35,22 @@ public class SsoUtils {
     }
     
     public static boolean isAnySsoActive(){
-        List<String> ssoList = Arrays.asList("OKTA-ankush", "GITHUB-ankush", "AZURE-ankush");
-        Bson filter = Filters.in("_id", ssoList);
-        return ConfigsDao.instance.count(filter) > 0;
+        int accountId = Context.accountId.get();
+        String oktaIdString = OktaConfig.getOktaId(accountId);
+        if(DashboardMode.isMetered() && !DashboardMode.isOnPremDeployment()){
+            if(!isAnySsoActive(accountId)){
+                return ConfigsDao.instance.count(Filters.and(
+                    Filters.eq(Constants.ID, oktaIdString),
+                    Filters.eq(OktaConfig.ACCOUNT_ID, accountId)
+                )) > 0;
+            }else{
+                return true;
+            }
+        }else{
+            List<String> ssoList = Arrays.asList(oktaIdString, "GITHUB-ankush", "AZURE-ankush");
+            Bson filter = Filters.in("_id", ssoList);
+            return ConfigsDao.instance.count(filter) > 0;
+        }
     }
 
     public static HttpServletRequest getWrappedRequest(HttpServletRequest servletRequest, ConfigType configType, int accountId){
