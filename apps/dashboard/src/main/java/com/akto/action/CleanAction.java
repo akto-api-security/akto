@@ -109,11 +109,12 @@ public class CleanAction extends UserAction {
         return deleteFilters;
     }
 
+    private static final String TEMP_RETAIN = "temp_retain";
+
     public String deleteNonHostSTIs() {
 
         int accountId = Context.accountId.get();
 
-        final String TEMP_RETAIN = "temp_retain";
 
         service.submit(() -> {
             Context.accountId.set(accountId);
@@ -183,25 +184,26 @@ public class CleanAction extends UserAction {
                             }
                         } catch (Exception e) {
                             e.printStackTrace();
-                        } finally {
-
-                            Bson updateFilter = Filters.and(
-                                Filters.eq(SingleTypeInfo._API_COLLECTION_ID, apiCollectionId),
-                                Filters.exists(TEMP_RETAIN, true)
-                            );
-
-                            UpdateResult res = SingleTypeInfoDao.instance.updateMany(updateFilter,
-                                    Updates.unset(TEMP_RETAIN));
-                            loggerMaker.infoAndAddToDb("deleteNonHostSTIs temp retain undo update: matched: "
-                                    + res.getMatchedCount() + " modified: " + res.getModifiedCount());
                         }
                     }
                 }
             }
         });
-
         return Action.SUCCESS.toUpperCase();
+    }
 
+    public String unsetTemp() {
+        for (int apiCollectionId : apiCollectionIds) {
+            Bson updateFilter = Filters.and(
+                    Filters.eq(SingleTypeInfo._API_COLLECTION_ID, apiCollectionId),
+                    Filters.exists(TEMP_RETAIN, true));
+
+            UpdateResult res = SingleTypeInfoDao.instance.updateMany(updateFilter,
+                    Updates.unset(TEMP_RETAIN));
+            loggerMaker.infoAndAddToDb("unsetTemp temp retain undo update: matched: "
+                    + res.getMatchedCount() + " modified: " + res.getModifiedCount());
+        }
+        return Action.SUCCESS.toUpperCase();
     }
 
     public List<Integer> getApiCollectionIds() {
