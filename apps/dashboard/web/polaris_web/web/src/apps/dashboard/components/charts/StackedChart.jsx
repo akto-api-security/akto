@@ -50,6 +50,9 @@ function StackedChart(props) {
         },
         tooltip:{
             shared: true,
+            useHTML: true,
+            pointFormat: '<span>{series.name}</span>: <b>{point.y}</b><br/>',
+    
         },
         plotOptions: {
             column: {

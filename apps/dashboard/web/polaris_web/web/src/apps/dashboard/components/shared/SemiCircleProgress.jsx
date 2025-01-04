@@ -34,7 +34,7 @@ function SemiCircleProgress({progress, size, height, width, title}) {
             y: 0.4*size,
             style:{
                 fontWeight: 'medium',
-                color: "#FFFFFF",
+                color: "#344054",
                 fontSize: '14px'
             }
         },

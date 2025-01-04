@@ -34,6 +34,8 @@ function LineChart(props) {
         },
         tooltip:{
             shared: false,
+            useHTML: true,
+            pointFormat: '<span style="color:{series.color}">{series.name}</span>: <b>{point.y}</b><br/>',
         },
         plotOptions: {
             column: {

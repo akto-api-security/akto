@@ -122,7 +122,7 @@ const TestEditor = () => {
             <InlineStack gap="500">
                 <Button onClick={handleExit} icon={ExitIcon}  variant="plain" />
                 <InlineStack gap={"200"}>
-                    <TitleWithInfo docsUrl={"https://docs.akto.io/test-editor/concepts"} tooltipContent={"Test editor playground"} titleText={"Test Editor"} tone="text-inverse"/>
+                    <TitleWithInfo docsUrl={"https://docs.akto.io/test-editor/concepts"} tooltipContent={"Test editor playground"} titleText={"Test Editor"} tone="base"/>
                 </InlineStack>
             </InlineStack>
 

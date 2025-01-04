@@ -27,3 +27,8 @@
     box-shadow: var(--p-shadow-inset-200)!important;
     background-color: var(--p-color-bg-fill-tertiary-active) !important;
 }
+
+.polaris-secondaryAction-button > .Polaris-Button--variantSecondary:active{
+    box-shadow: var(--p-shadow-inset-200)!important;
+    background-color: var(--p-color-bg-fill-tertiary-active) !important;
+}

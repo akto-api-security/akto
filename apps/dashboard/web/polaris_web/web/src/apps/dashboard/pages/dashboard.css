@@ -213,9 +213,39 @@
 .Polaris-Button--variantPrimary:hover{
     background-color: #5400CB !important;
     --pc-button-bg-gradient:#5400CB !important;
-}
+}Polaris-Checkbox__Backdrop
 
 .Polaris-Button--variantPrimary:active{
     background-color: #4700AE !important;
     --pc-button-bg-gradient:#4700AE !important;
+}
+
+.call-banner .Polaris-Link--monochrome{
+    color: var(--p-color-text-link) !important;
+}
+
+.call-banner .Polaris-Link--monochrome:hover{
+    color: var(--p-color-text-link-hover) !important;
+}
+
+.polaris-call-link:hover{
+    color: var(--p-color-text-link-hover) !important;
+}
+
+.Polaris-Checkbox__Input:checked + .Polaris-Checkbox__Backdrop, .Polaris-Checkbox__Input.Polaris-Checkbox__Input--indeterminate + .Polaris-Checkbox__Backdrop{
+    background-color: #6200EA !important;
+    box-shadow: none !important;
+}
+
+.Polaris-Pagination.Polaris-Pagination--table .Polaris-Box{
+    background-color: #ffffff !important;
+}
+
+.Polaris-Button--disabled{
+    background: var(--pc-button-bg_disabled) !important;
+    color: var(--pc-button-color_disabled) !important;
+}
+
+.highcharts-axis-labels.highcharts-xaxis-labels span{
+    text-align: center !important;
 }

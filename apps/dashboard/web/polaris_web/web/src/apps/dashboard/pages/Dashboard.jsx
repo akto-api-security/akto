@@ -3,7 +3,7 @@ import { history } from "@/util/history";
 import Store from "../store";
 import homeFunctions from "./home/module";
 import { useEffect, useState, useRef} from "react";
-import { Frame, Toast, BlockStack, Banner, Button, Text } from "@shopify/polaris";
+import { Frame, Toast, BlockStack, Banner, Button, Text, Link } from "@shopify/polaris";
 import "./dashboard.css"
 import func from "@/util/func"
 import transform from "./testing/transform";
@@ -193,13 +193,9 @@ function Dashboard() {
             {func.checkLocal() && !(location.pathname.includes("test-editor") || location.pathname.includes("settings") || location.pathname.includes("onboarding") || location.pathname.includes("summary")) ?<div className="call-banner">
                 <Banner hideIcon={true}> 
                     <Text variant="headingMd">Need a 1:1 experience?</Text>
-                    <Button
-
-
-                        onClick={() => {
-                            window.open("https://akto.io/api-security-demo", "_blank")
-                        }}
-                        variant="tertiary" size="micro"><Text variant="bodyMd" tone="subdued">Book a call</Text></Button>
+                    <div style={{minHeight: "8px"}}></div>
+                    <Link url="https://akto.io/api-security-demo" target="_blank">Book a call</Link>
+                    
                 </Banner>
             </div> : null}
         </Frame>

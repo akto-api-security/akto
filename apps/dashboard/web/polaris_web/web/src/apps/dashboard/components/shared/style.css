@@ -82,7 +82,7 @@
     overflow-x:hidden; 
     text-overflow: ellipsis; 
     white-space: nowrap;
-    max-width: 63vw;
+    max-width: 200px;
 }
 
 .modified .line-numbers{

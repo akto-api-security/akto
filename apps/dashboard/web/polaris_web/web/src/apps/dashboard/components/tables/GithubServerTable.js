@@ -431,11 +431,10 @@ function GithubServerTable(props) {
               >
                 {rowMarkup}
               </IndexTable>
-              <Divider/>
             </div>
             </LegacyCard.Section>
-            {(total !== 0 && !props?.hidePagination) && <LegacyCard.Section>
-              <InlineStack align="center">
+            {(total !== 0 && !props?.hidePagination) && 
+              
                 <Pagination
                   label={
                     total == 0 ? 'No data found' :
@@ -449,9 +448,10 @@ function GithubServerTable(props) {
                   hasNext={total > (page + 1) * pageLimit}
                   nextKeys={[Key.RightArrow]}
                   onNext={onPageNext}
+                  type="table"
                 />
-              </InlineStack>
-            </LegacyCard.Section>}
+              
+            }
           </div>
         }
 
