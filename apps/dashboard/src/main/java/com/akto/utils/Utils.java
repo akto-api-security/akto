@@ -41,6 +41,7 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.BulkWriteOptions;
+import com.mongodb.client.model.DeleteManyModel;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.UpdateManyModel;
 import com.mongodb.client.model.UpdateOneModel;
@@ -642,7 +643,7 @@ public class Utils {
         return oldList;
     }
 
-    public static void moveApisFromSampleData(Map<Key,Integer> sampleDataToBeMovedMap){
+    public static void moveApisFromSampleData(Map<Key,Integer> sampleDataToBeMovedMap, Set<String> alreadySeenApis){
 
         Map<ApiInfoKey, Key> mapApiInfoKeyToKey = new HashMap<>();
         List<Key> toBeDeleted = new ArrayList<>();
@@ -748,22 +749,34 @@ public class Utils {
     
         // update single type info data
         ArrayList<WriteModel<SingleTypeInfo>> bulkUpdatesForSti = new ArrayList<>();
+        ArrayList<WriteModel<SingleTypeInfo>> deleteListForStis = new ArrayList<>();
         for(Key key: sampleDataToBeMovedMap.keySet()){
+            String currentApiInfoKey =  key.getUrl() + "?#?" + key.getMethod();
             Bson filterQ = Filters.and(
                 Filters.eq(SingleTypeInfo._API_COLLECTION_ID, key.getApiCollectionId()),
                 Filters.eq(SingleTypeInfo._URL, key.getUrl()),
                 Filters.eq(SingleTypeInfo._METHOD, key.getMethod())
             );
-            bulkUpdatesForSti.add(new UpdateManyModel<>(filterQ, 
-            Updates.combine(
-                Updates.set(SingleTypeInfo._API_COLLECTION_ID, sampleDataToBeMovedMap.get(key)),
-                Updates.addToSet(SingleTypeInfo._COLLECTION_IDS, sampleDataToBeMovedMap.get(key))
-            )));
+            if(alreadySeenApis.contains(currentApiInfoKey)){
+                bulkUpdatesForSti.add(new UpdateManyModel<>(filterQ, 
+                Updates.combine(
+                    Updates.set(SingleTypeInfo._API_COLLECTION_ID, sampleDataToBeMovedMap.get(key)),
+                    Updates.addToSet(SingleTypeInfo._COLLECTION_IDS, sampleDataToBeMovedMap.get(key))
+                )));
+                alreadySeenApis.remove(currentApiInfoKey);
+            }else{
+                deleteListForStis.add(new DeleteManyModel<>(filterQ));
+            }
         }
 
         if(!bulkUpdatesForSti.isEmpty()){
             loggerMaker.infoAndAddToDb("Updated " + bulkUpdatesForSti.size() + " stis into database.");
             SingleTypeInfoDao.instance.getMCollection().bulkWrite(bulkUpdatesForSti, new BulkWriteOptions().ordered(false));
+        }
+
+        if(!deleteListForStis.isEmpty()){
+            loggerMaker.infoAndAddToDb("Deleting " + deleteListForStis.size() + " stis into database.");
+            SingleTypeInfoDao.instance.getMCollection().bulkWrite(deleteListForStis, new BulkWriteOptions().ordered(false));
         }
 
     }

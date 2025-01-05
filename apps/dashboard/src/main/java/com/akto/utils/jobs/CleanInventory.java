@@ -148,6 +148,8 @@ public class CleanInventory {
             Updates.setOnInsert("urls", new HashSet<>())
         );
 
+        Set<String> alreadySeenApis = new HashSet<>();
+
         Map<String,FilterConfig> filterMap = FilterYamlTemplateDao.instance.fetchFilterConfig(false, yamlTemplates, true);
         Pattern pattern = createRegexPatternFromList(redundantUrlList);
         do {
@@ -232,6 +234,8 @@ public class CleanInventory {
                         toMove.add(sampleData.getId());
                         int initialCount = moveHostCollectionWiseCountMap.getOrDefault(sampleData.getId().getApiCollectionId(), 0);
                         moveHostCollectionWiseCountMap.put(sampleData.getId().getApiCollectionId(),initialCount + 1);
+                        String apiInfoId = sampleData.getId().getUrl() + "?#?" + sampleData.getId().getMethod();
+                        alreadySeenApis.add(apiInfoId);
                         if(saveLogsToDB){
                             loggerMaker.infoAndAddToDb("Filter passed, modify sample data of API: " + sampleData.getId(), LogDb.DASHBOARD);
                         }else{
@@ -289,7 +293,7 @@ public class CleanInventory {
             String shouldMove = System.getenv("MOVE_REDUNDANT_APIS");
             if(shouldMove.equals("true")){
                 if(!sampleDataToBeMovedIntoCollection.isEmpty()){
-                    moveApisFromSampleData(sampleDataToBeMovedIntoCollection);
+                    moveApisFromSampleData(sampleDataToBeMovedIntoCollection, alreadySeenApis);
                     sampleDataToBeMovedIntoCollection.clear();
                 }
                 
