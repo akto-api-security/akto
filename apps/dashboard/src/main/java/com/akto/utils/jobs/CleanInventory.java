@@ -290,8 +290,18 @@ public class CleanInventory {
                 deleteApis(toBeDeleted);
             }
 
-            String shouldMove = System.getenv("MOVE_REDUNDANT_APIS");
-            if(shouldMove.equals("true")){
+            boolean shouldMove = false;
+
+            String commaSeparatedAllowedAccounts = System.getenv("ALLOWED_ACCOUNTS_WITH_MOVE_ACCESS");
+            if(commaSeparatedAllowedAccounts != null){
+                String[] accountStringList = commaSeparatedAllowedAccounts.split(",");
+                Set<String> accounts = new HashSet<>(Arrays.asList(accountStringList));
+                String currentAccount = String.valueOf(Context.accountId.get());
+                shouldMove = accounts.contains(currentAccount);
+            }else if(System.getenv("MOVE_REDUNDANT_APIS") != null && System.getenv("MOVE_REDUNDANT_APIS").equals("true")){
+                shouldMove =true;
+            }
+            if(shouldMove){
                 if(!sampleDataToBeMovedIntoCollection.isEmpty()){
                     moveApisFromSampleData(sampleDataToBeMovedIntoCollection, alreadySeenApis);
                     sampleDataToBeMovedIntoCollection.clear();
