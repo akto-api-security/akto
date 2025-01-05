@@ -97,6 +97,7 @@ import com.akto.util.JSONUtils;
 import com.akto.util.Pair;
 import com.akto.util.UsageUtils;
 import com.akto.util.enums.GlobalEnums.Severity;
+import com.akto.util.enums.GlobalEnums.TemplatePlan;
 import com.akto.util.enums.GlobalEnums.TestCategory;
 import com.akto.util.enums.GlobalEnums.YamlTemplateSource;
 import com.akto.util.http_util.CoreHTTPClient;
@@ -3120,20 +3121,7 @@ public class InitializerListener implements ServletContextListener {
                 int countTotalTemplates = 0;
                 int countUnchangedTemplates = 0;
                 Set<String> multiNodesIds = new HashSet<>();
-
-                Bson filterQ = Filters.in(Organization.ACCOUNTS, Context.accountId.get());
-                Organization organization = OrganizationsDao.instance.findOne(filterQ);
-                FeatureAccess proTemplateFeatureAccess = TemplateSettingsUtil.getFeatureAccessForTemplate(organization, GlobalEnums.TemplateFeatureAccess.PRO_TESTS);
-                FeatureAccess enterpriseTemplateFeatureAccess = TemplateSettingsUtil.getFeatureAccessForTemplate(organization, GlobalEnums.TemplateFeatureAccess.ENTERPRISE_TESTS);
-
-                GlobalEnums.TemplateFeatureAccess selectedTemplateFeature = null;
-                if(proTemplateFeatureAccess.getIsGranted()) {
-                    selectedTemplateFeature = GlobalEnums.TemplateFeatureAccess.PRO_TESTS;
-                } else if(enterpriseTemplateFeatureAccess.getIsGranted()) {
-                    selectedTemplateFeature = GlobalEnums.TemplateFeatureAccess.ENTERPRISE_TESTS;
-                }
-                List<GlobalEnums.TemplatePlan> templatePlans = TemplateSettingsUtil.getTemplatePlans(DashboardMode.getDashboardMode(), selectedTemplateFeature);
-
+                int skipped = 0;
                 while ((entry = zipInputStream.getNextEntry()) != null) {
                     if (!entry.isDirectory()) {
                         String entryName = entry.getName();
@@ -3186,7 +3174,8 @@ public class InitializerListener implements ServletContextListener {
                         if (testConfig != null) {
                             boolean hasSettings = testConfig.getAttributes() != null;
 
-                            if (hasSettings && !templatePlans.contains(testConfig.getAttributes().getPlan())) {
+                            if (hasSettings && !testConfig.getAttributes().getPlan().equals(TemplatePlan.FREE) && DashboardMode.isLocalDeployment()) {
+                                skipped++;
                                 continue;
                             }
 
@@ -3264,6 +3253,9 @@ public class InitializerListener implements ServletContextListener {
                 if (countTotalTemplates != countUnchangedTemplates) {
                     loggerMaker.infoAndAddToDb(countUnchangedTemplates + "/" + countTotalTemplates + " unchanged", LogDb.DASHBOARD);
                 }
+
+                loggerMaker.infoAndAddToDb("Skipped " + skipped + " test templates for account: " + Context.accountId.get());
+
             } catch (Exception ex) {
                 cacheLoggerMaker.errorAndAddToDb(ex,
                         String.format("Error while processing Test template files zip. Error %s", ex.getMessage()),
