@@ -16,6 +16,8 @@ public class MaliciousEventModel {
   private long detectedAt;
   private int latestApiCollectionId;
   private EventType eventType;
+  private String category;
+  private String subCategory;
 
   public enum EventType {
     SINGLE,
@@ -36,6 +38,8 @@ public class MaliciousEventModel {
     this.latestApiCollectionId = builder.latestApiCollectionId;
     this.detectedAt = builder.detectedAt;
     this.eventType = builder.eventType;
+    this.category = builder.category;
+    this.subCategory = builder.subCategory;
   }
 
   public static class Builder {
@@ -49,6 +53,8 @@ public class MaliciousEventModel {
     private String latestApiOrig;
     private int latestApiCollectionId;
     private long detectedAt;
+    private String category;
+    private String subCategory;
 
     public Builder setFilterId(String filterId) {
       this.filterId = filterId;
@@ -97,6 +103,16 @@ public class MaliciousEventModel {
 
     public Builder setEventType(EventType eventType) {
       this.eventType = eventType;
+      return this;
+    }
+
+    public Builder setCategory(String category) {
+      this.category = category;
+      return this;
+    }
+
+    public Builder setSubCategory(String subCategory) {
+      this.subCategory = subCategory;
       return this;
     }
 
@@ -195,5 +211,21 @@ public class MaliciousEventModel {
 
   public void setEventType(EventType eventType) {
     this.eventType = eventType;
+  }
+
+  public String getCategory() {
+    return category;
+  }
+
+  public void setCategory(String category) {
+    this.category = category;
+  }
+
+  public String getSubCategory() {
+    return subCategory;
+  }
+
+  public void setSubCategory(String subCategory) {
+    this.subCategory = subCategory;
   }
 }

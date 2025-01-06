@@ -6,11 +6,16 @@ import com.akto.dto.type.URLMethods;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchAlertFiltersResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListMaliciousRequestsResponse;
 import com.akto.proto.utils.ProtoMessageUtils;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.entity.ContentType;
+import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.util.EntityUtils;
@@ -32,6 +37,8 @@ public class SuspectSampleDataAction extends UserAction {
   private final String backendUrl;
   private final String backendToken;
 
+  private final ObjectMapper objectMapper = new ObjectMapper();
+
   public SuspectSampleDataAction() {
     super();
     this.httpClient = HttpClients.createDefault();
@@ -40,20 +47,36 @@ public class SuspectSampleDataAction extends UserAction {
   }
 
   public String fetchSampleDataV2() {
-    HttpGet get =
-        new HttpGet(String.format("%s/api/dashboard/list_malicious_requests", backendUrl));
-    get.addHeader("Authorization", "Bearer " + backendToken);
-    get.addHeader("Content-Type", "application/json");
+    HttpPost post =
+        new HttpPost(String.format("%s/api/dashboard/list_malicious_requests", backendUrl));
+    post.addHeader("Authorization", "Bearer " + backendToken);
+    post.addHeader("Content-Type", "application/json");
 
-    try (CloseableHttpResponse resp = this.httpClient.execute(get)) {
+    Map<String, Object> body =
+        new HashMap<String, Object>() {
+          {
+            put("skip", skip);
+            put("limit", LIMIT);
+          }
+        };
+    String msg = objectMapper.valueToTree(body).toString();
+
+    System.out.println("Request body for list malicious requests" + msg);
+
+    StringEntity requestEntity = new StringEntity(msg, ContentType.APPLICATION_JSON);
+    post.setEntity(requestEntity);
+
+    try (CloseableHttpResponse resp = this.httpClient.execute(post)) {
       String responseBody = EntityUtils.toString(resp.getEntity());
+
+      System.out.println(responseBody);
 
       ProtoMessageUtils.<ListMaliciousRequestsResponse>toProtoMessage(
               ListMaliciousRequestsResponse.class, responseBody)
           .ifPresent(
-              msg -> {
+              m -> {
                 this.maliciousEvents =
-                    msg.getMaliciousEventsList().stream()
+                    m.getMaliciousEventsList().stream()
                         .map(
                             smr ->
                                 new DashboardMaliciousEvent(
@@ -83,6 +106,8 @@ public class SuspectSampleDataAction extends UserAction {
 
     try (CloseableHttpResponse resp = this.httpClient.execute(get)) {
       String responseBody = EntityUtils.toString(resp.getEntity());
+
+      System.out.println(responseBody);
 
       ProtoMessageUtils.<FetchAlertFiltersResponse>toProtoMessage(
               FetchAlertFiltersResponse.class, responseBody)

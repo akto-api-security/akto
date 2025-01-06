@@ -1,12 +1,11 @@
 package com.akto.threat.backend;
 
-import com.akto.kafka.KafkaConfig;
 import com.akto.threat.backend.interceptors.AuthenticationInterceptor;
 import com.akto.threat.backend.router.DashboardRouter;
 import com.akto.threat.backend.router.ThreatDetectionRouter;
-import com.akto.threat.backend.service.DashboardService;
 import com.akto.threat.backend.service.MaliciousEventService;
-import com.mongodb.client.MongoClient;
+import com.akto.threat.backend.service.ThreatActorService;
+import com.akto.threat.backend.service.ThreatApiService;
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.Vertx;
 import io.vertx.ext.web.Router;
@@ -14,12 +13,17 @@ import io.vertx.ext.web.handler.BodyHandler;
 
 public class BackendVerticle extends AbstractVerticle {
 
-  private final MongoClient mongoClient;
-  private final KafkaConfig kafkaConfig;
+  private final MaliciousEventService maliciousEventService;
+  private final ThreatActorService threatActorService;
+  private final ThreatApiService threatApiService;
 
-  public BackendVerticle(MongoClient mongoClient, KafkaConfig kafkaConfig) {
-    this.mongoClient = mongoClient;
-    this.kafkaConfig = kafkaConfig;
+  public BackendVerticle(
+      MaliciousEventService maliciousEventService,
+      ThreatActorService threatActorService,
+      ThreatApiService threatApiService) {
+    this.maliciousEventService = maliciousEventService;
+    this.threatActorService = threatActorService;
+    this.threatApiService = threatApiService;
   }
 
   @Override
@@ -34,9 +38,10 @@ public class BackendVerticle extends AbstractVerticle {
     api.route().handler(BodyHandler.create());
     api.route().handler(new AuthenticationInterceptor());
 
-    Router dashboardRouter = new DashboardRouter(new DashboardService(mongoClient)).setup(vertx);
-    Router threatDetectionRouter =
-        new ThreatDetectionRouter(new MaliciousEventService(kafkaConfig)).setup(vertx);
+    Router dashboardRouter =
+        new DashboardRouter(maliciousEventService, threatActorService, threatApiService)
+            .setup(vertx);
+    Router threatDetectionRouter = new ThreatDetectionRouter(maliciousEventService).setup(vertx);
 
     api.route("/dashboard/*").subRouter(dashboardRouter);
     api.route("/threat_detection/*").subRouter(threatDetectionRouter);
