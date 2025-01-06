@@ -378,7 +378,7 @@ function IssuesPage() {
 
         let obj = {
             'filterStatus': filterStatus,
-            'filterCollectionsId': [filterCollectionsId.toString()],
+            'filterCollectionsId': filterCollectionsId.forEach((x) => {return x.toString()}),
             'filterSeverity': filterSeverity,
             filterSubCategory: filterSubCategory,
             startEpoch: [startTimestamp.toString()]
