@@ -70,7 +70,7 @@ function DropdownSearch(props) {
             setTimeout(() => {
                 if (value === '' && selectedOptions.length === 0) {
                     const options = deselectedOptions.slice(0, defaultSliceValue);
-                    const title = options.length > defaultSliceValue
+                    const title = options.length >= defaultSliceValue
                         ? `Showing ${options.length} result${func.addPlurality(options.length)} only. (type more to refine results)`
                         : "Showing all results";
                     const nestedOptions = [{
