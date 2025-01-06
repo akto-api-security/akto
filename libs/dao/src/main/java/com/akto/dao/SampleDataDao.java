@@ -4,6 +4,7 @@ import com.akto.dao.context.Context;
 import com.akto.dto.ApiCollectionUsers;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.testing.TestingEndpoints;
+import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.URLMethods;
 import com.akto.dto.type.SingleTypeInfo;
@@ -84,6 +85,18 @@ public class SampleDataDao extends AccountsContextDaoWithRbac<SampleData> {
                 Filters.eq("_id.url", url),
                 Filters.eq("_id.method", method.name())
         );
+    }
+
+
+    public static List<Bson> filterForMultipleSampleData(List<Key> sampleList) {
+        List<Bson> ret = new ArrayList<>();
+
+        for(Key key: sampleList) {
+            Bson f = filterForSampleData(key.getApiCollectionId(), key.getUrl(), key.getMethod());
+            ret.add(f);
+        }
+
+        return ret;
     }
 
     public List<SampleData> fetchSampleDataPaginated(int apiCollectionId, String lastFetchedUrl,
