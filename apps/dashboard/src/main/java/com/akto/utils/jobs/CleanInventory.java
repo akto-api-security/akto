@@ -131,17 +131,24 @@ public class CleanInventory {
     }
 
     private static void moveApisFromSampleData(List<Key> sampleDataIds) {
+        if (sampleDataIds.isEmpty()) return;
+        
         List<SampleData> allSamples = SampleDataDao.instance.findAll(Filters.or(SampleDataDao.filterForMultipleSampleData(sampleDataIds)));
-
+        List<String> messages = new ArrayList<>();
         for(SampleData sampleData: allSamples) {
+            messages.addAll(sampleData.getSamples());
+        }
+
+        if (allSamples.isEmpty() || messages.isEmpty()) return;
+        
+
             try {
-                Utils.pushDataToKafka(sampleData.getId().getApiCollectionId(), "", sampleData.getSamples(), new ArrayList<>(), true);
+                Utils.pushDataToKafka(allSamples.get(0).getId().getApiCollectionId(), "", messages, new ArrayList<>(), true);
                 loggerMaker.infoAndAddToDb("Successfully moved APIs.");
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb("Error during move APIs: " + e.getMessage());
                 e.printStackTrace();
             }
-        }
     }
     
     public static void cleanFilteredSampleDataFromAdvancedFilters(List<ApiCollection> apiCollections, List<YamlTemplate> yamlTemplates, List<String> redundantUrlList, String filePath, boolean shouldDeleteRequest, boolean saveLogsToDB) throws IOException{
