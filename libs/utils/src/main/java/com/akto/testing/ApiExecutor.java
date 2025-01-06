@@ -100,8 +100,6 @@ public class ApiExecutor {
         String body;
         try {
             response = call.execute();
-
-            loggerMaker.infoAndAddToDb("Received protocol: " + response.protocol(), LogDb.TESTING);
             
             ResponseBody responseBody = null;
             if (nonTestingContext) {
@@ -129,7 +127,7 @@ public class ApiExecutor {
             }
         } catch (IOException e) {
             if (!(request.url().toString().contains("insertRuntimeLog") || request.url().toString().contains("insertTestingLog"))) {
-                loggerMaker.errorAndAddToDb("Error while executing request " + request.url() + ": " + e, LogDb.TESTING);
+                loggerMaker.errorAndAddToDb("Error while executing request " + request.url() + " " + response.protocol() +" : " + e, LogDb.TESTING);
             } else {
                 System.out.println("Error while executing request " + request.url() + ": " + e);
             }
