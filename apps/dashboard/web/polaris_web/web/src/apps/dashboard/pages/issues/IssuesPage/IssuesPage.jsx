@@ -376,9 +376,11 @@ function IssuesPage() {
             filterSubCategory = filterSubCategory.concat(categoryToSubCategories[issue])
         })
 
+        const collectionIdsArray = filterCollectionsId.map((x) => {return x.toString()})
+
         let obj = {
             'filterStatus': filterStatus,
-            'filterCollectionsId': [filterCollectionsId.toString()],
+            'filterCollectionsId': collectionIdsArray,
             'filterSeverity': filterSeverity,
             filterSubCategory: filterSubCategory,
             startEpoch: [startTimestamp.toString()]
