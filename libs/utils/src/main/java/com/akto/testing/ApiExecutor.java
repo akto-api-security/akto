@@ -100,6 +100,9 @@ public class ApiExecutor {
         String body;
         try {
             response = call.execute();
+
+            loggerMaker.infoAndAddToDb("Received protocol: " + response.protocol(), LogDb.TESTING);
+            
             ResponseBody responseBody = null;
             if (nonTestingContext) {
                 responseBody = response.body();
