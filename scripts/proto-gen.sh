@@ -4,7 +4,7 @@
 # Please install buf if not already installed by following the instructions at https://docs.buf.build/installation
 if ! command -v buf >/dev/null 2>&1; then
     echo "Please install buf if not already installed by following the instructions at https://docs.buf.build/installation"
-    exit
+    exit 1
 fi
 
 buf lint protobuf
