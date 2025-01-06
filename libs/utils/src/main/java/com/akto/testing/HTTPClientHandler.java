@@ -13,6 +13,7 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.Arrays;
 
 public class HTTPClientHandler {
     private int readTimeout = 30;
@@ -26,7 +27,7 @@ public class HTTPClientHandler {
                 .connectionPool(new ConnectionPool(256, 5L, TimeUnit.MINUTES))
                 .sslSocketFactory(CoreHTTPClient.trustAllSslSocketFactory, (X509TrustManager)CoreHTTPClient.trustAllCerts[0])
                 .hostnameVerifier((hostname, session) -> true)
-                .protocols(Arrays.asList(Protocol.HTTP_1_1));
+                .protocols(Arrays.asList(Protocol.HTTP_1_1))
                 .followRedirects(followRedirects);
     }
 
