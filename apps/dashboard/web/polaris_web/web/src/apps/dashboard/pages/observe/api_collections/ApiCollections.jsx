@@ -1,6 +1,6 @@
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
-import { Text, Button, IndexFiltersMode, Box, Badge, Popover, ActionList, Link, Tooltip, Modal, Checkbox, LegacyCard, ResourceList, ResourceItem, Avatar, Filters, Card, HorizontalStack, Icon} from "@shopify/polaris"
-import { HideMinor, ViewMinor,FileMinor } from '@shopify/polaris-icons';
+import { Text, Button, IndexFiltersMode, Box, Badge, Popover, ActionList, ResourceItem, Avatar,  HorizontalStack, Icon, TextField} from "@shopify/polaris"
+import { HideMinor, ViewMinor,FileMinor, FileFilledMinor } from '@shopify/polaris-icons';
 import api from "../api"
 import dashboardApi from "../../dashboard/api"
 import settingRequests from "../../settings/api"
@@ -216,6 +216,8 @@ function ApiCollections() {
     const [normalData, setNormalData] = useState([])
     const [treeView, setTreeView] = useState(false);
     const [moreActions, setMoreActions] = useState(false);
+    const [textFieldActive, setTextFieldActive] = useState(false);
+    const [customEnv,setCustomEnv] = useState('')
 
     // const dummyData = dummyJson;
 
@@ -627,14 +629,25 @@ function ApiCollections() {
                 autofocusTarget="first-node"
             >
                 <Popover.Pane>
-                    <ActionList
+                    {textFieldActive ? 
+                    <Box padding={"1"}>
+                        <TextField onChange={setCustomEnv} value={customEnv} connectedRight={(
+                            <Button onClick={() => {
+                                resetResourcesSelected();
+                                updateEnvType(selectedResources, customEnv);
+                            }} plain icon={FileFilledMinor}/>
+                        )}/>
+                    </Box>
+                        :<ActionList
                         actionRole="menuitem"
                         items={[
                             {content: 'Staging', onAction: () => updateEnvType(selectedResources, "STAGING")},
                             {content: 'Production', onAction: () => updateEnvType(selectedResources, "PRODUCTION")},
                             {content: 'Reset', onAction: () => updateEnvType(selectedResources, null)},
+                            {content: 'Add yours', onAction: () => setTextFieldActive(!textFieldActive)}
                         ]}
-                    />
+                    
+                    />}
                 </Popover.Pane>
             </Popover>
         )
