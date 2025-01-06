@@ -673,6 +673,27 @@ public class DbLayer {
         ActivitiesDao.instance.insertActivity("High Vulnerability detected", count + " HIGH vulnerabilites detected");
     }
 
+    public static TestingRunResultSummary updateIssueCountInSummary(String summaryId, Map<String, Integer> totalCountIssues, String operator) {
+        if(operator == null || !operator.equals("increment")){
+            return updateIssueCountInSummary(summaryId,totalCountIssues);
+        }else{
+            ObjectId summaryObjectId = new ObjectId(summaryId);
+            FindOneAndUpdateOptions options = new FindOneAndUpdateOptions();
+            options.returnDocument(ReturnDocument.AFTER);
+            Bson updateIncrement = Updates.combine(
+                Updates.inc("countIssues.HIGH", totalCountIssues.getOrDefault("HIGH", 0)),
+                Updates.inc("countIssues.MEDIUM", totalCountIssues.getOrDefault("MEDIUM", 0)),
+                Updates.inc("countIssues.LOW", totalCountIssues.getOrDefault("LOW", 0))
+            );
+            return TestingRunResultSummariesDao.instance.getMCollection().findOneAndUpdate(
+                    Filters.eq(Constants.ID, summaryObjectId),
+                    Updates.combine(
+                            Updates.set(TestingRunResultSummary.END_TIMESTAMP, Context.now()),
+                            Updates.set(TestingRunResultSummary.STATE, State.COMPLETED),
+                            updateIncrement),options);
+        }
+    }
+
     public static TestingRunResultSummary updateIssueCountInSummary(String summaryId, Map<String, Integer> totalCountIssues) {
         ObjectId summaryObjectId = new ObjectId(summaryId);
         FindOneAndUpdateOptions options = new FindOneAndUpdateOptions();
@@ -694,9 +715,8 @@ public class DbLayer {
                 Filters.eq(Constants.ID, summaryObjectId),
                 Updates.combine(
                         Updates.set(TestingRunResultSummary.END_TIMESTAMP, Context.now()),
-                        Updates.set(TestingRunResultSummary.STATE, state),
-                        Updates.set(TestingRunResultSummary.COUNT_ISSUES, totalCountIssues)),
-                options);
+                        Updates.set(TestingRunResultSummary.STATE, state)
+                ),options);
     }
 
     public static List<Integer> fetchDeactivatedCollections() {
