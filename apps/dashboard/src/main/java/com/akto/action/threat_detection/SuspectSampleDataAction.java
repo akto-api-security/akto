@@ -42,21 +42,18 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
   }
 
   public String fetchSampleData() {
-    HttpPost post =
-        new HttpPost(
-            String.format("%s/api/dashboard/list_malicious_requests", this.getBackendUrl()));
+    HttpPost post = new HttpPost(String.format("%s/api/dashboard/list_malicious_requests", this.getBackendUrl()));
     post.addHeader("Authorization", "Bearer " + this.getApiToken());
     post.addHeader("Content-Type", "application/json");
 
     System.out.print("API Token: " + this.getApiToken());
 
-    Map<String, Object> body =
-        new HashMap<String, Object>() {
-          {
-            put("skip", skip);
-            put("limit", LIMIT);
-          }
-        };
+    Map<String, Object> body = new HashMap<String, Object>() {
+      {
+        put("skip", skip);
+        put("limit", LIMIT);
+      }
+    };
     String msg = objectMapper.valueToTree(body).toString();
 
     System.out.println("Request body for list malicious requests" + msg);
@@ -70,24 +67,22 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
       System.out.println(responseBody);
 
       ProtoMessageUtils.<ListMaliciousRequestsResponse>toProtoMessage(
-              ListMaliciousRequestsResponse.class, responseBody)
+          ListMaliciousRequestsResponse.class, responseBody)
           .ifPresent(
               m -> {
-                this.maliciousEvents =
-                    m.getMaliciousEventsList().stream()
-                        .map(
-                            smr ->
-                                new DashboardMaliciousEvent(
-                                    smr.getId(),
-                                    smr.getActor(),
-                                    smr.getFilterId(),
-                                    smr.getEndpoint(),
-                                    URLMethods.Method.fromString(smr.getMethod()),
-                                    smr.getApiCollectionId(),
-                                    smr.getIp(),
-                                    smr.getCountry(),
-                                    smr.getDetectedAt()))
-                        .collect(Collectors.toList());
+                this.maliciousEvents = m.getMaliciousEventsList().stream()
+                    .map(
+                        smr -> new DashboardMaliciousEvent(
+                            smr.getId(),
+                            smr.getActor(),
+                            smr.getFilterId(),
+                            smr.getEndpoint(),
+                            URLMethods.Method.fromString(smr.getMethod()),
+                            smr.getApiCollectionId(),
+                            smr.getIp(),
+                            smr.getCountry(),
+                            smr.getDetectedAt()))
+                    .collect(Collectors.toList());
               });
     } catch (Exception e) {
       e.printStackTrace();
@@ -98,8 +93,7 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
   }
 
   public String fetchFilters() {
-    HttpGet get =
-        new HttpGet(String.format("%s/api/dashboard/fetch_filters", this.getBackendUrl()));
+    HttpGet get = new HttpGet(String.format("%s/api/dashboard/fetch_filters", this.getBackendUrl()));
     get.addHeader("Authorization", "Bearer " + this.getApiToken());
     get.addHeader("Content-Type", "application/json");
 
@@ -109,7 +103,7 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
       System.out.println(responseBody);
 
       ProtoMessageUtils.<FetchAlertFiltersResponse>toProtoMessage(
-              FetchAlertFiltersResponse.class, responseBody)
+          FetchAlertFiltersResponse.class, responseBody)
           .ifPresent(
               msg -> {
                 this.ips = msg.getActorsList();
