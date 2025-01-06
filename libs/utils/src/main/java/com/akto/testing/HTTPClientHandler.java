@@ -26,6 +26,7 @@ public class HTTPClientHandler {
                 .connectionPool(new ConnectionPool(256, 5L, TimeUnit.MINUTES))
                 .sslSocketFactory(CoreHTTPClient.trustAllSslSocketFactory, (X509TrustManager)CoreHTTPClient.trustAllCerts[0])
                 .hostnameVerifier((hostname, session) -> true)
+                .protocols(Arrays.asList(Protocol.HTTP_1_1));
                 .followRedirects(followRedirects);
     }
 
@@ -63,7 +64,6 @@ public class HTTPClientHandler {
             }
 
             Response response = chain.proceed(request);
-
 
             if (response == null) {
                 testLogs.add(new TestingRunResult.TestLog(TestingRunResult.TestLogType.INFO, "Response Body: null"));
