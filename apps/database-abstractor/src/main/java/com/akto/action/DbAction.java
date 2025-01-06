@@ -141,6 +141,8 @@ public class DbAction extends ActionSupport {
     String state;
     Bson filter;
 
+    String operator;
+
     public BasicDBList getIssuesIds() {
         return issuesIds;
     }
@@ -1505,7 +1507,7 @@ public class DbAction extends ActionSupport {
 
     public String updateIssueCountInSummary() {
         try {
-            trrs = DbLayer.updateIssueCountInSummary(summaryId, totalCountIssues);
+            trrs = DbLayer.updateIssueCountInSummary(summaryId, totalCountIssues, operator);
             trrs.setTestingRunHexId(trrs.getTestingRunId().toHexString());
         } catch (Exception e) {
             return Action.ERROR.toUpperCase();
@@ -2649,6 +2651,14 @@ public class DbAction extends ActionSupport {
 
     public void setFilter(Bson filter) {
         this.filter = filter;
+    }
+
+    public String getOperator() {
+        return operator;
+    }
+
+    public void setOperator(String operator) {
+        this.operator = operator;
     }
 
 }
