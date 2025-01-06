@@ -248,12 +248,6 @@
             <artifactId>commons-csv</artifactId>
             <version>1.9.0</version>
         </dependency>
-        <dependency>
-            <artifactId>grpc-api</artifactId>
-            <groupId>io.grpc</groupId>
-            <version>1.68.1</version>
-            <scope>compile</scope>
-        </dependency>
     </dependencies>
     <build>
         <sourceDirectory>src/main/java</sourceDirectory>
