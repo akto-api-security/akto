@@ -170,6 +170,8 @@ public abstract class DataActor {
 
     public abstract TestingRunResultSummary updateIssueCountInSummary(String summaryId, Map<String, Integer> totalCountIssues);
 
+    public abstract TestingRunResultSummary updateIssueCountInSummary(String summaryId, Map<String, Integer> totalCountIssues, String operator);
+
     public abstract TestingRunResultSummary updateIssueCountAndStateInSummary(String summaryId, Map<String, Integer> totalCountIssues, String state);
 
     public abstract List<TestingRunResult> fetchLatestTestingRunResultBySummaryId(String summaryId, int limit, int skip);

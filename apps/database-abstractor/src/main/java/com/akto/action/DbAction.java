@@ -160,6 +160,8 @@ public class DbAction extends ActionSupport {
     String state;
     Bson filter;
 
+    String operator;
+
     public BasicDBList getIssuesIds() {
         return issuesIds;
     }
@@ -1814,11 +1816,16 @@ public class DbAction extends ActionSupport {
 
     public String updateIssueCountInSummary() {
         try {
+            Object summaryObjectId = null;
             if (summaryId != null) {
-                ObjectId summaryObjectId = new ObjectId(summaryId);
-                totalCountIssues = TestExecutor.calcTotalCountIssues(summaryObjectId);
+                summaryObjectId = new ObjectId(summaryId);
             }
-            trrs = DbLayer.updateIssueCountInSummary(summaryId, totalCountIssues);
+            if((operator == null || operator.isEmpty()) && summaryId != null){
+                totalCountIssues = TestExecutor.calcTotalCountIssues(summaryObjectId);
+                trrs = DbLayer.updateIssueCountInSummary(summaryId, totalCountIssues);
+            }else{
+                trrs = DbLayer.updateIssueCountInSummary(summaryId, totalCountIssues, operator);
+            }
             trrs.setTestingRunHexId(trrs.getTestingRunId().toHexString());
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in updateIssueCountInSummary " + e.toString());
@@ -3338,6 +3345,14 @@ public class DbAction extends ActionSupport {
 
     public TestScript getTestScript() {
         return testScript;
+    }
+    
+    public String getOperator() {
+        return operator;
+    }
+
+    public void setOperator(String operator) {
+        this.operator = operator;
     }
 
 }
