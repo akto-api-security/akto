@@ -141,20 +141,6 @@ jobs:
           mask-password: 'true'
           registry-type: public
 
-      - name: Build, tag, and push docker image to Amazon ECR
-        env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          ECR_REPOSITORY: akto-api-security
-          REGISTRY_ALIAS: p7q3h0z2
-          IMAGE_TAG: local
-          IMAGE_TAG2: latest
-        run: |
-          docker buildx create --use
-          # Build a docker container and push it to DockerHub 
-          # cd apps/api-threat-detection
-          # docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-api-protection:$IMAGE_TAG -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-api-protection:$IMAGE_TAG2 . --push
-          # echo "::set-output name=image::$ECR_REGISTRY/akto-api-protection:$IMAGE_TAG"
-
       - name: Push git tag
         id: tag_version
         uses: mathieudutour/github-tag-action@v6.1
