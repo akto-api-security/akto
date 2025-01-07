@@ -41,6 +41,12 @@ jobs:
           wget -O general.json https://raw.githubusercontent.com/akto-api-security/pii-types/master/general.json
           wget -O fintech.json https://raw.githubusercontent.com/akto-api-security/akto/master/pii-types/fintech.json
           wget -O filetypes.json https://raw.githubusercontent.com/akto-api-security/akto/master/pii-types/filetypes.json
+      - name: Create maxmind directory
+        run: mkdir -p ./apps/threat-detection-backend/src/main/resources/maxmind
+      - name: Download Maxmind Country database
+        working-directory: ./apps/threat-detection-backend/src/main/resources/maxmind
+        run: |
+          wget -O Geo-Country.mmdb https://raw.githubusercontent.com/akto-api-security/tests-library/refs/heads/master/resources/Geo-Country.mmdb
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v1

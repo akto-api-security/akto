@@ -66,6 +66,14 @@ jobs:
           wget -O filetypes.json https://raw.githubusercontent.com/akto-api-security/akto/master/pii-types/filetypes.json
           wget -O automated_api_groups.csv https://raw.githubusercontent.com/akto-api-security/akto/master/automated-api-groups/automated-api-groups.csv
 
+
+      - name: Create maxmind directory
+        run: mkdir -p ./apps/threat-detection-backend/src/main/resources/maxmind
+      - name: Download Maxmind Country database
+        working-directory: ./apps/threat-detection-backend/src/main/resources/maxmind
+        run: |
+          wget -O Geo-Country.mmdb https://raw.githubusercontent.com/akto-api-security/tests-library/refs/heads/master/resources/Geo-Country.mmdb
+
       - name: Prepare Dashboard polaris UI
         working-directory: ./apps/dashboard/web/polaris_web
         run: npm install && export RELEASE_VERSION=${{github.event.inputs.release_version}} && npm run build

@@ -11,6 +11,7 @@ import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.Fe
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListMaliciousRequestsRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListMaliciousRequestsResponse;
 import com.akto.proto.generated.threat_detection.service.malicious_alert_service.v1.RecordMaliciousEventRequest;
+import com.akto.threat.backend.client.IPLookupClient;
 import com.akto.threat.backend.constants.KafkaTopic;
 import com.akto.threat.backend.constants.MongoDBCollection;
 import com.akto.threat.backend.db.AggregateSampleMaliciousEventModel;
@@ -33,10 +34,13 @@ public class MaliciousEventService {
 
   private final Kafka kafka;
   private MongoClient mongoClient;
+  private IPLookupClient ipLookupClient;
 
-  public MaliciousEventService(KafkaConfig kafkaConfig, MongoClient mongoClient) {
+  public MaliciousEventService(
+      KafkaConfig kafkaConfig, MongoClient mongoClient, IPLookupClient ipLookupClient) {
     this.kafka = new Kafka(kafkaConfig);
     this.mongoClient = mongoClient;
+    this.ipLookupClient = ipLookupClient;
   }
 
   public void recordMaliciousEvent(String accountId, RecordMaliciousEventRequest request) {
@@ -64,7 +68,8 @@ public class MaliciousEventService {
             .setLatestApiCollectionId(evt.getLatestApiCollectionId())
             .setEventType(maliciousEventType)
             .setLatestApiIp(evt.getLatestApiIp())
-            .setCountry("US")
+            .setCountry(
+                this.ipLookupClient.getCountryISOCodeGivenIp(evt.getLatestApiIp()).orElse(""))
             .setCategory(evt.getCategory())
             .setSubCategory(evt.getSubCategory())
             .build();

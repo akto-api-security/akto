@@ -71,8 +71,8 @@ public class FlushMessagesToDB {
   private void processRecords(ConsumerRecords<String, String> records) {
     records.forEach(
         r -> {
-          String message = r.value();
           try {
+            String message = r.value();
             writeMessage(message);
           } catch (JsonProcessingException e) {
             System.out.println("Error while parsing message" + e);
