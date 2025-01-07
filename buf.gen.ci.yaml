@@ -11,5 +11,5 @@ managed:
       value: com.akto.proto.generated
 
 plugins:
-  - protoc_builtin: java
+  - remote: buf.build/protocolbuffers/java:v28.3
     out: libs/protobuf/src/main/java
