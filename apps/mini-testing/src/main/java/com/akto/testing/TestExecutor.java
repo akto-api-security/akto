@@ -807,6 +807,7 @@ public class TestExecutor {
                         }
                         switch (apiInfoKey.getMethod()) {
                             case POST:
+                            case PUT:
                                 // TODO: Handle cases where the delete API does not have the delete method
                                 List<DependencyNode> children = dataActor.findDependencyNodes(apiInfoKey.getApiCollectionId(), apiInfoKey.getUrl(), apiInfoKey.getMethod().name(), "DELETE");
 
@@ -825,9 +826,8 @@ public class TestExecutor {
                                             List<KVPair> kvPairs = new ArrayList<>();
                                             boolean fullReplace = true;
                                             for(ParamInfo paramInfo: node.getParamInfos()) {
-                                                // TODO: Handle for header and url params
+                                                // TODO: Handle for header
                                                 if (paramInfo.isHeader()) continue;
-                                                if (paramInfo.isUrlParam()) continue;
                                                 Set<Object> valuesFromResponse = valuesMap.get(paramInfo.getResponseParam());
 
                                                 if (valuesFromResponse == null || valuesFromResponse.isEmpty()) {
@@ -838,7 +838,7 @@ public class TestExecutor {
                                                 Object valueFromResponse = valuesFromResponse.iterator().next();
 
                                                 KVPair.KVType type = valueFromResponse instanceof Integer ? KVPair.KVType.INTEGER : KVPair.KVType.STRING;
-                                                KVPair kvPair = new KVPair(paramInfo.getRequestParam(), valueFromResponse.toString(), false, false, type);
+                                                KVPair kvPair = new KVPair(paramInfo.getRequestParam(), valueFromResponse.toString(), false, paramInfo.isUrlParam(), type);
                                                 kvPairs.add(kvPair);
                                             }
 
@@ -905,9 +905,6 @@ public class TestExecutor {
 
                                 break;
                             // TODO: implement for other methods
-                            case PUT:
-
-                                break;
                             case PATCH:
 
                                 break;
