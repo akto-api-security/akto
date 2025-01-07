@@ -19,6 +19,7 @@ function LearnPopoverComponent({learnMoreObj}) {
             });
         }
     }
+
     return (
         <Popover
             active={popoverActive}
@@ -42,7 +43,7 @@ function LearnPopoverComponent({learnMoreObj}) {
                     </Text>
                 </VerticalStack>
             </Box> : null}
-            <ActionList items={[...learnMoreObj?.docsLink, ...learnMoreObj?.videoLink]} />
+            <ActionList items={[...learnMoreObj?.docsLink, ...learnMoreObj?.videoLink || []]} />
             
         </Popover>
     )
