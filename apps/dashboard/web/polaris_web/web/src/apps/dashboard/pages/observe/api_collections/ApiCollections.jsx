@@ -1,5 +1,5 @@
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
-import { Text, Button, IndexFiltersMode, Box, Badge, Popover, ActionList, ResourceItem, Avatar,  HorizontalStack, Icon, TextField} from "@shopify/polaris"
+import { Text, Button, IndexFiltersMode, Box, Badge, Popover, ActionList, ResourceItem, Avatar,  HorizontalStack, Icon, TextField, Tooltip} from "@shopify/polaris"
 import { HideMinor, ViewMinor,FileMinor, FileFilledMinor } from '@shopify/polaris-icons';
 import api from "../api"
 import dashboardApi from "../../dashboard/api"
@@ -632,10 +632,13 @@ function ApiCollections() {
                     {textFieldActive ? 
                     <Box padding={"1"}>
                         <TextField onChange={setCustomEnv} value={customEnv} connectedRight={(
-                            <Button onClick={() => {
-                                resetResourcesSelected();
-                                updateEnvType(selectedResources, customEnv);
-                            }} plain icon={FileFilledMinor}/>
+                            <Tooltip content="Save your Custom env type" dismissOnMouseOut>
+                                <Button onClick={() => {
+                                    resetResourcesSelected();
+                                    updateEnvType(selectedResources, customEnv);
+                                    setTextFieldActive(false);
+                                }} plain icon={FileFilledMinor}/>
+                            </Tooltip>
                         )}/>
                     </Box>
                         :<ActionList
@@ -644,7 +647,7 @@ function ApiCollections() {
                             {content: 'Staging', onAction: () => updateEnvType(selectedResources, "STAGING")},
                             {content: 'Production', onAction: () => updateEnvType(selectedResources, "PRODUCTION")},
                             {content: 'Reset', onAction: () => updateEnvType(selectedResources, null)},
-                            {content: 'Add yours', onAction: () => setTextFieldActive(!textFieldActive)}
+                            {content: 'Add Custom', onAction: () => setTextFieldActive(!textFieldActive)}
                         ]}
                     
                     />}
@@ -667,7 +670,7 @@ function ApiCollections() {
         Object.keys(copyObj).forEach((key) => {
             data[key].length > 0 && data[key].forEach((c) => {
                 c['envType'] = dataMap[c.id]
-                c['envTypeComp'] = dataMap[c.id] ? <Badge size="small" status="info">{func.toSentenceCase(dataMap[c.id])}</Badge> : null
+                c['envTypeComp'] = dataMap[c.id] ? <Badge size="small" status="info">{dataMap[c.id]}</Badge> : null
             })
         })
         setData(copyObj)
