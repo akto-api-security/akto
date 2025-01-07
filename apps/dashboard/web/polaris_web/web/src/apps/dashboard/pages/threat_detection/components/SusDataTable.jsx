@@ -118,6 +118,7 @@ function SusDataTable({ currDateRange, rowClicked }) {
     let ret = res?.maliciousEvents.map((x) => {
       return {
         ...x,
+        id: x.id,
         actorComp: x?.actor,
         endpointComp: (
           <GetPrettifyEndpoint method={x.method} url={x.url} isNew={false} />
