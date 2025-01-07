@@ -9,7 +9,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     outputs:
       IMAGE_TAG: ${{ steps.docker_tag.outputs.IMAGE_TAG }}
     steps:
