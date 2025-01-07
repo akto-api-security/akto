@@ -143,7 +143,7 @@ public class CleanInventory {
         
 
             try {
-                Utils.pushDataToKafka(allSamples.get(0).getId().getApiCollectionId(), "", messages, new ArrayList<>(), true);
+                Utils.pushDataToKafka(allSamples.get(0).getId().getApiCollectionId(), "", messages, new ArrayList<>(), true, false);
                 loggerMaker.infoAndAddToDb("Successfully moved APIs.");
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb("Error during move APIs: " + e.getMessage());
