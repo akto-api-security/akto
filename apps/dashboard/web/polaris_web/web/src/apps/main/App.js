@@ -175,21 +175,26 @@ const router = createBrowserRouter([
             element:<IssuesPage/>
           },
           {
+            path: "protection",
+            children: [
+              {
+                path: "threat-activity",
+                element: <ThreatDetectionPage/>
+              },
+              {
+                path: "threat-api",
+                element: <ThreatApiPage/>
+              },
+              {
+                path: "threat-actor",
+                element: <ThreatActorPage/>
+              }
+            ]
+          },
+          {
             path: "quick-start",
             element: <QuickStart/>,
           },
-          {
-            path:"threat-detection",
-            element:<ThreatDetectionPage/>
-          },
-          {
-           path: "threat-api",
-           element: <ThreatApiPage/>
-          },
-          {
-            path: "threat-actor",
-            element: <ThreatActorPage/>
-          }
         ]
       },
       {
