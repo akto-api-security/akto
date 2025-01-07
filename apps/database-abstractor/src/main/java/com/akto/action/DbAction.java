@@ -1816,7 +1816,7 @@ public class DbAction extends ActionSupport {
 
     public String updateIssueCountInSummary() {
         try {
-            Object summaryObjectId = null;
+            ObjectId summaryObjectId = null;
             if (summaryId != null) {
                 summaryObjectId = new ObjectId(summaryId);
             }
