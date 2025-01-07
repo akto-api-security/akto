@@ -579,10 +579,14 @@ prettifyEpoch(epoch) {
   },
   requestFirstLine(message, queryParams) {
     if (message["request"]) {
-      let url = message["request"]["url"]
+      let url = message["request"]["url"] || ""
       return message["request"]["method"] + " " + url + func.convertQueryParamsToUrl(queryParams) + " " + message["request"]["type"]
     } else {
-      return message.method + " " + message.path.split("?")[0] + func.convertQueryParamsToUrl(queryParams) + " " + message.type
+      let pathString = ""
+      if(message.path !== null && message?.path !== undefined){
+        pathString = message.path.split("?")[0];
+      }
+      return message?.method + " " + pathString + func.convertQueryParamsToUrl(queryParams) + " " + message?.type
     }
   },
   responseFirstLine(message) {
