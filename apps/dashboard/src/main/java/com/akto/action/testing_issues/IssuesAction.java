@@ -311,6 +311,7 @@ public class IssuesAction extends UserAction {
         pipeline.add(projectStage);
     }
 
+    private List<TestingRunIssues> removedRunResultsIssuesList;
     public String fetchVulnerableTestingRunResultsFromIssues() {
         Bson filters = createFilters(true);
         try {
@@ -334,6 +335,14 @@ public class IssuesAction extends UserAction {
                 // this.sampleDataVsCurlMap = new HashMap<>();
                 return SUCCESS.toUpperCase();
             }
+
+            Map<String, TestingRunIssues> testingRunIssuesMap = new HashMap<>();
+            for(TestingRunIssues issue: issues) {
+                String testSubCategory = issue.getId().getTestSubCategory();
+                String key = issue.getId().getApiInfoKey().toString() + "_" + testSubCategory;
+                testingRunIssuesMap.put(key, issue);
+            }
+
             Bson orFilters = Filters.or(andFilters);
             this.testingRunResults = TestingRunResultDao.instance.findAll(orFilters);
             Map<String, String> sampleDataVsCurlMap = new HashMap<>();
@@ -376,7 +385,14 @@ public class IssuesAction extends UserAction {
                     // }
                 }
                 runResult.setTestResults(testResults);
+
+
+                String filterKey = runResult.getApiInfoKey().toString() + "_" + runResult.getTestSubType();
+                testingRunIssuesMap.remove(filterKey);
             }
+
+            removedRunResultsIssuesList = new ArrayList<>();
+            removedRunResultsIssuesList.addAll(testingRunIssuesMap.values());
             // this.sampleDataVsCurlMap = sampleDataVsCurlMap;
         } catch (Exception e) {
             return ERROR.toUpperCase();
@@ -952,5 +968,9 @@ public class IssuesAction extends UserAction {
 
     public void setTestingRunResultHexIdsMap(Map<String, String> testingRunResultHexIdsMap) {
         this.testingRunResultHexIdsMap = testingRunResultHexIdsMap;
+    }
+
+    public List<TestingRunIssues> getRemovedRunResultsIssuesList() {
+        return removedRunResultsIssuesList;
     }
 }
