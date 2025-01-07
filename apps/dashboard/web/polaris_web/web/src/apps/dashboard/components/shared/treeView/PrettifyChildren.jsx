@@ -68,7 +68,7 @@ function PrettifyChildren({ data, headers }) {
             let ids = c.hasOwnProperty('apiCollectionIds') ? c['apiCollectionIds'] : [c.id];
             let collectionObj = transform.convertToPrettifyData(c);
             collectionObj.urlsCount = c.urlsCount;
-            collectionObj.envTypeComp = c.envType ? <Badge size="small" status="info">{func.toSentenceCase(c.envType)}</Badge> : null;
+            collectionObj.envTypeComp = c.envType ? <Badge size="small" status="info">{c.envType}</Badge> : null;
 
             let isChildOpen = isLevelVisible(c.level);
             collectionObj.displayNameComp = 

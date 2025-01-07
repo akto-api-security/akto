@@ -767,7 +767,7 @@ public class ApiCollectionsAction extends UserAction {
 
     List<Integer> apiCollectionIds;
 
-    private ENV_TYPE envType;
+    private String envType;
 
 	public String updateEnvType(){
         try {
@@ -942,7 +942,7 @@ public class ApiCollectionsAction extends UserAction {
         this.redacted = redacted;
     }
 
-    public void setEnvType(ENV_TYPE envType) {
+    public void setEnvType(String envType) {
 		this.envType = envType;
 	}
 
