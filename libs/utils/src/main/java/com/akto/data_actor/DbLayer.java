@@ -376,7 +376,7 @@ public class DbLayer {
                         Updates.set(ApiCollection.VXLAN_ID, vxlanId),
                         Updates.setOnInsert("startTs", Context.now()),
                         Updates.setOnInsert("urls", new HashSet<>()),
-                        Updates.set("userSetEnvType", vpcId)
+                        Updates.setOnInsert("userSetEnvType", vpcId)
                 ),
                 updateOptions
         );
@@ -405,7 +405,7 @@ public class DbLayer {
             Updates.setOnInsert("_id", id),
             Updates.setOnInsert("startTs", Context.now()),
             Updates.setOnInsert("urls", new HashSet<>()),
-            Updates.set("userSetEnvType", vpcId)
+            Updates.setOnInsert("userSetEnvType", vpcId)
         );
 
         ApiCollectionsDao.instance.getMCollection().findOneAndUpdate(Filters.eq(ApiCollection.HOST_NAME, host), updates, updateOptions);
