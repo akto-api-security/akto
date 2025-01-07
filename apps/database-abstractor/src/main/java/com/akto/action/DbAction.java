@@ -1816,7 +1816,16 @@ public class DbAction extends ActionSupport {
 
     public String updateIssueCountInSummary() {
         try {
-            trrs = DbLayer.updateIssueCountInSummary(summaryId, totalCountIssues, operator);
+            Object summaryObjectId = null;
+            if (summaryId != null) {
+                summaryObjectId = new ObjectId(summaryId);
+            }
+            if((operator == null || operator.isEmpty()) && summaryId != null){
+                totalCountIssues = TestExecutor.calcTotalCountIssues(summaryObjectId);
+                trrs = DbLayer.updateIssueCountInSummary(summaryId, totalCountIssues);
+            }else{
+                trrs = DbLayer.updateIssueCountInSummary(summaryId, totalCountIssues, operator);
+            }
             trrs.setTestingRunHexId(trrs.getTestingRunId().toHexString());
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in updateIssueCountInSummary " + e.toString());
