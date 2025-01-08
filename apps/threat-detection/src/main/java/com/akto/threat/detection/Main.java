@@ -4,6 +4,7 @@ import com.akto.DaoInit;
 import com.akto.kafka.KafkaConfig;
 import com.akto.kafka.KafkaConsumerConfig;
 import com.akto.kafka.KafkaProducerConfig;
+import com.akto.kafka.Serializer;
 import com.akto.threat.detection.constants.KafkaTopic;
 import com.akto.threat.detection.session_factory.SessionFactoryUtils;
 import com.akto.threat.detection.tasks.CleanupTask;
@@ -19,7 +20,7 @@ public class Main {
 
   private static final String CONSUMER_GROUP_ID = "akto.threat_detection";
 
-  public static void main(String[] args) throws Exception {
+  public static void main(String[] args) {
     runMigrations();
 
     SessionFactory sessionFactory = SessionFactoryUtils.createFactory();
@@ -37,6 +38,8 @@ public class Main {
                     .build())
             .setProducerConfig(
                 KafkaProducerConfig.newBuilder().setBatchSize(100).setLingerMs(100).build())
+            .setKeySerializer(Serializer.STRING)
+            .setValueSerializer(Serializer.BYTE_ARRAY)
             .build();
 
     KafkaConfig internalKafka =
@@ -50,6 +53,8 @@ public class Main {
                     .build())
             .setProducerConfig(
                 KafkaProducerConfig.newBuilder().setBatchSize(100).setLingerMs(100).build())
+            .setKeySerializer(Serializer.STRING)
+            .setValueSerializer(Serializer.BYTE_ARRAY)
             .build();
 
     new MaliciousTrafficDetectorTask(trafficKafka, internalKafka, createRedisClient()).run();

@@ -1,7 +1,7 @@
 package com.akto.threat.detection.tasks;
 
 import com.akto.kafka.KafkaConfig;
-import com.akto.runtime.utils.Utils;
+
 import java.time.Duration;
 import java.util.Collections;
 import java.util.Properties;
@@ -11,7 +11,6 @@ import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
-import org.apache.kafka.common.serialization.StringDeserializer;
 
 public abstract class AbstractKafkaConsumerTask<V> implements Task {
 
@@ -23,15 +22,17 @@ public abstract class AbstractKafkaConsumerTask<V> implements Task {
     this.kafkaTopic = kafkaTopic;
     this.kafkaConfig = kafkaConfig;
 
-    String kafkaBrokerUrl = kafkaConfig.getBootstrapServers();
-    String groupId = kafkaConfig.getGroupId();
-
     Properties properties = new Properties();
-    properties.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, kafkaBrokerUrl);
-    properties.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
-    properties.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG,
-        "org.apache.kafka.common.serialization.ByteArrayDeserializer");
-    properties.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, kafkaConfig.getConsumerConfig().getMaxPollRecords());
+    properties.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, kafkaConfig.getBootstrapServers());
+    properties.put(
+        ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG,
+        kafkaConfig.getValueSerializer().getDeserializer());
+    properties.put(
+        ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG,
+        kafkaConfig.getValueSerializer().getDeserializer());
+    properties.put(
+        ConsumerConfig.MAX_POLL_RECORDS_CONFIG,
+        kafkaConfig.getConsumerConfig().getMaxPollRecords());
     properties.put(ConsumerConfig.GROUP_ID_CONFIG, kafkaConfig.getGroupId());
     properties.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
     properties.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, false);
@@ -49,8 +50,9 @@ public abstract class AbstractKafkaConsumerTask<V> implements Task {
         () -> {
           // Poll data from Kafka topic
           while (true) {
-            ConsumerRecords<String, V> records = kafkaConsumer.poll(
-                Duration.ofMillis(kafkaConfig.getConsumerConfig().getPollDurationMilli()));
+            ConsumerRecords<String, V> records =
+                kafkaConsumer.poll(
+                    Duration.ofMillis(kafkaConfig.getConsumerConfig().getPollDurationMilli()));
             if (records.isEmpty()) {
               continue;
             }
