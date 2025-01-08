@@ -90,7 +90,7 @@ public class ApiCollectionsAction extends UserAction {
                 int conditionsCount = 0;
                 if(!apiCollection.getAutomated()){
                     ApiCollection apiCollectionWithCond = ApiCollectionsDao.instance.findOne(Filters.eq(Constants.ID, apiCollection.getId()), Projections.include("conditions"));
-                    if(apiCollectionWithCond.getConditions() != null && apiCollectionWithCond.getConditions().get(0) != null){
+                    if(apiCollectionWithCond.getConditions() != null && !apiCollectionWithCond.getConditions().isEmpty()  && apiCollectionWithCond.getConditions().get(0) != null){
                         if(apiCollectionWithCond.getConditions().get(0).getType().equals(TestingEndpoints.Type.CUSTOM)){
                             CustomTestingEndpoints testingEndpoints = (CustomTestingEndpoints) apiCollectionWithCond.getConditions().get(0);
                             if (testingEndpoints.getApisList() != null && !testingEndpoints.getApisList().isEmpty()) {
@@ -596,7 +596,7 @@ public class ApiCollectionsAction extends UserAction {
         sensitiveSubtypes.addAll(SingleTypeInfoDao.instance.sensitiveSubTypeNames());
 
         List<String> sensitiveSubtypesInRequest = SingleTypeInfoDao.instance.sensitiveSubTypeInRequestNames();
-        this.sensitiveUrlsInResponse = SingleTypeInfoDao.instance.getSensitiveApisCount(sensitiveSubtypes, true, Filters.nin(SingleTypeInfo._COLLECTION_IDS, deactivatedCollections));
+        this.sensitiveUrlsInResponse = SingleTypeInfoDao.instance.getSensitiveApisCount(sensitiveSubtypes, true, Filters.nin(SingleTypeInfo._API_COLLECTION_ID, deactivatedCollections));
 
         sensitiveSubtypes.addAll(sensitiveSubtypesInRequest);
         this.sensitiveSubtypesInCollection = SingleTypeInfoDao.instance.getSensitiveSubtypesDetectedForCollection(sensitiveSubtypes);
@@ -767,7 +767,7 @@ public class ApiCollectionsAction extends UserAction {
 
     List<Integer> apiCollectionIds;
 
-    private ENV_TYPE envType;
+    private String envType;
 
 	public String updateEnvType(){
         try {
@@ -942,7 +942,7 @@ public class ApiCollectionsAction extends UserAction {
         this.redacted = redacted;
     }
 
-    public void setEnvType(ENV_TYPE envType) {
+    public void setEnvType(String envType) {
 		this.envType = envType;
 	}
 

@@ -34,6 +34,16 @@ export default {
         })
         return resp        
     },
+    async fetchTestRunResultsCount(testingRunResultSummaryHexId) {
+        const resp = await request({
+            url: '/api/fetchTestRunResultsCount',
+            method: 'post',
+            data: {
+                testingRunResultSummaryHexId
+            }
+        })
+        return resp        
+    },
     async fetchAllSubCategories(fetchOnlyActive, mode, skip, limit) {
         const resp = await request({
             url: 'api/fetchAllSubCategories',
@@ -493,6 +503,13 @@ export default {
             url: '/api/fetchSeverityInfoForIssues',
             method: 'post',
             data: {...filters, issueIds, endTimeStamp}
+        })
+    },
+    handleRefreshTableCount(testingRunResultSummaryHexId) {
+        return request({
+            url: '/api/handleRefreshTableCount',
+            method: 'post',
+            data: {testingRunResultSummaryHexId}
         })
     }
 }

@@ -158,7 +158,7 @@ public class HarAction extends UserAction {
             FilesDao.instance.insertOne(file);
             List<String> messages = har.getMessages(harString, apiCollectionId, Context.accountId.get());
             harErrors = har.getErrors();
-            Utils.pushDataToKafka(apiCollectionId, topic, messages, harErrors, skipKafka);
+            Utils.pushDataToKafka(apiCollectionId, topic, messages, harErrors, skipKafka, true);
             loggerMaker.infoAndAddToDb("Har file upload processing for collectionId:" + apiCollectionId + " finished", LoggerMaker.LogDb.DASHBOARD);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e,"Exception while parsing harString", LoggerMaker.LogDb.DASHBOARD);

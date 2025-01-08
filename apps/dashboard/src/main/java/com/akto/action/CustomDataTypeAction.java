@@ -1105,7 +1105,7 @@ public class CustomDataTypeAction extends UserAction{
         BasicDBObject groupedId = new BasicDBObject(SingleTypeInfo._API_COLLECTION_ID, "$apiCollectionId")
                                     .append(SingleTypeInfo._URL, "$url")
                                     .append(SingleTypeInfo._METHOD, "$method");
-        Bson customFilter = Filters.nin(SingleTypeInfo._COLLECTION_IDS, UsageMetricCalculator.getDeactivated());
+        Bson customFilter = Filters.nin(SingleTypeInfo._API_COLLECTION_ID, UsageMetricCalculator.getDeactivated());
 
         List<String> sensitiveSubtypes = SingleTypeInfoDao.instance.sensitiveSubTypeInResponseNames();
         sensitiveSubtypes.addAll(SingleTypeInfoDao.instance.sensitiveSubTypeNames());

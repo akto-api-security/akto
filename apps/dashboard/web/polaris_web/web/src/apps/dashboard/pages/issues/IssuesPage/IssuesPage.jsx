@@ -229,7 +229,7 @@ function IssuesPage() {
         }
         
         function ignoreAction(ignoreReason){
-            api.bulkUpdateIssueStatus(items, "IGNORED", ignoreReason ).then((res) => {
+            api.bulkUpdateIssueStatus(items, "IGNORED", ignoreReason, {} ).then((res) => {
                 setToast(true, false, `Issue${items.length==1 ? "" : "s"} ignored`)
                 resetResourcesSelected()
             })
@@ -376,12 +376,15 @@ function IssuesPage() {
             filterSubCategory = filterSubCategory.concat(categoryToSubCategories[issue])
         })
 
+        const collectionIdsArray = filterCollectionsId.map((x) => {return x.toString()})
+
         let obj = {
             'filterStatus': filterStatus,
-            'filterCollectionsId': [filterCollectionsId.toString()],
+            'filterCollectionsId': collectionIdsArray,
             'filterSeverity': filterSeverity,
             filterSubCategory: filterSubCategory,
-            startEpoch: [startTimestamp.toString()]
+            startEpoch: [startTimestamp.toString()],
+            endTimeStamp: [endTimestamp.toString()]
         }
         setIssuesFilters(obj)
 

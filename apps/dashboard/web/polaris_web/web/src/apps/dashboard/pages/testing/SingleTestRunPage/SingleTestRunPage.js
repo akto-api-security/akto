@@ -135,6 +135,7 @@ function SingleTestRunPage() {
   const [testingRunResultSummariesObj, setTestingRunResultSummariesObj] = useState({})
   const [allResultsLength, setAllResultsLength] = useState(undefined)
   const [currentSummary, setCurrentSummary] = useState('')
+  const [pageTotalCount, setPageTotalCount] = useState(0)
 
   const tableTabMap = {
     vulnerable: "VULNERABLE",
@@ -144,6 +145,8 @@ function SingleTestRunPage() {
     no_vulnerability_found: "SECURED",
     ignored_issues: "IGNORED_ISSUES"
   }
+
+  const [copyFilters, setCopyFilters] = useState({})
 
   const refreshId = useRef(null);
   const hexId = params.hexId;
@@ -247,6 +250,7 @@ function SingleTestRunPage() {
     let testRunResultsRes = []
     let testRunCountMap = []
     let totalIgnoredIssuesCount = 0
+    let issuesList = []
     const { testingRun, workflowTest, testingRunType } = testingRunResultSummariesObj
     if(testingRun === undefined){
       return {value: [], total: 0}
@@ -270,18 +274,36 @@ function SingleTestRunPage() {
         })
         testRunResultsRes = ignoredTestRunResults
         totalIgnoredIssuesCount = ignoredTestRunResults.length
+        setPageTotalCount(selectedTab === 'ignored_issues' ? totalIgnoredIssuesCount : testRunCountMap[tableTabMap[selectedTab]])
       } else {
-        await api.fetchTestingRunResults(localSelectedTestRun.testingRunResultSummaryHexId, tableTabMap[selectedTab], sortKey, sortOrder, skip, limit, filters, queryValue).then(({ testingRunResults, testCountMap, errorEnums }) => {
-          testRunCountMap = testCountMap
+        await api.fetchTestingRunResults(localSelectedTestRun.testingRunResultSummaryHexId, tableTabMap[selectedTab], sortKey, sortOrder, skip, limit, filters, queryValue).then(({ testingRunResults, issueslist, errorEnums }) => {
+          issuesList = issueslist || []
           testRunResultsRes = transform.prepareTestRunResults(hexId, testingRunResults, subCategoryMap, subCategoryFromSourceConfigMap)
           if(selectedTab === 'domain_unreachable' || selectedTab === 'skipped' || selectedTab === 'need_configurations') {
             errorEnums['UNKNOWN_ERROR_OCCURRED'] = "OOPS! Unknown error occurred."
             setErrorsObject(errorEnums)
             setMissingConfigs(transform.getMissingConfigs(testRunResultsRes))
           }
-          const orderedValues = tableTabsOrder.map(key => testCountMap[tableTabMap[key]] || 0)
-          setTestRunResultsCount(orderedValues)
         })
+        if(!func.deepComparison(copyFilters, filters)){
+          setCopyFilters(filters)
+          api.fetchTestRunResultsCount(localSelectedTestRun.testingRunResultSummaryHexId).then((testCountMap) => {
+            testRunCountMap = testCountMap || []
+            testRunCountMap['VULNERABLE'] = Math.abs(testRunCountMap['VULNERABLE']-issuesList.length)
+            testRunCountMap['IGNORED_ISSUES'] = (issuesList.length || 0)
+            let countOthers = 0;
+            Object.keys(testCountMap).forEach((x) => {
+              if(x !== 'ALL'){
+                countOthers += testCountMap[x]
+              }
+            })
+            testRunCountMap['SECURED'] = testCountMap['ALL'] - countOthers
+            const orderedValues = tableTabsOrder.map(key => testCountMap[tableTabMap[key]] || 0)
+            setTestRunResultsCount(orderedValues)
+            setPageTotalCount(testRunCountMap[tableTabMap[selectedTab]])
+          })
+        }
+       
       }
     }
     fillTempData(testRunResultsRes, selectedTab)
@@ -499,6 +521,7 @@ const promotedBulkActions = (selectedDataHexIds) => {
         "selected": 1
       }}
       callFromOutside={updateTable}
+      pageTotalCount={pageTotalCount}
     />
   )
 
@@ -616,6 +639,13 @@ const editableConfigsComp = (
     }
   }
 
+  const handleRefreshTableCount = async(summaryHexId) => {
+    await api.handleRefreshTableCount(summaryHexId).then((res) => {
+      func.setToast(true, false, "Re-calculating issues count")
+      setSecondaryPopover(false)
+    })
+  }
+
   const EmptyData = () => {
     return(
       <div style={{margin: 'auto', marginTop: '20vh'}}>
@@ -710,6 +740,11 @@ const editableConfigsComp = (
       content: 'Edit testing config settings',
       icon: EditMajor,
       onAction: () => { setShowEditableSettings(true); handleAddSettings(); }
+    },
+    {
+      content: 'Re-Calculate Issues Count',
+      icon: RefreshMajor,
+      onAction: () => {handleRefreshTableCount(currentSummary.hexId)}
     }
   ]})
   const moreActionsComp = (

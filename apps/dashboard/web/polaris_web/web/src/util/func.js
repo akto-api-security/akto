@@ -579,10 +579,14 @@ prettifyEpoch(epoch) {
   },
   requestFirstLine(message, queryParams) {
     if (message["request"]) {
-      let url = message["request"]["url"]
+      let url = message["request"]["url"] || ""
       return message["request"]["method"] + " " + url + func.convertQueryParamsToUrl(queryParams) + " " + message["request"]["type"]
     } else {
-      return message.method + " " + message.path.split("?")[0] + func.convertQueryParamsToUrl(queryParams) + " " + message.type
+      let pathString = ""
+      if(message.path !== null && message?.path !== undefined){
+        pathString = message.path.split("?")[0];
+      }
+      return message?.method + " " + pathString + func.convertQueryParamsToUrl(queryParams) + " " + message?.type
     }
   },
   responseFirstLine(message) {
@@ -1646,6 +1650,16 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
     }
     return false;
   },
+  checkForRbacFeatureBasic(){
+    const stiggFeatures = window.STIGG_FEATURE_WISE_ALLOWED
+    let rbacAccess = false;
+    if (!stiggFeatures || Object.keys(stiggFeatures).length === 0) {
+        rbacAccess = true
+    } else if(stiggFeatures && stiggFeatures['RBAC_BASIC']){
+        rbacAccess = stiggFeatures['RBAC_BASIC'].isGranted
+    }
+    return rbacAccess;
+  },
   checkForRbacFeature(){
     const stiggFeatures = window.STIGG_FEATURE_WISE_ALLOWED
     let rbacAccess = false;
@@ -1657,7 +1671,7 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
     return rbacAccess;
   },
   checkUserValidForIntegrations(){
-    const rbacAccess = this.checkForRbacFeature();
+    const rbacAccess = this.checkForRbacFeatureBasic();
     if(!rbacAccess){
       return true;
     }

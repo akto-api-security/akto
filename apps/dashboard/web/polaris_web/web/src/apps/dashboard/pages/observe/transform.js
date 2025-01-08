@@ -466,7 +466,7 @@ const transform = {
                 riskScore: c.riskScore,
                 deactivatedRiskScore: c.deactivated ? (c.riskScore - 10 ) : c.riskScore,
                 activatedRiskScore: -1 * (c.deactivated ? c.riskScore : (c.riskScore - 10 )),
-                envTypeComp: isLoading ? loadingComp : c.envType ? <Badge size="small" status="info">{func.toSentenceCase(c.envType)}</Badge> : null,
+                envTypeComp: isLoading ? loadingComp : c.envType ? <Badge size="small" status="info">{c.envType}</Badge> : null,
                 sensitiveSubTypesVal: c?.sensitiveInRespTypes.join(" ") ||  "-"
             }
         })

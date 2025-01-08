@@ -15,7 +15,6 @@ import "./style.css"
 import ActivityTracker from '../../dashboard/components/ActivityTracker'
 import observeFunc from "../../observe/transform.js"
 import settingFunctions from '../../settings/module.js'
-import DropdownSearch from '../../../components/shared/DropdownSearch.jsx'
 import JiraTicketCreationModal from '../../../components/shared/JiraTicketCreationModal.jsx'
 
 function TestRunResultFlyout(props) {
@@ -66,7 +65,12 @@ function TestRunResultFlyout(props) {
     },[issueDetails?.id?.apiInfoKey])
 
     function ignoreAction(ignoreReason){
-        issuesApi.bulkUpdateIssueStatus([issueDetails.id], "IGNORED", ignoreReason ).then((res) => {
+        const severity = (selectedTestRunResult && selectedTestRunResult.vulnerable) ? issueDetails.severity : "";
+        let obj = {}
+        if(issueDetails?.testRunIssueStatus !== "IGNORED"){
+            obj = {[selectedTestRunResult.id]: severity.toUpperCase()}
+        }
+        issuesApi.bulkUpdateIssueStatus([issueDetails.id], "IGNORED", ignoreReason, obj ).then((res) => {
             func.setToast(true, false, `Issue ignored`)
         })
     }

@@ -2,13 +2,13 @@ package com.akto.utils;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 
 import com.akto.dao.ConfigsDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.Config;
 import com.akto.dto.Config.OktaConfig;
+import com.akto.util.Constants;
 import com.akto.utils.sso.SsoUtils;
 
 public class OktaLogin {
@@ -24,7 +24,7 @@ public class OktaLogin {
         }
 
         if (shouldProbeAgain) {
-            OktaConfig oktaConfig = (Config.OktaConfig) ConfigsDao.instance.findOne("_id", "OKTA-ankush");
+            OktaConfig oktaConfig = (Config.OktaConfig) ConfigsDao.instance.findOne(Constants.ID, OktaConfig.getOktaId(Context.accountId.get()));
             if (instance == null) {
                 instance = new OktaLogin();
             }
@@ -48,6 +48,22 @@ public class OktaLogin {
         paramMap.put("response_type", "code");
         paramMap.put("scope", "openid%20email%20profile");
         paramMap.put("state", "login");
+
+        String queryString = SsoUtils.getQueryString(paramMap);
+
+        String authUrl = "https://" + oktaConfig.getOktaDomainUrl() + "/oauth2/" + oktaConfig.getAuthorisationServerId() + "/v1/authorize?" + queryString;
+        return authUrl;
+    }
+
+    public static String getAuthorisationUrl(String email) {
+        OktaConfig oktaConfig = Config.getOktaConfig(email);
+
+        Map<String, String> paramMap = new HashMap<>();
+        paramMap.put("client_id", oktaConfig.getClientId());
+        paramMap.put("redirect_uri",oktaConfig.getRedirectUri());
+        paramMap.put("response_type", "code");
+        paramMap.put("scope", "openid%20email%20profile");
+        paramMap.put("state", String.valueOf(oktaConfig.getAccountId()));
 
         String queryString = SsoUtils.getQueryString(paramMap);
 

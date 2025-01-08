@@ -47,6 +47,7 @@ public class UsageMetricCalculator {
      * to handle multiple accounts using static maps.
      */
     private final static String FEATURE_LABEL_STRING = "RBAC_FEATURE";
+    private final static String BASIC_RBAC_FEATURE = "RBAC_BASIC";
     private static Map<Integer, Integer> lastDeactivatedFetchedMap = new HashMap<>();
     private static final int REFRESH_INTERVAL = 60 * 2; // 2 minutes.
     private static final int REFRESH_INTERVAL_RBAC = 60 * 60; // 1 hour.
@@ -75,7 +76,8 @@ public class UsageMetricCalculator {
 
         HashMap<String, FeatureAccess> featureWiseAllowed = organization.getFeatureWiseAllowed();
         FeatureAccess featureAccess = featureWiseAllowed.getOrDefault(FEATURE_LABEL_STRING, FeatureAccess.noAccess);
-        return featureAccess.getIsGranted();
+        FeatureAccess basicAccess = featureWiseAllowed.getOrDefault(BASIC_RBAC_FEATURE, FeatureAccess.noAccess);
+        return featureAccess.getIsGranted() || basicAccess.getIsGranted();
     }
 
     public static boolean isRbacFeatureAvailable(int accountId){

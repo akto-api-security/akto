@@ -231,7 +231,7 @@ public class RuntimeListener extends AfterMongoConnectListener {
                 urlList.add(singleTypeInfo.getUrl());
             }
             if (urlList.size() != 202) {
-                Utils.pushDataToKafka(VULNERABLE_API_COLLECTION_ID, "", result, new ArrayList<>(), true);
+                Utils.pushDataToKafka(VULNERABLE_API_COLLECTION_ID, "", result, new ArrayList<>(), true, true);
             }
 
         } catch (Exception e) {
@@ -319,7 +319,7 @@ public class RuntimeListener extends AfterMongoConnectListener {
 
             }
             loggerMaker.infoAndAddToDb("create vulnerable mapping" + accountId, LoggerMaker.LogDb.DASHBOARD);
-            Utils.pushDataToKafka(LLM_API_COLLECTION_ID, "", result, new ArrayList<>(), true);
+            Utils.pushDataToKafka(LLM_API_COLLECTION_ID, "", result, new ArrayList<>(), true, true);
 
         } catch (Exception e) {
             // add log

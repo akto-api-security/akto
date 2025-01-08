@@ -37,6 +37,7 @@ import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.Severity;
 import com.akto.util.enums.GlobalEnums.TestCategory;
 import com.akto.util.enums.GlobalEnums.TestRunIssueStatus;
+import com.akto.utils.jobs.CleanInventory;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.*;
@@ -50,6 +51,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.*;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 import static com.akto.util.Constants.ID;
 import static com.akto.util.Constants.ONE_DAY_TIMESTAMP;
@@ -76,6 +80,9 @@ public class IssuesAction extends UserAction {
     private int startEpoch;
     long endTimeStamp;
     private Map<Integer,Map<String,Integer>> severityInfo = new HashMap<>();
+
+    private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
+
 
     private Bson createFilters (boolean useFilterStatus) {
         Bson filters = Filters.empty();
@@ -304,6 +311,7 @@ public class IssuesAction extends UserAction {
         pipeline.add(projectStage);
     }
 
+    private List<TestingRunIssues> removedRunResultsIssuesList;
     public String fetchVulnerableTestingRunResultsFromIssues() {
         Bson filters = createFilters(true);
         try {
@@ -324,23 +332,31 @@ public class IssuesAction extends UserAction {
             }
             if (issues.isEmpty()) {
                 this.testingRunResults = new ArrayList<>();
-                this.sampleDataVsCurlMap = new HashMap<>();
+                // this.sampleDataVsCurlMap = new HashMap<>();
                 return SUCCESS.toUpperCase();
             }
+
+            Map<String, TestingRunIssues> testingRunIssuesMap = new HashMap<>();
+            for(TestingRunIssues issue: issues) {
+                String testSubCategory = issue.getId().getTestSubCategory();
+                String key = issue.getId().getApiInfoKey().toString() + "_" + testSubCategory;
+                testingRunIssuesMap.put(key, issue);
+            }
+
             Bson orFilters = Filters.or(andFilters);
             this.testingRunResults = TestingRunResultDao.instance.findAll(orFilters);
             Map<String, String> sampleDataVsCurlMap = new HashMap<>();
             // todo: fix
             for (TestingRunResult runResult: this.testingRunResults) {
                 List<GenericTestResult> testResults = new ArrayList<>();
-                WorkflowTest workflowTest = runResult.getWorkflowTest();
+                // WorkflowTest workflowTest = runResult.getWorkflowTest();
                 for (GenericTestResult tr : runResult.getTestResults()) {
                     if (tr.isVulnerable()) {
                         if (tr instanceof TestResult) {
                             TestResult testResult = (TestResult) tr;
                             testResults.add(testResult);
-                            sampleDataVsCurlMap.put(testResult.getMessage(), ExportSampleDataAction.getCurl(testResult.getMessage()));
-                            sampleDataVsCurlMap.put(testResult.getOriginalMessage(), ExportSampleDataAction.getCurl(testResult.getOriginalMessage()));
+                            // sampleDataVsCurlMap.put(testResult.getMessage(), ExportSampleDataAction.getCurl(testResult.getMessage()));
+                            // sampleDataVsCurlMap.put(testResult.getOriginalMessage(), ExportSampleDataAction.getCurl(testResult.getOriginalMessage()));
                         } else if (tr instanceof MultiExecTestResult){
                             MultiExecTestResult testResult = (MultiExecTestResult) tr;
                             testResults.add(testResult);
@@ -350,27 +366,34 @@ public class IssuesAction extends UserAction {
                                 String nodeResultLastMessage = StartTestAction.getNodeResultLastMessage(nodeResult.getMessage());
                                 if (nodeResultLastMessage != null) {
                                     nodeResult.setMessage(nodeResultLastMessage);
-                                    sampleDataVsCurlMap.put(nodeResultLastMessage,
-                                            ExportSampleDataAction.getCurl(nodeResultLastMessage));
+                                    // sampleDataVsCurlMap.put(nodeResultLastMessage,
+                                    //         ExportSampleDataAction.getCurl(nodeResultLastMessage));
                                 }
                             }
                         }
                     }
-                    if (workflowTest != null) {
-                        Map<String, WorkflowNodeDetails> nodeDetailsMap = workflowTest.getMapNodeIdToWorkflowNodeDetails();
-                        for (String nodeName: nodeDetailsMap.keySet()) {
-                            if (nodeDetailsMap.get(nodeName) instanceof YamlNodeDetails) {
-                                YamlNodeDetails details = (YamlNodeDetails) nodeDetailsMap.get(nodeName);
-                                sampleDataVsCurlMap.put(details.getOriginalMessage(),
-                                        ExportSampleDataAction.getCurl(details.getOriginalMessage()));
-                            }
+                    // if (workflowTest != null) {
+                    //     Map<String, WorkflowNodeDetails> nodeDetailsMap = workflowTest.getMapNodeIdToWorkflowNodeDetails();
+                    //     for (String nodeName: nodeDetailsMap.keySet()) {
+                    //         if (nodeDetailsMap.get(nodeName) instanceof YamlNodeDetails) {
+                    //             YamlNodeDetails details = (YamlNodeDetails) nodeDetailsMap.get(nodeName);
+                    //             sampleDataVsCurlMap.put(details.getOriginalMessage(),
+                    //                     ExportSampleDataAction.getCurl(details.getOriginalMessage()));
+                    //         }
 
-                        }
-                    }
+                    //     }
+                    // }
                 }
                 runResult.setTestResults(testResults);
+
+
+                String filterKey = runResult.getApiInfoKey().toString() + "_" + runResult.getTestSubType();
+                testingRunIssuesMap.remove(filterKey);
             }
-            this.sampleDataVsCurlMap = sampleDataVsCurlMap;
+
+            removedRunResultsIssuesList = new ArrayList<>();
+            removedRunResultsIssuesList.addAll(testingRunIssuesMap.values());
+            // this.sampleDataVsCurlMap = sampleDataVsCurlMap;
         } catch (Exception e) {
             return ERROR.toUpperCase();
         }
@@ -513,6 +536,8 @@ public class IssuesAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    private Map<String,String> testingRunResultHexIdsMap;
+
     public String bulkUpdateIssueStatus () {
         if (issueIdArray == null || statusToBeUpdated == null || ignoreReason == null) {
             throw new IllegalStateException();
@@ -530,6 +555,42 @@ public class IssuesAction extends UserAction {
             update = Updates.combine(update, Updates.unset(TestingRunIssues.IGNORE_REASON));
         }
         TestingRunIssuesDao.instance.updateMany(Filters.in(ID, issueIdArray), update);
+
+        int accountId = Context.accountId.get();
+        executorService.schedule( new Runnable() {
+            public void run() {
+                Context.accountId.set(accountId);
+                try {
+
+                    final Map<String, Integer> countIssuesMap = new HashMap<>();
+                    countIssuesMap.put(Severity.HIGH.toString(), 0);
+                    countIssuesMap.put(Severity.MEDIUM.toString(), 0);
+                    countIssuesMap.put(Severity.LOW.toString(), 0);
+
+                    // update summaries accordingly with issues ignored
+
+                    Map<ObjectId,String> mapSummaryToResultId = TestingRunResultDao.instance.mapSummaryIdToTestingResultHexId(testingRunResultHexIdsMap.keySet());
+                    Map<ObjectId,Map<String,Integer>> summaryWiseCountMap = new HashMap<>();
+
+                    for(ObjectId summaryId: mapSummaryToResultId.keySet()){
+                        String resultHexId = mapSummaryToResultId.get(summaryId);
+                        Map<String, Integer> countMap = summaryWiseCountMap.getOrDefault(summaryId, countIssuesMap);
+                        String severity = testingRunResultHexIdsMap.get(resultHexId);
+                        int initialCount = countMap.getOrDefault(severity, 0);
+                        countMap.put(severity, initialCount + 1);
+                        summaryWiseCountMap.put(summaryId, countMap);
+                    }
+                    if(!summaryWiseCountMap.isEmpty()){
+                        TestingRunResultSummariesDao.instance.bulkUpdateTestingRunResultSummariesCount(summaryWiseCountMap);
+                    }
+
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+        }, 0 , TimeUnit.SECONDS);
+        
+
         return SUCCESS.toUpperCase();
     }
 
@@ -903,5 +964,13 @@ public class IssuesAction extends UserAction {
 
     public void setSeverityInfo(Map<Integer, Map<String, Integer>> severityInfo) {
         this.severityInfo = severityInfo;
+    }
+
+    public void setTestingRunResultHexIdsMap(Map<String, String> testingRunResultHexIdsMap) {
+        this.testingRunResultHexIdsMap = testingRunResultHexIdsMap;
+    }
+
+    public List<TestingRunIssues> getRemovedRunResultsIssuesList() {
+        return removedRunResultsIssuesList;
     }
 }

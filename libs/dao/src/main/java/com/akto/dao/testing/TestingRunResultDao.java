@@ -23,7 +23,11 @@ import org.bson.types.ObjectId;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 public class TestingRunResultDao extends AccountsContextDaoWithRbac<TestingRunResult> {
 
@@ -182,6 +186,27 @@ public class TestingRunResultDao extends AccountsContextDaoWithRbac<TestingRunRe
         }
 
         return testingRunResults;
+    }
+
+    public Map<ObjectId,String> mapSummaryIdToTestingResultHexId(Set<String> testingRunResultHexIds){
+        Map<ObjectId,String> finalMap = new HashMap<>();
+        if(testingRunResultHexIds == null || testingRunResultHexIds.isEmpty()){
+            return finalMap;
+        }
+
+        List<ObjectId> objectIdList = testingRunResultHexIds.stream()
+                                                .map(ObjectId::new)
+                                                .collect(Collectors.toList());
+
+        // doing only for 1000 results at a time
+        objectIdList = objectIdList.subList(0, 1000);
+
+        List<TestingRunResult> runResults = instance.findAll(Filters.in(Constants.ID, objectIdList), Projections.include(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID));
+        for(TestingRunResult runResult: runResults){
+            finalMap.put(runResult.getTestRunResultSummaryId(), runResult.getHexId());
+        }
+
+        return finalMap;
     }
 
     public void createIndicesIfAbsent() {

@@ -32,6 +32,8 @@ import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.ApiCollectionUsers.CollectionType;
 import com.akto.dto.Config.AzureConfig;
+import com.akto.dto.Config.ConfigType;
+import com.akto.dto.Config.OktaConfig;
 import com.akto.dto.RBAC.Role;
 import com.akto.dto.User.AktoUIMode;
 import com.akto.dto.data_types.Conditions;
@@ -137,6 +139,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
+import org.checkerframework.checker.units.qual.C;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -2947,6 +2950,27 @@ public class InitializerListener implements ServletContextListener {
         }
     }
 
+    private static void moveOktaOidcSSO(BackwardCompatibility backwardCompatibility){
+        if(backwardCompatibility.getMoveOktaOidcSSO() == 0){
+            String saltId = ConfigType.OKTA.name() + Config.CONFIG_SALT;
+            Config.OktaConfig oktaConfig = (Config.OktaConfig) ConfigsDao.instance.findOne(
+                Filters.eq(Constants.ID, saltId)
+            );
+            if(oktaConfig != null){
+                int accountId = Context.accountId.get();
+                oktaConfig.setId(OktaConfig.getOktaId(accountId));
+                ConfigsDao.instance.insertOne(oktaConfig);
+                ConfigsDao.instance.deleteAll(
+                    Filters.eq(Constants.ID, saltId)
+                );
+            }
+            BackwardCompatibilityDao.instance.updateOne(
+                Filters.eq("_id", backwardCompatibility.getId()),
+                Updates.set(BackwardCompatibility.MOVE_OKTA_OIDC_SSO, Context.now())
+            );
+        }
+    }
+
     public static void setBackwardCompatibilities(BackwardCompatibility backwardCompatibility){
         if (DashboardMode.isMetered()) {
             initializeOrganizationAccountBelongsTo(backwardCompatibility);
@@ -2978,6 +3002,7 @@ public class InitializerListener implements ServletContextListener {
         dropSpecialCharacterApiCollections(backwardCompatibility);
         addDefaultAdvancedFilters(backwardCompatibility);
         moveAzureSamlConfig(backwardCompatibility);
+        moveOktaOidcSSO(backwardCompatibility);
     }
 
     public static void printMultipleHosts(int apiCollectionId) {

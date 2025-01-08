@@ -509,32 +509,38 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
     }
 
     public String registerViaOkta() throws IOException{
-        if (!DashboardMode.isOnPremDeployment()) return Action.ERROR.toUpperCase();
-        OktaLogin oktaLoginInstance = OktaLogin.getInstance();
-        if(oktaLoginInstance == null){
-            servletResponse.sendRedirect("/login");
-            return ERROR.toUpperCase();
-        }
-
-        Config.OktaConfig oktaConfig = OktaLogin.getInstance().getOktaConfig();
-        if (oktaConfig == null) {
-            servletResponse.sendRedirect("/login");
-            return ERROR.toUpperCase();
-        }
-
-        String domainUrl = "https://" + oktaConfig.getOktaDomainUrl() + "/oauth2/" + oktaConfig.getAuthorisationServerId() + "/v1";
-        String clientId = oktaConfig.getClientId();
-        String clientSecret = oktaConfig.getClientSecret();
-        String redirectUri = oktaConfig.getRedirectUri();
-
-        BasicDBObject params = new BasicDBObject();
-        params.put("grant_type", "authorization_code");
-        params.put("code", this.code);
-        params.put("client_id", clientId);
-        params.put("client_secret", clientSecret);
-        params.put("redirect_uri", redirectUri);
-
         try {
+            Config.OktaConfig oktaConfig;
+            if(DashboardMode.isOnPremDeployment()) {
+                OktaLogin oktaLoginInstance = OktaLogin.getInstance();
+                if(oktaLoginInstance == null){
+                    servletResponse.sendRedirect("/login");
+                    return ERROR.toUpperCase();
+                }
+
+                setAccountId(1000000);
+                oktaConfig = OktaLogin.getInstance().getOktaConfig();
+            } else {
+                setAccountId(Integer.parseInt(state));
+                oktaConfig = Config.getOktaConfig(accountId);
+            }
+            if(oktaConfig == null) {
+                servletResponse.sendRedirect("/login");
+                return ERROR.toUpperCase();
+            }
+
+            String domainUrl = "https://" + oktaConfig.getOktaDomainUrl() + "/oauth2/" + oktaConfig.getAuthorisationServerId() + "/v1";
+            String clientId = oktaConfig.getClientId();
+            String clientSecret = oktaConfig.getClientSecret();
+            String redirectUri = oktaConfig.getRedirectUri();
+
+            BasicDBObject params = new BasicDBObject();
+            params.put("grant_type", "authorization_code");
+            params.put("code", this.code);
+            params.put("client_id", clientId);
+            params.put("client_secret", clientSecret);
+            params.put("redirect_uri", redirectUri);
+
             Map<String,Object> tokenData = CustomHttpRequest.postRequestEncodedType(domainUrl +"/token",params);
             String accessToken = tokenData.get("access_token").toString();
             Map<String,Object> userInfo = CustomHttpRequest.getRequest( domainUrl + "/userinfo","Bearer " + accessToken);
@@ -544,7 +550,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             SignupInfo.OktaSignupInfo oktaSignupInfo= new SignupInfo.OktaSignupInfo(accessToken, username);
             
             shouldLogin = "true";
-            createUserAndRedirect(email, username, oktaSignupInfo, 1000000, Config.ConfigType.OKTA.toString());
+            createUserAndRedirect(email, username, oktaSignupInfo, accountId, Config.ConfigType.OKTA.toString(), RBAC.Role.MEMBER);
             code = "";
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error while signing in via okta sso \n" + e.getMessage(), LogDb.DASHBOARD);
@@ -560,7 +566,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
     public String sendRequestToSamlIdP() throws IOException{
         String queryString = servletRequest.getQueryString();
         String emailId = Util.getValueFromQueryString(queryString, "email");
-        if(emailId.length() == 0){
+        if(emailId.isEmpty()){
             code = "Error, user email cannot be empty";
             logger.error(code);
             servletResponse.sendRedirect("/login");
@@ -569,11 +575,10 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
         logger.info("Trying to sign in for: " + emailId);
         setUserEmail(emailId);
         SAMLConfig samlConfig = SSOConfigsDao.instance.getSSOConfig(userEmail);
-        if(samlConfig == null){
-            code = "Error, cannot login via SSO, redirecting to login";
+        if(samlConfig == null) {
+            code = "Error, cannot login via SSO, trying to login with okta sso";
             logger.error(code);
-            servletResponse.sendRedirect("/login");
-            return ERROR.toUpperCase();
+            return oktaAuthUrlCreator(emailId);
         }
         int tempAccountId = Integer.parseInt(samlConfig.getId());
         logger.info("Account id: " + tempAccountId + " found for " + emailId);
@@ -596,6 +601,21 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             servletResponse.sendRedirect("/login");
             return ERROR.toUpperCase();
         }
+        return SUCCESS.toUpperCase();
+    }
+
+    public String oktaAuthUrlCreator(String emailId) throws IOException {
+        logger.info("Trying to create auth url for okta sso for: " + emailId);
+        Config.OktaConfig oktaConfig = Config.getOktaConfig(emailId);
+        if(oktaConfig == null) {
+            code= "Error, cannot find okta sso for this organization, redirecting to login";
+            logger.error(code);
+            servletResponse.sendRedirect("/login");
+            return ERROR.toUpperCase();
+        }
+
+        String authorisationUrl = OktaLogin.getAuthorisationUrl(emailId);
+        servletResponse.sendRedirect(authorisationUrl);
         return SUCCESS.toUpperCase();
     }
 
