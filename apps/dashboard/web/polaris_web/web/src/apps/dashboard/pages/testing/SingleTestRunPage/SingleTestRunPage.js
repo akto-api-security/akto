@@ -291,6 +291,13 @@ function SingleTestRunPage() {
             testRunCountMap = testCountMap || []
             testRunCountMap['VULNERABLE'] = Math.abs(testRunCountMap['VULNERABLE']-issuesList.length)
             testRunCountMap['IGNORED_ISSUES'] = (issuesList.length || 0)
+            let countOthers = 0;
+            Object.keys(testCountMap).forEach((x) => {
+              if(x !== 'ALL'){
+                countOthers += testCountMap[x]
+              }
+            })
+            testRunCountMap['SECURED'] = testCountMap['ALL'] - countOthers
             const orderedValues = tableTabsOrder.map(key => testCountMap[tableTabMap[key]] || 0)
             setTestRunResultsCount(orderedValues)
             setPageTotalCount(testRunCountMap[tableTabMap[selectedTab]])
