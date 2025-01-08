@@ -28,6 +28,8 @@ jobs:
           node-version: "17"
       - name: Setup Protoc
         uses: arduino/setup-protoc@v3
+        with:
+          version: "29.2"
       - uses: bufbuild/buf-action@v1
         with:
           setup_only: true
