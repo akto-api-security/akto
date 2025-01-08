@@ -52,6 +52,7 @@ import com.akto.dto.pii.PIIType;
 import com.akto.dto.settings.DefaultPayload;
 import com.akto.dto.sso.SAMLConfig;
 import com.akto.dto.test_editor.TestConfig;
+import com.akto.dto.test_editor.TestLibrary;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.testing.*;
 import com.akto.dto.testing.custom_groups.AllAPIsGroup;
@@ -2434,6 +2435,30 @@ public class InitializerListener implements ServletContextListener {
         }
     }
 
+    public static Set<String> getAktoDefaultTestLibs() {
+        return new HashSet<>(Arrays.asList("akto-api-security/tests-library:standard", "akto-api-security/tests-library:pro"));
+    }
+
+    public static void insertAktoTestLibraries(AccountSettings accountSettings) {
+        List<TestLibrary> testLibraries = accountSettings == null ? new ArrayList<>() : accountSettings.getTestLibraries();
+        Set<String> aktoTestLibraries = getAktoDefaultTestLibs();
+
+        if (testLibraries != null) {
+            for (TestLibrary testLibrary: testLibraries) {
+                String author = testLibrary.getAuthor();
+                if (author.equals(Constants._AKTO)) {
+                    aktoTestLibraries.remove(testLibrary.getRepositoryUrl());
+                }
+            }
+        }
+
+        for (String pendingLib: aktoTestLibraries) {
+            AccountSettingsDao.instance.updateOne(
+                AccountSettingsDao.generateFilter(), 
+                Updates.addToSet(AccountSettings.TEST_LIBRARIES, new TestLibrary(pendingLib, Constants._AKTO, Context.now())));
+        }
+    }
+
     public static void insertPiiSources(){
         Map<String, String> map = new HashMap<>();
         String fileUrl = "https://raw.githubusercontent.com/akto-api-security/pii-types/master/general.json";
@@ -3092,10 +3117,29 @@ public class InitializerListener implements ServletContextListener {
                     loggerMaker.errorAndAddToDb("Error while fetching Test Editor Templates from Github and local", LogDb.DASHBOARD);
                     return;
                 }
+
+                Map<String, byte[]> allYamlTemplates = TestTemplateUtils.getZipFromMultipleRepoAndBranch(getAktoDefaultTestLibs());
                 AccountTask.instance.executeTask((account) -> {
                     try {
-                        loggerMaker.infoAndAddToDb("Updating Test Editor Templates for accountId: " + account.getId(), LogDb.DASHBOARD);
+                        loggerMaker.infoAndAddToDb("Updating Test Editor Templates for accountId: " + account.getId(), LogDb.DASHBOARD);                        
                         processTemplateFilesZip(testingTemplates, Constants._AKTO, YamlTemplateSource.AKTO_TEMPLATES.toString(), "");
+
+                        if (!DashboardMode.isMetered()) return;
+
+                        loggerMaker.infoAndAddToDb("Updating Pro and Standard Templates for accountId: " + account.getId(), LogDb.DASHBOARD);                        
+                        
+                        AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+
+                        if (accountSettings == null ||accountSettings.getTestLibraries() == null) return;
+
+                        for(TestLibrary testLibrary: accountSettings.getTestLibraries()) {
+                            String repoUrl = testLibrary.getRepositoryUrl();
+                            if (repoUrl.contains("akto-api-security/tests-library")) {
+                                byte[] zipFile = allYamlTemplates.get(testLibrary.getRepositoryUrl());
+                                processTemplateFilesZip(zipFile, Constants._AKTO, YamlTemplateSource.AKTO_TEMPLATES.toString(), "");
+                            }
+                        }
+                        
                     } catch (Exception e) {
                         cacheLoggerMaker.errorAndAddToDb(e,
                                 String.format("Error while updating Test Editor Files %s", e.toString()),
@@ -3261,6 +3305,8 @@ public class InitializerListener implements ServletContextListener {
                         String.format("Error while processing Test template files zip. Error %s", ex.getMessage()),
                         LogDb.DASHBOARD);
             }
+        } else {
+            loggerMaker.infoAndAddToDb("Received null zip file");
         }
     }
 
