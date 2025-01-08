@@ -2006,11 +2006,14 @@ public class ClientActor extends DataActor {
         }
     }
 
-    public TestingRunResultSummary updateIssueCountInSummary(String summaryId, Map<String, Integer> totalCountIssues) {
+    private  TestingRunResultSummary getUpdatedSummaryAfterCount(String summaryId, Map<String, Integer> totalCountIssues, String operator){
         Map<String, List<String>> headers = buildHeaders();
         BasicDBObject obj = new BasicDBObject();
         obj.put("summaryId", summaryId);
         obj.put("totalCountIssues", totalCountIssues);
+        if(operator != null && !operator.isEmpty()){
+            obj.put("operator", operator);
+        }
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/updateIssueCountInSummary", "", "POST", obj.toString(), headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
@@ -2038,11 +2041,18 @@ public class ClientActor extends DataActor {
         }
     }
 
+    public TestingRunResultSummary updateIssueCountInSummary(String summaryId, Map<String, Integer> totalCountIssues, String operator) {
+        return getUpdatedSummaryAfterCount(summaryId, totalCountIssues, operator);
+    }
+
+    public TestingRunResultSummary updateIssueCountInSummary(String summaryId, Map<String, Integer> totalCountIssues) {
+        return getUpdatedSummaryAfterCount(summaryId, totalCountIssues, null);
+    }
+
     public TestingRunResultSummary updateIssueCountAndStateInSummary(String summaryId, Map<String, Integer> totalCountIssues, String state) {
         Map<String, List<String>> headers = buildHeaders();
         BasicDBObject obj = new BasicDBObject();
         obj.put("summaryId", summaryId);
-        obj.put("totalCountIssues", totalCountIssues);
         obj.put("state", state);
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/updateIssueCountAndStateInSummary", "", "POST", obj.toString(), headers, "");
         try {
