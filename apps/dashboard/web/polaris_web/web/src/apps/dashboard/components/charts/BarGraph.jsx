@@ -37,9 +37,6 @@ function BarGraph({defaultChartOptions, backgroundColor, height, title, data, xA
             },
             labels:{
                 useHTML: true,
-                formatter: function() {
-                    return `<div title="${this.value}">${this.value}</div>`;
-                }
             },
             
         },

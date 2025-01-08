@@ -743,8 +743,8 @@ function ApiEndpoints(props) {
 
                 
             </Popover>
-            {isApiGroup &&collectionsObj?.automated !== true ? <Button onClick={() => navigate("/dashboard/observe/query_mode?collectionId=" + apiCollectionId)}>Edit conditions</Button> : null}
-            {isGptActive ? <Button onClick={displayGPT} disabled={showEmptyScreen}>Ask AktoGPT</Button>: null}
+            {isApiGroup &&collectionsObj?.automated !== true ? <div className="polaris-secondaryAction-button"> <Button onClick={() => navigate("/dashboard/observe/query_mode?collectionId=" + apiCollectionId)}>Edit conditions</Button> </div> : null}
+            {isGptActive ? <div className="polaris-secondaryAction-button"> <Button onClick={displayGPT} disabled={showEmptyScreen}>Ask AktoGPT</Button> </div>: null}
             <RunTest
                 apiCollectionId={apiCollectionId}
                 endpoints={filteredEndpoints}

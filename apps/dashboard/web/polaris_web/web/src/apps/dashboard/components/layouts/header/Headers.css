@@ -64,6 +64,10 @@
     background-color: var(--p-color-bg-fill-secondary) !important;
 }
 
+.Polaris-TopBar-Menu__Activator.Polaris-TopBar-Menu__Activator--userMenu:active{
+    box-shadow: var(--p-shadow-inset-200)!important;
+}
+
 .Polaris-TopBar-Menu__Activator[aria-expanded='true'] {
     box-shadow: var(--p-shadow-inset-200)!important;
     background-color: var(--p-color-bg-fill-secondary-active) !important;

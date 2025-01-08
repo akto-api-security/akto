@@ -64,7 +64,7 @@ function BurpSource() {
             textComponent: (
                 <div style={{display: "flex", gap: '4px', alignItems: 'center'}}>
                     <Text variant="bodyMd">1. Download akto's burp extension</Text>
-                    <Button size="slim" onClick={downloadBurpJar}>Download</Button>
+                    <Button size="micro" onClick={downloadBurpJar}>Download</Button>
                 </div>
             ),
         },
