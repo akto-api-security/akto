@@ -146,6 +146,8 @@ function SingleTestRunPage() {
     ignored_issues: "IGNORED_ISSUES"
   }
 
+  const [copyFilters, setCopyFilters] = useState({})
+
   const refreshId = useRef(null);
   const hexId = params.hexId;
   const [conditions, dispatchConditions] = useReducer(produce((draft, action) => func.conditionsReducer(draft, action)), []);
@@ -283,14 +285,25 @@ function SingleTestRunPage() {
             setMissingConfigs(transform.getMissingConfigs(testRunResultsRes))
           }
         })
-        api.fetchTestRunResultsCount(localSelectedTestRun.testingRunResultSummaryHexId).then(({testCountMap}) => {
-          testRunCountMap = testCountMap || []
-          testRunCountMap['VULNERABLE'] = Math.abs(testRunCountMap['VULNERABLE']-issuesList.length)
-          testRunCountMap['IGNORED_ISSUES'] = (issuesList.length || 0)
-          const orderedValues = tableTabsOrder.map(key => testCountMap[tableTabMap[key]] || 0)
-          setTestRunResultsCount(orderedValues)
-          setPageTotalCount(testRunCountMap[tableTabMap[selectedTab]])
-        })
+        if(!func.deepComparison(copyFilters, filters)){
+          setCopyFilters(filters)
+          api.fetchTestRunResultsCount(localSelectedTestRun.testingRunResultSummaryHexId).then((testCountMap) => {
+            testRunCountMap = testCountMap || []
+            testRunCountMap['VULNERABLE'] = Math.abs(testRunCountMap['VULNERABLE']-issuesList.length)
+            testRunCountMap['IGNORED_ISSUES'] = (issuesList.length || 0)
+            let countOthers = 0;
+            Object.keys(testCountMap).forEach((x) => {
+              if(x !== 'ALL'){
+                countOthers += testCountMap[x]
+              }
+            })
+            testRunCountMap['SECURED'] = testCountMap['ALL'] - countOthers
+            const orderedValues = tableTabsOrder.map(key => testCountMap[tableTabMap[key]] || 0)
+            setTestRunResultsCount(orderedValues)
+            setPageTotalCount(testRunCountMap[tableTabMap[selectedTab]])
+          })
+        }
+       
       }
     }
     fillTempData(testRunResultsRes, selectedTab)

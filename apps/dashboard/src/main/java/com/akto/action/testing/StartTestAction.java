@@ -1,6 +1,5 @@
 package com.akto.action.testing;
 
-import com.akto.action.ExportSampleDataAction;
 import com.akto.action.UserAction;
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.YamlTemplateDao;
@@ -37,10 +36,12 @@ import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
-import java.nio.file.DirectoryStream.Filter;
 import java.time.Instant;
 import java.util.*;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
@@ -581,6 +582,8 @@ public class StartTestAction extends UserAction {
                 case SKIPPED_EXEC_NEED_CONFIG:
                     filterList.add(Filters.eq(TestingRunResult.REQUIRES_CONFIG, true));
                     break;
+                default:
+                    break;
             }
         }
 
@@ -606,6 +609,19 @@ public class StartTestAction extends UserAction {
         return sortStage;
     }
 
+    private Map<String, Integer> getCountMapForQueryMode(ObjectId testingRunResultSummaryId, QueryMode queryMode, int accountId){
+        Context.accountId.set(accountId);
+        Map<String, Integer> resultantMap = new HashMap<>();
+
+        List<Bson> filterList =  prepareTestRunResultsFilters(testingRunResultSummaryId, queryMode);
+        int count = (int) TestingRunResultDao.instance.count(Filters.and(filterList));
+        resultantMap.put(queryMode.toString(), count);
+
+        return resultantMap;
+    }
+
+    private final ExecutorService multiExecService = Executors.newFixedThreadPool(5);
+
     Map<String, Integer> testCountMap;
     public String fetchTestRunResultsCount() {
         ObjectId testingRunResultSummaryId;
@@ -616,22 +632,41 @@ public class StartTestAction extends UserAction {
             return ERROR.toUpperCase();
         }
 
-        testCountMap = new HashMap<>();
-        int timeNow = Context.now();
-        for(QueryMode qm : QueryMode.values()) {
-            if(qm.equals(QueryMode.ALL) || qm.equals(QueryMode.SKIPPED_EXEC_NO_ACTION)) {
-                continue;
-            }
+        
+        int accountId = Context.accountId.get();
 
-            timeNow = Context.now();
-            int count = (int) TestingRunResultDao.instance.count(Filters.and(
-                    prepareTestRunResultsFilters(testingRunResultSummaryId, qm)
-            ));
-            loggerMaker.infoAndAddToDb("[" + (Context.now() - timeNow) + "] Fetched total count of testingRunResults for: " + qm.name(), LogDb.DASHBOARD);
-            testCountMap.put(qm.toString(), count);
+        testCountMap = new HashMap<>();
+        List<Callable<Map<String, Integer>>> jobs = new ArrayList<>();
+
+        for(QueryMode qm : QueryMode.values()) {
+            if(!(qm.equals(QueryMode.SECURED) || qm.equals(QueryMode.SKIPPED_EXEC_NO_ACTION))){
+                jobs.add(() -> getCountMapForQueryMode(testingRunResultSummaryId, qm, accountId));
+            }
         }
 
-        testCountMap.put(QueryMode.VULNERABLE.name(), testCountMap.getOrDefault(QueryMode.VULNERABLE.name(), 0));
+        try {
+            List<Future<Map<String, Integer>>> futures = new ArrayList<>();
+            for (Callable<Map<String, Integer>> job : jobs) {
+                futures.add(multiExecService.submit(job));
+            }
+
+            for (Future<Map<String, Integer>> future : futures) {
+                try {
+                    Map<String, Integer> queryCountMap = future.get();
+                    for(String key: queryCountMap.keySet()){
+                        testCountMap.put(key, queryCountMap.getOrDefault(key, 0));
+                    }
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+                
+            }
+            
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ERROR.toUpperCase();
+        }
+
         return SUCCESS.toUpperCase();
     }
 
