@@ -23,7 +23,7 @@ public class SuspectSampleData {
      * we retrospectively match all sus-samples' url
      * with the urls present in the db to match them.
      */
-    public static final String MATCHING_URL = "matchingUrl";
+    public final static String MATCHING_URL = "matchingUrl";
     String matchingUrl;
 
     /*
@@ -31,16 +31,11 @@ public class SuspectSampleData {
      */
     String filterId;
 
-    public SuspectSampleData() {}
+    public SuspectSampleData() {
+    }
 
-    public SuspectSampleData(
-            List<String> sourceIPs,
-            int apiCollectionId,
-            String url,
-            Method method,
-            String sample,
-            int discovered,
-            String filterId) {
+    public SuspectSampleData(List<String> sourceIPs, int apiCollectionId, String url, Method method, String sample,
+            int discovered, String filterId) {
         this.sourceIPs = sourceIPs;
         this.apiCollectionId = apiCollectionId;
         this.url = url;
@@ -128,30 +123,16 @@ public class SuspectSampleData {
 
     @Override
     public String toString() {
-        return "{"
-                + " \"apiCollectionId\":\""
-                + getApiCollectionId()
-                + "\""
-                + ", \"url\":\""
-                + getUrl()
-                + "\""
-                + ", \"method\":\""
-                + getMethod()
-                + "\""
-                + ", \"matchingUrl\":\""
-                + (getMatchingUrl() != null ? getMatchingUrl() : "/")
-                + "\""
-                + ", \"discovered\":\""
-                + getDiscovered()
-                + "\""
-                + ", \"filter\":\""
-                + getFilterId()
-                + "\""
-                + ", \"IPs\":\""
-                + (getSourceIPs() != null ? getSourceIPs() : "[]")
-                + "\""
-                + ", \"sample\":"
-                + getSample()
-                + "}";
+        return "{" +
+                " \"apiCollectionId\":\"" + getApiCollectionId() + "\"" +
+                ", \"url\":\"" + getUrl() + "\"" +
+                ", \"method\":\"" + getMethod() + "\"" +
+                ", \"matchingUrl\":\"" + (getMatchingUrl() != null ? getMatchingUrl() : "/") + "\"" +
+                ", \"discovered\":\"" + getDiscovered() + "\"" +
+                ", \"filter\":\"" + getFilterId() + "\"" +
+                ", \"IPs\":\"" + (getSourceIPs() !=null ? getSourceIPs() : "[]" )+ "\"" +
+                ", \"sample\":" + getSample() +
+                "}";
     }
+
 }
