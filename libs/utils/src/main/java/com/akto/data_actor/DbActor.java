@@ -421,6 +421,11 @@ public class DbActor extends DataActor {
         return DbLayer.updateIssueCountInSummary(summaryId, totalCountIssues);
     }
 
+    public TestingRunResultSummary updateIssueCountInSummary(String summaryId,
+            Map<String, Integer> totalCountIssues, String operator) {
+        return DbLayer.updateIssueCountInSummary(summaryId, totalCountIssues, operator);
+    }
+
     public TestingRunResultSummary updateIssueCountAndStateInSummary(String summaryId, Map<String, Integer> totalCountIssues, String state) {
         return DbLayer.updateIssueCountAndStateInSummary(summaryId, totalCountIssues, state);
     }

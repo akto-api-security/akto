@@ -276,11 +276,6 @@ public class TestExecutor {
     public static void updateTestSummary(ObjectId summaryId){
         loggerMaker.infoAndAddToDb("Finished updating results count", LogDb.TESTING);
 
-        Map<String, Integer> totalCountIssues = new HashMap<>();
-        totalCountIssues.put(Severity.HIGH.toString(), 0);
-        totalCountIssues.put(Severity.MEDIUM.toString(), 0);
-        totalCountIssues.put(Severity.LOW.toString(), 0);
-
         State updatedState = GetRunningTestsStatus.getRunningTests().isTestRunning(summaryId) ? State.COMPLETED : GetRunningTestsStatus.getRunningTests().getCurrentState(summaryId);
 
         int skip = 0;
@@ -291,13 +286,6 @@ public class TestExecutor {
             List<TestingRunResult> testingRunResults = dataActor.fetchLatestTestingRunResultBySummaryId(summaryId.toHexString(), limit, skip);
             loggerMaker.infoAndAddToDb("Reading " + testingRunResults.size() + " vulnerable testingRunResults",
                     LogDb.TESTING);
-
-            for (TestingRunResult testingRunResult : testingRunResults) {
-                String severity = getSeverityFromTestingRunResult(testingRunResult).toString();
-                int initialCount = totalCountIssues.get(severity);
-                totalCountIssues.put(severity, initialCount + 1);
-            }
-
             if (testingRunResults.size() == limit) {
                 skip += limit;
                 fetchMore = true;
@@ -305,13 +293,8 @@ public class TestExecutor {
 
         } while (fetchMore);
 
-        TestingRunResultSummary testingRunResultSummary = dataActor.updateIssueCountAndStateInSummary(summaryId.toHexString(), totalCountIssues, updatedState.toString());
+        TestingRunResultSummary testingRunResultSummary = dataActor.updateIssueCountAndStateInSummary(summaryId.toHexString(), new HashMap<>(), updatedState.toString());
         // GithubUtils.publishGithubComments(testingRunResultSummary);
-
-        loggerMaker.infoAndAddToDb("Finished updating TestingRunResultSummariesDao", LogDb.TESTING);
-        if(totalCountIssues.get(Severity.HIGH.toString()) > 0) {
-            dataActor.insertActivity(totalCountIssues.get(Severity.HIGH.toString()));
-        }
     }
 
     public static Severity getSeverityFromTestingRunResult(TestingRunResult testingRunResult){
