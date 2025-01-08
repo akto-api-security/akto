@@ -16,7 +16,7 @@
         <maven.compiler.target>1.8</maven.compiler.target>
         <sonar.organization>akto-api-security</sonar.organization>
         <sonar.host.url>https://sonarcloud.io</sonar.host.url>
-        <jacoco.version>0.8.5</jacoco.version>     
+        <jacoco.version>0.8.5</jacoco.version>
         <jacoco.reportPath>${project.basedir}/../../target/jacoco.exec</jacoco.reportPath>
     </properties>
 
@@ -113,13 +113,14 @@
                             <executable>make</executable>
                             <arguments>
                                 <argument>proto-gen</argument>
+                                <argument>BUF_TEMPLATE=buf.gen.yaml</argument>
                             </arguments>
                             <failOnError>true</failOnError>
                         </configuration>
                         <inherited>false</inherited>
                     </execution>
                 </executions>
-            </plugin>        
+            </plugin>
         </plugins>
     </build>
 
