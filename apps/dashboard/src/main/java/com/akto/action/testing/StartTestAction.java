@@ -218,6 +218,20 @@ public class StartTestAction extends UserAction {
                     Updates.combine(
                             Updates.set(TestingRun.STATE, TestingRun.State.SCHEDULED),
                             Updates.set(TestingRun.SCHEDULE_TIMESTAMP, scheduleTimestamp)));
+            } else {
+                // CI-CD test.
+                /*
+                 * If test is already running or scheduled, do nothing.
+                 * If test is stopped/failed, mark it as completed.
+                 */
+                if(localTestingRun.getState().equals(TestingRun.State.FAILED) || localTestingRun.getState().equals(TestingRun.State.STOPPED)){
+                    TestingRunDao.instance.updateOne(
+                    Filters.eq(Constants.ID, localTestingRun.getId()),
+                    Updates.combine(
+                            Updates.set(TestingRun.STATE, TestingRun.State.COMPLETED),
+                            Updates.set(TestingRun.END_TIMESTAMP, Context.now())));
+                }
+                 
             }
             if (this.overriddenTestAppUrl != null || this.selectedTests != null) {
                 int id = UUID.randomUUID().hashCode() & 0xfffffff ;
