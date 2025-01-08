@@ -52,6 +52,7 @@ import com.akto.dto.pii.PIIType;
 import com.akto.dto.settings.DefaultPayload;
 import com.akto.dto.sso.SAMLConfig;
 import com.akto.dto.test_editor.TestConfig;
+import com.akto.dto.test_editor.TestLibrary;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.testing.*;
 import com.akto.dto.testing.custom_groups.AllAPIsGroup;
@@ -97,6 +98,7 @@ import com.akto.util.JSONUtils;
 import com.akto.util.Pair;
 import com.akto.util.UsageUtils;
 import com.akto.util.enums.GlobalEnums.Severity;
+import com.akto.util.enums.GlobalEnums.TemplatePlan;
 import com.akto.util.enums.GlobalEnums.TestCategory;
 import com.akto.util.enums.GlobalEnums.YamlTemplateSource;
 import com.akto.util.http_util.CoreHTTPClient;
@@ -2433,6 +2435,30 @@ public class InitializerListener implements ServletContextListener {
         }
     }
 
+    public static Set<String> getAktoDefaultTestLibs() {
+        return new HashSet<>(Arrays.asList("akto-api-security/tests-library:standard", "akto-api-security/tests-library:pro"));
+    }
+
+    public static void insertAktoTestLibraries(AccountSettings accountSettings) {
+        List<TestLibrary> testLibraries = accountSettings == null ? new ArrayList<>() : accountSettings.getTestLibraries();
+        Set<String> aktoTestLibraries = getAktoDefaultTestLibs();
+
+        if (testLibraries != null) {
+            for (TestLibrary testLibrary: testLibraries) {
+                String author = testLibrary.getAuthor();
+                if (author.equals(Constants._AKTO)) {
+                    aktoTestLibraries.remove(testLibrary.getRepositoryUrl());
+                }
+            }
+        }
+
+        for (String pendingLib: aktoTestLibraries) {
+            AccountSettingsDao.instance.updateOne(
+                AccountSettingsDao.generateFilter(), 
+                Updates.addToSet(AccountSettings.TEST_LIBRARIES, new TestLibrary(pendingLib, Constants._AKTO, Context.now())));
+        }
+    }
+
     public static void insertPiiSources(){
         Map<String, String> map = new HashMap<>();
         String fileUrl = "https://raw.githubusercontent.com/akto-api-security/pii-types/master/general.json";
@@ -3091,10 +3117,29 @@ public class InitializerListener implements ServletContextListener {
                     loggerMaker.errorAndAddToDb("Error while fetching Test Editor Templates from Github and local", LogDb.DASHBOARD);
                     return;
                 }
+
+                Map<String, byte[]> allYamlTemplates = TestTemplateUtils.getZipFromMultipleRepoAndBranch(getAktoDefaultTestLibs());
                 AccountTask.instance.executeTask((account) -> {
                     try {
-                        loggerMaker.infoAndAddToDb("Updating Test Editor Templates for accountId: " + account.getId(), LogDb.DASHBOARD);
+                        loggerMaker.infoAndAddToDb("Updating Test Editor Templates for accountId: " + account.getId(), LogDb.DASHBOARD);                        
                         processTemplateFilesZip(testingTemplates, Constants._AKTO, YamlTemplateSource.AKTO_TEMPLATES.toString(), "");
+
+                        if (!DashboardMode.isMetered()) return;
+
+                        loggerMaker.infoAndAddToDb("Updating Pro and Standard Templates for accountId: " + account.getId(), LogDb.DASHBOARD);                        
+                        
+                        AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+
+                        if (accountSettings == null ||accountSettings.getTestLibraries() == null) return;
+
+                        for(TestLibrary testLibrary: accountSettings.getTestLibraries()) {
+                            String repoUrl = testLibrary.getRepositoryUrl();
+                            if (repoUrl.contains("akto-api-security/tests-library")) {
+                                byte[] zipFile = allYamlTemplates.get(testLibrary.getRepositoryUrl());
+                                processTemplateFilesZip(zipFile, Constants._AKTO, YamlTemplateSource.AKTO_TEMPLATES.toString(), "");
+                            }
+                        }
+                        
                     } catch (Exception e) {
                         cacheLoggerMaker.errorAndAddToDb(e,
                                 String.format("Error while updating Test Editor Files %s", e.toString()),
@@ -3120,20 +3165,7 @@ public class InitializerListener implements ServletContextListener {
                 int countTotalTemplates = 0;
                 int countUnchangedTemplates = 0;
                 Set<String> multiNodesIds = new HashSet<>();
-
-                Bson filterQ = Filters.in(Organization.ACCOUNTS, Context.accountId.get());
-                Organization organization = OrganizationsDao.instance.findOne(filterQ);
-                FeatureAccess proTemplateFeatureAccess = TemplateSettingsUtil.getFeatureAccessForTemplate(organization, GlobalEnums.TemplateFeatureAccess.PRO_TESTS);
-                FeatureAccess enterpriseTemplateFeatureAccess = TemplateSettingsUtil.getFeatureAccessForTemplate(organization, GlobalEnums.TemplateFeatureAccess.ENTERPRISE_TESTS);
-
-                GlobalEnums.TemplateFeatureAccess selectedTemplateFeature = null;
-                if(proTemplateFeatureAccess.getIsGranted()) {
-                    selectedTemplateFeature = GlobalEnums.TemplateFeatureAccess.PRO_TESTS;
-                } else if(enterpriseTemplateFeatureAccess.getIsGranted()) {
-                    selectedTemplateFeature = GlobalEnums.TemplateFeatureAccess.ENTERPRISE_TESTS;
-                }
-                List<GlobalEnums.TemplatePlan> templatePlans = TemplateSettingsUtil.getTemplatePlans(DashboardMode.getDashboardMode(), selectedTemplateFeature);
-
+                int skipped = 0;
                 while ((entry = zipInputStream.getNextEntry()) != null) {
                     if (!entry.isDirectory()) {
                         String entryName = entry.getName();
@@ -3186,7 +3218,8 @@ public class InitializerListener implements ServletContextListener {
                         if (testConfig != null) {
                             boolean hasSettings = testConfig.getAttributes() != null;
 
-                            if (hasSettings && !templatePlans.contains(testConfig.getAttributes().getPlan())) {
+                            if (hasSettings && !testConfig.getAttributes().getPlan().equals(TemplatePlan.FREE) && DashboardMode.isLocalDeployment()) {
+                                skipped++;
                                 continue;
                             }
 
@@ -3264,11 +3297,16 @@ public class InitializerListener implements ServletContextListener {
                 if (countTotalTemplates != countUnchangedTemplates) {
                     loggerMaker.infoAndAddToDb(countUnchangedTemplates + "/" + countTotalTemplates + " unchanged", LogDb.DASHBOARD);
                 }
+
+                loggerMaker.infoAndAddToDb("Skipped " + skipped + " test templates for account: " + Context.accountId.get());
+
             } catch (Exception ex) {
                 cacheLoggerMaker.errorAndAddToDb(ex,
                         String.format("Error while processing Test template files zip. Error %s", ex.getMessage()),
                         LogDb.DASHBOARD);
             }
+        } else {
+            loggerMaker.infoAndAddToDb("Received null zip file");
         }
     }
 
