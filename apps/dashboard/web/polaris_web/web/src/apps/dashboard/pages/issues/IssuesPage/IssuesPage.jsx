@@ -383,7 +383,8 @@ function IssuesPage() {
             'filterCollectionsId': collectionIdsArray,
             'filterSeverity': filterSeverity,
             filterSubCategory: filterSubCategory,
-            startEpoch: [startTimestamp.toString()]
+            startEpoch: [startTimestamp.toString()],
+            endTimeStamp: [endTimestamp.toString()]
         }
         setIssuesFilters(obj)
 
