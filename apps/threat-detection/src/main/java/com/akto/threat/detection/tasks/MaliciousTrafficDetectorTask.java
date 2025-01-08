@@ -23,7 +23,6 @@ import com.akto.proto.generated.threat_detection.message.sample_request.v1.Sampl
 import com.akto.proto.generated.threat_detection.message.sample_request.v1.SampleRequestKafkaEnvelope;
 import com.akto.proto.http_response_param.v1.HttpResponseParam;
 import com.akto.rules.TestPlugin;
-import com.akto.runtime.utils.Utils;
 import com.akto.test_editor.execution.VariableResolver;
 import com.akto.test_editor.filter.data_operands_impl.ValidationResult;
 import com.akto.threat.detection.actor.SourceIPActorGenerator;
@@ -38,10 +37,7 @@ import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import org.apache.commons.lang3.math.NumberUtils;
-import org.apache.kafka.clients.consumer.Consumer;
-import org.apache.kafka.clients.consumer.ConsumerRecord;
-import org.apache.kafka.clients.consumer.ConsumerRecords;
-import org.apache.kafka.clients.consumer.KafkaConsumer;
+import org.apache.kafka.clients.consumer.*;
 
 /*
 Class is responsible for consuming traffic data from the Kafka topic.
@@ -66,13 +62,21 @@ public class MaliciousTrafficDetectorTask implements Task {
       KafkaConfig trafficConfig, KafkaConfig internalConfig, RedisClient redisClient) {
     this.kafkaConfig = trafficConfig;
 
-    String kafkaBrokerUrl = trafficConfig.getBootstrapServers();
-    String groupId = trafficConfig.getGroupId();
-
-    this.kafkaConsumer =
-        new KafkaConsumer<>(
-            Utils.configProperties(
-                kafkaBrokerUrl, groupId, trafficConfig.getConsumerConfig().getMaxPollRecords()));
+    Properties properties = new Properties();
+    properties.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, trafficConfig.getBootstrapServers());
+    properties.put(
+        ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG,
+        trafficConfig.getKeySerializer().getDeserializer());
+    properties.put(
+        ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG,
+        trafficConfig.getValueSerializer().getDeserializer());
+    properties.put(
+        ConsumerConfig.MAX_POLL_RECORDS_CONFIG,
+        trafficConfig.getConsumerConfig().getMaxPollRecords());
+    properties.put(ConsumerConfig.GROUP_ID_CONFIG, trafficConfig.getGroupId());
+    properties.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
+    properties.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, false);
+    this.kafkaConsumer = new KafkaConsumer<>(properties);
 
     this.httpCallParser = new HttpCallParser(120, 1000);
 
