@@ -46,26 +46,22 @@ const headers = [
     title: "Source IP",
     value: "sourceIPComponent",
   },
-  {
-    title: "",
-    type: CellType.ACTION,
-  },
 ];
 
 const sortOptions = [
   {
     label: "Discovered time",
-    value: "discovered asc",
+    value: "detectedAt asc",
     directionLabel: "Newest",
-    sortKey: "discovered",
-    columnIndex: 3,
+    sortKey: "detectedAt",
+    columnIndex: 5,
   },
   {
     label: "Discovered time",
-    value: "discovered desc",
+    value: "detectedAt desc",
     directionLabel: "Oldest",
-    sortKey: "discovered",
-    columnIndex: 3,
+    sortKey: "detectedAt",
+    columnIndex: 5,
   },
 ];
 
@@ -187,24 +183,6 @@ function SusDataTable({ currDateRange, rowClicked }) {
     }
   }
 
-  const getActions = (item) => {
-    return [
-      {
-        items: [
-          {
-            content: "View in collection",
-            onAction: () => {
-              window.open(
-                `/dashboard/observe/inventory/${item.apiCollectionId}`,
-                "_blank"
-              );
-            },
-          },
-        ],
-      },
-    ];
-  };
-
   const key = startTimestamp + endTimestamp;
   return (
     <GithubServerTable
@@ -215,12 +193,11 @@ function SusDataTable({ currDateRange, rowClicked }) {
       sortOptions={sortOptions}
       disambiguateLabel={disambiguateLabel}
       loading={loading}
-      // onRowClick={(data) => rowClicked(data)} [For now removing on row click functionality]
       fetchData={fetchData}
       filters={filters}
       selectable={false}
       hasRowActions={true}
-      getActions={getActions}
+      getActions={() => []}
       hideQueryField={true}
       headings={headers}
       useNewRow={true}

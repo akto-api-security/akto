@@ -78,6 +78,7 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
           {
             put("skip", skip);
             put("limit", LIMIT);
+            put("sort", sort);
           }
         };
     String msg = objectMapper.valueToTree(body).toString();
