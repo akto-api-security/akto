@@ -680,17 +680,22 @@ public class DbLayer {
             ObjectId summaryObjectId = new ObjectId(summaryId);
             FindOneAndUpdateOptions options = new FindOneAndUpdateOptions();
             options.returnDocument(ReturnDocument.AFTER);
+            Bson finalUpdate =  Updates.combine(Updates.set(TestingRunResultSummary.END_TIMESTAMP, Context.now()),
+                                        Updates.set(TestingRunResultSummary.STATE, State.COMPLETED),
+                                    Updates.set(TestingRunResultSummary.COUNT_ISSUES, totalCountIssues)
+            );
             Bson updateIncrement = Updates.combine(
                 Updates.inc("countIssues.HIGH", totalCountIssues.getOrDefault("HIGH", 0)),
                 Updates.inc("countIssues.MEDIUM", totalCountIssues.getOrDefault("MEDIUM", 0)),
                 Updates.inc("countIssues.LOW", totalCountIssues.getOrDefault("LOW", 0))
             );
+            if(!((operator == null || operator.isEmpty()))){
+                finalUpdate = updateIncrement;
+            }
             return TestingRunResultSummariesDao.instance.getMCollection().findOneAndUpdate(
                     Filters.eq(Constants.ID, summaryObjectId),
-                    Updates.combine(
-                            Updates.set(TestingRunResultSummary.END_TIMESTAMP, Context.now()),
-                            Updates.set(TestingRunResultSummary.STATE, State.COMPLETED),
-                            updateIncrement),options);
+                    finalUpdate, options
+                );
         }
     }
 
