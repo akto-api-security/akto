@@ -68,6 +68,21 @@ let filtersOptions = [
         label: 'API groups',
         title: 'API groups',
         choices: [],
+    },
+    {
+        key: 'activeCollections',
+        label: 'Active collections',
+        title: 'Active collections',
+        choices: [
+            {
+                label:"Active collections",
+                value:true
+            },
+            {
+                label:"All collections",
+                value:false
+            }],
+        singleSelect:true
     }
 ]
 
@@ -202,7 +217,24 @@ function IssuesPage() {
     }, [startTimestamp, endTimestamp])
 
     const [searchParams, setSearchParams] = useSearchParams();
-  const resultId = searchParams.get("result")
+    const resultId = searchParams.get("result")
+
+    const filterParams = searchParams.get('filters')
+    let initialValForResponseFilter = true
+    if(filterParams && filterParams !== undefined &&filterParams.split('activeCollections').length > 1){
+        let isRequestVal =  filterParams.split("activeCollections__")[1].split('&')[0]
+        if(isRequestVal.length > 0){
+            initialValForResponseFilter = (isRequestVal === 'true' || isRequestVal.includes('true'))
+        }
+    }
+
+    const appliedFilters = [
+        {
+            key: 'activeCollections',
+            value: [initialValForResponseFilter],
+            onRemove: () => {}
+        }
+    ]
 
     filtersOptions = func.getCollectionFilters(filtersOptions)
 
@@ -325,6 +357,12 @@ function IssuesPage() {
             case "collectionIds":
             case "apiCollectionId":
                 return func.convertToDisambiguateLabelObj(value, apiCollectionMap, 2)
+            case "activeCollections":
+                if(value[0]){
+                    return "Active collections only"
+                }else{
+                    return "All collections"
+                }
             default:
               return value;
           }          
@@ -369,6 +407,7 @@ function IssuesPage() {
         setTableLoading(true)
         let filterStatus = [selectedTab.toUpperCase()]
         let filterSeverity = filters.severity
+        const activeCollections = (filters?.activeCollections !== undefined && filters?.activeCollections.length > 0) ? filters?.activeCollections[0] : initialValForResponseFilter;
         const apiCollectionId = filters.apiCollectionId || []
         let filterCollectionsId = apiCollectionId.concat(filters.collectionIds)
         let filterSubCategory = []
@@ -384,7 +423,8 @@ function IssuesPage() {
             'filterSeverity': filterSeverity,
             filterSubCategory: filterSubCategory,
             startEpoch: [startTimestamp.toString()],
-            endTimeStamp: [endTimestamp.toString()]
+            endTimeStamp: [endTimestamp.toString()],
+            activeCollections: [activeCollections.toString()]
         }
         setIssuesFilters(obj)
 
@@ -393,7 +433,7 @@ function IssuesPage() {
 
         let issueItem = []
 
-        await api.fetchIssues(skip, limit, filterStatus, filterCollectionsId, filterSeverity, filterSubCategory, sortKey, sortOrder, startTimestamp, endTimestamp).then((issuesDataRes) => {
+        await api.fetchIssues(skip, limit, filterStatus, filterCollectionsId, filterSeverity, filterSubCategory, sortKey, sortOrder, startTimestamp, endTimestamp, activeCollections).then((issuesDataRes) => {
             const uniqueIssuesMap = new Map()
             issuesDataRes.issues.forEach(item => {
                 const key = `${item?.id?.testSubCategory}|${item?.severity}|${item?.unread.toString()}`
@@ -467,6 +507,7 @@ function IssuesPage() {
                 key={key}
                 pageLimit={50}
                 fetchData={fetchTableData}
+                appliedFilters={appliedFilters}
                 sortOptions={sortOptions}
                 resourceName={resourceName}
                 filters={filtersOptions}

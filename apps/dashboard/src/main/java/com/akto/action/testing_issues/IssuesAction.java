@@ -37,7 +37,6 @@ import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.Severity;
 import com.akto.util.enums.GlobalEnums.TestCategory;
 import com.akto.util.enums.GlobalEnums.TestRunIssueStatus;
-import com.akto.utils.jobs.CleanInventory;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.*;
@@ -77,6 +76,8 @@ public class IssuesAction extends UserAction {
     private List<Severity> filterSeverity;
     private List<String> filterSubCategory;
     private List<TestingRunIssues> similarlyAffectedIssues;
+    private boolean activeCollections;
+
     private int startEpoch;
     long endTimeStamp;
     private Map<Integer,Map<String,Integer>> severityInfo = new HashMap<>();
@@ -106,6 +107,11 @@ public class IssuesAction extends UserAction {
         
         if(endTimeStamp != 0){
             filters = Filters.and(filters, Filters.lt(TestingRunIssues.CREATION_TIME, endTimeStamp));
+        }
+
+        if(activeCollections){
+            Set<Integer> deactivatedCollections = UsageMetricCalculator.getDeactivated();
+            filters = Filters.and(filters, Filters.nin("_id.apiInfoKey.apiCollectionId", deactivatedCollections));
         }
 
         Bson combinedFilters = Filters.and(filters, Filters.ne("_id.testErrorSource", "TEST_EDITOR"));
@@ -972,5 +978,9 @@ public class IssuesAction extends UserAction {
 
     public List<TestingRunIssues> getRemovedRunResultsIssuesList() {
         return removedRunResultsIssuesList;
+    }
+
+    public void setActiveCollections(boolean activeCollections) {
+        this.activeCollections = activeCollections;
     }
 }
