@@ -101,6 +101,8 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
                                     smr.getDiscoveredAt(),
                                     smr.getCountry()))
                         .collect(Collectors.toList());
+
+                this.total = m.getTotal();
               });
     } catch (Exception e) {
       e.printStackTrace();
