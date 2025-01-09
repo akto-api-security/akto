@@ -28,6 +28,8 @@ public class TestingRun {
     public static final String _API_COLLECTION_ID = "testingEndpoints.apiCollectionId";
     public static final String _API_COLLECTION_ID_IN_LIST = "testingEndpoints.apisList.apiCollectionId";
 
+    private boolean isNewTestRun = true;
+
     @BsonIgnore
     private String hexId;
     @BsonIgnore
@@ -55,6 +57,7 @@ public class TestingRun {
         this.periodInSeconds = periodInSeconds;
         this.name = name;
         this.triggeredBy = triggeredBy;
+        this.isNewTestRun = true;
     }
     public TestingRun(int scheduleTimestamp, String userEmail, TestingEndpoints testingEndpoints, int testIdConfig, State state, int periodInSeconds, String name, int testRunTime, int maxConcurrentRequests) {
         this.scheduleTimestamp = scheduleTimestamp;
@@ -68,6 +71,7 @@ public class TestingRun {
         this.state = state;
         this.periodInSeconds = periodInSeconds;
         this.name = name;
+        this.isNewTestRun = true;
     }
 
     public TestingRunConfig getTestingRunConfig() {
@@ -205,6 +209,14 @@ public class TestingRun {
             ", periodInSeconds='" + getPeriodInSeconds() + "'" +
             ", name='" + getName() + "'" +
             "}";
+    }
+
+    public boolean isNewTestRun() {
+        return isNewTestRun;
+    }
+
+    public void setNewTestRun(boolean isNewTestRun) {
+        this.isNewTestRun = isNewTestRun;
     }
 
 }
