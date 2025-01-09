@@ -211,7 +211,7 @@ public class TestingIssuesHandler {
 
         if(summaryId != null){
             // update testing run result summary here
-            dataActor.updateIssueCountInSummary(ID, countIssuesMap, "increment");
+            dataActor.updateIssueCountInSummary(summaryId.toHexString(), countIssuesMap, "increment");
             loggerMaker.infoAndAddToDb(String.format("Increasing the issues count map with summary id %s , HIGH: %d, MEDIUM: %d, LOW: %d", summaryId.toHexString(),countIssuesMap.get("HIGH"), countIssuesMap.get("MEDIUM"), countIssuesMap.get("LOW")), LogDb.TESTING);
         }
     }
