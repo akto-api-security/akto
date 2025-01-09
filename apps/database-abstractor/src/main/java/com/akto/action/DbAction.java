@@ -1828,6 +1828,7 @@ public class DbAction extends ActionSupport {
             }
             trrs.setTestingRunHexId(trrs.getTestingRunId().toHexString());
         } catch (Exception e) {
+            e.printStackTrace();
             loggerMaker.errorAndAddToDb(e, "Error in updateIssueCountInSummary " + e.toString());
             return Action.ERROR.toUpperCase();
         }
