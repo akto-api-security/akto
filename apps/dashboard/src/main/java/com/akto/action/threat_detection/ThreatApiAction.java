@@ -103,6 +103,8 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
                                     smr.getRequestsCount(),
                                     smr.getDiscoveredAt()))
                         .collect(Collectors.toList());
+
+                this.total = m.getTotal();
               });
     } catch (Exception e) {
       e.printStackTrace();
