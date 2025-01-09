@@ -6,6 +6,7 @@ import com.akto.crons.GetRunningTestsStatus;
 import com.akto.dao.*;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
+import com.akto.dao.settings.CommonUtilsDao;
 import com.akto.dao.testing.TestingRunConfigDao;
 import com.akto.dao.testing.TestingRunDao;
 import com.akto.dao.testing.TestingRunResultDao;
@@ -13,6 +14,7 @@ import com.akto.dao.testing.TestingRunResultSummariesDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.billing.SyncLimit;
+import com.akto.dto.settings.CommonUtils;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.*;
 import com.akto.dto.billing.Organization;
@@ -813,20 +815,13 @@ public class Main {
 
     private static void deleteNonVulnerableResults() {
         if (shouldDeleteNonVulnerableResults()) {
-            /*
-             * Since this is a heavy job,
-             * running it for only one account on one instance at a time.
-             */
-            boolean dibs = Cluster.callDibs(Cluster.DELETE_TESTING_RUN_RESULTS, 60 * 60, 60);
-            if (!dibs) {
-                return;
-            }
-            loggerMaker.infoAndAddToDb(
-                    String.format("%s dibs acquired, starting", Cluster.DELETE_TESTING_RUN_RESULTS));
-
-            deleteNonVulnerableResultsUtil();
-            loggerMaker.infoAndAddToDb(
-                    "deleteNonVulnerableResults Completed deleting non-vulnerable TestingRunResults");
+            UpdateOptions updateOptions = new UpdateOptions().upsert(true);
+            loggerMaker.infoAndAddToDb("Adding account id " + Context.accountId.get() + " in the list to delete non-vulnerable test results.");
+            CommonUtilsDao.instance.getMCollection().updateOne(
+                Filters.eq(CommonUtils.JOB_TYPE, CommonUtils.JOB_TYPES.DELETE_NON_VULNERABLE_TESTS),
+                Updates.addToSet(CommonUtils.ACCOUNTS, Context.accountId.get()),
+                updateOptions
+            );
         }
     }
 
@@ -862,11 +857,12 @@ public class Main {
         return false;
     }
 
-    private static void deleteNonVulnerableResultsUtil() {
+    public static void deleteNonVulnerableResultsUtil(int accountId) {
 
         final int LIMIT = 1000;
         final int BATCH_LIMIT = 5;
         int skip = 0;
+        Context.accountId.set(accountId);
 
         do {
 
@@ -904,22 +900,6 @@ public class Main {
 
             skip += LIMIT;
         } while (true);
-
-        runCompactIfPossible();
-    }
-
-    private static void runCompactIfPossible() {
-        if (!DbMode.allowCappedCollections()) {
-            /*
-             * db.runCommand not supported for DBs excluding mongoDB
-             */
-            return;
-        }
-
-        loggerMaker.infoAndAddToDb("deleteNonVulnerableResultsUtil Running compact to reclaim space");
-        Document compactResult = TestingRunResultDao.instance.compactCollection();
-        loggerMaker.infoAndAddToDb(
-                String.format("deleteNonVulnerableResultsUtil compact result: %s", compactResult.toString()));
     }
 
     private static boolean actuallyDeleteTestingRunResults(List<ObjectId> ids) {
