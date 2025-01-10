@@ -10,7 +10,7 @@ import graphql.util.TraverserContext;
 import graphql.util.TreeTransformerUtil;
 import graphql.validation.DocumentVisitor;
 import graphql.validation.LanguageTraversal;
-import org.mortbay.util.ajax.JSON;
+import com.alibaba.fastjson2.JSON;
 
 import java.util.*;
 
@@ -291,7 +291,7 @@ public class GraphQLUtils {//Singleton class
                                 hashMap.put(HttpResponseParams.QUERY + key, map.get(key));
                             }
                             hashMap.remove(HttpResponseParams.QUERY);
-                            httpResponseParamsCopy.requestParams.setPayload(JSON.toString(hashMap));
+                            httpResponseParamsCopy.requestParams.setPayload(JSON.toJSONString(hashMap));
                             responseParamsList.add(httpResponseParamsCopy);
                         } catch (Exception e) {
                             //eat exception, No changes to request payload, parse Exception
