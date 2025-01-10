@@ -165,7 +165,7 @@
                 <div id="root"></div>
                 <script>
                     var beamer_config = {
-                        product_id : 'TEEsyHNL42222', //DO NOT CHANGE: This is your product code on Beamer
+                        product_id : window.DASHBOARD_MODE === 'ON_PREM' ? 'rggteHBr72897': 'TEEsyHNL42222', //DO NOT CHANGE: This is your product code on Beamer
                         selector: '#beamer-btn',
                         top: 0,
                         left: 0,
