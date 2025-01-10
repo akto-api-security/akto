@@ -409,7 +409,6 @@ public class DaoInit {
         TrafficAlertsDao.instance.createIndicesIfAbsent();
         RuntimeMetricsDao.instance.createIndicesIfAbsent();
         ApiAuditLogsDao.instance.createIndicesIfAbsent();
-        VulnerabilityReportPDFDao.instance.createIndicesIfAbsent();
     }
 
 }

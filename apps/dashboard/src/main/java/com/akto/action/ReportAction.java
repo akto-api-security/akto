@@ -1,5 +1,6 @@
 package com.akto.action;
 
+import java.net.URL;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.Executors;
@@ -10,9 +11,10 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
 
-import com.akto.dao.VulnerabilityReportPDFDao;
-import com.akto.dto.VulnerabilityReportPDF;
+import com.akto.dao.testing.sources.TestReportsDao;
+import com.akto.dto.testing.sources.TestReports;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Updates;
 import org.apache.struts2.ServletActionContext;
 import org.bson.types.ObjectId;
 import org.json.JSONObject;
@@ -46,11 +48,20 @@ public class ReportAction extends UserAction {
             return ERROR.toUpperCase();
         }
 
+        String reportUrlId;
+        try {
+            String path = new URL(reportUrl).getPath();
+            String[] segments = path.split("/");
+            reportUrlId = segments[segments.length - 1];
+        } catch (Exception e) {
+            reportUrlId = "";
+        }
+
         if(firstPollRequest) {
-            VulnerabilityReportPDF vulnerabilityReportPDF = VulnerabilityReportPDFDao.instance.findOne(Filters.eq(VulnerabilityReportPDF.VULNERABILITY_REPORT_URL, reportUrl));
-            if(vulnerabilityReportPDF != null && (vulnerabilityReportPDF.getVulnerabilityReportPDFBinary() != null || !vulnerabilityReportPDF.getVulnerabilityReportPDFBinary().isEmpty())) {
+            TestReports testReport = TestReportsDao.instance.findOne(Filters.eq("_id", new ObjectId(reportUrlId)));
+            if(testReport != null && (testReport.getPdfReportString() != null && !testReport.getPdfReportString().isEmpty())) {
                 status = "COMPLETED";
-                pdf = vulnerabilityReportPDF.getVulnerabilityReportPDFBinary();
+                pdf = testReport.getPdfReportString();
                 return SUCCESS.toUpperCase();
             }
         }
@@ -108,11 +119,7 @@ public class ReportAction extends UserAction {
                 if (status.equals("COMPLETED")) {
                     loggerMaker.infoAndAddToDb("Pdf download status for report id - " + reportId + " completed. Attaching pdf in response ", LogDb.DASHBOARD);
                     pdf = node.get("base64PDF").textValue();
-                    VulnerabilityReportPDFDao.instance.insertOne(new VulnerabilityReportPDF(
-                        reportUrl,
-                        pdf,
-                        Context.now()
-                    ));
+                    TestReportsDao.instance.updateOne(Filters.eq("_id", new ObjectId(reportUrlId)), Updates.set(TestReports.PDF_REPORT_STRING, pdf));
                 }
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb(e, "Error while polling pdf download for report id - " + reportId, LogDb.DASHBOARD);
