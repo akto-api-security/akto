@@ -17,7 +17,7 @@ function CopyCommand({command}) {
                 connectedRight={(<Tooltip dismissOnMouseOut content="Copy URL">
                     <Box>
                         <div ref={ref} />
-                        <Button onClick={copyContent} icon={ClipboardIcon} />
+                        <Button onClick={copyContent} icon={ClipboardIcon} size='large'/>
                     </Box>
                 </Tooltip>)}
                 value={command}

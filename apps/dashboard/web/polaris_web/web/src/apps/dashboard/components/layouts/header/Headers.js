@@ -159,8 +159,8 @@ export default function Header() {
                         } },
                         { content: <ContentWithIcon text={"Tutorials"} icon={EyeglassesIcon}/>, onAction: () => { window.open("https://www.youtube.com/@aktodotio") } },
                         { content: <ContentWithIcon icon={InventoryUpdatedIcon} text={"Changelog"} />, onAction: () => { window.open("https://app.getbeamer.com/akto/en") } },
-                        { content: <ContentWithIcon icon="/public/discord.svg" text={"Discord Support"} isAvatar={true}/>, onAction: () => { window.open("https://discord.com/invite/Wpc6xVME4s") } },
-                        { content: <ContentWithIcon icon="/public/github_icon.svg" text={"Star On Github"} isAvatar={true}/>, onAction: () => { window.open("https://github.com/akto-api-security/akto") } }
+                        { content: <ContentWithIcon icon="/public/discord-mark.svg" text={"Discord Support"} isAvatar={true}/>, onAction: () => { window.open("https://discord.com/invite/Wpc6xVME4s") } },
+                        { content: <ContentWithIcon icon="/public/github-mark.svg" text={"Star On Github"} isAvatar={true}/>, onAction: () => { window.open("https://github.com/akto-api-security/akto") } }
                     ],
                 },
             ]}
@@ -235,7 +235,8 @@ export default function Header() {
             <TopBar.Menu
                activatorContent={
                    <span  id="beamer-btn"  className={getColorForIcon()}>
-                       <Icon tone="primary" source={NotificationIcon} />
+                        <Button icon={NotificationIcon} variant='tertiary'/>
+                       {/* <Icon tone="primary" source={NotificationIcon} /> */}
                    </span>
                }
                actions={[]}

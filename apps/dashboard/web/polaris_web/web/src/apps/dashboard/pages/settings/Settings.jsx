@@ -20,7 +20,7 @@ function SettingsHeader() {
                 <Box>
                     <Icon source={SettingsIcon}/>
                 </Box>
-                <Text tone="text-inverse" variant="headingMd" as="h4">Settings</Text>
+                <Text tone="base" variant="headingMd" as="h4">Settings</Text>
             </InlineStack>
             <Button  icon={XIcon} onClick={handleSettingsClose} variant="plain" size="large" />
         </div>
@@ -35,7 +35,7 @@ const Settings = () => {
 
     return (
         <Frame navigation={<SettingsLeftNav />} topBar={<SettingsHeader />}>
-            <Box borderStartEndRadius="300" minHeight="100%" background="bg" paddingBlockEnd={"2000"}>
+            <Box background="bg" paddingBlockEnd={"2000"}>
                 <Outlet />
             </Box>
         </Frame>

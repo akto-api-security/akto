@@ -16,7 +16,7 @@ let expired = false;
 if (
   window.STIGG_CUSTOMER_ID &&
   (window.EXPIRED && window.EXPIRED == 'true')) {
-
+  
   expired = true;
 }
 

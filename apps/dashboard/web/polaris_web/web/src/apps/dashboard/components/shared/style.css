@@ -75,14 +75,14 @@
 }
 
 .active {
-    /* background: #00A47C; */
+    background: #00A47C;
 }
 
 .tooltipSpan {
     overflow-x:hidden; 
     text-overflow: ellipsis; 
     white-space: nowrap;
-    max-width: 63vw;
+    max-width: 200px;
 }
 
 .modified .line-numbers{

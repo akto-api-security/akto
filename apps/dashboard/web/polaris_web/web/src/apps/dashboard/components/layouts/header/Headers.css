@@ -18,9 +18,62 @@
     background: transparent !important;
 } */
 
-.Polaris-TopBar-Menu__Activator:hover{
+/* .Polaris-TopBar-Menu__Activator:hover{
     --border-gradient-bg-hover: var(--p-color-bg-fill-hover)!important;
     --border-gradient-border-hover: var(--p-color-border-gradient-hover)!important;
     --border-gradient-bg-selected: var(--p-color-button-gradient-bg-fill-selected)!important;
     --border-gradient-border-selected: var(--p-color-border-gradient-selected)!important;
+} */
+
+
+.Polaris-TopBar-Menu__Activator{
+    background-color: transparent !important;
+}
+.Polaris-TopBar-Menu__Activator:hover{
+    background-color: var(--p-color-bg-hover)!important;
+}
+
+.Polaris-TopBar__SecondaryMenu svg {
+    fill: var(--p-color-icon-secondary) !important;
+}
+::placeholder { 
+    color: var(--p-color-text) !important;
+}
+.Polaris-TopBar{
+    border-bottom: 1px solid #E1E3E5;
+    background-color:var(--p-color-bg-surface)!important;
+}
+.Polaris-TopBar-SearchField__Input{
+    background-color:var(--p-color-bg-fill-secondary)!important;
+    color: var(--p-color-text) !important;
+    height: 2.25rem !important;
+    border:none !important ;
+} 
+.Polaris-TopBar-SearchField__Backdrop{
+    background-color:var(--p-color-bg-fill-secondary)!important;
+    color: var(--p-color-text) !important;
+    border-radius: var(--p-border-radius-200) !important;
+}
+
+.Polaris-TopBar-Menu__Activator.Polaris-TopBar-Menu__Activator--userMenu:active p, .Polaris-TopBar-Menu__Activator[aria-expanded='true'] p, .Polaris-TopBar-Menu__Activator.Polaris-TopBar-Menu__Activator--userMenu{
+    color: var(--p-color-text) !important;
+}
+
+.Polaris-TopBar-Menu__Activator.Polaris-TopBar-Menu__Activator--userMenu:hover,
+.Polaris-TopBar-Menu__Activator.Polaris-TopBar-Menu__Activator--userMenu:active{
+    background-color: var(--p-color-bg-fill-secondary) !important;
+}
+
+.Polaris-TopBar-Menu__Activator.Polaris-TopBar-Menu__Activator--userMenu:active{
+    box-shadow: var(--p-shadow-inset-200)!important;
+}
+
+.Polaris-TopBar-Menu__Activator[aria-expanded='true'] {
+    box-shadow: var(--p-shadow-inset-200)!important;
+    background-color: var(--p-color-bg-fill-secondary-active) !important;
+}
+
+
+.Polaris-TopBar-SearchField__Icon svg {
+    fill: rgba(97, 106, 117, 1) !important;
 }

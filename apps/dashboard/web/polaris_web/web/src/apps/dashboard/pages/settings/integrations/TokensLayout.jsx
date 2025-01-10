@@ -4,6 +4,7 @@ import settingFunctions from '../module';
 import func from '@/util/func';
 import IntegrationsLayout from './IntegrationsLayout';
 import PasswordTextField from '../../../components/layouts/PasswordTextField';
+import EmptyScreensLayout from '../../../components/banners/EmptyScreensLayout';
 
 function TokensLayout(props) {
   const [tokenList , setTokenList] = useState([])
@@ -43,23 +44,21 @@ function TokensLayout(props) {
       </div>     
     ))
   )
-  
+
   const emptyComponent = (
-      <LegacyCard.Section>
-        <EmptyState
-          heading='No tokens found'
-          action={{content: <div data-testid="generate_token_button">Generate Token</div>,onAction: generateNewToken}}
-          // secondaryAction={{
-          //   content: 'Learn more',
-          // }}
-        >
-          <p>A token is required to use this integration. Click "Generate token" to generate one.</p>
-        </EmptyState>
-      </LegacyCard.Section>
+    <EmptyScreensLayout key={"emptyScreen"}
+                    iconSrc={"/public/key_icon.svg"}
+                    headingText={"No tokens found"}
+                    description={"A token is required to use this integration. Click \"Generate token\" to generate one."}
+                    buttonText={"Generate Token"}
+                    onAction={generateNewToken}
+                />
   )
   
+
+  
   const BurpSuiteCard = (
-    <LegacyCard title="Tokens" 
+    <LegacyCard  
         secondaryFooterActions={tokenList.length > 0 ? [{content: 'See how it works', onAction: seeWork}] : []}
         primaryFooterAction={tokenList.length > 0 ? {content: 'Generate token', onAction: generateNewToken} : null}
     >

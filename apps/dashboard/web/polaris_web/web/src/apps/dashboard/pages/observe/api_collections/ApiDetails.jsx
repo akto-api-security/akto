@@ -271,12 +271,12 @@ function ApiDetails(props) {
                     isGptActive || isDemergingActive ? <Popover
                         active={showMoreActions}
                         activator={
-                            <Tooltip content="More actions" ><Button
+                            <Button
 
 
                                 icon={MenuHorizontalIcon}
                                 onClick={() => setShowMoreActions(!showMoreActions)}
-                                variant="monochromePlain" /></Tooltip>
+                                />
                         }
                         autofocusTarget="first-node"
                         onClose={() => setShowMoreActions(false)}

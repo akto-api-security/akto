@@ -37,6 +37,7 @@ function DonutChart({data, title, size,type,navUrl, isRequest, pieInnerSize}) {
             y: size*0.4,
         },
         tooltip: {
+            useHTML: true,
             backgroundColor: {
                 linearGradient: [0, 0, 0, 60],
                 stops: [

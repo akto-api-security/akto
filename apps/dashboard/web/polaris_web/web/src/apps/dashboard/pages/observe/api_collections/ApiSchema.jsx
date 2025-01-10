@@ -121,7 +121,7 @@ function ApiSingleSchema(props) {
                             <Box paddingBlockStart="050" paddingBlockEnd="050"> 
                                 <InlineStack gap="200">
                                     <Text variant="bodyMd">Header</Text>
-                                    <span style={{padding: '4px 8px', width: 'fit-content', color: '#202223', background:(isHeader ? "#ECEBFF" : "#E4E5E7"), borderRadius: '4px'}}>
+                                    <span style={{padding: '0.125rem 0.5rem', width: 'fit-content', color: '#202223', background:(isHeader ? "#ECEBFF" : "#E4E5E7"), borderRadius: '4px', fontSize:'0.75rem'}}>
                                         {headerCount}
                                     </span>
                                 </InlineStack>
@@ -131,7 +131,7 @@ function ApiSingleSchema(props) {
                             <Box paddingBlockStart="050" paddingBlockEnd="050"> 
                                 <InlineStack gap="200">
                                     <Text variant="bodyMd">Payload</Text>
-                                    <span style={{padding: '4px 8px', width: 'fit-content', color: '#202223', background:(!isHeader ? "#ECEBFF" : "#E4E5E7"), borderRadius: '4px'}}>
+                                    <span style={{padding: '0.125rem 0.5rem', width: 'fit-content', color: '#202223', background:(!isHeader ? "#ECEBFF" : "#E4E5E7"), borderRadius: '4px', fontSize:'0.75rem'}}>
                                         {payloadCount}
                                     </span>
                                 </InlineStack>

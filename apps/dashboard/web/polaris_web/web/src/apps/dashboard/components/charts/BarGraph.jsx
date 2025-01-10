@@ -3,6 +3,7 @@ import HighchartsReact from "highcharts-react-official"
 import Highcharts from "highcharts"
 import { useRef } from "react";
 import observeFunc from "../../pages/observe/transform"
+import { Tooltip } from '@shopify/polaris';
 
 function BarGraph({defaultChartOptions, backgroundColor, height, title, data, xAxisTitle,barWidth, yAxisTitle, barGap, showGridLines, showYAxis}) {
 
@@ -34,6 +35,10 @@ function BarGraph({defaultChartOptions, backgroundColor, height, title, data, xA
             title: {
                 text: xAxisTitle || '',
             },
+            labels:{
+                useHTML: true,
+            },
+            
         },
         yAxis: [
             {
@@ -46,6 +51,7 @@ function BarGraph({defaultChartOptions, backgroundColor, height, title, data, xA
             }
         ],
         tooltip: {
+            useHTML: true,
             backgroundColor: {
                 linearGradient: [0, 0, 0, 60],
                 stops: [

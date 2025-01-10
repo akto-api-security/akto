@@ -780,13 +780,13 @@ getUrlComp(url){
 getCollapsibleRow(urls, severity){
   const borderStyle = '4px solid ' + func.getHexColorForSeverity(severity?.toUpperCase());
   return(
-    <tr style={{background: "#FAFBFB", borderLeft: borderStyle, padding: '0px !important', borderTop: '1px solid #dde0e4'}}>
+    <tr style={{background: "#FAFBFB", borderLeft: borderStyle, padding: '0px !important', borderTop: '1px solid #dde0e4', borderBottom: '1px solid #dde0e4'}}>
       <td colSpan={7} style={{padding: '0px !important'}}>
           {urls.map((ele,index)=>{
-            const borderStyle = index < (urls.length - 1) ? {borderBlockEndWidth : 1} : {}
+            const borderStyle = index < (urls.length - 1) ? {borderBlockEndWidth : "025"} : {}
             return( 
               <Box padding={"200"} paddingInlineEnd={"400"} paddingInlineStart={"400"} key={index}
-                  borderColor="border-secondary" {...borderStyle} borderBlockEndWidth="025"
+                  borderColor="border-secondary" {...borderStyle} 
               >
                 <Link monochrome onClick={() => history.navigate(ele.nextUrl)} removeUnderline >
                   {this.getUrlComp(ele.url)}

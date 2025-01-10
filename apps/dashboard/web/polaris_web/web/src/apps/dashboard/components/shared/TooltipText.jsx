@@ -15,7 +15,7 @@ function TooltipText(props) {
     }, []);
 
     const TextContent = (
-        <div className="tooltipSpan" ref={ref}>
+        <div className="tooltipSpan" ref={ref} truncate={true}>
             <Text as={"span"} {...textProps}>
                 {text}
             </Text>

@@ -43,14 +43,6 @@
     opacity: 1 !important;
 }
 
-.Polaris-Navigation, .Polaris-Navigation__PrimaryNavigation:hover{
-    border-top-left-radius: var(--p-border-radius-300) !important;
-}
-.Polaris-Frame.Polaris-Frame--hasNav.Polaris-Frame--hasTopBar, .Polaris-Frame__Navigation {
-    background-color: black;
-    background-clip: padding-box;
-}   
-
-.editor-navbar {
-    scrollbar-width: none;
+.Polaris-Navigation__ItemInnerWrapper--selected .Polaris-Navigation__Text > span {
+    color: var(--p-color-text);
 }

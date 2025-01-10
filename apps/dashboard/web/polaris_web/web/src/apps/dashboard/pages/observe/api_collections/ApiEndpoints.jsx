@@ -649,40 +649,36 @@ function ApiEndpoints(props) {
                 onClose={() => { setExportOpen(false) }}
                 preferredAlignment="right"
             >
-                
-                
-                    <ActionList
-                        actionRole="menuitem"
-                        items={[
-                        {
-                            content: "Refresh",
-                            onAction: handleRefresh,
-                        },
-                        isApiGroup && {
-                            content: "Re-compute api group",
-                            onAction: computeApiGroup,
-                        },
-                        !isApiGroup && !(collectionsObj?.hostName && collectionsObj?.hostName?.length > 0) && {
-                            content: (
-                            <UploadFile
-                                fileFormat=".har"
-                                fileChanged={(file) => handleFileChange(file)}
-                                tooltipText="Upload traffic(.har)"
-                                label={<Text fontWeight="regular" variant="bodyMd">Upload traffic</Text>}
-                                primary={false}
-                            />
-                            ),
-                        },
-                        ].filter(Boolean)}
-                    />
-                   
-
-                    <Divider/>
                     
                     <ActionList
                         actionRole="menuitem"
-                        sections={[{
-                            title: <p style={{paddingLeft:"0.3rem", fontWeight:"550"}}>Export as</p>,
+                        sections={[
+                            {
+                                items:[
+                                    {
+                                        content: "Refresh",
+                                        onAction: handleRefresh,
+                                    },
+                                    isApiGroup && {
+                                        content: "Re-compute api group",
+                                        onAction: computeApiGroup,
+                                    },
+                                    !isApiGroup && !(collectionsObj?.hostName && collectionsObj?.hostName?.length > 0) && {
+                                        content: (
+                                        <UploadFile
+                                            fileFormat=".har"
+                                            fileChanged={(file) => handleFileChange(file)}
+                                            tooltipText="Upload traffic(.har)"
+                                            label={<Text fontWeight="regular" variant="bodyMd">Upload traffic</Text>}
+                                            primary={false}
+                                        />
+                                        ),
+                                    },
+                                    ].filter(Boolean)
+                            }
+                            ,
+                            {
+                            title: "Export as",
                             items:[
                         
                                 {
@@ -707,16 +703,9 @@ function ApiEndpoints(props) {
                                     dataTestId: "csv_option",
                                 },
                                 ]
-                        }]}
-                    />
-                    
-                    <Divider/>
-
-                    
-                    <ActionList
-                        actionRole="menuitem"
-                        sections={[{
-                            title:<p style={{paddingLeft:"0.3rem", fontWeight:"550"}}>Others</p>, 
+                        },
+                        {
+                            title:"Others", 
                             items: [{
                                 content: (
                                     <Checkbox
@@ -734,28 +723,28 @@ function ApiEndpoints(props) {
                                 ),
                                 accessibilityLabel: "Redact Collection Data",
                             }]
-                        }]}
-                    />
-                    
-                    <Divider/>
-                    
-                    <ActionList
-                        actionRole="menuitem"
-                        items={[
-                        {
-                            content: `${showWorkflowTests ? "Hide" : "Show"} workflow tests`,
-                            onAction: toggleWorkflowTests,
-                            accessibilityLabel: "Toggle Workflow Tests",
-                            className: "popover-menu-button--extraMargin",
                         },
-                        ]}
+                        {
+                            title:"", 
+                            items:[
+                                {
+                                    content: `${showWorkflowTests ? "Hide" : "Show"} workflow tests`,
+                                    onAction: toggleWorkflowTests,
+                                    accessibilityLabel: "Toggle Workflow Tests",
+                                    className: "popover-menu-button--extraMargin",
+                                }
+                                ]
+                            
+                        }
+
+                    ]}
                     />
                     
 
                 
             </Popover>
-            {isApiGroup &&collectionsObj?.automated !== true ? <Button onClick={() => navigate("/dashboard/observe/query_mode?collectionId=" + apiCollectionId)}>Edit conditions</Button> : null}
-            {isGptActive ? <Button onClick={displayGPT} disabled={showEmptyScreen}>Ask AktoGPT</Button>: null}
+            {isApiGroup &&collectionsObj?.automated !== true ? <div className="polaris-secondaryAction-button"> <Button onClick={() => navigate("/dashboard/observe/query_mode?collectionId=" + apiCollectionId)}>Edit conditions</Button> </div> : null}
+            {isGptActive ? <div className="polaris-secondaryAction-button"> <Button onClick={displayGPT} disabled={showEmptyScreen}>Ask AktoGPT</Button> </div>: null}
             <RunTest
                 apiCollectionId={apiCollectionId}
                 endpoints={filteredEndpoints}

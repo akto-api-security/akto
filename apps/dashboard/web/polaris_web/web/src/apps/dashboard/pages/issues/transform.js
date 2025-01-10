@@ -27,7 +27,7 @@ const transform = {
     },
     getIssuesPageCollapsibleRow(urls) {
         return (
-            <tr style={{background: "#FAFBFB", padding: '0px !important', borderTop: '1px solid #dde0e4'}}>
+            <tr style={{background: "#FAFBFB", padding: '0px !important', borderTop: '1px solid #dde0e4', borderBottom: '1px solid #dde0e4'}}>
                 <td colSpan={'100%'} style={{padding: '0px !important'}}>
                     {urls.map((ele,index)=>{
                     const borderStyle = index < (urls.length - 1) ? {borderBlockEndWidth : "025"} : {}
