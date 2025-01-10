@@ -54,11 +54,21 @@ public class ReportAction extends UserAction {
             String[] segments = path.split("/");
             reportUrlId = segments[segments.length - 1];
         } catch (Exception e) {
-            reportUrlId = "";
+            status = "ERROR";
+            addActionError("Report URL cannot be empty");
+            return ERROR.toUpperCase();
         }
 
+        if(!ObjectId.isValid(reportUrlId)) {
+            status = "ERROR";
+            addActionError("Report URL is invalid");
+            return ERROR.toUpperCase();
+        }
+
+        ObjectId reportUrlIdObj = new ObjectId(reportUrlId);
+
         if(firstPollRequest) {
-            TestReports testReport = TestReportsDao.instance.findOne(Filters.eq("_id", new ObjectId(reportUrlId)));
+            TestReports testReport = TestReportsDao.instance.findOne(Filters.eq("_id", reportUrlIdObj));
             if(testReport != null && (testReport.getPdfReportString() != null && !testReport.getPdfReportString().isEmpty())) {
                 status = "COMPLETED";
                 pdf = testReport.getPdfReportString();
@@ -87,7 +97,7 @@ public class ReportAction extends UserAction {
                     session.setAttribute("login", Context.now());
                 }
 
-                String url = System.getenv("REPORT_PUPPETEER_REPLAY_SERVICE_URL") + "/downloadReportPDF";
+                String url = System.getenv("PUPPETEER_REPLAY_SERVICE_URL") + "/downloadReportPDF";
                 JSONObject requestBody = new JSONObject();
                 requestBody.put("reportId", reportId);
                 requestBody.put("username", user.getName());
@@ -108,7 +118,7 @@ public class ReportAction extends UserAction {
             loggerMaker.infoAndAddToDb("Polling pdf download status for report id - " + reportId, LogDb.DASHBOARD);
 
             try {
-                String url = System.getenv("REPORT_PUPPETEER_REPLAY_SERVICE_URL") + "/downloadReportPDF";
+                String url = System.getenv("PUPPETEER_REPLAY_SERVICE_URL") + "/downloadReportPDF";
                 JSONObject requestBody = new JSONObject();
                 requestBody.put("reportId", reportId);
                 String reqData = requestBody.toString();
@@ -119,7 +129,7 @@ public class ReportAction extends UserAction {
                 if (status.equals("COMPLETED")) {
                     loggerMaker.infoAndAddToDb("Pdf download status for report id - " + reportId + " completed. Attaching pdf in response ", LogDb.DASHBOARD);
                     pdf = node.get("base64PDF").textValue();
-                    TestReportsDao.instance.updateOne(Filters.eq("_id", new ObjectId(reportUrlId)), Updates.set(TestReports.PDF_REPORT_STRING, pdf));
+                    TestReportsDao.instance.updateOne(Filters.eq("_id", reportUrlIdObj), Updates.set(TestReports.PDF_REPORT_STRING, pdf));
                 }
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb(e, "Error while polling pdf download for report id - " + reportId, LogDb.DASHBOARD);
