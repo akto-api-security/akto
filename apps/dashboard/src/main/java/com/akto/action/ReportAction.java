@@ -73,7 +73,7 @@ public class ReportAction extends UserAction {
                     session.setAttribute("login", Context.now());
                 }
 
-                String url = System.getenv("PUPPETEER_REPLAY_SERVICE_URL") + "/downloadReportPDF";
+                String url = System.getenv("REPORT_PUPPETEER_REPLAY_SERVICE_URL") + "/downloadReportPDF";
                 JSONObject requestBody = new JSONObject();
                 requestBody.put("reportId", reportId);
                 requestBody.put("username", user.getName());
@@ -94,7 +94,7 @@ public class ReportAction extends UserAction {
             loggerMaker.infoAndAddToDb("Polling pdf download status for report id - " + reportId, LogDb.DASHBOARD);
 
             try {
-                String url = System.getenv("PUPPETEER_REPLAY_SERVICE_URL") + "/downloadReportPDF";
+                String url = System.getenv("REPORT_PUPPETEER_REPLAY_SERVICE_URL") + "/downloadReportPDF";
                 JSONObject requestBody = new JSONObject();
                 requestBody.put("reportId", reportId);
                 String reqData = requestBody.toString();
