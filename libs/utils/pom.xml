@@ -43,11 +43,6 @@
             <version>1.23.0</version>
         </dependency>
         <dependency>
-            <groupId>org.mortbay.jetty</groupId>
-            <artifactId>jetty</artifactId>
-            <version>7.0.0.pre4</version>
-        </dependency>
-        <dependency>
             <groupId>com.google.apis</groupId>
             <artifactId>google-api-services-sheets</artifactId>
             <version>v4-rev493-1.23.0</version>
@@ -71,6 +66,12 @@
             <groupId>com.akto.libs.dao</groupId>
             <artifactId>dao</artifactId>
             <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>javax.servlet</groupId>
+            <artifactId>javax.servlet-api</artifactId>
+            <version>4.0.1</version>
+            <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>org.apache.httpcomponents</groupId>
