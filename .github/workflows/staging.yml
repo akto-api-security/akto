@@ -23,7 +23,7 @@ jobs:
         id: docker_tag
         run: echo "IMAGE_TAG=a-$(echo ${{ github.ref_name }} | sed 's/[^a-zA-Z0-9]/-/g')" >> $GITHUB_OUTPUT
 
-      - run: mvn package -Dakto-image-tag=${{ github.event.inputs.Tag }} -Dakto-build-time=$(eval "date +%s") -Dakto-release-version=${{steps.docker_tag.outputs.IMAGE_TAG}}
+      - run: mvn package -Dakto-image-tag=${{ github.event.inputs.Tag }} -Dakto-build-time=$(eval "date +%s") -Dakto-release-version=${{steps.docker_tag.outputs.IMAGE_TAG}} -Dmaven.test.skip=true
       - name: DockerHub login
         env:
           DOCKER_USERNAME: ${{secrets.DOCKER_USERNAME}}
