@@ -43,7 +43,7 @@ function AdvancedSettingsComponent({dispatchConditions, conditions, hideButton})
 
     return (
         <BlockStack gap={"3"}>
-            {hideButton ? null : <Button fullWidth={false} plain removeUnderline onClick={() => setShowAdvancedSettings(!showAdvancedSettings)}>Advanced configurations</Button>}
+            {hideButton ? null : <Button fullWidth={false} variant='plain' onClick={() => setShowAdvancedSettings(!showAdvancedSettings)}>Advanced configurations</Button>}
             {showAdvancedSettings ?
                 <BlockStack gap={"200"}>
                     {conditions.map((condition, index) => {
@@ -51,7 +51,7 @@ function AdvancedSettingsComponent({dispatchConditions, conditions, hideButton})
                             <InlineStack gap={"100"} key={index} wrap={false}>
                                 <div style={{flex: 1}}>
                                     <InlineStack gap={"200"} wrap={false}>
-                                        <Button plain removeUnderline size="medium">AND</Button>
+                                        <Button size="medium">AND</Button>
                                         <Dropdown
                                             id={`operator-type-${index}`}
                                             menuItems={operatorTypeOptions} 
@@ -77,7 +77,7 @@ function AdvancedSettingsComponent({dispatchConditions, conditions, hideButton})
                                         />
                                     </InlineGrid>
                                 </div>
-                                <Button icon={DeleteIcon} onClick={() => handleDelete(index)} />
+                                <Button size='large' icon={DeleteIcon} onClick={() => handleDelete(index)} />
                             </InlineStack>
                         )
                     })}
