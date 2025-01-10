@@ -35,6 +35,7 @@ public class ReportAction extends UserAction {
     private String reportUrl;
     private String pdf;
     private String status;
+    private boolean firstPollRequest;
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(ReportAction.class);
     
@@ -45,11 +46,13 @@ public class ReportAction extends UserAction {
             return ERROR.toUpperCase();
         }
 
-        VulnerabilityReportPDF vulnerabilityReportPDF = VulnerabilityReportPDFDao.instance.findOne(Filters.eq(VulnerabilityReportPDF.VULNERABILITY_REPORT_URL, reportUrl));
-        if(vulnerabilityReportPDF != null && (vulnerabilityReportPDF.getVulnerabilityReportPDFBinary() != null || !vulnerabilityReportPDF.getVulnerabilityReportPDFBinary().isEmpty())) {
-            status = "COMPLETED";
-            pdf = vulnerabilityReportPDF.getVulnerabilityReportPDFBinary();
-            return SUCCESS.toUpperCase();
+        if(firstPollRequest) {
+            VulnerabilityReportPDF vulnerabilityReportPDF = VulnerabilityReportPDFDao.instance.findOne(Filters.eq(VulnerabilityReportPDF.VULNERABILITY_REPORT_URL, reportUrl));
+            if(vulnerabilityReportPDF != null && (vulnerabilityReportPDF.getVulnerabilityReportPDFBinary() != null || !vulnerabilityReportPDF.getVulnerabilityReportPDFBinary().isEmpty())) {
+                status = "COMPLETED";
+                pdf = vulnerabilityReportPDF.getVulnerabilityReportPDFBinary();
+                return SUCCESS.toUpperCase();
+            }
         }
 
         if (reportId == null) {
@@ -166,5 +169,9 @@ public class ReportAction extends UserAction {
 
     public void setStatus(String status) {
         this.status = status;
+    }
+
+    public void setFirstPollRequest(boolean firstPollRequest) {
+        this.firstPollRequest = firstPollRequest;
     }
 }
