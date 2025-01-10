@@ -10,6 +10,9 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
 
+import com.akto.dao.VulnerabilityReportPDFDao;
+import com.akto.dto.VulnerabilityReportPDF;
+import com.mongodb.client.model.Filters;
 import org.apache.struts2.ServletActionContext;
 import org.bson.types.ObjectId;
 import org.json.JSONObject;
@@ -36,6 +39,19 @@ public class ReportAction extends UserAction {
     private static final LoggerMaker loggerMaker = new LoggerMaker(ReportAction.class);
     
     public String downloadReportPDF() {
+        if(reportUrl == null || reportUrl.isEmpty()) {
+            status = "ERROR";
+            addActionError("Report URL cannot be empty");
+            return ERROR.toUpperCase();
+        }
+
+        VulnerabilityReportPDF vulnerabilityReportPDF = VulnerabilityReportPDFDao.instance.findOne(Filters.eq(VulnerabilityReportPDF.VULNERABILITY_REPORT_URL, reportUrl));
+        if(vulnerabilityReportPDF != null && (vulnerabilityReportPDF.getVulnerabilityReportPDFBinary() != null || !vulnerabilityReportPDF.getVulnerabilityReportPDFBinary().isEmpty())) {
+            status = "COMPLETED";
+            pdf = vulnerabilityReportPDF.getVulnerabilityReportPDFBinary();
+            return SUCCESS.toUpperCase();
+        }
+
         if (reportId == null) {
             // Initiate PDF generation
 
@@ -89,6 +105,11 @@ public class ReportAction extends UserAction {
                 if (status.equals("COMPLETED")) {
                     loggerMaker.infoAndAddToDb("Pdf download status for report id - " + reportId + " completed. Attaching pdf in response ", LogDb.DASHBOARD);
                     pdf = node.get("base64PDF").textValue();
+                    VulnerabilityReportPDFDao.instance.insertOne(new VulnerabilityReportPDF(
+                        reportUrl,
+                        pdf,
+                        Context.now()
+                    ));
                 }
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb(e, "Error while polling pdf download for report id - " + reportId, LogDb.DASHBOARD);
