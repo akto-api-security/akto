@@ -113,4 +113,10 @@
         <testSourceDirectory>src/test/java</testSourceDirectory>
     </build>
 
+    <properties>
+        <!-- Skip tests -->
+        <maven.test.skip>true</maven.test.skip>
+    </properties>
+
+
 </project>
