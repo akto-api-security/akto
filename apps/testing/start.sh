@@ -17,8 +17,8 @@ fi
 # 2. Handle edge cases: "max" means no strict limit or a very large limit
 if [ "$MEM_LIMIT_BYTES" = "max" ]; then
     # Arbitrary fallback (1 GiB in bytes here, but adjust as needed)
-    echo "Cgroup memory limit set to 'max', defaulting to 1GiB"
-    MEM_LIMIT_BYTES=1073741824
+    echo "Cgroup memory limit set to 'max', defaulting to free memory"
+    MEM_LIMIT_BYTES=$(free -b | awk '/Mem:/ {print $2}')
 fi
 
 # 3. Convert the memory limit from bytes to MB (integer division)
