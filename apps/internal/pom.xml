@@ -54,7 +54,13 @@
             <artifactId>jetty-servlets</artifactId>
             <version>9.4.44.v20210927</version>
         </dependency>
-        
+        <dependency>
+            <groupId>de.flapdoodle.embed</groupId>
+            <artifactId>de.flapdoodle.embed.mongo</artifactId>
+            <version>3.2.6</version>
+            <scope>test</scope>
+        </dependency>
+  
        
     </dependencies>
     <build>
