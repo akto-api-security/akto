@@ -14,6 +14,7 @@ import java.util.regex.Pattern;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 import com.akto.dao.testing.TestingRunResultDao;
+import com.akto.dao.testing.VulnerableTestingRunResultDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.CollectionConditions.ConditionsType;
@@ -441,7 +442,16 @@ public class Utils {
                             Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, testingRunResultSummaryId),
                             Filters.eq(TestingRunResult.VULNERABLE, true)
                         );
-        List<TestingRunResult> allVulResults = TestingRunResultDao.instance.findAll(filterQ, projection);
+        boolean isNewTestingSummary = VulnerableTestingRunResultDao.instance.isStoredInVulnerableCollection(testingRunResultSummaryId, true);
+        List<TestingRunResult> allVulResults = new ArrayList<>();
+        if(!isNewTestingSummary){
+            allVulResults = TestingRunResultDao.instance.findAll(filterQ, projection);
+        }else{
+            allVulResults = VulnerableTestingRunResultDao.instance.findAll(
+                Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, testingRunResultSummaryId)
+            );
+        }
+        
 
         Map<TestingIssuesId, TestingRunResult> testingIssuesIdsMap = TestingUtils.
                 listOfIssuesIdsFromTestingRunResults(allVulResults, true, false);

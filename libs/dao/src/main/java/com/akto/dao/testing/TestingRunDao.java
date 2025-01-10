@@ -12,8 +12,8 @@ import com.akto.dao.context.Context;
 import com.akto.dto.testing.TestingRun;
 import com.mongodb.client.model.CreateCollectionOptions;
 import com.akto.dto.testing.TestingRunResultSummary;
+import com.akto.util.Constants;
 import com.mongodb.client.MongoCursor;
-import com.mongodb.client.model.CreateCollectionOptions;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 
@@ -35,6 +35,9 @@ public class TestingRunDao extends AccountsContextDao<TestingRun> {
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames,false);
 
         fieldNames = new String[]{TestingRun.NAME};
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames,false);
+
+        fieldNames = new String[]{Constants.ID, TestingRun.IS_NEW_TESTING_RUN};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames,false);
     }
     
@@ -76,6 +79,18 @@ public class TestingRunDao extends AccountsContextDao<TestingRun> {
         }
 
         return testingSummaryIds;
+    }
+
+    public boolean isStoredInVulnerableCollection(ObjectId testingRunId){
+        if(testingRunId == null){
+            return false;
+        }
+        return instance.count(
+            Filters.and(
+                Filters.eq(Constants.ID, testingRunId),
+                Filters.eq(TestingRun.IS_NEW_TESTING_RUN, true)
+            )
+        ) > 0;
     }
 
     @Override

@@ -614,7 +614,7 @@ public class StartTestAction extends UserAction {
         Map<String, Integer> resultantMap = new HashMap<>();
 
         List<Bson> filterList =  prepareTestRunResultsFilters(testingRunResultSummaryId, queryMode);
-        int count = (int) TestingRunResultDao.instance.count(Filters.and(filterList));
+        int count = VulnerableTestingRunResultDao.instance.countFromDb(Filters.and(filterList), queryMode.equals(QueryMode.VULNERABLE));
         resultantMap.put(queryMode.toString(), count);
 
         return resultantMap;
@@ -720,8 +720,8 @@ public class StartTestAction extends UserAction {
 
             timeNow = Context.now();
             Bson filters = testingRunResultFilters.isEmpty() ? Filters.empty() : Filters.and(testingRunResultFilters);
-            this.testingRunResults = TestingRunResultDao.instance
-                    .fetchLatestTestingRunResultWithCustomAggregations(filters, pageLimit, skip, sortStage);
+            this.testingRunResults = VulnerableTestingRunResultDao.instance
+                    .fetchLatestTestingRunResultWithCustomAggregations(filters, pageLimit, skip, sortStage, testingRunResultSummaryId, queryMode.equals(QueryMode.VULNERABLE));
             loggerMaker.infoAndAddToDb("[" + (Context.now() - timeNow) + "] Fetched testing run results of size: " + testingRunResults.size(), LogDb.DASHBOARD);
 
             timeNow = Context.now();
@@ -778,13 +778,25 @@ public class StartTestAction extends UserAction {
         try {
             testingRunResultSummaryId = new ObjectId(testingRunResultSummaryHexId);
             Bson filterForReport = com.akto.action.testing.Utils.createFiltersForTestingReport(reportFilterList);
+            boolean isStoredInVulnerableCollection = VulnerableTestingRunResultDao.instance.isStoredInVulnerableCollection(testingRunResultSummaryId, true);
             Bson filters = Filters.and(
                     Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, testingRunResultSummaryId),
                     Filters.eq(TestingRunResult.VULNERABLE, true),
                     filterForReport
             );
+            List<TestingRunResult> testingRunResultList = new ArrayList<>();
+            if(isStoredInVulnerableCollection){
+                filters = Filters.and(
+                    Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, testingRunResultSummaryId),
+                    filterForReport
+                );
+                testingRunResultList = VulnerableTestingRunResultDao.instance.findAll(filters, skip, 50, null);
+            }else{
+                testingRunResultList = TestingRunResultDao.instance.findAll(filters, skip, 50, null);
+            }
+            
 
-            List<TestingRunResult> testingRunResultList = TestingRunResultDao.instance.findAll(filters, skip, 50, null);
+            
             // Map<String, String> sampleDataVsCurlMap = new HashMap<>();
             // for (TestingRunResult runResult: testingRunResultList) {
             //     WorkflowTest workflowTest = runResult.getWorkflowTest();
@@ -848,7 +860,7 @@ public class StartTestAction extends UserAction {
 
     public String fetchTestRunResultDetails() {
         ObjectId testingRunResultId = new ObjectId(testingRunResultHexId);
-        this.testingRunResult = TestingRunResultDao.instance.findOne("_id", testingRunResultId);
+        this.testingRunResult = VulnerableTestingRunResultDao.instance.findOne("_id", testingRunResultId);
         List<GenericTestResult> runResults = new ArrayList<>();
 
         for (GenericTestResult testResult: this.testingRunResult.getTestResults()) {
@@ -868,7 +880,7 @@ public class StartTestAction extends UserAction {
 
     public String fetchIssueFromTestRunResultDetails() {
         ObjectId testingRunResultId = new ObjectId(testingRunResultHexId);
-        TestingRunResult result = TestingRunResultDao.instance.findOne(Constants.ID, testingRunResultId);
+        TestingRunResult result = VulnerableTestingRunResultDao.instance.findOne(Constants.ID, testingRunResultId);
         try {
             if (result.isVulnerable()) {
                 // name = category
@@ -1132,12 +1144,14 @@ public class StartTestAction extends UserAction {
                 Context.accountId.set(accountId);
                 try {
                     ObjectId summaryObjectId = new ObjectId(testingRunResultSummaryHexId);
-                    List<TestingRunResult> testingRunResults = TestingRunResultDao.instance.findAll(
+                    boolean isStoredInVulnerableCollection = VulnerableTestingRunResultDao.instance.isStoredInVulnerableCollection(summaryObjectId, true);
+                    List<TestingRunResult> testingRunResults = VulnerableTestingRunResultDao.instance.findAll(
                         Filters.and(
                             Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, summaryObjectId),
                             vulnerableFilter
                         ), 
-                        Projections.include(TestingRunResult.API_INFO_KEY, TestingRunResult.TEST_SUB_TYPE)
+                        Projections.include(TestingRunResult.API_INFO_KEY, TestingRunResult.TEST_SUB_TYPE),
+                        isStoredInVulnerableCollection
                     );
 
                     if(testingRunResults.isEmpty()){
@@ -1182,10 +1196,18 @@ public class StartTestAction extends UserAction {
                     );
             
                     // update testing run results, by setting them isIgnored true
-                    TestingRunResultDao.instance.updateMany(
-                        Filters.in(Constants.ID, ignoredResults),
-                        Updates.set(TestingRunResult.IS_IGNORED_RESULT, true)
-                    );
+                    if(isStoredInVulnerableCollection){
+                        VulnerableTestingRunResultDao.instance.updateMany(
+                            Filters.in(Constants.ID, ignoredResults),
+                            Updates.set(TestingRunResult.IS_IGNORED_RESULT, true)
+                        );
+                    }else{
+                        TestingRunResultDao.instance.updateMany(
+                            Filters.in(Constants.ID, ignoredResults),
+                            Updates.set(TestingRunResult.IS_IGNORED_RESULT, true)
+                        );
+                    }
+                    
                 } catch (Exception e) {
                     e.printStackTrace();
                 }

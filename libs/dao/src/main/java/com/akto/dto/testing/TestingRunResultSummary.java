@@ -33,6 +33,9 @@ public class TestingRunResultSummary {
 
     private int testIdConfig;
 
+    public static final String IS_NEW_TESTING_RUN_RESULT_SUMMARY = "isNewTestingSummary";
+    private boolean isNewTestingSummary = true;
+
     @BsonIgnore
     private String hexId;
 
@@ -53,6 +56,7 @@ public class TestingRunResultSummary {
         this.testResultsCount = testResultsCount;
         this.testIdConfig = testIdConfig;
         this.testInitiatedCount = testInitiatedCount;
+        this.isNewTestingSummary = true;
     }
 
     public ObjectId getId() {
@@ -170,5 +174,13 @@ public class TestingRunResultSummary {
             ", metadata='" + getMetadata().toString() + "'" +
             ", testInitiatedCount='" + getTestInitiatedCount() + "'" +
             "}";
+    }
+
+    public boolean isNewTestingSummary() {
+        return isNewTestingSummary;
+    }
+
+    public void setNewTestingSummary(boolean isNewTestingSummary) {
+        this.isNewTestingSummary = isNewTestingSummary;
     }
 }
