@@ -176,17 +176,19 @@ public class TestingIssuesHandler {
                     break;
                 }
             }
-            if (!doesExists && runResult.isVulnerable()) {
+            if (runResult.isVulnerable()) {
                 Severity severity = TestExecutor.getSeverityFromTestingRunResult(runResult);
                 Map<String, Object> filterMap = new HashMap<>();
                 filterMap.put(ID, testingIssuesId);
                 ArrayList<String> updates = new ArrayList<>();
                 UpdatePayload updatePayload = new UpdatePayload(TestingRunIssues.KEY_SEVERITY, severity.name(), SET_OPERATION);
                 updates.add(updatePayload.toString());
-                if(shouldCountIssue){
+                if(!doesExists || shouldCountIssue){
                     updatePayload = new UpdatePayload(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.OPEN.name(), SET_OPERATION);
-                    int count = countIssuesMap.getOrDefault(severity.name(), 0);
-                    countIssuesMap.put(severity.name(), count + 1);
+                    if(shouldCountIssue || !doesExists) {
+                        int count = countIssuesMap.getOrDefault(severity.name(), 0);
+                        countIssuesMap.put(severity.name(), count + 1);
+                    }        
                 }
                 updates.add(updatePayload.toString());
                 updatePayload = new UpdatePayload(TestingRunIssues.CREATION_TIME, lastSeen, SET_OPERATION);
