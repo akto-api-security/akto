@@ -131,6 +131,15 @@ public class TeamAction extends UserAction implements ServletResponseAware, Serv
 
         Role currentUserRole = RBACDao.getCurrentRoleForUser(currUserId, accId);
         Role userRole = RBACDao.getCurrentRoleForUser(userDetails.getId(), accId); // current role of the user whose role is changing
+
+        Role requestedRole = null;
+        try {
+            requestedRole = Role.valueOf(reqUserRole);
+        } catch (Exception e) {
+            addActionError("Invalid user role");
+            return Action.ERROR.toUpperCase();
+        }
+
         switch (action) {
             case REMOVE_USER:
                 if (userExists) {
@@ -151,13 +160,17 @@ public class TeamAction extends UserAction implements ServletResponseAware, Serv
                     try {
                         Role[] rolesHierarchy = currentUserRole.getRoleHierarchy();
                         boolean isValidUpdateRole = false;
+                        boolean shouldChangeRole = false;
+
                         for(Role role: rolesHierarchy){
                             if(role == userRole){
                                 isValidUpdateRole = true;
-                                break;
+                            }
+                            if(role == requestedRole){
+                                shouldChangeRole = true;
                             }
                         }
-                        if(isValidUpdateRole){
+                        if(isValidUpdateRole && shouldChangeRole){
                             RBACDao.instance.updateOne(
                                 filterRbac,
                                 Updates.set(RBAC.ROLE, Role.valueOf(reqUserRole)));
