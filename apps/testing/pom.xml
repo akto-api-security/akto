@@ -17,11 +17,6 @@
 
     <dependencies>
         <dependency>
-            <groupId>org.mortbay.jetty</groupId>
-            <artifactId>jetty</artifactId>
-            <version>6.1.26</version>
-        </dependency>
-        <dependency>
             <groupId>com.akto.libs.dao</groupId>
             <artifactId>dao</artifactId>
             <version>${project.version}</version>
@@ -43,12 +38,6 @@
             <groupId>org.bouncycastle</groupId>
             <artifactId>bcprov-jdk16</artifactId>
             <version>1.46</version>
-        </dependency>
-        <!-- https://mvnrepository.com/artifact/org.yaml/snakeyaml -->
-        <dependency>
-            <groupId>org.yaml</groupId>
-            <artifactId>snakeyaml</artifactId>
-            <version>1.33</version>
         </dependency>
         <dependency>
             <groupId>de.flapdoodle.embed</groupId>
