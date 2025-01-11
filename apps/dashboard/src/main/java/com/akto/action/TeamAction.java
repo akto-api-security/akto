@@ -159,8 +159,8 @@ public class TeamAction extends UserAction implements ServletResponseAware, Serv
                 if (userExists) {
                     try {
                         Role[] rolesHierarchy = currentUserRole.getRoleHierarchy();
-                        boolean isValidUpdateRole = false;
-                        boolean shouldChangeRole = false;
+                        boolean isValidUpdateRole = false; // cannot change for a user role higher than yourself
+                        boolean shouldChangeRole = false; // cannot change to a role higher than yourself
 
                         for(Role role: rolesHierarchy){
                             if(role == userRole){
