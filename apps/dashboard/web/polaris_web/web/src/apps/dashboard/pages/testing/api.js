@@ -44,6 +44,14 @@ export default {
         })
         return resp        
     },
+    async fetchRemediationInfo(testId) {
+        const resp = await request({
+            url: 'api/fetchRemediationInfo',
+            method: 'post',
+            data: {testId}
+        })
+        return resp
+    },
     async fetchAllSubCategories(fetchOnlyActive, mode, skip, limit) {
         const resp = await request({
             url: 'api/fetchAllSubCategories',

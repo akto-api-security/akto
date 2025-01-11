@@ -462,6 +462,11 @@ public class IssuesAction extends UserAction {
         infoObj.put("_name", testConfig.getId());
         infoObj.put("content", testConfig.getContent());
         infoObj.put("templateSource", testConfig.getTemplateSource());
+
+       
+        infoObj.put("remediation", testConfig.getAuthor().equalsIgnoreCase(Constants._AKTO));
+        
+        
         infoObj.put("updatedTs", testConfig.getUpdateTs());
         infoObj.put("author", testConfig.getAuthor());
 
@@ -517,7 +522,6 @@ public class IssuesAction extends UserAction {
 
         return SUCCESS.toUpperCase();
     }
-
 
     public String updateIssueStatus () {
         if (issueId == null || statusToBeUpdated == null || ignoreReason == null) {
