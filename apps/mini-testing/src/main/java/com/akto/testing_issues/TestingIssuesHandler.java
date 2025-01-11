@@ -185,10 +185,8 @@ public class TestingIssuesHandler {
                 updates.add(updatePayload.toString());
                 if(!doesExists || shouldCountIssue){
                     updatePayload = new UpdatePayload(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.OPEN.name(), SET_OPERATION);
-                    if(shouldCountIssue || !doesExists) {
-                        int count = countIssuesMap.getOrDefault(severity.name(), 0);
-                        countIssuesMap.put(severity.name(), count + 1);
-                    }        
+                    int count = countIssuesMap.getOrDefault(severity.name(), 0);
+                    countIssuesMap.put(severity.name(), count + 1);      
                 }
                 updates.add(updatePayload.toString());
                 updatePayload = new UpdatePayload(TestingRunIssues.CREATION_TIME, lastSeen, SET_OPERATION);
