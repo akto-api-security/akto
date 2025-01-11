@@ -41,6 +41,7 @@ import com.akto.testing_issues.TestingIssuesHandler;
 import com.akto.util.JSONUtils;
 import com.akto.util.enums.GlobalEnums.Severity;
 import com.akto.util.enums.LoginFlowEnums;
+import com.alibaba.fastjson2.JSON;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
@@ -49,7 +50,6 @@ import static com.akto.test_editor.execution.Build.modifyRequest;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.types.ObjectId;
 import org.json.JSONObject;
-import org.mortbay.util.ajax.JSON;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
