@@ -2480,6 +2480,7 @@ public class InitializerListener implements ServletContextListener {
             int gracePeriod = organization.getGracePeriod();
             String hotjarSiteId = organization.getHotjarSiteId();
             String planType = organization.getplanType();
+            String trialMsg = organization.gettrialMsg();
             String organizationId = organization.getId();
             /*
              * This ensures, we don't fetch feature wise allowed from akto too often.
@@ -2545,6 +2546,7 @@ public class InitializerListener implements ServletContextListener {
             gracePeriod = OrganizationUtils.fetchOrgGracePeriodFromMetaData(metaData);
             hotjarSiteId = OrganizationUtils.fetchHotjarSiteId(metaData);
             planType = OrganizationUtils.fetchplanType(metaData);
+            trialMsg = OrganizationUtils.fetchtrialMsg(metaData);
             boolean expired = OrganizationUtils.fetchExpired(metaData);
             boolean telemetryEnabled = OrganizationUtils.fetchTelemetryEnabled(metaData);
             // setTelemetrySettings(organization, telemetryEnabled);
@@ -2556,6 +2558,8 @@ public class InitializerListener implements ServletContextListener {
             organization.setHotjarSiteId(hotjarSiteId);
             
             organization.setplanType(planType);
+
+            organization.settrialMsg(trialMsg);
 
             organization.setGracePeriod(gracePeriod);
             organization.setFeatureWiseAllowed(featureWiseAllowed);
@@ -2579,6 +2583,7 @@ public class InitializerListener implements ServletContextListener {
                             Updates.set(Organization._EXPIRED, expired),
                             Updates.set(Organization.HOTJAR_SITE_ID, hotjarSiteId),
                             Updates.set(Organization.PLAN_TYPE, planType),
+                            Updates.set(Organization.TRIAL_MSG, trialMsg),
                             Updates.set(Organization.TEST_TELEMETRY_ENABLED, testTelemetryEnabled),
                             Updates.set(Organization.LAST_FEATURE_MAP_UPDATE, lastFeatureMapUpdate)));
 

@@ -230,6 +230,7 @@ public class ProfileAction extends UserAction {
             userDetails.append("expired", organization.checkExpirationWithAktoSync());
             userDetails.append("hotjarSiteId", organization.getHotjarSiteId());
             userDetails.append("planType", organization.getplanType());
+            userDetails.append("trialMsg", organization.gettrialMsg());
         }
 
         if (versions.length > 2) {

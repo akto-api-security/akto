@@ -98,6 +98,8 @@
 
                     window.PLAN_TYPE = '${requestScope.planType}'
 
+                    window.TRIAL_MSG = '${requestScope.trialMsg}'
+
                     // Enabling the debug mode flag is useful during implementation,
                     // but it's recommended you remove it for production
 
