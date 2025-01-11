@@ -1578,7 +1578,6 @@ public class APICatalogSync {
             Bson filterForHostHeader = SingleTypeInfoDao.filterForHostHeader(-1,false);
             Bson filterQ = Filters.and(filterForHostHeader, Filters.regex(SingleTypeInfo._URL, "STRING|INTEGER"));
             allParams = SingleTypeInfoDao.instance.findAll(filterQ, Projections.exclude(SingleTypeInfo._VALUES));
-            allParams.addAll(SingleTypeInfoDao.instance.findAll(new BasicDBObject(), Projections.exclude(SingleTypeInfo._VALUES)));
 
             int dependencyFlowLimit = 1_000;
             if (mergingCalled && allParams.size() < dependencyFlowLimit) {
