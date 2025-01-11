@@ -78,8 +78,10 @@ function TestRunResultFlyout(props) {
     },[issueDetails?.id?.apiInfoKey])
 
     useEffect(() => {
-        if (remediationSrc) {
+        if (!remediationSrc) {
             fetchRemediationInfo("tests-library-master/remediation/"+selectedTestRunResult.testCategoryId+".md")
+        } else {
+            setRemediationText(remediationSrc)
         }
     }, [selectedTestRunResult.testCategoryId, remediationSrc])
 

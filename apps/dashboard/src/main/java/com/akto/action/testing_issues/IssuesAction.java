@@ -43,6 +43,7 @@ import com.mongodb.client.model.*;
 import com.mongodb.client.result.InsertOneResult;
 import com.opensymphony.xwork2.Action;
 
+import org.apache.commons.lang3.StringUtils;
 import org.bson.Document;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
@@ -463,8 +464,11 @@ public class IssuesAction extends UserAction {
         infoObj.put("content", testConfig.getContent());
         infoObj.put("templateSource", testConfig.getTemplateSource());
 
-       
-        infoObj.put("remediation", testConfig.getAuthor().equalsIgnoreCase(Constants._AKTO));
+        String remediationContent = info.getRemediation();
+
+        if (!StringUtils.isEmpty(remediationContent)) {
+            infoObj.put("remediation", remediationContent);
+        }
         
         
         infoObj.put("updatedTs", testConfig.getUpdateTs());

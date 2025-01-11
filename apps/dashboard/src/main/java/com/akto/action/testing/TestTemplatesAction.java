@@ -25,11 +25,10 @@ public class TestTemplatesAction extends UserAction {
         Remediation remediationObj = RemediationsDao.instance.findOne(Constants.ID, testId);
 
         if (remediationObj == null) {
-            addActionError("remediation missing from db for testId: " + testId);
-            return ERROR.toUpperCase();
+            this.remediation = ""; 
+        } else {
+            this.remediation = remediationObj.getRemediationText();
         }
-
-        this.remediation = remediationObj.getRemediationText();
         
         return SUCCESS.toUpperCase();
     }
