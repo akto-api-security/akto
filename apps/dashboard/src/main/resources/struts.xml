@@ -330,9 +330,9 @@
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">USER_ACTIONS</param>
+                <param name="featureLabel">ADMIN_ACTIONS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">User made another user admin in Akto</param>
+                <param name="actionDescription">Admin changed the role of the user in Akto dashboard</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -1163,7 +1163,7 @@
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">USER_ACTIONS</param>
+                <param name="featureLabel">INVITE_MEMBERS</param>
                 <param name="accessType">READ_WRITE</param>
                 <param name="actionDescription">User invited another user to Akto</param>
             </interceptor-ref>
