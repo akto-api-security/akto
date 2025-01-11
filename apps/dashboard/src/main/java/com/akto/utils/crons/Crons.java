@@ -9,32 +9,44 @@ import java.util.function.Consumer;
 
 import com.akto.dao.ApiInfoDao;
 import com.akto.dao.HistoricalDataDao;
+import com.akto.dao.TestingAlertsDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.HistoricalData;
+import com.akto.dto.TestingAlerts;
 import com.akto.listener.InitializerListener;
 import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 
-import com.akto.task.Cluster;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
 import com.akto.dao.testing.DeleteTestRunsDao;
+import com.akto.dao.testing.TestingRunDao;
 import com.akto.dao.traffic_metrics.RuntimeMetricsDao;
 import com.akto.dao.traffic_metrics.TrafficAlertsDao;
 import com.akto.dto.Account;
 import com.akto.dto.testing.DeleteTestRuns;
+import com.akto.dto.testing.TestingRun;
 import com.akto.dto.traffic_metrics.RuntimeMetrics;
 import com.akto.dto.traffic_metrics.TrafficAlerts;
 import com.akto.dto.traffic_metrics.TrafficAlerts.ALERT_TYPE;
 import com.akto.util.AccountTask;
 import com.akto.util.enums.GlobalEnums.Severity;
+import com.akto.util.http_util.CoreHTTPClient;
 import com.akto.utils.DeleteTestRunUtils;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Accumulators;
 import com.mongodb.client.model.Aggregates;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.FindOneAndUpdateOptions;
+import com.mongodb.client.model.Updates;
+import com.slack.api.Slack;
+import com.slack.api.util.http.SlackHttpClient;
+import com.slack.api.webhook.WebhookResponse;
+
+import okhttp3.OkHttpClient;
 
 
 public class Crons {
@@ -129,6 +141,45 @@ public class Crons {
                         }
                     }
                 },"traffic-alerts-scheduler");
+            }
+        }, 0 , 5, TimeUnit.MINUTES);
+    }
+
+    public void testingAlertsScheduler(){
+        scheduler.scheduleAtFixedRate(new Runnable() {
+            public void run(){
+                logger.infoAndAddToDb("testing alerts scheduler triggered", LogDb.DASHBOARD);
+                Bson filters = Filters.and(
+                    Filters.lte("updatedTs", Context.now() - 15 * 60),
+                    Filters.eq("status", "SCHEDULED"),
+                    Filters.eq("alertSent", false)
+                );
+                List<TestingAlerts> testingAlerts = TestingAlertsDao.instance.findAll(filters);
+
+                for (TestingAlerts alert: testingAlerts) {
+                    TestingRun tr = TestingRunDao.instance.findOne(Filters.eq("_id", alert.getTestRunId()));
+                    if (tr != null && tr.getScheduleTimestamp() < Context.now()) {
+                        OkHttpClient httpClient = CoreHTTPClient.client.newBuilder().build();
+                        SlackHttpClient slackHttpClient = new SlackHttpClient(httpClient);
+                        Slack slack = Slack.getInstance(slackHttpClient);
+                        String webhookUrl = "https://hooks.slack.com/triggers/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";
+                        try {
+                            BasicDBObject payload = new BasicDBObject();
+                            payload.put("accountId", alert.getAccountId());
+                            payload.put("testRunId", alert.getTestRunId().toHexString());
+                            logger.infoAndAddToDb("Test alert payload:" + payload, LogDb.DASHBOARD);
+                            WebhookResponse response = slack.send(webhookUrl, payload.toJson());
+                            logger.infoAndAddToDb("Test alert Response: " + response.getBody(), LogDb.DASHBOARD);
+                            Bson updates = Updates.combine(
+                                Updates.set("alertSent", true)
+                            );
+                            TestingAlertsDao.instance.getMCollection().findOneAndUpdate(Filters.eq("testRunId", tr.getId()), updates, new FindOneAndUpdateOptions());
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                            logger.errorAndAddToDb(e, "Error while sending testing alert: " + e.getMessage(), LogDb.DASHBOARD);
+                        }
+                    }
+                }
             }
         }, 0 , 5, TimeUnit.MINUTES);
     }

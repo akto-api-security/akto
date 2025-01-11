@@ -1,12 +1,14 @@
 package com.akto.action.testing;
 
 import com.akto.action.UserAction;
+import com.akto.dao.TestingAlertsDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing.sources.TestSourceConfigsDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dao.testing.*;
 import com.akto.dto.ApiInfo;
+import com.akto.dto.TestingAlerts;
 import com.akto.dto.User;
 import com.akto.dto.ApiToken.Utility;
 import com.akto.dto.CollectionConditions.TestConfigsAdvancedSettings;
@@ -210,6 +212,8 @@ public class StartTestAction extends UserAction {
             } else {
                 TestingRunDao.instance.insertOne(localTestingRun);
                 testingRunHexId = localTestingRun.getId().toHexString();
+                TestingAlerts testingAlerts = new TestingAlerts(Context.accountId.get(), localTestingRun.getId(), "SCHEDULED", Context.now(), false);
+                TestingAlertsDao.instance.insertOne(testingAlerts);
             }
             this.testIdConfig = 0;
         } else {
