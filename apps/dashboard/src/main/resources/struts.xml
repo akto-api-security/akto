@@ -1974,26 +1974,6 @@
             </result>
         </action>
 
-        <action name="api/uploadTcp" class="com.akto.action.HarAction" method="uploadTcp">
-            <interceptor-ref name="defaultStack"/>
-            <interceptor-ref name="json"/>
-            <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">API_COLLECTIONS</param>
-                <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">User uploaded a TCP file</param>
-            </interceptor-ref>
-            <result name="FORBIDDEN" type="json">
-                <param name="statusCode">403</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
-            </result>
-            <result name="SUCCESS"  type="json">
-            </result>
-            <result name="ERROR" type="httpheader">
-                <param name="status">401</param>
-            </result>
-        </action>
-
         <action name="api/createCollection" class="com.akto.action.ApiCollectionsAction" method="createCollection">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
