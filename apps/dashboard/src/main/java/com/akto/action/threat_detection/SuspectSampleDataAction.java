@@ -42,20 +42,39 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
   }
 
   public String fetchSampleData() {
-    HttpPost post =
-        new HttpPost(
-            String.format("%s/api/dashboard/list_malicious_requests", this.getBackendUrl()));
+    HttpPost post = new HttpPost(
+        String.format("%s/api/dashboard/list_malicious_requests", this.getBackendUrl()));
     post.addHeader("Authorization", "Bearer " + this.getApiToken());
     post.addHeader("Content-Type", "application/json");
 
-    Map<String, Object> body =
-        new HashMap<String, Object>() {
-          {
-            put("skip", skip);
-            put("limit", LIMIT);
-            put("sort", sort);
-          }
-        };
+    Map<String, Object> filter = new HashMap<>();
+    if (this.ips != null && !this.ips.isEmpty()) {
+      filter.put("ips", this.ips);
+    }
+
+    if (this.urls != null && !this.urls.isEmpty()) {
+      filter.put("urls", this.urls);
+    }
+
+    Map<String, Integer> time_range = new HashMap<>();
+    if (this.startTimestamp > 0) {
+      time_range.put("start", this.startTimestamp);
+    }
+
+    if (this.endTimestamp > 0) {
+      time_range.put("end", this.endTimestamp);
+    }
+
+    filter.put("detected_at_time_range", time_range);
+
+    Map<String, Object> body = new HashMap<String, Object>() {
+      {
+        put("skip", skip);
+        put("limit", LIMIT);
+        put("sort", sort);
+        put("filter", filter);
+      }
+    };
     String msg = objectMapper.valueToTree(body).toString();
 
     StringEntity requestEntity = new StringEntity(msg, ContentType.APPLICATION_JSON);
@@ -65,24 +84,22 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
       String responseBody = EntityUtils.toString(resp.getEntity());
 
       ProtoMessageUtils.<ListMaliciousRequestsResponse>toProtoMessage(
-              ListMaliciousRequestsResponse.class, responseBody)
+          ListMaliciousRequestsResponse.class, responseBody)
           .ifPresent(
               m -> {
-                this.maliciousEvents =
-                    m.getMaliciousEventsList().stream()
-                        .map(
-                            smr ->
-                                new DashboardMaliciousEvent(
-                                    smr.getId(),
-                                    smr.getActor(),
-                                    smr.getFilterId(),
-                                    smr.getEndpoint(),
-                                    URLMethods.Method.fromString(smr.getMethod()),
-                                    smr.getApiCollectionId(),
-                                    smr.getIp(),
-                                    smr.getCountry(),
-                                    smr.getDetectedAt()))
-                        .collect(Collectors.toList());
+                this.maliciousEvents = m.getMaliciousEventsList().stream()
+                    .map(
+                        smr -> new DashboardMaliciousEvent(
+                            smr.getId(),
+                            smr.getActor(),
+                            smr.getFilterId(),
+                            smr.getEndpoint(),
+                            URLMethods.Method.fromString(smr.getMethod()),
+                            smr.getApiCollectionId(),
+                            smr.getIp(),
+                            smr.getCountry(),
+                            smr.getDetectedAt()))
+                    .collect(Collectors.toList());
                 this.total = m.getTotal();
               });
     } catch (Exception e) {
@@ -94,8 +111,7 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
   }
 
   public String fetchFilters() {
-    HttpGet get =
-        new HttpGet(String.format("%s/api/dashboard/fetch_filters", this.getBackendUrl()));
+    HttpGet get = new HttpGet(String.format("%s/api/dashboard/fetch_filters", this.getBackendUrl()));
     get.addHeader("Authorization", "Bearer " + this.getApiToken());
     get.addHeader("Content-Type", "application/json");
 
@@ -103,7 +119,7 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
       String responseBody = EntityUtils.toString(resp.getEntity());
 
       ProtoMessageUtils.<FetchAlertFiltersResponse>toProtoMessage(
-              FetchAlertFiltersResponse.class, responseBody)
+          FetchAlertFiltersResponse.class, responseBody)
           .ifPresent(
               msg -> {
                 this.ips = msg.getActorsList();
