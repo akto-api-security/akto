@@ -63,7 +63,7 @@ public class TeamAction extends UserAction implements ServletResponseAware, Serv
         for(Object obj: users) {
             BasicDBObject userObj = (BasicDBObject) obj;
             RBAC rbac = userToRBAC.get(userObj.getInt("id"));
-            String status = rbac == null ? Role.MEMBER.getName() : rbac.getRole().getName();
+            String status = (rbac == null || rbac.getRole() == null) ? Role.MEMBER.getName() : rbac.getRole().getName();
             userObj.append("role", status);
             try {
                 String login = userObj.getString(User.LOGIN);
