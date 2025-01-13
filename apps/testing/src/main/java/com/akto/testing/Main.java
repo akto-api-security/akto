@@ -101,7 +101,8 @@ public class Main {
                         Updates.set(TestingRunResultSummary.STATE, TestingRun.State.RUNNING),
                         Updates.setOnInsert(TestingRunResultSummary.START_TIMESTAMP, start),
                         Updates.set(TestingRunResultSummary.TEST_RESULTS_COUNT, 0),
-                        Updates.set(TestingRunResultSummary.COUNT_ISSUES, emptyCountIssuesMap)
+                        Updates.set(TestingRunResultSummary.COUNT_ISSUES, emptyCountIssuesMap),
+                        Updates.set(TestingRunResultSummary.IS_NEW_TESTING_RUN_RESULT_SUMMARY, true)
                 ),
                 new FindOneAndUpdateOptions().upsert(true).returnDocument(ReturnDocument.AFTER)
         );
@@ -517,6 +518,7 @@ public class Main {
                                     trrs.setState(State.RUNNING);
                                     trrs.setTestResultsCount(0);
                                     trrs.setCountIssues(emptyCountIssuesMap);
+                                    trrs.setNewTestingSummary(true);
                                     TestingRunResultSummariesDao.instance.insertOne(trrs);
                                     summaryId = trrs.getId();
                                 } else {

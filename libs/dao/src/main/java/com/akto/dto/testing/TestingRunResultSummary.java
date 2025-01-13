@@ -176,7 +176,7 @@ public class TestingRunResultSummary {
             "}";
     }
 
-    public boolean isNewTestingSummary() {
+    public boolean getNewTestingSummary() {
         return isNewTestingSummary;
     }
 
