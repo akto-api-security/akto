@@ -13,6 +13,7 @@ import javax.servlet.http.HttpSession;
 
 import com.akto.dao.testing.sources.TestReportsDao;
 import com.akto.dto.testing.sources.TestReports;
+import com.mongodb.MongoCommandException;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 import org.apache.struts2.ServletActionContext;
@@ -40,7 +41,7 @@ public class ReportAction extends UserAction {
     private boolean firstPollRequest;
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(ReportAction.class);
-    
+
     public String downloadReportPDF() {
         if(reportUrl == null || reportUrl.isEmpty()) {
             status = "ERROR";
@@ -129,7 +130,22 @@ public class ReportAction extends UserAction {
                 if (status.equals("COMPLETED")) {
                     loggerMaker.infoAndAddToDb("Pdf download status for report id - " + reportId + " completed. Attaching pdf in response ", LogDb.DASHBOARD);
                     pdf = node.get("base64PDF").textValue();
-                    TestReportsDao.instance.updateOne(Filters.eq("_id", reportUrlIdObj), Updates.set(TestReports.PDF_REPORT_STRING, pdf));
+                    try {
+                        TestReportsDao.instance.updateOne(Filters.eq("_id", reportUrlIdObj), Updates.set(TestReports.PDF_REPORT_STRING, pdf));
+                    } catch(Exception e) {
+                        loggerMaker.errorAndAddToDb("Error: " + e.getMessage() + ", while updating report binary for reportId: " + reportId, LogDb.DASHBOARD);
+                        if (e instanceof MongoCommandException) {
+                            MongoCommandException mongoException = (MongoCommandException) e;
+                            if (mongoException.getCode() == 17420) {
+                                addActionError("The report is too large to save. Please reduce its size and try again.");
+                            } else {
+                                addActionError("A database error occurred while saving the report. Try again later.");
+                            }
+                        } else {
+                            addActionError("An error occurred while updating the report in DB. Please try again.");
+                        }
+                        status = "ERROR";
+                    }
                 }
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb(e, "Error while polling pdf download for report id - " + reportId, LogDb.DASHBOARD);
