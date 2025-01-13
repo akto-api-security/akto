@@ -138,23 +138,15 @@ function SusDataTable({ currDateRange, rowClicked }) {
         return { label: x.displayName, value: x.id };
       });
     let urlChoices = res?.urls
-      .filter((x) => {
-        return x.length > 0;
-      })
       .map((x) => {
-        return { label: x, value: x };
+        const url = x || "/"
+        return { label: url, value: x };
       });
     let ipChoices = res?.ips.map((x) => {
       return { label: x, value: x };
     });
 
     filters = [
-      {
-        key: "apiCollectionId",
-        label: "Collection",
-        title: "Collection",
-        choices: apiCollectionFilterChoices,
-      },
       {
         key: "sourceIps",
         label: "Source IP",
