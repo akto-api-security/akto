@@ -160,11 +160,16 @@ const Users = () => {
         }
 
         // Call Update Role API
-        setUsers(users.map(user => user.login === login ? { ...user, role: newRole } : user))
-        setRoleSelectionPopup(prevState => ({ ...prevState, [login]: false }))
-        await updateUserRole(login, newRole)
-
-        toggleRoleSelectionPopup(id)
+        await updateUserRole(login, newRole).then((res) => {
+            try {
+                setUsers(users.map(user => user.login === login ? { ...user, role: newRole } : user))
+                setRoleSelectionPopup(prevState => ({ ...prevState, [login]: false }))
+                toggleRoleSelectionPopup(id)
+                func.setToast(true, false, "Updated user role successfully")
+            } catch (error) {
+            }
+        })
+        
     }
 
     const toggleRoleSelectionPopup = (id) => {
@@ -238,7 +243,7 @@ const Users = () => {
             primaryAction={{
                 content: 'Invite user',
                 onAction: () => toggleInviteUserModal(),
-                'disabled': (isLocalDeploy || userRole === 'GUEST')
+                // 'disabled': (isLocalDeploy || userRole === 'GUEST')
             }}
             divider
         >
