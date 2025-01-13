@@ -2297,6 +2297,7 @@ public class InitializerListener implements ServletContextListener {
                             runInitializerFunctions();
                         }
                     }, "context-initializer-secondary");
+                    setUpTestEditorTemplatesScheduler();
 
                     crons.trafficAlertsScheduler();
                     crons.insertHistoricalDataJob();
@@ -2315,7 +2316,6 @@ public class InitializerListener implements ServletContextListener {
                     setUpWebhookScheduler();
                     cleanInventoryJobRunner();
                     setUpDefaultPayloadRemover();
-                    setUpTestEditorTemplatesScheduler();
                     setUpDependencyFlowScheduler();
                     tokenGeneratorCron.tokenGeneratorScheduler();
                     crons.deleteTestRunsScheduler();
@@ -3035,7 +3035,7 @@ public class InitializerListener implements ServletContextListener {
         try {
             setBackwardCompatibilities(backwardCompatibility);
             loggerMaker.infoAndAddToDb("Backward compatibilities set for " + Context.accountId.get(), LogDb.DASHBOARD);
-            insertPiiSources();
+            // insertPiiSources();
             loggerMaker.infoAndAddToDb("PII sources inserted set for " + Context.accountId.get(), LogDb.DASHBOARD);
 
 //            setUpPiiCleanerScheduler();
@@ -3043,11 +3043,11 @@ public class InitializerListener implements ServletContextListener {
 //            setUpWebhookScheduler();
 //            setUpPiiAndTestSourcesScheduler();
 
-            AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
-            dropSampleDataIfEarlierNotDroped(accountSettings);
+            // AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+            // dropSampleDataIfEarlierNotDroped(accountSettings);
 
-            backFillDiscovered();
-            backFillStatusCodeType();
+            // backFillDiscovered();
+            // backFillStatusCodeType();
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e,"error while setting up dashboard: " + e.toString(), LogDb.DASHBOARD);
         }
