@@ -338,7 +338,7 @@ const SampleApi = () => {
                     testingRunResult={testResult?.testingRunResult}
                     runIssues={testResult?.testingRunIssues}
                     testSubCategoryMap={testResult?.subCategoryMap}
-                    testId={selectedTest.value}
+                    testId={selectedTest?.value}
                     source="editor"
                 />
                 </Box>

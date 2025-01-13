@@ -135,6 +135,10 @@ public class ProfileAction extends UserAction {
         } catch (Exception e) {
         }
 
+        if (DashboardMode.isMetered()) {
+            InitializerListener.insertAktoTestLibraries(accountSettings);
+        }
+
         Organization organization = OrganizationsDao.instance.findOne(
                 Filters.in(Organization.ACCOUNTS, sessionAccId)
         );

@@ -41,7 +41,7 @@ public class RbacEnums {
         METRICS(AccessGroups.DEBUG_INFO),
         LOGS(AccessGroups.DEBUG_INFO),
         BILLING(AccessGroups.SETTINGS),
-        INVITE_MEMBERS(AccessGroups.SETTINGS),
+        INVITE_MEMBERS(AccessGroups.DEBUG_INFO),
         ADMIN_ACTIONS(AccessGroups.ADMIN),
         USER_ACTIONS(AccessGroups.USER);
         private final AccessGroups accessGroup;

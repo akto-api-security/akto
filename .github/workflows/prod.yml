@@ -23,10 +23,10 @@ on:
         type: boolean
         default: true
         description: Internal
-      protection:
+      threat_detection_backend:
         type: boolean
         default: true
-        description: Protection
+        description: Threat Deteection Backend
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
@@ -37,12 +37,12 @@ jobs:
 
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
-    # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - uses: actions/checkout@v2
       - uses: actions/setup-java@v2
         with:
-          distribution: 'adopt'
-          java-version: '8'
+          distribution: "adopt"
+          java-version: "8"
           architecture: x64
       - uses: actions/setup-node@v2
         with:
@@ -62,6 +62,14 @@ jobs:
           wget -O fintech.json https://raw.githubusercontent.com/akto-api-security/akto/master/pii-types/fintech.json
           wget -O filetypes.json https://raw.githubusercontent.com/akto-api-security/akto/master/pii-types/filetypes.json
           wget -O automated_api_groups.csv https://raw.githubusercontent.com/akto-api-security/akto/master/automated-api-groups/automated-api-groups.csv
+
+
+      - name: Create maxmind directory
+        run: mkdir -p ./apps/threat-detection-backend/src/main/resources/maxmind
+      - name: Download Maxmind Country database
+        working-directory: ./apps/threat-detection-backend/src/main/resources/maxmind
+        run: |
+          wget -O Geo-Country.mmdb https://raw.githubusercontent.com/akto-api-security/tests-library/refs/heads/master/resources/Geo-Country.mmdb
 
       - name: Prepare Dashboard polaris UI
         working-directory: ./apps/dashboard/web/polaris_web
@@ -125,10 +133,9 @@ jobs:
             echo "::set-output name=image::$ECR_REGISTRY/akto-internal:$IMAGE_TAG"
           fi
 
-          if [[ "${{ github.event.inputs.protection }}" == "true" ]]; then
-            cd ../api-threat-detection
-            docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-api-protection:$IMAGE_TAG_1 -t $ECR_REGISTRY/akto-api-protection:$IMAGE_TAG_2 -t $ECR_REGISTRY/akto-api-protection:$IMAGE_TAG_3 . --push
-            echo "::set-output name=image::$ECR_REGISTRY/akto-api-protection:$IMAGE_TAG"
+          if [[ "${{ github.event.inputs.threat_detection_backend}}" == "true" ]]; then
+            cd apps/threat-detection-backend
+            docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-threat-detection-backend:$IMAGE_TAG . --push
           fi
       - name: Configure AWS Credentials for ECR
         uses: aws-actions/configure-aws-credentials@v1
@@ -140,7 +147,7 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v1
         with:
-          mask-password: 'true'
+          mask-password: "true"
           registry-type: public
 
       - name: Push git tag
