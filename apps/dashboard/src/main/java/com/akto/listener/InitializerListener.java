@@ -3218,9 +3218,14 @@ public class InitializerListener implements ServletContextListener {
                             String testConfigId = testConfig.getId();
 
                             existingTemplatesInDb = mapIdToHash.get(testConfigId);
-
+                            loggerMaker.infoAndAddToDb("Trying to add test yaml: " + testConfigId + " existingTemplatesInDb: " + existingTemplatesInDb, LogDb.DASHBOARD);
+                            
                             if (existingTemplatesInDb != null && existingTemplatesInDb.size() == 1) {
+                                loggerMaker.infoAndAddToDb("Trying to add test yaml: " + testConfigId + " existingTemplatesInDb size: " + existingTemplatesInDb.size(), LogDb.DASHBOARD);
+
                                 int existingTemplateHash = existingTemplatesInDb.get(0).getHash();
+                                loggerMaker.infoAndAddToDb("Hashes: " + testConfigId + " hashDB: " + existingTemplateHash + " template: " + existingTemplateHash, LogDb.DASHBOARD);
+
                                 if (existingTemplateHash == templateContent.hashCode()) {
                                     countUnchangedTemplates++;
                                     if(TestConfig.isTestMultiNode(testConfig)){
@@ -3231,6 +3236,7 @@ public class InitializerListener implements ServletContextListener {
                                     loggerMaker.infoAndAddToDb("Updating test yaml: " + testConfigId, LogDb.DASHBOARD);
                                 }
                             }
+                            loggerMaker.infoAndAddToDb("Reached end: " + testConfigId, LogDb.DASHBOARD);
 
                         } catch (Exception e) {
                             loggerMaker.errorAndAddToDb(e,
