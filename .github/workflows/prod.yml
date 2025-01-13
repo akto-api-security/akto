@@ -134,7 +134,7 @@ jobs:
           fi
 
           if [[ "${{ github.event.inputs.threat_detection_backend}}" == "true" ]]; then
-            cd apps/threat-detection-backend
+            cd ../threat-detection-backend
             docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-threat-detection-backend:$IMAGE_TAG . --push
           fi
       - name: Configure AWS Credentials for ECR
