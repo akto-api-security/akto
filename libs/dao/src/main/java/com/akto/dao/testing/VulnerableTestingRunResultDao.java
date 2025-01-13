@@ -31,13 +31,8 @@ public class VulnerableTestingRunResultDao extends TestingRunResultDao {
         
         MCollection.createIndexIfAbsent(getDBName(), getCollName(),
                 new String[] { TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID }, false);
-
-        MCollection.createIndexIfAbsent(getDBName(), getCollName(), new String[]{TestingRunResult.END_TIMESTAMP}, false);
-
-        String[] fieldNames = new String[]{TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, TestingRunResult.API_INFO_KEY+"."+ApiInfoKey.API_COLLECTION_ID};
-        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
-
-        fieldNames = new String[]{TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, TestingRunResult.TEST_RESULTS+"."+GenericTestResult._CONFIDENCE};
+        
+        String[] fieldNames = new String[]{TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, TestingRunResult.TEST_RESULTS+"."+GenericTestResult._CONFIDENCE};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
 
         fieldNames = new String[]{TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, TestingRunResult.TEST_SUPER_TYPE};
