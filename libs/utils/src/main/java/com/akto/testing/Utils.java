@@ -39,6 +39,7 @@ import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.Severity;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
+import com.mongodb.ConnectionString;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Accumulators;
 import com.mongodb.client.model.Aggregates;
@@ -474,6 +475,27 @@ public class Utils {
         }
 
         return countIssuesMap;
+    }
+
+    public static List<TestingRunResult> fetchLatestTestingRunResult(Bson filter){
+        List<TestingRunResult> resultsFromNonVulCollection = TestingRunResultDao.instance.fetchLatestTestingRunResult(filter, 1);
+        List<TestingRunResult> resultsFromVulCollection = VulnerableTestingRunResultDao.instance.fetchLatestTestingRunResult(filter, 1);
+
+        if(resultsFromVulCollection != null && !resultsFromVulCollection.isEmpty()){
+            if(resultsFromNonVulCollection != null && !resultsFromNonVulCollection.isEmpty()){
+                TestingRunResult tr1 = resultsFromVulCollection.get(0);
+                TestingRunResult tr2 = resultsFromNonVulCollection.get(0);
+                if(tr1.getEndTimestamp() >= tr2.getEndTimestamp()){
+                    return resultsFromVulCollection;
+                }else{
+                    return resultsFromVulCollection;
+                }
+            }else{
+                return resultsFromVulCollection;
+            }
+        }
+
+        return resultsFromNonVulCollection;
     }
     
 }

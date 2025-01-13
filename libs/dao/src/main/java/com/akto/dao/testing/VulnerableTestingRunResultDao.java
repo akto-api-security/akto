@@ -92,10 +92,10 @@ public class VulnerableTestingRunResultDao extends TestingRunResultDao {
     }
 
     @Override
-    public TestingRunResult findOne(Bson q) {
-        TestingRunResult tr = super.findOne(q);
+    public TestingRunResult findOne(Bson q, Bson projection) {
+        TestingRunResult tr = super.findOne(q, projection);
         if(tr == null){
-            tr = instance.findOne(q);
+            tr = instance.findOne(q, projection);
         }
         return tr;
     }

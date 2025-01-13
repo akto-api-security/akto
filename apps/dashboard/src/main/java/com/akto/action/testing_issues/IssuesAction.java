@@ -454,7 +454,7 @@ public class IssuesAction extends UserAction {
                 Filters.eq(TestingRunResult.TEST_SUB_TYPE, testSubType),
                 Filters.eq(TestingRunResult.API_INFO_KEY, issue.getId().getApiInfoKey())
         );
-        testingRunResult = VulnerableTestingRunResultDao.instance.findOne(filterForRunResult);
+        testingRunResult = VulnerableTestingRunResultDao.instance.findOne(filterForRunResult, null);
         if(testingRunResult == null){
             testingRunResult = TestingRunResultDao.instance.findOne(filterForRunResult);
         }

@@ -10,6 +10,7 @@ import com.akto.dao.testing.TestingRunConfigDao;
 import com.akto.dao.testing.TestingRunDao;
 import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dao.testing.TestingRunResultSummariesDao;
+import com.akto.dao.testing.VulnerableTestingRunResultDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.billing.SyncLimit;
@@ -437,7 +438,7 @@ public class Main {
                                 Filters.eq(TestingRunResultSummary.TESTING_RUN_ID, testingRun.getId()),
                                 Filters.eq(TestingRunResultSummary.STATE, State.FAILED)
                             );
-                            List<TestingRunResult> testingRunResults = TestingRunResultDao.instance.fetchLatestTestingRunResult(Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, testingRunResultSummary.getId()), 1);
+                            List<TestingRunResult> testingRunResults = Utils.fetchLatestTestingRunResult(Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, testingRunResultSummary.getId()));
                             if (testingRunResults != null && !testingRunResults.isEmpty()) {
                                 TestingRunResult testingRunResult = testingRunResults.get(0);
                                 if (Context.now() - testingRunResult.getEndTimestamp() < LAST_TEST_RUN_EXECUTION_DELTA) {
@@ -745,10 +746,11 @@ public class Main {
                 if(newIssuesModelList.size() <= 5) {
                     Bson filterForRunResult = Filters.and(
                             Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, testingRunIssues.getLatestTestingRunSummaryId()),
+                            Filters.eq(TestingRunResult.VULNERABLE, true),
                             Filters.eq(TestingRunResult.TEST_SUB_TYPE, testingRunIssues.getId().getTestSubCategory()),
                             Filters.eq(TestingRunResult.API_INFO_KEY, testingRunIssues.getId().getApiInfoKey())
                     );
-                    TestingRunResult testingRunResult = TestingRunResultDao.instance.findOne(filterForRunResult, Projections.include("_id"));
+                    TestingRunResult testingRunResult = VulnerableTestingRunResultDao.instance.findOne(filterForRunResult, Projections.include("_id"));
                     testRunResultId = testingRunResult.getHexId();
                 } else testRunResultId = "";
 
