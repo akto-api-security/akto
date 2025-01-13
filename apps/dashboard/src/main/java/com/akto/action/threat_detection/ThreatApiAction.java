@@ -38,24 +38,26 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
   }
 
   public String fetchThreatCategoryCount() {
-    HttpGet get = new HttpGet(String.format("%s/api/dashboard/get_subcategory_wise_count", this.getBackendUrl()));
+    HttpGet get =
+        new HttpGet(
+            String.format("%s/api/dashboard/get_subcategory_wise_count", this.getBackendUrl()));
     get.addHeader("Authorization", "Bearer " + this.getApiToken());
     get.addHeader("Content-Type", "application/json");
 
     try (CloseableHttpResponse resp = this.httpClient.execute(get)) {
       String responseBody = EntityUtils.toString(resp.getEntity());
 
-      System.out.println(responseBody);
-
       ProtoMessageUtils.<ThreatCategoryWiseCountResponse>toProtoMessage(
-          ThreatCategoryWiseCountResponse.class, responseBody)
+              ThreatCategoryWiseCountResponse.class, responseBody)
           .ifPresent(
               m -> {
-                this.categoryCounts = m.getCategoryWiseCountsList().stream()
-                    .map(
-                        smr -> new ThreatCategoryCount(
-                            smr.getCategory(), smr.getSubCategory(), smr.getCount()))
-                    .collect(Collectors.toList());
+                this.categoryCounts =
+                    m.getCategoryWiseCountsList().stream()
+                        .map(
+                            smr ->
+                                new ThreatCategoryCount(
+                                    smr.getCategory(), smr.getSubCategory(), smr.getCount()))
+                        .collect(Collectors.toList());
               });
     } catch (Exception e) {
       e.printStackTrace();
@@ -66,19 +68,20 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
   }
 
   public String fetchThreatApis() {
-    HttpPost post = new HttpPost(String.format("%s/api/dashboard/list_threat_apis", this.getBackendUrl()));
+    HttpPost post =
+        new HttpPost(String.format("%s/api/dashboard/list_threat_apis", this.getBackendUrl()));
     post.addHeader("Authorization", "Bearer " + this.getApiToken());
     post.addHeader("Content-Type", "application/json");
 
-    Map<String, Object> body = new HashMap<String, Object>() {
-      {
-        put("skip", skip);
-        put("limit", LIMIT);
-      }
-    };
+    Map<String, Object> body =
+        new HashMap<String, Object>() {
+          {
+            put("skip", skip);
+            put("limit", LIMIT);
+            put("sort", sort);
+          }
+        };
     String msg = objectMapper.valueToTree(body).toString();
-
-    System.out.println("Request body for list threat actors" + msg);
 
     StringEntity requestEntity = new StringEntity(msg, ContentType.APPLICATION_JSON);
     post.setEntity(requestEntity);
@@ -86,21 +89,23 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
     try (CloseableHttpResponse resp = this.httpClient.execute(post)) {
       String responseBody = EntityUtils.toString(resp.getEntity());
 
-      System.out.println(responseBody);
-
       ProtoMessageUtils.<ListThreatApiResponse>toProtoMessage(
-          ListThreatApiResponse.class, responseBody)
+              ListThreatApiResponse.class, responseBody)
           .ifPresent(
               m -> {
-                this.apis = m.getApisList().stream()
-                    .map(
-                        smr -> new DashboardThreatApi(
-                            smr.getEndpoint(),
-                            URLMethods.Method.fromString(smr.getMethod()),
-                            smr.getActorsCount(),
-                            smr.getRequestsCount(),
-                            smr.getDiscoveredAt()))
-                    .collect(Collectors.toList());
+                this.apis =
+                    m.getApisList().stream()
+                        .map(
+                            smr ->
+                                new DashboardThreatApi(
+                                    smr.getEndpoint(),
+                                    URLMethods.Method.fromString(smr.getMethod()),
+                                    smr.getActorsCount(),
+                                    smr.getRequestsCount(),
+                                    smr.getDiscoveredAt()))
+                        .collect(Collectors.toList());
+
+                this.total = m.getTotal();
               });
     } catch (Exception e) {
       e.printStackTrace();
