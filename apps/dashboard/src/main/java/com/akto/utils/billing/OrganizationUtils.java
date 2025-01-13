@@ -291,6 +291,10 @@ public class OrganizationUtils {
         return additionalMetaData.getString("PLAN_TYPE", "");
     }
 
+    public static String fetchtrialMsg(BasicDBObject additionalMetaData) {
+        return additionalMetaData.getString("TRIAL_MSG", "");
+    }
+
     public static boolean fetchTelemetryEnabled(BasicDBObject additionalMetaData) {
         return additionalMetaData.getString("ENABLE_TELEMETRY", "NA").equalsIgnoreCase("ENABLED");
     }

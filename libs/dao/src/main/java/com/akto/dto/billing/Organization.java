@@ -39,6 +39,9 @@ public class Organization {
     public static final String PLAN_TYPE = "planType";
     public String planType = "planType";
 
+    public static final String TRIAL_MSG = "trialMsg";
+    public String trialMsg = "trialMsg";
+
     public static final String TEST_TELEMETRY_ENABLED = "testTelemetryEnabled";
     private boolean testTelemetryEnabled;
     private int gracePeriod;
@@ -140,6 +143,14 @@ public class Organization {
 
     public  void setplanType(String planType) {
         this.planType = planType;
+    }
+
+    public  String gettrialMsg() {
+        return trialMsg;
+    }
+
+    public  void settrialMsg(String trialMsg) {
+        this.trialMsg = trialMsg;
     }
 
     public int getLastFeatureMapUpdate() {
