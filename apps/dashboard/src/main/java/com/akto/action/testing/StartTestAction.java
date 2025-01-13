@@ -860,7 +860,7 @@ public class StartTestAction extends UserAction {
 
     public String fetchTestRunResultDetails() {
         ObjectId testingRunResultId = new ObjectId(testingRunResultHexId);
-        this.testingRunResult = VulnerableTestingRunResultDao.instance.findOne("_id", testingRunResultId);
+        this.testingRunResult = VulnerableTestingRunResultDao.instance.findOne(Filters.eq(Constants.ID, testingRunResultId), null);
         List<GenericTestResult> runResults = new ArrayList<>();
 
         for (GenericTestResult testResult: this.testingRunResult.getTestResults()) {
@@ -880,7 +880,7 @@ public class StartTestAction extends UserAction {
 
     public String fetchIssueFromTestRunResultDetails() {
         ObjectId testingRunResultId = new ObjectId(testingRunResultHexId);
-        TestingRunResult result = VulnerableTestingRunResultDao.instance.findOne(Constants.ID, testingRunResultId);
+        TestingRunResult result = VulnerableTestingRunResultDao.instance.findOne(Filters.eq(Constants.ID, testingRunResultId), null);
         try {
             if (result.isVulnerable()) {
                 // name = category
