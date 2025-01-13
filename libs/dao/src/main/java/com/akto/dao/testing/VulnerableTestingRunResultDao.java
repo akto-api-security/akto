@@ -80,22 +80,21 @@ public class VulnerableTestingRunResultDao extends TestingRunResultDao {
                 return count;
             }
         }
-        return (int) super.count(filter);
+        return (int) TestingRunResultDao.instance.count(filter);
     }
 
     public List<TestingRunResult> fetchLatestTestingRunResultWithCustomAggregations(Bson filters, int limit, int skip, Bson customSort, ObjectId summaryId, boolean isVulnerable) {
         if(isVulnerable && instance.isStoredInVulnerableCollection(summaryId, true)){
             return instance.fetchLatestTestingRunResultWithCustomAggregations(filters, limit, skip, customSort);
         }else{
-            return super.fetchLatestTestingRunResultWithCustomAggregations(filters, limit, skip, customSort);
+            return TestingRunResultDao.instance.fetchLatestTestingRunResultWithCustomAggregations(filters, limit, skip, customSort);
         }
     }
 
-    @Override
     public TestingRunResult findOne(Bson q, Bson projection) {
-        TestingRunResult tr = super.findOne(q, projection);
+        TestingRunResult tr = TestingRunResultDao.instance.findOne(q, projection);
         if(tr == null){
-            tr = instance.findOne(q, projection);
+            return super.findOne(q, projection);
         }
         return tr;
     }
@@ -104,7 +103,7 @@ public class VulnerableTestingRunResultDao extends TestingRunResultDao {
         if(isStoredInVulnerableCollection){
             return instance.findAll(q,projection);
         }
-        return super.findAll(q, projection);
+        return TestingRunResultDao.instance.findAll(q, projection);
     }
 
     @Override
