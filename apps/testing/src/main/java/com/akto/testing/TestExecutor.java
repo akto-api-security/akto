@@ -11,6 +11,7 @@ import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing.TestRolesDao;
 import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dao.testing.TestingRunResultSummariesDao;
+import com.akto.dao.testing.VulnerableTestingRunResultDao;
 import com.akto.dao.testing.WorkflowTestResultsDao;
 import com.akto.dao.testing.WorkflowTestsDao;
 import com.akto.dto.ApiInfo;
@@ -572,6 +573,19 @@ public class TestExecutor {
             trim(testingRunResults);
             TestingRunResultDao.instance.insertMany(testingRunResults);
             loggerMaker.infoAndAddToDb("Inserted testing results", LogDb.TESTING);
+
+            // insert vulnerable testing run results here
+            List<TestingRunResult> vulTestResults = new ArrayList<>();
+            for(TestingRunResult runResult: testingRunResults){
+                if(runResult != null && runResult.isVulnerable()){
+                    vulTestResults.add(runResult);
+                }
+            }
+
+            if(!vulTestResults.isEmpty()){
+                loggerMaker.infoAndAddToDb("Inserted vul testing results.", LogDb.TESTING);
+                VulnerableTestingRunResultDao.instance.insertMany(vulTestResults);
+            }
 
             TestingRunResultSummariesDao.instance.getMCollection().withWriteConcern(WriteConcern.W1).findOneAndUpdate(
                 Filters.eq(Constants.ID, testRunResultSummaryId),

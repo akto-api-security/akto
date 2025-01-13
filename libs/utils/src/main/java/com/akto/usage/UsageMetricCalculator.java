@@ -150,6 +150,9 @@ public class UsageMetricCalculator {
             add(Filters.gt(TestingRunResult.END_TIMESTAMP, measureEpoch));
             add(demoAndDeactivatedCollFilter);
         }};
+
+        // TODO: When we shift vulnerable test results into new collection completely {without making copy}, fix count here then.
+
         int testRuns = (int) TestingRunResultDao.instance.count(Filters.and(filters));
 
         /*

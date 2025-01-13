@@ -134,7 +134,7 @@ public class TestingRunResultDao extends AccountsContextDaoWithRbac<TestingRunRe
         pipeline.add(Aggregates.skip(skip));
         pipeline.add(Aggregates.limit(limit));
         pipeline.addAll(customAggregation);
-        MongoCursor<BasicDBObject> cursor = instance.getMCollection()
+        MongoCursor<BasicDBObject> cursor = this.getMCollection()
                 .aggregate(pipeline, BasicDBObject.class).cursor();
         List<TestingRunResult> testingRunResults = new ArrayList<>();
         while (cursor.hasNext()) {
