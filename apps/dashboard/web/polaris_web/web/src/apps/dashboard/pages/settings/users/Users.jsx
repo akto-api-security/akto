@@ -243,7 +243,7 @@ const Users = () => {
             primaryAction={{
                 content: 'Invite user',
                 onAction: () => toggleInviteUserModal(),
-                // 'disabled': (isLocalDeploy || userRole === 'GUEST')
+                'disabled': (isLocalDeploy || userRole === 'GUEST' || userRole === 'DEVELOPER')
             }}
             divider
         >
