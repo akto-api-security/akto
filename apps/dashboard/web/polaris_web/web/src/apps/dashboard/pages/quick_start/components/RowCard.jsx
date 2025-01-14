@@ -1,4 +1,4 @@
-import { Avatar, Button, Card, Text, VerticalStack, HorizontalStack, Badge, Box } from '@shopify/polaris';
+import { Avatar, Link, Button, Card, Text, VerticalStack, HorizontalStack, Badge, Box } from '@shopify/polaris';
 
 function RowCard(props) {
 
@@ -13,26 +13,24 @@ function RowCard(props) {
 
     return (
         <Card>
-            <VerticalStack gap="5">
-                <div style={{display: 'flex' , justifyContent: 'space-between'}}>
-                    <Box padding={"2"} borderWidth='1' borderColor='border-subdued' borderRadius='2'>
-                    <Avatar customer size="extraSmall" name={cardObj.label} source={cardObj.icon} shape='square'/>
-                    </Box>
-                    <Box paddingBlockStart="1">
-                        {cardObj.badge ? <Badge size='small' status='info'>{cardObj.badge}</Badge> : null}
-                    </Box>
-                </div>
+            <div style={{display: 'flex', gap: '12px'}}>
                 <VerticalStack gap="1">
-                    <Text variant="headingMd" as="h5">{cardObj.label}</Text>
+                    <div style={{display: 'flex' , justifyContent: 'space-between'}}>
+                        <Box padding={"2"} borderWidth='1' borderColor='border-subdued' borderRadius='2'>
+                        <Avatar customer size="extraSmall" name={cardObj.label} source={cardObj.icon} shape='square'/>
+                        </Box>
+                        <Box paddingBlockStart="1">
+                            {cardObj.badge ? <Badge size='small' status='info'>{cardObj.badge}</Badge> : null}
+                        </Box>
+                    </div>
+                </VerticalStack>
+                <VerticalStack gap="1">
+                    <Link monochrome removeUnderline textAlign="left" onClick={handleAction}><Text  variant="headingMd" as="h5">{cardObj.label}</Text></Link>
                     <Box minHeight="80px">
                         <Text variant="bodyMd" color='subdued'>{cardObj.text}</Text>
                     </Box>
                 </VerticalStack>
-                <HorizontalStack gap={"4"} align='start'>
-                    <Button onClick={handleAction}>{buttonText}</Button>
-                    <Button plain onClick={goToDocs} size='medium'>See Docs</Button>
-                </HorizontalStack>
-            </VerticalStack>
+            </div>
         </Card>
     )
 }
