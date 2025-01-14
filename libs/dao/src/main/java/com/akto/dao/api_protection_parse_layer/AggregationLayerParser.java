@@ -9,7 +9,7 @@ import com.akto.dto.api_protection_parse_layer.Rule;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 public class AggregationLayerParser {
-    
+
     ObjectMapper objectMapper = new ObjectMapper();
 
     public AggregationLayerParser() {
@@ -30,7 +30,6 @@ public class AggregationLayerParser {
         } catch (Exception e) {
             throw e;
         }
-        
         return aggRules;
     }
 

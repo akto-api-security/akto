@@ -4,6 +4,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import com.akto.dto.api_protection_parse_layer.AggregationRules;
 import com.akto.dto.test_editor.ConfigParserResult;
 import com.akto.dto.test_editor.ExecutorConfigParserResult;
 
@@ -22,6 +23,7 @@ public class FilterConfig {
     private String author;
     public static final String _CONTENT = "content";
     private String content;
+    private AggregationRules aggregationRules;
 
     public static final String DEFAULT_ALLOW_FILTER = "DEFAULT_ALLOW_FILTER";
     public static final String DEFAULT_BLOCK_FILTER = "DEFAULT_BLOCK_FILTER";
@@ -32,10 +34,11 @@ public class FilterConfig {
 
     private ExecutorConfigParserResult executor;
 
-    public FilterConfig(String id, ConfigParserResult filter, Map<String, List<String>> wordLists) {
+    public FilterConfig(String id, ConfigParserResult filter, Map<String, List<String>> wordLists, AggregationRules aggregationRules) {
         this.id = id;
         this.filter = filter;
         this.wordLists = wordLists;
+        this.aggregationRules = aggregationRules;
     }
 
     public FilterConfig() {
@@ -113,5 +116,13 @@ public class FilterConfig {
 
     public void setExecutor(ExecutorConfigParserResult executor) {
         this.executor = executor;
+    }
+
+    public AggregationRules getAggregationRules() {
+        return aggregationRules;
+    }
+
+    public void setAggregationRules(AggregationRules aggregationRules) {
+        this.aggregationRules = aggregationRules;
     }
 }

@@ -7,7 +7,7 @@ public class Rule {
 
     public Rule() {
     }
-    
+
     public Rule(String name, Condition condition) {
         this.name = name;
         this.condition = condition;
@@ -25,7 +25,4 @@ public class Rule {
     public void setCondition(Condition condition) {
         this.condition = condition;
     }
-
-    
-
 }
