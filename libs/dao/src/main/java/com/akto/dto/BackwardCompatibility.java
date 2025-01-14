@@ -103,6 +103,9 @@ public class BackwardCompatibility {
     public static final String MOVE_OKTA_OIDC_SSO = "moveOktaOidcSSO";
     private int moveOktaOidcSSO;
 
+    public static final String MARK_SUMMARIES_NEW_FOR_VULNERABLE = "markSummariesVulnerable";
+    private int markSummariesVulnerable;
+
     public BackwardCompatibility(int id, int dropFilterSampleData, int resetSingleTypeInfoCount, int dropWorkflowTestResult,
                                  int readyForNewTestingFramework,int addAktoDataTypes, boolean deploymentStatusUpdated,
                                  int authMechanismData, boolean mirroringLambdaTriggered, int deleteAccessListFromApiToken,
@@ -112,7 +115,7 @@ public class BackwardCompatibility {
                                  int loginSignupGroups, int vulnerableApiUpdationVersionV1, int riskScoreGroups,
                                  int deactivateCollections, int disableAwsSecretPii, int apiCollectionAutomatedField, 
                                  int automatedApiGroups, int addAdminRoleIfAbsent, int dropSpecialCharacterApiCollections, int fixApiAccessType,
-                                 int addDefaultFilters, int moveAzureSamlToNormalSaml, int deleteOptionsAPIs, int moveOktaOidcSSO) {
+                                 int addDefaultFilters, int moveAzureSamlToNormalSaml, int deleteOptionsAPIs, int moveOktaOidcSSO, int markSummariesVulnerable) {
         this.id = id;
         this.dropFilterSampleData = dropFilterSampleData;
         this.resetSingleTypeInfoCount = resetSingleTypeInfoCount;
@@ -145,6 +148,7 @@ public class BackwardCompatibility {
         this.moveAzureSamlToNormalSaml = moveAzureSamlToNormalSaml;
         this.deleteOptionsAPIs = deleteOptionsAPIs;
         this.moveOktaOidcSSO = moveOktaOidcSSO;
+        this.markSummariesVulnerable = markSummariesVulnerable;
     }
 
     public BackwardCompatibility() {
@@ -436,5 +440,13 @@ public class BackwardCompatibility {
 
     public void setMoveOktaOidcSSO(int moveOktaOidcSSO) {
         this.moveOktaOidcSSO = moveOktaOidcSSO;
+    }
+
+    public int getMarkSummariesVulnerable() {
+        return markSummariesVulnerable;
+    }
+
+    public void setMarkSummariesVulnerable(int markSummariesVulnerable) {
+        this.markSummariesVulnerable = markSummariesVulnerable;
     }
 }

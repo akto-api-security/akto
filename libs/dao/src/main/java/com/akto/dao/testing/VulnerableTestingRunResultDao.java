@@ -1,5 +1,6 @@
 package com.akto.dao.testing;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import org.bson.conversions.Bson;
@@ -11,6 +12,10 @@ import com.akto.dto.testing.GenericTestResult;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.TestingRunResultSummary;
 import com.akto.util.Constants;
+import com.mongodb.BasicDBObject;
+import com.mongodb.client.MongoCursor;
+import com.mongodb.client.model.Accumulators;
+import com.mongodb.client.model.Aggregates;
 import com.mongodb.client.model.CreateCollectionOptions;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
@@ -51,15 +56,7 @@ public class VulnerableTestingRunResultDao extends TestingRunResultDao {
                     Filters.eq(TestingRunResultSummary.IS_NEW_TESTING_RUN_RESULT_SUMMARY, true)
                 );
                 boolean isNew = TestingRunResultSummariesDao.instance.count(filter) > 0;
-                if(!isNew){
-                    TestingRunResultSummary trrs = TestingRunResultSummariesDao.instance.findOne(
-                        Filters.eq(Constants.ID, objectId),
-                        Projections.include(TestingRunResultSummary.TESTING_RUN_ID)
-                    );
-                    return TestingRunDao.instance.isStoredInVulnerableCollection(trrs.getTestingRunId());
-                }else{
-                    return isNew;
-                }
+                return isNew;
             } catch (Exception e) {
                 e.printStackTrace();
                 return false;
@@ -98,6 +95,27 @@ public class VulnerableTestingRunResultDao extends TestingRunResultDao {
             return instance.findAll(q,projection);
         }
         return TestingRunResultDao.instance.findAll(q, projection);
+    }
+
+    public List<ObjectId> summaryIdsStoredForVulnerableTests(){
+        String groupedId = "summaries";
+        List<Bson> pipeLine = new ArrayList<>();
+        pipeLine.add(
+            Aggregates.group(groupedId, Accumulators.addToSet("summaryIds", "$" + TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID))
+        );
+        try {
+            MongoCursor<BasicDBObject> cursor = instance.getMCollection().aggregate(pipeLine, BasicDBObject.class).cursor();
+            List<ObjectId> uniqueSummaries = new ArrayList<>();
+            while (cursor.hasNext()) {
+                BasicDBObject dbObject = cursor.next();
+                uniqueSummaries = (List<ObjectId>) dbObject.get("summaryIds");
+            }
+            return uniqueSummaries;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return new ArrayList<>();
+        }
+        
     }
 
     @Override
