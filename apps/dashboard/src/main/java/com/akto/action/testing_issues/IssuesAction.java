@@ -602,9 +602,14 @@ public class IssuesAction extends UserAction {
                     countIssuesMap.put(Severity.LOW.toString(), 0);
 
                     // update summaries accordingly with issues ignored
-
-                    // TODO: fix this smartly
-                    Map<ObjectId,String> mapSummaryToResultId = TestingRunResultDao.instance.mapSummaryIdToTestingResultHexId(testingRunResultHexIdsMap.keySet());
+                    // currently we change the summaries from result page only
+                    // so only 1 result comes at a time
+                    // Map<String,String> testingRunResultHexIdsMap has only 1 result.
+                    
+                    Map<ObjectId,String> mapSummaryToResultId = VulnerableTestingRunResultDao.instance.mapSummaryIdToTestingResultHexId(testingRunResultHexIdsMap.keySet());
+                    if(mapSummaryToResultId.isEmpty()){
+                        mapSummaryToResultId = TestingRunResultDao.instance.mapSummaryIdToTestingResultHexId(testingRunResultHexIdsMap.keySet());
+                    }
                     Map<ObjectId,Map<String,Integer>> summaryWiseCountMap = new HashMap<>();
 
                     for(ObjectId summaryId: mapSummaryToResultId.keySet()){
