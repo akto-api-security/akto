@@ -186,10 +186,10 @@ public class MaliciousTrafficDetectorTask implements Task {
         // we still push malicious requests to kafka
 
         // todo: modify fetch yaml and read aggregate rules from it
-        List<Rule> rules = new ArrayList<>();
-        rules.add(new Rule("Lfi Rule 1", new Condition(10, 10)));
-        AggregationRules aggRules = new AggregationRules();
-        aggRules.setRule(rules);
+        // List<Rule> rules = new ArrayList<>();
+        // rules.add(new Rule("Lfi Rule 1", new Condition(10, 10)));
+        AggregationRules aggRules = apiFilter.getAggregationRules();
+        //aggRules.setRule(rules);
 
         boolean isAggFilter = aggRules != null && !aggRules.getRule().isEmpty();
 

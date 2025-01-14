@@ -4,7 +4,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import com.akto.dao.api_protection_parse_layer.AggregationLayerParser;
 import com.akto.dao.test_editor.filter.ConfigParser;
+import com.akto.dto.api_protection_parse_layer.AggregationRules;
 import com.akto.dto.monitoring.FilterConfig;
 import com.akto.dto.test_editor.ConfigParserResult;
 import com.akto.dto.test_editor.ExecutorConfigParserResult;
@@ -36,7 +38,7 @@ public class FilterConfigYamlParser {
         Object filterMap = config.get(FilterConfig.FILTER);
         if (filterMap == null) {
             isFilterError = true;
-            filterConfig = new FilterConfig(id, null, null);
+            filterConfig = new FilterConfig(id, null, null, null);
         }
 
         ConfigParser configParser = new ConfigParser();
@@ -44,7 +46,7 @@ public class FilterConfigYamlParser {
         if (filters == null) {
             // todo: throw error
             isFilterError = true;
-            filterConfig = new FilterConfig(id, null, null);
+            filterConfig = new FilterConfig(id, null, null, null);
         }
 
         Map<String, List<String>> wordListMap = new HashMap<>();
@@ -54,10 +56,10 @@ public class FilterConfigYamlParser {
             }
         } catch (Exception e) {
             isFilterError = true;
-            filterConfig = new FilterConfig(id, filters, null);
+            filterConfig = new FilterConfig(id, filters, null, null);
         }
         if(!isFilterError){
-            filterConfig =  new FilterConfig(id, filters, wordListMap);
+            filterConfig =  new FilterConfig(id, filters, wordListMap, null);
         }
 
         if(shouldParseExecutor){
@@ -68,6 +70,18 @@ public class FilterConfigYamlParser {
             }
             ExecutorConfigParserResult executorConfigParserResult = executorConfigParser.parseConfigMap(executionMap);
             filterConfig.setExecutor(executorConfigParserResult);
+        }
+
+        AggregationLayerParser parser = new AggregationLayerParser();
+        AggregationRules aggRules = null;
+        try {
+            aggRules = parser.parse(config);
+        } catch (Exception e) {
+            // TODO: handle exception
+        }
+
+        if (filterConfig != null) {
+            filterConfig.setAggregationRules(aggRules);
         }
 
         return filterConfig;
