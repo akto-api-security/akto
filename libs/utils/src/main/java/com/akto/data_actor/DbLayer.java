@@ -38,6 +38,7 @@ import com.akto.dao.testing.TestingRunConfigDao;
 import com.akto.dao.testing.TestingRunDao;
 import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dao.testing.TestingRunResultSummariesDao;
+import com.akto.dao.testing.VulnerableTestingRunResultDao;
 import com.akto.dao.testing.WorkflowTestResultsDao;
 import com.akto.dao.testing.WorkflowTestsDao;
 import com.akto.dao.testing.config.TestCollectionPropertiesDao;
@@ -451,6 +452,9 @@ public class DbLayer {
 
     public static TestingRunResultSummary createTRRSummaryIfAbsent(String testingRunHexId, int start) {
         ObjectId testingRunId = new ObjectId(testingRunHexId);
+        
+        // since the extra field is not used in mini-testing explicitly, we can just update the summary here
+        // it is only used in dashboard for querying data from new collection
 
         return TestingRunResultSummariesDao.instance.getMCollection().findOneAndUpdate(
                 Filters.and(
@@ -459,7 +463,8 @@ public class DbLayer {
                 ),
                 Updates.combine(
                         Updates.set(TestingRunResultSummary.STATE, TestingRun.State.RUNNING),
-                        Updates.setOnInsert(TestingRunResultSummary.START_TIMESTAMP, start)
+                        Updates.setOnInsert(TestingRunResultSummary.START_TIMESTAMP, start),
+                        Updates.set(TestingRunResultSummary.IS_NEW_TESTING_RUN_RESULT_SUMMARY, true)
                 ),
                 new FindOneAndUpdateOptions().upsert(true).returnDocument(ReturnDocument.AFTER)
         );
@@ -542,9 +547,30 @@ public class DbLayer {
         return TestingRunResultSummariesDao.instance.fetchLatestTestingRunResultSummaries(Collections.singletonList(testingRunObjId));
     }
 
+    private static List<TestingRunResult> fetchLatestTestingRunResultFromComparison(Bson filter){
+        List<TestingRunResult> resultsFromNonVulCollection = TestingRunResultDao.instance.fetchLatestTestingRunResult(filter, 1);
+        List<TestingRunResult> resultsFromVulCollection = VulnerableTestingRunResultDao.instance.fetchLatestTestingRunResult(filter, 1);
+
+        if(resultsFromVulCollection != null && !resultsFromVulCollection.isEmpty()){
+            if(resultsFromNonVulCollection != null && !resultsFromNonVulCollection.isEmpty()){
+                TestingRunResult tr1 = resultsFromVulCollection.get(0);
+                TestingRunResult tr2 = resultsFromNonVulCollection.get(0);
+                if(tr1.getEndTimestamp() >= tr2.getEndTimestamp()){
+                    return resultsFromVulCollection;
+                }else{
+                    return resultsFromVulCollection;
+                }
+            }else{
+                return resultsFromVulCollection;
+            }
+        }
+
+        return resultsFromNonVulCollection;
+    }
+
     public static List<TestingRunResult> fetchLatestTestingRunResult(String testingRunResultSummaryId) {
         ObjectId summaryObjectId = new ObjectId(testingRunResultSummaryId);
-        return TestingRunResultDao.instance.fetchLatestTestingRunResult(Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, summaryObjectId), 1);
+        return fetchLatestTestingRunResultFromComparison(Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, summaryObjectId));
     }
 
     public static TestingRunResultSummary fetchTestingRunResultSummary(String testingRunResultSummaryId) {
@@ -564,6 +590,7 @@ public class DbLayer {
     }
 
     public static void insertTestingRunResultSummary(TestingRunResultSummary trrs) {
+        trrs.setNewTestingSummary(true);
         TestingRunResultSummariesDao.instance.insertOne(trrs);
     }
 
@@ -660,6 +687,10 @@ public class DbLayer {
 
     public static void insertTestingRunResults(TestingRunResult testingRunResult) {
         TestingRunResultDao.instance.insertOne(testingRunResult);
+        // from now store vulnerable results in separate collection also
+        if(testingRunResult.isVulnerable()){
+            VulnerableTestingRunResultDao.instance.insertOne(testingRunResult);
+        }
     }
 
     public static void updateTotalApiCountInTestSummary(String summaryId, int totalApiCount) {
@@ -736,7 +767,16 @@ public class DbLayer {
 
     public static List<TestingRunResult> fetchLatestTestingRunResultBySummaryId(String summaryId, int limit, int skip) {
         ObjectId summaryObjectId = new ObjectId(summaryId);
-        return TestingRunResultDao.instance
+        if(VulnerableTestingRunResultDao.instance.isStoredInVulnerableCollection(summaryObjectId)){
+            return VulnerableTestingRunResultDao.instance
+                    .fetchLatestTestingRunResult(
+                        Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, summaryObjectId),
+                        limit,
+                        skip,
+                        Projections.exclude("testResults.originalMessage", "testResults.nodeResultMap")
+                    );
+        }else{
+            return TestingRunResultDao.instance
                     .fetchLatestTestingRunResult(
                             Filters.and(
                                     Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, summaryObjectId),
@@ -744,6 +784,8 @@ public class DbLayer {
                             limit,
                             skip,
                             Projections.exclude("testResults.originalMessage", "testResults.nodeResultMap"));
+        }
+        
     }
 
     public static List<TestRoles> fetchTestRoles() {
