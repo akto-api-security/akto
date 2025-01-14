@@ -10,6 +10,7 @@ import com.akto.dao.testing.TestingRunConfigDao;
 import com.akto.dao.testing.TestingRunDao;
 import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dao.testing.TestingRunResultSummariesDao;
+import com.akto.dao.testing.VulnerableTestingRunResultDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.billing.SyncLimit;
@@ -59,10 +60,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.*;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
@@ -102,7 +101,8 @@ public class Main {
                         Updates.set(TestingRunResultSummary.STATE, TestingRun.State.RUNNING),
                         Updates.setOnInsert(TestingRunResultSummary.START_TIMESTAMP, start),
                         Updates.set(TestingRunResultSummary.TEST_RESULTS_COUNT, 0),
-                        Updates.set(TestingRunResultSummary.COUNT_ISSUES, emptyCountIssuesMap)
+                        Updates.set(TestingRunResultSummary.COUNT_ISSUES, emptyCountIssuesMap),
+                        Updates.set(TestingRunResultSummary.IS_NEW_TESTING_RUN_RESULT_SUMMARY, true)
                 ),
                 new FindOneAndUpdateOptions().upsert(true).returnDocument(ReturnDocument.AFTER)
         );
@@ -439,7 +439,7 @@ public class Main {
                                 Filters.eq(TestingRunResultSummary.TESTING_RUN_ID, testingRun.getId()),
                                 Filters.eq(TestingRunResultSummary.STATE, State.FAILED)
                             );
-                            List<TestingRunResult> testingRunResults = TestingRunResultDao.instance.fetchLatestTestingRunResult(Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, testingRunResultSummary.getId()), 1);
+                            List<TestingRunResult> testingRunResults = Utils.fetchLatestTestingRunResult(Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, testingRunResultSummary.getId()));
                             if (testingRunResults != null && !testingRunResults.isEmpty()) {
                                 TestingRunResult testingRunResult = testingRunResults.get(0);
                                 if (Context.now() - testingRunResult.getEndTimestamp() < LAST_TEST_RUN_EXECUTION_DELTA) {
@@ -518,6 +518,7 @@ public class Main {
                                     trrs.setState(State.RUNNING);
                                     trrs.setTestResultsCount(0);
                                     trrs.setCountIssues(emptyCountIssuesMap);
+                                    trrs.setNewTestingSummary(true);
                                     TestingRunResultSummariesDao.instance.insertOne(trrs);
                                     summaryId = trrs.getId();
                                 } else {
@@ -747,10 +748,11 @@ public class Main {
                 if(newIssuesModelList.size() <= 5) {
                     Bson filterForRunResult = Filters.and(
                             Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, testingRunIssues.getLatestTestingRunSummaryId()),
+                            Filters.eq(TestingRunResult.VULNERABLE, true),
                             Filters.eq(TestingRunResult.TEST_SUB_TYPE, testingRunIssues.getId().getTestSubCategory()),
                             Filters.eq(TestingRunResult.API_INFO_KEY, testingRunIssues.getId().getApiInfoKey())
                     );
-                    TestingRunResult testingRunResult = TestingRunResultDao.instance.findOne(filterForRunResult, Projections.include("_id"));
+                    TestingRunResult testingRunResult = VulnerableTestingRunResultDao.instance.findOneWithComparison(filterForRunResult, Projections.include("_id"));
                     testRunResultId = testingRunResult.getHexId();
                 } else testRunResultId = "";
 

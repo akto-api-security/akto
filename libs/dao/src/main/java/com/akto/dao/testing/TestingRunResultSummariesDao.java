@@ -140,7 +140,6 @@ public class TestingRunResultSummariesDao extends AccountsContextDao<TestingRunR
         fieldNames = new String[]{TestingRunResultSummary.END_TIMESTAMP};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames,false);
 
-
         IndexOptions sparseIndex = new IndexOptions().sparse(true);
 
         Bson branchIndex = Indexes.ascending("metadata.branch");

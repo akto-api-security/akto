@@ -2975,11 +2975,32 @@ public class InitializerListener implements ServletContextListener {
         }
     }
 
+    private static void markSummariesAsVulnerable(BackwardCompatibility backwardCompatibility){
+        // case for the customers where vulnerable are stored in new collection and only testing runs are marked as new.
+
+        if(backwardCompatibility.getMarkSummariesVulnerable() == 0){
+
+            List<ObjectId> summaryIds = VulnerableTestingRunResultDao.instance.summaryIdsStoredForVulnerableTests();
+            if(!summaryIds.isEmpty()){
+                TestingRunResultSummariesDao.instance.updateMany(
+                    Filters.in(Constants.ID, summaryIds), 
+                    Updates.set(TestingRunResultSummary.IS_NEW_TESTING_RUN_RESULT_SUMMARY, true)
+                );
+            }
+
+            BackwardCompatibilityDao.instance.updateOne(
+                Filters.eq("_id", backwardCompatibility.getId()),
+                Updates.set(BackwardCompatibility.MARK_SUMMARIES_NEW_FOR_VULNERABLE, Context.now())
+            );
+        }
+    }
+
     public static void setBackwardCompatibilities(BackwardCompatibility backwardCompatibility){
         if (DashboardMode.isMetered()) {
             initializeOrganizationAccountBelongsTo(backwardCompatibility);
             setOrganizationsInBilling(backwardCompatibility);
         }
+        markSummariesAsVulnerable(backwardCompatibility);
         setAktoDefaultNewUI(backwardCompatibility);
         dropLastCronRunInfoField(backwardCompatibility);
         fetchIntegratedConnections(backwardCompatibility);

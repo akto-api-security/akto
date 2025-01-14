@@ -8,6 +8,7 @@ import com.akto.dao.testing.TestRolesDao;
 import com.akto.dao.testing.TestingRunDao;
 import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dao.testing.TestingRunResultSummariesDao;
+import com.akto.dao.testing.VulnerableTestingRunResultDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dao.traffic_metrics.TrafficAlertsDao;
 import com.akto.dao.traffic_metrics.RuntimeMetricsDao;
@@ -409,6 +410,7 @@ public class DaoInit {
         TrafficAlertsDao.instance.createIndicesIfAbsent();
         RuntimeMetricsDao.instance.createIndicesIfAbsent();
         ApiAuditLogsDao.instance.createIndicesIfAbsent();
+        VulnerableTestingRunResultDao.instance.createIndicesIfAbsent();
     }
 
 }
