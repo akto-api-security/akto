@@ -454,10 +454,7 @@ public class IssuesAction extends UserAction {
                 Filters.eq(TestingRunResult.TEST_SUB_TYPE, testSubType),
                 Filters.eq(TestingRunResult.API_INFO_KEY, issue.getId().getApiInfoKey())
         );
-        testingRunResult = VulnerableTestingRunResultDao.instance.findOne(filterForRunResult, null);
-        if(testingRunResult == null){
-            testingRunResult = TestingRunResultDao.instance.findOne(filterForRunResult);
-        }
+        testingRunResult = VulnerableTestingRunResultDao.instance.findOneWithComparison(filterForRunResult, null);
         if (issue.isUnread() && (currentUserRole.equals(Role.ADMIN) || currentUserRole.equals(Role.MEMBER))) {
             logger.info("Issue id from db to be marked as read " + issueId);
             Bson update = Updates.combine(Updates.set(TestingRunIssues.UNREAD, false),

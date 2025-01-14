@@ -7,7 +7,6 @@ import org.bson.types.ObjectId;
 
 import com.akto.dao.MCollection;
 import com.akto.dao.context.Context;
-import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.testing.GenericTestResult;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.TestingRunResultSummary;
@@ -86,10 +85,10 @@ public class VulnerableTestingRunResultDao extends TestingRunResultDao {
         }
     }
 
-    public TestingRunResult findOne(Bson q, Bson projection) {
-        TestingRunResult tr = TestingRunResultDao.instance.findOne(q, projection);
+    public TestingRunResult findOneWithComparison(Bson q, Bson projection) {
+        TestingRunResult tr = super.findOne(q, projection);
         if(tr == null){
-            return super.findOne(q, projection);
+            return TestingRunResultDao.instance.findOne(q, projection);
         }
         return tr;
     }

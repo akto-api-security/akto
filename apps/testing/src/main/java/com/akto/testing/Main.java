@@ -752,7 +752,7 @@ public class Main {
                             Filters.eq(TestingRunResult.TEST_SUB_TYPE, testingRunIssues.getId().getTestSubCategory()),
                             Filters.eq(TestingRunResult.API_INFO_KEY, testingRunIssues.getId().getApiInfoKey())
                     );
-                    TestingRunResult testingRunResult = VulnerableTestingRunResultDao.instance.findOne(filterForRunResult, Projections.include("_id"));
+                    TestingRunResult testingRunResult = VulnerableTestingRunResultDao.instance.findOneWithComparison(filterForRunResult, Projections.include("_id"));
                     testRunResultId = testingRunResult.getHexId();
                 } else testRunResultId = "";
 
