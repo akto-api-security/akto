@@ -3248,7 +3248,7 @@ public class InitializerListener implements ServletContextListener {
                         if (testConfig != null) {
                             boolean hasSettings = testConfig.getAttributes() != null;
 
-                            if (hasSettings && !testConfig.getAttributes().getPlan().equals(TemplatePlan.FREE) && DashboardMode.isLocalDeployment()) {
+                            if (hasSettings && !testConfig.getAttributes().getPlan().equals(TemplatePlan.FREE) && !DashboardMode.isMetered()) {
                                 skipped++;
                                 continue;
                             }
