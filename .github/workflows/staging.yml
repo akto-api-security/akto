@@ -7,10 +7,6 @@ on:
   pull_request:
   workflow_dispatch:
 
-concurrency:
-  group: "staging${{ github.head_ref }}"
-  cancel-in-progress: true
-
 jobs:
   build:
     runs-on: ubuntu-22.04
