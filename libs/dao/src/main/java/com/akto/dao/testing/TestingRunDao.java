@@ -12,6 +12,7 @@ import com.akto.dao.context.Context;
 import com.akto.dto.testing.TestingRun;
 import com.mongodb.client.model.CreateCollectionOptions;
 import com.akto.dto.testing.TestingRunResultSummary;
+import com.akto.util.Constants;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.CreateCollectionOptions;
 import com.mongodb.client.model.Filters;
@@ -76,6 +77,18 @@ public class TestingRunDao extends AccountsContextDao<TestingRun> {
         }
 
         return testingSummaryIds;
+    }
+
+    public boolean isStoredInVulnerableCollection(ObjectId testingRunId){
+        if(testingRunId == null){
+            return false;
+        }
+        return instance.count(
+            Filters.and(
+                Filters.eq(Constants.ID, testingRunId),
+                Filters.eq(TestingRun.IS_NEW_TESTING_RUN, true)
+            )
+        ) > 0;
     }
 
     @Override
