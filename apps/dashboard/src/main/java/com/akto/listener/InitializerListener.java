@@ -3224,7 +3224,7 @@ public class InitializerListener implements ServletContextListener {
                                 loggerMaker.infoAndAddToDb("Trying to add test yaml: " + testConfigId + " existingTemplatesInDb size: " + existingTemplatesInDb.size(), LogDb.DASHBOARD);
 
                                 int existingTemplateHash = existingTemplatesInDb.get(0).getHash();
-                                loggerMaker.infoAndAddToDb("Hashes: " + testConfigId + " hashDB: " + existingTemplateHash + " template: " + existingTemplateHash, LogDb.DASHBOARD);
+                                loggerMaker.infoAndAddToDb("Hashes: " + testConfigId + " hashDB: " + existingTemplateHash + " template: " + templateContent.hashCode(), LogDb.DASHBOARD);
 
                                 if (existingTemplateHash == templateContent.hashCode()) {
                                     countUnchangedTemplates++;
