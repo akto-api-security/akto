@@ -124,6 +124,11 @@ public class ReportAction extends UserAction {
                 requestBody.put("reportId", reportId);
                 String reqData = requestBody.toString();
                 JsonNode node = ApiRequest.postRequest(new HashMap<>(), url, reqData);
+                if(node == null) {
+                    addActionError("The report is too large to save. Please reduce its size and try again.");
+                    status = "ERROR";
+                    return ERROR.toUpperCase();
+                }
                 status = (String) node.get("status").textValue();
                 loggerMaker.infoAndAddToDb("Pdf download status for report id - " + reportId + " - " + status, LogDb.DASHBOARD);
 
