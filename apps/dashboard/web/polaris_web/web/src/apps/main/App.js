@@ -80,6 +80,7 @@ import TeamsWebhook from "../dashboard/pages/settings/integrations/teamsWebhooks
 import AuditLogs from "../dashboard/pages/settings/audit_logs/AuditLogs";
 import ThreatApiPage from "../dashboard/pages/threat_detection/ThreatApiPage";
 import ThreatActorPage from "../dashboard/pages/threat_detection/ThreatActorPage";
+import InternalDashboard from "../dashboard/pages/internal/InternalDashboard";
 
 // if you add a component in a new path, please verify the search implementation in function -> 'getSearchItemsArr' in func.js
 
@@ -95,6 +96,10 @@ const router = createBrowserRouter([
           {
             path: "home",
             element: <HomeDashboard />,
+          },
+          {
+            path: "internal",
+            element: <InternalDashboard />
           },
           {
             path: "testing",
