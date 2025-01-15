@@ -200,6 +200,7 @@ function SingleTestRunPage() {
       let tmp = {...summary};
       if(tmp === null || tmp?.countIssues === null || tmp?.countIssues === undefined){
         tmp.countIssues = {
+          "CRITICAL": 0,
           "HIGH": 0,
           "MEDIUM": 0,
           "LOW": 0
@@ -695,12 +696,20 @@ const editableConfigsComp = (
           {
             selectedTestRun?.severity && 
             selectedTestRun.severity
-            .map((item) =>
-            <Badge key={item} status={func.getTestResultStatus(item)}>
-              <Text fontWeight="regular">
-                {item}
-              </Text>
-            </Badge>
+            .map((item) =>{
+              const sev = item.split(' ')
+              const tempSev = sev.length > 1 ? sev[1].toUpperCase() : ''
+              return(
+                <div className={`badge-wrapper-${tempSev}`}>
+                    <Badge key={item}>
+                      <Text fontWeight="regular">
+                        {item}
+                      </Text>
+                    </Badge>
+                </div>
+              )
+            }
+            
             )}
             <Button plain monochrome onClick={() => setUpdateTable(Date.now().toString())}><Tooltip content="Refresh page" dismissOnMouseOut> <Icon source={RefreshMajor} /></Tooltip></Button>
         </HorizontalStack>

@@ -218,7 +218,7 @@ const dashboardFunc = {
         }
     },
     sortAndFilterAlerts(alerts) {
-        const severityOrder = { 'HIGH': 3, 'MEDIUM': 2, 'LOW': 1 };
+        const severityOrder = { 'CRITICAL': 4, 'HIGH': 3, 'MEDIUM': 2, 'LOW': 1 };
         const dismissLimit =  60 * 60;
         const currentTime = func.timeNow()
     
