@@ -1,7 +1,7 @@
 
 const keywords = [
     "id", "info", 
-    "name", "description", "details", "impact", "category", "shortName", "displayName", "subCategory", "severity", "tags", "references",
+    "name", "description", "details", "impact", "remediation", "attributes", "category", "shortName", "displayName", "subCategory", "severity", "tags", "references",
     "response_code", "method", "url", "request_payload", "response_payload", "request_headers", "response_headers", "query_param", "api_collection_id",
     "regex", "eq", "neq", "gt", "gte", "lt", "lte", 
     "key", "value", "requests", "req", "res",

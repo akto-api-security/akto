@@ -134,7 +134,7 @@ public class TestingRunResultDao extends AccountsContextDaoWithRbac<TestingRunRe
         pipeline.add(Aggregates.skip(skip));
         pipeline.add(Aggregates.limit(limit));
         pipeline.addAll(customAggregation);
-        MongoCursor<BasicDBObject> cursor = instance.getMCollection()
+        MongoCursor<BasicDBObject> cursor = this.getMCollection()
                 .aggregate(pipeline, BasicDBObject.class).cursor();
         List<TestingRunResult> testingRunResults = new ArrayList<>();
         while (cursor.hasNext()) {
@@ -198,10 +198,7 @@ public class TestingRunResultDao extends AccountsContextDaoWithRbac<TestingRunRe
                                                 .map(ObjectId::new)
                                                 .collect(Collectors.toList());
 
-        // doing only for 1000 results at a time
-        objectIdList = objectIdList.subList(0, 1000);
-
-        List<TestingRunResult> runResults = instance.findAll(Filters.in(Constants.ID, objectIdList), Projections.include(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID));
+        List<TestingRunResult> runResults = this.findAll(Filters.in(Constants.ID, objectIdList), Projections.include(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID));
         for(TestingRunResult runResult: runResults){
             finalMap.put(runResult.getTestRunResultSummaryId(), runResult.getHexId());
         }

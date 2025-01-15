@@ -14,6 +14,7 @@ import java.util.regex.Pattern;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 import com.akto.dao.testing.TestingRunResultDao;
+import com.akto.dao.testing.VulnerableTestingRunResultDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.CollectionConditions.ConditionsType;
@@ -38,6 +39,7 @@ import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.Severity;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
+import com.mongodb.ConnectionString;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Accumulators;
 import com.mongodb.client.model.Aggregates;
@@ -441,7 +443,16 @@ public class Utils {
                             Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, testingRunResultSummaryId),
                             Filters.eq(TestingRunResult.VULNERABLE, true)
                         );
-        List<TestingRunResult> allVulResults = TestingRunResultDao.instance.findAll(filterQ, projection);
+        boolean isNewTestingSummary = VulnerableTestingRunResultDao.instance.isStoredInVulnerableCollection(testingRunResultSummaryId, true);
+        List<TestingRunResult> allVulResults = new ArrayList<>();
+        if(!isNewTestingSummary){
+            allVulResults = TestingRunResultDao.instance.findAll(filterQ, projection);
+        }else{
+            allVulResults = VulnerableTestingRunResultDao.instance.findAll(
+                Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, testingRunResultSummaryId)
+            );
+        }
+        
 
         Map<TestingIssuesId, TestingRunResult> testingIssuesIdsMap = TestingUtils.
                 listOfIssuesIdsFromTestingRunResults(allVulResults, true, false);
@@ -464,6 +475,27 @@ public class Utils {
         }
 
         return countIssuesMap;
+    }
+
+    public static List<TestingRunResult> fetchLatestTestingRunResult(Bson filter){
+        List<TestingRunResult> resultsFromNonVulCollection = TestingRunResultDao.instance.fetchLatestTestingRunResult(filter, 1);
+        List<TestingRunResult> resultsFromVulCollection = VulnerableTestingRunResultDao.instance.fetchLatestTestingRunResult(filter, 1);
+
+        if(resultsFromVulCollection != null && !resultsFromVulCollection.isEmpty()){
+            if(resultsFromNonVulCollection != null && !resultsFromNonVulCollection.isEmpty()){
+                TestingRunResult tr1 = resultsFromVulCollection.get(0);
+                TestingRunResult tr2 = resultsFromNonVulCollection.get(0);
+                if(tr1.getEndTimestamp() >= tr2.getEndTimestamp()){
+                    return resultsFromVulCollection;
+                }else{
+                    return resultsFromVulCollection;
+                }
+            }else{
+                return resultsFromVulCollection;
+            }
+        }
+
+        return resultsFromNonVulCollection;
     }
     
 }
