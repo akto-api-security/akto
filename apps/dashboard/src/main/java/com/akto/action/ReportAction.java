@@ -1,8 +1,7 @@
 package com.akto.action;
 
 import java.net.URL;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -13,10 +12,13 @@ import javax.servlet.http.HttpSession;
 
 import com.akto.dao.testing.sources.TestReportsDao;
 import com.akto.dto.testing.sources.TestReports;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mongodb.MongoCommandException;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.struts2.ServletActionContext;
+import org.bson.BsonMaximumSizeExceededException;
 import org.bson.types.ObjectId;
 import org.json.JSONObject;
 
@@ -36,7 +38,7 @@ public class ReportAction extends UserAction {
     private String organizationName;
     private String reportDate;
     private String reportUrl;
-    private String pdf;
+    private List<String> pdf;
     private String status;
     private boolean firstPollRequest;
 
@@ -70,9 +72,13 @@ public class ReportAction extends UserAction {
 
         if(firstPollRequest) {
             TestReports testReport = TestReportsDao.instance.findOne(Filters.eq("_id", reportUrlIdObj));
-            if(testReport != null && (testReport.getPdfReportString() != null && !testReport.getPdfReportString().isEmpty())) {
+            if(testReport != null && !StringUtils.isEmpty(testReport.getPdfReportString())) {
                 status = "COMPLETED";
-                pdf = testReport.getPdfReportString();
+                pdf = Arrays.asList(testReport.getPdfReportString());
+                return SUCCESS.toUpperCase();
+            } else if(testReport != null && (testReport.getPdfReportStringChunks() != null && !testReport.getPdfReportStringChunks().isEmpty())) {
+                status = "COMPLETED";
+                pdf = testReport.getPdfReportStringChunks();
                 return SUCCESS.toUpperCase();
             }
         }
@@ -134,27 +140,40 @@ public class ReportAction extends UserAction {
 
                 if (status.equals("COMPLETED")) {
                     loggerMaker.infoAndAddToDb("Pdf download status for report id - " + reportId + " completed. Attaching pdf in response ", LogDb.DASHBOARD);
-                    pdf = node.get("base64PDF").textValue();
+                    ObjectMapper objectMapper = new ObjectMapper();
+                    JsonNode base64PDF = node.get("base64PDF");
+                    if(base64PDF == null) {
+                        status = "ERROR";
+                        return ERROR.toUpperCase();
+                    }
+                    pdf = objectMapper.convertValue(base64PDF, List.class);
+
                     try {
-                        TestReportsDao.instance.updateOne(Filters.eq("_id", reportUrlIdObj), Updates.set(TestReports.PDF_REPORT_STRING, pdf));
+                        TestReportsDao.instance.updateOne(Filters.eq("_id", reportUrlIdObj), Updates.set(TestReports.PDF_REPORT_STRING_CHUNKS, pdf));
                     } catch(Exception e) {
                         loggerMaker.errorAndAddToDb("Error: " + e.getMessage() + ", while updating report binary for reportId: " + reportId, LogDb.DASHBOARD);
                         if (e instanceof MongoCommandException) {
                             MongoCommandException mongoException = (MongoCommandException) e;
                             if (mongoException.getCode() == 17420) {
-                                addActionError("The report is too large to save. Please reduce its size and try again.");
+                                status = "COMPLETED";
+                                return SUCCESS.toUpperCase();
                             } else {
                                 addActionError("A database error occurred while saving the report. Try again later.");
                             }
+                        } else if(e instanceof BsonMaximumSizeExceededException) {
+                            status = "COMPLETED";
+                            return SUCCESS.toUpperCase();
                         } else {
                             addActionError("An error occurred while updating the report in DB. Please try again.");
                         }
                         status = "ERROR";
+                        return ERROR.toUpperCase();
                     }
                 }
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb(e, "Error while polling pdf download for report id - " + reportId, LogDb.DASHBOARD);
                 status = "ERROR";
+                return ERROR.toUpperCase();
             }
         }
 
@@ -193,11 +212,11 @@ public class ReportAction extends UserAction {
         this.reportUrl = reportUrl;
     }
 
-    public String getPdf() {
+    public List<String> getPdf() {
         return pdf;
     }
 
-    public void setPdf(String pdf) {
+    public void setPdf(List<String> pdf) {
         this.pdf = pdf;
     }
 

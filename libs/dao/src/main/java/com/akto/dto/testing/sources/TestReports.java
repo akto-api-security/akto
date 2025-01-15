@@ -16,15 +16,19 @@ public class TestReports {
     public static final String PDF_REPORT_STRING = "pdfReportString";
     private String pdfReportString;
 
+    public static final String PDF_REPORT_STRING_CHUNKS = "pdfReportStringChunks";
+    private List<String> pdfReportStringChunks;
+
     public static final String ISSUE_IDS_FOR_REPORT = "issuesIdsForReport";
     private List<TestingIssuesId> issuesIdsForReport;
 
     public TestReports () {}
 
-    public TestReports (Map<String, List<String>> filtersForReport, int timestamp, String pdfReportString, List<TestingIssuesId> issuesIdsForReport){
+    public TestReports (Map<String, List<String>> filtersForReport, int timestamp, String pdfReportString, List<String> pdfReportStringChunks, List<TestingIssuesId> issuesIdsForReport){
         this.filtersForReport = filtersForReport;
         this.timestamp = timestamp;
         this.pdfReportString = pdfReportString;
+        this.pdfReportStringChunks = pdfReportStringChunks;
         this.issuesIdsForReport = issuesIdsForReport;
     }
 
@@ -59,5 +63,13 @@ public class TestReports {
 
     public void setIssuesIdsForReport(List<TestingIssuesId> issuesIdsForReport) {
         this.issuesIdsForReport = issuesIdsForReport;
+    }
+
+    public List<String> getPdfReportStringChunks() {
+        return pdfReportStringChunks;
+    }
+
+    public void setPdfReportStringChunks(List<String> pdfReportStringChunks) {
+        this.pdfReportStringChunks = pdfReportStringChunks;
     }
 }

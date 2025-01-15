@@ -739,7 +739,7 @@ public class IssuesAction extends UserAction {
 
     public String generateTestReport () {
         try {
-            TestReports testReport = new TestReports(reportFilterList, Context.now(), "", this.issuesIdsForReport);
+            TestReports testReport = new TestReports(reportFilterList, Context.now(), "", new ArrayList<>(), this.issuesIdsForReport);
             InsertOneResult insertTResult = TestReportsDao.instance.insertOne(testReport);
             this.generatedReportId = insertTResult.getInsertedId().toString();
             return SUCCESS.toUpperCase();
