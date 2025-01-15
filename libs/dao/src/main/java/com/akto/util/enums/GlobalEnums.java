@@ -1,5 +1,7 @@
 package com.akto.util.enums;
 
+import java.util.Arrays;
+
 public class GlobalEnums {
     /* * * * * * * *  Enums for Testing run issues * * * * * * * * * * * *  */
 
@@ -95,7 +97,13 @@ public class GlobalEnums {
         HIGH,
         MEDIUM,
         LOW,
-        INFO
+        INFO;
+
+        public static String[] getNames() {
+            return Arrays.stream(Severity.values())
+                    .map(Enum::name)
+                    .toArray(String[]::new);
+        }
     }
 
     public enum TestRunIssueStatus {

@@ -701,11 +701,7 @@ const editableConfigsComp = (
               const tempSev = sev.length > 1 ? sev[1].toUpperCase() : ''
               return(
                 <div className={`badge-wrapper-${tempSev}`}>
-                    <Badge key={item}>
-                      <Text fontWeight="regular">
-                        {item}
-                      </Text>
-                    </Badge>
+                    <Badge key={item}>{item}</Badge>
                 </div>
               )
             }

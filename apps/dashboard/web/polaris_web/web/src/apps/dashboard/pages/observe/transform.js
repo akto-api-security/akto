@@ -403,7 +403,9 @@ const transform = {
                 {
                     Object.keys(severityInfo).length > 0 ? Object.keys(severityInfo).map((key,index)=>{
                         return(
-                            <Badge size="small" status={this.getColor(key)} key={index}>{severityInfo[key].toString()}</Badge>
+                            <div className={`badge-wrapper-${key}`}>
+                                <Badge size="small" key={index}>{severityInfo[key].toString()}</Badge>
+                            </div>
                         )
                     }):
                     <Text fontWeight="regular" variant="bodyMd" color="subdued">-</Text>
