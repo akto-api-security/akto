@@ -71,6 +71,7 @@ function TestRunResultPage(props) {
   const [infoState, setInfoState] = useState([])
   const [loading, setLoading] = useState(true);
   const [showDetails, setShowDetails] = useState(true)
+  const [remediation, setRemediation] = useState("")
   const hostNameMap = PersistStore(state => state.hostNameMap)
 
   const useFlyout = location.pathname.includes("test-editor") ? false : true
@@ -209,6 +210,7 @@ function TestRunResultPage(props) {
       const moreInfoSections = transform.getInfoSectionsHeaders()
       setJiraIssueUrl(jiraIssueCopy)
       setInfoState(transform.fillMoreInformation(subCategoryMap[runIssues?.id?.testSubCategory],moreInfoSections, runIssuesArr, jiraIssueCopy, onClickButton))
+      setRemediation(subCategoryMap[runIssues?.id?.testSubCategory]?.remediation)
       // setJiraIssueUrl(jiraIssueUrl)
       // setInfoState(transform.fillMoreInformation(subCategoryMap[runIssues?.id?.testSubCategory],moreInfoSections, runIssuesArr))
     } else {
@@ -224,7 +226,8 @@ function TestRunResultPage(props) {
     useFlyout ?
     <>
     <TestRunResultFlyout
-      selectedTestRunResult={selectedTestRunResult} 
+      selectedTestRunResult={selectedTestRunResult}
+      remediationSrc={remediation}
       testingRunResult={testingRunResult} 
       loading={loading} 
       issueDetails={issueDetails} 

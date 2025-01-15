@@ -3168,6 +3168,13 @@ public class InitializerListener implements ServletContextListener {
                     return;
                 }
 
+                try {
+                    processRemedationFilesZip(testingTemplates);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    loggerMaker.infoAndAddToDb("Unable to import remediations", LogDb.DASHBOARD);
+                }
+
                 Map<String, byte[]> allYamlTemplates = TestTemplateUtils.getZipFromMultipleRepoAndBranch(getAktoDefaultTestLibs());
                 AccountTask.instance.executeTask((account) -> {
                     try {
@@ -3198,6 +3205,88 @@ public class InitializerListener implements ServletContextListener {
                 }, "update-test-editor-templates-github");
             }
         }, 0, 4, TimeUnit.HOURS);
+    }
+
+    public static void processRemedationFilesZip(byte[] zipFile) {
+        if (zipFile != null) {
+            try (ByteArrayInputStream inputStream = new ByteArrayInputStream(zipFile);
+                    ZipInputStream zipInputStream = new ZipInputStream(inputStream)) {
+
+                ZipEntry entry;
+                List<Remediation> remediations = RemediationsDao.instance.findAll(Filters.empty(), Projections.include(Remediation.TEST_ID, Remediation.HASH));
+                Map<String, List<Remediation>> mapRemediationIdToHash = remediations.stream().collect(Collectors.groupingBy(Remediation::getid));
+
+                int countUnchangedRemediations = 0;
+                int countTotalRemediations = 0;
+
+                while ((entry = zipInputStream.getNextEntry()) != null) {
+                    if (!entry.isDirectory()) {
+                        String entryName = entry.getName();
+
+                        boolean isRemediation = entryName.contains("remediation");
+                        if (!isRemediation) {
+                            loggerMaker.infoAndAddToDb(
+                                    String.format("%s not a remediation file, skipping", entryName),
+                                    LogDb.DASHBOARD);
+                            continue;
+                        }
+
+                        if (!entryName.endsWith(".md")) {
+                            loggerMaker.infoAndAddToDb(
+                                    String.format("%s not a md file, skipping", entryName),
+                                    LogDb.DASHBOARD);
+                            continue;
+                        }
+
+                        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+                        byte[] buffer = new byte[1024];
+                        int bytesRead;
+                        while ((bytesRead = zipInputStream.read(buffer)) != -1) {
+                            outputStream.write(buffer, 0, bytesRead);
+                        }
+
+                        String templateContent = new String(outputStream.toByteArray(), "UTF-8");
+
+                        List<Remediation> remediationsInDb = mapRemediationIdToHash.get(entryName);
+                        int remediationHashFromFile = templateContent.hashCode();
+
+                        countTotalRemediations++;
+                        if (remediationsInDb != null && remediationsInDb.size() >= 1) {
+                            int remediationHashInDb = remediationsInDb.get(0).getHash();
+
+                            if (remediationHashFromFile == remediationHashInDb) {
+                                countUnchangedRemediations++;
+                            } else {
+                                loggerMaker.infoAndAddToDb("Updating remediation content: " + entryName, LogDb.DASHBOARD);
+                                Bson updates = 
+                                    Updates.combine(
+                                        Updates.set(Remediation.REMEDIATION_TEXT, templateContent),
+                                        Updates.set(Remediation.HASH, remediationHashFromFile)
+                                    );
+                                        
+                                RemediationsDao.instance.updateOne(Remediation.TEST_ID, Remediation.REMEDIATION_TEXT, updates);
+                            }
+                        } else {
+                            loggerMaker.infoAndAddToDb("Inserting remediation content: " + entryName, LogDb.DASHBOARD);
+                            RemediationsDao.instance.insertOne(new Remediation(entryName, templateContent, remediationHashFromFile));
+                        }
+                    }
+
+                    zipInputStream.closeEntry();
+                }
+
+                if (countTotalRemediations != countUnchangedRemediations) {
+                    loggerMaker.infoAndAddToDb(countUnchangedRemediations + "/" + countTotalRemediations + "remediations unchanged", LogDb.DASHBOARD);
+                }
+        
+            } catch (Exception ex) {
+                cacheLoggerMaker.errorAndAddToDb(ex,
+                        String.format("Error while processing Test template files zip. Error %s", ex.getMessage()),
+                        LogDb.DASHBOARD);
+            }
+        } else {
+            loggerMaker.infoAndAddToDb("Received null zip file");
+        }        
     }
 
     public static void processTemplateFilesZip(byte[] zipFile, String author, String source, String repositoryUrl) {
