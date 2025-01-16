@@ -13,8 +13,8 @@ public class LongValueCodec implements RedisCodec<String, Long> {
 
   @Override
   public Long decodeValue(ByteBuffer bytes) {
-    if (!bytes.hasRemaining()) return null;
-    return bytes.getLong();
+    String valueAsString = StandardCharsets.UTF_8.decode(bytes).toString();
+    return Long.parseLong(valueAsString);
   }
 
   @Override
@@ -24,9 +24,7 @@ public class LongValueCodec implements RedisCodec<String, Long> {
 
   @Override
   public ByteBuffer encodeValue(Long value) {
-    ByteBuffer buffer = ByteBuffer.allocate(Long.BYTES);
-    buffer.putLong(value);
-    buffer.flip();
-    return buffer;
+    String valueAsString = value.toString();
+    return StandardCharsets.UTF_8.encode(valueAsString);
   }
 }
