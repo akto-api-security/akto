@@ -57,7 +57,9 @@ public class Main {
             .setValueSerializer(Serializer.BYTE_ARRAY)
             .build();
 
-    new MaliciousTrafficDetectorTask(trafficKafka, internalKafka, createRedisClient()).run();
+    RedisClient localRedis = createLocalRedisClient();
+
+    new MaliciousTrafficDetectorTask(trafficKafka, internalKafka, localRedis).run();
     new FlushSampleDataTask(
             sessionFactory, internalKafka, KafkaTopic.ThreatDetection.MALICIOUS_EVENTS)
         .run();
@@ -67,8 +69,8 @@ public class Main {
     new CleanupTask(sessionFactory).run();
   }
 
-  public static RedisClient createRedisClient() {
-    return RedisClient.create(System.getenv("AKTO_THREAT_DETECTION_REDIS_URI"));
+  public static RedisClient createLocalRedisClient() {
+    return RedisClient.create(System.getenv("AKTO_THREAT_DETECTION_LOCAL_REDIS_URI"));
   }
 
   public static void runMigrations() {

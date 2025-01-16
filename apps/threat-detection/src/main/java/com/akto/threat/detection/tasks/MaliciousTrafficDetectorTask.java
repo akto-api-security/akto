@@ -26,7 +26,7 @@ import com.akto.rules.TestPlugin;
 import com.akto.test_editor.execution.VariableResolver;
 import com.akto.test_editor.filter.data_operands_impl.ValidationResult;
 import com.akto.threat.detection.actor.SourceIPActorGenerator;
-import com.akto.threat.detection.cache.RedisBackedCounterCache;
+import com.akto.threat.detection.cache.RedisCounterCache;
 import com.akto.threat.detection.constants.KafkaTopic;
 import com.akto.threat.detection.kafka.KafkaProtoProducer;
 import com.akto.threat.detection.smart_event_detector.window_based.WindowBasedThresholdNotifier;
@@ -82,14 +82,14 @@ public class MaliciousTrafficDetectorTask implements Task {
 
     this.windowBasedThresholdNotifier =
         new WindowBasedThresholdNotifier(
-            new RedisBackedCounterCache(redisClient, "wbt"),
+            new RedisCounterCache(redisClient, "wbt"),
             new WindowBasedThresholdNotifier.Config(100, 10 * 60));
 
     this.internalKafka = new KafkaProtoProducer(internalConfig);
   }
 
   public void run() {
-    this.kafkaConsumer.subscribe(Collections.singletonList("akto.api.logs"));
+    this.kafkaConsumer.subscribe(Collections.singletonList("akto.api.logs2"));
     ExecutorService pollingExecutor = Executors.newSingleThreadExecutor();
     pollingExecutor.execute(
         () -> {
