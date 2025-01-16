@@ -105,27 +105,19 @@ public class TestingRunIssuesDao extends AccountsContextDaoWithRbac<TestingRunIs
                 String severity = ((BasicDBObject) basicDBObject.get("_id")).getString("severity");
                 int apiCollectionId = ((BasicDBObject) basicDBObject.get("_id")).getInt("apiCollectionId");
                 int count = basicDBObject.getInt("count");
-                resultMap.computeIfAbsent(apiCollectionId, k -> new LinkedHashMap<>());
-                Map<String, Integer> severityMap = resultMap.get(apiCollectionId);
-
-                severityMap.put(severity, count);
+                if(resultMap.containsKey(apiCollectionId)){
+                    Map<String,Integer> severityMap = resultMap.get(apiCollectionId);
+                    severityMap.put(severity, count);
+                }else{
+                    Map<String,Integer> severityMap = new HashMap<>();
+                    severityMap.put(severity, count);
+                    resultMap.put(apiCollectionId, severityMap);
+                }
 
             } catch (Exception e) {
                 e.printStackTrace();
             }
         }
-
-        String[] severityOrder = GlobalEnums.Severity.getNames();
-        resultMap.forEach((apiCollectionId, severityMap) -> {
-            Map<String, Integer> orderedMap = new LinkedHashMap<>();
-            for (String severity : severityOrder) {
-                if (severityMap.containsKey(severity)) {
-                    orderedMap.put(severity, severityMap.get(severity));
-                }
-            }
-            resultMap.put(apiCollectionId, orderedMap);
-        });
-
         return resultMap;
     }
   

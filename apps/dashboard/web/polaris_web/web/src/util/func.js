@@ -236,12 +236,24 @@ prettifyEpoch(epoch) {
     }
     return result;
   },
+  sortObjectBySeverity(obj) {
+    const severityOrder = this.getAktoSeverities()
+
+    const sortedEntries = Object.entries(obj).sort(
+        ([keyA], [keyB]) => severityOrder.indexOf(keyA) - severityOrder.indexOf(keyB)
+    )
+
+    return Object.fromEntries(sortedEntries)
+  },
   getSeverityStatus(countIssues) {
     if(countIssues==null || countIssues==undefined){
       return [];
     }
-    return Object.keys(countIssues).filter((key) => {
-      return (countIssues[key] > 0)
+
+    const sortedCountIssues = this.sortObjectBySeverity(countIssues)
+
+    return Object.keys(sortedCountIssues).filter((key) => {
+      return (sortedCountIssues[key] > 0)
     })
   },
   getTestingRunIconObj(state) {

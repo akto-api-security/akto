@@ -297,13 +297,11 @@ const SummaryCardComponent = () =>{
             <HorizontalGrid columns={2} gap={6}>
               <ChartypeComponent navUrl={"/dashboard/issues/"} data={subCategoryInfo} title={"Categories"} isNormal={true} boxHeight={'250px'}/>
               {/* <ChartypeComponent data={severityCountMap} reverse={true} title={"Severity"} charTitle={totalVulnerabilities} chartSubtitle={"Total Vulnerabilities"}/> */}
-              <div style={{ marginTop: "20px" }}>
-                <ChartypeComponent
-                    data={severityCountMap}
-                    navUrl={"/dashboard/issues/"} title={"Severity"} isNormal={true} boxHeight={'250px'} dataTableWidth="250px" boxPadding={0}
-                    pieInnerSize="50%"
-                />
-              </div>
+              <ChartypeComponent
+                  data={severityCountMap}
+                  navUrl={"/dashboard/issues/"} title={"Severity"} isNormal={true} boxHeight={'250px'} dataTableWidth="250px" boxPadding={8}
+                  pieInnerSize="50%"
+              />
             </HorizontalGrid>
 
           </LegacyCard.Subsection>

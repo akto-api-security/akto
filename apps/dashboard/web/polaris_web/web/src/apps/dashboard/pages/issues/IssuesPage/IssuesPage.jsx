@@ -52,6 +52,7 @@ let filtersOptions = [
         label: 'Severity',
         title: 'Severity',
         choices: [
+            {label: 'Critical', value: 'CRITICAL'},
             { label: "High", value: "HIGH" }, 
             { label: "Medium", value: "MEDIUM" },
             { label: "Low", value: "LOW" }
