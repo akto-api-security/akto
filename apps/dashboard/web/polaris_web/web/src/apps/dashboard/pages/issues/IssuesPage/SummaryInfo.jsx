@@ -57,7 +57,7 @@ const SummaryInfo = ({ startTimestamp, endTimestamp }) => {
             smoothChartComponent: (<SmoothAreaChart tickPositions={openIssues} />)
         },
         {
-            title: 'High',
+            title: 'Critical',
             data: criticalIssues[criticalIssues.length-1],
             variant: 'heading2xl',
             color: 'critical',
