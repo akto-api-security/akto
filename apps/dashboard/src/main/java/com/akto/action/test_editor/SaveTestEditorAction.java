@@ -16,6 +16,7 @@ import com.akto.dao.testing.TestRolesDao;
 import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dto.AccountSettings;
 import com.akto.dto.ApiInfo;
+import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.CustomAuthType;
 import com.akto.dto.User;
 import com.akto.dto.test_editor.Category;
@@ -45,6 +46,7 @@ import com.akto.store.SampleMessageStore;
 import com.akto.store.TestingUtil;
 import com.akto.test_editor.execution.VariableResolver;
 import com.akto.testing.TestExecutor;
+import com.akto.testing.Utils;
 import com.akto.util.Constants;
 import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.Severity;
@@ -334,7 +336,11 @@ public class SaveTestEditorAction extends UserAction {
         int lastSampleIndex = sampleDataList.get(0).getSamples().size() - 1;
         
         TestingRunConfig testingRunConfig = new TestingRunConfig();
-        testingRunResult = executor.runTestNew(infoKey, null, testingUtil, null, testConfig, testingRunConfig, true, testLogs);
+        List<String> samples = testingUtil.getSampleMessages().get(infoKey);
+        TestingRunResult testingRunResult = Utils.generateFailedRunResultForMessage(null, infoKey, testConfig.getInfo().getCategory().getName(), testConfig.getInfo().getSubCategory(), null,samples , null);
+        if(testingRunResult == null){
+            testingRunResult = executor.runTestNew(infoKey, null, testingUtil, null, testConfig, testingRunConfig, true, testLogs, samples.get(samples.size() - 1), Context.accountId.get());
+        }
         if (testingRunResult == null) {
             testingRunResult = new TestingRunResult(
                     new ObjectId(), infoKey, testConfig.getInfo().getCategory().getName(), testConfig.getInfo().getSubCategory() ,Collections.singletonList(new TestResult(null, sampleDataList.get(0).getSamples().get(lastSampleIndex),

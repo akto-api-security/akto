@@ -536,7 +536,7 @@ public class Main {
                         summaryId = trrs.getId();
                     }
 
-                    TestExecutor testExecutor = new TestExecutor();
+                    TestingProducer testingProducer = new TestingProducer();
                     if (trrs.getState() == State.SCHEDULED) {
                         if (trrs.getMetadata()!= null && trrs.getMetadata().containsKey("pull_request_id") && trrs.getMetadata().containsKey("commit_sha_head") ) {
                             //case of github status push
@@ -546,8 +546,9 @@ public class Main {
                     }
                     RequiredConfigs.initiate();
                     if(!maxRetriesReached){
-                        testExecutor.init(testingRun, summaryId, syncLimit);
-                        raiseMixpanelEvent(summaryId, testingRun, accountId);
+                        // init producer and the consumer here
+                        // producer for testing is currently calls init functions from test-executor
+                        testingProducer.initProducer(testingRun, summaryId, syncLimit);                        
                     }
                     
             } catch (Exception e) {

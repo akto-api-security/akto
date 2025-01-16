@@ -13,11 +13,14 @@ import java.util.regex.Pattern;
 
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
+
+import com.akto.dao.context.Context;
 import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dao.testing.VulnerableTestingRunResultDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.CollectionConditions.ConditionsType;
+import com.akto.dto.ApiInfo;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.RawApi;
 import com.akto.dto.test_editor.DataOperandsFilterResponse;
@@ -25,6 +28,11 @@ import com.akto.dto.test_editor.FilterNode;
 import com.akto.dto.test_editor.Util;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
+import com.akto.dto.testing.GenericTestResult;
+import com.akto.dto.testing.TestResult;
+import com.akto.dto.testing.TestResult.Confidence;
+import com.akto.dto.testing.TestResult.TestError;
+import com.akto.dto.testing.TestingRunConfig;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.WorkflowUpdatedSampleData;
 import com.akto.dto.type.RequestTemplate;
@@ -33,13 +41,13 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.test_editor.filter.Filter;
 import com.akto.test_editor.filter.data_operands_impl.ValidationResult;
 import com.akto.testing_utils.TestingUtils;
+import com.akto.usage.UsageMetricCalculator;
 import com.akto.util.Constants;
 import com.akto.util.JSONUtils;
 import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.Severity;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
-import com.mongodb.ConnectionString;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Accumulators;
 import com.mongodb.client.model.Aggregates;
@@ -496,6 +504,31 @@ public class Utils {
         }
 
         return resultsFromNonVulCollection;
+    }
+
+    public static TestingRunResult generateFailedRunResultForMessage(ObjectId testingRunId,ApiInfoKey apiInfoKey, String testSuperType, 
+        String testSubType, ObjectId testRunResultSummaryId, List<String> messages, String errorMessage) {
+
+        TestingRunResult testingRunResult = null;       
+        Set<Integer> deactivatedCollections = UsageMetricCalculator.getDeactivated();
+        List<GenericTestResult> testResults = new ArrayList<>();
+        String failMessage = errorMessage;
+
+        if(deactivatedCollections.contains(apiInfoKey.getApiCollectionId())){
+            failMessage = TestError.DEACTIVATED_ENDPOINT.getMessage();
+        }else if(messages == null || messages.isEmpty()){
+            failMessage = TestError.NO_PATH.getMessage();
+        }
+            
+        if(failMessage != null){
+            testResults.add(new TestResult(null, null, Collections.singletonList(failMessage),0, false, Confidence.HIGH, null));
+            testingRunResult = new TestingRunResult(
+                testingRunId, apiInfoKey, testSuperType, testSubType, testResults,
+                false, new ArrayList<>(), 100, Context.now(),
+                Context.now(), testRunResultSummaryId, null, Collections
+                        .singletonList(new TestingRunResult.TestLog(TestingRunResult.TestLogType.INFO, failMessage)));
+        }       
+        return testingRunResult;
     }
     
 }
