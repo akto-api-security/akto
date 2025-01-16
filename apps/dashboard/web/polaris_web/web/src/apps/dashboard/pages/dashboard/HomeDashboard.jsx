@@ -114,6 +114,7 @@ function HomeDashboard() {
                 finalResult.push({
                     "testName": x["name"],
                     "time": func.prettifyEpoch(x["run_time_epoch"]),
+                    "criticalCount": severityMap["critical"] ? severityMap["critical"] : "0",
                     "highCount": severityMap["high"] ? severityMap["high"] : "0",
                     "mediumCount": severityMap["medium"] ? severityMap["medium"] : "0",
                     "lowCount": severityMap["low"] ? severityMap["low"] : "0",
@@ -450,7 +451,7 @@ function HomeDashboard() {
     ) : null
 
     function buildSeverityMap(severityInfo) {
-        const countMap = { HIGH: 0, MEDIUM: 0, LOW: 0 }
+        const countMap = { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0 }
 
         if (severityInfo && severityInfo != undefined && severityInfo != null && severityInfo instanceof Object) {
             for (const apiCollectionId in severityInfo) {
@@ -462,6 +463,11 @@ function HomeDashboard() {
         }
 
         const result = {
+            "Critical": {
+                "text": countMap.CRITICAL || 0,
+                "color": "#E45357",
+                "filterKey": "Critical"
+            },
             "High": {
                 "text": countMap.HIGH || 0,
                 "color": "#EF864C",

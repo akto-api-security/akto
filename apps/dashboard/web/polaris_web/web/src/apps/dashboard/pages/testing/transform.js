@@ -710,6 +710,7 @@ getInfoSectionsHeaders(){
 convertSubIntoSubcategory(resp){
   let obj = {}
   let countObj = {
+    CRITICAL: 0,
     HIGH: 0,
     MEDIUM: 0,
     LOW: 0,

@@ -149,9 +149,10 @@ const tableCountObj = func.getTabsCount(definedTableTabs, {}, initialCount)
 const tableTabs = func.getTableTabsContent(definedTableTabs, tableCountObj, setCurrentTab, currentTab, tabsInfo)
 
 const [severityCountMap, setSeverityCountMap] = useState({
-  HIGH: {text : 0, color: func.getColorForCharts("HIGH")},
-  MEDIUM: {text : 0, color: func.getColorForCharts("MEDIUM")},
-  LOW: {text : 0, color: func.getColorForCharts("LOW")},
+  CRITICAL: {text : 0, color: func.getHexColorForSeverity("CRITICAL")},
+  HIGH: {text : 0, color: func.getHexColorForSeverity("HIGH")},
+  MEDIUM: {text : 0, color: func.getHexColorForSeverity("MEDIUM")},
+  LOW: {text : 0, color: func.getHexColorForSeverity("LOW")},
 })
 const [subCategoryInfo, setSubCategoryInfo] = useState({})
 const [collapsible, setCollapsible] = useState(true)
@@ -295,7 +296,12 @@ const SummaryCardComponent = () =>{
             <Box paddingBlockStart={3}><Divider/></Box>
             <HorizontalGrid columns={2} gap={6}>
               <ChartypeComponent navUrl={"/dashboard/issues/"} data={subCategoryInfo} title={"Categories"} isNormal={true} boxHeight={'250px'}/>
-              <ChartypeComponent data={severityCountMap} reverse={true} title={"Severity"} charTitle={totalVulnerabilities} chartSubtitle={"Total Vulnerabilities"}/>
+              {/* <ChartypeComponent data={severityCountMap} reverse={true} title={"Severity"} charTitle={totalVulnerabilities} chartSubtitle={"Total Vulnerabilities"}/> */}
+              <ChartypeComponent
+                  data={severityCountMap}
+                  navUrl={"/dashboard/issues/"} title={"Severity"} isNormal={true} boxHeight={'250px'} dataTableWidth="250px" boxPadding={8}
+                  pieInnerSize="50%"
+              />
             </HorizontalGrid>
 
           </LegacyCard.Subsection>
