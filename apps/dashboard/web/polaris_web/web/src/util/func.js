@@ -1337,7 +1337,7 @@ mapCollectionIdToHostName(apiCollections){
       case "HIGH":
         return "#FFB800"
       case "MEDIUM":
-        return "#FFE600"
+        return "#EDDB39"
       case "LOW":
         return "#0000000f"
       default:
