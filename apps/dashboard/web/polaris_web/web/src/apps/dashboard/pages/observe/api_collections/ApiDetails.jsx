@@ -261,6 +261,7 @@ function ApiDetails(props) {
                     endpoints={[apiDetail]}
                     filtered={true}
                     useLocalSubCategoryData={useLocalSubCategoryData}
+                    preActivator={false}
                 />
                 <Box>
                     <Tooltip content="Open URL in test editor" dismissOnMouseOut>

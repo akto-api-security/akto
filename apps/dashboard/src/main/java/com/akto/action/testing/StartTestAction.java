@@ -506,7 +506,7 @@ public class StartTestAction extends UserAction {
         }
 
         TestingRunConfig runConfig = TestingRunConfigDao.instance.findOne(
-            Filters.eq("_id", this.testingRun.getTestIdConfig()), Projections.exclude("collectionWiseApiInfoKey", "testSubCategoryList")
+            Filters.eq("_id", this.testingRun.getTestIdConfig()), Projections.exclude("collectionWiseApiInfoKey")
         );
 
         this.testingRun.setTestingRunConfig(runConfig);
