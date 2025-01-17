@@ -465,22 +465,22 @@ function HomeDashboard() {
         const result = {
             "Critical": {
                 "text": countMap.CRITICAL || 0,
-                "color": "#E45357",
+                "color": func.getHexColorForSeverity("CRITICAL"),
                 "filterKey": "Critical"
             },
             "High": {
                 "text": countMap.HIGH || 0,
-                "color": "#EF864C",
+                "color": func.getHexColorForSeverity("HIGH"),
                 "filterKey": "High"
             },
             "Medium": {
                 "text": countMap.MEDIUM || 0,
-                "color": "#F6C564",
+                "color": func.getHexColorForSeverity("MEDIUM"),
                 "filterKey": "Medium"
             },
             "Low": {
                 "text": countMap.LOW || 0,
-                "color": "#6FD1A6",
+                "color": func.getHexColorForSeverity("LOW"),
                 "filterKey": "Low"
             }
         };
