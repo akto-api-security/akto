@@ -1333,15 +1333,15 @@ mapCollectionIdToHostName(apiCollections){
   getHexColorForSeverity(key){
     switch(key){
       case "CRITICAL":
-        return "#E45357"
+        return "#E51C00"
       case "HIGH":
-        return "#EF864C"
+        return "#FFB800"
       case "MEDIUM":
-        return "#F6C564"
+        return "#FFE600"
       case "LOW":
-        return "#6FD1A6"
+        return "#0000000f"
       default:
-        return "#2C6ECB"
+        return "#0000000f"
     }
 
   },
