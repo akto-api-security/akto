@@ -339,7 +339,7 @@ public class SaveTestEditorAction extends UserAction {
         List<String> samples = testingUtil.getSampleMessages().get(infoKey);
         TestingRunResult testingRunResult = Utils.generateFailedRunResultForMessage(null, infoKey, testConfig.getInfo().getCategory().getName(), testConfig.getInfo().getSubCategory(), null,samples , null);
         if(testingRunResult == null){
-            testingRunResult = executor.runTestNew(infoKey, null, testingUtil, null, testConfig, testingRunConfig, true, testLogs, samples.get(samples.size() - 1), Context.accountId.get());
+            testingRunResult = executor.runTestNew(infoKey, null, testingUtil, null, testConfig, testingRunConfig, true, testLogs, samples.get(samples.size() - 1));
         }
         if (testingRunResult == null) {
             testingRunResult = new TestingRunResult(

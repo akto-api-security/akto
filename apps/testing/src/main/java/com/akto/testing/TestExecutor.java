@@ -30,6 +30,7 @@ import com.akto.dto.testing.*;
 import com.akto.dto.testing.TestResult.Confidence;
 import com.akto.dto.testing.TestResult.TestError;
 import com.akto.dto.testing.TestingRun.State;
+import com.akto.dto.testing.info.TestMessages;
 import com.akto.dto.type.RequestTemplate;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
@@ -44,6 +45,8 @@ import com.akto.test_editor.execution.Build;
 import com.akto.test_editor.execution.Executor;
 import com.akto.test_editor.execution.VariableResolver;
 import com.akto.test_editor.filter.data_operands_impl.ValidationResult;
+import com.akto.testing.testing_with_kafka.CommonSingletonForTesting;
+import com.akto.testing.testing_with_kafka.TestingProducer;
 import com.akto.testing.yaml_tests.YamlTestTemplate;
 import com.akto.testing_issues.TestingIssuesHandler;
 import com.akto.usage.UsageMetricCalculator;
@@ -256,6 +259,9 @@ public class TestExecutor {
         //     }
         // }
 
+        // init the singleton class here
+        CommonSingletonForTesting.getInstance().init(testingUtil, testingRun.getTestingRunConfig(), debug, testConfigMap);
+
         if(!shouldInitOnly){
             int maxThreads = Math.min(testingRunSubCategories.size(), 1000);
             if(maxThreads == 0){
@@ -271,8 +277,6 @@ public class TestExecutor {
             CountDownLatch latch = new CountDownLatch(apiInfoKeyList.size());
 
             final int maxRunTime = 10 * 60;
-
-            TestingConsumer testingConsumer = new TestingConsumer();
             for (ApiInfo.ApiInfoKey apiInfoKey: apiInfoKeyList) {
                 List<String> messages = testingUtil.getSampleMessages().get(apiInfoKey);
                 for (String testSubCategory: testingRunSubCategories) {
@@ -302,9 +306,14 @@ public class TestExecutor {
                         loggerMaker.infoAndAddToDb("Skipping test from producers because: " + failMessage + " apiinfo: " + apiInfoKey.toString(), LogDb.TESTING);
                     }else{
                         // push data to kafka here and inside that call run test new function
+                        // create an object of TestMessage
+                        TestMessages testMessages = new TestMessages(
+                            testingRun.getId(), summaryId, apiInfoKey, testSubType, testLogs, accountId
+                        );
+                        logger.info("Inserting record for apiInfoKey: " + apiInfoKey.toString() + " subcategory: " + testSubType);
                         try {
                             Future<Void> future = threadPool.submit(() -> 
-                                testingConsumer.runAndInsertNewTestResult(apiInfoKey, testingRun.getId(), testingUtil, summaryId, testConfig, testingRun.getTestingRunConfig(), debug, testLogs, messages.get(messages.size() - 1), accountId)
+                                TestingProducer.pushMessagesToKafka(Arrays.asList(testMessages))
                             );
                             testingRecords.add(future);
                         } catch (Exception e) {
@@ -332,7 +341,7 @@ public class TestExecutor {
                 throw new RuntimeException(e);
             }
     
-            loggerMaker.infoAndAddToDb("Finished testing", LogDb.TESTING);
+            loggerMaker.infoAndAddToDb("Finished inserting records in kafka", LogDb.TESTING);
         }
         
     }
@@ -763,7 +772,7 @@ public class TestExecutor {
     }
 
     public TestingRunResult runTestNew(ApiInfo.ApiInfoKey apiInfoKey, ObjectId testRunId, TestingUtil testingUtil,
-                                       ObjectId testRunResultSummaryId, TestConfig testConfig, TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs, String message, int accountId) {
+                                       ObjectId testRunResultSummaryId, TestConfig testConfig, TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs, String message) {
 
         String testSuperType = testConfig.getInfo().getCategory().getName();
         String testSubType = testConfig.getInfo().getSubCategory();

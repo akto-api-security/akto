@@ -37,6 +37,8 @@ import com.akto.notifications.slack.SlackSender;
 import com.akto.rules.RequiredConfigs;
 import com.akto.task.Cluster;
 import com.akto.test_editor.execution.Executor;
+import com.akto.testing.testing_with_kafka.TestingConsumer;
+import com.akto.testing.testing_with_kafka.TestingProducer;
 import com.akto.util.AccountTask;
 import com.akto.util.Constants;
 import com.akto.util.DashboardMode;
@@ -537,6 +539,7 @@ public class Main {
                     }
 
                     TestingProducer testingProducer = new TestingProducer();
+                    TestingConsumer testingConsumer = new TestingConsumer();
                     if (trrs.getState() == State.SCHEDULED) {
                         if (trrs.getMetadata()!= null && trrs.getMetadata().containsKey("pull_request_id") && trrs.getMetadata().containsKey("commit_sha_head") ) {
                             //case of github status push
@@ -548,7 +551,8 @@ public class Main {
                     if(!maxRetriesReached){
                         // init producer and the consumer here
                         // producer for testing is currently calls init functions from test-executor
-                        testingProducer.initProducer(testingRun, summaryId, syncLimit);                        
+                        testingProducer.initProducer(testingRun, summaryId, syncLimit);  
+                        testingConsumer.init();                      
                     }
                     
             } catch (Exception e) {

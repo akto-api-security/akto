@@ -324,7 +324,7 @@ public class Main {
                     List<String> samples = testingUtil.getSampleMessages().get(it);
                     testingRunResult = Utils.generateFailedRunResultForMessage(null, it, testConfig.getInfo().getCategory().getName(), testConfig.getInfo().getSubCategory(), null,samples , null);
                     if(testingRunResult == null){
-                        testingRunResult = testExecutor.runTestNew(it, null, testingUtil, null, testConfig, null, false, new ArrayList<>(), samples.get(samples.size() - 1), Context.accountId.get());
+                        testingRunResult = testExecutor.runTestNew(it, null, testingUtil, null, testConfig, null, false, new ArrayList<>(), samples.get(samples.size() - 1));
                     }
                 } catch (Exception e) {
                     e.printStackTrace();
