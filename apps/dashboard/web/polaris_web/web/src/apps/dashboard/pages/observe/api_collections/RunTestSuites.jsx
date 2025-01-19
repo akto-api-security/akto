@@ -5,7 +5,6 @@ import data from "./dummyData.json"
 import "./run_test_suites.css"
 import RunTestConfiguration from "./RunTestConfiguration";
 import AdvancedSettingsComponent from "./component/AdvancedSettingsComponent";
-import { use } from "react";
 
 
 
@@ -13,7 +12,6 @@ function RunTestSuites({ testSuiteModal, testSuiteModalToggle, parentTestRun, se
 
     const [owaspTop10, owaspTop10Toggle] = useState(true);
     const [openConfigurations, openConfigurationsToggle] = useState(false);
-    const [testSuite, setTestSuite] = useState(true);
     const [selectedTestSuites, setSelectedTestSuites] = useState([]);
     const [testRun, setTestRun] = useState({...initialState});
 
@@ -108,7 +106,6 @@ function RunTestSuites({ testSuiteModal, testSuiteModalToggle, parentTestRun, se
     const [shouldCallFunction, setShouldCallFunction] = useState(false);
 
     function handleTestSuiteRun(){
-        console.log("handleTestSuiteRun");
         setParentTestRun(testRun);
         setShouldCallFunction(true);
     }
@@ -308,7 +305,7 @@ function RunTestSuites({ testSuiteModal, testSuiteModalToggle, parentTestRun, se
                                             <span style={{ fontWeight: "550", color: " #202223" }}>
                                                 {data.owaspTop10.name} <span style={{ paddingLeft: "0.2rem" }}> </span>
                                             </span>
-                                            <Badge>{data.owaspTop10.plans.length}</Badge>
+                                            
                                         </Button>
                                     </div>
                                 </HorizontalStack>

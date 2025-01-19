@@ -152,16 +152,14 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
             })
         }
 
-        // Set if a test is selected or not
-        // Object.keys(processMapCategoryToSubcategory).map(category => {
-        //     const selectedTests = []
+        Object.keys(processMapCategoryToSubcategory).map(category => {
+            const selectedTests = []
 
-        //     mapCategoryToSubcategory[category]["selected"].map(test => selectedTests.push(test.value))
-        //     processMapCategoryToSubcategory[category].forEach((test, index, arr) => {
-        //         arr[index]["selected"] = selectedTests.includes(test.value)
-        //     })
-        // })
-        // because this line testSuite is getting wrong testName
+            mapCategoryToSubcategory[category]["selected"].map(test => selectedTests.push(test.value))
+            processMapCategoryToSubcategory[category].forEach((test, index, arr) => {
+                arr[index]["selected"] = false
+            })
+        })
         const testName = convertToLowerCaseWithUnderscores(apiCollectionName);
         //Auth Mechanism
         let authMechanismPresent = false
@@ -499,11 +497,9 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         }
 
         if (filtered || selectedResourcesForPrimaryAction?.length > 0) {
-                console.log(apiInfoKeyList, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, "TESTING_UI", testRoleId, continuousTesting, sendSlackAlert, finalAdvancedConditions, cleanUpTestingResources)
-                await observeApi.scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, "TESTING_UI", testRoleId, continuousTesting, sendSlackAlert, finalAdvancedConditions, cleanUpTestingResources)
+                await observeApi.scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, "TESTING_UI", testRoleId, continuousTesting, sendSlackAlert, finalAdvancedConditions, cleanUpTestingResources,testIdConfig?.hexId)
         } else {
-            console.log(collectionId, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, finalAdvancedConditions,cleanUpTestingResources)
-            await observeApi.scheduleTestForCollection(collectionId, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, finalAdvancedConditions,cleanUpTestingResources)
+                await observeApi.scheduleTestForCollection(collectionId, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, finalAdvancedConditions,cleanUpTestingResources,testIdConfig?.hexId)
         }
 
         setActive(false)
