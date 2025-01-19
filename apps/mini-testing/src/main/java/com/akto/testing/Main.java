@@ -68,6 +68,8 @@ public class Main {
 
     public static boolean SKIP_SSRF_CHECK = ("true".equalsIgnoreCase(System.getenv("SKIP_SSRF_CHECK")) || !DashboardMode.isSaasDeployment());
     public static final boolean IS_SAAS = "true".equalsIgnoreCase(System.getenv("IS_SAAS"));
+    
+    private static String customMiniTestingServiceName = System.getenv("MINI_TESTING_NAME");
 
     private static void setupRateLimitWatcher (AccountSettings settings) {
         
@@ -245,9 +247,23 @@ public class Main {
         }, 0, 5, TimeUnit.MINUTES);
     }
 
+    public static void modifyHybridTestingSettingWithCustomName() {
+        scheduler.scheduleAtFixedRate(new Runnable() {
+            public void run() {
+                if(customMiniTestingServiceName == null || customMiniTestingServiceName.trim().isEmpty()) {
+                    customMiniTestingServiceName = "Default_" + UUID.randomUUID().toString().substring(0, 4);
+                }
+                dataActor.modifyHybridTestingSettingWithCustomName(RuntimeMode.isHybridDeployment(), customMiniTestingServiceName);
+            }
+        }, 0, 5, TimeUnit.MINUTES);
+    }
+
     public static void main(String[] args) throws InterruptedException {
         AccountSettings accountSettings = dataActor.fetchAccountSettings();
-        dataActor.modifyHybridTestingSetting(RuntimeMode.isHybridDeployment());
+        if(customMiniTestingServiceName == null) {
+            customMiniTestingServiceName = "Default_" + UUID.randomUUID().toString().substring(0, 4);
+        }
+        modifyHybridTestingSettingWithCustomName();
         setupRateLimitWatcher(accountSettings);
         checkForPlaygroundTest();
 
@@ -353,13 +369,13 @@ public class Main {
             long startDetailed = System.currentTimeMillis();
             int delta = start - 20*60;
 
-            TestingRunResultSummary trrs = dataActor.findPendingTestingRunResultSummary(start, delta);
+            TestingRunResultSummary trrs = dataActor.findPendingTestingRunResultSummary(start, delta, customMiniTestingServiceName);
             boolean isSummaryRunning = trrs != null && trrs.getState().equals(State.RUNNING);
             TestingRun testingRun;
             ObjectId summaryId = null;
             if (trrs == null) {
                 delta = Context.now() - 20*60;
-                testingRun = dataActor.findPendingTestingRun(delta);
+                testingRun = dataActor.findPendingTestingRun(delta, customMiniTestingServiceName);
             } else {
                 summaryId = trrs.getId();
                 loggerMaker.infoAndAddToDb("Found trrs " + trrs.getHexId() +  " for account: " + accountId);
@@ -378,6 +394,10 @@ public class Main {
                     dataActor.updateTestRunResultSummaryNoUpsert(trrs.getId().toHexString());
                     loggerMaker.infoAndAddToDb("Stopped TRRS: " + trrs.getId());
                 }
+                continue;
+            }
+
+            if(customMiniTestingServiceName != null && !customMiniTestingServiceName.equals(testingRun.getMiniTestingServiceName())) {
                 continue;
             }
 

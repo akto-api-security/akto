@@ -113,9 +113,9 @@ public abstract class DataActor {
 
     public abstract TestingRunResultSummary createTRRSummaryIfAbsent(String testingRunHexId, int start);
 
-    public abstract TestingRun findPendingTestingRun(int delta);
+    public abstract TestingRun findPendingTestingRun(int delta, String miniTestingServiceName);
 
-    public abstract TestingRunResultSummary findPendingTestingRunResultSummary(int now, int delta);
+    public abstract TestingRunResultSummary findPendingTestingRunResultSummary(int now, int delta, String miniTestingServiceName);
 
     public abstract TestingRun findTestingRun(String testingRunId);
 
@@ -230,6 +230,8 @@ public abstract class DataActor {
     public abstract SampleData fetchSampleDataByIdMethod(int apiCollectionId, String url, String method);
 
     public abstract void modifyHybridTestingSetting(boolean hybridTestingEnabled);
+
+    public abstract void modifyHybridTestingSettingWithCustomName(boolean hybridTestingEnabled, String serviceName);
 
     public abstract void insertTestingLog(Log log);
 
