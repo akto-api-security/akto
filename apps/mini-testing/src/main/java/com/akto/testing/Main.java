@@ -1,5 +1,6 @@
 package com.akto.testing;
 
+import com.akto.RuntimeMode;
 import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.context.Context;
 import com.akto.data_actor.DataActor;
@@ -54,6 +55,8 @@ public class Main {
 
     public static boolean SKIP_SSRF_CHECK = ("true".equalsIgnoreCase(System.getenv("SKIP_SSRF_CHECK")) || !DashboardMode.isSaasDeployment());
     public static final boolean IS_SAAS = "true".equalsIgnoreCase(System.getenv("IS_SAAS"));
+
+    private static String customMiniTestingServiceName;
 
     private static void setupRateLimitWatcher (AccountSettings settings) {
         
@@ -112,6 +115,18 @@ public class Main {
         }
     }
 
+    public static void modifyHybridTestingSettingWithCustomName() {
+        scheduler.scheduleAtFixedRate(new Runnable() {
+            public void run() {
+                customMiniTestingServiceName = System.getenv("MINI_TESTING_NAME");
+                if(customMiniTestingServiceName == null || customMiniTestingServiceName.trim().isEmpty()) {
+                    customMiniTestingServiceName = "Default_" + UUID.randomUUID().toString().substring(0, 4);
+                }
+                dataActor.modifyHybridTestingSettingWithCustomName(RuntimeMode.isHybridDeployment(), customMiniTestingServiceName);
+            }
+        }, 0, 5, TimeUnit.MINUTES);
+    }
+
     public static void main(String[] args) throws InterruptedException {
         AccountSettings accountSettings = dataActor.fetchAccountSettings();
         setupRateLimitWatcher(accountSettings);
@@ -155,13 +170,13 @@ public class Main {
             long startDetailed = System.currentTimeMillis();
             int delta = start - 20*60;
 
-            TestingRunResultSummary trrs = dataActor.findPendingTestingRunResultSummary(start, delta);
+            TestingRunResultSummary trrs = dataActor.findPendingTestingRunResultSummary(start, delta, customMiniTestingServiceName);
             boolean isSummaryRunning = trrs != null && trrs.getState().equals(State.RUNNING);
             TestingRun testingRun;
             ObjectId summaryId = null;
             if (trrs == null) {
                 delta = Context.now() - 20*60;
-                testingRun = dataActor.findPendingTestingRun(delta);
+                testingRun = dataActor.findPendingTestingRun(delta, customMiniTestingServiceName);
             } else {
                 summaryId = trrs.getId();
                 loggerMaker.infoAndAddToDb("Found trrs " + trrs.getHexId() +  " for account: " + accountId);

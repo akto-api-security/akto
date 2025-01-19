@@ -209,6 +209,7 @@ public class DbAction extends ActionSupport {
     Bson completedUpdate;
     int totalApiCount;
     boolean hybridTestingEnabled;
+    String miniTestingServiceName;
     TestingRun testingRun;
     TestingRunConfig testingRunConfig;
     Boolean exists;
@@ -1320,7 +1321,7 @@ public class DbAction extends ActionSupport {
 
     public String findPendingTestingRun() {
         try {
-            testingRun = DbLayer.findPendingTestingRun(delta);
+            testingRun = DbLayer.findPendingTestingRun(delta, miniTestingServiceName);
             updateTestingRunApisList(testingRun);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in findPendingTestingRun " + e.toString());
@@ -1331,7 +1332,7 @@ public class DbAction extends ActionSupport {
 
     public String findPendingTestingRunResultSummary() {
         try {
-            trrs = DbLayer.findPendingTestingRunResultSummary(now, delta);
+            trrs = DbLayer.findPendingTestingRunResultSummary(now, delta, miniTestingServiceName);
             if (trrs != null) {
                 trrs.setTestingRunHexId(trrs.getTestingRunId().toHexString());
             }
@@ -1944,6 +1945,15 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
+    public String modifyHybridTestingSettingWithCustomName() {
+        try {
+            DbLayer.modifyHybridTestingSettingWithCustomName(hybridTestingEnabled, miniTestingServiceName);
+        } catch (Exception e) {
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
     public String insertTestingLog() {
         try {
             int accId = Context.accountId.get();
@@ -2333,7 +2343,7 @@ public class DbAction extends ActionSupport {
         }
         return Action.SUCCESS.toUpperCase();
     }
-    
+
     public String getCurrentTestingRunDetailsFromEditor(){
         try {
             testingRunPlayground = DbLayer.getCurrentTestingRunDetailsFromEditor(this.ts);
@@ -3460,7 +3470,7 @@ public class DbAction extends ActionSupport {
     public List<String> getTestSuiteTestSubCategories() {
         return testSuiteTestSubCategories;
     }
-    
+
     public TestingRunPlayground getTestingRunPlayground() {
         return testingRunPlayground;
     }
@@ -3488,5 +3498,13 @@ public class DbAction extends ActionSupport {
 
     public void setTestingRunPlaygroundId(String testingRunPlaygroundId) {
         this.testingRunPlaygroundId = testingRunPlaygroundId;
+    }
+
+    public String getMiniTestingServiceName() {
+        return miniTestingServiceName;
+    }
+
+    public void setMiniTestingServiceName(String miniTestingServiceName) {
+        this.miniTestingServiceName = miniTestingServiceName;
     }
 }
