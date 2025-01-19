@@ -514,7 +514,7 @@ function SingleTestRunPage() {
       return testingEndpoints.apiCollectionId;
     }
 
-    return (testingEndpoints.apisList?.length === 1) ? testingEndpoints.apisList[0].apiCollectionId : undefined;
+    return (testingEndpoints.apisList?.length > 0) ? testingEndpoints.apisList[0].apiCollectionId : undefined;
   }
 
   function checkFiltered() {
