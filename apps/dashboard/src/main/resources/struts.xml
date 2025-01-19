@@ -9286,9 +9286,9 @@
             <result name="UNAUTHORIZED" type="json">
                  <param name="statusCode">403</param>
                  <param name="ignoreHierarchy">false</param>
-                 <param name="includeProperties">^actionErrors.*</param>      
+                 <param name="includeProperties">^actionErrors.*</param>
             </result>
-        </action>      
+        </action>
 
         <action name="api/fetchAzureBoardsIntegration" class="com.akto.action.AzureBoardsIntegrationAction" method="fetchAzureBoardsIntegration" >
             <interceptor-ref name="json"/>
@@ -9535,8 +9535,28 @@
                  <param name="ignoreHierarchy">false</param>
                  <param name="includeProperties">^actionErrors.*</param>
             </result>
-        </action>        
+        </action>
 
+        <action name="api/fetchMiniTestingServiceNames" class="com.akto.action.testing.StartTestAction" method="fetchMiniTestingServiceNames">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">TEST_RESULTS</param>
+                <param name="accessType">READ</param>
+            </interceptor-ref>
+
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS" type="json" />
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
 
 
     </package>
