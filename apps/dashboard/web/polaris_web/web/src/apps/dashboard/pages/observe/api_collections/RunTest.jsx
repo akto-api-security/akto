@@ -39,7 +39,8 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         testRoleId: "",
         sendSlackAlert: false,
         sendMsTeamsAlert: false,
-        cleanUpTestingResources: false
+        cleanUpTestingResources: false,
+        miniTestingServiceName: ""
     }
     const navigate = useNavigate()
 
@@ -72,6 +73,9 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
     const [optionsSelected, setOptionsSelected] = useState(initialArr)
     const [slackIntegrated, setSlackIntegrated] = useState(false)
     const [teamsTestingWebhookIntegrated, setTeamsTestingWebhookIntegrated] = useState(false)
+
+    const [miniTestingServiceNames, setMiniTestingServiceNames] = useState([])
+    const [isHybridTestingEnabled, setIsHybridTestingEnabled] = useState(false)
 
     const emptyCondition = { data: { key: '', value: '' }, operator: { 'type': 'ADD_HEADER' } }
     const [conditions, dispatchConditions] = useReducer(produce((draft, action) => func.conditionsReducer(draft, action)), []);
@@ -158,6 +162,17 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         const authMechanismDataResponse = await testingApi.fetchAuthMechanismData()
         if (authMechanismDataResponse.authMechanism)
             authMechanismPresent = true
+        testingApi.fetchMiniTestingServiceNames().then(({miniTestingServiceNames, isHybridTestingEnabled}) => {
+            const miniTestingServiceNamesOptions = (miniTestingServiceNames || []).map(name => {
+                return {
+                    label: name,
+                    value: name
+                }
+            })
+            setMiniTestingServiceNames(miniTestingServiceNamesOptions)
+            setIsHybridTestingEnabled(isHybridTestingEnabled)
+        })
+
         setTestRun(prev => {
             const state = {
                 ...prev,
@@ -488,7 +503,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
     }
 
     async function handleRun() {
-        const { startTimestamp, recurringDaily, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, cleanUpTestingResources } = testRun
+        const { startTimestamp, recurringDaily, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, cleanUpTestingResources, miniTestingServiceName } = testRun
         const collectionId = parseInt(apiCollectionId)
 
         const tests = testRun.tests
@@ -529,9 +544,9 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         }
 
         if (filtered || selectedResourcesForPrimaryAction?.length > 0) {
-            await observeApi.scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, "TESTING_UI", testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, finalAdvancedConditions, cleanUpTestingResources)
+            await observeApi.scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, "TESTING_UI", testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, finalAdvancedConditions, cleanUpTestingResources, (miniTestingServiceName || miniTestingServiceNames?.[0]?.value))
         } else {
-            await observeApi.scheduleTestForCollection(collectionId, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, finalAdvancedConditions, cleanUpTestingResources)
+            await observeApi.scheduleTestForCollection(collectionId, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, finalAdvancedConditions, cleanUpTestingResources, (miniTestingServiceName || miniTestingServiceNames?.[0]?.value))
         }
 
         setActive(false)
@@ -622,7 +637,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         setTestMode(check);
     }
 
-    // only for configurations 
+    // only for configurations
     const handleModifyConfig = async () => {
         const settings = transform.prepareConditionsForTesting(conditions)
         const editableConfigObject = transform.prepareEditableConfigObject(testRun, settings, testIdConfig.hexId)
