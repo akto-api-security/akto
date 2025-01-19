@@ -1,7 +1,7 @@
 import { Box, Button, DataTable, Divider, Modal, Text, TextField, Icon, Checkbox, Badge, Banner, InlineGrid, HorizontalStack, Link, VerticalStack, Tooltip, Popover, ActionMenu, OptionList, ActionList } from "@shopify/polaris";
 import { TickMinor, CancelMajor, SearchMinor } from "@shopify/polaris-icons";
 import { useEffect, useReducer, useRef, useState } from "react";
-import { default as observeApi } from "../api";
+import api, { default as observeApi } from "../api";
 import { default as testingApi } from "../../testing/api";
 import SpinnerCentered from "../../../components/progress/SpinnerCentered"
 import Dropdown from "../../../components/layouts/Dropdown";
@@ -17,7 +17,7 @@ import RunTestSuites from "./RunTestSuites";
 import RunTestConfiguration from "./RunTestConfiguration";
 
 
-function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOutside, closeRunTest, selectedResourcesForPrimaryAction, useLocalSubCategoryData, preActivator,  testMode, testIdConfig }) {
+function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOutside, closeRunTest, selectedResourcesForPrimaryAction, useLocalSubCategoryData, preActivator,  testMode, testIdConfig, setTestMode }) {
 
     const initialState = {
         categories: [],
@@ -153,17 +153,16 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         }
 
         // Set if a test is selected or not
-        Object.keys(processMapCategoryToSubcategory).map(category => {
-            const selectedTests = []
+        // Object.keys(processMapCategoryToSubcategory).map(category => {
+        //     const selectedTests = []
 
-            mapCategoryToSubcategory[category]["selected"].map(test => selectedTests.push(test.value))
-            processMapCategoryToSubcategory[category].forEach((test, index, arr) => {
-                arr[index]["selected"] = selectedTests.includes(test.value)
-            })
-        })
-
-        const testName = convertToLowerCaseWithUnderscores(apiCollectionName) + "_" + nameSuffixes(processMapCategoryToSubcategory).join("_")
-
+        //     mapCategoryToSubcategory[category]["selected"].map(test => selectedTests.push(test.value))
+        //     processMapCategoryToSubcategory[category].forEach((test, index, arr) => {
+        //         arr[index]["selected"] = selectedTests.includes(test.value)
+        //     })
+        // })
+        // because this line testSuite is getting wrong testName
+        const testName = convertToLowerCaseWithUnderscores(apiCollectionName);
         //Auth Mechanism
         let authMechanismPresent = false
         const authMechanismDataResponse = await testingApi.fetchAuthMechanismData()
@@ -190,7 +189,8 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
     const toggleRunTest = () => {
         setActive(prev => !prev)
         if (active) {
-            closeRunTest()
+            if(closeRunTest !== undefined)closeRunTest()
+            setTestMode("");
         }
     }
 
@@ -462,6 +462,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         const collectionId = parseInt(apiCollectionId)
 
         const tests = testRun.tests
+        
         const selectedTests = []
         Object.keys(tests).forEach(category => {
             tests[category].forEach(test => {
@@ -497,9 +498,11 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
             finalAdvancedConditions = transform.prepareConditionsForTesting(conditions)
         }
 
-        if (filtered || selectedResourcesForPrimaryAction.length > 0) {
-            await observeApi.scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, "TESTING_UI", testRoleId, continuousTesting, sendSlackAlert, finalAdvancedConditions, cleanUpTestingResources)
+        if (filtered || selectedResourcesForPrimaryAction?.length > 0) {
+                console.log(apiInfoKeyList, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, "TESTING_UI", testRoleId, continuousTesting, sendSlackAlert, finalAdvancedConditions, cleanUpTestingResources)
+                await observeApi.scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, "TESTING_UI", testRoleId, continuousTesting, sendSlackAlert, finalAdvancedConditions, cleanUpTestingResources)
         } else {
+            console.log(collectionId, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, finalAdvancedConditions,cleanUpTestingResources)
             await observeApi.scheduleTestForCollection(collectionId, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, finalAdvancedConditions,cleanUpTestingResources)
         }
 
@@ -571,8 +574,8 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
             <RunTestSuites
                 testSuiteModal={testSuite}
                 testSuiteModalToggle={testSuiteToggle}
-                testRun={testRun}
-                setTestRun={setTestRun}
+                parentTestRun={testRun}
+                setParentTestRun={setTestRun}
                 runTypeOptions={runTypeOptions}
                 hourlyTimes={hourlyTimes}
                 testRunTimeOptions={testRunTimeOptions}
@@ -586,7 +589,10 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                 nameSuffixes={nameSuffixes}
                 convertToLowerCaseWithUnderscores={convertToLowerCaseWithUnderscores}
                 apiCollectionName={apiCollectionName}
-                testIdConfig={testIdConfig}/>
+                testIdConfig={testIdConfig}
+                initialState={initialState}
+                setTestMode={setTestMode}
+                testMode={testMode}/>
             <Modal
                 activator={runTestRef}
                 open={active}

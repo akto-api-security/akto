@@ -5,25 +5,27 @@ import data from "./dummyData.json"
 import "./run_test_suites.css"
 import RunTestConfiguration from "./RunTestConfiguration";
 import AdvancedSettingsComponent from "./component/AdvancedSettingsComponent";
+import { use } from "react";
 
 
 
-function RunTestSuites({ testSuiteModal, testSuiteModalToggle, testRun, setTestRun, runTypeOptions, hourlyTimes, testRunTimeOptions, testRolesArr, maxConcurrentRequestsOptions, slackIntegrated, generateLabelForSlackIntegration, dispatchConditions, conditions, handleRun, handleRemoveAll, convertToLowerCaseWithUnderscores, apiCollectionName, testIdConfig }) {
+function RunTestSuites({ testSuiteModal, testSuiteModalToggle, parentTestRun, setParentTestRun, runTypeOptions, hourlyTimes, testRunTimeOptions, testRolesArr, maxConcurrentRequestsOptions, slackIntegrated, generateLabelForSlackIntegration, dispatchConditions, conditions, handleRun, convertToLowerCaseWithUnderscores, apiCollectionName, testIdConfig,initialState,setTestMode, testMode }) {
 
     const [owaspTop10, owaspTop10Toggle] = useState(true);
     const [openConfigurations, openConfigurationsToggle] = useState(false);
     const [testSuite, setTestSuite] = useState(true);
     const [selectedTestSuites, setSelectedTestSuites] = useState([]);
+    const [testRun, setTestRun] = useState({...initialState});
 
     const owaspTop10List = {
         "Broken Object Level Authorization": ["BOLA"],
         "Broken Authentication": ["NO_AUTH"],
-        "Broken Object Property Level Authorization": ["EDE","MA"],
+        "Broken Object Property Level Authorization": ["EDE", "MA"],
         "Unrestricted Resource Consumption": ["RL"],
         "Broken Function Level Authorization": ["BFLA"],
         "Unrestricted Access to Sensitive Business Flows": ["INPUT"],
         "Server Side Request Forgery": ['SSRF'],
-        "Security Misconfiguration": ["SM", "UHM", "VEM", "MHH", "SVD", "CORS","ILM"],
+        "Security Misconfiguration": ["SM", "UHM", "VEM", "MHH", "SVD", "CORS", "ILM"],
         "Improper Inventory Management": ["IAM", "IIM"],
         "Unsafe Consumption of APIs": ["COMMAND_INJECTION", "INJ", "CRLF", "SSTI", "LFI", "XSS", "INJECT"]
     }
@@ -34,7 +36,7 @@ function RunTestSuites({ testSuiteModal, testSuiteModalToggle, testRun, setTestR
         if (testIdConfig?.testingRunConfig?.testSubCategoryList?.length > 0) {
             const testSubCategoryList = [...testIdConfig.testingRunConfig.testSubCategoryList];
 
-            const updatedTests = { ...testRun.tests };
+            const updatedTests = { ...parentTestRun.tests };
 
             // Reset all test selections
             Object.keys(updatedTests).forEach(category => {
@@ -46,7 +48,7 @@ function RunTestSuites({ testSuiteModal, testSuiteModalToggle, testRun, setTestR
             Object.keys(updatedTests).forEach(category => {
                 updatedTests[category] = updatedTests[category].map(test => ({
                     ...test,
-                    selected: testSubCategorySet.has(test.value), 
+                    selected: testSubCategorySet.has(test.value),
                 }));
             });
 
@@ -54,38 +56,67 @@ function RunTestSuites({ testSuiteModal, testSuiteModalToggle, testRun, setTestR
             function areObjectArraysEqual(obj1, obj2) {
                 const keys1 = Object.keys(obj1);
                 const keys2 = Object.keys(obj2);
-            
+
                 if (keys1.length !== keys2.length) return false;
-            
+
                 const setKeys1 = new Set(keys1);
                 const setKeys2 = new Set(keys2);
                 if (setKeys1.size !== setKeys2.size || [...setKeys1].some(key => !setKeys2.has(key))) {
                     return false;
                 }
-            
+
                 for (let key of keys1) {
                     const arr1 = obj1[key].map(obj => JSON.stringify(obj)).sort(); // O(m log m)
                     const arr2 = obj2[key].map(obj => JSON.stringify(obj)).sort(); // O(m log m)
-            
+
                     if (arr1.length !== arr2.length || arr1.some((item, index) => item !== arr2[index])) {
                         return false;
                     }
                 }
-            
+
                 return true;
             }
-            
+
 
             // Update state only if there is a change
-            if (!areObjectArraysEqual(updatedTests, testRun.tests)) {
+            if (!areObjectArraysEqual(updatedTests, parentTestRun.tests)) {
                 setTestRun(prev => ({
-                    ...prev,
+                    ...parentTestRun,
                     tests: updatedTests,
                 }));
-            } 
+            }
         }
-    }, [testRun]);
+        else {
+            setTestRun(prev => {
+                return {
+                    ...parentTestRun
+                }
+            });
+        }
+        const updatedName = parentTestRun.testName;
+        setSelectedTestSuites(prev=>{
+            const updatedSelectedTestSuites = [];
+            Object.keys(owaspTop10List).forEach(key => {
+                if(updatedName.includes(key.replace(/\s+/g, '_'))){
+                    updatedSelectedTestSuites.push(key.replace(/\s+/g, '_'));
+                }
+            })
+            return updatedSelectedTestSuites;
+        });
+    }, [parentTestRun]);
 
+    const [shouldCallFunction, setShouldCallFunction] = useState(false);
+
+    function handleTestSuiteRun(){
+        console.log("handleTestSuiteRun");
+        setParentTestRun(testRun);
+        setShouldCallFunction(true);
+    }
+
+    useEffect(() => {
+        if(shouldCallFunction) handleRun();
+        setShouldCallFunction(false);
+    }, [shouldCallFunction]);
 
     function handleTestSuiteSelection(key, data) {
         let updatedSelectedTestSuites;
@@ -115,6 +146,18 @@ function RunTestSuites({ testSuiteModal, testSuiteModalToggle, testRun, setTestR
         });
     }
 
+    function handleRemoveAll() {
+        setTestRun(prev => {
+            const tests = { ...testRun.tests }
+            Object.keys(tests).forEach(category => {
+                tests[category] = tests[category].map(test => ({ ...test, selected: false }))
+            })
+
+            return { ...prev, tests: tests}
+        })
+        func.setToast(true, false, "All tests unselected")
+    }
+
     function countTestSuitesTests(data) {
         let count = 0;
         const test = { ...testRun.tests };
@@ -137,7 +180,7 @@ function RunTestSuites({ testSuiteModal, testSuiteModalToggle, testRun, setTestR
 
     function checkedSelected(data) {
         let hasNonEmptyCategory = false;
-    
+
         for (const category of data) {
             if (testRun.tests[category] && testRun.tests[category].length > 0) {
                 hasNonEmptyCategory = true;
@@ -146,11 +189,11 @@ function RunTestSuites({ testSuiteModal, testSuiteModalToggle, testRun, setTestR
                 }
             }
         }
-    
+
         return hasNonEmptyCategory;
     }
 
-    function checkDisableTestSuite(data){
+    function checkDisableTestSuite(data) {
         for (const category of data) {
             if (testRun.tests[category] && testRun.tests[category].length > 0) {
                 return false;
@@ -208,24 +251,28 @@ function RunTestSuites({ testSuiteModal, testSuiteModalToggle, testRun, setTestR
         <div className="runTestSuitesModal">
             <Modal
                 open={testSuiteModal}
-                onClose={() => testSuiteModalToggle(false)}
+                onClose={() => {
+                    if(setTestMode)setTestMode("");
+                    testSuiteModalToggle(false);
+                }}
                 title="Configure Test"
                 primaryAction={{
-                    content: 'Run test',
-                    onAction: () => handleRun(),
+                    content: testMode?'Save & Re-run':'Run test',
+                    onAction: () => handleTestSuiteRun(),
+                    disabled: countAllSelectedTests() === 0,
                 }}
                 secondaryActions={[
-                    {
+                    countAllSelectedTests()?{
                         content: `${countAllSelectedTests()} tests selected`,
                         disabled: true,
                         plain: true,
-                    },
+                    }:null,
                     {
                         content: 'Cancel',
                         onAction: () => testSuiteModalToggle(false),
                     },
 
-                ]}
+                ].filter(Boolean)}
                 large
                 footer={openConfigurations ? <Button onClick={() => openConfigurationsToggle(false)} plain><Text as="p" fontWeight="regular">Go back to test selection</Text></Button> : <Button onClick={() => openConfigurationsToggle(true)} plain><Text as="p" fontWeight="regular">Change Configurations</Text></Button>}
             >
@@ -241,11 +288,7 @@ function RunTestSuites({ testSuiteModal, testSuiteModalToggle, testRun, setTestR
                                     />
                                 </div>
                                 <HorizontalStack gap={4}>
-                                    <Button
-                                        plain
-                                    ><div data-testid="remove_all_tests">Refresh</div></Button>
-
-                                    <Button
+                                    <Button disabled={countAllSelectedTests() === 0}
                                         onClick={() => { handleRemoveAll() }}
                                         plain
                                         destructive><div data-testid="remove_all_tests">Clear selection</div></Button>

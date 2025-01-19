@@ -224,13 +224,13 @@ function SingleTestRunPage() {
 
   useEffect(() => {
     setUpdateTable(Date.now().toString())
-    if (testingRunResultSummariesObj?.testingRun?.testingEndpoints?.type === "COLLECTION_WISE") {
-      api.fetchCollectionWiseApiEndpoints(testingRunResultSummariesObj?.testingRun?.testingEndpoints.apiCollectionId).then((res) => {
+    if (testingRunResultSummariesObj?.testingRun?.testingEndpoints.type === "COLLECTION_WISE") {
+      api.fetchCollectionWiseApiEndpoints(testingRunResultSummariesObj?.testingRun.testingEndpoints.apiCollectionId).then((res) => {
         setFilteredEndpoints([...res?.listOfEndpointsInCollection]);
       })
     }
-    else if(testingRunResultSummariesObj?.testingRun?.testingEndpoints?.type === "CUSTOM"){
-      setFilteredEndpoints([...testingRunResultSummariesObj?.testingRun?.testingEndpoints?.apisList]);
+    else if (testingRunResultSummariesObj?.testingRun?.testingEndpoints.type === "CUSTOM") {
+      setFilteredEndpoints([...testingRunResultSummariesObj?.testingRun.testingEndpoints.apisList]);
     }
   }, [testingRunResultSummariesObj])
 
@@ -506,15 +506,25 @@ function SingleTestRunPage() {
   }
 
   function getCollectionId() {
-    if (testingRunResultSummariesObj?.testingRun?.testingEndpoints?.type !== "COLLECTION_WISE") {
-      return testingRunResultSummariesObj?.testingRun.testingEndpoints?.apisList?.length == 1 ? testingRunResultSummariesObj?.testingRun.testingEndpoints?.apisList[0].apiCollectionId : undefined;
+    const testingEndpoints = testingRunResultSummariesObj?.testingRun?.testingEndpoints;
+
+    if (!testingEndpoints) return undefined;
+
+    if (testingEndpoints.type === "COLLECTION_WISE") {
+      return testingEndpoints.apiCollectionId;
     }
-    return testingRunResultSummariesObj?.testingRun?.apiCollectionId;
+
+    return (testingEndpoints.apisList?.length === 1) ? testingEndpoints.apisList[0].apiCollectionId : undefined;
   }
+
+  function checkFiltered() {
+    return testingRunResultSummariesObj?.testingRun?.testingEndpoints?.type !== "COLLECTION_WISE";
+  }
+
 
   const resultTable = (
     <>
-      {testMode.length > 0 ? <RunTest testMode={testMode} preActivator={true} testIdConfig={testingRunResultSummariesObj?.testingRun} apiCollectionId={getCollectionId()} endpoints={filteredEndpoints}/> : null}
+      {testMode.length > 0 ? <RunTest testMode={testMode} preActivator={true} testIdConfig={testingRunResultSummariesObj?.testingRun} apiCollectionId={getCollectionId()} endpoints={filteredEndpoints} setTestMode={setTestMode} filtered={checkFiltered()} /> : null}
       <GithubServerTable
         key={"table"}
         pageLimit={selectedTab === 'vulnerable' ? 150 : 50}
@@ -786,7 +796,7 @@ function SingleTestRunPage() {
       },
       {
         content: 'Add individual test',
-        icon:PlusMinor,
+        icon: PlusMinor,
         onAction: () => { setTestMode("individualTest") }
       }
     ]
