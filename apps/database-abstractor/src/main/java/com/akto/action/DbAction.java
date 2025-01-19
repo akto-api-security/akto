@@ -188,6 +188,7 @@ public class DbAction extends ActionSupport {
     Bson completedUpdate;
     int totalApiCount;
     boolean hybridTestingEnabled;
+    String miniTestingServiceName;
     TestingRun testingRun;
     TestingRunConfig testingRunConfig;
     Boolean exists;
@@ -1069,7 +1070,7 @@ public class DbAction extends ActionSupport {
 
     public String findPendingTestingRun() {
         try {
-            testingRun = DbLayer.findPendingTestingRun(delta);
+            testingRun = DbLayer.findPendingTestingRun(delta, miniTestingServiceName);
             if (testingRun != null) {
                 /*
                 * There is a db call involved for collectionWiseTestingEndpoints, thus this hack. 
@@ -1088,7 +1089,7 @@ public class DbAction extends ActionSupport {
 
     public String findPendingTestingRunResultSummary() {
         try {
-            trrs = DbLayer.findPendingTestingRunResultSummary(now, delta);
+            trrs = DbLayer.findPendingTestingRunResultSummary(now, delta, miniTestingServiceName);
             if (trrs != null) {
                 trrs.setTestingRunHexId(trrs.getTestingRunId().toHexString());
             }
@@ -1603,6 +1604,15 @@ public class DbAction extends ActionSupport {
     public String modifyHybridTestingSetting() {
         try {
             DbLayer.modifyHybridTestingSetting(hybridTestingEnabled);
+        } catch (Exception e) {
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String modifyHybridTestingSettingWithCustomName() {
+        try {
+            DbLayer.modifyHybridTestingSettingWithCustomName(hybridTestingEnabled, miniTestingServiceName);
         } catch (Exception e) {
             return Action.ERROR.toUpperCase();
         }
@@ -2679,6 +2689,14 @@ public class DbAction extends ActionSupport {
 
     public void setFilter(Bson filter) {
         this.filter = filter;
+    }
+
+    public String getMiniTestingServiceName() {
+        return miniTestingServiceName;
+    }
+
+    public void setMiniTestingServiceName(String miniTestingServiceName) {
+        this.miniTestingServiceName = miniTestingServiceName;
     }
 
     public String getOperator() {
