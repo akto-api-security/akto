@@ -69,6 +69,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static com.akto.test_editor.execution.Build.modifyRequest;
+import static com.akto.testing.Utils.writeJsonContentInFile;
 
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -149,6 +150,13 @@ public class TestExecutor {
     }
 
     public void apiWiseInit(TestingRun testingRun, ObjectId summaryId, boolean debug, List<TestingRunResult.TestLog> testLogs, SyncLimit syncLimit, boolean shouldInitOnly) {
+
+        // write producer running here as producer has been initiated now
+        BasicDBObject dbObject = new BasicDBObject();
+        dbObject.put("PRODUCER_RUNNING", true);
+        dbObject.put("CONSUMER_RUNNING", false);
+        writeJsonContentInFile(Constants.TESTING_STATE_FOLDER_PATH, Constants.TESTING_STATE_FILE_NAME, dbObject);
+
         int accountId = Context.accountId.get();
         TestingEndpoints testingEndpoints = testingRun.getTestingEndpoints();
 
@@ -340,7 +348,11 @@ public class TestExecutor {
             } catch (InterruptedException e) {
                 throw new RuntimeException(e);
             }
-    
+
+            dbObject = new BasicDBObject();
+            dbObject.put("PRODUCER_RUNNING", false);
+            dbObject.put("CONSUMER_RUNNING", true);
+            writeJsonContentInFile(Constants.TESTING_STATE_FOLDER_PATH, Constants.TESTING_STATE_FILE_NAME, dbObject);
             loggerMaker.infoAndAddToDb("Finished inserting records in kafka", LogDb.TESTING);
         }
         

@@ -27,6 +27,8 @@ public class Constants {
     public static final String TEST_RESULTS_TOPIC_NAME = "akto.test.messages";
     public static final String AKTO_KAFKA_GROUP_ID_CONFIG =  "asdf";
     public static final int AKTO_KAFKA_MAX_POLL_RECORDS_CONFIG = 100;
+    public static final String TESTING_STATE_FOLDER_PATH = "testing-info";
+    public static final String TESTING_STATE_FILE_NAME = "testing-state.json";
 
     public static final String UNDERSCORE = "_";
 

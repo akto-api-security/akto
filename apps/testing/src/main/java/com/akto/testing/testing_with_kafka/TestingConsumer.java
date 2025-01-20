@@ -36,8 +36,8 @@ import com.mongodb.WriteConcern;
 
 public class TestingConsumer {
 
-    Properties properties = com.akto.runtime.utils.Utils.configProperties(Constants.LOCAL_KAFKA_BROKER_URL, Constants.AKTO_KAFKA_GROUP_ID_CONFIG, Constants.AKTO_KAFKA_MAX_POLL_RECORDS_CONFIG);
-    private Consumer<String, String> consumer = new KafkaConsumer<>(properties); ;
+    static Properties properties = com.akto.runtime.utils.Utils.configProperties(Constants.LOCAL_KAFKA_BROKER_URL, Constants.AKTO_KAFKA_GROUP_ID_CONFIG, Constants.AKTO_KAFKA_MAX_POLL_RECORDS_CONFIG);
+    private static Consumer<String, String> consumer = new KafkaConsumer<>(properties); 
     final private TestExecutor testExecutor = new TestExecutor();
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(TestingConsumer.class);
@@ -87,27 +87,12 @@ public class TestingConsumer {
     }
     public void init(){
         initializeConsumer();
+        consumer.wakeup();
+        
         String topicName = Constants.TEST_RESULTS_TOPIC_NAME;
-
-        final Thread mainThread = Thread.currentThread();
         final AtomicBoolean exceptionOnCommitSync = new AtomicBoolean(false);
 
         List<Future<Void>> futures = new ArrayList<>();
-
-        Runtime.getRuntime().addShutdownHook(new Thread() {
-            public void run() {
-                consumer.wakeup();
-                try {
-                    if (!exceptionOnCommitSync.get()) {
-                        mainThread.join();
-                    }
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                } catch (Error e){
-                    loggerMaker.errorAndAddToDb("Error in main thread: "+ e.getMessage(), LogDb.TESTING);
-                }
-            }
-        });
 
         long lastSyncOffset = 0;
         try {
@@ -118,6 +103,11 @@ public class TestingConsumer {
 
             while (true) {
                 ConsumerRecords<String, String> records = consumer.poll(Duration.ofMillis(10000));
+                if(records.isEmpty()){
+                    logger.info("Returning as no records were found, so now complete the test.");
+                    consumer.close();
+                    return;
+                }
                 try {
                     consumer.commitSync();
                 } catch (Exception e) {
@@ -143,7 +133,6 @@ public class TestingConsumer {
             Utils.printL(e);
             loggerMaker.errorAndAddToDb("Error in main testing consumer: " + e.getMessage(),LogDb.TESTING);
             e.printStackTrace();
-            System.exit(0);
         } finally {
             consumer.close();
         }

@@ -1,5 +1,6 @@
 package com.akto.testing;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -20,7 +21,6 @@ import com.akto.dao.testing.VulnerableTestingRunResultDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.CollectionConditions.ConditionsType;
-import com.akto.dto.ApiInfo;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.RawApi;
 import com.akto.dto.test_editor.DataOperandsFilterResponse;
@@ -32,7 +32,6 @@ import com.akto.dto.testing.GenericTestResult;
 import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.TestResult.Confidence;
 import com.akto.dto.testing.TestResult.TestError;
-import com.akto.dto.testing.TestingRunConfig;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.WorkflowUpdatedSampleData;
 import com.akto.dto.type.RequestTemplate;
@@ -46,6 +45,7 @@ import com.akto.util.Constants;
 import com.akto.util.JSONUtils;
 import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.Severity;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
@@ -530,5 +530,42 @@ public class Utils {
         }       
         return testingRunResult;
     }
+
+    public static boolean createFolder(String folderName){
+        File statusDir = new File(folderName);
+        
+        if (!statusDir.exists()) {
+            boolean created = statusDir.mkdirs();
+            if (!created) {
+                System.err.println("Failed to create directory: " + folderName);
+                return false;
+            }
+            return true;
+        }
+        return false;
+    }
+
+    public static void writeJsonContentInFile(String folderName, String fileName, Object content){
+        try {
+            File file = new File(folderName, fileName);
+            ObjectMapper objectMapper = new ObjectMapper();
+            objectMapper.writerWithDefaultPrettyPrinter().writeValue(file, content);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    public static <T> T readJsonContentFromFile(String folderName, String fileName, Class<T> valueType) {
+        T result = null;
+        try {
+            File file = new File(folderName, fileName);
+            ObjectMapper objectMapper = new ObjectMapper();
+            result = objectMapper.readValue(file, valueType);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return result;
+    }
+    
     
 }

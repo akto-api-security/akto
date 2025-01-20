@@ -329,6 +329,10 @@ public class Main {
         loggerMaker.infoAndAddToDb("os.arch: " + System.getProperty("os.arch"), LogDb.TESTING);
         loggerMaker.infoAndAddToDb("os.version: " + System.getProperty("os.version"), LogDb.TESTING);
 
+        // create /testing-info folder in the memory from here
+        boolean val = Utils.createFolder(Constants.TESTING_STATE_FOLDER_PATH);
+        logger.info("Testing info folder status: " + val);
+
         SingleTypeInfo.init();
         while (true) {
             AccountTask.instance.executeTaskForNonHybridAccounts(account -> {
