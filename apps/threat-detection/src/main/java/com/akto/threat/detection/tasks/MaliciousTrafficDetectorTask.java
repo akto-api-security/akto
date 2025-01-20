@@ -271,6 +271,8 @@ public class MaliciousTrafficDetectorTask implements Task {
             .setLatestApiPayload(maliciousReq.getPayload())
             .setLatestApiMethod(maliciousReq.getMethod())
             .setDetectedAt(responseParam.getTime())
+            .setCategory(apiFilter.getInfo().getCategory().getName())
+            .setSubCategory(apiFilter.getInfo().getSubCategory())
             .build();
     MaliciousEventKafkaEnvelope envelope =
         MaliciousEventKafkaEnvelope.newBuilder()

@@ -6,10 +6,12 @@ import java.util.Map;
 
 import com.akto.dao.api_protection_parse_layer.AggregationLayerParser;
 import com.akto.dao.test_editor.filter.ConfigParser;
+import com.akto.dao.test_editor.info.InfoParser;
 import com.akto.dto.api_protection_parse_layer.AggregationRules;
 import com.akto.dto.monitoring.FilterConfig;
 import com.akto.dto.test_editor.ConfigParserResult;
 import com.akto.dto.test_editor.ExecutorConfigParserResult;
+import com.akto.dto.test_editor.Info;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
@@ -82,6 +84,14 @@ public class FilterConfigYamlParser {
 
         if (filterConfig != null) {
             filterConfig.setAggregationRules(aggRules);
+        }
+
+        InfoParser infoParser = new InfoParser();
+        if (config.containsKey("info")) {
+            Info info = infoParser.parse(config.get("info"));
+            if (filterConfig != null) {
+                filterConfig.setInfo(info);
+            }
         }
 
         return filterConfig;
