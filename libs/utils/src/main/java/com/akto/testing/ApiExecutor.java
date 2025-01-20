@@ -424,6 +424,13 @@ public class ApiExecutor {
             payloadConditions.getOrDefault(TestEditorEnums.NonTerminalExecutorDataOperands.ADD_BODY_PARAM.name(), emptyList),
             payloadConditions.getOrDefault(TestEditorEnums.TerminalExecutorDataOperands.DELETE_BODY_PARAM.name(), emptyList)
         );
+
+        // modify query params as well from payload conditions only, not handling query conditions separately for now
+        Utils.modifyQueryOperations(originalHttpRequest, 
+            payloadConditions.getOrDefault(TestEditorEnums.NonTerminalExecutorDataOperands.MODIFY_BODY_PARAM.name(), emptyList), 
+            emptyList,
+            payloadConditions.getOrDefault(TestEditorEnums.TerminalExecutorDataOperands.DELETE_BODY_PARAM.name(), emptyList)
+        );
     }
 
     private static void calculateHashAndAddAuth(OriginalHttpRequest originalHttpRequest, boolean executeScript) {
