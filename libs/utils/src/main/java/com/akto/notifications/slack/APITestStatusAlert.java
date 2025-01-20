@@ -35,9 +35,9 @@ public class APITestStatusAlert extends SlackAlerts {
      * @param viewOnAktoURL The URL to view all the issues on the Akto dashboard.
      * @param exportReportUrl The URL to export the issue report.
      */
-    public APITestStatusAlert(String title, int high, int medium, int low, int vulnerableApis, int newIssues, int totalApis, String collection, long scanTimeInSeconds, String testType, long nextTestRun, List<NewIssuesModel> newIssuesList, String viewOnAktoURL, String exportReportUrl) {
+    public APITestStatusAlert(String title, int critical, int high, int medium, int low, int vulnerableApis, int newIssues, int totalApis, String collection, long scanTimeInSeconds, String testType, long nextTestRun, List<NewIssuesModel> newIssuesList, String viewOnAktoURL, String exportReportUrl) {
         super(API_TEST_STATUS_ALERT);
-        init(title, high, medium, low, vulnerableApis, newIssues, totalApis, collection, scanTimeInSeconds, testType, nextTestRun, newIssuesList, viewOnAktoURL, exportReportUrl);
+        init(title, critical, high, medium, low, vulnerableApis, newIssues, totalApis, collection, scanTimeInSeconds, testType, nextTestRun, newIssuesList, viewOnAktoURL, exportReportUrl);
     }
 
     private HorizontalFieldModel horizontalFieldModel;
@@ -45,7 +45,7 @@ public class APITestStatusAlert extends SlackAlerts {
     private List<NewIssuesModel> newIssuesModelList;
     private List<ActionButtonModel> actionButtonModelList;
     private String dashboardUrl;
-    private void init(String title, int high, int medium, int low, int vulnerableApis, int newIssues, int totalApis, String collection, long scanTimeInSeconds, String testType, long nextTestRun, List<NewIssuesModel> newIssuesList, String viewOnAktoURL, String exportReportUrl) {
+    private void init(String title, int critical, int high, int medium, int low, int vulnerableApis, int newIssues, int totalApis, String collection, long scanTimeInSeconds, String testType, long nextTestRun, List<NewIssuesModel> newIssuesList, String viewOnAktoURL, String exportReportUrl) {
         List<SlackWebhook> listWebhooks = SlackWebhooksDao.instance.findAll(new BasicDBObject());
         if(listWebhooks != null && !listWebhooks.isEmpty()) {
             SlackWebhook slackWebhook = listWebhooks.get(0);

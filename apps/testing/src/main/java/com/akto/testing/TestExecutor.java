@@ -132,6 +132,7 @@ public class TestExecutor {
         }
 
         Map<String, Integer> totalCountIssues = new HashMap<>();
+        totalCountIssues.put("CRITICAL", 0);
         totalCountIssues.put("HIGH", 0);
         totalCountIssues.put("MEDIUM", 0);
         totalCountIssues.put("LOW", 0);

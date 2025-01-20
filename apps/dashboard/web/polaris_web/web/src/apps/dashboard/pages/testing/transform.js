@@ -225,7 +225,7 @@ const transform = {
     },
     prettifyTestName: (testName, icon, iconColor, iconToolTipContent)=>{
       return(
-        <HorizontalStack gap={4}>
+        <HorizontalStack wrap={false} gap={4}>
           <Tooltip content={iconToolTipContent} hoverDelay={"300"} dismissOnMouseOut>
             <Box><Icon source={icon} color={iconColor}/></Box>
           </Tooltip>

@@ -572,6 +572,7 @@ public class Utils {
     public static float calculateRiskValueForSeverity(String severity){
         float riskScore = 0 ;
         switch (severity) {
+            case "CRITICAL":
             case "HIGH":
                 riskScore += 100;
                 break;

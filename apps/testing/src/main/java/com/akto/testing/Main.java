@@ -791,6 +791,7 @@ public class Main {
 
         SlackAlerts apiTestStatusAlert = new APITestStatusAlert(
                 testingRun.getName(),
+                severityCount.getOrDefault(GlobalEnums.Severity.CRITICAL.name(), 0),
                 severityCount.getOrDefault(GlobalEnums.Severity.HIGH.name(), 0),
                 severityCount.getOrDefault(GlobalEnums.Severity.MEDIUM.name(), 0),
                 severityCount.getOrDefault(GlobalEnums.Severity.LOW.name(), 0),
