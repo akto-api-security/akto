@@ -23,6 +23,8 @@ import java.io.IOException;
 import java.security.NoSuchAlgorithmException;
 import java.security.spec.InvalidKeySpecException;
 import java.util.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class InviteUserAction extends UserAction{
 
@@ -36,6 +38,7 @@ public class InviteUserAction extends UserAction{
     public static final String AKTO_DOMAIN = "akto.io";
 
     public static Map<String, String> commonOrganisationsMap = new HashMap<>();
+    private static final ExecutorService executor = Executors.newFixedThreadPool(1);
 
     public static String validateEmail(String email, String adminLogin) {
         if (email == null) return INVALID_EMAIL_ERROR;
@@ -161,15 +164,24 @@ public class InviteUserAction extends UserAction{
 
         String inviteFrom = getSUser().getName();
         Mail email = SendgridEmail.getInstance().buildInvitationEmail(inviteeName, inviteeEmail, inviteFrom, finalInviteCode);
+        if (!DashboardMode.isOnPremDeployment()) {
+            sendInviteEmail(email);
+        } else {
+            executor.submit(() -> {
+                sendInviteEmail(email);
+            });
+        }
+
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    private void sendInviteEmail(Mail email) {
         try {
             SendgridEmail.getInstance().send(email);
         } catch (IOException e) {
             loggerMaker.errorAndAddToDb("invite email sending failed" + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
             e.printStackTrace();
-//            return ERROR.toUpperCase();
         }
-
-        return Action.SUCCESS.toUpperCase();
     }
 
     private String invitationCodeToDelete;
