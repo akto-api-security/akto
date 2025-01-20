@@ -249,6 +249,7 @@ public class TestExecutor {
 
     public static Map<String, Integer> calcTotalCountIssues(ObjectId summaryId) {
         Map<String, Integer> totalCountIssues = new HashMap<>();
+        totalCountIssues.put(Severity.CRITICAL.toString(), 0);
         totalCountIssues.put(Severity.HIGH.toString(), 0);
         totalCountIssues.put(Severity.MEDIUM.toString(), 0);
         totalCountIssues.put(Severity.LOW.toString(), 0);
@@ -264,7 +265,7 @@ public class TestExecutor {
 
             for (TestingRunResult testingRunResult : testingRunResults) {
                 String severity = getSeverityFromTestingRunResult(testingRunResult).toString();
-                int initialCount = totalCountIssues.get(severity);
+                int initialCount = totalCountIssues.getOrDefault(severity, 0);
                 totalCountIssues.put(severity, initialCount + 1);
             }
 

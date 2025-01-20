@@ -716,6 +716,7 @@ public class DbLayer {
                                     Updates.set(TestingRunResultSummary.COUNT_ISSUES, totalCountIssues)
             );
             Bson updateIncrement = Updates.combine(
+                Updates.inc("countIssues.CRITICAL", totalCountIssues.getOrDefault("CRITICAL", 0)),
                 Updates.inc("countIssues.HIGH", totalCountIssues.getOrDefault("HIGH", 0)),
                 Updates.inc("countIssues.MEDIUM", totalCountIssues.getOrDefault("MEDIUM", 0)),
                 Updates.inc("countIssues.LOW", totalCountIssues.getOrDefault("LOW", 0))
