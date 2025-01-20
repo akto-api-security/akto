@@ -1,7 +1,6 @@
 import { VerticalStack, Modal, TextField, Button, Text, HorizontalStack, Collapsible, Badge, Pagination, TextContainer, Icon, Scrollable, Checkbox, Box, Tooltip, Card, MediaCard } from "@shopify/polaris";
 import { TickMinor, CancelMajor, SearchMinor } from "@shopify/polaris-icons";
 import { useEffect, useRef, useState } from "react";
-import data from "./dummyData.json"
 import "./run_test_suites.css"
 import RunTestConfiguration from "./RunTestConfiguration";
 import AdvancedSettingsComponent from "./component/AdvancedSettingsComponent";
@@ -64,8 +63,8 @@ function RunTestSuites({ testSuiteModal, testSuiteModalToggle, parentTestRun, se
                 }
 
                 for (let key of keys1) {
-                    const arr1 = obj1[key].map(obj => JSON.stringify(obj)).sort(); // O(m log m)
-                    const arr2 = obj2[key].map(obj => JSON.stringify(obj)).sort(); // O(m log m)
+                    const arr1 = obj1[key].map(obj => JSON.stringify(obj)).sort(); 
+                    const arr2 = obj2[key].map(obj => JSON.stringify(obj)).sort(); 
 
                     if (arr1.length !== arr2.length || arr1.some((item, index) => item !== arr2[index])) {
                         return false;
@@ -303,7 +302,7 @@ function RunTestSuites({ testSuiteModal, testSuiteModalToggle, parentTestRun, se
                                             disclosure
                                         >
                                             <span style={{ fontWeight: "550", color: " #202223" }}>
-                                                {data.owaspTop10.name} <span style={{ paddingLeft: "0.2rem" }}> </span>
+                                                {"OWASP top 10"} <span style={{ paddingLeft: "0.2rem" }}> </span>
                                             </span>
                                             
                                         </Button>
