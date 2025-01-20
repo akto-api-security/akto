@@ -53,6 +53,7 @@ import com.akto.dto.pii.PIISource;
 import com.akto.dto.pii.PIIType;
 import com.akto.dto.settings.DefaultPayload;
 import com.akto.dto.sso.SAMLConfig;
+import com.akto.dto.test_editor.Category;
 import com.akto.dto.test_editor.TestConfig;
 import com.akto.dto.test_editor.TestLibrary;
 import com.akto.dto.test_editor.YamlTemplate;
@@ -127,6 +128,7 @@ import com.mongodb.bulk.BulkWriteResult;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.*;
 import com.mongodb.client.result.DeleteResult;
+import com.mongodb.client.result.UpdateResult;
 import com.slack.api.Slack;
 import com.slack.api.util.http.SlackHttpClient;
 import com.slack.api.webhook.WebhookResponse;
@@ -3213,6 +3215,11 @@ public class InitializerListener implements ServletContextListener {
                                 processTemplateFilesZip(zipFile, Constants._AKTO, YamlTemplateSource.AKTO_TEMPLATES.toString(), "");
                             }
                         }
+
+                        if (accountSettings.getComplianceInfosUpdatedTs() > 0) {
+                            addComplianceFromCommonToAccount(getFromCommonDb());
+                            replaceComplianceFromCommonToAccount(getFromCommonDb());    
+                        }
                         
                     } catch (Exception e) {
                         cacheLoggerMaker.errorAndAddToDb(e,
@@ -3306,6 +3313,85 @@ public class InitializerListener implements ServletContextListener {
         }        
     }
 
+    private static Map<String, ComplianceInfo> getFromCommonDb() {
+        Bson emptyFilter = Filters.empty();
+        List<ComplianceInfo> complianceInfosInDb = ComplianceInfosDao.instance.findAll(emptyFilter, Projections.exclude(ComplianceInfo.MAP_COMPLIANCE_TO_LIST_CLAUSES));
+        Map<String, ComplianceInfo> mapIdToComplianceInDb = complianceInfosInDb.stream().collect(Collectors.toMap(ComplianceInfo::getId, Function.identity()));
+        return mapIdToComplianceInDb;        
+    }
+
+    public static void replaceComplianceFromCommonToAccount(Map<String, ComplianceInfo> mapIdToComplianceInCommon) {
+        try {
+            String ic = "info.compliance.";
+            for(String fileSourceId: mapIdToComplianceInCommon.keySet()) {
+                ComplianceInfo complianceInfoInCommon = mapIdToComplianceInCommon.get(fileSourceId);
+
+                Bson filters = 
+                    Filters.and(
+                        Filters.eq("info.compliance.source", fileSourceId), 
+                        Filters.ne(ic+ComplianceInfo.HASH, complianceInfoInCommon.getHash())
+                    );
+
+                Bson updates = Updates.combine(
+                    Updates.set(ic+ComplianceInfo.HASH, complianceInfoInCommon.getHash()),
+                    Updates.set(ic+ComplianceInfo.MAP_COMPLIANCE_TO_LIST_CLAUSES, complianceInfoInCommon.getMapComplianceToListClauses())
+                );                 
+                UpdateResult updateResult = ComplianceMappingsDao.instance.updateMany(filters, updates);
+                loggerMaker.infoAndAddToDb("replaceComplianceFromCommonToAccount: " + Context.accountId.get() + " : " +fileSourceId+" "+ updateResult);
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error in replaceComplianceFromCommonToAccount: " + Context.accountId.get() + " : " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
+    public static void addComplianceFromCommonToAccount(Map<String, ComplianceInfo> mapIdToComplianceInCommon) {
+        try {
+            
+            for(String fileSourceId: mapIdToComplianceInCommon.keySet()) {
+                ComplianceInfo complianceInfoInCommon = mapIdToComplianceInCommon.get(fileSourceId);
+                String compId = complianceInfoInCommon.getId().split("/")[1].split("\\.")[0].toUpperCase();
+
+                boolean isCategoryTemplate = TestCategory.valueOf(compId.toUpperCase()) != null;
+
+                if (isCategoryTemplate) continue;
+
+                Bson filters = 
+                    Filters.and(
+                        Filters.eq(Constants.ID, compId), 
+                        Filters.exists("info.compliance", false)
+                    );
+
+                ComplianceMapping complianceMapping = ComplianceMapping.createFromInfo(complianceInfoInCommon);    
+                UpdateResult updateResult = YamlTemplateDao.instance.updateMany(filters, Updates.set("compliance", complianceMapping));
+                loggerMaker.infoAndAddToDb("addComplianceFromCommonToAccount for test id: " + Context.accountId.get() + " : " + compId + " " + updateResult);
+            }            
+
+
+            for(String fileSourceId: mapIdToComplianceInCommon.keySet()) {
+                ComplianceInfo complianceInfoInCommon = mapIdToComplianceInCommon.get(fileSourceId);
+                String compId = complianceInfoInCommon.getId().split("/")[1].split("\\.")[0].toUpperCase();
+
+                boolean isCategoryTemplate = TestCategory.valueOf(compId.toUpperCase()) != null;
+
+                if (!isCategoryTemplate) continue;
+
+                Bson filters = 
+                    Filters.and(
+                        Filters.eq("info.category.shortName", compId.toUpperCase()), 
+                        Filters.exists("info.compliance", false)
+                    );
+
+                ComplianceMapping complianceMapping = ComplianceMapping.createFromInfo(complianceInfoInCommon);    
+                UpdateResult updateResult = YamlTemplateDao.instance.updateMany(filters, Updates.set("compliance", complianceMapping));
+                loggerMaker.infoAndAddToDb("addComplianceFromCommonToAccount for category: " + Context.accountId.get() + " : " + compId + " "  + updateResult);
+            }            
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error in addComplianceFromCommonToAccount: " + Context.accountId.get() + " : " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
     public static void processComplianceInfosFromZip(byte[] zipFile) {
         if (zipFile != null) {
             try (ByteArrayInputStream inputStream = new ByteArrayInputStream(zipFile);
@@ -3316,9 +3402,7 @@ public class InitializerListener implements ServletContextListener {
                 int countUnchangedCompliances = 0;
                 int countTotalCompliances = 0;
 
-                Bson emptyFilter = Filters.empty();
-                List<ComplianceInfo> complianceInfosInDb = ComplianceInfosDao.instance.findAll(emptyFilter, Projections.exclude(ComplianceInfo.MAP_COMPLIANCE_TO_LIST_CLAUSES));
-                Map<String, ComplianceInfo> mapIdToComplianceInDb = complianceInfosInDb.stream().collect(Collectors.toMap(ComplianceInfo::getId, Function.identity()));
+                Map<String, ComplianceInfo> mapIdToComplianceInDb = getFromCommonDb();
 
                 while ((entry = zipInputStream.getNextEntry()) != null) {
                     if (!entry.isDirectory()) {

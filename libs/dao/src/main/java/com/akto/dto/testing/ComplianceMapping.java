@@ -3,42 +3,29 @@ package com.akto.dto.testing;
 import java.util.List;
 import java.util.Map;
 
-import org.bson.codecs.pojo.annotations.BsonId;
-
 public class ComplianceMapping {
     
-    @BsonId
-    String id;
-
     private Map<String, List<String>> mapComplianceToListClauses;
 
     String author;
 
-    int lastUpdatedTs;
-
+    public static final String SOURCE = "source";
     String source;
 
     int hash;
 
-
     public ComplianceMapping() {
     }
 
-    public ComplianceMapping(String id, Map<String,List<String>> mapComplianceToListClauses, String author, int lastUpdatedTs, String source, int hash) {
-        this.id = id;
+    public ComplianceMapping(Map<String,List<String>> mapComplianceToListClauses, String author, String source, int hash) {
         this.mapComplianceToListClauses = mapComplianceToListClauses;
         this.author = author;
-        this.lastUpdatedTs = lastUpdatedTs;
         this.source = source;
         this.hash = hash;
     }
 
-    public String getId() {
-        return this.id;
-    }
-
-    public void setId(String id) {
-        this.id = id;
+    public static ComplianceMapping createFromInfo(ComplianceInfo complianceInfo) {
+        return new ComplianceMapping(complianceInfo.getMapComplianceToListClauses(), complianceInfo.getAuthor(), complianceInfo.getId(), complianceInfo.getHash());
     }
 
     public Map<String,List<String>> getMapComplianceToListClauses() {
@@ -55,14 +42,6 @@ public class ComplianceMapping {
 
     public void setAuthor(String author) {
         this.author = author;
-    }
-
-    public int getLastUpdatedTs() {
-        return this.lastUpdatedTs;
-    }
-
-    public void setLastUpdatedTs(int lastUpdatedTs) {
-        this.lastUpdatedTs = lastUpdatedTs;
     }
 
     public String getSource() {
@@ -84,10 +63,8 @@ public class ComplianceMapping {
     @Override
     public String toString() {
         return "{" +
-            " id='" + getId() + "'" +
             ", mapComplianceToListClauses='" + getMapComplianceToListClauses() + "'" +
             ", author='" + getAuthor() + "'" +
-            ", lastUpdatedTs='" + getLastUpdatedTs() + "'" +
             ", source='" + getSource() + "'" +
             ", hash='" + getHash() + "'" +
             "}";
