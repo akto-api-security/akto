@@ -216,6 +216,7 @@ const transform = {
     },
     prepareCountIssues : (data) => {
       let obj={
+        'Critical': (data && data['CRITICAL']) ? data['CRITICAL'] : 0,
         'High': (data && data['HIGH']) ? data['HIGH'] : 0,
         'Medium':(data && data['MEDIUM']) ? data['MEDIUM'] : 0,
         'Low': (data && data['LOW']) ? data['LOW'] : 0
@@ -299,7 +300,7 @@ const transform = {
         const prettifiedTest={
           ...obj,
           testName: transform.prettifyTestName(data.name || "Test", iconObj.icon,iconObj.color, iconObj.tooltipContent),
-          severity: observeFunc.getIssuesList(transform.filterObjectByValueGreaterThanZero(testingRunResultSummary.countIssues || {"HIGH" : 0, "MEDIUM": 0, "LOW": 0}))
+          severity: observeFunc.getIssuesList(transform.filterObjectByValueGreaterThanZero(testingRunResultSummary.countIssues || {"CRITICAL": 0, "HIGH" : 0, "MEDIUM": 0, "LOW": 0}))
         }
         return prettifiedTest
       }else{
@@ -709,6 +710,7 @@ getInfoSectionsHeaders(){
 convertSubIntoSubcategory(resp){
   let obj = {}
   let countObj = {
+    CRITICAL: 0,
     HIGH: 0,
     MEDIUM: 0,
     LOW: 0,
@@ -868,7 +870,9 @@ getPrettifiedTestRunResults(testRunResults){
     let prettifiedObj = {
       ...obj,
       nameComp: <div data-testid={obj.name}><Box maxWidth="250px"><TooltipText tooltip={obj.name} text={obj.name} textProps={{fontWeight: 'medium'}}/></Box></div>,
-      severityComp: obj?.vulnerable === true ? <Badge size="small" status={func.getTestResultStatus(obj?.severity[0])}>{obj?.severity[0]}</Badge> : <Text>-</Text>,
+      severityComp: obj?.vulnerable === true ? <div className={`badge-wrapper-${obj?.severity[0].toUpperCase()}`}>
+      <Badge size="small" status={func.getTestResultStatus(obj?.severity[0])}>{obj?.severity[0]}</Badge>
+  </div>: <Text>-</Text>,
       cweDisplayComp: obj?.cweDisplay?.length > 0 ? <HorizontalStack gap={1} wrap={false}>
         {obj.cweDisplay.map((ele,index)=>{
           return(

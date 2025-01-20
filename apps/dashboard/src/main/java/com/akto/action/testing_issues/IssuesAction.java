@@ -1,6 +1,5 @@
 package com.akto.action.testing_issues;
 
-import com.akto.action.ExportSampleDataAction;
 import com.akto.action.UserAction;
 import com.akto.action.testing.Utils;
 import com.akto.dao.HistoricalDataDao;
@@ -11,6 +10,7 @@ import com.akto.dao.demo.VulnerableRequestForTemplateDao;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dao.testing.TestingRunResultSummariesDao;
+import com.akto.dao.testing.VulnerableTestingRunResultDao;
 import com.akto.dao.testing.sources.TestReportsDao;
 import com.akto.dao.testing.sources.TestSourceConfigsDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
@@ -43,6 +43,7 @@ import com.mongodb.client.model.*;
 import com.mongodb.client.result.InsertOneResult;
 import com.opensymphony.xwork2.Action;
 
+import org.apache.commons.lang3.StringUtils;
 import org.bson.Document;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
@@ -328,13 +329,33 @@ public class IssuesAction extends UserAction {
                 issues =  TestingRunIssuesDao.instance.findAll(filters, skip, 50, null);
             }
             List<Bson> andFilters = new ArrayList<>();
+            List<Bson> filtersForNewCollection = new ArrayList<>();
+
+            Map<String,Boolean> summaryIdVsIsNew = new HashMap<>();
+
             for (TestingRunIssues issue : issues) {
-                andFilters.add(Filters.and(
-                        Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, issue.getLatestTestingRunSummaryId()),
-                        Filters.eq(TestingRunResult.TEST_SUB_TYPE, issue.getId().getTestSubCategory()),
-                        Filters.eq(TestingRunResult.API_INFO_KEY, issue.getId().getApiInfoKey()),
-                        Filters.eq(TestingRunResult.VULNERABLE, true)
-                ));
+
+                ObjectId currentSummaryId = issue.getLatestTestingRunSummaryId();
+
+                Bson baseFilter = Filters.and(
+                    Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, currentSummaryId),
+                    Filters.eq(TestingRunResult.TEST_SUB_TYPE, issue.getId().getTestSubCategory()),
+                    Filters.eq(TestingRunResult.API_INFO_KEY, issue.getId().getApiInfoKey())
+                );
+
+                Boolean val = summaryIdVsIsNew.get(currentSummaryId.toHexString());
+                if(val == null){
+                    val = VulnerableTestingRunResultDao.instance.isStoredInVulnerableCollection(currentSummaryId, true);
+                    summaryIdVsIsNew.put(currentSummaryId.toHexString(), val);
+                }
+
+                if(!val){
+                    andFilters.add(
+                        Filters.and(baseFilter,Filters.eq(TestingRunResult.VULNERABLE, true))
+                    );
+                }else{
+                    filtersForNewCollection.add(baseFilter);
+                }
             }
             if (issues.isEmpty()) {
                 this.testingRunResults = new ArrayList<>();
@@ -348,9 +369,17 @@ public class IssuesAction extends UserAction {
                 String key = issue.getId().getApiInfoKey().toString() + "_" + testSubCategory;
                 testingRunIssuesMap.put(key, issue);
             }
+            if(!andFilters.isEmpty()){
+                Bson orFilters = Filters.or(andFilters);
+                this.testingRunResults = TestingRunResultDao.instance.findAll(orFilters);
+            }
 
-            Bson orFilters = Filters.or(andFilters);
-            this.testingRunResults = TestingRunResultDao.instance.findAll(orFilters);
+            if (!filtersForNewCollection.isEmpty()) {
+                this.testingRunResults.addAll(
+                    VulnerableTestingRunResultDao.instance.findAll(Filters.or(filtersForNewCollection))
+                );
+            }
+
             Map<String, String> sampleDataVsCurlMap = new HashMap<>();
             // todo: fix
             for (TestingRunResult runResult: this.testingRunResults) {
@@ -426,7 +455,7 @@ public class IssuesAction extends UserAction {
                 Filters.eq(TestingRunResult.TEST_SUB_TYPE, testSubType),
                 Filters.eq(TestingRunResult.API_INFO_KEY, issue.getId().getApiInfoKey())
         );
-        testingRunResult = TestingRunResultDao.instance.findOne(filterForRunResult);
+        testingRunResult = VulnerableTestingRunResultDao.instance.findOneWithComparison(filterForRunResult, null);
         if (issue.isUnread() && (currentUserRole.equals(Role.ADMIN) || currentUserRole.equals(Role.MEMBER))) {
             logger.info("Issue id from db to be marked as read " + issueId);
             Bson update = Updates.combine(Updates.set(TestingRunIssues.UNREAD, false),
@@ -462,6 +491,14 @@ public class IssuesAction extends UserAction {
         infoObj.put("_name", testConfig.getId());
         infoObj.put("content", testConfig.getContent());
         infoObj.put("templateSource", testConfig.getTemplateSource());
+
+        String remediationContent = info.getRemediation();
+
+        if (!StringUtils.isEmpty(remediationContent)) {
+            infoObj.put("remediation", remediationContent);
+        }
+        
+        
         infoObj.put("updatedTs", testConfig.getUpdateTs());
         infoObj.put("author", testConfig.getAuthor());
 
@@ -518,7 +555,6 @@ public class IssuesAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
-
     public String updateIssueStatus () {
         if (issueId == null || statusToBeUpdated == null || ignoreReason == null) {
             throw new IllegalStateException();
@@ -574,8 +610,14 @@ public class IssuesAction extends UserAction {
                     countIssuesMap.put(Severity.LOW.toString(), 0);
 
                     // update summaries accordingly with issues ignored
-
-                    Map<ObjectId,String> mapSummaryToResultId = TestingRunResultDao.instance.mapSummaryIdToTestingResultHexId(testingRunResultHexIdsMap.keySet());
+                    // currently we change the summaries from result page only
+                    // so only 1 result comes at a time
+                    // Map<String,String> testingRunResultHexIdsMap has only 1 result.
+                    
+                    Map<ObjectId,String> mapSummaryToResultId = VulnerableTestingRunResultDao.instance.mapSummaryIdToTestingResultHexId(testingRunResultHexIdsMap.keySet());
+                    if(mapSummaryToResultId.isEmpty()){
+                        mapSummaryToResultId = TestingRunResultDao.instance.mapSummaryIdToTestingResultHexId(testingRunResultHexIdsMap.keySet());
+                    }
                     Map<ObjectId,Map<String,Integer>> summaryWiseCountMap = new HashMap<>();
 
                     for(ObjectId summaryId: mapSummaryToResultId.keySet()){
@@ -604,21 +646,44 @@ public class IssuesAction extends UserAction {
     List<String> issueStatusQuery;
     List<TestingRunResult> testingRunResultList;
     private Map<String, List<String>> filters;
+
     public String fetchIssuesByStatusAndSummaryId() {
+        if(latestTestingRunSummaryId == null || latestTestingRunSummaryId.isEmpty()){
+            addActionError("SummaryId is a required field and cannot be empty.");
+            return ERROR.toUpperCase();
+        }
+        if(!ObjectId.isValid(latestTestingRunSummaryId)){
+            addActionError("SummaryId is not valid");
+            return ERROR.toUpperCase();
+        }
+
+        ObjectId objectId = new ObjectId(latestTestingRunSummaryId);
+
         Bson triFilters = Filters.and(
                 Filters.in(TestingRunIssues.TEST_RUN_ISSUES_STATUS, issueStatusQuery),
-                Filters.in(TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_ID, new ObjectId(latestTestingRunSummaryId))
+                Filters.in(TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_ID, objectId)
         );
         issues = TestingRunIssuesDao.instance.findAll(triFilters, Projections.include("_id"));
-
         List<Bson> testingRunResultsFilterList = new ArrayList<>();
+        boolean isStoredInVulnerableCollection = VulnerableTestingRunResultDao.instance.isStoredInVulnerableCollection(objectId, true);
         for(TestingRunIssues issue: issues) {
-            testingRunResultsFilterList.add(Filters.and(
+            Bson filter = Filters.empty();
+            if(isStoredInVulnerableCollection){
+                filter = Filters.and(
+                    Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, new ObjectId(latestTestingRunSummaryId)),
+                    Filters.eq(TestingRunResult.API_INFO_KEY, issue.getId().getApiInfoKey()),
+                    Filters.eq(TestingRunResult.TEST_SUB_TYPE, issue.getId().getTestSubCategory())
+                );
+                
+            }else{
+                filter = Filters.and(
                     Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, new ObjectId(latestTestingRunSummaryId)),
                     Filters.eq(TestingRunResult.VULNERABLE, true),
                     Filters.eq(TestingRunResult.API_INFO_KEY, issue.getId().getApiInfoKey()),
                     Filters.eq(TestingRunResult.TEST_SUB_TYPE, issue.getId().getTestSubCategory())
-            ));
+                );
+            }
+            testingRunResultsFilterList.add(filter);
         }
 
         List<Bson> filtersList = new ArrayList<>();
@@ -632,7 +697,11 @@ public class IssuesAction extends UserAction {
             return SUCCESS.toUpperCase();
         }
 
-        testingRunResultList = TestingRunResultDao.instance.fetchLatestTestingRunResultWithCustomAggregations(Filters.and(filtersList), limit, skip, sortStage);
+        if(isStoredInVulnerableCollection){
+            testingRunResultList = VulnerableTestingRunResultDao.instance.fetchLatestTestingRunResultWithCustomAggregations(Filters.and(filtersList), limit, skip, sortStage);
+        }else{
+            testingRunResultList = TestingRunResultDao.instance.fetchLatestTestingRunResultWithCustomAggregations(Filters.and(filtersList), limit, skip, sortStage);
+        }
 
         return SUCCESS.toUpperCase();
     }

@@ -197,3 +197,27 @@
     margin-top: -20px;
     padding-block: 10px;
 }
+
+.badge-wrapper-CRITICAL .Polaris-Badge {
+    background-color: #E51C00 !important;
+    color: #FFFBFB !important;
+    font-weight: 550 !important;
+}
+
+.badge-wrapper-HIGH .Polaris-Badge {
+    background-color: #FFB800 !important;
+    color: #5E4200 !important;
+    font-weight: 550 !important;
+}
+
+.badge-wrapper-MEDIUM .Polaris-Badge {
+    background-color: #EDDB39 !important;
+    color: #332E00 !important;
+    font-weight: 550 !important;
+}
+
+.badge-wrapper-LOW .Polaris-Badge {
+    background-color: #0000000f;
+    color: #616161 !important;
+    font-weight: 550 !important;
+}

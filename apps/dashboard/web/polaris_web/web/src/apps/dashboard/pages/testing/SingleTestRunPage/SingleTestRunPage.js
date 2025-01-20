@@ -70,9 +70,10 @@ let filters = [
     label: 'Severity',
     title: 'Severity',
     choices: [
-      { label: 'High', value: 'HIGH' },
-      { label: 'Medium', value: 'MEDIUM' },
-      { label: 'Low', value: 'LOW' }
+      {label: 'Critical', value: 'CRITICAL'},
+      {label: 'High', value: 'HIGH'},
+      {label: 'Medium', value: 'MEDIUM'},
+      {label: 'Low', value: 'LOW'}
     ],
   },
   {
@@ -204,6 +205,7 @@ function SingleTestRunPage() {
       let tmp = { ...summary };
       if (tmp === null || tmp?.countIssues === null || tmp?.countIssues === undefined) {
         tmp.countIssues = {
+          "CRITICAL": 0,
           "HIGH": 0,
           "MEDIUM": 0,
           "LOW": 0
@@ -729,15 +731,18 @@ function SingleTestRunPage() {
           </Box>
           {
             selectedTestRun?.severity &&
-            selectedTestRun.severity
-              .map((item) =>
-                <Badge key={item} status={func.getTestResultStatus(item)}>
-                  <Text fontWeight="regular">
-                    {item}
-                  </Text>
-                </Badge>
-              )}
-          <Button plain monochrome onClick={() => setUpdateTable(Date.now().toString())}><Tooltip content="Refresh page" dismissOnMouseOut> <Icon source={RefreshMajor} /></Tooltip></Button>
+            selectedTestRun.severity.map((item) =>{
+              const sev = item.split(' ')
+              const tempSev = sev.length > 1 ? sev[1].toUpperCase() : ''
+              return(
+                <div className={`badge-wrapper-${tempSev}`}>
+                    <Badge key={item}>{item}</Badge>
+                </div>
+              )
+            }
+            
+            )}
+            <Button plain monochrome onClick={() => setUpdateTable(Date.now().toString())}><Tooltip content="Refresh page" dismissOnMouseOut> <Icon source={RefreshMajor} /></Tooltip></Button>
         </HorizontalStack>
         <HorizontalStack gap={"2"}>
           <HorizontalStack gap={"1"}>

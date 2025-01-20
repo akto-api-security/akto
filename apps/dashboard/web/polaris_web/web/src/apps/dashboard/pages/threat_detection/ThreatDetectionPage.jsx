@@ -33,19 +33,15 @@ function ThreatDetectionPage() {
     </HorizontalGrid>
 
     const components = [
-        horizontalComponent,
         <SusDataTable key={"sus-data-table"}
             currDateRange={currDateRange}
             rowClicked={rowClicked} />,
-        <SampleDetails showDetails={showDetails}
-            setShowDetails={setShowDetails}
-            sampleData={sampleData} />
     ]
 
     return <PageWithMultipleCards
         title={
             <TitleWithInfo
-                titleText={"Threat detection"}
+                titleText={"Threat Activity"}
                 tooltipContent={"Identify malicious requests with Akto's powerful threat detection capabilities"}
             />
         }

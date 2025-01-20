@@ -38,22 +38,23 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
   }
 
   public String getActorsCountPerCounty() {
-    HttpGet get = new HttpGet(String.format("%s/api/dashboard/get_actors_count_per_country", this.getBackendUrl()));
+    HttpGet get =
+        new HttpGet(
+            String.format("%s/api/dashboard/get_actors_count_per_country", this.getBackendUrl()));
     get.addHeader("Authorization", "Bearer " + this.getApiToken());
     get.addHeader("Content-Type", "application/json");
 
     try (CloseableHttpResponse resp = this.httpClient.execute(get)) {
       String responseBody = EntityUtils.toString(resp.getEntity());
 
-      System.out.println(responseBody);
-
       ProtoMessageUtils.<ThreatActorByCountryResponse>toProtoMessage(
-          ThreatActorByCountryResponse.class, responseBody)
+              ThreatActorByCountryResponse.class, responseBody)
           .ifPresent(
               m -> {
-                this.actorsCountPerCountry = m.getCountriesList().stream()
-                    .map(smr -> new ThreatActorPerCountry(smr.getCode(), smr.getCount()))
-                    .collect(Collectors.toList());
+                this.actorsCountPerCountry =
+                    m.getCountriesList().stream()
+                        .map(smr -> new ThreatActorPerCountry(smr.getCode(), smr.getCount()))
+                        .collect(Collectors.toList());
               });
     } catch (Exception e) {
       e.printStackTrace();
@@ -64,19 +65,20 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
   }
 
   public String fetchThreatActors() {
-    HttpPost post = new HttpPost(String.format("%s/api/dashboard/list_threat_actors", this.getBackendUrl()));
+    HttpPost post =
+        new HttpPost(String.format("%s/api/dashboard/list_threat_actors", this.getBackendUrl()));
     post.addHeader("Authorization", "Bearer " + this.getApiToken());
     post.addHeader("Content-Type", "application/json");
 
-    Map<String, Object> body = new HashMap<String, Object>() {
-      {
-        put("skip", skip);
-        put("limit", LIMIT);
-      }
-    };
+    Map<String, Object> body =
+        new HashMap<String, Object>() {
+          {
+            put("skip", skip);
+            put("limit", LIMIT);
+            put("sort", sort);
+          }
+        };
     String msg = objectMapper.valueToTree(body).toString();
-
-    System.out.println("Request body for list threat actors" + msg);
 
     StringEntity requestEntity = new StringEntity(msg, ContentType.APPLICATION_JSON);
     post.setEntity(requestEntity);
@@ -84,22 +86,24 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
     try (CloseableHttpResponse resp = this.httpClient.execute(post)) {
       String responseBody = EntityUtils.toString(resp.getEntity());
 
-      System.out.println(responseBody);
-
       ProtoMessageUtils.<ListThreatActorResponse>toProtoMessage(
-          ListThreatActorResponse.class, responseBody)
+              ListThreatActorResponse.class, responseBody)
           .ifPresent(
               m -> {
-                this.actors = m.getActorsList().stream()
-                    .map(
-                        smr -> new DashboardThreatActor(
-                            smr.getId(),
-                            smr.getLatestApiEndpoint(),
-                            smr.getLatestApiIp(),
-                            URLMethods.Method.fromString(smr.getLatestApiMethod()),
-                            smr.getDiscoveredAt(),
-                            smr.getCountry()))
-                    .collect(Collectors.toList());
+                this.actors =
+                    m.getActorsList().stream()
+                        .map(
+                            smr ->
+                                new DashboardThreatActor(
+                                    smr.getId(),
+                                    smr.getLatestApiEndpoint(),
+                                    smr.getLatestApiIp(),
+                                    URLMethods.Method.fromString(smr.getLatestApiMethod()),
+                                    smr.getDiscoveredAt(),
+                                    smr.getCountry()))
+                        .collect(Collectors.toList());
+
+                this.total = m.getTotal();
               });
     } catch (Exception e) {
       e.printStackTrace();

@@ -98,7 +98,6 @@ jobs:
           ECR_REPOSITORY: akto-api-security
           IMAGE_TAG_1: local
           IMAGE_TAG_2: ${{ github.event.inputs.release_version }}_local
-          IMAGE_TAG_3: latest
         run: |
           docker buildx create --use
           # Build a docker container and push it to DockerHub
@@ -134,8 +133,8 @@ jobs:
           fi
 
           if [[ "${{ github.event.inputs.threat_detection_backend}}" == "true" ]]; then
-            cd apps/threat-detection-backend
-            docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-threat-detection-backend:$IMAGE_TAG . --push
+            cd ../threat-detection-backend
+            docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-threat-detection-backend:$IMAGE_TAG_1 -t $ECR_REGISTRY/akto-threat-detection-backend:$IMAGE_TAG_2 . --push
           fi
       - name: Configure AWS Credentials for ECR
         uses: aws-actions/configure-aws-credentials@v1

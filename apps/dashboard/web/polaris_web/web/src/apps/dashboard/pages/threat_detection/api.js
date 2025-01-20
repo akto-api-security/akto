@@ -38,21 +38,23 @@ const threatDetectionRequests = {
             data: {}
         })
     },
-    fetchThreatActors(skip) {
+    fetchThreatActors(skip, sort) {
         return request({
             url: '/api/fetchThreatActors',
             method: 'post',
             data: {
-                skip: skip
+                skip: skip,
+                sort: sort
             }
         })
     },
-    fetchThreatApis(skip) {
+    fetchThreatApis(skip, sort) {
         return request({
             url: '/api/fetchThreatApis',
             method: 'post',
             data: {
-                skip: skip
+                skip: skip,
+                sort: sort
             }
         })
     },

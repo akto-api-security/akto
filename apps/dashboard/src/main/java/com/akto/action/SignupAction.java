@@ -13,6 +13,7 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.notifications.slack.NewUserJoiningAlert;
 import com.akto.notifications.slack.SlackAlerts;
 import com.akto.notifications.slack.SlackSender;
+import com.akto.usage.UsageMetricCalculator;
 import com.akto.util.http_request.CustomHttpRequest;
 import com.akto.utils.Auth0;
 import com.akto.utils.GithubLogin;
@@ -548,9 +549,14 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             String username = userInfo.get("preferred_username").toString();
 
             SignupInfo.OktaSignupInfo oktaSignupInfo= new SignupInfo.OktaSignupInfo(accessToken, username);
+
+            RBAC.Role defaultRole = RBAC.Role.MEMBER;
+            if(UsageMetricCalculator.isRbacFeatureAvailable(accountId)){
+                defaultRole = RBAC.Role.GUEST;
+            }
             
             shouldLogin = "true";
-            createUserAndRedirect(email, username, oktaSignupInfo, accountId, Config.ConfigType.OKTA.toString(), RBAC.Role.MEMBER);
+            createUserAndRedirect(email, username, oktaSignupInfo, accountId, Config.ConfigType.OKTA.toString(), defaultRole);
             code = "";
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error while signing in via okta sso \n" + e.getMessage(), LogDb.DASHBOARD);
@@ -659,7 +665,13 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             shouldLogin = "true";
             logger.info("Successful signing with Azure Idp for: "+ useremail);
             SignupInfo.SamlSsoSignupInfo signUpInfo = new SignupInfo.SamlSsoSignupInfo(username, useremail, Config.ConfigType.AZURE);
-            createUserAndRedirect(useremail, username, signUpInfo, this.accountId, Config.ConfigType.AZURE.toString(), RBAC.Role.MEMBER);
+
+            RBAC.Role defaultRole = RBAC.Role.MEMBER;
+            if(UsageMetricCalculator.isRbacFeatureAvailable(this.accountId)){
+                defaultRole = RBAC.Role.GUEST;
+            }
+
+            createUserAndRedirect(useremail, username, signUpInfo, this.accountId, Config.ConfigType.AZURE.toString(), defaultRole);
         } catch (Exception e1) {
             loggerMaker.errorAndAddToDb("Error while signing in via azure sso \n" + e1.getMessage(), LogDb.DASHBOARD);
             servletResponse.sendRedirect("/login");
@@ -708,7 +720,13 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             
             shouldLogin = "true";
             SignupInfo.SamlSsoSignupInfo signUpInfo = new SignupInfo.SamlSsoSignupInfo(username, userEmail, Config.ConfigType.GOOGLE_SAML);
-            createUserAndRedirect(userEmail, username, signUpInfo, this.accountId, Config.ConfigType.GOOGLE_SAML.toString(), RBAC.Role.MEMBER);
+
+            RBAC.Role defaultRole = RBAC.Role.MEMBER;
+            if(UsageMetricCalculator.isRbacFeatureAvailable(this.accountId)){
+                defaultRole = RBAC.Role.GUEST;
+            }
+
+            createUserAndRedirect(userEmail, username, signUpInfo, this.accountId, Config.ConfigType.GOOGLE_SAML.toString(), defaultRole);
         } catch (Exception e1) {
             loggerMaker.errorAndAddToDb("Error while signing in via google workspace sso \n" + e1.getMessage(), LogDb.DASHBOARD);
             servletResponse.sendRedirect("/login");
