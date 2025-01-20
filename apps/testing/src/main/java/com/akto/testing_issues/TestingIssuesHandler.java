@@ -112,6 +112,7 @@ public class TestingIssuesHandler {
         ObjectId summaryId = null;
 
         Map<String, Integer> countIssuesMap = new HashMap<>();
+        countIssuesMap.put(Severity.CRITICAL.toString(), 0);
         countIssuesMap.put(Severity.HIGH.toString(), 0);
         countIssuesMap.put(Severity.MEDIUM.toString(), 0);
         countIssuesMap.put(Severity.LOW.toString(), 0);
@@ -167,6 +168,7 @@ public class TestingIssuesHandler {
             TestingRunResultSummariesDao.instance.updateOneNoUpsert(
                 Filters.eq("_id", summaryId),
                 Updates.combine(
+                    Updates.inc("countIssues.CRITICAL", countIssuesMap.get("CRITICAL")),
                     Updates.inc("countIssues.HIGH", countIssuesMap.get("HIGH")),
                     Updates.inc("countIssues.MEDIUM", countIssuesMap.get("MEDIUM")),
                     Updates.inc("countIssues.LOW", countIssuesMap.get("LOW"))

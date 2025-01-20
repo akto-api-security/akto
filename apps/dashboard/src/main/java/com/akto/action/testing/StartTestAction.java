@@ -598,8 +598,8 @@ public class StartTestAction extends UserAction {
         Bson sortStage = null;
         if (TestingRunIssues.KEY_SEVERITY.equals(sortKey)) {
             sortStage = (sortOrder == 1) ?
-                    Aggregates.sort(Sorts.ascending("severityValue", TestingRunResult.END_TIMESTAMP)) :
-                    Aggregates.sort(Sorts.descending("severityValue", TestingRunResult.END_TIMESTAMP));
+                    Aggregates.sort(Sorts.ascending("severityValue")) :
+                    Aggregates.sort(Sorts.descending("severityValue"));
         } else if ("time".equals(sortKey)) {
             sortStage = (sortOrder == 1) ?
                     Aggregates.sort(Sorts.ascending(TestingRunResult.END_TIMESTAMP)) :

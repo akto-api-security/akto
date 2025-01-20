@@ -9,7 +9,7 @@ import api from '../../../../signup/api';
 import func from '@/util/func';
 import SemiCircleProgress from '../../shared/SemiCircleProgress';
 import { usePolling } from '../../../../main/PollingProvider';
-import { debounce, get } from 'lodash';
+import { debounce } from 'lodash';
 import LocalStore from '../../../../main/LocalStorageStore';
 import homeFunctions from '../../../../dashboard/pages/home/module';
 
