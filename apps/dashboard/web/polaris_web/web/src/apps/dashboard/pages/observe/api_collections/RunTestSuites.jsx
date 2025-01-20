@@ -7,12 +7,12 @@ import AdvancedSettingsComponent from "./component/AdvancedSettingsComponent";
 
 
 
-function RunTestSuites({ testSuiteModal, testSuiteModalToggle, parentTestRun, setParentTestRun, runTypeOptions, hourlyTimes, testRunTimeOptions, testRolesArr, maxConcurrentRequestsOptions, slackIntegrated, generateLabelForSlackIntegration, dispatchConditions, conditions, handleRun, convertToLowerCaseWithUnderscores, apiCollectionName, testIdConfig,initialState,setTestMode, testMode }) {
+function RunTestSuites({ testSuiteModal, testSuiteModalToggle, parentTestRun, setParentTestRun, runTypeOptions, hourlyTimes, testRunTimeOptions, testRolesArr, maxConcurrentRequestsOptions, slackIntegrated, generateLabelForSlackIntegration, dispatchConditions, conditions, handleRun, convertToLowerCaseWithUnderscores, apiCollectionName, testIdConfig, initialState, setTestMode, testMode }) {
 
     const [owaspTop10, owaspTop10Toggle] = useState(true);
     const [openConfigurations, openConfigurationsToggle] = useState(false);
     const [selectedTestSuites, setSelectedTestSuites] = useState([]);
-    const [testRun, setTestRun] = useState({...initialState});
+    const [testRun, setTestRun] = useState({ ...initialState });
 
     const owaspTop10List = {
         "Broken Object Level Authorization": ["BOLA"],
@@ -63,8 +63,8 @@ function RunTestSuites({ testSuiteModal, testSuiteModalToggle, parentTestRun, se
                 }
 
                 for (let key of keys1) {
-                    const arr1 = obj1[key].map(obj => JSON.stringify(obj)).sort(); 
-                    const arr2 = obj2[key].map(obj => JSON.stringify(obj)).sort(); 
+                    const arr1 = obj1[key].map(obj => JSON.stringify(obj)).sort();
+                    const arr2 = obj2[key].map(obj => JSON.stringify(obj)).sort();
 
                     if (arr1.length !== arr2.length || arr1.some((item, index) => item !== arr2[index])) {
                         return false;
@@ -91,10 +91,10 @@ function RunTestSuites({ testSuiteModal, testSuiteModalToggle, parentTestRun, se
             });
         }
         const updatedName = parentTestRun.testName;
-        setSelectedTestSuites(prev=>{
+        setSelectedTestSuites(prev => {
             const updatedSelectedTestSuites = [];
             Object.keys(owaspTop10List).forEach(key => {
-                if(updatedName.includes(key.replace(/\s+/g, '_'))){
+                if (updatedName.includes(key.replace(/\s+/g, '_'))) {
                     updatedSelectedTestSuites.push(key.replace(/\s+/g, '_'));
                 }
             })
@@ -104,13 +104,13 @@ function RunTestSuites({ testSuiteModal, testSuiteModalToggle, parentTestRun, se
 
     const [shouldCallFunction, setShouldCallFunction] = useState(false);
 
-    function handleTestSuiteRun(){
+    function handleTestSuiteRun() {
         setParentTestRun(testRun);
         setShouldCallFunction(true);
     }
 
     useEffect(() => {
-        if(shouldCallFunction) handleRun();
+        if (shouldCallFunction) handleRun();
         setShouldCallFunction(false);
     }, [shouldCallFunction]);
 
@@ -149,7 +149,7 @@ function RunTestSuites({ testSuiteModal, testSuiteModalToggle, parentTestRun, se
                 tests[category] = tests[category].map(test => ({ ...test, selected: false }))
             })
 
-            return { ...prev, tests: tests}
+            return { ...prev, tests: tests }
         })
         func.setToast(true, false, "All tests unselected")
     }
@@ -248,21 +248,21 @@ function RunTestSuites({ testSuiteModal, testSuiteModalToggle, parentTestRun, se
             <Modal
                 open={testSuiteModal}
                 onClose={() => {
-                    if(setTestMode)setTestMode("");
+                    if (setTestMode) setTestMode("");
                     testSuiteModalToggle(false);
                 }}
                 title="Configure Test"
                 primaryAction={{
-                    content: testMode?'Save & Re-run':'Run test',
+                    content: testMode ? 'Save & Re-run' : 'Run test',
                     onAction: () => handleTestSuiteRun(),
                     disabled: countAllSelectedTests() === 0,
                 }}
                 secondaryActions={[
-                    countAllSelectedTests()?{
+                    countAllSelectedTests() ? {
                         content: `${countAllSelectedTests()} tests selected`,
                         disabled: true,
                         plain: true,
-                    }:null,
+                    } : null,
                     {
                         content: 'Cancel',
                         onAction: () => testSuiteModalToggle(false),
@@ -304,7 +304,7 @@ function RunTestSuites({ testSuiteModal, testSuiteModalToggle, parentTestRun, se
                                             <span style={{ fontWeight: "550", color: " #202223" }}>
                                                 {"OWASP top 10"} <span style={{ paddingLeft: "0.2rem" }}> </span>
                                             </span>
-                                            
+
                                         </Button>
                                     </div>
                                 </HorizontalStack>
@@ -316,20 +316,13 @@ function RunTestSuites({ testSuiteModal, testSuiteModalToggle, parentTestRun, se
                                 >
                                     <div className="testSuiteHorizontalScroll" style={{ display: "flex" }}>
                                         <Scrollable horizontal >
-                                            <div
-                                                style={{
-                                                    display: "flex",
-                                                    justifyContent: "flex-start",
-                                                    alignItems: "center",
-                                                    boxShadow: "0px 1px 2px 0px #00000026"
-                                                }}
-                                            >
 
-                                                {Object.entries(owaspTop10List).map(([key, value], index) => (
-                                                    renderAktoTestSuites({ key, value })
-                                                ))}
 
-                                            </div>
+                                            {Object.entries(owaspTop10List).map(([key, value]) => (
+                                                renderAktoTestSuites({ key, value })
+                                            ))}
+
+
 
                                         </Scrollable>
                                         <div style={{

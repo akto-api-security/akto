@@ -37,3 +37,7 @@
 .Polaris-Modal-Section{
     min-height: 75vh !important;
 }
+
+.testSuiteHorizontalScroll .Polaris-Scrollable.Polaris-Scrollable--vertical.Polaris-Scrollable--horizontal{
+    display: flex;
+}
