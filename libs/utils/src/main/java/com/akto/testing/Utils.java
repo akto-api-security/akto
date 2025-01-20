@@ -432,6 +432,45 @@ public class Utils {
         
     }
 
+    public static void modifyQueryOperations(OriginalHttpRequest httpRequest, List<ConditionsType> modifyOperations, List<ConditionsType> addOperations, List<ConditionsType> deleteOperations){
+
+        // since this is being used with payload conditions, we are not supporting any add operations, operations are done only on existing query keys
+
+        String query = httpRequest.getQueryParams();
+        if(query == null || query.isEmpty()){
+            return ;
+        }
+
+        BasicDBObject queryParamObj = RequestTemplate.getQueryJSON(httpRequest.getUrl() + "?" + query);
+
+        if(!modifyOperations.isEmpty()){
+            for(ConditionsType condition : modifyOperations){
+                if(queryParamObj.containsKey(condition.getKey())){
+                    queryParamObj.put(condition.getKey(), condition.getValue());
+                }
+            }
+        }
+
+
+        if(!deleteOperations.isEmpty()){
+            for(ConditionsType condition : deleteOperations){
+                if(queryParamObj.containsKey(condition.getKey())){
+                    queryParamObj.remove(condition.getKey());
+                }
+            }
+        } 
+        
+        String queryParams = "";
+        for (String key: queryParamObj.keySet()) {
+            queryParams +=  (key + "=" + queryParamObj.get(key) + "&");
+        }
+        if (queryParams.length() > 0) {
+            queryParams = queryParams.substring(0, queryParams.length() - 1);
+        }
+
+        httpRequest.setQueryParams(queryParams);
+    }
+
     public static Map<String, Integer> finalCountIssuesMap(ObjectId testingRunResultSummaryId){
         Map<String, Integer> countIssuesMap = new HashMap<>();
         countIssuesMap.put(Severity.HIGH.toString(), 0);
