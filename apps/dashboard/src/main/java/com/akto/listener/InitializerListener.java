@@ -3336,7 +3336,7 @@ public class InitializerListener implements ServletContextListener {
                     Updates.set(ic+ComplianceInfo.HASH, complianceInfoInCommon.getHash()),
                     Updates.set(ic+ComplianceInfo.MAP_COMPLIANCE_TO_LIST_CLAUSES, complianceInfoInCommon.getMapComplianceToListClauses())
                 );                 
-                UpdateResult updateResult = ComplianceMappingsDao.instance.updateMany(filters, updates);
+                UpdateResult updateResult = YamlTemplateDao.instance.updateMany(filters, updates);
                 loggerMaker.infoAndAddToDb("replaceComplianceFromCommonToAccount: " + Context.accountId.get() + " : " +fileSourceId+" "+ updateResult);
             }
         } catch (Exception e) {
