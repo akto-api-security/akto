@@ -2441,7 +2441,23 @@ public class InitializerListener implements ServletContextListener {
         return new HashSet<>(Arrays.asList("akto-api-security/tests-library:standard", "akto-api-security/tests-library:pro"));
     }
 
-    public static void insertAktoTestLibraries(AccountSettings accountSettings) {
+    public static void insertStateInAccountSettings(AccountSettings accountSettings) {
+        if (DashboardMode.isMetered()) {
+            insertAktoTestLibraries(accountSettings);
+        }
+        
+        insertCompliances(accountSettings);
+    }
+
+    private static void insertCompliances(AccountSettings accountSettings) {
+        boolean complianceInfosAlreadyPresent = accountSettings != null && accountSettings.getComplianceInfosUpdatedTs() > 0;
+
+        if (!complianceInfosAlreadyPresent) {
+            AccountSettingsDao.instance.updateOne(AccountSettingsDao.generateFilter(), Updates.set(AccountSettings.COMPLIANCE_INFOS_UPDATED_TS, 1));
+        }
+    }
+
+    private static void insertAktoTestLibraries(AccountSettings accountSettings) {
         List<TestLibrary> testLibraries = accountSettings == null ? new ArrayList<>() : accountSettings.getTestLibraries();
         Set<String> aktoTestLibraries = getAktoDefaultTestLibs();
 
@@ -3170,6 +3186,7 @@ public class InitializerListener implements ServletContextListener {
 
                 try {
                     processRemedationFilesZip(testingTemplates);
+                    processComplianceInfosFromZip(testingTemplates);
                 } catch (Exception e) {
                     e.printStackTrace();
                     loggerMaker.infoAndAddToDb("Unable to import remediations", LogDb.DASHBOARD);
@@ -3277,6 +3294,96 @@ public class InitializerListener implements ServletContextListener {
 
                 if (countTotalRemediations != countUnchangedRemediations) {
                     loggerMaker.infoAndAddToDb(countUnchangedRemediations + "/" + countTotalRemediations + "remediations unchanged", LogDb.DASHBOARD);
+                }
+        
+            } catch (Exception ex) {
+                cacheLoggerMaker.errorAndAddToDb(ex,
+                        String.format("Error while processing Test template files zip. Error %s", ex.getMessage()),
+                        LogDb.DASHBOARD);
+            }
+        } else {
+            loggerMaker.infoAndAddToDb("Received null zip file");
+        }        
+    }
+
+    public static void processComplianceInfosFromZip(byte[] zipFile) {
+        if (zipFile != null) {
+            try (ByteArrayInputStream inputStream = new ByteArrayInputStream(zipFile);
+                    ZipInputStream zipInputStream = new ZipInputStream(inputStream)) {
+
+                ZipEntry entry;
+
+                int countUnchangedCompliances = 0;
+                int countTotalCompliances = 0;
+
+                Bson emptyFilter = Filters.empty();
+                List<ComplianceInfo> complianceInfosInDb = ComplianceInfosDao.instance.findAll(emptyFilter, Projections.exclude(ComplianceInfo.MAP_COMPLIANCE_TO_LIST_CLAUSES));
+                Map<String, ComplianceInfo> mapIdToComplianceInDb = complianceInfosInDb.stream().collect(Collectors.toMap(ComplianceInfo::getId, Function.identity()));
+
+                while ((entry = zipInputStream.getNextEntry()) != null) {
+                    if (!entry.isDirectory()) {
+                        String entryName = entry.getName();
+
+                        boolean isCompliance = entryName.contains("compliance/");
+                        if (!isCompliance) {
+                            loggerMaker.infoAndAddToDb(
+                                    String.format("%s not a compliance file, skipping", entryName),
+                                    LogDb.DASHBOARD);
+                            continue;
+                        }
+
+                        if (!entryName.endsWith(".yml") && !entryName.endsWith(".yaml")) {
+                            loggerMaker.infoAndAddToDb(
+                                    String.format("%s not a yaml file, skipping", entryName),
+                                    LogDb.DASHBOARD);
+                            continue;
+                        }
+
+                        String[] filePathTokens = entryName.split("/");
+
+                        if (filePathTokens.length <= 1) {
+                            loggerMaker.infoAndAddToDb(
+                                String.format("%s has no directory patthern", entryName),
+                                LogDb.DASHBOARD);
+                            continue;
+                        }
+
+                        String fileSourceId = "compliance/"+filePathTokens[filePathTokens.length-1];
+
+                        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+                        byte[] buffer = new byte[1024];
+                        int bytesRead;
+                        while ((bytesRead = zipInputStream.read(buffer)) != -1) {
+                            outputStream.write(buffer, 0, bytesRead);
+                        }
+
+                        String templateContent = new String(outputStream.toByteArray(), "UTF-8");
+                        int templateHashCode = templateContent.hashCode();
+
+                        Map<String, List<String>> contentMap = TestConfigYamlParser.parseComplianceTemplate(templateContent);
+
+                        ComplianceInfo complianceInfoInDb = mapIdToComplianceInDb.get(fileSourceId);
+                        countTotalCompliances++;
+
+                        if (complianceInfoInDb == null) {
+                            ComplianceInfo newComplianceInfo = new ComplianceInfo(fileSourceId, contentMap, Constants._AKTO, templateHashCode, "");
+                            loggerMaker.infoAndAddToDb("Inserting compliance content: " + entryName, LogDb.DASHBOARD);
+                            ComplianceInfosDao.instance.insertOne(newComplianceInfo);
+
+                        } else if (complianceInfoInDb.getHash() == templateHashCode ) {
+                            countUnchangedCompliances++;
+                        } else {
+                            Bson updates = Updates.combine(Updates.set(ComplianceInfo.MAP_COMPLIANCE_TO_LIST_CLAUSES, contentMap), Updates.set(ComplianceInfo.HASH, templateHashCode));
+                            loggerMaker.infoAndAddToDb("Updating compliance content: " + entryName, LogDb.DASHBOARD);
+                            ComplianceInfosDao.instance.updateOne(Constants.ID, fileSourceId, updates);
+                        }
+                    }
+
+                    zipInputStream.closeEntry();
+                }
+
+                if (countTotalCompliances != countUnchangedCompliances) {
+                    loggerMaker.infoAndAddToDb(countUnchangedCompliances + "/" + countTotalCompliances + "compliances unchanged", LogDb.DASHBOARD);
                 }
         
             } catch (Exception ex) {

@@ -120,6 +120,9 @@ public class AccountSettings {
     public static final String HANDLE_APIS_CASE_INSENSITIVE = "handleApisCaseInsensitive";
     private boolean handleApisCaseInsensitive;
 
+    public static final String COMPLIANCE_INFOS_UPDATED_TS = "complianceInfosUpdatedTs";
+    private int complianceInfosUpdatedTs;
+
     public AccountSettings() {
     }
 
@@ -455,5 +458,13 @@ public class AccountSettings {
 
     public void setAllowOptionsAPIs(boolean allowOptionsAPIs) {
         this.allowOptionsAPIs = allowOptionsAPIs;
+    }
+
+    public int getComplianceInfosUpdatedTs() {
+        return this.complianceInfosUpdatedTs;
+    }
+
+    public void setcCmplianceInfosUpdatedTs(int complianceInfosUpdatedTs) {
+        this.complianceInfosUpdatedTs = complianceInfosUpdatedTs;
     }
 }

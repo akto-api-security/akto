@@ -26,6 +26,20 @@ public class TestConfigYamlParser {
         return parseConfig(config);
     }
 
+    public static Map<String, List<String>> parseComplianceTemplate(String content) throws Exception {
+
+        ObjectMapper mapper = new ObjectMapper(new YAMLFactory());
+
+        Map<String, Object> config = mapper.readValue(content, Map.class);
+
+        Map<String, List<String>> ret = new HashMap<>();
+        for(String complianceName: config.keySet()) {
+            ret.put(complianceName.toUpperCase(), (List) config.get(complianceName));
+        }
+
+        return ret;
+    }    
+
     public static TestConfig parseConfig(Map<String, Object> config) throws Exception {
 
         TestConfig testConfig = null;
