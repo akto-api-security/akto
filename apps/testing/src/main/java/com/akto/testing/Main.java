@@ -61,6 +61,8 @@ import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static com.akto.testing.Utils.readJsonContentFromFile;
+
 import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -243,6 +245,36 @@ public class Main {
         }
     }
 
+    private static BasicDBObject checkIfAlreadyTestIsRunningOnMachine(){
+        // this will return true if consumer is running and this the latest summary of the testing run 
+        // and also the summary should be in running state
+        try {
+            BasicDBObject currentTestInfo = readJsonContentFromFile(Constants.TESTING_STATE_FOLDER_PATH, Constants.TESTING_STATE_FILE_NAME, BasicDBObject.class);
+            if(currentTestInfo == null){
+                return null;
+            }
+            if(!currentTestInfo.getBoolean("CONSUMER_RUNNING", false)){
+                return null;
+            }
+            String testingRunId = currentTestInfo.getString("testingRunId");
+            String testingRunSummaryId = currentTestInfo.getString("summaryId");
+
+            TestingRunResultSummary testingRunResultSummary = TestingRunResultSummariesDao.instance.findOne(Filters.eq(Constants.ID, new ObjectId(testingRunSummaryId)), Projections.include(TestingRunResultSummary.STATE));
+            if(testingRunResultSummary == null || testingRunResultSummary.getState() != null ||  testingRunResultSummary.getState() != State.RUNNING){
+                return null;
+            }
+
+            TestingRunResultSummary latestSummary =  TestingRunResultSummariesDao.instance.findLatestOne(Filters.eq(TestingRunResultSummary.TESTING_RUN_ID, new ObjectId(testingRunId)));
+            if(latestSummary.getHexId().equals(testingRunSummaryId)){
+                return currentTestInfo;
+            }else{
+                return null;
+            }   
+        } catch (Exception e) {
+            logger.error("Error in reading the testing state file: " + e.getMessage());
+            return null;
+        }
+    }
     
     // Runnable task for monitoring memory
     static class MemoryMonitorTask implements Runnable {
@@ -310,6 +342,29 @@ public class Main {
         }
 
         loggerMaker.infoAndAddToDb("Starting.......", LogDb.TESTING);
+
+        TestingProducer testingProducer = new TestingProducer();
+        TestingConsumer testingConsumer = new TestingConsumer();
+        testingConsumer.initializeConsumer();
+
+        // read from files here and then see if we want to init the Producer and run the consumer
+        // if producer is running, then we can skip the check and let the default testing pick up the job
+
+        BasicDBObject currentTestInfo = checkIfAlreadyTestIsRunningOnMachine();
+        if(currentTestInfo != null){
+            int accountId = currentTestInfo.getInt("accountId");
+            Context.accountId.set(accountId);
+            loggerMaker.infoAndAddToDb("Tests were already running on this machine, thus resuming the test for account: "+ accountId, LogDb.TESTING);
+            FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccess(accountId, MetricTypes.TEST_RUNS);
+
+            String testingRunId = currentTestInfo.getString("testingRunId");
+            String testingRunSummaryId = currentTestInfo.getString("summaryId");
+            TestingRun testingRun = TestingRunDao.instance.findOne(Filters.eq(Constants.ID, new ObjectId(testingRunId)));
+            ObjectId summaryId = new ObjectId(testingRunSummaryId);
+            testingProducer.initProducer(testingRun, summaryId, featureAccess.fetchSyncLimit(), true);
+            testingConsumer.init();
+        }
+
 
         schedulerAccessMatrix.scheduleAtFixedRate(new Runnable() {
             public void run() {
@@ -542,8 +597,6 @@ public class Main {
                         summaryId = trrs.getId();
                     }
 
-                    TestingProducer testingProducer = new TestingProducer();
-                    TestingConsumer testingConsumer = new TestingConsumer();
                     if (trrs.getState() == State.SCHEDULED) {
                         if (trrs.getMetadata()!= null && trrs.getMetadata().containsKey("pull_request_id") && trrs.getMetadata().containsKey("commit_sha_head") ) {
                             //case of github status push
@@ -555,7 +608,7 @@ public class Main {
                     if(!maxRetriesReached){
                         // init producer and the consumer here
                         // producer for testing is currently calls init functions from test-executor
-                        testingProducer.initProducer(testingRun, summaryId, syncLimit);  
+                        testingProducer.initProducer(testingRun, summaryId, syncLimit, false);  
                         testingConsumer.init();                      
                     }
                     

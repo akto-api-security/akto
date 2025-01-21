@@ -152,12 +152,18 @@ public class TestExecutor {
     public void apiWiseInit(TestingRun testingRun, ObjectId summaryId, boolean debug, List<TestingRunResult.TestLog> testLogs, SyncLimit syncLimit, boolean shouldInitOnly) {
 
         // write producer running here as producer has been initiated now
-        BasicDBObject dbObject = new BasicDBObject();
-        dbObject.put("PRODUCER_RUNNING", true);
-        dbObject.put("CONSUMER_RUNNING", false);
-        writeJsonContentInFile(Constants.TESTING_STATE_FOLDER_PATH, Constants.TESTING_STATE_FILE_NAME, dbObject);
-
         int accountId = Context.accountId.get();
+
+        BasicDBObject dbObject = new BasicDBObject();
+        if(!shouldInitOnly){
+            dbObject.put("PRODUCER_RUNNING", true);
+            dbObject.put("CONSUMER_RUNNING", false);
+            dbObject.put("accountId", accountId);
+            dbObject.put("summaryId", summaryId.toHexString());
+            dbObject.put("testingRunId", testingRun.getId().toHexString()); 
+            writeJsonContentInFile(Constants.TESTING_STATE_FOLDER_PATH, Constants.TESTING_STATE_FILE_NAME, dbObject);
+        }
+        
         TestingEndpoints testingEndpoints = testingRun.getTestingEndpoints();
 
         if (testingRun.getTestingRunConfig() != null) {
@@ -288,48 +294,8 @@ public class TestExecutor {
             for (ApiInfo.ApiInfoKey apiInfoKey: apiInfoKeyList) {
                 List<String> messages = testingUtil.getSampleMessages().get(apiInfoKey);
                 for (String testSubCategory: testingRunSubCategories) {
-                    TestConfig testConfig = testConfigMap.get(testSubCategory);
-                    
-                    if (testConfig == null) {
-                        loggerMaker.infoAndAddToDb("Found testing config null: " + apiInfoKey.toString() + " : " + testSubCategory);
-                        continue;
-                    }
-    
-                    if (!applyRunOnceCheck(apiInfoKey, testConfig, subCategoryEndpointMap, apiInfoKeyToHostMap, testSubCategory)) {
-                        loggerMaker.infoAndAddToDb("Failing apply run once check for: " + apiInfoKey.toString() + " : " + testSubCategory);
-                        continue;
-                    }
-    
-                    String failMessage = null;
-                    if (!demoCollections.contains(apiInfoKey.getApiCollectionId()) &&
-                            syncLimit.updateUsageLeftAndCheckSkip()) {
-                        failMessage = TestError.USAGE_EXCEEDED.getMessage();
-                    }
-    
-                    String testSuperType = testConfig.getInfo().getCategory().getName();
-                    String testSubType = testConfig.getInfo().getSubCategory();
-    
-                    TestingRunResult testingRunResult = Utils.generateFailedRunResultForMessage(testingRun.getId(), apiInfoKey, testSuperType, testSubType, summaryId, messages, failMessage); 
-                    if(testingRunResult != null){
-                        loggerMaker.infoAndAddToDb("Skipping test from producers because: " + failMessage + " apiinfo: " + apiInfoKey.toString(), LogDb.TESTING);
-                    }else{
-                        // push data to kafka here and inside that call run test new function
-                        // create an object of TestMessage
-                        TestMessages testMessages = new TestMessages(
-                            testingRun.getId(), summaryId, apiInfoKey, testSubType, testLogs, accountId
-                        );
-                        logger.info("Inserting record for apiInfoKey: " + apiInfoKey.toString() + " subcategory: " + testSubType);
-                        try {
-                            Future<Void> future = threadPool.submit(() -> 
-                                TestingProducer.pushMessagesToKafka(Arrays.asList(testMessages))
-                            );
-                            testingRecords.add(future);
-                        } catch (Exception e) {
-                            e.printStackTrace();
-                            continue;
-                        }
-                        
-                    }
+                    Future<Void> future = threadPool.submit(() ->doJobForTest(accountId, testSubCategory, apiInfoKey, messages, summaryId, syncLimit, apiInfoKeyToHostMap, subCategoryEndpointMap, testConfigMap, testLogs, testingRun));
+                    testingRecords.add(future);
                 }
                 latch.countDown();
             }
@@ -348,14 +314,60 @@ public class TestExecutor {
             } catch (InterruptedException e) {
                 throw new RuntimeException(e);
             }
-
-            dbObject = new BasicDBObject();
-            dbObject.put("PRODUCER_RUNNING", false);
-            dbObject.put("CONSUMER_RUNNING", true);
-            writeJsonContentInFile(Constants.TESTING_STATE_FOLDER_PATH, Constants.TESTING_STATE_FILE_NAME, dbObject);
-            loggerMaker.infoAndAddToDb("Finished inserting records in kafka", LogDb.TESTING);
+            if(!shouldInitOnly){
+                dbObject.put("PRODUCER_RUNNING", false);
+                dbObject.put("CONSUMER_RUNNING", true);
+                writeJsonContentInFile(Constants.TESTING_STATE_FOLDER_PATH, Constants.TESTING_STATE_FILE_NAME, dbObject);
+                loggerMaker.infoAndAddToDb("Finished inserting records in kafka", LogDb.TESTING);
+            }
         }
         
+    }
+
+    private Void doJobForTest(int accountId, String testSubCategory, ApiInfo.ApiInfoKey apiInfoKey,
+            List<String> messages, ObjectId summaryId, SyncLimit syncLimit, Map<ApiInfoKey, String> apiInfoKeyToHostMap,
+            ConcurrentHashMap<String, String> subCategoryEndpointMap, Map<String, TestConfig> testConfigMap,
+            List<TestingRunResult.TestLog> testLogs, TestingRun testingRun) {
+        Context.accountId.set(accountId);
+        TestConfig testConfig = testConfigMap.get(testSubCategory);
+                    
+        if (testConfig == null) {
+            loggerMaker.infoAndAddToDb("Found testing config null: " + apiInfoKey.toString() + " : " + testSubCategory);
+            return null;
+        }
+
+        if (!applyRunOnceCheck(apiInfoKey, testConfig, subCategoryEndpointMap, apiInfoKeyToHostMap, testSubCategory)) {
+            return null;
+        }
+
+        String failMessage = null;
+        if (!demoCollections.contains(apiInfoKey.getApiCollectionId()) &&
+                syncLimit.updateUsageLeftAndCheckSkip()) {
+            failMessage = TestError.USAGE_EXCEEDED.getMessage();
+        }
+
+        String testSuperType = testConfig.getInfo().getCategory().getName();
+        String testSubType = testConfig.getInfo().getSubCategory();
+
+        TestingRunResult testingRunResult = Utils.generateFailedRunResultForMessage(testingRun.getId(), apiInfoKey, testSuperType, testSubType, summaryId, messages, failMessage); 
+        if(testingRunResult != null){
+            loggerMaker.infoAndAddToDb("Skipping test from producers because: " + failMessage + " apiinfo: " + apiInfoKey.toString(), LogDb.TESTING);
+        }else{
+            // push data to kafka here and inside that call run test new function
+            // create an object of TestMessage
+            TestMessages testMessages = new TestMessages(
+                testingRun.getId(), summaryId, apiInfoKey, testSubType, testLogs, accountId
+            );
+            logger.info("Inserting record for apiInfoKey: " + apiInfoKey.toString() + " subcategory: " + testSubType);
+            try {
+                TestingProducer.pushMessagesToKafka(Arrays.asList(testMessages));
+            } catch (Exception e) {
+                e.printStackTrace();
+                return null;
+            }
+            
+        }
+        return null;
     }
 
     public static void updateTestSummary(ObjectId summaryId){

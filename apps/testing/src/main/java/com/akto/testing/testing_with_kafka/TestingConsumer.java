@@ -37,14 +37,14 @@ import com.mongodb.WriteConcern;
 public class TestingConsumer {
 
     static Properties properties = com.akto.runtime.utils.Utils.configProperties(Constants.LOCAL_KAFKA_BROKER_URL, Constants.AKTO_KAFKA_GROUP_ID_CONFIG, Constants.AKTO_KAFKA_MAX_POLL_RECORDS_CONFIG);
-    private static Consumer<String, String> consumer = new KafkaConsumer<>(properties); 
+    private static final Consumer<String, String> consumer = new KafkaConsumer<>(properties); 
     final private TestExecutor testExecutor = new TestExecutor();
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(TestingConsumer.class);
     private static final Logger logger = LoggerFactory.getLogger(TestingConsumer.class);
     private static final ExecutorService threadPool = Executors.newFixedThreadPool(100);
 
-    private void initializeConsumer() {
+    public void initializeConsumer() {
         String mongoURI = System.getenv("AKTO_MONGO_CONN");
         ReadPreference readPreference = ReadPreference.secondary();
         if(DashboardMode.isOnPremDeployment()){
@@ -52,6 +52,10 @@ public class TestingConsumer {
         }
         WriteConcern writeConcern = WriteConcern.W1;
         DaoInit.init(new ConnectionString(mongoURI), readPreference, writeConcern);
+
+        String topicName = Constants.TEST_RESULTS_TOPIC_NAME;
+        consumer.subscribe(Arrays.asList(topicName));
+        loggerMaker.infoAndAddToDb("Consumer subscribed", LogDb.RUNTIME);
     }
 
     public static TestMessages parseTestMessage(String message) {
@@ -86,21 +90,12 @@ public class TestingConsumer {
         }
     }
     public void init(){
-        initializeConsumer();
         consumer.wakeup();
-        
-        String topicName = Constants.TEST_RESULTS_TOPIC_NAME;
         final AtomicBoolean exceptionOnCommitSync = new AtomicBoolean(false);
-
         List<Future<Void>> futures = new ArrayList<>();
 
         long lastSyncOffset = 0;
         try {
-            consumer.subscribe(Arrays.asList(topicName));
-            loggerMaker.infoAndAddToDb("Consumer subscribed", LogDb.RUNTIME);
-
-            // poll for new data here 
-
             while (true) {
                 ConsumerRecords<String, String> records = consumer.poll(Duration.ofMillis(10000));
                 if(records.isEmpty()){

@@ -27,7 +27,6 @@ import com.akto.util.Constants;
 public class TestingProducer {
 
     public static final Kafka producer = new Kafka(Constants.LOCAL_KAFKA_BROKER_URL, 500, 1000);
-    
     public static Void pushMessagesToKafka(List<TestMessages> messages){
         for(TestMessages testMessages: messages){
             String messageString = testMessages.toString();
@@ -79,14 +78,8 @@ public class TestingProducer {
         }
     }
 
-    private boolean isKafkaEmpty(){
-        return true;
-    }
-
-    public void initProducer(TestingRun testingRun, ObjectId summaryId, SyncLimit syncLimit){
+    public void initProducer(TestingRun testingRun, ObjectId summaryId, SyncLimit syncLimit, boolean doInitOnly){
         TestExecutor executor = new TestExecutor();
-
-        boolean doInitOnly = !isKafkaEmpty();
         if(doInitOnly){
             try {
                 deleteAllMessagesFromTopic(Constants.LOCAL_KAFKA_BROKER_URL, Constants.TEST_RESULTS_TOPIC_NAME);
