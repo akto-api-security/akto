@@ -206,6 +206,10 @@ public class Main {
 
         final boolean checkPg = aSettings != null && aSettings.isRedactPayload();
 
+        AllMetrics.instance.init(LogDb.RUNTIME, checkPg);
+        loggerMaker.infoAndAddToDb("All metrics initialized", LogDb.RUNTIME);
+
+
         if (checkPg) {
             try {
                 com.akto.sql.Main.createSampleDataTable();
@@ -517,9 +521,6 @@ public class Main {
 
         Account account = dataActor.fetchActiveAccount();
         Context.accountId.set(account.getId());
-
-        AllMetrics.instance.init();
-        loggerMaker.infoAndAddToDb("All metrics initialized", LogDb.RUNTIME);
 
         Setup setup = dataActor.fetchSetup();
 
