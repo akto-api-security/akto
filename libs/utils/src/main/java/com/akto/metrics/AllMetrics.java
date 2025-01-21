@@ -56,11 +56,12 @@ public class AllMetrics {
         cyborgApiPayloadSize = new SumMetric("CYBORG_API_PAYLOAD_SIZE", 60, accountId, orgId);
         multipleSampleDataFetchLatency = new LatencyMetric("MULTIPLE_SAMPLE_DATA_FETCH_LATENCY", 60, accountId, orgId);
 
+        // Any new metric needs to be added here as well.
         metrics = Arrays.asList(runtimeKafkaRecordCount, runtimeKafkaRecordSize, runtimeProcessLatency,
                 postgreSampleDataInsertedCount, postgreSampleDataInsertLatency, mergingJobLatency, mergingJobUrlsUpdatedCount,
                 staleSampleDataCleanupJobLatency, staleSampleDataDeletedCount, mergingJobUrlUpdateLatency, cyborgCallLatency,
                 cyborgCallCount, cyborgDataSize, testingRunCount, testingRunLatency, totalSampleDataCount, sampleDataFetchLatency,
-                sampleDataFetchCount, pgDataSizeInMb, kafkaOffset, kafkaRecordsLagMax, kafkaRecordsConsumedRate, kafkaFetchAvgLatency,
+                pgDataSizeInMb, kafkaRecordsLagMax, kafkaRecordsConsumedRate, kafkaFetchAvgLatency,
                 kafkaBytesConsumedRate, cyborgNewApiCount, cyborgTotalApiCount, deltaCatalogNewCount, deltaCatalogTotalCount,
                 cyborgApiPayloadSize, multipleSampleDataFetchLatency);
 
@@ -102,11 +103,10 @@ public class AllMetrics {
     private static final String URL = "https://logs.akto.io/ingest-metrics";
 
     private static final OkHttpClient client = CoreHTTPClient.client.newBuilder()
-            .writeTimeout(1, TimeUnit.SECONDS)
-            .readTimeout(1, TimeUnit.SECONDS)
-            .callTimeout(1, TimeUnit.SECONDS)
+            .writeTimeout(3, TimeUnit.SECONDS)
+            .readTimeout(3, TimeUnit.SECONDS)
+            .callTimeout(3, TimeUnit.SECONDS)
             .build();
-
 
     private final static LoggerMaker loggerMaker = new LoggerMaker(AllMetrics.class);
 
