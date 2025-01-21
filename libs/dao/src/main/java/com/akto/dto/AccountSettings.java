@@ -464,7 +464,7 @@ public class AccountSettings {
         return this.complianceInfosUpdatedTs;
     }
 
-    public void setcCmplianceInfosUpdatedTs(int complianceInfosUpdatedTs) {
+    public void setComplianceInfosUpdatedTs(int complianceInfosUpdatedTs) {
         this.complianceInfosUpdatedTs = complianceInfosUpdatedTs;
     }
 }

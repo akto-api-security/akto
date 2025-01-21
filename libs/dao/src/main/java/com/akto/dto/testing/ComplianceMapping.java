@@ -7,12 +7,12 @@ public class ComplianceMapping {
     
     private Map<String, List<String>> mapComplianceToListClauses;
 
-    String author;
+    private String author;
 
     public static final String SOURCE = "source";
-    String source;
+    private String source;
 
-    int hash;
+    private int hash;
 
     public ComplianceMapping() {
     }

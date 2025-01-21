@@ -138,6 +138,7 @@ import okhttp3.OkHttpClient;
 
 import org.apache.commons.csv.CSVRecord;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.EnumUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
@@ -3193,7 +3194,7 @@ public class InitializerListener implements ServletContextListener {
                     e.printStackTrace();
                     loggerMaker.infoAndAddToDb("Unable to import remediations", LogDb.DASHBOARD);
                 }
-
+                Map<String, ComplianceInfo> complianceCommonMap = getFromCommonDb();
                 Map<String, byte[]> allYamlTemplates = TestTemplateUtils.getZipFromMultipleRepoAndBranch(getAktoDefaultTestLibs());
                 AccountTask.instance.executeTask((account) -> {
                     try {
@@ -3216,9 +3217,9 @@ public class InitializerListener implements ServletContextListener {
                             }
                         }
 
-                        if (accountSettings.getComplianceInfosUpdatedTs() > 0) {
-                            addComplianceFromCommonToAccount(getFromCommonDb());
-                            replaceComplianceFromCommonToAccount(getFromCommonDb());    
+                        if (accountSettings.getComplianceInfosUpdatedTs() > 0) {                            
+                            addComplianceFromCommonToAccount(complianceCommonMap);
+                            replaceComplianceFromCommonToAccount(complianceCommonMap);    
                         }
                         
                     } catch (Exception e) {
@@ -3315,7 +3316,7 @@ public class InitializerListener implements ServletContextListener {
 
     private static Map<String, ComplianceInfo> getFromCommonDb() {
         Bson emptyFilter = Filters.empty();
-        List<ComplianceInfo> complianceInfosInDb = ComplianceInfosDao.instance.findAll(emptyFilter, Projections.exclude(ComplianceInfo.MAP_COMPLIANCE_TO_LIST_CLAUSES));
+        List<ComplianceInfo> complianceInfosInDb = ComplianceInfosDao.instance.findAll(emptyFilter);
         Map<String, ComplianceInfo> mapIdToComplianceInDb = complianceInfosInDb.stream().collect(Collectors.toMap(ComplianceInfo::getId, Function.identity()));
         return mapIdToComplianceInDb;        
     }
@@ -3352,7 +3353,7 @@ public class InitializerListener implements ServletContextListener {
                 ComplianceInfo complianceInfoInCommon = mapIdToComplianceInCommon.get(fileSourceId);
                 String compId = complianceInfoInCommon.getId().split("/")[1].split("\\.")[0].toUpperCase();
 
-                boolean isCategoryTemplate = TestCategory.valueOf(compId.toUpperCase()) != null;
+                boolean isCategoryTemplate = EnumUtils.getEnum(TestCategory.class, compId.toUpperCase()) != null;
 
                 if (isCategoryTemplate) continue;
 
@@ -3363,7 +3364,7 @@ public class InitializerListener implements ServletContextListener {
                     );
 
                 ComplianceMapping complianceMapping = ComplianceMapping.createFromInfo(complianceInfoInCommon);    
-                UpdateResult updateResult = YamlTemplateDao.instance.updateMany(filters, Updates.set("compliance", complianceMapping));
+                UpdateResult updateResult = YamlTemplateDao.instance.updateMany(filters, Updates.set("info.compliance", complianceMapping));
                 loggerMaker.infoAndAddToDb("addComplianceFromCommonToAccount for test id: " + Context.accountId.get() + " : " + compId + " " + updateResult);
             }            
 
@@ -3372,18 +3373,18 @@ public class InitializerListener implements ServletContextListener {
                 ComplianceInfo complianceInfoInCommon = mapIdToComplianceInCommon.get(fileSourceId);
                 String compId = complianceInfoInCommon.getId().split("/")[1].split("\\.")[0].toUpperCase();
 
-                boolean isCategoryTemplate = TestCategory.valueOf(compId.toUpperCase()) != null;
+                boolean isCategoryTemplate = EnumUtils.getEnum(TestCategory.class, compId.toUpperCase()) != null;
 
                 if (!isCategoryTemplate) continue;
 
                 Bson filters = 
                     Filters.and(
-                        Filters.eq("info.category.shortName", compId.toUpperCase()), 
+                        Filters.eq("info.category.name", compId.toUpperCase()), 
                         Filters.exists("info.compliance", false)
                     );
 
                 ComplianceMapping complianceMapping = ComplianceMapping.createFromInfo(complianceInfoInCommon);    
-                UpdateResult updateResult = YamlTemplateDao.instance.updateMany(filters, Updates.set("compliance", complianceMapping));
+                UpdateResult updateResult = YamlTemplateDao.instance.updateMany(filters, Updates.set("info.compliance", complianceMapping));
                 loggerMaker.infoAndAddToDb("addComplianceFromCommonToAccount for category: " + Context.accountId.get() + " : " + compId + " "  + updateResult);
             }            
         } catch (Exception e) {
@@ -3416,7 +3417,7 @@ public class InitializerListener implements ServletContextListener {
                             continue;
                         }
 
-                        if (!entryName.endsWith(".yml") && !entryName.endsWith(".yaml")) {
+                        if (!entryName.endsWith(".conf") && !entryName.endsWith(".yml") && !entryName.endsWith(".yaml")) {
                             loggerMaker.infoAndAddToDb(
                                     String.format("%s not a yaml file, skipping", entryName),
                                     LogDb.DASHBOARD);
@@ -3451,7 +3452,7 @@ public class InitializerListener implements ServletContextListener {
 
                         if (complianceInfoInDb == null) {
                             ComplianceInfo newComplianceInfo = new ComplianceInfo(fileSourceId, contentMap, Constants._AKTO, templateHashCode, "");
-                            loggerMaker.infoAndAddToDb("Inserting compliance content: " + entryName, LogDb.DASHBOARD);
+                            loggerMaker.infoAndAddToDb("Inserting compliance content: " + entryName + " c=" + templateContent + " ci: " + newComplianceInfo, LogDb.DASHBOARD);
                             ComplianceInfosDao.instance.insertOne(newComplianceInfo);
 
                         } else if (complianceInfoInDb.getHash() == templateHashCode ) {
@@ -3474,6 +3475,7 @@ public class InitializerListener implements ServletContextListener {
                 cacheLoggerMaker.errorAndAddToDb(ex,
                         String.format("Error while processing Test template files zip. Error %s", ex.getMessage()),
                         LogDb.DASHBOARD);
+                        ex.printStackTrace();
             }
         } else {
             loggerMaker.infoAndAddToDb("Received null zip file");
