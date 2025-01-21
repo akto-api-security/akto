@@ -105,7 +105,6 @@ public class HttpCallParser {
         this.sync_threshold_time = sync_threshold_time;
         apiCatalogSync = new APICatalogSync(userIdentifier, thresh, fetchAllSTI);
         apiCatalogSync.buildFromDB(false, fetchAllSTI);
-        boolean useMap = !(Main.isOnprem || RuntimeMode.isHybridDeployment());
         apiCollectionsMap = new HashMap<>();
         List<ApiCollection> apiCollections = dataActor.fetchAllApiCollectionsMeta();
         for (ApiCollection apiCollection: apiCollections) {
@@ -371,7 +370,7 @@ public class HttpCallParser {
                 count += countMap.get(ts);
             }
 
-            if (organization != null && Main.isOnprem) {
+            if (organization != null && (Main.isOnprem || RuntimeMode.isHybridDeployment())) {
                 String metricKey = key.getName().name() + "|" + key.getIp() + "|" + key.getHost() + "|" + key.getVxlanID() + "|" + organization.getId() + "|" + accountId;
                 count += (int) metricsData.getOrDefault(metricKey, 0);
                 metricsData.put(metricKey, count);
@@ -382,7 +381,7 @@ public class HttpCallParser {
         }
 
         if (bulkUpdates.size() > 0) {
-            if (metricsData.size() != 0 && Main.isOnprem) {
+            if (metricsData.size() != 0 && (Main.isOnprem || RuntimeMode.isHybridDeployment())) {
                 queue.add(metricsData);
             }
             List<Object> writesForTraffic = new ArrayList<>();
