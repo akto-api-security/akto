@@ -1,6 +1,7 @@
 package com.akto.dto.test_editor;
 
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 import com.mongodb.BasicDBList;
@@ -60,7 +61,8 @@ public class Util {
                         res = true;
                     } else if (!valList.isEmpty() &&
                             !(valList.get(0) instanceof BasicDBObject || valList.get(0) instanceof BasicDBList) &&
-                            key.equalsIgnoreCase(queryKey)) {
+                            key.equalsIgnoreCase(queryKey) &&
+                            (queryVal instanceof List || queryVal instanceof BasicDBList)) {
                         keysToModify.add(key);
                         res = true;
                     }
