@@ -3058,7 +3058,7 @@ public class ClientActor extends DataActor {
 
     public static boolean checkAccount() {
         try {
-            String token = System.getenv("DATABASE_ABSTRACTOR_SERVICE_TOKEN");
+            String token = getAuthToken();
             DecodedJWT jwt = JWT.decode(token);
             String payload = jwt.getPayload();
             byte[] decodedBytes = Base64.getUrlDecoder().decode(payload);

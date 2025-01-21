@@ -4,6 +4,7 @@ import com.akto.dao.context.Context;
 import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.billing.Organization;
 import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.http_util.CoreHTTPClient;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
@@ -19,42 +20,53 @@ import java.util.concurrent.TimeUnit;
 
 public class AllMetrics {
 
-    public void init(){
+    private final static int METRIC_SEND_LIMIT = 10;
+
+    public void init(LogDb module, boolean pgMetrics){
         int accountId = Context.accountId.get();
 
         Organization organization = DataActorFactory.fetchInstance().fetchOrganization(accountId);
         String orgId = organization.getId();
 
-        runtimeKafkaRecordCount = new SumMetric("RT_KAFKA_RECORD_COUNT", 60, accountId, orgId);
-        runtimeKafkaRecordSize = new SumMetric("RT_KAFKA_RECORD_SIZE", 60, accountId, orgId);
-        runtimeProcessLatency = new LatencyMetric("RT_KAFKA_LATENCY", 60, accountId, orgId);
-        postgreSampleDataInsertedCount = new SumMetric("PG_SAMPLE_DATA_INSERT_COUNT", 60, accountId, orgId);
-        postgreSampleDataInsertLatency = new LatencyMetric("PG_SAMPLE_DATA_INSERT_LATENCY", 60, accountId, orgId);
-        mergingJobLatency = new LatencyMetric("MERGING_JOB_LATENCY", 60, accountId, orgId);
-        mergingJobUrlsUpdatedCount = new SumMetric("MERGING_JOB_URLS_UPDATED_COUNT", 60, accountId, orgId);
-        staleSampleDataCleanupJobLatency = new LatencyMetric("STALE_SAMPLE_DATA_CLEANUP_JOB_LATENCY", 60, accountId, orgId);
-        staleSampleDataDeletedCount = new SumMetric("STALE_SAMPLE_DATA_DELETED_COUNT", 60, accountId, orgId);
-        mergingJobUrlUpdateLatency = new LatencyMetric("MERGING_JOB_URL_UPDATE_LATENCY", 60, accountId, orgId);
+        if(LogDb.RUNTIME.equals(module)){
+            runtimeKafkaRecordCount = new SumMetric("RT_KAFKA_RECORD_COUNT", 60, accountId, orgId);
+            runtimeKafkaRecordSize = new SumMetric("RT_KAFKA_RECORD_SIZE", 60, accountId, orgId);
+            runtimeProcessLatency = new LatencyMetric("RT_KAFKA_LATENCY", 60, accountId, orgId);
+            kafkaRecordsLagMax = new SumMetric("KAFKA_RECORDS_LAG_MAX", 60, accountId, orgId);
+            kafkaRecordsConsumedRate = new SumMetric("KAFKA_RECORDS_CONSUMED_RATE", 60, accountId, orgId);
+            kafkaFetchAvgLatency = new LatencyMetric("KAFKA_FETCH_AVG_LATENCY", 60, accountId, orgId);
+            kafkaBytesConsumedRate = new SumMetric("KAFKA_BYTES_CONSUMED_RATE", 60, accountId, orgId);
+            cyborgNewApiCount = new SumMetric("CYBORG_NEW_API_COUNT", 60, accountId, orgId);
+            cyborgTotalApiCount = new SumMetric("CYBORG_TOTAL_API_COUNT", 60, accountId, orgId);
+            deltaCatalogTotalCount = new SumMetric("DELTA_CATALOG_TOTAL_COUNT", 60, accountId, orgId);
+            deltaCatalogNewCount = new SumMetric("DELTA_CATALOG_NEW_COUNT", 60, accountId, orgId);
+            cyborgApiPayloadSize = new SumMetric("CYBORG_API_PAYLOAD_SIZE", 60, accountId, orgId);    
+        }
+
+        if(pgMetrics){
+            postgreSampleDataInsertedCount = new SumMetric("PG_SAMPLE_DATA_INSERT_COUNT", 60, accountId, orgId);
+            postgreSampleDataInsertLatency = new LatencyMetric("PG_SAMPLE_DATA_INSERT_LATENCY", 60, accountId, orgId);
+            mergingJobLatency = new LatencyMetric("MERGING_JOB_LATENCY", 60, accountId, orgId);
+            mergingJobUrlsUpdatedCount = new SumMetric("MERGING_JOB_URLS_UPDATED_COUNT", 60, accountId, orgId);
+            staleSampleDataCleanupJobLatency = new LatencyMetric("STALE_SAMPLE_DATA_CLEANUP_JOB_LATENCY", 60, accountId, orgId);
+            staleSampleDataDeletedCount = new SumMetric("STALE_SAMPLE_DATA_DELETED_COUNT", 60, accountId, orgId);
+            mergingJobUrlUpdateLatency = new LatencyMetric("MERGING_JOB_URL_UPDATE_LATENCY", 60, accountId, orgId);
+            totalSampleDataCount = new SumMetric("TOTAL_SAMPLE_DATA_COUNT", 60, accountId, orgId);
+            pgDataSizeInMb = new SumMetric("PG_DATA_SIZE_IN_MB", 60, accountId, orgId);
+        }
+
+        if(LogDb.TESTING.equals(module)){
+            testingRunCount = new SumMetric("TESTING_RUN_COUNT", 60, accountId, orgId);
+            testingRunLatency = new LatencyMetric("TESTING_RUN_LATENCY", 60, accountId, orgId);
+            sampleDataFetchLatency = new LatencyMetric("SAMPLE_DATA_FETCH_LATENCY", 60, accountId, orgId);
+            multipleSampleDataFetchLatency = new LatencyMetric("MULTIPLE_SAMPLE_DATA_FETCH_LATENCY", 60, accountId, orgId);
+        }
+
+        // sampleDataFetchCount = new SumMetric("SAMPLE_DATA_FETCH_COUNT", 60, accountId, orgId); // tODO: Do we need this?
+        // kafkaOffset = new SumMetric("KAFKA_OFFSET", 60, accountId, orgId);
         cyborgCallLatency = new LatencyMetric("CYBORG_CALL_LATENCY", 60, accountId, orgId);
         cyborgCallCount = new SumMetric("CYBORG_CALL_COUNT", 60, accountId, orgId);
         cyborgDataSize = new SumMetric("CYBORG_DATA_SIZE", 60, accountId, orgId);
-        testingRunCount = new SumMetric("TESTING_RUN_COUNT", 60, accountId, orgId);
-        testingRunLatency = new LatencyMetric("TESTING_RUN_LATENCY", 60, accountId, orgId);
-        totalSampleDataCount = new SumMetric("TOTAL_SAMPLE_DATA_COUNT", 60, accountId, orgId);
-        sampleDataFetchLatency = new LatencyMetric("SAMPLE_DATA_FETCH_LATENCY", 60, accountId, orgId);
-        sampleDataFetchCount = new SumMetric("SAMPLE_DATA_FETCH_COUNT", 60, accountId, orgId); // tODO: Do we need this?
-        pgDataSizeInMb = new SumMetric("PG_DATA_SIZE_IN_MB", 60, accountId, orgId);
-        kafkaOffset = new SumMetric("KAFKA_OFFSET", 60, accountId, orgId);
-        kafkaRecordsLagMax = new SumMetric("KAFKA_RECORDS_LAG_MAX", 60, accountId, orgId);
-        kafkaRecordsConsumedRate = new SumMetric("KAFKA_RECORDS_CONSUMED_RATE", 60, accountId, orgId);
-        kafkaFetchAvgLatency = new LatencyMetric("KAFKA_FETCH_AVG_LATENCY", 60, accountId, orgId);
-        kafkaBytesConsumedRate = new SumMetric("KAFKA_BYTES_CONSUMED_RATE", 60, accountId, orgId);
-        cyborgNewApiCount = new SumMetric("CYBORG_NEW_API_COUNT", 60, accountId, orgId);
-        cyborgTotalApiCount = new SumMetric("CYBORG_TOTAL_API_COUNT", 60, accountId, orgId);
-        deltaCatalogTotalCount = new SumMetric("DELTA_CATALOG_TOTAL_COUNT", 60, accountId, orgId);
-        deltaCatalogNewCount = new SumMetric("DELTA_CATALOG_NEW_COUNT", 60, accountId, orgId);
-        cyborgApiPayloadSize = new SumMetric("CYBORG_API_PAYLOAD_SIZE", 60, accountId, orgId);
-        multipleSampleDataFetchLatency = new LatencyMetric("MULTIPLE_SAMPLE_DATA_FETCH_LATENCY", 60, accountId, orgId);
 
         // Any new metric needs to be added here as well.
         metrics = Arrays.asList(runtimeKafkaRecordCount, runtimeKafkaRecordSize, runtimeProcessLatency,
@@ -85,6 +97,10 @@ public class AllMetrics {
                     metricsData.put("instance_id", instance_id);
                     metricsData.put("account_id", m.accountId);
                     list.add(metricsData);
+                    if (list.size() >= METRIC_SEND_LIMIT) {
+                        sendDataToAkto(list);
+                        list.clear();
+                    }
 
                 }
                 if(!list.isEmpty()) {
@@ -103,9 +119,9 @@ public class AllMetrics {
     private static final String URL = "https://logs.akto.io/ingest-metrics";
 
     private static final OkHttpClient client = CoreHTTPClient.client.newBuilder()
-            .writeTimeout(3, TimeUnit.SECONDS)
-            .readTimeout(3, TimeUnit.SECONDS)
-            .callTimeout(3, TimeUnit.SECONDS)
+            .writeTimeout(1, TimeUnit.SECONDS)
+            .readTimeout(1, TimeUnit.SECONDS)
+            .callTimeout(1, TimeUnit.SECONDS)
             .build();
 
     private final static LoggerMaker loggerMaker = new LoggerMaker(AllMetrics.class);
