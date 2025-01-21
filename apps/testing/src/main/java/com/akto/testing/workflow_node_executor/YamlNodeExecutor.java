@@ -186,6 +186,9 @@ public class YamlNodeExecutor extends NodeExecutor {
                 } else {
                     responseLenArr.add(testResponse.getBody().length());
                 }
+                if (vulnerable) {
+                    break;
+                }
 
             } catch (Exception e) {
                 // TODO: handle exception
