@@ -481,6 +481,7 @@ public class Utils {
 
     public static Map<String, Integer> finalCountIssuesMap(ObjectId testingRunResultSummaryId){
         Map<String, Integer> countIssuesMap = new HashMap<>();
+        countIssuesMap.put(Severity.CRITICAL.toString(), 0);
         countIssuesMap.put(Severity.HIGH.toString(), 0);
         countIssuesMap.put(Severity.MEDIUM.toString(), 0);
         countIssuesMap.put(Severity.LOW.toString(), 0);
@@ -496,7 +497,7 @@ public class Utils {
             allVulResults = TestingRunResultDao.instance.findAll(filterQ, projection);
         }else{
             allVulResults = VulnerableTestingRunResultDao.instance.findAll(
-                Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, testingRunResultSummaryId)
+                Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, testingRunResultSummaryId), projection
             );
         }
         

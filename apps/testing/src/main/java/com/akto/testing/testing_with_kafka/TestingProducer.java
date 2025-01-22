@@ -80,7 +80,7 @@ public class TestingProducer {
 
     public void initProducer(TestingRun testingRun, ObjectId summaryId, SyncLimit syncLimit, boolean doInitOnly){
         TestExecutor executor = new TestExecutor();
-        if(doInitOnly){
+        if(!doInitOnly){
             try {
                 deleteAllMessagesFromTopic(Constants.LOCAL_KAFKA_BROKER_URL, Constants.TEST_RESULTS_TOPIC_NAME);
             } catch (ExecutionException | InterruptedException e) {

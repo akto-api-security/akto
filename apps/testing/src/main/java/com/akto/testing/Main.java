@@ -259,8 +259,11 @@ public class Main {
             String testingRunId = currentTestInfo.getString("testingRunId");
             String testingRunSummaryId = currentTestInfo.getString("summaryId");
 
+            int accountID = currentTestInfo.getInt("accountId");
+            Context.accountId.set(accountID);
+
             TestingRunResultSummary testingRunResultSummary = TestingRunResultSummariesDao.instance.findOne(Filters.eq(Constants.ID, new ObjectId(testingRunSummaryId)), Projections.include(TestingRunResultSummary.STATE));
-            if(testingRunResultSummary == null || testingRunResultSummary.getState() != null ||  testingRunResultSummary.getState() != State.RUNNING){
+            if(testingRunResultSummary == null || testingRunResultSummary.getState() == null ||  testingRunResultSummary.getState() != State.RUNNING){
                 return null;
             }
 
@@ -352,17 +355,18 @@ public class Main {
 
         BasicDBObject currentTestInfo = checkIfAlreadyTestIsRunningOnMachine();
         if(currentTestInfo != null){
-            int accountId = currentTestInfo.getInt("accountId");
-            Context.accountId.set(accountId);
-            loggerMaker.infoAndAddToDb("Tests were already running on this machine, thus resuming the test for account: "+ accountId, LogDb.TESTING);
-            FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccess(accountId, MetricTypes.TEST_RUNS);
+            loggerMaker.infoAndAddToDb("Tests were already running on this machine, thus resuming the test for account: "+ Context.accountId.get(), LogDb.TESTING);
+            FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccess(Context.accountId.get(), MetricTypes.TEST_RUNS);
 
             String testingRunId = currentTestInfo.getString("testingRunId");
             String testingRunSummaryId = currentTestInfo.getString("summaryId");
             TestingRun testingRun = TestingRunDao.instance.findOne(Filters.eq(Constants.ID, new ObjectId(testingRunId)));
+            TestingRunConfig baseConfig = TestingRunConfigDao.instance.findOne(Constants.ID, testingRun.getTestIdConfig());
+            testingRun.setTestingRunConfig(baseConfig);
             ObjectId summaryId = new ObjectId(testingRunSummaryId);
             testingProducer.initProducer(testingRun, summaryId, featureAccess.fetchSyncLimit(), true);
-            testingConsumer.init();
+            int maxRunTime = testingRun.getTestRunTime() <= 0 ? 30*60 : testingRun.getTestRunTime();
+            testingConsumer.init(maxRunTime);
         }
 
 
@@ -608,8 +612,9 @@ public class Main {
                     if(!maxRetriesReached){
                         // init producer and the consumer here
                         // producer for testing is currently calls init functions from test-executor
+                        int maxRunTime = testingRun.getTestRunTime() <= 0 ? 30*60 : testingRun.getTestRunTime();
                         testingProducer.initProducer(testingRun, summaryId, syncLimit, false);  
-                        testingConsumer.init();                      
+                        testingConsumer.init(maxRunTime);                      
                     }
                     
             } catch (Exception e) {

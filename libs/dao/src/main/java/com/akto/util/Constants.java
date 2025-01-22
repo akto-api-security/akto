@@ -26,7 +26,7 @@ public class Constants {
     public static final String LOCAL_KAFKA_BROKER_URL = "localhost:29092"; // run kafka process with name kafka1 in docker
     public static final String TEST_RESULTS_TOPIC_NAME = "akto.test.messages";
     public static final String AKTO_KAFKA_GROUP_ID_CONFIG =  "testing-group";
-    public static final int AKTO_KAFKA_MAX_POLL_RECORDS_CONFIG = 100;
+    public static final int AKTO_KAFKA_MAX_POLL_RECORDS_CONFIG = 1; // read one message at a time
     public static final String TESTING_STATE_FOLDER_PATH = "testing-info";
     public static final String TESTING_STATE_FILE_NAME = "testing-state.json";
 

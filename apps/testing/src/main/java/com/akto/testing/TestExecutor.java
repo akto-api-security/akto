@@ -84,7 +84,6 @@ public class TestExecutor {
     public static long acceptableSizeInBytes = 5_000_000;
     private static final Gson gson = new Gson();
 
-    private static Map<String, Map<String, Integer>> requestRestrictionMap = new ConcurrentHashMap<>();
     public static final String REQUEST_HOUR = "requestHour";
     public static final String COUNT = "count";
     public static final int ALLOWED_REQUEST_PER_HOUR = 100;
@@ -641,7 +640,6 @@ public class TestExecutor {
             TestingIssuesHandler handler = new TestingIssuesHandler();
             boolean triggeredByTestEditor = false;
             handler.handleIssuesCreationFromTestingRunResults(testingRunResults, triggeredByTestEditor);
-            testingRunResults.clear();
         }
     }
 
