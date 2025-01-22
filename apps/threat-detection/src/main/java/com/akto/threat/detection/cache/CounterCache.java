@@ -10,5 +10,5 @@ public interface CounterCache {
 
   boolean exists(String key);
 
-  void clear(String key);
+  void reset(String key);
 }

@@ -70,7 +70,7 @@ public class WindowBasedThresholdNotifier {
     boolean thresholdBreached = windowCount >= rule.getCondition().getMatchCount();
 
     if (thresholdBreached) {
-      this.cache.clear(cacheKey);
+      this.cache.reset(cacheKey);
     }
 
     return new Result(thresholdBreached);
