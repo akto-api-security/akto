@@ -42,29 +42,46 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
   }
 
   public String fetchSampleData() {
-    HttpPost post = new HttpPost(String.format("%s/api/dashboard/list_malicious_requests", this.getBackendUrl()));
+    HttpPost post = new HttpPost(
+        String.format("%s/api/dashboard/list_malicious_requests", this.getBackendUrl()));
     post.addHeader("Authorization", "Bearer " + this.getApiToken());
     post.addHeader("Content-Type", "application/json");
 
-    System.out.print("API Token: " + this.getApiToken());
+    Map<String, Object> filter = new HashMap<>();
+    if (this.ips != null && !this.ips.isEmpty()) {
+      filter.put("ips", this.ips);
+    }
+
+    if (this.urls != null && !this.urls.isEmpty()) {
+      filter.put("urls", this.urls);
+    }
+
+    Map<String, Integer> time_range = new HashMap<>();
+    if (this.startTimestamp > 0) {
+      time_range.put("start", this.startTimestamp);
+    }
+
+    if (this.endTimestamp > 0) {
+      time_range.put("end", this.endTimestamp);
+    }
+
+    filter.put("detected_at_time_range", time_range);
 
     Map<String, Object> body = new HashMap<String, Object>() {
       {
         put("skip", skip);
         put("limit", LIMIT);
+        put("sort", sort);
+        put("filter", filter);
       }
     };
     String msg = objectMapper.valueToTree(body).toString();
-
-    System.out.println("Request body for list malicious requests" + msg);
 
     StringEntity requestEntity = new StringEntity(msg, ContentType.APPLICATION_JSON);
     post.setEntity(requestEntity);
 
     try (CloseableHttpResponse resp = this.httpClient.execute(post)) {
       String responseBody = EntityUtils.toString(resp.getEntity());
-
-      System.out.println(responseBody);
 
       ProtoMessageUtils.<ListMaliciousRequestsResponse>toProtoMessage(
           ListMaliciousRequestsResponse.class, responseBody)
@@ -83,6 +100,7 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
                             smr.getCountry(),
                             smr.getDetectedAt()))
                     .collect(Collectors.toList());
+                this.total = m.getTotal();
               });
     } catch (Exception e) {
       e.printStackTrace();
@@ -99,8 +117,6 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
 
     try (CloseableHttpResponse resp = this.httpClient.execute(get)) {
       String responseBody = EntityUtils.toString(resp.getEntity());
-
-      System.out.println(responseBody);
 
       ProtoMessageUtils.<FetchAlertFiltersResponse>toProtoMessage(
           FetchAlertFiltersResponse.class, responseBody)

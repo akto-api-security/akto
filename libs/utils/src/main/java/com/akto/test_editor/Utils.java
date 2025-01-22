@@ -878,6 +878,13 @@ public class Utils {
                     String regex = regexInfo.get("regex");
                     String replaceWith = regexInfo.get("replace_with");
                     newPayload = Utils.applyRegexModifier(payload, regex, replaceWith);
+                } else if (key instanceof String && key != "" && ((String) key).contains("regex_replace")) {
+                    Map<String, Map<String, String>> regexReplace = parseStringToMap((String) key);
+                    String payload = rawApi.getRequest().getBody();
+                    Map<String, String> regexInfo = regexReplace.get("regex_replace");
+                    String regex = regexInfo.get("regex");
+                    String replaceWith = regexInfo.get("replace_with");
+                    newPayload = Utils.applyRegexModifier(payload, regex, replaceWith);
                 } else {
                     newPayload = key.toString();
                 }
@@ -936,6 +943,35 @@ public class Utils {
                 return new ExecutorSingleOperationResp(false, "invalid operationType");
         }
             
+    }
+
+    public static Map<String, Map<String, String>> parseStringToMap(String mapString) {
+
+        mapString = mapString.trim();
+        if (mapString.startsWith("{") && mapString.endsWith("}")) {
+            mapString = mapString.substring(1, mapString.length() - 1);
+        }
+
+        Map<String, Map<String, String>> resultMap = new HashMap<>();
+        String[] entries = mapString.split("=", 2);
+
+        String outerKey = entries[0].trim();
+        String innerMapString = entries[1].trim();
+
+        innerMapString = innerMapString.substring(1, innerMapString.length() - 1);
+
+        Map<String, String> innerMap = new HashMap<>();
+        String[] innerEntries = innerMapString.split(", ");
+
+        for (String innerEntry : innerEntries) {
+            String[] innerKeyValue = innerEntry.split("=", 2);
+            String innerKey = innerKeyValue[0].trim();
+            String innerValue = innerKeyValue[1].trim();
+            innerMap.put(innerKey, innerValue);
+        }
+
+        resultMap.put(outerKey, innerMap);
+        return resultMap;
     }
 
 

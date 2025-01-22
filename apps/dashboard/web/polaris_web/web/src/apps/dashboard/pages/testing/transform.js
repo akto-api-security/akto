@@ -225,7 +225,7 @@ const transform = {
     },
     prettifyTestName: (testName, icon, iconColor, iconToolTipContent)=>{
       return(
-        <HorizontalStack gap={4}>
+        <HorizontalStack wrap={false} gap={4}>
           <Tooltip content={iconToolTipContent} hoverDelay={"300"} dismissOnMouseOut>
             <Box><Icon source={icon} color={iconColor}/></Box>
           </Tooltip>
@@ -597,7 +597,7 @@ const transform = {
     let finalDataSubCategories = [], promises = [], categories = [];
     let testSourceConfigs = []
     const limit = 50;
-    for(var i = 0 ; i < 20; i++){
+    for(var i = 0 ; i < 25; i++){
       promises.push(
         api.fetchAllSubCategories(fetchActive, type, i * limit, limit)
       )
@@ -710,6 +710,7 @@ getInfoSectionsHeaders(){
 convertSubIntoSubcategory(resp){
   let obj = {}
   let countObj = {
+    CRITICAL: 0,
     HIGH: 0,
     MEDIUM: 0,
     LOW: 0,

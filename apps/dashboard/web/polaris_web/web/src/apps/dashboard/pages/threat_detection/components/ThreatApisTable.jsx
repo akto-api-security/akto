@@ -36,7 +36,22 @@ const headers = [
   },
 ];
 
-const sortOptions = [];
+const sortOptions = [
+  {
+    label: "Discovered time",
+    value: "discoveredAt asc",
+    directionLabel: "Newest",
+    sortKey: "discoveredAt",
+    columnIndex: 4,
+  },
+  {
+    label: "Discovered time",
+    value: "discoveredAt desc",
+    directionLabel: "Oldest",
+    sortKey: "discoveredAt",
+    columnIndex: 4,
+  },
+];
 
 let filters = [];
 
@@ -60,7 +75,7 @@ function ThreatApiTable({ currDateRange, rowClicked }) {
   async function fetchData(sortKey, sortOrder, skip) {
     setLoading(true);
     const sort = { [sortKey]: sortOrder };
-    const res = await api.fetchThreatApis(skip);
+    const res = await api.fetchThreatApis(skip, sort);
     let total = res.total;
     let ret = res?.apis?.map((x) => {
       return {

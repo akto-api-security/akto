@@ -398,12 +398,15 @@ const transform = {
     },
 
     getIssuesList(severityInfo){
+        const sortedSeverityInfo = func.sortObjectBySeverity(severityInfo)
         return (
             <HorizontalStack gap="1" wrap={false}>
                 {
-                    Object.keys(severityInfo).length > 0 ? Object.keys(severityInfo).map((key,index)=>{
+                    Object.keys(sortedSeverityInfo).length > 0 ? Object.keys(sortedSeverityInfo).map((key,index)=>{
                         return(
-                            <Badge size="small" status={this.getColor(key)} key={index}>{severityInfo[key].toString()}</Badge>
+                            <div className={`badge-wrapper-${key}`}>
+                                <Badge size="small" key={index}>{sortedSeverityInfo[key].toString()}</Badge>
+                            </div>
                         )
                     }):
                     <Text fontWeight="regular" variant="bodyMd" color="subdued">-</Text>
@@ -413,11 +416,12 @@ const transform = {
     },
 
     getIssuesListText(severityInfo){
+        const sortedSeverityInfo = func.sortObjectBySeverity(severityInfo)
         let val = "-"
-        if(Object.keys(severityInfo).length > 0){
+        if(Object.keys(sortedSeverityInfo).length > 0){
             val = ""
-            Object.keys(severityInfo).map((key) => {
-                val += (key + ": " + severityInfo[key] + " ")
+            Object.keys(sortedSeverityInfo).map((key) => {
+                val += (key + ": " + sortedSeverityInfo[key] + " ")
             })
         } 
         return val

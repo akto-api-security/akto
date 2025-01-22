@@ -2576,8 +2576,10 @@ public class InitializerListener implements ServletContextListener {
             planType = OrganizationUtils.fetchplanType(metaData);
             trialMsg = OrganizationUtils.fetchtrialMsg(metaData);
             boolean expired = OrganizationUtils.fetchExpired(metaData);
-            boolean telemetryEnabled = OrganizationUtils.fetchTelemetryEnabled(metaData);
-            // setTelemetrySettings(organization, telemetryEnabled);
+            if (DashboardMode.isOnPremDeployment()) {
+                boolean telemetryEnabled = OrganizationUtils.fetchTelemetryEnabled(metaData);
+                setTelemetrySettings(organization, telemetryEnabled);
+            }
             boolean testTelemetryEnabled = OrganizationUtils.fetchTestTelemetryEnabled(metaData);
             organization.setTestTelemetryEnabled(testTelemetryEnabled);
 

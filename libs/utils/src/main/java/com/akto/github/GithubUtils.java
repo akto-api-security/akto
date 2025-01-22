@@ -304,6 +304,10 @@ public class GithubUtils {
         Map<String, Integer> countIssues =  testingRunResultSummary.getCountIssues();
         for (String severity : countIssues.keySet()) {
             switch (severity) {
+                case "CRITICAL":
+                    messageStringBuilder.replace(messageStringBuilder.indexOf("@@CRITICAL_COUNT@@")
+                            ,messageStringBuilder.indexOf("@@CRITICAL_COUNT@@") + "@@CRITICAL_COUNT@@".length(), String.valueOf(countIssues.get(severity)));
+                    break;
                 case "HIGH":
                     messageStringBuilder.replace(messageStringBuilder.indexOf("@@HIGH_COUNT@@")
                             ,messageStringBuilder.indexOf("@@HIGH_COUNT@@") + "@@HIGH_COUNT@@".length(), String.valueOf(countIssues.get(severity)));
