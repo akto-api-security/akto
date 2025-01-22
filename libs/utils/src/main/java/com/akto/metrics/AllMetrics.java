@@ -20,8 +20,6 @@ import java.util.concurrent.TimeUnit;
 
 public class AllMetrics {
 
-    private final static int METRIC_SEND_LIMIT = 10;
-
     public void init(LogDb module, boolean pgMetrics){
         int accountId = Context.accountId.get();
 
@@ -77,10 +75,6 @@ public class AllMetrics {
                 kafkaBytesConsumedRate, cyborgNewApiCount, cyborgTotalApiCount, deltaCatalogNewCount, deltaCatalogTotalCount,
                 cyborgApiPayloadSize, multipleSampleDataFetchLatency);
 
-        if(executorService == null){
-            executorService  = Executors.newScheduledThreadPool(1);
-        }
-
         executorService.scheduleAtFixedRate(() -> {
             try {
                 BasicDBList list = new BasicDBList();
@@ -97,10 +91,6 @@ public class AllMetrics {
                     metricsData.put("instance_id", instance_id);
                     metricsData.put("account_id", m.accountId);
                     list.add(metricsData);
-                    if (list.size() >= METRIC_SEND_LIMIT) {
-                        sendDataToAkto(list);
-                        list.clear();
-                    }
 
                 }
                 if(!list.isEmpty()) {
@@ -118,13 +108,10 @@ public class AllMetrics {
 
     private static final String URL = "https://logs.akto.io/ingest-metrics";
 
-    private static final OkHttpClient client = CoreHTTPClient.client.newBuilder()
-            .writeTimeout(1, TimeUnit.SECONDS)
-            .readTimeout(1, TimeUnit.SECONDS)
-            .callTimeout(1, TimeUnit.SECONDS)
-            .build();
+    // Using default timeouts [10 seconds], as this is a slow API.
+    private static final OkHttpClient client = CoreHTTPClient.client.newBuilder().build();
 
-    private final static LoggerMaker loggerMaker = new LoggerMaker(AllMetrics.class);
+    private final static LoggerMaker loggerMaker = new LoggerMaker(AllMetrics.class, LogDb.RUNTIME);
 
     private static final String instance_id = UUID.randomUUID().toString();
     private Metric runtimeKafkaRecordCount;
@@ -311,7 +298,7 @@ public class AllMetrics {
     }
 
 
-    private static ScheduledExecutorService executorService;
+    private static final ScheduledExecutorService executorService = Executors.newScheduledThreadPool(1);
 
     enum MetricType{
         LATENCY, SUM
@@ -442,9 +429,9 @@ public class AllMetrics {
             }
         }
         if (response!= null && response.isSuccessful()) {
-            loggerMaker.infoAndAddToDb("Updated traffic_metrics", LoggerMaker.LogDb.RUNTIME);
+            loggerMaker.infoAndAddToDb("Updated data_metrics", LoggerMaker.LogDb.RUNTIME);
         } else {
-            loggerMaker.infoAndAddToDb("Traffic_metrics not sent", LoggerMaker.LogDb.RUNTIME);
+            loggerMaker.infoAndAddToDb("data_metrics not sent", LoggerMaker.LogDb.RUNTIME);
         }
     }
 }

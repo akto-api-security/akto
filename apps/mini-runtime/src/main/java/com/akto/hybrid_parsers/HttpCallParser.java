@@ -1,8 +1,6 @@
 package com.akto.hybrid_parsers;
 
 import com.akto.RuntimeMode;
-import com.akto.dao.ApiCollectionsDao;
-import com.akto.dao.billing.OrganizationsDao;
 import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.context.Context;
 import com.akto.dao.traffic_metrics.TrafficMetricsDao;
@@ -36,10 +34,8 @@ import com.akto.hybrid_runtime.APICatalogSync;
 import com.akto.hybrid_runtime.Main;
 import com.akto.hybrid_runtime.MergeLogicLocal;
 import com.akto.hybrid_runtime.URLAggregator;
-import com.akto.util.JSONUtils;
 import com.akto.util.Pair;
 import com.akto.util.Constants;
-import com.akto.util.HttpRequestResponseUtils;
 import com.akto.util.http_util.CoreHTTPClient;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.*;
@@ -71,11 +67,9 @@ public class HttpCallParser {
     private Map<TrafficMetrics.Key, TrafficMetrics> trafficMetricsMap = new HashMap<>();
     public static final ScheduledExecutorService trafficMetricsExecutor = Executors.newScheduledThreadPool(1);
     private static final String trafficMetricsUrl = "https://logs.akto.io/traffic-metrics";
-    private static final OkHttpClient client = CoreHTTPClient.client.newBuilder()
-            .writeTimeout(1, TimeUnit.SECONDS)
-            .readTimeout(1, TimeUnit.SECONDS)
-            .callTimeout(1, TimeUnit.SECONDS)
-            .build();
+
+    // Using default timeouts [10 seconds], as this is a slow API.
+    private static final OkHttpClient client = CoreHTTPClient.client.newBuilder().build();
     
     private static final ExecutorService service = Executors.newFixedThreadPool(1);
     private static boolean pgMerging = false;
