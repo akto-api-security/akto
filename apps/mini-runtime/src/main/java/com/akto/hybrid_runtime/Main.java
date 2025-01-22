@@ -207,6 +207,7 @@ public class Main {
         final boolean checkPg = aSettings != null && aSettings.isRedactPayload();
 
         AllMetrics.instance.init(LogDb.RUNTIME, checkPg);
+        HttpCallParser.init();
         loggerMaker.infoAndAddToDb("All metrics initialized", LogDb.RUNTIME);
 
 
