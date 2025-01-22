@@ -660,8 +660,7 @@ public class IssuesAction extends UserAction {
         ObjectId objectId = new ObjectId(latestTestingRunSummaryId);
 
         Bson triFilters = Filters.and(
-                Filters.in(TestingRunIssues.TEST_RUN_ISSUES_STATUS, issueStatusQuery),
-                Filters.in(TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_ID, objectId)
+                Filters.in(TestingRunIssues.TEST_RUN_ISSUES_STATUS, issueStatusQuery)
         );
         issues = TestingRunIssuesDao.instance.findAll(triFilters, Projections.include("_id"));
         List<Bson> testingRunResultsFilterList = new ArrayList<>();

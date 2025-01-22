@@ -680,6 +680,7 @@ public class StartTestAction extends UserAction {
 
     private Map<TestError, String> errorEnums = new HashMap<>();
     List<TestingRunIssues> issueslist;
+    int totalIgnoredIssues;
 
     public String fetchTestingRunResults() {
         ObjectId testingRunResultSummaryId;
@@ -695,11 +696,43 @@ public class StartTestAction extends UserAction {
         if (queryMode != null) loggerMaker.infoAndAddToDb("fetchTestingRunResults called for queryMode="+queryMode);
 
         int timeNow = Context.now();
-        Bson ignoredIssuesFilters = Filters.and(
-                Filters.in(TestingRunIssues.TEST_RUN_ISSUES_STATUS, "IGNORED"),
-                Filters.in(TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_ID, testingRunResultSummaryId)
+        List<TestingRunResult> testingRunResultList = new ArrayList();
+        ObjectId objectId = new ObjectId(testingRunResultSummaryHexId);
+        Bson triFilters = Filters.and(
+                Filters.in(TestingRunIssues.TEST_RUN_ISSUES_STATUS, Arrays.asList("IGNORED"))
         );
-        issueslist = TestingRunIssuesDao.instance.findAll(ignoredIssuesFilters, Projections.include("_id"));
+        issueslist = TestingRunIssuesDao.instance.findAll(triFilters, Projections.include("_id"));
+        List<Bson> testingRunResultsFilterList = new ArrayList<>();
+        boolean isStoredInVulnerableCollection = VulnerableTestingRunResultDao.instance.isStoredInVulnerableCollection(objectId, true);
+        for(TestingRunIssues issue: issueslist) {
+            Bson filter = Filters.empty();
+            if(isStoredInVulnerableCollection){
+                filter = Filters.and(
+                        Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, new ObjectId(testingRunResultSummaryHexId)),
+                        Filters.eq(TestingRunResult.API_INFO_KEY, issue.getId().getApiInfoKey()),
+                        Filters.eq(TestingRunResult.TEST_SUB_TYPE, issue.getId().getTestSubCategory())
+                );
+
+            } else {
+                filter = Filters.and(
+                        Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, new ObjectId(testingRunResultSummaryHexId)),
+                        Filters.eq(TestingRunResult.VULNERABLE, true),
+                        Filters.eq(TestingRunResult.API_INFO_KEY, issue.getId().getApiInfoKey()),
+                        Filters.eq(TestingRunResult.TEST_SUB_TYPE, issue.getId().getTestSubCategory())
+                );
+            }
+            testingRunResultsFilterList.add(filter);
+        }
+        List<Bson> filtersList = new ArrayList<>();
+        if(!testingRunResultsFilterList.isEmpty()) filtersList.add(Filters.or(testingRunResultsFilterList));
+        Bson sort = prepareTestingRunResultCustomSorting(sortKey, sortOrder);
+        if(isStoredInVulnerableCollection){
+            testingRunResultList = VulnerableTestingRunResultDao.instance.fetchLatestTestingRunResultWithCustomAggregations(Filters.and(filtersList), limit, skip, sort);
+        }else{
+            testingRunResultList = TestingRunResultDao.instance.fetchLatestTestingRunResultWithCustomAggregations(Filters.and(filtersList), limit, skip, sort);
+        }
+        totalIgnoredIssues = testingRunResultList.size();
+
         loggerMaker.infoAndAddToDb("[" + (Context.now() - timeNow) + "] Fetched testing run issues of size: " + issueslist.size(), LogDb.DASHBOARD);
 
         List<Bson> testingRunResultFilters = prepareTestRunResultsFilters(testingRunResultSummaryId, queryMode);
@@ -725,7 +758,7 @@ public class StartTestAction extends UserAction {
             loggerMaker.infoAndAddToDb("[" + (Context.now() - timeNow) + "] Fetched testing run results of size: " + testingRunResults.size(), LogDb.DASHBOARD);
 
             timeNow = Context.now();
-            removeTestingRunResultsByIssues(testingRunResults, issueslist, false);
+            removeCommonTestingRunResults(testingRunResults, testingRunResultList);
             loggerMaker.infoAndAddToDb("[" + (Context.now() - timeNow) + "] Removed ignored issues from testing run results. Current size of testing run results: " + testingRunResults.size(), LogDb.DASHBOARD);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "error in fetchLatestTestingRunResult: " + e);
@@ -737,38 +770,20 @@ public class StartTestAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
-    public static void removeTestingRunResultsByIssues(List<TestingRunResult> testingRunResults,
-                                                       List<TestingRunIssues> testingRunIssues,
-                                                       boolean retainByIssues) {
-        long startTime = System.currentTimeMillis();
+    public static void removeCommonTestingRunResults(List<TestingRunResult> removeFromTestingRunResults,
+                                                       List<TestingRunResult> removeTestingRunResults) {
+        Iterator<TestingRunResult> iterator = removeFromTestingRunResults.iterator();
 
-        Set<String> issuesSet = new HashSet<>();
-        for (TestingRunIssues issue : testingRunIssues) {
-            String apiInfoKeyString = issue.getId().getApiInfoKey().toString();
-            String key = apiInfoKeyString + "|" + issue.getId().getTestSubCategory();
-            issuesSet.add(key);
-        }
-        loggerMaker.infoAndAddToDb("Total issues to be removed from TestingRunResults list: " + issuesSet.size(), LogDb.DASHBOARD);
+        while(iterator.hasNext()) {
+            TestingRunResult currentResult = iterator.next();
 
-        Iterator<TestingRunResult> resultIterator = testingRunResults.iterator();
+            boolean isCommon = removeTestingRunResults.stream()
+                    .anyMatch(result -> result.getId().equals(currentResult.getId()));
 
-        while (resultIterator.hasNext()) {
-            TestingRunResult result = resultIterator.next();
-            String apiInfoKeyString = result.getApiInfoKey().toString();
-            String resultKey = apiInfoKeyString + "|" + result.getTestSubType();
-
-            boolean matchFound = issuesSet.contains(resultKey);
-
-            if (retainByIssues && !matchFound) {
-                resultIterator.remove();
-            } else if (!retainByIssues && matchFound) {
-                resultIterator.remove();
+            if(isCommon) {
+                iterator.remove();
             }
         }
-
-        long endTime = System.currentTimeMillis();
-        long duration = endTime - startTime;
-        loggerMaker.infoAndAddToDb("[" + Instant.now() + "] Removed elements from TestingRunResults list in " + duration + " ms", LogDb.DASHBOARD);
     }
 
     private Map<String, List<String>> reportFilterList;
@@ -1586,5 +1601,9 @@ public class StartTestAction extends UserAction {
 
     public void setCleanUpTestingResources(boolean cleanUpTestingResources) {
         this.cleanUpTestingResources = cleanUpTestingResources;
+    }
+
+    public int getTotalIgnoredIssues() {
+        return totalIgnoredIssues;
     }
 }
