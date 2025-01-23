@@ -72,8 +72,7 @@ import com.akto.log.CacheLoggerMaker;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.mixpanel.AktoMixpanel;
-import com.akto.notifications.slack.DailyUpdate;
-import com.akto.notifications.slack.TestSummaryGenerator;
+import com.akto.notifications.slack.*;
 import com.akto.parsers.HttpCallParser;
 import com.akto.runtime.RuntimeUtil;
 import com.akto.stigg.StiggReporterClient;
@@ -872,18 +871,20 @@ public class InitializerListener implements ServletContextListener {
                                 String testSummaryPayload = testSummaryGenerator.toJson(slackWebhook.getDashboardUrl());
 
                                 ChangesInfo ci = getChangesInfo(now - slackWebhook.getLastSentTimestamp(), now - slackWebhook.getLastSentTimestamp(), null, null, false);
-                                DailyUpdate dailyUpdate = new DailyUpdate(
-                                0, 0,
-                                ci.newSensitiveParams.size(), ci.newEndpointsLast7Days.size(),
-                                ci.recentSentiiveParams, ci.newParamsInExistingEndpoints,
-                                slackWebhook.getLastSentTimestamp(), now,
-                                ci.newSensitiveParams, slackWebhook.getDashboardUrl());
+
+                                SlackAlerts dailyInventorySummaryAlert = new DailyInventorySummaryAlert(
+                                        ci.newEndpointsLast7Days.size(),
+                                        ci.newSensitiveParams.size(),
+                                        ci.recentSentiiveParams,
+                                        ci.newParamsInExistingEndpoints,
+                                        slackWebhook.getDashboardUrl()
+                                );
 
                                 slackWebhook.setLastSentTimestamp(now);
                                 SlackWebhooksDao.instance.updateOne(eq("webhook", slackWebhook.getWebhook()), Updates.set("lastSentTimestamp", now));
 
                                 String webhookUrl = slackWebhook.getWebhook();
-                                String payload = dailyUpdate.toJSON();
+                                String payload = dailyInventorySummaryAlert.toJson();
                                 loggerMaker.infoAndAddToDb(payload, LogDb.DASHBOARD);
                                 try {
                                     URI uri = URI.create(webhookUrl);
