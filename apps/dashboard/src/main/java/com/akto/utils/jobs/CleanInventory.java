@@ -1,8 +1,5 @@
 package com.akto.utils.jobs;
 
-import java.io.BufferedWriter;
-import java.io.File;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -19,20 +16,27 @@ import java.util.function.Function;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
-import com.akto.dto.CodeAnalysisRepo;
 import com.mongodb.client.model.Updates;
+import com.mongodb.client.result.DeleteResult;
+import com.mongodb.client.result.UpdateResult;
+
 import org.bson.conversions.Bson;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.ApiInfoDao;
 import com.akto.dao.SampleDataDao;
 import com.akto.dao.SensitiveSampleDataDao;
 import com.akto.dao.SingleTypeInfoDao;
+import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.monitoring.FilterYamlTemplateDao;
 import com.akto.dto.Account;
 import com.akto.dto.ApiCollection;
+import com.akto.dto.ApiInfo;
+import com.akto.dto.ApiInfo.ApiInfoKey;
+import com.akto.dto.billing.Organization;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.monitoring.FilterConfig;
 import com.akto.dto.monitoring.FilterConfig.FILTER_TYPE;
@@ -53,6 +57,7 @@ import com.akto.util.Pair;
 import com.akto.utils.Utils;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Sorts;
 
 import static com.akto.utils.Utils.deleteApis;
@@ -402,4 +407,202 @@ public class CleanInventory {
         }
     }
 
+    private static List<Bson> checkSTIs(List<ApiInfoKey> filters, boolean runActually) {
+        List<Bson> deleteFilters = new ArrayList<>();
+        List<Bson> filters2 = new ArrayList<>();
+        for(ApiInfoKey key : filters) {
+            filters2.add(SingleTypeInfoDao.filterForSTIUsingURL(key.getApiCollectionId(), key.getUrl(), key.getMethod()));
+        }
+        List<SingleTypeInfo> sti = SingleTypeInfoDao.instance.findAll(Filters.or(filters2));
+        HashSet<ApiInfoKey> stiSet = new HashSet<>();
+        if (sti != null && !sti.isEmpty()) {
+            for (SingleTypeInfo st : sti) {
+                stiSet.add(new ApiInfoKey(st.getApiCollectionId(), st.getUrl(), Method.valueOf(st.getMethod())));
+            }
+        }
+        for(ApiInfoKey key : filters) {
+            if(stiSet.contains(key)) {
+                continue;
+            }
+            loggerMaker.infoAndAddToDb("STI not found for STI: " + key.toString());
+            if (runActually) {
+                deleteFilters.add(ApiInfoDao.getFilter(key));
+            }
+        }
+
+        return deleteFilters;
+    }
+
+    public static void deleteExtraApiInfo(List<Integer> apiCollectionIds, boolean runActually) {
+        List<Bson> deleteFilters = new ArrayList<>();
+        for (int apiCollectionId : apiCollectionIds) {
+            List<ApiInfo> apiInfos = ApiInfoDao.instance.findAll(Filters.eq("_id.apiCollectionId", apiCollectionId),
+                    Projections.include("_id"));
+
+            if (apiInfos == null) {
+                loggerMaker.infoAndAddToDb("No API Info found for API Collection Id: " + apiCollectionId);
+                continue;
+            }
+
+            loggerMaker.infoAndAddToDb("Checking ApiInfos count: " + apiInfos.size());
+            List<ApiInfoKey> filters = new ArrayList<>();
+            for (ApiInfo apiInfo : apiInfos) {
+                ApiInfoKey key = apiInfo.getId();
+
+                filters.add(key);
+
+                if (filters.size() >= 100) {
+                    deleteFilters.addAll(checkSTIs(filters, runActually));
+                    filters.clear();
+                }
+            }
+            if (!filters.isEmpty()) {
+                deleteFilters.addAll(checkSTIs(filters, runActually));
+            }
+        }
+        loggerMaker.infoAndAddToDb("Total API Info to delete: " + deleteFilters.size());
+
+        if (runActually && deleteFilters.size() > 0) {
+            loggerMaker.infoAndAddToDb("deleteExtraApiInfo Actually deleting : " + deleteFilters.size());
+            DeleteResult res = ApiInfoDao.instance.deleteAll(Filters.or(deleteFilters));
+            loggerMaker.infoAndAddToDb("deleteExtraApiInfo Actually deleted : " + res.getDeletedCount());
+        }
+    }
+
+    private static final String TEMP_RETAIN = "temp_retain";
+
+    public static long deleteNonHostSTIs(List<Integer> apiCollectionIds, boolean runActually) {
+        long returnCount = 0;
+        for (int apiCollectionId : apiCollectionIds) {
+
+            List<SingleTypeInfo> urls = SingleTypeInfoDao.instance
+                    .findAll(SingleTypeInfoDao.filterForHostHeader(apiCollectionId, true), Projections.include(
+                            SingleTypeInfo._API_COLLECTION_ID, SingleTypeInfo._URL, SingleTypeInfo._METHOD));
+
+            if (urls != null && !urls.isEmpty()) {
+
+                loggerMaker.infoAndAddToDb("deleteNonHostSTIs STIs with host found: " + urls.size());
+                List<Bson> filters = new ArrayList<>();
+                for (SingleTypeInfo url : urls) {
+                    filters.add(SingleTypeInfoDao.filterForSTIUsingURL(url.getApiCollectionId(), url.getUrl(),
+                            Method.valueOf(url.getMethod())));
+                }
+
+                Bson filter = Filters.and(
+                        Filters.eq(SingleTypeInfo._API_COLLECTION_ID, apiCollectionId),
+                        Filters.nor(filters));
+
+                long count = SingleTypeInfoDao.instance.count(filter);
+
+                loggerMaker.infoAndAddToDb("deleteNonHostSTIs STIs for deletion found: " + count);
+
+                returnCount = count;
+                if (runActually) {
+                    try {
+                        List<Bson> batchFilter = new ArrayList<>();
+                        for (SingleTypeInfo url : urls) {
+                            batchFilter.add(
+                                    SingleTypeInfoDao.filterForSTIUsingURL(url.getApiCollectionId(), url.getUrl(),
+                                            Method.valueOf(url.getMethod())));
+
+                            if (batchFilter.size() >= 50) {
+                                UpdateResult res = SingleTypeInfoDao.instance.updateMany(Filters.or(batchFilter),
+                                        Updates.set(TEMP_RETAIN, true));
+                                loggerMaker.infoAndAddToDb("deleteNonHostSTIs temp retain initial update: matched: "
+                                        + res.getMatchedCount() + " modified: " + res.getModifiedCount());
+                                batchFilter.clear();
+                            }
+                        }
+                        if (batchFilter.size() > 0) {
+                            UpdateResult res = SingleTypeInfoDao.instance.updateMany(Filters.or(batchFilter),
+                                    Updates.set(TEMP_RETAIN, true));
+                            loggerMaker.infoAndAddToDb("deleteNonHostSTIs temp retain initial update: matched: "
+                                    + res.getMatchedCount() + " modified: " + res.getModifiedCount());
+                            batchFilter.clear();
+                        }
+
+                        Bson deleteFilter = Filters.and(
+                                Filters.eq(SingleTypeInfo._API_COLLECTION_ID, apiCollectionId),
+                                Filters.exists(TEMP_RETAIN, false));
+
+                        long countVerify = SingleTypeInfoDao.instance.count(deleteFilter);
+
+                        if (countVerify == count) {
+
+                            DeleteResult res = SingleTypeInfoDao.instance.deleteAll(deleteFilter);
+                            loggerMaker.infoAndAddToDb("deleteNonHostSTIs deleted STIs: " + res.getDeletedCount());
+
+                        } else {
+                            loggerMaker.infoAndAddToDb("deleteNonHostSTIs delete count mismatch: " + count
+                                    + " deleteCount: " + countVerify);
+                        }
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
+        }
+        return returnCount;
+    }
+
+    public static void unsetTemp(List<Integer> apiCollectionIds) {
+        for (int apiCollectionId : apiCollectionIds) {
+            Bson updateFilter = Filters.and(
+                    Filters.eq(SingleTypeInfo._API_COLLECTION_ID, apiCollectionId),
+                    Filters.exists(TEMP_RETAIN, true));
+
+            UpdateResult res = SingleTypeInfoDao.instance.updateMany(updateFilter,
+                    Updates.unset(TEMP_RETAIN));
+            loggerMaker.infoAndAddToDb("unsetTemp temp retain undo update: matched: "
+                    + res.getMatchedCount() + " modified: " + res.getModifiedCount());
+        }
+    }
+
+    public static void cleanStaleDataJob() {
+        if (DashboardMode.isOnPremDeployment()) {
+            AccountTask.instance.executeTask(new Consumer<Account>() {
+                @Override
+                public void accept(Account t) {
+                    try {
+                        cleanStaleData();
+                    } catch (Exception e) {
+                        loggerMaker.errorAndAddToDb("Error while clean-stale-data" + e.getMessage(), LogDb.DASHBOARD);
+                    }
+                }
+            }, "clean-stale-data");
+        }
+    }
+
+    private static void cleanStaleData() throws Exception {
+        int accountId = Context.accountId.get();
+        Organization organization = OrganizationsDao.instance.findOneByAccountId(accountId);
+        if ("".equals(organization.getId())) {
+            long start = Context.epochInMillis();
+            loggerMaker.infoAndAddToDb("Starting cleanStaleData job at " + start);
+
+            List<ApiCollection> apiCollections = ApiCollectionsDao.instance.fetchNonApiGroupsIds();
+
+            for (ApiCollection apiCollection : apiCollections) {
+                int id = apiCollection.getId();
+                deleteExtraApiInfo(Arrays.asList(id), true);
+            }
+
+            for (ApiCollection apiCollection : apiCollections) {
+                int id = apiCollection.getId();
+                List<Integer> idList = Arrays.asList(id);
+                long count = deleteNonHostSTIs(idList, true);
+                int retries = 0;
+                // wait for data to be deleted.
+                while (count > 0 && retries < 30) {
+                    Thread.sleep(10000);
+                    count = deleteNonHostSTIs(idList, false);
+                }
+                if (count == 0) {
+                    unsetTemp(idList);
+                }
+            }
+            long end = Context.epochInMillis();
+            loggerMaker.infoAndAddToDb("Completed cleanStaleData job at " + end + " in: " + (end - start));
+        }
+    }
 }

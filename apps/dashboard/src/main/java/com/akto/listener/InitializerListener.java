@@ -79,14 +79,12 @@ import com.akto.runtime.RuntimeUtil;
 import com.akto.stigg.StiggReporterClient;
 import com.akto.task.Cluster;
 import com.akto.telemetry.TelemetryJob;
-import com.akto.test_editor.TemplateSettingsUtil;
 import com.akto.testing.ApiExecutor;
 import com.akto.testing.HostDNSLookup;
 import com.akto.testing.TemplateMapper;
 import com.akto.usage.UsageMetricCalculator;
 import com.akto.usage.UsageMetricHandler;
 import com.akto.testing.workflow_node_executor.Utils;
-import com.akto.util.enums.GlobalEnums;
 import com.akto.util.filter.DictionaryFilter;
 import com.akto.utils.jobs.JobUtils;
 import com.akto.utils.jobs.MatchingJob;
@@ -2331,6 +2329,12 @@ public class InitializerListener implements ServletContextListener {
                      */
                     CleanInventory.cleanInventoryJobRunner();
                     // CleanTestingJob.cleanTestingJobRunner();
+
+                    try {
+                        CleanInventory.cleanStaleDataJob();
+                    } catch(Exception e){
+                        loggerMaker.errorAndAddToDb(e, "Exception in cleanStaleDataJob");
+                    }
 
                     MatchingJob.MatchingJobRunner();
 
