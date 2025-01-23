@@ -178,9 +178,15 @@ function About() {
                 onChange={() => {
                     const userProps = {}
                     let subsKey = window.DASHBOARD_MODE === 'ON_PREM' ? "mono_subscribed" : "akto_subscribed"
-                    userProps[subsKey] = true
-                    if (window.Intercom) window.Intercom("update", userProps)
-                    if (window.mixpanel) window.mixpanel.people.set(userProps)
+                    userProps[subsKey] = "yes"
+                    if  (window.Intercom) {
+                        window.Intercom("update", userProps)
+                        window.Intercom("trackEvent", subsKey)
+                    }
+            
+                    if (window.mixpanel) {
+                        window.mixpanel.people.set(userProps);
+                    }
                     setIsSubscribed(!isSubscribed)
                     localStorage.setItem('isSubscribed', (!isSubscribed).toString())
                     if (!isSubscribed) {
