@@ -137,6 +137,7 @@ function SingleTestRunPage() {
   const [allResultsLength, setAllResultsLength] = useState(undefined)
   const [currentSummary, setCurrentSummary] = useState('')
   const [pageTotalCount, setPageTotalCount] = useState(0)
+  const [prevSelectedTab, setPrevSelectedTab] = useState('')
 
   const tableTabMap = {
     vulnerable: "VULNERABLE",
@@ -287,9 +288,12 @@ function SingleTestRunPage() {
             setErrorsObject(errorEnums)
             setMissingConfigs(transform.getMissingConfigs(testRunResultsRes))
           }
-        })
-        
+        })       
+      }
+
+      if(!func.deepComparison(copyFilters, filters) || selectedTab !== prevSelectedTab){
         setCopyFilters(filters)
+        setPrevSelectedTab(selectedTab)
         api.fetchTestRunResultsCount(localSelectedTestRun.testingRunResultSummaryHexId).then((testCountMap) => {
           testRunCountMap = testCountMap || []
           testRunCountMap['VULNERABLE'] = Math.abs(testRunCountMap['VULNERABLE']-totalIgnoredIssuesCount)
@@ -300,12 +304,12 @@ function SingleTestRunPage() {
               countOthers += testCountMap[x]
             }
           })
-          testRunCountMap['SECURED'] = testCountMap['ALL'] - countOthers
+          testRunCountMap['SECURED'] = testCountMap['ALL'] === 0 ? 0 : (testCountMap['ALL'] - countOthers)
           const orderedValues = tableTabsOrder.map(key => testCountMap[tableTabMap[key]] || 0)
           setTestRunResultsCount(orderedValues)
           setPageTotalCount(selectedTab === 'ignored_issues' ? totalIgnoredIssuesCount : testRunCountMap[tableTabMap[selectedTab]])
         })
-       
+        
       }
     }
     
