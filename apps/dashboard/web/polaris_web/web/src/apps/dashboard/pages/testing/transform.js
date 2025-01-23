@@ -83,7 +83,7 @@ function getTestingRunType(testingRun, testingRunResultSummary, cicd) {
   if (testingRunResultSummary.metadata != null || cicd) {
     return 'CI/CD';
   }
-  if (testingRun.state === "SCHEDULED" || testingRun.periodInSeconds !== 0) {
+  if (testingRun.periodInSeconds > 0) {
     return 'Recurring';
   }
   return 'One-time'
