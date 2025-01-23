@@ -1,5 +1,5 @@
-import { Box, Button, DataTable, Divider, Modal, Text, TextField, Icon, Checkbox, Badge, Banner, InlineGrid, HorizontalStack, Link, VerticalStack, Tooltip, Popover, ActionMenu, OptionList, ActionList } from "@shopify/polaris";
-import { TickMinor, CancelMajor, SearchMinor } from "@shopify/polaris-icons";
+import { Box, Button, DataTable, Divider, Modal, Text, TextField, Icon, Checkbox, Badge, Banner, InlineGrid, HorizontalStack, Link, VerticalStack, Tooltip, Popover, ActionMenu, OptionList, ActionList, ButtonGroup } from "@shopify/polaris";
+import { TickMinor, CancelMajor, SearchMinor, NoteMinor, AppsMinor, AppsFilledMajor } from "@shopify/polaris-icons";
 import { useEffect, useReducer, useRef, useState } from "react";
 import api, { default as observeApi } from "../api";
 import { default as testingApi } from "../../testing/api";
@@ -17,7 +17,7 @@ import RunTestSuites from "./RunTestSuites";
 import RunTestConfiguration from "./RunTestConfiguration";
 
 
-function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOutside, closeRunTest, selectedResourcesForPrimaryAction, useLocalSubCategoryData, preActivator,  testMode, testIdConfig, setTestMode }) {
+function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOutside, closeRunTest, selectedResourcesForPrimaryAction, useLocalSubCategoryData, preActivator, testIdConfig, activeFromTesting, setActiveFromTesting, showEditableSettings, setShowEditableSettings }) {
 
     const initialState = {
         categories: [],
@@ -76,16 +76,14 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
 
     const localCategoryMap = LocalStore.getState().categoryMap
     const localSubCategoryMap = LocalStore.getState().subCategoryMap
+    const [testMode, setTestMode] = useState(true)
+    const [shouldRuntestConfig, setShouldRuntestConfig] = useState(false)
+
+    const [openConfigurations, openConfigurationsToggle] = useState(false);
 
     useEffect(() => {
-        if(preActivator){
+        if (preActivator) {
             setParentActivator(true);
-            if(testMode === "testSuite"){
-                testSuiteToggle(true)
-            }
-            else if(testMode === "individualTest"){
-                toggleRunTest()
-            }
         }
 
     }, [testMode])
@@ -166,15 +164,19 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         const authMechanismDataResponse = await testingApi.fetchAuthMechanismData()
         if (authMechanismDataResponse.authMechanism)
             authMechanismPresent = true
-        setTestRun(prev => ({
-            ...prev,
-            categories: categories,
-            tests: processMapCategoryToSubcategory,
-            selectedCategory: Object.keys(processMapCategoryToSubcategory).length > 0 ? Object.keys(processMapCategoryToSubcategory)[0] : "",
-            testName: testName,
-            authMechanismPresent: authMechanismPresent
-        }))
+        setTestRun(prev => {
+            const state = {
+                ...prev,
+                categories: categories,
+                tests: processMapCategoryToSubcategory,
+                selectedCategory: Object.keys(processMapCategoryToSubcategory).length > 0 ? Object.keys(processMapCategoryToSubcategory)[0] : "",
+                testName: testName,
+                authMechanismPresent: authMechanismPresent
+            };
+            return state;
+        });
         setLoading(false)
+        setShouldRuntestConfig(true);
     }
 
     useEffect(() => {
@@ -184,11 +186,74 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         }
     }, [apiCollectionName, runTestFromOutside])
 
+
+
+    useEffect(() => {
+        if (shouldRuntestConfig === false) return;
+        if (testIdConfig?.testingRunConfig?.testSubCategoryList?.length > 0) {
+            const testSubCategoryList = [...testIdConfig.testingRunConfig.testSubCategoryList];
+
+            const updatedTests = { ...testRun.tests };
+
+            // Reset all test selections
+            Object.keys(updatedTests).forEach(category => {
+                updatedTests[category] = updatedTests[category].map(test => ({ ...test, selected: false }));
+            });
+
+            const testSubCategorySet = new Set(testSubCategoryList);
+
+            Object.keys(updatedTests).forEach(category => {
+                updatedTests[category] = updatedTests[category].map(test => ({
+                    ...test,
+                    selected: testSubCategorySet.has(test.value),
+                }));
+            });
+
+            // Efficient deep equality check 
+            function areObjectArraysEqual(obj1, obj2) {
+                const keys1 = Object.keys(obj1);
+                const keys2 = Object.keys(obj2);
+
+                if (keys1.length !== keys2.length) return false;
+
+                const setKeys1 = new Set(keys1);
+                const setKeys2 = new Set(keys2);
+                if (setKeys1.size !== setKeys2.size || [...setKeys1].some(key => !setKeys2.has(key))) {
+                    return false;
+                }
+
+                for (let key of keys1) {
+                    const arr1 = obj1[key].map(obj => JSON.stringify(obj)).sort();
+                    const arr2 = obj2[key].map(obj => JSON.stringify(obj)).sort();
+
+                    if (arr1.length !== arr2.length || arr1.some((item, index) => item !== arr2[index])) {
+                        return false;
+                    }
+                }
+
+                return true;
+            }
+
+            // Update state only if there is a change
+            if (!areObjectArraysEqual(updatedTests, testRun.tests)) {
+                setTestRun(prev => ({
+                    ...testRun,
+                    tests: updatedTests,
+                }));
+            }
+        }
+        setShouldRuntestConfig(false);
+    }, [shouldRuntestConfig])
+
+
     const toggleRunTest = () => {
+        if (activeFromTesting) {
+            setActiveFromTesting(false);
+            return;
+        }
         setActive(prev => !prev)
         if (active) {
-            if(closeRunTest !== undefined)closeRunTest()
-            setTestMode("");
+            if (closeRunTest !== undefined) closeRunTest()
         }
     }
 
@@ -214,36 +279,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         }
     }
 
-    const [testPopover, setTestPopover] = useState(false);
-
     const [testSuite, testSuiteToggle] = useState(false);
-
-    const activators = (
-        <Popover
-            active={testPopover}
-
-            activator={
-                <Button onClick={() => setTestPopover(!testPopover)} primary disclosure>Run Tests</Button>
-            }
-            onClose={() => setTestPopover(false)}
-        >
-            <ActionList
-                items={[
-                    {
-                        content: "Test suites",
-                        onAction: () => testSuiteToggle(true)
-                    },
-                    {
-                        content: "Individual tests",
-                        onAction: toggleRunTest,
-                        active: disabled || testRun.selectedCategory.length === 0,
-                    }
-                ]}
-            >
-
-            </ActionList>
-        </Popover>
-    )
 
     const activator = (
         <div ref={runTestRef}>
@@ -456,11 +492,11 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
     }
 
     async function handleRun() {
-        const { startTimestamp, recurringDaily, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert,cleanUpTestingResources } = testRun
+        const { startTimestamp, recurringDaily, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, cleanUpTestingResources } = testRun
         const collectionId = parseInt(apiCollectionId)
 
         const tests = testRun.tests
-        
+
         const selectedTests = []
         Object.keys(tests).forEach(category => {
             tests[category].forEach(test => {
@@ -469,7 +505,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         })
 
         let apiInfoKeyList;
-        if(!selectedResourcesForPrimaryAction || selectedResourcesForPrimaryAction.length === 0) {
+        if (!selectedResourcesForPrimaryAction || selectedResourcesForPrimaryAction.length === 0) {
             apiInfoKeyList = endpoints.map(endpoint => ({
                 apiCollectionId: endpoint.apiCollectionId,
                 method: endpoint.method,
@@ -497,9 +533,18 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         }
 
         if (filtered || selectedResourcesForPrimaryAction?.length > 0) {
-                await observeApi.scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, "TESTING_UI", testRoleId, continuousTesting, sendSlackAlert, finalAdvancedConditions, cleanUpTestingResources,testIdConfig?.hexId)
+            if (testIdConfig) {
+                await testingApi.modifyTestingRunConfig(testIdConfig?.testingRunConfig?.id, null, selectedTests)
+                transform.rerunTest(testIdConfig.hexId, null, true)
+
+            }
+            else await observeApi.scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, "TESTING_UI", testRoleId, continuousTesting, sendSlackAlert, finalAdvancedConditions, cleanUpTestingResources)
         } else {
-                await observeApi.scheduleTestForCollection(collectionId, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, finalAdvancedConditions,cleanUpTestingResources,testIdConfig?.hexId)
+            if (testIdConfig) {
+                await testingApi.modifyTestingRunConfig(testIdConfig?.testingRunConfig?.id, null, selectedTests)
+                transform.rerunTest(testIdConfig.hexId, null, true)
+            }
+            else observeApi.scheduleTestForCollection(collectionId, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, finalAdvancedConditions, cleanUpTestingResources)
         }
 
         setActive(false)
@@ -537,6 +582,15 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
 
     const allTestsSelectedOfCategory = getCurrentStatus()
 
+    function countAllSelectedTests() {
+        let count = 0;
+        const test = { ...testRun.tests };
+        Object.keys(test).forEach(category => {
+            count += test[category].filter(test => test.selected).length;
+        });
+        return count;
+    }
+
     function toggleTestsSelection(val) {
         let copyTestRun = testRun
         copyTestRun.tests[testRun.selectedCategory].forEach((test) => {
@@ -564,172 +618,256 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         );
     }
 
+    const handleButtonClick = (check) => {
+        setTestMode(check);
+    }
+
+    const handleModifyConfig = async () => {
+        const settings = transform.prepareConditionsForTesting(conditions)
+        await testingApi.modifyTestingRunConfig(testIdConfig?.testingRunConfig?.id, settings).then(() => {
+            func.setToast(true, false, "Modified testing run config successfully")
+            setShowEditableSettings(false)
+        })
+    }
+
+    const handleAddSettings = () => {
+        if (conditions.length === 0 && testingRunConfigSettings.length > 0) {
+          testingRunConfigSettings.forEach((condition) => {
+            const operatorType = condition.operatorType
+            condition.operationsGroupList.forEach((obj) => {
+              const finalObj = { 'data': obj, 'operator': { 'type': operatorType } }
+              dispatchConditions({ type: "add", obj: finalObj })
+            })
+          })
+        }
+      }
+
+    // still not working properly need api to modify test_run object
+    const editableConfigsComp = (
+        <Modal
+            large
+            fullScreen
+            open={showEditableSettings}
+            onClose={() => setShowEditableSettings(false)}
+            title={"Edit test configurations"}
+            primaryAction={{
+                content: 'Save',
+                onAction: () => handleModifyConfig()
+            }}
+        >
+            <Modal.Section>
+                <>
+                    <RunTestConfiguration
+                        testRun={testRun}
+                        setTestRun={setTestRun}
+                        runTypeOptions={runTypeOptions}
+                        hourlyTimes={hourlyTimes}
+                        testRunTimeOptions={testRunTimeOptions}
+                        testRolesArr={testRolesArr}
+                        maxConcurrentRequestsOptions={maxConcurrentRequestsOptions}
+                        slackIntegrated={slackIntegrated}
+                        generateLabelForSlackIntegration={generateLabelForSlackIntegration}
+                        getLabel={getLabel}
+                    />
+                    <AdvancedSettingsComponent dispatchConditions={dispatchConditions} conditions={conditions} />
+                </>
+            </Modal.Section>
+        </Modal>
+    )
+
+
+
     return (
         <div>
-            {!parentActivator? activators:null}
-            <RunTestSuites
-                testSuiteModal={testSuite}
-                testSuiteModalToggle={testSuiteToggle}
-                parentTestRun={testRun}
-                setParentTestRun={setTestRun}
-                runTypeOptions={runTypeOptions}
-                hourlyTimes={hourlyTimes}
-                testRunTimeOptions={testRunTimeOptions}
-                testRolesArr={testRolesArr}
-                maxConcurrentRequestsOptions={maxConcurrentRequestsOptions}
-                slackIntegrated={slackIntegrated}
-                generateLabelForSlackIntegration={generateLabelForSlackIntegration} 
-                dispatchConditions={dispatchConditions} conditions={conditions}
-                handleRun={handleRun}
-                handleRemoveAll={handleRemoveAll}
-                nameSuffixes={nameSuffixes}
-                convertToLowerCaseWithUnderscores={convertToLowerCaseWithUnderscores}
-                apiCollectionName={apiCollectionName}
-                testIdConfig={testIdConfig}
-                initialState={initialState}
-                setTestMode={setTestMode}
-                testMode={testMode}/>
+            {!parentActivator ? activator : null}
+            {showEditableSettings? editableConfigsComp: null}
             <Modal
+
                 activator={runTestRef}
-                open={active}
+                open={active || activeFromTesting}
                 onClose={toggleRunTest}
-                title="Configure test"
+                title={<HorizontalStack gap={4}><Text as="h2" fontWeight="semibold">Configure test</Text>
+                    <ButtonGroup segmented>
+                        <Button monochrome pressed={testMode} icon={NoteMinor} onClick={() => handleButtonClick(true)}></Button>
+                        <Button monochrome pressed={!testMode} icon={AppsFilledMajor} onClick={() => handleButtonClick(false)}></Button>
+                    </ButtonGroup>
+                </HorizontalStack>}
                 primaryAction={{
-                    content: scheduleString(),
+                    content: activeFromTesting ? "Save & Re-run" : scheduleString(),
                     onAction: handleRun,
-                    disabled: !testRun.authMechanismPresent
+                    disabled: (countAllSelectedTests() === 0) || !testRun.authMechanismPresent
                 }}
+                secondaryActions={[
+                    countAllSelectedTests() ? {
+                        content: `${countAllSelectedTests()} tests selected`,
+                        disabled: true,
+                        plain: true,
+                    } : null,
+                    {
+                        content: 'Cancel',
+                        onAction: () => toggleRunTest(),
+                    },
+
+                ].filter(Boolean)}
+
                 large
+
+                footer={testMode ? null : openConfigurations ? <Button onClick={() => openConfigurationsToggle(false)} plain><Text as="p" fontWeight="regular">Go back to test selection</Text></Button> : <Button onClick={() => openConfigurationsToggle(true)} plain><Text as="p" fontWeight="regular">Change Configurations</Text></Button>}
             >
                 {loading ? <SpinnerCentered /> :
-                    <Modal.Section>
-                        <VerticalStack gap={"3"}>
-                            {!testRun.authMechanismPresent &&
-                                <div>
-                                    <Banner
-                                        title="Authentication mechanism not configured"
-                                        action={
-                                            {
-                                                content: 'Configure authentication mechanism',
-                                                onAction: () => navigate("/dashboard/testing/user-config")
-                                            }}
-                                        status="critical"
-                                    >
+                    testMode ?
+                        <Modal.Section>
+                            <VerticalStack gap={"3"}>
+                                {!testRun.authMechanismPresent &&
+                                    <div>
+                                        <Banner
+                                            title="Authentication mechanism not configured"
+                                            action={
+                                                {
+                                                    content: 'Configure authentication mechanism',
+                                                    onAction: () => navigate("/dashboard/testing/user-config")
+                                                }}
+                                            status="critical"
+                                        >
 
-                                        <Text variant="bodyMd">
-                                            Running specialized tests like Broken Object Level Authorization,
-                                            Broken User Authentication etc, require an additional attacker
-                                            authorization token. Hence before triggering Akto tests on your apis,
-                                            you may need to specify an authorization token which can be treated as
-                                            attacker token during test run. Attacker Token can be specified
-                                            manually, as well as in automated manner. We provide multiple ways to
-                                            automate Attacker token generation.
-                                        </Text>
-                                    </Banner>
-                                    <br />
-                                </div>
-                            }
-
-
-                            <div style={{ display: "grid", gridTemplateColumns: "max-content auto max-content", alignItems: "center", gap: "10px" }}>
-                                <Text variant="headingMd">Name:</Text>
-                                <div style={{ maxWidth: "75%" }}>
-                                    <TextField
-                                        placeholder="Enter test name"
-                                        value={testRun.testName}
-                                        onChange={(testName) => setTestRun(prev => ({ ...prev, testName: testName }))}
-                                    />
-                                </div>
-
-                                <Button
-                                    icon={CancelMajor}
-                                    destructive
-                                    onClick={handleRemoveAll}
-                                    disabled={checkRemoveAll()}><div data-testid="remove_all_tests">Remove All</div></Button>
-                            </div>
-                            <div style={{ display: "grid", gridTemplateColumns: "50% 50%", border: "1px solid #C9CCCF" }}>
-                                <div style={{ borderRight: "1px solid #C9CCCF" }}>
-                                    <div style={{ padding: "15px", alignItems: "center" }}>
-                                        <Text variant="headingMd">Test Categories</Text>
+                                            <Text variant="bodyMd">
+                                                Running specialized tests like Broken Object Level Authorization,
+                                                Broken User Authentication etc, require an additional attacker
+                                                authorization token. Hence before triggering Akto tests on your apis,
+                                                you may need to specify an authorization token which can be treated as
+                                                attacker token during test run. Attacker Token can be specified
+                                                manually, as well as in automated manner. We provide multiple ways to
+                                                automate Attacker token generation.
+                                            </Text>
+                                        </Banner>
+                                        <br />
                                     </div>
-                                    <Divider />
-                                    <div style={{ maxHeight: "35vh", overflowY: "auto" }}>
+                                }
 
-                                        <DataTable
-                                            columnContentTypes={[
-                                                'text',
-                                            ]}
-                                            headings={[]}
-                                            rows={categoryRows}
-                                            increasedTableDensity
+
+                                <div style={{ display: "grid", gridTemplateColumns: "max-content auto max-content", alignItems: "center", gap: "10px" }}>
+                                    <Text variant="headingMd">Name:</Text>
+                                    <div style={{ maxWidth: "75%" }}>
+                                        <TextField
+                                            placeholder="Enter test name"
+                                            value={testRun.testName}
+                                            onChange={(testName) => setTestRun(prev => ({ ...prev, testName: testName }))}
                                         />
                                     </div>
+
+                                    <Button
+                                        icon={CancelMajor}
+                                        destructive
+                                        onClick={handleRemoveAll}
+                                        disabled={checkRemoveAll()}><div data-testid="remove_all_tests">Clear selection</div></Button>
                                 </div>
-                                <div>
-                                    <div style={{ padding: !showSearch ? "13px" : "9px", alignItems: "center", justifyContent: 'space-between', display: 'flex' }}>
-                                        <HorizontalStack gap={"2"}>
-                                            <Checkbox
-                                                checked={allTestsSelectedOfCategory}
-                                                onChange={(val) => toggleTestsSelection(val)}
+                                <div style={{ display: "grid", gridTemplateColumns: "50% 50%", border: "1px solid #C9CCCF" }}>
+                                    <div style={{ borderRight: "1px solid #C9CCCF" }}>
+                                        <div style={{ padding: "15px", alignItems: "center" }}>
+                                            <Text variant="headingMd">Test Categories</Text>
+                                        </div>
+                                        <Divider />
+                                        <div style={{ maxHeight: "35vh", overflowY: "auto" }}>
+
+                                            <DataTable
+                                                columnContentTypes={[
+                                                    'text',
+                                                ]}
+                                                headings={[]}
+                                                rows={categoryRows}
+                                                increasedTableDensity
                                             />
-                                            <Text variant="headingMd">Tests</Text>
-                                        </HorizontalStack>
-                                        <HorizontalStack gap={"2"}>
-                                            <Popover
-                                                activator={<Button
-
-                                                    size="slim"
-                                                    onClick={() => setShowFiltersOption(!showFiltersOption)}
-                                                    plain>More filters</Button>}
-                                                onClose={() => setShowFiltersOption(false)}
-                                                active={showFiltersOption}
-                                            >
-                                                <Popover.Pane fixed>
-                                                    <OptionList
-                                                        onChange={(x) => { setOptionsSelected(x); selectOnlyFilteredTests(x); }}
-                                                        allowMultiple
-                                                        sections={sectionsForFilters}
-                                                        selected={optionsSelected}
-                                                    />
-                                                </Popover.Pane>
-                                            </Popover>
-                                            {showSearch ? <TextField onChange={handleInputValue} value={searchValue} autoFocus
-                                                focused /> : null}
-                                            <Tooltip content={"Click to search"} dismissOnMouseOut>
-                                                <Button size="slim" icon={SearchMinor} onClick={() => setShowSearch(!showSearch)} />
-                                            </Tooltip>
-                                        </HorizontalStack>
+                                        </div>
                                     </div>
-                                    <Divider />
-                                    <div style={{ maxHeight: "35vh", overflowY: "auto", paddingTop: "5px" }}>
-                                        <DataTable
-                                            columnContentTypes={[
-                                                'text',
-                                            ]}
-                                            headings={[]}
-                                            rows={testRows}
-                                            hoverable={false}
-                                            increasedTableDensity
-                                        />
+                                    <div>
+                                        <div style={{ padding: !showSearch ? "13px" : "9px", alignItems: "center", justifyContent: 'space-between', display: 'flex' }}>
+                                            <HorizontalStack gap={"2"}>
+                                                <Checkbox
+                                                    checked={allTestsSelectedOfCategory}
+                                                    onChange={(val) => toggleTestsSelection(val)}
+                                                />
+                                                <Text variant="headingMd">Tests</Text>
+                                            </HorizontalStack>
+                                            <HorizontalStack gap={"2"}>
+                                                <Popover
+                                                    activator={<Button
+
+                                                        size="slim"
+                                                        onClick={() => setShowFiltersOption(!showFiltersOption)}
+                                                        plain>More filters</Button>}
+                                                    onClose={() => setShowFiltersOption(false)}
+                                                    active={showFiltersOption}
+                                                >
+                                                    <Popover.Pane fixed>
+                                                        <OptionList
+                                                            onChange={(x) => { setOptionsSelected(x); selectOnlyFilteredTests(x); }}
+                                                            allowMultiple
+                                                            sections={sectionsForFilters}
+                                                            selected={optionsSelected}
+                                                        />
+                                                    </Popover.Pane>
+                                                </Popover>
+                                                {showSearch ? <TextField onChange={handleInputValue} value={searchValue} autoFocus
+                                                    focused /> : null}
+                                                <Tooltip content={"Click to search"} dismissOnMouseOut>
+                                                    <Button size="slim" icon={SearchMinor} onClick={() => setShowSearch(!showSearch)} />
+                                                </Tooltip>
+                                            </HorizontalStack>
+                                        </div>
+                                        <Divider />
+                                        <div style={{ maxHeight: "35vh", overflowY: "auto", paddingTop: "5px" }}>
+                                            <DataTable
+                                                columnContentTypes={[
+                                                    'text',
+                                                ]}
+                                                headings={[]}
+                                                rows={testRows}
+                                                hoverable={false}
+                                                increasedTableDensity
+                                            />
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                            <RunTestConfiguration
+                                <RunTestConfiguration
+                                    testRun={testRun}
+                                    setTestRun={setTestRun}
+                                    runTypeOptions={runTypeOptions}
+                                    hourlyTimes={hourlyTimes}
+                                    testRunTimeOptions={testRunTimeOptions}
+                                    testRolesArr={testRolesArr}
+                                    maxConcurrentRequestsOptions={maxConcurrentRequestsOptions}
+                                    slackIntegrated={slackIntegrated}
+                                    generateLabelForSlackIntegration={generateLabelForSlackIntegration}
+                                />
+
+                            </VerticalStack>
+                            <AdvancedSettingsComponent dispatchConditions={dispatchConditions} conditions={conditions} />
+
+                        </Modal.Section> : <Modal.Section>
+                            {!openConfigurations ? <RunTestSuites
                                 testRun={testRun}
                                 setTestRun={setTestRun}
-                                runTypeOptions={runTypeOptions}
-                                hourlyTimes={hourlyTimes}
-                                testRunTimeOptions={testRunTimeOptions}
-                                testRolesArr={testRolesArr}
-                                maxConcurrentRequestsOptions={maxConcurrentRequestsOptions}
-                                slackIntegrated={slackIntegrated}
-                                generateLabelForSlackIntegration={generateLabelForSlackIntegration}
-                            />
-
-                        </VerticalStack>
-                        <AdvancedSettingsComponent dispatchConditions={dispatchConditions} conditions={conditions} />
-
-                    </Modal.Section>
+                                handleRun={handleRun}
+                                handleRemoveAll={handleRemoveAll}
+                                apiCollectionName={apiCollectionName}
+                                setTestMode={setTestMode}
+                                checkRemoveAll={checkRemoveAll} /> :
+                                <>
+                                    <RunTestConfiguration
+                                        testRun={testRun}
+                                        setTestRun={setTestRun}
+                                        runTypeOptions={runTypeOptions}
+                                        hourlyTimes={hourlyTimes}
+                                        testRunTimeOptions={testRunTimeOptions}
+                                        testRolesArr={testRolesArr}
+                                        maxConcurrentRequestsOptions={maxConcurrentRequestsOptions}
+                                        slackIntegrated={slackIntegrated}
+                                        generateLabelForSlackIntegration={generateLabelForSlackIntegration}
+                                    />
+                                    <AdvancedSettingsComponent dispatchConditions={dispatchConditions} conditions={conditions} />
+                                </>
+                            }
+                        </Modal.Section>
                 }
             </Modal>
         </div>

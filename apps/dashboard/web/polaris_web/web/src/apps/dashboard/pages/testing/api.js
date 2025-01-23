@@ -475,11 +475,18 @@ export default {
             data: { latestTestingRunSummaryId, issueStatusQuery, sortKey, sortOrder, skip, limit, filters }
         })
     },
-    modifyTestingRunConfig(testingRunConfigId, testConfigsAdvancedSettings){
+    modifyTestingRunConfig(testingRunConfigId, testConfigsAdvancedSettings,selectedTestRun) {
+        const requestData = { testingRunConfigId }
+        if(testConfigsAdvancedSettings){
+            requestData.testConfigsAdvancedSettings = testConfigsAdvancedSettings;
+        }
+        if(selectedTestRun){
+            requestData.selectedTests = selectedTestRun;
+        }
         return request({
             url: '/api/modifyTestingRunConfig',
             method: 'post',
-            data: { testingRunConfigId, testConfigsAdvancedSettings }
+            data: requestData
         })
     },
     async fetchTestingRunResultsSummary(testingRunSummaryId) {

@@ -236,25 +236,10 @@ public class StartTestAction extends UserAction {
             }
 
             if (this.overriddenTestAppUrl != null || this.selectedTests != null) {
-                TestingRunConfig existingConfig = TestingRunConfigDao.instance.findOne(Filters.eq(Constants.ID, localTestingRun.getTestIdConfig()));
-                if (existingConfig != null) {
-                    // If the TestingRunConfig exists, update it with new information (overridden URL or selected tests).
-                    TestingRunConfigDao.instance.updateOne(
-                        Filters.eq(Constants.ID, localTestingRun.getTestIdConfig()),
-                        Updates.combine(
-                            Updates.set("overriddenTestAppUrl", this.overriddenTestAppUrl),  
-                            Updates.set("testSubCategoryList", this.selectedTests),              
-                            Updates.set("testRoleId", this.testRoleId)                      
-                        )
-                    );
-                    this.testIdConfig = existingConfig.getId();
-                }
-                else {
-                    int id = UUID.randomUUID().hashCode() & 0xfffffff;
-                    TestingRunConfig testingRunConfig = new TestingRunConfig(id, null, this.selectedTests, null, this.overriddenTestAppUrl, this.testRoleId);
-                    this.testIdConfig = testingRunConfig.getId(); 
-                    TestingRunConfigDao.instance.insertOne(testingRunConfig);
-                }
+                int id = UUID.randomUUID().hashCode() & 0xfffffff;
+                TestingRunConfig testingRunConfig = new TestingRunConfig(id, null, this.selectedTests, null, this.overriddenTestAppUrl, this.testRoleId);
+                this.testIdConfig = testingRunConfig.getId();
+                TestingRunConfigDao.instance.insertOne(testingRunConfig);
             } 
 
         }
@@ -1142,10 +1127,18 @@ public class StartTestAction extends UserAction {
     }
 
     public String modifyTestingRunConfig(){
-        TestingRunConfigDao.instance.updateOne(
-            Filters.eq(Constants.ID, this.testingRunConfigId),
-            Updates.set("configsAdvancedSettings", this.testConfigsAdvancedSettings)
-        );
+        if(this.selectedTests == null){
+            TestingRunConfigDao.instance.updateOne(
+                Filters.eq(Constants.ID, this.testingRunConfigId),
+                Updates.set("configsAdvancedSettings", this.testConfigsAdvancedSettings)
+            );
+            
+        } else {
+            TestingRunConfigDao.instance.updateOne(
+                Filters.eq(Constants.ID, this.testingRunConfigId),
+                Updates.set("testSubCategoryList", this.selectedTests)
+                );
+        }
         return SUCCESS.toUpperCase();
     }
 

@@ -6,27 +6,8 @@
     overflow: hidden !important;
 }
 
-.createTestSuiteBox {
-    background: linear-gradient(90deg, #FFFFFF 0%, #F5EEFF 100%) !important;
-    border: 1px solid;
-    /* border-image-source: linear-gradient(90deg, #7F1ED9 0%, #2F55D3 27.5%, #065A3D 49.5%, #052D38 71%, #6200EA 100%); */
-    border-radius: var(--p-border-radius-200) !important;
-    border-color: #6200EA;
-}
-
-
-
-.Polaris-Modal-Dialog__Modal.Polaris-Modal-Dialog--sizeLarge > .Polaris-InlineStack > .Polaris-Box > .Polaris-InlineStack > .Polaris-InlineStack .Polaris-Button--disabled > span {
-    font-size: 12px !important;
-    font-weight: 400 !important;
-}
-
 .testSuiteDisclosureButton svg {
     fill: #5C5F62  !important;
-}
-
-.testSuiteHorizontalScroll .Polaris-Scrollable.Polaris-Scrollable--vertical.Polaris-Scrollable--horizontal{
-    scrollbar-width: none;
 }
 
 .testSuiteCard .Polaris-VerticalStack{
@@ -34,10 +15,3 @@
     border-radius: 0.5rem;
 }
 
-.Polaris-Modal-Section{
-    min-height: 75vh !important;
-}
-
-.testSuiteHorizontalScroll .Polaris-Scrollable.Polaris-Scrollable--vertical.Polaris-Scrollable--horizontal{
-    display: flex;
-}

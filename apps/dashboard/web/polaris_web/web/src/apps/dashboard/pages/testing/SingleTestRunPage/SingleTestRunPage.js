@@ -26,7 +26,9 @@ import {
   RefreshMajor,
   CustomersMinor,
   EditMajor,
-  PlusMinor
+  PlusMinor,
+  SettingsMajor,
+  SettingsMinor
 } from '@shopify/polaris-icons';
 import api from "../api";
 import func from '@/util/func';
@@ -125,7 +127,7 @@ function SingleTestRunPage() {
   const currentTestingRuns = []
   const [updateTable, setUpdateTable] = useState("")
   const [testRunResultsCount, setTestRunResultsCount] = useState({})
-  const [testMode, setTestMode] = useState("")
+  const [testMode, setTestMode] = useState(false)
 
   const initialTestingObj = { testsInitiated: 0, testsInsertedInDb: 0, testingRunId: -1 }
   const [currentTestObj, setCurrentTestObj] = useState(initialTestingObj)
@@ -523,10 +525,11 @@ function SingleTestRunPage() {
     return testingRunResultSummariesObj?.testingRun?.testingEndpoints?.type !== "COLLECTION_WISE";
   }
 
+  const [activeFromTesting, setActiveFromTesting] = useState(false)
 
   const resultTable = (
     <>
-      {testMode.length > 0 ? <RunTest testMode={testMode} preActivator={true} testIdConfig={testingRunResultSummariesObj?.testingRun} apiCollectionId={getCollectionId()} endpoints={filteredEndpoints} setTestMode={setTestMode} filtered={checkFiltered()} /> : null}
+      <RunTest activeFromTesting={activeFromTesting} setActiveFromTesting={setActiveFromTesting}  preActivator={true} testIdConfig={testingRunResultSummariesObj?.testingRun} apiCollectionId={getCollectionId()} endpoints={filteredEndpoints} setTestMode={setTestMode} filtered={checkFiltered()} setShowEditableSettings={setShowEditableSettings} showEditableSettings={showEditableSettings} />
       <GithubServerTable
         key={"table"}
         pageLimit={selectedTab === 'vulnerable' ? 150 : 50}
@@ -612,40 +615,40 @@ function SingleTestRunPage() {
     ) : null
   ), [currentTestObj, progress]);
 
-  const handleModifyConfig = async () => {
-    const settings = transform.prepareConditionsForTesting(conditions)
-    await api.modifyTestingRunConfig(testingRunConfigId, settings).then(() => {
-      func.setToast(true, false, "Modified testing run config successfully")
-      setShowEditableSettings(false)
-    })
-  }
+  // const handleModifyConfig = async () => {
+  //   const settings = transform.prepareConditionsForTesting(conditions)
+  //   await api.modifyTestingRunConfig(testingRunConfigId, settings).then(() => {
+  //     func.setToast(true, false, "Modified testing run config successfully")
+  //     setShowEditableSettings(false)
+  //   })
+  // }
 
-  const editableConfigsComp = (
-    <Modal
-      large
-      fullScreen
-      open={showEditableSettings}
-      onClose={() => setShowEditableSettings(false)}
-      title={"Edit test configurations"}
-      primaryAction={{
-        content: 'Save',
-        onAction: () => handleModifyConfig()
-      }}
-    >
-      <Modal.Section>
-        <AdvancedSettingsComponent
-          key={"configSettings"}
-          conditions={conditions}
-          dispatchConditions={dispatchConditions}
-          hideButton={true}
-        />
-      </Modal.Section>
-    </Modal>
-  )
+  // const editableConfigsComp = (
+  //   <Modal
+  //     large
+  //     fullScreen
+  //     open={showEditableSettings}
+  //     onClose={() => setShowEditableSettings(false)}
+  //     title={"Edit test configurations"}
+  //     primaryAction={{
+  //       content: 'Save',
+  //       onAction: () => handleModifyConfig()
+  //     }}
+  //   >
+  //     <Modal.Section>
+  //       <AdvancedSettingsComponent
+  //         key={"configSettings"}
+  //         conditions={conditions}
+  //         dispatchConditions={dispatchConditions}
+  //         hideButton={true}
+  //       />
+  //     </Modal.Section>
+  //   </Modal>
+  // )
 
   const components = [
     runningTestsComp, <TrendChart key={tempLoading.running} hexId={hexId} setSummary={setSummary} show={selectedTestRun.run_type && selectedTestRun.run_type !== 'One-time'} />,
-    metadataComponent(), loading ? <SpinnerCentered key="loading" /> : (!workflowTest ? resultTable : workflowTestBuilder), editableConfigsComp];
+    metadataComponent(), loading ? <SpinnerCentered key="loading" /> : (!workflowTest ? resultTable : workflowTestBuilder)];
 
   const openVulnerabilityReport = async () => {
     const currentPageKey = "/dashboard/testing/" + selectedTestRun?.id + "/#" + selectedTab
@@ -778,31 +781,27 @@ function SingleTestRunPage() {
     ]
   })
   moreActionsList.push({
-    title: 'Update', items: [
+    title: 'Edit',
+    items: [
       {
-        content: 'Edit testing config settings',
-        icon: EditMajor,
-        onAction: () => { setShowEditableSettings(true); handleAddSettings(); }
+        content: 'Tests',
+        icon: PlusMinor,
+        onAction: () => { setActiveFromTesting(true) }
       },
       {
-        content: 'Re-Calculate Issues Count',
-        icon: RefreshMajor,
-        onAction: () => { handleRefreshTableCount(currentSummary.hexId) }
+        content: 'Configurations',
+        icon: SettingsMinor,
+        onAction: () => { setShowEditableSettings(true);}
       }
     ]
   })
   moreActionsList.push({
-    title: 'Edit test',
-    items: [
+    title: 'More',
+    items:[
       {
-        content: 'Add test suites',
-        icon: PlusMinor,
-        onAction: () => { setTestMode("testSuite") }
-      },
-      {
-        content: 'Add individual test',
-        icon: PlusMinor,
-        onAction: () => { setTestMode("individualTest") }
+        content: 'Re-Calculate Issues Count',
+        icon: RefreshMajor,
+        onAction: () => { handleRefreshTableCount(currentSummary.hexId) }
       }
     ]
   })
