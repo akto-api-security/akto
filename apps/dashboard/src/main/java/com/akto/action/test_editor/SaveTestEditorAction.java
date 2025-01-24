@@ -361,6 +361,7 @@ public class SaveTestEditorAction extends UserAction {
         subCategoryMap.put(testConfig.getId(), infoObj);
 
         List<GenericTestResult> runResults = new ArrayList<>();
+        this.testingRunResult = testingRunResult;
 
         for (GenericTestResult testResult: this.testingRunResult.getTestResults()) {
             if (testResult instanceof TestResult) {
