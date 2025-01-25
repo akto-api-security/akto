@@ -1272,6 +1272,9 @@ getDeprecatedEndpoints(apiInfoList, unusedEndpoints, apiCollectionId) {
 
   return combinedArr
  },
+ getComplianceIcon: (complianceName) => {
+  return "/public/"+complianceName.toUpperCase()+".svg";
+},
 
  convertToDisambiguateLabel(value, convertFunc, maxAllowed){
   if (value.length > maxAllowed) {

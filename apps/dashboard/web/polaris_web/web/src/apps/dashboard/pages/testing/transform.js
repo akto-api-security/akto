@@ -9,6 +9,7 @@ import {ResourcesMajor,
   CalendarMinor,
   ReplayMinor,
   PlayMinor,
+  LockMajor
 } from '@shopify/polaris-icons';
 import React from 'react'
 import { Text,HorizontalStack, Badge, Link, List, Box, Icon, Avatar, Tag, Tooltip} from '@shopify/polaris';
@@ -171,6 +172,7 @@ function getCveLink(item) {
 }
 
 const transform = {
+
   tagList: (list, linkType) => {
 
     let ret = list?.map((tag, index) => {
@@ -475,6 +477,27 @@ const transform = {
             </HorizontalStack>
           )
           break;
+        case "Compliance":
+          if (category?.compliance?.mapComplianceToListClauses && Object.keys(category?.compliance?.mapComplianceToListClauses).length > 0) {
+            sectionLocal.content = (
+              <HorizontalStack gap="2">
+                {
+                  Object.keys(category?.compliance?.mapComplianceToListClauses).map((compliance, index) => {
+                    return (
+                      <Tag key={index} background="white">
+                        <HorizontalStack wrap="false" gap={1}>
+                          <Avatar source={func.getComplianceIcon(compliance)} shape="square"  size="extraSmall"/>
+                          <Text>{compliance}</Text>
+                        </HorizontalStack>  
+                      </Tag>
+                    )
+                  })
+                }
+              </HorizontalStack>
+            )
+          }
+          break;
+
         case "References":
           if (category?.references == null || category?.references == undefined || category?.references.length == 0) {
             return;
@@ -675,6 +698,12 @@ getInfoSectionsHeaders(){
       tooltipContent: 'Category info about the test.'
     },
     {
+      icon: LockMajor,
+      title: "Compliance",
+      content: "",
+      tooltipContent: "Compliances for the above test"
+    },
+    {
       icon: CreditCardSecureMajor,
       title: "CWE",
       content: "",
@@ -696,7 +725,7 @@ getInfoSectionsHeaders(){
       icon: ResourcesMajor,
       title: "References",
       content: "",
-      tooltipContent: "References for the above test."
+      tooltipContent: "References for the above test"
     },
     {
       icon: ResourcesMajor,

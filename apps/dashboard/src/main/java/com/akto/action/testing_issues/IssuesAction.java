@@ -75,6 +75,7 @@ public class IssuesAction extends UserAction {
     private List<TestRunIssueStatus> filterStatus;
     private List<Integer> filterCollectionsId;
     private List<Severity> filterSeverity;
+    private List<String> filterCompliance;
     private List<String> filterSubCategory;
     private List<TestingRunIssues> similarlyAffectedIssues;
     private boolean activeCollections;
@@ -483,6 +484,7 @@ public class IssuesAction extends UserAction {
         infoObj.put("issueDetails", info.getDetails());
         infoObj.put("issueImpact", info.getImpact());
         infoObj.put("issueTags", info.getTags());
+        infoObj.put("compliance", info.getCompliance());
         infoObj.put("testName", info.getName());
         infoObj.put("references", info.getReferences());
         infoObj.put("cwe", info.getCwe());
@@ -1051,5 +1053,13 @@ public class IssuesAction extends UserAction {
 
     public void setActiveCollections(boolean activeCollections) {
         this.activeCollections = activeCollections;
+    }
+
+    public List<String> getFilterCompliance() {
+        return filterCompliance;
+    }
+
+    public void setFilterCompliance(List<String> filterCompliance) {
+        this.filterCompliance = filterCompliance;
     }
 }
