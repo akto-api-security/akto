@@ -137,6 +137,7 @@ function SingleTestRunPage() {
   const [allResultsLength, setAllResultsLength] = useState(undefined)
   const [currentSummary, setCurrentSummary] = useState('')
   const [pageTotalCount, setPageTotalCount] = useState(0)
+  const [prevSelectedTab, setPrevSelectedTab] = useState('')
 
   const tableTabMap = {
     vulnerable: "VULNERABLE",
@@ -278,36 +279,40 @@ function SingleTestRunPage() {
         totalIgnoredIssuesCount = ignoredTestRunResults.length
         setPageTotalCount(selectedTab === 'ignored_issues' ? totalIgnoredIssuesCount : testRunCountMap[tableTabMap[selectedTab]])
       } else {
-        await api.fetchTestingRunResults(localSelectedTestRun.testingRunResultSummaryHexId, tableTabMap[selectedTab], sortKey, sortOrder, skip, limit, filters, queryValue).then(({ testingRunResults, issueslist, errorEnums }) => {
+        await api.fetchTestingRunResults(localSelectedTestRun.testingRunResultSummaryHexId, tableTabMap[selectedTab], sortKey, sortOrder, skip, limit, filters, queryValue).then(({ testingRunResults, issueslist, errorEnums, totalIgnoredIssues }) => {
           issuesList = issueslist || []
+          totalIgnoredIssuesCount = totalIgnoredIssues
           testRunResultsRes = transform.prepareTestRunResults(hexId, testingRunResults, subCategoryMap, subCategoryFromSourceConfigMap)
           if(selectedTab === 'domain_unreachable' || selectedTab === 'skipped' || selectedTab === 'need_configurations') {
             errorEnums['UNKNOWN_ERROR_OCCURRED'] = "OOPS! Unknown error occurred."
             setErrorsObject(errorEnums)
             setMissingConfigs(transform.getMissingConfigs(testRunResultsRes))
           }
-        })
-        if(!func.deepComparison(copyFilters, filters)){
-          setCopyFilters(filters)
-          api.fetchTestRunResultsCount(localSelectedTestRun.testingRunResultSummaryHexId).then((testCountMap) => {
-            testRunCountMap = testCountMap || []
-            testRunCountMap['VULNERABLE'] = Math.abs(testRunCountMap['VULNERABLE']-issuesList.length)
-            testRunCountMap['IGNORED_ISSUES'] = (issuesList.length || 0)
-            let countOthers = 0;
-            Object.keys(testCountMap).forEach((x) => {
-              if(x !== 'ALL'){
-                countOthers += testCountMap[x]
-              }
-            })
-            testRunCountMap['SECURED'] = testCountMap['ALL'] - countOthers
-            const orderedValues = tableTabsOrder.map(key => testCountMap[tableTabMap[key]] || 0)
-            setTestRunResultsCount(orderedValues)
-            setPageTotalCount(testRunCountMap[tableTabMap[selectedTab]])
+        })       
+      }
+
+      if(!func.deepComparison(copyFilters, filters) || selectedTab !== prevSelectedTab){
+        setCopyFilters(filters)
+        setPrevSelectedTab(selectedTab)
+        api.fetchTestRunResultsCount(localSelectedTestRun.testingRunResultSummaryHexId).then((testCountMap) => {
+          testRunCountMap = testCountMap || []
+          testRunCountMap['VULNERABLE'] = Math.abs(testRunCountMap['VULNERABLE']-totalIgnoredIssuesCount)
+          testRunCountMap['IGNORED_ISSUES'] = (totalIgnoredIssuesCount || 0)
+          let countOthers = 0;
+          Object.keys(testCountMap).forEach((x) => {
+            if(x !== 'ALL'){
+              countOthers += testCountMap[x]
+            }
           })
-        }
-       
+          testRunCountMap['SECURED'] = testCountMap['ALL'] === 0 ? 0 : (testCountMap['ALL'] - countOthers)
+          const orderedValues = tableTabsOrder.map(key => testCountMap[tableTabMap[key]] || 0)
+          setTestRunResultsCount(orderedValues)
+          setPageTotalCount(selectedTab === 'ignored_issues' ? totalIgnoredIssuesCount : testRunCountMap[tableTabMap[selectedTab]])
+        })
+        
       }
     }
+    
     fillTempData(testRunResultsRes, selectedTab)
     return {value: transform.getPrettifiedTestRunResults(testRunResultsRes), total: selectedTab === 'ignored_issues' ? totalIgnoredIssuesCount : testRunCountMap[tableTabMap[selectedTab]]}
   }
