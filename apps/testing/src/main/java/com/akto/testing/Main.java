@@ -28,6 +28,7 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.mixpanel.AktoMixpanel;
 import com.akto.notifications.slack.APITestStatusAlert;
+import com.akto.notifications.slack.CustomTextAlert;
 import com.akto.notifications.slack.NewIssuesModel;
 import com.akto.notifications.slack.SlackAlerts;
 import com.akto.notifications.slack.SlackSender;
@@ -50,6 +51,7 @@ import com.mongodb.ReadPreference;
 import com.mongodb.WriteConcern;
 import com.mongodb.client.model.*;
 import com.mongodb.client.result.DeleteResult;
+import com.slack.api.Slack;
 
 import org.bson.Document;
 import org.bson.conversions.Bson;
@@ -57,6 +59,7 @@ import org.bson.types.ObjectId;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.util.StringUtils;
 
 import static com.akto.testing.Utils.readJsonContentFromFile;
 
@@ -79,6 +82,8 @@ public class Main {
 
     public static boolean SKIP_SSRF_CHECK = ("true".equalsIgnoreCase(System.getenv("SKIP_SSRF_CHECK")) || !DashboardMode.isSaasDeployment());
     public static final boolean IS_SAAS = "true".equalsIgnoreCase(System.getenv("IS_SAAS"));
+    public static final String AKTO_SLACK_WEBHOOK = System.getenv("AKTO_SLACK_WEBHOOK");
+    public static final Slack SLACK_INSTANCE = Slack.getInstance();
 
     private static Map<String, Integer> emptyCountIssuesMap = new HashMap<>();
 
@@ -369,6 +374,16 @@ public class Main {
             // mark the test completed here
             testCompletion.markTestAsCompleteAndRunFunctions(testingRun, summaryId);
 
+            if (StringUtils.hasLength(AKTO_SLACK_WEBHOOK) ) {
+                try {
+                    CustomTextAlert customTextAlert = new CustomTextAlert("Test completed for accountId=" + accountId + " testingRun=" + testingRun.getHexId() + " summaryId=" + summaryId.toHexString() + " : @Arjun you are up now. Make your time worth it. :)");
+                    SLACK_INSTANCE.send(AKTO_SLACK_WEBHOOK, customTextAlert.toJson());
+                } catch (Exception e) {
+                    logger.error("Error sending slack alert for completion of test", e);
+                }
+                
+            }
+            
             deleteScheduler.execute(() -> {
                 Context.accountId.set(accountId);
                 try {
@@ -617,10 +632,16 @@ public class Main {
                         }
                     }
                     RequiredConfigs.initiate();
+                    int maxRunTime = testingRun.getTestRunTime() <= 0 ? 30*60 : testingRun.getTestRunTime();
+                    
+                    if (StringUtils.hasLength(AKTO_SLACK_WEBHOOK) ) {
+                        CustomTextAlert customTextAlert = new CustomTextAlert("Test started: accountId=" + Context.accountId.get() + " testingRun=" + testingRun.getHexId() + " summaryId=" + summaryId.toHexString() + " time=" + maxRunTime);
+                        SLACK_INSTANCE.send(AKTO_SLACK_WEBHOOK, customTextAlert.toJson());
+                    }
+
                     if(!maxRetriesReached){
                         // init producer and the consumer here
                         // producer for testing is currently calls init functions from test-executor
-                        int maxRunTime = testingRun.getTestRunTime() <= 0 ? 30*60 : testingRun.getTestRunTime();
                         testingProducer.initProducer(testingRun, summaryId, syncLimit, false);  
                         testingConsumer.init(maxRunTime);                      
                     }
@@ -629,7 +650,15 @@ public class Main {
                     loggerMaker.errorAndAddToDb(e, "Error in init " + e);
                 }
                 testCompletion.markTestAsCompleteAndRunFunctions(testingRun, summaryId);
-
+                if (StringUtils.hasLength(AKTO_SLACK_WEBHOOK) ) {
+                    try {
+                        CustomTextAlert customTextAlert = new CustomTextAlert("Test completed for accountId=" + accountId + " testingRun=" + testingRun.getHexId() + " summaryId=" + summaryId.toHexString() + " : @Arjun you are up now. Make your time worth it. :)");
+                        SLACK_INSTANCE.send(AKTO_SLACK_WEBHOOK, customTextAlert.toJson());
+                    } catch (Exception e) {
+                        logger.error("Error sending slack alert for completion of test", e);
+                    }
+                    
+                }
                 /*
                  * In case the testing run results start overflowing
                  * due to being a capped collection,

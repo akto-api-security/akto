@@ -16,6 +16,7 @@ import org.apache.kafka.clients.consumer.*;
 import org.bson.types.ObjectId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.util.StringUtils;
 
 import com.akto.DaoInit;
 import com.akto.crons.GetRunningTestsStatus;
@@ -25,6 +26,8 @@ import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.test_editor.TestConfig;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.info.TestMessages;
+import com.akto.notifications.slack.CustomTextAlert;
+import com.akto.testing.Main;
 import com.akto.testing.TestExecutor;
 import com.akto.util.Constants;
 import com.akto.util.DashboardMode;
@@ -46,7 +49,7 @@ public class TestingConsumer {
     }
     private static Consumer<String, String> consumer = new KafkaConsumer<>(properties); 
     private static final Logger logger = LoggerFactory.getLogger(TestingConsumer.class);
-    final static ExecutorService executor = Executors.newFixedThreadPool(100);
+    public static ExecutorService executor = Executors.newFixedThreadPool(100);
 
     public void initializeConsumer() {
         String mongoURI = System.getenv("AKTO_MONGO_CONN");
@@ -90,6 +93,7 @@ public class TestingConsumer {
     }
     
     public void init(int maxRunTimeInSeconds) {
+        executor = Executors.newFixedThreadPool(100);
         BasicDBObject currentTestInfo = readJsonContentFromFile(Constants.TESTING_STATE_FOLDER_PATH, Constants.TESTING_STATE_FILE_NAME, BasicDBObject.class);
         final String summaryIdForTest = currentTestInfo.getString("summaryId");
         final ObjectId summaryObjectId = new ObjectId(summaryIdForTest);
@@ -117,6 +121,15 @@ public class TestingConsumer {
 
             parallelConsumer = ParallelStreamProcessor.createEosStreamProcessor(options);
             parallelConsumer.subscribe(Arrays.asList(topicName)); 
+            if (StringUtils.hasLength(Main.AKTO_SLACK_WEBHOOK) ) {
+                try {
+                    CustomTextAlert customTextAlert = new CustomTextAlert("Tests being picked for execution" + currentTestInfo.getInt("accountId") + " summaryId=" + summaryIdForTest);
+                    Main.SLACK_INSTANCE.send(Main.AKTO_SLACK_WEBHOOK, customTextAlert.toJson());
+                } catch (Exception e) {
+                    logger.error("Error sending slack alert for completion of test", e);
+                }
+                
+            }
         }
 
         try {
