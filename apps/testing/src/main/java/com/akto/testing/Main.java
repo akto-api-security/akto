@@ -4,7 +4,6 @@ import com.akto.DaoInit;
 import com.akto.billing.UsageMetricUtils;
 import com.akto.crons.GetRunningTestsStatus;
 import com.akto.dao.*;
-import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.testing.TestingRunConfigDao;
 import com.akto.dao.testing.TestingRunDao;
@@ -16,7 +15,6 @@ import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.billing.SyncLimit;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.*;
-import com.akto.dto.billing.Organization;
 import com.akto.dto.testing.*;
 import com.akto.dto.testing.TestingEndpoints.Operator;
 import com.akto.dto.testing.TestingRun.State;
@@ -29,7 +27,6 @@ import com.akto.github.GithubUtils;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.mixpanel.AktoMixpanel;
-import com.akto.usage.UsageMetricHandler;
 import com.akto.notifications.slack.APITestStatusAlert;
 import com.akto.notifications.slack.NewIssuesModel;
 import com.akto.notifications.slack.SlackAlerts;
@@ -77,8 +74,6 @@ public class Main {
 
     public static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
     public static final ScheduledExecutorService deleteScheduler = Executors.newScheduledThreadPool(1);
-
-    public static final ScheduledExecutorService testTelemetryScheduler = Executors.newScheduledThreadPool(2);
 
     public static final ScheduledExecutorService schedulerAccessMatrix = Executors.newScheduledThreadPool(2);
 
@@ -348,6 +343,7 @@ public class Main {
 
         TestingProducer testingProducer = new TestingProducer();
         TestingConsumer testingConsumer = new TestingConsumer();
+        TestCompletion testCompletion = new TestCompletion();
         testingConsumer.initializeConsumer();
 
         // read from files here and then see if we want to init the Producer and run the consumer
@@ -355,8 +351,10 @@ public class Main {
 
         BasicDBObject currentTestInfo = checkIfAlreadyTestIsRunningOnMachine();
         if(currentTestInfo != null){
-            loggerMaker.infoAndAddToDb("Tests were already running on this machine, thus resuming the test for account: "+ Context.accountId.get(), LogDb.TESTING);
-            FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccess(Context.accountId.get(), MetricTypes.TEST_RUNS);
+            int accountId = Context.accountId.get();
+            loggerMaker.infoAndAddToDb("Tests were already running on this machine, thus resuming the test for account: "+ accountId, LogDb.TESTING);
+            FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccess(accountId, MetricTypes.TEST_RUNS);
+            
 
             String testingRunId = currentTestInfo.getString("testingRunId");
             String testingRunSummaryId = currentTestInfo.getString("summaryId");
@@ -367,6 +365,19 @@ public class Main {
             testingProducer.initProducer(testingRun, summaryId, featureAccess.fetchSyncLimit(), true);
             int maxRunTime = testingRun.getTestRunTime() <= 0 ? 30*60 : testingRun.getTestRunTime();
             testingConsumer.init(maxRunTime);
+
+            // mark the test completed here
+            testCompletion.markTestAsCompleteAndRunFunctions(testingRun, summaryId);
+
+            deleteScheduler.execute(() -> {
+                Context.accountId.set(accountId);
+                try {
+                    deleteNonVulnerableResults();
+
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb(e, "Error in deleting testing run results");
+                }
+            });
         }
 
 
@@ -459,9 +470,6 @@ public class Main {
                 }
 
                 SyncLimit syncLimit = featureAccess.fetchSyncLimit();
-                // saving the initial usageLeft, to calc delta later.
-                int usageLeft = syncLimit.getUsageLeft();
-
                 /*
                  * Since the role cache is static
                  * so to prevent it from being shared across accounts.
@@ -620,37 +628,7 @@ public class Main {
             } catch (Exception e) {
                     loggerMaker.errorAndAddToDb(e, "Error in init " + e);
                 }
-                Bson completedUpdate = Updates.combine(
-                        Updates.set(TestingRun.STATE, TestingRun.State.COMPLETED),
-                        Updates.set(TestingRun.END_TIMESTAMP, Context.now())
-                );
-
-                if (testingRun.getPeriodInSeconds() > 0 ) {
-                    completedUpdate = Updates.combine(
-                            Updates.set(TestingRun.STATE, TestingRun.State.SCHEDULED),
-                            Updates.set(TestingRun.END_TIMESTAMP, Context.now()),
-                            Updates.set(TestingRun.SCHEDULE_TIMESTAMP, testingRun.getScheduleTimestamp() + testingRun.getPeriodInSeconds())
-                    );
-                } else if (testingRun.getPeriodInSeconds() == -1) {
-                    completedUpdate = Updates.combine(
-                            Updates.set(TestingRun.STATE, TestingRun.State.SCHEDULED),
-                            Updates.set(TestingRun.END_TIMESTAMP, Context.now()),
-                            Updates.set(TestingRun.SCHEDULE_TIMESTAMP, testingRun.getScheduleTimestamp() + 5 * 60)
-                    );
-                }
-
-                if(GetRunningTestsStatus.getRunningTests().isTestRunning(testingRun.getId())){
-                    loggerMaker.infoAndAddToDb("Updating status of running test to Completed.");
-                    TestingRunDao.instance.getMCollection().withWriteConcern(writeConcern).findOneAndUpdate(
-                            Filters.eq("_id", testingRun.getId()),  completedUpdate
-                    );
-                }
-
-                if(summaryId != null && testingRun.getTestIdConfig() != 1){
-                    TestExecutor.updateTestSummary(summaryId);
-                }
-
-                loggerMaker.infoAndAddToDb("Tests completed in " + (Context.now() - start) + " seconds for account: " + accountId, LogDb.TESTING);
+                testCompletion.markTestAsCompleteAndRunFunctions(testingRun, summaryId);
 
                 /*
                  * In case the testing run results start overflowing
@@ -669,32 +647,6 @@ public class Main {
                     }
                 });
                 
-                Organization organization = OrganizationsDao.instance.findOne(
-                        Filters.in(Organization.ACCOUNTS, Context.accountId.get()));
-
-                if(organization != null && organization.getTestTelemetryEnabled()){
-                    loggerMaker.infoAndAddToDb("Test telemetry enabled for account: " + accountId + ", sending results", LogDb.TESTING);
-                    ObjectId finalSummaryId = summaryId;
-                    testTelemetryScheduler.execute(() -> {
-                        Context.accountId.set(accountId);
-                        try {
-                            com.akto.onprem.Constants.sendTestResults(finalSummaryId, organization);
-                            loggerMaker.infoAndAddToDb("Test telemetry sent for account: " + accountId, LogDb.TESTING);
-                        } catch (Exception e) {
-                            loggerMaker.errorAndAddToDb(e, "Error in sending test telemetry for account: " + accountId);
-                        }
-                    });
-                } else {
-                    loggerMaker.infoAndAddToDb("Test telemetry disabled for account: " + accountId, LogDb.TESTING);
-                }
-
-                // update usage after test is completed.
-                 int deltaUsage = 0;
-                 if(syncLimit.checkLimit){
-                     deltaUsage = usageLeft - syncLimit.getUsageLeft();
-                 }
- 
-                 UsageMetricHandler.calcAndFetchFeatureAccessUsingDeltaUsage(MetricTypes.TEST_RUNS, accountId, deltaUsage);
 
             }, "testing");
             Thread.sleep(1000);

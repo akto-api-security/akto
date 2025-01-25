@@ -18,6 +18,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.akto.DaoInit;
+import com.akto.crons.GetRunningTestsStatus;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
@@ -90,6 +91,8 @@ public class TestingConsumer {
     
     public void init(int maxRunTimeInSeconds) {
         BasicDBObject currentTestInfo = readJsonContentFromFile(Constants.TESTING_STATE_FOLDER_PATH, Constants.TESTING_STATE_FILE_NAME, BasicDBObject.class);
+        final String summaryIdForTest = currentTestInfo.getString("summaryId");
+        final ObjectId summaryObjectId = new ObjectId(summaryIdForTest);
         final int startTime = Context.now();
         AtomicInteger lastRecordRead = new AtomicInteger(Context.now());
         boolean isConsumerRunning = false;
@@ -121,7 +124,6 @@ public class TestingConsumer {
                 String threadName = Thread.currentThread().getName();
                 String message = record.value();
                 logger.info("Thread [" + threadName + "] picked up record: " + message);
-
                 try {
                     lastRecordRead.set(Context.now());
                     Future<?> future = executor.submit(() -> runTestFromMessage(message));
@@ -139,7 +141,12 @@ public class TestingConsumer {
             });
 
             while (parallelConsumer != null) {
-                if ((Context.now() - startTime > maxRunTimeInSeconds)) {
+                if(!GetRunningTestsStatus.getRunningTests().isTestRunning(summaryObjectId, true)){
+                    logger.info("Tests have been marked stopped.");
+                    executor.shutdownNow();
+                    break;
+                }
+                else if ((Context.now() - startTime > maxRunTimeInSeconds)) {
                     logger.info("Max run time reached. Stopping consumer.");
                     executor.shutdownNow();
                     break;
