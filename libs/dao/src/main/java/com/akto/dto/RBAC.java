@@ -3,11 +3,6 @@ package com.akto.dto;
 
 import org.bson.types.ObjectId;
 
-import com.akto.dto.rbac.*;
-
-import com.akto.dto.rbac.RbacEnums.Feature;
-import com.akto.dto.rbac.RbacEnums.ReadWriteAccess;
-
 import java.util.ArrayList;
 import java.util.List;
 
@@ -17,49 +12,22 @@ public class RBAC {
     private int userId;
 
     public static final String USER_ID = "userId";
-    private Role role;
+    private String role;
     public static final String ROLE = "role";
     private int accountId;
     public static final String ACCOUNT_ID = "accountId";
     private List<Integer> apiCollectionsId;
     public static final String API_COLLECTIONS_ID = "apiCollectionsId";
 
-    public enum Role {
-        ADMIN("ADMIN",new AdminRoleStrategy()),
-        MEMBER("SECURITY ENGINEER", new MemberRoleStrategy()),
-        DEVELOPER("DEVELOPER", new DeveloperRoleStrategy()),
-        GUEST("GUEST", new GuestRoleStrategy());
-
-        private final RoleStrategy roleStrategy;
-        private String name;
-
-        Role(String name ,RoleStrategy roleStrategy) {
-            this.roleStrategy = roleStrategy;
-            this.name = name;
-        }
-
-        public Role[] getRoleHierarchy() {
-            return roleStrategy.getRoleHierarchy();
-        }
-
-        public ReadWriteAccess getReadWriteAccessForFeature(Feature feature) {
-            return roleStrategy.getFeatureAccessMap().getOrDefault(feature, ReadWriteAccess.READ);
-        }
-
-        public String getName() {
-            return name;
-        }
-    }
-
     public RBAC(int userId, Role role) {
         this.userId = userId;
-        this.role = role;
+        this.role = role.getName();
         this.apiCollectionsId = new ArrayList<>();
     }
 
     public RBAC(int userId, Role role, int accountId) {
         this.userId = userId;
-        this.role = role;
+        this.role = role.getName();
         this.accountId = accountId;
         this.apiCollectionsId = new ArrayList<>();
     }
@@ -84,11 +52,11 @@ public class RBAC {
         this.userId = userId;
     }
 
-    public Role getRole() {
+    public String getRole() {
         return role;
     }
 
-    public void setRole(Role role) {
+    public void setRole(String role) {
         this.role = role;
     }
 
@@ -101,8 +69,16 @@ public class RBAC {
     }
 
     public List<Integer> getApiCollectionsId() {
+        if (apiCollectionsId == null || apiCollectionsId.isEmpty()) {
+            try {
+                Role actualRole = Role.valueOf(role);
+                return actualRole.getApiCollectionsId();
+            } catch (Exception e) {
+            }
+        }
         return apiCollectionsId;
     }
+
     public void setApiCollectionsId(List<Integer> apiCollectionsId) {
         this.apiCollectionsId = apiCollectionsId;
     }

@@ -5,7 +5,7 @@ import com.akto.dao.RBACDao;
 import com.akto.dao.UsersDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.PendingInviteCode;
-import com.akto.dto.RBAC;
+import com.akto.dto.Role;
 import com.akto.dto.User;
 import com.akto.log.LoggerMaker;
 import com.akto.notifications.email.SendgridEmail;
@@ -85,7 +85,7 @@ public class InviteUserAction extends UserAction{
     }
 
     private String finalInviteCode;
-    private RBAC.Role inviteeRole;
+    private String inviteeRole;
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(InviteUserAction.class, LoggerMaker.LogDb.DASHBOARD);
 
@@ -108,9 +108,14 @@ public class InviteUserAction extends UserAction{
             return ERROR.toUpperCase();
         }
 
-        RBAC.Role userRole = RBACDao.getCurrentRoleForUser(user_id, Context.accountId.get());
+        Role userRole = RBACDao.getCurrentRoleForUser(user_id, Context.accountId.get());
+        Role inviteeRole = null;
+        try {
+            inviteeRole = Role.valueOf(this.inviteeRole);
+        } catch(Exception e){
+        }
 
-        if (!Arrays.asList(userRole.getRoleHierarchy()).contains(this.inviteeRole)) {
+        if (!Arrays.asList(userRole.getRoleHierarchy()).contains(inviteeRole)) {
             addActionError("User not allowed to invite for this role");
             return ERROR.toUpperCase();
         }
@@ -210,11 +215,11 @@ public class InviteUserAction extends UserAction{
         return finalInviteCode;
     }
 
-    public RBAC.Role getInviteeRole() {
+    public String getInviteeRole() {
         return inviteeRole;
     }
 
-    public void setInviteeRole(RBAC.Role inviteeRole) {
+    public void setInviteeRole(String inviteeRole) {
         this.inviteeRole = inviteeRole;
     }
 }

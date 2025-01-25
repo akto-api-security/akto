@@ -276,7 +276,7 @@ public class ApiCollectionsAction extends UserAction {
                     Filters.and(
                             Filters.eq(RBAC.USER_ID, userId),
                             Filters.eq(RBAC.ACCOUNT_ID, accountId),
-                            Filters.ne(RBAC.ROLE, RBAC.Role.ADMIN.getName())
+                            Filters.ne(RBAC.ROLE, Role.ADMIN.getName())
                     ),
                     Updates.addToSet(RBAC.API_COLLECTIONS_ID, apiCollection.getId()),
                     new UpdateOptions().upsert(false)

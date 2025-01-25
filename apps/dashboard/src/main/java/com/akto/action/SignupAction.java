@@ -280,7 +280,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                 if(user != null){
                     AccountAction.addUserToExistingAccount(email, pendingInviteCode.getAccountId());
                 }
-                createUserAndRedirect(email, name, auth0SignupInfo, pendingInviteCode.getAccountId(), Config.ConfigType.AUTH0.toString(), pendingInviteCode.getInviteeRole());
+                createUserAndRedirect(email, name, auth0SignupInfo, pendingInviteCode.getAccountId(), Config.ConfigType.AUTH0.toString(), Role.valueOf(pendingInviteCode.getInviteeRole()));
 
                 return SUCCESS.toUpperCase();
             } else if(pendingInviteCode == null){
@@ -370,7 +370,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             return ERROR.toUpperCase();
         }
         int invitedToAccountId = 0;
-        RBAC.Role inviteeRole = null;
+        Role inviteeRole = null;
         if (!invitationCode.isEmpty()) {
             Jws<Claims> jws;
             try {
@@ -397,7 +397,12 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             // deleting the invitation code
             PendingInviteCodesDao.instance.getMCollection().deleteOne(filter);
             invitedToAccountId = pendingInviteCode.getAccountId();
-            inviteeRole = pendingInviteCode.getInviteeRole();
+            inviteeRole = Role.GUEST;
+            try {
+                inviteeRole = Role.valueOf(pendingInviteCode.getInviteeRole());
+            } catch(Exception e){
+            }
+
         } else {
             if (!InitializerListener.isSaas) {
                 long countUsers = UsersDao.instance.getMCollection().countDocuments();
@@ -550,9 +555,9 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
 
             SignupInfo.OktaSignupInfo oktaSignupInfo= new SignupInfo.OktaSignupInfo(accessToken, username);
 
-            RBAC.Role defaultRole = RBAC.Role.MEMBER;
+            Role defaultRole = Role.MEMBER;
             if(UsageMetricCalculator.isRbacFeatureAvailable(accountId)){
-                defaultRole = RBAC.Role.GUEST;
+                defaultRole = Role.GUEST;
             }
             
             shouldLogin = "true";
@@ -666,9 +671,9 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             logger.info("Successful signing with Azure Idp for: "+ useremail);
             SignupInfo.SamlSsoSignupInfo signUpInfo = new SignupInfo.SamlSsoSignupInfo(username, useremail, Config.ConfigType.AZURE);
 
-            RBAC.Role defaultRole = RBAC.Role.MEMBER;
+            Role defaultRole = Role.MEMBER;
             if(UsageMetricCalculator.isRbacFeatureAvailable(this.accountId)){
-                defaultRole = RBAC.Role.GUEST;
+                defaultRole = Role.GUEST;
             }
 
             createUserAndRedirect(useremail, username, signUpInfo, this.accountId, Config.ConfigType.AZURE.toString(), defaultRole);
@@ -721,9 +726,9 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             shouldLogin = "true";
             SignupInfo.SamlSsoSignupInfo signUpInfo = new SignupInfo.SamlSsoSignupInfo(username, userEmail, Config.ConfigType.GOOGLE_SAML);
 
-            RBAC.Role defaultRole = RBAC.Role.MEMBER;
+            Role defaultRole = Role.MEMBER;
             if(UsageMetricCalculator.isRbacFeatureAvailable(this.accountId)){
-                defaultRole = RBAC.Role.GUEST;
+                defaultRole = Role.GUEST;
             }
 
             createUserAndRedirect(userEmail, username, signUpInfo, this.accountId, Config.ConfigType.GOOGLE_SAML.toString(), defaultRole);
@@ -814,7 +819,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
     }
 
     private void createUserAndRedirect(String userEmail, String username, SignupInfo signupInfo,
-                                       int invitationToAccount, String method, RBAC.Role invitedRole) throws IOException {
+                                       int invitationToAccount, String method, Role invitedRole) throws IOException {
         loggerMaker.infoAndAddToDb("createUserAndRedirect called");
         User user = UsersDao.instance.findOne(eq("login", userEmail));
         if (user == null && "false".equalsIgnoreCase(shouldLogin)) {
@@ -879,7 +884,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
 
 
             loggerMaker.infoAndAddToDb("Initialize Account");
-            user = AccountAction.initializeAccount(userEmail, accountId, "My account",invitationToAccount == 0, invitedRole == null ? RBAC.Role.ADMIN : invitedRole);
+            user = AccountAction.initializeAccount(userEmail, accountId, "My account",invitationToAccount == 0, invitedRole == null ? Role.ADMIN : invitedRole);
 
             servletRequest.getSession().setAttribute("user", user);
             servletRequest.getSession().setAttribute("accountId", accountId);

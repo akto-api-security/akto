@@ -34,7 +34,6 @@ import com.akto.dto.ApiCollectionUsers.CollectionType;
 import com.akto.dto.Config.AzureConfig;
 import com.akto.dto.Config.ConfigType;
 import com.akto.dto.Config.OktaConfig;
-import com.akto.dto.RBAC.Role;
 import com.akto.dto.User.AktoUIMode;
 import com.akto.dto.data_types.Conditions;
 import com.akto.dto.data_types.Conditions.Operator;
@@ -1996,7 +1995,7 @@ public class InitializerListener implements ServletContextListener {
                         Filters.and(
                             Filters.eq(RBAC.ACCOUNT_ID,Context.accountId.get()),
                             Filters.eq(RBAC.USER_ID, firstUser.getId())
-                        ),Updates.set(RBAC.ROLE, RBAC.Role.ADMIN.name()));
+                        ),Updates.set(RBAC.ROLE, Role.ADMIN.getName()));
                 } else {
                     loggerMaker.errorAndAddToDb("First user is also missing in DB, unable to make org.", LogDb.DASHBOARD);
                     return;
@@ -2829,14 +2828,14 @@ public class InitializerListener implements ServletContextListener {
 
             RBAC firstUserAdminRbac = RBACDao.instance.findOne(Filters.and(
                 Filters.eq(RBAC.USER_ID, firstUser.getId()),
-                Filters.eq(RBAC.ROLE, Role.ADMIN.name())
+                Filters.eq(RBAC.ROLE, Role.ADMIN.getName())
             ));
 
             if(firstUserAdminRbac != null){
                 loggerMaker.infoAndAddToDb("Found admin rbac for first user: " + firstUser.getLogin() + " , thus deleting it's member role RBAC", LogDb.DASHBOARD);
                 RBACDao.instance.deleteAll(Filters.and(
                     Filters.eq(RBAC.USER_ID, firstUser.getId()),
-                    Filters.eq(RBAC.ROLE, Role.MEMBER.name())
+                    Filters.eq(RBAC.ROLE, Role.MEMBER.getName())
                 ));
             }else{
                 loggerMaker.infoAndAddToDb("Found non-admin rbac for first user: " + firstUser.getLogin() + " , thus inserting admin role", LogDb.DASHBOARD);
@@ -2914,7 +2913,7 @@ public class InitializerListener implements ServletContextListener {
                     String adminEmail = "";
                     Organization org = OrganizationsDao.instance.findOne(Filters.empty());
                     if(org == null){
-                        RBAC rbac = RBACDao.instance.findOne(Filters.eq(RBAC.ROLE, RBAC.Role.ADMIN.name()));
+                        RBAC rbac = RBACDao.instance.findOne(Filters.eq(RBAC.ROLE, Role.ADMIN.getName()));
                         User adminUser = UsersDao.instance.findOne(Filters.eq("login", rbac.getUserId()));
                         adminEmail = adminUser.getLogin();
                     }else{

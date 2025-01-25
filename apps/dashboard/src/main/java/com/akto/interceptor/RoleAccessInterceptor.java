@@ -4,9 +4,9 @@ import com.akto.audit_logs_util.AuditLogsUtil;
 import com.akto.dao.RBACDao;
 import com.akto.dao.audit_logs.ApiAuditLogsDao;
 import com.akto.dao.context.Context;
+import com.akto.dto.Role;
 import com.akto.dto.User;
 import com.akto.dto.audit_logs.ApiAuditLogs;
-import com.akto.dto.RBAC.Role;
 import com.akto.dto.rbac.RbacEnums;
 import com.akto.dto.rbac.RbacEnums.Feature;
 import com.akto.dto.rbac.RbacEnums.ReadWriteAccess;
@@ -126,7 +126,7 @@ public class RoleAccessInterceptor extends AbstractInterceptor {
                 hasRequiredAccess = true;
             }
             if(featureLabel.equals(Feature.ADMIN_ACTIONS.name())){
-                hasRequiredAccess = userRole.equals(Role.ADMIN.name());
+                hasRequiredAccess = userRole.equals(Role.ADMIN.getName());
             }
 
             if(!hasRequiredAccess) {

@@ -16,7 +16,7 @@ import com.akto.dao.testing.sources.TestSourceConfigsDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.HistoricalData;
-import com.akto.dto.RBAC.Role;
+import com.akto.dto.Role;
 import com.akto.dto.demo.VulnerableRequestForTemplate;
 import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.dto.test_editor.Info;

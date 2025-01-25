@@ -25,7 +25,6 @@ import org.json.JSONObject;
 import com.akto.action.observe.Utils;
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.YamlTemplateDao;
-import com.akto.dto.RBAC.Role;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.type.SingleTypeInfo.SuperType;
 import com.akto.listener.InitializerListener;

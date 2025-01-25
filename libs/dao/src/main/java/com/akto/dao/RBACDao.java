@@ -8,7 +8,7 @@ import org.slf4j.LoggerFactory;
 
 import com.akto.dao.context.Context;
 import com.akto.dto.RBAC;
-import com.akto.dto.RBAC.Role;
+import com.akto.dto.Role;
 import com.mongodb.client.model.Filters;
 
 import java.util.ArrayList;
@@ -53,12 +53,12 @@ public class RBACDao extends CommonContextDao<RBAC> {
         RBAC rbac = RBACDao.instance.findOne(
                 Filters.or(Filters.and(
                                 Filters.eq(RBAC.USER_ID, userId),
-                                Filters.eq(RBAC.ROLE, RBAC.Role.ADMIN),
+                                Filters.eq(RBAC.ROLE, Role.ADMIN),
                                 Filters.eq(RBAC.ACCOUNT_ID, accountId)
                         ),
                         Filters.and(
                                 Filters.eq(RBAC.USER_ID, userId),
-                                Filters.eq(RBAC.ROLE, RBAC.Role.ADMIN),
+                                Filters.eq(RBAC.ROLE, Role.ADMIN),
                                 Filters.exists(RBAC.ACCOUNT_ID, false)
                                 )
                 )
@@ -79,9 +79,13 @@ public class RBACDao extends CommonContextDao<RBAC> {
                     Filters.eq(RBAC.ACCOUNT_ID, accountId));
 
             RBAC userRbac = RBACDao.instance.findOne(filterRbac);
-            if(userRbac != null){
-                currentRole = userRbac.getRole();
-            }else{
+            if (userRbac != null) {
+                try {
+                    currentRole = Role.valueOf(userRbac.getRole());
+                } catch (Exception e) {
+                    currentRole = Role.GUEST;
+                }
+            } else {
                 currentRole = Role.MEMBER;
             }
 
@@ -104,7 +108,7 @@ public class RBACDao extends CommonContextDao<RBAC> {
             return new ArrayList<>();
         }
 
-        if (RBAC.Role.ADMIN.equals(rbac.getRole())) {
+        if (Role.ADMIN.equals(rbac.getRole())) {
             logger.info(String.format("Rbac is admin userId: %d accountId: %d", userId, accountId));
             return null;
         }

@@ -6,7 +6,7 @@ import com.akto.dao.UsersDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.PendingInviteCode;
 import com.akto.dto.RBAC;
-import com.akto.dto.RBAC.Role;
+import com.akto.dto.Role;
 import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.dto.User;
 import com.akto.log.LoggerMaker;
@@ -63,7 +63,7 @@ public class TeamAction extends UserAction implements ServletResponseAware, Serv
         for(Object obj: users) {
             BasicDBObject userObj = (BasicDBObject) obj;
             RBAC rbac = userToRBAC.get(userObj.getInt("id"));
-            String status = (rbac == null || rbac.getRole() == null) ? Role.MEMBER.getName() : rbac.getRole().getName();
+            String status = (rbac == null || rbac.getRole() == null) ? Role.MEMBER.getName() : rbac.getRole();
             userObj.append("role", status);
             try {
                 String login = userObj.getString(User.LOGIN);
@@ -84,12 +84,16 @@ public class TeamAction extends UserAction implements ServletResponseAware, Serv
             if (pendingInviteCode.getAccountId() == 0) {//case where account id doesn't exists belonged to older 1_000_000 account
                 pendingInviteCode.setAccountId(1_000_000);
             }
-            Role inviteeRole = pendingInviteCode.getInviteeRole();
+            Role inviteeRole = Role.GUEST;
+            try {
+                inviteeRole = Role.valueOf(pendingInviteCode.getInviteeRole());
+            } catch(Exception e){
+            }
             String roleText = "Invitation sent ";
             if (inviteeRole == null) {
                 roleText += "for Security Engineer";
             } else {
-                roleText += "for " + inviteeRole.name();
+                roleText += "for " + inviteeRole.getName();
             }
             /*
              * Do not send invitation code, if already a member.

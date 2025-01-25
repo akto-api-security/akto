@@ -11,10 +11,10 @@ import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.Account;
 import com.akto.dto.AccountSettings;
-import com.akto.dto.RBAC;
 import com.akto.dto.User;
 import com.akto.dto.UserAccountEntry;
 import com.akto.dto.ApiToken.Utility;
+import com.akto.dto.Role;
 import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.jira_integration.JiraIntegration;
@@ -124,7 +124,7 @@ public class ProfileAction extends UserAction {
         }
         String[] versions = dashboardVersion.split(" - ");
         User userFromDB = UsersDao.instance.findOne(Filters.eq(Constants.ID, user.getId()));
-        RBAC.Role userRole = RBACDao.getCurrentRoleForUser(user.getId(), Context.accountId.get());
+        Role userRole = RBACDao.getCurrentRoleForUser(user.getId(), Context.accountId.get());
 
         boolean jiraIntegrated = false;
         try {
@@ -165,7 +165,7 @@ public class ProfileAction extends UserAction {
                 .append("accountName", accountName)
                 .append("aktoUIMode", userFromDB.getAktoUIMode().name())
                 .append("jiraIntegrated", jiraIntegrated)
-                .append("userRole", userRole.toString().toUpperCase())
+                .append("userRole", userRole.getName())
                 .append("currentTimeZone", timeZone)
                 .append("organizationName", orgName);
 

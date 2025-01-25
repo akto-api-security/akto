@@ -6,10 +6,10 @@ import com.akto.dao.context.Context;
 import com.akto.dao.testing.EndpointLogicalGroupDao;
 import com.akto.dao.testing.TestRolesDao;
 import com.akto.dao.testing.config.TestCollectionPropertiesDao;
-import com.akto.dto.RBAC;
 import com.akto.dto.User;
 import com.akto.dto.testing.config.TestCollectionProperty;
 import com.akto.dto.RecordedLoginFlowInput;
+import com.akto.dto.Role;
 import com.akto.dto.data_types.Conditions;
 import com.akto.dto.data_types.Conditions.Operator;
 import com.akto.dto.data_types.Predicate;
@@ -148,8 +148,8 @@ public class TestRolesAction extends UserAction {
         boolean noAccess = !user.getLogin().equals(role.getCreatedBy());
 
         if(noAccess) {
-            RBAC.Role currentRoleForUser = RBACDao.getCurrentRoleForUser(user.getId(), Context.accountId.get());
-            if (!currentRoleForUser.equals(RBAC.Role.ADMIN)) {
+            Role currentRoleForUser = RBACDao.getCurrentRoleForUser(user.getId(), Context.accountId.get());
+            if (!currentRoleForUser.equals(Role.ADMIN)) {
                 addActionError("You do not have permission to delete this role.");
                 return ERROR.toUpperCase();
             }

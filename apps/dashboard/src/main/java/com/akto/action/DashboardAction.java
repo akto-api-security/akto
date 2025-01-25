@@ -254,9 +254,9 @@ public class DashboardAction extends UserAction {
                 Updates.set(User.NAME, username),
                 Updates.set(User.NAME_LAST_UPDATE, Context.now())
         ));
-        RBAC.Role currentRoleForUser = RBACDao.getCurrentRoleForUser(user.getId(), Context.accountId.get());
+        Role currentRoleForUser = RBACDao.getCurrentRoleForUser(user.getId(), Context.accountId.get());
 
-        if(currentRoleForUser != null && currentRoleForUser.getName().equals(RBAC.Role.ADMIN.getName())) {
+        if(currentRoleForUser != null && currentRoleForUser.getName().equals(Role.ADMIN.getName())) {
             if(organization == null || organization.trim().isEmpty()) {
                 addActionError("Organization cannot be empty");
                 return Action.ERROR.toUpperCase();
