@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Configuration status="WARN">
+
+    <!-- Appender configuration: Console output -->
+    <Appenders>
+        <Console name="STDOUT" target="SYSTEM_OUT">
+            <PatternLayout pattern="[%level] %d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %c{1} - %msg%n" />
+        </Console>
+        <Console name="Console-Appender" target="SYSTEM_OUT">
+            <PatternLayout>
+                <pattern>
+                    [%-5level] %d{yyyy-MM-dd HH:mm:ss.SSS} [%t] %c{1} - %msg%n
+                </pattern>
+            </PatternLayout>
+        </Console>
+    </Appenders>
+
+    <!-- Loggers configuration -->
+    <Loggers>
+        <!-- Root logger configuration -->
+        <Root level="info">
+            <AppenderRef ref="STDOUT" />
+        </Root>
+
+        <Logger name="org.hibernate.SQL" level="info" additivity="false">
+            <AppenderRef ref="Console-Appender" />
+        </Logger>
+        <Logger name="org.hibernate.type.descriptor.sql" level="info" additivity="false">
+            <AppenderRef ref="Console-Appender" />
+        </Logger>
+        <Logger name="org.hibernate.stat" level="info" additivity="false">
+            <AppenderRef ref="Console-Appender" />
+        </Logger>
+        <Logger name="org.hibernate.SQL_SLOW" level="info" additivity="false">
+            <AppenderRef ref="Console-Appender" />
+        </Logger>
+        <Logger name="org.hibernate.cache" level="info" additivity="false">
+            <AppenderRef ref="Console-Appender" />
+        </Logger>
+    </Loggers>
+</Configuration>
