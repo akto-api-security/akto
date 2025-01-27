@@ -26,7 +26,7 @@ import com.akto.util.Constants;
 
 public class TestingProducer {
 
-    public static final Kafka producer = new Kafka(Constants.LOCAL_KAFKA_BROKER_URL, 500, 1000);
+    public static final Kafka producer = Constants.IS_NEW_TESTING_ENABLED ?  new Kafka(Constants.LOCAL_KAFKA_BROKER_URL, 500, 1000) : null;
     public static Void pushMessagesToKafka(List<TestMessages> messages){
         for(TestMessages testMessages: messages){
             String messageString = testMessages.toString();

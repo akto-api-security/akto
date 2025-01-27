@@ -349,12 +349,18 @@ public class Main {
         TestingProducer testingProducer = new TestingProducer();
         TestingConsumer testingConsumer = new TestingConsumer();
         TestCompletion testCompletion = new TestCompletion();
-        testingConsumer.initializeConsumer();
+        if(Constants.IS_NEW_TESTING_ENABLED){
+            testingConsumer.initializeConsumer();
+        }
 
         // read from files here and then see if we want to init the Producer and run the consumer
         // if producer is running, then we can skip the check and let the default testing pick up the job
 
-        BasicDBObject currentTestInfo = checkIfAlreadyTestIsRunningOnMachine();
+        BasicDBObject currentTestInfo = null;
+        if(Constants.IS_NEW_TESTING_ENABLED){
+            currentTestInfo = checkIfAlreadyTestIsRunningOnMachine();
+        }
+
         if(currentTestInfo != null){
             int accountId = Context.accountId.get();
             loggerMaker.infoAndAddToDb("Tests were already running on this machine, thus resuming the test for account: "+ accountId, LogDb.TESTING);
@@ -415,8 +421,10 @@ public class Main {
         loggerMaker.infoAndAddToDb("os.version: " + System.getProperty("os.version"), LogDb.TESTING);
 
         // create /testing-info folder in the memory from here
-        boolean val = Utils.createFolder(Constants.TESTING_STATE_FOLDER_PATH);
-        logger.info("Testing info folder status: " + val);
+        if(Constants.IS_NEW_TESTING_ENABLED){
+            boolean val = Utils.createFolder(Constants.TESTING_STATE_FOLDER_PATH);
+            logger.info("Testing info folder status: " + val);
+        }
 
         SingleTypeInfo.init();
         while (true) {
@@ -642,8 +650,13 @@ public class Main {
                     if(!maxRetriesReached){
                         // init producer and the consumer here
                         // producer for testing is currently calls init functions from test-executor
-                        testingProducer.initProducer(testingRun, summaryId, syncLimit, false);  
-                        testingConsumer.init(maxRunTime);                      
+                        if(Constants.IS_NEW_TESTING_ENABLED){
+                            testingProducer.initProducer(testingRun, summaryId, syncLimit, false);  
+                            testingConsumer.init(maxRunTime);  
+                        }else{
+                            TestExecutor testExecutor = new TestExecutor();
+                            testExecutor.init(testingRun, summaryId, syncLimit, false);
+                        }                   
                     }
                     
             } catch (Exception e) {

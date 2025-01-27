@@ -155,7 +155,7 @@ public class TestExecutor {
         int accountId = Context.accountId.get();
 
         BasicDBObject dbObject = new BasicDBObject();
-        if(!shouldInitOnly){
+        if(!shouldInitOnly && Constants.IS_NEW_TESTING_ENABLED){
             dbObject.put("PRODUCER_RUNNING", true);
             dbObject.put("CONSUMER_RUNNING", false);
             dbObject.put("accountId", accountId);
@@ -283,21 +283,34 @@ public class TestExecutor {
                 return;
             }
             
+            if(!Constants.IS_NEW_TESTING_ENABLED){
+                maxThreads = Math.min(100, Math.max(10, testingRun.getMaxConcurrentRequests()));
+            }
 
             List<Future<Void>> testingRecords = new ArrayList<>();
             ExecutorService threadPool = Executors.newFixedThreadPool(maxThreads);
         
             // create count down latch to know when inserting kafka records are completed.
             CountDownLatch latch = new CountDownLatch(apiInfoKeyList.size());
+            int tempRunTime = 10 * 60;
+            if(!Constants.IS_NEW_TESTING_ENABLED){
+                tempRunTime = testingRun.getTestRunTime() <= 0 ? 30*60 : testingRun.getTestRunTime();
+            }
 
-            final int maxRunTime = 10 * 60;
+            final int maxRunTime = tempRunTime;
             for (ApiInfo.ApiInfoKey apiInfoKey: apiInfoKeyList) {
                 List<String> messages = testingUtil.getSampleMessages().get(apiInfoKey);
-                for (String testSubCategory: testingRunSubCategories) {
-                    Future<Void> future = threadPool.submit(() ->doJobForTest(accountId, testSubCategory, apiInfoKey, messages, summaryId, syncLimit, apiInfoKeyToHostMap, subCategoryEndpointMap, testConfigMap, testLogs, testingRun));
+                if(Constants.IS_NEW_TESTING_ENABLED){
+                    for (String testSubCategory: testingRunSubCategories) {
+                        Future<Void> future = threadPool.submit(() ->doJobForTest(accountId, testSubCategory, apiInfoKey, messages, summaryId, syncLimit, apiInfoKeyToHostMap, subCategoryEndpointMap, testConfigMap, testLogs, testingRun));
+                        testingRecords.add(future);
+                    }
+                    latch.countDown();
+                }
+                else{
+                    Future<Void> future = threadPool.submit(() -> startWithLatch(testingRunSubCategories, accountId, apiInfoKey, messages, summaryId, syncLimit, apiInfoKeyToHostMap, subCategoryEndpointMap, testConfigMap, testLogs, testingRun, latch));
                     testingRecords.add(future);
                 }
-                latch.countDown();
             }
     
     
@@ -314,7 +327,7 @@ public class TestExecutor {
             } catch (InterruptedException e) {
                 throw new RuntimeException(e);
             }
-            if(!shouldInitOnly){
+            if(!shouldInitOnly && Constants.IS_NEW_TESTING_ENABLED){
                 dbObject.put("PRODUCER_RUNNING", false);
                 dbObject.put("CONSUMER_RUNNING", true);
                 writeJsonContentInFile(Constants.TESTING_STATE_FOLDER_PATH, Constants.TESTING_STATE_FILE_NAME, dbObject);
@@ -322,6 +335,26 @@ public class TestExecutor {
             }
         }
         
+    }
+
+    private Void startWithLatch(List<String> testingRunSubCategories,int accountId,ApiInfo.ApiInfoKey apiInfoKey,
+        List<String> messages, ObjectId summaryId, SyncLimit syncLimit, Map<ApiInfoKey, String> apiInfoKeyToHostMap,
+        ConcurrentHashMap<String, String> subCategoryEndpointMap, Map<String, TestConfig> testConfigMap,
+        List<TestingRunResult.TestLog> testLogs, TestingRun testingRun, CountDownLatch latch){
+
+            Context.accountId.set(accountId);
+            for (String testSubCategory: testingRunSubCategories) {
+                loggerMaker.infoAndAddToDb("Trying to run test for category: " + testSubCategory + " with summary state: " + GetRunningTestsStatus.getRunningTests().getCurrentState(summaryId) );
+                if(GetRunningTestsStatus.getRunningTests().isTestRunning(summaryId, true)){
+                    doJobForTest(accountId, testSubCategory, apiInfoKey, messages, summaryId, syncLimit, apiInfoKeyToHostMap, subCategoryEndpointMap, testConfigMap, testLogs, testingRun);
+                }else{
+                    logger.info("Test stopped for id: " + testingRun.getHexId());
+                    break;
+                }
+            }
+            latch.countDown();
+
+        return null;
     }
 
     private Void doJobForTest(int accountId, String testSubCategory, ApiInfo.ApiInfoKey apiInfoKey,
@@ -352,7 +385,7 @@ public class TestExecutor {
         TestingRunResult testingRunResult = Utils.generateFailedRunResultForMessage(testingRun.getId(), apiInfoKey, testSuperType, testSubType, summaryId, messages, failMessage); 
         if(testingRunResult != null){
             loggerMaker.infoAndAddToDb("Skipping test from producers because: " + failMessage + " apiinfo: " + apiInfoKey.toString(), LogDb.TESTING);
-        }else{
+        }else if (Constants.IS_NEW_TESTING_ENABLED){
             // push data to kafka here and inside that call run test new function
             // create an object of TestMessage
             TestMessages testMessages = new TestMessages(
@@ -366,10 +399,18 @@ public class TestExecutor {
                 return null;
             }
             
+        }else{
+            if(GetRunningTestsStatus.getRunningTests().isTestRunning(summaryId, true)){
+                CommonSingletonForTesting instance = CommonSingletonForTesting.getInstance();
+                String sampleMessage = messages.get(messages.size() - 1);
+                testingRunResult = runTestNew(apiInfoKey, summaryId, instance.getTestingUtil(), summaryId, testConfig, instance.getTestingRunConfig(), instance.isDebug(), testLogs, sampleMessage);
+                insertResultsAndMakeIssues(Collections.singletonList(testingRunResult), summaryId);
+            }
+            
         }
         return null;
     }
-
+    
     public static void updateTestSummary(ObjectId summaryId){
         loggerMaker.infoAndAddToDb("Finished updating results count", LogDb.TESTING);
 

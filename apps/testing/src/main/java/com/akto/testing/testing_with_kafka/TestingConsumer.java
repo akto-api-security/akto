@@ -47,7 +47,7 @@ public class TestingConsumer {
     static{
         properties.put(ConsumerConfig.MAX_POLL_INTERVAL_MS_CONFIG, 10000); 
     }
-    private static Consumer<String, String> consumer = new KafkaConsumer<>(properties); 
+    private static Consumer<String, String> consumer = Constants.IS_NEW_TESTING_ENABLED ? new KafkaConsumer<>(properties) : null; 
     private static final Logger logger = LoggerFactory.getLogger(TestingConsumer.class);
     public static ExecutorService executor = Executors.newFixedThreadPool(100);
 
