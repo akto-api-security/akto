@@ -818,6 +818,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
         createUserAndRedirect(userEmail, username, signupInfo, invitationToAccount, method, null);
     }
 
+    // TODO: either set context.accountId or shift role to common dao.
     private void createUserAndRedirect(String userEmail, String username, SignupInfo signupInfo,
                                        int invitationToAccount, String method, Role invitedRole) throws IOException {
         loggerMaker.infoAndAddToDb("createUserAndRedirect called");

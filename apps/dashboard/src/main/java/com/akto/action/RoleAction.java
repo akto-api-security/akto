@@ -1,0 +1,194 @@
+package com.akto.action;
+
+import java.util.List;
+
+import com.akto.dao.CustomRoleDao;
+import com.akto.dao.PendingInviteCodesDao;
+import com.akto.dao.RBACDao;
+import com.akto.dao.context.Context;
+import com.akto.dto.PendingInviteCode;
+import com.akto.dto.RBAC;
+import com.akto.dto.Role;
+import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Updates;
+
+public class RoleAction extends UserAction {
+
+    /*
+     * Create Role.
+     * Update Role.
+     * Delete Role. -> If no user is associated with the role.
+     * Get Roles.
+     */
+
+    List<Role> roles;
+
+    public List<Role> getRoles() {
+        return roles;
+    }
+
+    public String getCustomRoles() {
+        int accountId = Context.accountId.get();
+        roles = Role.getCustomRolesForAccount(accountId);
+        return SUCCESS.toUpperCase();
+    }
+
+    List<Integer> apiCollectionIds;
+
+    public void setApiCollectionIds(List<Integer> apiCollectionIds) {
+        this.apiCollectionIds = apiCollectionIds;
+    }
+
+    String roleName;
+
+    public void setRoleName(String roleName) {
+        this.roleName = roleName;
+    }
+
+    String baseRole;
+
+    public void setBaseRole(String baseRole) {
+        this.baseRole = baseRole;
+    }
+
+    boolean defaultInviteRole;
+
+    public void setDefaultInviteRole(boolean defaultInviteRole) {
+        this.defaultInviteRole = defaultInviteRole;
+    }
+
+    private static final int MAX_ROLE_NAME_LENGTH = 50;
+
+    private boolean validateRoleName() {
+        if (this.roleName == null || this.roleName.isEmpty()) {
+            addActionError("Role names cannot be empty.");
+            return false;
+        }
+
+        if (this.roleName.length() > MAX_ROLE_NAME_LENGTH) {
+            addActionError("Role names cannot be more than " + MAX_ROLE_NAME_LENGTH + " characters.");
+            return false;
+        }
+
+        for (char c : this.roleName.toCharArray()) {
+            boolean alphabets = (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z');
+            boolean numbers = c >= '0' && c <= '9';
+            boolean specialChars = c == '-' || c == '_';
+
+            if (!(alphabets || numbers || specialChars)) {
+                addActionError("Role names can only be alphanumeric and contain '-'and '_'");
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private boolean defaultInviteCheck(){
+        if(defaultInviteRole){
+            List<Role> roles = Role.getCustomRolesForAccount(Context.accountId.get());
+            for(Role role: roles){
+                if(role.getDefaultInviteRole()){
+                    addActionError("Default invite role already exists.");
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    public String createCustomRole() {
+
+        if (!validateRoleName()) {
+            return ERROR.toUpperCase();
+        }
+
+        // Always save Upper-case.
+        roleName = roleName.toUpperCase();
+
+        Role existingRole = CustomRoleDao.instance.findRoleByName(roleName);
+
+        if (existingRole != null) {
+            addActionError("Existing role with same name exists.");
+            return ERROR.toUpperCase();
+        }
+        try {
+            // TODO: what if they give custom role in base role.
+            Role.valueOf(baseRole);
+        } catch (Exception e) {
+            addActionError("Base role does not exist");
+            return ERROR.toUpperCase();
+        }
+
+        if(!defaultInviteCheck()){
+            return ERROR.toUpperCase();
+        }
+
+        Role role = new Role(roleName, baseRole, apiCollectionIds, defaultInviteRole);
+        CustomRoleDao.instance.insertOne(role);
+        Role.deleteCustomRoleCache(Context.accountId.get());
+        return SUCCESS.toUpperCase();
+    }
+
+    public String updateCustomRole(){
+        if (!validateRoleName()) {
+            return ERROR.toUpperCase();
+        }
+        Role existingRole = CustomRoleDao.instance.findRoleByName(roleName);
+
+        if (existingRole == null) {
+            addActionError("Role does not exist.");
+            return ERROR.toUpperCase();
+        }
+
+        try {
+            Role.valueOf(baseRole);
+        } catch (Exception e) {
+            addActionError("Base role does not exist");
+            return ERROR.toUpperCase();
+        }
+
+        if(!defaultInviteCheck() && !existingRole.getDefaultInviteRole()){
+            return ERROR.toUpperCase();
+        }
+
+        CustomRoleDao.instance.updateOne(Filters.eq(Role._NAME, roleName),Updates.combine(
+            Updates.set(Role.BASE_ROLE, baseRole),
+            Updates.set(Role.API_COLLECTIONS_ID, apiCollectionIds),
+            Updates.set(Role.DEFAULT_INVITE_ROLE, defaultInviteRole)
+        ));
+        Role.deleteCustomRoleCache(Context.accountId.get());
+
+        return SUCCESS.toUpperCase();
+    }
+
+    public String deleteCustomRole(){
+        Role existingRole = CustomRoleDao.instance.findRoleByName(roleName);
+
+        if (existingRole == null) {
+            addActionError("Role does not exist.");
+            return ERROR.toUpperCase();
+        }
+
+        List<RBAC> usersWithRole = RBACDao.instance.findAll(Filters.eq(RBAC.ROLE, roleName));
+
+        if(!usersWithRole.isEmpty()){
+            addActionError("Role is associated with users. Cannot delete.");
+            return ERROR.toUpperCase();
+        }
+
+        /*
+         * Alt. approach: Delete all pending invites associated with the role.
+         */
+        List<PendingInviteCode> pendingInviteCodes = PendingInviteCodesDao.instance.findAll(Filters.eq(PendingInviteCode.INVITEE_ROLE, roleName));
+        if(!pendingInviteCodes.isEmpty()){
+            addActionError("Role is associated with pending invites. Cannot delete.");
+            return ERROR.toUpperCase();
+        }
+
+        CustomRoleDao.instance.deleteAll(Filters.eq(Role._NAME, roleName));
+        Role.deleteCustomRoleCache(Context.accountId.get());
+
+        return SUCCESS.toUpperCase();
+    }
+
+}

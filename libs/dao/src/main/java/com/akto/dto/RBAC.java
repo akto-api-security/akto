@@ -69,13 +69,6 @@ public class RBAC {
     }
 
     public List<Integer> getApiCollectionsId() {
-        if (apiCollectionsId == null || apiCollectionsId.isEmpty()) {
-            try {
-                Role actualRole = Role.valueOf(role);
-                return actualRole.getApiCollectionsId();
-            } catch (Exception e) {
-            }
-        }
         return apiCollectionsId;
     }
 

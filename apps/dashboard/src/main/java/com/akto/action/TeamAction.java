@@ -26,6 +26,8 @@ import org.bson.conversions.Bson;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -167,17 +169,17 @@ public class TeamAction extends UserAction implements ServletResponseAware, Serv
                         boolean shouldChangeRole = false; // cannot change to a role higher than yourself
 
                         for(Role role: rolesHierarchy){
-                            if(role == userRole){
+                            if(role.getBaseRole().equals(userRole.getBaseRole())){
                                 isValidUpdateRole = true;
                             }
-                            if(role == requestedRole){
+                            if(role.getBaseRole().equals(requestedRole.getBaseRole())){
                                 shouldChangeRole = true;
                             }
                         }
                         if(isValidUpdateRole && shouldChangeRole){
                             RBACDao.instance.updateOne(
                                 filterRbac,
-                                Updates.set(RBAC.ROLE, Role.valueOf(reqUserRole)));
+                                Updates.set(RBAC.ROLE, reqUserRole));
                                 RBACDao.instance.deleteUserEntryFromCache(new Pair<>(userDetails.getId(), accId));
                                 UsersCollectionsList.deleteCollectionIdsFromCache(userDetails.getId(), accId);
                             return Action.SUCCESS.toUpperCase();
@@ -213,7 +215,7 @@ public class TeamAction extends UserAction implements ServletResponseAware, Serv
         return performAction(ActionType.UPDATE_USER_ROLE, this.userRole.toUpperCase());
     }
 
-    private Role[] userRoleHierarchy;
+    private List<String> userRoleHierarchy;
 
     public String getRoleHierarchy(){
         if(this.userRole == null || this.userRole.isEmpty()){
@@ -221,7 +223,11 @@ public class TeamAction extends UserAction implements ServletResponseAware, Serv
             return Action.ERROR.toUpperCase();
         }
         try {
-            this.userRoleHierarchy = Role.valueOf(userRole).getRoleHierarchy();
+            Role[] roleHierarchy = Role.valueOf(userRole).getRoleHierarchy();
+            this.userRoleHierarchy = new ArrayList<>();
+            for(Role role: roleHierarchy){
+                this.userRoleHierarchy.add(role.getName());
+            }   
             return Action.SUCCESS.toUpperCase();
         } catch (Exception e) {
             addActionError("User role doesn't exist.");
@@ -304,7 +310,7 @@ public class TeamAction extends UserAction implements ServletResponseAware, Serv
         this.userRole = userRole;
     }
 
-    public Role[] getUserRoleHierarchy() {
+    public List<String> getUserRoleHierarchy() {
         return userRoleHierarchy;
     }
 

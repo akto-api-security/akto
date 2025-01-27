@@ -108,9 +108,15 @@ public class RBACDao extends CommonContextDao<RBAC> {
             return new ArrayList<>();
         }
 
-        if (Role.ADMIN.equals(rbac.getRole())) {
+        if (Role.ADMIN.getName().equals(rbac.getRole())) {
             logger.info(String.format("Rbac is admin userId: %d accountId: %d", userId, accountId));
             return null;
+        }
+
+        String role = rbac.getRole();
+        Role customRole = CustomRoleDao.instance.findRoleByName(role);
+        if (customRole != null) {
+            return customRole.getApiCollectionsId();
         }
 
         if (rbac.getApiCollectionsId() == null) {
@@ -125,12 +131,11 @@ public class RBACDao extends CommonContextDao<RBAC> {
 
     public HashMap<Integer, List<Integer>> getAllUsersCollections(int accountId) {
         HashMap<Integer, List<Integer>> collectionList = new HashMap<>();
-        List<RBAC> rbacList = RBACDao.instance.findAll(Filters.eq(RBAC.ACCOUNT_ID, accountId), Projections.include(RBAC.USER_ID, RBAC.API_COLLECTIONS_ID));
 
-        for(RBAC rbac : rbacList) {
-            int userId = rbac.getUserId();
-            
-            collectionList.put(userId, rbac.getApiCollectionsId());
+        List<Integer> userList = UsersDao.instance.getAllUsersIdsForTheAccount(accountId);
+
+        for (int userId : userList) {
+            collectionList.put(userId, getUserCollectionsById(userId, accountId));
         }
 
         return collectionList;

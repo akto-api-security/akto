@@ -109,13 +109,15 @@ public class InviteUserAction extends UserAction{
         }
 
         Role userRole = RBACDao.getCurrentRoleForUser(user_id, Context.accountId.get());
-        Role inviteeRole = null;
+    Role baseRole = null;
         try {
-            inviteeRole = Role.valueOf(this.inviteeRole);
+            Role inviteeRole = Role.valueOf(this.inviteeRole);
+            baseRole = Role.valueOf(inviteeRole.getBaseRole());
         } catch(Exception e){
         }
 
-        if (!Arrays.asList(userRole.getRoleHierarchy()).contains(inviteeRole)) {
+
+        if (!Arrays.asList(userRole.getRoleHierarchy()).contains(baseRole)) {
             addActionError("User not allowed to invite for this role");
             return ERROR.toUpperCase();
         }

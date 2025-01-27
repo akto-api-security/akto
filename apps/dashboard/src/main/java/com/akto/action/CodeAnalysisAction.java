@@ -57,7 +57,7 @@ public class CodeAnalysisAction extends UserAction {
         try {
             int accountId = Context.accountId.get();
             DashboardMode dashboardMode = DashboardMode.getDashboardMode();        
-            RBAC record = RBACDao.instance.findOne(RBAC.ACCOUNT_ID, accountId, RBAC.ROLE, Role.ADMIN);
+            RBAC record = RBACDao.instance.findOne(RBAC.ACCOUNT_ID, accountId, RBAC.ROLE, Role.ADMIN.getName());
             if (record == null) {
                 return;
             }
