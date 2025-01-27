@@ -199,25 +199,25 @@
 }
 
 .badge-wrapper-CRITICAL .Polaris-Badge {
-    background-color: #E51C00 !important;
+    background-color: #DF2909 !important;
     color: #FFFBFB !important;
     font-weight: 550 !important;
 }
 
 .badge-wrapper-HIGH .Polaris-Badge {
-    background-color: #F35C70 !important;
+    background-color: #FA6156 !important;
     color: #FFFBFB !important;
     font-weight: 550 !important;
 }
 
 .badge-wrapper-MEDIUM .Polaris-Badge {
-    background-color: #F4AD69 !important;
-    color: #FFFBFB !important;
+    background-color: #FFD79D !important;
+    color: #202223 !important;
     font-weight: 550 !important;
 }
 
 .badge-wrapper-LOW .Polaris-Badge {
-    background-color: #B5B5B5;
-    color: #FFFBFB !important;
+    background-color: #A4E8F2;
+    color: #202223 !important;
     font-weight: 550 !important;
 }
