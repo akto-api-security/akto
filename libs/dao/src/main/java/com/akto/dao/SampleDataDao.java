@@ -65,6 +65,21 @@ public class SampleDataDao extends AccountsContextDao<SampleData> {
         return SampleDataDao.instance.findOne(filterQSampleData);
     }
 
+    public SampleData fetchAllSampleDataForApi(int apiCollectionId, String url, URLMethods.Method method) {
+        Bson filterQSampleData = filterForSampleData(apiCollectionId, url, method);
+        List<SampleData> list = SampleDataDao.instance.findAll(filterQSampleData);
+        SampleData sampleData = new SampleData();
+        if (list != null && !list.isEmpty()) {
+            sampleData = list.get(0);
+            if (list.size() > 1) {
+                for (SampleData data : list) {
+                    sampleData.getSamples().addAll(data.getSamples());
+                }
+            }
+        }
+        return sampleData;
+    }
+
     public static Bson filterForSampleData(int apiCollectionId, String url, URLMethods.Method method) {
         return Filters.and(
                 Filters.eq("_id.apiCollectionId", apiCollectionId),

@@ -90,6 +90,7 @@ public class ApiCollection {
         this.name = name;
         this.conditions = conditions;
         this.type = Type.API_GROUP;
+        this.startTs = Context.now();
     }
 
     public static boolean useHost = true;
