@@ -568,7 +568,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
         return SUCCESS.toUpperCase();
     }
 
-    private String fetchDefaultInviteRole(int accountId, String fallbackDefault){
+    public String fetchDefaultInviteRole(int accountId, String fallbackDefault){
         try {
             Context.accountId.set(accountId);
             CustomRole defaultRole = CustomRoleDao.instance.findOne(CustomRole.DEFAULT_INVITE_ROLE, true);
