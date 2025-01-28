@@ -5,10 +5,12 @@ import java.util.List;
 import com.akto.dao.CustomRoleDao;
 import com.akto.dao.PendingInviteCodesDao;
 import com.akto.dao.RBACDao;
+import com.akto.dao.context.Context;
 import com.akto.dto.CustomRole;
 import com.akto.dto.PendingInviteCode;
 import com.akto.dto.RBAC;
 import com.akto.dto.RBAC.Role;
+import com.akto.util.Pair;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
@@ -124,6 +126,7 @@ public class RoleAction extends UserAction {
 
         CustomRole role = new CustomRole(roleName, baseRole, apiCollectionIds, defaultInviteRole);
         CustomRoleDao.instance.insertOne(role);
+        RBACDao.instance.deleteUserEntryFromCache(new Pair<>(getSUser().getId(), Context.accountId.get()));
         return SUCCESS.toUpperCase();
     }
 
@@ -154,6 +157,7 @@ public class RoleAction extends UserAction {
             Updates.set(CustomRole.API_COLLECTIONS_ID, apiCollectionIds),
             Updates.set(CustomRole.DEFAULT_INVITE_ROLE, defaultInviteRole)
         ));
+        RBACDao.instance.deleteUserEntryFromCache(new Pair<>(getSUser().getId(), Context.accountId.get()));
 
         return SUCCESS.toUpperCase();
     }
@@ -183,6 +187,7 @@ public class RoleAction extends UserAction {
         }
 
         CustomRoleDao.instance.deleteAll(Filters.eq(CustomRole._NAME, roleName));
+        RBACDao.instance.deleteUserEntryFromCache(new Pair<>(getSUser().getId(), Context.accountId.get()));
 
         return SUCCESS.toUpperCase();
     }

@@ -124,7 +124,7 @@ const Users = () => {
     ]
 
     const getRoleHierarchy = async() => {
-        let roleHierarchyResp = await settingRequests.getRoleHierarchy(window.USER_ROLE)
+        let roleHierarchyResp = await settingRequests.getRoleHierarchy()
         if(roleHierarchyResp.includes("MEMBER")){
             roleHierarchyResp.push("SECURITY ENGINEER")
         }
@@ -193,6 +193,7 @@ const Users = () => {
             }
         })
         
+        await getTeamData();
     }
 
     const toggleRoleSelectionPopup = (id) => {

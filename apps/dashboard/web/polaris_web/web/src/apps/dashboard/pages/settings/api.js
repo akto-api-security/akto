@@ -430,12 +430,11 @@ const settingRequests = {
             }
         });
     },
-    getRoleHierarchy(userRole){
+    getRoleHierarchy(){
         return request({
             url: '/api/getRoleHierarchy',
             method: 'post',
             data: {
-                userRole
             }
         });
     },
