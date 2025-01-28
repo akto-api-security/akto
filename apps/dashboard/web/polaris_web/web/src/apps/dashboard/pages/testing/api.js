@@ -475,14 +475,8 @@ export default {
             data: { latestTestingRunSummaryId, issueStatusQuery, sortKey, sortOrder, skip, limit, filters }
         })
     },
-    modifyTestingRunConfig(testingRunConfigId, testConfigsAdvancedSettings,selectedTestRun) {
-        const requestData = { testingRunConfigId }
-        if(testConfigsAdvancedSettings){
-            requestData.testConfigsAdvancedSettings = testConfigsAdvancedSettings;
-        }
-        if(selectedTestRun){
-            requestData.selectedTests = selectedTestRun;
-        }
+    modifyTestingRunConfig(testingRunConfigId, editableConfigObject) {
+        const requestData = { testingRunConfigId, editableTestingRunConfig: editableConfigObject }
         return request({
             url: '/api/modifyTestingRunConfig',
             method: 'post',

@@ -17,7 +17,7 @@ import RunTestSuites from "./RunTestSuites";
 import RunTestConfiguration from "./RunTestConfiguration";
 
 
-function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOutside, closeRunTest, selectedResourcesForPrimaryAction, useLocalSubCategoryData, preActivator, testIdConfig, activeFromTesting, setActiveFromTesting, showEditableSettings, setShowEditableSettings }) {
+function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOutside, closeRunTest, selectedResourcesForPrimaryAction, useLocalSubCategoryData, preActivator, testIdConfig, activeFromTesting, setActiveFromTesting, showEditableSettings, setShowEditableSettings, parentAdvanceSettingsConfig }) {
 
     const initialState = {
         categories: [],
@@ -234,16 +234,21 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                 return true;
             }
 
-            // Update state only if there is a change
             if (!areObjectArraysEqual(updatedTests, testRun.tests)) {
+                handleAddSettings(parentAdvanceSettingsConfig);
                 setTestRun(prev => ({
                     ...testRun,
                     tests: updatedTests,
+                    overriddenTestAppUrl: testIdConfig.testingRunConfig.overriddenTestAppUrl,
+                    maxConcurrentRequests: testIdConfig.maxConcurrentRequests,
+                    testRunTime: testIdConfig.testRunTime,
+                    testRoleId: testIdConfig.testingRunConfig.testRoleId,
                 }));
             }
         }
         setShouldRuntestConfig(false);
     }, [shouldRuntestConfig])
+
 
 
     const toggleRunTest = () => {
@@ -278,8 +283,6 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
             mapCategoryToSubcategory: ret
         }
     }
-
-    const [testSuite, testSuiteToggle] = useState(false);
 
     const activator = (
         <div ref={runTestRef}>
@@ -622,27 +625,34 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         setTestMode(check);
     }
 
+    // only for configurations 
     const handleModifyConfig = async () => {
         const settings = transform.prepareConditionsForTesting(conditions)
-        await testingApi.modifyTestingRunConfig(testIdConfig?.testingRunConfig?.id, settings).then(() => {
+        const editableConfigObject = transform.prepareEditableConfigObject(testRun, settings, testIdConfig.hexId)
+        await testingApi.modifyTestingRunConfig(testIdConfig?.testingRunConfig?.id, editableConfigObject).then(() => {
             func.setToast(true, false, "Modified testing run config successfully")
             setShowEditableSettings(false)
         })
+
+        if(activeFromTesting){
+            transform.rerunTest(testIdConfig.hexId, null, true)
+        }
     }
 
-    const handleAddSettings = () => {
-        if (conditions.length === 0 && testingRunConfigSettings.length > 0) {
-          testingRunConfigSettings.forEach((condition) => {
-            const operatorType = condition.operatorType
-            condition.operationsGroupList.forEach((obj) => {
-              const finalObj = { 'data': obj, 'operator': { 'type': operatorType } }
-              dispatchConditions({ type: "add", obj: finalObj })
-            })
-          })
-        }
-      }
+    const handleAddSettings = (parentAdvanceSettingsConfig) => {
+        if (parentAdvanceSettingsConfig.length > 0) {
+            dispatchConditions({ type: "clear" });
+            parentAdvanceSettingsConfig.forEach((condition) => {
+                const operatorType = condition.operator.type
+                const obj = condition.data
+                const finalObj = { 'data': obj, 'operator': { 'type': operatorType } }
+                dispatchConditions({ type: "add", obj: finalObj })
 
-    // still not working properly need api to modify test_run object
+            })
+        }
+    }
+
+
     const editableConfigsComp = (
         <Modal
             large
@@ -652,12 +662,13 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
             title={"Edit test configurations"}
             primaryAction={{
                 content: 'Save',
-                onAction: () => handleModifyConfig()
+                onAction: () => { handleModifyConfig(); },
             }}
         >
             <Modal.Section>
                 <>
                     <RunTestConfiguration
+                        showEditableSettings={setActiveFromTesting}
                         testRun={testRun}
                         setTestRun={setTestRun}
                         runTypeOptions={runTypeOptions}
@@ -680,7 +691,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
     return (
         <div>
             {!parentActivator ? activator : null}
-            {showEditableSettings? editableConfigsComp: null}
+            {showEditableSettings ? editableConfigsComp : null}
             <Modal
 
                 activator={runTestRef}
@@ -694,7 +705,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                 </HorizontalStack>}
                 primaryAction={{
                     content: activeFromTesting ? "Save & Re-run" : scheduleString(),
-                    onAction: handleRun,
+                    onAction: activeFromTesting? handleModifyConfig: handleRun,
                     disabled: (countAllSelectedTests() === 0) || !testRun.authMechanismPresent
                 }}
                 secondaryActions={[
@@ -829,6 +840,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                                     </div>
                                 </div>
                                 <RunTestConfiguration
+                                    showEditableSettings={setActiveFromTesting}
                                     testRun={testRun}
                                     setTestRun={setTestRun}
                                     runTypeOptions={runTypeOptions}
@@ -851,9 +863,10 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                                 handleRemoveAll={handleRemoveAll}
                                 apiCollectionName={apiCollectionName}
                                 setTestMode={setTestMode}
-                                checkRemoveAll={checkRemoveAll} /> :
+                                checkRemoveAll={checkRemoveAll} handleModifyConfig={handleModifyConfig} /> :
                                 <>
                                     <RunTestConfiguration
+                                        showEditableSettings={setActiveFromTesting}
                                         testRun={testRun}
                                         setTestRun={setTestRun}
                                         runTypeOptions={runTypeOptions}

@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import "./run_test_suites.css"
 
 
-function RunTestSuites({  testRun, setTestRun, handleRun, checkRemoveAll, handleRemoveAll }) {
+function RunTestSuites({  testRun, setTestRun, handleRun, checkRemoveAll, handleRemoveAll,handleModifyConfig }) {
 
     const [owaspTop10, owaspTop10Toggle] = useState(true);
 
@@ -20,14 +20,6 @@ function RunTestSuites({  testRun, setTestRun, handleRun, checkRemoveAll, handle
         "Improper Inventory Management": ["IAM", "IIM"],
         "Unsafe Consumption of APIs": ["COMMAND_INJECTION", "INJ", "CRLF", "SSTI", "LFI", "XSS", "INJECT"]
     }
-
-    const [shouldCallFunction, setShouldCallFunction] = useState(false);
-
-
-    useEffect(() => {
-        if (shouldCallFunction) handleRun();
-        setShouldCallFunction(false);
-    }, [shouldCallFunction]);
 
     function createAcronym(str) {
         return str.split(/\s+/).map(word => word.charAt(0).toUpperCase()).join('');

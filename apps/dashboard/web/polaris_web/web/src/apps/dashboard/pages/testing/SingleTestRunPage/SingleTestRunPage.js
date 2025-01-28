@@ -328,6 +328,8 @@ function SingleTestRunPage() {
     return { value: transform.getPrettifiedTestRunResults(testRunResultsRes), total: selectedTab === 'ignored_issues' ? totalIgnoredIssuesCount : testRunCountMap[tableTabMap[selectedTab]] }
   }
 
+  useEffect(() => {handleAddSettings()}, [testingRunConfigSettings])
+
   useEffect(() => {
     fetchTestingRunResultSummaries()
     filters = func.getCollectionFilters(filters)
@@ -529,7 +531,7 @@ function SingleTestRunPage() {
 
   const resultTable = (
     <>
-      <RunTest activeFromTesting={activeFromTesting} setActiveFromTesting={setActiveFromTesting}  preActivator={true} testIdConfig={testingRunResultSummariesObj?.testingRun} apiCollectionId={getCollectionId()} endpoints={filteredEndpoints} setTestMode={setTestMode} filtered={checkFiltered()} setShowEditableSettings={setShowEditableSettings} showEditableSettings={showEditableSettings} />
+      <RunTest activeFromTesting={activeFromTesting} setActiveFromTesting={setActiveFromTesting}  preActivator={true} testIdConfig={testingRunResultSummariesObj?.testingRun} apiCollectionId={getCollectionId()} endpoints={filteredEndpoints} setTestMode={setTestMode} filtered={checkFiltered()} setShowEditableSettings={setShowEditableSettings} showEditableSettings={showEditableSettings} parentAdvanceSettingsConfig={conditions}/>
       <GithubServerTable
         key={"table"}
         pageLimit={selectedTab === 'vulnerable' ? 150 : 50}
@@ -615,36 +617,6 @@ function SingleTestRunPage() {
     ) : null
   ), [currentTestObj, progress]);
 
-  // const handleModifyConfig = async () => {
-  //   const settings = transform.prepareConditionsForTesting(conditions)
-  //   await api.modifyTestingRunConfig(testingRunConfigId, settings).then(() => {
-  //     func.setToast(true, false, "Modified testing run config successfully")
-  //     setShowEditableSettings(false)
-  //   })
-  // }
-
-  // const editableConfigsComp = (
-  //   <Modal
-  //     large
-  //     fullScreen
-  //     open={showEditableSettings}
-  //     onClose={() => setShowEditableSettings(false)}
-  //     title={"Edit test configurations"}
-  //     primaryAction={{
-  //       content: 'Save',
-  //       onAction: () => handleModifyConfig()
-  //     }}
-  //   >
-  //     <Modal.Section>
-  //       <AdvancedSettingsComponent
-  //         key={"configSettings"}
-  //         conditions={conditions}
-  //         dispatchConditions={dispatchConditions}
-  //         hideButton={true}
-  //       />
-  //     </Modal.Section>
-  //   </Modal>
-  // )
 
   const components = [
     runningTestsComp, <TrendChart key={tempLoading.running} hexId={hexId} setSummary={setSummary} show={selectedTestRun.run_type && selectedTestRun.run_type !== 'One-time'} />,
@@ -791,7 +763,7 @@ function SingleTestRunPage() {
       {
         content: 'Configurations',
         icon: SettingsMinor,
-        onAction: () => { setShowEditableSettings(true);}
+        onAction: () => { setShowEditableSettings(true);  handleAddSettings()}
       }
     ]
   })

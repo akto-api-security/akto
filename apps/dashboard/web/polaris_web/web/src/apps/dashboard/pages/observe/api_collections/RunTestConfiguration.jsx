@@ -2,7 +2,7 @@ import React from 'react';
 import { VerticalStack, HorizontalGrid, Checkbox, TextField, Text } from '@shopify/polaris';
 import Dropdown from "../../../components/layouts/Dropdown";
 
-const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes, testRunTimeOptions, testRolesArr, maxConcurrentRequestsOptions, slackIntegrated, generateLabelForSlackIntegration,getLabel }) => {
+const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes, testRunTimeOptions, testRolesArr, maxConcurrentRequestsOptions, slackIntegrated, generateLabelForSlackIntegration,getLabel,showEditableSettings }) => {
     return (
         <VerticalStack gap={"4"}>
             <HorizontalGrid gap={"4"} columns={"3"}>
@@ -25,10 +25,10 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
                             continuousTesting,
                             runTypeLabel: runType.label
                         }));
-                    }} />
+                    }} disabled={showEditableSettings} />
                 <Dropdown
                     label="Select Time:"
-                    disabled={testRun.continuousTesting === true}
+                    disabled={testRun.continuousTesting === true || showEditableSettings}
                     menuItems={hourlyTimes}
                     initial={testRun.hourlyLabel}
                     selected={(hour) => {
