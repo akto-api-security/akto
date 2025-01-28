@@ -78,6 +78,24 @@ public class Main {
 
     }
 
+    private static int lastPing = 0;
+    private final static int PING_INTERVAL = 5 * 60;
+
+    private static boolean postgresConnected = false;
+
+    public static boolean isPostgresConnected() {
+        try {
+            int now = Context.now();
+            if ((lastPing + PING_INTERVAL) <= now) {
+                lastPing = now;
+                getConnection();
+                postgresConnected = true;
+            }
+        } catch (Exception e) {
+        }
+        return postgresConnected;
+    }
+
     public static String extractDatabaseName() {
         String regex = "jdbc:postgresql://[^/]+:\\d+/(\\w+)";
         java.util.regex.Pattern pattern = java.util.regex.Pattern.compile(regex);

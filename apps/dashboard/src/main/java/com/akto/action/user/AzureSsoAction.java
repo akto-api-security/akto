@@ -6,6 +6,7 @@ import java.util.ArrayList;
 
 import com.akto.action.UserAction;
 import com.akto.dao.ConfigsDao;
+import com.akto.dao.RBACDao;
 import com.akto.dao.UsersDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.Config;
@@ -32,6 +33,14 @@ public class AzureSsoAction extends UserAction{
             return ERROR.toUpperCase();
         }
 
+        User user = getSUser();
+        if (user == null) return ERROR.toUpperCase();
+        boolean isAdmin = RBACDao.instance.isAdmin(user.getId(), Context.accountId.get());
+        if (!isAdmin) {
+            addActionError("Only admin can add SSO");
+            return Action.ERROR.toUpperCase();
+        }
+
         if (SsoUtils.isAnySsoActive()) {
             addActionError("A SSO Integration already exists.");
             return ERROR.toUpperCase();
@@ -54,6 +63,14 @@ public class AzureSsoAction extends UserAction{
         if(!DashboardMode.isOnPremDeployment()){
             addActionError("This feature is only available in on-prem deployment");
             return ERROR.toUpperCase();
+        }
+
+        User user = getSUser();
+        if (user == null) return ERROR.toUpperCase();
+        boolean isAdmin = RBACDao.instance.isAdmin(user.getId(), Context.accountId.get());
+        if (!isAdmin) {
+            addActionError("Only admin can delete SSO");
+            return Action.ERROR.toUpperCase();
         }
 
         DeleteResult result = ConfigsDao.instance.deleteAll(Filters.eq("_id", "AZURE-ankush"));

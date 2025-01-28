@@ -35,7 +35,7 @@ function DropdownSearch(props) {
 
         }
         setOptions((prev) => {
-            if(selectedOptions.length > 0 || prev.length > 0){
+            if(func.deepComparison(prev,deselectedOptions)){
                 return prev;
             }
             return deselectedOptions;
@@ -66,7 +66,7 @@ function DropdownSearch(props) {
             }
 
             setTimeout(() => {
-                if (value === '' && selectedOptions.length === 0) {
+                if (value === '') {
                     setOptions(deselectedOptions);
                     setLoading(false);
                     return;

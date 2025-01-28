@@ -1,6 +1,7 @@
 
 package com.akto.testing;
 
+import com.akto.crons.GetRunningTestsStatus;
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.data_actor.DataActor;
@@ -8,16 +9,23 @@ import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.CustomAuthType;
+import com.akto.dto.DependencyNode;
+import com.akto.dto.DependencyNode.ParamInfo;
 import com.akto.dto.OriginalHttpRequest;
+import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.RawApi;
 import com.akto.dto.api_workflow.Graph;
+import com.akto.dto.dependency_flow.KVPair;
+import com.akto.dto.dependency_flow.ReplaceDetail;
 import com.akto.dto.test_editor.*;
 import com.akto.dto.testing.*;
 import com.akto.dto.testing.TestResult.Confidence;
 import com.akto.dto.testing.TestResult.TestError;
+import com.akto.dto.testing.TestingRun.State;
 import com.akto.dto.type.RequestTemplate;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
+import com.akto.dto.type.URLMethods.Method;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.metrics.AllMetrics;
@@ -25,6 +33,7 @@ import com.akto.sql.SampleDataAltDb;
 import com.akto.store.AuthMechanismStore;
 import com.akto.store.SampleMessageStore;
 import com.akto.store.TestingUtil;
+import com.akto.test_editor.execution.Build;
 import com.akto.test_editor.execution.Executor;
 import com.akto.test_editor.execution.VariableResolver;
 import com.akto.testing.yaml_tests.YamlTestTemplate;
@@ -32,13 +41,15 @@ import com.akto.testing_issues.TestingIssuesHandler;
 import com.akto.util.JSONUtils;
 import com.akto.util.enums.GlobalEnums.Severity;
 import com.akto.util.enums.LoginFlowEnums;
+import com.alibaba.fastjson2.JSON;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
+import static com.akto.test_editor.execution.Build.modifyRequest;
 
+import org.apache.commons.lang3.StringUtils;
 import org.bson.types.ObjectId;
 import org.json.JSONObject;
-import org.mortbay.util.ajax.JSON;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -46,10 +57,11 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.*;
 import java.util.concurrent.*;
+import com.akto.testing.workflow_node_executor.Utils;
 
 public class TestExecutor {
 
-    private static final LoggerMaker loggerMaker = new LoggerMaker(TestExecutor.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(TestExecutor.class, LogDb.TESTING);
     private static final Logger logger = LoggerFactory.getLogger(TestExecutor.class);
 
     public static long acceptableSizeInBytes = 5_000_000;
@@ -128,8 +140,16 @@ public class TestExecutor {
         AuthMechanism authMechanism = authMechanismStore.getAuthMechanism();
 
         List<YamlTemplate> yamlTemplates = new ArrayList<>();
-        for (int i = 0; i < 10; i++) {
-            yamlTemplates.addAll(dataActor.fetchYamlTemplates(false, i*50));
+        final int TEST_LIMIT = 50;
+        for (int i = 0; i < 100; i++) {
+            List<YamlTemplate> temp = dataActor.fetchYamlTemplates(false, i * TEST_LIMIT);
+            if (temp == null || temp.isEmpty()) {
+                break;
+            }
+            yamlTemplates.addAll(temp);
+            if (temp.size() < TEST_LIMIT) {
+                break;
+            }
         }
 
         Map<String, TestConfig> testConfigMap = YamlTemplateDao.instance.fetchTestConfigMap(false, false, yamlTemplates);
@@ -229,17 +249,23 @@ public class TestExecutor {
         loggerMaker.infoAndAddToDb("Waiting...", LogDb.TESTING);
 
         try {
-            boolean awaitResult = latch.await(maxRunTime, TimeUnit.SECONDS);
-            loggerMaker.infoAndAddToDb("Await result: " + awaitResult, LogDb.TESTING);
-
-            if (!awaitResult) { // latch countdown didn't reach 0
-                for (Future<Void> future : futureTestingRunResults) {
-                    future.cancel(true);
-                }
-                loggerMaker.infoAndAddToDb("Canceled all running future tasks due to timeout.", LogDb.TESTING);
+            //boolean awaitResult = latch.await(maxRunTime, TimeUnit.SECONDS);
+            int waitTs = Context.now();
+            while(latch.getCount() > 0 && GetRunningTestsStatus.getRunningTests().isTestRunning(summaryId) 
+                && (Context.now() - waitTs < maxRunTime)) {
+                    loggerMaker.infoAndAddToDb("waiting for tests to finish", LogDb.TESTING);
+                    Thread.sleep(10000);
             }
+            loggerMaker.infoAndAddToDb("test is completed", LogDb.TESTING);
+            //awaitResult = latch.getCount() > 0 && GetRunningTestsStatus.getRunningTests().isTestRunning(summaryId);
+            //loggerMaker.infoAndAddToDb("Await result: " + awaitResult, LogDb.TESTING);
 
-        } catch (InterruptedException e) {
+            for (Future<Void> future : futureTestingRunResults) {
+                future.cancel(true);
+            }
+            loggerMaker.infoAndAddToDb("Canceled all running future tasks due to timeout.", LogDb.TESTING);
+
+        } catch (Exception e) {
             throw new RuntimeException(e);
         }
 
@@ -247,12 +273,10 @@ public class TestExecutor {
 
     }
 
-    public static Map<String, Integer> calcTotalCountIssues(ObjectId summaryId) {
-        Map<String, Integer> totalCountIssues = new HashMap<>();
-        totalCountIssues.put(Severity.CRITICAL.toString(), 0);
-        totalCountIssues.put(Severity.HIGH.toString(), 0);
-        totalCountIssues.put(Severity.MEDIUM.toString(), 0);
-        totalCountIssues.put(Severity.LOW.toString(), 0);
+    public static void updateTestSummary(ObjectId summaryId){
+        loggerMaker.infoAndAddToDb("Finished updating results count", LogDb.TESTING);
+
+        State updatedState = GetRunningTestsStatus.getRunningTests().isTestRunning(summaryId) ? State.COMPLETED : GetRunningTestsStatus.getRunningTests().getCurrentState(summaryId);
 
         int skip = 0;
         int limit = 1000;
@@ -262,13 +286,6 @@ public class TestExecutor {
             List<TestingRunResult> testingRunResults = dataActor.fetchLatestTestingRunResultBySummaryId(summaryId.toHexString(), limit, skip);
             loggerMaker.infoAndAddToDb("Reading " + testingRunResults.size() + " vulnerable testingRunResults",
                     LogDb.TESTING);
-
-            for (TestingRunResult testingRunResult : testingRunResults) {
-                String severity = getSeverityFromTestingRunResult(testingRunResult).toString();
-                int initialCount = totalCountIssues.getOrDefault(severity, 0);
-                totalCountIssues.put(severity, initialCount + 1);
-            }
-
             if (testingRunResults.size() == limit) {
                 skip += limit;
                 fetchMore = true;
@@ -276,20 +293,8 @@ public class TestExecutor {
 
         } while (fetchMore);
 
-        return totalCountIssues;
-    }
-
-    public static void updateTestSummary(ObjectId summaryId){
-        loggerMaker.infoAndAddToDb("Finished updating results count", LogDb.TESTING);
-        Map<String, Integer> totalCountIssues = calcTotalCountIssues(summaryId);
-
-        TestingRunResultSummary testingRunResultSummary = dataActor.updateIssueCountInSummary(summaryId.toHexString(), totalCountIssues);
+        TestingRunResultSummary testingRunResultSummary = dataActor.updateIssueCountAndStateInSummary(summaryId.toHexString(), new HashMap<>(), updatedState.toString());
         // GithubUtils.publishGithubComments(testingRunResultSummary);
-
-        loggerMaker.infoAndAddToDb("Finished updating TestingRunResultSummariesDao", LogDb.TESTING);
-        if(totalCountIssues.get(Severity.HIGH.toString()) > 0) {
-            dataActor.insertActivity(totalCountIssues.get(Severity.HIGH.toString()));
-        }
     }
 
     public static Severity getSeverityFromTestingRunResult(TestingRunResult testingRunResult){
@@ -354,7 +359,7 @@ public class TestExecutor {
         WorkflowTest workflowObj = convertToWorkflowGraph(authMechanism.getRequestData(), loginFlowParams);
         ApiWorkflowExecutor apiWorkflowExecutor = new ApiWorkflowExecutor();
         LoginFlowResponse loginFlowResp;
-        loginFlowResp =  com.akto.testing.workflow_node_executor.Utils.runLoginFlow(workflowObj, authMechanism, loginFlowParams);
+        loginFlowResp =  Utils.runLoginFlow(workflowObj, authMechanism, loginFlowParams);
         return loginFlowResp;
     }
 
@@ -388,13 +393,16 @@ public class TestExecutor {
 
             int waitTime = 0;
             WorkflowNodeDetails.Type nodeType = WorkflowNodeDetails.Type.API;
-            if (data.getType().equals(LoginFlowEnums.LoginStepTypesEnums.OTP_VERIFICATION.toString())) {
+            if ((data.getType() != null
+                    && data.getType().equals(LoginFlowEnums.LoginStepTypesEnums.OTP_VERIFICATION.toString()))
+                    || (data.getUrl() != null && data.getUrl().contains("fetchOtpData"))) {
                 nodeType = WorkflowNodeDetails.Type.OTP;
                 if (loginFlowParams == null || !loginFlowParams.getFetchValueMap()) {
                     waitTime = 60;
                 }
             }
-            if (data.getType().equals(LoginFlowEnums.LoginStepTypesEnums.RECORDED_FLOW.toString())) {
+            if (data.getType() != null
+                    && data.getType().equals(LoginFlowEnums.LoginStepTypesEnums.RECORDED_FLOW.toString())) {
                 nodeType = WorkflowNodeDetails.Type.RECORDED;
             }
 
@@ -466,14 +474,13 @@ public class TestExecutor {
 
         Context.accountId.set(accountId);
         loggerMaker.infoAndAddToDb("Starting test for " + apiInfoKey, LogDb.TESTING);   
-
         try {
             startTestNew(apiInfoKey, testRunId, testingRunConfig, testingUtil, testRunResultSummaryId, testConfigMap, subCategoryEndpointMap, apiInfoKeyToHostMap, debug, testLogs, startTime, maxRunTime);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "error while running tests: " + e);
         }
-
         latch.countDown();
+        loggerMaker.infoAndAddToDb("DONE FINAL: " + latch.getCount(), LogDb.TESTING);
         return null;
     }
 
@@ -547,6 +554,9 @@ public class TestExecutor {
             TestingIssuesHandler handler = new TestingIssuesHandler();
             boolean triggeredByTestEditor = false;
             try{
+                List<GenericTestResult> list = new ArrayList<>();
+                list.add(testRes);
+                trr.setTestResults(list);
                 handler.handleIssuesCreationFromTestingRunResults(testingRunResults, triggeredByTestEditor);
             } catch (Exception e){
                 loggerMaker.errorAndAddToDb(e, "Unable to create issues", LogDb.TESTING);
@@ -565,31 +575,36 @@ public class TestExecutor {
 
         int countSuccessfulTests = 0;
         for (String testSubCategory: testSubCategories) {
-            if (Context.now() - startTime > timeToKill) {
-                loggerMaker.infoAndAddToDb("Timed out in " + (Context.now()-startTime) + "seconds");
-                return;
-            }
-            List<TestingRunResult> testingRunResults = new ArrayList<>();
+            if(GetRunningTestsStatus.getRunningTests().isTestRunning(testRunResultSummaryId)){
+                if (Context.now() - startTime > timeToKill) {
+                    loggerMaker.infoAndAddToDb("Timed out in " + (Context.now()-startTime) + "seconds");
+                    return;
+                }
+                List<TestingRunResult> testingRunResults = new ArrayList<>();
 
-            TestConfig testConfig = testConfigMap.get(testSubCategory);
-            
-            if (testConfig == null) continue;
-            TestingRunResult testingRunResult = null;
-            if (!applyRunOnceCheck(apiInfoKey, testConfig, subCategoryEndpointMap, apiInfoKeyToHostMap, testSubCategory)) {
-                continue;
-            }
-            try {
-                testingRunResult = runTestNew(apiInfoKey,testRunId,testingUtil,testRunResultSummaryId, testConfig, testingRunConfig, debug, testLogs);
-            } catch (Exception e) {
-                loggerMaker.errorAndAddToDb("Error while running tests for " + testSubCategory +  ": " + e.getMessage(), LogDb.TESTING);
-                e.printStackTrace();
-            }
-            if (testingRunResult != null) {
-                testingRunResults.add(testingRunResult);
-                countSuccessfulTests++;
-            }
+                TestConfig testConfig = testConfigMap.get(testSubCategory);
+                
+                if (testConfig == null) continue;
+                TestingRunResult testingRunResult = null;
+                if (!applyRunOnceCheck(apiInfoKey, testConfig, subCategoryEndpointMap, apiInfoKeyToHostMap, testSubCategory)) {
+                    continue;
+                }
+                try {
+                    testingRunResult = runTestNew(apiInfoKey,testRunId,testingUtil,testRunResultSummaryId, testConfig, testingRunConfig, debug, testLogs);
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb("Error while running tests for " + testSubCategory +  ": " + e.getMessage(), LogDb.TESTING);
+                    e.printStackTrace();
+                }
+                if (testingRunResult != null) {
+                    testingRunResults.add(testingRunResult);
+                    countSuccessfulTests++;
+                }
 
-            insertResultsAndMakeIssues(testingRunResults, testRunResultSummaryId);
+                insertResultsAndMakeIssues(testingRunResults, testRunResultSummaryId);
+            }else{
+                logger.info("Test stopped for id: " + testRunId.toString());
+                break;
+            }
         }
         if(countSuccessfulTests > 0){
             dataActor.updateLastTestedField(apiInfoKey.getApiCollectionId(), apiInfoKey.getUrl(), apiInfoKey.getMethod().toString());
@@ -639,7 +654,7 @@ public class TestExecutor {
             messages.addAll(SampleDataAltDb.findSamplesByApiInfoKey(apiInfoKey));
         } catch (Exception e) {
             // TODO Auto-generated catch block
-            e.printStackTrace();
+            //e.printStackTrace();
         }
 
         if (messages == null || messages.isEmpty()){
@@ -655,7 +670,11 @@ public class TestExecutor {
         String message = messages.get(messages.size() - 1);
         try {
             long start = System.currentTimeMillis();
-            String msg = SampleDataAltDb.findLatestSampleByApiInfoKey(apiInfoKey);
+            String msg = null;
+            try {
+                msg = SampleDataAltDb.findLatestSampleByApiInfoKey(apiInfoKey);
+            } catch (Exception e) {
+            }
             if (msg != null) {
                 message = msg;
             }
@@ -719,17 +738,198 @@ public class TestExecutor {
             } catch (Exception e){
                 testResult.setConfidence(Confidence.HIGH);
             }
+            // dynamic severity for tests
+            Confidence overConfidence = getConfidenceForTests(testConfig, yamlTestTemplate);
+            if (overConfidence != null) {
+                testResult.setConfidence(overConfidence);
+            }
         }
 
         List<SingleTypeInfo> singleTypeInfos = new ArrayList<>();
 
         int confidencePercentage = 100;
 
-        return new TestingRunResult(
-                testRunId, apiInfoKey, testSuperType, testSubType ,testResults.getTestResults(),
-                vulnerable,singleTypeInfos,confidencePercentage,startTime,
-                endTime, testRunResultSummaryId, testResults.getWorkflowTest(), testLogs
-        );
+        TestingRunResult ret = new TestingRunResult(
+            testRunId, apiInfoKey, testSuperType, testSubType ,testResults.getTestResults(),
+            vulnerable,singleTypeInfos,confidencePercentage,startTime,
+            endTime, testRunResultSummaryId, testResults.getWorkflowTest(), testLogs);  
+
+        if (testingRunConfig!=null && testingRunConfig.getCleanUp()) {
+            try {
+                cleanUpTestArtifacts(Collections.singletonList(ret), apiInfoKey, testingUtil, testingRunConfig);
+            } catch(Exception e){
+                loggerMaker.errorAndAddToDb(e, "Error while cleaning up test artifacts: " + e.getMessage(), LogDb.TESTING);
+            }
+        }
+
+        return ret;
+    }
+
+    private Map<ApiInfoKey, List<ApiInfoKey>> cleanUpTestArtifacts(List<TestingRunResult> testingRunResults, ApiInfoKey apiInfoKey, TestingUtil testingUtil, TestingRunConfig testingRunConfig) {
+
+        Map<ApiInfoKey, List<ApiInfoKey>> cleanedUpRequests = new HashMap<>();
+
+        for (TestingRunResult trr: testingRunResults) {
+
+            for(GenericTestResult gtr: trr.getTestResults()) {                
+                for(String message: gtr.getResponses()) {
+                    if (message != null) {
+                        String formattedMessage = null;
+                        try {
+                            formattedMessage = com.akto.runtime.utils.Utils.convertToSampleMessage(message);
+                        } catch (Exception e) {
+                            loggerMaker.errorAndAddToDb("cleanUpTestArtifacts: Error while formatting message: " + e.getMessage(), LogDb.TESTING);
+                        }
+                        if (formattedMessage == null) {
+                            continue;
+                        }
+                        RawApi rawApiToBeReplayed = RawApi.buildFromMessage(formattedMessage);
+                        if (rawApiToBeReplayed.getResponse().getStatusCode() >= 300) {
+                            loggerMaker.infoAndAddToDb("cleanUpTestArtifacts rawApiToBeReplayed status code invalid: " + rawApiToBeReplayed.getResponse().getStatusCode(), LogDb.TESTING);
+                            continue;
+                        }
+                        switch (apiInfoKey.getMethod()) {
+                            case POST:
+                            case PUT:
+                                // TODO: Handle cases where the delete API does not have the delete method
+                                List<DependencyNode> children = dataActor.findDependencyNodes(apiInfoKey.getApiCollectionId(), apiInfoKey.getUrl(), apiInfoKey.getMethod().name(), "DELETE");
+
+                                if (children != null && !children.isEmpty()) {
+                                    for(DependencyNode node: children) {
+                                        Map<String, Set<Object>> valuesMap = Build.getValuesMap(rawApiToBeReplayed.getResponse());
+
+                                        ApiInfoKey cleanUpApiInfoKey = new ApiInfoKey(Integer.valueOf(node.getApiCollectionIdReq()), node.getUrlReq(), Method.valueOf(node.getMethodReq()));
+                                        List<String> samples = testingUtil.getSampleMessages().get(cleanUpApiInfoKey);
+                                        if (samples == null || samples.isEmpty()) {
+                                            loggerMaker.infoAndAddToDb(String.format("cleanUpTestArtifacts samples not found for: %s %s %s", node.getApiCollectionIdReq(), node.getUrlReq(), node.getMethodReq()));
+                                            continue;
+                                        } else {
+                                            RawApi nextApi = RawApi.buildFromMessage(samples.get(0));
+
+                                            List<KVPair> kvPairs = new ArrayList<>();
+                                            boolean fullReplace = true;
+                                            for(ParamInfo paramInfo: node.getParamInfos()) {
+                                                // TODO: Handle for header
+                                                if (paramInfo.isHeader()) continue;
+                                                Set<Object> valuesFromResponse = valuesMap.get(paramInfo.getResponseParam());
+
+                                                if (valuesFromResponse == null || valuesFromResponse.isEmpty()) {
+                                                    fullReplace = false;
+                                                    break;
+                                                }
+
+                                                Object valueFromResponse = valuesFromResponse.iterator().next();
+
+                                                KVPair.KVType type = valueFromResponse instanceof Integer ? KVPair.KVType.INTEGER : KVPair.KVType.STRING;
+                                                KVPair kvPair = new KVPair(paramInfo.getRequestParam(), valueFromResponse.toString(), false, paramInfo.isUrlParam(), type);
+                                                kvPairs.add(kvPair);
+                                            }
+
+                                            if (!fullReplace) {
+                                                loggerMaker.infoAndAddToDb(String.format("cleanUpTestArtifacts unable to replace all values in dependency node %s %s %s", node.getApiCollectionIdReq(), node.getUrlReq(), node.getMethodReq()));
+                                                continue;
+                                            }
+
+                                            if (testingRunConfig != null && StringUtils.isNotBlank(testingRunConfig.getTestRoleId())) {
+                                                TestRoles role = dataActor.fetchTestRolesforId(testingRunConfig.getTestRoleId());
+                                                if (role != null) {
+                                                    EndpointLogicalGroup endpointLogicalGroup = role.fetchEndpointLogicalGroup();
+                                                    if (endpointLogicalGroup != null && endpointLogicalGroup.getTestingEndpoints() != null  && endpointLogicalGroup.getTestingEndpoints().containsApi(apiInfoKey)) {
+                                                        if (role.getDefaultAuthMechanism() != null) {
+                                                            loggerMaker.infoAndAddToDb("attempting to override auth ", LogDb.TESTING);
+                                                            Executor.modifyAuthTokenInRawApi(role, nextApi);
+                                                        } else {
+                                                            loggerMaker.infoAndAddToDb("Default auth mechanism absent", LogDb.TESTING);
+                                                        }
+                                                    } else {
+                                                        loggerMaker.infoAndAddToDb("Endpoint didn't satisfy endpoint condition for testRole", LogDb.TESTING);
+                                                    }
+                                                } else {
+                                                    String reason = "Test role has been deleted";
+                                                    loggerMaker.infoAndAddToDb(reason + ", going ahead with sample auth", LogDb.TESTING);
+                                                }
+                                            }
+
+                                            ReplaceDetail replaceDetail = new ReplaceDetail(apiInfoKey.getApiCollectionId(), apiInfoKey.getUrl(), apiInfoKey.getMethod().name(), kvPairs);
+                                            modifyRequest(nextApi.getRequest(), replaceDetail);
+                                            loggerMaker.infoAndAddToDb("cleanUpTestArtifacts: ====REQUEST====");
+                                            loggerMaker.infoAndAddToDb("cleanUpTestArtifacts: REQUEST: " + nextApi.getRequest().getMethod() + " " + nextApi.getRequest().getUrl() + "?" + nextApi.getRequest().getQueryParams());
+                                            loggerMaker.infoAndAddToDb("cleanUpTestArtifacts: REQUEST headers: " + nextApi.getRequest().getHeaders());
+                                            loggerMaker.infoAndAddToDb("cleanUpTestArtifacts: REQUEST body: " + nextApi.getRequest().getBody());
+                                            loggerMaker.infoAndAddToDb("cleanUpTestArtifacts: ====RESPONSE====");
+                                            try {
+                                                OriginalHttpResponse nextResponse = ApiExecutor.sendRequest(nextApi.getRequest(), true, testingRunConfig, false, new ArrayList<>());
+                                                loggerMaker.infoAndAddToDb("cleanUpTestArtifacts: RESPONSE headers: " + nextApi.getResponse().getHeaders());
+                                                loggerMaker.infoAndAddToDb("cleanUpTestArtifacts: RESPONSE body: " + nextResponse.getBody());
+                                                loggerMaker.infoAndAddToDb("cleanUpTestArtifacts: RESPONSE status code: " + nextResponse.getStatusCode());
+
+                                                if(nextResponse.getStatusCode() < 300) {
+                                                    if(cleanedUpRequests.get(apiInfoKey) != null) {
+                                                        cleanedUpRequests.get(apiInfoKey).add(cleanUpApiInfoKey);
+                                                    } else {
+                                                        cleanedUpRequests.put(apiInfoKey, Arrays.asList(cleanUpApiInfoKey));
+                                                    }
+                                                }
+
+                                            } catch (Exception e) {
+                                                e.printStackTrace();
+                                                loggerMaker.errorAndAddToDb(e,
+                                                        "exception in sending api request for cleanup"
+                                                                + e.getMessage());
+                                            }
+                                        }
+                                    }
+                                } else {
+                                    loggerMaker.infoAndAddToDb(String.format(
+                                            "cleanUpTestArtifacts: dependency nodes not found for %s %s %s %s",
+                                            String.valueOf(apiInfoKey.getApiCollectionId()), apiInfoKey.getUrl(),
+                                            apiInfoKey.getMethod().name(), "POST"));
+                                }
+
+                                break;
+                            // TODO: implement for other methods
+                            case PATCH:
+
+                                break;
+                            case DELETE:
+
+                                break;
+
+                            case GET:    
+                            default:
+                                break;
+                        }
+                    }
+                }
+            }
+        }        
+
+        return cleanedUpRequests;
+    }
+
+    public Confidence getConfidenceForTests(TestConfig testConfig, YamlTestTemplate template) {
+        Confidence someConfidence = null;
+        if (testConfig.getDynamicSeverityList() != null) {
+            for (SeverityParserResult temp : testConfig.getDynamicSeverityList()) {
+                if (temp.getCheck() != null) {
+                    FilterNode filterNode = temp.getCheck().getNode();
+                    template.setFilterNode(filterNode);
+                    boolean res = template.filter();
+                    if (res) {
+                        try {
+                            return Confidence.valueOf(temp.getSeverity());
+                        } catch (Exception e) {
+                        }
+                    }
+                } else {
+                    /*
+                     * Default value has no check condition.
+                     */
+                    someConfidence = Confidence.valueOf(temp.getSeverity());
+                }
+            }
+        }
+        return someConfidence;
     }
 
     public boolean filterGraphQlPayload(RawApi rawApi, ApiInfo.ApiInfoKey apiInfoKey) throws Exception {

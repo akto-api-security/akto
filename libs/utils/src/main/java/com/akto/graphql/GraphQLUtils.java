@@ -10,7 +10,8 @@ import graphql.util.TraverserContext;
 import graphql.util.TreeTransformerUtil;
 import graphql.validation.DocumentVisitor;
 import graphql.validation.LanguageTraversal;
-import org.mortbay.util.ajax.JSON;
+import com.alibaba.fastjson2.JSON;
+import com.alibaba.fastjson2.JSONObject;
 
 import java.util.*;
 
@@ -103,7 +104,8 @@ public class GraphQLUtils {//Singleton class
         Map mapOfRequestPayload = null;
         Object[] listOfRequestPayload = null;
         try {
-            Object obj = JSON.parse(requestPayload);
+            JSONObject jsonObject = JSON.parseObject(requestPayload);
+            Object obj = (Object)jsonObject;
             if (obj instanceof Map) {
                 mapOfRequestPayload = (Map) obj;
             } else if (obj instanceof Object[]) {
@@ -304,7 +306,7 @@ public class GraphQLUtils {//Singleton class
                                 hashMap.put(GraphQLUtils.QUERY + key, map.get(key));
                             }
                             hashMap.remove(GraphQLUtils.QUERY);
-                            httpResponseParamsCopy.requestParams.setPayload(JSON.toString(hashMap));
+                            httpResponseParamsCopy.requestParams.setPayload(JSON.toJSONString(hashMap));
                             responseParamsList.add(httpResponseParamsCopy);
                         } catch (Exception e) {
                             //eat exception, No changes to request payload, parse Exception

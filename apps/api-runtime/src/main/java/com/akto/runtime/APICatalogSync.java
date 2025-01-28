@@ -6,10 +6,14 @@ import java.util.regex.Pattern;
 
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
+import com.akto.dao.monitoring.FilterYamlTemplateDao;
+import com.akto.dao.runtime_filters.AdvancedTrafficFiltersDao;
 import com.akto.dao.filter.MergedUrlsDao;
 import com.akto.dto.*;
 import com.akto.dto.billing.SyncLimit;
 import com.akto.dto.dependency_flow.DependencyFlow;
+import com.akto.dto.monitoring.FilterConfig;
+import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.filter.MergedUrls;
 import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.SampleData;
@@ -65,6 +69,7 @@ public class APICatalogSync {
     public Map<SensitiveParamInfo, Boolean> sensitiveParamInfoBooleanMap;
     public static boolean mergeAsyncOutside = true;
     public BloomFilter<CharSequence> existingAPIsInDb = BloomFilter.create(Funnels.stringFunnel(Charsets.UTF_8), 1_000_000, 0.001 );
+    public Map<String, FilterConfig> advancedFilterMap =  new HashMap<>();
 
     public static Set<MergedUrls> mergedUrls;
 
@@ -1565,7 +1570,8 @@ public class APICatalogSync {
             this.delta = new HashMap<>();
         }
 
-
+        List<YamlTemplate> advancedFilterTemplates = AdvancedTrafficFiltersDao.instance.findAll(Filters.ne(YamlTemplate.INACTIVE, true));
+        advancedFilterMap = FilterYamlTemplateDao.instance.fetchFilterConfig(false, advancedFilterTemplates, true);
         try {
             // fetchAllSTI check added to make sure only runs in dashboard
             if (!fetchAllSTI) {

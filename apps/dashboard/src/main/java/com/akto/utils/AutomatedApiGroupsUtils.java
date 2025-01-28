@@ -14,7 +14,6 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-import com.akto.listener.InitializerListener;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVRecord;
@@ -50,18 +49,22 @@ public class AutomatedApiGroupsUtils {
     public static final int UPDATE_BATCH_SIZE = 100;
     public static final int DELETE_BATCH_SIZE = 100;
 
-    public static List<CSVRecord> fetchGroups() {
+    public static List<CSVRecord> fetchGroups(Boolean updateGroups) {
         GithubSync githubSync = new GithubSync();
         GithubFile githubFile = githubSync.syncFile("akto-api-security/akto","automated-api-groups/automated-api-groups.csv", null, null);
         String groupsCsvContent = null;
 
         if (githubFile == null) {
-            // Use the local file as a fallback only for the initial creation of the automated groups
-            try {
-                String resourceName = "automated-api-groups.csv";
-                groupsCsvContent = InitializerListener.convertStreamToString(InitializerListener.class.getResourceAsStream("/" + resourceName));
-            } catch (Exception ex) {
-                loggerMaker.errorAndAddToDb(ex, String.format("Error while loading automated groups csv file. Error: %s", ex.getMessage()), LogDb.DASHBOARD);
+            if (!updateGroups) {
+                // Use the local file as a fallback only for the initial creation of the automated groups
+                try {
+                    String resourceName = "automated-api-groups/automated-api-groups.csv";
+                    byte[] fileBytes = Files.readAllBytes(Paths.get(resourceName));
+                    String fileContent = new String(fileBytes, StandardCharsets.UTF_8);
+                    groupsCsvContent = fileContent;
+                } catch (Exception ex) {
+                    loggerMaker.errorAndAddToDb(ex, String.format("Error while loading automated groups csv file. Error: %s", ex.getMessage()), LogDb.DASHBOARD);
+                }
             }
         } else {
             groupsCsvContent = githubFile.getContent();

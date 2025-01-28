@@ -1,10 +1,9 @@
 import React, { useEffect, useState } from 'react'
+import GithubSimpleTable from '../../../components/tables/GithubSimpleTable'
 import transform from '../transform'
 import func from '@/util/func'
 import api from '../api'
-import { IndexTable, useIndexResourceState, LegacyCard, HorizontalStack, Pagination } from '@shopify/polaris'
-import { GithubRow } from '../../../components/tables/rows/GithubRow'
-import observeFunc from "../../observe/transform"
+import { IndexFiltersMode } from '@shopify/polaris'
 
 function SummaryTable({testingRunResultSummaries}) {
 
@@ -30,8 +29,10 @@ function SummaryTable({testingRunResultSummaries}) {
         },
     ]
 
-    const pageLimit = 10
-    const [page, setPage] = useState(0)
+    const resourceName = {
+        singular: 'summary',
+        plural: 'summaries',
+    };
 
     const promotedBulkActions = (selectedTestRuns) => { 
         return [
@@ -49,84 +50,21 @@ function SummaryTable({testingRunResultSummaries}) {
         setData(transform.prettifySummaryTable(testingRunResultSummaries))
     },[testingRunResultSummaries])
 
-    const resourceIDResolver = (data) => {
-        return data.id;
-    };
-
-    const { selectedResources, allResourcesSelected, handleSelectionChange } =
-    useIndexResourceState(data, {
-      resourceIDResolver,
-    });
-
-    let tmp = data && data.length <= pageLimit ? data :
-    data.slice(page * pageLimit, Math.min((page + 1) * pageLimit, data.length))
-    let rowMarkup = tmp
-        .map(
-        (
-            data,
-            index,
-        ) => (
-            <GithubRow
-                key={data.id}
-                id={data.id}
-                dataObj={data}
-                index={index}
-                headers={headers}
-                page={page}
-                newRow={true}
-                headings={headers}
-                selectedResources={selectedResources}
-            />
-        ),
-    );
-
-    const onPageNext = () => {
-        setPage((page) => (page + 1));
-    }
-
-    const onPagePrevious = () => {
-        setPage((page) => (page - 1));
-    }
-    const total = data.length
-    let tableClass =  "new-table removeHeaderColor condensed-row" 
-
     return (
-        <div className={tableClass}>
-            <LegacyCard>
-                <LegacyCard.Section flush>
-                    <IndexTable
-                        headings={headers}
-                        resourceName={{ singular: 'summary', plural: 'summaries' }}
-                        hasZebraStriping={true}
-                        itemCount={total}
-                        selectedItemsCount={
-                            allResourcesSelected ? 'All' : selectedResources.length
-                        }
-                        promotedBulkActions={promotedBulkActions(selectedResources)}
-                        onSelectionChange={handleSelectionChange}
-                    >
-                        {rowMarkup}
-                    </IndexTable>
-                </LegacyCard.Section>
-                <LegacyCard.Section>
-                    <HorizontalStack
-                        align="center">
-                        <Pagination
-                            label={
-                                total === 0 ? 'No data found' :
-                                    <div data-testid="pagination-label">
-                                        {`Showing ${observeFunc.formatNumberWithCommas(page * pageLimit + Math.min(1, total))}-${observeFunc.formatNumberWithCommas(Math.min((page + 1) * pageLimit, total))} of ${observeFunc.formatNumberWithCommas(total)}`}
-                                    </div>
-                            }
-                            hasPrevious={page > 0}
-                            onPrevious={onPagePrevious}
-                            hasNext={total > (page + 1) * pageLimit}
-                            onNext={onPageNext}
-                        />
-                    </HorizontalStack>
-                    </LegacyCard.Section>
-            </LegacyCard>
-        </div>
+        <GithubSimpleTable
+            hasZebraStriping={true}
+            headers={headers}
+            pageLimit={10}
+            data={data}
+            selectable={true}
+            resourceName={resourceName}
+            filters={[]}
+            promotedBulkActions={promotedBulkActions}
+            mode={IndexFiltersMode.Default}
+            headings={headers}
+            useNewRow={true}
+            condensedHeight={true}
+        />
     )
 }
 

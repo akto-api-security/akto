@@ -37,15 +37,27 @@ export default function Header() {
     const searchItemsArr = func.getSearchItemsArr(allRoutes, allCollections)
 
     const setCurrentTestingRuns = TestingStore(state => state.setCurrentTestingRuns)
-    const [intervalId, setIntervalId] = useState(null);
+    
+    const fetchTestingStatus = () => {
+        setInterval(()=> {
+            testingApi.fetchTestingRunStatus().then((resp) => {
+                setCurrentTestingRuns(resp.currentRunningTestsStatus)
+                setCurrentTestsObj({
+                    totalTestsInitiated: resp?.testRunsScheduled || 0,
+                    totalTestsCompleted: resp?.totalTestsCompleted || 0,
+                    totalTestsQueued: resp?.testRunsQueued || 0,
+                    testRunsArr: resp?.currentRunningTestsStatus || []
+                })
+            })
+        },2000)
+    }
 
     const toggleIsUserMenuOpen = useCallback(
         () => setIsUserMenuOpen((isUserMenuOpen) => !isUserMenuOpen),
         [],
     );
 
-    const handleLogOut = async () => { 
-        clearInterval(intervalId)
+    const handleLogOut = async () => {        
         api.logout().then(res => {
             resetAll();
             storeAccessToken(null)
@@ -238,28 +250,8 @@ export default function Header() {
     );
 
     useEffect(() => {
-        const fetchTestingStatus = () => {
-            const id = setInterval(() => {
-                testingApi.fetchTestingRunStatus().then((resp) => {
-                    setCurrentTestingRuns(resp.currentRunningTestsStatus);
-                    setCurrentTestsObj({
-                        totalTestsInitiated: resp?.testRunsScheduled || 0,
-                        totalTestsCompleted: resp?.totalTestsCompleted || 0,
-                        totalTestsQueued: resp?.testRunsQueued || 0,
-                        testRunsArr: resp?.currentRunningTestsStatus || []
-                    });
-                });
-            }, 2000);
-            setIntervalId(id); 
-        };
-
-        fetchTestingStatus();
-
-        return () => {
-            clearInterval(intervalId);
-        };
-    }, []);
-
+        fetchTestingStatus()
+    },[])
 
     return (
         topBarMarkup

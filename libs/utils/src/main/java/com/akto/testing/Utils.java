@@ -1,7 +1,12 @@
 package com.akto.testing;
 
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -9,16 +14,29 @@ import javax.script.ScriptEngine;
 import javax.script.ScriptEngineManager;
 import javax.script.ScriptException;
 
+import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.OriginalHttpRequest;
+import com.akto.dto.RawApi;
+import com.akto.dto.CollectionConditions.ConditionsType;
+import com.akto.dto.test_editor.DataOperandsFilterResponse;
+import com.akto.dto.test_editor.FilterNode;
+import com.akto.dto.test_editor.Util;
 import com.akto.dto.testing.WorkflowUpdatedSampleData;
 import com.akto.dto.type.RequestTemplate;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.test_editor.filter.Filter;
+import com.akto.test_editor.filter.data_operands_impl.ValidationResult;
 import com.akto.util.JSONUtils;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 
 import okhttp3.MediaType;
+
+import static com.akto.runtime.RuntimeUtil.extractAllValuesFromPayload;
+import static com.akto.test_editor.Utils.deleteKeyFromPayload;
+import static com.akto.test_editor.execution.Operations.deleteCookie;
+import static com.akto.test_editor.execution.Operations.modifyCookie;
 
 public class Utils {
 
@@ -200,7 +218,7 @@ public class Utils {
 
 
     public static String replaceVariables(String payload, Map<String, Object> valuesMap, boolean escapeString) throws Exception {
-        String regex = "\\$\\{(x\\d+\\.[\\w\\-\\[\\].]+|AKTO\\.changes_info\\..*?)\\}"; 
+        String regex = "\\$\\{((x|step)\\d+\\.[\\w\\-\\[\\].]+|AKTO\\.changes_info\\..*?)\\}"; 
         Pattern p = Pattern.compile(regex);
 
         // replace with values
@@ -211,8 +229,13 @@ public class Utils {
             if (key == null) continue;
             Object obj = valuesMap.get(key);
             if (obj == null) {
-                loggerMaker.errorAndAddToDb("couldn't find: " + key, LogDb.TESTING);
-                throw new Exception("Couldn't find " + key);
+                if (key.toLowerCase().startsWith("x0.unique_")) {
+                    String suffix = key.substring(key.toLowerCase().indexOf("_")+1);
+                    obj = suffix+"_"+System.nanoTime();
+                } else {
+                    loggerMaker.errorAndAddToDb("couldn't find: " + key, LogDb.TESTING);
+                    throw new Exception("Couldn't find " + key);
+                }
             }
             String val = obj.toString();
             if (escapeString) {
@@ -292,5 +315,191 @@ public class Utils {
         }
     }
 
-    
+
+    public static double compareWithOriginalResponse(String originalPayload, String currentPayload, Map<String, Boolean> comparisonExcludedKeys) {
+        if (originalPayload == null && currentPayload == null) return 100;
+        if (originalPayload == null || currentPayload == null) return 0;
+
+        String trimmedOriginalPayload = originalPayload.trim();
+        String trimmedCurrentPayload = currentPayload.trim();
+        if (trimmedCurrentPayload.equals(trimmedOriginalPayload)) return 100;
+
+        Map<String, Set<String>> originalResponseParamMap = new HashMap<>();
+        Map<String, Set<String>> currentResponseParamMap = new HashMap<>();
+        try {
+            extractAllValuesFromPayload(originalPayload, originalResponseParamMap);
+            extractAllValuesFromPayload(currentPayload, currentResponseParamMap);
+        } catch (Exception e) {
+            return 0.0;
+        }
+
+        if (originalResponseParamMap.keySet().size() == 0 && currentResponseParamMap.keySet().size() == 0) {
+            return 100.0;
+        }
+
+        Set<String> visited = new HashSet<>();
+        int matched = 0;
+        for (String k1: originalResponseParamMap.keySet()) {
+            if (visited.contains(k1) || comparisonExcludedKeys.containsKey(k1)) continue;
+            visited.add(k1);
+            Set<String> v1 = originalResponseParamMap.get(k1);
+            Set<String> v2 = currentResponseParamMap.get(k1);
+            if (Objects.equals(v1, v2)) matched +=1;
+        }
+
+        for (String k1: currentResponseParamMap.keySet()) {
+            if (visited.contains(k1) || comparisonExcludedKeys.containsKey(k1)) continue;
+            visited.add(k1);
+            Set<String> v1 = originalResponseParamMap.get(k1);
+            Set<String> v2 = currentResponseParamMap.get(k1);
+            if (Objects.equals(v1, v2)) matched +=1;
+        }
+
+        int visitedSize = visited.size();
+        if (visitedSize == 0) return 0.0;
+
+        double result = (100.0*matched)/visitedSize;
+
+        if (Double.isFinite(result)) {
+            return result;
+        } else {
+            return 0.0;
+        }
+
+    }
+
+    public static ValidationResult validateFilter(FilterNode filterNode, RawApi rawApi, ApiInfoKey apiInfoKey, Map<String, Object> varMap, String logId) {
+        if (filterNode == null) return new ValidationResult(true, "");
+        if (rawApi == null) return  new ValidationResult(true, "raw api is null");
+        return validate(filterNode, rawApi, null, apiInfoKey,"filter", varMap, logId);
+    }
+
+    private static ValidationResult validate(FilterNode node, RawApi rawApi, RawApi testRawApi, ApiInfoKey apiInfoKey, String context, Map<String, Object> varMap, String logId) {
+        Filter filter = new Filter();
+        DataOperandsFilterResponse dataOperandsFilterResponse = filter.isEndpointValid(node, rawApi, testRawApi, apiInfoKey, null, null , false,context, varMap, logId, false);
+        return new ValidationResult(dataOperandsFilterResponse.getResult(), dataOperandsFilterResponse.getValidationReason());
+    }
+
+    public static void modifyBodyOperations(OriginalHttpRequest httpRequest, List<ConditionsType> modifyOperations, List<ConditionsType> addOperations, List<ConditionsType> deleteOperations){
+        String oldReqBody = httpRequest.getBody();
+        if(oldReqBody == null || oldReqBody.isEmpty()){
+            return ;
+        }
+        BasicDBObject payload;
+
+        if (oldReqBody != null && oldReqBody.startsWith("[")) {
+            oldReqBody = "{\"json\": "+oldReqBody+"}";
+        }
+        try {
+            payload = BasicDBObject.parse(oldReqBody);
+        } catch (Exception e) {
+            payload = new BasicDBObject();
+        }
+
+        if(!modifyOperations.isEmpty()){
+            for(ConditionsType condition : modifyOperations){
+                Object value = condition.getValue();
+                try {
+                    value = replaceVariables(value.toString(), new HashMap<>(), false);
+                } catch (Exception e) {
+                    ;
+                }
+                Util.modifyValueInPayload(payload, null, condition.getKey(), value);
+            }
+        }
+        if(!addOperations.isEmpty()){
+            for(ConditionsType condition : addOperations){
+                payload.put(condition.getKey(), condition.getValue());
+            }
+        }
+
+        if(!deleteOperations.isEmpty()){
+            for(ConditionsType condition : deleteOperations){
+                deleteKeyFromPayload(payload, null, condition.getKey());
+            }
+        }
+
+        String payloadStr = payload.toJson();
+
+        if (payload.size() == 1 && payload.containsKey("json")) {
+            Object jsonValue = payload.get("json");
+            if (jsonValue instanceof BasicDBList) {
+                payloadStr = payload.get("json").toString();
+            }
+        }
+
+
+        httpRequest.setBody(payloadStr);
+    }
+
+    public static void modifyHeaderOperations(OriginalHttpRequest httpRequest, List<ConditionsType> modifyOperations, List<ConditionsType> addOperations, List<ConditionsType> deleteOperations){
+        Map<String, List<String>> reqHeaders = httpRequest.getHeaders();
+
+        if(!addOperations.isEmpty()){
+            for(ConditionsType condition : addOperations){
+                List<String> valList = Collections.singletonList(condition.getValue());
+                reqHeaders.put(condition.getKey(), valList);
+            }
+        }
+
+        if(!deleteOperations.isEmpty()){
+            for(ConditionsType condition : deleteOperations){
+                String key = condition.getKey();
+                deleteCookie(reqHeaders, key, null);
+                if (reqHeaders.containsKey(key)) {
+                    reqHeaders.remove(key);
+                }
+            }
+        }
+
+        if(!modifyOperations.isEmpty()){
+            for(ConditionsType condition : modifyOperations){
+                String key = condition.getKey();
+                modifyCookie(reqHeaders, key, condition.getValue());
+                List<String> valList = Collections.singletonList(condition.getValue());
+                reqHeaders.put(condition.getKey(), valList);
+            }
+        }
+        
+        
+    }
+
+    public static void modifyQueryOperations(OriginalHttpRequest httpRequest, List<ConditionsType> modifyOperations, List<ConditionsType> addOperations, List<ConditionsType> deleteOperations){
+
+        // since this is being used with payload conditions, we are not supporting any add operations, operations are done only on existing query keys
+
+        String query = httpRequest.getQueryParams();
+        if(query == null || query.isEmpty()){
+            return ;
+        }
+
+        BasicDBObject queryParamObj = RequestTemplate.getQueryJSON(httpRequest.getUrl() + "?" + query);
+
+        if(!modifyOperations.isEmpty()){
+            for(ConditionsType condition : modifyOperations){
+                if(queryParamObj.containsKey(condition.getKey())){
+                    queryParamObj.put(condition.getKey(), condition.getValue());
+                }
+            }
+        }
+
+
+        if(!deleteOperations.isEmpty()){
+            for(ConditionsType condition : deleteOperations){
+                if(queryParamObj.containsKey(condition.getKey())){
+                    queryParamObj.remove(condition.getKey());
+                }
+            }
+        } 
+        
+        String queryParams = "";
+        for (String key: queryParamObj.keySet()) {
+            queryParams +=  (key + "=" + queryParamObj.get(key) + "&");
+        }
+        if (queryParams.length() > 0) {
+            queryParams = queryParams.substring(0, queryParams.length() - 1);
+        }
+
+        httpRequest.setQueryParams(queryParams);
+    }
 }

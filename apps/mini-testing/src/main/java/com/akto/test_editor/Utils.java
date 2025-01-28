@@ -79,6 +79,17 @@ public class Utils {
                         return true;
                     }
                 }
+
+                if (value instanceof BasicDBList && key.equalsIgnoreCase(queryKey)) {
+                    BasicDBList valList = (BasicDBList) value;
+                    if (valList.size() == 0
+                            || !((valList.get(0) instanceof BasicDBObject)
+                                    || (valList.get(0) instanceof BasicDBList))) {
+                        basicDBObject.remove(key);
+                        return true;
+                    }
+                }
+
                 res = deleteKeyFromPayload(value, key, queryKey);
                 if (res) {
                     break;

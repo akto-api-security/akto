@@ -17,7 +17,6 @@ public class Account {
     private boolean mergingRunning = false;
 
     private int mergingInitiateTs = 0;
-
     public Account() {}
 
     public Account(int id, String name) {
@@ -97,11 +96,12 @@ public class Account {
         this.hybridSaasAccount = hybridSaasAccount;
     }
 
-    public boolean getHybridTestingEnabled() {
+    public boolean isHybridTestingEnabled() {
         return hybridTestingEnabled;
     }
 
     public void setHybridTestingEnabled(boolean hybridTestingEnabled) {
         this.hybridTestingEnabled = hybridTestingEnabled;
     }
+
 }

@@ -1,6 +1,7 @@
 package com.akto.testing_issues;
 
 import com.akto.dao.context.Context;
+import com.akto.dao.testing.TestingRunResultSummariesDao;
 import com.akto.dao.testing.sources.TestSourceConfigsDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.data_actor.DataActor;
@@ -21,6 +22,7 @@ import com.akto.util.enums.GlobalEnums.TestRunIssueStatus;
 import com.mongodb.bulk.BulkWriteResult;
 import com.mongodb.client.model.*;
 import org.bson.conversions.Bson;
+import org.bson.types.ObjectId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -149,22 +151,43 @@ public class TestingIssuesHandler {
                                                            Map<TestingIssuesId, TestingRunResult> testingIssuesIdsMap,
                                                            List<TestingRunIssues> testingRunIssuesList) {
         int lastSeen = Context.now();
-        testingIssuesIdsMap.forEach((testingIssuesId, runResult) -> {
+        Map<String, Integer> countIssuesMap = new HashMap<>();
+        countIssuesMap.put(Severity.HIGH.toString(), 0);
+        countIssuesMap.put(Severity.MEDIUM.toString(), 0);
+        countIssuesMap.put(Severity.LOW.toString(), 0);
+
+        ObjectId summaryId = null;
+
+        for(TestingIssuesId testingIssuesId : testingIssuesIdsMap.keySet()) {
+            TestingRunResult runResult = testingIssuesIdsMap.get(testingIssuesId);
             boolean doesExists = false;
+            boolean shouldCountIssue = false;
+
+            if (summaryId == null) {
+                summaryId = runResult.getTestRunResultSummaryId();
+            }
+
             for (TestingRunIssues testingRunIssues : testingRunIssuesList) {
                 if (testingRunIssues.getId().equals(testingIssuesId)) {
                     doesExists = true;
+                    if(testingRunIssues.getTestRunIssueStatus().equals(TestRunIssueStatus.OPEN)) {
+                        shouldCountIssue = true;
+                    }
                     break;
                 }
             }
-            if (!doesExists && runResult.isVulnerable()) {
+            if (runResult.isVulnerable()) {
                 Severity severity = TestExecutor.getSeverityFromTestingRunResult(runResult);
                 Map<String, Object> filterMap = new HashMap<>();
                 filterMap.put(ID, testingIssuesId);
                 ArrayList<String> updates = new ArrayList<>();
                 UpdatePayload updatePayload = new UpdatePayload(TestingRunIssues.KEY_SEVERITY, severity.name(), SET_OPERATION);
                 updates.add(updatePayload.toString());
-                updatePayload = new UpdatePayload(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.OPEN.name(), SET_OPERATION);
+                if(!doesExists || shouldCountIssue){
+                    updatePayload = new UpdatePayload(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.OPEN.name(), SET_OPERATION);
+                    int count = countIssuesMap.getOrDefault(severity.name(), 0);
+                    countIssuesMap.put(severity.name(), count + 1);      
+                }
                 updates.add(updatePayload.toString());
                 updatePayload = new UpdatePayload(TestingRunIssues.CREATION_TIME, lastSeen, SET_OPERATION);
                 updates.add(updatePayload.toString());
@@ -172,7 +195,7 @@ public class TestingIssuesHandler {
                 updates.add(updatePayload.toString());
                 updatePayload = new UpdatePayload(TestingRunIssues.LAST_UPDATED, lastSeen, SET_OPERATION);
                 updates.add(updatePayload.toString());
-                updatePayload = new UpdatePayload(TestingRunIssues.UNREAD, false, SET_OPERATION);
+                updatePayload = new UpdatePayload(TestingRunIssues.UNREAD, true, SET_OPERATION);
                 updates.add(updatePayload.toString());
                 updatePayload = new UpdatePayload(TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_HEX_ID, runResult.getTestRunResultSummaryId().toHexString(), SET_OPERATION);
                 updates.add(updatePayload.toString());
@@ -184,7 +207,13 @@ public class TestingIssuesHandler {
                 writeModelList.add(new BulkUpdates(filterMap, updates));
                 loggerMaker.infoAndAddToDb(String.format("Inserting the id %s , with summary Id as %s", testingIssuesId, runResult.getTestRunResultSummaryId()), LogDb.TESTING);
             }
-        });
+        }
+
+        if(summaryId != null){
+            // update testing run result summary here
+            dataActor.updateIssueCountInSummary(summaryId.toHexString(), countIssuesMap, "increment");
+            loggerMaker.infoAndAddToDb(String.format("Increasing the issues count map with summary id %s , HIGH: %d, MEDIUM: %d, LOW: %d", summaryId.toHexString(),countIssuesMap.get("HIGH"), countIssuesMap.get("MEDIUM"), countIssuesMap.get("LOW")), LogDb.TESTING);
+        }
     }
 
     public void handleIssuesCreationFromTestingRunResults(List<TestingRunResult> testingRunResultList, boolean triggeredByTestEditor) {

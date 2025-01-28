@@ -55,7 +55,7 @@ function TestrunsBannerComponent({isInventory,onButtonClick}) {
     return (
         <BannerLayout
             title={"Test your APIs"}
-            text={"400+ built-in tests covering OWASP Top 10, HackerOne top 10 and all the business logic vulnerabilities for your API Security testing needs."}
+            text={"150+ built-in tests covering OWASP Top 10, HackerOne top 10 and all the business logic vulnerabilities for your API Security testing needs."}
             videoLength={TESTING_VIDEO_LENGTH}
             // videoLink={TESTING_VIDEO_URL}
             videoThumbnail={TESTING_VIDEO_THUMBNAIL}

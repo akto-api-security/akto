@@ -32,7 +32,7 @@ public class Token {
                 Calendar.MINUTE,
                 15
         );
-        
+
     }
     
     public Token(String refreshToken) throws NoSuchAlgorithmException, InvalidKeySpecException, IOException {

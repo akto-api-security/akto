@@ -419,9 +419,7 @@ public class Main {
                             Updates.set(TestingRun.SCHEDULE_TIMESTAMP, testingRun.getScheduleTimestamp() + 5 * 60)
                     );
                 }
-
                 if(GetRunningTestsStatus.getRunningTests().isTestRunning(testingRun.getId())){
-                    loggerMaker.infoAndAddToDb("Updating status of running test to Completed.");
                     TestingRunDao.instance.getMCollection().findOneAndUpdate(
                             Filters.eq("_id", testingRun.getId()),  completedUpdate
                     );
@@ -635,9 +633,7 @@ public class Main {
                 testingRun.getHexId(),
                 summaryId.toHexString()
         );
-        if (testingRun.getSendSlackAlert()) {
-            SlackSender.sendAlert(accountId, apiTestStatusAlert);
-        }
+        SlackSender.sendAlert(accountId, apiTestStatusAlert);
 
         AktoMixpanel aktoMixpanel = new AktoMixpanel();
         aktoMixpanel.sendEvent(distinct_id, "Test executed", props);
