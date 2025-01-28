@@ -35,8 +35,8 @@ import com.akto.notifications.slack.SlackSender;
 import com.akto.rules.RequiredConfigs;
 import com.akto.task.Cluster;
 import com.akto.test_editor.execution.Executor;
-import com.akto.testing.testing_with_kafka.TestingConsumer;
-import com.akto.testing.testing_with_kafka.TestingProducer;
+import com.akto.testing.kafka_utils.ConsumerUtil;
+import com.akto.testing.kafka_utils.Producer;
 import com.akto.util.AccountTask;
 import com.akto.util.Constants;
 import com.akto.util.DashboardMode;
@@ -346,8 +346,8 @@ public class Main {
 
         loggerMaker.infoAndAddToDb("Starting.......", LogDb.TESTING);
 
-        TestingProducer testingProducer = new TestingProducer();
-        TestingConsumer testingConsumer = new TestingConsumer();
+        Producer testingProducer = new Producer();
+        ConsumerUtil testingConsumer = new ConsumerUtil();
         TestCompletion testCompletion = new TestCompletion();
         if(Constants.IS_NEW_TESTING_ENABLED){
             testingConsumer.initializeConsumer();
@@ -362,43 +362,47 @@ public class Main {
         }
 
         if(currentTestInfo != null){
-            int accountId = Context.accountId.get();
-            loggerMaker.infoAndAddToDb("Tests were already running on this machine, thus resuming the test for account: "+ accountId, LogDb.TESTING);
-            FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccess(accountId, MetricTypes.TEST_RUNS);
-            
+            try {
+                int accountId = Context.accountId.get();
+                loggerMaker.infoAndAddToDb("Tests were already running on this machine, thus resuming the test for account: "+ accountId, LogDb.TESTING);
+                FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccess(accountId, MetricTypes.TEST_RUNS);
+                
 
-            String testingRunId = currentTestInfo.getString("testingRunId");
-            String testingRunSummaryId = currentTestInfo.getString("summaryId");
-            TestingRun testingRun = TestingRunDao.instance.findOne(Filters.eq(Constants.ID, new ObjectId(testingRunId)));
-            TestingRunConfig baseConfig = TestingRunConfigDao.instance.findOne(Constants.ID, testingRun.getTestIdConfig());
-            testingRun.setTestingRunConfig(baseConfig);
-            ObjectId summaryId = new ObjectId(testingRunSummaryId);
-            testingProducer.initProducer(testingRun, summaryId, featureAccess.fetchSyncLimit(), true);
-            int maxRunTime = testingRun.getTestRunTime() <= 0 ? 30*60 : testingRun.getTestRunTime();
-            testingConsumer.init(maxRunTime);
+                String testingRunId = currentTestInfo.getString("testingRunId");
+                String testingRunSummaryId = currentTestInfo.getString("summaryId");
+                TestingRun testingRun = TestingRunDao.instance.findOne(Filters.eq(Constants.ID, new ObjectId(testingRunId)));
+                TestingRunConfig baseConfig = TestingRunConfigDao.instance.findOne(Constants.ID, testingRun.getTestIdConfig());
+                testingRun.setTestingRunConfig(baseConfig);
+                ObjectId summaryId = new ObjectId(testingRunSummaryId);
+                testingProducer.initProducer(testingRun, summaryId, featureAccess.fetchSyncLimit(), true);
+                int maxRunTime = testingRun.getTestRunTime() <= 0 ? 30*60 : testingRun.getTestRunTime();
+                testingConsumer.init(maxRunTime);
 
-            // mark the test completed here
-            testCompletion.markTestAsCompleteAndRunFunctions(testingRun, summaryId);
+                // mark the test completed here
+                testCompletion.markTestAsCompleteAndRunFunctions(testingRun, summaryId);
 
-            if (StringUtils.hasLength(AKTO_SLACK_WEBHOOK) ) {
-                try {
-                    CustomTextAlert customTextAlert = new CustomTextAlert("Test completed for accountId=" + accountId + " testingRun=" + testingRun.getHexId() + " summaryId=" + summaryId.toHexString() + " : @Arjun you are up now. Make your time worth it. :)");
-                    SLACK_INSTANCE.send(AKTO_SLACK_WEBHOOK, customTextAlert.toJson());
-                } catch (Exception e) {
-                    logger.error("Error sending slack alert for completion of test", e);
+                if (StringUtils.hasLength(AKTO_SLACK_WEBHOOK) ) {
+                    try {
+                        CustomTextAlert customTextAlert = new CustomTextAlert("Test completed for accountId=" + accountId + " testingRun=" + testingRun.getHexId() + " summaryId=" + summaryId.toHexString() + " : @Arjun you are up now. Make your time worth it. :)");
+                        SLACK_INSTANCE.send(AKTO_SLACK_WEBHOOK, customTextAlert.toJson());
+                    } catch (Exception e) {
+                        logger.error("Error sending slack alert for completion of test", e);
+                    }
+                    
                 }
                 
-            }
-            
-            deleteScheduler.execute(() -> {
-                Context.accountId.set(accountId);
-                try {
-                    deleteNonVulnerableResults();
+                deleteScheduler.execute(() -> {
+                    Context.accountId.set(accountId);
+                    try {
+                        deleteNonVulnerableResults();
 
-                } catch (Exception e) {
-                    loggerMaker.errorAndAddToDb(e, "Error in deleting testing run results");
-                }
-            });
+                    } catch (Exception e) {
+                        loggerMaker.errorAndAddToDb(e, "Error in deleting testing run results");
+                    }
+                });
+            } catch (Exception e) {
+                logger.error("Error in running failed tests from file.", e);
+            }
         }
 
 

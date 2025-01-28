@@ -1,4 +1,4 @@
-package com.akto.testing.testing_with_kafka;
+package com.akto.testing.kafka_utils;
 
 
 import java.util.Map;
@@ -7,19 +7,19 @@ import com.akto.dto.test_editor.TestConfig;
 import com.akto.dto.testing.TestingRunConfig;
 import com.akto.store.TestingUtil;
 
-public class CommonSingletonForTesting {
+public class TestingConfigurations {
 
-    private static final CommonSingletonForTesting instance = new CommonSingletonForTesting();
+    private static final TestingConfigurations instance = new TestingConfigurations();
 
     private TestingUtil testingUtil;
     private TestingRunConfig testingRunConfig;
     private boolean debug;
     Map<String, TestConfig> testConfigMap;
 
-    private CommonSingletonForTesting() {
+    private TestingConfigurations() {
     }
 
-    public static CommonSingletonForTesting getInstance() {
+    public static TestingConfigurations getInstance() {
         return instance;
     }
 

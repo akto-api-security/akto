@@ -7,7 +7,7 @@ import org.bson.types.ObjectId;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.testing.TestingRunResult;
 
-public class TestMessages {
+public class SingleTestPayload {
 
     private ObjectId testingRunId;
     private ObjectId testingRunResultSummaryId;
@@ -16,7 +16,7 @@ public class TestMessages {
     private List<TestingRunResult.TestLog> testLogs;
     private int accountId;
 
-    public TestMessages (ObjectId testingRunId, ObjectId testingRunResultSummaryId, ApiInfoKey apiInfoKey, String subcategory, List<TestingRunResult.TestLog> testLogs, int accountId){
+    public SingleTestPayload (ObjectId testingRunId, ObjectId testingRunResultSummaryId, ApiInfoKey apiInfoKey, String subcategory, List<TestingRunResult.TestLog> testLogs, int accountId){
         this.testingRunId = testingRunId;
         this.testingRunResultSummaryId = testingRunResultSummaryId;
         this.apiInfoKey = apiInfoKey;

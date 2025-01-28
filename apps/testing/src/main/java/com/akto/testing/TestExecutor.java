@@ -30,7 +30,7 @@ import com.akto.dto.testing.*;
 import com.akto.dto.testing.TestResult.Confidence;
 import com.akto.dto.testing.TestResult.TestError;
 import com.akto.dto.testing.TestingRun.State;
-import com.akto.dto.testing.info.TestMessages;
+import com.akto.dto.testing.info.SingleTestPayload;
 import com.akto.dto.type.RequestTemplate;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
@@ -45,8 +45,8 @@ import com.akto.test_editor.execution.Build;
 import com.akto.test_editor.execution.Executor;
 import com.akto.test_editor.execution.VariableResolver;
 import com.akto.test_editor.filter.data_operands_impl.ValidationResult;
-import com.akto.testing.testing_with_kafka.CommonSingletonForTesting;
-import com.akto.testing.testing_with_kafka.TestingProducer;
+import com.akto.testing.kafka_utils.TestingConfigurations;
+import com.akto.testing.kafka_utils.Producer;
 import com.akto.testing.yaml_tests.YamlTestTemplate;
 import com.akto.testing_issues.TestingIssuesHandler;
 import com.akto.usage.UsageMetricCalculator;
@@ -274,7 +274,7 @@ public class TestExecutor {
         // }
 
         // init the singleton class here
-        CommonSingletonForTesting.getInstance().init(testingUtil, testingRun.getTestingRunConfig(), debug, testConfigMap);
+        TestingConfigurations.getInstance().init(testingUtil, testingRun.getTestingRunConfig(), debug, testConfigMap);
 
         if(!shouldInitOnly){
             int maxThreads = Math.min(testingRunSubCategories.size(), 1000);
@@ -302,7 +302,7 @@ public class TestExecutor {
                 List<String> messages = testingUtil.getSampleMessages().get(apiInfoKey);
                 if(Constants.IS_NEW_TESTING_ENABLED){
                     for (String testSubCategory: testingRunSubCategories) {
-                        Future<Void> future = threadPool.submit(() ->doJobForTest(accountId, testSubCategory, apiInfoKey, messages, summaryId, syncLimit, apiInfoKeyToHostMap, subCategoryEndpointMap, testConfigMap, testLogs, testingRun));
+                        Future<Void> future = threadPool.submit(() ->insertRecordInKafka(accountId, testSubCategory, apiInfoKey, messages, summaryId, syncLimit, apiInfoKeyToHostMap, subCategoryEndpointMap, testConfigMap, testLogs, testingRun));
                         testingRecords.add(future);
                     }
                     latch.countDown();
@@ -346,7 +346,7 @@ public class TestExecutor {
             for (String testSubCategory: testingRunSubCategories) {
                 loggerMaker.infoAndAddToDb("Trying to run test for category: " + testSubCategory + " with summary state: " + GetRunningTestsStatus.getRunningTests().getCurrentState(summaryId) );
                 if(GetRunningTestsStatus.getRunningTests().isTestRunning(summaryId, true)){
-                    doJobForTest(accountId, testSubCategory, apiInfoKey, messages, summaryId, syncLimit, apiInfoKeyToHostMap, subCategoryEndpointMap, testConfigMap, testLogs, testingRun);
+                    insertRecordInKafka(accountId, testSubCategory, apiInfoKey, messages, summaryId, syncLimit, apiInfoKeyToHostMap, subCategoryEndpointMap, testConfigMap, testLogs, testingRun);
                 }else{
                     logger.info("Test stopped for id: " + testingRun.getHexId());
                     break;
@@ -357,7 +357,7 @@ public class TestExecutor {
         return null;
     }
 
-    private Void doJobForTest(int accountId, String testSubCategory, ApiInfo.ApiInfoKey apiInfoKey,
+    private Void insertRecordInKafka(int accountId, String testSubCategory, ApiInfo.ApiInfoKey apiInfoKey,
             List<String> messages, ObjectId summaryId, SyncLimit syncLimit, Map<ApiInfoKey, String> apiInfoKeyToHostMap,
             ConcurrentHashMap<String, String> subCategoryEndpointMap, Map<String, TestConfig> testConfigMap,
             List<TestingRunResult.TestLog> testLogs, TestingRun testingRun) {
@@ -388,12 +388,12 @@ public class TestExecutor {
         }else if (Constants.IS_NEW_TESTING_ENABLED){
             // push data to kafka here and inside that call run test new function
             // create an object of TestMessage
-            TestMessages testMessages = new TestMessages(
+            SingleTestPayload singleTestPayload = new SingleTestPayload(
                 testingRun.getId(), summaryId, apiInfoKey, testSubType, testLogs, accountId
             );
             logger.info("Inserting record for apiInfoKey: " + apiInfoKey.toString() + " subcategory: " + testSubType);
             try {
-                TestingProducer.pushMessagesToKafka(Arrays.asList(testMessages));
+                Producer.pushMessagesToKafka(Arrays.asList(singleTestPayload));
             } catch (Exception e) {
                 e.printStackTrace();
                 return null;
@@ -401,7 +401,7 @@ public class TestExecutor {
             
         }else{
             if(GetRunningTestsStatus.getRunningTests().isTestRunning(summaryId, true)){
-                CommonSingletonForTesting instance = CommonSingletonForTesting.getInstance();
+                TestingConfigurations instance = TestingConfigurations.getInstance();
                 String sampleMessage = messages.get(messages.size() - 1);
                 testingRunResult = runTestNew(apiInfoKey, summaryId, instance.getTestingUtil(), summaryId, testConfig, instance.getTestingRunConfig(), instance.isDebug(), testLogs, sampleMessage);
                 insertResultsAndMakeIssues(Collections.singletonList(testingRunResult), summaryId);

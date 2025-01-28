@@ -1,4 +1,4 @@
-package com.akto.testing.testing_with_kafka;
+package com.akto.testing.kafka_utils;
 import static com.akto.testing.Utils.readJsonContentFromFile;
 import static com.akto.testing.Utils.writeJsonContentInFile;
 
@@ -25,7 +25,7 @@ import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.test_editor.TestConfig;
 import com.akto.dto.testing.TestingRunResult;
-import com.akto.dto.testing.info.TestMessages;
+import com.akto.dto.testing.info.SingleTestPayload;
 import com.akto.notifications.slack.CustomTextAlert;
 import com.akto.testing.Main;
 import com.akto.testing.TestExecutor;
@@ -41,14 +41,14 @@ import com.mongodb.WriteConcern;
 import io.confluent.parallelconsumer.ParallelConsumerOptions;
 import io.confluent.parallelconsumer.ParallelStreamProcessor;
 
-public class TestingConsumer {
+public class ConsumerUtil {
 
     static Properties properties = com.akto.runtime.utils.Utils.configProperties(Constants.LOCAL_KAFKA_BROKER_URL, Constants.AKTO_KAFKA_GROUP_ID_CONFIG, Constants.AKTO_KAFKA_MAX_POLL_RECORDS_CONFIG);
     static{
         properties.put(ConsumerConfig.MAX_POLL_INTERVAL_MS_CONFIG, 10000); 
     }
     private static Consumer<String, String> consumer = Constants.IS_NEW_TESTING_ENABLED ? new KafkaConsumer<>(properties) : null; 
-    private static final Logger logger = LoggerFactory.getLogger(TestingConsumer.class);
+    private static final Logger logger = LoggerFactory.getLogger(ConsumerUtil.class);
     public static ExecutorService executor = Executors.newFixedThreadPool(100);
 
     public void initializeConsumer() {
@@ -61,7 +61,7 @@ public class TestingConsumer {
         DaoInit.init(new ConnectionString(mongoURI), readPreference, writeConcern);
     }
 
-    public static TestMessages parseTestMessage(String message) {
+    public static SingleTestPayload parseTestMessage(String message) {
         JSONObject jsonObject = JSON.parseObject(message);
         ObjectId testingRunId = new ObjectId(jsonObject.getString("testingRunId"));
         ObjectId testingRunResultSummaryId = new ObjectId(jsonObject.getString("testingRunResultSummaryId"));
@@ -69,26 +69,26 @@ public class TestingConsumer {
         String subcategory = jsonObject.getString("subcategory");
         List<TestingRunResult.TestLog> testLogs = JSON.parseArray(jsonObject.getString("testLogs"), TestingRunResult.TestLog.class);
         int accountId = jsonObject.getInteger("accountId");
-        return new TestMessages(testingRunId, testingRunResultSummaryId, apiInfoKey, subcategory, testLogs, accountId);
+        return new SingleTestPayload(testingRunId, testingRunResultSummaryId, apiInfoKey, subcategory, testLogs, accountId);
     }
 
     public void runTestFromMessage(String message){
-        TestMessages testMessages = parseTestMessage(message);
-        Context.accountId.set(testMessages.getAccountId());
+        SingleTestPayload singleTestPayload = parseTestMessage(message);
+        Context.accountId.set(singleTestPayload.getAccountId());
         TestExecutor executor = new TestExecutor();
 
-        CommonSingletonForTesting instance = CommonSingletonForTesting.getInstance();
-        String subCategory = testMessages.getSubcategory();
+        TestingConfigurations instance = TestingConfigurations.getInstance();
+        String subCategory = singleTestPayload.getSubcategory();
         TestConfig testConfig = instance.getTestConfigMap().get(subCategory);
-        ApiInfoKey apiInfoKey = testMessages.getApiInfoKey();
+        ApiInfoKey apiInfoKey = singleTestPayload.getApiInfoKey();
 
         List<String> messagesList = instance.getTestingUtil().getSampleMessages().get(apiInfoKey);
         if(messagesList == null || messagesList.isEmpty()){}
         else{
             String sample = messagesList.get(messagesList.size() - 1);
             logger.info("Running test for: " + apiInfoKey + " with subcategory: " + subCategory);
-            TestingRunResult runResult = executor.runTestNew(apiInfoKey, testMessages.getTestingRunId(), instance.getTestingUtil(), testMessages.getTestingRunResultSummaryId(),testConfig , instance.getTestingRunConfig(), instance.isDebug(), testMessages.getTestLogs(), sample);
-            executor.insertResultsAndMakeIssues(Collections.singletonList(runResult), testMessages.getTestingRunResultSummaryId());
+            TestingRunResult runResult = executor.runTestNew(apiInfoKey, singleTestPayload.getTestingRunId(), instance.getTestingUtil(), singleTestPayload.getTestingRunResultSummaryId(),testConfig , instance.getTestingRunConfig(), instance.isDebug(), singleTestPayload.getTestLogs(), sample);
+            executor.insertResultsAndMakeIssues(Collections.singletonList(runResult), singleTestPayload.getTestingRunResultSummaryId());
         }
     }
     
