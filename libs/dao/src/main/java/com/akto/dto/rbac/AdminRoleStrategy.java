@@ -3,15 +3,15 @@ package com.akto.dto.rbac;
 import java.util.HashMap;
 import java.util.Map;
 
-import com.akto.dto.RBAC.Role;
 import com.akto.dto.rbac.RbacEnums.AccessGroups;
 import com.akto.dto.rbac.RbacEnums.Feature;
 import com.akto.dto.rbac.RbacEnums.ReadWriteAccess;
+import com.akto.dto.RBAC.Role;
 
 public class AdminRoleStrategy implements RoleStrategy {
     @Override
-    public CustomRole[] getRoleHierarchy() {
-        return new CustomRole[]{CustomRole.ADMIN, CustomRole.MEMBER, CustomRole.DEVELOPER, CustomRole.GUEST};
+    public Role[] getRoleHierarchy() {
+        return new Role[]{Role.ADMIN, Role.MEMBER, Role.DEVELOPER, Role.GUEST};
     }
 
     @Override

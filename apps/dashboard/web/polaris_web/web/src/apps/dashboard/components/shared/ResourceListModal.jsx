@@ -9,6 +9,24 @@ function ResourceListModal({ isLarge, activatorPlaceaholder, isColoredActivator,
         secondaryAction = () => {}
     }
 
+    let secondaryActions = []
+    if (showDeleteAction) {
+        secondaryActions.push({
+            content: 'Delete',
+            onAction: () => {
+                deleteAction()
+                setPopup(false)
+            }
+        })
+    }
+    secondaryActions.push({
+        content: 'Cancel',
+        onAction: () => {
+            secondaryAction()
+            setPopup(false)
+        }
+    })
+
     return (
         <Modal
             large={isLarge}
@@ -27,19 +45,7 @@ function ResourceListModal({ isLarge, activatorPlaceaholder, isColoredActivator,
                     if(flag) setPopup(false)
                 },
             }}
-            secondaryActions={[(showDeleteAction ? {
-                content: 'Delete',
-                onAction: () => {
-                    deleteAction()
-                    setPopup(false)
-                }
-            } : {}),{
-                content: 'Cancel',
-                onAction: () => {
-                    secondaryAction()
-                    setPopup(false)
-                }
-            }]}
+            secondaryActions={secondaryActions}
         >
             {component}
         </Modal>

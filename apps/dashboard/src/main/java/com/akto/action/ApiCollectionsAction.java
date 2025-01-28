@@ -20,7 +20,6 @@ import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Aggregates;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.ApiInfo.ApiInfoKey;
-import com.akto.dto.RBAC.Role;
 import com.akto.dto.testing.CustomTestingEndpoints;
 import com.akto.dto.CollectionConditions.ConditionUtils;
 import com.akto.dto.rbac.UsersCollectionsList;
@@ -277,7 +276,7 @@ public class ApiCollectionsAction extends UserAction {
                     Filters.and(
                             Filters.eq(RBAC.USER_ID, userId),
                             Filters.eq(RBAC.ACCOUNT_ID, accountId),
-                            Filters.ne(RBAC.ROLE, Role.ADMIN.getName())
+                            Filters.ne(RBAC.ROLE, RBAC.Role.ADMIN.getName())
                     ),
                     Updates.addToSet(RBAC.API_COLLECTIONS_ID, apiCollection.getId()),
                     new UpdateOptions().upsert(false)
@@ -794,6 +793,19 @@ public class ApiCollectionsAction extends UserAction {
         for(Map.Entry<String, List<Integer>> entry : userCollectionMap.entrySet()) {
             int userId = Integer.parseInt(entry.getKey());
             Set<Integer> apiCollections = new HashSet<>(entry.getValue());
+
+            RBAC rbac = RBACDao.instance.findOne(Filters.and(
+                    Filters.eq(RBAC.USER_ID, userId),
+                    Filters.eq(RBAC.ACCOUNT_ID, accountId)));
+            String role = rbac.getRole();
+            CustomRole customRole = CustomRoleDao.instance.findRoleByName(role);
+            /*
+             * If the role is custom role, only update the user with the delta.
+             */
+            if (customRole != null && customRole.getApiCollectionsId() != null
+                    && !customRole.getApiCollectionsId().isEmpty()) {
+                apiCollections.removeAll(customRole.getApiCollectionsId());
+            }
 
             RBACDao.updateApiCollectionAccess(userId, accountId, apiCollections);
             UsersCollectionsList.deleteCollectionIdsFromCache(userId, accountId);

@@ -15,7 +15,6 @@ import java.util.concurrent.TimeUnit;
 
 import com.akto.dao.*;
 import com.akto.dto.*;
-import com.akto.dto.RBAC.Role;
 import com.akto.dto.type.SingleTypeInfo;
 import org.bson.conversions.Bson;
 import org.bson.types.Code;
@@ -26,6 +25,7 @@ import org.json.JSONObject;
 import com.akto.action.observe.Utils;
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.YamlTemplateDao;
+import com.akto.dto.RBAC.Role;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.type.SingleTypeInfo.SuperType;
 import com.akto.listener.InitializerListener;
@@ -58,7 +58,7 @@ public class CodeAnalysisAction extends UserAction {
         try {
             int accountId = Context.accountId.get();
             DashboardMode dashboardMode = DashboardMode.getDashboardMode();        
-            RBAC record = RBACDao.instance.findOne(RBAC.ACCOUNT_ID, accountId, RBAC.ROLE, Role.ADMIN.getName());
+            RBAC record = RBACDao.instance.findOne(RBAC.ACCOUNT_ID, accountId, RBAC.ROLE, Role.ADMIN.name());
             if (record == null) {
                 return;
             }

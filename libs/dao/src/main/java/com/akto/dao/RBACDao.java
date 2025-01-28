@@ -71,7 +71,7 @@ public class RBACDao extends CommonContextDao<RBAC> {
             if (userRbac != null) {
                 currentRole = userRbac.getRole();
             } else {
-                currentRole = Role.MEMBER.getName();
+                currentRole = Role.MEMBER.name();
             }
             
             CustomRole customRole = CustomRoleDao.instance.findRoleByName(currentRole);
@@ -100,7 +100,7 @@ public class RBACDao extends CommonContextDao<RBAC> {
             return new ArrayList<>();
         }
 
-        if (Role.ADMIN.getName().equals(rbac.getRole())) {
+        if (RBAC.Role.ADMIN.name().equals(rbac.getRole())) {
             logger.info(String.format("Rbac is admin userId: %d accountId: %d", userId, accountId));
             return null;
         }

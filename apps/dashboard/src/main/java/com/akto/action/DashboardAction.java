@@ -7,7 +7,6 @@ import java.util.regex.Pattern;
 import com.akto.dao.*;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dto.*;
-import com.akto.dto.RBAC.Role;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.dto.test_run_findings.TestingRunIssues;
@@ -255,9 +254,9 @@ public class DashboardAction extends UserAction {
                 Updates.set(User.NAME, username),
                 Updates.set(User.NAME_LAST_UPDATE, Context.now())
         ));
-        Role currentRoleForUser = RBACDao.getCurrentRoleForUser(user.getId(), Context.accountId.get());
+        RBAC.Role currentRoleForUser = RBACDao.getCurrentRoleForUser(user.getId(), Context.accountId.get());
 
-        if(currentRoleForUser != null && currentRoleForUser.getName().equals(Role.ADMIN.getName())) {
+        if(currentRoleForUser != null && currentRoleForUser.getName().equals(RBAC.Role.ADMIN.getName())) {
             if(organization == null || organization.trim().isEmpty()) {
                 addActionError("Organization cannot be empty");
                 return Action.ERROR.toUpperCase();

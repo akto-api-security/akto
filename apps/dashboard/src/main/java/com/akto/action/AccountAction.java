@@ -5,7 +5,6 @@ import com.akto.dao.*;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.*;
-import com.akto.dto.RBAC.Role;
 import com.akto.dto.billing.Organization;
 import com.akto.listener.InitializerListener;
 import com.akto.listener.RuntimeListener;
@@ -270,7 +269,7 @@ private static final LoggerMaker loggerMaker = new LoggerMaker(AccountAction.cla
             }
         }
    
-        User user = initializeAccount(email, newAccountId, newAccountName,true, Role.ADMIN.getName());
+        User user = initializeAccount(email, newAccountId, newAccountName,true, RBAC.Role.ADMIN.name());
         getSession().put("user", user);
         getSession().put("accountId", newAccountId);
         return Action.SUCCESS.toUpperCase();

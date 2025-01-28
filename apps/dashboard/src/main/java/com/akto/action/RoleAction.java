@@ -5,11 +5,11 @@ import java.util.List;
 import com.akto.dao.CustomRoleDao;
 import com.akto.dao.PendingInviteCodesDao;
 import com.akto.dao.RBACDao;
-import com.akto.dao.context.Context;
 import com.akto.dto.CustomRole;
 import com.akto.dto.PendingInviteCode;
 import com.akto.dto.RBAC;
 import com.akto.dto.RBAC.Role;
+import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 
@@ -29,8 +29,7 @@ public class RoleAction extends UserAction {
     }
 
     public String getCustomRoles() {
-        int accountId = Context.accountId.get();
-        roles = CustomRole.getCustomRolesForAccount(accountId);
+        roles = CustomRoleDao.instance.findAll(new BasicDBObject());
         return SUCCESS.toUpperCase();
     }
 
@@ -86,7 +85,7 @@ public class RoleAction extends UserAction {
 
     private boolean defaultInviteCheck(){
         if(defaultInviteRole){
-            List<CustomRole> roles = CustomRole.getCustomRolesForAccount(Context.accountId.get());
+            List<CustomRole> roles = CustomRoleDao.instance.findAll(new BasicDBObject());
             for(CustomRole role: roles){
                 if(role.getDefaultInviteRole()){
                     addActionError("Default invite role already exists.");
@@ -125,7 +124,6 @@ public class RoleAction extends UserAction {
 
         CustomRole role = new CustomRole(roleName, baseRole, apiCollectionIds, defaultInviteRole);
         CustomRoleDao.instance.insertOne(role);
-        CustomRole.deleteCustomRoleCache(Context.accountId.get());
         return SUCCESS.toUpperCase();
     }
 
@@ -156,7 +154,6 @@ public class RoleAction extends UserAction {
             Updates.set(CustomRole.API_COLLECTIONS_ID, apiCollectionIds),
             Updates.set(CustomRole.DEFAULT_INVITE_ROLE, defaultInviteRole)
         ));
-        CustomRole.deleteCustomRoleCache(Context.accountId.get());
 
         return SUCCESS.toUpperCase();
     }
@@ -186,7 +183,6 @@ public class RoleAction extends UserAction {
         }
 
         CustomRoleDao.instance.deleteAll(Filters.eq(CustomRole._NAME, roleName));
-        CustomRole.deleteCustomRoleCache(Context.accountId.get());
 
         return SUCCESS.toUpperCase();
     }

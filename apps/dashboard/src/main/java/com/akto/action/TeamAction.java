@@ -229,16 +229,12 @@ public class TeamAction extends UserAction implements ServletResponseAware, Serv
         return performAction(ActionType.UPDATE_USER_ROLE, this.userRole.toUpperCase());
     }
 
-    private List<String> userRoleHierarchy;
+    private Role[] userRoleHierarchy;
 
     public String getRoleHierarchy(){
         try {
             Role currentRole = RBACDao.getCurrentRoleForUser(getSUser().getId(), Context.accountId.get());
-            Role[] roleHierarchy = currentRole.getRoleHierarchy();
-            this.userRoleHierarchy = new ArrayList<>();
-            for(Role role: roleHierarchy){
-                this.userRoleHierarchy.add(role.getName());
-            }   
+            this.userRoleHierarchy = currentRole.getRoleHierarchy();
             return Action.SUCCESS.toUpperCase();
         } catch (Exception e) {
             addActionError("User role doesn't exist.");
@@ -321,7 +317,7 @@ public class TeamAction extends UserAction implements ServletResponseAware, Serv
         this.userRole = userRole;
     }
 
-    public List<String> getUserRoleHierarchy() {
+    public Role[] getUserRoleHierarchy() {
         return userRoleHierarchy;
     }
 

@@ -2,8 +2,6 @@ package com.akto.dto;
 
 import org.bson.types.ObjectId;
 
-import com.akto.dto.RBAC.Role;
-
 public class PendingInviteCode {
 
     private ObjectId id;
@@ -29,7 +27,7 @@ public class PendingInviteCode {
         this.inviteeEmailId = inviteeEmailId;
         this.expiry = expiry;
         this.accountId = accountId;
-        this.inviteeRole = Role.GUEST.getName();
+        this.inviteeRole = RBAC.Role.GUEST.name();
     }
 
     public PendingInviteCode(String inviteCode, int issuer, String inviteeEmailId, long expiry, int accountId, String inviteeRole) {

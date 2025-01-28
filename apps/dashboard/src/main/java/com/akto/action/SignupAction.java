@@ -5,7 +5,6 @@ import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.*;
 import com.akto.dto.Config.ConfigType;
-import com.akto.dto.RBAC.Role;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.sso.SAMLConfig;
 import com.akto.listener.InitializerListener;
@@ -553,9 +552,9 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
 
             SignupInfo.OktaSignupInfo oktaSignupInfo= new SignupInfo.OktaSignupInfo(accessToken, username);
 
-            String defaultRole = Role.MEMBER.getName();
+            String defaultRole = RBAC.Role.MEMBER.name();
             if (UsageMetricCalculator.isRbacFeatureAvailable(accountId)) {
-                defaultRole = fetchDefaultInviteRole(accountId, Role.GUEST.getName());
+                defaultRole = fetchDefaultInviteRole(accountId, RBAC.Role.GUEST.name());
             }
             
             shouldLogin = "true";
@@ -571,10 +570,8 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
 
     private String fetchDefaultInviteRole(int accountId, String fallbackDefault){
         try {
-            int initialAccountId = Context.accountId.get();
             Context.accountId.set(accountId);
             CustomRole defaultRole = CustomRoleDao.instance.findOne(CustomRole.DEFAULT_INVITE_ROLE, true);
-            Context.accountId.set(initialAccountId);
             if(defaultRole != null){
                 return defaultRole.getName();
             }
@@ -684,9 +681,9 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             logger.info("Successful signing with Azure Idp for: "+ useremail);
             SignupInfo.SamlSsoSignupInfo signUpInfo = new SignupInfo.SamlSsoSignupInfo(username, useremail, Config.ConfigType.AZURE);
 
-            String defaultRole = Role.MEMBER.getName();
+            String defaultRole = RBAC.Role.MEMBER.name();
             if (UsageMetricCalculator.isRbacFeatureAvailable(this.accountId)) {
-                defaultRole = fetchDefaultInviteRole(this.accountId,Role.GUEST.getName());
+                defaultRole = fetchDefaultInviteRole(this.accountId,RBAC.Role.GUEST.name());
             }
 
             createUserAndRedirect(useremail, username, signUpInfo, this.accountId, Config.ConfigType.AZURE.toString(), defaultRole);
@@ -739,9 +736,9 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             shouldLogin = "true";
             SignupInfo.SamlSsoSignupInfo signUpInfo = new SignupInfo.SamlSsoSignupInfo(username, userEmail, Config.ConfigType.GOOGLE_SAML);
 
-            String defaultRole = Role.MEMBER.getName();
+            String defaultRole = RBAC.Role.MEMBER.name();
             if (UsageMetricCalculator.isRbacFeatureAvailable(this.accountId)) {
-                defaultRole = fetchDefaultInviteRole(this.accountId, Role.GUEST.getName());
+                defaultRole = fetchDefaultInviteRole(this.accountId, RBAC.Role.GUEST.name());
             }
 
             createUserAndRedirect(userEmail, username, signUpInfo, this.accountId, Config.ConfigType.GOOGLE_SAML.toString(), defaultRole);
@@ -831,7 +828,6 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
         createUserAndRedirect(userEmail, username, signupInfo, invitationToAccount, method, null);
     }
 
-    // TODO: either set context.accountId or shift role to common dao.
     private void createUserAndRedirect(String userEmail, String username, SignupInfo signupInfo,
                                        int invitationToAccount, String method, String invitedRole) throws IOException {
         loggerMaker.infoAndAddToDb("createUserAndRedirect called");
@@ -898,7 +894,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
 
 
             loggerMaker.infoAndAddToDb("Initialize Account");
-            user = AccountAction.initializeAccount(userEmail, accountId, "My account",invitationToAccount == 0, invitedRole == null ? Role.ADMIN.getName() : invitedRole);
+            user = AccountAction.initializeAccount(userEmail, accountId, "My account",invitationToAccount == 0, invitedRole == null ? RBAC.Role.ADMIN.name() : invitedRole);
 
             servletRequest.getSession().setAttribute("user", user);
             servletRequest.getSession().setAttribute("accountId", accountId);

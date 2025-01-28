@@ -304,7 +304,7 @@ public class InitializerListener implements ServletContextListener {
 
         DashboardMode dashboardMode = DashboardMode.getDashboardMode();        
 
-        RBAC record = RBACDao.instance.findOne("role", Role.ADMIN.getName());
+        RBAC record = RBACDao.instance.findOne("role", Role.ADMIN.name());
 
         if (record == null) {
             return;
@@ -1982,12 +1982,12 @@ public class InitializerListener implements ServletContextListener {
             return;
         }
 
-        RBAC rbac = RBACDao.instance.findOne(RBAC.ACCOUNT_ID, accountId, RBAC.ROLE, Role.ADMIN.getName());
+        RBAC rbac = RBACDao.instance.findOne(RBAC.ACCOUNT_ID, accountId, RBAC.ROLE, Role.ADMIN.name());
 
         if (rbac == null) {
             loggerMaker.infoAndAddToDb("Admin is missing in DB", LogDb.DASHBOARD);
-            RBACDao.instance.getMCollection().updateOne(Filters.and(Filters.eq(RBAC.ROLE, Role.ADMIN.getName()), Filters.exists(RBAC.ACCOUNT_ID, false)), Updates.set(RBAC.ACCOUNT_ID, accountId), new UpdateOptions().upsert(false));
-            rbac = RBACDao.instance.findOne(RBAC.ACCOUNT_ID, accountId, RBAC.ROLE, Role.ADMIN.getName());
+            RBACDao.instance.getMCollection().updateOne(Filters.and(Filters.eq(RBAC.ROLE, Role.ADMIN.name()), Filters.exists(RBAC.ACCOUNT_ID, false)), Updates.set(RBAC.ACCOUNT_ID, accountId), new UpdateOptions().upsert(false));
+            rbac = RBACDao.instance.findOne(RBAC.ACCOUNT_ID, accountId, RBAC.ROLE, Role.ADMIN.name());
             if(rbac == null){
                 loggerMaker.errorAndAddToDb("Admin is still missing in DB, making first user as admin", LogDb.DASHBOARD);
                 User firstUser = UsersDao.instance.getFirstUser(accountId);
@@ -1996,7 +1996,7 @@ public class InitializerListener implements ServletContextListener {
                         Filters.and(
                             Filters.eq(RBAC.ACCOUNT_ID,Context.accountId.get()),
                             Filters.eq(RBAC.USER_ID, firstUser.getId())
-                        ),Updates.set(RBAC.ROLE, Role.ADMIN.getName()));
+                        ),Updates.set(RBAC.ROLE, RBAC.Role.ADMIN.name()));
                 } else {
                     loggerMaker.errorAndAddToDb("First user is also missing in DB, unable to make org.", LogDb.DASHBOARD);
                     return;
@@ -2829,19 +2829,19 @@ public class InitializerListener implements ServletContextListener {
 
             RBAC firstUserAdminRbac = RBACDao.instance.findOne(Filters.and(
                 Filters.eq(RBAC.USER_ID, firstUser.getId()),
-                Filters.eq(RBAC.ROLE, Role.ADMIN.getName())
+                Filters.eq(RBAC.ROLE, Role.ADMIN.name())
             ));
 
             if(firstUserAdminRbac != null){
                 loggerMaker.infoAndAddToDb("Found admin rbac for first user: " + firstUser.getLogin() + " , thus deleting it's member role RBAC", LogDb.DASHBOARD);
                 RBACDao.instance.deleteAll(Filters.and(
                     Filters.eq(RBAC.USER_ID, firstUser.getId()),
-                    Filters.eq(RBAC.ROLE, Role.MEMBER.getName())
+                    Filters.eq(RBAC.ROLE, Role.MEMBER.name())
                 ));
             }else{
                 loggerMaker.infoAndAddToDb("Found non-admin rbac for first user: " + firstUser.getLogin() + " , thus inserting admin role", LogDb.DASHBOARD);
                 RBACDao.instance.insertOne(
-                    new RBAC(firstUser.getId(), Role.ADMIN.getName(), Context.accountId.get())
+                    new RBAC(firstUser.getId(), Role.ADMIN.name(), Context.accountId.get())
                 );
             }
 
@@ -2914,7 +2914,7 @@ public class InitializerListener implements ServletContextListener {
                     String adminEmail = "";
                     Organization org = OrganizationsDao.instance.findOne(Filters.empty());
                     if(org == null){
-                        RBAC rbac = RBACDao.instance.findOne(Filters.eq(RBAC.ROLE, Role.ADMIN.getName()));
+                        RBAC rbac = RBACDao.instance.findOne(Filters.eq(RBAC.ROLE, RBAC.Role.ADMIN.name()));
                         User adminUser = UsersDao.instance.findOne(Filters.eq("login", rbac.getUserId()));
                         adminEmail = adminUser.getLogin();
                     }else{
