@@ -1,12 +1,14 @@
 package com.akto.action;
 
+import com.akto.dao.CustomRoleDao;
 import com.akto.dao.PendingInviteCodesDao;
 import com.akto.dao.RBACDao;
 import com.akto.dao.UsersDao;
 import com.akto.dao.context.Context;
+import com.akto.dto.CustomRole;
 import com.akto.dto.PendingInviteCode;
 import com.akto.dto.RBAC;
-import com.akto.dto.Role;
+import com.akto.dto.RBAC.Role;
 import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.dto.User;
 import com.akto.log.LoggerMaker;
@@ -86,9 +88,14 @@ public class TeamAction extends UserAction implements ServletResponseAware, Serv
             if (pendingInviteCode.getAccountId() == 0) {//case where account id doesn't exists belonged to older 1_000_000 account
                 pendingInviteCode.setAccountId(1_000_000);
             }
-            Role inviteeRole = Role.GUEST;
+            Role inviteeRole = null;
             try {
-                inviteeRole = Role.valueOf(pendingInviteCode.getInviteeRole());
+                CustomRole role = CustomRoleDao.instance.findRoleByName(pendingInviteCode.getInviteeRole());
+                if (role != null) {
+                    inviteeRole = Role.valueOf(role.getBaseRole());
+                } else {
+                    inviteeRole = Role.valueOf(pendingInviteCode.getInviteeRole());
+                }
             } catch(Exception e){
             }
             String roleText = "Invitation sent ";
@@ -138,9 +145,15 @@ public class TeamAction extends UserAction implements ServletResponseAware, Serv
         Role currentUserRole = RBACDao.getCurrentRoleForUser(currUserId, accId);
         Role userRole = RBACDao.getCurrentRoleForUser(userDetails.getId(), accId); // current role of the user whose role is changing
 
+        CustomRole customRole = CustomRoleDao.instance.findRoleByName(reqUserRole);
+
         Role requestedRole = null;
         try {
-            requestedRole = Role.valueOf(reqUserRole);
+            if (customRole != null) {
+                requestedRole = Role.valueOf(customRole.getBaseRole());
+            } else {
+                requestedRole = Role.valueOf(reqUserRole);
+            }
         } catch (Exception e) {
             addActionError("Invalid user role");
             return Action.ERROR.toUpperCase();
@@ -169,16 +182,17 @@ public class TeamAction extends UserAction implements ServletResponseAware, Serv
                         boolean shouldChangeRole = false; // cannot change to a role higher than yourself
 
                         for(Role role: rolesHierarchy){
-                            if(role.getBaseRole().equals(userRole.getBaseRole())){
+                            if(role.equals(userRole)){
                                 isValidUpdateRole = true;
                             }
-                            if(role.getBaseRole().equals(requestedRole.getBaseRole())){
+                            if(role.equals(requestedRole)){
                                 shouldChangeRole = true;
                             }
                         }
                         if(isValidUpdateRole && shouldChangeRole){
                             RBACDao.instance.updateOne(
                                 filterRbac,
+                                // Saving the custom role here.
                                 Updates.set(RBAC.ROLE, reqUserRole));
                                 RBACDao.instance.deleteUserEntryFromCache(new Pair<>(userDetails.getId(), accId));
                                 UsersCollectionsList.deleteCollectionIdsFromCache(userDetails.getId(), accId);
@@ -218,12 +232,9 @@ public class TeamAction extends UserAction implements ServletResponseAware, Serv
     private List<String> userRoleHierarchy;
 
     public String getRoleHierarchy(){
-        if(this.userRole == null || this.userRole.isEmpty()){
-            addActionError("Role cannot be null or empty");
-            return Action.ERROR.toUpperCase();
-        }
         try {
-            Role[] roleHierarchy = Role.valueOf(userRole).getRoleHierarchy();
+            Role currentRole = RBACDao.getCurrentRoleForUser(getSUser().getId(), Context.accountId.get());
+            Role[] roleHierarchy = currentRole.getRoleHierarchy();
             this.userRoleHierarchy = new ArrayList<>();
             for(Role role: roleHierarchy){
                 this.userRoleHierarchy.add(role.getName());

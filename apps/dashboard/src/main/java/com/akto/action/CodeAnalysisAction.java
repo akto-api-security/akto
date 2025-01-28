@@ -15,6 +15,7 @@ import java.util.concurrent.TimeUnit;
 
 import com.akto.dao.*;
 import com.akto.dto.*;
+import com.akto.dto.RBAC.Role;
 import com.akto.dto.type.SingleTypeInfo;
 import org.bson.conversions.Bson;
 import org.bson.types.Code;

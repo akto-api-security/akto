@@ -14,7 +14,7 @@ import com.akto.dto.AccountSettings;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiToken;
 import com.akto.dto.RBAC;
-import com.akto.dto.Role;
+import com.akto.dto.RBAC.Role;
 import com.akto.dto.User;
 import com.akto.dto.UserAccountEntry;
 import com.akto.dto.ApiToken.Utility;
@@ -185,7 +185,7 @@ public class TestStartTestAction extends MongoBasedTest {
 
         user = UsersDao.instance.findOne(Filters.eq(User.LOGIN, login));
 
-        RBAC rbac = new RBAC(user.getId(), Role.ADMIN, ACCOUNT_ID);
+        RBAC rbac = new RBAC(user.getId(), Role.ADMIN.getName(), ACCOUNT_ID);
         RBACDao.instance.insertOne(rbac);
 
         AccountSettings acc = new AccountSettings();

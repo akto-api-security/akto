@@ -14,7 +14,7 @@ import com.akto.dto.AccountSettings;
 import com.akto.dto.User;
 import com.akto.dto.UserAccountEntry;
 import com.akto.dto.ApiToken.Utility;
-import com.akto.dto.Role;
+import com.akto.dto.RBAC.Role;
 import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.jira_integration.JiraIntegration;

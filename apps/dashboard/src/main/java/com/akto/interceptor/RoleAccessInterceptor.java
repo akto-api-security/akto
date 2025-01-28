@@ -4,7 +4,7 @@ import com.akto.audit_logs_util.AuditLogsUtil;
 import com.akto.dao.RBACDao;
 import com.akto.dao.audit_logs.ApiAuditLogsDao;
 import com.akto.dao.context.Context;
-import com.akto.dto.Role;
+import com.akto.dto.RBAC.Role;
 import com.akto.dto.User;
 import com.akto.dto.audit_logs.ApiAuditLogs;
 import com.akto.dto.rbac.RbacEnums;

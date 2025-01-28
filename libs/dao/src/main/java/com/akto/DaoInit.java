@@ -272,7 +272,7 @@ public class DaoInit {
         ClassModel<HistoricalData> historicalDataClassModel = ClassModel.builder(HistoricalData.class).enableDiscriminator(true).build();
         ClassModel<TestConfigsAdvancedSettings> configSettingClassModel = ClassModel.builder(TestConfigsAdvancedSettings.class).enableDiscriminator(true).build();
         ClassModel<ConditionsType> configSettingsConditionTypeClassModel = ClassModel.builder(ConditionsType.class).enableDiscriminator(true).build();
-        ClassModel<Role> roleClassModel = ClassModel.builder(Role.class).enableDiscriminator(true).build();
+        ClassModel<CustomRole> roleClassModel = ClassModel.builder(CustomRole.class).enableDiscriminator(true).build();
 
         CodecRegistry pojoCodecRegistry = fromProviders(PojoCodecProvider.builder().register(
                 configClassModel, signupInfoClassModel, apiAuthClassModel, attempResultModel, urlTemplateModel,

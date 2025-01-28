@@ -2,6 +2,8 @@ package com.akto.dto;
 
 import org.bson.types.ObjectId;
 
+import com.akto.dto.RBAC.Role;
+
 public class PendingInviteCode {
 
     private ObjectId id;

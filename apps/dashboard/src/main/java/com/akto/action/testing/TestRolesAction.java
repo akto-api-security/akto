@@ -9,7 +9,7 @@ import com.akto.dao.testing.config.TestCollectionPropertiesDao;
 import com.akto.dto.User;
 import com.akto.dto.testing.config.TestCollectionProperty;
 import com.akto.dto.RecordedLoginFlowInput;
-import com.akto.dto.Role;
+import com.akto.dto.RBAC.Role;
 import com.akto.dto.data_types.Conditions;
 import com.akto.dto.data_types.Conditions.Operator;
 import com.akto.dto.data_types.Predicate;

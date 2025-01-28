@@ -6,9 +6,10 @@ import com.akto.dao.CustomRoleDao;
 import com.akto.dao.PendingInviteCodesDao;
 import com.akto.dao.RBACDao;
 import com.akto.dao.context.Context;
+import com.akto.dto.CustomRole;
 import com.akto.dto.PendingInviteCode;
 import com.akto.dto.RBAC;
-import com.akto.dto.Role;
+import com.akto.dto.RBAC.Role;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 
@@ -21,15 +22,15 @@ public class RoleAction extends UserAction {
      * Get Roles.
      */
 
-    List<Role> roles;
+    List<CustomRole> roles;
 
-    public List<Role> getRoles() {
+    public List<CustomRole> getRoles() {
         return roles;
     }
 
     public String getCustomRoles() {
         int accountId = Context.accountId.get();
-        roles = Role.getCustomRolesForAccount(accountId);
+        roles = CustomRole.getCustomRolesForAccount(accountId);
         return SUCCESS.toUpperCase();
     }
 
@@ -85,8 +86,8 @@ public class RoleAction extends UserAction {
 
     private boolean defaultInviteCheck(){
         if(defaultInviteRole){
-            List<Role> roles = Role.getCustomRolesForAccount(Context.accountId.get());
-            for(Role role: roles){
+            List<CustomRole> roles = CustomRole.getCustomRolesForAccount(Context.accountId.get());
+            for(CustomRole role: roles){
                 if(role.getDefaultInviteRole()){
                     addActionError("Default invite role already exists.");
                     return false;
@@ -105,14 +106,13 @@ public class RoleAction extends UserAction {
         // Always save Upper-case.
         roleName = roleName.toUpperCase();
 
-        Role existingRole = CustomRoleDao.instance.findRoleByName(roleName);
+        CustomRole existingRole = CustomRoleDao.instance.findRoleByName(roleName);
 
         if (existingRole != null) {
             addActionError("Existing role with same name exists.");
             return ERROR.toUpperCase();
         }
         try {
-            // TODO: what if they give custom role in base role.
             Role.valueOf(baseRole);
         } catch (Exception e) {
             addActionError("Base role does not exist");
@@ -123,9 +123,9 @@ public class RoleAction extends UserAction {
             return ERROR.toUpperCase();
         }
 
-        Role role = new Role(roleName, baseRole, apiCollectionIds, defaultInviteRole);
+        CustomRole role = new CustomRole(roleName, baseRole, apiCollectionIds, defaultInviteRole);
         CustomRoleDao.instance.insertOne(role);
-        Role.deleteCustomRoleCache(Context.accountId.get());
+        CustomRole.deleteCustomRoleCache(Context.accountId.get());
         return SUCCESS.toUpperCase();
     }
 
@@ -133,7 +133,7 @@ public class RoleAction extends UserAction {
         if (!validateRoleName()) {
             return ERROR.toUpperCase();
         }
-        Role existingRole = CustomRoleDao.instance.findRoleByName(roleName);
+        CustomRole existingRole = CustomRoleDao.instance.findRoleByName(roleName);
 
         if (existingRole == null) {
             addActionError("Role does not exist.");
@@ -151,18 +151,18 @@ public class RoleAction extends UserAction {
             return ERROR.toUpperCase();
         }
 
-        CustomRoleDao.instance.updateOne(Filters.eq(Role._NAME, roleName),Updates.combine(
-            Updates.set(Role.BASE_ROLE, baseRole),
-            Updates.set(Role.API_COLLECTIONS_ID, apiCollectionIds),
-            Updates.set(Role.DEFAULT_INVITE_ROLE, defaultInviteRole)
+        CustomRoleDao.instance.updateOne(Filters.eq(CustomRole._NAME, roleName),Updates.combine(
+            Updates.set(CustomRole.BASE_ROLE, baseRole),
+            Updates.set(CustomRole.API_COLLECTIONS_ID, apiCollectionIds),
+            Updates.set(CustomRole.DEFAULT_INVITE_ROLE, defaultInviteRole)
         ));
-        Role.deleteCustomRoleCache(Context.accountId.get());
+        CustomRole.deleteCustomRoleCache(Context.accountId.get());
 
         return SUCCESS.toUpperCase();
     }
 
     public String deleteCustomRole(){
-        Role existingRole = CustomRoleDao.instance.findRoleByName(roleName);
+        CustomRole existingRole = CustomRoleDao.instance.findRoleByName(roleName);
 
         if (existingRole == null) {
             addActionError("Role does not exist.");
@@ -185,8 +185,8 @@ public class RoleAction extends UserAction {
             return ERROR.toUpperCase();
         }
 
-        CustomRoleDao.instance.deleteAll(Filters.eq(Role._NAME, roleName));
-        Role.deleteCustomRoleCache(Context.accountId.get());
+        CustomRoleDao.instance.deleteAll(Filters.eq(CustomRole._NAME, roleName));
+        CustomRole.deleteCustomRoleCache(Context.accountId.get());
 
         return SUCCESS.toUpperCase();
     }

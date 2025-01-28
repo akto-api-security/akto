@@ -1,19 +1,14 @@
 package com.akto.dao;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import com.akto.dto.Role;
+import com.akto.dto.CustomRole;
 import com.mongodb.client.model.Filters;
 
-public class CustomRoleDao extends AccountsContextDao<Role> {
+public class CustomRoleDao extends AccountsContextDao<CustomRole> {
 
     public static final CustomRoleDao instance = new CustomRoleDao();
 
-    private static final Logger logger = LoggerFactory.getLogger(CustomRoleDao.class);
-
-    public Role findRoleByName(String roleName) {
-        return instance.findOne(Filters.eq(Role._NAME, roleName));
+    public CustomRole findRoleByName(String roleName) {
+        return instance.findOne(Filters.eq(CustomRole._NAME, roleName));
     }
 
     @Override
@@ -22,8 +17,8 @@ public class CustomRoleDao extends AccountsContextDao<Role> {
     }
 
     @Override
-    public Class<Role> getClassT() {
-        return Role.class;
+    public Class<CustomRole> getClassT() {
+        return CustomRole.class;
     }
 
 }

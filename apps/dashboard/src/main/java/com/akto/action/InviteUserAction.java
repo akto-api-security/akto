@@ -1,11 +1,13 @@
 package com.akto.action;
 
+import com.akto.dao.CustomRoleDao;
 import com.akto.dao.PendingInviteCodesDao;
 import com.akto.dao.RBACDao;
 import com.akto.dao.UsersDao;
 import com.akto.dao.context.Context;
+import com.akto.dto.CustomRole;
 import com.akto.dto.PendingInviteCode;
-import com.akto.dto.Role;
+import com.akto.dto.RBAC.Role;
 import com.akto.dto.User;
 import com.akto.log.LoggerMaker;
 import com.akto.notifications.email.SendgridEmail;
@@ -109,13 +111,15 @@ public class InviteUserAction extends UserAction{
         }
 
         Role userRole = RBACDao.getCurrentRoleForUser(user_id, Context.accountId.get());
-    Role baseRole = null;
-        try {
-            Role inviteeRole = Role.valueOf(this.inviteeRole);
-            baseRole = Role.valueOf(inviteeRole.getBaseRole());
-        } catch(Exception e){
-        }
+        Role baseRole = null;
 
+        CustomRole customRole = CustomRoleDao.instance.findRoleByName(this.inviteeRole);
+
+        if(customRole != null) {
+            baseRole = Role.valueOf(customRole.getBaseRole());
+        } else {
+            baseRole = Role.valueOf(this.inviteeRole);
+        }
 
         if (!Arrays.asList(userRole.getRoleHierarchy()).contains(baseRole)) {
             addActionError("User not allowed to invite for this role");
