@@ -72,10 +72,10 @@ let filters = [
     label: 'Severity',
     title: 'Severity',
     choices: [
-      {label: 'Critical', value: 'CRITICAL'},
-      {label: 'High', value: 'HIGH'},
-      {label: 'Medium', value: 'MEDIUM'},
-      {label: 'Low', value: 'LOW'}
+      { label: 'Critical', value: 'CRITICAL' },
+      { label: 'High', value: 'HIGH' },
+      { label: 'Medium', value: 'MEDIUM' },
+      { label: 'Low', value: 'LOW' }
     ],
   },
   {
@@ -143,6 +143,9 @@ function SingleTestRunPage() {
   const [allResultsLength, setAllResultsLength] = useState(undefined)
   const [currentSummary, setCurrentSummary] = useState('')
   const [pageTotalCount, setPageTotalCount] = useState(0)
+  const localCategoryMap = LocalStore.getState().categoryMap
+  const localSubCategoryMap = LocalStore.getState().subCategoryMap
+  const [useLocalSubCategoryData, setUseLocalSubCategoryData] = useState(false)
 
   const tableTabMap = {
     vulnerable: "VULNERABLE",
@@ -224,17 +227,13 @@ function SingleTestRunPage() {
     }
   }
 
-  const [filteredEndpoints, setFilteredEndpoints] = useState([])
-
   useEffect(() => {
     setUpdateTable(Date.now().toString())
-    if (testingRunResultSummariesObj?.testingRun?.testingEndpoints.type === "COLLECTION_WISE") {
-      api.fetchCollectionWiseApiEndpoints(testingRunResultSummariesObj?.testingRun.testingEndpoints.apiCollectionId).then((res) => {
-        setFilteredEndpoints([...res?.listOfEndpointsInCollection]);
-      })
-    }
-    else if (testingRunResultSummariesObj?.testingRun?.testingEndpoints.type === "CUSTOM") {
-      setFilteredEndpoints([...testingRunResultSummariesObj?.testingRun.testingEndpoints.apisList]);
+    if (
+      (localCategoryMap && Object.keys(localCategoryMap).length > 0) &&
+      (localSubCategoryMap && Object.keys(localSubCategoryMap).length > 0)
+    ) {
+      setUseLocalSubCategoryData(true)
     }
   }, [testingRunResultSummariesObj])
 
@@ -328,7 +327,7 @@ function SingleTestRunPage() {
     return { value: transform.getPrettifiedTestRunResults(testRunResultsRes), total: selectedTab === 'ignored_issues' ? totalIgnoredIssuesCount : testRunCountMap[tableTabMap[selectedTab]] }
   }
 
-  useEffect(() => {handleAddSettings()}, [testingRunConfigSettings])
+  useEffect(() => { handleAddSettings() }, [testingRunConfigSettings])
 
   useEffect(() => {
     fetchTestingRunResultSummaries()
@@ -522,16 +521,12 @@ function SingleTestRunPage() {
 
     return (testingEndpoints.apisList?.length > 0) ? testingEndpoints.apisList[0].apiCollectionId : undefined;
   }
-
-  function checkFiltered() {
-    return testingRunResultSummariesObj?.testingRun?.testingEndpoints?.type !== "COLLECTION_WISE";
-  }
-
+  
   const [activeFromTesting, setActiveFromTesting] = useState(false)
 
   const resultTable = (
     <>
-      <RunTest activeFromTesting={activeFromTesting} setActiveFromTesting={setActiveFromTesting}  preActivator={true} testIdConfig={testingRunResultSummariesObj?.testingRun} apiCollectionId={getCollectionId()} endpoints={filteredEndpoints} setTestMode={setTestMode} filtered={checkFiltered()} setShowEditableSettings={setShowEditableSettings} showEditableSettings={showEditableSettings} parentAdvanceSettingsConfig={conditions}/>
+      <RunTest activeFromTesting={activeFromTesting} setActiveFromTesting={setActiveFromTesting} preActivator={true} testIdConfig={testingRunResultSummariesObj?.testingRun} apiCollectionId={getCollectionId()} setTestMode={setTestMode} setShowEditableSettings={setShowEditableSettings} showEditableSettings={showEditableSettings} parentAdvanceSettingsConfig={conditions} useLocalSubCategoryData={useLocalSubCategoryData} />
       <GithubServerTable
         key={"table"}
         pageLimit={selectedTab === 'vulnerable' ? 150 : 50}
@@ -706,18 +701,18 @@ function SingleTestRunPage() {
           </Box>
           {
             selectedTestRun?.severity &&
-            selectedTestRun.severity.map((item) =>{
+            selectedTestRun.severity.map((item) => {
               const sev = item.split(' ')
               const tempSev = sev.length > 1 ? sev[1].toUpperCase() : ''
-              return(
+              return (
                 <div className={`badge-wrapper-${tempSev}`}>
-                    <Badge key={item}>{item}</Badge>
+                  <Badge key={item}>{item}</Badge>
                 </div>
               )
             }
-            
+
             )}
-            <Button plain monochrome onClick={() => setUpdateTable(Date.now().toString())}><Tooltip content="Refresh page" dismissOnMouseOut> <Icon source={RefreshMajor} /></Tooltip></Button>
+          <Button plain monochrome onClick={() => setUpdateTable(Date.now().toString())}><Tooltip content="Refresh page" dismissOnMouseOut> <Icon source={RefreshMajor} /></Tooltip></Button>
         </HorizontalStack>
         <HorizontalStack gap={"2"}>
           <HorizontalStack gap={"1"}>
@@ -763,13 +758,13 @@ function SingleTestRunPage() {
       {
         content: 'Configurations',
         icon: SettingsMinor,
-        onAction: () => { setShowEditableSettings(true);  handleAddSettings()}
+        onAction: () => { setShowEditableSettings(true); handleAddSettings() }
       }
     ]
   })
   moreActionsList.push({
     title: 'More',
-    items:[
+    items: [
       {
         content: 'Re-Calculate Issues Count',
         icon: RefreshMajor,

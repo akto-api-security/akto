@@ -70,7 +70,7 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
                     <Text>Select Test Role</Text>
                     <Dropdown
                         menuItems={testRolesArr}
-                        initial={"No test role selected"}
+                        initial={testRun.testRoleLabel}
                         selected={(requests) => {
                             let testRole;
                             if (!(requests === "No test role selected")) { testRole = requests; }
@@ -87,7 +87,7 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
                     <Text>Max Concurrent Requests</Text>
                     <Dropdown
                         menuItems={maxConcurrentRequestsOptions}
-                        initial={"Default"}
+                        initial={getLabel(maxConcurrentRequestsOptions, testRun.maxConcurrentRequests.toString()).label}
                         selected={(requests) => {
                             let maxConcurrentRequests;
                             if (requests === "Default") maxConcurrentRequests = -1;
