@@ -115,10 +115,15 @@ public class InviteUserAction extends UserAction{
 
         CustomRole customRole = CustomRoleDao.instance.findRoleByName(this.inviteeRole);
 
-        if(customRole != null) {
-            baseRole = Role.valueOf(customRole.getBaseRole());
-        } else {
-            baseRole = Role.valueOf(this.inviteeRole);
+        try {
+            if (customRole != null) {
+                baseRole = Role.valueOf(customRole.getBaseRole());
+            } else {
+                baseRole = Role.valueOf(this.inviteeRole);
+            }
+        } catch (Exception e) {
+            addActionError("Invalid role");
+            return ERROR.toUpperCase();
         }
 
         if (!Arrays.asList(userRole.getRoleHierarchy()).contains(baseRole)) {

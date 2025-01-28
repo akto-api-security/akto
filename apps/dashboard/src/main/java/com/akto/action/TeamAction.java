@@ -88,21 +88,12 @@ public class TeamAction extends UserAction implements ServletResponseAware, Serv
             if (pendingInviteCode.getAccountId() == 0) {//case where account id doesn't exists belonged to older 1_000_000 account
                 pendingInviteCode.setAccountId(1_000_000);
             }
-            Role inviteeRole = null;
-            try {
-                CustomRole role = CustomRoleDao.instance.findRoleByName(pendingInviteCode.getInviteeRole());
-                if (role != null) {
-                    inviteeRole = Role.valueOf(role.getBaseRole());
-                } else {
-                    inviteeRole = Role.valueOf(pendingInviteCode.getInviteeRole());
-                }
-            } catch(Exception e){
-            }
+            String inviteeRole = pendingInviteCode.getInviteeRole();
             String roleText = "Invitation sent ";
             if (inviteeRole == null) {
                 roleText += "for Security Engineer";
             } else {
-                roleText += "for " + inviteeRole.getName();
+                roleText += "for " + inviteeRole;
             }
             /*
              * Do not send invitation code, if already a member.
@@ -190,10 +181,14 @@ public class TeamAction extends UserAction implements ServletResponseAware, Serv
                             }
                         }
                         if(isValidUpdateRole && shouldChangeRole){
-                            RBACDao.instance.updateOne(
+                            /*
+                             * We do only want to update the role, if it exists.
+                             */
+                            RBACDao.instance.updateOneNoUpsert(
                                 filterRbac,
                                 // Saving the custom role here.
                                 Updates.set(RBAC.ROLE, reqUserRole));
+
                                 RBACDao.instance.deleteUserEntryFromCache(new Pair<>(userDetails.getId(), accId));
                                 UsersCollectionsList.deleteCollectionIdsFromCache(userDetails.getId(), accId);
                             return Action.SUCCESS.toUpperCase();

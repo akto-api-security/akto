@@ -413,6 +413,7 @@ public class DaoInit {
         RuntimeMetricsDao.instance.createIndicesIfAbsent();
         ApiAuditLogsDao.instance.createIndicesIfAbsent();
         VulnerableTestingRunResultDao.instance.createIndicesIfAbsent();
+        CustomRoleDao.instance.createIndicesIfAbsent();
     }
 
 }

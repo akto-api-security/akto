@@ -31,6 +31,10 @@ public class RoleAction extends UserAction {
     }
 
     public String getCustomRoles() {
+        /*
+         * Need all data for a role, 
+         * thus no projections being used.
+         */
         roles = CustomRoleDao.instance.findAll(new BasicDBObject());
         return SUCCESS.toUpperCase();
     }
@@ -61,7 +65,7 @@ public class RoleAction extends UserAction {
 
     private static final int MAX_ROLE_NAME_LENGTH = 50;
 
-    private boolean validateRoleName() {
+    public boolean validateRoleName() {
         if (this.roleName == null || this.roleName.isEmpty()) {
             addActionError("Role names cannot be empty.");
             return false;
@@ -82,6 +86,17 @@ public class RoleAction extends UserAction {
                 return false;
             }
         }
+
+        try {
+            /*
+             * We do not want role name from the reserved names.
+             */
+            Role.valueOf(this.roleName);
+            addActionError(this.roleName + " is a reserved keyword.");
+            return false;
+        } catch(Exception e){
+        }
+
         return true;
     }
 
