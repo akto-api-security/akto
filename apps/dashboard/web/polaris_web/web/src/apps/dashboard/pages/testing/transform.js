@@ -1119,6 +1119,25 @@ getMissingConfigs(testResults){
         operationsGroupList: tempObj[key],
       };
     });
+  },
+  prepareEditableConfigObject(testRun,settings,hexId){
+    const tests = testRun.tests;
+    const selectedTests = []
+        Object.keys(tests).forEach(category => {
+            tests[category].forEach(test => {
+                if (test.selected) selectedTests.push(test.value)
+            })
+        })
+
+    return {
+      testConfigsAdvancedSettings:settings,
+      testRoleId: testRun.testRoleId,
+      subCategoriesList: selectedTests,
+      overriddenTestAppUrl: testRun.overriddenTestAppUrl,
+      maxConcurrentRequests: testRun.maxConcurrentRequests,
+      testingRunHexId: hexId,
+      testRunTime: testRun.testRunTime,
+    }
   }
 }
 

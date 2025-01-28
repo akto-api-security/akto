@@ -6,6 +6,7 @@ import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing.sources.TestSourceConfigsDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dao.testing.*;
+import com.akto.dao.testing.config.EditableTestingRunConfig;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.User;
 import com.akto.dto.ApiToken.Utility;
@@ -234,12 +235,13 @@ public class StartTestAction extends UserAction {
                 }
                  
             }
+
             if (this.overriddenTestAppUrl != null || this.selectedTests != null) {
-                int id = UUID.randomUUID().hashCode() & 0xfffffff ;
+                int id = UUID.randomUUID().hashCode() & 0xfffffff;
                 TestingRunConfig testingRunConfig = new TestingRunConfig(id, null, this.selectedTests, null, this.overriddenTestAppUrl, this.testRoleId);
                 this.testIdConfig = testingRunConfig.getId();
                 TestingRunConfigDao.instance.insertOne(testingRunConfig);
-            }
+            } 
 
         }
 
@@ -506,7 +508,7 @@ public class StartTestAction extends UserAction {
         }
 
         TestingRunConfig runConfig = TestingRunConfigDao.instance.findOne(
-            Filters.eq("_id", this.testingRun.getTestIdConfig()), Projections.exclude("collectionWiseApiInfoKey", "testSubCategoryList")
+            Filters.eq("_id", this.testingRun.getTestIdConfig()), Projections.exclude("collectionWiseApiInfoKey")
         );
 
         this.testingRun.setTestingRunConfig(runConfig);
@@ -1125,11 +1127,28 @@ public class StartTestAction extends UserAction {
         return Action.SUCCESS.toUpperCase();
     }
 
+    private EditableTestingRunConfig editableTestingRunConfig;
+
     public String modifyTestingRunConfig(){
         TestingRunConfigDao.instance.updateOne(
             Filters.eq(Constants.ID, this.testingRunConfigId),
-            Updates.set("configsAdvancedSettings", this.testConfigsAdvancedSettings)
-        );
+                Updates.combine(
+                    Updates.set("configsAdvancedSettings", this.editableTestingRunConfig.getTestConfigsAdvancedSettings()),
+                    Updates.set("testSubCategoryList", this.editableTestingRunConfig.getSubCategoriesList()),
+                    Updates.set("testRoleId", this.editableTestingRunConfig.getTestRoleId()),
+                    Updates.set("overriddenTestAppUrl", this.editableTestingRunConfig.getOverriddenTestAppUrl())
+                )
+            );
+            
+        if(editableTestingRunConfig.getTestingRunHexId() != null){
+            TestingRunDao.instance.updateOne(
+                Filters.eq(Constants.ID, new ObjectId(editableTestingRunConfig.getTestingRunHexId())),
+                Updates.combine(
+                    Updates.set("testRunTime", this.editableTestingRunConfig.getTestRunTime()),
+                    Updates.set("maxConcurrentRequests", this.editableTestingRunConfig.getMaxConcurrentRequests())
+                )
+            );
+        }
         return SUCCESS.toUpperCase();
     }
 
@@ -1566,6 +1585,10 @@ public class StartTestAction extends UserAction {
 
     public void setTestingRunConfigId(int testingRunConfigId) {
         this.testingRunConfigId = testingRunConfigId;
+    }
+
+    public void setEditableTestingRunConfig(EditableTestingRunConfig editableTestingRunConfig) {
+        this.editableTestingRunConfig = editableTestingRunConfig;
     }
 
     public Map<String, Integer> getTestCountMap() {

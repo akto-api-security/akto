@@ -728,6 +728,7 @@ function ApiEndpoints(props) {
                 closeRunTest={() => setRunTests(false)}
                 disabled={showEmptyScreen}
                 selectedResourcesForPrimaryAction={selectedResourcesForPrimaryAction}
+                preActivator={false}
             />
         </HorizontalStack>
     )
