@@ -13,7 +13,6 @@ import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.URLMethods;
 import com.akto.log.LoggerMaker;
-import com.akto.runtime.policies.AuthPolicy;
 import com.akto.testing.ApiExecutor;
 import com.akto.util.Constants;
 import com.akto.util.HttpRequestResponseUtils;
@@ -30,6 +29,7 @@ import java.util.*;
 
 import static com.akto.util.HttpRequestResponseUtils.FORM_URL_ENCODED_CONTENT_TYPE;
 import static com.akto.util.HttpRequestResponseUtils.extractValuesFromPayload;
+import static com.akto.runtime.utils.Utils.parseCookie;
 
 public class Build {
 
@@ -408,7 +408,7 @@ public class Build {
             if (values == null) continue;
 
             if (headerKey.equalsIgnoreCase("set-cookie")) {
-                Map<String, String> cookieMap = AuthPolicy.parseCookie(values);
+                Map<String, String> cookieMap = parseCookie(values);
                 for (String cookieKey : cookieMap.keySet()) {
                     String cookieVal = cookieMap.get(cookieKey);
                     valuesMap.put(cookieKey, new HashSet<>(Collections.singletonList(cookieVal)));

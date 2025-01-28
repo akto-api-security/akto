@@ -2,6 +2,7 @@ package com.akto.store;
 
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
+import com.akto.data_actor.DbLayer;
 import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.testing.*;
@@ -42,8 +43,12 @@ public class SampleMessageStore {
 
     public void fetchSampleMessages(Set<Integer> apiCollectionIds) {
         List<SampleData> sampleDataList = new ArrayList<>();
-        for (int i = 0; i < 20; i++) {
-            List<SampleData> sampleDataBatch = dataActor.fetchSampleData(apiCollectionIds, i*500);
+        for (int i = 0; i < 200; i++) {
+            List<SampleData> sampleDataBatch = dataActor.fetchSampleData(apiCollectionIds,
+                    i * DbLayer.SAMPLE_DATA_LIMIT);
+            if (sampleDataBatch == null || sampleDataBatch.isEmpty()) {
+                break;
+            }
             sampleDataList.addAll(sampleDataBatch);
         }
         Map<ApiInfo.ApiInfoKey, List<String>> tempSampleDataMap = new HashMap<>();
@@ -67,10 +72,32 @@ public class SampleMessageStore {
         List<RawApi> messages = new ArrayList<>();
         try {
             long start = System.currentTimeMillis();
-            List<String> samples = SampleDataAltDb.findSamplesByApiInfoKey(apiInfoKey);
+            List<String> samples = new ArrayList<>();
+            try {
+                samples = SampleDataAltDb.findSamplesByApiInfoKey(apiInfoKey);
+            } catch (Exception e) {
+            }
+            if (samples == null) {
+                samples = new ArrayList<>();
+            }
             AllMetrics.instance.setMultipleSampleDataFetchLatency(System.currentTimeMillis() - start);
             for(String message: samples){
                 messages.add(RawApi.buildFromMessage(message));
+            }
+
+            if (messages.isEmpty()) {
+                List<String> dbSamples = sampleDataMap.get(apiInfoKey);
+                if (dbSamples == null || dbSamples.isEmpty())
+                    return messages;
+
+                for (String message : dbSamples) {
+                    try {
+                        messages.add(RawApi.buildFromMessage(message));
+                    } catch (Exception e) {
+                        loggerMaker.errorAndAddToDb("Error while building RawAPI for " + apiInfoKey + " : " + e,
+                                LogDb.TESTING);
+                    }
+                }
             }
             return messages;
         } catch (Exception e) {

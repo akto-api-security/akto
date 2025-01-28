@@ -1,13 +1,14 @@
 package com.akto.testing;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.context.Context;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
+import com.akto.data_actor.DbLayer;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.CustomAuthType;
@@ -25,23 +26,22 @@ import com.akto.util.Constants;
 import com.mongodb.BasicDBObject;
 
 public class AccessMatrixAnalyzer {
-    private static final LoggerMaker loggerMaker = new LoggerMaker(AccessMatrixAnalyzer.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(AccessMatrixAnalyzer.class, LogDb.TESTING);
     private static final DataActor dataActor = DataActorFactory.fetchInstance();
-    private static final int LIMIT = 2000;
+    private static final int LIMIT = DbLayer.ENDPOINT_LIMIT;
 
     private static final int DELTA_PERIOD_VALUE = 60 * 24 * 60 * 60;
     public List<ApiInfoKey> getEndpointsToAnalyze(AccessMatrixTaskInfo task) {
         EndpointLogicalGroup endpointLogicalGroup = dataActor.fetchEndpointLogicalGroup(task.getEndpointLogicalGroupName());
 
         if (endpointLogicalGroup == null) return new ArrayList<>();
-        List<ApiInfoKey> ret = new ArrayList<>();
+        Set<ApiInfoKey> ret = new HashSet<>();
         List<ApiCollection> apiCollections = dataActor.fetchAllApiCollectionsMeta();
         for(ApiCollection apiCollection: apiCollections) {
             int lastBatchSize = 0;
             int skip = 0;
             do {
-                List<BasicDBObject> apiBatch =
-                        ApiCollectionsDao.fetchEndpointsInCollectionUsingHost(apiCollection.getId(), skip, LIMIT, DELTA_PERIOD_VALUE);
+                List<BasicDBObject> apiBatch = dataActor.fetchEndpointsInCollectionUsingHost(apiCollection.getId(), skip, DELTA_PERIOD_VALUE);
                 skip += LIMIT;
                 lastBatchSize = apiBatch.size();
                 if (!apiBatch.isEmpty()) {
@@ -65,7 +65,7 @@ public class AccessMatrixAnalyzer {
 
         }
 
-        return ret;
+        return new ArrayList<>(ret);
     }
 
     public void run() throws Exception {
@@ -79,9 +79,8 @@ public class AccessMatrixAnalyzer {
             CustomTestingEndpoints tempTestingEndpoints = new CustomTestingEndpoints(endpoints);        
 
             List<ApiInfo.ApiInfoKey> apiInfoKeyList = tempTestingEndpoints.returnApis();
-            if (apiInfoKeyList == null || apiInfoKeyList.isEmpty()) return;
+            if (apiInfoKeyList == null || apiInfoKeyList.isEmpty()) continue;
             loggerMaker.infoAndAddToDb("APIs found: " + apiInfoKeyList.size(), LogDb.TESTING);
-
 
             Set<Integer> apiCollectionIds = Main.extractApiCollectionIds(apiInfoKeyList);
             sampleMessageStore.fetchSampleMessages(apiCollectionIds);
@@ -110,7 +109,7 @@ public class AccessMatrixAnalyzer {
                     loggerMaker.infoAndAddToDb("Finished checking for " + task.getId() + " " + endpoint.getMethod() + " " + endpoint.getUrl(), LogDb.TESTING);
                 }
             }
-            dataActor.updateAccessMatrixInfo(task.getId().toHexString(), task.getFrequencyInSeconds());
+            dataActor.updateAccessMatrixInfo(task.getHexId(), task.getFrequencyInSeconds());
             loggerMaker.infoAndAddToDb("Matrix analyzer task " + task.getId() + "  completed successfully", LogDb.TESTING);
         }
     }

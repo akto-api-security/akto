@@ -16,16 +16,16 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.databind.node.TextNode;
-import com.mongodb.BasicDBObject;
 
 import java.util.*;
 
 import static com.akto.dto.RawApi.convertHeaders;
+import static com.akto.runtime.utils.Utils.parseCookie;
 
 public class RedactSampleData {
     static ObjectMapper mapper = new ObjectMapper();
     static JsonFactory factory = mapper.getFactory();
-    private static final LoggerMaker loggerMaker = new LoggerMaker(RedactSampleData.class, LogDb.RUNTIME);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(RedactSampleData.class, LogDb.TESTING);
 
     public static final String redactValue = "****";
 
@@ -43,7 +43,7 @@ public class RedactSampleData {
     public static String redactCookie(Map<String, List<String>> headers, String header) {
         String cookie = "";
         List<String> cookieList = headers.getOrDefault(header, new ArrayList<>());
-        Map<String, String> cookieMap = AuthPolicy.parseCookie(cookieList);
+        Map<String, String> cookieMap = parseCookie(cookieList);
         for (String cookieKey : cookieMap.keySet()) {
             cookie += cookieKey + "=" + redactValue + ";";
         }
@@ -51,33 +51,6 @@ public class RedactSampleData {
             cookie = redactValue;
         }
         return cookie;
-    }
-
-    private static String handleQueryParams(String url, boolean redactAll, String redactValue) {
-
-        if (!redactAll || url == null || url.isEmpty()) {
-            return url;
-        }
-        String finalUrl = url;
-        try {
-            String[] split = url.split("\\?");
-            if (split.length == 2) {
-                finalUrl = split[0];
-                finalUrl += "?";
-                String[] urlParams = split[1].split("&");
-                for (int i = 0; i < urlParams.length; i++) {
-                    String[] param = urlParams[i].split("=");
-                    if (i != 0) {
-                        finalUrl += "&";
-                    }
-                    finalUrl += param[0] + "=" + redactValue;
-                }
-            }
-
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "unable to redact query params");
-        }
-        return finalUrl;
     }
 
     private static void handleHeaders(Map<String, List<String>> responseHeaders, boolean redactAll) {
@@ -140,9 +113,6 @@ public class RedactSampleData {
 
         // request payload
         String requestPayload = httpResponseParams.requestParams.getPayload();
-        //query params
-        String url = handleQueryParams(httpResponseParams.requestParams.getURL(), redactAll, redactValue);
-        httpResponseParams.requestParams.setUrl(url);
         if (requestPayload == null) requestPayload = "{}";
         try {
             // TODO: support subtype/collection wise redact for graphql
@@ -216,32 +186,6 @@ public class RedactSampleData {
         }
 
     }
-
-    public static String convertOriginalReqRespToString(OriginalHttpRequest request, OriginalHttpResponse response)  {
-        BasicDBObject req = new BasicDBObject();
-        if (request != null) {
-            req.put("url", request.getUrl());
-            req.put("method", request.getMethod());
-            req.put("type", request.getType());
-            req.put("queryParams", request.getQueryParams());
-            req.put("body", request.getBody());
-            req.put("headers", convertHeaders(request.getHeaders()));
-        }
-
-        BasicDBObject resp = new BasicDBObject();
-        if (response != null) {
-            resp.put("statusCode", response.getStatusCode());
-            resp.put("body", response.getBody());
-            resp.put("headers", convertHeaders(response.getHeaders()));
-        }
-
-        BasicDBObject ret = new BasicDBObject();
-        ret.put("request", req);
-        ret.put("response", resp);
-
-        return ret.toString();
-    }
-
     public static String convertHttpRespToOriginalString(HttpResponseParams httpResponseParams) throws JsonProcessingException {
         Map<String,Object> m = new HashMap<>();
         HttpRequestParams httpRequestParams = httpResponseParams.getRequestParams();

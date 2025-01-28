@@ -34,26 +34,14 @@ function ApiDetails(props) {
         setLoading(true)
         const { apiCollectionId, endpoint, method } = apiDetail
         setSelectedUrl({url: endpoint, method: method})
-        let commonMessages = []
         await api.fetchSampleData(endpoint, apiCollectionId, method).then((res) => {
-            api.fetchSensitiveSampleData(endpoint, apiCollectionId, method).then(async (resp) => {
-                if (resp.sensitiveSampleData && Object.keys(resp.sensitiveSampleData).length > 0) {
-                    if (res.sampleDataList.length > 0) {
-                        commonMessages = transform.getCommonSamples(res.sampleDataList[0].samples, resp)
-                    } else {
-                        commonMessages = transform.prepareSampleData(resp, '')
-                    }
-                } else {
-                    let sensitiveData = []
-                    await api.loadSensitiveParameters(apiCollectionId, endpoint, method).then((res3) => {
-                        sensitiveData = res3.data.endpoints;
-                    })
-                    let samples = res.sampleDataList.map(x => x.samples)
-                    samples = samples.flat()
-                    let newResp = transform.convertSampleDataToSensitiveSampleData(samples, sensitiveData)
-                    commonMessages = transform.prepareSampleData(newResp, '')
-                } 
-                setSampleData(commonMessages)
+            api.fetchSensitiveSampleData(endpoint, apiCollectionId, method).then((resp) => {
+                if (res.sampleDataList.length > 0) {
+                    const commonMessages = transform.getCommonSamples(res.sampleDataList[0].samples,resp)
+                    setSampleData(commonMessages)
+                }else{
+                    setSampleData(transform.prepareSampleData(resp, ''))
+                }
             })
         })
         setTimeout(()=>{

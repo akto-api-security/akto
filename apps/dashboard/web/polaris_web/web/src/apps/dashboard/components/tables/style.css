@@ -17,20 +17,3 @@
 .removeHeaderColor .Polaris-IndexTable__TableHeading {
     background:none;
 }
-
-.add-new-buttons{
-    position: absolute;
-    z-index: 2;
-    right: 144px;
-    margin-top: -36px;
-}
-
-.add-new-buttons .Polaris-Icon__Svg{
-    max-width: 120% !important;
-    max-height: 120% !important;
-    width: 120% !important;
-}
-
-.add-new-buttons .Polaris-Icon{
-    color: rgba(97, 106, 117, 1) !important;
-}

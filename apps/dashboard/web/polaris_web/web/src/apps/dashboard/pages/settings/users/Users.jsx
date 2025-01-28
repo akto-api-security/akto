@@ -1,15 +1,12 @@
-import { ActionList, Avatar, Banner, Box, Button, Icon, LegacyCard, Link, Page, Popover, ResourceItem, ResourceList, Text } from "@shopify/polaris"
-import { DeleteMajor, TickMinor } from "@shopify/polaris-icons"
-import { useEffect, useState } from "react";
+import { Avatar, Banner, Button, Card, LegacyCard, Modal, Page, ResourceItem, ResourceList, Scrollable, Text, TextContainer, TextField } from "@shopify/polaris"
+import { useCallback, useEffect, useState } from "react";
 import settingRequests from "../api";
 import func from "@/util/func";
 import InviteUserModal from "./InviteUserModal";
 import Store from "../../../store";
-import PersistStore from '../../../../main/PersistStore';
 
 const Users = () => {
     const username = Store(state => state.username)
-    const userRole = PersistStore(state => state.userRole)
 
     const [inviteUser, setInviteUser] = useState({
         isActive: false,
@@ -20,109 +17,6 @@ const Users = () => {
 
     const [loading, setLoading] = useState(false)
     const [users, setUsers] = useState([])
-    const [roleHierarchy, setRoleHierarchy] = useState([])
-    const stiggFeatures = window.STIGG_FEATURE_WISE_ALLOWED
-    let rbacAccess = false;
-
-    if (!stiggFeatures || Object.keys(stiggFeatures).length === 0) {
-        rbacAccess = true
-    } else if(stiggFeatures && stiggFeatures['RBAC_FEATURE']){
-        rbacAccess = stiggFeatures['RBAC_FEATURE'].isGranted
-    }
-
-    const [roleSelectionPopup, setRoleSelectionPopup] = useState({})
-
-    let paidFeatureRoleOptions =  rbacAccess ? [
-        {
-            content: 'Developer',
-            role: 'DEVELOPER',
-        },
-        {
-            content: 'Guest',
-            role: 'GUEST',
-        }
-    ] : []
-
-    const rolesOptions = [
-        {
-            items: [
-            {
-                content: 'Admin',
-                role: 'ADMIN',
-            },
-            {
-                content: 'Security Engineer',
-                role: 'MEMBER',
-            }, ...paidFeatureRoleOptions]
-        },
-        {
-            items: [{
-                destructive: true,
-                content: 'Remove',
-                role: 'REMOVE',
-                icon: DeleteMajor
-            }]
-        }
-    ]
-
-    const getRoleHierarchy = async() => {
-        let roleHierarchyResp = await settingRequests.getRoleHierarchy(window.USER_ROLE)
-        if(window.USER_ROLE === 'ADMIN'){
-            roleHierarchyResp.push('REMOVE')
-        }
-        setRoleHierarchy(roleHierarchyResp)
-        
-    }
-
-    useEffect(() => {
-        getTeamData();
-        getRoleHierarchy()
-    }, [])
-
-    const handleRoleSelectChange = async (id, newRole, login) => {
-        if(newRole === 'REMOVE') {
-            await handleRemoveUser(login)
-            toggleRoleSelectionPopup(id)
-            setUsers(users.filter(user => user.login !== login))
-            return
-        }
-
-        // Call Update Role API
-        setUsers(users.map(user => user.login === login ? { ...user, role: newRole } : user))
-        setRoleSelectionPopup(prevState => ({ ...prevState, [login]: false }))
-        await updateUserRole(login, newRole)
-
-        toggleRoleSelectionPopup(id)
-    }
-
-    const toggleRoleSelectionPopup = (id) => {
-        setRoleSelectionPopup(prevState => ({
-            ...prevState,
-            [id]: !prevState[id]
-        }));
-    }
-
-    const getRolesOptionsWithTick = (currentRole) => {
-        const tempArr =  rolesOptions.map(section => ({
-            ...section,
-            items: section.items.filter((c) => roleHierarchy.includes(c.role)).map(item => ({
-                ...item,
-                prefix: item.role === "REMOVE"?  <Box><Icon source={DeleteMajor}/></Box> : item.role === currentRole ? <Box><Icon source={TickMinor}/></Box> : <div style={{padding: "10px"}}/>
-            }))
-        }));
-        return tempArr
-    }
-
-    const getRoleDisplayName = (role) => {
-        for(let section of rolesOptions) {
-            for(let item of section.items) {
-                if(item.role === role) {
-                    return item.content;
-                }
-            }
-        }
-        return role;
-    }
 
     const getTeamData = async () => {
         setLoading(true);
@@ -131,7 +25,17 @@ const Users = () => {
         setLoading(false)
     };
 
+    useEffect(() => {
+        getTeamData();
+    }, [])
+
     const isLocalDeploy = false;
+    const currentUser = users.find(user => user.login === username)
+
+    let isAdmin = false
+    if (currentUser) {
+        isAdmin = currentUser.role === "ADMIN"
+    } 
 
     const toggleInviteUserModal = () => {
         setInviteUser({
@@ -147,18 +51,18 @@ const Users = () => {
         func.setToast(true, false, "User removed successfully")
     }
 
-    const updateUserRole = async (login,roleVal) => {
-        await settingRequests.makeAdmin(login, roleVal)
-        func.setToast(true, false, "Role updated for " + login + " successfully")
+    const handleMakeAdmin = async (login) => {
+        await settingRequests.makeAdmin(login)
+        func.setToast(true, false, "User " + login + " made admin successfully")
     }
-    
+
     return (
         <Page
             title="Users"
             primaryAction={{
                 content: 'Invite user',
                 onAction: () => toggleInviteUserModal(),
-                'disabled': (isLocalDeploy || userRole === 'GUEST')
+                disabled: isLocalDeploy
             }}
             divider
         >
@@ -176,47 +80,30 @@ const Users = () => {
                 </Banner>
             }
             <br />
-            
-            <Banner>
-                <Text variant="headingMd">Role permissions</Text>
-                <Text variant="bodyMd">Each role have different permissions. <Link url="https://docs.akto.io/" target="_blank">Learn more</Link></Text>
-            </Banner>
-
+            <Text variant="headingMd">Team details</Text>
+            <Text variant="bodyMd">Find and manage your team permissions here</Text>
             <div style={{ paddingTop: "20px" }}>
                 <LegacyCard>
                     <ResourceList
                         resourceName={{ singular: 'user', plural: 'users' }}
                         items={users}
                         renderItem={(item) => {
-                            const { id, name, login, role } = item;
+                            const { id, login, role } = item;
+
                             const initials = func.initials(login)
                             const media = <Avatar user size="medium" name={login} initials={initials} />
-                            const shortcutActions = (username !== login && roleHierarchy.includes(role.toUpperCase())) ? 
+                            const shortcutActions = username !== login && isAdmin  ? 
                                 [
                                     {
-                                        content: <Popover
-                                                    active={roleSelectionPopup[id]}
-                                                    onClose={() => toggleRoleSelectionPopup(id)}
-                                                    activator={<Button disclosure onClick={() => toggleRoleSelectionPopup(id)}>{getRoleDisplayName(role)}</Button>}
-                                                 >
-                                                    <ActionList
-                                                        actionRole="menuitem"
-                                                        sections={getRolesOptionsWithTick(role).map(section => ({
-                                                            ...section,
-                                                            items: section.items.map(item => ({
-                                                                ...item,
-                                                                onAction: () => handleRoleSelectChange(id, item.role, login)
-                                                            }))
-                                                        }))}
-                                                    />
-                                                 </Popover>
-                                    }
-                                ] : [
+                                        content: 'Remove user',
+                                        onAction: () => {handleRemoveUser(login)},
+                                    },
+                                    ( role.toUpperCase() === "MEMBER" ) &&
                                     {
-                                        content: <Text color="subdued">{func.toSentenceCase(getRoleDisplayName(role))}</Text>,
-                                        url: '#',
+                                        content: 'Make admin',
+                                        onAction: () => {handleMakeAdmin(login)},
                                     }
-                                ]
+                                ] : []
 
                             return (
                                 <ResourceItem
@@ -226,10 +113,10 @@ const Users = () => {
                                     persistActions
                                 >
                                     <Text variant="bodyMd" fontWeight="bold" as="h3">
-                                        {name}
+                                        {login}
                                     </Text>
                                     <Text variant="bodyMd">
-                                        {login}
+                                        {role}
                                     </Text>
                                 </ResourceItem>
                             );
@@ -243,8 +130,6 @@ const Users = () => {
                     inviteUser={inviteUser} 
                     setInviteUser={setInviteUser}
                     toggleInviteUserModal={toggleInviteUserModal}
-                    roleHierarchy={roleHierarchy}
-                    rolesOptions={rolesOptions}
                 />
             </div>
 

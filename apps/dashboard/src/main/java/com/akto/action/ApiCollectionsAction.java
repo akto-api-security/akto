@@ -5,7 +5,6 @@ import java.util.stream.Collectors;
 
 import org.bson.conversions.Bson;
 
-import com.akto.DaoInit;
 import com.akto.action.observe.Utils;
 import com.akto.dao.*;
 import com.akto.billing.UsageMetricUtils;
@@ -43,10 +42,8 @@ import com.akto.util.LastCronRunInfo;
 import com.mongodb.client.model.Accumulators;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.FindOneAndUpdateOptions;
-import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Updates;
 import com.mongodb.BasicDBObject;
-import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Updates;
 import com.mongodb.client.result.DeleteResult;
 import com.mongodb.client.result.UpdateResult;
@@ -119,16 +116,6 @@ public class ApiCollectionsAction extends UserAction {
                 count = SingleTypeInfoDao.instance.countEndpoints(Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionId));
                 apiCollection.setUrlsCount(count);
             } else {
-                /*
-                 * In case the default collection is filled by traffic-collector traffic, 
-                 * the count will not be null, but the fallbackCount would be zero
-                 */
-                if (apiCollectionId == 0 && count != null) {
-                    fallbackCount = count;
-                }
-                if (fallbackCount == 0 && count != null) {
-                    fallbackCount = count;
-                }
                 apiCollection.setUrlsCount(fallbackCount);
             }
             if(map.containsKey(apiCollectionId)) {
@@ -152,10 +139,7 @@ public class ApiCollectionsAction extends UserAction {
     }
 
     public String fetchAllCollectionsBasic(){
-        this.apiCollections = ApiCollectionsDao.instance.findAll(
-            new BasicDBObject(), 
-            Projections.include(ApiCollection.ID, ApiCollection.NAME, ApiCollection.HOST_NAME)
-        );
+        this.apiCollections = ApiCollectionsDao.instance.findAll(new BasicDBObject());
         return Action.SUCCESS.toUpperCase();
     }
 

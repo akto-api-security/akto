@@ -37,7 +37,6 @@ function GithubSimpleTable(props) {
         filterStateUrl={props?.filterStateUrl}
         hidePagination={props?.hidePagination}
         bannerComp={props?.bannerComp}
-        csvFileName={props?.csvFileName}
     />
 
 }

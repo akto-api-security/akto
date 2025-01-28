@@ -1,10 +1,17 @@
 package com.akto.testing;
 
 import com.akto.dao.context.Context;
+import com.akto.dao.test_editor.TestEditorEnums;
+import com.akto.dao.testing.config.TestScriptsDao;
+import com.akto.data_actor.DataActor;
+import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
+import com.akto.dto.CollectionConditions.ConditionsType;
+import com.akto.dto.CollectionConditions.TestConfigsAdvancedSettings;
 import com.akto.dto.testing.TestingRunConfig;
 import com.akto.dto.testing.TestingRunResult;
+import com.akto.dto.testing.config.TestScript;
 import com.akto.dto.testing.rate_limit.RateLimitHandler;
 import com.akto.dto.type.URLMethods;
 import com.akto.log.LoggerMaker;
@@ -17,6 +24,8 @@ import okhttp3.*;
 import okio.BufferedSink;
 
 import org.apache.commons.lang3.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -25,13 +34,24 @@ import java.net.URISyntaxException;
 import java.net.URL;
 import java.util.*;
 
+import javax.script.ScriptContext;
+import javax.script.ScriptEngine;
+import javax.script.ScriptEngineManager;
+import javax.script.SimpleScriptContext;
+import jdk.nashorn.api.scripting.ScriptObjectMirror;
+
 public class ApiExecutor {
     private static final LoggerMaker loggerMaker = new LoggerMaker(ApiExecutor.class);
+    private static final Logger logger = LoggerFactory.getLogger(ApiExecutor.class);
 
     // Load only first 1 MiB of response body into memory.
     private static final int MAX_RESPONSE_SIZE = 1024*1024;
+    private static Map<Integer, Integer> lastFetchedMap = new HashMap<>();
+    private static Map<Integer, TestScript> testScriptMap = new HashMap<>();
+
+    private static final DataActor dataActor = DataActorFactory.fetchInstance();
     
-    private static OriginalHttpResponse common(Request request, boolean followRedirects, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck) throws Exception {
+    private static OriginalHttpResponse common(Request request, boolean followRedirects, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck, boolean nonTestingContext) throws Exception {
 
         Integer accountId = Context.accountId.get();
         if (accountId != null) {
@@ -80,7 +100,13 @@ public class ApiExecutor {
         String body;
         try {
             response = call.execute();
-            ResponseBody responseBody = response.peekBody(MAX_RESPONSE_SIZE);
+            
+            ResponseBody responseBody = null;
+            if (nonTestingContext) {
+                responseBody = response.body();
+            } else {
+                responseBody = response.peekBody(MAX_RESPONSE_SIZE);
+            }
             if (responseBody == null) {
                 throw new Exception("Couldn't read response body");
             }
@@ -101,7 +127,7 @@ public class ApiExecutor {
             }
         } catch (IOException e) {
             if (!(request.url().toString().contains("insertRuntimeLog") || request.url().toString().contains("insertTestingLog"))) {
-                loggerMaker.errorAndAddToDb("Error while executing request " + request.url() + ": " + e, LogDb.TESTING);
+                loggerMaker.errorAndAddToDb("Error while executing request " + request.url() + " " + response.protocol() +" : " + e, LogDb.TESTING);
             } else {
                 System.out.println("Error while executing request " + request.url() + ": " + e);
             }
@@ -228,10 +254,18 @@ public class ApiExecutor {
     public static OriginalHttpResponse sendRequest(OriginalHttpRequest request, boolean followRedirects, TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck) throws Exception {
         // don't lowercase url because query params will change and will result in incorrect request
 
+        if(testingRunConfig != null && testingRunConfig.getConfigsAdvancedSettings() != null && !testingRunConfig.getConfigsAdvancedSettings().isEmpty()){
+            calculateFinalRequestFromAdvancedSettings(request, testingRunConfig.getConfigsAdvancedSettings());
+        }
+
         String url = prepareUrl(request, testingRunConfig);
 
         if (!(url.contains("insertRuntimeLog") || url.contains("insertTestingLog"))) {
             loggerMaker.infoAndAddToDb("Final url is: " + url, LogDb.TESTING);
+        }
+
+        if (url.contains("login_submit")) {
+            loggerMaker.infoAndAddToDb("Request Payload " + request.getBody(), LogDb.TESTING);
         }
         request.setUrl(url);
 
@@ -256,12 +290,19 @@ public class ApiExecutor {
         URLMethods.Method method = URLMethods.Method.fromString(request.getMethod());
 
         builder = builder.url(request.getFullUrlWithParams());
+        boolean executeScript = testingRunConfig != null;
+        calculateHashAndAddAuth(request, executeScript);
+
+        boolean nonTestingContext = false;
+        if (testingRunConfig == null) {
+            nonTestingContext = true;
+        }
 
         OriginalHttpResponse response = null;
         switch (method) {
             case GET:
             case HEAD:
-                response = getRequest(request, builder, followRedirects, debug, testLogs, skipSSRFCheck);
+                response = getRequest(request, builder, followRedirects, debug, testLogs, skipSSRFCheck, nonTestingContext);
                 break;
             case POST:
             case PUT:
@@ -270,23 +311,53 @@ public class ApiExecutor {
             case PATCH:
             case TRACK:
             case TRACE:
-                response = sendWithRequestBody(request, builder, followRedirects, debug, testLogs, skipSSRFCheck);
+                response = sendWithRequestBody(request, builder, followRedirects, debug, testLogs, skipSSRFCheck, nonTestingContext);
                 break;
             case OTHER:
                 throw new Exception("Invalid method name");
         }
         //loggerMaker.infoAndAddToDb("Received response from: " + url, LogDb.TESTING);
 
+        if (url.contains("login_submit")) {
+            loggerMaker.infoAndAddToDb("Response Payload " + response.getBody(), LogDb.TESTING);
+        }
         return response;
     }
     public static OriginalHttpResponse sendRequest(OriginalHttpRequest request, boolean followRedirects, TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs) throws Exception {
         return sendRequest(request, followRedirects, testingRunConfig, debug, testLogs, false);
     }
 
+    private static final List<Integer> BACK_OFF_LIMITS = new ArrayList<>(Arrays.asList(1, 2, 5));
 
-    private static OriginalHttpResponse getRequest(OriginalHttpRequest request, Request.Builder builder, boolean followRedirects, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck)  throws Exception{
+    public static OriginalHttpResponse sendRequestBackOff(OriginalHttpRequest request, boolean followRedirects, TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs) throws Exception {
+        OriginalHttpResponse response = null;
+
+        for (int limit : BACK_OFF_LIMITS) {
+            try {
+                response = sendRequest(request, followRedirects, testingRunConfig, debug, testLogs, false);
+                if (response == null) {
+                    throw new NullPointerException(String.format("Response is null"));
+                }
+                if (response.getStatusCode() != 200) {
+                    throw new Exception(String.format("Invalid response code %d", response.getStatusCode()));
+                }
+                break;
+            } catch (Exception e) {
+                logger.error("Error in sending request for api : {} , will retry after {} seconds : {}", request.getUrl(),
+                        limit, e.toString());
+                try {
+                    Thread.sleep(1000 * limit);
+                } catch (Exception f) {
+                    logger.error("Error in exponential backoff at limit {} : {}", limit, f.toString());
+                }
+            }
+        }
+        return response;
+    }
+
+    private static OriginalHttpResponse getRequest(OriginalHttpRequest request, Request.Builder builder, boolean followRedirects, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck, boolean nonTestingContext)  throws Exception{
         Request okHttpRequest = builder.build();
-        return common(okHttpRequest, followRedirects, debug, testLogs, skipSSRFCheck);
+        return common(okHttpRequest, followRedirects, debug, testLogs, skipSSRFCheck, nonTestingContext);
     }
 
     public static RequestBody getFileRequestBody(String fileUrl){
@@ -329,9 +400,110 @@ public class ApiExecutor {
         
     }
 
+    private static void calculateFinalRequestFromAdvancedSettings(OriginalHttpRequest originalHttpRequest, List<TestConfigsAdvancedSettings> advancedSettings){
+        Map<String,List<ConditionsType>> headerConditions = new HashMap<>();
+        Map<String,List<ConditionsType>> payloadConditions = new HashMap<>();
+
+        for(TestConfigsAdvancedSettings settings: advancedSettings){
+            if(settings.getOperatorType().toLowerCase().contains("header")){
+                headerConditions.put(settings.getOperatorType(), settings.getOperationsGroupList());
+            }else{
+                payloadConditions.put(settings.getOperatorType(), settings.getOperationsGroupList());
+            }
+        }
+        List<ConditionsType> emptyList = new ArrayList<>();
+
+        Utils.modifyHeaderOperations(originalHttpRequest, 
+            headerConditions.getOrDefault(TestEditorEnums.NonTerminalExecutorDataOperands.MODIFY_HEADER.name(), emptyList), 
+            headerConditions.getOrDefault(TestEditorEnums.NonTerminalExecutorDataOperands.ADD_HEADER.name(), emptyList),
+            headerConditions.getOrDefault(TestEditorEnums.TerminalExecutorDataOperands.DELETE_HEADER.name(), emptyList)
+        );
+
+        Utils.modifyBodyOperations(originalHttpRequest, 
+            payloadConditions.getOrDefault(TestEditorEnums.NonTerminalExecutorDataOperands.MODIFY_BODY_PARAM.name(), emptyList), 
+            payloadConditions.getOrDefault(TestEditorEnums.NonTerminalExecutorDataOperands.ADD_BODY_PARAM.name(), emptyList),
+            payloadConditions.getOrDefault(TestEditorEnums.TerminalExecutorDataOperands.DELETE_BODY_PARAM.name(), emptyList)
+        );
+
+        // modify query params as well from payload conditions only, not handling query conditions separately for now
+        Utils.modifyQueryOperations(originalHttpRequest, 
+            payloadConditions.getOrDefault(TestEditorEnums.NonTerminalExecutorDataOperands.MODIFY_BODY_PARAM.name(), emptyList), 
+            emptyList,
+            payloadConditions.getOrDefault(TestEditorEnums.TerminalExecutorDataOperands.DELETE_BODY_PARAM.name(), emptyList)
+        );
+    }
+
+    private static void calculateHashAndAddAuth(OriginalHttpRequest originalHttpRequest, boolean executeScript) {
+        if (!executeScript) {
+            return;
+        }
+        int accountId = Context.accountId.get();
+        try {
+            String script;
+            TestScript testScript = testScriptMap.getOrDefault(accountId, null);
+            int lastTestScriptFetched = lastFetchedMap.getOrDefault(accountId, 0);
+            if (Context.now() - lastTestScriptFetched > 5 * 60) {
+                testScript = dataActor.fetchTestScript();
+                lastTestScriptFetched = Context.now();
+                testScriptMap.put(accountId, testScript);
+                lastFetchedMap.put(accountId, Context.now());
+            }
+            if (testScript != null && testScript.getJavascript() != null) {
+                script = testScript.getJavascript();
+            } else {
+                // loggerMaker.infoAndAddToDb("returning from calculateHashAndAddAuth, no test script present");
+                return;
+            }
+            loggerMaker.infoAndAddToDb("Starting calculateHashAndAddAuth");
+
+            ScriptEngineManager manager = new ScriptEngineManager();
+            ScriptEngine engine = manager.getEngineByName("nashorn");
+
+            SimpleScriptContext sctx = ((SimpleScriptContext) engine.get("context"));
+            sctx.setAttribute("method", originalHttpRequest.getMethod(), ScriptContext.ENGINE_SCOPE);
+            sctx.setAttribute("headers", originalHttpRequest.getHeaders(), ScriptContext.ENGINE_SCOPE);
+            sctx.setAttribute("url", originalHttpRequest.getPath(), ScriptContext.ENGINE_SCOPE);
+            sctx.setAttribute("payload", originalHttpRequest.getBody(), ScriptContext.ENGINE_SCOPE);
+            sctx.setAttribute("queryParams", originalHttpRequest.getQueryParams(), ScriptContext.ENGINE_SCOPE);
+            engine.eval(script);
+
+            String method = (String) sctx.getAttribute("method");
+            Map<String, Object> headers = (Map) sctx.getAttribute("headers");
+            String url = (String) sctx.getAttribute("url");
+            String payload = (String) sctx.getAttribute("payload");
+            String queryParams = (String) sctx.getAttribute("queryParams");
+
+            Map<String, List<String>> hs = new HashMap<>();
+            for (String key: headers.keySet()) {
+                try {
+                    ScriptObjectMirror scm = ((ScriptObjectMirror) headers.get(key));
+                    List<String> val = new ArrayList<>();
+                    for (int i = 0; i < scm.size(); i++) {
+                        val.add((String) scm.get(Integer.toString(i)));
+                    }
+                    hs.put(key, val);
+                } catch (Exception e) {
+                    hs.put(key, (List) headers.get(key));
+                }
+            }
+
+            originalHttpRequest.setBody(payload);
+            originalHttpRequest.setMethod(method);
+            originalHttpRequest.setUrl(url);
+            originalHttpRequest.setHeaders(hs);
+            originalHttpRequest.setQueryParams(queryParams);
+
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in calculateHashAndAddAuth " + e.getMessage() + " url " + originalHttpRequest.getUrl());
+            e.printStackTrace();
+            return;
+        }
+    }
 
 
-    private static OriginalHttpResponse sendWithRequestBody(OriginalHttpRequest request, Request.Builder builder, boolean followRedirects, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck) throws Exception {
+
+
+    private static OriginalHttpResponse sendWithRequestBody(OriginalHttpRequest request, Request.Builder builder, boolean followRedirects, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck, boolean nonTestingContext) throws Exception {
         Map<String,List<String>> headers = request.getHeaders();
         if (headers == null) {
             headers = new HashMap<>();
@@ -348,7 +520,7 @@ public class ApiExecutor {
             Request updatedRequest = builder.build();
 
 
-            return common(updatedRequest, followRedirects, debug, testLogs, skipSSRFCheck);
+            return common(updatedRequest, followRedirects, debug, testLogs, skipSSRFCheck, nonTestingContext);
         }
 
         String contentType = request.findContentType();
@@ -364,6 +536,6 @@ public class ApiExecutor {
         RequestBody body = RequestBody.create(payload, MediaType.parse(contentType));
         builder = builder.method(request.getMethod(), body);
         Request okHttpRequest = builder.build();
-        return common(okHttpRequest, followRedirects, debug, testLogs, skipSSRFCheck);
+        return common(okHttpRequest, followRedirects, debug, testLogs, skipSSRFCheck, nonTestingContext);
     }
 }

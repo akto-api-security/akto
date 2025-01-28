@@ -2,7 +2,6 @@ import React from 'react'
 import { Avatar, HorizontalStack, Text } from "@shopify/polaris"
 import BannerLayout from '../../../../components/banners/BannerLayout'
 import { COLLECTIONS_VIDEO_LENGTH, COLLECTIONS_VIDEO_THUMBNAIL, COLLECTIONS_VIDEO_URL } from '../../../../../main/onboardingData'
-import quickStartFunc from "../../../quick_start/transform"
 import "../api_inventory.css"
 
 function CollectionsPageBanner() {
@@ -13,8 +12,6 @@ function CollectionsPageBanner() {
         '/public/gcp.svg',
         '/public/postman.svg'
     ]
-
-    const connectorsList = quickStartFunc.getConnectorsList()
     
     const iconComponent = (
         <HorizontalStack gap={"2"} align="start">
@@ -27,7 +24,7 @@ function CollectionsPageBanner() {
                     )
                 })}
             </HorizontalStack>
-            <Text color="subdued" variant="bodyMd">{`+${Math.max(connectorsList.length - 4, 18)} more`}</Text>
+            <Text color="subdued" variant="bodyMd">+11 more</Text>
         </HorizontalStack>
     )
 

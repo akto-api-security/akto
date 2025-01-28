@@ -40,6 +40,10 @@
     background-color: rgba(0, 255, 0, 0.1);
 }
 
+.new-diff .view-line{
+    padding-left: 10px ;
+}
+
 .new-diff .monaco-hover{
     background-color: #FFF5EA !important;
     border-radius: 2px;

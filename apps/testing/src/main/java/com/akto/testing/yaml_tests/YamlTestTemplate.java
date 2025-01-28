@@ -13,6 +13,7 @@ import com.akto.rules.TestPlugin;
 import com.akto.test_editor.Utils;
 import com.akto.test_editor.auth.AuthValidator;
 import com.akto.test_editor.execution.Executor;
+import com.akto.test_editor.filter.data_operands_impl.ValidationResult;
 import com.akto.testing.StatusCodeAnalyser;
 
 import java.util.ArrayList;
@@ -104,9 +105,9 @@ public class YamlTestTemplate extends SecurityTestTemplate {
                 return false;
             }
         }
-        boolean isValid = TestPlugin.validateFilter(this.getFilterNode(),this.getRawApi(), this.getApiInfoKey(), this.varMap, this.logId);
+        ValidationResult isValid = TestPlugin.validateFilter(this.getFilterNode(),this.getRawApi(), this.getApiInfoKey(), this.varMap, this.logId);
         // loggerMaker.infoAndAddToDb("filter status " + isValid + " " + logId, LogDb.TESTING);
-        return isValid;
+        return isValid.getIsValid();
     }
 
 

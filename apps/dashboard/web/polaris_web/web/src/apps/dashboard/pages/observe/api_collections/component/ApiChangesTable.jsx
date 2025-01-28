@@ -12,7 +12,7 @@ import useTable from '../../../../components/tables/TableContext';
 
 function ApiChangesTable(props) {
 
-  const { handleRowClick, tableLoading, startTimeStamp, endTimeStamp, newEndpoints, parametersCount } = props ;
+  const { handleRowClick, tableLoading, startTimeStamp, endTimeStamp, newEndpoints, parametersCount, tab } = props ;
   const [selectedTab, setSelectedTab] = useState("new_endpoints") ;
   const [selected, setSelected] = useState(0) ;
   const dataTypeNames = Store(state => state.dataTypeNames);
@@ -21,7 +21,7 @@ function ApiChangesTable(props) {
   const [filters, setFilters] = useState([])
 
   const definedTableTabs = ['New endpoints', 'New params']
-  const initialCount = [newEndpoints.length , parametersCount]
+  const initialCount = [0 , parametersCount]
 
   const { tabsInfo } = useTable()
   const tableCountObj = func.getTabsCount(definedTableTabs, newEndpoints, initialCount)

@@ -7,8 +7,6 @@ import com.akto.dao.context.Context;
 import com.akto.dao.filter.MergedUrlsDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.*;
-import com.akto.dto.ApiCollection.ENV_TYPE;
-import com.akto.dto.ApiCollection.Type;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.CodeAnalysisApiInfo.CodeAnalysisApiInfoKey;
 import com.akto.dto.filter.MergedUrls;
@@ -380,7 +378,7 @@ public class InventoryAction extends UserAction {
         codeAnalysisCollectionInfo.put("codeAnalysisCollection", codeAnalysisCollection);
 
         // Fetch code analysis endpoints
-        Map<String, CodeAnalysisApiInfo> codeAnalysisApisMap = new HashMap<>();
+        Map<String, CodeAnalysisApi> codeAnalysisApisMap = new HashMap<>();
         if (codeAnalysisCollection != null) {
             List<CodeAnalysisApiInfo> codeAnalysisApiInfoList = CodeAnalysisApiInfoDao.instance.findAll(
                     Filters.eq("_id.codeAnalysisCollectionId", codeAnalysisCollection.getId()
@@ -389,7 +387,12 @@ public class InventoryAction extends UserAction {
             
             for(CodeAnalysisApiInfo codeAnalysisApiInfo: codeAnalysisApiInfoList) {
                 CodeAnalysisApiInfoKey codeAnalysisApiInfoKey = codeAnalysisApiInfo.getId();
-                codeAnalysisApisMap.put(codeAnalysisApiInfoKey.getMethod() + " " + codeAnalysisApiInfoKey.getEndpoint(), codeAnalysisApiInfo);
+                CodeAnalysisApi codeAnalysisApi = new CodeAnalysisApi(
+                    codeAnalysisApiInfoKey.getMethod(),
+                    codeAnalysisApiInfoKey.getEndpoint(),
+                    codeAnalysisApiInfo.getLocation()
+                );
+                codeAnalysisApisMap.put(codeAnalysisApi.generateCodeAnalysisApisMapKey(), codeAnalysisApi);
             }
         }
         codeAnalysisCollectionInfo.put("codeAnalysisApisMap", codeAnalysisApisMap);
@@ -629,17 +632,6 @@ public class InventoryAction extends UserAction {
         );
 
         List<SingleTypeInfo> list = SingleTypeInfoDao.instance.findAll(filters);
-
-
-        Bson filtersForCodeAnalysisSTIs = Filters.and(
-            Filters.eq(SingleTypeInfo._API_COLLECTION_ID, apiCollectionId),
-            Filters.eq(SingleTypeInfo._URL, url),  
-            Filters.eq(SingleTypeInfo._METHOD, method)
-        );
-        List<SingleTypeInfo> codeAnalysisSTIs = CodeAnalysisSingleTypeInfoDao.instance.findAll(filtersForCodeAnalysisSTIs);
-        if (!codeAnalysisSTIs.isEmpty()) {
-            list.addAll(codeAnalysisSTIs);
-        }
 
         response = new BasicDBObject();
         response.put("data", new BasicDBObject("params", list));

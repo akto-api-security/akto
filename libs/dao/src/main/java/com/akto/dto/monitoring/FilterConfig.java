@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Map;
 
 import com.akto.dto.test_editor.ConfigParserResult;
+import com.akto.dto.test_editor.ExecutorConfigParserResult;
 
 public class FilterConfig {
     private String id;
@@ -21,6 +22,15 @@ public class FilterConfig {
     private String author;
     public static final String _CONTENT = "content";
     private String content;
+
+    private ExecutorConfigParserResult executor;
+
+    public static final String DEFAULT_ALLOW_FILTER = "DEFAULT_ALLOW_FILTER";
+    public static final String DEFAULT_BLOCK_FILTER = "DEFAULT_BLOCK_FILTER";
+
+    public enum FILTER_TYPE{
+        BLOCKED , ALLOWED, MODIFIED, UNCHANGED, ERROR
+    }
 
     public FilterConfig(String id, ConfigParserResult filter, Map<String, List<String>> wordLists) {
         this.id = id;
@@ -95,5 +105,13 @@ public class FilterConfig {
 
     public void setContent(String content) {
         this.content = content;
+    }
+
+    public ExecutorConfigParserResult getExecutor() {
+        return executor;
+    }
+
+    public void setExecutor(ExecutorConfigParserResult executor) {
+        this.executor = executor;
     }
 }

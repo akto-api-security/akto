@@ -10,7 +10,7 @@ import {
   Key,
   ChoiceList,
   Tabs} from '@shopify/polaris';
-import {CellType, GithubRow} from './rows/GithubRow';
+import {GithubRow} from './rows/GithubRow';
 import { useState, useCallback, useEffect } from 'react';
 import "./style.css"
 import transform from '../../pages/observe/transform';
@@ -76,6 +76,15 @@ function GithubServerTable(props) {
 
   let filterOperators = props.headers.reduce((map, e) => { map[e.sortKey || e.value] = 'OR'; return map }, {})
 
+  const handleSelectedTab = (x) => {
+    const tableTabs = props.tableTabs ? props.tableTabs : props.tabs
+    if(tableTabs){
+      const primitivePath = window.location.origin + window.location.pathname + window.location?.search
+      const newUrl = primitivePath + "#" +  tableTabs[x].id
+      window.history.replaceState(null, null, newUrl)
+    } 
+  }
+
   useEffect(()=> {
     let queryFilters 
     if (performance.getEntriesByType('navigation')[0].type === 'reload') {
@@ -102,26 +111,10 @@ function GithubServerTable(props) {
     tempData ? setData([...tempData.value]) : setData([])
     tempData ? setTotal(tempData.total) : setTotal(0)
     applyFilter(tempData.total)
-    if (!performance.getEntriesByType('navigation')[0].type === 'reload') {
-      setTableInitialState({
-        ...tableInitialState,
-        [currentPageKey]: tempData.total
-      })
-    }
-  }
-
-  const handleSelectedTab = (x) => {
-    const tableTabs = props.tableTabs ? props.tableTabs : props.tabs
-    if(tableTabs){
-      const primitivePath = window.location.origin + window.location.pathname + window.location?.search
-      const newUrl = primitivePath + "#" +  tableTabs[x].id
-      window.history.replaceState(null, null, newUrl)
-    }
-    let val = total
-    if(total instanceof Object){
-      val = total.length
-    }
-    applyFilter(val) 
+    setTableInitialState({
+      ...tableInitialState,
+      [currentPageKey]: tempData.total
+    })
   }
 
   useEffect(() => {
@@ -228,6 +221,10 @@ function GithubServerTable(props) {
                 {...(filter.singleSelect ? {} : { allowMultiple: true })}
                 allowMultiple
                 preSelected={
+                  appliedFilters.filter((localFilter) => { return localFilter.key == filter.key }).length == 1 ?
+                    appliedFilters.filter((localFilter) => { return localFilter.key == filter.key })[0].value : filter.selected || []
+                }
+                value={
                   appliedFilters.filter((localFilter) => { return localFilter.key == filter.key }).length == 1 ?
                     appliedFilters.filter((localFilter) => { return localFilter.key == filter.key })[0].value : filter.selected || []
                 }
@@ -339,7 +336,7 @@ function GithubServerTable(props) {
                 loading={props.loading || false}
                 selected={props?.selected}
                 onSelect={(x) => handleTabChange(x)}
-              ></IndexFilters>
+              />
               {props?.bannerComp?.selected === props?.selected ? props?.bannerComp?.comp : null}
               <div className={tableHeightClass}>
               <IndexTable

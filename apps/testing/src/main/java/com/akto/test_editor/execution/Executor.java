@@ -1,16 +1,11 @@
 package com.akto.test_editor.execution;
 
-import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.billing.OrganizationsDao;
-import com.akto.dao.billing.TokensDao;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import com.akto.dao.CustomAuthTypeDao;
 import com.akto.dao.context.Context;
-import com.akto.dao.test_editor.TestEditorEnums;
-import com.akto.dao.test_editor.TestEditorEnums.ExecutorOperandTypes;
 import com.akto.dao.testing.TestRolesDao;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.CustomAuthType;
@@ -22,11 +17,7 @@ import com.akto.dto.testing.sources.AuthWithCond;
 import com.akto.testing.*;
 import com.akto.util.enums.LoginFlowEnums;
 import com.akto.util.enums.LoginFlowEnums.AuthMechanismTypes;
-import com.akto.util.enums.LoginFlowEnums.LoginStepTypesEnums;
-import com.akto.utils.RedactSampleData;
 import com.akto.dto.api_workflow.Graph;
-import com.akto.dto.billing.Organization;
-import com.akto.dto.billing.Tokens;
 import com.akto.dto.test_editor.*;
 import com.akto.dto.testing.TestResult.Confidence;
 import com.akto.dto.testing.TestResult.TestError;
@@ -37,9 +28,6 @@ import com.akto.rules.TestPlugin;
 import com.akto.test_editor.Utils;
 import com.akto.testing.TestExecutor;
 import com.akto.util.Constants;
-import com.akto.util.UsageUtils;
-import com.akto.util.enums.LoginFlowEnums;
-import com.akto.util.enums.LoginFlowEnums.AuthMechanismTypes;
 import com.akto.util.modifier.JWTPayloadReplacer;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -48,18 +36,16 @@ import java.net.URI;
 import org.json.JSONObject;
 
 import com.mongodb.BasicDBObject;
-import static com.akto.rules.TestPlugin.extractAllValuesFromPayload;
 import static com.akto.test_editor.Utils.bodyValuesUnchanged;
 import static com.akto.test_editor.Utils.headerValuesUnchanged;
+import static com.akto.runtime.utils.Utils.convertOriginalReqRespToString;
+import static com.akto.testing.Utils.compareWithOriginalResponse;
 
 import com.mongodb.client.model.Filters;
-import org.json.JSONObject;
-import org.kohsuke.github.GHRateLimit.Record;
-import com.mongodb.client.model.Updates;
 
 import org.apache.commons.lang3.StringUtils;
-import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
+
 
 public class Executor {
 
@@ -135,6 +121,7 @@ public class Executor {
                 loggerMaker.infoAndAddToDb(reason + ", going ahead with sample auth", LogDb.TESTING);
             }
         }
+        origRawApi = sampleRawApi.copy();
 
         boolean requestSent = false;
 
@@ -145,8 +132,8 @@ public class Executor {
                 apiInfoKeys.add(apiInfoKey);
                 memory = new Memory(apiInfoKeys, new HashMap<>());
             }
-            workflowTest = buildWorkflowGraph(reqNodes, rawApi, authMechanism, customAuthTypes, apiInfoKey, varMap, validatorNode);
-            result.add(triggerMultiExecution(workflowTest, reqNodes, rawApi, authMechanism, customAuthTypes, apiInfoKey, varMap, validatorNode, debug, testLogs, memory));
+            workflowTest = buildWorkflowGraph(reqNodes, sampleRawApi, authMechanism, customAuthTypes, apiInfoKey, varMap, validatorNode);
+            result.add(triggerMultiExecution(workflowTest, reqNodes, sampleRawApi, authMechanism, customAuthTypes, apiInfoKey, varMap, validatorNode, debug, testLogs, memory));
             yamlTestResult = new YamlTestResult(result, workflowTest);
             
             return yamlTestResult;
@@ -173,7 +160,7 @@ public class Executor {
             }
             try {
                 // follow redirects = true for now
-                testResponse = ApiExecutor.sendRequest(testReq.getRequest(), followRedirect, testingRunConfig, debug, testLogs, Main.SKIP_SSRF_CHECK);
+                testResponse = ApiExecutor.sendRequest(testReq.getRequest(), followRedirect, testingRunConfig, debug, testLogs, Utils.SKIP_SSRF_CHECK);
                 requestSent = true;
                 ExecutionResult attempt = new ExecutionResult(singleReq.getSuccess(), singleReq.getErrMsg(), testReq.getRequest(), testResponse);
                 TestResult res = validate(attempt, sampleRawApi, varMap, logId, validatorNode, apiInfoKey);
@@ -377,7 +364,7 @@ public class Executor {
             return null;
         }
 
-        String msg = RedactSampleData.convertOriginalReqRespToString(attempt.getRequest(), attempt.getResponse());
+        String msg = convertOriginalReqRespToString(attempt.getRequest(), attempt.getResponse());
         RawApi testRawApi = new RawApi(attempt.getRequest(), attempt.getResponse(), msg);
         boolean vulnerable = TestPlugin.validateValidator(validatorNode, rawApi, testRawApi , apiInfoKey, varMap, logId);
         if (vulnerable) {
@@ -385,7 +372,7 @@ public class Executor {
         }
         double percentageMatch = 0;
         if (rawApi.getResponse() != null && testRawApi.getResponse() != null) {
-            percentageMatch = TestPlugin.compareWithOriginalResponse(
+            percentageMatch = compareWithOriginalResponse(
                 rawApi.getResponse().getBody(), testRawApi.getResponse().getBody(), new HashMap<>()
             );
         }
@@ -538,37 +525,6 @@ public class Executor {
         return null;
     }
 
-    private static BasicDBObject getBillingTokenForAuth() {
-        BasicDBObject bDObject;
-        int accountId = Context.accountId.get();
-        Organization organization = OrganizationsDao.instance.findOne(
-                Filters.in(Organization.ACCOUNTS, accountId)
-        );
-        if (organization == null) {
-            return new BasicDBObject("error", "organization not found");
-        }
-
-        Tokens tokens;
-        Bson filters = Filters.and(
-                Filters.eq(Tokens.ORG_ID, organization.getId()),
-                Filters.eq(Tokens.ACCOUNT_ID, accountId)
-        );
-        String errMessage = "";
-        tokens = TokensDao.instance.findOne(filters);
-        if (tokens == null) {
-            errMessage = "error extracting ${akto_header}, token is missing";
-        }
-        if (tokens.isOldToken()) {
-            errMessage = "error extracting ${akto_header}, token is old";
-        }
-        if(errMessage.length() > 0){
-            bDObject = new BasicDBObject("error", errMessage);
-        }else{
-            bDObject = new BasicDBObject("token", tokens.getToken());
-        }
-        return bDObject;
-    }
-
     public ExecutorSingleOperationResp runOperation(String operationType, RawApi rawApi, Object key, Object value, Map<String, Object> varMap, AuthMechanism authMechanism, List<CustomAuthType> customAuthTypes, ApiInfo.ApiInfoKey apiInfoKey) {
         switch (operationType.toLowerCase()) {
             case "send_ssrf_req":
@@ -580,7 +536,7 @@ public class Executor {
                 uuidList.add(generatedUUID);
                 varMap.put("random_uuid", uuidList);
 
-                BasicDBObject response = getBillingTokenForAuth();
+                BasicDBObject response = OrganizationsDao.getBillingTokenForAuth();
                 if(response.getString("token") != null){
                     String tokenVal = response.getString("token");
                     return Utils.sendRequestToSsrfServer(url + generatedUUID, redirectUrl, tokenVal);
@@ -589,57 +545,9 @@ public class Executor {
                 }
             case "attach_file":
                 return Operations.addHeader(rawApi, Constants.AKTO_ATTACH_FILE , key.toString());
-            case "add_body_param":
-                Object epochVal = Utils.getEpochTime(value);
-                if (epochVal != null) {
-                    value = epochVal;
-                }
-                return Operations.addBody(rawApi, key.toString(), value);
-            case "modify_body_param":
-                epochVal = Utils.getEpochTime(value);
-                if (epochVal != null) {
-                    value = epochVal;
-                }
-                return Operations.modifyBodyParam(rawApi, key.toString(), value);
-            case "delete_graphql_field":
-                return Operations.deleteGraphqlField(rawApi, key == null ? "": key.toString());
-            case "add_graphql_field":
-                return Operations.addGraphqlField(rawApi, key == null ? "": key.toString(), value == null ? "" : value.toString());
-            case "add_unique_graphql_field":
-                return Operations.addUniqueGraphqlField(rawApi, key == null ? "": key.toString(), value == null ? "" : value.toString());
-            case "modify_graphql_field":
-                return Operations.modifyGraphqlField(rawApi, key == null ? "": key.toString(), value == null ? "" : value.toString());
-            case "delete_body_param":
-                return Operations.deleteBodyParam(rawApi, key.toString());
-            case "replace_body":
-                String newPayload = rawApi.getRequest().getBody();
-                if (key instanceof Map) {
-                    Map<String, Map<String, String>> regexReplace = (Map) key;
-                    String payload = rawApi.getRequest().getBody();
-                    Map<String, String> regexInfo = regexReplace.get("regex_replace");
-                    String regex = regexInfo.get("regex");
-                    String replaceWith = regexInfo.get("replace_with");
-                    newPayload = Utils.applyRegexModifier(payload, regex, replaceWith);
-                } else {
-                    newPayload = key.toString();
-                }
-                return Operations.replaceBody(rawApi, newPayload);
-            case "add_header":
-                if (value.equals("${akto_header}")) {
-                    BasicDBObject tokenResponse = getBillingTokenForAuth();
-                    if(tokenResponse.getString("token") != null){
-                        value = tokenResponse.getString("token");
-                    }else{
-                        return new ExecutorSingleOperationResp(false, tokenResponse.getString("error"));
-                    }
-                }
-                epochVal = Utils.getEpochTime(value);
-                if (epochVal != null) {
-                    value = epochVal;
-                }
 
-                return Operations.addHeader(rawApi, key.toString(), value.toString());
             case "modify_header":
+                Object epochVal = Utils.getEpochTime(value);
                 String keyStr = key.toString();
                 String valStr = value.toString();
 
@@ -666,33 +574,6 @@ public class Executor {
                     }
                     return Operations.modifyHeader(rawApi, keyStr, valStr);
                 }
-            case "delete_header":
-                return Operations.deleteHeader(rawApi, key.toString());
-            case "add_query_param":
-                epochVal = Utils.getEpochTime(value);
-                if (epochVal != null) {
-                    value = epochVal;
-                }
-                return Operations.addQueryParam(rawApi, key.toString(), value);
-            case "modify_query_param":
-                epochVal = Utils.getEpochTime(value);
-                if (epochVal != null) {
-                    value = epochVal;
-                }
-                return Operations.modifyQueryParam(rawApi, key.toString(), value);
-            case "delete_query_param":
-                return Operations.deleteQueryParam(rawApi, key.toString());
-            case "modify_url":
-                String newUrl = null;
-                UrlModifierPayload urlModifierPayload = Utils.fetchUrlModifyPayload(key.toString());
-                if (urlModifierPayload != null) {
-                    newUrl = Utils.buildNewUrl(urlModifierPayload, rawApi.getRequest().getUrl());
-                } else {
-                    newUrl = key.toString();
-                }
-                return Operations.modifyUrl(rawApi, newUrl);
-            case "modify_method":
-                return Operations.modifyMethod(rawApi, key.toString());
             case "remove_auth_header":
                 List<String> authHeaders = (List<String>) varMap.get("auth_headers");
                 boolean removed = false;
@@ -823,7 +704,7 @@ public class Executor {
                     return new ExecutorSingleOperationResp(true, "");
                 }
             default:
-                return new ExecutorSingleOperationResp(false, "invalid operationType");
+                return Utils.modifySampleDataUtil(operationType, rawApi, key, value, varMap, apiInfoKey);
 
         }
     }

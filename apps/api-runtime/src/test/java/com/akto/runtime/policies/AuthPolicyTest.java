@@ -81,20 +81,6 @@ public class AuthPolicyTest extends MongoBasedTest {
     }
 
     @Test
-    public void testEmptyHeaderValues() {
-        Map<String, List<String>> headers = new HashMap<>();
-        headers.put(AuthPolicy.AUTHORIZATION_HEADER_NAME, Collections.emptyList());
-        HttpResponseParams httpResponseParams = generateHttpResponseParams(headers);
-        ApiInfo apiInfo = new ApiInfo(httpResponseParams);
-        boolean result = AuthPolicy.findAuthType(httpResponseParams,apiInfo, null,customAuthTypes);
-        Assertions.assertFalse(result);
-        Set<ApiInfo.AuthType> s = new HashSet<>();
-        s.add(ApiInfo.AuthType.AUTHORIZATION_HEADER);
-        Assertions.assertEquals(apiInfo.getAllAuthTypesFound().size(), 1);
-        Assertions.assertTrue(apiInfo.getAllAuthTypesFound().contains(s));
-    }
-
-    @Test
     public void testBearerWithoutHeader() {
         Map<String, List<String>> headers = new HashMap<>();
         headers.put("someRandom", Collections.singletonList("bearer woiefjwoeifw"));

@@ -1,17 +1,7 @@
 package com.akto.dto.testing;
 
 import com.akto.dto.OriginalHttpRequest;
-import com.akto.util.CookieTransformer;
-import com.akto.util.JSONUtils;
-import com.akto.util.JsonStringPayloadModifier;
 import com.akto.util.TokenPayloadModifier;
-import com.mongodb.BasicDBObject;
-
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-
 public class LoginRequestAuthParam extends AuthParam {
 
     private Location where;
@@ -43,19 +33,7 @@ public class LoginRequestAuthParam extends AuthParam {
 
     @Override
     public boolean authTokenPresent(OriginalHttpRequest request) {
-        if (this.key == null) return false;
-        String k = this.key.toLowerCase().trim();
-
-        if (where.toString().equals(AuthParam.Location.BODY.toString())) {
-            String body = request.getBody();
-            BasicDBObject basicDBObject =  BasicDBObject.parse(request.getBody());
-            BasicDBObject data = JSONUtils.flattenWithDots(basicDBObject);
-            return data.keySet().contains(this.key);
-        } else {
-            Map<String, List<String>> headers = request.getHeaders();
-            List<String> cookieList = headers.getOrDefault("cookie", new ArrayList<>());
-            return headers.containsKey(k) || CookieTransformer.isKeyPresentInCookie(cookieList, k);
-        }
+        return Utils.isRequestKeyPresent(this.key, request, where);
     }
 
     public Location getWhere() {
