@@ -526,7 +526,7 @@ function SingleTestRunPage() {
 
   const resultTable = (
     <>
-      <RunTest activeFromTesting={activeFromTesting} setActiveFromTesting={setActiveFromTesting} preActivator={true} testIdConfig={testingRunResultSummariesObj?.testingRun} apiCollectionId={getCollectionId()} setTestMode={setTestMode} setShowEditableSettings={setShowEditableSettings} showEditableSettings={showEditableSettings} parentAdvanceSettingsConfig={conditions} useLocalSubCategoryData={useLocalSubCategoryData} />
+      <RunTest activeFromTesting={activeFromTesting} setActiveFromTesting={setActiveFromTesting} preActivator={true} testIdConfig={testingRunResultSummariesObj?.testingRun} apiCollectionId={getCollectionId()} setTestMode={setTestMode} setShowEditableSettings={setShowEditableSettings} showEditableSettings={showEditableSettings} parentAdvanceSettingsConfig={conditions} useLocalSubCategoryData={useLocalSubCategoryData} testRunType={testingRunResultSummariesObj?.testingRunType}/>
       <GithubServerTable
         key={"table"}
         pageLimit={selectedTab === 'vulnerable' ? 150 : 50}

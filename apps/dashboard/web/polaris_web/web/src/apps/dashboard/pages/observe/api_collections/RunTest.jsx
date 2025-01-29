@@ -17,7 +17,7 @@ import RunTestSuites from "./RunTestSuites";
 import RunTestConfiguration from "./RunTestConfiguration";
 
 
-function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOutside, closeRunTest, selectedResourcesForPrimaryAction, useLocalSubCategoryData, preActivator, testIdConfig, activeFromTesting, setActiveFromTesting, showEditableSettings, setShowEditableSettings, parentAdvanceSettingsConfig }) {
+function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOutside, closeRunTest, selectedResourcesForPrimaryAction, useLocalSubCategoryData, preActivator, testIdConfig, activeFromTesting, setActiveFromTesting, showEditableSettings, setShowEditableSettings, parentAdvanceSettingsConfig,testRunType }) {
 
     const initialState = {
         categories: [],
@@ -238,6 +238,12 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
 
             if (!areObjectArraysEqual(updatedTests, testRun.tests)) {
                 handleAddSettings(parentAdvanceSettingsConfig);
+                const getRunTypeLabel = (runType) => {
+                    if(!runType) return "Now";
+                    if (runType === "CI-CD" || runType === "ONE_TIME") return "Now";
+                    else if(runType === "DAILY") return "Daily";
+                    else if(runType === "CONTINUOUSLY") return "Continuously";
+                }
                 setTestRun(prev => ({
                     ...testRun,
                     tests: updatedTests,
@@ -247,6 +253,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                     testRoleId: testIdConfig.testingRunConfig.testRoleId,
                     testRunTimeLabel:(testIdConfig.testRunTime===-1)?"30 minutes":getLabel(testRunTimeOptions,  testIdConfig.testRunTime.toString())?.label,
                     testRoleLabel: getLabel(testRolesArr, testIdConfig.testingRunConfig.testRoleId).label,
+                    runTypeLabel:getRunTypeLabel(testRunType)
                 }));
             }
         }
