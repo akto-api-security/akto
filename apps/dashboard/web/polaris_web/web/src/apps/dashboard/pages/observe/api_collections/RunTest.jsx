@@ -245,7 +245,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                     maxConcurrentRequests: testIdConfig.maxConcurrentRequests,
                     testRunTime: testIdConfig.testRunTime,
                     testRoleId: testIdConfig.testingRunConfig.testRoleId,
-                    testRunTimeLabel:getLabel(testRunTimeOptions,  testIdConfig.testRunTime.toString())?.label,
+                    testRunTimeLabel:(testIdConfig.testRunTime===-1)?"30 minutes":getLabel(testRunTimeOptions,  testIdConfig.testRunTime.toString())?.label,
                     testRoleLabel: getLabel(testRolesArr, testIdConfig.testingRunConfig.testRoleId).label,
                 }));
             }
@@ -439,7 +439,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         return abc
     }, [])
 
-    const testRunTimeOptions = [{label:"Default",value:"-1"},...runTimeMinutes, ...runTimeHours]
+    const testRunTimeOptions = [...runTimeMinutes, ...runTimeHours]
 
     const runTypeOptions = [{ label: "Daily", value: "Daily" }, { label: "Continuously", value: "Continuously" }, { label: "Now", value: "Now" }]
 
@@ -540,18 +540,9 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         }
 
         if (filtered || selectedResourcesForPrimaryAction?.length > 0) {
-            if (testIdConfig) {
-                await testingApi.modifyTestingRunConfig(testIdConfig?.testingRunConfig?.id, null, selectedTests)
-                transform.rerunTest(testIdConfig.hexId, null, true)
-
-            }
-            else await observeApi.scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, "TESTING_UI", testRoleId, continuousTesting, sendSlackAlert, finalAdvancedConditions, cleanUpTestingResources)
+            await observeApi.scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, "TESTING_UI", testRoleId, continuousTesting, sendSlackAlert, finalAdvancedConditions, cleanUpTestingResources)
         } else {
-            if (testIdConfig) {
-                await testingApi.modifyTestingRunConfig(testIdConfig?.testingRunConfig?.id, null, selectedTests)
-                transform.rerunTest(testIdConfig.hexId, null, true)
-            }
-            else observeApi.scheduleTestForCollection(collectionId, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, finalAdvancedConditions, cleanUpTestingResources)
+            await observeApi.scheduleTestForCollection(collectionId, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, finalAdvancedConditions, cleanUpTestingResources)
         }
 
         setActive(false)
