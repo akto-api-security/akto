@@ -241,8 +241,8 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                 const getRunTypeLabel = (runType) => {
                     if(!runType) return "Now";
                     if (runType === "CI-CD" || runType === "ONE_TIME") return "Now";
-                    else if(runType === "DAILY") return "Daily";
-                    else if(runType === "CONTINUOUSLY") return "Continuously";
+                    else if(runType === "RECURRING") return "Daily";
+                    else if(runType === "CONTINUOUS_TESTING") return "Continuously";
                 }
                 setTestRun(prev => ({
                     ...testRun,
