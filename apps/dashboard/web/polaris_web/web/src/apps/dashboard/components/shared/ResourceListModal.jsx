@@ -1,16 +1,41 @@
 import { Modal, Text } from '@shopify/polaris'
 import React, { useState } from 'react'
 
-function ResourceListModal({ isLarge, activatorPlaceaholder, isColoredActivator, title, titleHidden, primaryAction, component }) {
+function ResourceListModal({ isLarge, activatorPlaceaholder, isColoredActivator, title, titleHidden, primaryAction, component, secondaryAction, showDeleteAction, deleteAction }) {
     const [popup, setPopup] = useState(false)
     const activatorText = isColoredActivator ? <Text color='subdued'>{activatorPlaceaholder}</Text> : activatorPlaceaholder
+
+    if(!secondaryAction) {
+        secondaryAction = () => {}
+    }
+
+    let secondaryActions = []
+    if (showDeleteAction) {
+        secondaryActions.push({
+            content: 'Delete',
+            onAction: () => {
+                deleteAction()
+                setPopup(false)
+            }
+        })
+    }
+    secondaryActions.push({
+        content: 'Cancel',
+        onAction: () => {
+            secondaryAction()
+            setPopup(false)
+        }
+    })
 
     return (
         <Modal
             large={isLarge}
             activator={<div onClick={() => setPopup(!popup)}>{activatorText}</div>}
             open={popup}
-            onClose={() => setPopup(false)}
+            onClose={() => { 
+            secondaryAction()
+            setPopup(false)
+             }}
             title={title}
             titleHidden={titleHidden}
             primaryAction={{
@@ -20,10 +45,7 @@ function ResourceListModal({ isLarge, activatorPlaceaholder, isColoredActivator,
                     if(flag) setPopup(false)
                 },
             }}
-            secondaryActions={{
-                content: 'Cancel',
-                onAction: () => setPopup(false)
-            }}
+            secondaryActions={secondaryActions}
         >
             {component}
         </Modal>

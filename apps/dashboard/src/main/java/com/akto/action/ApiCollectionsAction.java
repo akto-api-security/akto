@@ -794,6 +794,23 @@ public class ApiCollectionsAction extends UserAction {
             int userId = Integer.parseInt(entry.getKey());
             Set<Integer> apiCollections = new HashSet<>(entry.getValue());
 
+            /*
+             * Need actual role, not base role, 
+             * thus using direct Rbac query, not cached map.
+             */
+            RBAC rbac = RBACDao.instance.findOne(Filters.and(
+                    Filters.eq(RBAC.USER_ID, userId),
+                    Filters.eq(RBAC.ACCOUNT_ID, accountId)));
+            String role = rbac.getRole();
+            CustomRole customRole = CustomRoleDao.instance.findRoleByName(role);
+            /*
+             * If the role is custom role, only update the user with the delta.
+             */
+            if (customRole != null && customRole.getApiCollectionsId() != null
+                    && !customRole.getApiCollectionsId().isEmpty()) {
+                apiCollections.removeAll(customRole.getApiCollectionsId());
+            }
+
             RBACDao.updateApiCollectionAccess(userId, accountId, apiCollections);
             UsersCollectionsList.deleteCollectionIdsFromCache(userId, accountId);
         }
