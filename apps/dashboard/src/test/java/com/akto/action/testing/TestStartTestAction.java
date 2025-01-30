@@ -8,8 +8,10 @@ import com.akto.dao.RBACDao;
 import com.akto.dao.UsersDao;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
+import com.akto.dao.testing.TestingRunConfigDao;
 import com.akto.dao.testing.TestingRunDao;
 import com.akto.dao.testing.TestingRunResultSummariesDao;
+import com.akto.dto.testing.config.EditableTestingRunConfig;
 import com.akto.dto.AccountSettings;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiToken;
@@ -264,6 +266,54 @@ public class TestStartTestAction extends MongoBasedTest {
 
         assertEquals(metadata, summary.getMetadata());
 
+    }
+
+    @Test
+    public void testModifyTestingRunConfig() {
+
+        int testingRunConfigId = UUID.randomUUID().hashCode() & 0xfffffff;
+        ObjectId testingRunHexId = new ObjectId();
+
+        List<String> list1 = Arrays.asList("pkucgztk", "oionxmec", "tmptskkz", "rorcqyqf");
+        List<String> list2 = Arrays.asList("sqhrduyv", "awpqhaxz", "tdzydooe", "hxwvtoem");
+        TestingRunConfig testingRunConfig = new TestingRunConfig();
+        testingRunConfig.setTestRoleId("initialRole");
+        testingRunConfig.setOverriddenTestAppUrl("https://initial.url");
+        testingRunConfig.setTestSubCategoryList(list1);
+
+        TestingRunConfigDao.instance.insertOne(testingRunConfig);
+
+        TestingRun testingRun = new TestingRun();
+        testingRun.setTestIdConfig(testingRunConfigId);
+        testingRun.setTestRunTime(1800);
+        testingRun.setMaxConcurrentRequests(5);
+        testingRun.setId(testingRunHexId);
+
+        TestingRunDao.instance.insertOne(testingRun);
+
+        EditableTestingRunConfig editableTestingRunConfig = new EditableTestingRunConfig();
+        editableTestingRunConfig.setTestRunTime(3600);
+        editableTestingRunConfig.setTestRoleId("newRole");
+        editableTestingRunConfig.setOverriddenTestAppUrl("https://test.url");
+        editableTestingRunConfig.setMaxConcurrentRequests(10);
+        editableTestingRunConfig.setTestSubCategoryList(list2);
+
+        StartTestAction startTestAction = new StartTestAction();
+        startTestAction.setTestingRunConfigId(testingRunConfigId);
+        startTestAction.setEditableTestingRunConfig(editableTestingRunConfig);
+
+        String result = startTestAction.modifyTestingRunConfig();
+        
+        assertEquals(Action.SUCCESS.toUpperCase(), result);
+
+        TestingRunConfig updatedConfig = TestingRunConfigDao.instance.findOne(Filters.eq(Constants.ID, testingRunConfigId));
+        assertEquals("newRole", updatedConfig.getTestRoleId());
+        assertEquals("https://test.url", updatedConfig.getOverriddenTestAppUrl());
+        assertEquals(list2, updatedConfig.getTestSubCategoryList());
+
+        TestingRun updatedTestingRun = TestingRunDao.instance.findOne(Filters.eq(Constants.ID, testingRunHexId));
+        assertEquals(3600, updatedTestingRun.getTestRunTime());
+        assertEquals(10, updatedTestingRun.getMaxConcurrentRequests());
     }
 
 }

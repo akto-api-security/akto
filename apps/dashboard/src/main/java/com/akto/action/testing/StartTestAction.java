@@ -6,7 +6,7 @@ import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing.sources.TestSourceConfigsDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dao.testing.*;
-import com.akto.dao.testing.config.EditableTestingRunConfig;
+import com.akto.dto.testing.config.EditableTestingRunConfig;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.User;
 import com.akto.dto.ApiToken.Utility;
@@ -1130,24 +1130,41 @@ public class StartTestAction extends UserAction {
     private EditableTestingRunConfig editableTestingRunConfig;
 
     public String modifyTestingRunConfig(){
-        TestingRunConfigDao.instance.updateOne(
-            Filters.eq(Constants.ID, this.testingRunConfigId),
-                Updates.combine(
-                    Updates.set("configsAdvancedSettings", this.editableTestingRunConfig.getTestConfigsAdvancedSettings()),
-                    Updates.set("testSubCategoryList", this.editableTestingRunConfig.getSubCategoriesList()),
-                    Updates.set("testRoleId", this.editableTestingRunConfig.getTestRoleId()),
-                    Updates.set("overriddenTestAppUrl", this.editableTestingRunConfig.getOverriddenTestAppUrl())
-                )
-            );
+        if (editableTestingRunConfig == null) {
+            return Action.ERROR.toUpperCase();
+        }
+        try {
+            if (this.testingRunConfigId == 0) {
+                throw new Exception();
+            } else {
+                TestingRunConfigDao.instance.updateOne(
+                    Filters.eq(Constants.ID, this.testingRunConfigId),
+                    Updates.combine(
+                        Updates.set("configsAdvancedSettings", this.editableTestingRunConfig.getConfigsAdvancedSettings()),
+                        Updates.set("testSubCategoryList", this.editableTestingRunConfig.getTestSubCategoryList()),
+                        Updates.set("testRoleId", this.editableTestingRunConfig.getTestRoleId()),
+                        Updates.set("overriddenTestAppUrl", this.editableTestingRunConfig.getOverriddenTestAppUrl())
+                    )
+                );
+            }
+
+            if (editableTestingRunConfig.getTestingRunHexId() != null) {
+                String hexId = editableTestingRunConfig.getTestingRunHexId();
             
-        if(editableTestingRunConfig.getTestingRunHexId() != null){
-            TestingRunDao.instance.updateOne(
-                Filters.eq(Constants.ID, new ObjectId(editableTestingRunConfig.getTestingRunHexId())),
-                Updates.combine(
-                    Updates.set("testRunTime", this.editableTestingRunConfig.getTestRunTime()),
-                    Updates.set("maxConcurrentRequests", this.editableTestingRunConfig.getMaxConcurrentRequests())
-                )
-            );
+                ObjectId objectId = new ObjectId(hexId);
+                    
+                TestingRunDao.instance.updateOne(
+                    Filters.eq(Constants.ID, objectId),
+                    Updates.combine(
+                        Updates.set("testRunTime", this.editableTestingRunConfig.getTestRunTime()),
+                        Updates.set("maxConcurrentRequests", this.editableTestingRunConfig.getMaxConcurrentRequests())
+                    )
+                );
+                
+            }
+
+        } catch (Exception e) {
+            return Action.ERROR.toUpperCase();
         }
         return SUCCESS.toUpperCase();
     }
