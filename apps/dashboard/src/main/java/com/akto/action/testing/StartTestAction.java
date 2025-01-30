@@ -1140,18 +1140,29 @@ public class StartTestAction extends UserAction {
                 return Action.ERROR.toUpperCase();
             } else {
 
-                TestingRunConfig existingtestingRunConfig = TestingRunConfigDao.instance.findOne(Filters.eq(Constants.ID, this.testingRunConfigId));
-                if (existingtestingRunConfig == null) {
-                    addActionError("testing run config object not found");
-                return Action.ERROR.toUpperCase();
+                TestingRunConfig existingTestingRunConfig = TestingRunConfigDao.instance.findOne(Filters.eq(Constants.ID, this.testingRunConfigId));
+                if (existingTestingRunConfig == null) {
+                    addActionError("Testing run config object not found for ID: " + this.testingRunConfigId);
+                    return Action.ERROR.toUpperCase();
                 }
 
-                existingtestingRunConfig.setConfigsAdvancedSettings(this.editableTestingRunConfig.getConfigsAdvancedSettings());
-                existingtestingRunConfig.setTestSubCategoryList(this.editableTestingRunConfig.getTestSubCategoryList());
-                existingtestingRunConfig.setTestRoleId(this.editableTestingRunConfig.getTestRoleId());
-                existingtestingRunConfig.setOverriddenTestAppUrl(this.editableTestingRunConfig.getOverriddenTestAppUrl());
+                if (editableTestingRunConfig.getConfigsAdvancedSettings() != null) {
+                    existingTestingRunConfig.setConfigsAdvancedSettings(editableTestingRunConfig.getConfigsAdvancedSettings());
+                }
+        
+                if (editableTestingRunConfig.getTestSubCategoryList() != null) {
+                    existingTestingRunConfig.setTestSubCategoryList(editableTestingRunConfig.getTestSubCategoryList());
+                }
+        
+                if (editableTestingRunConfig.getTestRoleId() != null) {
+                    existingTestingRunConfig.setTestRoleId(editableTestingRunConfig.getTestRoleId());
+                }
+        
+                if (editableTestingRunConfig.getOverriddenTestAppUrl() != null) {
+                    existingTestingRunConfig.setOverriddenTestAppUrl(editableTestingRunConfig.getOverriddenTestAppUrl());
+                }
 
-                TestingRunConfigDao.instance.replaceOne(Filters.eq(Constants.ID, this.testingRunConfigId), existingtestingRunConfig);
+                TestingRunConfigDao.instance.replaceOne(Filters.eq(Constants.ID, this.testingRunConfigId), existingTestingRunConfig);
             }
 
             if (editableTestingRunConfig.getTestingRunHexId() != null) {
@@ -1159,8 +1170,13 @@ public class StartTestAction extends UserAction {
                 TestingRun existingTestingRun = TestingRunDao.instance.findOne(Filters.eq(Constants.ID, new ObjectId(editableTestingRunConfig.getTestingRunHexId())));
 
                 if (existingTestingRun != null) {
-                    existingTestingRun.setTestRunTime(this.editableTestingRunConfig.getTestRunTime());
-                    existingTestingRun.setMaxConcurrentRequests(this.editableTestingRunConfig.getMaxConcurrentRequests());
+                    if (editableTestingRunConfig.getTestRunTime() != 0) {
+                        existingTestingRun.setTestRunTime(editableTestingRunConfig.getTestRunTime());
+                    }
+    
+                    if (editableTestingRunConfig.getMaxConcurrentRequests() != 0) {
+                        existingTestingRun.setMaxConcurrentRequests(editableTestingRunConfig.getMaxConcurrentRequests());
+                    }
         
                     TestingRunDao.instance.replaceOne(
                         Filters.eq(Constants.ID, new ObjectId(editableTestingRunConfig.getTestingRunHexId())),
@@ -1169,6 +1185,7 @@ public class StartTestAction extends UserAction {
                 }
                 
             }
+
 
         } catch (Exception e) {
             addActionError("Unable to modify testing run config and testing run");
