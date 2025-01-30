@@ -3,6 +3,7 @@ package com.akto.testing;
 
 import com.akto.crons.GetRunningTestsStatus;
 import com.akto.dao.ActivitiesDao;
+import com.akto.dao.ApiInfoDao;
 import com.akto.dao.CustomAuthTypeDao;
 import com.akto.dao.DependencyNodeDao;
 import com.akto.dao.context.Context;
@@ -75,6 +76,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class TestExecutor {
 
@@ -302,7 +304,7 @@ public class TestExecutor {
                 List<String> messages = testingUtil.getSampleMessages().get(apiInfoKey);
                 if(Constants.IS_NEW_TESTING_ENABLED){
                     for (String testSubCategory: testingRunSubCategories) {
-                        Future<Void> future = threadPool.submit(() ->insertRecordInKafka(accountId, testSubCategory, apiInfoKey, messages, summaryId, syncLimit, apiInfoKeyToHostMap, subCategoryEndpointMap, testConfigMap, testLogs, testingRun));
+                        Future<Void> future = threadPool.submit(() ->insertRecordInKafka(accountId, testSubCategory, apiInfoKey, messages, summaryId, syncLimit, apiInfoKeyToHostMap, subCategoryEndpointMap, testConfigMap, testLogs, testingRun, new AtomicBoolean(false)));
                         testingRecords.add(future);
                     }
                     latch.countDown();
@@ -343,14 +345,19 @@ public class TestExecutor {
         List<TestingRunResult.TestLog> testLogs, TestingRun testingRun, CountDownLatch latch){
 
             Context.accountId.set(accountId);
+            AtomicBoolean isApiInfoTested = new AtomicBoolean(false);
             for (String testSubCategory: testingRunSubCategories) {
                 loggerMaker.infoAndAddToDb("Trying to run test for category: " + testSubCategory + " with summary state: " + GetRunningTestsStatus.getRunningTests().getCurrentState(summaryId) );
                 if(GetRunningTestsStatus.getRunningTests().isTestRunning(summaryId, true)){
-                    insertRecordInKafka(accountId, testSubCategory, apiInfoKey, messages, summaryId, syncLimit, apiInfoKeyToHostMap, subCategoryEndpointMap, testConfigMap, testLogs, testingRun);
+                    insertRecordInKafka(accountId, testSubCategory, apiInfoKey, messages, summaryId, syncLimit, apiInfoKeyToHostMap, subCategoryEndpointMap, testConfigMap, testLogs, testingRun, isApiInfoTested);
                 }else{
                     logger.info("Test stopped for id: " + testingRun.getHexId());
                     break;
                 }
+            }
+            if(isApiInfoTested.get()){
+                logger.info("Api: " + apiInfoKey.toString() + " has been successfully tested");
+                ApiInfoDao.instance.updateLastTestedField(apiInfoKey);
             }
             latch.countDown();
 
@@ -360,7 +367,7 @@ public class TestExecutor {
     private Void insertRecordInKafka(int accountId, String testSubCategory, ApiInfo.ApiInfoKey apiInfoKey,
             List<String> messages, ObjectId summaryId, SyncLimit syncLimit, Map<ApiInfoKey, String> apiInfoKeyToHostMap,
             ConcurrentHashMap<String, String> subCategoryEndpointMap, Map<String, TestConfig> testConfigMap,
-            List<TestingRunResult.TestLog> testLogs, TestingRun testingRun) {
+            List<TestingRunResult.TestLog> testLogs, TestingRun testingRun, AtomicBoolean isApiInfoTested) {
         Context.accountId.set(accountId);
         TestConfig testConfig = testConfigMap.get(testSubCategory);
                     
@@ -404,6 +411,12 @@ public class TestExecutor {
                 TestingConfigurations instance = TestingConfigurations.getInstance();
                 String sampleMessage = messages.get(messages.size() - 1);
                 testingRunResult = runTestNew(apiInfoKey, summaryId, instance.getTestingUtil(), summaryId, testConfig, instance.getTestingRunConfig(), instance.isDebug(), testLogs, sampleMessage);
+                if (testingRunResult != null) {
+                    List<String> errorList = testingRunResult.getErrorsList();
+                    if (errorList == null || !errorList.contains(TestResult.API_CALL_FAILED_ERROR_STRING)) {
+                        isApiInfoTested.set(true);
+                    }
+                }
                 insertResultsAndMakeIssues(Collections.singletonList(testingRunResult), summaryId);
             }
             
