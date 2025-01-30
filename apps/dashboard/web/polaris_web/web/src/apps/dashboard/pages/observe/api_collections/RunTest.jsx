@@ -17,7 +17,7 @@ import RunTestSuites from "./RunTestSuites";
 import RunTestConfiguration from "./RunTestConfiguration";
 
 
-function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOutside, closeRunTest, selectedResourcesForPrimaryAction, useLocalSubCategoryData, preActivator, testIdConfig, activeFromTesting, setActiveFromTesting, showEditableSettings, setShowEditableSettings, parentAdvanceSettingsConfig,testRunType }) {
+function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOutside, closeRunTest, selectedResourcesForPrimaryAction, useLocalSubCategoryData, preActivator, testIdConfig, activeFromTesting, setActiveFromTesting, showEditableSettings, setShowEditableSettings, parentAdvanceSettingsConfig, testRunType }) {
 
     const initialState = {
         categories: [],
@@ -121,15 +121,15 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
             subCategories: [],
             testSourceConfigs: []
         }
-        
+
         if ((localCategoryMap && Object.keys(localCategoryMap).length > 0) && (localSubCategoryMap && Object.keys(localSubCategoryMap).length > 0)) {
             metaDataObj = {
                 categories: Object.values(localCategoryMap),
                 subCategories: Object.values(localSubCategoryMap),
                 testSourceConfigs: []
             }
-            
-        } else { 
+
+        } else {
             metaDataObj = await transform.getAllSubcategoriesData(true, "runTests")
         }
         let categories = metaDataObj.categories
@@ -239,10 +239,10 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
             if (!areObjectArraysEqual(updatedTests, testRun.tests)) {
                 handleAddSettings(parentAdvanceSettingsConfig);
                 const getRunTypeLabel = (runType) => {
-                    if(!runType) return "Now";
+                    if (!runType) return "Now";
                     if (runType === "CI-CD" || runType === "ONE_TIME") return "Now";
-                    else if(runType === "RECURRING") return "Daily";
-                    else if(runType === "CONTINUOUS_TESTING") return "Continuously";
+                    else if (runType === "RECURRING") return "Daily";
+                    else if (runType === "CONTINUOUS_TESTING") return "Continuously";
                 }
                 setTestRun(prev => ({
                     ...testRun,
@@ -251,9 +251,9 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                     maxConcurrentRequests: testIdConfig.maxConcurrentRequests,
                     testRunTime: testIdConfig.testRunTime,
                     testRoleId: testIdConfig.testingRunConfig.testRoleId,
-                    testRunTimeLabel:(testIdConfig.testRunTime===-1)?"30 minutes":getLabel(testRunTimeOptions,  testIdConfig.testRunTime.toString())?.label,
+                    testRunTimeLabel: (testIdConfig.testRunTime === -1) ? "30 minutes" : getLabel(testRunTimeOptions, testIdConfig.testRunTime.toString())?.label,
                     testRoleLabel: getLabel(testRolesArr, testIdConfig.testingRunConfig.testRoleId).label,
-                    runTypeLabel:getRunTypeLabel(testRunType)
+                    runTypeLabel: getRunTypeLabel(testRunType)
                 }));
             }
         }
@@ -265,7 +265,18 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
     const toggleRunTest = () => {
         if (activeFromTesting) {
             setActiveFromTesting(false);
+            setShouldRuntestConfig(true);
             return;
+        }
+        if (!activeFromTesting) {
+            setTestRun(prev => {
+                const tests = { ...testRun.tests }
+                Object.keys(tests).forEach(category => {
+                    tests[category] = tests[category].map(test => ({ ...test, selected: false }))
+                })
+    
+                return { ...prev, tests: tests, testName: convertToLowerCaseWithUnderscores(apiCollectionName) }
+            })
         }
         setActive(prev => !prev)
         if (active) {
@@ -636,7 +647,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
             setShowEditableSettings(false)
         })
 
-        if(activeFromTesting){
+        if (activeFromTesting) {
             transform.rerunTest(testIdConfig.hexId, null, true)
         }
     }
@@ -707,7 +718,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                 </HorizontalStack>}
                 primaryAction={{
                     content: activeFromTesting ? "Save & Re-run" : scheduleString(),
-                    onAction: activeFromTesting? handleModifyConfig: handleRun,
+                    onAction: activeFromTesting ? handleModifyConfig : handleRun,
                     disabled: (countAllSelectedTests() === 0) || !testRun.authMechanismPresent
                 }}
                 secondaryActions={[
@@ -767,12 +778,14 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                                             onChange={(testName) => setTestRun(prev => ({ ...prev, testName: testName }))}
                                         />
                                     </div>
-
-                                    <Button
-                                        icon={CancelMajor}
-                                        destructive
-                                        onClick={handleRemoveAll}
-                                        disabled={checkRemoveAll()}><div data-testid="remove_all_tests">Clear selection</div></Button>
+                                    <div className="removeAllButton">
+                                        <Button
+                                            icon={CancelMajor}
+                                            plain
+                                            destructive
+                                            onClick={handleRemoveAll}
+                                            disabled={checkRemoveAll()}><div data-testid="remove_all_tests">Clear selection</div></Button>
+                                    </div>
                                 </div>
                                 <div style={{ display: "grid", gridTemplateColumns: "50% 50%", border: "1px solid #C9CCCF" }}>
                                     <div style={{ borderRight: "1px solid #C9CCCF" }}>
