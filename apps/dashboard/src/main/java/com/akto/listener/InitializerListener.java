@@ -592,7 +592,9 @@ public class InitializerListener implements ServletContextListener {
                         piiKey,
                         dt.getBoolean("sensitive"),
                         dt.getString("regexPattern"),
-                        dt.getBoolean("onKey")
+                        dt.getBoolean("onKey"),
+                        dt.getString("regexPatternOnValue"),
+                        dt.getBoolean("onKeyAndPayload")
                 );
 
                 CustomDataType existingCDT = customDataTypesMap.getOrDefault(piiKey, null);
@@ -697,9 +699,20 @@ public class InitializerListener implements ServletContextListener {
     private static CustomDataType getCustomDataTypeFromPiiType(PIISource piiSource, PIIType piiType, Boolean active) {
         String piiKey = piiType.getName();
 
-        List<Predicate> predicates = new ArrayList<>();
-        Conditions conditions = new Conditions(predicates, Operator.OR);
-        predicates.add(new RegexPredicate(piiType.getRegexPattern()));
+        List<Predicate> keyPredicates = new ArrayList<>();
+        Conditions keyConditions = new Conditions(keyPredicates, Operator.OR);
+
+        if(piiType.getOnKey() || piiType.getOnKeyAndPayload()){
+            keyPredicates.add(new RegexPredicate(piiType.getRegexPattern()));
+        }
+
+        List<Predicate> valuePredicates = new ArrayList<>();
+        Conditions valueConditions = new Conditions(valuePredicates, Operator.OR);
+        if(!piiType.getOnKey() || piiType.getOnKeyAndPayload()){
+            String valuePattern = piiType.getOnKeyAndPayload() ? piiType.getRegexPatternOnValue() : piiType.getRegexPattern();
+            valuePredicates.add(new RegexPredicate(valuePattern));
+        }
+
         IgnoreData ignoreData = new IgnoreData(new HashMap<>(), new HashSet<>());
         CustomDataType ret = new CustomDataType(
                 piiKey,
@@ -707,8 +720,8 @@ public class InitializerListener implements ServletContextListener {
                 Collections.emptyList(),
                 piiSource.getAddedByUser(),
                 active,
-                (piiType.getOnKey() ? conditions : null),
-                (piiType.getOnKey() ? null : conditions),
+                ((piiType.getOnKey() || piiType.getOnKeyAndPayload()) ? keyConditions : null),
+                ((piiType.getOnKey() && !piiType.getOnKeyAndPayload()) ? null : valueConditions),
                 Operator.OR,
                 ignoreData,
                 false,
