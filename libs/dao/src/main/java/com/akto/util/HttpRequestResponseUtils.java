@@ -146,10 +146,12 @@ public class HttpRequestResponseUtils {
         for (String key : jsonObject.keySet()) {
             // Encode the key and value, and append them to the string builder
             try {
-                formUrlEncoded.append(encode(key))
-                        .append("=")
-                        .append(encode(jsonObject.getString(key)))
-                        .append("&");
+                /*
+                 * Taking this change from mini-runtime-release.
+                 * Takes care of case where key is not present in json Object.
+                 */
+                String tmp = encode(key) + "=" + encode(String.valueOf(jsonObject.get(key))) + "&";
+                formUrlEncoded.append(tmp);
             } catch (Exception e) {
                 e.printStackTrace();
             }
