@@ -49,7 +49,7 @@ public class SsoUtils {
         }else{
             List<String> ssoList = Arrays.asList(oktaIdString, "GITHUB-ankush", "AZURE-ankush");
             Bson filter = Filters.in("_id", ssoList);
-            return ConfigsDao.instance.count(filter) > 0;
+            return ConfigsDao.instance.count(filter) > 0 || isAnySsoActive(1000000);
         }
     }
 

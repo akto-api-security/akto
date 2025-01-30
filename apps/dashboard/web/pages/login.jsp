@@ -72,7 +72,11 @@
                     window.TIME_ZONE = '${requestScope.currentTimeZone}'
                     window.USER_FULL_NAME = '${requestScope.userFullName}'
                     window.ORGANIZATION_NAME = '${requestScope.organizationName}'
-                    window.GOOGLE_SSO_URL=atob('${requestScope.googleSsoUrl}')
+                    window.GOOGLE_SAML_AUTH_URL=atob('${requestScope.googleSamlAuthUrl}')
+                    window.OKTA_AUTH_URL = '${requestScope.oktaAuthUrl}'
+                    window.AZURE_AUTH_URL = '${requestScope.azureAuthUrl}'
+                    window.GITHUB_AUTH_URL = '${requestScope.githubAuthUrl}'
+                    window.ACTIVE_SSO = '${requestScope.activeSso}'
 
                     window.STIGG_IS_OVERAGE='${requestScope.stiggIsOverage}'
                     window.USAGE_PAUSED=JSON.parse('${requestScope.usagePaused}' || '{}');

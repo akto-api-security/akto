@@ -35,34 +35,49 @@ function SignUp() {
     }))
   }
 
-  const oktaUrl = window.OKTA_AUTH_URL
-  const githubId = window.GITHUB_CLIENT_ID
-  const githubUrl = window.GITHUB_URL ? window.GITHUB_URL : "https://github.com"
+  const activeSSO = window.ACTIVE_SSO
+  const githubAuthUrl = window.GITHUB_AUTH_URL
+  const oktaAuthUrl = window.OKTA_AUTH_URL
+  const azureAuthUrl = window.AZURE_AUTH_URL
   const resetAll = PersistStore(state => state.resetAll)
   const { clearPollingInterval } = usePolling();
 
   const githubAuthObj = {
     logo: '/public/github_icon.svg',
     text: 'Continue with Github SSO',
-    onClickFunc: () => { window.location.href = (githubUrl + "/login/oauth/authorize?client_id=" + githubId); }
+    onClickFunc: () => { window.location.href = githubAuthUrl }
   }
 
   const oktaAuthObj = {
     logo: '/public/okta_logo.svg',
     text: 'Continue with Okta SSO',
-    onClickFunc: () => { window.location.href = oktaUrl }
+    onClickFunc: () => { window.location.href = oktaAuthUrl }
+  }
+
+  const azureAuthObj = {
+    logo: '/public/azure_logo.svg',
+    text: 'Continue with Azure SSO',
+    onClickFunc: () => { window.location.href = azureAuthUrl }
+  }
+
+  const googleSamlAuthObj = {
+    logo: '/public/gcp.svg',
+    text: 'Continue with Google SAML SSO',
+    onClickFunc: () => { window.location.href = "" }
   }
 
   useEffect(() => {
     resetAll()
     clearPollingInterval()
     let copySsoList = []
-    if (githubId !== undefined && githubId.length > 0) {
+    if (activeSSO?.toLowerCase() === "github" && githubAuthUrl?.length > 0) {
       copySsoList.push(githubAuthObj)
-    }
-
-    if (oktaUrl !== undefined && oktaUrl.length > 0) {
+    } else if(activeSSO?.toLowerCase() === "okta" && oktaAuthUrl?.length > 0) {
       copySsoList.push(oktaAuthObj)
+    } else if(activeSSO?.toLowerCase() === "azure" && azureAuthUrl?.length > 0) {
+      copySsoList.push(azureAuthObj)
+    } else if(activeSSO?.toLowerCase() === "google_saml") {
+      copySsoList.push(googleSamlAuthObj)
     }
 
     setSsoList(copySsoList)
