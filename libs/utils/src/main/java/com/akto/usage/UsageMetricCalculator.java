@@ -46,6 +46,10 @@ public class UsageMetricCalculator {
     /*
      * to handle multiple accounts using static maps.
      */
+    /*
+     * RBAC_FEATURE is advanced RBAC, for collection based RBAC and custom roles.
+     * RBAC_BASIC is basic RBAC for inviting with multiple roles.
+     */
     private final static String FEATURE_LABEL_STRING = "RBAC_FEATURE";
     private final static String BASIC_RBAC_FEATURE = "RBAC_BASIC";
     private static Map<Integer, Integer> lastDeactivatedFetchedMap = new HashMap<>();

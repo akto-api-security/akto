@@ -17,7 +17,7 @@ public class RBAC {
     private int userId;
 
     public static final String USER_ID = "userId";
-    private Role role;
+    private String role;
     public static final String ROLE = "role";
     private int accountId;
     public static final String ACCOUNT_ID = "accountId";
@@ -51,13 +51,13 @@ public class RBAC {
         }
     }
 
-    public RBAC(int userId, Role role) {
+    public RBAC(int userId, String role) {
         this.userId = userId;
         this.role = role;
         this.apiCollectionsId = new ArrayList<>();
     }
 
-    public RBAC(int userId, Role role, int accountId) {
+    public RBAC(int userId, String role, int accountId) {
         this.userId = userId;
         this.role = role;
         this.accountId = accountId;
@@ -84,11 +84,11 @@ public class RBAC {
         this.userId = userId;
     }
 
-    public Role getRole() {
+    public String getRole() {
         return role;
     }
 
-    public void setRole(Role role) {
+    public void setRole(String role) {
         this.role = role;
     }
 
@@ -103,6 +103,7 @@ public class RBAC {
     public List<Integer> getApiCollectionsId() {
         return apiCollectionsId;
     }
+
     public void setApiCollectionsId(List<Integer> apiCollectionsId) {
         this.apiCollectionsId = apiCollectionsId;
     }

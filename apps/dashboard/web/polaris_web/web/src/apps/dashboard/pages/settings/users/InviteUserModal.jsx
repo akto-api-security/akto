@@ -1,15 +1,20 @@
 import { Modal, Text, TextField } from "@shopify/polaris"
-import { useState, useRef, useCallback } from "react"
+import { useState, useRef, useCallback, useEffect } from "react"
 import func from "@/util/func"
 import Store from "../../../store"
 import settingRequests from "../api"
 import Dropdown from "../../../components/layouts/Dropdown"
 
-const InviteUserModal = ({ inviteUser, setInviteUser, toggleInviteUserModal, roleHierarchy, rolesOptions}) => {
+const InviteUserModal = ({ inviteUser, setInviteUser, toggleInviteUserModal, roleHierarchy, rolesOptions, defaultInviteRole}) => {
+
     const setToastConfig = Store(state => state.setToastConfig)
     const ref = useRef(null)
     const [inviteEmail, setInviteEmail] = useState()
-    const [inviteRole, setInviteRole] = useState('MEMBER')
+    const [inviteRole, setInviteRole] = useState(defaultInviteRole)
+
+    useEffect(() => {
+        setInviteRole(defaultInviteRole)
+    }, [defaultInviteRole])
 
     const handleRoleSelectChange = useCallback(
         (value) => {
@@ -49,7 +54,7 @@ const InviteUserModal = ({ inviteUser, setInviteUser, toggleInviteUserModal, rol
         })
 
         setInviteEmail("")
-        setInviteRole("GUEST")
+        setInviteRole(defaultInviteRole)
     }
 
     const handleCopyInvitation = () => {

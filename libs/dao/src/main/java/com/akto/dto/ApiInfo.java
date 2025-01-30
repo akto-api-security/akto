@@ -315,6 +315,11 @@ public class ApiInfo {
         return null;
     }
 
+    public static ApiInfoKey getApiInfoKeyFromString(String key) {
+        String[] parts = key.split(" ");
+        return new ApiInfoKey(Integer.parseInt(parts[0]), parts[1], URLMethods.Method.valueOf(parts[2]));
+    }
+
     @Override
     public String toString() {
         return "{" +
@@ -338,8 +343,8 @@ public class ApiInfo {
 
     public void setId(ApiInfoKey id) {
         this.collectionIds = Util.replaceElementInList(this.collectionIds, 
-        id == null ? null : id.getApiCollectionId(),
-        this.id == null ? null : this.id.getApiCollectionId());
+        id == null ? null : (Integer) id.getApiCollectionId(),
+        this.id == null ? null : (Integer) this.id.getApiCollectionId());
         this.id = id;
     }
 

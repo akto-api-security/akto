@@ -168,6 +168,17 @@ public class UsersDao extends CommonContextDao<User> {
         return result;
     }
 
+    public List<Integer> getAllUsersIdsForTheAccount(int accountId) {
+        List<User> users = instance.findAll(Filters.exists("accounts."+accountId));
+        List<Integer> result = new ArrayList<>();
+
+        for (User user: users) {
+            result.add(user.getId());
+        }
+
+        return result;
+    }
+
     public BasicDBList getUsersAutoComplete(int accountId, String expression) {
         List<User> users = instance.findAll(
                 Filters.and(
