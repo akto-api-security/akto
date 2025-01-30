@@ -50,6 +50,7 @@ function TrendChart(props) {
     }
 
     function processChartData(data) {
+        let retC = []
         let retH = []
         let retM = []
         let retL = []
@@ -71,6 +72,10 @@ function TrendChart(props) {
             let ts = x["startTimestamp"] * 1000
             let countIssuesMap = x["countIssues"]
             if(countIssuesMap && Object.keys(countIssuesMap).length > 0){
+                if(!countIssuesMap["CRITICAL"]){
+                    countIssuesMap["CRITICAL"] = 0;
+                }
+                retC.push([ts, countIssuesMap["CRITICAL"]])
                 retH.push([ts, countIssuesMap["HIGH"]])
                 retM.push([ts, countIssuesMap["MEDIUM"]])
                 retL.push([ts, countIssuesMap["LOW"]])
@@ -79,18 +84,23 @@ function TrendChart(props) {
 
         return [
             {
+                data: retC,
+                color: func.getHexColorForSeverity("CRITICAL"),
+                name: "Critical"
+            },
+            {
                 data: retH,
-                color: "var(--p-color-bg-critical-strong)",
+                color: func.getHexColorForSeverity("HIGH"),
                 name: "High"
             },
             {
                 data: retM,
-                color: "var(--p-color-bg-critical)",
+                color: func.getHexColorForSeverity("MEDIUM"),
                 name: "Medium"
             },
             {
                 data: retL,
-                color: "var(--p-color-bg-caution)",
+                color: func.getHexColorForSeverity("LOW"),
                 name: "Low"
             }
         ]
@@ -151,8 +161,11 @@ function TrendChart(props) {
 
             let count = 0
             testingRunResultSummaries.forEach((ele)=>{
-                let obj = (ele?.countIssues && Object.keys(ele.countIssues).length > 0) ? ele.countIssues : {HIGH: 0, MEDIUM: 0, LOW: 0}
-                count += (obj.HIGH + obj.MEDIUM + obj.LOW)
+                let obj = (ele?.countIssues && Object.keys(ele.countIssues).length > 0) ? ele.countIssues : {CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0}
+                if (!obj.CRITICAL) {
+                    obj.CRITICAL = 0;
+                }
+                count += (obj.CRITICAL + obj.HIGH + obj.MEDIUM + obj.LOW)
             })
 
             setTotalVulnerabilites(count)
