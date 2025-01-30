@@ -502,7 +502,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             logger.info("username {}", username);
             SignupInfo.GithubSignupInfo ghSignupInfo = new SignupInfo.GithubSignupInfo(accessToken, refreshToken, refreshTokenExpiry, email, username);
             shouldLogin = "true";
-            createUserAndRedirect(email, username, ghSignupInfo, 1000000, Config.ConfigType.GITHUB.toString(), RBAC.Role.MEMBER);
+            createUserAndRedirectWithDefaultRole(email, username, ghSignupInfo, 1000000, Config.ConfigType.GITHUB.toString());
             code = "";
             logger.info("Executed registerViaGithub");
 
@@ -557,14 +557,8 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             String username = userInfo.get("preferred_username").toString();
 
             SignupInfo.OktaSignupInfo oktaSignupInfo= new SignupInfo.OktaSignupInfo(accessToken, username);
-
-            String defaultRole = RBAC.Role.MEMBER.name();
-            if (UsageMetricCalculator.isRbacFeatureAvailable(accountId)) {
-                defaultRole = fetchDefaultInviteRole(accountId, RBAC.Role.GUEST.name());
-            }
-            
             shouldLogin = "true";
-            createUserAndRedirect(email, username, oktaSignupInfo, accountId, Config.ConfigType.OKTA.toString(), defaultRole);
+            createUserAndRedirectWithDefaultRole(email, username, oktaSignupInfo, accountId, Config.ConfigType.OKTA.toString());
             code = "";
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error while signing in via okta sso \n" + e.getMessage(), LogDb.DASHBOARD);
@@ -692,12 +686,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             logger.info("Successful signing with Azure Idp for: "+ useremail);
             SignupInfo.SamlSsoSignupInfo signUpInfo = new SignupInfo.SamlSsoSignupInfo(username, useremail, Config.ConfigType.AZURE);
 
-            String defaultRole = RBAC.Role.MEMBER.name();
-            if (UsageMetricCalculator.isRbacFeatureAvailable(this.accountId)) {
-                defaultRole = fetchDefaultInviteRole(this.accountId,RBAC.Role.GUEST.name());
-            }
-
-            createUserAndRedirect(useremail, username, signUpInfo, this.accountId, Config.ConfigType.AZURE.toString(), defaultRole);
+            createUserAndRedirectWithDefaultRole(useremail, username, signUpInfo, this.accountId, Config.ConfigType.AZURE.toString());
         } catch (Exception e1) {
             loggerMaker.errorAndAddToDb("Error while signing in via azure sso \n" + e1.getMessage(), LogDb.DASHBOARD);
             servletResponse.sendRedirect("/login");
@@ -747,12 +736,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             shouldLogin = "true";
             SignupInfo.SamlSsoSignupInfo signUpInfo = new SignupInfo.SamlSsoSignupInfo(username, userEmail, Config.ConfigType.GOOGLE_SAML);
 
-            String defaultRole = RBAC.Role.MEMBER.name();
-            if (UsageMetricCalculator.isRbacFeatureAvailable(this.accountId)) {
-                defaultRole = fetchDefaultInviteRole(this.accountId, RBAC.Role.GUEST.name());
-            }
-
-            createUserAndRedirect(userEmail, username, signUpInfo, this.accountId, Config.ConfigType.GOOGLE_SAML.toString(), defaultRole);
+            createUserAndRedirectWithDefaultRole(userEmail, username, signUpInfo, this.accountId, Config.ConfigType.GOOGLE_SAML.toString());
         } catch (Exception e1) {
             loggerMaker.errorAndAddToDb("Error while signing in via google workspace sso \n" + e1.getMessage(), LogDb.DASHBOARD);
             servletResponse.sendRedirect("/login");
@@ -837,6 +821,15 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
     private void createUserAndRedirect(String userEmail, String username, SignupInfo signupInfo,
                                        int invitationToAccount, String method) throws IOException {
         createUserAndRedirect(userEmail, username, signupInfo, invitationToAccount, method, null);
+    }
+
+    private void createUserAndRedirectWithDefaultRole(String userEmail, String username, SignupInfo signupInfo,
+                                       int invitationToAccount, String method) throws IOException {
+        String defaultRole = RBAC.Role.MEMBER.name();
+        if (UsageMetricCalculator.isRbacFeatureAvailable(invitationToAccount)) {
+            defaultRole = fetchDefaultInviteRole(invitationToAccount, RBAC.Role.GUEST.name());
+        }
+        createUserAndRedirect(userEmail, username, signupInfo, invitationToAccount, method, defaultRole);
     }
 
     private void createUserAndRedirect(String userEmail, String username, SignupInfo signupInfo,
