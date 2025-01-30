@@ -943,7 +943,7 @@ public class StartTestAction extends UserAction {
         if (this.testingRunHexId != null) {
             try {
                 ObjectId testingId = new ObjectId(this.testingRunHexId);
-                TestingRunDao.instance.updateOne(
+                TestingRunDao.instance.updateOneNoUpsert(
                         Filters.and(filter, Filters.eq(Constants.ID, testingId)),
                         Updates.set(TestingRun.STATE, State.STOPPED));
                 Bson testingSummaryFilter = Filters.and(
