@@ -270,6 +270,8 @@ public class TestStartTestAction extends MongoBasedTest {
 
     @Test
     public void testModifyTestingRunConfig() {
+        TestingRunConfigDao.instance.getMCollection().drop();
+        TestingRunDao.instance.getMCollection().drop();
 
         int testingRunConfigId = UUID.randomUUID().hashCode() & 0xfffffff;
         ObjectId testingRunHexId = new ObjectId();
@@ -277,6 +279,7 @@ public class TestStartTestAction extends MongoBasedTest {
         List<String> list1 = Arrays.asList("pkucgztk", "oionxmec", "tmptskkz", "rorcqyqf");
         List<String> list2 = Arrays.asList("sqhrduyv", "awpqhaxz", "tdzydooe", "hxwvtoem");
         TestingRunConfig testingRunConfig = new TestingRunConfig();
+        testingRunConfig.setId(testingRunConfigId);
         testingRunConfig.setTestRoleId("initialRole");
         testingRunConfig.setOverriddenTestAppUrl("https://initial.url");
         testingRunConfig.setTestSubCategoryList(list1);
@@ -297,6 +300,7 @@ public class TestStartTestAction extends MongoBasedTest {
         editableTestingRunConfig.setOverriddenTestAppUrl("https://test.url");
         editableTestingRunConfig.setMaxConcurrentRequests(10);
         editableTestingRunConfig.setTestSubCategoryList(list2);
+        editableTestingRunConfig.setTestingRunHexId(testingRunHexId.toHexString());
 
         StartTestAction startTestAction = new StartTestAction();
         startTestAction.setTestingRunConfigId(testingRunConfigId);
