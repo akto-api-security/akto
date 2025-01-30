@@ -17,7 +17,7 @@ import RunTestSuites from "./RunTestSuites";
 import RunTestConfiguration from "./RunTestConfiguration";
 
 
-function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOutside, closeRunTest, selectedResourcesForPrimaryAction, useLocalSubCategoryData, preActivator, testIdConfig, activeFromTesting, setActiveFromTesting, showEditableSettings, setShowEditableSettings, parentAdvanceSettingsConfig }) {
+function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOutside, closeRunTest, selectedResourcesForPrimaryAction, useLocalSubCategoryData, preActivator, testIdConfig, activeFromTesting, setActiveFromTesting, showEditableSettings, setShowEditableSettings, parentAdvanceSettingsConfig,testRunType }) {
 
     const initialState = {
         categories: [],
@@ -121,14 +121,16 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
             subCategories: [],
             testSourceConfigs: []
         }
-        if (!useLocalSubCategoryData) {
-            metaDataObj = await transform.getAllSubcategoriesData(true, "runTests")
-        } else {
+        
+        if ((localCategoryMap && Object.keys(localCategoryMap).length > 0) && (localSubCategoryMap && Object.keys(localSubCategoryMap).length > 0)) {
             metaDataObj = {
                 categories: Object.values(localCategoryMap),
                 subCategories: Object.values(localSubCategoryMap),
                 testSourceConfigs: []
             }
+            
+        } else { 
+            metaDataObj = await transform.getAllSubcategoriesData(true, "runTests")
         }
         let categories = metaDataObj.categories
         let businessLogicSubcategories = metaDataObj.subCategories
@@ -194,7 +196,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
             const testSubCategoryList = [...testIdConfig.testingRunConfig.testSubCategoryList];
 
             const updatedTests = { ...testRun.tests };
-
+            // console.log("updatedTests", updatedTests);
             // Reset all test selections
             Object.keys(updatedTests).forEach(category => {
                 updatedTests[category] = updatedTests[category].map(test => ({ ...test, selected: false }));
@@ -236,6 +238,12 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
 
             if (!areObjectArraysEqual(updatedTests, testRun.tests)) {
                 handleAddSettings(parentAdvanceSettingsConfig);
+                const getRunTypeLabel = (runType) => {
+                    if(!runType) return "Now";
+                    if (runType === "CI-CD" || runType === "ONE_TIME") return "Now";
+                    else if(runType === "RECURRING") return "Daily";
+                    else if(runType === "CONTINUOUS_TESTING") return "Continuously";
+                }
                 setTestRun(prev => ({
                     ...testRun,
                     tests: updatedTests,
@@ -243,6 +251,9 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                     maxConcurrentRequests: testIdConfig.maxConcurrentRequests,
                     testRunTime: testIdConfig.testRunTime,
                     testRoleId: testIdConfig.testingRunConfig.testRoleId,
+                    testRunTimeLabel:(testIdConfig.testRunTime===-1)?"30 minutes":getLabel(testRunTimeOptions,  testIdConfig.testRunTime.toString())?.label,
+                    testRoleLabel: getLabel(testRolesArr, testIdConfig.testingRunConfig.testRoleId).label,
+                    runTypeLabel:getRunTypeLabel(testRunType)
                 }));
             }
         }
@@ -536,18 +547,9 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         }
 
         if (filtered || selectedResourcesForPrimaryAction?.length > 0) {
-            if (testIdConfig) {
-                await testingApi.modifyTestingRunConfig(testIdConfig?.testingRunConfig?.id, null, selectedTests)
-                transform.rerunTest(testIdConfig.hexId, null, true)
-
-            }
-            else await observeApi.scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, "TESTING_UI", testRoleId, continuousTesting, sendSlackAlert, finalAdvancedConditions, cleanUpTestingResources)
+            await observeApi.scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, "TESTING_UI", testRoleId, continuousTesting, sendSlackAlert, finalAdvancedConditions, cleanUpTestingResources)
         } else {
-            if (testIdConfig) {
-                await testingApi.modifyTestingRunConfig(testIdConfig?.testingRunConfig?.id, null, selectedTests)
-                transform.rerunTest(testIdConfig.hexId, null, true)
-            }
-            else observeApi.scheduleTestForCollection(collectionId, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, finalAdvancedConditions, cleanUpTestingResources)
+            await observeApi.scheduleTestForCollection(collectionId, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, finalAdvancedConditions, cleanUpTestingResources)
         }
 
         setActive(false)
@@ -850,6 +852,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                                     maxConcurrentRequestsOptions={maxConcurrentRequestsOptions}
                                     slackIntegrated={slackIntegrated}
                                     generateLabelForSlackIntegration={generateLabelForSlackIntegration}
+                                    getLabel={getLabel}
                                 />
 
                             </VerticalStack>
@@ -876,6 +879,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                                         maxConcurrentRequestsOptions={maxConcurrentRequestsOptions}
                                         slackIntegrated={slackIntegrated}
                                         generateLabelForSlackIntegration={generateLabelForSlackIntegration}
+                                        getLabel={getLabel}
                                     />
                                     <AdvancedSettingsComponent dispatchConditions={dispatchConditions} conditions={conditions} />
                                 </>

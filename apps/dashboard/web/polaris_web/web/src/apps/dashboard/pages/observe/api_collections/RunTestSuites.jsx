@@ -28,10 +28,11 @@ function RunTestSuites({  testRun, setTestRun, handleRun, checkRemoveAll, handle
     function handleTestSuiteSelection(key, data) {
         setTestRun(prev => {
             const updatedTests = { ...prev.tests };
-            let someSelected = true
+            const someSelected = data.some(category =>
+                updatedTests[category]?.some(test => test.selected)
+            );
             data.forEach(category => {
                 if (updatedTests[category]) {
-                    someSelected = updatedTests[category].some(test => test.selected);
                     updatedTests[category] = updatedTests[category].map(test => ({
                         ...test,
                         selected: someSelected ? false : true
