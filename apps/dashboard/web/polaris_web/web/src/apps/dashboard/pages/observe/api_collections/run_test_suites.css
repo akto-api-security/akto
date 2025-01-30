@@ -15,3 +15,7 @@
     border-radius: 0.5rem;
 }
 
+.removeAllButton .Polaris-Button--plain.Polaris-Button--disabled svg {
+    fill: var(--p-color-icon-disabled) !important;
+}
+

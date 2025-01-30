@@ -109,6 +109,26 @@ function RunTestSuites({  testRun, setTestRun, handleRun, checkRemoveAll, handle
         return true;
     }
 
+    function checkifSelected(data) {
+        let text = `${countTestSuitesTests(data)} tests`;
+        let isSomeSelected = false;
+        let countSelected = 0;
+        for (const category of data) {
+            if (testRun.tests[category] && testRun.tests[category].length > 0) {
+                if (testRun.tests[category].some(test => test.selected)) {
+                    isSomeSelected = true;
+                }
+                testRun.tests[category]?.forEach(test => {
+                    if (test.selected) {
+                        countSelected++;
+                    }
+                });
+            }
+        }
+        if(isSomeSelected === false) return text;
+        else return `${countSelected} out of ${countTestSuitesTests(data)} selected`;
+    }
+
     function renderAktoTestSuites(data) {
         return (
             <div className="testSuiteCard" style={{marginLeft: "0.15rem"}}>
@@ -126,7 +146,7 @@ function RunTestSuites({  testRun, setTestRun, handleRun, checkRemoveAll, handle
                                             <Text variant="headingMd" fontWeight="regular" truncate={true}>{data?.key}</Text>
                                         </Tooltip>
                                     }
-                                    helpText={`${countTestSuitesTests(data?.value)} tests`}
+                                    helpText={checkifSelected(data?.value)}
                                     onChange={() => { handleTestSuiteSelection(data?.key, data?.value) }}
                                     checked={checkedSelected(data?.value)}
                                     disabled={checkDisableTestSuite(data?.value)}
@@ -164,12 +184,13 @@ function RunTestSuites({  testRun, setTestRun, handleRun, checkRemoveAll, handle
                             onChange={(testName) => setTestRun(prev => ({ ...prev, testName: testName }))}
                         />
                     </div>
-
+                    <div className="removeAllButton">
                     <Button
                         icon={CancelMajor}
+                        plain
                         destructive
                         onClick={handleRemoveAll}
-                        disabled={checkRemoveAll()}><div data-testid="remove_all_tests">Clear selection</div></Button>
+                        disabled={checkRemoveAll()}><div data-testid="remove_all_tests">Clear selection</div></Button></div>
                 </div>
                 <VerticalStack>
                     <HorizontalStack align="start">
