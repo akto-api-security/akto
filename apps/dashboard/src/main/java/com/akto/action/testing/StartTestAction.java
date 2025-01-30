@@ -1131,39 +1131,47 @@ public class StartTestAction extends UserAction {
 
     public String modifyTestingRunConfig(){
         if (editableTestingRunConfig == null) {
+            addActionError("Invalid editableTestingRunConfig");
             return Action.ERROR.toUpperCase();
         }
         try {
             if (this.testingRunConfigId == 0) {
-                throw new Exception();
+                addActionError("Invalid testing run config id");
+                return Action.ERROR.toUpperCase();
             } else {
-                TestingRunConfigDao.instance.updateOne(
-                    Filters.eq(Constants.ID, this.testingRunConfigId),
-                    Updates.combine(
-                        Updates.set("configsAdvancedSettings", this.editableTestingRunConfig.getConfigsAdvancedSettings()),
-                        Updates.set("testSubCategoryList", this.editableTestingRunConfig.getTestSubCategoryList()),
-                        Updates.set("testRoleId", this.editableTestingRunConfig.getTestRoleId()),
-                        Updates.set("overriddenTestAppUrl", this.editableTestingRunConfig.getOverriddenTestAppUrl())
-                    )
-                );
+
+                TestingRunConfig existingtestingRunConfig = TestingRunConfigDao.instance.findOne(Filters.eq(Constants.ID, this.testingRunConfigId));
+                if (existingtestingRunConfig == null) {
+                    addActionError("testing run config object not found");
+                return Action.ERROR.toUpperCase();
+                }
+
+                existingtestingRunConfig.setConfigsAdvancedSettings(this.editableTestingRunConfig.getConfigsAdvancedSettings());
+                existingtestingRunConfig.setTestSubCategoryList(this.editableTestingRunConfig.getTestSubCategoryList());
+                existingtestingRunConfig.setTestRoleId(this.editableTestingRunConfig.getTestRoleId());
+                existingtestingRunConfig.setOverriddenTestAppUrl(this.editableTestingRunConfig.getOverriddenTestAppUrl());
+
+                TestingRunConfigDao.instance.replaceOne(Filters.eq(Constants.ID, this.testingRunConfigId), existingtestingRunConfig);
             }
 
             if (editableTestingRunConfig.getTestingRunHexId() != null) {
-                String hexId = editableTestingRunConfig.getTestingRunHexId();
             
-                ObjectId objectId = new ObjectId(hexId);
-                    
-                TestingRunDao.instance.updateOne(
-                    Filters.eq(Constants.ID, objectId),
-                    Updates.combine(
-                        Updates.set("testRunTime", this.editableTestingRunConfig.getTestRunTime()),
-                        Updates.set("maxConcurrentRequests", this.editableTestingRunConfig.getMaxConcurrentRequests())
-                    )
-                );
+                TestingRun existingTestingRun = TestingRunDao.instance.findOne(Filters.eq(Constants.ID, new ObjectId(editableTestingRunConfig.getTestingRunHexId())));
+
+                if (existingTestingRun != null) {
+                    existingTestingRun.setTestRunTime(this.editableTestingRunConfig.getTestRunTime());
+                    existingTestingRun.setMaxConcurrentRequests(this.editableTestingRunConfig.getMaxConcurrentRequests());
+        
+                    TestingRunDao.instance.replaceOne(
+                        Filters.eq(Constants.ID, new ObjectId(editableTestingRunConfig.getTestingRunHexId())),
+                        existingTestingRun
+                    );
+                }
                 
             }
 
         } catch (Exception e) {
+            addActionError("Unable to modify testing run config and testing run");
             return Action.ERROR.toUpperCase();
         }
         return SUCCESS.toUpperCase();
