@@ -1,5 +1,6 @@
 package com.akto.testing;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -13,6 +14,8 @@ import java.util.regex.Pattern;
 
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
+
+import com.akto.dao.context.Context;
 import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dao.testing.VulnerableTestingRunResultDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
@@ -25,6 +28,10 @@ import com.akto.dto.test_editor.FilterNode;
 import com.akto.dto.test_editor.Util;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
+import com.akto.dto.testing.GenericTestResult;
+import com.akto.dto.testing.TestResult;
+import com.akto.dto.testing.TestResult.Confidence;
+import com.akto.dto.testing.TestResult.TestError;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.WorkflowUpdatedSampleData;
 import com.akto.dto.type.RequestTemplate;
@@ -33,13 +40,14 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.test_editor.filter.Filter;
 import com.akto.test_editor.filter.data_operands_impl.ValidationResult;
 import com.akto.testing_utils.TestingUtils;
+import com.akto.usage.UsageMetricCalculator;
 import com.akto.util.Constants;
 import com.akto.util.JSONUtils;
 import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.Severity;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
-import com.mongodb.ConnectionString;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Accumulators;
 import com.mongodb.client.model.Aggregates;
@@ -473,6 +481,7 @@ public class Utils {
 
     public static Map<String, Integer> finalCountIssuesMap(ObjectId testingRunResultSummaryId){
         Map<String, Integer> countIssuesMap = new HashMap<>();
+        countIssuesMap.put(Severity.CRITICAL.toString(), 0);
         countIssuesMap.put(Severity.HIGH.toString(), 0);
         countIssuesMap.put(Severity.MEDIUM.toString(), 0);
         countIssuesMap.put(Severity.LOW.toString(), 0);
@@ -488,7 +497,7 @@ public class Utils {
             allVulResults = TestingRunResultDao.instance.findAll(filterQ, projection);
         }else{
             allVulResults = VulnerableTestingRunResultDao.instance.findAll(
-                Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, testingRunResultSummaryId)
+                Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, testingRunResultSummaryId), projection
             );
         }
         
@@ -536,5 +545,67 @@ public class Utils {
 
         return resultsFromNonVulCollection;
     }
+
+    public static TestingRunResult generateFailedRunResultForMessage(ObjectId testingRunId,ApiInfoKey apiInfoKey, String testSuperType, 
+        String testSubType, ObjectId testRunResultSummaryId, List<String> messages, String errorMessage) {
+
+        TestingRunResult testingRunResult = null;       
+        Set<Integer> deactivatedCollections = UsageMetricCalculator.getDeactivated();
+        List<GenericTestResult> testResults = new ArrayList<>();
+        String failMessage = errorMessage;
+
+        if(deactivatedCollections.contains(apiInfoKey.getApiCollectionId())){
+            failMessage = TestError.DEACTIVATED_ENDPOINT.getMessage();
+        }else if(messages == null || messages.isEmpty()){
+            failMessage = TestError.NO_PATH.getMessage();
+        }
+            
+        if(failMessage != null){
+            testResults.add(new TestResult(null, null, Collections.singletonList(failMessage),0, false, Confidence.HIGH, null));
+            testingRunResult = new TestingRunResult(
+                testingRunId, apiInfoKey, testSuperType, testSubType, testResults,
+                false, new ArrayList<>(), 100, Context.now(),
+                Context.now(), testRunResultSummaryId, null, Collections
+                        .singletonList(new TestingRunResult.TestLog(TestingRunResult.TestLogType.INFO, failMessage)));
+        }       
+        return testingRunResult;
+    }
+
+    public static boolean createFolder(String folderName){
+        File statusDir = new File(folderName);
+        
+        if (!statusDir.exists()) {
+            boolean created = statusDir.mkdirs();
+            if (!created) {
+                System.err.println("Failed to create directory: " + folderName);
+                return false;
+            }
+            return true;
+        }
+        return false;
+    }
+
+    public static void writeJsonContentInFile(String folderName, String fileName, Object content){
+        try {
+            File file = new File(folderName, fileName);
+            ObjectMapper objectMapper = new ObjectMapper();
+            objectMapper.writerWithDefaultPrettyPrinter().writeValue(file, content);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    public static <T> T readJsonContentFromFile(String folderName, String fileName, Class<T> valueType) {
+        T result = null;
+        try {
+            File file = new File(folderName, fileName);
+            ObjectMapper objectMapper = new ObjectMapper();
+            result = objectMapper.readValue(file, valueType);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return result;
+    }
+    
     
 }

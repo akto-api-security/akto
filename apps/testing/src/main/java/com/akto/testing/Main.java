@@ -4,7 +4,6 @@ import com.akto.DaoInit;
 import com.akto.billing.UsageMetricUtils;
 import com.akto.crons.GetRunningTestsStatus;
 import com.akto.dao.*;
-import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.testing.TestingRunConfigDao;
 import com.akto.dao.testing.TestingRunDao;
@@ -16,7 +15,6 @@ import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.billing.SyncLimit;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.*;
-import com.akto.dto.billing.Organization;
 import com.akto.dto.testing.*;
 import com.akto.dto.testing.TestingEndpoints.Operator;
 import com.akto.dto.testing.TestingRun.State;
@@ -29,14 +27,16 @@ import com.akto.github.GithubUtils;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.mixpanel.AktoMixpanel;
-import com.akto.usage.UsageMetricHandler;
 import com.akto.notifications.slack.APITestStatusAlert;
+import com.akto.notifications.slack.CustomTextAlert;
 import com.akto.notifications.slack.NewIssuesModel;
 import com.akto.notifications.slack.SlackAlerts;
 import com.akto.notifications.slack.SlackSender;
 import com.akto.rules.RequiredConfigs;
 import com.akto.task.Cluster;
 import com.akto.test_editor.execution.Executor;
+import com.akto.testing.kafka_utils.ConsumerUtil;
+import com.akto.testing.kafka_utils.Producer;
 import com.akto.util.AccountTask;
 import com.akto.util.Constants;
 import com.akto.util.DashboardMode;
@@ -51,6 +51,7 @@ import com.mongodb.ReadPreference;
 import com.mongodb.WriteConcern;
 import com.mongodb.client.model.*;
 import com.mongodb.client.result.DeleteResult;
+import com.slack.api.Slack;
 
 import org.bson.Document;
 import org.bson.conversions.Bson;
@@ -58,6 +59,9 @@ import org.bson.types.ObjectId;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.util.StringUtils;
+
+import static com.akto.testing.Utils.readJsonContentFromFile;
 
 import java.util.*;
 import java.util.concurrent.Executors;
@@ -74,12 +78,12 @@ public class Main {
     public static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
     public static final ScheduledExecutorService deleteScheduler = Executors.newScheduledThreadPool(1);
 
-    public static final ScheduledExecutorService testTelemetryScheduler = Executors.newScheduledThreadPool(2);
-
     public static final ScheduledExecutorService schedulerAccessMatrix = Executors.newScheduledThreadPool(2);
 
     public static boolean SKIP_SSRF_CHECK = ("true".equalsIgnoreCase(System.getenv("SKIP_SSRF_CHECK")) || !DashboardMode.isSaasDeployment());
     public static final boolean IS_SAAS = "true".equalsIgnoreCase(System.getenv("IS_SAAS"));
+    public static final String AKTO_SLACK_WEBHOOK = System.getenv("AKTO_SLACK_WEBHOOK");
+    public static final Slack SLACK_INSTANCE = Slack.getInstance();
 
     private static Map<String, Integer> emptyCountIssuesMap = new HashMap<>();
 
@@ -241,6 +245,39 @@ public class Main {
         }
     }
 
+    private static BasicDBObject checkIfAlreadyTestIsRunningOnMachine(){
+        // this will return true if consumer is running and this the latest summary of the testing run 
+        // and also the summary should be in running state
+        try {
+            BasicDBObject currentTestInfo = readJsonContentFromFile(Constants.TESTING_STATE_FOLDER_PATH, Constants.TESTING_STATE_FILE_NAME, BasicDBObject.class);
+            if(currentTestInfo == null){
+                return null;
+            }
+            if(!currentTestInfo.getBoolean("CONSUMER_RUNNING", false)){
+                return null;
+            }
+            String testingRunId = currentTestInfo.getString("testingRunId");
+            String testingRunSummaryId = currentTestInfo.getString("summaryId");
+
+            int accountID = currentTestInfo.getInt("accountId");
+            Context.accountId.set(accountID);
+
+            TestingRunResultSummary testingRunResultSummary = TestingRunResultSummariesDao.instance.findOne(Filters.eq(Constants.ID, new ObjectId(testingRunSummaryId)), Projections.include(TestingRunResultSummary.STATE));
+            if(testingRunResultSummary == null || testingRunResultSummary.getState() == null ||  testingRunResultSummary.getState() != State.RUNNING){
+                return null;
+            }
+
+            TestingRunResultSummary latestSummary =  TestingRunResultSummariesDao.instance.findLatestOne(Filters.eq(TestingRunResultSummary.TESTING_RUN_ID, new ObjectId(testingRunId)));
+            if(latestSummary.getHexId().equals(testingRunSummaryId)){
+                return currentTestInfo;
+            }else{
+                return null;
+            }   
+        } catch (Exception e) {
+            logger.error("Error in reading the testing state file: " + e.getMessage());
+            return null;
+        }
+    }
     
     // Runnable task for monitoring memory
     static class MemoryMonitorTask implements Runnable {
@@ -309,6 +346,66 @@ public class Main {
 
         loggerMaker.infoAndAddToDb("Starting.......", LogDb.TESTING);
 
+        Producer testingProducer = new Producer();
+        ConsumerUtil testingConsumer = new ConsumerUtil();
+        TestCompletion testCompletion = new TestCompletion();
+        if(Constants.IS_NEW_TESTING_ENABLED){
+            testingConsumer.initializeConsumer();
+        }
+
+        // read from files here and then see if we want to init the Producer and run the consumer
+        // if producer is running, then we can skip the check and let the default testing pick up the job
+
+        BasicDBObject currentTestInfo = null;
+        if(Constants.IS_NEW_TESTING_ENABLED){
+            currentTestInfo = checkIfAlreadyTestIsRunningOnMachine();
+        }
+
+        if(currentTestInfo != null){
+            try {
+                int accountId = Context.accountId.get();
+                loggerMaker.infoAndAddToDb("Tests were already running on this machine, thus resuming the test for account: "+ accountId, LogDb.TESTING);
+                FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccess(accountId, MetricTypes.TEST_RUNS);
+                
+
+                String testingRunId = currentTestInfo.getString("testingRunId");
+                String testingRunSummaryId = currentTestInfo.getString("summaryId");
+                TestingRun testingRun = TestingRunDao.instance.findOne(Filters.eq(Constants.ID, new ObjectId(testingRunId)));
+                TestingRunConfig baseConfig = TestingRunConfigDao.instance.findOne(Constants.ID, testingRun.getTestIdConfig());
+                testingRun.setTestingRunConfig(baseConfig);
+                ObjectId summaryId = new ObjectId(testingRunSummaryId);
+                testingProducer.initProducer(testingRun, summaryId, featureAccess.fetchSyncLimit(), true);
+                int maxRunTime = testingRun.getTestRunTime() <= 0 ? 30*60 : testingRun.getTestRunTime();
+                testingConsumer.init(maxRunTime);
+
+                // mark the test completed here
+                testCompletion.markTestAsCompleteAndRunFunctions(testingRun, summaryId);
+
+                if (StringUtils.hasLength(AKTO_SLACK_WEBHOOK) ) {
+                    try {
+                        CustomTextAlert customTextAlert = new CustomTextAlert("Test completed for accountId=" + accountId + " testingRun=" + testingRun.getHexId() + " summaryId=" + summaryId.toHexString() + " : @Arjun you are up now. Make your time worth it. :)");
+                        SLACK_INSTANCE.send(AKTO_SLACK_WEBHOOK, customTextAlert.toJson());
+                    } catch (Exception e) {
+                        logger.error("Error sending slack alert for completion of test", e);
+                    }
+                    
+                }
+                
+                deleteScheduler.execute(() -> {
+                    Context.accountId.set(accountId);
+                    try {
+                        deleteNonVulnerableResults();
+
+                    } catch (Exception e) {
+                        loggerMaker.errorAndAddToDb(e, "Error in deleting testing run results");
+                    }
+                });
+            } catch (Exception e) {
+                logger.error("Error in running failed tests from file.", e);
+            }
+        }
+
+
         schedulerAccessMatrix.scheduleAtFixedRate(new Runnable() {
             public void run() {
                 AccountTask.instance.executeTaskForNonHybridAccounts(account -> {
@@ -326,6 +423,12 @@ public class Main {
         loggerMaker.infoAndAddToDb("sun.arch.data.model: " +  System.getProperty("sun.arch.data.model"), LogDb.TESTING);
         loggerMaker.infoAndAddToDb("os.arch: " + System.getProperty("os.arch"), LogDb.TESTING);
         loggerMaker.infoAndAddToDb("os.version: " + System.getProperty("os.version"), LogDb.TESTING);
+
+        // create /testing-info folder in the memory from here
+        if(Constants.IS_NEW_TESTING_ENABLED){
+            boolean val = Utils.createFolder(Constants.TESTING_STATE_FOLDER_PATH);
+            logger.info("Testing info folder status: " + val);
+        }
 
         SingleTypeInfo.init();
         while (true) {
@@ -394,9 +497,6 @@ public class Main {
                 }
 
                 SyncLimit syncLimit = featureAccess.fetchSyncLimit();
-                // saving the initial usageLeft, to calc delta later.
-                int usageLeft = syncLimit.getUsageLeft();
-
                 /*
                  * Since the role cache is static
                  * so to prevent it from being shared across accounts.
@@ -536,7 +636,6 @@ public class Main {
                         summaryId = trrs.getId();
                     }
 
-                    TestExecutor testExecutor = new TestExecutor();
                     if (trrs.getState() == State.SCHEDULED) {
                         if (trrs.getMetadata()!= null && trrs.getMetadata().containsKey("pull_request_id") && trrs.getMetadata().containsKey("commit_sha_head") ) {
                             //case of github status push
@@ -545,46 +644,38 @@ public class Main {
                         }
                     }
                     RequiredConfigs.initiate();
+                    int maxRunTime = testingRun.getTestRunTime() <= 0 ? 30*60 : testingRun.getTestRunTime();
+                    
+                    if (StringUtils.hasLength(AKTO_SLACK_WEBHOOK) ) {
+                        CustomTextAlert customTextAlert = new CustomTextAlert("Test started: accountId=" + Context.accountId.get() + " testingRun=" + testingRun.getHexId() + " summaryId=" + summaryId.toHexString() + " time=" + maxRunTime);
+                        SLACK_INSTANCE.send(AKTO_SLACK_WEBHOOK, customTextAlert.toJson());
+                    }
+
                     if(!maxRetriesReached){
-                        testExecutor.init(testingRun, summaryId, syncLimit);
-                        raiseMixpanelEvent(summaryId, testingRun, accountId);
+                        // init producer and the consumer here
+                        // producer for testing is currently calls init functions from test-executor
+                        if(Constants.IS_NEW_TESTING_ENABLED){
+                            testingProducer.initProducer(testingRun, summaryId, syncLimit, false);  
+                            testingConsumer.init(maxRunTime);  
+                        }else{
+                            TestExecutor testExecutor = new TestExecutor();
+                            testExecutor.init(testingRun, summaryId, syncLimit, false);
+                        }                   
                     }
                     
             } catch (Exception e) {
                     loggerMaker.errorAndAddToDb(e, "Error in init " + e);
                 }
-                Bson completedUpdate = Updates.combine(
-                        Updates.set(TestingRun.STATE, TestingRun.State.COMPLETED),
-                        Updates.set(TestingRun.END_TIMESTAMP, Context.now())
-                );
-
-                if (testingRun.getPeriodInSeconds() > 0 ) {
-                    completedUpdate = Updates.combine(
-                            Updates.set(TestingRun.STATE, TestingRun.State.SCHEDULED),
-                            Updates.set(TestingRun.END_TIMESTAMP, Context.now()),
-                            Updates.set(TestingRun.SCHEDULE_TIMESTAMP, testingRun.getScheduleTimestamp() + testingRun.getPeriodInSeconds())
-                    );
-                } else if (testingRun.getPeriodInSeconds() == -1) {
-                    completedUpdate = Updates.combine(
-                            Updates.set(TestingRun.STATE, TestingRun.State.SCHEDULED),
-                            Updates.set(TestingRun.END_TIMESTAMP, Context.now()),
-                            Updates.set(TestingRun.SCHEDULE_TIMESTAMP, testingRun.getScheduleTimestamp() + 5 * 60)
-                    );
+                testCompletion.markTestAsCompleteAndRunFunctions(testingRun, summaryId);
+                if (StringUtils.hasLength(AKTO_SLACK_WEBHOOK) ) {
+                    try {
+                        CustomTextAlert customTextAlert = new CustomTextAlert("Test completed for accountId=" + accountId + " testingRun=" + testingRun.getHexId() + " summaryId=" + summaryId.toHexString() + " : @Arjun you are up now. Make your time worth it. :)");
+                        SLACK_INSTANCE.send(AKTO_SLACK_WEBHOOK, customTextAlert.toJson());
+                    } catch (Exception e) {
+                        logger.error("Error sending slack alert for completion of test", e);
+                    }
+                    
                 }
-
-                if(GetRunningTestsStatus.getRunningTests().isTestRunning(testingRun.getId())){
-                    loggerMaker.infoAndAddToDb("Updating status of running test to Completed.");
-                    TestingRunDao.instance.getMCollection().withWriteConcern(writeConcern).findOneAndUpdate(
-                            Filters.eq("_id", testingRun.getId()),  completedUpdate
-                    );
-                }
-
-                if(summaryId != null && testingRun.getTestIdConfig() != 1){
-                    TestExecutor.updateTestSummary(summaryId);
-                }
-
-                loggerMaker.infoAndAddToDb("Tests completed in " + (Context.now() - start) + " seconds for account: " + accountId, LogDb.TESTING);
-
                 /*
                  * In case the testing run results start overflowing
                  * due to being a capped collection,
@@ -602,32 +693,6 @@ public class Main {
                     }
                 });
                 
-                Organization organization = OrganizationsDao.instance.findOne(
-                        Filters.in(Organization.ACCOUNTS, Context.accountId.get()));
-
-                if(organization != null && organization.getTestTelemetryEnabled()){
-                    loggerMaker.infoAndAddToDb("Test telemetry enabled for account: " + accountId + ", sending results", LogDb.TESTING);
-                    ObjectId finalSummaryId = summaryId;
-                    testTelemetryScheduler.execute(() -> {
-                        Context.accountId.set(accountId);
-                        try {
-                            com.akto.onprem.Constants.sendTestResults(finalSummaryId, organization);
-                            loggerMaker.infoAndAddToDb("Test telemetry sent for account: " + accountId, LogDb.TESTING);
-                        } catch (Exception e) {
-                            loggerMaker.errorAndAddToDb(e, "Error in sending test telemetry for account: " + accountId);
-                        }
-                    });
-                } else {
-                    loggerMaker.infoAndAddToDb("Test telemetry disabled for account: " + accountId, LogDb.TESTING);
-                }
-
-                // update usage after test is completed.
-                 int deltaUsage = 0;
-                 if(syncLimit.checkLimit){
-                     deltaUsage = usageLeft - syncLimit.getUsageLeft();
-                 }
- 
-                 UsageMetricHandler.calcAndFetchFeatureAccessUsingDeltaUsage(MetricTypes.TEST_RUNS, accountId, deltaUsage);
 
             }, "testing");
             Thread.sleep(1000);
