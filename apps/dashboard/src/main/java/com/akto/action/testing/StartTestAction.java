@@ -1130,7 +1130,7 @@ public class StartTestAction extends UserAction {
     private EditableTestingRunConfig editableTestingRunConfig;
 
     public String modifyTestingRunConfig(){
-        TestingRunConfigDao.instance.updateOne(
+        TestingRunConfigDao.instance.updateOneNoUpsert(
             Filters.eq(Constants.ID, this.testingRunConfigId),
                 Updates.combine(
                     Updates.set("configsAdvancedSettings", this.editableTestingRunConfig.getTestConfigsAdvancedSettings()),
@@ -1141,7 +1141,7 @@ public class StartTestAction extends UserAction {
             );
             
         if(editableTestingRunConfig.getTestingRunHexId() != null){
-            TestingRunDao.instance.updateOne(
+            TestingRunDao.instance.updateOneNoUpsert(
                 Filters.eq(Constants.ID, new ObjectId(editableTestingRunConfig.getTestingRunHexId())),
                 Updates.combine(
                     Updates.set("testRunTime", this.editableTestingRunConfig.getTestRunTime()),
