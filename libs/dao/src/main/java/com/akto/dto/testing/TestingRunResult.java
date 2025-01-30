@@ -20,8 +20,10 @@ public class TestingRunResult implements Comparable<TestingRunResult> {
 
     public static final String TEST_RUN_ID = "testRunId";
     private ObjectId testRunId;
+
     @BsonIgnore
     private String testRunHexId;
+
     public static final String API_INFO_KEY = "apiInfoKey";
     private ApiInfo.ApiInfoKey apiInfoKey;
     public static final String TEST_SUPER_TYPE = "testSuperType";
@@ -49,6 +51,7 @@ public class TestingRunResult implements Comparable<TestingRunResult> {
     private List<TestResult> singleTestResults;
     @BsonIgnore
     private List<MultiExecTestResult> multiExecTestResults;
+
 
     public static final String ERRORS_LIST = "errorsList";
     private  List<String> errorsList;
@@ -180,6 +183,17 @@ public class TestingRunResult implements Comparable<TestingRunResult> {
         this.testRunResultSummaryId = testRunResultSummaryId;
     }
 
+    public String getTestRunHexId() {
+        if (testRunHexId == null && this.testRunId != null) {
+            return this.testRunId.toHexString();
+        }
+        return this.testRunHexId;
+    }
+
+    public void setTestRunHexId(String testRunHexId) {
+        this.testRunHexId = testRunHexId;
+    }
+
     public String getTestSuperType() {
         return testSuperType;
     }
@@ -234,15 +248,6 @@ public class TestingRunResult implements Comparable<TestingRunResult> {
 
     public void setWorkflowTest(WorkflowTest workflowTest) {
         this.workflowTest = workflowTest;
-    }
-
-    public String getTestRunHexId() {
-        if (testRunHexId == null) return this.testRunId.toHexString();
-        return this.testRunHexId;
-    }
-
-    public void setTestRunHexId(String testRunHexId) {
-        this.testRunHexId = testRunHexId;
     }
 
     public String getTestRunResultSummaryHexId() {

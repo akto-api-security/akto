@@ -12,7 +12,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.*;
-import static com.akto.runtime.utils.Utils.parseCookie;
 
 public class AuthPolicy {
 
@@ -34,6 +33,25 @@ public class AuthPolicy {
         return new ArrayList<>();
     }
 
+    public static Map<String,String> parseCookie(List<String> cookieList){
+        Map<String,String> cookieMap = new HashMap<>();
+        if(cookieList==null)return cookieMap;
+        for (String cookieValues : cookieList) {
+            String[] cookies = cookieValues.split(";");
+            for (String cookie : cookies) {
+                cookie=cookie.trim();
+                String[] cookieFields = cookie.split("=");
+                boolean twoCookieFields = cookieFields.length == 2;
+                if (twoCookieFields) {
+                    if(!cookieMap.containsKey(cookieFields[0])){
+                        cookieMap.put(cookieFields[0], cookieFields[1]);
+                    }
+                }
+            }
+        }
+        return cookieMap;
+    }
+
     public static boolean findAuthType(HttpResponseParams httpResponseParams, ApiInfo apiInfo, RuntimeFilter filter, List<CustomAuthType> customAuthTypes) {
         Set<Set<ApiInfo.AuthType>> allAuthTypesFound = apiInfo.getAllAuthTypesFound();
         if (allAuthTypesFound == null) allAuthTypesFound = new HashSet<>();
@@ -48,12 +66,6 @@ public class AuthPolicy {
         Map<String,String> cookieMap = parseCookie(cookieList);
         Set<ApiInfo.AuthType> authTypes = new HashSet<>();
 
-        BasicDBObject flattenedPayload = null;
-        try{
-            BasicDBObject basicDBObject =  BasicDBObject.parse(httpResponseParams.getRequestParams().getPayload());
-            flattenedPayload = JSONUtils.flattenWithDots(basicDBObject);
-        } catch (Exception e){
-        }
         for (CustomAuthType customAuthType : customAuthTypes) {
 
             Set<String> headerAndCookieKeys = new HashSet<>();
@@ -69,17 +81,29 @@ public class AuthPolicy {
 
             // Find custom auth type in payload
             List<String> customAuthTypePayloadKeys = customAuthType.getPayloadKeys();
-            if(flattenedPayload != null && !flattenedPayload.isEmpty() && !customAuthTypePayloadKeys.isEmpty() && flattenedPayload.keySet().containsAll(customAuthTypePayloadKeys)){
-                authTypes.add(ApiInfo.AuthType.CUSTOM);
-                break;
+            if(!customAuthTypePayloadKeys.isEmpty() ){
+                BasicDBObject flattenedPayload = null;
+                try{
+                    BasicDBObject basicDBObject = BasicDBObject.parse(httpResponseParams.getRequestParams().getPayload());
+                    flattenedPayload = JSONUtils.flattenWithDots(basicDBObject);
+                } catch (Exception e){
+                }
+                if(flattenedPayload != null && !flattenedPayload.isEmpty() && flattenedPayload.keySet().containsAll(customAuthTypePayloadKeys)){
+                    authTypes.add(ApiInfo.AuthType.CUSTOM);
+                    break;
+                }
             }
         }
 
         // find bearer or basic tokens in any header
         for (String header : headers.keySet()) {
             List<String> headerValues = headers.getOrDefault(header, new ArrayList<>());
-            for (String value : headerValues) {
-                authTypes.addAll(findBearerBasicAuth(header, value));
+            if (!headerValues.isEmpty()) {
+                for (String value : headerValues) {
+                    authTypes.addAll(findBearerBasicAuth(header, value));
+                }
+            } else {
+                authTypes.addAll(findBearerBasicAuth(header, ""));
             }
         }
 

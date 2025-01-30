@@ -14,12 +14,16 @@ public class CodeAnalysisCollection {
     private String projectDir;
     public static final String PROJECT_DIR = "projectDir";
 
+    public static final String API_COLLECTION_ID = "apiCollectionId";
+    private int apiCollectionId;
+
     public CodeAnalysisCollection() {
     }
 
-    public CodeAnalysisCollection(String name, String projectDir) {
+    public CodeAnalysisCollection(String name, String projectDir, int apiCollectionId) {
         this.name = name;
         this.projectDir = projectDir;
+        this.apiCollectionId = apiCollectionId;
     }
 
     public ObjectId getId() {
@@ -45,5 +49,13 @@ public class CodeAnalysisCollection {
 
     public void setProjectDir(String projectDir) {
         this.projectDir = projectDir;
+    }
+
+    public int getApiCollectionId() {
+        return apiCollectionId;
+    }
+
+    public void setApiCollectionId(int apiCollectionId) {
+        this.apiCollectionId = apiCollectionId;
     }
 }
