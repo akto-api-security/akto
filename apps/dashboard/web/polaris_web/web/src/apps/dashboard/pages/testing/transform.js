@@ -1130,9 +1130,9 @@ getMissingConfigs(testResults){
         })
 
     return {
-      testConfigsAdvancedSettings:settings,
+      configsAdvancedSettings:settings,
       testRoleId: testRun.testRoleId,
-      subCategoriesList: selectedTests,
+      testSubCategoryList: selectedTests,
       overriddenTestAppUrl: testRun.overriddenTestAppUrl,
       maxConcurrentRequests: testRun.maxConcurrentRequests,
       testingRunHexId: hexId,
