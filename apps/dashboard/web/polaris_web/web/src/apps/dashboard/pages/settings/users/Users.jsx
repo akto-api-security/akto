@@ -8,6 +8,7 @@ import PersistStore from "../../../../main/PersistStore";
 import SearchableResourceList from "../../../components/shared/SearchableResourceList";
 import ResourceListModal from "../../../components/shared/ResourceListModal";
 import observeApi from "../../observe/api";
+import { usersCollectionRenderItem } from "../rbac/utils";
 
 const Users = () => {
     const username = window.USER_NAME
@@ -74,6 +75,9 @@ const Users = () => {
         func.copyToClipboard(passwordResetState.passwordResetLink, ref, "Password reset link copied to clipboard")
     }
 
+    const [customRoles, setCustomRoles] = useState([])
+    const [defaultInviteRole, setDefaultInviteRole] = useState('MEMBER')
+
     let paidFeatureRoleOptions =  rbacAccess ? [
         {
             content: 'Developer',
@@ -82,14 +86,14 @@ const Users = () => {
         {
             content: 'Guest',
             role: 'GUEST',
-        }
+        }, ...customRoles
     ] : []
 
     const websiteHostName = window.location.origin
     const notOnPremHostnames = ["app.akto.io", "localhost", "127.0.0.1", "[::1]"]
     const isOnPrem = websiteHostName && !notOnPremHostnames.includes(window.location.hostname)
 
-    const rolesOptions = [
+    let rolesOptions = [
         {
             items: [
             {
@@ -120,7 +124,7 @@ const Users = () => {
     ]
 
     const getRoleHierarchy = async() => {
-        let roleHierarchyResp = await settingRequests.getRoleHierarchy(window.USER_ROLE)
+        let roleHierarchyResp = await settingRequests.getRoleHierarchy()
         if(roleHierarchyResp.includes("MEMBER")){
             roleHierarchyResp.push("SECURITY ENGINEER")
         }
@@ -128,6 +132,25 @@ const Users = () => {
             roleHierarchyResp.push('REMOVE')
             roleHierarchyResp.push('RESET_PASSWORD')
         }
+
+        const customRolesResponse = await settingRequests.getCustomRoles()
+        if(customRolesResponse.roles){
+            setCustomRoles(customRolesResponse.roles.map(x => {
+
+                if(roleHierarchyResp.includes(x.baseRole)){
+                    roleHierarchyResp.push(x.name)
+                }
+                if(x.defaultInviteRole){
+                    setDefaultInviteRole(x.name)
+                }
+
+                return {
+                    content: x.name,
+                    role: x.name
+                }
+            }))
+        }
+
         setRoleHierarchy(roleHierarchyResp)
 
     }
@@ -170,6 +193,7 @@ const Users = () => {
             }
         })
         
+        await getTeamData();
     }
 
     const toggleRoleSelectionPopup = (id) => {
@@ -277,16 +301,6 @@ const Users = () => {
                             const initials = func.initials(login)
                             const media = <Avatar user size="medium" name={login} initials={initials} />
 
-                            const usersCollectionRenderItem = (item) => {
-                                const { id, collectionName } = item;
-
-                                return (
-                                    <ResourceItem id={id}>
-                                        <Text variant="bodyMd" fontWeight="semibold" as="h3">{collectionName}</Text>
-                                    </ResourceItem>
-                                );
-                            }
-
                             const updateUsersCollection = async () => {
                                 const collectionIdList = selectedItems[id];
                                 const userCollectionMap = {
@@ -388,6 +402,7 @@ const Users = () => {
                     toggleInviteUserModal={toggleInviteUserModal}
                     roleHierarchy={roleHierarchy}
                     rolesOptions={rolesOptions}
+                    defaultInviteRole={defaultInviteRole}
                 />
                 <Modal
                     small

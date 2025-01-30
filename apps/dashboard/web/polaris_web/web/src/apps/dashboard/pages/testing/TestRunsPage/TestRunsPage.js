@@ -322,11 +322,13 @@ const SummaryCardComponent = () =>{
           <LegacyCard.Subsection>
             <Box paddingBlockStart={3}><Divider/></Box>
             <HorizontalGrid columns={2} gap={6}>
-              <ChartypeComponent navUrl={"/dashboard/issues/"} data={subCategoryInfo} title={"Categories"} isNormal={true} boxHeight={'250px'}/>
+              <ChartypeComponent chartSize={190} navUrl={"/dashboard/issues/"} data={subCategoryInfo} title={"Categories"} isNormal={true} boxHeight={'250px'}/>
               <ChartypeComponent
                   data={severityMap}
                   navUrl={"/dashboard/issues/"} title={"Severity"} isNormal={true} boxHeight={'250px'} dataTableWidth="250px" boxPadding={8}
                   pieInnerSize="50%"
+                  chartOnLeft={false}
+                  chartSize={190}
               />
             </HorizontalGrid>
 

@@ -3,7 +3,7 @@ import { useState } from "react"
 
 function OperatorDropdown(props) {
 
-    const { label, items, selected } = props
+    const { label, items, selected, designer } = props
     const [popoverActive, setPopoverActive] = useState(false);
     const togglePopoverActive = () => setPopoverActive((popoverActive) => !popoverActive);
 
@@ -13,7 +13,10 @@ function OperatorDropdown(props) {
             <Popover
                 active={popoverActive}
                 activator={
-                    <Button onClick={togglePopoverActive} disclosure plain removeUnderline>{label}</Button>
+                    designer ?
+                        <Button onClick={togglePopoverActive} disclosure>{label}</Button>
+                        :
+                        <Button onClick={togglePopoverActive} disclosure plain removeUnderline>{label}</Button>
                 }
                 onClose={togglePopoverActive}
             >

@@ -87,23 +87,7 @@ public class ApiCollectionsAction extends UserAction {
             if (count != null && (apiCollection.getHostName() != null)) {
                 apiCollection.setUrlsCount(count);
             } else if(ApiCollection.Type.API_GROUP.equals(apiCollection.getType())){
-                int conditionsCount = 0;
-                if(!apiCollection.getAutomated()){
-                    ApiCollection apiCollectionWithCond = ApiCollectionsDao.instance.findOne(Filters.eq(Constants.ID, apiCollection.getId()), Projections.include("conditions"));
-                    if(apiCollectionWithCond.getConditions() != null && !apiCollectionWithCond.getConditions().isEmpty()  && apiCollectionWithCond.getConditions().get(0) != null){
-                        if(apiCollectionWithCond.getConditions().get(0).getType().equals(TestingEndpoints.Type.CUSTOM)){
-                            CustomTestingEndpoints testingEndpoints = (CustomTestingEndpoints) apiCollectionWithCond.getConditions().get(0);
-                            if (testingEndpoints.getApisList() != null && !testingEndpoints.getApisList().isEmpty()) {
-                                conditionsCount = testingEndpoints.getApisList().size();
-                                loggerMaker.infoAndAddToDb("fillApiCollectionsUrlCount collection: " + apiCollectionWithCond.getDisplayName() + " count: " + conditionsCount);
-                            }
-                        }
-                    }
-                }
-                
-                if (conditionsCount != 0) {
-                    count = conditionsCount;
-                } else if (count == null) {
+                if (count == null) {
                     count = fallbackCount;
                 }
                 apiCollection.setUrlsCount(count);
@@ -809,6 +793,23 @@ public class ApiCollectionsAction extends UserAction {
         for(Map.Entry<String, List<Integer>> entry : userCollectionMap.entrySet()) {
             int userId = Integer.parseInt(entry.getKey());
             Set<Integer> apiCollections = new HashSet<>(entry.getValue());
+
+            /*
+             * Need actual role, not base role, 
+             * thus using direct Rbac query, not cached map.
+             */
+            RBAC rbac = RBACDao.instance.findOne(Filters.and(
+                    Filters.eq(RBAC.USER_ID, userId),
+                    Filters.eq(RBAC.ACCOUNT_ID, accountId)));
+            String role = rbac.getRole();
+            CustomRole customRole = CustomRoleDao.instance.findRoleByName(role);
+            /*
+             * If the role is custom role, only update the user with the delta.
+             */
+            if (customRole != null && customRole.getApiCollectionsId() != null
+                    && !customRole.getApiCollectionsId().isEmpty()) {
+                apiCollections.removeAll(customRole.getApiCollectionsId());
+            }
 
             RBACDao.updateApiCollectionAccess(userId, accountId, apiCollections);
             UsersCollectionsList.deleteCollectionIdsFromCache(userId, accountId);

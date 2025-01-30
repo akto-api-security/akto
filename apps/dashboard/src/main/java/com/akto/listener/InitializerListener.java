@@ -304,7 +304,7 @@ public class InitializerListener implements ServletContextListener {
 
         DashboardMode dashboardMode = DashboardMode.getDashboardMode();        
 
-        RBAC record = RBACDao.instance.findOne("role", Role.ADMIN);
+        RBAC record = RBACDao.instance.findOne("role", Role.ADMIN.name());
 
         if (record == null) {
             return;
@@ -1982,12 +1982,12 @@ public class InitializerListener implements ServletContextListener {
             return;
         }
 
-        RBAC rbac = RBACDao.instance.findOne(RBAC.ACCOUNT_ID, accountId, RBAC.ROLE, Role.ADMIN);
+        RBAC rbac = RBACDao.instance.findOne(RBAC.ACCOUNT_ID, accountId, RBAC.ROLE, Role.ADMIN.name());
 
         if (rbac == null) {
             loggerMaker.infoAndAddToDb("Admin is missing in DB", LogDb.DASHBOARD);
-            RBACDao.instance.getMCollection().updateOne(Filters.and(Filters.eq(RBAC.ROLE, Role.ADMIN), Filters.exists(RBAC.ACCOUNT_ID, false)), Updates.set(RBAC.ACCOUNT_ID, accountId), new UpdateOptions().upsert(false));
-            rbac = RBACDao.instance.findOne(RBAC.ACCOUNT_ID, accountId, RBAC.ROLE, Role.ADMIN);
+            RBACDao.instance.getMCollection().updateOne(Filters.and(Filters.eq(RBAC.ROLE, Role.ADMIN.name()), Filters.exists(RBAC.ACCOUNT_ID, false)), Updates.set(RBAC.ACCOUNT_ID, accountId), new UpdateOptions().upsert(false));
+            rbac = RBACDao.instance.findOne(RBAC.ACCOUNT_ID, accountId, RBAC.ROLE, Role.ADMIN.name());
             if(rbac == null){
                 loggerMaker.errorAndAddToDb("Admin is still missing in DB, making first user as admin", LogDb.DASHBOARD);
                 User firstUser = UsersDao.instance.getFirstUser(accountId);
@@ -2305,7 +2305,6 @@ public class InitializerListener implements ServletContextListener {
                     }
                     if (DashboardMode.isMetered()) {
                         setupUsageScheduler();
-                        setupUsageSyncScheduler();
                     }
                     trimCappedCollections();
                     setUpPiiAndTestSourcesScheduler();
@@ -2576,8 +2575,10 @@ public class InitializerListener implements ServletContextListener {
             planType = OrganizationUtils.fetchplanType(metaData);
             trialMsg = OrganizationUtils.fetchtrialMsg(metaData);
             boolean expired = OrganizationUtils.fetchExpired(metaData);
-            boolean telemetryEnabled = OrganizationUtils.fetchTelemetryEnabled(metaData);
-            // setTelemetrySettings(organization, telemetryEnabled);
+            if (DashboardMode.isOnPremDeployment()) {
+                boolean telemetryEnabled = OrganizationUtils.fetchTelemetryEnabled(metaData);
+                setTelemetrySettings(organization, telemetryEnabled);
+            }
             boolean testTelemetryEnabled = OrganizationUtils.fetchTestTelemetryEnabled(metaData);
             organization.setTestTelemetryEnabled(testTelemetryEnabled);
 
@@ -2840,7 +2841,7 @@ public class InitializerListener implements ServletContextListener {
             }else{
                 loggerMaker.infoAndAddToDb("Found non-admin rbac for first user: " + firstUser.getLogin() + " , thus inserting admin role", LogDb.DASHBOARD);
                 RBACDao.instance.insertOne(
-                    new RBAC(firstUser.getId(), Role.ADMIN, Context.accountId.get())
+                    new RBAC(firstUser.getId(), Role.ADMIN.name(), Context.accountId.get())
                 );
             }
 
@@ -3582,15 +3583,19 @@ public class InitializerListener implements ServletContextListener {
                     loggerMaker.infoAndAddToDb("Usage cron dibs not acquired, skipping usage cron", LoggerMaker.LogDb.DASHBOARD);
                     return;
                 }
-                calcUsage();
-            }
-        }, 0, 1, UsageUtils.USAGE_CRON_PERIOD);
-    }
-
-    public void setupUsageSyncScheduler() {
-        scheduler.scheduleAtFixedRate(new Runnable() {
-            public void run() {
+                /*
+                 * This syncs existing entries in db.
+                 * This is needed in case the machine were down,
+                 * and any usage for an interval has not been reported.
+                 */
                 syncWithAkto();
+                /*
+                 * This recalculates usage and syncs the same.
+                 * The existing usage contains real-time data, which is calculated with some
+                 * error rate, for fast calculations.
+                 * This is needed, to correctly calculate the usage and report it back.
+                 */
+                calcUsage();
             }
         }, 0, 1, UsageUtils.USAGE_CRON_PERIOD);
     }

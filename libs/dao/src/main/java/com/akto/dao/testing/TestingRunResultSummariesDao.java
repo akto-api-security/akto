@@ -150,7 +150,7 @@ public class TestingRunResultSummariesDao extends AccountsContextDao<TestingRunR
     }
 
     public List<TestingRunResultSummary> getCurrentRunningTestsSummaries(){
-        int filterTime = Context.now() - 2 * 60 * 60;
+        int filterTime = Context.now() - 12 * 60 * 60;
         List<TestingRunResultSummary> trrs = TestingRunResultSummariesDao.instance.findAll(
             Filters.and(
                 Filters.eq(TestingRunResultSummary.STATE, TestingRun.State.RUNNING),

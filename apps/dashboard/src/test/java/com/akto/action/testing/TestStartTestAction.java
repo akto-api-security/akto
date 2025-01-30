@@ -185,7 +185,7 @@ public class TestStartTestAction extends MongoBasedTest {
 
         user = UsersDao.instance.findOne(Filters.eq(User.LOGIN, login));
 
-        RBAC rbac = new RBAC(user.getId(), Role.ADMIN, ACCOUNT_ID);
+        RBAC rbac = new RBAC(user.getId(), Role.ADMIN.name(), ACCOUNT_ID);
         RBACDao.instance.insertOne(rbac);
 
         AccountSettings acc = new AccountSettings();
