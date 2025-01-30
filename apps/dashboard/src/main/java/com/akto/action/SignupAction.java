@@ -457,6 +457,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
         params.put("client_id", githubConfig.getClientId());
         params.put("client_secret", githubConfig.getClientSecret());
         params.put("code", this.code);
+        params.put("scope", "user");
         logger.info("Github code length: {}", this.code.length());
         try {
             String githubUrl = githubConfig.getGithubUrl();
@@ -491,12 +492,17 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             int refreshTokenExpiry = (int) Double.parseDouble(tokenData.getOrDefault("refresh_token_expires_in", "0").toString());
             Map<String,Object> userData = CustomHttpRequest.getRequest(githubApiUrl + "/user", "Bearer " + accessToken);
             logger.info("Get request to {} success", githubApiUrl);
-            String company = "sso";
-            String username = userData.get("login").toString() + "@" + company;
+
+            List<Map<String, String>> emailResp = GithubLogin.getEmailRequest(accessToken);
+            String username = userData.get("name").toString();
+            String email = GithubLogin.getPrimaryGithubEmail(emailResp);
+            if(email == null || email.isEmpty()) {
+                email = username + "@sso";
+            }
             logger.info("username {}", username);
-            SignupInfo.GithubSignupInfo ghSignupInfo = new SignupInfo.GithubSignupInfo(accessToken, refreshToken, refreshTokenExpiry, username);
+            SignupInfo.GithubSignupInfo ghSignupInfo = new SignupInfo.GithubSignupInfo(accessToken, refreshToken, refreshTokenExpiry, email, username);
             shouldLogin = "true";
-            createUserAndRedirect(username, username, ghSignupInfo, 1000000, Config.ConfigType.GITHUB.toString());
+            createUserAndRedirect(email, username, ghSignupInfo, 1000000, Config.ConfigType.GITHUB.toString(), RBAC.Role.MEMBER);
             code = "";
             logger.info("Executed registerViaGithub");
 
@@ -587,7 +593,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
     public String sendRequestToSamlIdP() throws IOException{
         String queryString = servletRequest.getQueryString();
         String emailId = Util.getValueFromQueryString(queryString, "email");
-        if(emailId.isEmpty()){
+        if(!DashboardMode.isOnPremDeployment() && emailId.isEmpty()){
             code = "Error, user email cannot be empty";
             logger.error(code);
             servletResponse.sendRedirect("/login");
@@ -595,7 +601,12 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
         }
         logger.info("Trying to sign in for: " + emailId);
         setUserEmail(emailId);
-        SAMLConfig samlConfig = SSOConfigsDao.instance.getSSOConfig(userEmail);
+        SAMLConfig samlConfig = null;
+        if(userEmail != null && !userEmail.isEmpty()) {
+            samlConfig = SSOConfigsDao.instance.getSSOConfig(userEmail);
+        } else if(!DashboardMode.isOnPremDeployment()) {
+            samlConfig = Config.AzureConfig.getSSOConfigByAccountId(1000000, ConfigType.AZURE);
+        }
         if(samlConfig == null) {
             code = "Error, cannot login via SSO, trying to login with okta sso";
             logger.error(code);

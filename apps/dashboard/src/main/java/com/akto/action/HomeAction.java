@@ -1,14 +1,19 @@
 package com.akto.action;
 
 import com.akto.dao.UsersDao;
+import com.akto.dto.Config;
 import com.akto.dto.User;
+import com.akto.dto.sso.SAMLConfig;
 import com.akto.listener.InitializerListener;
 import com.akto.utils.*;
 import com.akto.util.DashboardMode;
+import com.akto.utils.sso.CustomSamlSettings;
 import com.auth0.AuthorizeUrl;
 import com.auth0.SessionUtils;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
+import com.onelogin.saml2.authn.AuthnRequest;
+import com.onelogin.saml2.settings.Saml2Settings;
 import com.opensymphony.xwork2.Action;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jws;
@@ -20,9 +25,13 @@ import org.slf4j.LoggerFactory;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import java.io.ByteArrayOutputStream;
+import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.Map;
+import java.util.zip.Deflater;
+import java.util.zip.DeflaterOutputStream;
 
 import static com.akto.action.SignupAction.*;
 import static com.akto.filter.UserDetailsFilter.LOGIN_URI;
@@ -50,14 +59,38 @@ public class HomeAction implements Action, SessionAware, ServletResponseAware, S
     public String execute() {
 
         servletRequest.setAttribute("isSaas", InitializerListener.isSaas);
-        if (GithubLogin.getClientId() != null) {
-            servletRequest.setAttribute("githubClientId", new String(Base64.getEncoder().encode(GithubLogin.getClientId().getBytes())));
-        }
-        if (GithubLogin.getGithubUrl() != null) {
-            servletRequest.setAttribute("githubUrl", GithubLogin.getGithubUrl());
-        }
-        if(DashboardMode.isOnPremDeployment() && OktaLogin.getAuthorisationUrl() != null){
-            servletRequest.setAttribute("oktaAuthUrl", new String(Base64.getEncoder().encode(OktaLogin.getAuthorisationUrl().getBytes())));
+        if(DashboardMode.isOnPremDeployment()) {
+            if (GithubLogin.getGithubUrl() != null) {
+                servletRequest.setAttribute("githubAuthUrl", GithubLogin.getGithubUrl() + "/login/oauth/authorize?client_id=" + GithubLogin.getClientId() + "&scope=user&state=1000000");
+                servletRequest.setAttribute("activeSso", Config.ConfigType.GITHUB);
+            } else if (OktaLogin.getAuthorisationUrl() != null) {
+                servletRequest.setAttribute("oktaAuthUrl", OktaLogin.getAuthorisationUrl());
+                servletRequest.setAttribute("activeSso", Config.ConfigType.OKTA);
+            } else if (Config.AzureConfig.getSSOConfigByAccountId(1000000, Config.ConfigType.AZURE) != null) {
+                try {
+                    SAMLConfig samlConfig = Config.AzureConfig.getSSOConfigByAccountId(1000000, Config.ConfigType.AZURE);
+                    Saml2Settings samlSettings = CustomSamlSettings.getSamlSettings(samlConfig);
+                    String samlRequestXml = new AuthnRequest(samlSettings).getAuthnRequestXml();
+
+                    ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+                    Deflater deflater = new Deflater(Deflater.DEFLATED, true);
+                    DeflaterOutputStream deflaterOutputStream = new DeflaterOutputStream(byteArrayOutputStream, deflater);
+                    deflaterOutputStream.write(samlRequestXml.getBytes(StandardCharsets.UTF_8));
+                    deflaterOutputStream.close();
+                    String base64Encoded = Base64.getEncoder().encodeToString(byteArrayOutputStream.toByteArray());
+                    String urlEncoded = URLEncoder.encode(base64Encoded, "UTF-8");
+
+                    servletRequest.setAttribute("azureAuthUrl", samlConfig.getLoginUrl() + "?SAMLRequest=" + urlEncoded + "&RelayState=" + 1000000);
+                    servletRequest.setAttribute("activeSso", Config.ConfigType.AZURE);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    logger.error(e.getMessage());
+                }
+            } else if (Config.GoogleConfig.getSSOConfigByAccountId(1000000, Config.ConfigType.GOOGLE_SAML) != null) {
+                Config.GoogleConfig googleSamlConfig = (Config.GoogleConfig) Config.GoogleConfig.getSSOConfigByAccountId(1000000, Config.ConfigType.GOOGLE_SAML);
+                servletRequest.setAttribute("googleSamlAuthUrl", googleSamlConfig.getAuthURI());
+                servletRequest.setAttribute("activeSso", Config.ConfigType.GOOGLE_SAML);
+            }
         }
         if (InitializerListener.aktoVersion != null && InitializerListener.aktoVersion.contains("akto-release-version")) {
             servletRequest.setAttribute("AktoVersionGlobal", "");

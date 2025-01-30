@@ -24,7 +24,7 @@ public class OktaLogin {
         }
 
         if (shouldProbeAgain) {
-            OktaConfig oktaConfig = (Config.OktaConfig) ConfigsDao.instance.findOne(Constants.ID, OktaConfig.getOktaId(Context.accountId.get()));
+            OktaConfig oktaConfig = (Config.OktaConfig) ConfigsDao.instance.findOne(Constants.ID, OktaConfig.getOktaId(1000000));
             if (instance == null) {
                 instance = new OktaLogin();
             }
@@ -47,7 +47,7 @@ public class OktaLogin {
         paramMap.put("redirect_uri",oktaConfig.getRedirectUri());
         paramMap.put("response_type", "code");
         paramMap.put("scope", "openid%20email%20profile");
-        paramMap.put("state", "login");
+        paramMap.put("state", String.valueOf(oktaConfig.getAccountId()));
 
         String queryString = SsoUtils.getQueryString(paramMap);
 

@@ -9,7 +9,7 @@ import func from "@/util/func"
 import Details from '../components/Details';
 import { CancelMajor } from "@shopify/polaris-icons"
 
-function CustomSamlSso({ssoType,entityTitle, entityId, loginURL,pageTitle, signinUrl, integrationSteps, cardContent, handleSubmitOutSide, handleDeleteOutside, samlUrlDocs, loading, showCustomInputs, certificateName}) {
+function CustomSamlSso({ssoType,entityTitle, entityId, loginURL,pageTitle, signinUrl, integrationSteps, cardContent, handleSubmitOutSide, handleDeleteOutside, samlUrlDocs, loading, showCustomInputs, certificateName, isButtonActive}) {
     const [componentType, setComponentType] = useState(0) ;
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [files, setFiles] = useState(null)
@@ -17,7 +17,7 @@ function CustomSamlSso({ssoType,entityTitle, entityId, loginURL,pageTitle, signi
     const [identifier, setIdentifier] = useState('')
 
     const stepsComponent = (
-        <StepsComponent integrationSteps={integrationSteps} onClickFunc={() => setComponentType(1)} buttonActive={true}/>
+        <StepsComponent integrationSteps={integrationSteps} onClickFunc={() => setComponentType(1)} buttonActive={isButtonActive}/>
     )
 
     const setFilesCheck = (file) => {
