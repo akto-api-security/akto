@@ -1146,23 +1146,32 @@ public class StartTestAction extends UserAction {
                     return Action.ERROR.toUpperCase();
                 }
 
-                if (editableTestingRunConfig.getConfigsAdvancedSettings() != null) {
-                    existingTestingRunConfig.setConfigsAdvancedSettings(editableTestingRunConfig.getConfigsAdvancedSettings());
+                List<Bson> updates = new ArrayList<>();
+
+                if (editableTestingRunConfig.getConfigsAdvancedSettings() != null && !editableTestingRunConfig.getConfigsAdvancedSettings().equals(existingTestingRunConfig.getConfigsAdvancedSettings())) {
+                    updates.add(Updates.set(TestingRunConfig.TEST_CONFIGS_ADVANCED_SETTINGS, editableTestingRunConfig.getConfigsAdvancedSettings()));
                 }
-        
-                if (editableTestingRunConfig.getTestSubCategoryList() != null) {
-                    existingTestingRunConfig.setTestSubCategoryList(editableTestingRunConfig.getTestSubCategoryList());
+                
+                if (editableTestingRunConfig.getTestSubCategoryList() != null &&
+                    !editableTestingRunConfig.getTestSubCategoryList().equals(existingTestingRunConfig.getTestSubCategoryList())) {
+                    updates.add(Updates.set(TestingRunConfig.TEST_SUBCATEGORY_LIST, editableTestingRunConfig.getTestSubCategoryList()));
                 }
-        
-                if (editableTestingRunConfig.getTestRoleId() != null) {
-                    existingTestingRunConfig.setTestRoleId(editableTestingRunConfig.getTestRoleId());
+                
+                if (editableTestingRunConfig.getTestRoleId() != null && !editableTestingRunConfig.getTestRoleId().equals(existingTestingRunConfig.getTestRoleId())) {
+                    updates.add(Updates.set(TestingRunConfig.TEST_ROLE_ID, editableTestingRunConfig.getTestRoleId()));
                 }
-        
-                if (editableTestingRunConfig.getOverriddenTestAppUrl() != null) {
-                    existingTestingRunConfig.setOverriddenTestAppUrl(editableTestingRunConfig.getOverriddenTestAppUrl());
+                
+                if (editableTestingRunConfig.getOverriddenTestAppUrl() != null && !editableTestingRunConfig.getOverriddenTestAppUrl().equals(existingTestingRunConfig.getOverriddenTestAppUrl())) {
+                    updates.add(Updates.set(TestingRunConfig.OVERRIDDEN_TEST_APP_URL, editableTestingRunConfig.getOverriddenTestAppUrl()));
+                }
+                
+                if (!updates.isEmpty()) {
+                    TestingRunConfigDao.instance.updateOne(
+                        Filters.eq(Constants.ID, this.testingRunConfigId),
+                        Updates.combine(updates) 
+                    );
                 }
 
-                TestingRunConfigDao.instance.replaceOne(Filters.eq(Constants.ID, this.testingRunConfigId), existingTestingRunConfig);
             }
 
             if (editableTestingRunConfig.getTestingRunHexId() != null) {
@@ -1170,18 +1179,22 @@ public class StartTestAction extends UserAction {
                 TestingRun existingTestingRun = TestingRunDao.instance.findOne(Filters.eq(Constants.ID, new ObjectId(editableTestingRunConfig.getTestingRunHexId())));
 
                 if (existingTestingRun != null) {
-                    if (editableTestingRunConfig.getTestRunTime() != 0) {
-                        existingTestingRun.setTestRunTime(editableTestingRunConfig.getTestRunTime());
+                    List<Bson> updates = new ArrayList<>();
+
+                    if (editableTestingRunConfig.getTestRunTime() != 0 && editableTestingRunConfig.getTestRunTime() != existingTestingRun.getTestRunTime()) {
+                        updates.add(Updates.set(TestingRun.TEST_RUNTIME, editableTestingRunConfig.getTestRunTime()));
                     }
-    
-                    if (editableTestingRunConfig.getMaxConcurrentRequests() != 0) {
-                        existingTestingRun.setMaxConcurrentRequests(editableTestingRunConfig.getMaxConcurrentRequests());
+                
+                    if (editableTestingRunConfig.getMaxConcurrentRequests() != 0 && editableTestingRunConfig.getMaxConcurrentRequests() != existingTestingRun.getMaxConcurrentRequests()) {
+                        updates.add(Updates.set(TestingRun.MAX_CONCURRENT_REQUEST, editableTestingRunConfig.getMaxConcurrentRequests()));
                     }
-        
-                    TestingRunDao.instance.replaceOne(
-                        Filters.eq(Constants.ID, new ObjectId(editableTestingRunConfig.getTestingRunHexId())),
-                        existingTestingRun
-                    );
+                
+                    if (!updates.isEmpty()) {
+                        TestingRunDao.instance.updateOne(
+                            Filters.eq(Constants.ID,new ObjectId(editableTestingRunConfig.getTestingRunHexId())),
+                            Updates.combine(updates) 
+                        );
+                    }
                 }
                 
             }

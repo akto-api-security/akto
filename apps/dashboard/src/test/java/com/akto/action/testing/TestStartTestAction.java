@@ -19,6 +19,8 @@ import com.akto.dto.RBAC;
 import com.akto.dto.User;
 import com.akto.dto.UserAccountEntry;
 import com.akto.dto.ApiToken.Utility;
+import com.akto.dto.CollectionConditions.ConditionsType;
+import com.akto.dto.CollectionConditions.TestConfigsAdvancedSettings;
 import com.akto.dto.RBAC.Role;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.testing.*;
@@ -45,6 +47,7 @@ import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotEquals;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -283,6 +286,17 @@ public class TestStartTestAction extends MongoBasedTest {
         testingRunConfig.setTestRoleId("initialRole");
         testingRunConfig.setOverriddenTestAppUrl("https://initial.url");
         testingRunConfig.setTestSubCategoryList(list1);
+        testingRunConfig.setId(testingRunConfigId);
+
+        List<TestConfigsAdvancedSettings> testConfigsAdvancedSettingsList = new ArrayList<>();
+        TestConfigsAdvancedSettings testConfigsAdvancedSettings1 = new TestConfigsAdvancedSettings();
+        testConfigsAdvancedSettings1.setOperatorType("ADD_HEADER");
+        testConfigsAdvancedSettings1.setOperationsGroupList(new ArrayList<ConditionsType>());
+        testConfigsAdvancedSettings1.getOperationsGroupList().add(new ConditionsType("param1", "value1", new HashSet<>(Arrays.asList("url1", "url2"))));
+        testConfigsAdvancedSettings1.getOperationsGroupList().add(new ConditionsType("param2", "value2", new HashSet<>(Arrays.asList("url1", "url2"))));
+        testConfigsAdvancedSettingsList.add(testConfigsAdvancedSettings1);
+
+        testingRunConfig.setConfigsAdvancedSettings(testConfigsAdvancedSettingsList);
 
         TestingRunConfigDao.instance.insertOne(testingRunConfig);
 
@@ -315,9 +329,18 @@ public class TestStartTestAction extends MongoBasedTest {
         assertEquals("https://test.url", updatedConfig.getOverriddenTestAppUrl());
         assertEquals(list2, updatedConfig.getTestSubCategoryList());
 
+        assertEquals(testConfigsAdvancedSettingsList, updatedConfig.getConfigsAdvancedSettings());
+
+        // Ensure TestConfigsAdvancedSettings equals() override method works correctly
+        testConfigsAdvancedSettingsList.get(0).getOperationsGroupList().add(new ConditionsType("param3", "value3", new HashSet<>(Arrays.asList("url1", "url2"))));
+        assertNotEquals(testConfigsAdvancedSettingsList, updatedConfig.getConfigsAdvancedSettings());
+
+
         TestingRun updatedTestingRun = TestingRunDao.instance.findOne(Filters.eq(Constants.ID, testingRunHexId));
         assertEquals(3600, updatedTestingRun.getTestRunTime());
         assertEquals(10, updatedTestingRun.getMaxConcurrentRequests());
+
+        
     }
 
 }
