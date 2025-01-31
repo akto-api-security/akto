@@ -43,11 +43,18 @@ public class ConditionsType {
 
     @Override
     public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
+        if (this == o)
+            return true;
+        if (o == null || getClass() != o.getClass())
+            return false;
         ConditionsType that = (ConditionsType) o;
-        return key.equals(that.key) && value.equals(that.value) && urlsList.equals(that.urlsList);
+        return ((key != null && that.key != null && key.equals(that.key)) ||
+                (key == null && that.key == null)) &&
+                ((value != null && that.value != null && value.equals(that.value)) ||
+                        (value == null && that.value == null))
+                &&
+                ((urlsList != null && that.urlsList != null && urlsList.equals(that.urlsList)) ||
+                        (urlsList == null && that.urlsList == null));
     }
-
 
 }
