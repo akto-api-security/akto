@@ -1990,7 +1990,6 @@ public class InitializerListener implements ServletContextListener {
         Organization organization = OrganizationsDao.instance.findOne(filterQ);
         boolean alreadyExists = organization != null;
         if (alreadyExists) {
-            fetchAndSaveFeatureWiseAllowed(organization);
             loggerMaker.infoAndAddToDb("Org already exists for account: " + accountId, LogDb.DASHBOARD);
             return;
         }
