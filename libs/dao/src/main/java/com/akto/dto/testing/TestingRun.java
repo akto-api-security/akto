@@ -20,7 +20,9 @@ public class TestingRun {
     private int testIdConfig;
     public static final String PERIOD_IN_SECONDS = "periodInSeconds";
     private int periodInSeconds;
+    public static final String TEST_RUNTIME = "testRunTime";
     private int testRunTime;
+    public static final String MAX_CONCURRENT_REQUEST = "maxConcurrentRequests";
     private int maxConcurrentRequests;
     private String triggeredBy;
     public static final String TRIGGERED_BY = "triggeredBy";

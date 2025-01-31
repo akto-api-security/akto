@@ -6,6 +6,7 @@ import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing.sources.TestSourceConfigsDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dao.testing.*;
+import com.akto.dto.testing.config.EditableTestingRunConfig;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.User;
 import com.akto.dto.ApiToken.Utility;
@@ -234,12 +235,13 @@ public class StartTestAction extends UserAction {
                 }
                  
             }
+
             if (this.overriddenTestAppUrl != null || this.selectedTests != null) {
-                int id = UUID.randomUUID().hashCode() & 0xfffffff ;
+                int id = UUID.randomUUID().hashCode() & 0xfffffff;
                 TestingRunConfig testingRunConfig = new TestingRunConfig(id, null, this.selectedTests, null, this.overriddenTestAppUrl, this.testRoleId);
                 this.testIdConfig = testingRunConfig.getId();
                 TestingRunConfigDao.instance.insertOne(testingRunConfig);
-            }
+            } 
 
         }
 
@@ -506,7 +508,7 @@ public class StartTestAction extends UserAction {
         }
 
         TestingRunConfig runConfig = TestingRunConfigDao.instance.findOne(
-            Filters.eq("_id", this.testingRun.getTestIdConfig()), Projections.exclude("collectionWiseApiInfoKey", "testSubCategoryList")
+            Filters.eq("_id", this.testingRun.getTestIdConfig()), Projections.exclude("collectionWiseApiInfoKey")
         );
 
         this.testingRun.setTestingRunConfig(runConfig);
@@ -1125,11 +1127,83 @@ public class StartTestAction extends UserAction {
         return Action.SUCCESS.toUpperCase();
     }
 
+    private EditableTestingRunConfig editableTestingRunConfig;
+
     public String modifyTestingRunConfig(){
-        TestingRunConfigDao.instance.updateOne(
-            Filters.eq(Constants.ID, this.testingRunConfigId),
-            Updates.set("configsAdvancedSettings", this.testConfigsAdvancedSettings)
-        );
+        if (editableTestingRunConfig == null) {
+            addActionError("Invalid editableTestingRunConfig");
+            return Action.ERROR.toUpperCase();
+        }
+        try {
+            if (this.testingRunConfigId == 0) {
+                addActionError("Invalid testing run config id");
+                return Action.ERROR.toUpperCase();
+            } else {
+
+                TestingRunConfig existingTestingRunConfig = TestingRunConfigDao.instance.findOne(Filters.eq(Constants.ID, this.testingRunConfigId));
+                if (existingTestingRunConfig == null) {
+                    addActionError("Testing run config object not found for ID: " + this.testingRunConfigId);
+                    return Action.ERROR.toUpperCase();
+                }
+
+                List<Bson> updates = new ArrayList<>();
+
+                if (editableTestingRunConfig.getConfigsAdvancedSettings() != null && !editableTestingRunConfig.getConfigsAdvancedSettings().equals(existingTestingRunConfig.getConfigsAdvancedSettings())) {
+                    updates.add(Updates.set(TestingRunConfig.TEST_CONFIGS_ADVANCED_SETTINGS, editableTestingRunConfig.getConfigsAdvancedSettings()));
+                }
+                
+                if (editableTestingRunConfig.getTestSubCategoryList() != null &&
+                    !editableTestingRunConfig.getTestSubCategoryList().equals(existingTestingRunConfig.getTestSubCategoryList())) {
+                    updates.add(Updates.set(TestingRunConfig.TEST_SUBCATEGORY_LIST, editableTestingRunConfig.getTestSubCategoryList()));
+                }
+                
+                if (editableTestingRunConfig.getTestRoleId() != null && !editableTestingRunConfig.getTestRoleId().equals(existingTestingRunConfig.getTestRoleId())) {
+                    updates.add(Updates.set(TestingRunConfig.TEST_ROLE_ID, editableTestingRunConfig.getTestRoleId()));
+                }
+                
+                if (editableTestingRunConfig.getOverriddenTestAppUrl() != null && !editableTestingRunConfig.getOverriddenTestAppUrl().equals(existingTestingRunConfig.getOverriddenTestAppUrl())) {
+                    updates.add(Updates.set(TestingRunConfig.OVERRIDDEN_TEST_APP_URL, editableTestingRunConfig.getOverriddenTestAppUrl()));
+                }
+                
+                if (!updates.isEmpty()) {
+                    TestingRunConfigDao.instance.updateOne(
+                        Filters.eq(Constants.ID, this.testingRunConfigId),
+                        Updates.combine(updates) 
+                    );
+                }
+
+            }
+
+            if (editableTestingRunConfig.getTestingRunHexId() != null) {
+            
+                TestingRun existingTestingRun = TestingRunDao.instance.findOne(Filters.eq(Constants.ID, new ObjectId(editableTestingRunConfig.getTestingRunHexId())));
+
+                if (existingTestingRun != null) {
+                    List<Bson> updates = new ArrayList<>();
+
+                    if (editableTestingRunConfig.getTestRunTime() != 0 && editableTestingRunConfig.getTestRunTime() != existingTestingRun.getTestRunTime()) {
+                        updates.add(Updates.set(TestingRun.TEST_RUNTIME, editableTestingRunConfig.getTestRunTime()));
+                    }
+                
+                    if (editableTestingRunConfig.getMaxConcurrentRequests() != 0 && editableTestingRunConfig.getMaxConcurrentRequests() != existingTestingRun.getMaxConcurrentRequests()) {
+                        updates.add(Updates.set(TestingRun.MAX_CONCURRENT_REQUEST, editableTestingRunConfig.getMaxConcurrentRequests()));
+                    }
+                
+                    if (!updates.isEmpty()) {
+                        TestingRunDao.instance.updateOne(
+                            Filters.eq(Constants.ID,new ObjectId(editableTestingRunConfig.getTestingRunHexId())),
+                            Updates.combine(updates) 
+                        );
+                    }
+                }
+                
+            }
+
+
+        } catch (Exception e) {
+            addActionError("Unable to modify testing run config and testing run");
+            return Action.ERROR.toUpperCase();
+        }
         return SUCCESS.toUpperCase();
     }
 
@@ -1566,6 +1640,10 @@ public class StartTestAction extends UserAction {
 
     public void setTestingRunConfigId(int testingRunConfigId) {
         this.testingRunConfigId = testingRunConfigId;
+    }
+
+    public void setEditableTestingRunConfig(EditableTestingRunConfig editableTestingRunConfig) {
+        this.editableTestingRunConfig = editableTestingRunConfig;
     }
 
     public Map<String, Integer> getTestCountMap() {
