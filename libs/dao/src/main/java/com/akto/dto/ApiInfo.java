@@ -307,7 +307,7 @@ public class ApiInfo {
     }
 
     public String findSeverity() {
-        if (this.severityScore >= 1000) return "CRTICAL";
+        if (this.severityScore >= 1000) return "CRITICAL";
         if (this.severityScore >= 100) return "HIGH";
         if (this.severityScore >= 10) return "MEDIUM";
         if (this.severityScore > 1) return "LOW";

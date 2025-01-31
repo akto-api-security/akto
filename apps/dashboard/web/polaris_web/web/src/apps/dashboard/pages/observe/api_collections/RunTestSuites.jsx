@@ -2,9 +2,9 @@ import { VerticalStack, Modal, TextField, Button, Text, HorizontalStack, Collaps
 import { TickMinor, CancelMajor, SearchMinor } from "@shopify/polaris-icons";
 import { useEffect, useRef, useState } from "react";
 import "./run_test_suites.css"
+import createTestName from "./Utils"
 
-
-function RunTestSuites({  testRun, setTestRun, handleRun, checkRemoveAll, handleRemoveAll,handleModifyConfig }) {
+function RunTestSuites({  testRun, setTestRun, apiCollectionName, checkRemoveAll, handleRemoveAll,handleModifyConfig, activeFromTesting}) {
 
     const [owaspTop10, owaspTop10Toggle] = useState(true);
 
@@ -40,14 +40,7 @@ function RunTestSuites({  testRun, setTestRun, handleRun, checkRemoveAll, handle
                 }
             });
 
-            let updatedTestName = prev.testName;
-            const acronym = createAcronym(key);
-            if (someSelected) {
-                const regex = new RegExp(`_${acronym}`, 'g');
-                updatedTestName = updatedTestName.replace(regex, "");
-            } else {
-                updatedTestName += `_${acronym}`;
-            }
+            let updatedTestName = createTestName(apiCollectionName, updatedTests, activeFromTesting, prev.testName);
 
             return {
                 ...prev,
@@ -65,16 +58,6 @@ function RunTestSuites({  testRun, setTestRun, handleRun, checkRemoveAll, handle
             if (test[category]) {
                 count += test[category].length;
             }
-        });
-        return count;
-    }
-
-    function countAllSelectedTests() {
-        if (testRun === undefined) return ;
-        let count = 0;
-        const test = { ...testRun.tests };
-        Object.keys(test).forEach(category => {
-            count += test[category].filter(test => test.selected).length;
         });
         return count;
     }
@@ -132,18 +115,14 @@ function RunTestSuites({  testRun, setTestRun, handleRun, checkRemoveAll, handle
     function renderAktoTestSuites(data) {
         return (
             <div className="testSuiteCard" style={{marginLeft: "0.15rem"}}>
-                <Box minWidth="300px" maxWidth="300px" minHeight="152px" borderRadius={2} borderStyle="solid" paddingBlockEnd={4} insetInlineEnd={1}>
+                <Box minWidth="300px" maxWidth="300px" borderRadius={2} borderStyle="solid" insetInlineEnd={1}>
                     <VerticalStack>
-                        <div style={{ height: "80px", backgroundColor: "#ECEBFF", borderTopLeftRadius: "0.5rem", borderTopRightRadius: "0.5rem" }}>
-                            <img src="/public/test_suite.svg"/>
-                        </div>
                         <div >
                             <Box paddingBlockStart={2} paddingBlockEnd={2} paddingInlineStart={4} paddingInlineEnd={4} borderRadiusEndStart={2} borderRadiusEndEnd="2" borderColor="border">
-
                                 <Checkbox
                                     label={
                                         <Tooltip content={data?.key}>
-                                            <Text variant="headingMd" fontWeight="regular" truncate={true}>{data?.key}</Text>
+                                            <Text variant="headingSm" fontWeight="medium" truncate={true}>{data?.key}</Text>
                                         </Tooltip>
                                     }
                                     helpText={checkifSelected(data?.value)}
@@ -160,17 +139,6 @@ function RunTestSuites({  testRun, setTestRun, handleRun, checkRemoveAll, handle
         );
     }
 
-    function filterTestSuites() {
-        if (!searchValue || searchValue === "") return owaspTop10List;
-        const filtered = {};
-        Object.entries(owaspTop10List).forEach(([key, value]) => {
-            if (key.toLowerCase().includes(searchValue.toLowerCase())) {
-                filtered[key] = value;
-            }
-        });
-        return filtered;
-    }
-
     return (
         <Scrollable vertical={true} horizontal={false} shadow={false}>
         <div className="runTestSuitesModal" style={{ minHeight: "72vh" }}>
@@ -181,6 +149,7 @@ function RunTestSuites({  testRun, setTestRun, handleRun, checkRemoveAll, handle
                         <TextField
                             placeholder="Enter test name"
                             value={testRun.testName}
+                            disabled={activeFromTesting}
                             onChange={(testName) => setTestRun(prev => ({ ...prev, testName: testName }))}
                         />
                     </div>
@@ -215,8 +184,8 @@ function RunTestSuites({  testRun, setTestRun, handleRun, checkRemoveAll, handle
                         transition={{ duration: "500ms", timingFunction: "ease-in-out" }}
                         expandOnPrint
                     >
-                        <div className="testSuiteHorizontalScroll" style={{ display: "flex" }}>
-                            <HorizontalStack gap={2}>
+                        {/* <div className="testSuiteHorizontalScroll" style={{ display: "flex" }}> */}
+                            <HorizontalStack gap={4} align={"start"} blockAlign={"center"}>
 
                                 {
 
@@ -227,7 +196,7 @@ function RunTestSuites({  testRun, setTestRun, handleRun, checkRemoveAll, handle
 
 
                             </HorizontalStack>
-                        </div>
+                        {/* </div> */}
                     </Collapsible>
 
                 </VerticalStack>

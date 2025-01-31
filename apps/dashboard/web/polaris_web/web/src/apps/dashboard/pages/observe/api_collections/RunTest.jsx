@@ -15,7 +15,7 @@ import AdvancedSettingsComponent from "./component/AdvancedSettingsComponent";
 import { produce } from "immer"
 import RunTestSuites from "./RunTestSuites";
 import RunTestConfiguration from "./RunTestConfiguration";
-
+import createTestName from "./Utils"
 
 function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOutside, closeRunTest, selectedResourcesForPrimaryAction, useLocalSubCategoryData, preActivator, testIdConfig, activeFromTesting, setActiveFromTesting, showEditableSettings, setShowEditableSettings, parentAdvanceSettingsConfig, testRunType }) {
 
@@ -88,24 +88,6 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
 
     }, [testMode])
 
-    function nameSuffixes(tests) {
-        return Object.entries(tests)
-            .filter(category => {
-                let selectedCount = 0
-                category[1].forEach(test => {
-                    if (test.selected) selectedCount += 1
-                })
-
-                return selectedCount > 0
-            })
-            .map(category => category[0])
-    }
-
-    const convertToLowerCaseWithUnderscores = (inputString) => {
-        if (!inputString)
-            return ""
-        return inputString?.toLowerCase()?.replace(/\s+/g, '_');
-    }
     const apiCollectionName = collectionsMap[apiCollectionId]
 
     async function fetchData() {
@@ -157,10 +139,10 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
 
             mapCategoryToSubcategory[category]["selected"].map(test => selectedTests.push(test.value))
             processMapCategoryToSubcategory[category].forEach((test, index, arr) => {
-                arr[index]["selected"] = false
+                arr[index]["selected"] = selectedTests.includes(test.value)
             })
         })
-        const testName = convertToLowerCaseWithUnderscores(apiCollectionName);
+        const testName = createTestName(apiCollectionName, processMapCategoryToSubcategory);
         //Auth Mechanism
         let authMechanismPresent = false
         const authMechanismDataResponse = await testingApi.fetchAuthMechanismData()
@@ -253,7 +235,8 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                     testRoleId: testIdConfig.testingRunConfig.testRoleId,
                     testRunTimeLabel: (testIdConfig.testRunTime === -1) ? "30 minutes" : getLabel(testRunTimeOptions, testIdConfig.testRunTime.toString())?.label,
                     testRoleLabel: getLabel(testRolesArr, testIdConfig.testingRunConfig.testRoleId).label,
-                    runTypeLabel: getRunTypeLabel(testRunType)
+                    runTypeLabel: getRunTypeLabel(testRunType),
+                    testName: testIdConfig.name
                 }));
             }
         }
@@ -272,10 +255,10 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
             setTestRun(prev => {
                 const tests = { ...testRun.tests }
                 Object.keys(tests).forEach(category => {
-                    tests[category] = tests[category].map(test => ({ ...test, selected: false }))
+                    tests[category] = tests[category].map(test => ({ ...test, selected: true }))
                 })
-    
-                return { ...prev, tests: tests, testName: convertToLowerCaseWithUnderscores(apiCollectionName) }
+                const testName = createTestName(apiCollectionName, tests)
+                return { ...prev, tests: tests, testName: testName }
             })
         }
         setActive(prev => !prev)
@@ -347,7 +330,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                     selected: !curTest.selected
                 } : curTest
         )
-        const testName = convertToLowerCaseWithUnderscores(apiCollectionName) + "_" + nameSuffixes(localCopy).join("_")
+        const testName = createTestName(apiCollectionName, localCopy, activeFromTesting, testRun.testName)
         setTestRun(prev => ({
             ...prev,
             tests: {
@@ -498,7 +481,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                 tests[category] = tests[category].map(test => ({ ...test, selected: false }))
             })
 
-            return { ...prev, tests: tests, testName: convertToLowerCaseWithUnderscores(apiCollectionName) }
+            return { ...prev, tests: tests, testName: createTestName(apiCollectionName, tests, activeFromTesting, testRun.testName) }
         })
         func.setToast(true, false, "All tests unselected")
     }
@@ -613,7 +596,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
             test.selected = val
         })
         setTestRun(prev => {
-            return { ...prev, tests: copyTestRun.tests, testName: convertToLowerCaseWithUnderscores(apiCollectionName) + "_" + nameSuffixes(copyTestRun.tests).join("_") }
+            return { ...prev, tests: copyTestRun.tests, testName: createTestName(apiCollectionName, copyTestRun.tests, activeFromTesting, testRun.testName) }
         })
     }
 
@@ -699,8 +682,6 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         </Modal>
     )
 
-
-
     return (
         <div>
             {!parentActivator ? activator : null}
@@ -768,13 +749,13 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                                     </div>
                                 }
 
-
                                 <div style={{ display: "grid", gridTemplateColumns: "max-content auto max-content", alignItems: "center", gap: "10px" }}>
                                     <Text variant="headingMd">Name:</Text>
                                     <div style={{ maxWidth: "75%" }}>
                                         <TextField
                                             placeholder="Enter test name"
                                             value={testRun.testName}
+                                            disabled={activeFromTesting}
                                             onChange={(testName) => setTestRun(prev => ({ ...prev, testName: testName }))}
                                         />
                                     </div>
@@ -879,6 +860,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                                 handleRemoveAll={handleRemoveAll}
                                 apiCollectionName={apiCollectionName}
                                 setTestMode={setTestMode}
+                                activeFromTesting={activeFromTesting}
                                 checkRemoveAll={checkRemoveAll} handleModifyConfig={handleModifyConfig} /> :
                                 <>
                                     <RunTestConfiguration
