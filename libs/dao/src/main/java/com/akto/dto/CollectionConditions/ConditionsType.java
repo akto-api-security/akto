@@ -40,4 +40,14 @@ public class ConditionsType {
     public void setUrlsList(Set<String> urlsList) {
         this.urlsList = urlsList;
     }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        ConditionsType that = (ConditionsType) o;
+        return key.equals(that.key) && value.equals(that.value) && urlsList.equals(that.urlsList);
+    }
+
+
 }
