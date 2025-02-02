@@ -881,7 +881,7 @@ public class Main {
         }
 
         if(testingRun.getSendMsTeamsAlert() ){
-            TeamsSender.sendAlert(accountId, collection, alertData);
+            TeamsSender.sendAlert(accountId, alertData);
         }
 
         AktoMixpanel aktoMixpanel = new AktoMixpanel();

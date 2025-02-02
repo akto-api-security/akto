@@ -16,7 +16,7 @@ import com.mongodb.client.model.Filters;
 public class TeamsSender {
     private static final ExecutorService executor = Executors.newFixedThreadPool(1);
 
-    public static void sendAlert(int accountId, String orgId, TestingAlertData alertData) {
+    public static void sendAlert(int accountId, TestingAlertData alertData) {
         executor.submit(() -> {
             Context.accountId.set(accountId);
 
