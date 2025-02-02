@@ -682,7 +682,7 @@ public class StartTestAction extends UserAction {
 
     private Map<TestError, String> errorEnums = new HashMap<>();
     List<TestingRunIssues> issueslist;
-
+    private int vulnerableIssuesCount;
     public String fetchTestingRunResults() {
         ObjectId testingRunResultSummaryId;
         try {
@@ -705,6 +705,11 @@ public class StartTestAction extends UserAction {
         loggerMaker.infoAndAddToDb("[" + (Context.now() - timeNow) + "] Fetched testing run issues of size: " + issueslist.size(), LogDb.DASHBOARD);
 
         List<Bson> testingRunResultFilters = prepareTestRunResultsFilters(testingRunResultSummaryId, queryMode);
+
+        if(queryMode.equals(QueryMode.VULNERABLE)) {
+            vulnerableIssuesCount = (int) TestingRunResultDao.instance.count(Filters.and(testingRunResultFilters));
+            vulnerableIssuesCount = Math.abs(vulnerableIssuesCount - issueslist.size());
+        }
 
         if(queryMode == QueryMode.SKIPPED_EXEC || queryMode == QueryMode.SKIPPED_EXEC_NEED_CONFIG){
             TestError[] testErrors = TestResult.TestError.values();
@@ -1664,5 +1669,13 @@ public class StartTestAction extends UserAction {
 
     public void setCleanUpTestingResources(boolean cleanUpTestingResources) {
         this.cleanUpTestingResources = cleanUpTestingResources;
+    }
+
+    public int getVulnerableIssuesCount() {
+        return vulnerableIssuesCount;
+    }
+
+    public void setVulnerableIssuesCount(int vulnerableIssuesCount) {
+        this.vulnerableIssuesCount = vulnerableIssuesCount;
     }
 }
