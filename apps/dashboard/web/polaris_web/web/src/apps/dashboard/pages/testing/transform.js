@@ -1133,10 +1133,13 @@ getMissingConfigs(testResults){
       configsAdvancedSettings:settings,
       testRoleId: testRun.testRoleId,
       testSubCategoryList: selectedTests,
-      overriddenTestAppUrl: testRun.overriddenTestAppUrl,
+      overriddenTestAppUrl: testRun.hasOverriddenTestAppUrl ? testRun.overriddenTestAppUrl : "",
       maxConcurrentRequests: testRun.maxConcurrentRequests,
       testingRunHexId: hexId,
       testRunTime: testRun.testRunTime,
+      sendSlackAlert: testRun.sendSlackAlert,
+      recurringDaily: testRun.recurringDaily,
+      continuousTesting: testRun.continuousTesting,
     }
   }
 }

@@ -475,8 +475,8 @@ export default {
             data: { latestTestingRunSummaryId, issueStatusQuery, sortKey, sortOrder, skip, limit, filters }
         })
     },
-    modifyTestingRunConfig(testingRunConfigId, editableConfigObject) {
-        const requestData = { testingRunConfigId, editableTestingRunConfig: editableConfigObject }
+    modifyTestingRunConfig(testingRunConfigId, editableTestingRunConfig) {
+        const requestData = { testingRunConfigId, editableTestingRunConfig }
         return request({
             url: '/api/modifyTestingRunConfig',
             method: 'post',
