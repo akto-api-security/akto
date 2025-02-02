@@ -38,6 +38,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         testRoleLabel: "No test role selected",
         testRoleId: "",
         sendSlackAlert: false,
+        sendMsTeamsAlert: false,
         cleanUpTestingResources: false
     }
     const navigate = useNavigate()
@@ -70,6 +71,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
 
     const [optionsSelected, setOptionsSelected] = useState(initialArr)
     const [slackIntegrated, setSlackIntegrated] = useState(false)
+    const [teamsTestingWebhookIntegrated, setTeamsTestingWebhookIntegrated] = useState(false)
 
     const emptyCondition = { data: { key: '', value: '' }, operator: { 'type': 'ADD_HEADER' } }
     const [conditions, dispatchConditions] = useReducer(produce((draft, action) => func.conditionsReducer(draft, action)), []);
@@ -96,6 +98,14 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         observeApi.fetchSlackWebhooks().then((resp) => {
             const apiTokenList = resp.apiTokenList
             setSlackIntegrated(apiTokenList && apiTokenList.length > 0)
+        })
+
+        observeApi.checkWebhook("MICROSOFT_TEAMS", "TESTING_RUN_RESULTS").then((resp) => {
+            console.log(resp.webhookPresent, resp)
+            const webhookPresent = resp.webhookPresent
+            if(webhookPresent){
+                setTeamsTestingWebhookIntegrated(true)
+            }
         })
 
         let metaDataObj = {
@@ -500,7 +510,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
     }
 
     async function handleRun() {
-        const { startTimestamp, recurringDaily, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, cleanUpTestingResources } = testRun
+        const { startTimestamp, recurringDaily, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, cleanUpTestingResources } = testRun
         const collectionId = parseInt(apiCollectionId)
 
         const tests = testRun.tests
@@ -541,9 +551,9 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         }
 
         if (filtered || selectedResourcesForPrimaryAction?.length > 0) {
-            await observeApi.scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, "TESTING_UI", testRoleId, continuousTesting, sendSlackAlert, finalAdvancedConditions, cleanUpTestingResources)
+            await observeApi.scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, "TESTING_UI", testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, finalAdvancedConditions, cleanUpTestingResources)
         } else {
-            await observeApi.scheduleTestForCollection(collectionId, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, finalAdvancedConditions, cleanUpTestingResources)
+            await observeApi.scheduleTestForCollection(collectionId, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, finalAdvancedConditions, cleanUpTestingResources)
         }
 
         setActive(false)
@@ -617,6 +627,19 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         );
     }
 
+    function generateLabelForTeamsIntegration() {
+        return (
+            <HorizontalStack gap={1}>
+                <Link url='/dashboard/settings/integrations/teamsWebhooks' target="_blank" rel="noopener noreferrer" style={{ color: "#3385ff", textDecoration: 'none' }}>
+                    Enable
+                </Link>
+                <Text>
+                    Microsoft Teams integration to send alerts post completion
+                </Text>
+            </HorizontalStack>
+        );
+    }
+
     const handleButtonClick = (check) => {
         setTestMode(check);
     }
@@ -673,7 +696,9 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                         testRolesArr={testRolesArr}
                         maxConcurrentRequestsOptions={maxConcurrentRequestsOptions}
                         slackIntegrated={slackIntegrated}
+                        teamsTestingWebhookIntegrated={teamsTestingWebhookIntegrated}
                         generateLabelForSlackIntegration={generateLabelForSlackIntegration}
+                        generateLabelForTeamsIntegration={generateLabelForTeamsIntegration}
                         getLabel={getLabel}
                     />
                     <AdvancedSettingsComponent dispatchConditions={dispatchConditions} conditions={conditions} />
@@ -845,7 +870,9 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                                     testRolesArr={testRolesArr}
                                     maxConcurrentRequestsOptions={maxConcurrentRequestsOptions}
                                     slackIntegrated={slackIntegrated}
+                                    teamsTestingWebhookIntegrated={teamsTestingWebhookIntegrated}
                                     generateLabelForSlackIntegration={generateLabelForSlackIntegration}
+                                    generateLabelForTeamsIntegration={generateLabelForTeamsIntegration}
                                     getLabel={getLabel}
                                 />
 
@@ -873,7 +900,9 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                                         testRolesArr={testRolesArr}
                                         maxConcurrentRequestsOptions={maxConcurrentRequestsOptions}
                                         slackIntegrated={slackIntegrated}
+                                        teamsTestingWebhookIntegrated={teamsTestingWebhookIntegrated}
                                         generateLabelForSlackIntegration={generateLabelForSlackIntegration}
+                                        generateLabelForTeamsIntegration={generateLabelForTeamsIntegration}
                                         getLabel={getLabel}
                                     />
                                     <AdvancedSettingsComponent dispatchConditions={dispatchConditions} conditions={conditions} />

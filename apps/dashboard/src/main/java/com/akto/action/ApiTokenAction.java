@@ -18,6 +18,7 @@ import org.apache.struts2.interceptor.ServletRequestAware;
 
 import javax.servlet.http.HttpServletRequest;
 
+import static com.akto.utils.Utils.createDashboardUrlFromRequest;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -186,6 +187,6 @@ public class ApiTokenAction extends UserAction implements ServletRequestAware {
 
     @Override
     public void setServletRequest(HttpServletRequest request) {
-        this.dashboardUrl = request.getScheme() + "://" + request.getServerName() + ":" + request.getServerPort();
+        this.dashboardUrl = createDashboardUrlFromRequest(request);
     }
 }
