@@ -187,18 +187,49 @@ export default function LeftNav() {
                             key: "5",
                         },
                         {
+                            url: "#",
                             label: (
-                                <Text variant="bodyMd" fontWeight="medium">
-                                    Issues
+                                <Text
+                                    variant="bodyMd"
+                                    fontWeight="medium"
+                                    color={
+                                        leftNavSelected.includes("reports")
+                                            ? active === "active"
+                                                ? "subdued"
+                                                : ""
+                                            : ""
+                                    }
+                                >
+                                    Reports
                                 </Text>
                             ),
-                            icon: AnalyticsFilledMinor,
+                            icon: ReportFilledMinor,
                             onClick: () => {
-                                handleSelect("dashboard_issues");
-                                navigate("/dashboard/issues");
+                                navigate("/dashboard/reports/issues");
+                                handleSelect("dashboard_reports_issues");
                                 setActive("normal");
                             },
-                            selected: leftNavSelected === "dashboard_issues",
+                            selected: leftNavSelected.includes("_reports"),
+                            subNavigationItems: [
+                                {
+                                    label: "Issues",
+                                    onClick: () => {
+                                        navigate("/dashboard/reports/issues");
+                                        handleSelect("dashboard_reports_issues");
+                                        setActive("active");
+                                    },
+                                    selected: leftNavSelected === "dashboard_reports_issues",
+                                },
+                                {
+                                    label: "Compliance",
+                                    onClick: () => {
+                                        navigate("/dashboard/reports/compliance");
+                                        handleSelect("dashboard_reports_compliance");
+                                        setActive("active");
+                                    },
+                                    selected: leftNavSelected === "dashboard_reports_compliance",
+                                }
+                            ],
                             key: "6",
                         },
                         window?.STIGG_FEATURE_WISE_ALLOWED?.THREAT_DETECTION?.isGranted

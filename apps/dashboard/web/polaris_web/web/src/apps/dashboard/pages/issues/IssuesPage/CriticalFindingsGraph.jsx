@@ -6,8 +6,11 @@ import testingApi from "../../testing/api.js"
 import testingFunc from "../../testing/transform.js"
 import func from "@/util/func";
 import BarGraph from '../../../components/charts/BarGraph.jsx';
+import LocalStore from "../../../../main/LocalStorageStore";
 
-const CriticalFindingsGraph = ({ linkText, linkUrl }) => {
+const CriticalFindingsGraph = ({ linkText, linkUrl, complianceMode }) => {
+    const subCategoryMap = LocalStore(state => state.subCategoryMap);
+
     const [criticalFindingsData, setCriticalFindingsData] = useState([])
     const [showTestingComponents, setShowTestingComponents] = useState(false)
 
@@ -26,8 +29,19 @@ const CriticalFindingsGraph = ({ linkText, linkUrl }) => {
     const fetchGraphData = async () => {
         setShowTestingComponents(false)
         const subcategoryDataResp = await testingApi.getSummaryInfo(0, func.timeNow())
-        const tempResult = testingFunc.convertSubIntoSubcategory(subcategoryDataResp)
-        convertSubCategoryInfo(tempResult.subCategoryMap)
+        let tempResultSubCategoryMap = {}
+        if (complianceMode) {
+            Object.entries(subcategoryDataResp).forEach(([testId, count]) => {
+                let clauses = subCategoryMap[testId]?.compliance.mapComplianceToListClauses[complianceMode]
+                clauses.forEach(clause => {
+                    tempResultSubCategoryMap[clause] = tempResultSubCategoryMap[clause] || {text: 0, color: 'red', key: clause}
+                    tempResultSubCategoryMap[clause].text += count
+                });
+            })
+        } else {
+            tempResultSubCategoryMap = testingFunc.convertSubIntoSubcategory(subcategoryDataResp).subCategoryMap
+        }
+        convertSubCategoryInfo(tempResultSubCategoryMap)
         setShowTestingComponents(true)
     }
 
@@ -58,7 +72,7 @@ const CriticalFindingsGraph = ({ linkText, linkUrl }) => {
                 barWidth={30}
             />
         }
-        title="Vulnerabilities findings"
+        title={complianceMode ? (complianceMode + " clauses") : "Vulnerabilities findings"}
         titleToolTip="Overview of the most critical security issues detected, including the number of issues and APIs affected for each type of vulnerability."
         linkText={linkText}
         linkUrl={linkUrl}
