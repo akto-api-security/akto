@@ -104,16 +104,6 @@ public abstract class Config {
             this.id = configType.name()+"-ankush";
         }
 
-        public static Config getSSOConfigByAccountId(int accountId, ConfigType configType) {
-            return ConfigsDao.instance.findOne(
-                    Filters.and(
-                            Filters.eq(Constants.ID, configType.name()+CONFIG_SALT),
-                            Filters.eq(OktaConfig.ACCOUNT_ID, accountId),
-                            Filters.eq("configType", configType.name())
-                    )
-            );
-        }
-
         public String getClientId() {
             return clientId;
         }
@@ -550,15 +540,6 @@ public abstract class Config {
         public AzureConfig() {
             this.configType = ConfigType.AZURE;
             this.id = CONFIG_ID;
-        }
-
-        public static SAMLConfig getSSOConfigByAccountId(int accountId, ConfigType configType) {
-            return SSOConfigsDao.instance.findOne(
-                    Filters.and(
-                        Filters.eq(Constants.ID, String.valueOf(accountId)),
-                        Filters.eq("configType", configType.name())
-                    )
-            );
         }
 
         public String getX509Certificate() {
