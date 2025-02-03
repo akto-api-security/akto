@@ -3360,7 +3360,7 @@ public class InitializerListener implements ServletContextListener {
                 Bson filters = 
                     Filters.and(
                         Filters.eq(Constants.ID, compId), 
-                        Filters.exists("info.compliance", false)
+                        Filters.or(Filters.exists("info.compliance", false), Filters.ne("info.compliance.source", fileSourceId))
                     );
 
                 ComplianceMapping complianceMapping = ComplianceMapping.createFromInfo(complianceInfoInCommon);    
