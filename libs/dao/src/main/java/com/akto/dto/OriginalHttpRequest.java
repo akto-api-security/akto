@@ -83,6 +83,24 @@ public class OriginalHttpRequest {
         this.headers = buildHeadersMap(json, "requestHeaders");
     }
 
+    public void buildFromSampleMessageNew(HttpResponseParams responseParam) {
+        String rawUrl = responseParam.getRequestParams().getURL();
+        String[] rawUrlArr = rawUrl.split("\\?");
+        this.url = rawUrlArr[0];
+        if (rawUrlArr.length > 1) {
+            this.queryParams = rawUrlArr[1];
+        }
+
+        this.type = responseParam.getRequestParams().type;
+
+        this.method = responseParam.getRequestParams().getMethod();
+
+        String requestPayload = responseParam.getRequestParams().getPayload();
+        this.body = requestPayload.trim();
+
+        this.headers = responseParam.getRequestParams().getHeaders();
+    }
+
     public String getJsonRequestBody() {
         return HttpRequestResponseUtils.rawToJsonString(this.body, this.headers);
     }

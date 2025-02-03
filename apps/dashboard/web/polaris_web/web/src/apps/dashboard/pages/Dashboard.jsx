@@ -14,6 +14,7 @@ import AlertsBanner from "./AlertsBanner";
 import dashboardFunc from "./transform";
 import homeRequests from "./home/api";
 import WelcomeBackDetailsModal from "../components/WelcomeBackDetailsModal";
+import useTable from "../components/tables/TableContext";
 
 function Dashboard() {
 
@@ -23,6 +24,8 @@ function Dashboard() {
     const setAllCollections = PersistStore(state => state.setAllCollections)
     const setCollectionsMap = PersistStore(state => state.setCollectionsMap)
     const setHostNameMap = PersistStore(state => state.setHostNameMap)
+
+    const { selectItems } = useTable()
 
     const navigate = useNavigate();
 
@@ -93,6 +96,10 @@ function Dashboard() {
             }
         }
     }, [])
+
+    useEffect(() => {
+        selectItems([])
+    },[location.pathname])
 
     const toastConfig = Store(state => state.toastConfig)
     const setToastConfig = Store(state => state.setToastConfig)
@@ -165,13 +172,13 @@ function Dashboard() {
 
     },[])
 
-    // const shouldShowWelcomeBackModal = !func.checkLocal() && window?.USER_NAME?.length > 0 && (window?.USER_FULL_NAME?.length === 0 || (window?.USER_ROLE === 'ADMIN' && window?.ORGANIZATION_NAME?.length === 0))
+    const shouldShowWelcomeBackModal = window.IS_SAAS === "true" && window?.USER_NAME?.length > 0 && (window?.USER_FULL_NAME?.length === 0 || (window?.USER_ROLE === 'ADMIN' && window?.ORGANIZATION_NAME?.length === 0))
 
     return (
         <div className="dashboard">
         <Frame>
             <Outlet />
-            {/* {shouldShowWelcomeBackModal && <WelcomeBackDetailsModal isAdmin={window.USER_ROLE === 'ADMIN'} />} */}
+            {shouldShowWelcomeBackModal && <WelcomeBackDetailsModal isAdmin={window.USER_ROLE === 'ADMIN'} />}
             {toastMarkup}
             {ConfirmationModalMarkup}
             {displayItems.length > 0 ? <div className="alerts-banner">
@@ -190,11 +197,16 @@ function Dashboard() {
                     </VerticalStack>
             </div> : null}
             {func.checkLocal() && !(location.pathname.includes("test-editor") || location.pathname.includes("settings") || location.pathname.includes("onboarding") || location.pathname.includes("summary")) ?<div className="call-banner">
-                <Banner hideIcon={true}> 
+                <Banner hideIcon={true}>
                     <Text variant="headingMd">Need a 1:1 experience?</Text>
                     <Button plain monochrome onClick={() => {
                         window.open("https://akto.io/api-security-demo", "_blank")
                     }}><Text variant="bodyMd">Book a call</Text></Button>
+                </Banner>
+            </div> : null}
+            {window.TRIAL_MSG && !(location.pathname.includes("test-editor") || location.pathname.includes("settings") || location.pathname.includes("onboarding") || location.pathname.includes("summary")) ?<div className="call-banner">
+                <Banner hideIcon={true}>
+                    <Text variant="bodyMd">{window.TRIAL_MSG}</Text>
                 </Banner>
             </div> : null}
         </Frame>

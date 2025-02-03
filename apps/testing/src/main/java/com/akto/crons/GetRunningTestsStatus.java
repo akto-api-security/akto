@@ -40,7 +40,7 @@ public class GetRunningTestsStatus {
                     @Override
                     public void accept(Account t) {
                         try {
-                            int timeFilter = Context.now() - 30 * 60;
+                            int timeFilter = Context.now() - 6 * 60 * 60;
                             List<TestingRunResultSummary> currentRunningTests = TestingRunResultSummariesDao.instance.findAll(
                                 Filters.gte(TestingRunResultSummary.START_TIMESTAMP, timeFilter),
                                 Projections.include("_id", TestingRunResultSummary.STATE, TestingRunResultSummary.TESTING_RUN_ID) 

@@ -65,7 +65,6 @@ export default {
     },
 
     scheduleTestForCollection(apiCollectionId, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId) {
-        console.log('scheduleTestForCollection.api.js', testRoleId)
         return request({
             url: '/api/startTest',
             method: 'post',

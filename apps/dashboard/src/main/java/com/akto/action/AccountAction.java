@@ -269,13 +269,13 @@ private static final LoggerMaker loggerMaker = new LoggerMaker(AccountAction.cla
             }
         }
    
-        User user = initializeAccount(email, newAccountId, newAccountName,true, RBAC.Role.ADMIN);
+        User user = initializeAccount(email, newAccountId, newAccountName,true, RBAC.Role.ADMIN.name());
         getSession().put("user", user);
         getSession().put("accountId", newAccountId);
         return Action.SUCCESS.toUpperCase();
     }
 
-    public static User initializeAccount(String email, int newAccountId, String newAccountName, boolean isNew, RBAC.Role role) {
+    public static User initializeAccount(String email, int newAccountId, String newAccountName, boolean isNew, String role) {
         User user = UsersDao.addAccount(email, newAccountId, newAccountName);
         RBACDao.instance.insertOne(new RBAC(user.getId(), role, newAccountId));
         Context.accountId.set(newAccountId);
@@ -329,6 +329,10 @@ private static final LoggerMaker loggerMaker = new LoggerMaker(AccountAction.cla
                 AccountSettingsDao.instance.updateOnboardingFlag(true);
                 InitializerListener.insertPiiSources();
 
+                if (DashboardMode.isMetered()) {
+                    AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+                    InitializerListener.insertAktoTestLibraries(accountSettings);
+                }
                 try {
                     InitializerListener.executePIISourceFetch();
                 } catch (Exception e) {

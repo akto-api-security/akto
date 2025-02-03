@@ -430,12 +430,11 @@ const settingRequests = {
             }
         });
     },
-    getRoleHierarchy(userRole){
+    getRoleHierarchy(){
         return request({
             url: '/api/getRoleHierarchy',
             method: 'post',
             data: {
-                userRole
             }
         });
     },
@@ -469,6 +468,34 @@ const settingRequests = {
             url: '/api/fetchApiAuditLogsFromDb',
             method: 'post',
             data: {skip, limit, sortOrder, startTimestamp, endTimestamp}
+        })
+    },
+    getCustomRoles() {
+        return request({
+            url: '/api/getCustomRoles',
+            method: 'post',
+            data: {}
+        })
+    },
+    createCustomRole(apiCollectionIds, roleName, baseRole, defaultInviteRole) {
+        return request({
+            url: '/api/createCustomRole',
+            method: 'post',
+            data: { apiCollectionIds, roleName, baseRole, defaultInviteRole }
+        })
+    },
+    updateCustomRole(apiCollectionIds, roleName, baseRole, defaultInviteRole) {
+        return request({
+            url: '/api/updateCustomRole',
+            method: 'post',
+            data: {apiCollectionIds, roleName, baseRole, defaultInviteRole}
+        })
+    },
+    deleteCustomRole(roleName) {
+        return request({
+            url: '/api/deleteCustomRole',
+            method: 'post',
+            data: {roleName}
         })
     }
 }

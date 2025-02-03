@@ -1,11 +1,11 @@
 import request from "../../../../util/request"
 
 export default {
-    fetchIssues(skip, limit, filterStatus, filterCollectionsId, filterSeverity, filterSubCategory, sortKey, sortOrder, startEpoch, endTimeStamp) {
+    fetchIssues(skip, limit, filterStatus, filterCollectionsId, filterSeverity, filterSubCategory, sortKey, sortOrder, startEpoch, endTimeStamp, activeCollections) {
         return request({
             url: 'api/fetchAllIssues',
             method: 'post',
-            data: {skip, limit, filterStatus, filterCollectionsId, filterSeverity, filterSubCategory, sortKey, sortOrder, startEpoch, endTimeStamp}
+            data: {skip, limit, filterStatus, filterCollectionsId, filterSeverity, filterSubCategory, sortKey, sortOrder, startEpoch, endTimeStamp, activeCollections}
         })
     },
     fetchVulnerableTestingRunResultsFromIssues(filters, issuesIds , skip) {
@@ -23,11 +23,11 @@ export default {
             data: {issuesIds, issueStatusQuery}
         })
     },
-    bulkUpdateIssueStatus (issueIdArray, statusToBeUpdated, ignoreReason) {
+    bulkUpdateIssueStatus (issueIdArray, statusToBeUpdated, ignoreReason, testingRunResultHexIdsMap) {
         return request({
             url: 'api/bulkUpdateIssueStatus',
             method: 'post',
-            data: {issueIdArray, statusToBeUpdated, ignoreReason}
+            data: {issueIdArray, statusToBeUpdated, ignoreReason, testingRunResultHexIdsMap}
         })
     },
     fetchTestingRunResult (issueId) {

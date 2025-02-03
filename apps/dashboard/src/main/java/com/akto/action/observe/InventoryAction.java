@@ -357,7 +357,7 @@ public class InventoryAction extends UserAction {
         if(collection.getHostName() == null || collection.getHostName().isEmpty()){
             Bson filter = Filters.and(
                 Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionId),
-                Filters.nin(SingleTypeInfo._COLLECTION_IDS, deactivatedCollections)
+                Filters.nin(SingleTypeInfo._API_COLLECTION_ID, deactivatedCollections)
             );
             list = ApiCollectionsDao.fetchEndpointsInCollection(filter, 0, -1, Utils.DELTA_PERIOD_VALUE);
         }else{
@@ -373,7 +373,7 @@ public class InventoryAction extends UserAction {
         List<ApiInfo> apiInfos = ApiInfoDao.instance.findAll(
             Filters.and(
                 Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionId),
-                Filters.nin(SingleTypeInfo._COLLECTION_IDS, deactivatedCollections)
+                Filters.nin(ApiInfo.ID_API_COLLECTION_ID, deactivatedCollections)
             ));
         for(ApiInfo apiInfo: apiInfos){
             apiInfo.calculateActualAuth();
@@ -488,7 +488,7 @@ public class InventoryAction extends UserAction {
             if (apiCollectionId != -1) {
                 Bson apiCollectionIdFilter = Filters.and(
                     Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionId),
-                    Filters.nin(SingleTypeInfo._COLLECTION_IDS, deactivatedCollections)
+                    Filters.nin(SingleTypeInfo._API_COLLECTION_ID, deactivatedCollections)
                 );
                 filterCustomSensitiveParams.add(apiCollectionIdFilter);
             }

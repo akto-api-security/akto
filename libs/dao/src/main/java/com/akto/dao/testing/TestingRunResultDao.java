@@ -23,7 +23,11 @@ import org.bson.types.ObjectId;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 public class TestingRunResultDao extends AccountsContextDaoWithRbac<TestingRunResult> {
 
@@ -130,7 +134,7 @@ public class TestingRunResultDao extends AccountsContextDaoWithRbac<TestingRunRe
         pipeline.add(Aggregates.skip(skip));
         pipeline.add(Aggregates.limit(limit));
         pipeline.addAll(customAggregation);
-        MongoCursor<BasicDBObject> cursor = instance.getMCollection()
+        MongoCursor<BasicDBObject> cursor = this.getMCollection()
                 .aggregate(pipeline, BasicDBObject.class).cursor();
         List<TestingRunResult> testingRunResults = new ArrayList<>();
         while (cursor.hasNext()) {
@@ -184,6 +188,24 @@ public class TestingRunResultDao extends AccountsContextDaoWithRbac<TestingRunRe
         return testingRunResults;
     }
 
+    public Map<ObjectId,String> mapSummaryIdToTestingResultHexId(Set<String> testingRunResultHexIds){
+        Map<ObjectId,String> finalMap = new HashMap<>();
+        if(testingRunResultHexIds == null || testingRunResultHexIds.isEmpty()){
+            return finalMap;
+        }
+
+        List<ObjectId> objectIdList = testingRunResultHexIds.stream()
+                                                .map(ObjectId::new)
+                                                .collect(Collectors.toList());
+
+        List<TestingRunResult> runResults = this.findAll(Filters.in(Constants.ID, objectIdList), Projections.include(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID));
+        for(TestingRunResult runResult: runResults){
+            finalMap.put(runResult.getTestRunResultSummaryId(), runResult.getHexId());
+        }
+
+        return finalMap;
+    }
+
     public void createIndicesIfAbsent() {
         
         String dbName = Context.accountId.get()+"";
@@ -224,6 +246,9 @@ public class TestingRunResultDao extends AccountsContextDaoWithRbac<TestingRunRe
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
 
         fieldNames = new String[]{TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, TestingRunResult.TEST_SUPER_TYPE};
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
+
+        fieldNames = new String[]{TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, TestingRunResult.VULNERABLE, TestingRunResult.API_INFO_KEY, TestingRunResult.TEST_SUB_TYPE};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
     }
 

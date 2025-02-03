@@ -27,6 +27,7 @@ import com.akto.dao.TrafficInfoDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.demo.VulnerableRequestForTemplateDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
+import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.dto.testing.CustomTestingEndpoints;
 import com.akto.dto.testing.SensitiveDataEndpoints;
 import com.akto.dto.testing.TestingEndpoints;
@@ -35,6 +36,7 @@ import com.akto.dto.type.SingleTypeInfo;
 import com.akto.util.Constants;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
+import com.mongodb.client.model.Accumulators;
 import com.mongodb.client.model.Aggregates;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
@@ -94,6 +96,42 @@ public class ApiCollectionUsers {
         return (int) ApiInfoDao.instance.count(apiInfoFilters);
     }
 
+    public static int getApisCountFromConditionsWithStis(List<TestingEndpoints> conditions, List<Integer> deactivatedCollections){
+        if(conditions == null || conditions.isEmpty()){
+            return 0;
+        }
+
+        Bson stiFiltes = getFilters(conditions, CollectionType.ApiCollectionId);
+        List<Bson> pipeLine = new ArrayList<>();
+        pipeLine.add(Aggregates.match(stiFiltes));
+
+        try {
+            List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+            if(collectionIds != null) {
+                pipeLine.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
+            }
+        } catch(Exception e){
+        }
+
+        pipeLine.add(Aggregates.match(Filters.and(
+            Filters.eq(SingleTypeInfo._RESPONSE_CODE, -1),
+            Filters.eq(SingleTypeInfo._IS_HEADER, true)
+        )));
+        BasicDBObject groupedId = SingleTypeInfoDao.getApiInfoGroupedId();
+        pipeLine.add(Aggregates.group(groupedId, Accumulators.sum("count", 1)));
+        pipeLine.add(Aggregates.count("finalCount"));
+
+        int ansCount = 0;
+
+        MongoCursor<BasicDBObject> countCursor = SingleTypeInfoDao.instance.getMCollection().aggregate(pipeLine, BasicDBObject.class).cursor();
+        while(countCursor.hasNext()){
+            BasicDBObject dbObject = countCursor.next();
+            ansCount = dbObject.getInt("finalCount");
+        }
+
+        return ansCount;
+    }
+
     public static void updateApiCollection(List<TestingEndpoints> conditions, int id) {
 
         ApiCollectionsDao.instance.updateOne(
@@ -132,6 +170,7 @@ public class ApiCollectionUsers {
     }
 
     public static void addToCollectionsForCollectionId(List<TestingEndpoints> conditions, int apiCollectionId) {
+        logger.info("Started adding apis for in addToCollectionsForCollectionId: " + apiCollectionId);
         Bson update = Updates.addToSet(SingleTypeInfo._COLLECTION_IDS, apiCollectionId);
         Bson matchFilter = Filters.nin(SingleTypeInfo._COLLECTION_IDS, apiCollectionId);
         operationForCollectionId(conditions, apiCollectionId, update, matchFilter, false);
@@ -194,6 +233,9 @@ public class ApiCollectionUsers {
                     MCollection<?>[] collections = collectionsEntry.getValue();
                     Bson filter = filtersMap.get(type);
 
+                    // printing filter size
+                    long val = filter.toString().length();
+                    logger.info("Size of the filter in updateCollectionsForCollectionId is: " + val + "Bytes");
                     updateCollections(collections, filter, update);
                 }
 
@@ -203,7 +245,10 @@ public class ApiCollectionUsers {
 
     private static void updateCollections(MCollection<?>[] collections, Bson filter, Bson update) {
         for (MCollection<?> collection : collections) {
-            collection.getMCollection().updateMany(filter, update);
+            UpdateResult res = collection.getMCollection().updateMany(filter, update);
+            logger.info(String.format(
+                "mongo update results for updating collection groups are: {matchedCount : %d} {modifiedCount : %d} {collection: %s}",
+                res.getMatchedCount(), res.getModifiedCount(), collection.getCollName()));
         }
     }
 

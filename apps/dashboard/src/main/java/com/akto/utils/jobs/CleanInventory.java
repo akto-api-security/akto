@@ -50,6 +50,7 @@ import com.akto.test_editor.execution.ParseAndExecute;
 import com.akto.util.AccountTask;
 import com.akto.util.DashboardMode;
 import com.akto.util.Pair;
+import com.akto.utils.Utils;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Sorts;
@@ -128,6 +129,27 @@ public class CleanInventory {
         }
 
     }
+
+    private static void moveApisFromSampleData(List<Key> sampleDataIds) {
+        if (sampleDataIds.isEmpty()) return;
+        
+        List<SampleData> allSamples = SampleDataDao.instance.findAll(Filters.or(SampleDataDao.filterForMultipleSampleData(sampleDataIds)));
+        List<String> messages = new ArrayList<>();
+        for(SampleData sampleData: allSamples) {
+            messages.addAll(sampleData.getSamples());
+        }
+
+        if (allSamples.isEmpty() || messages.isEmpty()) return;
+        
+
+            try {
+                Utils.pushDataToKafka(allSamples.get(0).getId().getApiCollectionId(), "", messages, new ArrayList<>(), true, false);
+                loggerMaker.infoAndAddToDb("Successfully moved APIs.");
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("Error during move APIs: " + e.getMessage());
+                e.printStackTrace();
+            }
+    }
     
     public static void cleanFilteredSampleDataFromAdvancedFilters(List<ApiCollection> apiCollections, List<YamlTemplate> yamlTemplates, List<String> redundantUrlList, String filePath, boolean shouldDeleteRequest, boolean saveLogsToDB) throws IOException{
 
@@ -193,7 +215,7 @@ public class CleanInventory {
                                     }else if(filterMap.size() == 1){
                                         // filter failed and id was default_delete
                                         String key = filterMap.entrySet().iterator().next().getKey();
-                                        if(key.equals("DEFAULT_BLOCK_FILTER")){
+                                        if(!key.equals("DEFAULT_ALLOW_FILTER")){
                                             remainingSamples.add(sample);
                                         }
                                     }
@@ -257,6 +279,11 @@ public class CleanInventory {
             if (shouldDeleteRequest) {
                 logger.info("starting deletion of apis");
                 deleteApis(toBeDeleted);
+            }
+
+            if (shouldDeleteRequest && toMove.size() > 0) {
+                logger.info("starting moving APIs");
+                moveApisFromSampleData(toMove);
             }
 
             // String shouldMove = System.getenv("MOVE_REDUNDANT_APIS");

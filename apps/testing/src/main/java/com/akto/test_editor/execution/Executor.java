@@ -485,7 +485,7 @@ public class Executor {
         return removed;
     }
 
-    private ExecutorSingleOperationResp modifyAuthTokenInRawApi(TestRoles testRole, RawApi rawApi) {
+    public static ExecutorSingleOperationResp modifyAuthTokenInRawApi(TestRoles testRole, RawApi rawApi) {
         Map<String, List<String>> rawHeaders = rawApi.fetchReqHeaders();
         for(AuthWithCond authWithCond: testRole.getAuthWithCondList()) {
 

@@ -109,6 +109,18 @@ public class GlobalEnums {
         AKTO_TEMPLATES,
         CUSTOM
     }
+    public enum TemplatePlan {
+        FREE, STANDARD, PRO, ENTERPRISE
+    }
+    public enum TemplateFeatureAccess {
+        PRO_TESTS, ENTERPRISE_TESTS
+    }
+    public enum TemplateNature {
+        INTRUSIVE, NON_INTRUSIVE
+    }
+    public enum TemplateDuration {
+        SLOW, FAST
+    }
 
 
     /* ********************************************************************** */

@@ -248,7 +248,7 @@ public class CustomDataTypeAction extends UserAction{
 
     private AktoDataType aktoDataType;
     
-    public String saveAktoDataType(){
+    public String saveAktoDataType() {
 
         aktoDataType = AktoDataTypeDao.instance.findOne("name",name);
         if(aktoDataType==null){
@@ -305,7 +305,8 @@ public class CustomDataTypeAction extends UserAction{
                 Updates.set(AktoDataType.KEY_CONDITIONS, keyConditions),
                 Updates.set(AktoDataType.VALUE_CONDITIONS, valueConditions),
                 Updates.set(AktoDataType.OPERATOR, mainOperator),
-                Updates.set(AktoDataType.DATA_TYPE_PRIORITY, dataTypePriority)
+                Updates.set(AktoDataType.DATA_TYPE_PRIORITY, dataTypePriority),
+                Updates.set(AktoDataType._INACTIVE, !active)
             ),
             options
         );
@@ -1104,7 +1105,7 @@ public class CustomDataTypeAction extends UserAction{
         BasicDBObject groupedId = new BasicDBObject(SingleTypeInfo._API_COLLECTION_ID, "$apiCollectionId")
                                     .append(SingleTypeInfo._URL, "$url")
                                     .append(SingleTypeInfo._METHOD, "$method");
-        Bson customFilter = Filters.nin(SingleTypeInfo._COLLECTION_IDS, UsageMetricCalculator.getDeactivated());
+        Bson customFilter = Filters.nin(SingleTypeInfo._API_COLLECTION_ID, UsageMetricCalculator.getDeactivated());
 
         List<String> sensitiveSubtypes = SingleTypeInfoDao.instance.sensitiveSubTypeInResponseNames();
         sensitiveSubtypes.addAll(SingleTypeInfoDao.instance.sensitiveSubTypeNames());

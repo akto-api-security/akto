@@ -236,17 +236,29 @@ prettifyEpoch(epoch) {
     }
     return result;
   },
+  sortObjectBySeverity(obj) {
+    const severityOrder = this.getAktoSeverities()
+
+    const sortedEntries = Object.entries(obj).sort(
+        ([keyA], [keyB]) => severityOrder.indexOf(keyA) - severityOrder.indexOf(keyB)
+    )
+
+    return Object.fromEntries(sortedEntries)
+  },
   getSeverityStatus(countIssues) {
     if(countIssues==null || countIssues==undefined){
       return [];
     }
-    return Object.keys(countIssues).filter((key) => {
-      return (countIssues[key] > 0)
+
+    const sortedCountIssues = this.sortObjectBySeverity(countIssues)
+
+    return Object.keys(sortedCountIssues).filter((key) => {
+      return (sortedCountIssues[key] > 0)
     })
   },
   getTestingRunIconObj(state) {
     let testState = state?._name || state
-    switch(testState.toUpperCase()){
+    switch(testState?.toUpperCase()){
       case "RUNNING": 
         return {
           color: "subdued",
@@ -579,10 +591,14 @@ prettifyEpoch(epoch) {
   },
   requestFirstLine(message, queryParams) {
     if (message["request"]) {
-      let url = message["request"]["url"]
+      let url = message["request"]["url"] || ""
       return message["request"]["method"] + " " + url + func.convertQueryParamsToUrl(queryParams) + " " + message["request"]["type"]
     } else {
-      return message.method + " " + message.path.split("?")[0] + func.convertQueryParamsToUrl(queryParams) + " " + message.type
+      let pathString = ""
+      if(message.path !== null && message?.path !== undefined){
+        pathString = message.path.split("?")[0];
+      }
+      return message?.method + " " + pathString + func.convertQueryParamsToUrl(queryParams) + " " + message?.type
     }
   },
   responseFirstLine(message) {
@@ -914,6 +930,7 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName) {
           let authTypeTag = authType.replace(",", "");
           let riskScore = apiInfoMap[key] ? apiInfoMap[key]?.riskScore : 0
           let responseCodesArr = apiInfoMap[key] ? apiInfoMap[key]?.responseCodes : [] 
+          let discoveredTimestamp = apiInfoMap[key] ? (apiInfoMap[key].discoveredTimestamp || apiInfoMap[key].startTs) : 0
 
           ret[key] = {
               id: x.method + "###" + x.url + "###" + x.apiCollectionId + "###" + Math.random(),
@@ -929,10 +946,10 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName) {
               apiCollectionId: x.apiCollectionId,
               last_seen: apiInfoMap[key] ? (this.prettifyEpoch(apiInfoMap[key]["lastSeen"])) : this.prettifyEpoch(x.startTs),
               lastSeenTs: apiInfoMap[key] ? apiInfoMap[key]["lastSeen"] : x.startTs,
-              detectedTs: x.startTs,
+              detectedTs: (x.startTs || discoveredTimestamp),
               changesCount: x.changesCount,
               changes: x.changesCount && x.changesCount > 0 ? (x.changesCount +" new parameter"+(x.changesCount > 1? "s": "")) : 'No new changes',
-              added: "Discovered " + this.prettifyEpoch(x.startTs),
+              added: "Discovered " + this.prettifyEpoch(x.startTs || discoveredTimestamp),
               violations: apiInfoMap[key] ? apiInfoMap[key]["violations"] : {},
               apiCollectionName: idToName ? (idToName[x.apiCollectionId] || '-') : '-',
               auth_type: (authType || "no auth type found").toLowerCase(),
@@ -1246,9 +1263,11 @@ getDeprecatedEndpoints(apiInfoList, unusedEndpoints, apiCollectionId) {
  getSearchItemsArr(allRoutes,allCollections){
   let combinedArr = []
 
+  const activatedColections = allCollections.filter((item) => item.deactivated === false)
+
   let initialStr = "/dashboard/observe/inventory/"
 
-  allCollections.forEach((item)=> {
+  activatedColections.forEach((item)=> {
     combinedArr.push({content: item.displayName, url: initialStr + item.id, type:'collection'})
   })
 
@@ -1314,14 +1333,16 @@ mapCollectionIdToHostName(apiCollections){
   },
   getHexColorForSeverity(key){
     switch(key){
+      case "CRITICAL":
+        return "#DF2909"
       case "HIGH":
-        return "#D72C0D"
+        return "#FED3D1"
       case "MEDIUM":
         return "#FFD79D"
       case "LOW":
-        return "#2C6ECB"
+        return "#E4E5E7"
       default:
-        return "#2C6ECB"
+        return "#E4E5E7"
     }
 
   },
@@ -1644,6 +1665,16 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
     }
     return false;
   },
+  checkForRbacFeatureBasic(){
+    const stiggFeatures = window.STIGG_FEATURE_WISE_ALLOWED
+    let rbacAccess = false;
+    if (!stiggFeatures || Object.keys(stiggFeatures).length === 0) {
+        rbacAccess = true
+    } else if(stiggFeatures && stiggFeatures['RBAC_BASIC']){
+        rbacAccess = stiggFeatures['RBAC_BASIC'].isGranted
+    }
+    return rbacAccess;
+  },
   checkForRbacFeature(){
     const stiggFeatures = window.STIGG_FEATURE_WISE_ALLOWED
     let rbacAccess = false;
@@ -1655,7 +1686,7 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
     return rbacAccess;
   },
   checkUserValidForIntegrations(){
-    const rbacAccess = this.checkForRbacFeature();
+    const rbacAccess = this.checkForRbacFeatureBasic();
     if(!rbacAccess){
       return true;
     }

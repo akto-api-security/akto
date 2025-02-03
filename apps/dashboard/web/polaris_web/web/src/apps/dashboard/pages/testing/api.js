@@ -24,15 +24,33 @@ export default {
         })
         return resp
     },
-    async fetchTestingRunResults(testingRunResultSummaryHexId, queryMode, sortKey, sortOrder, skip, limit, filters, queryValue) {
+    async fetchTestingRunResults(testingRunResultSummaryHexId, queryMode, sortKey, sortOrder, skip, limit, reportFilterList, queryValue) {
         const resp = await request({
             url: '/api/fetchTestingRunResults',
             method: 'post',
             data: {
-                testingRunResultSummaryHexId, queryMode, sortKey, sortOrder, skip, limit, filters, queryValue
+                testingRunResultSummaryHexId, queryMode, sortKey, sortOrder, skip, limit, reportFilterList, queryValue
             }
         })
         return resp        
+    },
+    async fetchTestRunResultsCount(testingRunResultSummaryHexId) {
+        const resp = await request({
+            url: '/api/fetchTestRunResultsCount',
+            method: 'post',
+            data: {
+                testingRunResultSummaryHexId
+            }
+        })
+        return resp        
+    },
+    async fetchRemediationInfo(testId) {
+        const resp = await request({
+            url: 'api/fetchRemediationInfo',
+            method: 'post',
+            data: {testId}
+        })
+        return resp
     },
     async fetchAllSubCategories(fetchOnlyActive, mode, skip, limit) {
         const resp = await request({
@@ -256,11 +274,11 @@ export default {
             data: {roleName, index}
         })
     },
-    updateAuthInRole(roleName, apiCond ,index, authParamData, authAutomationType) {
+    updateAuthInRole(roleName, apiCond ,index, authParamData, authAutomationType, reqData, recordedLoginFlowInput) {
         return request({
             url: '/api/updateAuthInRole',
             method: 'post',
-            data: {roleName, apiCond, index, authParamData, authAutomationType}
+            data: {roleName, apiCond, index, authParamData, authAutomationType, reqData, recordedLoginFlowInput}
         })
     },
     deleteTestRuns(testRunIds){
@@ -415,11 +433,11 @@ export default {
             data: {}
         })
     },
-    downloadReportPDF(reportId, organizationName, reportDate, reportUrl) {
+    downloadReportPDF(reportId, organizationName, reportDate, reportUrl, firstPollRequest) {
         return request({
             url: '/api/downloadReportPDF',
             method: 'post',
-            data: {reportId, organizationName, reportDate, reportUrl}
+            data: {reportId, organizationName, reportDate, reportUrl, firstPollRequest}
         })
     },
     fetchScript() {
@@ -450,18 +468,19 @@ export default {
             data: {deltaTimeForScheduledSummaries}
         })
     },
-    fetchIssuesByStatusAndSummaryId(latestTestingRunSummaryId, issueStatusQuery) {
+    fetchIssuesByStatusAndSummaryId(latestTestingRunSummaryId, issueStatusQuery, sortKey, sortOrder, skip, limit, filters) {
         return request({
             url: '/api/fetchIssuesByStatusAndSummaryId',
             method: 'post',
-            data: { latestTestingRunSummaryId, issueStatusQuery }
+            data: { latestTestingRunSummaryId, issueStatusQuery, sortKey, sortOrder, skip, limit, filters }
         })
     },
-    modifyTestingRunConfig(testingRunConfigId, testConfigsAdvancedSettings){
+    modifyTestingRunConfig(testingRunConfigId, editableTestingRunConfig) {
+        const requestData = { testingRunConfigId, editableTestingRunConfig }
         return request({
             url: '/api/modifyTestingRunConfig',
             method: 'post',
-            data: { testingRunConfigId, testConfigsAdvancedSettings }
+            data: requestData
         })
     },
     async fetchTestingRunResultsSummary(testingRunSummaryId) {
@@ -486,6 +505,20 @@ export default {
             url: '/api/getReportFilters',
             method: 'post',
             data: { generatedReportId }
+        })
+    },
+    fetchSeverityInfoForIssues(filters, issueIds, endTimeStamp) {
+        return request({
+            url: '/api/fetchSeverityInfoForIssues',
+            method: 'post',
+            data: {...filters, issueIds, endTimeStamp}
+        })
+    },
+    handleRefreshTableCount(testingRunResultSummaryHexId) {
+        return request({
+            url: '/api/handleRefreshTableCount',
+            method: 'post',
+            data: {testingRunResultSummaryHexId}
         })
     }
 }

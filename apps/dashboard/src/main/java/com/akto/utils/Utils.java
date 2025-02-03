@@ -45,6 +45,8 @@ import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import javax.servlet.http.HttpServletRequest;
+
 import static com.akto.dto.RawApi.convertHeaders;
 
 
@@ -447,7 +449,7 @@ public class Utils {
 
     }
 
-    public static void pushDataToKafka(int apiCollectionId, String topic, List<String> messages, List<String> errors, boolean skipKafka) throws Exception {
+    public static void pushDataToKafka(int apiCollectionId, String topic, List<String> messages, List<String> errors, boolean skipKafka, boolean takeFromMsg) throws Exception {
         List<HttpResponseParams> responses = new ArrayList<>();
         for (String message: messages){
             int messageLimit = (int) Math.round(0.8 * KafkaListener.BATCH_SIZE_CONFIG);
@@ -469,13 +471,17 @@ public class Utils {
 
         //todo:shivam handle resource analyser in AccountHTTPCallParserAktoPolicyInfo
         if(skipKafka) {
-            String accountIdStr = responses.get(0).accountId;
-            if (!StringUtils.isNumeric(accountIdStr)) {
-                return;
-            }
 
-            int accountId = Integer.parseInt(accountIdStr);
-            Context.accountId.set(accountId);
+            int accountId = Context.accountId.get();
+            if (takeFromMsg) {
+                String accountIdStr = responses.get(0).accountId;
+                if (!StringUtils.isNumeric(accountIdStr)) {
+                    return;
+                }
+
+                accountId = Integer.parseInt(accountIdStr);
+                Context.accountId.set(accountId);
+            }
 
             SingleTypeInfo.fetchCustomDataTypes(accountId);
             AccountHTTPCallParserAktoPolicyInfo info = RuntimeListener.accountHTTPParserMap.get(accountId);
@@ -568,6 +574,7 @@ public class Utils {
     public static float calculateRiskValueForSeverity(String severity){
         float riskScore = 0 ;
         switch (severity) {
+            case "CRITICAL":
             case "HIGH":
                 riskScore += 100;
                 break;
@@ -621,4 +628,12 @@ public class Utils {
         input.addAll(copySet);
         return input;
     }
+
+    public static String createDashboardUrlFromRequest(HttpServletRequest request) {
+        if (request == null) {
+            return "http://localhost:8080";
+        }
+        return request.getScheme() + "://" + request.getServerName() + ":" + request.getServerPort();
+    }
+
 }

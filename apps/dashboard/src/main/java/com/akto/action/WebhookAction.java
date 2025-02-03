@@ -16,14 +16,20 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 import com.opensymphony.xwork2.Action;
+
+import org.apache.struts2.interceptor.ServletRequestAware;
 import org.bson.conversions.Bson;
+
+import static com.akto.utils.Utils.createDashboardUrlFromRequest;
 
 import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
-public class WebhookAction extends UserAction {
+import javax.servlet.http.HttpServletRequest;
+
+public class WebhookAction extends UserAction implements ServletRequestAware{
     
     private int id;
     private String webhookName;
@@ -42,6 +48,9 @@ public class WebhookAction extends UserAction {
     private int batchSize;
     private boolean sendInstantly;
     private String webhookType;
+    private boolean webhookPresent;
+    private String webhookOption;
+    private String dashboardUrl;
 
     private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
 
@@ -99,6 +108,7 @@ public class WebhookAction extends UserAction {
             }
             customWebhook.setSendInstantly(sendInstantly);
             customWebhook.setWebhookType(type);
+            customWebhook.setDashboardUrl(this.dashboardUrl);
             CustomWebhooksDao.instance.insertOne(customWebhook);
             fetchCustomWebhooks();
         }
@@ -156,7 +166,8 @@ public class WebhookAction extends UserAction {
                 Updates.set(CustomWebhook.SELECTED_WEBHOOK_OPTIONS, selectedWebhookOptions),
                 Updates.set(CustomWebhook.NEW_ENDPOINT_COLLECTIONS, newEndpointCollections),
                 Updates.set(CustomWebhook.NEW_SENSITIVE_ENDPOINT_COLLECTIONS, newSensitiveEndpointCollections),
-                Updates.set(CustomWebhook.SEND_INSTANTLY, sendInstantly)
+                Updates.set(CustomWebhook.SEND_INSTANTLY, sendInstantly),
+                Updates.set(CustomWebhook.DASHBOARD_URL, this.dashboardUrl)
             );
 
             if (batchSize > 0) {
@@ -245,6 +256,52 @@ public class WebhookAction extends UserAction {
         } else {
             CustomWebhooksDao.instance.deleteAll(new BasicDBObject("_id", id));
         }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    private enum ValidationDataType{
+        TYPE, OPTION
+    }
+
+    private boolean validationCheck(String data, ValidationDataType expectedType) {
+        if (data == null || data.isEmpty()) {
+            addActionError("webhook " + expectedType + " is invalid");
+            return false;
+        }
+        try {
+            switch (expectedType) {
+                case TYPE:
+                    CustomWebhook.WebhookType.valueOf(data);
+                    break;
+                case OPTION:
+                    CustomWebhook.WebhookOptions.valueOf(data);
+                    break;
+                default:
+                    throw new Exception("Invalid " + expectedType);
+            }
+        } catch (Exception e) {
+            addActionError("webhook " + expectedType + " is invalid");
+            return false;
+        }
+        return true;
+    }
+
+    public String checkWebhook() {
+
+        if (!(validationCheck(this.webhookType, ValidationDataType.TYPE) &&
+                validationCheck(this.webhookOption, ValidationDataType.OPTION))) {
+            return ERROR.toUpperCase();
+        }
+
+        CustomWebhook webhook = CustomWebhooksDao.instance.findOne(
+                Filters.and(
+                        Filters.eq(CustomWebhook.WEBHOOK_TYPE, webhookType),
+                        Filters.in(CustomWebhook.SELECTED_WEBHOOK_OPTIONS, webhookOption)));
+
+        if (webhook != null) {
+            webhookPresent = true;
+        }
+
         return Action.SUCCESS.toUpperCase();
     }
 
@@ -378,5 +435,18 @@ public class WebhookAction extends UserAction {
 
     public void setSendInstantly(boolean sendInstantly) {
         this.sendInstantly = sendInstantly;
+    }
+
+    @Override
+    public void setServletRequest(HttpServletRequest request) {
+        this.dashboardUrl = createDashboardUrlFromRequest(request);
+    }
+
+    public void setWebhookOption(String webhookOption) {
+        this.webhookOption = webhookOption;
+    }
+
+    public boolean getWebhookPresent() {
+        return webhookPresent;
     }
 }

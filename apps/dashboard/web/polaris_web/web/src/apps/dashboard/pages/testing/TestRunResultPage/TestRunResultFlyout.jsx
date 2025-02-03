@@ -8,6 +8,7 @@ import LayoutWithTabs from '../../../components/layouts/LayoutWithTabs'
 import { Badge, Box, Button, Divider, HorizontalStack, Icon, Popover, Text, VerticalStack, Link, Modal } from '@shopify/polaris'
 import api from '../../observe/api'
 import issuesApi from "../../issues/api"
+import testingApi from "../api"
 import GridRows from '../../../components/shared/GridRows'
 import { useNavigate } from 'react-router-dom'
 import TitleWithInfo from '@/apps/dashboard/components/shared/TitleWithInfo'
@@ -15,13 +16,14 @@ import "./style.css"
 import ActivityTracker from '../../dashboard/components/ActivityTracker'
 import observeFunc from "../../observe/transform.js"
 import settingFunctions from '../../settings/module.js'
-import DropdownSearch from '../../../components/shared/DropdownSearch.jsx'
 import JiraTicketCreationModal from '../../../components/shared/JiraTicketCreationModal.jsx'
+import MarkdownViewer from '../../../components/shared/MarkdownViewer.jsx'
 
 function TestRunResultFlyout(props) {
 
 
-    const { selectedTestRunResult, loading, issueDetails ,getDescriptionText, infoState, createJiraTicket, jiraIssueUrl, showDetails, setShowDetails, isIssuePage} = props
+    const { selectedTestRunResult, loading, issueDetails ,getDescriptionText, infoState, createJiraTicket, jiraIssueUrl, showDetails, setShowDetails, isIssuePage, remediationSrc} = props
+    const [remediationText, setRemediationText] = useState("")
     const [fullDescription, setFullDescription] = useState(false)
     const [rowItems, setRowItems] = useState([])
     const [popoverActive, setPopoverActive] = useState(false)
@@ -31,6 +33,16 @@ function TestRunResultFlyout(props) {
     const [projId, setProjId] = useState('')
     // modify testing run result and headers
     const infoStateFlyout = infoState && infoState.length > 0 ? infoState.filter((item) => item.title !== 'Jira') : []
+    const fetchRemediationInfo = useCallback (async (testId) => {
+        if (testId && testId.length > 0) {
+            await testingApi.fetchRemediationInfo(testId).then((resp) => {
+                setRemediationText(resp)
+            }).catch((err) => {
+                setRemediationText("Remediations not configured for this test.")
+            })
+        }
+    })
+
     const fetchApiInfo = useCallback( async(apiInfoKey) => {
         let apiInfo = {}
         if(apiInfoKey !== null){
@@ -65,8 +77,21 @@ function TestRunResultFlyout(props) {
        }
     },[issueDetails?.id?.apiInfoKey])
 
+    useEffect(() => {
+        if (!remediationSrc) {
+            fetchRemediationInfo("tests-library-master/remediation/"+selectedTestRunResult.testCategoryId+".md")
+        } else {
+            setRemediationText(remediationSrc)
+        }
+    }, [selectedTestRunResult.testCategoryId, remediationSrc])
+
     function ignoreAction(ignoreReason){
-        issuesApi.bulkUpdateIssueStatus([issueDetails.id], "IGNORED", ignoreReason ).then((res) => {
+        const severity = (selectedTestRunResult && selectedTestRunResult.vulnerable) ? issueDetails.severity : "";
+        let obj = {}
+        if(issueDetails?.testRunIssueStatus !== "IGNORED"){
+            obj = {[selectedTestRunResult.id]: severity.toUpperCase()}
+        }
+        issuesApi.bulkUpdateIssueStatus([issueDetails.id], "IGNORED", ignoreReason, obj ).then((res) => {
             func.setToast(true, false, `Issue ignored`)
         })
     }
@@ -339,6 +364,12 @@ function TestRunResultFlyout(props) {
         component: <ActivityTracker latestActivity={latestActivity} />
     }
 
+    const remediationTab = (selectedTestRunResult && selectedTestRunResult.vulnerable) && {
+        id: "remediation",
+        content: "Remediation",
+        component: (<MarkdownViewer markdown={remediationText}></MarkdownViewer>)
+    }
+
     const errorTab = {
         id: "error",
         content: "Attempt",
@@ -364,7 +395,7 @@ function TestRunResultFlyout(props) {
     const tabsComponent = (
         <LayoutWithTabs
             key={issueDetails?.id}
-            tabs={issueDetails?.id ? [overviewTab,timelineTab,ValuesTab]: [attemptTab]}
+            tabs={issueDetails?.id ? [overviewTab,timelineTab,ValuesTab, remediationTab]: [attemptTab]}
             currTab = {() => {}}
         />
     )

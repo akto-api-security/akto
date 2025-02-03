@@ -1,5 +1,7 @@
 package com.akto.testing;
 
+import java.io.File;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -10,6 +12,13 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.bson.conversions.Bson;
+import org.bson.types.ObjectId;
+
+import com.akto.dao.context.Context;
+import com.akto.dao.testing.TestingRunResultDao;
+import com.akto.dao.testing.VulnerableTestingRunResultDao;
+import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.CollectionConditions.ConditionsType;
 import com.akto.dto.OriginalHttpRequest;
@@ -17,15 +26,33 @@ import com.akto.dto.RawApi;
 import com.akto.dto.test_editor.DataOperandsFilterResponse;
 import com.akto.dto.test_editor.FilterNode;
 import com.akto.dto.test_editor.Util;
+import com.akto.dto.test_run_findings.TestingIssuesId;
+import com.akto.dto.test_run_findings.TestingRunIssues;
+import com.akto.dto.testing.GenericTestResult;
+import com.akto.dto.testing.TestResult;
+import com.akto.dto.testing.TestResult.Confidence;
+import com.akto.dto.testing.TestResult.TestError;
+import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.WorkflowUpdatedSampleData;
 import com.akto.dto.type.RequestTemplate;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.test_editor.filter.Filter;
 import com.akto.test_editor.filter.data_operands_impl.ValidationResult;
+import com.akto.testing_utils.TestingUtils;
+import com.akto.usage.UsageMetricCalculator;
+import com.akto.util.Constants;
 import com.akto.util.JSONUtils;
+import com.akto.util.enums.GlobalEnums;
+import com.akto.util.enums.GlobalEnums.Severity;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
+import com.mongodb.client.MongoCursor;
+import com.mongodb.client.model.Accumulators;
+import com.mongodb.client.model.Aggregates;
+import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Projections;
 
 import okhttp3.MediaType;
 
@@ -412,5 +439,173 @@ public class Utils {
         
         
     }
+
+    public static void modifyQueryOperations(OriginalHttpRequest httpRequest, List<ConditionsType> modifyOperations, List<ConditionsType> addOperations, List<ConditionsType> deleteOperations){
+
+        // since this is being used with payload conditions, we are not supporting any add operations, operations are done only on existing query keys
+
+        String query = httpRequest.getQueryParams();
+        if(query == null || query.isEmpty()){
+            return ;
+        }
+
+        BasicDBObject queryParamObj = RequestTemplate.getQueryJSON(httpRequest.getUrl() + "?" + query);
+
+        if(!modifyOperations.isEmpty()){
+            for(ConditionsType condition : modifyOperations){
+                if(queryParamObj.containsKey(condition.getKey())){
+                    queryParamObj.put(condition.getKey(), condition.getValue());
+                }
+            }
+        }
+
+
+        if(!deleteOperations.isEmpty()){
+            for(ConditionsType condition : deleteOperations){
+                if(queryParamObj.containsKey(condition.getKey())){
+                    queryParamObj.remove(condition.getKey());
+                }
+            }
+        } 
+        
+        String queryParams = "";
+        for (String key: queryParamObj.keySet()) {
+            queryParams +=  (key + "=" + queryParamObj.get(key) + "&");
+        }
+        if (queryParams.length() > 0) {
+            queryParams = queryParams.substring(0, queryParams.length() - 1);
+        }
+
+        httpRequest.setQueryParams(queryParams);
+    }
+
+    public static Map<String, Integer> finalCountIssuesMap(ObjectId testingRunResultSummaryId){
+        Map<String, Integer> countIssuesMap = new HashMap<>();
+        countIssuesMap.put(Severity.CRITICAL.toString(), 0);
+        countIssuesMap.put(Severity.HIGH.toString(), 0);
+        countIssuesMap.put(Severity.MEDIUM.toString(), 0);
+        countIssuesMap.put(Severity.LOW.toString(), 0);
+
+        Bson projection = Projections.include(TestingRunResult.API_INFO_KEY, TestingRunResult.TEST_SUB_TYPE);
+        Bson filterQ = Filters.and(
+                            Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, testingRunResultSummaryId),
+                            Filters.eq(TestingRunResult.VULNERABLE, true)
+                        );
+        boolean isNewTestingSummary = VulnerableTestingRunResultDao.instance.isStoredInVulnerableCollection(testingRunResultSummaryId, true);
+        List<TestingRunResult> allVulResults = new ArrayList<>();
+        if(!isNewTestingSummary){
+            allVulResults = TestingRunResultDao.instance.findAll(filterQ, projection);
+        }else{
+            allVulResults = VulnerableTestingRunResultDao.instance.findAll(
+                Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, testingRunResultSummaryId), projection
+            );
+        }
+        
+
+        Map<TestingIssuesId, TestingRunResult> testingIssuesIdsMap = TestingUtils.
+                listOfIssuesIdsFromTestingRunResults(allVulResults, true, false);
+
+        Bson inQuery = Filters.and(Filters.in(Constants.ID, testingIssuesIdsMap.keySet().toArray()), Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS, GlobalEnums.TestRunIssueStatus.OPEN));
+        List<Bson> pipeline = new ArrayList<>();
+        pipeline.add(Aggregates.match(inQuery));
+        pipeline.add(Aggregates.group(
+            "$" + TestingRunIssues.KEY_SEVERITY, Accumulators.sum("count",1)
+        ));
+
+
+        MongoCursor<BasicDBObject> cursor = TestingRunIssuesDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
+        while(cursor.hasNext()){
+            BasicDBObject dbObject = cursor.next();
+            String id = dbObject.getString("_id");
+            int val = dbObject.getInt("count");
+
+            countIssuesMap.put(id, val);
+        }
+
+        return countIssuesMap;
+    }
+
+    public static List<TestingRunResult> fetchLatestTestingRunResult(Bson filter){
+        List<TestingRunResult> resultsFromNonVulCollection = TestingRunResultDao.instance.fetchLatestTestingRunResult(filter, 1);
+        List<TestingRunResult> resultsFromVulCollection = VulnerableTestingRunResultDao.instance.fetchLatestTestingRunResult(filter, 1);
+
+        if(resultsFromVulCollection != null && !resultsFromVulCollection.isEmpty()){
+            if(resultsFromNonVulCollection != null && !resultsFromNonVulCollection.isEmpty()){
+                TestingRunResult tr1 = resultsFromVulCollection.get(0);
+                TestingRunResult tr2 = resultsFromNonVulCollection.get(0);
+                if(tr1.getEndTimestamp() >= tr2.getEndTimestamp()){
+                    return resultsFromVulCollection;
+                }else{
+                    return resultsFromVulCollection;
+                }
+            }else{
+                return resultsFromVulCollection;
+            }
+        }
+
+        return resultsFromNonVulCollection;
+    }
+
+    public static TestingRunResult generateFailedRunResultForMessage(ObjectId testingRunId,ApiInfoKey apiInfoKey, String testSuperType, 
+        String testSubType, ObjectId testRunResultSummaryId, List<String> messages, String errorMessage) {
+
+        TestingRunResult testingRunResult = null;       
+        Set<Integer> deactivatedCollections = UsageMetricCalculator.getDeactivated();
+        List<GenericTestResult> testResults = new ArrayList<>();
+        String failMessage = errorMessage;
+
+        if(deactivatedCollections.contains(apiInfoKey.getApiCollectionId())){
+            failMessage = TestError.DEACTIVATED_ENDPOINT.getMessage();
+        }else if(messages == null || messages.isEmpty()){
+            failMessage = TestError.NO_PATH.getMessage();
+        }
+            
+        if(failMessage != null){
+            testResults.add(new TestResult(null, null, Collections.singletonList(failMessage),0, false, Confidence.HIGH, null));
+            testingRunResult = new TestingRunResult(
+                testingRunId, apiInfoKey, testSuperType, testSubType, testResults,
+                false, new ArrayList<>(), 100, Context.now(),
+                Context.now(), testRunResultSummaryId, null, Collections
+                        .singletonList(new TestingRunResult.TestLog(TestingRunResult.TestLogType.INFO, failMessage)));
+        }       
+        return testingRunResult;
+    }
+
+    public static boolean createFolder(String folderName){
+        File statusDir = new File(folderName);
+        
+        if (!statusDir.exists()) {
+            boolean created = statusDir.mkdirs();
+            if (!created) {
+                System.err.println("Failed to create directory: " + folderName);
+                return false;
+            }
+            return true;
+        }
+        return false;
+    }
+
+    public static void writeJsonContentInFile(String folderName, String fileName, Object content){
+        try {
+            File file = new File(folderName, fileName);
+            ObjectMapper objectMapper = new ObjectMapper();
+            objectMapper.writerWithDefaultPrettyPrinter().writeValue(file, content);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    public static <T> T readJsonContentFromFile(String folderName, String fileName, Class<T> valueType) {
+        T result = null;
+        try {
+            File file = new File(folderName, fileName);
+            ObjectMapper objectMapper = new ObjectMapper();
+            result = objectMapper.readValue(file, valueType);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return result;
+    }
+    
     
 }

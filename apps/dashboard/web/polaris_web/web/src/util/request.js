@@ -129,7 +129,7 @@ service.interceptors.response.use((response) => {
   return response.data
 }, err)
 
-const black_list_apis = ['dashboard/accessToken', 'api/fetchBurpPluginInfo', 'api/fetchActiveLoaders', 'api/fetchAllSubCategories', 'api/fetchVulnerableRequests']
+const black_list_apis = ['dashboard/accessToken', 'api/fetchBurpPluginInfo', 'api/fetchActiveLoaders', 'api/fetchAllSubCategories', 'api/fetchVulnerableRequests', 'api/fetchActiveTestRunsStatus']
 async function raiseMixpanelEvent(api) {
   if (window?.Intercom) {
     if (api?.startsWith("/api/ingestPostman")) {

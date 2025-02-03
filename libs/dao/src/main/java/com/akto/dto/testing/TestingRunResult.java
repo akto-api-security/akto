@@ -46,6 +46,8 @@ public class TestingRunResult implements Comparable<TestingRunResult> {
     public static final String TEST_RUN_RESULT_SUMMARY_ID = "testRunResultSummaryId";
     private ObjectId testRunResultSummaryId;
 
+    public static final String IS_IGNORED_RESULT = "isIgnoredResult";
+    private boolean isIgnoredResult ;
 
     public static final String ERRORS_LIST = "errorsList";
     private  List<String> errorsList;
@@ -342,5 +344,13 @@ public class TestingRunResult implements Comparable<TestingRunResult> {
 
     public void setErrorsList(List<String> errorsList) {
         this.errorsList = errorsList;
+    }
+
+    public boolean isIgnoredResult() {
+        return isIgnoredResult;
+    }
+
+    public void setIgnoredResult(boolean isIgnoredResult) {
+        this.isIgnoredResult = isIgnoredResult;
     }
 }

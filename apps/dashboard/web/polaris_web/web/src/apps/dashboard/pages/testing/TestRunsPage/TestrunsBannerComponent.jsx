@@ -12,7 +12,7 @@ function SelectCollectionComponent() {
     const allCollections = PersistStore(state => state.allCollections);
     const navigate = useNavigate()
     let urlsCount = 0
-    const allCollectionsOptions = allCollections.filter(x => x.type !== "API_GROUP")
+    const allCollectionsOptions = allCollections.filter(x => (x.type !== "API_GROUP" && x.deactivated === false))
         .map(collection => {
             urlsCount += collection.urlsCount
             return {

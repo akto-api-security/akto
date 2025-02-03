@@ -1,184 +1,219 @@
 package com.akto.action.threat_detection;
 
-import java.util.ArrayList;
-import java.util.HashSet;
+import com.akto.dto.traffic.SuspectSampleData;
+import com.akto.dto.type.URLMethods;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchAlertFiltersResponse;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListMaliciousRequestsResponse;
+import com.akto.proto.utils.ProtoMessageUtils;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Set;
+import java.util.stream.Collectors;
+import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.entity.ContentType;
+import org.apache.http.entity.StringEntity;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClients;
+import org.apache.http.util.EntityUtils;
 
-import org.bson.conversions.Bson;
+public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
 
-import com.akto.action.UserAction;
-import com.akto.dao.SuspectSampleDataDao;
-import com.akto.dao.context.Context;
-import com.akto.dto.traffic.SuspectSampleData;
-import com.akto.util.Constants;
-import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.Sorts;
+  List<SuspectSampleData> sampleData;
+  List<DashboardMaliciousEvent> maliciousEvents;
+  int skip;
+  static final int LIMIT = 50;
+  List<String> ips;
+  List<String> urls;
+  List<Integer> apiCollectionIds;
+  long total;
+  Map<String, Integer> sort;
+  int startTimestamp, endTimestamp;
 
-public class SuspectSampleDataAction extends UserAction {
+  private final CloseableHttpClient httpClient;
 
-    List<SuspectSampleData> sampleData;
-    int skip;
-    static final int LIMIT = 50;
-    List<String> ips;
-    List<String> urls;
-    List<Integer> apiCollectionIds;
-    long total;
-    Map<String, Integer> sort;
-    int startTimestamp, endTimestamp;
+  private final ObjectMapper objectMapper = new ObjectMapper();
 
-    public String fetchSuspectSampleData() {
+  public SuspectSampleDataAction() {
+    super();
+    this.httpClient = HttpClients.createDefault();
+  }
 
-        List<Bson> filterList = new ArrayList<>();
+  public String fetchSampleData() {
+    HttpPost post = new HttpPost(
+        String.format("%s/api/dashboard/list_malicious_requests", this.getBackendUrl()));
+    post.addHeader("Authorization", "Bearer " + this.getApiToken());
+    post.addHeader("Content-Type", "application/json");
 
-        /*
-         * In case time filters are empty,
-         * using default filter as 2 months.
-         */
-
-         if (startTimestamp <= 0) {
-            startTimestamp = Context.now() - 2 * 30 * 24 * 60 * 60;
-        }
-        if (endTimestamp <= 0) {
-            endTimestamp = Context.now() + 10 * 60;
-        }
-
-        filterList.add(Filters.gte(SuspectSampleData._DISCOVERED, startTimestamp));
-        filterList.add(Filters.lte(SuspectSampleData._DISCOVERED, endTimestamp));
-
-        if (ips != null && !ips.isEmpty()) {
-            filterList.add(Filters.in(SuspectSampleData.SOURCE_IPS, ips));
-        }
-        if (urls != null && !urls.isEmpty()) {
-            filterList.add(Filters.in(SuspectSampleData.MATCHING_URL, urls));
-        }
-        if (apiCollectionIds != null && !apiCollectionIds.isEmpty()) {
-            filterList.add(Filters.in(SuspectSampleData.API_COLLECTION_ID, apiCollectionIds));
-        }
-
-        Bson finalFilter = Filters.empty();
-
-        if (!filterList.isEmpty()) {
-            finalFilter = Filters.and(filterList);
-        }
-
-        String sortKey = SuspectSampleData._DISCOVERED;
-        int sortDirection = -1;
-        /*
-         * add any new sort key here,
-         * for validation and sanity.
-         */
-        Set<String> sortKeys = new HashSet<>();
-        sortKeys.add(SuspectSampleData._DISCOVERED);
-
-        if (sort != null && !sort.isEmpty()) {
-            Entry<String, Integer> sortEntry = sort.entrySet().iterator().next();
-            sortKey = sortEntry.getKey();
-            if (!sortKeys.contains(sortKey)) {
-                sortKey = SuspectSampleData._DISCOVERED;
-            }
-            sortDirection = sortEntry.getValue();
-            if (!(sortDirection == -1 || sortDirection == 1)) {
-                sortDirection = -1;
-            }
-        }
-
-        /*
-         * In case timestamp is same, then id acts as tie-breaker,
-         * to avoid repeating the same documents again.
-         */
-        Bson sort = sortDirection == -1 ? Sorts.descending(sortKey, Constants.ID)
-                : Sorts.ascending(sortKey, Constants.ID);
-        sampleData = SuspectSampleDataDao.instance.findAll(finalFilter, skip, LIMIT, sort);
-        total = SuspectSampleDataDao.instance.count(finalFilter);
-
-        return SUCCESS.toUpperCase();
+    Map<String, Object> filter = new HashMap<>();
+    if (this.ips != null && !this.ips.isEmpty()) {
+      filter.put("ips", this.ips);
     }
 
-    public String fetchFilters() {
-        ips = new ArrayList<>(
-                SuspectSampleDataDao.instance.findDistinctFields(SuspectSampleData.SOURCE_IPS, String.class, Filters.empty()));
-        urls = new ArrayList<>(SuspectSampleDataDao.instance.findDistinctFields(SuspectSampleData.MATCHING_URL, String.class,
-                Filters.empty()));
-        return SUCCESS.toUpperCase();
+    if (this.urls != null && !this.urls.isEmpty()) {
+      filter.put("urls", this.urls);
     }
 
-    public List<SuspectSampleData> getSampleData() {
-        return sampleData;
+    Map<String, Integer> time_range = new HashMap<>();
+    if (this.startTimestamp > 0) {
+      time_range.put("start", this.startTimestamp);
     }
 
-    public void setSampleData(List<SuspectSampleData> sampleData) {
-        this.sampleData = sampleData;
+    if (this.endTimestamp > 0) {
+      time_range.put("end", this.endTimestamp);
     }
 
-    public int getSkip() {
-        return skip;
+    filter.put("detected_at_time_range", time_range);
+
+    Map<String, Object> body = new HashMap<String, Object>() {
+      {
+        put("skip", skip);
+        put("limit", LIMIT);
+        put("sort", sort);
+        put("filter", filter);
+      }
+    };
+    String msg = objectMapper.valueToTree(body).toString();
+
+    StringEntity requestEntity = new StringEntity(msg, ContentType.APPLICATION_JSON);
+    post.setEntity(requestEntity);
+
+    try (CloseableHttpResponse resp = this.httpClient.execute(post)) {
+      String responseBody = EntityUtils.toString(resp.getEntity());
+
+      ProtoMessageUtils.<ListMaliciousRequestsResponse>toProtoMessage(
+          ListMaliciousRequestsResponse.class, responseBody)
+          .ifPresent(
+              m -> {
+                this.maliciousEvents = m.getMaliciousEventsList().stream()
+                    .map(
+                        smr -> new DashboardMaliciousEvent(
+                            smr.getId(),
+                            smr.getActor(),
+                            smr.getFilterId(),
+                            smr.getEndpoint(),
+                            URLMethods.Method.fromString(smr.getMethod()),
+                            smr.getApiCollectionId(),
+                            smr.getIp(),
+                            smr.getCountry(),
+                            smr.getDetectedAt()))
+                    .collect(Collectors.toList());
+                this.total = m.getTotal();
+              });
+    } catch (Exception e) {
+      e.printStackTrace();
+      return ERROR.toUpperCase();
     }
 
-    public void setSkip(int skip) {
-        this.skip = skip;
+    return SUCCESS.toUpperCase();
+  }
+
+  public String fetchFilters() {
+    HttpGet get = new HttpGet(String.format("%s/api/dashboard/fetch_filters", this.getBackendUrl()));
+    get.addHeader("Authorization", "Bearer " + this.getApiToken());
+    get.addHeader("Content-Type", "application/json");
+
+    try (CloseableHttpResponse resp = this.httpClient.execute(get)) {
+      String responseBody = EntityUtils.toString(resp.getEntity());
+
+      ProtoMessageUtils.<FetchAlertFiltersResponse>toProtoMessage(
+          FetchAlertFiltersResponse.class, responseBody)
+          .ifPresent(
+              msg -> {
+                this.ips = msg.getActorsList();
+                this.urls = msg.getUrlsList();
+              });
+    } catch (Exception e) {
+      e.printStackTrace();
+      return ERROR.toUpperCase();
     }
 
-    public static int getLimit() {
-        return LIMIT;
-    }
+    return SUCCESS.toUpperCase();
+  }
 
-    public List<String> getIps() {
-        return ips;
-    }
+  public List<SuspectSampleData> getSampleData() {
+    return sampleData;
+  }
 
-    public void setIps(List<String> ips) {
-        this.ips = ips;
-    }
+  public void setSampleData(List<SuspectSampleData> sampleData) {
+    this.sampleData = sampleData;
+  }
 
-    public List<String> getUrls() {
-        return urls;
-    }
+  public int getSkip() {
+    return skip;
+  }
 
-    public void setUrls(List<String> urls) {
-        this.urls = urls;
-    }
+  public void setSkip(int skip) {
+    this.skip = skip;
+  }
 
-    public List<Integer> getApiCollectionIds() {
-        return apiCollectionIds;
-    }
+  public static int getLimit() {
+    return LIMIT;
+  }
 
-    public void setApiCollectionIds(List<Integer> apiCollectionIds) {
-        this.apiCollectionIds = apiCollectionIds;
-    }
+  public List<String> getIps() {
+    return ips;
+  }
 
-    public long getTotal() {
-        return total;
-    }
+  public void setIps(List<String> ips) {
+    this.ips = ips;
+  }
 
-    public void setTotal(long total) {
-        this.total = total;
-    }
+  public List<String> getUrls() {
+    return urls;
+  }
 
-    public Map<String, Integer> getSort() {
-        return sort;
-    }
+  public void setUrls(List<String> urls) {
+    this.urls = urls;
+  }
 
-    public void setSort(Map<String, Integer> sort) {
-        this.sort = sort;
-    }
+  public List<Integer> getApiCollectionIds() {
+    return apiCollectionIds;
+  }
 
-    public int getStartTimestamp() {
-        return startTimestamp;
-    }
+  public void setApiCollectionIds(List<Integer> apiCollectionIds) {
+    this.apiCollectionIds = apiCollectionIds;
+  }
 
-    public void setStartTimestamp(int startTimestamp) {
-        this.startTimestamp = startTimestamp;
-    }
+  public long getTotal() {
+    return total;
+  }
 
-    public int getEndTimestamp() {
-        return endTimestamp;
-    }
+  public void setTotal(long total) {
+    this.total = total;
+  }
 
-    public void setEndTimestamp(int endTimestamp) {
-        this.endTimestamp = endTimestamp;
-    }
+  public Map<String, Integer> getSort() {
+    return sort;
+  }
 
+  public void setSort(Map<String, Integer> sort) {
+    this.sort = sort;
+  }
+
+  public int getStartTimestamp() {
+    return startTimestamp;
+  }
+
+  public void setStartTimestamp(int startTimestamp) {
+    this.startTimestamp = startTimestamp;
+  }
+
+  public int getEndTimestamp() {
+    return endTimestamp;
+  }
+
+  public void setEndTimestamp(int endTimestamp) {
+    this.endTimestamp = endTimestamp;
+  }
+
+  public List<DashboardMaliciousEvent> getMaliciousEvents() {
+    return maliciousEvents;
+  }
+
+  public void setMaliciousEvents(List<DashboardMaliciousEvent> maliciousRequests) {
+    this.maliciousEvents = maliciousRequests;
+  }
 }

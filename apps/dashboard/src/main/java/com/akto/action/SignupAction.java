@@ -2,6 +2,7 @@ package com.akto.action;
 
 import com.akto.dao.*;
 import com.akto.dao.billing.OrganizationsDao;
+import com.akto.dao.context.Context;
 import com.akto.dto.*;
 import com.akto.dto.Config.ConfigType;
 import com.akto.dto.billing.Organization;
@@ -13,6 +14,7 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.notifications.slack.NewUserJoiningAlert;
 import com.akto.notifications.slack.SlackAlerts;
 import com.akto.notifications.slack.SlackSender;
+import com.akto.usage.UsageMetricCalculator;
 import com.akto.util.http_request.CustomHttpRequest;
 import com.akto.utils.Auth0;
 import com.akto.utils.GithubLogin;
@@ -369,7 +371,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             return ERROR.toUpperCase();
         }
         int invitedToAccountId = 0;
-        RBAC.Role inviteeRole = null;
+        String inviteeRole = null;
         if (!invitationCode.isEmpty()) {
             Jws<Claims> jws;
             try {
@@ -397,6 +399,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             PendingInviteCodesDao.instance.getMCollection().deleteOne(filter);
             invitedToAccountId = pendingInviteCode.getAccountId();
             inviteeRole = pendingInviteCode.getInviteeRole();
+
         } else {
             if (!InitializerListener.isSaas) {
                 long countUsers = UsersDao.instance.getMCollection().countDocuments();
@@ -509,32 +512,38 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
     }
 
     public String registerViaOkta() throws IOException{
-        if (!DashboardMode.isOnPremDeployment()) return Action.ERROR.toUpperCase();
-        OktaLogin oktaLoginInstance = OktaLogin.getInstance();
-        if(oktaLoginInstance == null){
-            servletResponse.sendRedirect("/login");
-            return ERROR.toUpperCase();
-        }
-
-        Config.OktaConfig oktaConfig = OktaLogin.getInstance().getOktaConfig();
-        if (oktaConfig == null) {
-            servletResponse.sendRedirect("/login");
-            return ERROR.toUpperCase();
-        }
-
-        String domainUrl = "https://" + oktaConfig.getOktaDomainUrl() + "/oauth2/" + oktaConfig.getAuthorisationServerId() + "/v1";
-        String clientId = oktaConfig.getClientId();
-        String clientSecret = oktaConfig.getClientSecret();
-        String redirectUri = oktaConfig.getRedirectUri();
-
-        BasicDBObject params = new BasicDBObject();
-        params.put("grant_type", "authorization_code");
-        params.put("code", this.code);
-        params.put("client_id", clientId);
-        params.put("client_secret", clientSecret);
-        params.put("redirect_uri", redirectUri);
-
         try {
+            Config.OktaConfig oktaConfig;
+            if(DashboardMode.isOnPremDeployment()) {
+                OktaLogin oktaLoginInstance = OktaLogin.getInstance();
+                if(oktaLoginInstance == null){
+                    servletResponse.sendRedirect("/login");
+                    return ERROR.toUpperCase();
+                }
+
+                setAccountId(1000000);
+                oktaConfig = OktaLogin.getInstance().getOktaConfig();
+            } else {
+                setAccountId(Integer.parseInt(state));
+                oktaConfig = Config.getOktaConfig(accountId);
+            }
+            if(oktaConfig == null) {
+                servletResponse.sendRedirect("/login");
+                return ERROR.toUpperCase();
+            }
+
+            String domainUrl = "https://" + oktaConfig.getOktaDomainUrl() + "/oauth2/" + oktaConfig.getAuthorisationServerId() + "/v1";
+            String clientId = oktaConfig.getClientId();
+            String clientSecret = oktaConfig.getClientSecret();
+            String redirectUri = oktaConfig.getRedirectUri();
+
+            BasicDBObject params = new BasicDBObject();
+            params.put("grant_type", "authorization_code");
+            params.put("code", this.code);
+            params.put("client_id", clientId);
+            params.put("client_secret", clientSecret);
+            params.put("redirect_uri", redirectUri);
+
             Map<String,Object> tokenData = CustomHttpRequest.postRequestEncodedType(domainUrl +"/token",params);
             String accessToken = tokenData.get("access_token").toString();
             Map<String,Object> userInfo = CustomHttpRequest.getRequest( domainUrl + "/userinfo","Bearer " + accessToken);
@@ -542,9 +551,14 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             String username = userInfo.get("preferred_username").toString();
 
             SignupInfo.OktaSignupInfo oktaSignupInfo= new SignupInfo.OktaSignupInfo(accessToken, username);
+
+            String defaultRole = RBAC.Role.MEMBER.name();
+            if (UsageMetricCalculator.isRbacFeatureAvailable(accountId)) {
+                defaultRole = fetchDefaultInviteRole(accountId, RBAC.Role.GUEST.name());
+            }
             
             shouldLogin = "true";
-            createUserAndRedirect(email, username, oktaSignupInfo, 1000000, Config.ConfigType.OKTA.toString());
+            createUserAndRedirect(email, username, oktaSignupInfo, accountId, Config.ConfigType.OKTA.toString(), defaultRole);
             code = "";
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error while signing in via okta sso \n" + e.getMessage(), LogDb.DASHBOARD);
@@ -554,13 +568,26 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
         return SUCCESS.toUpperCase();
     }
 
+    public String fetchDefaultInviteRole(int accountId, String fallbackDefault){
+        try {
+            Context.accountId.set(accountId);
+            CustomRole defaultRole = CustomRoleDao.instance.findOne(CustomRole.DEFAULT_INVITE_ROLE, true);
+            if(defaultRole != null){
+                return defaultRole.getName();
+            }
+        } catch(Exception e){
+            logger.error("Error while setting default role to " + fallbackDefault);
+        }
+        return fallbackDefault;
+    }
+
     private int accountId;
     private String userEmail;
 
     public String sendRequestToSamlIdP() throws IOException{
         String queryString = servletRequest.getQueryString();
         String emailId = Util.getValueFromQueryString(queryString, "email");
-        if(emailId.length() == 0){
+        if(emailId.isEmpty()){
             code = "Error, user email cannot be empty";
             logger.error(code);
             servletResponse.sendRedirect("/login");
@@ -569,11 +596,10 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
         logger.info("Trying to sign in for: " + emailId);
         setUserEmail(emailId);
         SAMLConfig samlConfig = SSOConfigsDao.instance.getSSOConfig(userEmail);
-        if(samlConfig == null){
-            code = "Error, cannot login via SSO, redirecting to login";
+        if(samlConfig == null) {
+            code = "Error, cannot login via SSO, trying to login with okta sso";
             logger.error(code);
-            servletResponse.sendRedirect("/login");
-            return ERROR.toUpperCase();
+            return oktaAuthUrlCreator(emailId);
         }
         int tempAccountId = Integer.parseInt(samlConfig.getId());
         logger.info("Account id: " + tempAccountId + " found for " + emailId);
@@ -596,6 +622,21 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             servletResponse.sendRedirect("/login");
             return ERROR.toUpperCase();
         }
+        return SUCCESS.toUpperCase();
+    }
+
+    public String oktaAuthUrlCreator(String emailId) throws IOException {
+        logger.info("Trying to create auth url for okta sso for: " + emailId);
+        Config.OktaConfig oktaConfig = Config.getOktaConfig(emailId);
+        if(oktaConfig == null) {
+            code= "Error, cannot find okta sso for this organization, redirecting to login";
+            logger.error(code);
+            servletResponse.sendRedirect("/login");
+            return ERROR.toUpperCase();
+        }
+
+        String authorisationUrl = OktaLogin.getAuthorisationUrl(emailId);
+        servletResponse.sendRedirect(authorisationUrl);
         return SUCCESS.toUpperCase();
     }
 
@@ -639,7 +680,13 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             shouldLogin = "true";
             logger.info("Successful signing with Azure Idp for: "+ useremail);
             SignupInfo.SamlSsoSignupInfo signUpInfo = new SignupInfo.SamlSsoSignupInfo(username, useremail, Config.ConfigType.AZURE);
-            createUserAndRedirect(useremail, username, signUpInfo, this.accountId, Config.ConfigType.AZURE.toString(), RBAC.Role.MEMBER);
+
+            String defaultRole = RBAC.Role.MEMBER.name();
+            if (UsageMetricCalculator.isRbacFeatureAvailable(this.accountId)) {
+                defaultRole = fetchDefaultInviteRole(this.accountId,RBAC.Role.GUEST.name());
+            }
+
+            createUserAndRedirect(useremail, username, signUpInfo, this.accountId, Config.ConfigType.AZURE.toString(), defaultRole);
         } catch (Exception e1) {
             loggerMaker.errorAndAddToDb("Error while signing in via azure sso \n" + e1.getMessage(), LogDb.DASHBOARD);
             servletResponse.sendRedirect("/login");
@@ -688,7 +735,13 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             
             shouldLogin = "true";
             SignupInfo.SamlSsoSignupInfo signUpInfo = new SignupInfo.SamlSsoSignupInfo(username, userEmail, Config.ConfigType.GOOGLE_SAML);
-            createUserAndRedirect(userEmail, username, signUpInfo, this.accountId, Config.ConfigType.GOOGLE_SAML.toString(), RBAC.Role.MEMBER);
+
+            String defaultRole = RBAC.Role.MEMBER.name();
+            if (UsageMetricCalculator.isRbacFeatureAvailable(this.accountId)) {
+                defaultRole = fetchDefaultInviteRole(this.accountId, RBAC.Role.GUEST.name());
+            }
+
+            createUserAndRedirect(userEmail, username, signUpInfo, this.accountId, Config.ConfigType.GOOGLE_SAML.toString(), defaultRole);
         } catch (Exception e1) {
             loggerMaker.errorAndAddToDb("Error while signing in via google workspace sso \n" + e1.getMessage(), LogDb.DASHBOARD);
             servletResponse.sendRedirect("/login");
@@ -776,7 +829,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
     }
 
     private void createUserAndRedirect(String userEmail, String username, SignupInfo signupInfo,
-                                       int invitationToAccount, String method, RBAC.Role invitedRole) throws IOException {
+                                       int invitationToAccount, String method, String invitedRole) throws IOException {
         loggerMaker.infoAndAddToDb("createUserAndRedirect called");
         User user = UsersDao.instance.findOne(eq("login", userEmail));
         if (user == null && "false".equalsIgnoreCase(shouldLogin)) {
@@ -841,7 +894,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
 
 
             loggerMaker.infoAndAddToDb("Initialize Account");
-            user = AccountAction.initializeAccount(userEmail, accountId, "My account",invitationToAccount == 0, invitedRole == null ? RBAC.Role.ADMIN : invitedRole);
+            user = AccountAction.initializeAccount(userEmail, accountId, "My account",invitationToAccount == 0, invitedRole == null ? RBAC.Role.ADMIN.name() : invitedRole);
 
             servletRequest.getSession().setAttribute("user", user);
             servletRequest.getSession().setAttribute("accountId", accountId);

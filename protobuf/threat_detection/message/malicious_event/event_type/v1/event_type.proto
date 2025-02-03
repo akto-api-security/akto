@@ -1,0 +1,12 @@
+syntax = "proto3";
+
+package threat_detection.message.malicious_event.event_type.v1;
+
+option java_outer_classname = "MaliciousEventProto";
+option java_package = "threat_detection.message.malicious_event.event_type.v1";
+
+enum EventType {
+  EVENT_TYPE_UNSPECIFIED = 0;
+  EVENT_TYPE_SINGLE = 1;
+  EVENT_TYPE_AGGREGATED = 2;
+}

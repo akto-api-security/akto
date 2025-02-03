@@ -84,7 +84,6 @@ public class ApiCollectionsAction extends UserAction {
             int apiCollectionId = apiCollection.getId();
             Integer count = countMap.get(apiCollectionId);
             int fallbackCount = apiCollection.getUrls()!=null ? apiCollection.getUrls().size() : apiCollection.getUrlsCount();
-		
             if (count != null && (apiCollection.getHostName() != null)) {
                 apiCollection.setUrlsCount(count);
             } else if(ApiCollection.Type.API_GROUP.equals(apiCollection.getType())){
@@ -396,8 +395,11 @@ public class ApiCollectionsAction extends UserAction {
             return ERROR.toUpperCase();
         }
 
+        loggerMaker.infoAndAddToDb("Started adding " + this.apiList.size() + " apis into custom collection.", LogDb.DASHBOARD);
+
         CustomTestingEndpoints condition = new CustomTestingEndpoints(apiList, CustomTestingEndpoints.Operator.OR);
         apiCollection.addToConditions(condition);
+        loggerMaker.infoAndAddToDb("Final conditions for collection: " +  apiCollection.getName() + " are: " + apiCollection.getConditions().toString());
         ApiCollectionUsers.updateApiCollection(apiCollection.getConditions(), apiCollection.getId());
         ApiCollectionUsers.addToCollectionsForCollectionId(apiCollection.getConditions(), apiCollection.getId());
 
@@ -510,7 +512,7 @@ public class ApiCollectionsAction extends UserAction {
         InventoryAction inventoryAction = new InventoryAction();
         inventoryAction.attachAPIInfoListInResponse(list,-1);
         this.setResponse(inventoryAction.getResponse());
-        response.put("apiCount", ApiCollectionUsers.getApisCountFromConditions(conditions, new ArrayList<>(deactivatedCollections)));
+        response.put("apiCount", ApiCollectionUsers.getApisCountFromConditionsWithStis(conditions, new ArrayList<>(deactivatedCollections)));
         return SUCCESS.toUpperCase();
     }
     public String getEndpointsFromConditions(){
@@ -578,7 +580,7 @@ public class ApiCollectionsAction extends UserAction {
         sensitiveSubtypes.addAll(SingleTypeInfoDao.instance.sensitiveSubTypeNames());
 
         List<String> sensitiveSubtypesInRequest = SingleTypeInfoDao.instance.sensitiveSubTypeInRequestNames();
-        this.sensitiveUrlsInResponse = SingleTypeInfoDao.instance.getSensitiveApisCount(sensitiveSubtypes, true, Filters.nin(SingleTypeInfo._COLLECTION_IDS, deactivatedCollections));
+        this.sensitiveUrlsInResponse = SingleTypeInfoDao.instance.getSensitiveApisCount(sensitiveSubtypes, true, Filters.nin(SingleTypeInfo._API_COLLECTION_ID, deactivatedCollections));
 
         sensitiveSubtypes.addAll(sensitiveSubtypesInRequest);
         this.sensitiveSubtypesInCollection = SingleTypeInfoDao.instance.getSensitiveSubtypesDetectedForCollection(sensitiveSubtypes);
@@ -749,7 +751,7 @@ public class ApiCollectionsAction extends UserAction {
 
     List<Integer> apiCollectionIds;
 
-    private ENV_TYPE envType;
+    private String envType;
 
 	public String updateEnvType(){
         try {
@@ -791,6 +793,23 @@ public class ApiCollectionsAction extends UserAction {
         for(Map.Entry<String, List<Integer>> entry : userCollectionMap.entrySet()) {
             int userId = Integer.parseInt(entry.getKey());
             Set<Integer> apiCollections = new HashSet<>(entry.getValue());
+
+            /*
+             * Need actual role, not base role, 
+             * thus using direct Rbac query, not cached map.
+             */
+            RBAC rbac = RBACDao.instance.findOne(Filters.and(
+                    Filters.eq(RBAC.USER_ID, userId),
+                    Filters.eq(RBAC.ACCOUNT_ID, accountId)));
+            String role = rbac.getRole();
+            CustomRole customRole = CustomRoleDao.instance.findRoleByName(role);
+            /*
+             * If the role is custom role, only update the user with the delta.
+             */
+            if (customRole != null && customRole.getApiCollectionsId() != null
+                    && !customRole.getApiCollectionsId().isEmpty()) {
+                apiCollections.removeAll(customRole.getApiCollectionsId());
+            }
 
             RBACDao.updateApiCollectionAccess(userId, accountId, apiCollections);
             UsersCollectionsList.deleteCollectionIdsFromCache(userId, accountId);
@@ -924,7 +943,7 @@ public class ApiCollectionsAction extends UserAction {
         this.redacted = redacted;
     }
 
-    public void setEnvType(ENV_TYPE envType) {
+    public void setEnvType(String envType) {
 		this.envType = envType;
 	}
 

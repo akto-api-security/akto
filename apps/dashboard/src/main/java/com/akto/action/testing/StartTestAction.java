@@ -1,12 +1,12 @@
 package com.akto.action.testing;
 
-import com.akto.action.ExportSampleDataAction;
 import com.akto.action.UserAction;
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing.sources.TestSourceConfigsDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dao.testing.*;
+import com.akto.dto.testing.config.EditableTestingRunConfig;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.User;
 import com.akto.dto.ApiToken.Utility;
@@ -24,6 +24,7 @@ import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.Constants;
+import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.TestErrorSource;
 import com.akto.utils.DeleteTestRunUtils;
 import com.akto.utils.Utils;
@@ -36,9 +37,14 @@ import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
+import java.time.Instant;
 import java.util.*;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -73,6 +79,8 @@ public class StartTestAction extends UserAction {
     private Map<String,Integer> issuesSummaryInfoMap = new HashMap<>();
 
     private String testRoleId;
+    private boolean cleanUpTestingResources;
+
     private static final Gson gson = new Gson();
 
     private static List<ObjectId> getTestingRunListFromSummary(Bson filters){
@@ -100,6 +108,7 @@ public class StartTestAction extends UserAction {
 
     private CallSource source;
     private boolean sendSlackAlert = false;
+    private boolean sendMsTeamsAlert = false;
 
     private TestingRun createTestingRun(int scheduleTimestamp, int periodInSeconds) {
         User user = getSUser();
@@ -146,7 +155,7 @@ public class StartTestAction extends UserAction {
         }
         if (this.selectedTests != null) {
             int id = UUID.randomUUID().hashCode() & 0xfffffff;
-            TestingRunConfig testingRunConfig = new TestingRunConfig(id, null, this.selectedTests, authMechanism.getId(), this.overriddenTestAppUrl, this.testRoleId);
+            TestingRunConfig testingRunConfig = new TestingRunConfig(id, null, this.selectedTests, authMechanism.getId(), this.overriddenTestAppUrl, this.testRoleId, this.cleanUpTestingResources);
             // add advanced setting here
             if(this.testConfigsAdvancedSettings != null && !this.testConfigsAdvancedSettings.isEmpty()){
                 testingRunConfig.setConfigsAdvancedSettings(this.testConfigsAdvancedSettings);
@@ -157,7 +166,7 @@ public class StartTestAction extends UserAction {
 
         return new TestingRun(scheduleTimestamp, user.getLogin(),
                 testingEndpoints, testIdConfig, State.SCHEDULED, periodInSeconds, testName, this.testRunTime,
-                this.maxConcurrentRequests, this.sendSlackAlert);
+                this.maxConcurrentRequests, this.sendSlackAlert, this.sendMsTeamsAlert);
     }
 
     private List<String> selectedTests;
@@ -212,13 +221,28 @@ public class StartTestAction extends UserAction {
                     Updates.combine(
                             Updates.set(TestingRun.STATE, TestingRun.State.SCHEDULED),
                             Updates.set(TestingRun.SCHEDULE_TIMESTAMP, scheduleTimestamp)));
+            } else {
+                // CI-CD test.
+                /*
+                 * If test is already running or scheduled, do nothing.
+                 * If test is stopped/failed, mark it as completed.
+                 */
+                if(localTestingRun.getState().equals(TestingRun.State.FAILED) || localTestingRun.getState().equals(TestingRun.State.STOPPED)){
+                    TestingRunDao.instance.updateOne(
+                    Filters.eq(Constants.ID, localTestingRun.getId()),
+                    Updates.combine(
+                            Updates.set(TestingRun.STATE, TestingRun.State.COMPLETED),
+                            Updates.set(TestingRun.END_TIMESTAMP, Context.now())));
+                }
+                 
             }
+
             if (this.overriddenTestAppUrl != null || this.selectedTests != null) {
-                int id = UUID.randomUUID().hashCode() & 0xfffffff ;
+                int id = UUID.randomUUID().hashCode() & 0xfffffff;
                 TestingRunConfig testingRunConfig = new TestingRunConfig(id, null, this.selectedTests, null, this.overriddenTestAppUrl, this.testRoleId);
                 this.testIdConfig = testingRunConfig.getId();
                 TestingRunConfigDao.instance.insertOne(testingRunConfig);
-            }
+            } 
 
         }
 
@@ -470,11 +494,12 @@ public class StartTestAction extends UserAction {
         );
 
         this.testingRunType = TestingRunType.ONE_TIME;
-        if(cicdCount > 0){
+        if (cicdCount > 0) {
             this.testingRunType = TestingRunType.CI_CD;
-        }
-        else if(this.testingRun.getPeriodInSeconds() > 0){
+        } else if (this.testingRun.getPeriodInSeconds() > 0) {
             this.testingRunType = TestingRunType.RECURRING;
+        } else if (this.testingRun.getPeriodInSeconds() == -1) {
+            this.testingRunType = TestingRunType.CONTINUOUS_TESTING;
         }
 
         if (this.testingRun != null && this.testingRun.getTestIdConfig() == 1) {
@@ -485,7 +510,7 @@ public class StartTestAction extends UserAction {
         }
 
         TestingRunConfig runConfig = TestingRunConfigDao.instance.findOne(
-            Filters.eq("_id", this.testingRun.getTestIdConfig()), Projections.exclude("collectionWiseApiInfoKey", "testSubCategoryList")
+            Filters.eq("_id", this.testingRun.getTestIdConfig()), Projections.exclude("collectionWiseApiInfoKey")
         );
 
         this.testingRun.setTestingRunConfig(runConfig);
@@ -506,39 +531,34 @@ public class StartTestAction extends UserAction {
         }
     }
 
+    private static Bson vulnerableFilter = Filters.and(
+        Filters.eq(TestingRunResult.VULNERABLE, true),
+        Filters.or(
+            Filters.exists(TestingRunResult.IS_IGNORED_RESULT, false),
+            Filters.eq(TestingRunResult.IS_IGNORED_RESULT, false)
+        )
+        
+    );
+
     private List<Bson> prepareTestRunResultsFilters(ObjectId testingRunResultSummaryId, QueryMode queryMode) {
         List<Bson> filterList = new ArrayList<>();
         filterList.add(Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, testingRunResultSummaryId));
 
-        if(filters != null && !filters.isEmpty()) {
-            for(Map.Entry<String, List> filterEntry : filters.entrySet()) {
-                String key = filterEntry.getKey();
-                switch (key) {
-                    case "severityStatus":
-                        filterList.add(Filters.in(TestingRunResult.TEST_RESULTS+"."+GenericTestResult._CONFIDENCE, filterEntry.getValue()));
-                        break;
-                    case "apiCollectionId":
-                    case "collectionIds":
-                        filterList.add(Filters.in(TestingRunResult.API_INFO_KEY+"."+ApiInfo.ApiInfoKey.API_COLLECTION_ID, filterEntry.getValue()));
-                        break;
-                    case "method":
-                        filterList.add(Filters.in(TestingRunResult.API_INFO_KEY+"."+ApiInfo.ApiInfoKey.METHOD, filterEntry.getValue()));
-                        break;
-                    case "categoryFilter":
-                        filterList.add(Filters.in(TestingRunResult.TEST_SUPER_TYPE, filterEntry.getValue()));
-                        break;
-                }
+        if(reportFilterList != null) {
+            Bson filtersForTestingRunResults = com.akto.action.testing.Utils.createFiltersForTestingReport(reportFilterList);
+            if (!filtersForTestingRunResults.equals(Filters.empty())) {
+                filterList.add(filtersForTestingRunResults);
             }
         }
 
         if(queryMode == null) {
             if(fetchOnlyVulnerable) {
-                filterList.add(Filters.eq(TestingRunResult.VULNERABLE, true));
+                filterList.add(vulnerableFilter);
             }
         } else {
             switch (queryMode) {
                 case VULNERABLE:
-                    filterList.add(Filters.eq(TestingRunResult.VULNERABLE, true));
+                    filterList.add(vulnerableFilter);
                     break;
                 case SKIPPED_EXEC_API_REQUEST_FAILED:
                     filterList.add(Filters.eq(TestingRunResult.VULNERABLE, false));
@@ -566,10 +586,92 @@ public class StartTestAction extends UserAction {
                 case SKIPPED_EXEC_NEED_CONFIG:
                     filterList.add(Filters.eq(TestingRunResult.REQUIRES_CONFIG, true));
                     break;
+                default:
+                    break;
             }
         }
 
+        if(filterList.isEmpty()) {
+            filterList.add(Filters.empty());
+        }
+
         return filterList;
+    }
+
+    public static Bson prepareTestingRunResultCustomSorting(String sortKey, int sortOrder) {
+        Bson sortStage = null;
+        if (TestingRunIssues.KEY_SEVERITY.equals(sortKey)) {
+            sortStage = (sortOrder == 1) ?
+                    Aggregates.sort(Sorts.ascending("severityValue")) :
+                    Aggregates.sort(Sorts.descending("severityValue"));
+        } else if ("time".equals(sortKey)) {
+            sortStage = (sortOrder == 1) ?
+                    Aggregates.sort(Sorts.ascending(TestingRunResult.END_TIMESTAMP)) :
+                    Aggregates.sort(Sorts.descending(TestingRunResult.END_TIMESTAMP));
+        }
+
+        return sortStage;
+    }
+
+    private Map<String, Integer> getCountMapForQueryMode(ObjectId testingRunResultSummaryId, QueryMode queryMode, int accountId){
+        Context.accountId.set(accountId);
+        Map<String, Integer> resultantMap = new HashMap<>();
+
+        List<Bson> filterList =  prepareTestRunResultsFilters(testingRunResultSummaryId, queryMode);
+        int count = VulnerableTestingRunResultDao.instance.countFromDb(Filters.and(filterList), queryMode.equals(QueryMode.VULNERABLE));
+        resultantMap.put(queryMode.toString(), count);
+
+        return resultantMap;
+    }
+
+    private final ExecutorService multiExecService = Executors.newFixedThreadPool(5);
+
+    Map<String, Integer> testCountMap;
+    public String fetchTestRunResultsCount() {
+        ObjectId testingRunResultSummaryId;
+        try {
+            testingRunResultSummaryId = new ObjectId(testingRunResultSummaryHexId);
+        } catch (Exception e) {
+            addActionError("Invalid test summary id");
+            return ERROR.toUpperCase();
+        }
+
+        
+        int accountId = Context.accountId.get();
+
+        testCountMap = new HashMap<>();
+        List<Callable<Map<String, Integer>>> jobs = new ArrayList<>();
+
+        for(QueryMode qm : QueryMode.values()) {
+            if(!(qm.equals(QueryMode.SECURED) || qm.equals(QueryMode.SKIPPED_EXEC_NO_ACTION))){
+                jobs.add(() -> getCountMapForQueryMode(testingRunResultSummaryId, qm, accountId));
+            }
+        }
+
+        try {
+            List<Future<Map<String, Integer>>> futures = new ArrayList<>();
+            for (Callable<Map<String, Integer>> job : jobs) {
+                futures.add(multiExecService.submit(job));
+            }
+
+            for (Future<Map<String, Integer>> future : futures) {
+                try {
+                    Map<String, Integer> queryCountMap = future.get();
+                    for(String key: queryCountMap.keySet()){
+                        testCountMap.put(key, queryCountMap.getOrDefault(key, 0));
+                    }
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+                
+            }
+            
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ERROR.toUpperCase();
+        }
+
+        return SUCCESS.toUpperCase();
     }
 
     String testingRunResultSummaryHexId;
@@ -581,8 +683,7 @@ public class StartTestAction extends UserAction {
     private QueryMode queryMode;
 
     private Map<TestError, String> errorEnums = new HashMap<>();
-
-    Map<String, Integer> testCountMap;
+    List<TestingRunIssues> issueslist;
 
     public String fetchTestingRunResults() {
         ObjectId testingRunResultSummaryId;
@@ -592,8 +693,18 @@ public class StartTestAction extends UserAction {
             addActionError("Invalid test summary id");
             return ERROR.toUpperCase();
         }
+
+
         if (testingRunResultSummaryHexId != null) loggerMaker.infoAndAddToDb("fetchTestingRunResults called for hexId=" + testingRunResultSummaryHexId);
         if (queryMode != null) loggerMaker.infoAndAddToDb("fetchTestingRunResults called for queryMode="+queryMode);
+
+        int timeNow = Context.now();
+        Bson ignoredIssuesFilters = Filters.and(
+                Filters.in(TestingRunIssues.TEST_RUN_ISSUES_STATUS, "IGNORED"),
+                Filters.in(TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_ID, testingRunResultSummaryId)
+        );
+        issueslist = TestingRunIssuesDao.instance.findAll(ignoredIssuesFilters, Projections.include("_id"));
+        loggerMaker.infoAndAddToDb("[" + (Context.now() - timeNow) + "] Fetched testing run issues of size: " + issueslist.size(), LogDb.DASHBOARD);
 
         List<Bson> testingRunResultFilters = prepareTestRunResultsFilters(testingRunResultSummaryId, queryMode);
 
@@ -609,44 +720,59 @@ public class StartTestAction extends UserAction {
 
         try {
             int pageLimit = limit <= 0 ? 150 : limit;
-            Bson sortStage = null;
-            if (TestingRunIssues.KEY_SEVERITY.equals(sortKey)) {
-                sortStage = (sortOrder == 1) ?
-                        Aggregates.sort(Sorts.ascending("severityValue", TestingRunResult.END_TIMESTAMP)) :
-                        Aggregates.sort(Sorts.descending("severityValue", TestingRunResult.END_TIMESTAMP));
-            } else if ("time".equals(sortKey)) {
-                sortStage = (sortOrder == 1) ?
-                        Aggregates.sort(Sorts.ascending(TestingRunResult.END_TIMESTAMP)) :
-                        Aggregates.sort(Sorts.descending(TestingRunResult.END_TIMESTAMP));
-            }
+            Bson sortStage = prepareTestingRunResultCustomSorting(sortKey, sortOrder);
 
-            this.testingRunResults = TestingRunResultDao.instance
-                    .fetchLatestTestingRunResultWithCustomAggregations(Filters.and(testingRunResultFilters), pageLimit, skip, sortStage);
+            timeNow = Context.now();
+            Bson filters = testingRunResultFilters.isEmpty() ? Filters.empty() : Filters.and(testingRunResultFilters);
+            this.testingRunResults = VulnerableTestingRunResultDao.instance
+                    .fetchLatestTestingRunResultWithCustomAggregations(filters, pageLimit, skip, sortStage, testingRunResultSummaryId, queryMode.equals(QueryMode.VULNERABLE));
+            loggerMaker.infoAndAddToDb("[" + (Context.now() - timeNow) + "] Fetched testing run results of size: " + testingRunResults.size(), LogDb.DASHBOARD);
 
-            testCountMap = new HashMap<>();
-            for(QueryMode qm : QueryMode.values()) {
-                if(qm.equals(QueryMode.ALL) || qm.equals(QueryMode.SKIPPED_EXEC_NO_ACTION)) {
-                    continue;
-                }
-
-                int count = (int) TestingRunResultDao.instance.count(Filters.and(
-                        prepareTestRunResultsFilters(testingRunResultSummaryId, qm)
-                ));
-                testCountMap.put(qm.toString(), count);
-            }
-
-            Bson ignoredIssuesFilters = Filters.and(
-                    Filters.in(TestingRunIssues.TEST_RUN_ISSUES_STATUS, Arrays.asList("IGNORED", "FIXED")),
-                    Filters.in(TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_ID, testingRunResultSummaryId)
-            );
-            int count = (int) TestingRunIssuesDao.instance.count(ignoredIssuesFilters);
-            testCountMap.put(QueryMode.VULNERABLE.name(), Math.abs(testCountMap.getOrDefault(QueryMode.VULNERABLE.name(), 0)-count));
-            testCountMap.put("IGNORED_ISSUES", count);
+            timeNow = Context.now();
+            removeTestingRunResultsByIssues(testingRunResults, issueslist, false);
+            loggerMaker.infoAndAddToDb("[" + (Context.now() - timeNow) + "] Removed ignored issues from testing run results. Current size of testing run results: " + testingRunResults.size(), LogDb.DASHBOARD);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "error in fetchLatestTestingRunResult: " + e);
         }
 
+        timeNow = Context.now();
+        loggerMaker.infoAndAddToDb("fetchTestingRunResults completed in: " + (Context.now() - timeNow), LogDb.DASHBOARD);
+
         return SUCCESS.toUpperCase();
+    }
+
+    public static void removeTestingRunResultsByIssues(List<TestingRunResult> testingRunResults,
+                                                       List<TestingRunIssues> testingRunIssues,
+                                                       boolean retainByIssues) {
+        long startTime = System.currentTimeMillis();
+
+        Set<String> issuesSet = new HashSet<>();
+        for (TestingRunIssues issue : testingRunIssues) {
+            String apiInfoKeyString = issue.getId().getApiInfoKey().toString();
+            String key = apiInfoKeyString + "|" + issue.getId().getTestSubCategory();
+            issuesSet.add(key);
+        }
+        loggerMaker.infoAndAddToDb("Total issues to be removed from TestingRunResults list: " + issuesSet.size(), LogDb.DASHBOARD);
+
+        Iterator<TestingRunResult> resultIterator = testingRunResults.iterator();
+
+        while (resultIterator.hasNext()) {
+            TestingRunResult result = resultIterator.next();
+            String apiInfoKeyString = result.getApiInfoKey().toString();
+            String resultKey = apiInfoKeyString + "|" + result.getTestSubType();
+
+            boolean matchFound = issuesSet.contains(resultKey);
+
+            if (retainByIssues && !matchFound) {
+                resultIterator.remove();
+            } else if (!retainByIssues && matchFound) {
+                resultIterator.remove();
+            }
+        }
+
+        long endTime = System.currentTimeMillis();
+        long duration = endTime - startTime;
+        loggerMaker.infoAndAddToDb("[" + Instant.now() + "] Removed elements from TestingRunResults list in " + duration + " ms", LogDb.DASHBOARD);
     }
 
     private Map<String, List<String>> reportFilterList;
@@ -656,53 +782,65 @@ public class StartTestAction extends UserAction {
         try {
             testingRunResultSummaryId = new ObjectId(testingRunResultSummaryHexId);
             Bson filterForReport = com.akto.action.testing.Utils.createFiltersForTestingReport(reportFilterList);
+            boolean isStoredInVulnerableCollection = VulnerableTestingRunResultDao.instance.isStoredInVulnerableCollection(testingRunResultSummaryId, true);
             Bson filters = Filters.and(
                     Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, testingRunResultSummaryId),
                     Filters.eq(TestingRunResult.VULNERABLE, true),
                     filterForReport
             );
-
-            List<TestingRunResult> testingRunResultList = TestingRunResultDao.instance.findAll(filters, skip, 50, null);
-            Map<String, String> sampleDataVsCurlMap = new HashMap<>();
-            for (TestingRunResult runResult: testingRunResultList) {
-                WorkflowTest workflowTest = runResult.getWorkflowTest();
-                for (GenericTestResult tr : runResult.getTestResults()) {
-                    if (tr.isVulnerable()) {
-                        if (tr instanceof TestResult) {
-                            TestResult testResult = (TestResult) tr;
-                            sampleDataVsCurlMap.put(testResult.getMessage(),
-                                    ExportSampleDataAction.getCurl(testResult.getMessage()));
-                            sampleDataVsCurlMap.put(testResult.getOriginalMessage(),
-                                    ExportSampleDataAction.getCurl(testResult.getOriginalMessage()));
-                        } else if (tr instanceof MultiExecTestResult){
-                            MultiExecTestResult testResult = (MultiExecTestResult) tr;
-                            Map<String, WorkflowTestResult.NodeResult> nodeResultMap = testResult.getNodeResultMap();
-                            for (String order : nodeResultMap.keySet()) {
-                                WorkflowTestResult.NodeResult nodeResult = nodeResultMap.get(order);
-                                String nodeResultLastMessage = getNodeResultLastMessage(nodeResult.getMessage());
-                                if (nodeResultLastMessage != null) {
-                                    nodeResult.setMessage(nodeResultLastMessage);
-                                    sampleDataVsCurlMap.put(nodeResultLastMessage,
-                                            ExportSampleDataAction.getCurl(nodeResultLastMessage));
-                                }
-                            }
-                        }
-                    }
-                }
-                if (workflowTest != null) {
-                    Map<String, WorkflowNodeDetails> nodeDetailsMap = workflowTest.getMapNodeIdToWorkflowNodeDetails();
-                    for (String nodeName: nodeDetailsMap.keySet()) {
-                        if (nodeDetailsMap.get(nodeName) instanceof YamlNodeDetails) {
-                            YamlNodeDetails details = (YamlNodeDetails) nodeDetailsMap.get(nodeName);
-                            sampleDataVsCurlMap.put(details.getOriginalMessage(),
-                                    ExportSampleDataAction.getCurl(details.getOriginalMessage()));
-                        }
-
-                    }
-                }
+            List<TestingRunResult> testingRunResultList = new ArrayList<>();
+            if(isStoredInVulnerableCollection){
+                filters = Filters.and(
+                    Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, testingRunResultSummaryId),
+                    filterForReport
+                );
+                testingRunResultList = VulnerableTestingRunResultDao.instance.findAll(filters, skip, 50, null);
+            }else{
+                testingRunResultList = TestingRunResultDao.instance.findAll(filters, skip, 50, null);
             }
+            
+
+            
+            // Map<String, String> sampleDataVsCurlMap = new HashMap<>();
+            // for (TestingRunResult runResult: testingRunResultList) {
+            //     WorkflowTest workflowTest = runResult.getWorkflowTest();
+            //     for (GenericTestResult tr : runResult.getTestResults()) {
+            //         if (tr.isVulnerable()) {
+            //             if (tr instanceof TestResult) {
+            //                 TestResult testResult = (TestResult) tr;
+            //                 // sampleDataVsCurlMap.put(testResult.getMessage(),
+            //                 //         ExportSampleDataAction.getCurl(testResult.getMessage()));
+            //                 // sampleDataVsCurlMap.put(testResult.getOriginalMessage(),
+            //                 //         ExportSampleDataAction.getCurl(testResult.getOriginalMessage()));
+            //             } else if (tr instanceof MultiExecTestResult){
+            //                 MultiExecTestResult testResult = (MultiExecTestResult) tr;
+            //                 Map<String, WorkflowTestResult.NodeResult> nodeResultMap = testResult.getNodeResultMap();
+            //                 for (String order : nodeResultMap.keySet()) {
+            //                     WorkflowTestResult.NodeResult nodeResult = nodeResultMap.get(order);
+            //                     String nodeResultLastMessage = getNodeResultLastMessage(nodeResult.getMessage());
+            //                     if (nodeResultLastMessage != null) {
+            //                         nodeResult.setMessage(nodeResultLastMessage);
+            //                         sampleDataVsCurlMap.put(nodeResultLastMessage,
+            //                                 ExportSampleDataAction.getCurl(nodeResultLastMessage));
+            //                     }
+            //                 }
+            //             }
+            //         }
+            //     }
+            //     if (workflowTest != null) {
+            //         Map<String, WorkflowNodeDetails> nodeDetailsMap = workflowTest.getMapNodeIdToWorkflowNodeDetails();
+            //         for (String nodeName: nodeDetailsMap.keySet()) {
+            //             if (nodeDetailsMap.get(nodeName) instanceof YamlNodeDetails) {
+            //                 YamlNodeDetails details = (YamlNodeDetails) nodeDetailsMap.get(nodeName);
+            //                 sampleDataVsCurlMap.put(details.getOriginalMessage(),
+            //                         ExportSampleDataAction.getCurl(details.getOriginalMessage()));
+            //             }
+
+            //         }
+            //     }
+            // }
             this.testingRunResults = testingRunResultList;
-            this.sampleDataVsCurlMap = sampleDataVsCurlMap;
+            // this.sampleDataVsCurlMap = sampleDataVsCurlMap;
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error while executing test run summary" + e.getMessage(), LogDb.DASHBOARD);
             addActionError("Invalid test summary id");
@@ -726,7 +864,7 @@ public class StartTestAction extends UserAction {
 
     public String fetchTestRunResultDetails() {
         ObjectId testingRunResultId = new ObjectId(testingRunResultHexId);
-        this.testingRunResult = TestingRunResultDao.instance.findOne("_id", testingRunResultId);
+        this.testingRunResult = VulnerableTestingRunResultDao.instance.findOneWithComparison(Filters.eq(Constants.ID, testingRunResultId), null);
         List<GenericTestResult> runResults = new ArrayList<>();
 
         for (GenericTestResult testResult: this.testingRunResult.getTestResults()) {
@@ -746,7 +884,7 @@ public class StartTestAction extends UserAction {
 
     public String fetchIssueFromTestRunResultDetails() {
         ObjectId testingRunResultId = new ObjectId(testingRunResultHexId);
-        TestingRunResult result = TestingRunResultDao.instance.findOne(Constants.ID, testingRunResultId);
+        TestingRunResult result = VulnerableTestingRunResultDao.instance.findOneWithComparison(Filters.eq(Constants.ID, testingRunResultId), null);
         try {
             if (result.isVulnerable()) {
                 // name = category
@@ -809,7 +947,7 @@ public class StartTestAction extends UserAction {
         if (this.testingRunHexId != null) {
             try {
                 ObjectId testingId = new ObjectId(this.testingRunHexId);
-                TestingRunDao.instance.updateOne(
+                TestingRunDao.instance.updateOneNoUpsert(
                         Filters.and(filter, Filters.eq(Constants.ID, testingId)),
                         Updates.set(TestingRun.STATE, State.STOPPED));
                 Bson testingSummaryFilter = Filters.and(
@@ -991,11 +1129,193 @@ public class StartTestAction extends UserAction {
         return Action.SUCCESS.toUpperCase();
     }
 
+    private EditableTestingRunConfig editableTestingRunConfig;
+
     public String modifyTestingRunConfig(){
-        TestingRunConfigDao.instance.updateOne(
-            Filters.eq(Constants.ID, this.testingRunConfigId),
-            Updates.set("configsAdvancedSettings", this.testConfigsAdvancedSettings)
-        );
+        if (editableTestingRunConfig == null) {
+            addActionError("Invalid editableTestingRunConfig");
+            return Action.ERROR.toUpperCase();
+        }
+        try {
+            if (this.testingRunConfigId == 0) {
+                addActionError("Invalid testing run config id");
+                return Action.ERROR.toUpperCase();
+            } else {
+
+                TestingRunConfig existingTestingRunConfig = TestingRunConfigDao.instance.findOne(Filters.eq(Constants.ID, this.testingRunConfigId));
+                if (existingTestingRunConfig == null) {
+                    addActionError("Testing run config object not found for ID: " + this.testingRunConfigId);
+                    return Action.ERROR.toUpperCase();
+                }
+
+                List<Bson> updates = new ArrayList<>();
+
+                if (editableTestingRunConfig.getConfigsAdvancedSettings() != null && !editableTestingRunConfig.getConfigsAdvancedSettings().equals(existingTestingRunConfig.getConfigsAdvancedSettings())) {
+                    updates.add(Updates.set(TestingRunConfig.TEST_CONFIGS_ADVANCED_SETTINGS, editableTestingRunConfig.getConfigsAdvancedSettings()));
+                }
+                
+                if (editableTestingRunConfig.getTestSubCategoryList() != null &&
+                    !editableTestingRunConfig.getTestSubCategoryList().equals(existingTestingRunConfig.getTestSubCategoryList())) {
+                    updates.add(Updates.set(TestingRunConfig.TEST_SUBCATEGORY_LIST, editableTestingRunConfig.getTestSubCategoryList()));
+                }
+                
+                if (editableTestingRunConfig.getTestRoleId() != null && !editableTestingRunConfig.getTestRoleId().equals(existingTestingRunConfig.getTestRoleId())) {
+                    updates.add(Updates.set(TestingRunConfig.TEST_ROLE_ID, editableTestingRunConfig.getTestRoleId()));
+                }
+                
+                if (editableTestingRunConfig.getOverriddenTestAppUrl() != null && !editableTestingRunConfig.getOverriddenTestAppUrl().equals(existingTestingRunConfig.getOverriddenTestAppUrl())) {
+                    updates.add(Updates.set(TestingRunConfig.OVERRIDDEN_TEST_APP_URL, editableTestingRunConfig.getOverriddenTestAppUrl()));
+                }
+                
+                if (!updates.isEmpty()) {
+                    TestingRunConfigDao.instance.updateOne(
+                        Filters.eq(Constants.ID, this.testingRunConfigId),
+                        Updates.combine(updates) 
+                    );
+                }
+
+            }
+
+            if (editableTestingRunConfig.getTestingRunHexId() != null) {
+            
+                TestingRun existingTestingRun = TestingRunDao.instance.findOne(Filters.eq(Constants.ID, new ObjectId(editableTestingRunConfig.getTestingRunHexId())));
+
+                if (existingTestingRun != null) {
+                    List<Bson> updates = new ArrayList<>();
+
+                    if (editableTestingRunConfig.getTestRunTime() > 0
+                            && editableTestingRunConfig.getTestRunTime() <= 6 * 60 * 60
+                            && editableTestingRunConfig.getTestRunTime() != existingTestingRun.getTestRunTime()) {
+                        updates.add(Updates.set(TestingRun.TEST_RUNTIME, editableTestingRunConfig.getTestRunTime()));
+                    }
+
+                    if (editableTestingRunConfig.getMaxConcurrentRequests() > 0
+                            && editableTestingRunConfig.getMaxConcurrentRequests() <= 100 && editableTestingRunConfig
+                                    .getMaxConcurrentRequests() != existingTestingRun.getMaxConcurrentRequests()) {
+                        updates.add(Updates.set(TestingRun.MAX_CONCURRENT_REQUEST,
+                                editableTestingRunConfig.getMaxConcurrentRequests()));
+                    }
+
+                    if (existingTestingRun.getSendSlackAlert() != editableTestingRunConfig.getSendSlackAlert()) {
+                        updates.add(
+                                Updates.set(TestingRun.SEND_SLACK_ALERT, editableTestingRunConfig.getSendSlackAlert()));
+                    }
+
+                    if (existingTestingRun.getSendMsTeamsAlert() != editableTestingRunConfig.getSendMsTeamsAlert()) {
+                        updates.add(
+                                Updates.set(TestingRun.SEND_MS_TEAMS_ALERT,
+                                        editableTestingRunConfig.getSendMsTeamsAlert()));
+                    }
+
+                    int periodInSeconds = 0;
+                    if (editableTestingRunConfig.getContinuousTesting()) {
+                        periodInSeconds = -1;
+                    } else if (editableTestingRunConfig.getRecurringDaily()) {
+                        periodInSeconds = 86400;
+                    }
+                    if (existingTestingRun.getPeriodInSeconds() != periodInSeconds) {
+                        updates.add(Updates.set(TestingRun.PERIOD_IN_SECONDS, periodInSeconds));
+                    }
+                
+                    if (!updates.isEmpty()) {
+                        TestingRunDao.instance.updateOne(
+                            Filters.eq(Constants.ID,new ObjectId(editableTestingRunConfig.getTestingRunHexId())),
+                            Updates.combine(updates) 
+                        );
+                    }
+                }
+                
+            }
+
+
+        } catch (Exception e) {
+            addActionError("Unable to modify testing run config and testing run");
+            return Action.ERROR.toUpperCase();
+        }
+        return SUCCESS.toUpperCase();
+    }
+
+    public String handleRefreshTableCount(){
+        if(this.testingRunResultSummaryHexId == null || this.testingRunResultSummaryHexId.isEmpty()){
+            addActionError("Invalid summary id");
+            return ERROR.toUpperCase();
+        }
+        int accountId = Context.accountId.get();
+        executorService.schedule( new Runnable() {
+            public void run() {
+                Context.accountId.set(accountId);
+                try {
+                    ObjectId summaryObjectId = new ObjectId(testingRunResultSummaryHexId);
+                    boolean isStoredInVulnerableCollection = VulnerableTestingRunResultDao.instance.isStoredInVulnerableCollection(summaryObjectId, true);
+                    List<TestingRunResult> testingRunResults = VulnerableTestingRunResultDao.instance.findAll(
+                        Filters.and(
+                            Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, summaryObjectId),
+                            vulnerableFilter
+                        ), 
+                        Projections.include(TestingRunResult.API_INFO_KEY, TestingRunResult.TEST_SUB_TYPE),
+                        isStoredInVulnerableCollection
+                    );
+
+                    if(testingRunResults.isEmpty()){
+                        return;
+                    }
+            
+                    Set<TestingIssuesId> issuesIds = new HashSet<>();
+                    Map<TestingIssuesId, ObjectId> mapIssueToResultId = new HashMap<>();
+                    Set<ObjectId> ignoredResults = new HashSet<>();
+                    for(TestingRunResult runResult: testingRunResults){
+                        TestingIssuesId issuesId = new TestingIssuesId(runResult.getApiInfoKey(), TestErrorSource.AUTOMATED_TESTING , runResult.getTestSubType());
+                        issuesIds.add(issuesId);
+                        mapIssueToResultId.put(issuesId, runResult.getId());
+                        ignoredResults.add(runResult.getId());
+                    }
+            
+                    List<TestingRunIssues> issues = TestingRunIssuesDao.instance.findAll(
+                        Filters.and(
+                            Filters.in(Constants.ID, issuesIds),
+                            Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS, GlobalEnums.TestRunIssueStatus.OPEN)
+                        ), Projections.include(TestingRunIssues.KEY_SEVERITY)
+                    );
+            
+                    Map<String, Integer> totalCountIssues = new HashMap<>();
+                    totalCountIssues.put("HIGH", 0);
+                    totalCountIssues.put("MEDIUM", 0);
+                    totalCountIssues.put("LOW", 0);
+            
+                    for(TestingRunIssues runIssue: issues){
+                        int initCount = totalCountIssues.getOrDefault(runIssue.getSeverity().name(), 0);
+                        totalCountIssues.put(runIssue.getSeverity().name(), initCount + 1);
+                        if(mapIssueToResultId.containsKey(runIssue.getId())){
+                            ObjectId resId = mapIssueToResultId.get(runIssue.getId());
+                            ignoredResults.remove(resId);
+                        }
+                    }
+            
+                    // update testing run result summary
+                    TestingRunResultSummariesDao.instance.updateOne(
+                        Filters.eq(Constants.ID, summaryObjectId),
+                        Updates.set(TestingRunResultSummary.COUNT_ISSUES, totalCountIssues)
+                    );
+            
+                    // update testing run results, by setting them isIgnored true
+                    if(isStoredInVulnerableCollection){
+                        VulnerableTestingRunResultDao.instance.updateMany(
+                            Filters.in(Constants.ID, ignoredResults),
+                            Updates.set(TestingRunResult.IS_IGNORED_RESULT, true)
+                        );
+                    }else{
+                        TestingRunResultDao.instance.updateMany(
+                            Filters.in(Constants.ID, ignoredResults),
+                            Updates.set(TestingRunResult.IS_IGNORED_RESULT, true)
+                        );
+                    }
+                    
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+        }, 0 , TimeUnit.SECONDS);
+
         return SUCCESS.toUpperCase();
     }
 
@@ -1350,11 +1670,35 @@ public class StartTestAction extends UserAction {
         this.testingRunConfigId = testingRunConfigId;
     }
 
+    public void setEditableTestingRunConfig(EditableTestingRunConfig editableTestingRunConfig) {
+        this.editableTestingRunConfig = editableTestingRunConfig;
+    }
+
     public Map<String, Integer> getTestCountMap() {
         return testCountMap;
     }
 
     public void setReportFilterList(Map<String, List<String>> reportFilterList) {
         this.reportFilterList = reportFilterList;
+    }
+
+    public List<TestingRunIssues> getIssueslist() {
+        return issueslist;
+    }
+    
+    public boolean getCleanUpTestingResources() {
+        return cleanUpTestingResources;
+    }
+
+    public void setCleanUpTestingResources(boolean cleanUpTestingResources) {
+        this.cleanUpTestingResources = cleanUpTestingResources;
+    }
+
+    public boolean getSendMsTeamsAlert() {
+        return sendMsTeamsAlert;
+    }
+
+    public void setSendMsTeamsAlert(boolean sendMsTeamsAlert) {
+        this.sendMsTeamsAlert = sendMsTeamsAlert;
     }
 }

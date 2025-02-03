@@ -3,6 +3,13 @@ import React from 'react'
 import TooltipText from '../../../components/shared/TooltipText'
 
 function TestSummaryCard({ summaryItem }) {
+    const severityLevels = [
+        { level: 'CRITICAL', count: summaryItem.criticalCount },
+        { level: 'HIGH', count: summaryItem.highCount },
+        { level: 'MEDIUM', count: summaryItem.mediumCount },
+        { level: 'LOW', count: summaryItem.lowCount },
+    ]
+
     return (
         <LegacyCard>
             <div style={{cursor: 'pointer'}} onClick={() => window.open(summaryItem.link, "_blank")}>
@@ -18,9 +25,11 @@ function TestSummaryCard({ summaryItem }) {
                             <VerticalStack gap={2}>
                                 <Text color='subdued' variant='headingXs' fontWeight='semibold'>Issues Found</Text>
                                 <HorizontalStack gap={2}>
-                                    <Badge size="small" status="critical">{summaryItem.highCount}</Badge>
-                                    <Badge size="small" status="warning">{summaryItem.mediumCount}</Badge>
-                                    <Badge size="small" status="info">{summaryItem.lowCount}</Badge>
+                                    {severityLevels.map(({ level, count }) => (
+                                        <div key={level} className={`badge-wrapper-${level}`}>
+                                            <Badge size="small">{count}</Badge>
+                                        </div>
+                                    ))}
                                 </HorizontalStack>
                             </VerticalStack>
                             <VerticalStack gap={2}>

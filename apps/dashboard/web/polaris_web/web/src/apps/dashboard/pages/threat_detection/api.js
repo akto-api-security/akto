@@ -38,6 +38,40 @@ const threatDetectionRequests = {
             data: {}
         })
     },
+    fetchThreatActors(skip, sort) {
+        return request({
+            url: '/api/fetchThreatActors',
+            method: 'post',
+            data: {
+                skip: skip,
+                sort: sort
+            }
+        })
+    },
+    fetchThreatApis(skip, sort) {
+        return request({
+            url: '/api/fetchThreatApis',
+            method: 'post',
+            data: {
+                skip: skip,
+                sort: sort
+            }
+        })
+    },
+    getActorsCountPerCounty() {
+        return request({
+            url: '/api/getActorsCountPerCounty',
+            method: 'get',
+            data: {}
+        })
+    },
+    fetchThreatCategoryCount() {
+        return request({
+            url: '/api/fetchThreatCategoryCount',
+            method: 'get',
+            data: {}
+        })
+    }
 }
 
 export default threatDetectionRequests

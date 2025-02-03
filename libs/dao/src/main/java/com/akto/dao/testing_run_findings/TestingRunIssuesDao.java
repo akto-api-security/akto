@@ -19,6 +19,7 @@ import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.test_run_findings.TestingIssuesId;
+import com.akto.util.Constants;
 import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.MongoDBEnums;
 import com.mongodb.BasicDBObject;
@@ -60,13 +61,24 @@ public class TestingRunIssuesDao extends AccountsContextDaoWithRbac<TestingRunIs
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
         fieldNames = new String[] {TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_ID};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
+
+        fieldNames =  new String[] {Constants.ID, TestingRunIssues.TEST_RUN_ISSUES_STATUS};
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
     
     }
 
     public Map<Integer,Map<String,Integer>> getSeveritiesMapForCollections(){
+        return getSeveritiesMapForCollections(null, true);
+    }
+
+    public Map<Integer,Map<String,Integer>> getSeveritiesMapForCollections(Bson filter, boolean expandApiGroups){
         Map<Integer,Map<String,Integer>> resultMap = new HashMap<>() ;
         List<Bson> pipeline = new ArrayList<>();
         pipeline.add(Aggregates.match(Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS, "OPEN")));
+
+        if(filter!=null){
+            pipeline.add(Aggregates.match(filter));
+        }
 
         try {
             List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
@@ -76,12 +88,16 @@ public class TestingRunIssuesDao extends AccountsContextDaoWithRbac<TestingRunIs
         } catch(Exception e){
         }
 
-        UnwindOptions unwindOptions = new UnwindOptions();
-        unwindOptions.preserveNullAndEmptyArrays(false);  
-        pipeline.add(Aggregates.unwind("$collectionIds", unwindOptions));
+        BasicDBObject groupedId = new BasicDBObject("apiCollectionId", "$_id.apiInfoKey.apiCollectionId")
+                .append("severity", "$severity");
 
-        BasicDBObject groupedId = new BasicDBObject("apiCollectionId", "$collectionIds")
-                                                .append("severity", "$severity") ;
+        if (expandApiGroups) {
+            UnwindOptions unwindOptions = new UnwindOptions();
+            unwindOptions.preserveNullAndEmptyArrays(false);
+            pipeline.add(Aggregates.unwind("$collectionIds", unwindOptions));
+            groupedId = new BasicDBObject("apiCollectionId", "$collectionIds")
+                    .append("severity", "$severity");
+        }
 
         pipeline.add(Aggregates.group(groupedId, Accumulators.sum("count", 1)));
 

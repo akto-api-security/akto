@@ -3,6 +3,7 @@ package com.akto.github;
 import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.testing.TestingRunDao;
 import com.akto.dao.testing.TestingRunResultDao;
+import com.akto.dao.testing.VulnerableTestingRunResultDao;
 import com.akto.dto.AccountSettings;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.testing.TestingRun;
@@ -235,25 +236,34 @@ public class GithubUtils {
         Set<String> affectedEndpoints = new HashSet<>();
         Map<String, Integer> testSuperTypeCount = new HashMap<>();
 
+        boolean isNewTestingSummary = VulnerableTestingRunResultDao.instance.isStoredInVulnerableCollection(testingRunResultSummary.getId(), true);
+
         boolean fetchMore = true;
         int skip = 0;
         int limit = 1000;
+        List<TestingRunResult> testingRunResultList;
         while (fetchMore) {
-            List<TestingRunResult> testingRunResultList = TestingRunResultDao.instance.findAll(Filters.and(Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, testingRunResultSummary.getId()),
+            if(isNewTestingSummary){
+                testingRunResultList = VulnerableTestingRunResultDao.instance.findAll(Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, testingRunResultSummary.getId()), skip, limit, null);
+            } else{
+                testingRunResultList = TestingRunResultDao.instance.findAll(Filters.and(Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, testingRunResultSummary.getId()),
                     Filters.eq(TestingRunResult.VULNERABLE, true)), skip, limit, null);
+            }
 
-            if (testingRunResultList.isEmpty() || testingRunResultList.size() < 1000) {
+            if (testingRunResultList == null || testingRunResultList.isEmpty() || testingRunResultList.size() < 1000) {
                 fetchMore = false;
             } else {
                 skip = skip + limit;
             }
-
-            for (TestingRunResult testingRunResult : testingRunResultList) {
-                String superType = testingRunResult.getTestSuperType();
-                testSuperTypeCount.merge(superType, 1, Integer::sum);
-                ApiInfo.ApiInfoKey infoKey = testingRunResult.getApiInfoKey();
-                String url = infoKey.method.name() + " " + infoKey.getUrl();
-                affectedEndpoints.add(url);
+            if(testingRunResultList != null){
+                for (TestingRunResult testingRunResult : testingRunResultList) {
+                    String superType = testingRunResult.getTestSuperType();
+                    testSuperTypeCount.merge(superType, 1, Integer::sum);
+                    ApiInfo.ApiInfoKey infoKey = testingRunResult.getApiInfoKey();
+                    String url = infoKey.method.name() + " " + infoKey.getUrl();
+                    affectedEndpoints.add(url);
+                }
+                testingRunResultList.clear();
             }
         }
 
@@ -294,6 +304,10 @@ public class GithubUtils {
         Map<String, Integer> countIssues =  testingRunResultSummary.getCountIssues();
         for (String severity : countIssues.keySet()) {
             switch (severity) {
+                case "CRITICAL":
+                    messageStringBuilder.replace(messageStringBuilder.indexOf("@@CRITICAL_COUNT@@")
+                            ,messageStringBuilder.indexOf("@@CRITICAL_COUNT@@") + "@@CRITICAL_COUNT@@".length(), String.valueOf(countIssues.get(severity)));
+                    break;
                 case "HIGH":
                     messageStringBuilder.replace(messageStringBuilder.indexOf("@@HIGH_COUNT@@")
                             ,messageStringBuilder.indexOf("@@HIGH_COUNT@@") + "@@HIGH_COUNT@@".length(), String.valueOf(countIssues.get(severity)));

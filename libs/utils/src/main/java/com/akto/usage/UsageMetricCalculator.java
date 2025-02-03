@@ -46,7 +46,12 @@ public class UsageMetricCalculator {
     /*
      * to handle multiple accounts using static maps.
      */
+    /*
+     * RBAC_FEATURE is advanced RBAC, for collection based RBAC and custom roles.
+     * RBAC_BASIC is basic RBAC for inviting with multiple roles.
+     */
     private final static String FEATURE_LABEL_STRING = "RBAC_FEATURE";
+    private final static String BASIC_RBAC_FEATURE = "RBAC_BASIC";
     private static Map<Integer, Integer> lastDeactivatedFetchedMap = new HashMap<>();
     private static final int REFRESH_INTERVAL = 60 * 2; // 2 minutes.
     private static final int REFRESH_INTERVAL_RBAC = 60 * 60; // 1 hour.
@@ -75,7 +80,8 @@ public class UsageMetricCalculator {
 
         HashMap<String, FeatureAccess> featureWiseAllowed = organization.getFeatureWiseAllowed();
         FeatureAccess featureAccess = featureWiseAllowed.getOrDefault(FEATURE_LABEL_STRING, FeatureAccess.noAccess);
-        return featureAccess.getIsGranted();
+        FeatureAccess basicAccess = featureWiseAllowed.getOrDefault(BASIC_RBAC_FEATURE, FeatureAccess.noAccess);
+        return featureAccess.getIsGranted() || basicAccess.getIsGranted();
     }
 
     public static boolean isRbacFeatureAvailable(int accountId){
@@ -148,6 +154,9 @@ public class UsageMetricCalculator {
             add(Filters.gt(TestingRunResult.END_TIMESTAMP, measureEpoch));
             add(demoAndDeactivatedCollFilter);
         }};
+
+        // TODO: When we shift vulnerable test results into new collection completely {without making copy}, fix count here then.
+
         int testRuns = (int) TestingRunResultDao.instance.count(Filters.and(filters));
 
         /*
