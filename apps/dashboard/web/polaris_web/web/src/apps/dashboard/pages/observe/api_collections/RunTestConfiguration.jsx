@@ -3,7 +3,7 @@ import { VerticalStack, HorizontalGrid, Checkbox, TextField, Text } from '@shopi
 import Dropdown from "../../../components/layouts/Dropdown";
 import func from "@/util/func"
 
-const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes, testRunTimeOptions, testRolesArr, maxConcurrentRequestsOptions, slackIntegrated, generateLabelForSlackIntegration,getLabel, timeFieldsDisabled }) => {
+const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes, testRunTimeOptions, testRolesArr, maxConcurrentRequestsOptions, slackIntegrated, generateLabelForSlackIntegration,getLabel, timeFieldsDisabled, teamsTestingWebhookIntegrated, generateLabelForTeamsIntegration}) => {
     return (
         <VerticalStack gap={"4"}>
             <HorizontalGrid gap={"4"} columns={"3"}>
@@ -109,6 +109,12 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
                 checked={testRun.sendSlackAlert}
                 onChange={() => setTestRun(prev => ({ ...prev, sendSlackAlert: !prev.sendSlackAlert }))}
                 disabled={!slackIntegrated}
+            />
+            <Checkbox
+                label={teamsTestingWebhookIntegrated ? "Send MS Teams alert post test completion" : generateLabelForTeamsIntegration()}
+                checked={testRun.sendMsTeamsAlert}
+                onChange={() => setTestRun(prev => ({ ...prev, sendMsTeamsAlert: !prev.sendMsTeamsAlert }))}
+                disabled={!teamsTestingWebhookIntegrated}
             />
             <HorizontalGrid columns={2}>
                 <Checkbox

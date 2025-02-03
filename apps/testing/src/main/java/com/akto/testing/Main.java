@@ -27,11 +27,13 @@ import com.akto.github.GithubUtils;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.mixpanel.AktoMixpanel;
+import com.akto.notifications.data.TestingAlertData;
 import com.akto.notifications.slack.APITestStatusAlert;
 import com.akto.notifications.slack.CustomTextAlert;
 import com.akto.notifications.slack.NewIssuesModel;
 import com.akto.notifications.slack.SlackAlerts;
 import com.akto.notifications.slack.SlackSender;
+import com.akto.notifications.teams.TeamsSender;
 import com.akto.rules.RequiredConfigs;
 import com.akto.task.Cluster;
 import com.akto.test_editor.execution.Executor;
@@ -729,7 +731,7 @@ public class Main {
         tr.setTestingEndpoints(newEps);
     }
 
-    private static void raiseMixpanelEvent(ObjectId summaryId, TestingRun testingRun, int accountId) {
+    public static void raiseMixpanelEvent(ObjectId summaryId, TestingRun testingRun, int accountId) {
         TestingRunResultSummary testingRunResultSummary = TestingRunResultSummariesDao.instance.findOne
                 (
                         Filters.eq(TestingRunResultSummary.ID, summaryId)
@@ -854,7 +856,7 @@ public class Main {
         long startTimestamp = testingRunResultSummary.getStartTimestamp();
         long scanTimeInSeconds = Math.abs(currentTime - startTimestamp);
 
-        SlackAlerts apiTestStatusAlert = new APITestStatusAlert(
+        TestingAlertData alertData = new TestingAlertData(
                 testingRun.getName(),
                 severityCount.getOrDefault(GlobalEnums.Severity.CRITICAL.name(), 0),
                 severityCount.getOrDefault(GlobalEnums.Severity.HIGH.name(), 0),
@@ -871,8 +873,15 @@ public class Main {
                 testingRun.getHexId(),
                 summaryId.toHexString()
         );
+
+        SlackAlerts apiTestStatusAlert = new APITestStatusAlert(alertData);
+
         if (testingRun.getSendSlackAlert()) {
             SlackSender.sendAlert(accountId, apiTestStatusAlert);
+        }
+
+        if(testingRun.getSendMsTeamsAlert() ){
+            TeamsSender.sendAlert(accountId, alertData);
         }
 
         AktoMixpanel aktoMixpanel = new AktoMixpanel();

@@ -2,6 +2,7 @@ package com.akto.notifications.slack;
 
 import com.akto.dao.notifications.SlackWebhooksDao;
 import com.akto.dto.notifications.SlackWebhook;
+import com.akto.notifications.data.TestingAlertData;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 
@@ -21,6 +22,7 @@ public class APITestStatusAlert extends SlackAlerts {
      * This constructor initializes a new daily test status alert with detailed api testing metrics.
      *
      * @param title The name of the API collection.
+     * @param critical The total number of critical severity issues.
      * @param high The total number of high severity issues.
      * @param medium The total number of medium severity issues.
      * @param low The total number of low severity issues.
@@ -35,9 +37,12 @@ public class APITestStatusAlert extends SlackAlerts {
      * @param viewOnAktoURL The URL to view all the issues on the Akto dashboard.
      * @param exportReportUrl The URL to export the issue report.
      */
-    public APITestStatusAlert(String title, int critical, int high, int medium, int low, int vulnerableApis, int newIssues, int totalApis, String collection, long scanTimeInSeconds, String testType, long nextTestRun, List<NewIssuesModel> newIssuesList, String viewOnAktoURL, String exportReportUrl) {
+    public APITestStatusAlert(TestingAlertData data) {
         super(API_TEST_STATUS_ALERT);
-        init(title, critical, high, medium, low, vulnerableApis, newIssues, totalApis, collection, scanTimeInSeconds, testType, nextTestRun, newIssuesList, viewOnAktoURL, exportReportUrl);
+        init(data.getTitle(), data.getCritical(), data.getHigh(), data.getMedium(), data.getLow(),
+             data.getVulnerableApis(), data.getNewIssues(), data.getTotalApis(), data.getCollection(),
+             data.getScanTimeInSeconds(), data.getTestType(), data.getNextTestRun(),
+             data.getNewIssuesList(), data.getViewOnAktoURL(), data.getExportReportUrl());
     }
 
     private HorizontalFieldModel horizontalFieldModel;

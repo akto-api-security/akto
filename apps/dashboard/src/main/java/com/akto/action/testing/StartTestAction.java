@@ -108,6 +108,7 @@ public class StartTestAction extends UserAction {
 
     private CallSource source;
     private boolean sendSlackAlert = false;
+    private boolean sendMsTeamsAlert = false;
 
     private TestingRun createTestingRun(int scheduleTimestamp, int periodInSeconds) {
         User user = getSUser();
@@ -165,7 +166,7 @@ public class StartTestAction extends UserAction {
 
         return new TestingRun(scheduleTimestamp, user.getLogin(),
                 testingEndpoints, testIdConfig, State.SCHEDULED, periodInSeconds, testName, this.testRunTime,
-                this.maxConcurrentRequests, this.sendSlackAlert);
+                this.maxConcurrentRequests, this.sendSlackAlert, this.sendMsTeamsAlert);
     }
 
     private List<String> selectedTests;
@@ -1200,6 +1201,12 @@ public class StartTestAction extends UserAction {
                                 Updates.set(TestingRun.SEND_SLACK_ALERT, editableTestingRunConfig.getSendSlackAlert()));
                     }
 
+                    if (existingTestingRun.getSendMsTeamsAlert() != editableTestingRunConfig.getSendMsTeamsAlert()) {
+                        updates.add(
+                                Updates.set(TestingRun.SEND_MS_TEAMS_ALERT,
+                                        editableTestingRunConfig.getSendMsTeamsAlert()));
+                    }
+
                     int periodInSeconds = 0;
                     if (editableTestingRunConfig.getContinuousTesting()) {
                         periodInSeconds = -1;
@@ -1685,5 +1692,13 @@ public class StartTestAction extends UserAction {
 
     public void setCleanUpTestingResources(boolean cleanUpTestingResources) {
         this.cleanUpTestingResources = cleanUpTestingResources;
+    }
+
+    public boolean getSendMsTeamsAlert() {
+        return sendMsTeamsAlert;
+    }
+
+    public void setSendMsTeamsAlert(boolean sendMsTeamsAlert) {
+        this.sendMsTeamsAlert = sendMsTeamsAlert;
     }
 }

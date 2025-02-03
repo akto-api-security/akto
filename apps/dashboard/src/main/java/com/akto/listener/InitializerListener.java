@@ -74,6 +74,7 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.mixpanel.AktoMixpanel;
 import com.akto.notifications.slack.DailyUpdate;
 import com.akto.notifications.slack.TestSummaryGenerator;
+import com.akto.notifications.webhook.WebhookSender;
 import com.akto.parsers.HttpCallParser;
 import com.akto.runtime.RuntimeUtil;
 import com.akto.stigg.StiggReporterClient;
@@ -936,6 +937,18 @@ public class InitializerListener implements ServletContextListener {
             return;
         }
 
+        /*
+         * TESTING_RUN_RESULTS type webhooks are 
+         * triggered only on test complete not periodically.
+         */
+
+        if (webhook.getSelectedWebhookOptions() != null &&
+                !webhook.getSelectedWebhookOptions().isEmpty()
+                && webhook.getSelectedWebhookOptions()
+                        .contains(CustomWebhook.WebhookOptions.TESTING_RUN_RESULTS)) {
+            return;
+        }
+
         ChangesInfo ci = getChangesInfo(now - webhook.getLastSentTimestamp(), now - webhook.getLastSentTimestamp(), webhook.getNewEndpointCollections(), webhook.getNewSensitiveEndpointCollections(), true);
 
         boolean sendApiThreats = false;
@@ -1182,29 +1195,7 @@ public class InitializerListener implements ServletContextListener {
             errors.add("Failed to replace variables");
         }
 
-        webhook.setLastSentTimestamp(now);
-        CustomWebhooksDao.instance.updateOne(Filters.eq("_id", webhook.getId()), Updates.set("lastSentTimestamp", now));
-
-        Map<String, List<String>> headers = OriginalHttpRequest.buildHeadersMap(webhook.getHeaderString());
-        OriginalHttpRequest request = new OriginalHttpRequest(webhook.getUrl(), webhook.getQueryParams(), webhook.getMethod().toString(), payload, headers, "");
-        OriginalHttpResponse response = null; // null response means api request failed. Do not use new OriginalHttpResponse() in such cases else the string parsing fails.
-
-        try {
-            response = ApiExecutor.sendRequest(request, true, null, false, new ArrayList<>());
-            loggerMaker.infoAndAddToDb("webhook request sent", LogDb.DASHBOARD);
-        } catch (Exception e) {
-            errors.add("API execution failed");
-        }
-
-        String message = null;
-        try {
-            message = convertOriginalReqRespToString(request, response);
-        } catch (Exception e) {
-            errors.add("Failed converting sample data");
-        }
-
-        CustomWebhookResult webhookResult = new CustomWebhookResult(webhook.getId(), webhook.getUserEmail(), now, message, errors);
-        CustomWebhooksResultDao.instance.insertOne(webhookResult);
+        WebhookSender.sendCustomWebhook(webhook, payload, errors, now, LogDb.DASHBOARD);
     }
 
     private static void createBodyForWebhook(CustomWebhook webhook) {
