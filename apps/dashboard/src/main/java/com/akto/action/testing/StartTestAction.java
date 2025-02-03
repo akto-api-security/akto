@@ -1137,7 +1137,7 @@ public class StartTestAction extends UserAction {
             return Action.ERROR.toUpperCase();
         }
         try {
-            if (this.testingRunConfigId == 0) {
+            if (this.testingRunConfigId < 0) {
                 addActionError("Invalid testing run config id");
                 return Action.ERROR.toUpperCase();
             } else {
@@ -1163,7 +1163,7 @@ public class StartTestAction extends UserAction {
                     updates.add(Updates.set(TestingRunConfig.TEST_ROLE_ID, editableTestingRunConfig.getTestRoleId()));
                 }
                 
-                if (editableTestingRunConfig.getOverriddenTestAppUrl() != null && !editableTestingRunConfig.getOverriddenTestAppUrl().equals(existingTestingRunConfig.getOverriddenTestAppUrl())) {
+                if (editableTestingRunConfig.getOverriddenTestAppUrl() != null && !editableTestingRunConfig.getOverriddenTestAppUrl().equals(existingTestingRunConfig.getOverriddenTestAppUrl()) && Utils.isValidURL(editableTestingRunConfig.getOverriddenTestAppUrl())) {
                     updates.add(Updates.set(TestingRunConfig.OVERRIDDEN_TEST_APP_URL, editableTestingRunConfig.getOverriddenTestAppUrl()));
                 }
                 

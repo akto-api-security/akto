@@ -622,10 +622,24 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         setTestMode(check);
     }
 
+    function isValidUrl(url) {
+        try {
+            new URL(url);
+            return true;
+        } catch (e) {
+            const pattern = /\$\{[^}]*\}/;
+            return pattern.test(url);
+        }
+    }
+
     // only for configurations 
     const handleModifyConfig = async () => {
         const settings = transform.prepareConditionsForTesting(conditions)
         const editableConfigObject = transform.prepareEditableConfigObject(testRun, settings, testIdConfig.hexId)
+        if (testRun.hasOverriddenTestAppUrl && !isValidUrl(testRun.overriddenTestAppUrl)) {
+            func.setToast(true, true, "The override url is invalid. Please check the url again.")
+            return ;
+        }
         await testingApi.modifyTestingRunConfig(testIdConfig?.testingRunConfig?.id, editableConfigObject).then(() => {
             func.setToast(true, false, "Modified testing run config successfully")
             setShowEditableSettings(false)
