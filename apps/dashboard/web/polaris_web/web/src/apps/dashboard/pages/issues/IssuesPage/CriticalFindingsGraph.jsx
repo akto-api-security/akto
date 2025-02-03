@@ -34,7 +34,7 @@ const CriticalFindingsGraph = ({ linkText, linkUrl, complianceMode }) => {
             Object.entries(subcategoryDataResp).forEach(([testId, count]) => {
                 let clauses = subCategoryMap[testId]?.compliance.mapComplianceToListClauses[complianceMode]
                 clauses.forEach(clause => {
-                    tempResultSubCategoryMap[clause] = tempResultSubCategoryMap[clause] || {text: 0, color: 'red', key: clause}
+                    tempResultSubCategoryMap[clause] = tempResultSubCategoryMap[clause] || {text: 0, key: clause}
                     tempResultSubCategoryMap[clause].text += count
                 });
             })
@@ -47,7 +47,7 @@ const CriticalFindingsGraph = ({ linkText, linkUrl, complianceMode }) => {
 
     useEffect(() => {
         fetchGraphData()
-    }, [])
+    }, [complianceMode])
     
     const defaultChartOptions = {
         "legend": {
