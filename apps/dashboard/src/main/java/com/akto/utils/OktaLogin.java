@@ -24,7 +24,9 @@ public class OktaLogin {
         }
 
         if (shouldProbeAgain) {
-            OktaConfig oktaConfig = (Config.OktaConfig) ConfigsDao.instance.findOne(Constants.ID, OktaConfig.getOktaId(1000000));
+            int accountId = Context.accountId.get() != null ? Context.accountId.get() : 1_000_000;
+            OktaConfig oktaConfig = (Config.OktaConfig) ConfigsDao.instance.findOne(Constants.ID, OktaConfig.getOktaId(accountId));
+            if(oktaConfig == null) return null;
             if (instance == null) {
                 instance = new OktaLogin();
             }

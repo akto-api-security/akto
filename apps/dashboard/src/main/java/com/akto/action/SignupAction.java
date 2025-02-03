@@ -526,8 +526,12 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                     servletResponse.sendRedirect("/login");
                     return ERROR.toUpperCase();
                 }
-
-                setAccountId(1000000);
+                try {
+                    setAccountId(Integer.parseInt(state));
+                } catch (NumberFormatException e) {
+                    servletResponse.sendRedirect("/login");
+                    return ERROR.toUpperCase();
+                }
                 oktaConfig = OktaLogin.getInstance().getOktaConfig();
             } else {
                 setAccountId(Integer.parseInt(state));
@@ -598,8 +602,8 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
         SAMLConfig samlConfig = null;
         if(userEmail != null && !userEmail.isEmpty()) {
             samlConfig = SSOConfigsDao.instance.getSSOConfig(userEmail);
-        } else if(!DashboardMode.isOnPremDeployment()) {
-            samlConfig = Config.AzureConfig.getSSOConfigByAccountId(1000000, ConfigType.AZURE);
+        } else if(DashboardMode.isOnPremDeployment()) {
+            samlConfig = SAMLConfig.getSAMLConfigByAccountId(1000000, ConfigType.AZURE);
         }
         if(samlConfig == null) {
             code = "Error, cannot login via SSO, trying to login with okta sso";
