@@ -494,11 +494,12 @@ public class StartTestAction extends UserAction {
         );
 
         this.testingRunType = TestingRunType.ONE_TIME;
-        if(cicdCount > 0){
+        if (cicdCount > 0) {
             this.testingRunType = TestingRunType.CI_CD;
-        }
-        else if(this.testingRun.getPeriodInSeconds() > 0){
+        } else if (this.testingRun.getPeriodInSeconds() > 0) {
             this.testingRunType = TestingRunType.RECURRING;
+        } else if (this.testingRun.getPeriodInSeconds() == -1) {
+            this.testingRunType = TestingRunType.CONTINUOUS_TESTING;
         }
 
         if (this.testingRun != null && this.testingRun.getTestIdConfig() == 1) {
@@ -1182,12 +1183,32 @@ public class StartTestAction extends UserAction {
                 if (existingTestingRun != null) {
                     List<Bson> updates = new ArrayList<>();
 
-                    if (editableTestingRunConfig.getTestRunTime() != 0 && editableTestingRunConfig.getTestRunTime() != existingTestingRun.getTestRunTime()) {
+                    if (editableTestingRunConfig.getTestRunTime() > 0
+                            && editableTestingRunConfig.getTestRunTime() <= 6 * 60 * 60
+                            && editableTestingRunConfig.getTestRunTime() != existingTestingRun.getTestRunTime()) {
                         updates.add(Updates.set(TestingRun.TEST_RUNTIME, editableTestingRunConfig.getTestRunTime()));
                     }
-                
-                    if (editableTestingRunConfig.getMaxConcurrentRequests() != 0 && editableTestingRunConfig.getMaxConcurrentRequests() != existingTestingRun.getMaxConcurrentRequests()) {
-                        updates.add(Updates.set(TestingRun.MAX_CONCURRENT_REQUEST, editableTestingRunConfig.getMaxConcurrentRequests()));
+
+                    if (editableTestingRunConfig.getMaxConcurrentRequests() > 0
+                            && editableTestingRunConfig.getMaxConcurrentRequests() <= 100 && editableTestingRunConfig
+                                    .getMaxConcurrentRequests() != existingTestingRun.getMaxConcurrentRequests()) {
+                        updates.add(Updates.set(TestingRun.MAX_CONCURRENT_REQUEST,
+                                editableTestingRunConfig.getMaxConcurrentRequests()));
+                    }
+
+                    if (existingTestingRun.getSendSlackAlert() != editableTestingRunConfig.getSendSlackAlert()) {
+                        updates.add(
+                                Updates.set(TestingRun.SEND_SLACK_ALERT, editableTestingRunConfig.getSendSlackAlert()));
+                    }
+
+                    int periodInSeconds = 0;
+                    if (editableTestingRunConfig.getContinuousTesting()) {
+                        periodInSeconds = -1;
+                    } else if (editableTestingRunConfig.getRecurringDaily()) {
+                        periodInSeconds = 86400;
+                    }
+                    if (existingTestingRun.getPeriodInSeconds() != periodInSeconds) {
+                        updates.add(Updates.set(TestingRun.PERIOD_IN_SECONDS, periodInSeconds));
                     }
                 
                     if (!updates.isEmpty()) {

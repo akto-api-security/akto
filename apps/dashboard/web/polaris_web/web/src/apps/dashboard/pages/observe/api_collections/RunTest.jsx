@@ -203,32 +203,6 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                 }));
             });
 
-            // Efficient deep equality check 
-            function areObjectArraysEqual(obj1, obj2) {
-                const keys1 = Object.keys(obj1);
-                const keys2 = Object.keys(obj2);
-
-                if (keys1.length !== keys2.length) return false;
-
-                const setKeys1 = new Set(keys1);
-                const setKeys2 = new Set(keys2);
-                if (setKeys1.size !== setKeys2.size || [...setKeys1].some(key => !setKeys2.has(key))) {
-                    return false;
-                }
-
-                for (let key of keys1) {
-                    const arr1 = obj1[key].map(obj => JSON.stringify(obj)).sort();
-                    const arr2 = obj2[key].map(obj => JSON.stringify(obj)).sort();
-
-                    if (arr1.length !== arr2.length || arr1.some((item, index) => item !== arr2[index])) {
-                        return false;
-                    }
-                }
-
-                return true;
-            }
-
-            if (!areObjectArraysEqual(updatedTests, testRun.tests)) {
                 handleAddSettings(parentAdvanceSettingsConfig);
                 const getRunTypeLabel = (runType) => {
                     if (!runType) return "Now";
@@ -240,15 +214,18 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                     ...testRun,
                     tests: updatedTests,
                     overriddenTestAppUrl: testIdConfig.testingRunConfig.overriddenTestAppUrl,
+                    hasOverriddenTestAppUrl: testIdConfig?.testingRunConfig?.overriddenTestAppUrl?.length > 0,
                     maxConcurrentRequests: testIdConfig.maxConcurrentRequests,
                     testRunTime: testIdConfig.testRunTime,
                     testRoleId: testIdConfig.testingRunConfig.testRoleId,
                     testRunTimeLabel: (testIdConfig.testRunTime === -1) ? "30 minutes" : getLabel(testRunTimeOptions, testIdConfig.testRunTime.toString())?.label,
                     testRoleLabel: getLabel(testRolesArr, testIdConfig.testingRunConfig.testRoleId).label,
                     runTypeLabel: getRunTypeLabel(testRunType),
-                    testName: testIdConfig.name
+                    testName: testIdConfig.name,
+                    sendSlackAlert: testIdConfig?.sendSlackAlert,
+                    recurringDaily: testIdConfig?.periodInSeconds === 86400,
+                    continuousTesting: testIdConfig?.periodInSeconds === -1
                 }));
-            }
         }
         setShouldRuntestConfig(false);
     }, [shouldRuntestConfig])
@@ -687,7 +664,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
             <Modal.Section>
                 <>
                     <RunTestConfiguration
-                        showEditableSettings={setActiveFromTesting}
+                        timeFieldsDisabled={showEditableSettings || activeFromTesting}
                         testRun={testRun}
                         setTestRun={setTestRun}
                         runTypeOptions={runTypeOptions}
@@ -861,7 +838,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                                     </div>
                                 </div>
                                 <RunTestConfiguration
-                                    showEditableSettings={setActiveFromTesting}
+                                    timeFieldsDisabled={showEditableSettings || activeFromTesting}
                                     testRun={testRun}
                                     setTestRun={setTestRun}
                                     runTypeOptions={runTypeOptions}
@@ -891,7 +868,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                                 checkRemoveAll={checkRemoveAll} handleModifyConfig={handleModifyConfig} /> :
                                 <>
                                     <RunTestConfiguration
-                                        showEditableSettings={setActiveFromTesting}
+                                        timeFieldsDisabled={showEditableSettings || activeFromTesting}
                                         testRun={testRun}
                                         setTestRun={setTestRun}
                                         runTypeOptions={runTypeOptions}
