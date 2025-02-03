@@ -61,7 +61,6 @@ jobs:
           echo $IMAGE_TAG >> $GITHUB_STEP_SUMMARY
           docker buildx create --use
           # Build a docker container and push it to DockerHub 
-          cd ../source-code-analyser
           cd apps/source-code-analyser
           docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/source-code-analyser:$IMAGE_TAG . --push
       - name: Set up JDK 11
