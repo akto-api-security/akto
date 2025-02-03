@@ -3,7 +3,7 @@ import { VerticalStack, HorizontalGrid, Checkbox, TextField, Text } from '@shopi
 import Dropdown from "../../../components/layouts/Dropdown";
 import func from "@/util/func"
 
-const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes, testRunTimeOptions, testRolesArr, maxConcurrentRequestsOptions, slackIntegrated, generateLabelForSlackIntegration,getLabel,showEditableSettings }) => {
+const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes, testRunTimeOptions, testRolesArr, maxConcurrentRequestsOptions, slackIntegrated, generateLabelForSlackIntegration,getLabel, timeFieldsDisabled }) => {
     return (
         <VerticalStack gap={"4"}>
             <HorizontalGrid gap={"4"} columns={"3"}>
@@ -26,10 +26,10 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
                             continuousTesting,
                             runTypeLabel: runType.label
                         }));
-                    }} disabled={showEditableSettings} />
+                    }} />
                 <Dropdown
                     label="Select Time:"
-                    disabled={testRun.continuousTesting === true || showEditableSettings}
+                    disabled={testRun.continuousTesting === true || timeFieldsDisabled}
                     menuItems={hourlyTimes}
                     initial={testRun.hourlyLabel}
                     selected={(hour) => {
@@ -114,7 +114,9 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
                 <Checkbox
                     label="Use different target for testing"
                     checked={testRun.hasOverriddenTestAppUrl}
-                    onChange={() => setTestRun(prev => ({ ...prev, hasOverriddenTestAppUrl: !prev.hasOverriddenTestAppUrl }))}
+                    onChange={() => {
+                        setTestRun(prev => ({ ...prev, hasOverriddenTestAppUrl: !prev.hasOverriddenTestAppUrl, overriddenTestAppUrl: "" }))
+                    }}
                 />
                 {testRun.hasOverriddenTestAppUrl &&
                     <div style={{ width: '400px' }}>
