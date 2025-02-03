@@ -223,6 +223,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                     runTypeLabel: getRunTypeLabel(testRunType),
                     testName: testIdConfig.name,
                     sendSlackAlert: testIdConfig?.sendSlackAlert,
+                    sendMsTeamsAlert: testIdConfig?.sendMsTeamsAlert,
                     recurringDaily: testIdConfig?.periodInSeconds === 86400,
                     continuousTesting: testIdConfig?.periodInSeconds === -1
                 }));

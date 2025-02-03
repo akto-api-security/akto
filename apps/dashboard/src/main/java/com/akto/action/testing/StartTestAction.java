@@ -1201,6 +1201,12 @@ public class StartTestAction extends UserAction {
                                 Updates.set(TestingRun.SEND_SLACK_ALERT, editableTestingRunConfig.getSendSlackAlert()));
                     }
 
+                    if (existingTestingRun.getSendMsTeamsAlert() != editableTestingRunConfig.getSendMsTeamsAlert()) {
+                        updates.add(
+                                Updates.set(TestingRun.SEND_MS_TEAMS_ALERT,
+                                        editableTestingRunConfig.getSendMsTeamsAlert()));
+                    }
+
                     int periodInSeconds = 0;
                     if (editableTestingRunConfig.getContinuousTesting()) {
                         periodInSeconds = -1;

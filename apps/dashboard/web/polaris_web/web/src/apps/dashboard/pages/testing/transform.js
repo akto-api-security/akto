@@ -1138,6 +1138,7 @@ getMissingConfigs(testResults){
       testingRunHexId: hexId,
       testRunTime: testRun.testRunTime,
       sendSlackAlert: testRun.sendSlackAlert,
+      sendMsTeamsAlert:testRun.sendMsTeamsAlert,
       recurringDaily: testRun.recurringDaily,
       continuousTesting: testRun.continuousTesting,
     }

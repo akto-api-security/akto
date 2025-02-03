@@ -8,6 +8,7 @@ public class EditableTestingRunConfig extends TestingRunConfig {
     private boolean sendSlackAlert;
     private boolean recurringDaily;
     private boolean continuousTesting;
+    private boolean sendMsTeamsAlert;
 
     public EditableTestingRunConfig() {
 
@@ -59,6 +60,14 @@ public class EditableTestingRunConfig extends TestingRunConfig {
 
     public void setContinuousTesting(boolean continuousTesting) {
         this.continuousTesting = continuousTesting;
+    }
+
+    public boolean getSendMsTeamsAlert() {
+        return sendMsTeamsAlert;
+    }
+
+    public void setSendMsTeamsAlert(boolean sendMsTeamsAlert) {
+        this.sendMsTeamsAlert = sendMsTeamsAlert;
     }
 }
 
