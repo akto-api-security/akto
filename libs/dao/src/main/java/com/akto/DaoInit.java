@@ -273,6 +273,7 @@ public class DaoInit {
         ClassModel<TestConfigsAdvancedSettings> configSettingClassModel = ClassModel.builder(TestConfigsAdvancedSettings.class).enableDiscriminator(true).build();
         ClassModel<ConditionsType> configSettingsConditionTypeClassModel = ClassModel.builder(ConditionsType.class).enableDiscriminator(true).build();
         ClassModel<CustomRole> roleClassModel = ClassModel.builder(CustomRole.class).enableDiscriminator(true).build();
+        ClassModel<TestingInstanceHeartBeat> testingInstanceHeartBeat = ClassModel.builder(TestingInstanceHeartBeat.class).enableDiscriminator(true).build();
 
         CodecRegistry pojoCodecRegistry = fromProviders(PojoCodecProvider.builder().register(
                 configClassModel, signupInfoClassModel, apiAuthClassModel, attempResultModel, urlTemplateModel,
@@ -303,7 +304,9 @@ public class DaoInit {
                         nodeClassModel, connectionClassModel, edgeClassModel, replaceDetailClassModel, modifyHostDetailClassModel, fileUploadClassModel
                 ,fileUploadLogClassModel, codeAnalysisCollectionClassModel, codeAnalysisApiLocationClassModel, codeAnalysisApiInfoClassModel, codeAnalysisApiInfoKeyClassModel,
                 riskScoreTestingEndpointsClassModel, OrganizationFlagsClassModel, sensitiveDataEndpointsClassModel, unauthenticatedEndpointsClassModel, allApisGroupClassModel,
-                eventsExampleClassModel, remediationClassModel, RuntimeMetricsClassModel, codeAnalysisRepoModel, codeAnalysisApiModel, historicalDataClassModel, configSettingClassModel, configSettingsConditionTypeClassModel, roleClassModel).automatic(true).build());
+                eventsExampleClassModel, remediationClassModel, RuntimeMetricsClassModel, codeAnalysisRepoModel, 
+                codeAnalysisApiModel, historicalDataClassModel, configSettingClassModel, 
+                configSettingsConditionTypeClassModel, roleClassModel, testingInstanceHeartBeat).automatic(true).build());
 
         final CodecRegistry customEnumCodecs = CodecRegistries.fromCodecs(
                 new EnumCodec<>(Conditions.Operator.class),
@@ -414,6 +417,7 @@ public class DaoInit {
         ApiAuditLogsDao.instance.createIndicesIfAbsent();
         VulnerableTestingRunResultDao.instance.createIndicesIfAbsent();
         CustomRoleDao.instance.createIndicesIfAbsent();
+        TestingInstanceHeartBeatDao.instance.createIndexIfAbsent();
     }
 
 }
