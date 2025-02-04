@@ -9,6 +9,7 @@ import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.FindOneAndUpdateOptions;
 import com.mongodb.client.model.ReturnDocument;
 import com.mongodb.client.model.Sorts;
+import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
 
 import java.util.*;
@@ -50,9 +51,11 @@ public class UsersDao extends CommonContextDao<User> {
         return tempUser;
     }
 
-    public static void addNewAccount(String login, Account account){
-        BasicDBObject setQ = new BasicDBObject(User.ACCOUNTS + "." + account.getId(),new UserAccountEntry(account.getId(), account.getName()));
-        UsersDao.instance.getMCollection().updateOne(eq(User.LOGIN, login), new BasicDBObject(SET, setQ));
+    public static void addNewAccount(String login, Account account) {
+        BasicDBObject setQ = new BasicDBObject(User.ACCOUNTS + "." + account.getId(),
+                new UserAccountEntry(account.getId(), account.getName()));
+        UsersDao.instance.getMCollection().updateOne(eq(User.LOGIN, login), new BasicDBObject(SET, setQ),
+                new UpdateOptions().upsert(false));
     }
 
     public User insertSignUp(String email, String name, SignupInfo info, int accountId) {
