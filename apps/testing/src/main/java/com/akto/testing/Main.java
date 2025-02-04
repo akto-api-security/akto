@@ -76,6 +76,7 @@ public class Main {
 
     private static final Logger logger = LoggerFactory.getLogger(Main.class);
 
+    private static final String testingInstanceId = UUID.randomUUID().toString();
 
     public static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
     public static final ScheduledExecutorService deleteScheduler = Executors.newScheduledThreadPool(1);
@@ -134,6 +135,22 @@ public class Main {
                 }, "rate-limit-scheduler");
             }
         }, 0, 1, TimeUnit.MINUTES);
+    }
+
+    private static void triggerHeartbeatCron() {
+        scheduler.scheduleAtFixedRate(new Runnable() {
+            public void run() {
+                UpdateOptions updateOptions = new UpdateOptions();
+                updateOptions.upsert(true);
+                Bson updates = Updates.combine(
+                    Updates.setOnInsert("instanceId", testingInstanceId),
+                    Updates.set("ts", Context.now())
+                );
+                TestingInstanceHeartBeatDao.instance.getMCollection().
+                updateOne(Filters.eq("instanceId", testingInstanceId), updates, updateOptions);
+
+            }
+        }, 0, 10, TimeUnit.SECONDS);
     }
 
     public static Set<Integer> extractApiCollectionIds(List<ApiInfo.ApiInfoKey> apiInfoKeyList) {
@@ -334,6 +351,8 @@ public class Main {
         } while (!connectedToMongo);
 
         setupRateLimitWatcher();
+
+        triggerHeartbeatCron();
         
         executorService.scheduleAtFixedRate(new Main.MemoryMonitorTask(), 0, 1, TimeUnit.SECONDS);
 
@@ -439,6 +458,9 @@ public class Main {
                 AccountSettings accountSettings = AccountSettingsDao.instance.findOne(
                     Filters.eq(Constants.ID, accountId), Projections.include(AccountSettings.DELTA_IGNORE_TIME_FOR_SCHEDULED_SUMMARIES)
                 );
+
+                TestingInstanceHeartBeatDao.instance.setTestingRunId(testingInstanceId, "");
+
                 int start = Context.now();
                 int defaultTime = DEFAULT_DELTA_IGNORE_TIME;
                 if(accountSettings != null){
@@ -459,6 +481,12 @@ public class Main {
                 if (testingRun == null) {
                     return;
                 }
+
+                if (!TestingInstanceHeartBeatDao.instance.isTestEligibleForInstance(testingRun.getHexId())) {
+                    return;
+                }
+
+                TestingInstanceHeartBeatDao.instance.setTestingRunId(testingInstanceId, testingRun.getHexId());
 
                 if (testingRun.getState().equals(State.STOPPED)) {
                     loggerMaker.infoAndAddToDb("Testing run stopped");
