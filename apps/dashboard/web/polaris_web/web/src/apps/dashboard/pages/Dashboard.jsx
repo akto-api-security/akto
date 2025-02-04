@@ -173,6 +173,11 @@ function Dashboard() {
     },[])
 
     const shouldShowWelcomeBackModal = window.IS_SAAS === "true" && window?.USER_NAME?.length > 0 && (window?.USER_FULL_NAME?.length === 0 || (window?.USER_ROLE === 'ADMIN' && window?.ORGANIZATION_NAME?.length === 0))
+    const ignoredPaths = [
+        "test-editor", "settings", "onboarding", "summary", "internal"
+    ]
+
+    const shouldHideBanner = ignoredPaths.filter((x) => location.pathname.includes(x)).length > 0
 
     return (
         <div className="dashboard">
@@ -196,7 +201,7 @@ function Dashboard() {
                         })}
                     </VerticalStack>
             </div> : null}
-            {func.checkLocal() && !(location.pathname.includes("test-editor") || location.pathname.includes("settings") || location.pathname.includes("onboarding") || location.pathname.includes("summary")) ?<div className="call-banner">
+            {func.checkLocal() && !shouldHideBanner ?<div className="call-banner">
                 <Banner hideIcon={true}>
                     <Text variant="headingMd">Need a 1:1 experience?</Text>
                     <Button plain monochrome onClick={() => {
@@ -204,7 +209,7 @@ function Dashboard() {
                     }}><Text variant="bodyMd">Book a call</Text></Button>
                 </Banner>
             </div> : null}
-            {window.TRIAL_MSG && !(location.pathname.includes("test-editor") || location.pathname.includes("settings") || location.pathname.includes("onboarding") || location.pathname.includes("summary")) ?<div className="call-banner">
+            {window.TRIAL_MSG && !shouldHideBanner ?<div className="call-banner">
                 <Banner hideIcon={true}>
                     <Text variant="bodyMd">{window.TRIAL_MSG}</Text>
                 </Banner>

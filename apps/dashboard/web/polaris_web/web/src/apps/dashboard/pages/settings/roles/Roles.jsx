@@ -1,6 +1,5 @@
-import { ActionList, Avatar, Banner, Box, Button, HorizontalStack, Icon, LegacyCard, Link, Page, Popover, ResourceItem, ResourceList, Text, Modal, TextField, VerticalStack, Checkbox } from "@shopify/polaris"
-import { DeleteMajor, TickMinor, PasskeyMajor } from "@shopify/polaris-icons"
-import { useEffect, useState, useRef } from "react";
+import { Box, HorizontalStack, LegacyCard, Page, ResourceItem, ResourceList, Text, Modal, TextField, VerticalStack, Checkbox } from "@shopify/polaris"
+import { useEffect, useState } from "react";
 import func from "@/util/func";
 import settingRequests from "../api";
 import ResourceListModal from "../../../components/shared/ResourceListModal";

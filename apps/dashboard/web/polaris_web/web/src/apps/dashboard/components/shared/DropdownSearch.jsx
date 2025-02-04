@@ -1,4 +1,4 @@
-import { Autocomplete, Avatar, Checkbox, HorizontalStack, Icon, Link, Text, TextContainer } from '@shopify/polaris';
+import { Autocomplete, Avatar,  Icon, Link, Text } from '@shopify/polaris';
 import { SearchMinor, ChevronDownMinor } from '@shopify/polaris-icons';
 import React, { useState, useCallback, useEffect } from 'react';
 import func from "@/util/func";
@@ -199,7 +199,7 @@ function DropdownSearch(props) {
         <React.Fragment>
             <Icon source={SearchMinor} />
             <div style={{ textAlign: 'center' }}>
-                <TextContainer>Could not find any results</TextContainer>
+                <Text>Could not find any results</Text>
             </div>
         </React.Fragment>
     );

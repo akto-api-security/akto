@@ -82,6 +82,7 @@ import AuditLogs from "../dashboard/pages/settings/audit_logs/AuditLogs";
 import ThreatApiPage from "../dashboard/pages/threat_detection/ThreatApiPage";
 import ThreatActorPage from "../dashboard/pages/threat_detection/ThreatActorPage";
 import ThreatPolicyPage from "../dashboard/pages/threat_detection/ThreatPolicyPage";
+import InternalDashboard from "../dashboard/pages/internal/InternalDashboard";
 
 // if you add a component in a new path, please verify the search implementation in function -> 'getSearchItemsArr' in func.js
 
@@ -90,6 +91,10 @@ const router = createBrowserRouter([
         path: "/dashboard",
         element: <Dashboard/>,
         children: [
+            {
+                path: 'internal',
+                element: <InternalDashboard />
+            },
             {
                 path: "",
                 element: <HomePage/>,
