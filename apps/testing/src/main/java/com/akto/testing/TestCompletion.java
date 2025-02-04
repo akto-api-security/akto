@@ -60,6 +60,8 @@ public class TestCompletion {
 
         int accountId = Context.accountId.get();
 
+        Main.raiseMixpanelEvent(summaryId, testingRun, accountId);
+
         Organization organization = OrganizationsDao.instance.findOne(
                         Filters.in(Organization.ACCOUNTS, accountId));
 

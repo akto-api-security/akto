@@ -1119,6 +1119,29 @@ getMissingConfigs(testResults){
         operationsGroupList: tempObj[key],
       };
     });
+  },
+  prepareEditableConfigObject(testRun,settings,hexId){
+    const tests = testRun.tests;
+    const selectedTests = []
+        Object.keys(tests).forEach(category => {
+            tests[category].forEach(test => {
+                if (test.selected) selectedTests.push(test.value)
+            })
+        })
+
+    return {
+      configsAdvancedSettings:settings,
+      testRoleId: testRun.testRoleId,
+      testSubCategoryList: selectedTests,
+      overriddenTestAppUrl: testRun.hasOverriddenTestAppUrl ? testRun.overriddenTestAppUrl : "",
+      maxConcurrentRequests: testRun.maxConcurrentRequests,
+      testingRunHexId: hexId,
+      testRunTime: testRun.testRunTime,
+      sendSlackAlert: testRun.sendSlackAlert,
+      sendMsTeamsAlert:testRun.sendMsTeamsAlert,
+      recurringDaily: testRun.recurringDaily,
+      continuousTesting: testRun.continuousTesting,
+    }
   }
 }
 

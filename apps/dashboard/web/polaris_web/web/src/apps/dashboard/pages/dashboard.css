@@ -205,8 +205,8 @@
 }
 
 .badge-wrapper-HIGH .Polaris-Badge {
-    background-color: #FA6156 !important;
-    color: #FFFBFB !important;
+    background-color: #FED3D1 !important;
+    color: #202223 !important;
     font-weight: 550 !important;
 }
 
@@ -217,7 +217,7 @@
 }
 
 .badge-wrapper-LOW .Polaris-Badge {
-    background-color: #A4E8F2;
+    background-color: #E4E5E7;
     color: #202223 !important;
     font-weight: 550 !important;
 }

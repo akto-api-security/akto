@@ -169,4 +169,18 @@ public class TestWebhookAction extends MongoBasedTest{
         System.out.println(Utils.isValidURL("asdad"));
     }
 
+    @Test
+    public void testValidationCheck(){
+        WebhookAction webhookAction = new WebhookAction();
+        webhookAction.setWebhookType(CustomWebhook.WebhookType.MICROSOFT_TEAMS.name());
+        webhookAction.setWebhookOption(CustomWebhook.WebhookOptions.TESTING_RUN_RESULTS.name());
+        assertEquals("SUCCESS", webhookAction.checkWebhook());
+
+        webhookAction.setWebhookType(CustomWebhook.WebhookType.MICROSOFT_TEAMS.name()+"1");
+        assertEquals("ERROR", webhookAction.checkWebhook());
+        webhookAction.setWebhookOption(CustomWebhook.WebhookOptions.TESTING_RUN_RESULTS.name() + "1");
+        webhookAction.setWebhookType(CustomWebhook.WebhookType.MICROSOFT_TEAMS.name());
+        assertEquals("ERROR", webhookAction.checkWebhook());
+
+    }
 }

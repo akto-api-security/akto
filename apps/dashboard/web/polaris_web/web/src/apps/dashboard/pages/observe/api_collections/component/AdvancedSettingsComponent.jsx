@@ -1,11 +1,11 @@
 import React, { useState } from 'react'
 
 import { Button, HorizontalGrid, HorizontalStack, TextField, VerticalStack } from '@shopify/polaris';
-import {DeleteMinor} from "@shopify/polaris-icons"
+import { DeleteMinor } from "@shopify/polaris-icons"
 import Dropdown from '../../../../components/layouts/Dropdown';
 
-function AdvancedSettingsComponent({dispatchConditions, conditions, hideButton}) {
-    const emptyCondition = {data: {key: '', value: ''}, operator: {'type': 'ADD_HEADER'}}
+function AdvancedSettingsComponent({ dispatchConditions, conditions, hideButton }) {
+    const emptyCondition = { data: { key: '', value: '' }, operator: { 'type': 'ADD_HEADER' } }
 
     const operatorTypeOptions = [
         { value: "ADD_HEADER", label: "Add Header" },
@@ -17,23 +17,23 @@ function AdvancedSettingsComponent({dispatchConditions, conditions, hideButton})
     ];
 
     const handleTypeSelected = (type, index) => {
-        dispatchConditions({ type: "update", index: index, key: 'operator', obj:{"type": type} })
+        dispatchConditions({ type: "update", index: index, key: 'operator', obj: { "type": type } })
     }
 
     const handleValueChange = (index, value) => {
-        dispatchConditions({type: 'update', index: index, key: "data", obj: {"value":value } })
+        dispatchConditions({ type: 'update', index: index, key: "data", obj: { "value": value } })
     }
 
     const handleKeyChange = (index, value) => {
-        dispatchConditions({type: 'update', index: index, key: "data", obj: {"key":value } })
+        dispatchConditions({ type: 'update', index: index, key: "data", obj: { "key": value } })
     }
 
     const handleDelete = (index) => {
-        dispatchConditions({type:"delete", index: index})
+        dispatchConditions({ type: "delete", index: index })
     };
 
     const handleAddField = () => {
-        dispatchConditions({type:"add", obj: emptyCondition})
+        dispatchConditions({ type: "add", obj: emptyCondition })
     };
 
     const [showAdvancedSettings, setShowAdvancedSettings] = useState(hideButton ? hideButton : false)
@@ -43,49 +43,49 @@ function AdvancedSettingsComponent({dispatchConditions, conditions, hideButton})
 
     return (
         <VerticalStack gap={"3"}>
-            {hideButton ? null : <Button fullWidth={false} plain removeUnderline onClick={() => setShowAdvancedSettings(!showAdvancedSettings)}>Advanced configurations</Button>}
-            {showAdvancedSettings ?
-                <VerticalStack gap={"2"}>
-                    {conditions.map((condition, index) => {
-                        return(
-                            <HorizontalStack gap={"1"} key={index} wrap={false}>
-                                <div style={{flex: 1}}>
-                                    <HorizontalStack gap={"2"} wrap={false}>
-                                        <Button plain removeUnderline size="medium">AND</Button>
-                                        <Dropdown
-                                            id={`operator-type-${index}`}
-                                            menuItems={operatorTypeOptions} 
-                                            initial={() => getLabel(condition?.operator?.type)} 
-                                            selected={(type) => handleTypeSelected(type,index)} 
-                                        />
-                                    </HorizontalStack>
-                                </div>
-                                <div style={{flex: 3}}>
-                                    <HorizontalGrid columns={2} gap={"2"}>
-                                        <TextField
-                                            id={`keyname-${index}`}
-                                            placeholder={"Enter key name"}
-                                            value={condition?.data['key']|| ""}
-                                            onChange={(newValue) => handleKeyChange(index,newValue)}
-                                        />
-                                        <TextField
-                                            id={`value-type-${index}`}
-                                            placeholder={"Enter value"}
-                                            value={condition?.data['value']|| ""}
-                                            onChange={(newValue) => handleValueChange(index,newValue)}
-                                            disabled={condition?.operator?.type.toLowerCase().includes("delete")}
-                                        />
-                                    </HorizontalGrid>
-                                </div>
-                                <Button icon={DeleteMinor} onClick={() => handleDelete(index)} />
-                            </HorizontalStack>
-                        )
-                    })}
-                    <HorizontalStack align="space-between">
-                        <Button onClick={handleAddField}>Add condition</Button>
-                    </HorizontalStack>
-                </VerticalStack> : null
-            }
+                {hideButton ? null : <div style={{marginTop:"1.2rem"}}> <HorizontalStack align='start'><Button removeUnderline={false} fullWidth={false} plain monochrome onClick={() => setShowAdvancedSettings(!showAdvancedSettings)}>Show advance configurations</Button></HorizontalStack> </div>}
+                {showAdvancedSettings ?
+                    <VerticalStack gap={"2"}>
+                        {conditions.map((condition, index) => {
+                            return (
+                                <HorizontalStack gap={"1"} key={index} wrap={false}>
+                                    <div style={{ flex: 1 }}>
+                                        <HorizontalStack gap={"2"} wrap={false}>
+                                            <Button plain removeUnderline size="medium">AND</Button>
+                                            <Dropdown
+                                                id={`operator-type-${index}`}
+                                                menuItems={operatorTypeOptions}
+                                                initial={() => getLabel(condition?.operator?.type)}
+                                                selected={(type) => handleTypeSelected(type, index)}
+                                            />
+                                        </HorizontalStack>
+                                    </div>
+                                    <div style={{ flex: 3 }}>
+                                        <HorizontalGrid columns={2} gap={"2"}>
+                                            <TextField
+                                                id={`keyname-${index}`}
+                                                placeholder={"Enter key name"}
+                                                value={condition?.data['key']|| ""}
+                                                onChange={(newValue) => handleKeyChange(index,newValue)}
+                                            />
+                                            <TextField
+                                                id={`value-type-${index}`}
+                                                placeholder={"Enter value"}
+                                                value={condition?.data['value']|| ""}
+                                                onChange={(newValue) => handleValueChange(index,newValue)}
+                                                disabled={condition?.operator?.type.toLowerCase().includes("delete")}
+                                            />
+                                        </HorizontalGrid>
+                                    </div>
+                                    <Button icon={DeleteMinor} onClick={() => handleDelete(index)} />
+                                </HorizontalStack>
+                            )
+                        })}
+                        <HorizontalStack align="space-between">
+                            <Button onClick={handleAddField}>Add condition</Button>
+                        </HorizontalStack>
+                    </VerticalStack> : null
+                }
         </VerticalStack>
     )
 }

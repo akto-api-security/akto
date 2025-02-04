@@ -45,6 +45,8 @@ import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import javax.servlet.http.HttpServletRequest;
+
 import static com.akto.dto.RawApi.convertHeaders;
 
 
@@ -626,4 +628,12 @@ public class Utils {
         input.addAll(copySet);
         return input;
     }
+
+    public static String createDashboardUrlFromRequest(HttpServletRequest request) {
+        if (request == null) {
+            return "http://localhost:8080";
+        }
+        return request.getScheme() + "://" + request.getServerName() + ":" + request.getServerPort();
+    }
+
 }

@@ -475,11 +475,12 @@ export default {
             data: { latestTestingRunSummaryId, issueStatusQuery, sortKey, sortOrder, skip, limit, filters }
         })
     },
-    modifyTestingRunConfig(testingRunConfigId, testConfigsAdvancedSettings){
+    modifyTestingRunConfig(testingRunConfigId, editableTestingRunConfig) {
+        const requestData = { testingRunConfigId, editableTestingRunConfig }
         return request({
             url: '/api/modifyTestingRunConfig',
             method: 'post',
-            data: { testingRunConfigId, testConfigsAdvancedSettings }
+            data: requestData
         })
     },
     async fetchTestingRunResultsSummary(testingRunSummaryId) {

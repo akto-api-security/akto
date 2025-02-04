@@ -1336,13 +1336,13 @@ mapCollectionIdToHostName(apiCollections){
       case "CRITICAL":
         return "#DF2909"
       case "HIGH":
-        return "#FA6156"
+        return "#FED3D1"
       case "MEDIUM":
         return "#FFD79D"
       case "LOW":
-        return "#A4E8F2"
+        return "#E4E5E7"
       default:
-        return "#A4E8F2"
+        return "#E4E5E7"
     }
 
   },
