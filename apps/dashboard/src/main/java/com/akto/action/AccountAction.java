@@ -291,12 +291,12 @@ private static final LoggerMaker loggerMaker = new LoggerMaker(AccountAction.cla
         return user;
     }
 
-    public static void addUserToExistingAccount(String email, int accountId){
+    public static User addUserToExistingAccount(String email, int accountId){
         Account account = AccountsDao.instance.findOne(eq("_id", accountId));
         UsersDao.addNewAccount(email, account);
-        User user = UsersDao.instance.findOne(eq(User.LOGIN, email));
         //RBACDao.instance.insertOne(new RBAC(user.getId(), RBAC.Role.MEMBER, accountId));
         Context.accountId.set(accountId);
+        return UsersDao.instance.findOne(eq(User.LOGIN, email));
     }
 
     private static void intializeCollectionsForTheAccount(int newAccountId) {
