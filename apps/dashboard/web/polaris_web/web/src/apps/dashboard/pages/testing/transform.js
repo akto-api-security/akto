@@ -84,7 +84,7 @@ function getTestingRunType(testingRun, testingRunResultSummary, cicd) {
   if (testingRunResultSummary.metadata != null || cicd) {
     return 'CI/CD';
   }
-  if (testingRun.state === "SCHEDULED" && testingRun.periodInSeconds !== 0) {
+  if (testingRun.periodInSeconds > 0) {
     return 'Recurring';
   }
   return 'One-time'
@@ -227,7 +227,7 @@ const transform = {
     },
     prettifyTestName: (testName, icon, iconColor, iconToolTipContent)=>{
       return(
-        <HorizontalStack gap={4}>
+        <HorizontalStack wrap={false} gap={4}>
           <Tooltip content={iconToolTipContent} hoverDelay={"300"} dismissOnMouseOut>
             <Box><Icon source={icon} color={iconColor}/></Box>
           </Tooltip>
@@ -620,7 +620,7 @@ const transform = {
     let finalDataSubCategories = [], promises = [], categories = [];
     let testSourceConfigs = []
     const limit = 50;
-    for(var i = 0 ; i < 20; i++){
+    for(var i = 0 ; i < 25; i++){
       promises.push(
         api.fetchAllSubCategories(fetchActive, type, i * limit, limit)
       )
@@ -1148,6 +1148,29 @@ getMissingConfigs(testResults){
         operationsGroupList: tempObj[key],
       };
     });
+  },
+  prepareEditableConfigObject(testRun,settings,hexId){
+    const tests = testRun.tests;
+    const selectedTests = []
+        Object.keys(tests).forEach(category => {
+            tests[category].forEach(test => {
+                if (test.selected) selectedTests.push(test.value)
+            })
+        })
+
+    return {
+      configsAdvancedSettings:settings,
+      testRoleId: testRun.testRoleId,
+      testSubCategoryList: selectedTests,
+      overriddenTestAppUrl: testRun.hasOverriddenTestAppUrl ? testRun.overriddenTestAppUrl : "",
+      maxConcurrentRequests: testRun.maxConcurrentRequests,
+      testingRunHexId: hexId,
+      testRunTime: testRun.testRunTime,
+      sendSlackAlert: testRun.sendSlackAlert,
+      sendMsTeamsAlert:testRun.sendMsTeamsAlert,
+      recurringDaily: testRun.recurringDaily,
+      continuousTesting: testRun.continuousTesting,
+    }
   }
 }
 

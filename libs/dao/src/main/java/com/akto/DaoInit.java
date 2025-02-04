@@ -274,6 +274,8 @@ public class DaoInit {
         ClassModel<HistoricalData> historicalDataClassModel = ClassModel.builder(HistoricalData.class).enableDiscriminator(true).build();
         ClassModel<TestConfigsAdvancedSettings> configSettingClassModel = ClassModel.builder(TestConfigsAdvancedSettings.class).enableDiscriminator(true).build();
         ClassModel<ConditionsType> configSettingsConditionTypeClassModel = ClassModel.builder(ConditionsType.class).enableDiscriminator(true).build();
+        ClassModel<CustomRole> roleClassModel = ClassModel.builder(CustomRole.class).enableDiscriminator(true).build();
+
         CodecRegistry pojoCodecRegistry = fromProviders(PojoCodecProvider.builder().register(
                 configClassModel, signupInfoClassModel, apiAuthClassModel, attempResultModel, urlTemplateModel,
                 pendingInviteCodeClassModel, rbacClassModel, kafkaHealthMetricClassModel, singleTypeInfoClassModel,
@@ -303,13 +305,12 @@ public class DaoInit {
                         nodeClassModel, connectionClassModel, edgeClassModel, replaceDetailClassModel, modifyHostDetailClassModel, fileUploadClassModel
                 ,fileUploadLogClassModel, codeAnalysisCollectionClassModel, codeAnalysisApiLocationClassModel, codeAnalysisApiInfoClassModel, codeAnalysisApiInfoKeyClassModel,
                 riskScoreTestingEndpointsClassModel, OrganizationFlagsClassModel, sensitiveDataEndpointsClassModel, unauthenticatedEndpointsClassModel, allApisGroupClassModel,
-                eventsExampleClassModel, remediationClassModel, complianceInfoModel, complianceMappingModel, RuntimeMetricsClassModel, codeAnalysisRepoModel, codeAnalysisApiModel, historicalDataClassModel, configSettingClassModel, configSettingsConditionTypeClassModel).automatic(true).build());
+                eventsExampleClassModel, remediationClassModel, complianceInfoModel, complianceMappingModel, RuntimeMetricsClassModel, codeAnalysisRepoModel, codeAnalysisApiModel, historicalDataClassModel, configSettingClassModel, configSettingsConditionTypeClassModel, roleClassModel).automatic(true).build());
 
         final CodecRegistry customEnumCodecs = CodecRegistries.fromCodecs(
                 new EnumCodec<>(Conditions.Operator.class),
                 new EnumCodec<>(SingleTypeInfo.SuperType.class),
                 new EnumCodec<>(Method.class),
-                new EnumCodec<>(RBAC.Role.class),
                 new EnumCodec<>(Credential.Type.class),
                 new EnumCodec<>(ApiToken.Utility.class),
                 new EnumCodec<>(ApiInfo.AuthType.class),
@@ -414,6 +415,7 @@ public class DaoInit {
         RuntimeMetricsDao.instance.createIndicesIfAbsent();
         ApiAuditLogsDao.instance.createIndicesIfAbsent();
         VulnerableTestingRunResultDao.instance.createIndicesIfAbsent();
+        CustomRoleDao.instance.createIndicesIfAbsent();
     }
 
 }

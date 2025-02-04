@@ -307,12 +307,17 @@ public class ApiInfo {
     }
 
     public String findSeverity() {
-        if (this.severityScore >= 1000) return "CRTICAL";
+        if (this.severityScore >= 1000) return "CRITICAL";
         if (this.severityScore >= 100) return "HIGH";
         if (this.severityScore >= 10) return "MEDIUM";
         if (this.severityScore > 1) return "LOW";
 
         return null;
+    }
+
+    public static ApiInfoKey getApiInfoKeyFromString(String key) {
+        String[] parts = key.split(" ");
+        return new ApiInfoKey(Integer.parseInt(parts[0]), parts[1], URLMethods.Method.valueOf(parts[2]));
     }
 
     @Override
@@ -338,8 +343,8 @@ public class ApiInfo {
 
     public void setId(ApiInfoKey id) {
         this.collectionIds = Util.replaceElementInList(this.collectionIds, 
-        id == null ? null : id.getApiCollectionId(),
-        this.id == null ? null : this.id.getApiCollectionId());
+        id == null ? null : (Integer) id.getApiCollectionId(),
+        this.id == null ? null : (Integer) this.id.getApiCollectionId());
         this.id = id;
     }
 

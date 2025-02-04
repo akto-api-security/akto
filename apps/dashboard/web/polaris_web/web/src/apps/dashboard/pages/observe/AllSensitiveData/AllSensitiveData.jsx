@@ -104,7 +104,10 @@ const convertToDataTypesData = (type, collectionsMap, countMap, subtypeToApiColl
         avatarComp: <Thumbnail source={iconSource} size="small" />,
         priorityVal: priorityText.length > 1 ? severityOrder[priorityText] : 0,
         priorityText: priorityText,
-        priorityComp: priorityText.length > 1 ? <Badge status={transform.getColor(priorityText, true)}>{func.toSentenceCase(priorityText)}</Badge> : "-",
+        priorityComp: priorityText.length > 1 ? 
+        <div key={type.name} className={`badge-wrapper-${priorityText}`}>
+            <Badge status={func.getHexColorForSeverity(priorityText)}>{func.toSentenceCase(priorityText)}</Badge>
+        </div> : "-",
         categoriesArr: categoriesList,
         categoryComp: categoriesList.length > 0 ?  (
             <ShowListInBadge 
@@ -187,7 +190,7 @@ function AllSensitiveData() {
     const convertToGraphData = (severityMap) => {
         let dataArr = []
         Object.keys(severityMap).forEach((x) => {
-            const color = transform.getColorForSensitiveData(x)
+            const color = func.getHexColorForSeverity(x)
             let text = func.toSentenceCase(x)
             const value =  severityMap[x]
             dataArr.push({

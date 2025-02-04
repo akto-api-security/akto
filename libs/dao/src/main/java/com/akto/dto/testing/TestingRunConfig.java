@@ -15,12 +15,14 @@ public class TestingRunConfig {
     @BsonId
     private int id;
     private Map<Integer, List<ApiInfo.ApiInfoKey>> collectionWiseApiInfoKey;
+    public static final String TEST_SUBCATEGORY_LIST = "testSubCategoryList";
     private List<String> testSubCategoryList;
     private ObjectId authMechanismId;
-
+    public static final String TEST_ROLE_ID = "testRoleId";
     private String testRoleId;
+    public static final String OVERRIDDEN_TEST_APP_URL = "overriddenTestAppUrl";
     private String overriddenTestAppUrl;
-    
+    public static final String TEST_CONFIGS_ADVANCED_SETTINGS = "configsAdvancedSettings";
     private List<TestConfigsAdvancedSettings> configsAdvancedSettings;
     private boolean cleanUp;
 

@@ -75,6 +75,7 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.mixpanel.AktoMixpanel;
 import com.akto.notifications.slack.DailyUpdate;
 import com.akto.notifications.slack.TestSummaryGenerator;
+import com.akto.notifications.webhook.WebhookSender;
 import com.akto.parsers.HttpCallParser;
 import com.akto.runtime.RuntimeUtil;
 import com.akto.stigg.StiggReporterClient;
@@ -307,7 +308,7 @@ public class InitializerListener implements ServletContextListener {
 
         DashboardMode dashboardMode = DashboardMode.getDashboardMode();        
 
-        RBAC record = RBACDao.instance.findOne("role", Role.ADMIN);
+        RBAC record = RBACDao.instance.findOne("role", Role.ADMIN.name());
 
         if (record == null) {
             return;
@@ -595,7 +596,9 @@ public class InitializerListener implements ServletContextListener {
                         piiKey,
                         dt.getBoolean("sensitive"),
                         dt.getString("regexPattern"),
-                        dt.getBoolean("onKey")
+                        dt.getBoolean("onKey"),
+                        dt.getString("regexPatternOnValue"),
+                        dt.getBoolean("onKeyAndPayload")
                 );
 
                 CustomDataType existingCDT = customDataTypesMap.getOrDefault(piiKey, null);
@@ -700,9 +703,20 @@ public class InitializerListener implements ServletContextListener {
     private static CustomDataType getCustomDataTypeFromPiiType(PIISource piiSource, PIIType piiType, Boolean active) {
         String piiKey = piiType.getName();
 
-        List<Predicate> predicates = new ArrayList<>();
-        Conditions conditions = new Conditions(predicates, Operator.OR);
-        predicates.add(new RegexPredicate(piiType.getRegexPattern()));
+        List<Predicate> keyPredicates = new ArrayList<>();
+        Conditions keyConditions = new Conditions(keyPredicates, Operator.OR);
+
+        if(piiType.getOnKey() || piiType.getOnKeyAndPayload()){
+            keyPredicates.add(new RegexPredicate(piiType.getRegexPattern()));
+        }
+
+        List<Predicate> valuePredicates = new ArrayList<>();
+        Conditions valueConditions = new Conditions(valuePredicates, Operator.OR);
+        if(!piiType.getOnKey() || piiType.getOnKeyAndPayload()){
+            String valuePattern = piiType.getOnKeyAndPayload() ? piiType.getRegexPatternOnValue() : piiType.getRegexPattern();
+            valuePredicates.add(new RegexPredicate(valuePattern));
+        }
+
         IgnoreData ignoreData = new IgnoreData(new HashMap<>(), new HashSet<>());
         CustomDataType ret = new CustomDataType(
                 piiKey,
@@ -710,8 +724,8 @@ public class InitializerListener implements ServletContextListener {
                 Collections.emptyList(),
                 piiSource.getAddedByUser(),
                 active,
-                (piiType.getOnKey() ? conditions : null),
-                (piiType.getOnKey() ? null : conditions),
+                ((piiType.getOnKey() || piiType.getOnKeyAndPayload()) ? keyConditions : null),
+                ((piiType.getOnKey() && !piiType.getOnKeyAndPayload()) ? null : valueConditions),
                 Operator.OR,
                 ignoreData,
                 false,
@@ -923,6 +937,18 @@ public class InitializerListener implements ServletContextListener {
         boolean shouldSend = (webhook.getLastSentTimestamp() + webhook.getFrequencyInSeconds()) <= now;
 
         if (webhook.getActiveStatus() != ActiveStatus.ACTIVE || !shouldSend) {
+            return;
+        }
+
+        /*
+         * TESTING_RUN_RESULTS type webhooks are 
+         * triggered only on test complete not periodically.
+         */
+
+        if (webhook.getSelectedWebhookOptions() != null &&
+                !webhook.getSelectedWebhookOptions().isEmpty()
+                && webhook.getSelectedWebhookOptions()
+                        .contains(CustomWebhook.WebhookOptions.TESTING_RUN_RESULTS)) {
             return;
         }
 
@@ -1172,29 +1198,7 @@ public class InitializerListener implements ServletContextListener {
             errors.add("Failed to replace variables");
         }
 
-        webhook.setLastSentTimestamp(now);
-        CustomWebhooksDao.instance.updateOne(Filters.eq("_id", webhook.getId()), Updates.set("lastSentTimestamp", now));
-
-        Map<String, List<String>> headers = OriginalHttpRequest.buildHeadersMap(webhook.getHeaderString());
-        OriginalHttpRequest request = new OriginalHttpRequest(webhook.getUrl(), webhook.getQueryParams(), webhook.getMethod().toString(), payload, headers, "");
-        OriginalHttpResponse response = null; // null response means api request failed. Do not use new OriginalHttpResponse() in such cases else the string parsing fails.
-
-        try {
-            response = ApiExecutor.sendRequest(request, true, null, false, new ArrayList<>());
-            loggerMaker.infoAndAddToDb("webhook request sent", LogDb.DASHBOARD);
-        } catch (Exception e) {
-            errors.add("API execution failed");
-        }
-
-        String message = null;
-        try {
-            message = convertOriginalReqRespToString(request, response);
-        } catch (Exception e) {
-            errors.add("Failed converting sample data");
-        }
-
-        CustomWebhookResult webhookResult = new CustomWebhookResult(webhook.getId(), webhook.getUserEmail(), now, message, errors);
-        CustomWebhooksResultDao.instance.insertOne(webhookResult);
+        WebhookSender.sendCustomWebhook(webhook, payload, errors, now, LogDb.DASHBOARD);
     }
 
     private static void createBodyForWebhook(CustomWebhook webhook) {
@@ -1980,17 +1984,16 @@ public class InitializerListener implements ServletContextListener {
         Organization organization = OrganizationsDao.instance.findOne(filterQ);
         boolean alreadyExists = organization != null;
         if (alreadyExists) {
-            fetchAndSaveFeatureWiseAllowed(organization);
             loggerMaker.infoAndAddToDb("Org already exists for account: " + accountId, LogDb.DASHBOARD);
             return;
         }
 
-        RBAC rbac = RBACDao.instance.findOne(RBAC.ACCOUNT_ID, accountId, RBAC.ROLE, Role.ADMIN);
+        RBAC rbac = RBACDao.instance.findOne(RBAC.ACCOUNT_ID, accountId, RBAC.ROLE, Role.ADMIN.name());
 
         if (rbac == null) {
             loggerMaker.infoAndAddToDb("Admin is missing in DB", LogDb.DASHBOARD);
-            RBACDao.instance.getMCollection().updateOne(Filters.and(Filters.eq(RBAC.ROLE, Role.ADMIN), Filters.exists(RBAC.ACCOUNT_ID, false)), Updates.set(RBAC.ACCOUNT_ID, accountId), new UpdateOptions().upsert(false));
-            rbac = RBACDao.instance.findOne(RBAC.ACCOUNT_ID, accountId, RBAC.ROLE, Role.ADMIN);
+            RBACDao.instance.getMCollection().updateOne(Filters.and(Filters.eq(RBAC.ROLE, Role.ADMIN.name()), Filters.exists(RBAC.ACCOUNT_ID, false)), Updates.set(RBAC.ACCOUNT_ID, accountId), new UpdateOptions().upsert(false));
+            rbac = RBACDao.instance.findOne(RBAC.ACCOUNT_ID, accountId, RBAC.ROLE, Role.ADMIN.name());
             if(rbac == null){
                 loggerMaker.errorAndAddToDb("Admin is still missing in DB, making first user as admin", LogDb.DASHBOARD);
                 User firstUser = UsersDao.instance.getFirstUser(accountId);
@@ -2308,7 +2311,6 @@ public class InitializerListener implements ServletContextListener {
                     }
                     if (DashboardMode.isMetered()) {
                         setupUsageScheduler();
-                        setupUsageSyncScheduler();
                     }
                     trimCappedCollections();
                     setUpPiiAndTestSourcesScheduler();
@@ -2595,8 +2597,10 @@ public class InitializerListener implements ServletContextListener {
             planType = OrganizationUtils.fetchplanType(metaData);
             trialMsg = OrganizationUtils.fetchtrialMsg(metaData);
             boolean expired = OrganizationUtils.fetchExpired(metaData);
-            boolean telemetryEnabled = OrganizationUtils.fetchTelemetryEnabled(metaData);
-            // setTelemetrySettings(organization, telemetryEnabled);
+            if (DashboardMode.isOnPremDeployment()) {
+                boolean telemetryEnabled = OrganizationUtils.fetchTelemetryEnabled(metaData);
+                setTelemetrySettings(organization, telemetryEnabled);
+            }
             boolean testTelemetryEnabled = OrganizationUtils.fetchTestTelemetryEnabled(metaData);
             organization.setTestTelemetryEnabled(testTelemetryEnabled);
 
@@ -2859,7 +2863,7 @@ public class InitializerListener implements ServletContextListener {
             }else{
                 loggerMaker.infoAndAddToDb("Found non-admin rbac for first user: " + firstUser.getLogin() + " , thus inserting admin role", LogDb.DASHBOARD);
                 RBACDao.instance.insertOne(
-                    new RBAC(firstUser.getId(), Role.ADMIN, Context.accountId.get())
+                    new RBAC(firstUser.getId(), Role.ADMIN.name(), Context.accountId.get())
                 );
             }
 
@@ -3775,15 +3779,19 @@ public class InitializerListener implements ServletContextListener {
                     loggerMaker.infoAndAddToDb("Usage cron dibs not acquired, skipping usage cron", LoggerMaker.LogDb.DASHBOARD);
                     return;
                 }
-                calcUsage();
-            }
-        }, 0, 1, UsageUtils.USAGE_CRON_PERIOD);
-    }
-
-    public void setupUsageSyncScheduler() {
-        scheduler.scheduleAtFixedRate(new Runnable() {
-            public void run() {
+                /*
+                 * This syncs existing entries in db.
+                 * This is needed in case the machine were down,
+                 * and any usage for an interval has not been reported.
+                 */
                 syncWithAkto();
+                /*
+                 * This recalculates usage and syncs the same.
+                 * The existing usage contains real-time data, which is calculated with some
+                 * error rate, for fast calculations.
+                 * This is needed, to correctly calculate the usage and report it back.
+                 */
+                calcUsage();
             }
         }, 0, 1, UsageUtils.USAGE_CRON_PERIOD);
     }

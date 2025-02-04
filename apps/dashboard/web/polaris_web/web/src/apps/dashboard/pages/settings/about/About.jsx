@@ -1,4 +1,4 @@
-import { Box, Button, ButtonGroup, Divider, LegacyCard, Text, VerticalStack, HorizontalGrid, HorizontalStack, Scrollable, TextField, Tag, Form, Tooltip } from '@shopify/polaris'
+import { Box, Button, ButtonGroup, Divider, LegacyCard, Text, VerticalStack, HorizontalGrid, HorizontalStack, Scrollable, TextField, Tag, Form, Tooltip, Checkbox } from '@shopify/polaris'
 import React, { useEffect, useState } from 'react'
 import settingFunctions from '../module'
 import Dropdown from '../../../components/layouts/Dropdown'
@@ -40,6 +40,9 @@ function About() {
     const [accountName, setAccountName] = useState('')
     const [currentTimeZone, setCurrentTimeZone] = useState('')
     const [toggleCaseSensitiveApis, setToggleCaseSensitiveApis] = useState(false)
+    const [isSubscribed, setIsSubscribed] = useState(() => {
+        return localStorage.getItem('isSubscribed') === 'true'
+    })
 
     const initialUrlsList = settingFunctions.getRedundantUrlOptions()
     const [selectedUrlList, setSelectedUrlsList] = useState([])
@@ -169,6 +172,28 @@ function About() {
                     </VerticalStack>
                 </Box>
             ))}
+            <Checkbox
+                label="Subscribe to updates"
+                checked={isSubscribed}
+                onChange={() => {
+                    const userProps = {}
+                    let subsKey = window.DASHBOARD_MODE === 'ON_PREM' ? "mono_subscribed" : "akto_subscribed"
+                    userProps[subsKey] = "yes"
+                    if  (window.Intercom) {
+                        window.Intercom("update", userProps)
+                        window.Intercom("trackEvent", subsKey)
+                    }
+            
+                    if (window.mixpanel) {
+                        window.mixpanel.people.set(userProps);
+                    }
+                    setIsSubscribed(!isSubscribed)
+                    localStorage.setItem('isSubscribed', (!isSubscribed).toString())
+                    if (!isSubscribed) {
+                        func.setToast(true, false, "Successfully subscribed to updates")
+                    }
+                }}
+            />
         </VerticalStack>
     )
 

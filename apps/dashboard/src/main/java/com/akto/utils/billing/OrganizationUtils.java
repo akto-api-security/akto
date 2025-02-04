@@ -94,23 +94,6 @@ public class OrganizationUtils {
         return result;
     }
 
-    public static Set<Integer> findAccountsBelongingToOrganization(int adminUserId) {
-        Set<Integer> accounts = new HashSet<Integer>();
-
-        try {
-            List<RBAC> adminAccountsRbac = RBACDao.instance.findAll(
-                Filters.eq(RBAC.USER_ID, adminUserId)
-            );
-
-            for (RBAC accountRbac : adminAccountsRbac) {
-                accounts.add(accountRbac.getAccountId());
-            }
-        } catch (Exception e) {
-            logger.info("Failed to find accounts belonging to organization. Error - " + e.getMessage());
-        }
-        
-        return accounts;
-    }
 
     private static BasicDBObject fetchFromInternalService(String apiName, BasicDBObject reqBody) {
         String json = reqBody.toJson();

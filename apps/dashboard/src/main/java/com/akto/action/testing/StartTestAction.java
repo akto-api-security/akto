@@ -6,6 +6,7 @@ import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing.sources.TestSourceConfigsDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dao.testing.*;
+import com.akto.dto.testing.config.EditableTestingRunConfig;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.User;
 import com.akto.dto.ApiToken.Utility;
@@ -107,6 +108,7 @@ public class StartTestAction extends UserAction {
 
     private CallSource source;
     private boolean sendSlackAlert = false;
+    private boolean sendMsTeamsAlert = false;
 
     private TestingRun createTestingRun(int scheduleTimestamp, int periodInSeconds) {
         User user = getSUser();
@@ -164,7 +166,7 @@ public class StartTestAction extends UserAction {
 
         return new TestingRun(scheduleTimestamp, user.getLogin(),
                 testingEndpoints, testIdConfig, State.SCHEDULED, periodInSeconds, testName, this.testRunTime,
-                this.maxConcurrentRequests, this.sendSlackAlert);
+                this.maxConcurrentRequests, this.sendSlackAlert, this.sendMsTeamsAlert);
     }
 
     private List<String> selectedTests;
@@ -234,12 +236,13 @@ public class StartTestAction extends UserAction {
                 }
                  
             }
+
             if (this.overriddenTestAppUrl != null || this.selectedTests != null) {
-                int id = UUID.randomUUID().hashCode() & 0xfffffff ;
+                int id = UUID.randomUUID().hashCode() & 0xfffffff;
                 TestingRunConfig testingRunConfig = new TestingRunConfig(id, null, this.selectedTests, null, this.overriddenTestAppUrl, this.testRoleId);
                 this.testIdConfig = testingRunConfig.getId();
                 TestingRunConfigDao.instance.insertOne(testingRunConfig);
-            }
+            } 
 
         }
 
@@ -491,11 +494,12 @@ public class StartTestAction extends UserAction {
         );
 
         this.testingRunType = TestingRunType.ONE_TIME;
-        if(cicdCount > 0){
+        if (cicdCount > 0) {
             this.testingRunType = TestingRunType.CI_CD;
-        }
-        else if(this.testingRun.getPeriodInSeconds() > 0){
+        } else if (this.testingRun.getPeriodInSeconds() > 0) {
             this.testingRunType = TestingRunType.RECURRING;
+        } else if (this.testingRun.getPeriodInSeconds() == -1) {
+            this.testingRunType = TestingRunType.CONTINUOUS_TESTING;
         }
 
         if (this.testingRun != null && this.testingRun.getTestIdConfig() == 1) {
@@ -506,7 +510,7 @@ public class StartTestAction extends UserAction {
         }
 
         TestingRunConfig runConfig = TestingRunConfigDao.instance.findOne(
-            Filters.eq("_id", this.testingRun.getTestIdConfig()), Projections.exclude("collectionWiseApiInfoKey", "testSubCategoryList")
+            Filters.eq("_id", this.testingRun.getTestIdConfig()), Projections.exclude("collectionWiseApiInfoKey")
         );
 
         this.testingRun.setTestingRunConfig(runConfig);
@@ -598,8 +602,8 @@ public class StartTestAction extends UserAction {
         Bson sortStage = null;
         if (TestingRunIssues.KEY_SEVERITY.equals(sortKey)) {
             sortStage = (sortOrder == 1) ?
-                    Aggregates.sort(Sorts.ascending("severityValue", TestingRunResult.END_TIMESTAMP)) :
-                    Aggregates.sort(Sorts.descending("severityValue", TestingRunResult.END_TIMESTAMP));
+                    Aggregates.sort(Sorts.ascending("severityValue")) :
+                    Aggregates.sort(Sorts.descending("severityValue"));
         } else if ("time".equals(sortKey)) {
             sortStage = (sortOrder == 1) ?
                     Aggregates.sort(Sorts.ascending(TestingRunResult.END_TIMESTAMP)) :
@@ -943,7 +947,7 @@ public class StartTestAction extends UserAction {
         if (this.testingRunHexId != null) {
             try {
                 ObjectId testingId = new ObjectId(this.testingRunHexId);
-                TestingRunDao.instance.updateOne(
+                TestingRunDao.instance.updateOneNoUpsert(
                         Filters.and(filter, Filters.eq(Constants.ID, testingId)),
                         Updates.set(TestingRun.STATE, State.STOPPED));
                 Bson testingSummaryFilter = Filters.and(
@@ -1125,11 +1129,109 @@ public class StartTestAction extends UserAction {
         return Action.SUCCESS.toUpperCase();
     }
 
+    private EditableTestingRunConfig editableTestingRunConfig;
+
     public String modifyTestingRunConfig(){
-        TestingRunConfigDao.instance.updateOne(
-            Filters.eq(Constants.ID, this.testingRunConfigId),
-            Updates.set("configsAdvancedSettings", this.testConfigsAdvancedSettings)
-        );
+        if (editableTestingRunConfig == null) {
+            addActionError("Invalid editableTestingRunConfig");
+            return Action.ERROR.toUpperCase();
+        }
+        try {
+            if (this.testingRunConfigId == 0) {
+                addActionError("Invalid testing run config id");
+                return Action.ERROR.toUpperCase();
+            } else {
+
+                TestingRunConfig existingTestingRunConfig = TestingRunConfigDao.instance.findOne(Filters.eq(Constants.ID, this.testingRunConfigId));
+                if (existingTestingRunConfig == null) {
+                    addActionError("Testing run config object not found for ID: " + this.testingRunConfigId);
+                    return Action.ERROR.toUpperCase();
+                }
+
+                List<Bson> updates = new ArrayList<>();
+
+                if (editableTestingRunConfig.getConfigsAdvancedSettings() != null && !editableTestingRunConfig.getConfigsAdvancedSettings().equals(existingTestingRunConfig.getConfigsAdvancedSettings())) {
+                    updates.add(Updates.set(TestingRunConfig.TEST_CONFIGS_ADVANCED_SETTINGS, editableTestingRunConfig.getConfigsAdvancedSettings()));
+                }
+                
+                if (editableTestingRunConfig.getTestSubCategoryList() != null &&
+                    !editableTestingRunConfig.getTestSubCategoryList().equals(existingTestingRunConfig.getTestSubCategoryList())) {
+                    updates.add(Updates.set(TestingRunConfig.TEST_SUBCATEGORY_LIST, editableTestingRunConfig.getTestSubCategoryList()));
+                }
+                
+                if (editableTestingRunConfig.getTestRoleId() != null && !editableTestingRunConfig.getTestRoleId().equals(existingTestingRunConfig.getTestRoleId())) {
+                    updates.add(Updates.set(TestingRunConfig.TEST_ROLE_ID, editableTestingRunConfig.getTestRoleId()));
+                }
+                
+                if (editableTestingRunConfig.getOverriddenTestAppUrl() != null && !editableTestingRunConfig.getOverriddenTestAppUrl().equals(existingTestingRunConfig.getOverriddenTestAppUrl())) {
+                    updates.add(Updates.set(TestingRunConfig.OVERRIDDEN_TEST_APP_URL, editableTestingRunConfig.getOverriddenTestAppUrl()));
+                }
+                
+                if (!updates.isEmpty()) {
+                    TestingRunConfigDao.instance.updateOne(
+                        Filters.eq(Constants.ID, this.testingRunConfigId),
+                        Updates.combine(updates) 
+                    );
+                }
+
+            }
+
+            if (editableTestingRunConfig.getTestingRunHexId() != null) {
+            
+                TestingRun existingTestingRun = TestingRunDao.instance.findOne(Filters.eq(Constants.ID, new ObjectId(editableTestingRunConfig.getTestingRunHexId())));
+
+                if (existingTestingRun != null) {
+                    List<Bson> updates = new ArrayList<>();
+
+                    if (editableTestingRunConfig.getTestRunTime() > 0
+                            && editableTestingRunConfig.getTestRunTime() <= 6 * 60 * 60
+                            && editableTestingRunConfig.getTestRunTime() != existingTestingRun.getTestRunTime()) {
+                        updates.add(Updates.set(TestingRun.TEST_RUNTIME, editableTestingRunConfig.getTestRunTime()));
+                    }
+
+                    if (editableTestingRunConfig.getMaxConcurrentRequests() > 0
+                            && editableTestingRunConfig.getMaxConcurrentRequests() <= 100 && editableTestingRunConfig
+                                    .getMaxConcurrentRequests() != existingTestingRun.getMaxConcurrentRequests()) {
+                        updates.add(Updates.set(TestingRun.MAX_CONCURRENT_REQUEST,
+                                editableTestingRunConfig.getMaxConcurrentRequests()));
+                    }
+
+                    if (existingTestingRun.getSendSlackAlert() != editableTestingRunConfig.getSendSlackAlert()) {
+                        updates.add(
+                                Updates.set(TestingRun.SEND_SLACK_ALERT, editableTestingRunConfig.getSendSlackAlert()));
+                    }
+
+                    if (existingTestingRun.getSendMsTeamsAlert() != editableTestingRunConfig.getSendMsTeamsAlert()) {
+                        updates.add(
+                                Updates.set(TestingRun.SEND_MS_TEAMS_ALERT,
+                                        editableTestingRunConfig.getSendMsTeamsAlert()));
+                    }
+
+                    int periodInSeconds = 0;
+                    if (editableTestingRunConfig.getContinuousTesting()) {
+                        periodInSeconds = -1;
+                    } else if (editableTestingRunConfig.getRecurringDaily()) {
+                        periodInSeconds = 86400;
+                    }
+                    if (existingTestingRun.getPeriodInSeconds() != periodInSeconds) {
+                        updates.add(Updates.set(TestingRun.PERIOD_IN_SECONDS, periodInSeconds));
+                    }
+                
+                    if (!updates.isEmpty()) {
+                        TestingRunDao.instance.updateOne(
+                            Filters.eq(Constants.ID,new ObjectId(editableTestingRunConfig.getTestingRunHexId())),
+                            Updates.combine(updates) 
+                        );
+                    }
+                }
+                
+            }
+
+
+        } catch (Exception e) {
+            addActionError("Unable to modify testing run config and testing run");
+            return Action.ERROR.toUpperCase();
+        }
         return SUCCESS.toUpperCase();
     }
 
@@ -1568,6 +1670,10 @@ public class StartTestAction extends UserAction {
         this.testingRunConfigId = testingRunConfigId;
     }
 
+    public void setEditableTestingRunConfig(EditableTestingRunConfig editableTestingRunConfig) {
+        this.editableTestingRunConfig = editableTestingRunConfig;
+    }
+
     public Map<String, Integer> getTestCountMap() {
         return testCountMap;
     }
@@ -1586,5 +1692,13 @@ public class StartTestAction extends UserAction {
 
     public void setCleanUpTestingResources(boolean cleanUpTestingResources) {
         this.cleanUpTestingResources = cleanUpTestingResources;
+    }
+
+    public boolean getSendMsTeamsAlert() {
+        return sendMsTeamsAlert;
+    }
+
+    public void setSendMsTeamsAlert(boolean sendMsTeamsAlert) {
+        this.sendMsTeamsAlert = sendMsTeamsAlert;
     }
 }

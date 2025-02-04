@@ -9,7 +9,7 @@ import api from '../../../../signup/api';
 import func from '@/util/func';
 import SemiCircleProgress from '../../shared/SemiCircleProgress';
 import { usePolling } from '../../../../main/PollingProvider';
-import { debounce, get } from 'lodash';
+import { debounce } from 'lodash';
 import LocalStore from '../../../../main/LocalStorageStore';
 import homeFunctions from '../../../../dashboard/pages/home/module';
 
@@ -213,7 +213,7 @@ export default function Header() {
             {(Object.keys(currentTestsObj).length > 0 && currentTestsObj?.testRunsArr?.length !== 0 && currentTestsObj?.totalTestsCompleted > 0) ? 
             <HorizontalStack gap={"2"}>
                 <Button plain monochrome onClick={() => {handleTestingNavigate()}}>
-                 <SemiCircleProgress key={"progress"} progress={progress} size={60} height={55} width={75}/>
+                 <SemiCircleProgress key={"progress"} progress={Math.min(progress, 100)} size={60} height={55} width={75}/>
                 </Button>
                 <VerticalStack gap={"0"}>
                     <Text fontWeight="medium">Test run status</Text>

@@ -930,6 +930,7 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName) {
           let authTypeTag = authType.replace(",", "");
           let riskScore = apiInfoMap[key] ? apiInfoMap[key]?.riskScore : 0
           let responseCodesArr = apiInfoMap[key] ? apiInfoMap[key]?.responseCodes : [] 
+          let discoveredTimestamp = apiInfoMap[key] ? (apiInfoMap[key].discoveredTimestamp || apiInfoMap[key].startTs) : 0
 
           ret[key] = {
               id: x.method + "###" + x.url + "###" + x.apiCollectionId + "###" + Math.random(),
@@ -945,10 +946,10 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName) {
               apiCollectionId: x.apiCollectionId,
               last_seen: apiInfoMap[key] ? (this.prettifyEpoch(apiInfoMap[key]["lastSeen"])) : this.prettifyEpoch(x.startTs),
               lastSeenTs: apiInfoMap[key] ? apiInfoMap[key]["lastSeen"] : x.startTs,
-              detectedTs: x.startTs,
+              detectedTs: (x.startTs || discoveredTimestamp),
               changesCount: x.changesCount,
               changes: x.changesCount && x.changesCount > 0 ? (x.changesCount +" new parameter"+(x.changesCount > 1? "s": "")) : 'No new changes',
-              added: "Discovered " + this.prettifyEpoch(x.startTs),
+              added: "Discovered " + this.prettifyEpoch(x.startTs || discoveredTimestamp),
               violations: apiInfoMap[key] ? apiInfoMap[key]["violations"] : {},
               apiCollectionName: idToName ? (idToName[x.apiCollectionId] || '-') : '-',
               auth_type: (authType || "no auth type found").toLowerCase(),
@@ -1336,15 +1337,15 @@ mapCollectionIdToHostName(apiCollections){
   getHexColorForSeverity(key){
     switch(key){
       case "CRITICAL":
-        return "#E51C00"
+        return "#DF2909"
       case "HIGH":
-        return "#FFB800"
+        return "#FED3D1"
       case "MEDIUM":
-        return "#EDDB39"
+        return "#FFD79D"
       case "LOW":
-        return "#0000000f"
+        return "#E4E5E7"
       default:
-        return "#0000000f"
+        return "#E4E5E7"
     }
 
   },
