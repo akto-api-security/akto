@@ -140,12 +140,15 @@ public class Main {
     private static void triggerHeartbeatCron() {
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
-                AccountTask.instance.executeTaskForNonHybridAccounts(new Consumer<Account>() {
-                    @Override
-                    public void accept(Account t) {
-                        TestingInstanceHeartBeatDao.instance.insertOne(new TestingInstanceHeartBeat(testingInstanceId, Context.now()));
-                    }
-                }, "testing-heart-beat-scheduler");
+                UpdateOptions updateOptions = new UpdateOptions();
+                updateOptions.upsert(true);
+                Bson updates = Updates.combine(
+                    Updates.setOnInsert("instanceId", testingInstanceId),
+                    Updates.set("ts", Context.now())
+                );
+                TestingInstanceHeartBeatDao.instance.getMCollection().
+                updateOne(Filters.eq("_id", testingInstanceId), updates, updateOptions);
+
             }
         }, 0, 10, TimeUnit.SECONDS);
     }
@@ -176,8 +179,7 @@ public class Main {
 
         Bson update = Updates.combine(
                 Updates.set(TestingRun.PICKED_UP_TIMESTAMP, Context.now()),
-                Updates.set(TestingRun.STATE, TestingRun.State.RUNNING),
-                Updates.set("instanceId", testingInstanceId)
+                Updates.set(TestingRun.STATE, TestingRun.State.RUNNING)
         );
 
         // returns the previous state of testing run before the update
@@ -456,6 +458,9 @@ public class Main {
                 AccountSettings accountSettings = AccountSettingsDao.instance.findOne(
                     Filters.eq(Constants.ID, accountId), Projections.include(AccountSettings.DELTA_IGNORE_TIME_FOR_SCHEDULED_SUMMARIES)
                 );
+
+                TestingInstanceHeartBeatDao.instance.setTestingRunId(testingInstanceId, "");
+
                 int start = Context.now();
                 int defaultTime = DEFAULT_DELTA_IGNORE_TIME;
                 if(accountSettings != null){
@@ -477,9 +482,11 @@ public class Main {
                     return;
                 }
 
-                if (!TestingInstanceHeartBeatDao.instance.isTestEligibleForInstance(testingRun.getInstanceId())) {
+                if (!TestingInstanceHeartBeatDao.instance.isTestEligibleForInstance(testingRun.getHexId())) {
                     return;
                 }
+
+                TestingInstanceHeartBeatDao.instance.setTestingRunId(testingInstanceId, testingRun.getHexId());
 
                 if (testingRun.getState().equals(State.STOPPED)) {
                     loggerMaker.infoAndAddToDb("Testing run stopped");

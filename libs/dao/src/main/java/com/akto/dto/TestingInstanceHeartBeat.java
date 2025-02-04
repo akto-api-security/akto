@@ -4,13 +4,15 @@ public class TestingInstanceHeartBeat {
     
     private int ts;
     private String instanceId;
+    private String testingRunId;
 
     public TestingInstanceHeartBeat() {
     }
 
-    public TestingInstanceHeartBeat(String instanceId, int ts) {
+    public TestingInstanceHeartBeat(String instanceId, int ts, String testingRunId) {
         this.instanceId = instanceId;
         this.ts = ts;
+        this.testingRunId = testingRunId;
     }
 
     public String getInstanceId() {
@@ -28,6 +30,15 @@ public class TestingInstanceHeartBeat {
     public void setTs(int ts) {
         this.ts = ts;
     }
+
+    public String getTestingRunId() {
+        return testingRunId;
+    }
+
+    public void setTestingRunId(String testingRunId) {
+        this.testingRunId = testingRunId;
+    }
+
 
 }
 
