@@ -5,7 +5,7 @@ import { Link, Text } from '@shopify/polaris'
 import InfoCard from '../../dashboard/new_components/InfoCard'
 import dashboardApi from "../../dashboard/api.js"
 
-const CriticalUnsecuredAPIsOverTimeGraph = ({ linkText, linkUrl }) => {
+const CriticalUnsecuredAPIsOverTimeGraph = ({ startTimestamp, endTimestamp, linkText, linkUrl }) => {
     const [unsecuredAPIs, setUnsecuredAPIs] = useState([])
     const [showTestingComponents, setShowTestingComponents] = useState(false)
 
@@ -25,7 +25,7 @@ const CriticalUnsecuredAPIsOverTimeGraph = ({ linkText, linkUrl }) => {
 
     const fetchGraphData = async () => {
         setShowTestingComponents(false)
-        const criticalIssuesTrendResp = await dashboardApi.fetchCriticalIssuesTrend()
+        const criticalIssuesTrendResp = await dashboardApi.fetchCriticalIssuesTrend(startTimestamp, endTimestamp)
 
         buildUnsecuredAPIs(criticalIssuesTrendResp)
         setShowTestingComponents(true)
@@ -33,7 +33,7 @@ const CriticalUnsecuredAPIsOverTimeGraph = ({ linkText, linkUrl }) => {
 
     useEffect(() => {
         fetchGraphData()
-    }, [])
+    }, [startTimestamp, endTimestamp])
     
     const defaultChartOptions = {
         "legend": {
@@ -61,11 +61,11 @@ const CriticalUnsecuredAPIsOverTimeGraph = ({ linkText, linkUrl }) => {
                 exportingDisabled={true}
             />
         }
-        title="Critical Unsecured APIs Over Time"
+        title="Critical & High Issues Over Time"
         titleToolTip="Chart showing the number of APIs detected(risk score >= 4) each month over the past year. Helps track security trends over time."
         linkText={linkText}
         linkUrl={linkUrl}
-    /> : <EmptyCard title="Critical Unsecured APIs Over Time" subTitleComponent={showTestingComponents ? <Text alignment='center' color='subdued'>No Unsecured APIs found</Text>: runTestEmptyCardComponent} />
+    /> : <EmptyCard title="Critical & High Issues Over Time" subTitleComponent={showTestingComponents ? <Text alignment='center' color='subdued'>No critical issue found</Text>: runTestEmptyCardComponent} />
 
     return (
         {...criticalUnsecuredAPIsOverTime}
