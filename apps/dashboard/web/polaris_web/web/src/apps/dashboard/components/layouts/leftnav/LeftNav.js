@@ -168,6 +168,15 @@ export default function LeftNav() {
                                     },
                                     selected: leftNavSelected === "dashboard_testing_user_config",
                                 },
+                                {
+                                    label:"Test suites",
+                                    onClick:()=>{
+                                        navigate("/dashboard/testing/test-suite");
+                                        handleSelect("dashboard_testing_test_suite");
+                                        setActive("active");
+                                    },
+                                    selected: leftNavSelected === "dashboard_testing_test_suite",
+                                }
                             ],
                             key: "4",
                         },
