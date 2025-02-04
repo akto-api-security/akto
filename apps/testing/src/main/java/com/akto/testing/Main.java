@@ -76,6 +76,7 @@ public class Main {
 
     private static final Logger logger = LoggerFactory.getLogger(Main.class);
 
+    private static final String testingInstanceId = UUID.randomUUID().toString();
 
     public static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
     public static final ScheduledExecutorService deleteScheduler = Executors.newScheduledThreadPool(1);
@@ -136,6 +137,19 @@ public class Main {
         }, 0, 1, TimeUnit.MINUTES);
     }
 
+    private static void triggerHeartbeatCron() {
+        scheduler.scheduleAtFixedRate(new Runnable() {
+            public void run() {
+                AccountTask.instance.executeTaskForNonHybridAccounts(new Consumer<Account>() {
+                    @Override
+                    public void accept(Account t) {
+                        TestingInstanceHeartBeatDao.instance.insertOne(new TestingInstanceHeartBeat(testingInstanceId, Context.now()));
+                    }
+                }, "testing-heart-beat-scheduler");
+            }
+        }, 0, 10, TimeUnit.SECONDS);
+    }
+
     public static Set<Integer> extractApiCollectionIds(List<ApiInfo.ApiInfoKey> apiInfoKeyList) {
         Set<Integer> ret = new HashSet<>();
         for(ApiInfo.ApiInfoKey apiInfoKey: apiInfoKeyList) {
@@ -162,7 +176,8 @@ public class Main {
 
         Bson update = Updates.combine(
                 Updates.set(TestingRun.PICKED_UP_TIMESTAMP, Context.now()),
-                Updates.set(TestingRun.STATE, TestingRun.State.RUNNING)
+                Updates.set(TestingRun.STATE, TestingRun.State.RUNNING),
+                Updates.set("instanceId", testingInstanceId)
         );
 
         // returns the previous state of testing run before the update
@@ -334,6 +349,8 @@ public class Main {
         } while (!connectedToMongo);
 
         setupRateLimitWatcher();
+
+        triggerHeartbeatCron();
         
         executorService.scheduleAtFixedRate(new Main.MemoryMonitorTask(), 0, 1, TimeUnit.SECONDS);
 
@@ -457,6 +474,10 @@ public class Main {
                 }
 
                 if (testingRun == null) {
+                    return;
+                }
+
+                if (!TestingInstanceHeartBeatDao.instance.isTestEligibleForInstance(testingRun.getInstanceId())) {
                     return;
                 }
 
