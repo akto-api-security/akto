@@ -1,5 +1,6 @@
 package com.akto.testing;
 
+import java.io.File;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -28,6 +29,7 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.test_editor.filter.Filter;
 import com.akto.test_editor.filter.data_operands_impl.ValidationResult;
 import com.akto.util.JSONUtils;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 
@@ -501,5 +503,27 @@ public class Utils {
         }
 
         httpRequest.setQueryParams(queryParams);
+    }
+
+    public static void writeJsonContentInFile(String folderName, String fileName, Object content){
+        try {
+            File file = new File(folderName, fileName);
+            ObjectMapper objectMapper = new ObjectMapper();
+            objectMapper.writerWithDefaultPrettyPrinter().writeValue(file, content);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    public static <T> T readJsonContentFromFile(String folderName, String fileName, Class<T> valueType) {
+        T result = null;
+        try {
+            File file = new File(folderName, fileName);
+            ObjectMapper objectMapper = new ObjectMapper();
+            result = objectMapper.readValue(file, valueType);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return result;
     }
 }

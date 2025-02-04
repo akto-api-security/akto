@@ -4,9 +4,13 @@ import com.akto.RuntimeMode;
 import com.akto.billing.UsageMetricUtils;
 import com.akto.crons.GetRunningTestsStatus;
 import com.akto.dao.context.Context;
+import com.akto.dao.testing.TestingRunConfigDao;
+import com.akto.dao.testing.TestingRunDao;
+import com.akto.dao.testing.TestingRunResultSummariesDao;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.*;
+import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.*;
@@ -16,6 +20,7 @@ import com.akto.dto.testing.rate_limit.ApiRateLimit;
 import com.akto.dto.testing.rate_limit.GlobalApiRateLimit;
 import com.akto.dto.testing.rate_limit.RateLimitHandler;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.dto.usage.MetricTypes;
 import com.akto.github.GithubUtils;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -25,15 +30,21 @@ import com.akto.notifications.slack.APITestStatusAlert;
 import com.akto.notifications.slack.NewIssuesModel;
 import com.akto.notifications.slack.SlackAlerts;
 import com.akto.notifications.slack.SlackSender;
+import com.akto.testing.kafka_utils.ConsumerUtil;
+import com.akto.testing.kafka_utils.Producer;
+import com.akto.util.Constants;
 import com.akto.util.DashboardMode;
 import com.akto.util.EmailAccountName;
 import com.akto.util.enums.GlobalEnums;
+import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.*;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static com.akto.testing.Utils.readJsonContentFromFile;
 
 import java.util.*;
 import java.util.concurrent.Executors;
@@ -82,6 +93,41 @@ public class Main {
     }
     private static final int LAST_TEST_RUN_EXECUTION_DELTA = 5 * 60;
     private static final int MAX_RETRIES_FOR_FAILED_SUMMARIES = 3;
+
+     private static BasicDBObject checkIfAlreadyTestIsRunningOnMachine(){
+        // this will return true if consumer is running and this the latest summary of the testing run 
+        // and also the summary should be in running state
+        try {
+            BasicDBObject currentTestInfo = readJsonContentFromFile(Constants.TESTING_STATE_FOLDER_PATH, Constants.TESTING_STATE_FILE_NAME, BasicDBObject.class);
+            if(currentTestInfo == null){
+                return null;
+            }
+            if(!currentTestInfo.getBoolean("CONSUMER_RUNNING", false)){
+                return null;
+            }
+            String testingRunId = currentTestInfo.getString("testingRunId");
+            String testingRunSummaryId = currentTestInfo.getString("summaryId");
+
+            int accountID = currentTestInfo.getInt("accountId");
+            Context.accountId.set(accountID);
+
+            TestingRunResultSummary testingRunResultSummary = dataActor.fetchTestingRunResultSummary(testingRunSummaryId);
+            if(testingRunResultSummary == null || testingRunResultSummary.getState() == null ||  testingRunResultSummary.getState() != State.RUNNING){
+                return null;
+            }
+            Bson filterQ = Filters.eq(TestingRunResultSummary.TESTING_RUN_ID, new ObjectId(testingRunId));
+            TestingRunResultSummary latestSummary = dataActor.findLatestTestingRunResultSummary(filterQ);
+            if(latestSummary.getHexId().equals(testingRunSummaryId)){
+                return currentTestInfo;
+            }else{
+                return null;
+            }   
+        } catch (Exception e) {
+            logger.error("Error in reading the testing state file: " + e.getMessage());
+            return null;
+        }
+    }
+    
 
     private static void setTestingRunConfig(TestingRun testingRun, TestingRunResultSummary trrs) {
         long timestamp = testingRun.getId().getTimestamp();
@@ -157,6 +203,10 @@ public class Main {
             }
         }
 
+        Producer testingProducer = new Producer();
+        ConsumerUtil testingConsumer = new ConsumerUtil();
+        TestCompletion testCompletion = new TestCompletion();
+
         loggerMaker.infoAndAddToDb("Starting.......", LogDb.TESTING);
 
         schedulerAccessMatrix.scheduleAtFixedRate(new Runnable() {
@@ -186,6 +236,54 @@ public class Main {
         int accountId = accountSettings.getId();
         Context.accountId.set(accountId);
         GetRunningTestsStatus.getRunningTests().getStatusOfRunningTests();
+
+          BasicDBObject currentTestInfo = null;
+        if(Constants.IS_NEW_TESTING_ENABLED){
+            currentTestInfo = checkIfAlreadyTestIsRunningOnMachine();
+        }
+
+        if(currentTestInfo != null){
+            try {
+                loggerMaker.infoAndAddToDb("Tests were already running on this machine, thus resuming the test for account: "+ accountId, LogDb.TESTING);
+                FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccess(accountId, MetricTypes.TEST_RUNS);
+                
+
+                String testingRunId = currentTestInfo.getString("testingRunId");
+                String testingRunSummaryId = currentTestInfo.getString("summaryId");
+                TestingRun testingRun = TestingRunDao.instance.findOne(Filters.eq(Constants.ID, new ObjectId(testingRunId)));
+                TestingRunConfig baseConfig = TestingRunConfigDao.instance.findOne(Constants.ID, testingRun.getTestIdConfig());
+                testingRun.setTestingRunConfig(baseConfig);
+                ObjectId summaryId = new ObjectId(testingRunSummaryId);
+                testingProducer.initProducer(testingRun, summaryId, true);
+                int maxRunTime = testingRun.getTestRunTime() <= 0 ? 30*60 : testingRun.getTestRunTime();
+                testingConsumer.init(maxRunTime);
+
+                // mark the test completed here
+                testCompletion.markTestAsCompleteAndRunFunctions(testingRun, summaryId, System.currentTimeMillis());
+
+                // if (StringUtils.hasLength(AKTO_SLACK_WEBHOOK) ) {
+                //     try {
+                //         CustomTextAlert customTextAlert = new CustomTextAlert("Test completed for accountId=" + accountId + " testingRun=" + testingRun.getHexId() + " summaryId=" + summaryId.toHexString() + " : @Arjun you are up now. Make your time worth it. :)");
+                //         SLACK_INSTANCE.send(AKTO_SLACK_WEBHOOK, customTextAlert.toJson());
+                //     } catch (Exception e) {
+                //         logger.error("Error sending slack alert for completion of test", e);
+                //     }
+                    
+                // }
+                
+                // deleteScheduler.execute(() -> {
+                //     Context.accountId.set(accountId);
+                //     try {
+                //         deleteNonVulnerableResults();
+
+                //     } catch (Exception e) {
+                //         loggerMaker.errorAndAddToDb(e, "Error in deleting testing run results");
+                //     }
+                // });
+            } catch (Exception e) {
+                logger.error("Error in running failed tests from file.", e);
+            }
+        }
 
         singleTypeInfoInit(accountId);
 
@@ -340,7 +438,13 @@ public class Main {
                     }
                 }
                 if(!maxRetriesReached){
-                    testExecutor.init(testingRun, summaryId);
+                    if(Constants.IS_NEW_TESTING_ENABLED){
+                        int maxRunTime = testingRun.getTestRunTime() <= 0 ? 30*60 : testingRun.getTestRunTime();
+                        testingProducer.initProducer(testingRun, summaryId, false);  
+                        testingConsumer.init(maxRunTime);  
+                    }else{
+                        testExecutor.init(testingRun, summaryId, false);
+                    } 
                     AllMetrics.instance.setTestingRunCount(1);
                 }
                 //raiseMixpanelEvent(summaryId, testingRun, accountId);
@@ -348,43 +452,8 @@ public class Main {
                 e.printStackTrace();
                 loggerMaker.errorAndAddToDb(e, "Error in init " + e);
             }
-            int scheduleTs = 0;
-
-            if (testingRun.getPeriodInSeconds() > 0 ) {
-                scheduleTs = testingRun.getScheduleTimestamp() + testingRun.getPeriodInSeconds();
-            } else if (testingRun.getPeriodInSeconds() == -1) {
-                scheduleTs = testingRun.getScheduleTimestamp() + 5 * 60;
-            }
-
-            if(GetRunningTestsStatus.getRunningTests().isTestRunning(testingRun.getId())){
-                dataActor.updateTestingRunAndMarkCompleted(testingRun.getId().toHexString(), scheduleTs);
-            }
-
-            if(summaryId != null && testingRun.getTestIdConfig() != 1){
-                TestExecutor.updateTestSummary(summaryId);
-            }
-
-            loggerMaker.infoAndAddToDb("Tests completed in " + (Context.now() - start) + " seconds for account: " + accountId, LogDb.TESTING);
-            AllMetrics.instance.setTestingRunLatency(System.currentTimeMillis() - startDetailed);
-
-            Organization organization = dataActor.fetchOrganization(accountId);
-
-            if(organization != null && organization.getTestTelemetryEnabled()){
-                loggerMaker.infoAndAddToDb("Test telemetry enabled for account: " + accountId + ", sending results", LogDb.TESTING);
-                ObjectId finalSummaryId = summaryId;
-                testTelemetryScheduler.execute(() -> {
-                    Context.accountId.set(accountId);
-                    try {
-                        com.akto.onprem.Constants.sendTestResults(finalSummaryId, organization);
-                        loggerMaker.infoAndAddToDb("Test telemetry sent for account: " + accountId, LogDb.TESTING);
-                    } catch (Exception e) {
-                        loggerMaker.errorAndAddToDb(e, "Error in sending test telemetry for account: " + accountId);
-                    }
-                });
-
-            } else {
-                loggerMaker.infoAndAddToDb("Test telemetry disabled for account: " + accountId, LogDb.TESTING);
-            }
+            
+            testCompletion.markTestAsCompleteAndRunFunctions(testingRun, summaryId, startDetailed);
 
             Thread.sleep(1000);
         }
