@@ -73,9 +73,9 @@ public class TestExecutor {
     public static final String REQUEST_HOUR = "requestHour";
     public static final String COUNT = "count";
     public static final int ALLOWED_REQUEST_PER_HOUR = 100;
-    public void init(TestingRun testingRun, ObjectId summaryId) {
+    public void init(TestingRun testingRun, ObjectId summaryId, boolean shouldInitOnly) {
         if (testingRun.getTestIdConfig() != 1) {
-            apiWiseInit(testingRun, summaryId, false, new ArrayList<>());
+            apiWiseInit(testingRun, summaryId, false, new ArrayList<>(), shouldInitOnly);
         } else {
             workflowInit(testingRun, summaryId, false, new ArrayList<>());
         }
@@ -118,7 +118,7 @@ public class TestExecutor {
         dataActor.updateIssueCountInTestSummary(summaryId.toHexString(), totalCountIssues);
     }
 
-    public void apiWiseInit(TestingRun testingRun, ObjectId summaryId, boolean debug, List<TestingRunResult.TestLog> testLogs) {
+    public void apiWiseInit(TestingRun testingRun, ObjectId summaryId, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean shouldInitOnly) {
         int accountId = Context.accountId.get();
         int now = Context.now();
         int maxConcurrentRequests = testingRun.getMaxConcurrentRequests() > 0 ? Math.min( testingRun.getMaxConcurrentRequests(), 100) : 10;
