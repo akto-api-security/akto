@@ -147,7 +147,7 @@ public class Main {
                     Updates.set("ts", Context.now())
                 );
                 TestingInstanceHeartBeatDao.instance.getMCollection().
-                updateOne(Filters.eq("_id", testingInstanceId), updates, updateOptions);
+                updateOne(Filters.eq("instanceId", testingInstanceId), updates, updateOptions);
 
             }
         }, 0, 10, TimeUnit.SECONDS);
