@@ -579,4 +579,8 @@ public class DbActor extends DataActor {
         return DbLayer.findDependencyNodes(apiCollectionId, url, method, reqMethod);
     }
 
+    public TestingRunResultSummary findLatestTestingRunResultSummary(Bson filter){
+        return DbLayer.findLatestTestingRunResultSummary(filter);
+    }
+
 }
