@@ -121,9 +121,9 @@ public class ConsumerUtil {
 
             parallelConsumer = ParallelStreamProcessor.createEosStreamProcessor(options);
             parallelConsumer.subscribe(Arrays.asList(topicName)); 
-            if (StringUtils.hasLength(Main.AKTO_SLACK_WEBHOOK) ) {
+            if (StringUtils.hasLength(Main.AKTO_SLACK_WEBHOOK)) {
                 try {
-                    CustomTextAlert customTextAlert = new CustomTextAlert("Tests being picked for execution" + currentTestInfo.getInt("accountId") + " summaryId=" + summaryIdForTest);
+                    CustomTextAlert customTextAlert = new CustomTextAlert("Tests being picked for execution through consumer for account: " + currentTestInfo.getInt("accountId") + " summaryId=" + summaryIdForTest);
                     Main.SLACK_INSTANCE.send(Main.AKTO_SLACK_WEBHOOK, customTextAlert.toJson());
                 } catch (Exception e) {
                     logger.error("Error sending slack alert for completion of test", e);
