@@ -16,6 +16,8 @@ import org.apache.kafka.clients.admin.RecordsToDelete;
 import org.apache.kafka.clients.admin.TopicDescription;
 import org.apache.kafka.common.TopicPartition;
 import org.bson.types.ObjectId;
+
+import com.akto.dto.billing.SyncLimit;
 import com.akto.dto.testing.TestingRun;
 import com.akto.dto.testing.info.SingleTestPayload;
 import com.akto.kafka.Kafka;
@@ -76,7 +78,7 @@ public class Producer {
         }
     }
 
-    public void initProducer(TestingRun testingRun, ObjectId summaryId, boolean doInitOnly){
+    public void initProducer(TestingRun testingRun, ObjectId summaryId, boolean doInitOnly, SyncLimit syncLimit){
         TestExecutor executor = new TestExecutor();
         if(!doInitOnly){
             try {
@@ -85,6 +87,6 @@ public class Producer {
                 e.printStackTrace();
             }
         }
-        executor.init(testingRun, summaryId, doInitOnly);
+        executor.init(testingRun, summaryId, syncLimit, doInitOnly);
     }
 }
