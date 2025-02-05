@@ -1141,5 +1141,9 @@ public class DbLayer {
         Bson delFilterQ = Filters.and(filterQ, Filters.eq(DependencyNode.METHOD_REQ, reqMethod));
         return DependencyNodeDao.instance.findAll(delFilterQ);
     }
+    
+    public static TestingRunResultSummary findLatestTestingRunResultSummary(Bson filter){
+        return TestingRunResultSummariesDao.instance.findLatestOne(filter);
+    }
 
 }
