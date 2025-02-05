@@ -205,29 +205,31 @@ public class TestExecutor {
 
         dataActor.updateTotalApiCountInTestSummary(summaryId.toHexString(), apiInfoKeyList.size());
 
-        // Todo: Aryan? [entire for-loop]
+        // Todo: Aryan? [entire for-loop] 
         ConcurrentHashMap<String, String> subCategoryEndpointMap = new ConcurrentHashMap<>();
         Map<ApiInfoKey, String> apiInfoKeyToHostMap = new HashMap<>();
         String hostName;
 
-        for (String testSubCategory: testingRun.getTestingRunConfig().getTestSubCategoryList()) {
-            TestConfig testConfig = testConfigMap.get(testSubCategory);
-            if (testConfig == null || testConfig.getStrategy() == null || testConfig.getStrategy().getRunOnce() == null) {
-                continue;
-            }
-            for (ApiInfo.ApiInfoKey apiInfoKey: apiInfoKeyList) {
-                try {
-                    hostName = findHost(apiInfoKey, testingUtil.getSampleMessages(), testingUtil.getSampleMessageStore());
-                    if (hostName == null) {
-                        continue;
-                    }
-                    apiInfoKeyToHostMap.put(apiInfoKey, hostName);
-                    subCategoryEndpointMap.put(apiInfoKey.getApiCollectionId() + "_" + testSubCategory, hostName);
-                } catch (URISyntaxException e) {
-                    loggerMaker.errorAndAddToDb("Error while finding host: " + e, LogDb.TESTING);
-                }
-            }
-        }
+        // this commented in main-testing
+
+        // for (String testSubCategory: testingRun.getTestingRunConfig().getTestSubCategoryList()) {
+        //     TestConfig testConfig = testConfigMap.get(testSubCategory);
+        //     if (testConfig == null || testConfig.getStrategy() == null || testConfig.getStrategy().getRunOnce() == null) {
+        //         continue;
+        //     }
+        //     for (ApiInfo.ApiInfoKey apiInfoKey: apiInfoKeyList) {
+        //         try {
+        //             hostName = findHost(apiInfoKey, testingUtil.getSampleMessages(), testingUtil.getSampleMessageStore());
+        //             if (hostName == null) {
+        //                 continue;
+        //             }
+        //             apiInfoKeyToHostMap.put(apiInfoKey, hostName);
+        //             subCategoryEndpointMap.put(apiInfoKey.getApiCollectionId() + "_" + testSubCategory, hostName);
+        //         } catch (URISyntaxException e) {
+        //             loggerMaker.errorAndAddToDb("Error while finding host: " + e, LogDb.TESTING);
+        //         }
+        //     }
+        // }
 
         // init the singleton class here
         TestingConfigurations.getInstance().init(testingUtil, testingRun.getTestingRunConfig(), debug, testConfigMap);
@@ -501,10 +503,8 @@ public class TestExecutor {
         loggerMaker.infoAndAddToDb("Starting test for " + apiInfoKey, LogDb.TESTING);   
         AtomicBoolean isApiInfoTested = new AtomicBoolean(false);
         try {
-            List<String> testSubCategories = testingRunConfig == null ? new ArrayList<>() : testingRunConfig.getTestSubCategoryList();
-
-            for (String testSubCategory: testSubCategories) {
-                if(GetRunningTestsStatus.getRunningTests().isTestRunning(testRunResultSummaryId)){
+            for (String testSubCategory: testingRunSubCategories) {
+                if(GetRunningTestsStatus.getRunningTests().isTestRunning(summaryId)){
                     insertRecordInKafka(accountId, testSubCategory, apiInfoKey, messages, summaryId, syncLimit, apiInfoKeyToHostMap, subCategoryEndpointMap, testConfigMap, testLogs, testingRun, isApiInfoTested);
                 }else{
                     logger.info("Test stopped for id: " + testingRun.getHexId());
@@ -625,8 +625,8 @@ public class TestExecutor {
 
 
         //Todo: Aryan? [failMessage should use SampleAltDb and create generateFailedRunResultForMessage in class Utils]
-        // String failMessage = null;
-        // TestingRunResult testingRunResult = Utils.generateFailedRunResultForMessage(testingRun.getId(), apiInfoKey, testSuperType, testSubType, summaryId, messages, failMessage); 
+        String failMessage = null;
+        TestingRunResult testingRunResult = com.akto.testing.Utils.generateFailedRunResultForMessage(testingRun.getId(), apiInfoKey, testSuperType, testSubType, summaryId, messages, failMessage); 
         if(testingRunResult != null){
             loggerMaker.infoAndAddToDb("Skipping test from producers because: " + failMessage + " apiinfo: " + apiInfoKey.toString(), LogDb.TESTING);
         }else if (Constants.IS_NEW_TESTING_ENABLED){
@@ -644,7 +644,7 @@ public class TestExecutor {
             }
 
         }else{
-            if(GetRunningTestsStatus.getRunningTests().isTestRunning(summaryId, true)){
+            if(GetRunningTestsStatus.getRunningTests().isTestRunning(summaryId)){
                 TestingConfigurations instance = TestingConfigurations.getInstance();
                 String sampleMessage = messages.get(messages.size() - 1);
                 testingRunResult = runTestNew(apiInfoKey, summaryId, instance.getTestingUtil(), summaryId, testConfig, instance.getTestingRunConfig(), instance.isDebug(), testLogs, sampleMessage);

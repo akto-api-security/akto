@@ -6,12 +6,12 @@ import com.akto.crons.GetRunningTestsStatus;
 import com.akto.dao.context.Context;
 import com.akto.dao.testing.TestingRunConfigDao;
 import com.akto.dao.testing.TestingRunDao;
-import com.akto.dao.testing.TestingRunResultSummariesDao;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.*;
 import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.billing.Organization;
+import com.akto.dto.billing.SyncLimit;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.*;
 import com.akto.dto.testing.TestingEndpoints.Operator;
@@ -245,8 +245,9 @@ public class Main {
         if(currentTestInfo != null){
             try {
                 loggerMaker.infoAndAddToDb("Tests were already running on this machine, thus resuming the test for account: "+ accountId, LogDb.TESTING);
-                FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccess(accountId, MetricTypes.TEST_RUNS);
-                
+                Organization organization = dataActor.fetchOrganization(accountId);
+                FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccess(organization, MetricTypes.TEST_RUNS);   
+                SyncLimit syncLimit = featureAccess.fetchSyncLimit();
 
                 String testingRunId = currentTestInfo.getString("testingRunId");
                 String testingRunSummaryId = currentTestInfo.getString("summaryId");
@@ -254,7 +255,7 @@ public class Main {
                 TestingRunConfig baseConfig = TestingRunConfigDao.instance.findOne(Constants.ID, testingRun.getTestIdConfig());
                 testingRun.setTestingRunConfig(baseConfig);
                 ObjectId summaryId = new ObjectId(testingRunSummaryId);
-                testingProducer.initProducer(testingRun, summaryId, true);
+                testingProducer.initProducer(testingRun, summaryId, true, syncLimit);
                 int maxRunTime = testingRun.getTestRunTime() <= 0 ? 30*60 : testingRun.getTestRunTime();
                 testingConsumer.init(maxRunTime);
 
@@ -437,17 +438,22 @@ public class Main {
 
                     }
                 }
+
+                Organization organization = dataActor.fetchOrganization(accountId);
+                FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccess(organization, MetricTypes.TEST_RUNS);   
+                SyncLimit syncLimit = featureAccess.fetchSyncLimit();
+
                 if(!maxRetriesReached){
                     if(Constants.IS_NEW_TESTING_ENABLED){
                         int maxRunTime = testingRun.getTestRunTime() <= 0 ? 30*60 : testingRun.getTestRunTime();
-                        testingProducer.initProducer(testingRun, summaryId, false);  
+                        testingProducer.initProducer(testingRun, summaryId, false, syncLimit);  
                         testingConsumer.init(maxRunTime);  
                     }else{
-                        testExecutor.init(testingRun, summaryId, false);
+                        testExecutor.init(testingRun, summaryId, syncLimit, false);
                     } 
                     AllMetrics.instance.setTestingRunCount(1);
                 }
-                //raiseMixpanelEvent(summaryId, testingRun, accountId);
+                // raiseMixpanelEvent(summaryId, testingRun, accountId);
             } catch (Exception e) {
                 e.printStackTrace();
                 loggerMaker.errorAndAddToDb(e, "Error in init " + e);
