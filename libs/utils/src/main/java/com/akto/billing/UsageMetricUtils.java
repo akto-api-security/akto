@@ -1,7 +1,6 @@
 package com.akto.billing;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -28,7 +27,6 @@ import com.akto.util.DashboardMode;
 import com.akto.util.EmailAccountName;
 import com.akto.util.UsageUtils;
 import com.akto.util.http_util.CoreHTTPClient;
-import com.google.api.client.json.Json;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
@@ -45,7 +43,7 @@ import org.slf4j.LoggerFactory;
 
 public class UsageMetricUtils {
     private static final Logger logger = LoggerFactory.getLogger(UsageMetricUtils.class);
-    private static final LoggerMaker loggerMaker = new LoggerMaker(UsageMetricUtils.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(UsageMetricUtils.class, LogDb.DASHBOARD);
     private static final CacheLoggerMaker cacheLoggerMaker = new CacheLoggerMaker(UsageMetricUtils.class);
     private static final OkHttpClient client = CoreHTTPClient.client.newBuilder().build();
 
@@ -242,6 +240,31 @@ public class UsageMetricUtils {
             featureAccess = getFeatureAccess(organization, metricType);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in fetching usage metric acc: " + accountId, LogDb.DASHBOARD);
+        }
+        return featureAccess;
+    }
+
+    public static FeatureAccess getFeatureAccessSaas(int accountId, String featureLabel) {
+        /*
+         * No access in case of billing service down.
+         * For selected features only.
+         */
+        FeatureAccess featureAccess = FeatureAccess.noAccess;
+        try {
+            if (!DashboardMode.isMetered()) {
+                return featureAccess;
+            }
+            Organization organization = OrganizationsDao.instance.findOneByAccountId(accountId);
+            if (organization == null) {
+                return featureAccess;
+            }
+            HashMap<String, FeatureAccess> featureWiseAllowed = organization.getFeatureWiseAllowed();
+            if (featureWiseAllowed == null || featureWiseAllowed.isEmpty()) {
+                return featureAccess;
+            }
+            featureAccess = featureWiseAllowed.getOrDefault(featureLabel, FeatureAccess.noAccess);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in fetching featureLabel acc: " + accountId, LogDb.DASHBOARD);
         }
         return featureAccess;
     }

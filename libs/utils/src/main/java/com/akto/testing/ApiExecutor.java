@@ -8,7 +8,6 @@ import com.akto.dto.CollectionConditions.ConditionsType;
 import com.akto.dto.CollectionConditions.TestConfigsAdvancedSettings;
 import com.akto.dto.testing.TestingRunConfig;
 import com.akto.dto.testing.TestingRunResult;
-import com.akto.dto.testing.config.TestScript;
 import com.akto.dto.testing.rate_limit.RateLimitHandler;
 import com.akto.dto.type.URLMethods;
 import com.akto.log.LoggerMaker;
@@ -29,12 +28,10 @@ import java.net.URL;
 import java.util.*;
 
 public class ApiExecutor {
-    private static final LoggerMaker loggerMaker = new LoggerMaker(ApiExecutor.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(ApiExecutor.class, LogDb.TESTING);
 
     // Load only first 1 MiB of response body into memory.
     private static final int MAX_RESPONSE_SIZE = 1024*1024;
-    private static Map<Integer, Integer> lastFetchedMap = new HashMap<>();
-    private static Map<Integer, TestScript> testScriptMap = new HashMap<>();
     
     private static OriginalHttpResponse common(Request request, boolean followRedirects, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck, String requestProtocol) throws Exception {
 
@@ -258,13 +255,13 @@ public class ApiExecutor {
     }
 
     public static Request buildRequest(OriginalHttpRequest request, TestingRunConfig testingRunConfig) throws Exception{
+        boolean executeScript = testingRunConfig != null;
+        ApiExecutorUtil.calculateHashAndAddAuth(request, executeScript);
         String url = prepareUrl(request, testingRunConfig);
         request.setUrl(url);
         Request.Builder builder = new Request.Builder();
         addHeaders(request, builder);
         builder = builder.url(request.getFullUrlWithParams());
-        boolean executeScript = testingRunConfig != null;
-        //calculateHashAndAddAuth(request, executeScript);
         Request okHttpRequest = builder.build();
         return okHttpRequest;
     }
@@ -294,6 +291,9 @@ public class ApiExecutor {
             calculateFinalRequestFromAdvancedSettings(request, testingRunConfig.getConfigsAdvancedSettings());
         }
 
+        boolean executeScript = testingRunConfig != null;
+        ApiExecutorUtil.calculateHashAndAddAuth(request, executeScript);
+
         String url = prepareUrl(request, testingRunConfig);
 
         if (!(url.contains("insertRuntimeLog") || url.contains("insertTestingLog") || url.contains("insertProtectionLog"))) {
@@ -308,9 +308,6 @@ public class ApiExecutor {
         URLMethods.Method method = URLMethods.Method.fromString(request.getMethod());
 
         builder = builder.url(request.getFullUrlWithParams());
-
-        boolean executeScript = testingRunConfig != null;
-        //calculateHashAndAddAuth(request, executeScript);
 
         OriginalHttpResponse response = null;
         HostValidator.validate(url);

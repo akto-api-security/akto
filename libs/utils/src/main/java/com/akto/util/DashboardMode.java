@@ -1,6 +1,10 @@
 package com.akto.util;
 
+import com.akto.dao.SetupDao;
+import com.akto.dto.Setup;
 import com.akto.onprem.Constants;
+import com.mongodb.BasicDBObject;
+
 import org.apache.commons.lang3.StringUtils;
 
 public enum DashboardMode {
@@ -53,6 +57,17 @@ public enum DashboardMode {
     }
 
     public static boolean isMetered() {
-        return isSaasDeployment() || isOnPremDeployment();
+
+        boolean isSaasDeployment = isSaasDeployment();
+        try {
+            Setup setup = SetupDao.instance.findOne(new BasicDBObject());
+            if(setup!=null){
+                String dashboardMode = setup.getDashboardMode();
+                isSaasDeployment = dashboardMode.equalsIgnoreCase(DashboardMode.SAAS.name());
+            }
+        } catch(Exception e){
+
+        }
+        return isSaasDeployment || isOnPremDeployment();
     }
 }
