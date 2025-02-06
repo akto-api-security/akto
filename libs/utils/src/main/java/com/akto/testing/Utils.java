@@ -542,7 +542,7 @@ public class Utils {
         String testSubType, ObjectId testRunResultSummaryId, List<String> messages, String errorMessage) {
 
         TestingRunResult testingRunResult = null;       
-        Set<Integer> deactivatedCollections = UsageMetricCalculator.getDeactivated();
+        // Set<Integer> deactivatedCollections = UsageMetricCalculator.getDeactivated();
         List<GenericTestResult> testResults = new ArrayList<>();
         String failMessage = errorMessage;
         String msg = null;
@@ -550,10 +550,8 @@ public class Utils {
             msg = SampleDataAltDb.findLatestSampleByApiInfoKey(apiInfoKey) ;
         } catch (Exception e) {
         }
-
-        if(deactivatedCollections.contains(apiInfoKey.getApiCollectionId())){
-            failMessage = TestError.DEACTIVATED_ENDPOINT.getMessage();
-        }else if((messages == null || messages.isEmpty()) && msg == null){
+        
+        if((messages == null || messages.isEmpty()) && msg == null){
             failMessage = TestError.NO_PATH.getMessage();
         }
             

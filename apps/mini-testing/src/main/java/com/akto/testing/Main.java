@@ -4,8 +4,6 @@ import com.akto.RuntimeMode;
 import com.akto.billing.UsageMetricUtils;
 import com.akto.crons.GetRunningTestsStatus;
 import com.akto.dao.context.Context;
-import com.akto.dao.testing.TestingRunConfigDao;
-import com.akto.dao.testing.TestingRunDao;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.*;
@@ -209,6 +207,11 @@ public class Main {
 
         loggerMaker.infoAndAddToDb("Starting.......", LogDb.TESTING);
 
+        if(Constants.IS_NEW_TESTING_ENABLED){
+            boolean val = Utils.createFolder(Constants.TESTING_STATE_FOLDER_PATH);
+            logger.info("Testing info folder status: " + val);
+        }
+
         schedulerAccessMatrix.scheduleAtFixedRate(new Runnable() {
             public void run() {
                 if (matrixAnalyzerRunning) {
@@ -249,10 +252,9 @@ public class Main {
                 FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccess(organization, MetricTypes.TEST_RUNS);   
                 SyncLimit syncLimit = featureAccess.fetchSyncLimit();
 
-                String testingRunId = currentTestInfo.getString("testingRunId");
                 String testingRunSummaryId = currentTestInfo.getString("summaryId");
-                TestingRun testingRun = TestingRunDao.instance.findOne(Filters.eq(Constants.ID, new ObjectId(testingRunId)));
-                TestingRunConfig baseConfig = TestingRunConfigDao.instance.findOne(Constants.ID, testingRun.getTestIdConfig());
+                TestingRun testingRun = dataActor.findTestingRun(testingRunSummaryId);
+                TestingRunConfig baseConfig = dataActor.findTestingRunConfig(testingRun.getTestIdConfig());
                 testingRun.setTestingRunConfig(baseConfig);
                 ObjectId summaryId = new ObjectId(testingRunSummaryId);
                 testingProducer.initProducer(testingRun, summaryId, true, syncLimit);
