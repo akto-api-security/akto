@@ -600,7 +600,6 @@ public class TestExecutor {
             } catch (Exception e){
                 loggerMaker.errorAndAddToDb(e, "Unable to create issues", LogDb.TESTING);
             }
-            testingRunResults.clear();
         }
     }
 
