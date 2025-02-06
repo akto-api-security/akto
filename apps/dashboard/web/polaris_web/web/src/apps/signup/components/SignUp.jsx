@@ -70,14 +70,25 @@ function SignUp() {
     resetAll()
     clearPollingInterval()
     let copySsoList = []
-    if (activeSSO?.toLowerCase() === "github" && githubAuthUrl?.length > 0) {
-      copySsoList.push(githubAuthObj)
-    } else if(activeSSO?.toLowerCase() === "okta" && oktaAuthUrl?.length > 0) {
-      copySsoList.push(oktaAuthObj)
-    } else if(activeSSO?.toLowerCase() === "azure" && azureAuthUrl?.length > 0) {
-      copySsoList.push(azureAuthObj)
-    } else if(activeSSO?.toLowerCase() === "google_saml") {
-      copySsoList.push(googleSamlAuthObj)
+    switch (activeSSO?.toLowerCase()) {
+      case "github":
+        if (githubAuthUrl?.length > 0) {
+          copySsoList.push(githubAuthObj);
+        }
+        break;
+      case "okta":
+        if (oktaAuthUrl?.length > 0) {
+          copySsoList.push(oktaAuthObj);
+        }
+        break;
+      case "azure":
+        if (azureAuthUrl?.length > 0) {
+          copySsoList.push(azureAuthObj);
+        }
+        break;
+      case "google_saml":
+        copySsoList.push(googleSamlAuthObj);
+        break;
     }
 
     setSsoList(copySsoList)
