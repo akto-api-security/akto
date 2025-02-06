@@ -1685,6 +1685,19 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
     }
     return rbacAccess;
   },
+
+  checkForFeatureSaas(featureLabel) {
+    const stiggFeatures = window.STIGG_FEATURE_WISE_ALLOWED
+    let access = false;
+    if (!stiggFeatures || Object.keys(stiggFeatures).length === 0) {
+      // for feature map not present, no access. For saas only.
+      access = false;
+    } else if (stiggFeatures && stiggFeatures[featureLabel]) {
+      access = stiggFeatures[featureLabel].isGranted
+    }
+    return access;
+  },
+
   checkUserValidForIntegrations(){
     const rbacAccess = this.checkForRbacFeatureBasic();
     if(!rbacAccess){
