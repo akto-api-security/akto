@@ -46,15 +46,6 @@ public class SAMLConfig extends Config  {
         return samlConfig;
     }
 
-    public static SAMLConfig getSAMLConfigByAccountId(int accountId, ConfigType configType) {
-        return SSOConfigsDao.instance.findOne(
-                Filters.and(
-                        Filters.eq(Constants.ID, String.valueOf(accountId)),
-                        Filters.eq("configType", configType.name())
-                )
-        );
-    }
-
     public String getApplicationIdentifier() {
         return applicationIdentifier;
     }
