@@ -35,6 +35,7 @@ import com.akto.dto.testing.WorkflowUpdatedSampleData;
 import com.akto.dto.type.RequestTemplate;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.sql.SampleDataAltDb;
 import com.akto.test_editor.filter.Filter;
 import com.akto.test_editor.filter.data_operands_impl.ValidationResult;
 import com.akto.usage.UsageMetricCalculator;
@@ -544,10 +545,15 @@ public class Utils {
         Set<Integer> deactivatedCollections = UsageMetricCalculator.getDeactivated();
         List<GenericTestResult> testResults = new ArrayList<>();
         String failMessage = errorMessage;
+        String msg = null;
+        try {
+            msg = SampleDataAltDb.findLatestSampleByApiInfoKey(apiInfoKey) ;
+        } catch (Exception e) {
+        }
 
         if(deactivatedCollections.contains(apiInfoKey.getApiCollectionId())){
             failMessage = TestError.DEACTIVATED_ENDPOINT.getMessage();
-        }else if(messages == null || messages.isEmpty()){
+        }else if((messages == null || messages.isEmpty()) && msg == null){
             failMessage = TestError.NO_PATH.getMessage();
         }
             

@@ -25,6 +25,7 @@ import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.test_editor.TestConfig;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.info.SingleTestPayload;
+import com.akto.sql.SampleDataAltDb;
 // import com.akto.notifications.slack.CustomTextAlert;
 import com.akto.testing.Main;
 import com.akto.testing.TestExecutor;
@@ -71,9 +72,17 @@ public class ConsumerUtil {
         if(messagesList == null || messagesList.isEmpty()){}
         else{
             String sample = messagesList.get(messagesList.size() - 1);
+            String msg = null;
+            try {
+                msg = SampleDataAltDb.findLatestSampleByApiInfoKey(apiInfoKey);
+            } catch (Exception e) {
+                // TODO: handle exception
+            }
+            if(msg != null){
+                sample = msg;
+            }
             logger.info("Running test for: " + apiInfoKey + " with subcategory: " + subCategory);
-            // TestingRunResult runResult = executor.runTestNew(apiInfoKey, singleTestPayload.getTestingRunId(), instance.getTestingUtil(), singleTestPayload.getTestingRunResultSummaryId(),testConfig , instance.getTestingRunConfig(), instance.isDebug(), singleTestPayload.getTestLogs(), sample);
-            TestingRunResult runResult = null;
+            TestingRunResult runResult = executor.runTestNew(apiInfoKey, singleTestPayload.getTestingRunId(), instance.getTestingUtil(), singleTestPayload.getTestingRunResultSummaryId(),testConfig , instance.getTestingRunConfig(), instance.isDebug(), singleTestPayload.getTestLogs(), sample);
             executor.insertResultsAndMakeIssues(Collections.singletonList(runResult), singleTestPayload.getTestingRunResultSummaryId());
         }
     }
