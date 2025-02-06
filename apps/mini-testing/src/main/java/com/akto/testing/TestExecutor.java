@@ -624,7 +624,6 @@ public class TestExecutor {
         String testSubType = testConfig.getInfo().getSubCategory();
 
 
-        //Todo: Aryan? [failMessage should use SampleAltDb and create generateFailedRunResultForMessage in class Utils]
         String failMessage = null;
         TestingRunResult testingRunResult = com.akto.testing.Utils.generateFailedRunResultForMessage(testingRun.getId(), apiInfoKey, testSuperType, testSubType, summaryId, messages, failMessage); 
         if(testingRunResult != null){
@@ -684,7 +683,6 @@ public class TestExecutor {
 
         String testSuperType = testConfig.getInfo().getCategory().getName();
         String testSubType = testConfig.getInfo().getSubCategory();
-        // Todo: Aryan? [SampleDataAltDb.findSamplesByApiInfoKey]
         try {
             long start = System.currentTimeMillis();
             String msg = null;
