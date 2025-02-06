@@ -24,7 +24,7 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
                             ...prev,
                             recurringDaily,
                             continuousTesting,
-                            runTypeLabel: runType.label
+                            runTypeLabel: runType
                         }));
                     }} />
                 <Dropdown
