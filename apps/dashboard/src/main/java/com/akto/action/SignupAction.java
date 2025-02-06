@@ -603,7 +603,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
         if(userEmail != null && !userEmail.isEmpty()) {
             samlConfig = SSOConfigsDao.instance.getSSOConfig(userEmail);
         } else if(DashboardMode.isOnPremDeployment()) {
-            samlConfig = SAMLConfig.getSAMLConfigByAccountId(1000000, ConfigType.AZURE);
+            samlConfig = SSOConfigsDao.getSAMLConfigByAccountId(1000000, ConfigType.AZURE);
         }
         if(samlConfig == null) {
             code = "Error, cannot login via SSO, trying to login with okta sso";

@@ -1,5 +1,6 @@
 package com.akto.action;
 
+import com.akto.dao.SSOConfigsDao;
 import com.akto.dao.UsersDao;
 import com.akto.dto.Config;
 import com.akto.dto.User;
@@ -69,9 +70,9 @@ public class HomeAction implements Action, SessionAware, ServletResponseAware, S
             servletRequest.setAttribute("activeSso", Config.ConfigType.OKTA);
         }
 
-        if (SAMLConfig.getSAMLConfigByAccountId(1000000, Config.ConfigType.AZURE) != null) {
+        if (SSOConfigsDao.getSAMLConfigByAccountId(1000000, Config.ConfigType.AZURE) != null) {
             try {
-                SAMLConfig samlConfig = SAMLConfig.getSAMLConfigByAccountId(1000000, Config.ConfigType.AZURE);
+                SAMLConfig samlConfig = SSOConfigsDao.getSAMLConfigByAccountId(1000000, Config.ConfigType.AZURE);
                 Saml2Settings samlSettings = CustomSamlSettings.getSamlSettings(samlConfig);
                 String samlRequestXml = new AuthnRequest(samlSettings).getAuthnRequestXml();
 
@@ -92,8 +93,8 @@ public class HomeAction implements Action, SessionAware, ServletResponseAware, S
         }
 
         // TODO("Haven't tested Google SAML SSO")
-        if (SAMLConfig.getSAMLConfigByAccountId(1000000, Config.ConfigType.GOOGLE_SAML) != null) {
-            SAMLConfig googleSamlConfig = SAMLConfig.getSAMLConfigByAccountId(1000000, Config.ConfigType.GOOGLE_SAML);
+        if (SSOConfigsDao.getSAMLConfigByAccountId(1000000, Config.ConfigType.GOOGLE_SAML) != null) {
+            SAMLConfig googleSamlConfig = SSOConfigsDao.getSAMLConfigByAccountId(1000000, Config.ConfigType.GOOGLE_SAML);
             servletRequest.setAttribute("googleSamlAuthUrl", googleSamlConfig.getLoginUrl());
             servletRequest.setAttribute("activeSso", Config.ConfigType.GOOGLE_SAML);
         }
