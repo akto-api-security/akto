@@ -7,54 +7,56 @@ import transform from "../../testing/transform";
 import LocalStore from "../../../../main/LocalStorageStore";
 import TestSuiteRow from "./TestSuiteRow";
 import func from "../../../../../util/func";
+import api from "../api";
 
 
 function FlyLayoutSuite(props) {
-    const {show, setShow, width, selectedTestSuite,setSelectedTestSuite} = props;
+    const { show, setShow, width, selectedTestSuite} = props;
     const [testSuiteName, setTestSuiteName] = useState("");
     const [testSearchValue, setTestSearchValue] = useState("");
     const [categories, setCategories] = useState([]);
 
     const handleExit = () => {
-        setSelectedTestSuite(null)
         setShow(false);
     }
+
+
     useEffect(() => {
         if (selectedTestSuite) {
             setCategories(prev => {
                 const selectedTestSuiteTests = new Set(selectedTestSuite.tests)
                 const updatedCategories = prev.map(category => ({
                     ...category,
-                    selected: false, 
+                    selected: false,
                     tests: category.tests.map(test => ({
-                        ...test, 
-                        selected: selectedTestSuiteTests.has(test.value)? true : false 
+                        ...test,
+                        selected: selectedTestSuiteTests.has(test.value) ? true : false
                     }))
                 }));
                 return updatedCategories;
             });
-            setTestSuiteName(selectedTestSuite.name);
+
+            setTestSuiteName(selectedTestSuite.testSuiteName);
         }
         else {
             setCategories(prev => {
                 const updatedCategories = prev.map(category => ({
                     ...category,
-                    selected: false, 
+                    selected: false,
                     tests: category.tests.map(test => ({
-                        ...test, 
-                        selected: false 
+                        ...test,
+                        selected: false
                     }))
                 }));
                 return updatedCategories;
             });
-            
+
             setTestSuiteName("");
         }
     }, [selectedTestSuite]);
 
 
     const fetchData = async () => {
-        console.log("fetching data")
         let metaDataObj = {
             categories: [],
             subCategories: [],
@@ -84,60 +86,58 @@ function FlyLayoutSuite(props) {
         fetchData();
     }, []);
 
-
-
-    const handleTestSuiteSave = () => {
-        if(!testSuiteName || testSuiteName === "") {
-            func.setToast(true, true, "Test Suite Name cannot be empty");
-            return ;
-        }
-        const selectedTestSuiteTests = [];
-        const updatedCategories = [...categories];
-        updatedCategories.forEach(element => {
-            element.tests.forEach(test => {
-                if (test.selected === true) {
-                    selectedTestSuiteTests.push(test.value);
-                }
-            });
-
-        });
-
-        let newSuite = {
-            name: testSuiteName,
-            id: testSuiteName,
-            tests: selectedTestSuiteTests,
-            testCount: selectedTestSuiteTests.length
-        }
-        console.log("done", newSuite)
-        LocalStore.getState().addCustomTestSuite(newSuite);
-        handleExit();
-        // window.location.reload();
-
-    }
-
     function handleSearch(val) {
         setTestSearchValue(val);
     }
 
-    let filteredCategories = [...categories];
+    let filteredCategories = JSON.parse(JSON.stringify(categories));;
     if (testSearchValue.length > 0) {
-        filteredCategories = categories.filter(category => {
-            if (category.displayName.toLowerCase().includes(testSearchValue.toLowerCase())) return true;
-            else {
-                let tests = category.value.tests.filter(test => test.label.toLowerCase().includes(testSearchValue.toLowerCase()));
-                if (tests.length > 0) return true;
-                else return false;
+        filteredCategories = filteredCategories.filter(category => {
+            let check = category.tests.some(test => test.selected);
+            return check;
+        });
+        filteredCategories = filteredCategories.filter(category => {
+
+
+            let tests = category.tests.filter(test => test.label.toLowerCase().includes(testSearchValue.toLowerCase()));
+            if (tests.length > 0) {
+                category.selected = true;
+                category.tests = tests;
+                return true;
             }
+            else {
+                return false;
+            }
+
         })
     }
+    else {
+        filteredCategories = filteredCategories.filter(category => {
+            let check = category.tests.some(test => test.selected);
+            return check;
+        });
+    }
 
+    function checkExpand() {
+        let check = false;
+        filteredCategories.forEach(category => {
+            if (!category.selected) check = true;
+        });
+        return check;
+
+    }
+    const countSearchResults = () => {
+        let count = 0;
+        filteredCategories.forEach(category => { count += category.tests.length });
+        return count;
+    }
 
     const headingComponents = (
         <HorizontalStack align="space-between">
             <div style={{ width: "40%" }}>
-                <TextField value={testSuiteName} onChange={(val) => setTestSuiteName(val)} label="Test Suite Name" placeholder="Test_suite_name" />
+                <TextField disabled={true} value={testSuiteName} onChange={(val) => setTestSuiteName(val)} label="Test Suite Name" placeholder="Test_suite_name" />
             </div>
-            <div style={{ width: "57%", paddingTop: "1.5rem" }}>
+            <div style={{ width: "58%", paddingTop: "1.5rem" }}>
                 <TextField value={testSearchValue} onChange={(val) => { handleSearch(val) }} prefix={<Icon source={SearchMinor} />} placeholder="Search" />
             </div>
         </HorizontalStack>
@@ -157,16 +157,23 @@ function FlyLayoutSuite(props) {
     function extendAllHandler() {
         setCategories(prev => {
             const updatedCategories = { ...prev };
-            let check = false;
             Object.values(updatedCategories).forEach(element => {
-                if (element.selected) check = true;
+                element.selected = true;
             });
-            Object.values(updatedCategories).forEach(element => {
-                element.selected = check ? false : true;
-            });
-
             return Object.values(updatedCategories);
         });
+    }
+
+    function collapseAllHandler() {
+
+        setCategories(prev => {
+            const updatedCategories = { ...prev };
+            Object.values(updatedCategories).forEach(element => {
+                element.selected = false;
+            });
+            return Object.values(updatedCategories);
+        });
+
     }
 
     function totalTestsCount() {
@@ -191,78 +198,52 @@ function FlyLayoutSuite(props) {
         return count;
     }
 
-    function totalTestCountCheck() {
-        let total = totalTestsCount();
-        let selected = totalSelectedTestsCount();
-        if (selected === 0) return false;
-        else if (total === selected) return true;
-        else return "indeterminate";
-    }
-
-    function handleTotalSelected() {
-        setCategories(prev => {
-            const updatedCategories = [...prev];
-            let someSelected = false;
-            updatedCategories.some(element => {
-                element.tests.some(test => test.selected) ? someSelected = true : someSelected = false;
-            })
-
-            updatedCategories.forEach(element => {
-                element.tests = element.tests.map(test => ({
-                    ...test,
-                    selected: someSelected ? false : true
-                }));
-
-            });
-
-            return updatedCategories;
-        });
-    }
 
     return (
         <div className={"flyLayout " + (show ? "show" : "")} style={{ width: divWidth }}>
             <div className="innerFlyLayout">
                 <Box borderColor="border-subdued" borderWidth="1" background="bg" width={divWidth} minHeight="100%">
-                    <div style={{ position: "absolute", right: "25vw", top: "50vh" }}></div> :
-                        <VerticalStack gap={"5"}>
-                            <Box padding={"4"} paddingBlockEnd={"0"} >
-                                <HorizontalStack align="space-between">
+                    <div style={{ position: "absolute", right: "25vw", top: "50vh" }}></div>
+                    <VerticalStack gap={"5"}>
+                        <Box padding={"4"} paddingBlockEnd={"0"} >
+                            <HorizontalStack align="space-between">
 
-                                    <Text variant="headingMd">
-                                        {"New Test Suite"}
-                                    </Text>
+                                <Text variant="headingMd">
+                                    {"Test Suite Details"}
+                                </Text>
 
-                                    <Button icon={CancelMajor} onClick={() => { handleExit() }} plain></Button>
-                                </HorizontalStack>
-                            </Box>
-                            <Box minHeight="82vh">
-                                <Scrollable style={{ maxHeight: "82vh" }} shadow>
-
-                                    <VerticalStack>
-                                        <Box borderColor="border-subdued" borderBlockStartWidth="1" borderBlockEndWidth="1" background="bg-subdued" padding={4}>
-                                            {headingComponents}
-                                        </Box>
-                                        <Box borderColor="border-subdued" borderBlockEndWidth="1" paddingBlockEnd={3} paddingBlockStart={3} paddingInlineStart={5} paddingInlineEnd={5}>
-                                            <HorizontalStack align="space-between">
-                                                <HorizontalStack align="start">
-                                                    <Checkbox checked={totalTestCountCheck()} onChange={() => { handleTotalSelected() }} />
-                                                    <Text fontWeight="semibold" as="h3">{`${totalSelectedTestsCount()} tests selected`}</Text>
-                                                </HorizontalStack>
-                                                <Button onClick={() => { extendAllHandler() }} plain><Text>Extend All</Text></Button>
-                                            </HorizontalStack>
-                                        </Box>
-                                        <ResourceList items={filteredCategories} renderItem={renderItem} >
-                                        </ResourceList>
-                                    </VerticalStack>
-
-                                </Scrollable>
-                            </Box>
-                            <HorizontalStack align="start">
-
-                                <Button primary onClick={() => { handleTestSuiteSave();}}>Save</Button>
+                                <Button icon={CancelMajor} onClick={() => { handleExit() }} plain></Button>
                             </HorizontalStack>
-                        </VerticalStack>
-                    
+                        </Box>
+                        <Box >
+                            <Scrollable style={{ maxHeight: "90vh" }}>
+
+                                <VerticalStack>
+                                    <Box borderColor="border-subdued" borderBlockStartWidth="1" borderBlockEndWidth="1" background="bg-subdued" padding={4}>
+                                        {headingComponents}
+                                    </Box>
+
+                                    <div style={{ margin: "20px", borderRadius: "0.5rem", boxShadow: " 0px 0px 5px 0px #0000000D, 0px 1px 2px 0px #00000026" }}>
+                                        <Box borderRadius="2" borderColor="border-subdued" >
+                                            <Box borderColor="border-subdued" paddingBlockEnd={3} paddingBlockStart={3} paddingInlineStart={5} paddingInlineEnd={5}>
+                                                <HorizontalStack align="space-between">
+                                                    <HorizontalStack align="start">
+                                                        <Text fontWeight="semibold" as="h3">{testSearchValue.length > 0 ? `Showing ${countSearchResults()} result` : `${totalSelectedTestsCount()} tests selected`}</Text>
+                                                    </HorizontalStack>
+                                                    {testSearchValue.trim().length === 0 ? <Button onClick={() => { checkExpand() ? extendAllHandler() : collapseAllHandler() }} plain><Text>{checkExpand() ? "Expand all" : "Collapse all"}</Text></Button> : <></>}
+                                                </HorizontalStack>
+                                            </Box>
+
+                                            <ResourceList items={filteredCategories} renderItem={renderItem} />
+                                        </Box>
+                                    </div>
+
+                                </VerticalStack>
+
+                            </Scrollable>
+                        </Box>
+                    </VerticalStack>
+
                 </Box>
 
             </div>

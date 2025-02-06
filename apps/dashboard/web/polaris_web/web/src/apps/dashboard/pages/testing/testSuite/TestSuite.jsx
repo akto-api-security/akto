@@ -1,4 +1,4 @@
-import { Button, HorizontalStack, Icon, IndexFiltersMode, TextField } from "@shopify/polaris"
+import { Button, HorizontalStack, Icon, IndexFiltersMode, Text, TextField } from "@shopify/polaris"
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
 import TitleWithInfo from "../../../components/shared/TitleWithInfo"
 import GithubSimpleTable from "../../../components/tables/GithubSimpleTable"
@@ -8,6 +8,7 @@ import LocalStore from "../../../../main/LocalStorageStore";
 import useTable from "../../../components/tables/TableContext"
 import func from "../../../../../util/func"
 import ShowListInBadge from "../../../components/shared/ShowListInBadge"
+import transform from "../../testing/transform";
 
 
 
@@ -16,19 +17,34 @@ const sortOptions = [
     { label: 'Template Name', value: 'template desc', directionLabel: 'Z-A', sortKey: 'name', columnIndex: 1 },
 ];
 
+
+const owaspTop10List = {
+    "Broken Object Level Authorization": ["BOLA"],
+    "Broken Authentication": ["NO_AUTH"],
+    "Broken Object Property Level Authorization": ["EDE", "MA"],
+    "Unrestricted Resource Consumption": ["RL"],
+    "Broken Function Level Authorization": ["BFLA"],
+    "Unrestricted Access to Sensitive Business Flows": ["INPUT"],
+    "Server Side Request Forgery": ['SSRF'],
+    "Security Misconfiguration": ["SM", "UHM", "VEM", "MHH", "SVD", "CORS", "ILM"],
+    "Improper Inventory Management": ["IAM", "IIM"],
+    "Unsafe Consumption of APIs": ["COMMAND_INJECTION", "INJ", "CRLF", "SSTI", "LFI", "XSS", "INJECT"]
+}
+
 function TestSuite() {
     const [show, setShow] = useState(false)
-    const [data, setData] = useState({ 'all': [], 'custom': [] })
-    const [selectedTab, setSelectedTab] = useState('all')
+    const [data, setData] = useState({ 'all_templates': []})
+    const [selectedTab, setSelectedTab] = useState('all_templates')
     const customTestSuiteData = [...LocalStore.getState().customTestSuites];
     const [selectedTestSuite, setSelectedTestSuite] = useState({})
 
     const { tabsInfo } = useTable()
-    const definedTableTabs = ['All', 'Custom'];
-    const tableTabs = func.getTableTabsContent(definedTableTabs, { "all": customTestSuiteData.length, "custom": customTestSuiteData.length }, setSelectedTab, selectedTab, tabsInfo)
+    const definedTableTabs = ['All templates'];
+    const tableCountObj = func.getTabsCount(definedTableTabs, data)
+    const tableTabs = func.getTableTabsContent(definedTableTabs, tableCountObj, setSelectedTab, selectedTab, tabsInfo)
 
 
-   
+
     const headings = [
         {
             title: "Template name",
@@ -62,50 +78,65 @@ function TestSuite() {
         setSelectedTestSuite(data);
     };
 
-    useEffect(() => {
-        const updatedData = customTestSuiteData.map(x => {
-            const categoriesCoveredSet = new Set();
-            
-            const subCategoryMap = LocalStore.getState().subCategoryMap;
-            const testSuiteTestSelectedList = new Set(x?.tests);
-
-            Object.entries(subCategoryMap).forEach(([key, tests]) => {
-                if(testSuiteTestSelectedList.has(tests.name)) {
-                    categoriesCoveredSet.add(tests.superCategory.name);
-                }
+    const fetchData = async () => {
+        const listData = owaspTop10List;
+        const metaDataObj = await transform.getAllSubcategoriesData(true, "runTests")
+        const subCategoryMap = {};
+        metaDataObj.subCategories.forEach(subCategory => {
+            if (!subCategoryMap[subCategory?.superCategory?.name]) {
+                subCategoryMap[subCategory.superCategory?.name] = [];
+            }
+            let obj = {
+                label: subCategory.testName,
+                value: subCategory.name,
+                author: subCategory.author,
+            }
+            subCategoryMap[subCategory.superCategory?.name].push(obj);
+        });
+        const updatedData = [];
+        let id = 1;
+        Object.entries(listData).forEach(([key, value]) => { 
+            const categoryTests = [];
+            value.forEach(cat => {
+                subCategoryMap[cat]?.forEach(test => {
+                    categoryTests.push(test.value);
+                });
             });
-
-            const categoriesCoveredArr = [...categoriesCoveredSet];
-
-            return {
-                ...x,
+            updatedData.push({
+                testSuiteName: key,
+                name: (<Text fontWeight="semibold">{key}</Text>),
+                id: id++,
+                testCount: categoryTests.length,
+                tests: categoryTests,
                 categoriesCovered: (
                     <ShowListInBadge
-                        itemsArr={categoriesCoveredArr}
+                        itemsArr={[...value]}
                         maxItems={4}
                         maxWidth={"250px"}
                         status={"new"}
                         itemWidth={"200px"}
                     />
                 )
-            };
+            });
         });
         const newData = {
-            all: [...updatedData],
-            custom: [...updatedData]
+            "all_templates": [...updatedData],
         }
-        console.log("newData", newData);
         if (JSON.stringify(data) !== JSON.stringify(newData)) {
             setData(prevData => ({
                 ...prevData,
-                all: [...updatedData], 
-                custom: [...updatedData]
+                all_templates: [...updatedData], 
             }));
         }
-        if (selectedTab !== "all") { 
-            setSelectedTab("all"); 
+        if (selectedTab !== "all_templates") { 
+            setSelectedTab("all_templates"); 
         }
-    }, [LocalStore.getState().customTestSuites])
+
+    };
+
+    useEffect(() => {
+        fetchData();
+    }, [])
 
 
     const [selected, setSelected] = useState(0)
@@ -118,40 +149,26 @@ function TestSuite() {
         }, 200)
     }
 
-    const promotedBulkActions = (val) => {
-        console.log(val);
-        let actions = [
-            {
-                content: 'Export as CSV',
-                onAction: () => console.log("agsa")
-            }
-        ];
-        return actions;
-    }
-
-
     const components = [
-        <GithubSimpleTable 
-            sortOptions={sortOptions} 
-            tableTabs={tableTabs} 
-            loading={tableLoading} 
-            selected={selected} 
+        <GithubSimpleTable
+            sortOptions={sortOptions}
+            tableTabs={tableTabs}
+            loading={tableLoading}
+            selected={selected}
             mode={IndexFiltersMode.Default}
-            onSelect={handleSelectedTab} 
-            onRowClick={handleRowClick} 
-            resourceName={resourceName} 
-            useNewRow={true} 
-            headers={headers} 
-            headings={headings} 
-            data={data[selectedTab]} 
-            promotedBulkActions={promotedBulkActions}
-            selectable={true}
+            onSelect={handleSelectedTab}
+            onRowClick={handleRowClick}
+            resourceName={resourceName}
+            useNewRow={true}
+            headers={headers}
+            headings={headings}
+            data={data[selectedTab]}
         />,
-        <FlyLayoutSuite 
-            selectedTestSuite={selectedTestSuite} 
+        <FlyLayoutSuite
+            selectedTestSuite={selectedTestSuite}
             setSelectedTestSuite={setSelectedTestSuite}
-            customTestSuiteData={customTestSuiteData} 
-            show={show} 
+            customTestSuiteData={customTestSuiteData}
+            show={show}
             setShow={setShow}
         />
     ]
@@ -165,7 +182,6 @@ function TestSuite() {
                     docsUrl={"https://docs.akto.io/api-inventory/concepts"}
                 />
             }
-            primaryAction={<Button primary onClick={() => {setShow(true) }}><div data-testid="new_test_role_button">Create new</div></Button>}
             components={components}
         >
 
