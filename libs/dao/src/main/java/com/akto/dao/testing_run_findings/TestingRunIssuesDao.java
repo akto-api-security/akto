@@ -1,9 +1,6 @@
 package com.akto.dao.testing_run_findings;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 import org.bson.conversions.Bson;
 
@@ -124,13 +121,15 @@ public class TestingRunIssuesDao extends AccountsContextDaoWithRbac<TestingRunIs
         return resultMap;
     }
   
-    public Map<String, Integer> getTotalSubcategoriesCountMap(int startTimeStamp, int endTimeStamp){
+    public Map<String, Integer> getTotalSubcategoriesCountMap(int startTimeStamp, int endTimeStamp, Set<Integer> deactivatedCollections){
         List<Bson> pipeline = new ArrayList<>();
+        if(deactivatedCollections == null) deactivatedCollections = new HashSet<>();
 
         pipeline.add(Aggregates.match(Filters.and(
                 Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS, "OPEN"),
                 Filters.lte(TestingRunIssues.LAST_SEEN, endTimeStamp),
-                Filters.gte(TestingRunIssues.LAST_SEEN, startTimeStamp)
+                Filters.gte(TestingRunIssues.LAST_SEEN, startTimeStamp),
+                Filters.nin("_id.apiInfoKey.apiCollectionId", deactivatedCollections)
             )
         ));
 

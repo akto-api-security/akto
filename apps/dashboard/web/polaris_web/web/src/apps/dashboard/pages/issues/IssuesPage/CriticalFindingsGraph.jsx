@@ -7,7 +7,7 @@ import testingFunc from "../../testing/transform.js"
 import func from "@/util/func";
 import BarGraph from '../../../components/charts/BarGraph.jsx';
 
-const CriticalFindingsGraph = ({ linkText, linkUrl }) => {
+const CriticalFindingsGraph = ({ startTimestamp, endTimestamp, linkText, linkUrl }) => {
     const [criticalFindingsData, setCriticalFindingsData] = useState([])
     const [showTestingComponents, setShowTestingComponents] = useState(false)
 
@@ -25,7 +25,7 @@ const CriticalFindingsGraph = ({ linkText, linkUrl }) => {
 
     const fetchGraphData = async () => {
         setShowTestingComponents(false)
-        const subcategoryDataResp = await testingApi.getSummaryInfo(0, func.timeNow())
+        const subcategoryDataResp = await testingApi.getSummaryInfo(startTimestamp, endTimestamp)
         const tempResult = testingFunc.convertSubIntoSubcategory(subcategoryDataResp)
         convertSubCategoryInfo(tempResult.subCategoryMap)
         setShowTestingComponents(true)
@@ -33,7 +33,7 @@ const CriticalFindingsGraph = ({ linkText, linkUrl }) => {
 
     useEffect(() => {
         fetchGraphData()
-    }, [])
+    }, [startTimestamp, endTimestamp])
     
     const defaultChartOptions = {
         "legend": {
@@ -58,11 +58,11 @@ const CriticalFindingsGraph = ({ linkText, linkUrl }) => {
                 barWidth={30}
             />
         }
-        title="Vulnerabilities findings"
-        titleToolTip="Overview of the most critical security issues detected, including the number of issues and APIs affected for each type of vulnerability."
+        title="Vulnerabilities findings by the top 5 categories"
+        titleToolTip="Overview of the most critical security issues detected, including the number of issues and APIs affected for each of the top 5 vulnerability categories."
         linkText={linkText}
         linkUrl={linkUrl}
-    /> : <EmptyCard title="Vulnerabilities findings" subTitleComponent={showTestingComponents ? <Text alignment='center' color='subdued'>No Vulnerabilities found</Text>: runTestEmptyCardComponent} />
+    /> : <EmptyCard title="Vulnerabilities findings by the top 5 categories" subTitleComponent={showTestingComponents ? <Text alignment='center' color='subdued'>No Vulnerabilities found</Text>: runTestEmptyCardComponent} />
 
     return (
         {...criticalFindings}

@@ -210,7 +210,8 @@ public class IssuesAction extends UserAction {
         long daysBetween = (endTimeStamp - startEpoch) / ONE_DAY_TIMESTAMP;
         List<Bson> pipeline = new ArrayList<>();
 
-        Bson notIncludedCollections = UsageMetricCalculator.excludeDemosAndDeactivated("_id." + TestingIssuesId.API_KEY_INFO + "." + ApiInfo.ApiInfoKey.API_COLLECTION_ID);
+        Set<Integer> deactivatedCollections = UsageMetricCalculator.getDeactivated();
+        Bson notIncludedCollections = Filters.nin(ID + "." + TestingIssuesId.API_KEY_INFO + "." + ApiInfo.ApiInfoKey.API_COLLECTION_ID, deactivatedCollections);
 
         Bson filters = Filters.and(
                 notIncludedCollections,
