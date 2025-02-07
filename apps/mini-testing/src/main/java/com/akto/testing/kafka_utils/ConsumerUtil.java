@@ -10,6 +10,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.kafka.clients.consumer.*;
@@ -93,7 +94,7 @@ public class ConsumerUtil {
         final String summaryIdForTest = currentTestInfo.getString("summaryId");
         final ObjectId summaryObjectId = new ObjectId(summaryIdForTest);
         final int startTime = Context.now();
-        AtomicInteger lastRecordRead = new AtomicInteger(Context.now());
+        AtomicBoolean firstRecordRead = new AtomicBoolean(false);
         boolean isConsumerRunning = false;
         if(currentTestInfo != null){
             isConsumerRunning = currentTestInfo.getBoolean("CONSUMER_RUNNING");
@@ -133,8 +134,8 @@ public class ConsumerUtil {
                 String message = record.value();
                 logger.info("Thread [" + threadName + "] picked up record: " + message);
                 try {
-                    lastRecordRead.set(Context.now());
                     Future<?> future = executor.submit(() -> runTestFromMessage(message));
+                    firstRecordRead.set(true);
                     try {
                         future.get(4, TimeUnit.MINUTES); 
                     } catch (InterruptedException e) {
@@ -158,7 +159,7 @@ public class ConsumerUtil {
                     logger.info("Max run time reached. Stopping consumer.");
                     executor.shutdownNow();
                     break;
-                }else if((Context.now() - lastRecordRead.get() > 10)){
+                }else if(firstRecordRead.get() && parallelConsumer.workRemaining() == 0){
                     logger.info("Records are empty now, thus executing final tests");
                     executor.shutdown();
                     executor.awaitTermination(maxRunTimeInSeconds, TimeUnit.SECONDS);
