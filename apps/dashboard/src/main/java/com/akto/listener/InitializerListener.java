@@ -13,7 +13,6 @@ import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.loaders.LoadersDao;
 import com.akto.dao.notifications.CustomWebhooksDao;
-import com.akto.dao.notifications.CustomWebhooksResultDao;
 import com.akto.dao.notifications.EventsMetricsDao;
 import com.akto.dao.notifications.SlackWebhooksDao;
 import com.akto.dao.pii.PIISourceDao;
@@ -167,7 +166,6 @@ import static com.akto.runtime.RuntimeUtil.matchesDefaultPayload;
 import static com.akto.task.Cluster.callDibs;
 import static com.akto.utils.billing.OrganizationUtils.syncOrganizationWithAkto;
 import static com.mongodb.client.model.Filters.eq;
-import static com.akto.runtime.utils.Utils.convertOriginalReqRespToString;
 import static com.akto.utils.Utils.deleteApis;
 
 public class InitializerListener implements ServletContextListener {
@@ -3011,11 +3009,6 @@ public class InitializerListener implements ServletContextListener {
                 ),
                 Updates.set(CustomDataType.OPERATOR, Operator.AND) 
             );
-
-            // trigger fix for token here
-            CustomDataTypeAction dataTypeAction = new CustomDataTypeAction();
-            dataTypeAction.setName("TOKEN");
-            String temp = dataTypeAction.resetDataTypeRetro();
 
             BackwardCompatibilityDao.instance.updateOne(
                 Filters.eq("_id", backwardCompatibility.getId()),
