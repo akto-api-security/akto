@@ -603,7 +603,7 @@ public class CustomDataTypeAction extends UserAction{
 
             SensitiveSampleDataDao.instance.getMCollection().deleteMany(Filters.eq("_id.subType", name));
             SingleTypeInfoDao.instance.updateMany(Filters.eq(SingleTypeInfo.SUB_TYPE, name),
-                    Updates.set(SingleTypeInfo.SUB_TYPE, SingleTypeInfo.GENERIC));
+                    Updates.set(SingleTypeInfo.SUB_TYPE, SingleTypeInfo.GENERIC.getName()));
 
             do {
                 sampleDataList = SampleDataDao.instance.findAll(Filters.empty(), skip, LIMIT, sort);
