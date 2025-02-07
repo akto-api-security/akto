@@ -5,7 +5,7 @@ import SingleDate from "../../../components/layouts/SingleDate";
 import func from "@/util/func"
 import DropdownSearch from '../../../components/shared/DropdownSearch';
 
-const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes, testRunTimeOptions, testRolesArr, maxConcurrentRequestsOptions, slackIntegrated, generateLabelForSlackIntegration,getLabel, timeFieldsDisabled, teamsTestingWebhookIntegrated, generateLabelForTeamsIntegration, jiraProjectMap}) => {
+const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes, testRunTimeOptions, testRolesArr, maxConcurrentRequestsOptions, slackIntegrated, generateLabelForSlackIntegration,getLabel, timeFieldsDisabled, teamsTestingWebhookIntegrated, generateLabelForTeamsIntegration, , isHybridTestingEnabled, miniTestingServiceNames, jiraProjectMap}) => {
     const reducer = (state, action) => {
         switch (action.type) {
           case "update":
@@ -13,7 +13,7 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
             let hourlyLabel = testRun.hourlyLabel;
             if(hourlyLabel !== "Now"){
                 const val = hourlyTimes.filter((item) => item.label === hourlyLabel)[0].value;
-                scheduledEpoch += parseInt(val) * 60 * 60;  
+                scheduledEpoch += parseInt(val) * 60 * 60;
             }
             const timeNow = new Date().getTime() / 1000;
             if(Math.abs(timeNow - scheduledEpoch) < 86400){
@@ -43,7 +43,7 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
             value: ele.issueType
         }))
         : [];
-  
+
     const severitiesArr = func.getAktoSeverities()
     const allSeverity = severitiesArr.map((x) => {return{value: x, label: func.toSentenceCase(x), id: func.toSentenceCase(x)}})
 
@@ -54,9 +54,9 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
             jiraProjectMap[firstProject]?.[0]?.issueType
                 ? jiraProjectMap[firstProject][0].issueType
                 : "";
-    
+
         const checkPrevToggle = !testRun?.autoTicketingDetails?.shouldCreateTickets;
-    
+
         if (checkPrevToggle) {
             setTestRun((prev) => ({
                 ...prev,
@@ -104,7 +104,7 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
                             recurringWeekly = true;
                         } else if (runType === 'Monthly') {
                             recurringMonthly = true;
-                        } 
+                        }
                         setTestRun(prev => ({
                             ...prev,
                             recurringDaily,
@@ -115,7 +115,7 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
                         }));
                     }} />
                 <div style={{ width: "100%" }}>
-                    <SingleDate 
+                    <SingleDate
                         dispatch={dispatch}
                         data={state.data}
                         dataKey="selectedDate"
@@ -204,6 +204,21 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
                             }));
                         }} />
             </HorizontalGrid>
+            {
+                isHybridTestingEnabled && miniTestingServiceNames?.length > 0 ?
+                <Dropdown
+                    label="Select Testing Module"
+                    menuItems={miniTestingServiceNames}
+                    initial={miniTestingServiceNames?.[0]?.value}
+                    selected={(requests) => {
+                        const miniTestingServiceNameOption = getLabel(miniTestingServiceNames, requests)
+                        setTestRun(prev => ({
+                            ...prev,
+                            miniTestingServiceName: miniTestingServiceNameOption.value
+                        }))
+                    }}
+                /> : <></>
+            }
             <Checkbox
                 label={slackIntegrated ? "Send slack alert post test completion" : generateLabelForSlackIntegration()}
                 checked={testRun.sendSlackAlert}
@@ -241,7 +256,7 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
                             placeHolder={"Select Issue Type"}
                             initial={testRun.autoTicketingDetails.issueType}
                         />
-                        <DropdownSearch    
+                        <DropdownSearch
                             optionsList={allSeverity}
                             placeholder={"Select Severity"}
                             setSelected={(val) => {setTestRun(prev => ({ ...prev, autoTicketingDetails: { ...prev.autoTicketingDetails, severities: val } })) }}

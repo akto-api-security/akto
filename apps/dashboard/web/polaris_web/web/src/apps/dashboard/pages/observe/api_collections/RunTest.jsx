@@ -737,6 +737,8 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                         generateLabelForTeamsIntegration={generateLabelForTeamsIntegration}
                         getLabel={getLabel}
                         jiraProjectMap={jiraProjectMap}
+                        isHybridTestingEnabled={isHybridTestingEnabled}
+                        miniTestingServiceNames={miniTestingServiceNames}
                     />
                     <AdvancedSettingsComponent dispatchConditions={dispatchConditions} conditions={conditions} />
                 </>
@@ -912,6 +914,8 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                                     generateLabelForTeamsIntegration={generateLabelForTeamsIntegration}
                                     getLabel={getLabel}
                                     jiraProjectMap={jiraProjectMap}
+                                    isHybridTestingEnabled={isHybridTestingEnabled}
+                                    miniTestingServiceNames={miniTestingServiceNames}
                                 />
 
                             </VerticalStack>
@@ -946,6 +950,8 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                                         generateLabelForTeamsIntegration={generateLabelForTeamsIntegration}
                                         getLabel={getLabel}
                                         jiraProjectMap={jiraProjectMap}
+                                        isHybridTestingEnabled={isHybridTestingEnabled}
+                                        miniTestingServiceNames={miniTestingServiceNames}
                                     />
                                     <AdvancedSettingsComponent dispatchConditions={dispatchConditions} conditions={conditions} />
                                 </>
