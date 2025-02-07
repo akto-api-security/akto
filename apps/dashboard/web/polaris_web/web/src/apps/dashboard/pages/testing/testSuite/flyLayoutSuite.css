@@ -1,0 +1,15 @@
+.sub-category-list-item .Polaris-ResourceItem__ListItem {
+    background-color: #FAFBFB !important;
+}
+
+.sub-category-list-item .Polaris-ResourceItem__ListItem:hover h3{
+    color: #202223 !important;
+}
+
+.sub-category-list-item .Polaris-ResourceItem__ListItem:first-child {
+    border-top: 0.5px solid rgba(221, 224, 228, 1) !important;
+}
+
+.category-list-item:hover {
+    background-color: var(--p-color-bg-hover) !important;
+}
