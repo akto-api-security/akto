@@ -2,6 +2,7 @@ package com.akto.testing.kafka_utils;
 import static com.akto.testing.Utils.readJsonContentFromFile;
 import static com.akto.testing.Utils.writeJsonContentInFile;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -10,26 +11,29 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.kafka.clients.consumer.*;
 import org.bson.types.ObjectId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.util.StringUtils;
 
 import com.akto.crons.GetRunningTestsStatus;
 import com.akto.dao.context.Context;
+import com.akto.data_actor.DataActor;
+import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.test_editor.TestConfig;
 import com.akto.dto.testing.TestingRunResult;
+import com.akto.dto.testing.TestResult.TestError;
 import com.akto.dto.testing.info.SingleTestPayload;
 import com.akto.sql.SampleDataAltDb;
 // import com.akto.notifications.slack.CustomTextAlert;
 import com.akto.testing.Main;
 import com.akto.testing.TestExecutor;
+import com.akto.testing.Utils;
 import com.akto.util.Constants;
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONObject;
@@ -41,6 +45,7 @@ import io.confluent.parallelconsumer.ParallelStreamProcessor;
 public class ConsumerUtil {
 
     static Properties properties = com.akto.runtime.utils.Utils.configProperties(Constants.LOCAL_KAFKA_BROKER_URL, Constants.AKTO_KAFKA_GROUP_ID_CONFIG, Constants.AKTO_KAFKA_MAX_POLL_RECORDS_CONFIG);
+    private static final DataActor dataActor = DataActorFactory.fetchInstance();
     static{
         properties.put(ConsumerConfig.MAX_POLL_INTERVAL_MS_CONFIG, 10000); 
     }
@@ -86,6 +91,22 @@ public class ConsumerUtil {
             TestingRunResult runResult = executor.runTestNew(apiInfoKey, singleTestPayload.getTestingRunId(), instance.getTestingUtil(), singleTestPayload.getTestingRunResultSummaryId(),testConfig , instance.getTestingRunConfig(), instance.isDebug(), singleTestPayload.getTestLogs(), sample);
             executor.insertResultsAndMakeIssues(Collections.singletonList(runResult), singleTestPayload.getTestingRunResultSummaryId());
         }
+    }
+
+    private void createTimedOutResultFromMessage(String message){
+        SingleTestPayload singleTestPayload = parseTestMessage(message);
+        Context.accountId.set(singleTestPayload.getAccountId());
+
+        String subCategory = singleTestPayload.getSubcategory();
+        TestConfig testConfig = TestingConfigurations.getInstance().getTestConfigMap().get(subCategory);
+
+        String testSuperType = testConfig.getInfo().getCategory().getName();
+        String testSubType = testConfig.getInfo().getSubCategory();
+
+        TestingRunResult runResult = Utils.generateFailedRunResultForMessage(singleTestPayload.getTestingRunId(), singleTestPayload.getApiInfoKey(), testSuperType, testSubType, singleTestPayload.getTestingRunResultSummaryId(), new ArrayList<>(),  TestError.TEST_TIMED_OUT.getMessage());
+        TestExecutor.trim(runResult);
+        dataActor.updateTestResultsCountInTestSummary(singleTestPayload.getTestingRunResultSummaryId().toHexString(), 1);
+        dataActor.insertTestingRunResults(runResult);
     }
     
     public void init(int maxRunTimeInSeconds) {
@@ -137,10 +158,15 @@ public class ConsumerUtil {
                     Future<?> future = executor.submit(() -> runTestFromMessage(message));
                     firstRecordRead.set(true);
                     try {
-                        future.get(4, TimeUnit.MINUTES); 
+                        future.get(5, TimeUnit.MINUTES); 
                     } catch (InterruptedException e) {
-                        logger.error("Task timed out: " + message);
+                        logger.error("Task timed out");
                         future.cancel(true);
+                        createTimedOutResultFromMessage(message);
+                    } catch(TimeoutException e){
+                        logger.error("Task timed out");
+                        future.cancel(true);
+                        createTimedOutResultFromMessage(message);
                     } catch (Exception e) {
                         logger.error("Error in task execution: " + message, e);
                     }
