@@ -1,7 +1,9 @@
 package com.akto.testing;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -84,24 +86,33 @@ public class HostValidator {
         return String.format("%s://%s:%s", url.scheme(), url.host(), url.port());
     }
 
-    public static void compute(Set<String> hosts, TestingRunConfig testingRunConfig) {
+    public static void compute(Map<String, String> hostAndContentType, TestingRunConfig testingRunConfig) {
         hostReachabilityMap = new HashMap<>();
-        if (hosts == null) {
+        if (hostAndContentType == null) {
             return;
         }
-        for (String host : hosts) {
+        for (String host : hostAndContentType.keySet()) {
             try {
                 String url = host;
                 if (!url.endsWith("/"))
                 url += "/";
-                
+
+                String contentType = hostAndContentType.get(host);
+                Map<String, List<String>> headers = new HashMap<>();
+
+                if (contentType != null) {
+                    headers.put("content-type", Arrays.asList(contentType));
+                }
+                if (host != null && !host.isEmpty()) {
+                    headers.put("host", Arrays.asList(host));
+                }
+
                 OriginalHttpRequest request = new OriginalHttpRequest(url, null, URLMethods.Method.GET.name(), null, new HashMap<>(), "");
-                String type = request.findContentType();
                 Request actualRequest = ApiExecutor.buildRequest(request, testingRunConfig);
                 String attemptUrl = getUniformUrlUtil(actualRequest.url());
                 loggerMaker.infoAndAddToDb("checking reachability for host: " + attemptUrl);
                 if(!hostReachabilityMap.containsKey(attemptUrl)){
-                    boolean reachable = checkDomainReach(actualRequest, false, type);
+                    boolean reachable = checkDomainReach(actualRequest, false, contentType);
                     hostReachabilityMap.put(attemptUrl, reachable);
                 }
             } catch (Exception e) {

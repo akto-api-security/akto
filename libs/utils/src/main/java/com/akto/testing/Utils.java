@@ -1,5 +1,10 @@
 package com.akto.testing;
 
+import static com.akto.runtime.RuntimeUtil.extractAllValuesFromPayload;
+import static com.akto.test_editor.Utils.deleteKeyFromPayload;
+import static com.akto.test_editor.execution.Operations.deleteCookie;
+import static com.akto.test_editor.execution.Operations.modifyCookie;
+
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -14,29 +19,37 @@ import java.util.regex.Pattern;
 
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
+import org.springframework.util.StringUtils;
 
+import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dao.testing.VulnerableTestingRunResultDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
+import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo.ApiInfoKey;
-import com.akto.dto.CollectionConditions.ConditionsType;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.RawApi;
+import com.akto.dto.CollectionConditions.ConditionsType;
 import com.akto.dto.test_editor.DataOperandsFilterResponse;
 import com.akto.dto.test_editor.FilterNode;
 import com.akto.dto.test_editor.Util;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
+import com.akto.dto.testing.CollectionWiseTestingEndpoints;
+import com.akto.dto.testing.CustomTestingEndpoints;
 import com.akto.dto.testing.GenericTestResult;
 import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.TestResult.Confidence;
 import com.akto.dto.testing.TestResult.TestError;
+import com.akto.dto.testing.TestingEndpoints;
+import com.akto.dto.testing.TestingRun;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.WorkflowUpdatedSampleData;
 import com.akto.dto.type.RequestTemplate;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.runtime.RuntimeUtil;
 import com.akto.test_editor.filter.Filter;
 import com.akto.test_editor.filter.data_operands_impl.ValidationResult;
 import com.akto.testing_utils.TestingUtils;
@@ -55,11 +68,6 @@ import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 
 import okhttp3.MediaType;
-
-import static com.akto.runtime.RuntimeUtil.extractAllValuesFromPayload;
-import static com.akto.test_editor.Utils.deleteKeyFromPayload;
-import static com.akto.test_editor.execution.Operations.deleteCookie;
-import static com.akto.test_editor.execution.Operations.modifyCookie;
 
 public class Utils {
 
@@ -554,9 +562,9 @@ public class Utils {
         List<GenericTestResult> testResults = new ArrayList<>();
         String failMessage = errorMessage;
 
-        if(deactivatedCollections.contains(apiInfoKey.getApiCollectionId())){
+        if(!StringUtils.hasLength(errorMessage) && deactivatedCollections.contains(apiInfoKey.getApiCollectionId())){
             failMessage = TestError.DEACTIVATED_ENDPOINT.getMessage();
-        }else if(messages == null || messages.isEmpty()){
+        }else if(!StringUtils.hasLength(errorMessage) && (messages == null || messages.isEmpty())){
             failMessage = TestError.NO_PATH.getMessage();
         }
             
@@ -606,6 +614,53 @@ public class Utils {
         }
         return result;
     }
+
+    private static boolean isCollectionDemo(int apiCollectionId){
+        try {
+            if(apiCollectionId == RuntimeUtil.VULNERABLE_API_COLLECTION_ID || apiCollectionId == RuntimeUtil.LLM_API_COLLECTION_ID){
+                return true;
+            }
     
+            ApiCollection collection = ApiCollectionsDao.instance.findOne(
+                Filters.eq(Constants.ID, apiCollectionId), Projections.include(Constants.ID)
+            );
+            if(collection.getName() == null){
+                return false;
+            }
+            return collection.getName().equals(RuntimeUtil.JUICE_SHOP_DEMO_COLLECTION_NAME);
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    public static boolean isTestingRunForDemoCollection(TestingRun testingRun){
+        TestingEndpoints endpoints = testingRun.getTestingEndpoints();
+        try {
+            if(endpoints.getType().equals(TestingEndpoints.Type.COLLECTION_WISE)){
+                CollectionWiseTestingEndpoints testingEndpoints = (CollectionWiseTestingEndpoints) endpoints;
+                int apiCollectionId = testingEndpoints.getApiCollectionId();
+                return isCollectionDemo(apiCollectionId);
+            }else{
+                int apiCollectionId = -1;
+                CustomTestingEndpoints testingEndpoints = (CustomTestingEndpoints) endpoints;
+                for(ApiInfoKey apiInfoKey : testingEndpoints.getApisList()){
+                    if(apiCollectionId != -1 && apiCollectionId != apiInfoKey.getApiCollectionId()){
+                        // case of groups{ multiple collections in single test}
+                        return false;
+                    }else{
+                        apiCollectionId = apiInfoKey.getApiCollectionId();
+                    }
+                }
+
+                if(apiCollectionId != -1){
+                    return isCollectionDemo(apiCollectionId);
+                }else{
+                    return false;
+                }
+            }
+        } catch (Exception e) {
+            return false;
+        }
+    }
     
 }

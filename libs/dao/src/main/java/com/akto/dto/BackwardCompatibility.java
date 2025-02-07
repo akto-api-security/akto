@@ -106,6 +106,9 @@ public class BackwardCompatibility {
     public static final String MARK_SUMMARIES_NEW_FOR_VULNERABLE = "markSummariesVulnerable";
     private int markSummariesVulnerable;
 
+    public static final String CHANGE_OPERATOR_CONDITION_IN_CDT = "changeOperatorConditionInCDT";
+    private int changeOperatorConditionInCDT;
+
     public BackwardCompatibility(int id, int dropFilterSampleData, int resetSingleTypeInfoCount, int dropWorkflowTestResult,
                                  int readyForNewTestingFramework,int addAktoDataTypes, boolean deploymentStatusUpdated,
                                  int authMechanismData, boolean mirroringLambdaTriggered, int deleteAccessListFromApiToken,
@@ -115,7 +118,8 @@ public class BackwardCompatibility {
                                  int loginSignupGroups, int vulnerableApiUpdationVersionV1, int riskScoreGroups,
                                  int deactivateCollections, int disableAwsSecretPii, int apiCollectionAutomatedField, 
                                  int automatedApiGroups, int addAdminRoleIfAbsent, int dropSpecialCharacterApiCollections, int fixApiAccessType,
-                                 int addDefaultFilters, int moveAzureSamlToNormalSaml, int deleteOptionsAPIs, int moveOktaOidcSSO, int markSummariesVulnerable) {
+                                 int addDefaultFilters, int moveAzureSamlToNormalSaml, int deleteOptionsAPIs, int moveOktaOidcSSO, int markSummariesVulnerable,
+                                 int changeOperatorConditionInCDT) {
         this.id = id;
         this.dropFilterSampleData = dropFilterSampleData;
         this.resetSingleTypeInfoCount = resetSingleTypeInfoCount;
@@ -149,6 +153,7 @@ public class BackwardCompatibility {
         this.deleteOptionsAPIs = deleteOptionsAPIs;
         this.moveOktaOidcSSO = moveOktaOidcSSO;
         this.markSummariesVulnerable = markSummariesVulnerable;
+        this.changeOperatorConditionInCDT = changeOperatorConditionInCDT;
     }
 
     public BackwardCompatibility() {
@@ -448,5 +453,13 @@ public class BackwardCompatibility {
 
     public void setMarkSummariesVulnerable(int markSummariesVulnerable) {
         this.markSummariesVulnerable = markSummariesVulnerable;
+    }
+
+    public int getChangeOperatorConditionInCDT() {
+        return changeOperatorConditionInCDT;
+    }
+
+    public void setChangeOperatorConditionInCDT(int changeOperatorConditionInCDT) {
+        this.changeOperatorConditionInCDT = changeOperatorConditionInCDT;
     }
 }

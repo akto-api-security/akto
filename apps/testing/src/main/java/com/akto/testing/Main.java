@@ -63,6 +63,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.util.StringUtils;
 
+import static com.akto.testing.Utils.isTestingRunForDemoCollection;
 import static com.akto.testing.Utils.readJsonContentFromFile;
 
 import java.util.*;
@@ -76,6 +77,7 @@ public class Main {
 
     private static final Logger logger = LoggerFactory.getLogger(Main.class);
 
+    private static final String testingInstanceId = UUID.randomUUID().toString();
 
     public static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
     public static final ScheduledExecutorService deleteScheduler = Executors.newScheduledThreadPool(1);
@@ -134,6 +136,22 @@ public class Main {
                 }, "rate-limit-scheduler");
             }
         }, 0, 1, TimeUnit.MINUTES);
+    }
+
+    private static void triggerHeartbeatCron() {
+        scheduler.scheduleAtFixedRate(new Runnable() {
+            public void run() {
+                UpdateOptions updateOptions = new UpdateOptions();
+                updateOptions.upsert(true);
+                Bson updates = Updates.combine(
+                    Updates.setOnInsert("instanceId", testingInstanceId),
+                    Updates.set("ts", Context.now())
+                );
+                TestingInstanceHeartBeatDao.instance.getMCollection().
+                updateOne(Filters.eq("instanceId", testingInstanceId), updates, updateOptions);
+
+            }
+        }, 0, 10, TimeUnit.SECONDS);
     }
 
     public static Set<Integer> extractApiCollectionIds(List<ApiInfo.ApiInfoKey> apiInfoKeyList) {
@@ -334,6 +352,8 @@ public class Main {
         } while (!connectedToMongo);
 
         setupRateLimitWatcher();
+
+        triggerHeartbeatCron();
         
         executorService.scheduleAtFixedRate(new Main.MemoryMonitorTask(), 0, 1, TimeUnit.SECONDS);
 
@@ -383,10 +403,10 @@ public class Main {
                 // mark the test completed here
                 testCompletion.markTestAsCompleteAndRunFunctions(testingRun, summaryId);
 
-                if (StringUtils.hasLength(AKTO_SLACK_WEBHOOK) ) {
+                if (StringUtils.hasLength(AKTO_SLACK_WEBHOOK) && !isTestingRunForDemoCollection(testingRun)) {
                     try {
                         CustomTextAlert customTextAlert = new CustomTextAlert("Test completed for accountId=" + accountId + " testingRun=" + testingRun.getHexId() + " summaryId=" + summaryId.toHexString() + " : @Arjun you are up now. Make your time worth it. :)");
-                        SLACK_INSTANCE.send(AKTO_SLACK_WEBHOOK, customTextAlert.toJson());
+                        SLACK_INSTANCE.send(AKTO_SLACK_WEBHOOK, customTextAlert.toJson());  
                     } catch (Exception e) {
                         logger.error("Error sending slack alert for completion of test", e);
                     }
@@ -439,6 +459,9 @@ public class Main {
                 AccountSettings accountSettings = AccountSettingsDao.instance.findOne(
                     Filters.eq(Constants.ID, accountId), Projections.include(AccountSettings.DELTA_IGNORE_TIME_FOR_SCHEDULED_SUMMARIES)
                 );
+
+                TestingInstanceHeartBeatDao.instance.setTestingRunId(testingInstanceId, "");
+
                 int start = Context.now();
                 int defaultTime = DEFAULT_DELTA_IGNORE_TIME;
                 if(accountSettings != null){
@@ -459,6 +482,12 @@ public class Main {
                 if (testingRun == null) {
                     return;
                 }
+
+                if (!TestingInstanceHeartBeatDao.instance.isTestEligibleForInstance(testingRun.getHexId())) {
+                    return;
+                }
+
+                TestingInstanceHeartBeatDao.instance.setTestingRunId(testingInstanceId, testingRun.getHexId());
 
                 if (testingRun.getState().equals(State.STOPPED)) {
                     loggerMaker.infoAndAddToDb("Testing run stopped");
@@ -648,7 +677,7 @@ public class Main {
                     RequiredConfigs.initiate();
                     int maxRunTime = testingRun.getTestRunTime() <= 0 ? 30*60 : testingRun.getTestRunTime();
                     
-                    if (StringUtils.hasLength(AKTO_SLACK_WEBHOOK) ) {
+                    if (StringUtils.hasLength(AKTO_SLACK_WEBHOOK) && !isTestingRunForDemoCollection(testingRun)) {
                         CustomTextAlert customTextAlert = new CustomTextAlert("Test started: accountId=" + Context.accountId.get() + " testingRun=" + testingRun.getHexId() + " summaryId=" + summaryId.toHexString() + " time=" + maxRunTime);
                         SLACK_INSTANCE.send(AKTO_SLACK_WEBHOOK, customTextAlert.toJson());
                     }
@@ -669,7 +698,7 @@ public class Main {
                     loggerMaker.errorAndAddToDb(e, "Error in init " + e);
                 }
                 testCompletion.markTestAsCompleteAndRunFunctions(testingRun, summaryId);
-                if (StringUtils.hasLength(AKTO_SLACK_WEBHOOK) ) {
+                if (StringUtils.hasLength(AKTO_SLACK_WEBHOOK) && !isTestingRunForDemoCollection(testingRun)) {
                     try {
                         CustomTextAlert customTextAlert = new CustomTextAlert("Test completed for accountId=" + accountId + " testingRun=" + testingRun.getHexId() + " summaryId=" + summaryId.toHexString() + " : @Arjun you are up now. Make your time worth it. :)");
                         SLACK_INSTANCE.send(AKTO_SLACK_WEBHOOK, customTextAlert.toJson());
