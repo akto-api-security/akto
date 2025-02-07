@@ -113,6 +113,7 @@ function WebhookCore(props) {
     }, [])
 
     let customWebhookOptions = [
+        { "type":"TRAFFIC", "title": "Traffic alerts", "value": "TRAFFIC_ALERTS", "collectionSelection": false },
         { "type":"TRAFFIC", "title": "New endpoint", "value": "NEW_ENDPOINT", "collectionSelection": true, "collectionStateField": "newEndpointCollections" },
         { "type":"TRAFFIC", "title": "New endpoint count", "value": "NEW_ENDPOINT_COUNT", "collectionSelection": false },
         { "type":"TRAFFIC", "title": "New sensitive endpoint", "value": "NEW_SENSITIVE_ENDPOINT", "collectionSelection": true, "collectionStateField": "newSensitiveEndpointCollections" },

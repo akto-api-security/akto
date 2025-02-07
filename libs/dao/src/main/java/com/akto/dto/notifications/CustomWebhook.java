@@ -57,6 +57,7 @@ public class CustomWebhook {
         API_THREAT_PAYLOADS("API Threat payloads", "${AKTO.changes_info.apiThreatPayloads}"),
         // optionReplaceString not being used for Testing Run results.
         TESTING_RUN_RESULTS("Testing run results", "${AKTO.changes_info.apiTestingRunResults}"),
+        // optionReplaceString not being used for Traffic alerts.
         TRAFFIC_ALERTS("Traffic alerts", "${AKTO.changes_info.apiTrafficAlerts}");
 
         final String optionName;
