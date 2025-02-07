@@ -46,7 +46,6 @@ import com.akto.dto.notifications.CustomWebhook;
 import com.akto.dto.notifications.CustomWebhook.ActiveStatus;
 import com.akto.dto.notifications.CustomWebhook.WebhookOptions;
 import com.akto.dto.notifications.CustomWebhook.WebhookType;
-import com.akto.dto.notifications.CustomWebhookResult;
 import com.akto.dto.notifications.SlackWebhook;
 import com.akto.dto.pii.PIISource;
 import com.akto.dto.pii.PIIType;
@@ -71,6 +70,9 @@ import com.akto.log.CacheLoggerMaker;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.mixpanel.AktoMixpanel;
+import com.akto.notifications.TrafficUpdates;
+import com.akto.notifications.TrafficUpdates.AlertResult;
+import com.akto.notifications.TrafficUpdates.AlertType;
 import com.akto.notifications.slack.DailyUpdate;
 import com.akto.notifications.slack.TestSummaryGenerator;
 import com.akto.notifications.webhook.WebhookSender;
@@ -79,14 +81,12 @@ import com.akto.runtime.RuntimeUtil;
 import com.akto.stigg.StiggReporterClient;
 import com.akto.task.Cluster;
 import com.akto.telemetry.TelemetryJob;
-import com.akto.test_editor.TemplateSettingsUtil;
 import com.akto.testing.ApiExecutor;
 import com.akto.testing.HostDNSLookup;
 import com.akto.testing.TemplateMapper;
 import com.akto.usage.UsageMetricCalculator;
 import com.akto.usage.UsageMetricHandler;
 import com.akto.testing.workflow_node_executor.Utils;
-import com.akto.util.enums.GlobalEnums;
 import com.akto.util.filter.DictionaryFilter;
 import com.akto.utils.jobs.JobUtils;
 import com.akto.utils.jobs.MatchingJob;
@@ -114,7 +114,6 @@ import com.akto.utils.jobs.CleanInventory;
 import com.akto.utils.jobs.DeactivateCollections;
 import com.akto.utils.billing.OrganizationUtils;
 import com.akto.utils.crons.Crons;
-import com.akto.utils.notifications.TrafficUpdates;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.akto.billing.UsageMetricUtils;
 import com.google.gson.Gson;
@@ -235,19 +234,35 @@ public class InitializerListener implements ServletContextListener {
                                 }
                             }
 
-
                             // look back period 6 days
                             loggerMaker.infoAndAddToDb("starting traffic alert scheduler", LoggerMaker.LogDb.DASHBOARD);
                             TrafficUpdates trafficUpdates = new TrafficUpdates(60*60*24*6);
                             trafficUpdates.populate(deactivatedHosts);
 
+                            boolean slackWebhookFound = true;
                             List<SlackWebhook> listWebhooks = SlackWebhooksDao.instance.findAll(new BasicDBObject());
                             if (listWebhooks == null || listWebhooks.isEmpty()) {
                                 loggerMaker.infoAndAddToDb("No slack webhooks found", LogDb.DASHBOARD);
+                                slackWebhookFound = false;
+                            }
+
+                            boolean teamsWebhooksFound = true;
+                            List<CustomWebhook> teamsWebhooks = CustomWebhooksDao.instance.findAll(
+                                    Filters.and(
+                                            Filters.eq(
+                                                    CustomWebhook.WEBHOOK_TYPE,
+                                                    CustomWebhook.WebhookType.MICROSOFT_TEAMS.name()),
+                                            Filters.in(CustomWebhook.SELECTED_WEBHOOK_OPTIONS,
+                                                    CustomWebhook.WebhookOptions.TRAFFIC_ALERTS.name())));
+
+                            if (teamsWebhooks == null || teamsWebhooks.isEmpty()) {
+                                loggerMaker.infoAndAddToDb("No teams webhooks found", LogDb.DASHBOARD);
+                                teamsWebhooksFound = false;
+                            }
+
+                            if (!(slackWebhookFound || teamsWebhooksFound)) {
                                 return;
                             }
-                            SlackWebhook webhook = listWebhooks.get(0);
-                            loggerMaker.infoAndAddToDb("Slack Webhook found: " + webhook.getWebhook(), LogDb.DASHBOARD);
 
                             int thresholdSeconds = defaultTrafficAlertThresholdSeconds;
                             AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
@@ -259,7 +274,24 @@ public class InitializerListener implements ServletContextListener {
                             loggerMaker.infoAndAddToDb("threshold seconds: " + thresholdSeconds, LoggerMaker.LogDb.DASHBOARD);
 
                             if (thresholdSeconds > 0) {
-                                trafficUpdates.sendAlerts(webhook.getWebhook(),webhook.getDashboardUrl()+"/dashboard/settings#Metrics", thresholdSeconds, deactivatedHosts);
+                                Map<AlertType, AlertResult> alertMap = trafficUpdates.createAlerts(thresholdSeconds, deactivatedHosts);
+                                if (slackWebhookFound && listWebhooks != null && !listWebhooks.isEmpty()) {
+                                    SlackWebhook webhook = listWebhooks.get(0);
+                                    loggerMaker.infoAndAddToDb("Slack Webhook found: " + webhook.getWebhook(),
+                                            LogDb.DASHBOARD);
+                                    trafficUpdates.sendSlackAlerts(webhook.getWebhook(),
+                                            getMetricsUrl(webhook.getDashboardUrl()), thresholdSeconds,
+                                            alertMap);
+                                }
+
+                                if (teamsWebhooksFound && teamsWebhooks != null && !teamsWebhooks.isEmpty()) {
+                                    for (CustomWebhook webhook : teamsWebhooks) {
+                                        trafficUpdates.sendTeamsAlerts(webhook,
+                                        getMetricsUrl(webhook.getDashboardUrl()),
+                                                thresholdSeconds, alertMap);
+                                    }
+                                }
+                                trafficUpdates.updateAlertSentTs(alertMap);
                             }
                         } catch (Exception e) {
                             loggerMaker.errorAndAddToDb(e,"Error while running traffic alerts: " + e.getMessage(), LogDb.DASHBOARD);
@@ -268,6 +300,10 @@ public class InitializerListener implements ServletContextListener {
                 }, "traffic-alerts-scheduler");
             }
         }, 0, 4, TimeUnit.HOURS);
+    }
+
+    private static String getMetricsUrl(String ogUrl){
+        return ogUrl + "/dashboard/settings/metrics";
     }
 
     public void setUpAktoMixpanelEndpointsScheduler(){
@@ -936,14 +972,18 @@ public class InitializerListener implements ServletContextListener {
         }
 
         /*
-         * TESTING_RUN_RESULTS type webhooks are 
+         * TESTING_RUN_RESULTS type webhooks are
          * triggered only on test complete not periodically.
+         * 
+         * TRAFFIC_ALERTS type webhooks have a separate cron.
          */
 
         if (webhook.getSelectedWebhookOptions() != null &&
                 !webhook.getSelectedWebhookOptions().isEmpty()
-                && webhook.getSelectedWebhookOptions()
-                        .contains(CustomWebhook.WebhookOptions.TESTING_RUN_RESULTS)) {
+                && (webhook.getSelectedWebhookOptions()
+                        .contains(CustomWebhook.WebhookOptions.TESTING_RUN_RESULTS)
+                        || webhook.getSelectedWebhookOptions()
+                                .contains(CustomWebhook.WebhookOptions.TRAFFIC_ALERTS))) {
             return;
         }
 

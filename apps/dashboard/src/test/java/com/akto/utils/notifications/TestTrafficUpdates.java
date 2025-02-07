@@ -6,12 +6,13 @@ import com.akto.dao.traffic_metrics.TrafficMetricsAlertsDao;
 import com.akto.dao.traffic_metrics.TrafficMetricsDao;
 import com.akto.dto.traffic_metrics.TrafficMetrics;
 import com.akto.dto.traffic_metrics.TrafficMetricsAlert;
+import com.akto.notifications.TrafficUpdates;
 import com.mongodb.BasicDBObject;
 import org.junit.Test;
 
 import java.util.*;
 
-import static com.akto.utils.notifications.TrafficUpdates.generateAlertResult;
+import static com.akto.notifications.TrafficUpdates.generateAlertResult;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 

@@ -1,23 +1,21 @@
-package com.akto.utils.notifications;
+package com.akto.notifications;
 
-import com.akto.calendar.DateUtils;
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.traffic_metrics.TrafficMetricsAlertsDao;
 import com.akto.dao.traffic_metrics.TrafficMetricsDao;
 import com.akto.dto.ApiCollection;
+import com.akto.dto.notifications.CustomWebhook;
 import com.akto.dto.traffic_metrics.TrafficMetrics;
 import com.akto.dto.traffic_metrics.TrafficMetricsAlert;
 import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.notifications.slack.DailyUpdate;
-import com.akto.runtime.Main;
-import com.akto.usage.UsageMetricCalculator;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.*;
 import com.slack.api.Slack;
-import org.apache.commons.collections.ArrayStack;
 import org.bson.Document;
 import org.bson.conversions.Bson;
 
@@ -32,12 +30,12 @@ public class TrafficUpdates {
         this.lookBackPeriod = lookBackPeriod;
     }
 
-    enum AlertType {
+    public enum AlertType {
         OUTGOING_REQUESTS_MIRRORING,
         FILTERED_REQUESTS_RUNTIME
     }
 
-    private static final LoggerMaker loggerMaker = new LoggerMaker(TrafficUpdates.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(TrafficUpdates.class, LogDb.DASHBOARD);
 
     public void populate(List<String> deactivatedHosts) {
 
@@ -50,19 +48,22 @@ public class TrafficUpdates {
         loggerMaker.infoAndAddToDb("Finished populateTrafficDetails for " + AlertType.FILTERED_REQUESTS_RUNTIME, LoggerMaker.LogDb.DASHBOARD);
     }
 
-    public void sendAlerts(String webhookUrl, String metricsUrl, int thresholdSeconds, List<String> deactivatedHosts) {
+    public Map<AlertType, AlertResult> createAlerts(int thresholdSeconds, List<String> deactivatedHosts) {
         Bson filter = deactivatedHosts != null && !deactivatedHosts.isEmpty() ? Filters.nin(TrafficMetricsAlert.HOST, deactivatedHosts) : Filters.empty();
         List<TrafficMetricsAlert> trafficMetricsAlertList = TrafficMetricsAlertsDao.instance.findAll(filter);
         List<TrafficMetricsAlert> filteredTrafficMetricsAlertsList = filterTrafficMetricsAlertsList(trafficMetricsAlertList);
         loggerMaker.infoAndAddToDb("filteredTrafficMetricsAlertsList: " + filteredTrafficMetricsAlertsList.size(), LoggerMaker.LogDb.DASHBOARD);
 
-        loggerMaker.infoAndAddToDb("Starting sendAlerts for " + AlertType.FILTERED_REQUESTS_RUNTIME, LoggerMaker.LogDb.DASHBOARD);
-        sendAlerts(thresholdSeconds,AlertType.OUTGOING_REQUESTS_MIRRORING, filteredTrafficMetricsAlertsList, webhookUrl, metricsUrl);
-        loggerMaker.infoAndAddToDb("Finished sendAlerts for " + AlertType.FILTERED_REQUESTS_RUNTIME, LoggerMaker.LogDb.DASHBOARD);
+        Map<AlertType, AlertResult> alertMap = new HashMap<>();
+        loggerMaker.infoAndAddToDb("Creating alerts for " + AlertType.FILTERED_REQUESTS_RUNTIME, LoggerMaker.LogDb.DASHBOARD);
 
-        loggerMaker.infoAndAddToDb("Starting sendAlerts for " + AlertType.FILTERED_REQUESTS_RUNTIME, LoggerMaker.LogDb.DASHBOARD);
-        sendAlerts(thresholdSeconds, AlertType.FILTERED_REQUESTS_RUNTIME, filteredTrafficMetricsAlertsList, webhookUrl, metricsUrl);
-        loggerMaker.infoAndAddToDb("Finished sendAlerts for " + AlertType.FILTERED_REQUESTS_RUNTIME, LoggerMaker.LogDb.DASHBOARD);
+        for (AlertType alertType : AlertType.values()) {
+            loggerMaker.infoAndAddToDb("Finished createAlerts for " + alertType, LoggerMaker.LogDb.DASHBOARD);
+            AlertResult alertResult = createAlert(thresholdSeconds, alertType, filteredTrafficMetricsAlertsList);
+            alertMap.put(alertType, alertResult);
+            loggerMaker.infoAndAddToDb("Starting createAlerts for " + alertType, LoggerMaker.LogDb.DASHBOARD);
+        }
+        return alertMap;
     }
 
     public List<TrafficMetricsAlert> filterTrafficMetricsAlertsList(List<TrafficMetricsAlert> trafficMetricsAlertList) {
@@ -173,8 +174,6 @@ public class TrafficUpdates {
         } catch (IOException e) {
             e.printStackTrace();
         }
-
-        updateTsFieldHostWise(hosts, alertType, Context.now(), true);
     }
 
     public static String generateRedAlertPayload(Set<String> hosts, AlertType alertType, String metricsUrl) {
@@ -227,8 +226,6 @@ public class TrafficUpdates {
         } catch (IOException e) {
             e.printStackTrace();
         }
-
-        updateTsFieldHostWise(hosts, alertType, Context.now(), false);
     }
 
     public static String generateGreenAlertPayload(Set<String> hosts, AlertType alertType, String metricsUrl) {
@@ -245,13 +242,13 @@ public class TrafficUpdates {
                 return null;
         }
 
-
         BasicDBList sectionsList = new BasicDBList();
         sectionsList.add(DailyUpdate.createSimpleBlockText(text));
         BasicDBObject ret = new BasicDBObject("blocks", sectionsList);
         return ret.toJson();
     }
 
+    // call this separately.
     public static void updateTsFieldHostWise(Set<String> hosts, AlertType alertType, int ts, boolean isRed) {
 
         String fieldName;
@@ -311,12 +308,36 @@ public class TrafficUpdates {
         return new AlertResult(redAlertHosts, greenAlertHosts);
     }
 
-    public void sendAlerts(int thresholdSeconds, AlertType alertType, List<TrafficMetricsAlert> trafficMetricsAlertList,
-                           String webhookUrl, String metricsUrl) {
-        AlertResult alertResult = generateAlertResult(thresholdSeconds, alertType, trafficMetricsAlertList);
+    public void sendSlackAlerts(String webhookUrl, String metricsUrl, int thresholdSeconds, Map<AlertType, AlertResult> alertMap) {
+        for (AlertType alertType : alertMap.keySet()) {
+            loggerMaker.infoAndAddToDb("Finished sendSlackAlerts for " + alertType, LoggerMaker.LogDb.DASHBOARD);
+            actuallySendSlackAlerts(alertType, webhookUrl, metricsUrl, alertMap.get(alertType));
+            loggerMaker.infoAndAddToDb("Starting sendSlackAlerts for " + alertType, LoggerMaker.LogDb.DASHBOARD);
+        }
+    }
 
+    public void sendTeamsAlerts(CustomWebhook webhook, String metricsUrl, int thresholdSeconds, Map<AlertType, AlertResult> alertMap) {
+        for (AlertType alertType : alertMap.keySet()) {
+            loggerMaker.infoAndAddToDb("Finished sendTeamsAlerts for " + alertType, LoggerMaker.LogDb.DASHBOARD);
+            TrafficUpdatesTeams.createAndSendTeamsTrafficAlerts(alertType, webhook, metricsUrl, alertMap.get(alertType));
+            loggerMaker.infoAndAddToDb("Starting sendTeamsAlerts for " + alertType, LoggerMaker.LogDb.DASHBOARD);
+        }
+    }
+
+    private void actuallySendSlackAlerts(AlertType alertType, String webhookUrl, String metricsUrl, AlertResult alertResult) {
         if (!alertResult.redAlertHosts.isEmpty()) sendRedAlert(alertResult.redAlertHosts, alertType, webhookUrl, metricsUrl);
         if (!alertResult.greenAlertHosts.isEmpty()) sendGreenAlert(alertResult.greenAlertHosts, alertType, webhookUrl,  metricsUrl);
+    }
+
+    private AlertResult createAlert(int thresholdSeconds, AlertType alertType, List<TrafficMetricsAlert> trafficMetricsAlertList) {
+        return generateAlertResult(thresholdSeconds, alertType, trafficMetricsAlertList);
+    }
+
+    public void updateAlertSentTs(Map<AlertType, AlertResult> alertMap) {
+        for (AlertType alertType : alertMap.keySet()) {
+            updateTsFieldHostWise(alertMap.get(alertType).redAlertHosts, alertType, Context.now(), true);
+            updateTsFieldHostWise(alertMap.get(alertType).greenAlertHosts, alertType, Context.now(), false);
+        }
     }
 
 }
