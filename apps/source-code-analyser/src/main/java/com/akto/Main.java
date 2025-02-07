@@ -1,6 +1,7 @@
 package com.akto;
 
 import com.akto.dao.AccountsDao;
+import com.akto.dao.context.Context;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.CodeAnalysisRepo;
@@ -92,10 +93,14 @@ public class Main {
 //                continue;
 //            }
             if (isConnectedToMongo) {
-                AccountTask.instance.executeTask(t -> {
-                    List<CodeAnalysisRepo> repos = fetchReposToSync();
-                    runForRepo(repos);
-                }, "initialize-runtime-task");
+                Context.accountId.set(1662497829);
+                loggerMaker.infoAndAddToDb("Fetching repos for 1662497829 account id");
+                List<CodeAnalysisRepo> repos = fetchReposToSync();
+                runForRepo(repos);
+//                AccountTask.instance.executeTask(t -> {
+//                    List<CodeAnalysisRepo> repos = fetchReposToSync();
+//                    runForRepo(repos);
+//                }, "initialize-runtime-task");
             } else {
                 List<CodeAnalysisRepo> repos = fetchReposToSync();
                 runForRepo(repos);
