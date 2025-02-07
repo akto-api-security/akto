@@ -28,6 +28,8 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
 import com.opensymphony.xwork2.Action;
 
+import static com.akto.dto.test_run_findings.TestingRunIssues.KEY_SEVERITY;
+
 public class DashboardAction extends UserAction {
 
     private int startTimeStamp;
@@ -100,6 +102,7 @@ public class DashboardAction extends UserAction {
     }
 
     private List<String> severityToFetch;
+    private final Map<String, Map<Integer, Integer>> severityWiseTrendData= new HashMap<>();
     private final Map<Integer, Integer> trendData = new HashMap<>();
     public String fetchCriticalIssuesTrend(){
         if(endTimeStamp == 0) endTimeStamp = Context.now();
@@ -115,7 +118,7 @@ public class DashboardAction extends UserAction {
         
         List<GlobalEnums.TestRunIssueStatus> allowedStatus = Arrays.asList(GlobalEnums.TestRunIssueStatus.OPEN, GlobalEnums.TestRunIssueStatus.FIXED);
         Bson issuesFilter = Filters.and(
-                Filters.in(TestingRunIssues.KEY_SEVERITY, severityToFetch),
+                Filters.in(KEY_SEVERITY, severityToFetch),
                 Filters.gte(TestingRunIssues.CREATION_TIME, startTimeStamp),
                 Filters.lte(TestingRunIssues.CREATION_TIME, endTimeStamp),
                 Filters.in(TestingRunIssues.TEST_RUN_ISSUES_STATUS, allowedStatus),
@@ -135,14 +138,23 @@ public class DashboardAction extends UserAction {
             }
         } catch(Exception e){
         }
-        pipeline.add(Aggregates.project(Projections.computed(dayOfYearFloat, new BasicDBObject("$divide", new Object[]{"$" + TestingRunIssues.CREATION_TIME, 86400}))));
+        pipeline.add(Aggregates.project(
+                Projections.fields(
+                        Projections.computed(dayOfYearFloat, new BasicDBObject("$divide", new Object[]{"$" + TestingRunIssues.CREATION_TIME, 86400})),
+                        Projections.include(KEY_SEVERITY)
+                )));
 
-        pipeline.add(Aggregates.project(Projections.computed(dayOfYear, new BasicDBObject("$floor", new Object[]{"$" + dayOfYearFloat}))));
+        pipeline.add(Aggregates.project(
+                Projections.fields(
+                        Projections.computed(dayOfYear, new BasicDBObject("$floor", new Object[]{"$" + dayOfYearFloat})),
+                        Projections.include(KEY_SEVERITY)
+                )));
 
         BasicDBObject groupedId = new BasicDBObject(dayOfYear, "$"+dayOfYear)
                                                     .append("url", "$_id.apiInfoKey.url")
                                                     .append("method", "$_id.apiInfoKey.method")
-                                                    .append("apiCollectionId", "$_id.apiInfoKey.apiCollectionId");
+                                                    .append("apiCollectionId", "$_id.apiInfoKey.apiCollectionId")
+                                                    .append(KEY_SEVERITY, "$" + KEY_SEVERITY);
         pipeline.add(Aggregates.group(groupedId, Accumulators.sum("count", 1)));
 
         MongoCursor<BasicDBObject> issuesCursor = TestingRunIssuesDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
@@ -150,9 +162,13 @@ public class DashboardAction extends UserAction {
         while(issuesCursor.hasNext()){
             BasicDBObject basicDBObject = issuesCursor.next();
             BasicDBObject o = (BasicDBObject) basicDBObject.get("_id");
+            String severity = o.getString(KEY_SEVERITY, GlobalEnums.Severity.LOW.name());
+            Map<Integer, Integer> trendData = severityWiseTrendData.computeIfAbsent(severity, k -> new HashMap<>());
             int date = o.getInt(dayOfYear);
             int count = trendData.getOrDefault(date,0);
             trendData.put(date, count+1);
+            count = this.trendData.getOrDefault(date,0);
+            this.trendData.put(date, count+1);
         }
 
         return SUCCESS.toUpperCase();
@@ -377,5 +393,9 @@ public class DashboardAction extends UserAction {
 
     public void setOrganization(String organization) {
         this.organization = organization;
+    }
+
+    public Map<String, Map<Integer, Integer>> getSeverityWiseTrendData() {
+        return severityWiseTrendData;
     }
 }
