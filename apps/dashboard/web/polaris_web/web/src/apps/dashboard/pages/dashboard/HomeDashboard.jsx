@@ -237,9 +237,9 @@ function HomeDashboard() {
             totalTestedApis += x.apisTested
         })
 
-        const tempRiskScore = totalAPIs ? (totalRiskScore / totalApis).toFixed(2) : 0
+        const tempRiskScore = totalApis ? (totalRiskScore / totalApis).toFixed(2) : 0
         setOldRiskScore(parseFloat(tempRiskScore))
-        const tempTestCoverate = totalAPIs ? (100 * totalTestedApis / totalApis).toFixed(2) : 0
+        const tempTestCoverate = totalApis ? (100 * totalTestedApis / totalApis).toFixed(2) : 0
         setOldTestCoverage(parseFloat(tempTestCoverate))
     }
 

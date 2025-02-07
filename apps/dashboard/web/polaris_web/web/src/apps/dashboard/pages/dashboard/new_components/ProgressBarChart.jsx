@@ -1,5 +1,6 @@
 import { Badge, DataTable, HorizontalStack, Text } from '@shopify/polaris';
 import React from 'react';
+import transform from '../../observe/transform';
 import CustomProgressBar from './CustomProgressBar';
 
 function ProgressBarChart({ data }) {
@@ -16,7 +17,7 @@ function ProgressBarChart({ data }) {
                         backgroundColor={item["backgroundColor"]}
                     />
                 </div>
-                <Text>{item.text}</Text>
+                <Text>{parseInt(item.text) !== NaN ? transform.formatNumberWithCommas(parseInt(item.text)): item.text}</Text>
             </HorizontalStack>,
         ]);
     };
