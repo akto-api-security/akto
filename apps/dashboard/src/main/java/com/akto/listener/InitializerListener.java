@@ -13,7 +13,6 @@ import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.loaders.LoadersDao;
 import com.akto.dao.notifications.CustomWebhooksDao;
-import com.akto.dao.notifications.CustomWebhooksResultDao;
 import com.akto.dao.notifications.EventsMetricsDao;
 import com.akto.dao.notifications.SlackWebhooksDao;
 import com.akto.dao.pii.PIISourceDao;
@@ -167,7 +166,6 @@ import static com.akto.runtime.RuntimeUtil.matchesDefaultPayload;
 import static com.akto.task.Cluster.callDibs;
 import static com.akto.utils.billing.OrganizationUtils.syncOrganizationWithAkto;
 import static com.mongodb.client.model.Filters.eq;
-import static com.akto.runtime.utils.Utils.convertOriginalReqRespToString;
 import static com.akto.utils.Utils.deleteApis;
 
 public class InitializerListener implements ServletContextListener {
@@ -723,7 +721,7 @@ public class InitializerListener implements ServletContextListener {
                 active,
                 ((piiType.getOnKey() || piiType.getOnKeyAndPayload()) ? keyConditions : null),
                 ((piiType.getOnKey() && !piiType.getOnKeyAndPayload()) ? null : valueConditions),
-                Operator.OR,
+                piiType.getOnKeyAndPayload() ? Operator.AND : Operator.OR,
                 ignoreData,
                 false,
                 true
@@ -2999,13 +2997,34 @@ public class InitializerListener implements ServletContextListener {
         }
     }
 
+    private static void updateCustomDataTypeOperator(BackwardCompatibility backwardCompatibility){
+        if(backwardCompatibility.getChangeOperatorConditionInCDT() == 0){
+            CustomDataTypeDao.instance.updateOneNoUpsert(
+                Filters.and(
+                    Filters.eq(CustomDataType.NAME, "TOKEN"),
+                    Filters.or(
+                        Filters.exists(CustomDataType.USER_MODIFIED_TIMESTAMP, false),
+                        Filters.eq(CustomDataType.USER_MODIFIED_TIMESTAMP, 0)
+                    )  
+                ),
+                Updates.set(CustomDataType.OPERATOR, Operator.AND) 
+            );
+
+            BackwardCompatibilityDao.instance.updateOne(
+                Filters.eq("_id", backwardCompatibility.getId()),
+                Updates.set(BackwardCompatibility.CHANGE_OPERATOR_CONDITION_IN_CDT, Context.now())
+            );
+        }
+    }
+
     public static void setBackwardCompatibilities(BackwardCompatibility backwardCompatibility){
         if (DashboardMode.isMetered()) {
             initializeOrganizationAccountBelongsTo(backwardCompatibility);
             setOrganizationsInBilling(backwardCompatibility);
         }
-        markSummariesAsVulnerable(backwardCompatibility);
         setAktoDefaultNewUI(backwardCompatibility);
+        updateCustomDataTypeOperator(backwardCompatibility);
+        markSummariesAsVulnerable(backwardCompatibility);
         dropLastCronRunInfoField(backwardCompatibility);
         fetchIntegratedConnections(backwardCompatibility);
         dropFilterSampleDataCollection(backwardCompatibility);
