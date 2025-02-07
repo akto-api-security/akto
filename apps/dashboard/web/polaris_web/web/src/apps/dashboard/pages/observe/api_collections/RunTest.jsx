@@ -693,6 +693,8 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                         generateLabelForSlackIntegration={generateLabelForSlackIntegration}
                         generateLabelForTeamsIntegration={generateLabelForTeamsIntegration}
                         getLabel={getLabel}
+                        isHybridTestingEnabled={isHybridTestingEnabled}
+                        miniTestingServiceNames={miniTestingServiceNames}
                     />
                     <AdvancedSettingsComponent dispatchConditions={dispatchConditions} conditions={conditions} />
                 </>
@@ -867,6 +869,8 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                                     generateLabelForSlackIntegration={generateLabelForSlackIntegration}
                                     generateLabelForTeamsIntegration={generateLabelForTeamsIntegration}
                                     getLabel={getLabel}
+                                    isHybridTestingEnabled={isHybridTestingEnabled}
+                                    miniTestingServiceNames={miniTestingServiceNames}
                                 />
 
                             </VerticalStack>
@@ -897,6 +901,8 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                                         generateLabelForSlackIntegration={generateLabelForSlackIntegration}
                                         generateLabelForTeamsIntegration={generateLabelForTeamsIntegration}
                                         getLabel={getLabel}
+                                        isHybridTestingEnabled={isHybridTestingEnabled}
+                                        miniTestingServiceNames={miniTestingServiceNames}
                                     />
                                     <AdvancedSettingsComponent dispatchConditions={dispatchConditions} conditions={conditions} />
                                 </>
