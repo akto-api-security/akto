@@ -600,6 +600,11 @@ public class CustomDataTypeAction extends UserAction{
             Bson sort = Sorts.ascending("_id.apiCollectionId", "_id.url", "_id.method");    
             List<HttpResponseParams> responses = new ArrayList<>();
             this.customSubTypeMatches = new ArrayList<>();
+
+            SensitiveSampleDataDao.instance.getMCollection().deleteMany(Filters.eq("_id.subType", name));
+            SingleTypeInfoDao.instance.updateMany(Filters.eq(SingleTypeInfo.SUB_TYPE, name),
+                    Updates.set(SingleTypeInfo.SUB_TYPE, SingleTypeInfo.GENERIC));
+
             do {
                 sampleDataList = SampleDataDao.instance.findAll(Filters.empty(), skip, LIMIT, sort);
                 skip += LIMIT;
