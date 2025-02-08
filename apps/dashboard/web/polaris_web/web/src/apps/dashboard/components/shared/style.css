@@ -122,3 +122,29 @@
 .control-row .Polaris-DataTable__Cell--firstColumn {
     padding-left: 8px !important;
 }
+
+.Polaris-Box {
+    /* border: 1px #fafafa !important; */
+    border: none !important;
+    padding: none !important;
+    /* box-shadow: none !important; */
+    /* background-color: #fafafa !important; */
+}
+
+.Polaris-Button {
+    box-shadow: none !important;
+    border: none !important;
+}
+
+.Polaris-LegacyCard {
+    box-shadow: none !important;
+}
+
+.Polaris-IndexFilters-FilterButton {
+    box-shadow: none !important;
+    border: none !important;
+}
+
+.Polaris-IndexTable__TableCell, .Polaris-IndexTable__TableCell--first, .Polaris-IndexTable__TableCell--last {
+    background-color: #ffffff !important;
+}

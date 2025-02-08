@@ -464,14 +464,14 @@ function GithubServerTable(props) {
         }
 
       </LegacyCard>
-      {(props?.showFooter !== false) && <HorizontalStack gap="1" align="center">
+      {/* {(props?.showFooter !== false) && <HorizontalStack gap="1" align="center">
         <Text>Stuck? feel free to</Text>
         <Link onClick={() => {
           window?.Intercom("show")
         }}>Contact us</Link>
         <Text>or</Text>
         <Link url="https://akto.io/api-security-demo" target="_blank">Book a call</Link>
-      </HorizontalStack>}
+      </HorizontalStack>} */}
     </div>
   );
 }
