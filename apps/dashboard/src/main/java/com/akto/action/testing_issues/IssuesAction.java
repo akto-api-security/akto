@@ -480,11 +480,18 @@ public class IssuesAction extends UserAction {
         BasicDBObject infoObj = new BasicDBObject();
         BasicDBObject superCategory = new BasicDBObject();
         BasicDBObject severity = new BasicDBObject();
+
+        ComplianceMapping complianceMapping = info.getCompliance();
+
+        if (complianceMapping == null) {
+            complianceMapping = new ComplianceMapping(new HashMap<>(), "", "", 0);
+        }
+
         infoObj.put("issueDescription", info.getDescription());
         infoObj.put("issueDetails", info.getDetails());
         infoObj.put("issueImpact", info.getImpact());
         infoObj.put("issueTags", info.getTags());
-        infoObj.put("compliance", info.getCompliance());
+        infoObj.put("compliance", complianceMapping);
         infoObj.put("testName", info.getName());
         infoObj.put("references", info.getReferences());
         infoObj.put("cwe", info.getCwe());

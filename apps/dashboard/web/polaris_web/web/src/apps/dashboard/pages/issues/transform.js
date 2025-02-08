@@ -53,7 +53,7 @@ const transform = {
         const processedData = await Promise.all(
             await Promise.all(rawData.map(async (issue, idx) => {
                 const key = `${issue.id.testSubCategory}|${issue.severity}|${issue.testRunIssueStatus}|${idx}`
-                let totalCompliance = issue.compliance.length
+                let totalCompliance = (issue.compliance || []).length
                 let maxShowCompliance = 2
                 let badge = totalCompliance > maxShowCompliance ? <Badge size="extraSmall">+{totalCompliance - maxShowCompliance}</Badge> : null
                 return {
