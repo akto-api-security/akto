@@ -31,6 +31,7 @@ import Metrics from "../dashboard/pages/settings/metrics/Metrics";
 import TestEditor from "../dashboard/pages/test_editor/TestEditor";
 import DataTypes from "../dashboard/pages/observe/data_types/DataTypes";
 import IssuesPage from "../dashboard/pages/issues/IssuesPage/IssuesPage";
+import CompliancePage from "../dashboard/pages/issues/IssuesPage/CompliancePage";
 import QuickStart from "../dashboard/pages/quick_start/QuickStart";
 import Webhooks from "../dashboard/pages/settings/integrations/webhooks/Webhooks";
 import Webhook from "../dashboard/pages/settings/integrations/webhooks/Webhook";
@@ -175,6 +176,19 @@ const router = createBrowserRouter([
                     {
                         path: "issues",
                         element: <IssuesPage/>
+                    },
+                    {
+                        path: "reports",
+                        children: [
+                            {
+                                path: "issues",
+                                element: <IssuesPage/>
+                            },
+                            {
+                                path: "compliance",
+                                element: <CompliancePage/>
+                            }
+                        ]
                     },
                     {
                         path: "protection",

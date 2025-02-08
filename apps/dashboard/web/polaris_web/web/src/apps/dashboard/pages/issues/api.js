@@ -1,11 +1,11 @@
 import request from "../../../../util/request"
 
 export default {
-    fetchIssues(skip, limit, filterStatus, filterCollectionsId, filterSeverity, filterSubCategory, sortKey, sortOrder, startEpoch, endTimeStamp, activeCollections) {
+    fetchIssues(skip, limit, filterStatus, filterCollectionsId, filterSeverity, filterSubCategory, sortKey, sortOrder, startEpoch, endTimeStamp, activeCollections, filterCompliance) {
         return request({
             url: 'api/fetchAllIssues',
             method: 'post',
-            data: {skip, limit, filterStatus, filterCollectionsId, filterSeverity, filterSubCategory, sortKey, sortOrder, startEpoch, endTimeStamp, activeCollections}
+            data: {skip, limit, filterStatus, filterCollectionsId, filterSeverity, filterSubCategory, sortKey, sortOrder, startEpoch, endTimeStamp, activeCollections, filterCompliance}
         })
     },
     fetchVulnerableTestingRunResultsFromIssues(filters, issuesIds , skip) {

@@ -2,6 +2,8 @@ package com.akto.dto.test_editor;
 
 import java.util.List;
 
+import com.akto.dto.testing.ComplianceMapping;
+
 public class Info {
     
     private String name;
@@ -28,8 +30,10 @@ public class Info {
 
     private List<String> cve;
 
+    private ComplianceMapping compliance;
+
     public Info(String name, String description, String details, String impact, String remediation, Category category, String subCategory,
-            String severity, List<String> tags, List<String> references, List<String> cwe, List<String> cve) {
+            String severity, List<String> tags, List<String> references, List<String> cwe, List<String> cve, ComplianceMapping compliance) {
         this.name = name;
         this.description = description;
         this.details = details;
@@ -42,6 +46,7 @@ public class Info {
         this.references = references;
         this.cwe = cwe;
         this.cve = cve;
+        this.compliance = compliance;
     }
 
     public Info() { }
@@ -141,6 +146,14 @@ public class Info {
 
     public void setCve(List<String> cve) {
         this.cve = cve;
+    }
+
+    public ComplianceMapping getCompliance() {
+        return this.compliance;
+    }
+
+    public void setCompliance(ComplianceMapping compliance) {
+        this.compliance = compliance;
     }
 
 }
