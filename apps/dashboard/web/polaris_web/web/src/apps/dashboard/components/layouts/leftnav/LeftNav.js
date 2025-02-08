@@ -30,6 +30,30 @@ export default function LeftNav() {
         setLeftNavSelected(selectedId);
     };
 
+    let reportsSubNavigationItems = [
+        {
+            label: "Issues",
+            onClick: () => {
+                navigate("/dashboard/reports/issues");
+                handleSelect("dashboard_reports_issues");
+                setActive("active");
+            },
+            selected: leftNavSelected === "dashboard_reports_issues",
+        }
+    ]
+
+    if (window.USER_NAME.indexOf("@akto.io")) {
+        reportsSubNavigationItems.push({
+            label: "Compliance",
+            onClick: () => {
+                navigate("/dashboard/reports/compliance");
+                handleSelect("dashboard_reports_compliance");
+                setActive("active");
+            },
+            selected: leftNavSelected === "dashboard_reports_compliance",
+        })
+    }
+
     const navigationMarkup = (
         <div className={active}>
             <Navigation location="/">
@@ -210,26 +234,7 @@ export default function LeftNav() {
                                 setActive("normal");
                             },
                             selected: leftNavSelected.includes("_reports"),
-                            subNavigationItems: [
-                                {
-                                    label: "Issues",
-                                    onClick: () => {
-                                        navigate("/dashboard/reports/issues");
-                                        handleSelect("dashboard_reports_issues");
-                                        setActive("active");
-                                    },
-                                    selected: leftNavSelected === "dashboard_reports_issues",
-                                },
-                                {
-                                    label: "Compliance",
-                                    onClick: () => {
-                                        navigate("/dashboard/reports/compliance");
-                                        handleSelect("dashboard_reports_compliance");
-                                        setActive("active");
-                                    },
-                                    selected: leftNavSelected === "dashboard_reports_compliance",
-                                }
-                            ],
+                            subNavigationItems: reportsSubNavigationItems,
                             key: "6",
                         },
                         window?.STIGG_FEATURE_WISE_ALLOWED?.THREAT_DETECTION?.isGranted
