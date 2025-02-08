@@ -29,7 +29,6 @@ import com.mongodb.client.model.Updates;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.kafka.clients.consumer.*;
 import org.apache.kafka.common.errors.WakeupException;
-import org.apache.kafka.common.serialization.StringDeserializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -41,7 +40,7 @@ public class Main {
     public static final String VPC_CIDR = "vpc_cidr";
     public static final String ACCOUNT_ID = "account_id";
     private static final Logger logger = LoggerFactory.getLogger(Main.class);
-    private static final LoggerMaker loggerMaker = new LoggerMaker(Main.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(Main.class, LogDb.RUNTIME);
 
     // this sync threshold time is used for deleting sample data
     public static final int sync_threshold_time = 120;
@@ -228,6 +227,17 @@ public class Main {
                         }
 
                         httpResponseParams = HttpCallParser.parseKafkaMessage(r.value());
+                        HttpRequestParams requestParams = httpResponseParams.getRequestParams();
+
+                        String debugHost = Utils.printDebugHostLog(httpResponseParams);
+                        if (debugHost != null) {
+                            loggerMaker.infoAndAddToDb("Found debug host: " + debugHost + " in url: " + requestParams.getMethod() + " " + requestParams.getURL());
+                        }
+
+                        if (Utils.printDebugUrlLog(requestParams.getURL())) {
+                            loggerMaker.infoAndAddToDb("Found debug url: " + requestParams.getURL());
+                        }
+
                     } catch (Exception e) {
                         loggerMaker.errorAndAddToDb(e, "Error while parsing kafka message " + e, LogDb.RUNTIME);
                         continue;
