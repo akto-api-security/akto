@@ -67,6 +67,31 @@ public class TrafficAction {
         return Action.SUCCESS.toUpperCase();
     }
 
+    public String fetchSampleDataForTestEditor() {
+        fetchSampleData();
+        if(sampleDataList == null || sampleDataList.isEmpty() || sampleDataList.get(0).getSamples().isEmpty()) {
+            sampleDataList = new ArrayList<>();
+            ApiCollection randomActiveCollection = ApiCollectionsDao.instance.findOne(Filters.and(
+                    Filters.eq(ApiCollection._DEACTIVATED, false),
+                    Filters.not(
+                            Filters.size(ApiCollection.URLS_STRING, 0)
+                    )
+            ));
+
+            if(randomActiveCollection == null) {
+                return Action.SUCCESS.toUpperCase();
+            }
+
+            int activeCollectionId = randomActiveCollection.getId();
+
+            sampleDataList = SampleDataDao.instance.findAll(Filters.and(
+                    Filters.in(SingleTypeInfo._COLLECTION_IDS, activeCollectionId),
+                    Filters.not(Filters.size(SampleData.SAMPLES, 0))
+            ));
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
     public String fetchAllSampleData() {
         sampleDataList = SampleDataDao.instance.findAll(Filters.eq(Constants.ID + "." + ApiInfoKey.API_COLLECTION_ID, apiCollectionId), skip, limit == 0 ? 50 : limit, null);
         return Action.SUCCESS.toUpperCase();
