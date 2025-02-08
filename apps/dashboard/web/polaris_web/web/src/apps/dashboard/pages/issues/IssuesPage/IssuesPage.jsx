@@ -452,7 +452,7 @@ function IssuesPage() {
                     uniqueIssuesMap.set(key, {
                         id: item?.id,
                         severity: func.toSentenceCase(item?.severity),
-                        compliance: Object.keys(subCategoryMap[item?.id?.testSubCategory].compliance?.mapComplianceToListClauses || {}),
+                        compliance: Object.keys(subCategoryMap[item?.id?.testSubCategory]?.compliance?.mapComplianceToListClauses || {}),
                         severityType: item?.severity,
                         issueName: item?.id?.testSubCategory,
                         category: item?.id?.testSubCategory,
