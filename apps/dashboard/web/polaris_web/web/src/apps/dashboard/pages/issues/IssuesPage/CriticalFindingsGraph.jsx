@@ -32,7 +32,7 @@ const CriticalFindingsGraph = ({ linkText, linkUrl, complianceMode }) => {
         let tempResultSubCategoryMap = {}
         if (complianceMode) {
             Object.entries(subcategoryDataResp).forEach(([testId, count]) => {
-                let clauses = subCategoryMap[testId]?.compliance.mapComplianceToListClauses[complianceMode]
+                let clauses = (subCategoryMap[testId]?.compliance?.mapComplianceToListClauses || {})[complianceMode] || []
                 clauses.forEach(clause => {
                     tempResultSubCategoryMap[clause] = tempResultSubCategoryMap[clause] || {text: 0, key: clause}
                     tempResultSubCategoryMap[clause].text += count
