@@ -2,6 +2,7 @@ package com.akto.testing.kafka_utils;
 import static com.akto.testing.Utils.readJsonContentFromFile;
 import static com.akto.testing.Utils.writeJsonContentInFile;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -10,7 +11,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.kafka.clients.consumer.*;
 import org.bson.types.ObjectId;
@@ -21,14 +23,19 @@ import org.springframework.util.StringUtils;
 import com.akto.DaoInit;
 import com.akto.crons.GetRunningTestsStatus;
 import com.akto.dao.context.Context;
+import com.akto.dao.testing.TestingRunResultDao;
+import com.akto.dao.testing.TestingRunResultSummariesDao;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.test_editor.TestConfig;
 import com.akto.dto.testing.TestingRunResult;
+import com.akto.dto.testing.TestingRunResultSummary;
+import com.akto.dto.testing.TestResult.TestError;
 import com.akto.dto.testing.info.SingleTestPayload;
 import com.akto.notifications.slack.CustomTextAlert;
 import com.akto.testing.Main;
 import com.akto.testing.TestExecutor;
+import com.akto.testing.Utils;
 import com.akto.util.Constants;
 import com.akto.util.DashboardMode;
 import com.alibaba.fastjson2.JSON;
@@ -37,6 +44,8 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import com.mongodb.ReadPreference;
 import com.mongodb.WriteConcern;
+import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Updates;
 
 import io.confluent.parallelconsumer.ParallelConsumerOptions;
 import io.confluent.parallelconsumer.ParallelStreamProcessor;
@@ -91,6 +100,25 @@ public class ConsumerUtil {
             executor.insertResultsAndMakeIssues(Collections.singletonList(runResult), singleTestPayload.getTestingRunResultSummaryId());
         }
     }
+
+    private void createTimedOutResultFromMessage(String message){
+        SingleTestPayload singleTestPayload = parseTestMessage(message);
+        Context.accountId.set(singleTestPayload.getAccountId());
+
+        String subCategory = singleTestPayload.getSubcategory();
+        TestConfig testConfig = TestingConfigurations.getInstance().getTestConfigMap().get(subCategory);
+
+        String testSuperType = testConfig.getInfo().getCategory().getName();
+        String testSubType = testConfig.getInfo().getSubCategory();
+
+        TestingRunResult runResult = Utils.generateFailedRunResultForMessage(singleTestPayload.getTestingRunId(), singleTestPayload.getApiInfoKey(), testSuperType, testSubType, singleTestPayload.getTestingRunResultSummaryId(), new ArrayList<>(),  TestError.TEST_TIMED_OUT.getMessage());
+        TestExecutor.trim(runResult);
+        TestingRunResultSummariesDao.instance.getMCollection().withWriteConcern(WriteConcern.W1).findOneAndUpdate(
+            Filters.eq(Constants.ID, singleTestPayload.getTestingRunResultSummaryId()),
+            Updates.inc(TestingRunResultSummary.TEST_RESULTS_COUNT, 1)
+        );
+        TestingRunResultDao.instance.insertOne(runResult);
+    }
     
     public void init(int maxRunTimeInSeconds) {
         executor = Executors.newFixedThreadPool(100);
@@ -98,8 +126,8 @@ public class ConsumerUtil {
         final String summaryIdForTest = currentTestInfo.getString("summaryId");
         final ObjectId summaryObjectId = new ObjectId(summaryIdForTest);
         final int startTime = Context.now();
-        AtomicInteger lastRecordRead = new AtomicInteger(Context.now());
         boolean isConsumerRunning = false;
+        AtomicBoolean firstRecordRead = new AtomicBoolean(false);
         if(currentTestInfo != null){
             isConsumerRunning = currentTestInfo.getBoolean("CONSUMER_RUNNING");
         }
@@ -121,9 +149,9 @@ public class ConsumerUtil {
 
             parallelConsumer = ParallelStreamProcessor.createEosStreamProcessor(options);
             parallelConsumer.subscribe(Arrays.asList(topicName)); 
-            if (StringUtils.hasLength(Main.AKTO_SLACK_WEBHOOK) ) {
+            if (StringUtils.hasLength(Main.AKTO_SLACK_WEBHOOK)) {
                 try {
-                    CustomTextAlert customTextAlert = new CustomTextAlert("Tests being picked for execution" + currentTestInfo.getInt("accountId") + " summaryId=" + summaryIdForTest);
+                    CustomTextAlert customTextAlert = new CustomTextAlert("Tests being picked for execution through consumer for account: " + currentTestInfo.getInt("accountId") + " summaryId=" + summaryIdForTest);
                     Main.SLACK_INSTANCE.send(Main.AKTO_SLACK_WEBHOOK, customTextAlert.toJson());
                 } catch (Exception e) {
                     logger.error("Error sending slack alert for completion of test", e);
@@ -138,13 +166,18 @@ public class ConsumerUtil {
                 String message = record.value();
                 logger.info("Thread [" + threadName + "] picked up record: " + message);
                 try {
-                    lastRecordRead.set(Context.now());
                     Future<?> future = executor.submit(() -> runTestFromMessage(message));
+                    firstRecordRead.set(true);
                     try {
-                        future.get(4, TimeUnit.MINUTES); 
+                        future.get(5, TimeUnit.MINUTES); 
                     } catch (InterruptedException e) {
-                        logger.error("Task timed out: " + message);
+                        logger.error("Task timed out");
                         future.cancel(true);
+                        createTimedOutResultFromMessage(message);
+                    } catch(TimeoutException e){
+                        logger.error("Task timed out");
+                        future.cancel(true);
+                        createTimedOutResultFromMessage(message);
                     } catch (Exception e) {
                         logger.error("Error in task execution: " + message, e);
                     }
@@ -163,7 +196,7 @@ public class ConsumerUtil {
                     logger.info("Max run time reached. Stopping consumer.");
                     executor.shutdownNow();
                     break;
-                }else if((Context.now() - lastRecordRead.get() > 10)){
+                }else if(firstRecordRead.get() && parallelConsumer.workRemaining() == 0){
                     logger.info("Records are empty now, thus executing final tests");
                     executor.shutdown();
                     executor.awaitTermination(maxRunTimeInSeconds, TimeUnit.SECONDS);
