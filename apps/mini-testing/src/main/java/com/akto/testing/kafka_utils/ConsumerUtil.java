@@ -13,6 +13,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.kafka.clients.consumer.*;
 import org.bson.types.ObjectId;
@@ -116,6 +117,9 @@ public class ConsumerUtil {
         final ObjectId summaryObjectId = new ObjectId(summaryIdForTest);
         final int startTime = Context.now();
         AtomicBoolean firstRecordRead = new AtomicBoolean(false);
+        AtomicInteger maxRetries = new AtomicInteger(0);
+        AtomicInteger countVal = new AtomicInteger(0);
+
         boolean isConsumerRunning = false;
         if(currentTestInfo != null){
             isConsumerRunning = currentTestInfo.getBoolean("CONSUMER_RUNNING");
@@ -176,6 +180,10 @@ public class ConsumerUtil {
             });
 
             while (parallelConsumer != null) {
+                if(countVal.get() % 100 == 0){
+                    countVal.set(0);
+                    logger.info("Total work remaining now is: " + parallelConsumer.workRemaining());
+                }
                 if(!GetRunningTestsStatus.getRunningTests().isTestRunning(summaryObjectId)){
                     logger.info("Tests have been marked stopped.");
                     executor.shutdownNow();
@@ -186,10 +194,14 @@ public class ConsumerUtil {
                     executor.shutdownNow();
                     break;
                 }else if(firstRecordRead.get() && parallelConsumer.workRemaining() == 0){
-                    logger.info("Records are empty now, thus executing final tests");
-                    executor.shutdown();
-                    executor.awaitTermination(maxRunTimeInSeconds, TimeUnit.SECONDS);
-                    break;
+                    if(maxRetries.get() < 3){
+                        maxRetries.incrementAndGet();
+                    }else{
+                        logger.info("Records are empty now, thus executing final tests");
+                        executor.shutdown();
+                        executor.awaitTermination(maxRunTimeInSeconds, TimeUnit.SECONDS);
+                        break;
+                    }
                 }
                 Thread.sleep(100);
             }
