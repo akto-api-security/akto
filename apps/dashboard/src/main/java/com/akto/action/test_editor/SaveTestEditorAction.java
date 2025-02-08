@@ -74,6 +74,7 @@ import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Stream;
 
 import static com.akto.util.enums.GlobalEnums.YamlTemplateSource;
 
@@ -541,7 +542,11 @@ public class SaveTestEditorAction extends UserAction {
         String folderPath = "/Users/shivamrawat/akto_code_openSource/akto/libs/dao/src/main/java/com/akto/dao/test_editor/inbuilt_test_yaml_files";
         Path dir = Paths.get(folderPath);
         List<String> files = new ArrayList<>();
-        Files.walk(dir).forEach(path -> showFile(path.toFile(), files));
+        try (Stream<Path> paths = Files.walk(dir)) {
+            paths.forEach(path -> showFile(path.toFile(), files));
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
         for (String filePath : files) {
             logger.info(filePath);
             List<String> lines = Files.readAllLines(Paths.get(filePath));
