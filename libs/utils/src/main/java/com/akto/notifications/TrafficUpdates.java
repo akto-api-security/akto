@@ -270,8 +270,8 @@ public class TrafficUpdates {
     }
 
     public static class AlertResult {
-        public Set<String> redAlertHosts = new HashSet<>();
-        public Set<String> greenAlertHosts = new HashSet<>();
+        Set<String> redAlertHosts = new HashSet<>();
+        Set<String> greenAlertHosts = new HashSet<>();
 
         public AlertResult(Set<String> redAlertHosts, Set<String> greenAlertHosts) {
             this.redAlertHosts = redAlertHosts;

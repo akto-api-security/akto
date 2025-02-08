@@ -1,4 +1,4 @@
-package com.akto.utils.notifications;
+package com.akto.notifications;
 
 import com.akto.MongoBasedTest;
 import com.akto.dao.context.Context;
