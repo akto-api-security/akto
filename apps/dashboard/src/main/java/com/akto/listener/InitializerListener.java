@@ -3221,6 +3221,8 @@ public class InitializerListener implements ServletContextListener {
                             }
                         }
 
+                        System.out.println("accountSettings.getComplianceInfosUpdatedTs(): " + accountSettings.getComplianceInfosUpdatedTs());
+
                         if (accountSettings.getComplianceInfosUpdatedTs() > 0) {                            
                             addComplianceFromCommonToAccount(complianceCommonMap);
                             replaceComplianceFromCommonToAccount(complianceCommonMap);    
@@ -3352,8 +3354,10 @@ public class InitializerListener implements ServletContextListener {
 
     public static void addComplianceFromCommonToAccount(Map<String, ComplianceInfo> mapIdToComplianceInCommon) {
         try {
-            
+            System.out.println("addComplianceFromCommonToAccount: " + mapIdToComplianceInCommon.size());
+
             for(String fileSourceId: mapIdToComplianceInCommon.keySet()) {
+                System.out.println("addComplianceFromCommonToAccount: " + fileSourceId);
                 ComplianceInfo complianceInfoInCommon = mapIdToComplianceInCommon.get(fileSourceId);
                 String compId = complianceInfoInCommon.getId().split("/")[1].split("\\.")[0].toUpperCase();
 
