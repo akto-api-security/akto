@@ -2279,14 +2279,15 @@ public class InitializerListener implements ServletContextListener {
                 }
 
                 setDashboardMode();
-                updateGlobalAktoVersion();
+                // updateGlobalAktoVersion();
+                setUpTestEditorTemplatesScheduler();
 
                 AccountTask.instance.executeTask(new Consumer<Account>() {
                     @Override
                     public void accept(Account account) {
                         AccountSettingsDao.instance.getStats();
                         Intercom.setToken(System.getenv("INTERCOM_TOKEN"));
-                        setDashboardVersionForAccount();
+                        // setDashboardVersionForAccount();
                     }
                 }, "context-initializer");
 
@@ -2320,7 +2321,6 @@ public class InitializerListener implements ServletContextListener {
                     setUpWebhookScheduler();
                     cleanInventoryJobRunner();
                     setUpDefaultPayloadRemover();
-                    setUpTestEditorTemplatesScheduler();
                     setUpDependencyFlowScheduler();
                     tokenGeneratorCron.tokenGeneratorScheduler();
                     crons.deleteTestRunsScheduler();
