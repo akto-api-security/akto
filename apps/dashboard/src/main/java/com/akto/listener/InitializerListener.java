@@ -2282,19 +2282,19 @@ public class InitializerListener implements ServletContextListener {
                 // updateGlobalAktoVersion();
                 setUpTestEditorTemplatesScheduler();
 
-                AccountTask.instance.executeTask(new Consumer<Account>() {
-                    @Override
-                    public void accept(Account account) {
-                        AccountSettingsDao.instance.getStats();
-                        Intercom.setToken(System.getenv("INTERCOM_TOKEN"));
-                        // setDashboardVersionForAccount();
-                    }
-                }, "context-initializer");
+                // AccountTask.instance.executeTask(new Consumer<Account>() {
+                //     @Override
+                //     public void accept(Account account) {
+                //         AccountSettingsDao.instance.getStats();
+                //         Intercom.setToken(System.getenv("INTERCOM_TOKEN"));
+                //         // setDashboardVersionForAccount();
+                //     }
+                // }, "context-initializer");
 
-                SingleTypeInfo.init();
+                // SingleTypeInfo.init();
 
                 int now = Context.now();
-                if (runJobFunctions || runJobFunctionsAnyway) {
+                if (now < 0) {
 
                     logger.info("Starting init functions and scheduling jobs at " + now);
 
