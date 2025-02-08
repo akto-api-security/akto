@@ -3523,4 +3523,30 @@ public class ClientActor extends DataActor {
         }
     }
 
+    public TestingRunResultSummary findLatestTestingRunResultSummary(Bson filter) {
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("filter", filter);
+        Map<String, List<String>> headers = buildHeaders();
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/findLatestTestingRunResultSummary", "", "POST",  obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in findLatestTestingRunResultSummary", LoggerMaker.LogDb.TESTING);
+                return null;
+            }
+            BasicDBObject payloadObj;
+            try {
+                payloadObj =  BasicDBObject.parse(responsePayload);
+                BasicDBObject summaryObject = (BasicDBObject) payloadObj.get("trrs");
+                TestingRunResultSummary summary = objectMapper.readValue(summaryObject.toJson(), TestingRunResultSummary.class);
+                return summary;
+            } catch(Exception e) {
+                return null;
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in findLatestTestingRunResultSummary" + e, LoggerMaker.LogDb.RUNTIME);
+            return null;
+        }
+    }
 }
