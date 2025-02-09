@@ -1,128 +1,74 @@
-import { Button, HorizontalStack, Text, VerticalStack, Box, Spinner, Divider, Scrollable, Icon, TextField, IndexFiltersMode, ResourceList, Collapsible, ResourceItem, Checkbox } from "@shopify/polaris"
+import { Button, HorizontalStack, Text, VerticalStack, Box, Scrollable, Icon, TextField, ResourceList} from "@shopify/polaris"
 import {
     CancelMajor, ChevronDownMinor, SearchMinor
 } from '@shopify/polaris-icons';
-import { useEffect, useRef, useState } from "react";
-import transform from "../../testing/transform";
+import { useEffect, useState } from "react";
 import TestSuiteRow from "./TestSuiteRow";
 
 function FlyLayoutSuite(props) {
-    const { show, setShow, width, selectedTestSuite, setSelectedTestSuite} = props;
+    const { show, setShow, width, selectedTestSuite} = props;
     const [testSuiteName, setTestSuiteName] = useState("");
     const [testSearchValue, setTestSearchValue] = useState("");
     const [categories, setCategories] = useState([]);
+    const [filteredCategories, setFilteredCategories] = useState([]);
+    const [prevSearchValue, setPrevSearchValue] = useState("");
 
     const handleExit = () => {
         setShow(false);
         setTestSearchValue("");
     }
 
-    const fetchData = async () => {
-        let metaDataObj = {
-            categories: [],
-            subCategories: [],
-            testSourceConfigs: []
-        }
-
-        metaDataObj = await transform.getAllSubcategoriesData(true, "runTests")
-        const subCategoryMap = {};
-        metaDataObj.subCategories.forEach(subCategory => {
-            if (!subCategoryMap[subCategory?.superCategory?.displayName]) {
-                subCategoryMap[subCategory.superCategory?.displayName] = [];
-            }
-            let obj = {
-                label: subCategory.testName,
-                value: subCategory.name,
-                author: subCategory.author,
-                selected: false
-            }
-            subCategoryMap[subCategory.superCategory?.displayName].push(obj);
-        });
-        let cat = [];
-        Object.entries(subCategoryMap).forEach(([key, tests]) => { cat.push({ displayName: key, tests, selected: false }) });
-        setCategories(cat)
-    }
 
     useEffect(() => {
-        fetchData();
-    }, []);
-
-
-
-    useEffect(() => {
-        if (selectedTestSuite) {
-            setCategories(prev => {
-                const selectedTestSuiteTests = new Set(selectedTestSuite.tests)
-                const updatedCategories = prev.map(category => ({
-                    ...category,
-                    selected: false,
-                    tests: category.tests.map(test => ({
-                        ...test,
-                        selected: selectedTestSuiteTests.has(test.value) ? true : false
-                    }))
-                }));
-                return updatedCategories;
-            });
-
-            setTestSuiteName(selectedTestSuite.testSuiteName);
-        }
-        else {
-            setCategories(prev => {
-                const updatedCategories = prev.map(category => ({
-                    ...category,
-                    selected: false,
-                    tests: category.tests.map(test => ({
-                        ...test,
-                        selected: false
-                    }))
-                }));
-                return updatedCategories;
-            });
-
+        if (selectedTestSuite?.allTest?.length) {
+            const deepCopy = JSON.parse(JSON.stringify(selectedTestSuite.allTest));
+            setCategories(deepCopy);
+            setTestSuiteName(selectedTestSuite.testSuiteName || "");
+        } else {
+            setCategories([]);
             setTestSuiteName("");
         }
-        
     }, [selectedTestSuite]);
+    
 
 
     function handleSearch(val) {
         setTestSearchValue(val);
     }
 
-    let filteredCategories = JSON.parse(JSON.stringify(categories));;
-    if (testSearchValue.length > 0) {
-        filteredCategories = filteredCategories.filter(category => {
-            let check = category.tests.some(test => test.selected);
-            return check;
-        });
-        filteredCategories = filteredCategories.filter(category => {
-            let tests = category.tests.filter(test => test.label.toLowerCase().includes(testSearchValue.toLowerCase()));
-            if (tests.length > 0) {
-                category.selected = true;
-                category.tests = tests;
-                return true;
-            }
-            else {
-                return false;
-            }
 
-        })
-    }
-    else {
-        filteredCategories = filteredCategories.filter(category => {
-            let check = category.tests.some(test => test.selected);
-            return check;
-        });
-    }
+    useEffect(() => {
+        let updatedCategories = [...categories];
+    
+        if (testSearchValue.length > 0) {
+          updatedCategories = updatedCategories.filter(category => {
+            const tests = category.tests.filter(test =>
+              test.label.toLowerCase().includes(testSearchValue.toLowerCase())
+            );
+    
+            if (tests.length > 0) {
+              if (testSearchValue !== prevSearchValue) {
+                category.selected = true;
+              }
+              else {
+                category.selected = category.selected || false;
+              }
+              category.tests = tests;
+              return true;
+            } else {
+              return false;
+            }
+          });
+        }
+
+        setFilteredCategories(updatedCategories);
+        setPrevSearchValue(testSearchValue); 
+    }, [testSearchValue, categories]);
 
     function checkExpand() {
-        let check = false;
-        filteredCategories.forEach(category => {
-            if (!category.selected) check = true;
-        });
-        return check;
-
+        return filteredCategories.some(category => !category.selected);
     }
+    
     const countSearchResults = () => {
         let count = 0;
         filteredCategories.forEach(category => { count += category.tests.length });
@@ -151,52 +97,31 @@ function FlyLayoutSuite(props) {
     function renderItem(item) {
         let id = 1;
         return (
-            <TestSuiteRow category={item} setCategories={setCategories} id={id} />
+            <TestSuiteRow category={item} setCategories={setCategories} id={id++} />
         );
     }
 
     function extendAllHandler() {
         setCategories(prev => {
-            const updatedCategories = { ...prev };
-            Object.values(updatedCategories).forEach(element => {
-                element.selected = true;
-            });
-            return Object.values(updatedCategories);
+            return prev.map(category => ({ ...category, selected: true }));
         });
     }
-
+    
     function collapseAllHandler() {
         setCategories(prev => {
-            const updatedCategories = { ...prev };
-            Object.values(updatedCategories).forEach(element => {
-                element.selected = false;
-            });
-            return Object.values(updatedCategories);
+            return prev.map(category => ({ ...category, selected: false }));
         });
-
     }
+    
 
     function totalTestsCount() {
-        let count = 0;
-        if (!categories) return count;
-        const updatedCategories = [...categories];
-        updatedCategories.forEach(element => {
-            count += element.tests.length;
-        })
-        return count;
+        return categories.reduce((count, category) => count + category.tests.length, 0);
     }
-
+    
     function totalSelectedTestsCount() {
-        let count = 0;
-        if (!categories) return count;
-        const updatedCategories = [...categories];
-        updatedCategories.forEach(element => {
-            element.tests.forEach(test => {
-                if (test?.selected) count++;
-            });
-        });
-        return count;
+        return filteredCategories.reduce((count, category) => count + category.tests.length, 0);
     }
+    
 
 
     return (

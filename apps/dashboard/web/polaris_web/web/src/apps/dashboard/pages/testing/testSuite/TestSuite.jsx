@@ -34,7 +34,7 @@ const owaspTop10List = {
 
 function TestSuite() {
     const [show, setShow] = useState(false)
-    const [data, setData] = useState({ 'all_templates': []})
+    const [data, setData] = useState({ 'all_templates': [] })
     const [selectedTab, setSelectedTab] = useState('all_templates')
     const [selectedTestSuite, setSelectedTestSuite] = useState({})
 
@@ -90,19 +90,29 @@ function TestSuite() {
                 label: subCategory.testName,
                 value: subCategory.name,
                 author: subCategory.author,
+                categoryName: subCategory.superCategory.displayName
             }
             subCategoryMap[subCategory.superCategory?.name].push(obj);
         });
         const updatedData = [];
         let id = 1;
-        Object.entries(listData).forEach(([key, value]) => { 
+        Object.entries(listData).forEach(([key, value]) => {
             const categoryTests = [];
+            const testSuiteSubCategoryMap = [];
             value.forEach(cat => {
+                if (!subCategoryMap[cat] || !Array.isArray(subCategoryMap[cat]) || subCategoryMap[cat].length === 0) return;
+
+                const obj = { tests: [], displayName: "", selected: false };
+                obj.tests = subCategoryMap[cat];
+                obj.displayName = subCategoryMap[cat][0].categoryName;
                 subCategoryMap[cat]?.forEach(test => {
-                    categoryTests.push(test.value);
+                    categoryTests.push(test);
                 });
+                testSuiteSubCategoryMap.push(obj);
             });
+
             updatedData.push({
+                allTest: testSuiteSubCategoryMap,
                 testSuiteName: key,
                 name: (<Text variant="headingSm" fontWeight="medium" as="h2">{key}</Text>),
                 id: id++,
@@ -120,17 +130,14 @@ function TestSuite() {
             });
         });
         cachedData = { all_templates: [...updatedData] };
-        const newData = {
-            "all_templates": [...updatedData],
-        }
-        if (JSON.stringify(data) !== JSON.stringify(newData)) {
-            setData(prevData => ({
-                ...prevData,
-                all_templates: [...updatedData], 
-            }));
-        }
-        if (selectedTab !== "all_templates") { 
-            setSelectedTab("all_templates"); 
+
+        setData(prevData => ({
+            ...prevData,
+            all_templates: [...updatedData],
+        }));
+
+        if (selectedTab !== "all_templates") {
+            setSelectedTab("all_templates");
         }
 
     };
@@ -155,7 +162,7 @@ function TestSuite() {
     }
 
 
-    
+
     const components = [
         <GithubSimpleTable
             sortOptions={sortOptions}
@@ -171,21 +178,21 @@ function TestSuite() {
             headings={headings}
             data={data[selectedTab]}
         />,
-        
-            <FlyLayoutSuite
-                selectedTestSuite={selectedTestSuite}
-                setSelectedTestSuite={setSelectedTestSuite}
-                show={show}
-                setShow={setShow}
-            />
-        
+
+        <FlyLayoutSuite
+            selectedTestSuite={selectedTestSuite}
+            setSelectedTestSuite={setSelectedTestSuite}
+            show={show}
+            setShow={setShow}
+        />
+
     ]
 
     return (
         <PageWithMultipleCards
             title={
                 <TitleWithInfo
-                    tooltipContent={"Akto automatically groups similar APIs into meaningful collections based on their subdomain names. "}
+                    tooltipContent={"Akto categorizes tests by OWASP Top 10 vulnerabilities, offering insights into common security issues and facilitating efficient resolution. "}
                     titleText={"Test Suites"}
                     docsUrl={"https://docs.akto.io/api-inventory/concepts"}
                 />
