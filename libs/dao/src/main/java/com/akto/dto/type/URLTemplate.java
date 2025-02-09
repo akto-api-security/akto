@@ -1,5 +1,6 @@
 package com.akto.dto.type;
 
+import java.util.Arrays;
 import java.util.UUID;
 
 import com.akto.dao.context.Context;
@@ -64,6 +65,10 @@ public class URLTemplate {
         }
         String[] thatTokens = url;
         if (thatTokens.length != this.tokens.length) return false;
+
+        if(Arrays.toString(url).contains("graphql") || Arrays.toString(url).contains("graph")) {
+            return false;
+        }
 
         for (int i = 0; i < thatTokens.length; i++) {
             String thatToken = thatTokens[i];
