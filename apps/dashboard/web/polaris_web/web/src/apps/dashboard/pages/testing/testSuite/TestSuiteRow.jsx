@@ -3,14 +3,11 @@ import {
     ChevronDownMinor,
     ChevronUpMinor
 } from '@shopify/polaris-icons';
-import { useNavigate } from "react-router-dom";
 import "./flyLayoutSuite.css"
 
 function TestSuiteRow({ category, id, setCategories }) {
     let displayName = category.displayName;
     let subCategories = category.tests;
-
-    const navigate = useNavigate();
 
     function toggleOpen() {
         setCategories(prev => {
@@ -24,19 +21,6 @@ function TestSuiteRow({ category, id, setCategories }) {
             return Object.values(updatedCategories);
         });
     }
-
-    function renderTest(item) {
-        return (
-            <ResourceItem style={{ backgroundColor: "rgba(249, 250, 251, 1)" }} onClick={() => navigate(`/dashboard/test-editor/${item.value}`)}>
-                <Box paddingInlineStart={5}>
-                    <HorizontalStack key={1} align="start">
-                        <Text color="subdued" fontWeight="regular" as="h3">{item.label}</Text>
-                    </HorizontalStack>
-                </Box>
-            </ResourceItem>
-        )
-    }
-
 
 
     return (
@@ -53,9 +37,19 @@ function TestSuiteRow({ category, id, setCategories }) {
                     </HorizontalStack>
                 </HorizontalStack>
             </ResourceItem>
-            <div className="sub-category-list-item">
-                <Collapsible open={category?.selected}>
-                    <ResourceList items={subCategories} renderItem={renderTest}></ResourceList>
+            <div className="sub-category-lists">
+            <Collapsible open={category?.selected}>
+                {subCategories.map((subCategory) => {
+                    return (
+                        <div style={{backgroundColor:" #FAFBFB"}} className="sub-category-lists-item" onClick={() => window.open(`${window.location.origin}/dashboard/test-editor/${subCategory.value}`)}>
+                        <Box borderColor="border-subdued" borderBlockStartWidth="1" paddingInlineStart={10} paddingBlockEnd={2} paddingBlockStart={2} >
+                            <HorizontalStack key={1} align="start">
+                                <Text color="subdued" fontWeight="regular" as="h3">{subCategory.label}</Text>
+                            </HorizontalStack>
+                        </Box>
+                        </div>
+                    )
+                })}
                 </Collapsible>
             </div>
 

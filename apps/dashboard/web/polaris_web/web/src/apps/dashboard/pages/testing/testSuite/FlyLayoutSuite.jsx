@@ -2,23 +2,51 @@ import { Button, HorizontalStack, Text, VerticalStack, Box, Spinner, Divider, Sc
 import {
     CancelMajor, ChevronDownMinor, SearchMinor
 } from '@shopify/polaris-icons';
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import transform from "../../testing/transform";
-import LocalStore from "../../../../main/LocalStorageStore";
 import TestSuiteRow from "./TestSuiteRow";
-import func from "../../../../../util/func";
-import api from "../api";
-
 
 function FlyLayoutSuite(props) {
-    const { show, setShow, width, selectedTestSuite} = props;
+    const { show, setShow, width, selectedTestSuite, setSelectedTestSuite} = props;
     const [testSuiteName, setTestSuiteName] = useState("");
     const [testSearchValue, setTestSearchValue] = useState("");
     const [categories, setCategories] = useState([]);
 
     const handleExit = () => {
         setShow(false);
+        setTestSearchValue("");
     }
+
+    const fetchData = async () => {
+        let metaDataObj = {
+            categories: [],
+            subCategories: [],
+            testSourceConfigs: []
+        }
+
+        metaDataObj = await transform.getAllSubcategoriesData(true, "runTests")
+        const subCategoryMap = {};
+        metaDataObj.subCategories.forEach(subCategory => {
+            if (!subCategoryMap[subCategory?.superCategory?.displayName]) {
+                subCategoryMap[subCategory.superCategory?.displayName] = [];
+            }
+            let obj = {
+                label: subCategory.testName,
+                value: subCategory.name,
+                author: subCategory.author,
+                selected: false
+            }
+            subCategoryMap[subCategory.superCategory?.displayName].push(obj);
+        });
+        let cat = [];
+        Object.entries(subCategoryMap).forEach(([key, tests]) => { cat.push({ displayName: key, tests, selected: false }) });
+        setCategories(cat)
+    }
+
+    useEffect(() => {
+        fetchData();
+    }, []);
+
 
 
     useEffect(() => {
@@ -53,38 +81,9 @@ function FlyLayoutSuite(props) {
 
             setTestSuiteName("");
         }
+        
     }, [selectedTestSuite]);
 
-
-    const fetchData = async () => {
-        let metaDataObj = {
-            categories: [],
-            subCategories: [],
-            testSourceConfigs: []
-        }
-
-        metaDataObj = await transform.getAllSubcategoriesData(true, "runTests")
-        const subCategoryMap = {};
-        metaDataObj.subCategories.forEach(subCategory => {
-            if (!subCategoryMap[subCategory?.superCategory?.displayName]) {
-                subCategoryMap[subCategory.superCategory?.displayName] = [];
-            }
-            let obj = {
-                label: subCategory.testName,
-                value: subCategory.name,
-                author: subCategory.author,
-                selected: false
-            }
-            subCategoryMap[subCategory.superCategory?.displayName].push(obj);
-        });
-        let cat = [];
-        Object.entries(subCategoryMap).forEach(([key, tests]) => { cat.push({ displayName: key, tests, selected: false }) });
-        setCategories(cat)
-    }
-
-    useEffect(() => {
-        fetchData();
-    }, []);
 
     function handleSearch(val) {
         setTestSearchValue(val);
@@ -97,8 +96,6 @@ function FlyLayoutSuite(props) {
             return check;
         });
         filteredCategories = filteredCategories.filter(category => {
-
-
             let tests = category.tests.filter(test => test.label.toLowerCase().includes(testSearchValue.toLowerCase()));
             if (tests.length > 0) {
                 category.selected = true;
@@ -132,13 +129,17 @@ function FlyLayoutSuite(props) {
         return count;
     }
 
+    const setSearchVal = (val) => { 
+        handleSearch(val);
+    };
+ 
     const headingComponents = (
         <HorizontalStack align="space-between">
             <div style={{ width: "40%" }}>
                 <TextField disabled={true} value={testSuiteName} onChange={(val) => setTestSuiteName(val)} label="Test Suite Name" placeholder="Test_suite_name" />
             </div>
             <div style={{ width: "58%", paddingTop: "1.5rem" }}>
-                <TextField value={testSearchValue} onChange={(val) => { handleSearch(val) }} prefix={<Icon source={SearchMinor} />} placeholder="Search" />
+                <TextField value={testSearchValue} onChange={(val) => { setSearchVal(val) }} prefix={<Icon source={SearchMinor} />} placeholder="Search" />
             </div>
         </HorizontalStack>
 
@@ -165,7 +166,6 @@ function FlyLayoutSuite(props) {
     }
 
     function collapseAllHandler() {
-
         setCategories(prev => {
             const updatedCategories = { ...prev };
             Object.values(updatedCategories).forEach(element => {
@@ -200,12 +200,11 @@ function FlyLayoutSuite(props) {
 
 
     return (
-        <div className={"flyLayout " + (show ? "show" : "")} style={{ width: divWidth }}>
+        <div className={"flyLayoutSuite " + (show ? "show" : "")} style={{ width: divWidth }}>
             <div className="innerFlyLayout">
                 <Box borderColor="border-subdued" borderWidth="1" background="bg" width={divWidth} minHeight="100%">
-                    <div style={{ position: "absolute", right: "25vw", top: "50vh" }}></div>
-                    <VerticalStack gap={"5"}>
-                        <Box padding={"4"} paddingBlockEnd={"0"} >
+                    <VerticalStack>
+                        <Box borderColor="border-subdued" borderBlockEndWidth="1" paddingBlockStart={4} paddingBlockEnd={4} paddingInlineStart={5} paddingInlineEnd={5}>
                             <HorizontalStack align="space-between">
 
                                 <Text variant="headingMd">
@@ -215,11 +214,11 @@ function FlyLayoutSuite(props) {
                                 <Button icon={CancelMajor} onClick={() => { handleExit() }} plain></Button>
                             </HorizontalStack>
                         </Box>
-                        <Box >
-                            <Scrollable style={{ maxHeight: "90vh" }}>
+                        <Box paddingBlockEnd={5}>
+                            <Scrollable style={{ height: "90vh" }}>
 
-                                <VerticalStack>
-                                    <Box borderColor="border-subdued" borderBlockStartWidth="1" borderBlockEndWidth="1" background="bg-subdued" padding={4}>
+                                <VerticalStack gap={4}>
+                                    <Box borderColor="border-subdued" borderBlockEndWidth="1" background="bg-subdued" padding={4}>
                                         {headingComponents}
                                     </Box>
 
@@ -228,7 +227,7 @@ function FlyLayoutSuite(props) {
                                             <Box borderColor="border-subdued" paddingBlockEnd={3} paddingBlockStart={3} paddingInlineStart={5} paddingInlineEnd={5}>
                                                 <HorizontalStack align="space-between">
                                                     <HorizontalStack align="start">
-                                                        <Text fontWeight="semibold" as="h3">{testSearchValue.length > 0 ? `Showing ${countSearchResults()} result` : `${totalSelectedTestsCount()} tests selected`}</Text>
+                                                        <Text fontWeight="semibold" as="h3">{testSearchValue.length > 0 ? `Showing ${countSearchResults()} result` : `${totalSelectedTestsCount()} tests & ${filteredCategories.length} category`}</Text>
                                                     </HorizontalStack>
                                                     {testSearchValue.trim().length === 0 ? <Button onClick={() => { checkExpand() ? extendAllHandler() : collapseAllHandler() }} plain><Text>{checkExpand() ? "Expand all" : "Collapse all"}</Text></Button> : <></>}
                                                 </HorizontalStack>
@@ -237,13 +236,12 @@ function FlyLayoutSuite(props) {
                                             <ResourceList items={filteredCategories} renderItem={renderItem} />
                                         </Box>
                                     </div>
-
+                                    <div style={{height:"20px"}}></div>
                                 </VerticalStack>
 
                             </Scrollable>
                         </Box>
                     </VerticalStack>
-
                 </Box>
 
             </div>

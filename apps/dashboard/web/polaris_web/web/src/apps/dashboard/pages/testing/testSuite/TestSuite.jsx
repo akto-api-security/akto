@@ -17,6 +17,7 @@ const sortOptions = [
     { label: 'Template Name', value: 'template desc', directionLabel: 'Z-A', sortKey: 'name', columnIndex: 1 },
 ];
 
+let cachedData = null;
 
 const owaspTop10List = {
     "Broken Object Level Authorization": ["BOLA"],
@@ -35,7 +36,6 @@ function TestSuite() {
     const [show, setShow] = useState(false)
     const [data, setData] = useState({ 'all_templates': []})
     const [selectedTab, setSelectedTab] = useState('all_templates')
-    const customTestSuiteData = [...LocalStore.getState().customTestSuites];
     const [selectedTestSuite, setSelectedTestSuite] = useState({})
 
     const { tabsInfo } = useTable()
@@ -104,7 +104,7 @@ function TestSuite() {
             });
             updatedData.push({
                 testSuiteName: key,
-                name: (<Text fontWeight="semibold">{key}</Text>),
+                name: (<Text variant="headingSm" fontWeight="medium" as="h2">{key}</Text>),
                 id: id++,
                 testCount: categoryTests.length,
                 tests: categoryTests,
@@ -119,6 +119,7 @@ function TestSuite() {
                 )
             });
         });
+        cachedData = { all_templates: [...updatedData] };
         const newData = {
             "all_templates": [...updatedData],
         }
@@ -135,7 +136,11 @@ function TestSuite() {
     };
 
     useEffect(() => {
-        fetchData();
+        if (!cachedData) {
+            fetchData();
+        } else {
+            setData(cachedData);
+        }
     }, [])
 
 
@@ -149,6 +154,8 @@ function TestSuite() {
         }, 200)
     }
 
+
+    
     const components = [
         <GithubSimpleTable
             sortOptions={sortOptions}
@@ -164,13 +171,14 @@ function TestSuite() {
             headings={headings}
             data={data[selectedTab]}
         />,
-        <FlyLayoutSuite
-            selectedTestSuite={selectedTestSuite}
-            setSelectedTestSuite={setSelectedTestSuite}
-            customTestSuiteData={customTestSuiteData}
-            show={show}
-            setShow={setShow}
-        />
+        
+            <FlyLayoutSuite
+                selectedTestSuite={selectedTestSuite}
+                setSelectedTestSuite={setSelectedTestSuite}
+                show={show}
+                setShow={setShow}
+            />
+        
     ]
 
     return (
