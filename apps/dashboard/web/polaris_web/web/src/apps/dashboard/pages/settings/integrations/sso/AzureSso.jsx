@@ -15,7 +15,6 @@ function AzureSso() {
 
     const [loginUrl, setLoginUrl] = useState('')
     const [azureIdentity, setAzureIdentity] = useState('')
-    const [nextButtonActive, setNextButtonActive] = useState()
 
 
     const cardContent = "Enable Login via Azure AD on your Akto dashboard";
@@ -63,12 +62,10 @@ function AzureSso() {
             await settingRequests.fetchAzureSso("AZURE").then((resp)=> {
                 setLoginUrl(resp.loginUrl)
                 setAzureIdentity(resp.ssoEntityId)
-                setNextButtonActive(true)
             })
             setLoading(false)
         } catch (error) {
             setLoading(false)
-            setNextButtonActive(false)
         }
     }
 
@@ -95,7 +92,6 @@ function AzureSso() {
             pageTitle={"Azure AD SSO SAML"}
             loading={loading}
             certificateName={"Federation Metadata XML"}
-            isButtonActive={nextButtonActive}
         />
     )
 }

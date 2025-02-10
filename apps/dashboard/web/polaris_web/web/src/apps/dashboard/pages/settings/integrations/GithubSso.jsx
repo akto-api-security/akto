@@ -13,7 +13,7 @@ function GithubSso() {
     const [showGithubSsoModal, setShowGithubSsoModal] = useState(false)
     const [githubPresent, setGithubPresent] = useState("")
     const [componentType, setComponentType] = useState(0) ;
-    const [nextButtonActive,setNextButtonActive] = useState();
+    const [nextButtonActive,setNextButtonActive] = useState(window.DASHBOARD_MODE === "ON_PREM");
     const [githubUrl, setGithubUrl] = useState("https://github.com")
     const [githubApiUrl, setGithubApiUrl] = useState("https://api.github.com")
 
@@ -66,7 +66,6 @@ function GithubSso() {
             setGithubClientId(githubClientId)
             if (githubUrl) setGithubUrl(githubUrl)
             if (githubApiUrl) setGithubApiUrl(githubApiUrl)
-            setNextButtonActive(true)
         } catch (error) {
             setNextButtonActive(false)
         }
