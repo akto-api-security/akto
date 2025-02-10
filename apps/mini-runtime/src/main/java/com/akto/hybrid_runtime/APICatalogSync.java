@@ -19,6 +19,7 @@ import com.akto.dto.type.SingleTypeInfo.Domain;
 import com.akto.dto.type.SingleTypeInfo.SubType;
 import com.akto.dto.type.SingleTypeInfo.SuperType;
 import com.akto.dto.type.URLMethods.Method;
+import com.akto.graphql.GraphQLUtils;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.data_actor.DataActor;
@@ -525,6 +526,11 @@ public class APICatalogSync {
         SuperType[] newTypes = new SuperType[tokens.length];
 
         int start = newUrl.getUrl().startsWith("http") ? 3 : 0;
+
+        if(GraphQLUtils.isGraphQLEndpoint(newUrl.getUrl())) {
+            return null; // Don't merge GraphQL endpoints
+        }
+
         for(int i = start; i < tokens.length; i ++) {
             String tempToken = tokens[i];
             if(DictionaryFilter.isEnglishWord(tempToken)) continue;
@@ -590,6 +596,11 @@ public class APICatalogSync {
 
         SuperType[] newTypes = new SuperType[newTokens.length];
         int templatizedStrTokens = 0;
+
+        if(GraphQLUtils.isGraphQLEndpoint(dbUrl.getUrl()) || GraphQLUtils.isGraphQLEndpoint(newUrl.getUrl())) {
+            return null; // Don't merge GraphQL endpoints
+        }
+
         for(int i = 0; i < newTokens.length; i ++) {
             String tempToken = newTokens[i];
             String dbToken = dbTokens[i];
