@@ -140,49 +140,55 @@ public class TestingRunResultDao extends AccountsContextDaoWithRbac<TestingRunRe
         while (cursor.hasNext()) {
             TestingRunResult testingRunResult = new TestingRunResult();
             BasicDBObject doc = cursor.next();
-            testingRunResult.setId(new ObjectId(doc.getString(Constants.ID)));
-            testingRunResult.setTestRunId(new ObjectId(doc.getString(TestingRunResult.TEST_RUN_ID)));
-            BasicDBObject apiInfoKeyObj = (BasicDBObject) doc.get(TestingRunResult.API_INFO_KEY);
-            ApiInfoKey apiInfoKey = new ApiInfoKey(apiInfoKeyObj.getInt(ApiInfoKey.API_COLLECTION_ID),
-                    apiInfoKeyObj.getString(ApiInfoKey.URL),
-                    URLMethods.Method.valueOf(apiInfoKeyObj.getString(ApiInfoKey.METHOD)));
-            testingRunResult.setApiInfoKey(apiInfoKey);
-            testingRunResult.setTestSuperType(doc.getString(TestingRunResult.TEST_SUPER_TYPE));
-            testingRunResult.setTestSubType(doc.getString(TestingRunResult.TEST_SUB_TYPE));
-            testingRunResult.setVulnerable(doc.getBoolean(TestingRunResult.VULNERABLE));
-            testingRunResult.setConfidencePercentage(doc.getInt(TestingRunResult.CONFIDENCE_PERCENTAGE));
-            testingRunResult.setStartTimestamp(doc.getInt(TestingRunResult.START_TIMESTAMP));
-            testingRunResult.setEndTimestamp(doc.getInt(TestingRunResult.END_TIMESTAMP));
-            testingRunResult.setTestRunResultSummaryId(
-                    new ObjectId(doc.getString(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID)));        
-
-            BasicDBList testResultsList = (BasicDBList)doc.get(TestingRunResult.TEST_RESULTS);
-
-            List<String> errors = new ArrayList<>();
-            List<GenericTestResult> testResults = new ArrayList<>();
-            if (testResultsList != null && !testResultsList.isEmpty()) {
-                BasicDBObject genericTestResult = (BasicDBObject)testResultsList.get(0);
-                String confidence = "";
-                if (genericTestResult.get(GenericTestResult._CONFIDENCE)!=null) {
-                    TestResult testResult = new TestResult();
-                    confidence = genericTestResult.getString(GenericTestResult._CONFIDENCE);
-                    try {
-                        testResult.setConfidence(Confidence.valueOf(confidence));
-                        testResults.add(testResult);
-                    } catch(Exception e){
+            try {
+                testingRunResult.setId(new ObjectId(doc.getString(Constants.ID)));
+                testingRunResult.setTestRunId(new ObjectId(doc.getString(TestingRunResult.TEST_RUN_ID)));
+                BasicDBObject apiInfoKeyObj = (BasicDBObject) doc.get(TestingRunResult.API_INFO_KEY);
+                ApiInfoKey apiInfoKey = new ApiInfoKey(apiInfoKeyObj.getInt(ApiInfoKey.API_COLLECTION_ID),
+                        apiInfoKeyObj.getString(ApiInfoKey.URL),
+                        URLMethods.Method.valueOf(apiInfoKeyObj.getString(ApiInfoKey.METHOD)));
+                testingRunResult.setApiInfoKey(apiInfoKey);
+                testingRunResult.setTestSuperType(doc.getString(TestingRunResult.TEST_SUPER_TYPE));
+                testingRunResult.setTestSubType(doc.getString(TestingRunResult.TEST_SUB_TYPE));
+                testingRunResult.setVulnerable(doc.getBoolean(TestingRunResult.VULNERABLE));
+                testingRunResult.setConfidencePercentage(doc.getInt(TestingRunResult.CONFIDENCE_PERCENTAGE));
+                testingRunResult.setStartTimestamp(doc.getInt(TestingRunResult.START_TIMESTAMP));
+                testingRunResult.setEndTimestamp(doc.getInt(TestingRunResult.END_TIMESTAMP));
+                testingRunResult.setTestRunResultSummaryId(
+                        new ObjectId(doc.getString(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID)));        
+    
+                BasicDBList testResultsList = (BasicDBList)doc.get(TestingRunResult.TEST_RESULTS);
+    
+                List<String> errors = new ArrayList<>();
+                List<GenericTestResult> testResults = new ArrayList<>();
+                if (testResultsList != null && !testResultsList.isEmpty()) {
+                    BasicDBObject genericTestResult = (BasicDBObject)testResultsList.get(0);
+                    String confidence = "";
+                    if (genericTestResult.get(GenericTestResult._CONFIDENCE)!=null) {
+                        TestResult testResult = new TestResult();
+                        confidence = genericTestResult.getString(GenericTestResult._CONFIDENCE);
+                        try {
+                            testResult.setConfidence(Confidence.valueOf(confidence));
+                            testResults.add(testResult);
+                        } catch(Exception e){
+                        }
+                    }
+                    if (genericTestResult.get(TestResult._ERRORS)!=null) {
+                        try {
+                            errors = (List)genericTestResult.get(TestResult._ERRORS);
+                        } catch(Exception e){
+                        }
                     }
                 }
-                if (genericTestResult.get(TestResult._ERRORS)!=null) {
-                    try {
-                        errors = (List)genericTestResult.get(TestResult._ERRORS);
-                    } catch(Exception e){
-                    }
-                }
+                testingRunResult.setErrorsList(errors);
+                testingRunResult.setTestResults(testResults);
+                testingRunResult.setHexId(testingRunResult.getId().toHexString());
+                testingRunResults.add(testingRunResult);
+            } catch (Exception e) {
+                e.printStackTrace();;
+                continue;
             }
-            testingRunResult.setErrorsList(errors);
-            testingRunResult.setTestResults(testResults);
-            testingRunResult.setHexId(testingRunResult.getId().toHexString());
-            testingRunResults.add(testingRunResult);
+           
         }
 
         return testingRunResults;
