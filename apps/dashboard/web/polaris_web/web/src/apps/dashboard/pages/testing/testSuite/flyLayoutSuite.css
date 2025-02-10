@@ -21,6 +21,7 @@
     transition: right 0.3s ease-in-out;
     z-index: 400;
 }
+
 .flyLayoutSuite.show {
     right: 0;
 }
@@ -28,4 +29,16 @@
 .flyLayoutSuite .category-list-item:not(:last-child) > .Polaris-ResourceItem__ListItem {
     border-bottom-left-radius: 0 !important;
     border-bottom-right-radius: 0 !important;
+}
+
+.flyLayoutSuite .category-list-item .Polaris-ResourceItem__ListItem {
+    position: sticky;
+    top: 0px;
+    z-index: 100;
+    background-color: white;
+}
+
+.flyLayoutSuite .category-list-item:last-child .sub-category-lists-item:last-child {
+    border-bottom-left-radius: var(--p-border-radius-2)!important;
+    border-bottom-right-radius: var(--p-border-radius-2) !important;
 }
