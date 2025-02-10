@@ -6,7 +6,7 @@ import Store from "../../../store";
 import func from "@/util/func";
 import { MarkFulfilledMinor, ReportMinor, ExternalMinor } from '@shopify/polaris-icons';
 import PersistStore from "../../../../main/PersistStore";
-import { Button, HorizontalGrid, HorizontalStack, IndexFiltersMode } from "@shopify/polaris";
+import { Button, Popover, Box, Avatar, Text, HorizontalGrid, HorizontalStack, IndexFiltersMode, VerticalStack } from "@shopify/polaris";
 import EmptyScreensLayout from "../../../components/banners/EmptyScreensLayout";
 import { ISSUES_PAGE_DOCS_URL } from "../../../../main/onboardingData";
 import {SelectCollectionComponent} from "../../testing/TestRunsPage/TestrunsBannerComponent"
@@ -40,6 +40,8 @@ const sortOptions = [
     { label: 'Discovered time', value: 'creationTime desc', directionLabel: 'Oldest', sortKey: 'creationTime', columnIndex: 7 },
 ];
 
+const allCompliances = ["CIS Controls", "CMMC", "CSA CCM", "Cybersecurity Maturity Model Certification (CMMC)", "FISMA", "FedRAMP", "GDPR", "HIPAA", "ISO 27001", "NIST 800-171", "NIST 800-53", "PCI DSS", "SOC 2"];
+
 let filtersOptions = [
     {
         key: 'apiCollectionId',
@@ -63,7 +65,7 @@ let filtersOptions = [
         label: "Issue category",
         title:"Issue category",
         choices:[]
-    },
+    },    
     {
         key: 'collectionIds',
         label: 'API groups',
@@ -92,7 +94,7 @@ const resourceName = {
     plural: 'issues',
 };
 
-function IssuesPage() {
+function CompliancePage() {
     const [headers, setHeaders] = useState([
         {
           title: '',
@@ -142,6 +144,13 @@ function IssuesPage() {
         },
     ])
 
+
+    function calcFilteredTestIds(complianceView) {
+        let ret = Object.entries(subCategoryMap).filter(([_, v]) => {return !!v.compliance?.mapComplianceToListClauses[complianceView]}).map(([k, _]) => k)
+        
+        return ret
+    }
+
     const subCategoryMap = LocalStore(state => state.subCategoryMap);
     const [issuesFilters, setIssuesFilters] = useState({})
     const [key, setKey] = useState(false);
@@ -157,6 +166,10 @@ function IssuesPage() {
     const [jiraProjectMaps,setJiraProjectMap] = useState({})
     const [issueType, setIssueType] = useState('');
     const [projId, setProjId] = useState('')
+    const [moreActions, setMoreActions] = useState(false);
+    const [complianceView, setComplianceView] = useState('SOC 2');
+    const [filteredTestIds, setFilteredTestIds] = useState([]);
+
 
     const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[5])
 
@@ -411,6 +424,11 @@ function IssuesPage() {
     }
   }, [subCategoryMap, apiCollectionMap])
 
+    const onSelectCompliance = (compliance) => {
+        setComplianceView(compliance)
+        resetResourcesSelected()
+        setMoreActions(false)
+    }
 
     const fetchTableData = async (sortKey, sortOrder, skip, limit, filters, filterOperators, queryValue) => {
         setTableLoading(true)
@@ -420,11 +438,8 @@ function IssuesPage() {
         const activeCollections = (filters?.activeCollections !== undefined && filters?.activeCollections.length > 0) ? filters?.activeCollections[0] : initialValForResponseFilter;
         const apiCollectionId = filters.apiCollectionId || []
         let filterCollectionsId = apiCollectionId.concat(filters.collectionIds)
-        let filterSubCategory = []
-        filters?.issueCategory?.forEach((issue) => {
-            filterSubCategory = filterSubCategory.concat(categoryToSubCategories[issue])
-        })
-
+        let filterSubCategory = calcFilteredTestIds(complianceView)
+        
         const collectionIdsArray = filterCollectionsId.map((x) => {return x.toString()})
 
         let obj = {
@@ -452,7 +467,7 @@ function IssuesPage() {
                     uniqueIssuesMap.set(key, {
                         id: item?.id,
                         severity: func.toSentenceCase(item?.severity),
-                        compliance: Object.keys(subCategoryMap[item?.id?.testSubCategory]?.compliance?.mapComplianceToListClauses || {}),
+                        compliance: Object.keys(subCategoryMap[item?.id?.testSubCategory].compliance?.mapComplianceToListClauses || {}),
                         severityType: item?.severity,
                         issueName: item?.id?.testSubCategory,
                         category: item?.id?.testSubCategory,
@@ -504,15 +519,9 @@ function IssuesPage() {
 
     const components = (
         <>
-            <SummaryInfo
-                key={"issues-summary-graph-details"}
-                startTimestamp={startTimestamp}
-                endTimestamp={endTimestamp}
-            />
-
             <HorizontalGrid gap={5} columns={2} key={"critical-issues-graph-detail"}>
-                <CriticalUnsecuredAPIsOverTimeGraph linkText={""} linkUrl={""} />
-                <CriticalFindingsGraph linkText={""} linkUrl={""} />
+                <CriticalFindingsGraph linkText={""} linkUrl={""}/>
+                <CriticalFindingsGraph linkText={""} linkUrl={""} complianceMode={complianceView}/>
             </HorizontalGrid>
 
             <GithubServerTable
@@ -550,9 +559,41 @@ function IssuesPage() {
             title={
                 <HorizontalStack gap={4}>
                     <TitleWithInfo
-                        titleText={"Issues"}
-                        tooltipContent={"Issues are created when a test from test library has passed validation and thus a potential vulnerability is found."}
+                        titleText={"Compliance Report"}
+                        tooltipContent={"View a detailed compliance report mapping detected issues to industry standards such as OWASP API Security Top 10, NIST, PCI-DSS, SOC 2, and more."}
                     />
+                    <Popover
+                        active={moreActions}
+                        activator={(
+                            <Button onClick={() => setMoreActions(!moreActions)} disclosure removeUnderline>
+                                <Box>
+                                    <HorizontalStack gap={2}>
+                                        <Avatar source={func.getComplianceIcon(complianceView)} shape="square"  size="extraSmall"/> 
+                                        <Text>{complianceView}</Text>
+                                    </HorizontalStack>
+                                </Box>
+                            </Button>
+                        )}
+                        autofocusTarget="first-node"
+                        onClose={() => { setMoreActions(false) }}
+                        preferredAlignment="right"
+                    >
+                        <Popover.Pane fixed>
+                            <Popover.Section>
+                            <VerticalStack gap={"2"}>
+                                {allCompliances.map(compliance => {return <Button textAlign="left" plain onClick={() => {onSelectCompliance(compliance)}} removeUnderline>
+                                    <Box>
+                                        <HorizontalStack gap={2}>
+                                            <Avatar source={func.getComplianceIcon(compliance)} shape="square"  size="extraSmall"/> 
+                                            <Text>{compliance}</Text>
+                                        </HorizontalStack>
+                                    </Box>
+                                </Button>} )}
+                            </VerticalStack>
+                                
+                            </Popover.Section>
+                        </Popover.Pane>
+                    </Popover>
                 </HorizontalStack>
             }
             isFirstPage={true}
@@ -573,22 +614,12 @@ function IssuesPage() {
             
             : components
             ]}
-            primaryAction={<Button primary onClick={() => openVulnerabilityReport()} disabled={showEmptyScreen}>Export results</Button>}
+            primaryAction={<Button primary onClick={() => openVulnerabilityReport()} disabled={showEmptyScreen}>Export {complianceView} report</Button>}
             secondaryActions={<DateRangeFilter initialDispatch={currDateRange} dispatch={(dateObj) => dispatchCurrDateRange({ type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias })} />}
         />
             {(resultId !== null && resultId.length > 0) ? <TestRunResultPage /> : null}
-            <JiraTicketCreationModal
-                modalActive={jiraModalActive}
-                setModalActive={setJiraModalActive}
-                handleSaveAction={handleSaveJiraAction}
-                jiraProjectMaps={jiraProjectMaps}
-                setProjId={setProjId}
-                setIssueType={setIssueType}
-                projId={projId}
-                issueType={issueType}
-            />
         </>
     )
 }
 
-export default IssuesPage
+export default CompliancePage

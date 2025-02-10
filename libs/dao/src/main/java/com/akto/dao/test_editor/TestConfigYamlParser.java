@@ -4,6 +4,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
+
 import com.akto.dao.test_editor.auth.Parser;
 import com.akto.dao.test_editor.filter.ConfigParser;
 import com.akto.dao.test_editor.info.InfoParser;
@@ -25,6 +27,22 @@ public class TestConfigYamlParser {
         Map<String, Object> config = mapper.readValue(content, Map.class);
         return parseConfig(config);
     }
+
+    public static Map<String, List<String>> parseComplianceTemplate(String content) throws Exception {
+
+        ObjectMapper mapper = new ObjectMapper(new YAMLFactory());
+
+        Map<String, Object> config = mapper.readValue(content, Map.class);
+
+        Map<String, List<String>> ret = new HashMap<>();
+        for(String complianceName: config.keySet()) {
+            List<Object> listObj = (List) config.get(complianceName);
+            List<String> listStr = listObj.stream().map(x -> x.toString()).collect(Collectors.toList());
+            ret.put(complianceName.toUpperCase(), listStr);
+        }
+
+        return ret;
+    }    
 
     public static TestConfig parseConfig(Map<String, Object> config) throws Exception {
 
