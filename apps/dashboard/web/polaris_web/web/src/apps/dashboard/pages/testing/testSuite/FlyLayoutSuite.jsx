@@ -145,7 +145,7 @@ function FlyLayoutSuite(props) {
                         <Box paddingBlockEnd={5}>
                             <Scrollable style={{ height: "90vh" }}>
 
-                                <VerticalStack gap={4}>
+                                <VerticalStack>
                                     <Box borderColor="border-subdued" borderBlockEndWidth="1" background="bg-subdued" padding={4}>
                                         {headingComponents}
                                     </Box>
@@ -155,7 +155,7 @@ function FlyLayoutSuite(props) {
                                             <Box borderColor="border-subdued" paddingBlockEnd={3} paddingBlockStart={3} paddingInlineStart={5} paddingInlineEnd={5}>
                                                 <HorizontalStack align="space-between">
                                                     <HorizontalStack align="start">
-                                                        <Text fontWeight="semibold" as="h3">{testSearchValue.length > 0 ? `Showing ${countSearchResults()} result` : `${totalSelectedTestsCount()} tests & ${filteredCategories.length} category`}</Text>
+                                                        <Text fontWeight="semibold" as="h3">{testSearchValue.length > 0 ? `Showing ${countSearchResults()} result` : `${filteredCategories.length} ${filteredCategories.length>1?'categories':'category'} & ${totalSelectedTestsCount()} tests`}</Text>
                                                     </HorizontalStack>
                                                     {testSearchValue.trim().length === 0 ? <Button onClick={() => { checkExpand() ? extendAllHandler() : collapseAllHandler() }} plain><Text>{checkExpand() ? "Expand all" : "Collapse all"}</Text></Button> : <></>}
                                                 </HorizontalStack>
