@@ -1,15 +1,31 @@
-.sub-category-list-item .Polaris-ResourceItem__ListItem {
-    background-color: #FAFBFB !important;
-}
-
-.sub-category-list-item .Polaris-ResourceItem__ListItem:hover h3{
+.sub-category-lists .sub-category-lists-item:hover h3{
     color: #202223 !important;
 }
 
-.sub-category-list-item .Polaris-ResourceItem__ListItem:first-child {
-    border-top: 0.5px solid rgba(221, 224, 228, 1) !important;
+.sub-category-lists:hover{
+    cursor: pointer;
 }
 
-.category-list-item:hover {
+.sub-category-lists .sub-category-lists-item:hover{
+    background-color: #F6F6F7 !important;
+}
+
+.category-list-item .Polaris-ResourceItem__ListItem:hover {
     background-color: var(--p-color-bg-hover) !important;
+}
+
+.flyLayoutSuite{
+    position: absolute;
+    top: 0;
+    right: -50vw;
+    transition: right 0.3s ease-in-out;
+    z-index: 400;
+}
+.flyLayoutSuite.show {
+    right: 0;
+}
+
+.flyLayoutSuite .category-list-item:not(:last-child) > .Polaris-ResourceItem__ListItem {
+    border-bottom-left-radius: 0 !important;
+    border-bottom-right-radius: 0 !important;
 }

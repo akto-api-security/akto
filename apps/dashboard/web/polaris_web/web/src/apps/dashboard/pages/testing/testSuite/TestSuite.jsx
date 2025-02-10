@@ -11,7 +11,6 @@ import ShowListInBadge from "../../../components/shared/ShowListInBadge"
 import transform from "../../testing/transform";
 
 
-
 const sortOptions = [
     { label: 'Template Name', value: 'template asc', directionLabel: 'A-Z', sortKey: 'name', columnIndex: 1 },
     { label: 'Template Name', value: 'template desc', directionLabel: 'Z-A', sortKey: 'name', columnIndex: 1 },
@@ -33,10 +32,12 @@ const owaspTop10List = {
 
 function TestSuite() {
     const [show, setShow] = useState(false)
-    const [data, setData] = useState({ 'all_templates': []})
+    const [data, setData] = useState({ 'all_templates': [] })
     const [selectedTab, setSelectedTab] = useState('all_templates')
-    const customTestSuiteData = [...LocalStore.getState().customTestSuites];
     const [selectedTestSuite, setSelectedTestSuite] = useState({})
+
+    const localCategoryMap = LocalStore.getState().categoryMap
+    const localSubCategoryMap = LocalStore.getState().subCategoryMap
 
     const { tabsInfo } = useTable()
     const definedTableTabs = ['All templates'];
@@ -80,7 +81,21 @@ function TestSuite() {
 
     const fetchData = async () => {
         const listData = owaspTop10List;
-        const metaDataObj = await transform.getAllSubcategoriesData(true, "runTests")
+        let metaDataObj = {
+            categories: [],
+            subCategories: [],
+            testSourceConfigs: []
+        }
+        if ((localCategoryMap && Object.keys(localCategoryMap).length > 0) && (localSubCategoryMap && Object.keys(localSubCategoryMap).length > 0)) {
+            metaDataObj = {
+                categories: Object.values(localCategoryMap),
+                subCategories: Object.values(localSubCategoryMap),
+                testSourceConfigs: []
+            }
+
+        } else {
+            metaDataObj = await transform.getAllSubcategoriesData(true, "runTests")
+        }
         const subCategoryMap = {};
         metaDataObj.subCategories.forEach(subCategory => {
             if (!subCategoryMap[subCategory?.superCategory?.name]) {
@@ -90,21 +105,31 @@ function TestSuite() {
                 label: subCategory.testName,
                 value: subCategory.name,
                 author: subCategory.author,
+                categoryName: subCategory.superCategory.displayName
             }
             subCategoryMap[subCategory.superCategory?.name].push(obj);
         });
         const updatedData = [];
         let id = 1;
-        Object.entries(listData).forEach(([key, value]) => { 
+        Object.entries(listData).forEach(([key, value]) => {
             const categoryTests = [];
+            const testSuiteSubCategoryMap = [];
             value.forEach(cat => {
+                if (!subCategoryMap[cat] || !Array.isArray(subCategoryMap[cat]) || subCategoryMap[cat].length === 0) return;
+
+                const obj = { tests: [], displayName: "", selected: false };
+                obj.tests = subCategoryMap[cat];
+                obj.displayName = subCategoryMap[cat][0].categoryName;
                 subCategoryMap[cat]?.forEach(test => {
-                    categoryTests.push(test.value);
+                    categoryTests.push(test);
                 });
+                testSuiteSubCategoryMap.push(obj);
             });
+
             updatedData.push({
+                allTest: testSuiteSubCategoryMap,
                 testSuiteName: key,
-                name: (<Text fontWeight="semibold">{key}</Text>),
+                name: (<Text variant="headingSm" fontWeight="medium" as="h2">{key}</Text>),
                 id: id++,
                 testCount: categoryTests.length,
                 tests: categoryTests,
@@ -119,23 +144,20 @@ function TestSuite() {
                 )
             });
         });
-        const newData = {
-            "all_templates": [...updatedData],
-        }
-        if (JSON.stringify(data) !== JSON.stringify(newData)) {
-            setData(prevData => ({
-                ...prevData,
-                all_templates: [...updatedData], 
-            }));
-        }
-        if (selectedTab !== "all_templates") { 
-            setSelectedTab("all_templates"); 
+        
+        setData(prevData => ({
+            ...prevData,
+            all_templates: [...updatedData],
+        }));
+
+        if (selectedTab !== "all_templates") {
+            setSelectedTab("all_templates");
         }
 
     };
 
     useEffect(() => {
-        fetchData();
+       fetchData()
     }, [])
 
 
@@ -148,6 +170,8 @@ function TestSuite() {
             setTableLoading(false)
         }, 200)
     }
+
+
 
     const components = [
         <GithubSimpleTable
@@ -164,20 +188,21 @@ function TestSuite() {
             headings={headings}
             data={data[selectedTab]}
         />,
+
         <FlyLayoutSuite
             selectedTestSuite={selectedTestSuite}
             setSelectedTestSuite={setSelectedTestSuite}
-            customTestSuiteData={customTestSuiteData}
             show={show}
             setShow={setShow}
         />
+
     ]
 
     return (
         <PageWithMultipleCards
             title={
                 <TitleWithInfo
-                    tooltipContent={"Akto automatically groups similar APIs into meaningful collections based on their subdomain names. "}
+                    tooltipContent={"Akto categorizes tests by OWASP Top 10 vulnerabilities, offering insights into common security issues and facilitating efficient resolution. "}
                     titleText={"Test Suites"}
                     docsUrl={"https://docs.akto.io/api-inventory/concepts"}
                 />
