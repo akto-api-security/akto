@@ -741,7 +741,7 @@ public class APICatalogSync {
 
         int start = newUrl.getUrl().startsWith("http") ? 3 : 0;
 
-        if(GraphQLUtils.isGraphQLEndpoint(newUrl.getUrl())) {
+        if(HttpResponseParams.isGraphQLEndpoint(newUrl.getUrl())) {
             return null; // Don't merge GraphQL endpoints
         }
 
@@ -811,7 +811,7 @@ public class APICatalogSync {
         SuperType[] newTypes = new SuperType[newTokens.length];
         int templatizedStrTokens = 0;
 
-        if(GraphQLUtils.isGraphQLEndpoint(dbUrl.getUrl()) || GraphQLUtils.isGraphQLEndpoint(newUrl.getUrl())) {
+        if(HttpResponseParams.isGraphQLEndpoint(dbUrl.getUrl()) || HttpResponseParams.isGraphQLEndpoint(newUrl.getUrl())) {
             return null; // Don't merge GraphQL endpoints
         }
 
