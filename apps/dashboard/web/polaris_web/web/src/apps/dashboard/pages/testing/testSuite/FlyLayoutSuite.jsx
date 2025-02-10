@@ -97,8 +97,8 @@ function FlyLayoutSuite(props) {
 
     const divWidth = width || "50vw";
 
+    let id = 1;
     function renderItem(item) {
-        let id = 1;
         return (
             <TestSuiteRow category={item} setCategories={setCategories} id={id++} setFilteredCategories={setFilteredCategories}/>
         );

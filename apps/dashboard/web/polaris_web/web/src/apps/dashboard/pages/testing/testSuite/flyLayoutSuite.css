@@ -13,10 +13,6 @@
 .category-list-item .Polaris-ResourceItem__ListItem:hover {
     background-color: var(--p-color-bg-hover) !important;
 }
-/* 
-.category-list-item:hover {
-    background-color: var(--p-color-bg-hover) !important;
-} */
 
 .flyLayoutSuite{
     position: absolute;
@@ -27,4 +23,9 @@
 }
 .flyLayoutSuite.show {
     right: 0;
+}
+
+.flyLayoutSuite .category-list-item:not(:last-child) > .Polaris-ResourceItem__ListItem {
+    border-bottom-left-radius: 0 !important;
+    border-bottom-right-radius: 0 !important;
 }
