@@ -603,7 +603,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
         if(userEmail != null && !userEmail.isEmpty()) {
             samlConfig = SSOConfigsDao.instance.getSSOConfig(userEmail);
         } else if(DashboardMode.isOnPremDeployment()) {
-            samlConfig = SSOConfigsDao.getSAMLConfigByAccountId(1000000, ConfigType.AZURE);
+            samlConfig = SSOConfigsDao.getSAMLConfigByAccountId(1000000);
         }
         if(samlConfig == null) {
             code = "Error, cannot login via SSO, trying to login with okta sso";
@@ -638,10 +638,13 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
         logger.info("Trying to create auth url for okta sso for: " + emailId);
         Config.OktaConfig oktaConfig = Config.getOktaConfig(emailId);
         if(oktaConfig == null) {
-            code= "Error, cannot find okta sso for this organization, redirecting to login";
-            logger.error(code);
-            servletResponse.sendRedirect("/login");
-            return ERROR.toUpperCase();
+            oktaConfig = OktaLogin.getInstance().getOktaConfig();
+            if(oktaConfig == null){
+                code= "Error, cannot find okta sso for this organization, redirecting to login";
+                logger.error(code);
+                servletResponse.sendRedirect("/login");
+                return ERROR.toUpperCase();
+            }
         }
 
         String authorisationUrl = OktaLogin.getAuthorisationUrl(emailId);

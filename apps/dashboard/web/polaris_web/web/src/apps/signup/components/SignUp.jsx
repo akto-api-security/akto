@@ -38,7 +38,6 @@ function SignUp() {
   const activeSSO = window.ACTIVE_SSO
   const githubAuthUrl = window.GITHUB_AUTH_URL
   const oktaAuthUrl = window.OKTA_AUTH_URL
-  const azureAuthUrl = window.AZURE_AUTH_URL
   const resetAll = PersistStore(state => state.resetAll)
   const { clearPollingInterval } = usePolling();
 
@@ -63,7 +62,7 @@ function SignUp() {
   const googleSamlAuthObj = {
     logo: '/public/gcp.svg',
     text: 'Continue with Google SAML SSO',
-    onClickFunc: () => { window.location.href = "" }
+    onClickFunc: () => { window.location.href = "/trigger-saml-sso" }
   }
 
   useEffect(() => {
@@ -86,6 +85,8 @@ function SignUp() {
         break;
       case "google_saml":
         copySsoList.push(googleSamlAuthObj);
+        break;
+      default:
         break;
     }
 

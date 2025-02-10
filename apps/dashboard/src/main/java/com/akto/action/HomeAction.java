@@ -4,7 +4,6 @@ import com.akto.dao.SSOConfigsDao;
 import com.akto.dao.UsersDao;
 import com.akto.dto.Config;
 import com.akto.dto.User;
-import com.akto.dto.sso.SAMLConfig;
 import com.akto.listener.InitializerListener;
 import com.akto.utils.*;
 import com.akto.util.DashboardMode;
@@ -52,26 +51,26 @@ public class HomeAction implements Action, SessionAware, ServletResponseAware, S
     public String execute() {
 
         servletRequest.setAttribute("isSaas", InitializerListener.isSaas);
-        if (GithubLogin.getGithubUrl() != null) {
-            servletRequest.setAttribute("githubAuthUrl", GithubLogin.getGithubUrl() + "/login/oauth/authorize?client_id=" + GithubLogin.getClientId() + "&scope=user&state=1000000");
-            servletRequest.setAttribute("activeSso", Config.ConfigType.GITHUB);
+        if(DashboardMode.isOnPremDeployment()){
+            if (GithubLogin.getGithubUrl() != null) {
+                servletRequest.setAttribute("githubAuthUrl", GithubLogin.getGithubUrl() + "/login/oauth/authorize?client_id=" + GithubLogin.getClientId() + "&scope=user&state=1000000");
+                servletRequest.setAttribute("activeSso", Config.ConfigType.GITHUB);
+            }
+    
+            if (OktaLogin.getAuthorisationUrl() != null) {
+                servletRequest.setAttribute("oktaAuthUrl", OktaLogin.getAuthorisationUrl());
+                servletRequest.setAttribute("activeSso", Config.ConfigType.OKTA);
+            }
+    
+            if (SSOConfigsDao.getSAMLConfigByAccountId(1000000, Config.ConfigType.AZURE) != null) {
+                servletRequest.setAttribute("activeSso", Config.ConfigType.AZURE);
+            }
+    
+            if (SSOConfigsDao.getSAMLConfigByAccountId(1000000, Config.ConfigType.GOOGLE_SAML) != null) {
+                servletRequest.setAttribute("activeSso", Config.ConfigType.GOOGLE_SAML);
+            }
         }
-
-        if (OktaLogin.getAuthorisationUrl() != null) {
-            servletRequest.setAttribute("oktaAuthUrl", OktaLogin.getAuthorisationUrl());
-            servletRequest.setAttribute("activeSso", Config.ConfigType.OKTA);
-        }
-
-        if (SSOConfigsDao.getSAMLConfigByAccountId(1000000, Config.ConfigType.AZURE) != null) {
-            servletRequest.setAttribute("activeSso", Config.ConfigType.AZURE);
-        }
-
-        // TODO("Haven't tested Google SAML SSO")
-        if (SSOConfigsDao.getSAMLConfigByAccountId(1000000, Config.ConfigType.GOOGLE_SAML) != null) {
-            SAMLConfig googleSamlConfig = SSOConfigsDao.getSAMLConfigByAccountId(1000000, Config.ConfigType.GOOGLE_SAML);
-            servletRequest.setAttribute("googleSamlAuthUrl", googleSamlConfig.getLoginUrl());
-            servletRequest.setAttribute("activeSso", Config.ConfigType.GOOGLE_SAML);
-        }
+        
         if (InitializerListener.aktoVersion != null && InitializerListener.aktoVersion.contains("akto-release-version")) {
             servletRequest.setAttribute("AktoVersionGlobal", "");
         } else {

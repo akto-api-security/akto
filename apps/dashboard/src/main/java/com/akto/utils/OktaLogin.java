@@ -49,7 +49,11 @@ public class OktaLogin {
         paramMap.put("redirect_uri",oktaConfig.getRedirectUri());
         paramMap.put("response_type", "code");
         paramMap.put("scope", "openid%20email%20profile");
-        paramMap.put("state", String.valueOf(oktaConfig.getAccountId()));
+        int accountId = 1000000;
+        if(oktaConfig.getAccountId() != 0){
+            accountId = oktaConfig.getAccountId();
+        }
+        paramMap.put("state", String.valueOf(accountId));
 
         String queryString = SsoUtils.getQueryString(paramMap);
 
