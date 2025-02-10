@@ -1,6 +1,8 @@
 package com.akto.action;
 
+import com.akto.dao.SSOConfigsDao;
 import com.akto.dao.UsersDao;
+import com.akto.dto.Config;
 import com.akto.dto.User;
 import com.akto.listener.InitializerListener;
 import com.akto.utils.*;
@@ -21,7 +23,6 @@ import org.slf4j.LoggerFactory;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.nio.charset.StandardCharsets;
-import java.util.Base64;
 import java.util.Map;
 
 import static com.akto.action.SignupAction.*;
@@ -50,15 +51,26 @@ public class HomeAction implements Action, SessionAware, ServletResponseAware, S
     public String execute() {
 
         servletRequest.setAttribute("isSaas", InitializerListener.isSaas);
-        if (GithubLogin.getClientId() != null) {
-            servletRequest.setAttribute("githubClientId", new String(Base64.getEncoder().encode(GithubLogin.getClientId().getBytes())));
+        if(DashboardMode.isOnPremDeployment()){
+            if (GithubLogin.getGithubUrl() != null) {
+                servletRequest.setAttribute("githubAuthUrl", GithubLogin.getGithubUrl() + "/login/oauth/authorize?client_id=" + GithubLogin.getClientId() + "&scope=user&state=1000000");
+                servletRequest.setAttribute("activeSso", Config.ConfigType.GITHUB);
+            }
+    
+            if (OktaLogin.getAuthorisationUrl() != null) {
+                servletRequest.setAttribute("oktaAuthUrl", OktaLogin.getAuthorisationUrl());
+                servletRequest.setAttribute("activeSso", Config.ConfigType.OKTA);
+            }
+    
+            if (SSOConfigsDao.getSAMLConfigByAccountId(1000000, Config.ConfigType.AZURE) != null) {
+                servletRequest.setAttribute("activeSso", Config.ConfigType.AZURE);
+            }
+    
+            if (SSOConfigsDao.getSAMLConfigByAccountId(1000000, Config.ConfigType.GOOGLE_SAML) != null) {
+                servletRequest.setAttribute("activeSso", Config.ConfigType.GOOGLE_SAML);
+            }
         }
-        if (GithubLogin.getGithubUrl() != null) {
-            servletRequest.setAttribute("githubUrl", GithubLogin.getGithubUrl());
-        }
-        if(DashboardMode.isOnPremDeployment() && OktaLogin.getAuthorisationUrl() != null){
-            servletRequest.setAttribute("oktaAuthUrl", new String(Base64.getEncoder().encode(OktaLogin.getAuthorisationUrl().getBytes())));
-        }
+        
         if (InitializerListener.aktoVersion != null && InitializerListener.aktoVersion.contains("akto-release-version")) {
             servletRequest.setAttribute("AktoVersionGlobal", "");
         } else {

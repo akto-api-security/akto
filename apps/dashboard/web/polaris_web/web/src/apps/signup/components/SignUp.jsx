@@ -35,34 +35,59 @@ function SignUp() {
     }))
   }
 
-  const oktaUrl = window.OKTA_AUTH_URL
-  const githubId = window.GITHUB_CLIENT_ID
-  const githubUrl = window.GITHUB_URL ? window.GITHUB_URL : "https://github.com"
+  const activeSSO = window.ACTIVE_SSO
+  const githubAuthUrl = window.GITHUB_AUTH_URL
+  const oktaAuthUrl = window.OKTA_AUTH_URL
   const resetAll = PersistStore(state => state.resetAll)
   const { clearPollingInterval } = usePolling();
 
   const githubAuthObj = {
     logo: '/public/github_icon.svg',
     text: 'Continue with Github SSO',
-    onClickFunc: () => { window.location.href = (githubUrl + "/login/oauth/authorize?client_id=" + githubId); }
+    onClickFunc: () => { window.location.href = githubAuthUrl }
   }
 
   const oktaAuthObj = {
     logo: '/public/okta_logo.svg',
     text: 'Continue with Okta SSO',
-    onClickFunc: () => { window.location.href = oktaUrl }
+    onClickFunc: () => { window.location.href = oktaAuthUrl }
+  }
+
+  const azureAuthObj = {
+    logo: '/public/azure_logo.svg',
+    text: 'Continue with Azure SSO',
+    onClickFunc: () => { window.location.href = "/trigger-saml-sso" }
+  }
+
+  const googleSamlAuthObj = {
+    logo: '/public/gcp.svg',
+    text: 'Continue with Google SAML SSO',
+    onClickFunc: () => { window.location.href = "/trigger-saml-sso" }
   }
 
   useEffect(() => {
     resetAll()
     clearPollingInterval()
     let copySsoList = []
-    if (githubId !== undefined && githubId.length > 0) {
-      copySsoList.push(githubAuthObj)
-    }
-
-    if (oktaUrl !== undefined && oktaUrl.length > 0) {
-      copySsoList.push(oktaAuthObj)
+    switch (activeSSO?.toLowerCase()) {
+      case "github":
+        if (githubAuthUrl?.length > 0) {
+          copySsoList.push(githubAuthObj);
+        }
+        break;
+      case "okta":
+        if (oktaAuthUrl?.length > 0) {
+          copySsoList.push(oktaAuthObj);
+        }
+        break;
+      case "azure":
+        copySsoList.push(azureAuthObj);
+        break;
+      case "google_saml":
+        copySsoList.push(googleSamlAuthObj);
+        break;
+      default:
+        break;
     }
 
     setSsoList(copySsoList)
@@ -280,7 +305,6 @@ function SignUp() {
       <Text alignment="center" variant="heading2xl">{activeObject.headingText}</Text>
       <VerticalStack gap={5}>
         {ssoCard}
-        {!func.checkLocal() ? <SSOTextfield onClickFunc={() => window.location.href="/sso-login"} logos={['/public/azure_logo.svg', '/public/gcp.svg']} text={"Sign in with SSO"} /> : null}
         {signupEmailCard}
         {loginActive && isOnPrem && resetPasswordComp}
       </VerticalStack>
