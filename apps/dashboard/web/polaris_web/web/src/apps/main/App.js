@@ -83,6 +83,7 @@ import AuditLogs from "../dashboard/pages/settings/audit_logs/AuditLogs";
 import ThreatApiPage from "../dashboard/pages/threat_detection/ThreatApiPage";
 import ThreatActorPage from "../dashboard/pages/threat_detection/ThreatActorPage";
 import ThreatPolicyPage from "../dashboard/pages/threat_detection/ThreatPolicyPage";
+import TestSuite from "../dashboard/pages/testing/testSuite/TestSuite";
 
 // if you add a component in a new path, please verify the search implementation in function -> 'getSearchItemsArr' in func.js
 
@@ -132,6 +133,10 @@ const router = createBrowserRouter([
                             {
                                 path: "dependency",
                                 element: <DependencyTable/>
+                            },
+                            {
+                              path:"test-suite",
+                              element:<TestSuite/>
                             }
                         ]
                     },
