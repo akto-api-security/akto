@@ -12,7 +12,6 @@ import com.akto.dto.Config;
 import com.akto.dto.User;
 import com.akto.dto.Config.OktaConfig;
 import com.akto.util.Constants;
-import com.akto.util.DashboardMode;
 import com.akto.utils.sso.SsoUtils;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
@@ -41,12 +40,10 @@ public class OktaSsoAction extends UserAction {
         oktaConfig.setAuthorisationServerId(authorisationServerId);
         oktaConfig.setOktaDomainUrl(oktaDomain);
         oktaConfig.setRedirectUri(redirectUri);
-        if(!DashboardMode.isOnPremDeployment()){
-            oktaConfig.setAccountId(Context.accountId.get());
-            String userLogin = getSUser().getLogin();
-            String domain = userLogin.split("@")[1];
-            oktaConfig.setOrganizationDomain(domain);
-        }
+        oktaConfig.setAccountId(Context.accountId.get());
+        String userLogin = getSUser().getLogin();
+        String domain = userLogin.split("@")[1];
+        oktaConfig.setOrganizationDomain(domain);
         ConfigsDao.instance.insertOne(oktaConfig);
 
         return SUCCESS.toUpperCase();

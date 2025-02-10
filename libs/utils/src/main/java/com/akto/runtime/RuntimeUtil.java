@@ -16,6 +16,13 @@ import java.net.URL;
 import java.util.*;
 
 public class RuntimeUtil {
+
+    public static final String JUICE_SHOP_DEMO_COLLECTION_NAME = "juice_shop_demo";
+    public static final String VULNERABLE_API_COLLECTION_NAME = "vulnerable_apis";
+    public static final String LLM_API_COLLECTION_NAME = "llm_apis";
+    public static final int VULNERABLE_API_COLLECTION_ID = 1111111111;
+    public static final int LLM_API_COLLECTION_ID = 1222222222;
+
     private static final LoggerMaker loggerMaker = new LoggerMaker(RuntimeUtil.class);
     public static boolean matchesDefaultPayload(HttpResponseParams httpResponseParams, Map<String, DefaultPayload> defaultPayloadMap) {
         try {

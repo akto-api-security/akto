@@ -126,6 +126,12 @@ function IssuesPage() {
             value: "domains"
         },
         {
+            title: "Compliance",
+            text: "Compliance",
+            value: "compliance",
+            sortActive: true
+        },
+        {
             title: "Discovered",
             text: "Discovered",
             value: "creationTime",
@@ -353,6 +359,8 @@ function IssuesPage() {
             case "issueStatus":
             case "severity":
                 return func.convertToDisambiguateLabel(value, func.toSentenceCase, 2)
+            case "compliance":
+                return func.convertToDisambiguateLabel(value, func.toUpperCase(), 2)
             case "issueCategory":
                 return func.convertToDisambiguateLabelObj(value, null, 3)
             case "collectionIds":
@@ -408,6 +416,7 @@ function IssuesPage() {
         setTableLoading(true)
         let filterStatus = [selectedTab.toUpperCase()]
         let filterSeverity = filters.severity
+        let filterCompliance = filters.compliance
         const activeCollections = (filters?.activeCollections !== undefined && filters?.activeCollections.length > 0) ? filters?.activeCollections[0] : initialValForResponseFilter;
         const apiCollectionId = filters.apiCollectionId || []
         let filterCollectionsId = apiCollectionId.concat(filters.collectionIds)
@@ -422,6 +431,7 @@ function IssuesPage() {
             'filterStatus': filterStatus,
             'filterCollectionsId': collectionIdsArray,
             'filterSeverity': filterSeverity,
+            'filterCompliance': filterCompliance,
             filterSubCategory: filterSubCategory,
             startEpoch: [startTimestamp.toString()],
             endTimeStamp: [endTimestamp.toString()],
@@ -434,7 +444,7 @@ function IssuesPage() {
 
         let issueItem = []
 
-        await api.fetchIssues(skip, limit, filterStatus, filterCollectionsId, filterSeverity, filterSubCategory, sortKey, sortOrder, startTimestamp, endTimestamp, activeCollections).then((issuesDataRes) => {
+        await api.fetchIssues(skip, limit, filterStatus, filterCollectionsId, filterSeverity, filterSubCategory, sortKey, sortOrder, startTimestamp, endTimestamp, activeCollections, filterCompliance).then((issuesDataRes) => {
             const uniqueIssuesMap = new Map()
             issuesDataRes.issues.forEach(item => {
                 const key = `${item?.id?.testSubCategory}|${item?.severity}|${item?.unread.toString()}`
@@ -442,6 +452,7 @@ function IssuesPage() {
                     uniqueIssuesMap.set(key, {
                         id: item?.id,
                         severity: func.toSentenceCase(item?.severity),
+                        compliance: Object.keys(subCategoryMap[item?.id?.testSubCategory]?.compliance?.mapComplianceToListClauses || {}),
                         severityType: item?.severity,
                         issueName: item?.id?.testSubCategory,
                         category: item?.id?.testSubCategory,

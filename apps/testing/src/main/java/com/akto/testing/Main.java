@@ -63,6 +63,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.util.StringUtils;
 
+import static com.akto.testing.Utils.isTestingRunForDemoCollection;
 import static com.akto.testing.Utils.readJsonContentFromFile;
 
 import java.util.*;
@@ -333,10 +334,7 @@ public class Main {
 
     public static void main(String[] args) throws InterruptedException {
         String mongoURI = System.getenv("AKTO_MONGO_CONN");
-        ReadPreference readPreference = ReadPreference.secondary();
-        if(DashboardMode.isOnPremDeployment()){
-            readPreference = ReadPreference.primary();
-        }
+        ReadPreference readPreference = ReadPreference.primary();
         WriteConcern writeConcern = WriteConcern.W1;
         DaoInit.init(new ConnectionString(mongoURI), readPreference, writeConcern);
 
@@ -402,10 +400,10 @@ public class Main {
                 // mark the test completed here
                 testCompletion.markTestAsCompleteAndRunFunctions(testingRun, summaryId);
 
-                if (StringUtils.hasLength(AKTO_SLACK_WEBHOOK) ) {
+                if (StringUtils.hasLength(AKTO_SLACK_WEBHOOK) && !isTestingRunForDemoCollection(testingRun)) {
                     try {
                         CustomTextAlert customTextAlert = new CustomTextAlert("Test completed for accountId=" + accountId + " testingRun=" + testingRun.getHexId() + " summaryId=" + summaryId.toHexString() + " : @Arjun you are up now. Make your time worth it. :)");
-                        SLACK_INSTANCE.send(AKTO_SLACK_WEBHOOK, customTextAlert.toJson());
+                        SLACK_INSTANCE.send(AKTO_SLACK_WEBHOOK, customTextAlert.toJson());  
                     } catch (Exception e) {
                         logger.error("Error sending slack alert for completion of test", e);
                     }
@@ -676,7 +674,7 @@ public class Main {
                     RequiredConfigs.initiate();
                     int maxRunTime = testingRun.getTestRunTime() <= 0 ? 30*60 : testingRun.getTestRunTime();
                     
-                    if (StringUtils.hasLength(AKTO_SLACK_WEBHOOK) ) {
+                    if (StringUtils.hasLength(AKTO_SLACK_WEBHOOK) && !isTestingRunForDemoCollection(testingRun)) {
                         CustomTextAlert customTextAlert = new CustomTextAlert("Test started: accountId=" + Context.accountId.get() + " testingRun=" + testingRun.getHexId() + " summaryId=" + summaryId.toHexString() + " time=" + maxRunTime);
                         SLACK_INSTANCE.send(AKTO_SLACK_WEBHOOK, customTextAlert.toJson());
                     }
@@ -697,7 +695,7 @@ public class Main {
                     loggerMaker.errorAndAddToDb(e, "Error in init " + e);
                 }
                 testCompletion.markTestAsCompleteAndRunFunctions(testingRun, summaryId);
-                if (StringUtils.hasLength(AKTO_SLACK_WEBHOOK) ) {
+                if (StringUtils.hasLength(AKTO_SLACK_WEBHOOK) && !isTestingRunForDemoCollection(testingRun)) {
                     try {
                         CustomTextAlert customTextAlert = new CustomTextAlert("Test completed for accountId=" + accountId + " testingRun=" + testingRun.getHexId() + " summaryId=" + summaryId.toHexString() + " : @Arjun you are up now. Make your time worth it. :)");
                         SLACK_INSTANCE.send(AKTO_SLACK_WEBHOOK, customTextAlert.toJson());
