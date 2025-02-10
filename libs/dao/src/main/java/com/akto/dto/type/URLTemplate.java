@@ -4,6 +4,7 @@ import java.util.Arrays;
 import java.util.UUID;
 
 import com.akto.dao.context.Context;
+import com.akto.dto.HttpResponseParams;
 import com.akto.dto.type.SingleTypeInfo.SuperType;
 import com.akto.dto.type.URLMethods.Method;
 
@@ -66,7 +67,7 @@ public class URLTemplate {
         String[] thatTokens = url;
         if (thatTokens.length != this.tokens.length) return false;
 
-        if(Arrays.toString(url).contains("graphql") || Arrays.toString(url).contains("graph")) {
+        if(HttpResponseParams.isGraphQLEndpoint(Arrays.toString(url))) {
             return false;
         }
 

@@ -320,11 +320,4 @@ public class GraphQLUtils {//Singleton class
         }
         return result;
     }
-
-    public static boolean isGraphQLEndpoint(String url) {
-        if(url.contains("graphql") || url.contains("graph")) {
-            return true;
-        }
-        return false;
-    }
 }
