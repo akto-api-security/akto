@@ -38,7 +38,11 @@ function FlyLayoutSuite(props) {
 
 
     useEffect(() => {
-        let updatedCategories = [...categories];
+        let deepCopy = [];
+        if (categories && Array.isArray(categories)) {
+            deepCopy = JSON.parse(JSON.stringify(categories));
+        }
+        let updatedCategories = [...deepCopy];
     
         if (testSearchValue.length > 0) {
           updatedCategories = updatedCategories.filter(category => {
@@ -60,7 +64,6 @@ function FlyLayoutSuite(props) {
             }
           });
         }
-
         setFilteredCategories(updatedCategories);
         setPrevSearchValue(testSearchValue); 
     }, [testSearchValue, categories]);
@@ -97,7 +100,7 @@ function FlyLayoutSuite(props) {
     function renderItem(item) {
         let id = 1;
         return (
-            <TestSuiteRow category={item} setCategories={setCategories} id={id++} />
+            <TestSuiteRow category={item} setCategories={setCategories} id={id++} setFilteredCategories={setFilteredCategories}/>
         );
     }
 

@@ -11,13 +11,11 @@ import ShowListInBadge from "../../../components/shared/ShowListInBadge"
 import transform from "../../testing/transform";
 
 
-
 const sortOptions = [
     { label: 'Template Name', value: 'template asc', directionLabel: 'A-Z', sortKey: 'name', columnIndex: 1 },
     { label: 'Template Name', value: 'template desc', directionLabel: 'Z-A', sortKey: 'name', columnIndex: 1 },
 ];
 
-let cachedData = null;
 
 const owaspTop10List = {
     "Broken Object Level Authorization": ["BOLA"],
@@ -37,6 +35,9 @@ function TestSuite() {
     const [data, setData] = useState({ 'all_templates': [] })
     const [selectedTab, setSelectedTab] = useState('all_templates')
     const [selectedTestSuite, setSelectedTestSuite] = useState({})
+
+    const localCategoryMap = LocalStore.getState().categoryMap
+    const localSubCategoryMap = LocalStore.getState().subCategoryMap
 
     const { tabsInfo } = useTable()
     const definedTableTabs = ['All templates'];
@@ -80,7 +81,21 @@ function TestSuite() {
 
     const fetchData = async () => {
         const listData = owaspTop10List;
-        const metaDataObj = await transform.getAllSubcategoriesData(true, "runTests")
+        let metaDataObj = {
+            categories: [],
+            subCategories: [],
+            testSourceConfigs: []
+        }
+        if ((localCategoryMap && Object.keys(localCategoryMap).length > 0) && (localSubCategoryMap && Object.keys(localSubCategoryMap).length > 0)) {
+            metaDataObj = {
+                categories: Object.values(localCategoryMap),
+                subCategories: Object.values(localSubCategoryMap),
+                testSourceConfigs: []
+            }
+
+        } else {
+            metaDataObj = await transform.getAllSubcategoriesData(true, "runTests")
+        }
         const subCategoryMap = {};
         metaDataObj.subCategories.forEach(subCategory => {
             if (!subCategoryMap[subCategory?.superCategory?.name]) {
@@ -129,8 +144,7 @@ function TestSuite() {
                 )
             });
         });
-        cachedData = { all_templates: [...updatedData] };
-
+        
         setData(prevData => ({
             ...prevData,
             all_templates: [...updatedData],
@@ -143,11 +157,7 @@ function TestSuite() {
     };
 
     useEffect(() => {
-        if (!cachedData) {
-            fetchData();
-        } else {
-            setData(cachedData);
-        }
+       fetchData()
     }, [])
 
 

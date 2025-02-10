@@ -5,19 +5,18 @@ import {
 } from '@shopify/polaris-icons';
 import "./flyLayoutSuite.css"
 
-function TestSuiteRow({ category, id, setCategories }) {
+function TestSuiteRow({ category, id, setCategories, setFilteredCategories }) {
     let displayName = category.displayName;
     let subCategories = category.tests;
 
     function toggleOpen() {
-        setCategories(prev => {
+        setFilteredCategories(prev => {
             const updatedCategories = { ...prev };
             Object.values(updatedCategories).forEach(element => {
                 if (element.displayName === displayName) {
                     element.selected = !element.selected;
                 }
             });
-
             return Object.values(updatedCategories);
         });
     }
