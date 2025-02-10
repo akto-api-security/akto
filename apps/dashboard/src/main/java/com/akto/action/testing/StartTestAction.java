@@ -1,15 +1,20 @@
 package com.akto.action.testing;
 
+import com.akto.DaoInit;
+import com.akto.action.ExportSampleDataAction;
 import com.akto.action.AccountAction;
 import com.akto.action.UserAction;
 import com.akto.dao.RBACDao;
+import com.akto.dao.AccountsDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing.sources.TestSourceConfigsDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dao.testing.*;
+import com.akto.dto.Account;
 import com.akto.dto.testing.config.EditableTestingRunConfig;
 import com.akto.dto.ApiInfo;
+import com.akto.dto.MiniTestingServiceHeartbeat;
 import com.akto.dto.User;
 import com.akto.dto.ApiToken.Utility;
 import com.akto.dto.RBAC;
@@ -28,11 +33,13 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.Constants;
 import com.akto.util.DashboardMode;
+import com.akto.util.Pair;
 import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.TestErrorSource;
 import com.akto.utils.DeleteTestRunUtils;
 import com.akto.utils.Utils;
 import com.google.gson.Gson;
+import com.mongodb.ConnectionString;
 import com.mongodb.client.model.*;
 import com.mongodb.client.result.InsertOneResult;
 import com.opensymphony.xwork2.Action;
@@ -114,7 +121,7 @@ public class StartTestAction extends UserAction {
     private boolean sendSlackAlert = false;
     private boolean sendMsTeamsAlert = false;
 
-    private TestingRun createTestingRun(int scheduleTimestamp, int periodInSeconds) {
+    private TestingRun createTestingRun(int scheduleTimestamp, int periodInSeconds, String miniTestingServiceName) {
         User user = getSUser();
 
         if (!StringUtils.isEmpty(this.overriddenTestAppUrl)) {
@@ -170,9 +177,10 @@ public class StartTestAction extends UserAction {
 
         return new TestingRun(scheduleTimestamp, user.getLogin(),
                 testingEndpoints, testIdConfig, State.SCHEDULED, periodInSeconds, testName, this.testRunTime,
-                this.maxConcurrentRequests, this.sendSlackAlert, this.sendMsTeamsAlert);
+                this.maxConcurrentRequests, this.sendSlackAlert, this.sendMsTeamsAlert, miniTestingServiceName);
     }
 
+    String selectedMiniTestingServiceName;
     private List<String> selectedTests;
     private List<TestConfigsAdvancedSettings> testConfigsAdvancedSettings;
 
@@ -213,7 +221,7 @@ public class StartTestAction extends UserAction {
         }
         if (localTestingRun == null) {
             try {
-                localTestingRun = createTestingRun(scheduleTimestamp, this.recurringDaily ? 86400 : 0);
+                localTestingRun = createTestingRun(scheduleTimestamp, this.recurringDaily ? 86400 : 0, selectedMiniTestingServiceName);
                 // pass boolean from ui, which will tell if testing is coniinuous on new endpoints
                 if (this.continuousTesting) {
                     localTestingRun.setPeriodInSeconds(-1);
@@ -252,7 +260,7 @@ public class StartTestAction extends UserAction {
                             Updates.set(TestingRun.STATE, TestingRun.State.COMPLETED),
                             Updates.set(TestingRun.END_TIMESTAMP, Context.now())));
                 }
-                 
+
             }
 
             if (this.overriddenTestAppUrl != null || this.selectedTests != null) {
@@ -260,7 +268,7 @@ public class StartTestAction extends UserAction {
                 TestingRunConfig testingRunConfig = new TestingRunConfig(id, null, this.selectedTests, null, this.overriddenTestAppUrl, this.testRoleId);
                 this.testIdConfig = testingRunConfig.getId();
                 TestingRunConfigDao.instance.insertOne(testingRunConfig);
-            } 
+            }
 
         }
 
@@ -654,7 +662,7 @@ public class StartTestAction extends UserAction {
             return ERROR.toUpperCase();
         }
 
-        
+
         int accountId = Context.accountId.get();
 
         testCountMap = new HashMap<>();
@@ -681,9 +689,9 @@ public class StartTestAction extends UserAction {
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
-                
+
             }
-            
+
         } catch (Exception e) {
             e.printStackTrace();
             return ERROR.toUpperCase();
@@ -816,9 +824,9 @@ public class StartTestAction extends UserAction {
             }else{
                 testingRunResultList = TestingRunResultDao.instance.findAll(filters, skip, 50, null);
             }
-            
 
-            
+
+
             // Map<String, String> sampleDataVsCurlMap = new HashMap<>();
             // for (TestingRunResult runResult: testingRunResultList) {
             //     WorkflowTest workflowTest = runResult.getWorkflowTest();
@@ -1171,31 +1179,31 @@ public class StartTestAction extends UserAction {
                 if (editableTestingRunConfig.getConfigsAdvancedSettings() != null && !editableTestingRunConfig.getConfigsAdvancedSettings().equals(existingTestingRunConfig.getConfigsAdvancedSettings())) {
                     updates.add(Updates.set(TestingRunConfig.TEST_CONFIGS_ADVANCED_SETTINGS, editableTestingRunConfig.getConfigsAdvancedSettings()));
                 }
-                
+
                 if (editableTestingRunConfig.getTestSubCategoryList() != null &&
                     !editableTestingRunConfig.getTestSubCategoryList().equals(existingTestingRunConfig.getTestSubCategoryList())) {
                     updates.add(Updates.set(TestingRunConfig.TEST_SUBCATEGORY_LIST, editableTestingRunConfig.getTestSubCategoryList()));
                 }
-                
+
                 if (editableTestingRunConfig.getTestRoleId() != null && !editableTestingRunConfig.getTestRoleId().equals(existingTestingRunConfig.getTestRoleId())) {
                     updates.add(Updates.set(TestingRunConfig.TEST_ROLE_ID, editableTestingRunConfig.getTestRoleId()));
                 }
-                
+
                 if (editableTestingRunConfig.getOverriddenTestAppUrl() != null && !editableTestingRunConfig.getOverriddenTestAppUrl().equals(existingTestingRunConfig.getOverriddenTestAppUrl())) {
                     updates.add(Updates.set(TestingRunConfig.OVERRIDDEN_TEST_APP_URL, editableTestingRunConfig.getOverriddenTestAppUrl()));
                 }
-                
+
                 if (!updates.isEmpty()) {
                     TestingRunConfigDao.instance.updateOne(
                         Filters.eq(Constants.ID, this.testingRunConfigId),
-                        Updates.combine(updates) 
+                        Updates.combine(updates)
                     );
                 }
 
             }
 
             if (editableTestingRunConfig.getTestingRunHexId() != null) {
-            
+
                 TestingRun existingTestingRun = TestingRunDao.instance.findOne(Filters.eq(Constants.ID, new ObjectId(editableTestingRunConfig.getTestingRunHexId())));
 
                 if (existingTestingRun != null) {
@@ -1234,15 +1242,15 @@ public class StartTestAction extends UserAction {
                     if (existingTestingRun.getPeriodInSeconds() != periodInSeconds) {
                         updates.add(Updates.set(TestingRun.PERIOD_IN_SECONDS, periodInSeconds));
                     }
-                
+
                     if (!updates.isEmpty()) {
                         TestingRunDao.instance.updateOne(
                             Filters.eq(Constants.ID,new ObjectId(editableTestingRunConfig.getTestingRunHexId())),
-                            Updates.combine(updates) 
+                            Updates.combine(updates)
                         );
                     }
                 }
-                
+
             }
 
 
@@ -1327,12 +1335,38 @@ public class StartTestAction extends UserAction {
                             Updates.set(TestingRunResult.IS_IGNORED_RESULT, true)
                         );
                     }
-                    
+
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
             }
         }, 0 , TimeUnit.SECONDS);
+
+        return SUCCESS.toUpperCase();
+    }
+
+    private Set<String> miniTestingServiceNames;
+    private boolean isHybridTestingEnabled;
+    public String fetchMiniTestingServiceNames() {
+        int accountId = Context.accountId.get();
+        Account account = AccountsDao.instance.findOne(Filters.eq("_id", accountId), Projections.include(Account.HYBRID_TESTING_ENABLED, Account.MINI_TESTING_HEARTBEAT));
+        if(account == null || !account.getHybridTestingEnabled() || account.getMiniTestingHeartbeat() == null) {
+            return SUCCESS.toUpperCase();
+        }
+
+        List<MiniTestingServiceHeartbeat> miniTestingHeartbeats = account.getMiniTestingHeartbeat();
+        isHybridTestingEnabled = account.getHybridTestingEnabled();
+
+        miniTestingServiceNames = new HashSet<>();
+
+        for(MiniTestingServiceHeartbeat miniTestingHeartbeat : miniTestingHeartbeats) {
+            String miniTestingServiceName = miniTestingHeartbeat.getMiniTestingServiceName();
+            int miniTestingLastHeartbeat = miniTestingHeartbeat.getLastHeartbeatTimestamp();
+
+            if(Math.abs(Context.now() - miniTestingLastHeartbeat) <= 300) {
+                miniTestingServiceNames.add(miniTestingServiceName);
+            }
+        }
 
         return SUCCESS.toUpperCase();
     }
@@ -1718,5 +1752,25 @@ public class StartTestAction extends UserAction {
 
     public void setSendMsTeamsAlert(boolean sendMsTeamsAlert) {
         this.sendMsTeamsAlert = sendMsTeamsAlert;
+    }
+
+    public Set<String> getMiniTestingServiceNames() {
+        return miniTestingServiceNames;
+    }
+
+    public void setMiniTestingServiceNames(Set<String> miniTestingServiceNames) {
+        this.miniTestingServiceNames = miniTestingServiceNames;
+    }
+
+    public boolean getIsHybridTestingEnabled() {
+        return isHybridTestingEnabled;
+    }
+
+    public void setIsHybridTestingEnabled(boolean isHybridTestingEnabled) {
+        this.isHybridTestingEnabled = isHybridTestingEnabled;
+    }
+
+    public void setSelectedMiniTestingServiceName(String selectedMiniTestingServiceName) {
+        this.selectedMiniTestingServiceName = selectedMiniTestingServiceName;
     }
 }

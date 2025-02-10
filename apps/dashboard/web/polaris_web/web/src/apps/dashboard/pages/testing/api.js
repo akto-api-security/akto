@@ -520,5 +520,12 @@ export default {
             method: 'post',
             data: {testingRunResultSummaryHexId}
         })
+    },
+    fetchMiniTestingServiceNames() {
+        return request({
+            url: '/api/fetchMiniTestingServiceNames',
+            method: 'post',
+            data: {}
+        })
     }
 }

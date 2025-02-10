@@ -3,7 +3,7 @@ import { VerticalStack, HorizontalGrid, Checkbox, TextField, Text } from '@shopi
 import Dropdown from "../../../components/layouts/Dropdown";
 import func from "@/util/func"
 
-const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes, testRunTimeOptions, testRolesArr, maxConcurrentRequestsOptions, slackIntegrated, generateLabelForSlackIntegration,getLabel, timeFieldsDisabled, teamsTestingWebhookIntegrated, generateLabelForTeamsIntegration}) => {
+const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes, testRunTimeOptions, testRolesArr, maxConcurrentRequestsOptions, slackIntegrated, generateLabelForSlackIntegration,getLabel, timeFieldsDisabled, teamsTestingWebhookIntegrated, generateLabelForTeamsIntegration, isHybridTestingEnabled, miniTestingServiceNames}) => {
     return (
         <VerticalStack gap={"4"}>
             <HorizontalGrid gap={"4"} columns={"3"}>
@@ -104,6 +104,21 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
                         }} />
                 </div>
             </HorizontalGrid>
+            {
+                isHybridTestingEnabled && miniTestingServiceNames?.length > 0 ?
+                <Dropdown
+                    label="Select Testing Module"
+                    menuItems={miniTestingServiceNames}
+                    initial={miniTestingServiceNames?.[0]?.value}
+                    selected={(requests) => {
+                        const miniTestingServiceNameOption = getLabel(miniTestingServiceNames, requests)
+                        setTestRun(prev => ({
+                            ...prev,
+                            miniTestingServiceName: miniTestingServiceNameOption.value
+                        }))
+                    }}
+                /> : <></>
+            }
             <Checkbox
                 label={slackIntegrated ? "Send slack alert post test completion" : generateLabelForSlackIntegration()}
                 checked={testRun.sendSlackAlert}
