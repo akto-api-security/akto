@@ -305,7 +305,6 @@ function SignUp() {
       <Text alignment="center" variant="heading2xl">{activeObject.headingText}</Text>
       <VerticalStack gap={5}>
         {ssoCard}
-        {!func.checkLocal() ? <SSOTextfield onClickFunc={() => window.location.href="/sso-login"} logos={['/public/azure_logo.svg', '/public/gcp.svg']} text={"Sign in with SSO"} /> : null}
         {signupEmailCard}
         {loginActive && isOnPrem && resetPasswordComp}
       </VerticalStack>
