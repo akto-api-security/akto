@@ -32,6 +32,7 @@ public class Constants {
     public static final String TESTING_STATE_FOLDER_PATH = System.getenv("TESTING_STATE_FOLDER_PATH") != null ? System.getenv("TESTING_STATE_FOLDER_PATH") : "testing-info";
     public static final String TESTING_STATE_FILE_NAME = "testing-state.json";
     public static final boolean IS_NEW_TESTING_ENABLED = (StringUtils.hasLength(System.getenv("NEW_TESTING_ENABLED")) && System.getenv("NEW_TESTING_ENABLED").equals("true"));
+    public static final String ALLOWED_ACCOUNT_IDS_FOR_INTERNAL_DASHBOARD = System.getenv("ALLOWED_ACCOUNT_IDS_FOR_INTERNAL_DASHBOARD");
 
     public static final String UNDERSCORE = "_";
 
