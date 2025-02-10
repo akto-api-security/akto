@@ -202,9 +202,9 @@ function TestSuite() {
         <PageWithMultipleCards
             title={
                 <TitleWithInfo
-                    tooltipContent={"Akto categorizes tests by OWASP Top 10 vulnerabilities, offering insights into common security issues and facilitating efficient resolution. "}
+                    tooltipContent={"Create or manage custom test suites by combining tests across categories for simplified test execution and reusability."}
                     titleText={"Test Suites"}
-                    docsUrl={"https://docs.akto.io/api-inventory/concepts"}
+                    docsUrl={"https://docs.akto.io/api-security-testing/concepts/test"}
                 />
             }
             components={components}
