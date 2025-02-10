@@ -57,7 +57,7 @@ function SignUp() {
   const azureAuthObj = {
     logo: '/public/azure_logo.svg',
     text: 'Continue with Azure SSO',
-    onClickFunc: () => { window.location.href = azureAuthUrl }
+    onClickFunc: () => { window.location.href = "/trigger-saml-sso" }
   }
 
   const googleSamlAuthObj = {
@@ -82,9 +82,7 @@ function SignUp() {
         }
         break;
       case "azure":
-        if (azureAuthUrl?.length > 0) {
-          copySsoList.push(azureAuthObj);
-        }
+        copySsoList.push(azureAuthObj);
         break;
       case "google_saml":
         copySsoList.push(googleSamlAuthObj);
