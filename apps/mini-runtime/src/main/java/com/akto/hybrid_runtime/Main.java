@@ -185,7 +185,7 @@ public class Main {
         aSettings = dataActor.fetchAccountSettings();
 
         //DaoInit.init(new ConnectionString(mongoURI));
-        DictionaryFilter.readDictionaryBinary();
+        // DictionaryFilter.readDictionaryBinary();
 
         loggerMaker.infoAndAddToDb("Runtime starting at " + Context.now() + "....", LogDb.RUNTIME);
 
