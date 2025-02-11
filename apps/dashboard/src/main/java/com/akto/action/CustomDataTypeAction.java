@@ -1,6 +1,7 @@
 package com.akto.action;
 
 
+import com.akto.DaoInit;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
 import com.akto.dto.*;
@@ -10,6 +11,7 @@ import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.listener.InitializerListener;
 import com.akto.listener.RuntimeListener;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -29,6 +31,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.mongodb.BasicDBObject;
+import com.mongodb.ConnectionString;
 import com.mongodb.bulk.BulkWriteResult;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.*;
@@ -120,6 +123,23 @@ public class CustomDataTypeAction extends UserAction{
         dataTypes.put("usersMap", usersMap);
         List<AktoDataType> aktoDataTypes = AktoDataTypeDao.instance.findAll(new BasicDBObject());
         dataTypes.put("aktoDataTypes", aktoDataTypes);
+
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String fillSensitiveDataTypes() {
+        try {
+            InitializerListener.insertPiiSources();
+        } catch (Exception e) {
+            e.printStackTrace();
+            loggerMaker.errorAndAddToDb("error in insertPiiSources " + e.getMessage());
+        }
+        try {
+            InitializerListener.executePIISourceFetch();
+        } catch (Exception e) {
+            e.printStackTrace();
+            loggerMaker.errorAndAddToDb("error in executePIISourceFetch " + e.getMessage());
+        }
 
         return Action.SUCCESS.toUpperCase();
     }
