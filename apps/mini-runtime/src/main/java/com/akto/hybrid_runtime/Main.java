@@ -146,7 +146,7 @@ public class Main {
         if (topicName == null) {
             topicName = "akto.api.logs";
         }
-        DictionaryFilter.readDictionaryBinary();
+        // DictionaryFilter.readDictionaryBinary();
         return topicName;
     }
 
