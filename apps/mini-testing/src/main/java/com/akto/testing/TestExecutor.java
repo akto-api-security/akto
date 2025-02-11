@@ -610,7 +610,9 @@ public class TestExecutor {
         TestConfig testConfig = testConfigMap.get(testSubCategory);
 
         if (testConfig == null) {
-            loggerMaker.infoAndAddToDb("Found testing config null: " + apiInfoKey.toString() + " : " + testSubCategory);
+            if(Constants.KAFKA_DEBUG_MODE){
+                loggerMaker.infoAndAddToDb("Found testing config null: " + apiInfoKey.toString() + " : " + testSubCategory);
+            }
             return null;
         }
 
@@ -625,7 +627,10 @@ public class TestExecutor {
         String failMessage = null;
         TestingRunResult testingRunResult = com.akto.testing.Utils.generateFailedRunResultForMessage(testingRun.getId(), apiInfoKey, testSuperType, testSubType, summaryId, messages, failMessage); 
         if(testingRunResult != null){
-            loggerMaker.infoAndAddToDb("Skipping test from producers because: " + failMessage + " apiinfo: " + apiInfoKey.toString(), LogDb.TESTING);
+            if(Constants.KAFKA_DEBUG_MODE){
+                loggerMaker.infoAndAddToDb("Skipping test from producers because: " + failMessage + " apiinfo: " + apiInfoKey.toString(), LogDb.TESTING);
+            }
+            
         }else if (Constants.IS_NEW_TESTING_ENABLED){
             // push data to kafka here and inside that call run test new function
             // create an object of TestMessage
@@ -633,7 +638,9 @@ public class TestExecutor {
                 testingRun.getId(), summaryId, apiInfoKey, testSubType, testLogs, accountId
             );
             totalRecords.incrementAndGet();
-            logger.info("Inserting record for apiInfoKey: " + apiInfoKey.toString() + " subcategory: " + testSubType);
+            if(Constants.KAFKA_DEBUG_MODE){
+                logger.info("Inserting record for apiInfoKey: " + apiInfoKey.toString() + " subcategory: " + testSubType);
+            }
             try {
                 Producer.pushMessagesToKafka(Arrays.asList(singleTestPayload));
             } catch (Exception e) {
