@@ -50,11 +50,11 @@ public class DashboardAction extends UserAction {
     public String findTotalIssues() {
         Set<Integer> demoCollections = new HashSet<>();
         demoCollections.addAll(deactivatedCollections);
-        demoCollections.add(RuntimeListener.LLM_API_COLLECTION_ID);
-        demoCollections.add(RuntimeListener.VULNERABLE_API_COLLECTION_ID);
-
-        ApiCollection juiceshopCollection = ApiCollectionsDao.instance.findByName("juice_shop_demo");
-        if (juiceshopCollection != null) demoCollections.add(juiceshopCollection.getId());
+//        demoCollections.add(RuntimeListener.LLM_API_COLLECTION_ID);
+//        demoCollections.add(RuntimeListener.VULNERABLE_API_COLLECTION_ID);
+//
+//        ApiCollection juiceshopCollection = ApiCollectionsDao.instance.findByName("juice_shop_demo");
+//        if (juiceshopCollection != null) demoCollections.add(juiceshopCollection.getId());
 
 
         if (startTimeStamp == 0) startTimeStamp = Context.now() - 24 * 1 * 60 * 60;
@@ -110,13 +110,13 @@ public class DashboardAction extends UserAction {
 
         Set<Integer> demoCollections = new HashSet<>();
         demoCollections.addAll(deactivatedCollections);
-        demoCollections.add(RuntimeListener.LLM_API_COLLECTION_ID);
-        demoCollections.add(RuntimeListener.VULNERABLE_API_COLLECTION_ID);
+//        demoCollections.add(RuntimeListener.LLM_API_COLLECTION_ID);
+//        demoCollections.add(RuntimeListener.VULNERABLE_API_COLLECTION_ID);
+//
+//        ApiCollection juiceshopCollection = ApiCollectionsDao.instance.findByName("juice_shop_demo");
+//        if (juiceshopCollection != null) demoCollections.add(juiceshopCollection.getId());
 
-        ApiCollection juiceshopCollection = ApiCollectionsDao.instance.findByName("juice_shop_demo");
-        if (juiceshopCollection != null) demoCollections.add(juiceshopCollection.getId());
-        
-        List<GlobalEnums.TestRunIssueStatus> allowedStatus = Arrays.asList(GlobalEnums.TestRunIssueStatus.OPEN, GlobalEnums.TestRunIssueStatus.FIXED);
+        List<GlobalEnums.TestRunIssueStatus> allowedStatus = Arrays.asList(GlobalEnums.TestRunIssueStatus.OPEN);
         Bson issuesFilter = Filters.and(
                 Filters.in(KEY_SEVERITY, severityToFetch),
                 Filters.gte(TestingRunIssues.CREATION_TIME, startTimeStamp),

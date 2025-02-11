@@ -511,8 +511,8 @@ function IssuesPage() {
             />
 
             <HorizontalGrid gap={5} columns={2} key={"critical-issues-graph-detail"}>
-                <CriticalUnsecuredAPIsOverTimeGraph linkText={""} linkUrl={""} />
-                <CriticalFindingsGraph linkText={""} linkUrl={""} />
+                <CriticalUnsecuredAPIsOverTimeGraph startTimestamp={startTimestamp} endTimestamp={endTimestamp} linkText={""} linkUrl={""} />
+                <CriticalFindingsGraph startTimestamp={startTimestamp} endTimestamp={endTimestamp} linkText={""} linkUrl={""} />
             </HorizontalGrid>
 
             <GithubServerTable
