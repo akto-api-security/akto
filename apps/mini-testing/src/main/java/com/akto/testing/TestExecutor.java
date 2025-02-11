@@ -63,6 +63,8 @@ import java.net.URISyntaxException;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+
 import com.akto.testing.workflow_node_executor.Utils;
 
 public class TestExecutor {
@@ -232,7 +234,7 @@ public class TestExecutor {
         // }
 
         // init the singleton class here
-        TestingConfigurations.getInstance().init(testingUtil, testingRun.getTestingRunConfig(), debug, testConfigMap);
+        TestingConfigurations.getInstance().init(testingUtil, testingRun.getTestingRunConfig(), debug, testConfigMap, testingRun.getMaxConcurrentRequests());
 
         if(!shouldInitOnly){
             int maxThreads = Math.min(testingRunSubCategories.size(), 1000);
@@ -256,14 +258,13 @@ public class TestExecutor {
             }
 
             final int maxRunTime = tempRunTime;
+            AtomicInteger totalRecords = new AtomicInteger(0);
             for (ApiInfo.ApiInfoKey apiInfoKey: apiInfoKeyList) {
                 List<String> messages = testingUtil.getSampleMessages().get(apiInfoKey);
                 if(Constants.IS_NEW_TESTING_ENABLED){
                     for (String testSubCategory: testingRunSubCategories) {
-                        Future<Void> future = threadPool.submit(() ->insertRecordInKafka(accountId, testSubCategory, apiInfoKey, messages, summaryId, syncLimit, apiInfoKeyToHostMap, subCategoryEndpointMap, testConfigMap, testLogs, testingRun, new AtomicBoolean(false)));
-                        testingRecords.add(future);
+                        insertRecordInKafka(accountId, testSubCategory, apiInfoKey, messages, summaryId, syncLimit, apiInfoKeyToHostMap, subCategoryEndpointMap, testConfigMap, testLogs, testingRun, new AtomicBoolean(false), totalRecords);
                     }
-                    latch.countDown();
                 }
                 else{
                     Future<Void> future = threadPool.submit(() -> startWithLatch(testingRunSubCategories, accountId, apiInfoKey, messages, summaryId, syncLimit, apiInfoKeyToHostMap, subCategoryEndpointMap, testConfigMap, testLogs, testingRun, latch));
@@ -272,33 +273,31 @@ public class TestExecutor {
             }
             
             try {
-                //boolean awaitResult = latch.await(maxRunTime, TimeUnit.SECONDS);
-                int waitTs = Context.now();
-                while(latch.getCount() > 0 && GetRunningTestsStatus.getRunningTests().isTestRunning(summaryId) 
-                    && (Context.now() - waitTs < maxRunTime)) {
-                        loggerMaker.infoAndAddToDb("waiting for tests to finish", LogDb.TESTING);
-                        Thread.sleep(10000);
+                if(!Constants.IS_NEW_TESTING_ENABLED){
+                    int waitTs = Context.now();
+                    while(latch.getCount() > 0 && GetRunningTestsStatus.getRunningTests().isTestRunning(summaryId) 
+                        && (Context.now() - waitTs < maxRunTime)) {
+                            loggerMaker.infoAndAddToDb("waiting for tests to finish", LogDb.TESTING);
+                            Thread.sleep(10000);
+                    }
+    
+                    for (Future<Void> future : testingRecords) {
+                        future.cancel(!Constants.IS_NEW_TESTING_ENABLED);
+                    }
+                    loggerMaker.infoAndAddToDb("Canceled all running future tasks due to timeout.", LogDb.TESTING);
                 }
-                loggerMaker.infoAndAddToDb("test is completed", LogDb.TESTING);
-                //awaitResult = latch.getCount() > 0 && GetRunningTestsStatus.getRunningTests().isTestRunning(summaryId);
-                //loggerMaker.infoAndAddToDb("Await result: " + awaitResult, LogDb.TESTING);
-
-                for (Future<Void> future : testingRecords) {
-                    future.cancel(true);
-                }
-                loggerMaker.infoAndAddToDb("Canceled all running future tasks due to timeout.", LogDb.TESTING);
+                
 
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
             if(!shouldInitOnly && Constants.IS_NEW_TESTING_ENABLED){
+                loggerMaker.infoAndAddToDb("Finished inserting records in kafka, Total records: " + totalRecords.get(), LogDb.TESTING);
                 dbObject.put("PRODUCER_RUNNING", false);
                 dbObject.put("CONSUMER_RUNNING", true);
                 writeJsonContentInFile(Constants.TESTING_STATE_FOLDER_PATH, Constants.TESTING_STATE_FILE_NAME, dbObject);
-                loggerMaker.infoAndAddToDb("Finished inserting records in kafka", LogDb.TESTING);
             }
         }
-        loggerMaker.infoAndAddToDb("Finished testing", LogDb.TESTING);
     }
 
     public static void updateTestSummary(ObjectId summaryId){
@@ -505,7 +504,7 @@ public class TestExecutor {
         try {
             for (String testSubCategory: testingRunSubCategories) {
                 if(GetRunningTestsStatus.getRunningTests().isTestRunning(summaryId)){
-                    insertRecordInKafka(accountId, testSubCategory, apiInfoKey, messages, summaryId, syncLimit, apiInfoKeyToHostMap, subCategoryEndpointMap, testConfigMap, testLogs, testingRun, isApiInfoTested);
+                    insertRecordInKafka(accountId, testSubCategory, apiInfoKey, messages, summaryId, syncLimit, apiInfoKeyToHostMap, subCategoryEndpointMap, testConfigMap, testLogs, testingRun, isApiInfoTested, new AtomicInteger(0));
                 }else{
                     logger.info("Test stopped for id: " + testingRun.getHexId());
                     break;
@@ -606,7 +605,7 @@ public class TestExecutor {
     private Void insertRecordInKafka(int accountId, String testSubCategory, ApiInfo.ApiInfoKey apiInfoKey,
             List<String> messages, ObjectId summaryId, SyncLimit syncLimit, Map<ApiInfoKey, String> apiInfoKeyToHostMap,
             ConcurrentHashMap<String, String> subCategoryEndpointMap, Map<String, TestConfig> testConfigMap,
-            List<TestingRunResult.TestLog> testLogs, TestingRun testingRun, AtomicBoolean isApiInfoTested) {
+            List<TestingRunResult.TestLog> testLogs, TestingRun testingRun, AtomicBoolean isApiInfoTested, AtomicInteger totalRecords) {
         Context.accountId.set(accountId);
         TestConfig testConfig = testConfigMap.get(testSubCategory);
 
@@ -633,6 +632,7 @@ public class TestExecutor {
             SingleTestPayload singleTestPayload = new SingleTestPayload(
                 testingRun.getId(), summaryId, apiInfoKey, testSubType, testLogs, accountId
             );
+            totalRecords.incrementAndGet();
             logger.info("Inserting record for apiInfoKey: " + apiInfoKey.toString() + " subcategory: " + testSubType);
             try {
                 Producer.pushMessagesToKafka(Arrays.asList(singleTestPayload));
