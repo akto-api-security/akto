@@ -221,3 +221,9 @@
     color: #202223 !important;
     font-weight: 550 !important;
 }
+
+.selected-card {
+    border-radius: 8px;
+    border: 1px solid #8C9196 !important;
+    box-shadow: var(--p-shadow-base) !important;
+}

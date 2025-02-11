@@ -59,7 +59,7 @@ function UpdateConnections(props) {
                             <Divider/>
                             <GridRows CardComponent={RowCard} columns="3" 
                             items={obj[key]} buttonText="Connect" onButtonClick={onButtonClick}     
-                            changedColumns={newCol} 
+                            changedColumns={newCol} currentSelected={currentCardObj?.label || ""}
                             />
                             </VerticalStack>
                         )
