@@ -277,7 +277,7 @@ public class TestExecutor {
         // }
 
         // init the singleton class here
-        TestingConfigurations.getInstance().init(testingUtil, testingRun.getTestingRunConfig(), debug, testConfigMap);
+        TestingConfigurations.getInstance().init(testingUtil, testingRun.getTestingRunConfig(), debug, testConfigMap, testingRun.getMaxConcurrentRequests());
 
         if(!shouldInitOnly){
             int maxThreads = Math.min(testingRunSubCategories.size(), 500);

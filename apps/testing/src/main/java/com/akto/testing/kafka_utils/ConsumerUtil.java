@@ -10,6 +10,7 @@ import java.util.Properties;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -121,7 +122,8 @@ public class ConsumerUtil {
     }
     
     public void init(int maxRunTimeInSeconds) {
-        executor = Executors.newFixedThreadPool(100);
+        TestingConfigurations instance = TestingConfigurations.getInstance();
+        executor = Executors.newFixedThreadPool(instance.getMaxConcurrentRequest());
         BasicDBObject currentTestInfo = readJsonContentFromFile(Constants.TESTING_STATE_FOLDER_PATH, Constants.TESTING_STATE_FILE_NAME, BasicDBObject.class);
         final String summaryIdForTest = currentTestInfo.getString("summaryId");
         final ObjectId summaryObjectId = new ObjectId(summaryIdForTest);
@@ -178,7 +180,10 @@ public class ConsumerUtil {
                         logger.error("Task timed out");
                         future.cancel(true);
                         createTimedOutResultFromMessage(message);
-                    } catch (Exception e) {
+                    } catch(RejectedExecutionException e){
+                        future.cancel(true);
+                    } 
+                    catch (Exception e) {
                         logger.error("Error in task execution: " + message, e);
                     }
                 } finally {
