@@ -17,6 +17,7 @@ import javax.script.ScriptEngineManager;
 import javax.script.ScriptException;
 
 import org.bson.types.ObjectId;
+import org.springframework.util.StringUtils;
 
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dao.context.Context;
@@ -551,7 +552,7 @@ public class Utils {
         } catch (Exception e) {
         }
         
-        if((messages == null || messages.isEmpty()) && msg == null){
+        if(!StringUtils.hasLength(failMessage) && (messages == null || messages.isEmpty()) && msg == null){
             failMessage = TestError.NO_PATH.getMessage();
         }
             

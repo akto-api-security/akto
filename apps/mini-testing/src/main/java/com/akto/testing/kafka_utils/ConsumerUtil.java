@@ -2,6 +2,7 @@ package com.akto.testing.kafka_utils;
 import static com.akto.testing.Utils.readJsonContentFromFile;
 import static com.akto.testing.Utils.writeJsonContentInFile;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -10,6 +11,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -17,19 +19,22 @@ import org.apache.kafka.clients.consumer.*;
 import org.bson.types.ObjectId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.util.StringUtils;
 
 import com.akto.crons.GetRunningTestsStatus;
 import com.akto.dao.context.Context;
+import com.akto.data_actor.DataActor;
+import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.test_editor.TestConfig;
 import com.akto.dto.testing.TestingRunResult;
+import com.akto.dto.testing.TestResult.TestError;
 import com.akto.dto.testing.info.SingleTestPayload;
 import com.akto.sql.SampleDataAltDb;
 // import com.akto.notifications.slack.CustomTextAlert;
-import com.akto.testing.Main;
+// import com.akto.testing.Main;
 import com.akto.testing.TestExecutor;
+import com.akto.testing.Utils;
 import com.akto.util.Constants;
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONObject;
@@ -41,6 +46,7 @@ import io.confluent.parallelconsumer.ParallelStreamProcessor;
 public class ConsumerUtil {
 
     static Properties properties = com.akto.runtime.utils.Utils.configProperties(Constants.LOCAL_KAFKA_BROKER_URL, Constants.AKTO_KAFKA_GROUP_ID_CONFIG, Constants.AKTO_KAFKA_MAX_POLL_RECORDS_CONFIG);
+    private static final DataActor dataActor = DataActorFactory.fetchInstance();
     static{
         properties.put(ConsumerConfig.MAX_POLL_INTERVAL_MS_CONFIG, 10000); 
     }
@@ -87,14 +93,34 @@ public class ConsumerUtil {
             executor.insertResultsAndMakeIssues(Collections.singletonList(runResult), singleTestPayload.getTestingRunResultSummaryId());
         }
     }
+
+    private void createTimedOutResultFromMessage(String message){
+        SingleTestPayload singleTestPayload = parseTestMessage(message);
+        Context.accountId.set(singleTestPayload.getAccountId());
+
+        String subCategory = singleTestPayload.getSubcategory();
+        TestConfig testConfig = TestingConfigurations.getInstance().getTestConfigMap().get(subCategory);
+
+        String testSuperType = testConfig.getInfo().getCategory().getName();
+        String testSubType = testConfig.getInfo().getSubCategory();
+
+        TestingRunResult runResult = Utils.generateFailedRunResultForMessage(singleTestPayload.getTestingRunId(), singleTestPayload.getApiInfoKey(), testSuperType, testSubType, singleTestPayload.getTestingRunResultSummaryId(), new ArrayList<>(),  TestError.TEST_TIMED_OUT.getMessage());
+        TestExecutor.trim(runResult);
+        dataActor.updateTestResultsCountInTestSummary(singleTestPayload.getTestingRunResultSummaryId().toHexString(), 1);
+        dataActor.insertTestingRunResults(runResult);
+    }
     
     public void init(int maxRunTimeInSeconds) {
-        executor = Executors.newFixedThreadPool(100);
+        TestingConfigurations instance = TestingConfigurations.getInstance();
+        executor = Executors.newFixedThreadPool(instance.getMaxConcurrentRequest());
         BasicDBObject currentTestInfo = readJsonContentFromFile(Constants.TESTING_STATE_FOLDER_PATH, Constants.TESTING_STATE_FILE_NAME, BasicDBObject.class);
         final String summaryIdForTest = currentTestInfo.getString("summaryId");
         final ObjectId summaryObjectId = new ObjectId(summaryIdForTest);
         final int startTime = Context.now();
         AtomicBoolean firstRecordRead = new AtomicBoolean(false);
+        AtomicInteger maxRetries = new AtomicInteger(0);
+        AtomicInteger countVal = new AtomicInteger(0);
+
         boolean isConsumerRunning = false;
         if(currentTestInfo != null){
             isConsumerRunning = currentTestInfo.getBoolean("CONSUMER_RUNNING");
@@ -134,22 +160,37 @@ public class ConsumerUtil {
                 String message = record.value();
                 logger.info("Thread [" + threadName + "] picked up record: " + message);
                 try {
-                    Future<?> future = executor.submit(() -> runTestFromMessage(message));
-                    firstRecordRead.set(true);
-                    try {
-                        future.get(4, TimeUnit.MINUTES); 
-                    } catch (InterruptedException e) {
-                        logger.error("Task timed out: " + message);
-                        future.cancel(true);
-                    } catch (Exception e) {
-                        logger.error("Error in task execution: " + message, e);
+                    if(!executor.isShutdown()){
+                        Future<?> future = executor.submit(() -> runTestFromMessage(message));
+                        firstRecordRead.set(true);
+                        try {
+                            future.get(5, TimeUnit.MINUTES); 
+                        } catch (InterruptedException e) {
+                            logger.error("Task timed out");
+                            future.cancel(true);
+                            if(!executor.isShutdown()){
+                                createTimedOutResultFromMessage(message);
+                            }
+                            
+                        } catch(TimeoutException e){
+                            logger.error("Task timed out");
+                            future.cancel(true);
+                            createTimedOutResultFromMessage(message);
+                        } catch (Exception e) {
+                            logger.error("Error in task execution: " + message, e);
+                        }
                     }
+                    
                 } finally {
                     logger.info("Thread [" + threadName + "] finished processing record: " + message);
                 }
             });
 
             while (parallelConsumer != null) {
+                if(countVal.get() % 100 == 0){
+                    countVal.set(0);
+                    logger.info("Total work remaining now is: " + parallelConsumer.workRemaining());
+                }
                 if(!GetRunningTestsStatus.getRunningTests().isTestRunning(summaryObjectId)){
                     logger.info("Tests have been marked stopped.");
                     executor.shutdownNow();
@@ -160,10 +201,14 @@ public class ConsumerUtil {
                     executor.shutdownNow();
                     break;
                 }else if(firstRecordRead.get() && parallelConsumer.workRemaining() == 0){
-                    logger.info("Records are empty now, thus executing final tests");
-                    executor.shutdown();
-                    executor.awaitTermination(maxRunTimeInSeconds, TimeUnit.SECONDS);
-                    break;
+                    if(maxRetries.get() < 3){
+                        maxRetries.incrementAndGet();
+                    }else{
+                        logger.info("Records are empty now, thus executing final tests");
+                        executor.shutdown();
+                        executor.awaitTermination(maxRunTimeInSeconds, TimeUnit.SECONDS);
+                        break;
+                    }
                 }
                 Thread.sleep(100);
             }
