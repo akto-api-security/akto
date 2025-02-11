@@ -267,7 +267,7 @@ function SingleTestRunPage() {
     let testRunResultsRes = []
     let testRunCountMap = []
     let totalIgnoredIssuesCount = 0
-    let issuesList = []
+    let ignoredIssueListCount = 0
     const { testingRun, workflowTest, testingRunType } = testingRunResultSummariesObj
     if (testingRun === undefined) {
       return { value: [], total: 0 }
@@ -293,8 +293,8 @@ function SingleTestRunPage() {
         totalIgnoredIssuesCount = ignoredTestRunResults.length
         setPageTotalCount(selectedTab === 'ignored_issues' ? totalIgnoredIssuesCount : testRunCountMap[tableTabMap[selectedTab]])
       } else {
-        await api.fetchTestingRunResults(localSelectedTestRun.testingRunResultSummaryHexId, tableTabMap[selectedTab], sortKey, sortOrder, skip, limit, filters, queryValue).then(({ testingRunResults, issueslist, errorEnums }) => {
-          issuesList = issueslist || []
+        await api.fetchTestingRunResults(localSelectedTestRun.testingRunResultSummaryHexId, tableTabMap[selectedTab], sortKey, sortOrder, skip, limit, filters, queryValue).then(({ testingRunResults, errorEnums, issueslistCount }) => {
+          ignoredIssueListCount = issueslistCount
           testRunResultsRes = transform.prepareTestRunResults(hexId, testingRunResults, subCategoryMap, subCategoryFromSourceConfigMap)
           if (selectedTab === 'domain_unreachable' || selectedTab === 'skipped' || selectedTab === 'need_configurations') {
             errorEnums['UNKNOWN_ERROR_OCCURRED'] = "OOPS! Unknown error occurred."
@@ -306,10 +306,8 @@ function SingleTestRunPage() {
           setCopyFilters(filters)
           api.fetchTestRunResultsCount(localSelectedTestRun.testingRunResultSummaryHexId).then((testCountMap) => {
             testRunCountMap = testCountMap || []
-            let vulnerableCount = testRunCountMap['VULNERABLE'] >= issuesList.length ? testRunCountMap['VULNERABLE'] - issuesList.length : 0
-            let ignoredIssuesCount = testRunCountMap['VULNERABLE'] >= issuesList.length ? issuesList.length : testRunCountMap['VULNERABLE']
-            testRunCountMap['VULNERABLE'] = vulnerableCount
-            testRunCountMap['IGNORED_ISSUES'] = ignoredIssuesCount
+            //Assuming vulnerable count is after removing ignored issues aLL - (OOTHER COUNT + IGNORED)
+            testRunCountMap['IGNORED_ISSUES'] = ignoredIssueListCount
             let countOthers = 0;
             Object.keys(testCountMap).forEach((x) => {
               if (x !== 'ALL') {
@@ -322,7 +320,6 @@ function SingleTestRunPage() {
             setPageTotalCount(testRunCountMap[tableTabMap[selectedTab]])
           })
         }
-
       }
     }
     fillTempData(testRunResultsRes, selectedTab)

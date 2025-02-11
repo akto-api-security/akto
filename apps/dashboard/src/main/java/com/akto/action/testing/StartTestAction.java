@@ -701,13 +701,18 @@ public class StartTestAction extends UserAction {
     String testingRunResultSummaryHexId;
     List<TestingRunResult> testingRunResults;
     private boolean fetchOnlyVulnerable;
+
+    public long getIssueslistCount() {
+        return issueslistCount;
+    }
+
     public enum QueryMode {
         VULNERABLE, SECURED, SKIPPED_EXEC_NEED_CONFIG, SKIPPED_EXEC_NO_ACTION, SKIPPED_EXEC, ALL, SKIPPED_EXEC_API_REQUEST_FAILED;
     }
     private QueryMode queryMode;
 
     private Map<TestError, String> errorEnums = new HashMap<>();
-    List<TestingRunIssues> issueslist;
+    private long issueslistCount;
 
     public String fetchTestingRunResults() {
         ObjectId testingRunResultSummaryId;
@@ -727,7 +732,8 @@ public class StartTestAction extends UserAction {
                 Filters.in(TestingRunIssues.TEST_RUN_ISSUES_STATUS, "IGNORED"),
                 Filters.in(TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_ID, testingRunResultSummaryId)
         );
-        issueslist = TestingRunIssuesDao.instance.findAll(ignoredIssuesFilters, Projections.include("_id"));
+        List<TestingRunIssues> issueslist = TestingRunIssuesDao.instance.findAll(ignoredIssuesFilters, Projections.include("_id"));
+        this.issueslistCount = issueslist.size();
         loggerMaker.infoAndAddToDb("[" + (Context.now() - timeNow) + "] Fetched testing run issues of size: " + issueslist.size(), LogDb.DASHBOARD);
 
         List<Bson> testingRunResultFilters = prepareTestRunResultsFilters(testingRunResultSummaryId, queryMode);
@@ -787,10 +793,12 @@ public class StartTestAction extends UserAction {
 
             boolean matchFound = issuesSet.contains(resultKey);
 
-            if (retainByIssues && !matchFound) {
-                resultIterator.remove();
-            } else if (!retainByIssues && matchFound) {
-                resultIterator.remove();
+            if (!result.isIgnoredResult()) {
+                if (retainByIssues && !matchFound) {
+                    resultIterator.remove();
+                } else if (!retainByIssues && matchFound) {
+                    resultIterator.remove();
+                }
             }
         }
 
@@ -1710,10 +1718,6 @@ public class StartTestAction extends UserAction {
         this.reportFilterList = reportFilterList;
     }
 
-    public List<TestingRunIssues> getIssueslist() {
-        return issueslist;
-    }
-    
     public boolean getCleanUpTestingResources() {
         return cleanUpTestingResources;
     }
