@@ -306,15 +306,17 @@ function SingleTestRunPage() {
           setCopyFilters(filters)
           api.fetchTestRunResultsCount(localSelectedTestRun.testingRunResultSummaryHexId).then((testCountMap) => {
             testRunCountMap = testCountMap || []
-            testRunCountMap['VULNERABLE'] = Math.abs(testRunCountMap['VULNERABLE'] - issuesList.length)
-            testRunCountMap['IGNORED_ISSUES'] = (issuesList.length || 0)
+            let vulnerableCount = testRunCountMap['VULNERABLE'] >= issuesList.length ? testRunCountMap['VULNERABLE'] - issuesList.length : 0
+            let ignoredIssuesCount = testRunCountMap['VULNERABLE'] >= issuesList.length ? issuesList.length : testRunCountMap['VULNERABLE']
+            testRunCountMap['VULNERABLE'] = vulnerableCount
+            testRunCountMap['IGNORED_ISSUES'] = ignoredIssuesCount
             let countOthers = 0;
             Object.keys(testCountMap).forEach((x) => {
               if (x !== 'ALL') {
                 countOthers += testCountMap[x]
               }
             })
-            testRunCountMap['SECURED'] = testCountMap['ALL'] - countOthers
+            testRunCountMap['SECURED'] = testCountMap['ALL'] >= countOthers ? testCountMap['ALL'] - countOthers : 0
             const orderedValues = tableTabsOrder.map(key => testCountMap[tableTabMap[key]] || 0)
             setTestRunResultsCount(orderedValues)
             setPageTotalCount(testRunCountMap[tableTabMap[selectedTab]])

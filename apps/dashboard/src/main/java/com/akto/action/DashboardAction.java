@@ -161,7 +161,6 @@ public class DashboardAction extends UserAction {
 
         while(issuesCursor.hasNext()){
             BasicDBObject basicDBObject = issuesCursor.next();
-            int val = (int) basicDBObject.values().toArray()[1];
             BasicDBObject o = (BasicDBObject) basicDBObject.get("_id");
             String severity = o.getString(KEY_SEVERITY, GlobalEnums.Severity.LOW.name());
             Map<Integer, Integer> trendData = severityWiseTrendData.computeIfAbsent(severity, k -> new HashMap<>());
