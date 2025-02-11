@@ -168,24 +168,27 @@ public class ConsumerUtil {
                 String message = record.value();
                 logger.info("Thread [" + threadName + "] picked up record: " + message);
                 try {
-                    Future<?> future = executor.submit(() -> runTestFromMessage(message));
-                    firstRecordRead.set(true);
-                    try {
-                        future.get(5, TimeUnit.MINUTES); 
-                    } catch (InterruptedException e) {
-                        logger.error("Task timed out");
-                        future.cancel(true);
-                        createTimedOutResultFromMessage(message);
-                    } catch(TimeoutException e){
-                        logger.error("Task timed out");
-                        future.cancel(true);
-                        createTimedOutResultFromMessage(message);
-                    } catch(RejectedExecutionException e){
-                        future.cancel(true);
-                    } 
-                    catch (Exception e) {
-                        logger.error("Error in task execution: " + message, e);
+                    if(!executor.isShutdown()){
+                        Future<?> future = executor.submit(() -> runTestFromMessage(message));
+                        firstRecordRead.set(true);
+                        try {
+                            future.get(5, TimeUnit.MINUTES); 
+                        } catch (InterruptedException e) {
+                            logger.error("Task timed out");
+                            future.cancel(true);
+                            createTimedOutResultFromMessage(message);
+                        } catch(TimeoutException e){
+                            logger.error("Task timed out");
+                            future.cancel(true);
+                            createTimedOutResultFromMessage(message);
+                        } catch(RejectedExecutionException e){
+                            future.cancel(true);
+                        } 
+                        catch (Exception e) {
+                            logger.error("Error in task execution: " + message, e);
+                        }
                     }
+                    
                 } finally {
                     logger.info("Thread [" + threadName + "] finished processing record: " + message);
                 }
