@@ -128,14 +128,8 @@ public class UsageMetricCalculator {
     }
 
     public static int calculateActiveEndpoints(UsageMetric usageMetric) {
-        int measureEpoch = usageMetric.getMeasureEpoch();
-        int activeEndpoints = SingleTypeInfoDao.instance.countEndpoints(
-                Filters.and(Filters.or(
-                        Filters.gt(SingleTypeInfo.LAST_SEEN, measureEpoch),
-                        Filters.gt(SingleTypeInfo._TIMESTAMP, measureEpoch)),
-                excludeDemosAndDeactivated(SingleTypeInfo._API_COLLECTION_ID)));
-        
-        return activeEndpoints;
+//        int measureEpoch = usageMetric.getMeasureEpoch();
+        return SingleTypeInfoDao.instance.countEndpoints(excludeDemosAndDeactivated(SingleTypeInfo._API_COLLECTION_ID));
     }
 
     public static int calculateCustomTests(UsageMetric usageMetric) {
