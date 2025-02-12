@@ -58,10 +58,10 @@ public class TrafficUpdates {
         loggerMaker.infoAndAddToDb("Creating alerts for " + AlertType.FILTERED_REQUESTS_RUNTIME, LoggerMaker.LogDb.DASHBOARD);
 
         for (AlertType alertType : AlertType.values()) {
-            loggerMaker.infoAndAddToDb("Finished createAlerts for " + alertType, LoggerMaker.LogDb.DASHBOARD);
+            loggerMaker.infoAndAddToDb("Starting createAlerts for " + alertType, LoggerMaker.LogDb.DASHBOARD);
             AlertResult alertResult = createAlert(thresholdSeconds, alertType, filteredTrafficMetricsAlertsList);
             alertMap.put(alertType, alertResult);
-            loggerMaker.infoAndAddToDb("Starting createAlerts for " + alertType, LoggerMaker.LogDb.DASHBOARD);
+            loggerMaker.infoAndAddToDb("Finished createAlerts for " + alertType, LoggerMaker.LogDb.DASHBOARD);
         }
         return alertMap;
     }
@@ -310,17 +310,17 @@ public class TrafficUpdates {
 
     public void sendSlackAlerts(String webhookUrl, String metricsUrl, int thresholdSeconds, Map<AlertType, AlertResult> alertMap) {
         for (AlertType alertType : alertMap.keySet()) {
-            loggerMaker.infoAndAddToDb("Finished sendSlackAlerts for " + alertType, LoggerMaker.LogDb.DASHBOARD);
-            actuallySendSlackAlerts(alertType, webhookUrl, metricsUrl, alertMap.get(alertType));
             loggerMaker.infoAndAddToDb("Starting sendSlackAlerts for " + alertType, LoggerMaker.LogDb.DASHBOARD);
+            actuallySendSlackAlerts(alertType, webhookUrl, metricsUrl, alertMap.get(alertType));
+            loggerMaker.infoAndAddToDb("Finished sendSlackAlerts for " + alertType, LoggerMaker.LogDb.DASHBOARD);
         }
     }
 
     public void sendTeamsAlerts(CustomWebhook webhook, String metricsUrl, int thresholdSeconds, Map<AlertType, AlertResult> alertMap) {
         for (AlertType alertType : alertMap.keySet()) {
-            loggerMaker.infoAndAddToDb("Finished sendTeamsAlerts for " + alertType, LoggerMaker.LogDb.DASHBOARD);
-            TrafficUpdatesTeams.createAndSendTeamsTrafficAlerts(alertType, webhook, metricsUrl, alertMap.get(alertType));
             loggerMaker.infoAndAddToDb("Starting sendTeamsAlerts for " + alertType, LoggerMaker.LogDb.DASHBOARD);
+            TrafficUpdatesTeams.createAndSendTeamsTrafficAlerts(alertType, webhook, metricsUrl, alertMap.get(alertType));
+            loggerMaker.infoAndAddToDb("Finished sendTeamsAlerts for " + alertType, LoggerMaker.LogDb.DASHBOARD);
         }
     }
 

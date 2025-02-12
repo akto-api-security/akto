@@ -332,6 +332,8 @@ function WebhookCore(props) {
         <LegacyCard title={CardTitle} key="options" actions={[{content: actionContent, onAction: toggleShowOptions}]}>
             <LegacyCard.Section>
                 {CardComponent}
+                {(webhook.selectedWebhookOptions && !webhook.selectedWebhookOptions.includes("TRAFFIC_ALERTS")) ?
+                (<>
                 <Divider />
                 <div style={{ paddingTop: "10px" }}>
                     <Text variant="headingMd">Run every</Text>
@@ -347,6 +349,8 @@ function WebhookCore(props) {
                         </span>
                     ))}
                 </div>
+                </>) : null
+                }
                 <br />
                 {(webhook.selectedWebhookOptions && webhook.selectedWebhookOptions.includes("API_THREAT_PAYLOADS")) ? (
                     <>
