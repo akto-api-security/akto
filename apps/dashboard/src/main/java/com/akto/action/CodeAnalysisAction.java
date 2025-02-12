@@ -3,6 +3,7 @@ package com.akto.action;
 import java.net.URI;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -305,7 +306,9 @@ public class CodeAnalysisAction extends UserAction {
                 singleTypeInfos.addAll(generateSTIsFromPayload(apiCollection.getId(), codeAnalysisApi.getEndpoint(), codeAnalysisApi.getMethod(), requestBody, -1));
                 singleTypeInfos.addAll(generateSTIsFromPayload(apiCollection.getId(), codeAnalysisApi.getEndpoint(), codeAnalysisApi.getMethod(), responseBody, 200));
 
-                Bson update = Updates.combine(Updates.max(SingleTypeInfo.LAST_SEEN, now), Updates.setOnInsert("timestamp", now));
+                Bson update = Updates.combine(Updates.max(SingleTypeInfo.LAST_SEEN, now),
+                        Updates.setOnInsert("timestamp", now),
+                        Updates.set(SingleTypeInfo._COLLECTION_IDS, Arrays.asList(apiCollection.getId())));
 
                 for (SingleTypeInfo singleTypeInfo: singleTypeInfos) {
                     bulkUpdatesSTI.add(

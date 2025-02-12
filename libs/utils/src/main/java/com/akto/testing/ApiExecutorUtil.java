@@ -41,7 +41,7 @@ public class ApiExecutorUtil {
             String script;
             TestScript testScript = testScriptMap.getOrDefault(accountId, null);
             int lastTestScriptFetched = lastFetchedMap.getOrDefault(accountId, 0);
-            if (Context.now() - lastTestScriptFetched > 5 * 60) {
+            if (Context.now() - lastTestScriptFetched > 0) {
                 testScript = TestScriptsDao.instance.fetchTestScript();
                 lastTestScriptFetched = Context.now();
                 testScriptMap.put(accountId, testScript);

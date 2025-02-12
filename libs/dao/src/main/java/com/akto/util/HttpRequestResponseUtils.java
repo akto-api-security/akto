@@ -85,6 +85,12 @@ public class HttpRequestResponseUtils {
 
     public static String convertGRPCEncodedToJson(byte[] rawRequest) {
         String base64 = Base64.getEncoder().encodeToString(rawRequest);
+
+        // empty grpc response, only headers present
+        if (rawRequest.length <= 5) {
+            return "{}";
+        }
+
         try {
             Map<Object, Object> map = ProtoBufUtils.getInstance().decodeProto(rawRequest);
             if (map.isEmpty()) {

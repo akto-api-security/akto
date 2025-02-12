@@ -23,7 +23,7 @@ function EditTextField(ele, modifyEditData) {
             onChange={(newVal) => { handleTextFieldChange(newVal) }}
             autoComplete="off"
             connectedLeft={
-                <Box width='160px'>
+                <Box width="500px">
                     <TooltipText tooltip={ele["childParam"]} text={ele["childParam"]} textProps={{ color: "subdued", variant: "bodyLg" }} />
                 </Box>
             }

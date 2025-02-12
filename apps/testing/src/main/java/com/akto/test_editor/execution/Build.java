@@ -1,13 +1,16 @@
 package com.akto.test_editor.execution;
 
+import com.akto.dao.CodeAnalysisSingleTypeInfoDao;
 import com.akto.dao.DependencyFlowNodesDao;
 import com.akto.dao.SampleDataDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiInfo;
+import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.RawApi;
 import com.akto.dto.dependency_flow.*;
+import com.akto.dto.dependency_flow.KVPair.KVType;
 import com.akto.dto.testing.TestingRunConfig;
 import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.SampleData;
@@ -17,13 +20,14 @@ import com.akto.testing.ApiExecutor;
 import com.akto.util.Constants;
 import com.akto.util.HttpRequestResponseUtils;
 import com.akto.util.JSONUtils;
+import com.akto.util.grpc.ParameterTransformer;
 import com.akto.util.modifier.SetValueModifier;
 import com.fasterxml.jackson.core.JsonFactory;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mongodb.client.model.Filters;
 import joptsimple.internal.Strings;
 import org.bson.conversions.Bson;
-
 import java.net.URI;
 import java.util.*;
 
@@ -152,8 +156,63 @@ public class Build {
         public void setIsSuccess(boolean success) {
             this.success = success;
         }
+    }
 
+    private static final ObjectMapper objectMapper = new ObjectMapper();
 
+    private static List<String> createGrpcSampleCodeAnalysis(Key id, List<KVPair> keyValue){
+        List<ApiInfoKey> apiInfoKeys = new ArrayList<>();
+        apiInfoKeys.add(new ApiInfo.ApiInfoKey(id.getApiCollectionId(), id.getUrl(), id.getMethod()));
+        Map<ApiInfoKey, List<String>> parametersMap = CodeAnalysisSingleTypeInfoDao.instance.fetchRequestParameters(apiInfoKeys);
+        List<String> samples = new ArrayList<>();
+        for(ApiInfoKey apiInfoKey: parametersMap.keySet()){
+            List<String> params = parametersMap.get(apiInfoKey);
+            Map<String, Object> paramValueMap = new HashMap<>();
+            for (String param : params) {
+                Object value = null;
+                for (KVPair kv : keyValue) {
+                    if (kv.getKey().equals(param)) {
+                        if (KVType.INTEGER.equals(kv.getType())) {
+                            value = Integer.parseInt(kv.getValue());
+                        } else if (KVType.STRING.equals(kv.getType())) {
+                            value = kv.getValue();
+                        } else if (KVType.BOOLEAN.equals(kv.getType())) {
+                            value = Boolean.valueOf(kv.getValue());
+                        }
+                        continue;
+                    }
+                }
+                if (value != null) {
+                    paramValueMap.put(ParameterTransformer.transformKey(param), value);
+                }
+            }
+            JsonNode requestJsonNode = ParameterTransformer.transform(paramValueMap);
+
+            Map<String, Object> sampleJson = new HashMap<>();
+            sampleJson.put("destIp", null);
+            sampleJson.put("method", id.getMethod().name());
+            sampleJson.put("requestPayload", requestJsonNode.toString());
+            sampleJson.put("responsePayload", "{}");
+            sampleJson.put("ip", "null");
+            sampleJson.put("source", "HAR");
+            sampleJson.put("type", "HTTP/1.1");
+            sampleJson.put("akto_vxlan_id", 1723184978);
+            sampleJson.put("path", id.getUrl());
+            sampleJson.put("requestHeaders", "{}");
+            sampleJson.put("responseHeaders", "{}");
+            sampleJson.put("time", "1723185238");
+            sampleJson.put("statusCode", "200");
+            sampleJson.put("status", "OK");
+            sampleJson.put("akto_account_id", "1000000");
+            sampleJson.put("direction", null);
+            sampleJson.put("is_pending", "false");
+            try{
+                samples.add(objectMapper.writeValueAsString(sampleJson));
+            } catch (Exception e){
+                
+            }
+        }
+        return samples;
     }
 
     Set<ApiInfo.ApiInfoKey> apisReplayedSet = new HashSet<>();
@@ -163,7 +222,12 @@ public class Build {
             Key id = sampleData.getId();
             try {
                 List<String> samples = sampleData.getSamples();
-                if (samples.isEmpty()) continue;;
+                ReplaceDetail replaceDetail = replaceDetailsMap.get(Objects.hash(id.getApiCollectionId(), id.getUrl(), id.getMethod().name()));
+                boolean used = false;
+                if (samples.isEmpty()) {
+                    used = true;
+                    samples.addAll(createGrpcSampleCodeAnalysis(id, replaceDetail.getKvPairs()));
+                }
 
                 String sample = samples.get(0);
                 OriginalHttpRequest request = new OriginalHttpRequest();
@@ -174,8 +238,9 @@ public class Build {
                 originalHttpResponse.buildFromSampleMessage(sample);
 
                 // do modifications
-                ReplaceDetail replaceDetail = replaceDetailsMap.get(Objects.hash(id.getApiCollectionId(), id.getUrl(), id.getMethod().name()));
-                modifyRequest(request, replaceDetail);
+                if (!used) {
+                    modifyRequest(request, replaceDetail);
+                }
 
                 TestingRunConfig testingRunConfig = new TestingRunConfig(0, new HashMap<>(), new ArrayList<>(), null,newHost, null);
 
@@ -242,7 +307,6 @@ public class Build {
             modifyHostDetailMap.put(modifyHostDetail.getCurrentHost(), modifyHostDetail);
         }
 
-
         List<Node> nodes = DependencyFlowNodesDao.instance.findNodesForCollectionIds(apiCollectionsIds,false,0, 10_000);
         buildParentToChildMap(nodes, parentToChildMap);
         Map<Integer, List<SampleData>> levelsToSampleDataMap = buildLevelsToSampleDataMap(nodes);
@@ -250,9 +314,11 @@ public class Build {
         List<RunResult> runResults = new ArrayList<>();
         // loop over levels and make requests
         for (int level: levelsToSampleDataMap.keySet()) {
-            List<SampleData> sdList =levelsToSampleDataMap.get(level);
-            sdList = fillSdList(sdList);
-            if (sdList.isEmpty()) continue;
+            List<SampleData> sdList = levelsToSampleDataMap.get(level);
+            List<SampleData> sdListFromDb = fillSdList(sdList);
+            if (!sdListFromDb.isEmpty()) {
+                sdList = sdListFromDb;
+            }
 
             loggerMaker.infoAndAddToDb("Running level: " + level, LoggerMaker.LogDb.DASHBOARD);
             try {

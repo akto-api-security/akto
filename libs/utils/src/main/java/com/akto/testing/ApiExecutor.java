@@ -481,4 +481,26 @@ public class ApiExecutor {
         Request okHttpRequest = builder.build();
         return common(okHttpRequest, followRedirects, debug, testLogs, skipSSRFCheck, requestProtocol);
     }
+
+    public static void main(String[] args) {
+        String payload = "{\n" + //
+                        "        \"param_5\": \"CmYKGgoLCM+9or0GEIuzxVkSCQgAEAAY07PNAhgAEgYIABAAGAUYgISvXyICCHgyAFo1CiISIHDMhgZGEjPrIvv4arK52T4Yjlr5Ull4b38D7j006b+/EIDC1y9AAEoFCIDO2gOIAQASZwplCiEClf2z9Z4OdkUvF54n3YISl5gY7n3W7y2QjxCdZbcjQlAyQEshDLuVepiO5L0kas8wAgEGN081UvbHpIFL0CwN8oX1yxdUOtZbookgOPmn1dQVJQRqo+mlA4vnMal/IuK0XA4=\"\n" + //
+                        "    }";
+        try {
+            loggerMaker.infoAndAddToDb("encoding to grpc payload:" + payload, LogDb.TESTING);
+            payload = ProtoBufUtils.base64EncodedJsonToProtobuf(payload);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Unable to encode grpc payload:" + payload, LogDb.TESTING);
+            // payload = request.getBody();
+        }
+        try {// trying decoding payload
+            byte[] payloadByteArray = Base64.getDecoder().decode(payload);
+            loggerMaker.infoAndAddToDb("Final base64 encoded payload:"+ payload, LogDb.TESTING);
+            loggerMaker.infoAndAddToDb("payloadByteArray: " + payloadByteArray);
+            // body = RequestBody.create(payloadByteArray, MediaType.parse(contentType));
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Unable to decode grpc payload:" + payload, LogDb.TESTING);
+        }
+
+    }
 }

@@ -321,7 +321,7 @@ public class Main {
     
                 // Pause for 1 second
                 try {
-                    Thread.sleep(1000);
+                    Thread.sleep(15000);
                 } catch (InterruptedException e) {
                     System.err.println("Memory monitor thread interrupted: " + e.getMessage());
                     break; // Exit the loop if thread is interrupted

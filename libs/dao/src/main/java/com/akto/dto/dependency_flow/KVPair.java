@@ -11,7 +11,7 @@ public class KVPair {
     private KVType type;
 
     public enum KVType {
-        STRING, INTEGER, JSON
+        STRING, INTEGER, JSON, BOOLEAN
     }
 
     public KVPair() {

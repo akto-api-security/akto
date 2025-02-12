@@ -17,6 +17,7 @@ function EditModal(props) {
                 content: 'Save',
                 onAction: () => {saveEditData(editData)},
             }}
+            large={true}
         >
             <Modal.Section>
                 <VerticalStack gap={2}>

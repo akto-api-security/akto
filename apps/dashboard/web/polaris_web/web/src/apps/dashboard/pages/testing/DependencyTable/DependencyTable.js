@@ -113,6 +113,10 @@ function DependencyTable() {
             })
         })
 
+        res = res.sort((a, b) => {
+            return a.childParam.localeCompare(b.childParam)
+        })
+
         return res
     }
 
@@ -194,6 +198,13 @@ function DependencyTable() {
         setEditData(newEditData);
     }
 
+    function isBoolean(value) {
+        return (
+            typeof value === "boolean" || 
+            (typeof value === "string" && (value.toLowerCase() === "true" || value.toLowerCase() === "false"))
+        );
+    }
+
     const convertDataToKVPairList = (data) => {
         let kvPairs = []
         data.forEach((x) => {
@@ -203,7 +214,7 @@ function DependencyTable() {
                 "isHeader": x["childParamIsHeader"],
                 "isUrlParam": x["childParamIsUrlParam"],
                 "value": x["value"],
-                "type": "STRING"
+                "type": isNaN(x["value"]) ? (isBoolean(x["value"]) ? "BOOLEAN" : "STRING") : "INTEGER"
             })
         })
 
