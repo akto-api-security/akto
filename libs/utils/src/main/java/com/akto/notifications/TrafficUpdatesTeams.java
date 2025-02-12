@@ -46,11 +46,12 @@ public class TrafficUpdatesTeams {
         body.append(CardTextBlock.createTextBlock(headingText, true, "bolder"));
 
         if (!alertResult.redAlertHosts.isEmpty()) {
-            String payload = generateRedAlertPayload(alertResult.greenAlertHosts, alertType, metricsUrl);
+            String payload = generateRedAlertPayload(alertResult.redAlertHosts, alertType, metricsUrl);
             if (payload != null) {
                 body.append(CardTextBlock.createTextBlock(payload, true, "default", "attention"));
             }
         }
+
         if (!alertResult.greenAlertHosts.isEmpty()) {
             String payload = generateGreenAlertPayload(alertResult.greenAlertHosts, alertType, metricsUrl);
             if (payload != null) {
