@@ -98,6 +98,15 @@ public class HttpResponseParams {
         return isAllowedForParse && requestPayload.contains(QUERY);
     }
 
+    public static boolean isGraphQLEndpoint(String url) {
+        for (String keyword : allowedPath) {
+            if (url.contains(keyword)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public int getTimeOrNow() {
         return getTime() == 0 ? Context.now() : getTime();
     }

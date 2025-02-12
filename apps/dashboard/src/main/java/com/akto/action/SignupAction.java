@@ -457,6 +457,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
         params.put("client_id", githubConfig.getClientId());
         params.put("client_secret", githubConfig.getClientSecret());
         params.put("code", this.code);
+        params.put("scope", "user");
         logger.info("Github code length: {}", this.code.length());
         try {
             String githubUrl = githubConfig.getGithubUrl();
@@ -491,12 +492,17 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             int refreshTokenExpiry = (int) Double.parseDouble(tokenData.getOrDefault("refresh_token_expires_in", "0").toString());
             Map<String,Object> userData = CustomHttpRequest.getRequest(githubApiUrl + "/user", "Bearer " + accessToken);
             logger.info("Get request to {} success", githubApiUrl);
-            String company = "sso";
-            String username = userData.get("login").toString() + "@" + company;
+
+            List<Map<String, String>> emailResp = GithubLogin.getEmailRequest(accessToken);
+            String username = userData.get("name").toString();
+            String email = GithubLogin.getPrimaryGithubEmail(emailResp);
+            if(email == null || email.isEmpty()) {
+                email = username + "@sso";
+            }
             logger.info("username {}", username);
-            SignupInfo.GithubSignupInfo ghSignupInfo = new SignupInfo.GithubSignupInfo(accessToken, refreshToken, refreshTokenExpiry, username);
+            SignupInfo.GithubSignupInfo ghSignupInfo = new SignupInfo.GithubSignupInfo(accessToken, refreshToken, refreshTokenExpiry, email, username);
             shouldLogin = "true";
-            createUserAndRedirect(username, username, ghSignupInfo, 1000000, Config.ConfigType.GITHUB.toString());
+            createUserAndRedirectWithDefaultRole(email, username, ghSignupInfo, 1000000, Config.ConfigType.GITHUB.toString());
             code = "";
             logger.info("Executed registerViaGithub");
 
@@ -520,8 +526,12 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                     servletResponse.sendRedirect("/login");
                     return ERROR.toUpperCase();
                 }
-
-                setAccountId(1000000);
+                try {
+                    setAccountId(Integer.parseInt(state));
+                } catch (NumberFormatException e) {
+                    servletResponse.sendRedirect("/login");
+                    return ERROR.toUpperCase();
+                }
                 oktaConfig = OktaLogin.getInstance().getOktaConfig();
             } else {
                 setAccountId(Integer.parseInt(state));
@@ -551,14 +561,8 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             String username = userInfo.get("preferred_username").toString();
 
             SignupInfo.OktaSignupInfo oktaSignupInfo= new SignupInfo.OktaSignupInfo(accessToken, username);
-
-            String defaultRole = RBAC.Role.MEMBER.name();
-            if (UsageMetricCalculator.isRbacFeatureAvailable(accountId)) {
-                defaultRole = fetchDefaultInviteRole(accountId, RBAC.Role.GUEST.name());
-            }
-            
             shouldLogin = "true";
-            createUserAndRedirect(email, username, oktaSignupInfo, accountId, Config.ConfigType.OKTA.toString(), defaultRole);
+            createUserAndRedirectWithDefaultRole(email, username, oktaSignupInfo, accountId, Config.ConfigType.OKTA.toString());
             code = "";
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error while signing in via okta sso \n" + e.getMessage(), LogDb.DASHBOARD);
@@ -587,7 +591,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
     public String sendRequestToSamlIdP() throws IOException{
         String queryString = servletRequest.getQueryString();
         String emailId = Util.getValueFromQueryString(queryString, "email");
-        if(emailId.isEmpty()){
+        if(!DashboardMode.isOnPremDeployment() && emailId.isEmpty()){
             code = "Error, user email cannot be empty";
             logger.error(code);
             servletResponse.sendRedirect("/login");
@@ -595,7 +599,12 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
         }
         logger.info("Trying to sign in for: " + emailId);
         setUserEmail(emailId);
-        SAMLConfig samlConfig = SSOConfigsDao.instance.getSSOConfig(userEmail);
+        SAMLConfig samlConfig = null;
+        if(userEmail != null && !userEmail.isEmpty()) {
+            samlConfig = SSOConfigsDao.instance.getSSOConfig(userEmail);
+        } else if(DashboardMode.isOnPremDeployment()) {
+            samlConfig = SSOConfigsDao.getSAMLConfigByAccountId(1000000);
+        }
         if(samlConfig == null) {
             code = "Error, cannot login via SSO, trying to login with okta sso";
             logger.error(code);
@@ -629,10 +638,13 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
         logger.info("Trying to create auth url for okta sso for: " + emailId);
         Config.OktaConfig oktaConfig = Config.getOktaConfig(emailId);
         if(oktaConfig == null) {
-            code= "Error, cannot find okta sso for this organization, redirecting to login";
-            logger.error(code);
-            servletResponse.sendRedirect("/login");
-            return ERROR.toUpperCase();
+            oktaConfig = OktaLogin.getInstance().getOktaConfig();
+            if(oktaConfig == null){
+                code= "Error, cannot find okta sso for this organization, redirecting to login";
+                logger.error(code);
+                servletResponse.sendRedirect("/login");
+                return ERROR.toUpperCase();
+            }
         }
 
         String authorisationUrl = OktaLogin.getAuthorisationUrl(emailId);
@@ -681,12 +693,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             logger.info("Successful signing with Azure Idp for: "+ useremail);
             SignupInfo.SamlSsoSignupInfo signUpInfo = new SignupInfo.SamlSsoSignupInfo(username, useremail, Config.ConfigType.AZURE);
 
-            String defaultRole = RBAC.Role.MEMBER.name();
-            if (UsageMetricCalculator.isRbacFeatureAvailable(this.accountId)) {
-                defaultRole = fetchDefaultInviteRole(this.accountId,RBAC.Role.GUEST.name());
-            }
-
-            createUserAndRedirect(useremail, username, signUpInfo, this.accountId, Config.ConfigType.AZURE.toString(), defaultRole);
+            createUserAndRedirectWithDefaultRole(useremail, username, signUpInfo, this.accountId, Config.ConfigType.AZURE.toString());
         } catch (Exception e1) {
             loggerMaker.errorAndAddToDb("Error while signing in via azure sso \n" + e1.getMessage(), LogDb.DASHBOARD);
             servletResponse.sendRedirect("/login");
@@ -736,12 +743,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             shouldLogin = "true";
             SignupInfo.SamlSsoSignupInfo signUpInfo = new SignupInfo.SamlSsoSignupInfo(username, userEmail, Config.ConfigType.GOOGLE_SAML);
 
-            String defaultRole = RBAC.Role.MEMBER.name();
-            if (UsageMetricCalculator.isRbacFeatureAvailable(this.accountId)) {
-                defaultRole = fetchDefaultInviteRole(this.accountId, RBAC.Role.GUEST.name());
-            }
-
-            createUserAndRedirect(userEmail, username, signUpInfo, this.accountId, Config.ConfigType.GOOGLE_SAML.toString(), defaultRole);
+            createUserAndRedirectWithDefaultRole(userEmail, username, signUpInfo, this.accountId, Config.ConfigType.GOOGLE_SAML.toString());
         } catch (Exception e1) {
             loggerMaker.errorAndAddToDb("Error while signing in via google workspace sso \n" + e1.getMessage(), LogDb.DASHBOARD);
             servletResponse.sendRedirect("/login");
@@ -826,6 +828,15 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
     private void createUserAndRedirect(String userEmail, String username, SignupInfo signupInfo,
                                        int invitationToAccount, String method) throws IOException {
         createUserAndRedirect(userEmail, username, signupInfo, invitationToAccount, method, null);
+    }
+
+    private void createUserAndRedirectWithDefaultRole(String userEmail, String username, SignupInfo signupInfo,
+                                       int invitationToAccount, String method) throws IOException {
+        String defaultRole = RBAC.Role.MEMBER.name();
+        if (UsageMetricCalculator.isRbacFeatureAvailable(invitationToAccount)) {
+            defaultRole = fetchDefaultInviteRole(invitationToAccount, RBAC.Role.GUEST.name());
+        }
+        createUserAndRedirect(userEmail, username, signupInfo, invitationToAccount, method, defaultRole);
     }
 
     private void createUserAndRedirect(String userEmail, String username, SignupInfo signupInfo,

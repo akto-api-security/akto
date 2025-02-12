@@ -329,10 +329,9 @@ private static final LoggerMaker loggerMaker = new LoggerMaker(AccountAction.cla
                 AccountSettingsDao.instance.updateOnboardingFlag(true);
                 InitializerListener.insertPiiSources();
 
-                if (DashboardMode.isMetered()) {
-                    AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
-                    InitializerListener.insertAktoTestLibraries(accountSettings);
-                }
+                AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+                InitializerListener.insertStateInAccountSettings(accountSettings);
+                
                 try {
                     InitializerListener.executePIISourceFetch();
                 } catch (Exception e) {

@@ -394,8 +394,12 @@ public abstract class MCollection<T> {
     }
 
     public Document getCollectionStats(){
-        MongoDatabase mongoDatabase = clients[0].getDatabase(getDBName());
-        return mongoDatabase.runCommand(new Document("collStats",getCollName()));
+        return getCollectionStatsFromNames(getDBName(), getCollName());
+    }
+
+    public static Document getCollectionStatsFromNames(String dbName, String collName){
+        MongoDatabase mongoDatabase = clients[0].getDatabase(dbName);
+        return mongoDatabase.runCommand(new Document("collStats",collName));
     }
 
     public Document compactCollection() {

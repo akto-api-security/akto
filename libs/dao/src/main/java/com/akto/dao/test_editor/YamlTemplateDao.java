@@ -52,6 +52,11 @@ public class YamlTemplateDao extends AccountsContextDao<YamlTemplate> {
                     testConfig.setInactive(yamlTemplate.getInactive());
                     testConfig.setAuthor(yamlTemplate.getAuthor());
                     testConfigMap.put(testConfig.getId(), testConfig);
+
+                    if (testConfig.getInfo() != null && yamlTemplate.getInfo() != null && yamlTemplate.getInfo().getCompliance() != null) {
+                        testConfig.getInfo().setCompliance(yamlTemplate.getInfo().getCompliance());
+                    }
+                    
                 } catch (Exception e) {
                     e.printStackTrace();
                 }

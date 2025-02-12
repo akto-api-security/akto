@@ -10,6 +10,7 @@ import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.listener.InitializerListener;
 import com.akto.listener.RuntimeListener;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -120,6 +121,23 @@ public class CustomDataTypeAction extends UserAction{
         dataTypes.put("usersMap", usersMap);
         List<AktoDataType> aktoDataTypes = AktoDataTypeDao.instance.findAll(new BasicDBObject());
         dataTypes.put("aktoDataTypes", aktoDataTypes);
+
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String fillSensitiveDataTypes() {
+        try {
+            InitializerListener.insertPiiSources();
+        } catch (Exception e) {
+            e.printStackTrace();
+            loggerMaker.errorAndAddToDb("error in insertPiiSources " + e.getMessage());
+        }
+        try {
+            InitializerListener.executePIISourceFetch();
+        } catch (Exception e) {
+            e.printStackTrace();
+            loggerMaker.errorAndAddToDb("error in executePIISourceFetch " + e.getMessage());
+        }
 
         return Action.SUCCESS.toUpperCase();
     }
@@ -600,6 +618,11 @@ public class CustomDataTypeAction extends UserAction{
             Bson sort = Sorts.ascending("_id.apiCollectionId", "_id.url", "_id.method");    
             List<HttpResponseParams> responses = new ArrayList<>();
             this.customSubTypeMatches = new ArrayList<>();
+
+            SensitiveSampleDataDao.instance.getMCollection().deleteMany(Filters.eq("_id.subType", name));
+            SingleTypeInfoDao.instance.updateMany(Filters.eq(SingleTypeInfo.SUB_TYPE, name),
+                    Updates.set(SingleTypeInfo.SUB_TYPE, SingleTypeInfo.GENERIC.getName()));
+
             do {
                 sampleDataList = SampleDataDao.instance.findAll(Filters.empty(), skip, LIMIT, sort);
                 skip += LIMIT;

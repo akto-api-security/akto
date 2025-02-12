@@ -31,7 +31,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         hourlyLabel: "Now",
         testRunTime: -1,
         testRunTimeLabel: "30 minutes",
-        runTypeLabel: "Now",
+        runTypeLabel: "Once",
         maxConcurrentRequests: -1,
         testName: "",
         authMechanismPresent: false,
@@ -205,8 +205,8 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
 
                 handleAddSettings(parentAdvanceSettingsConfig);
                 const getRunTypeLabel = (runType) => {
-                    if (!runType) return "Now";
-                    if (runType === "CI-CD" || runType === "ONE_TIME") return "Now";
+                    if (!runType) return "Once";
+                    if (runType === "CI-CD" || runType === "ONE_TIME") return "Once";
                     else if (runType === "RECURRING") return "Daily";
                     else if (runType === "CONTINUOUS_TESTING") return "Continuously";
                 }
@@ -430,7 +430,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
 
     const testRunTimeOptions = [...runTimeMinutes, ...runTimeHours]
 
-    const runTypeOptions = [{ label: "Daily", value: "Daily" }, { label: "Continuously", value: "Continuously" }, { label: "Now", value: "Now" }]
+    const runTypeOptions = [{ label: "Daily", value: "Daily" }, { label: "Continuously", value: "Continuously" }, { label: "Once", value: "Once" }]
 
     const maxRequests = hours.reduce((abc, x) => {
         if (x < 11) {
