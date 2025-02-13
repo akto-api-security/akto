@@ -3,6 +3,7 @@ import { TickMinor, CancelMajor, SearchMinor } from "@shopify/polaris-icons";
 import { useEffect, useRef, useState } from "react";
 import "./run_test_suites.css"
 import createTestName from "./Utils"
+import RunTestSuiteRow from "./RunTestSuiteRow";
 
 const owaspTop10List = {
     "Broken Object Level Authorization": ["BOLA"],
@@ -19,15 +20,13 @@ const owaspTop10List = {
 
 function RunTestSuites({ testRun, setTestRun, apiCollectionName, checkRemoveAll, handleRemoveAll, handleModifyConfig, activeFromTesting }) {
 
-    const [owaspTop10, owaspTop10Toggle] = useState(true);
-    const [testingMethods, testingMethodsToggle] = useState(true);
-    const [data, setData] = useState({ owaspTop10List: [], testingMethods: [] });
+    const [data, setData] = useState({ owaspTop10List: {}, testingMethods:{} });
 
     useEffect(() => {
         setData((prev) => {
             const updatedData = { ...prev };
-    
-            const newOwaspTop10List = Object.entries(owaspTop10List).map(([key, value]) => {
+            // Generate OWASP Top 10 Test Suites
+            const newOwaspTop10TestSuites = Object.entries(owaspTop10List).map(([key, value]) => {
                 const tests = [];
                 value.forEach((cat) => {
                     testRun?.tests?.[cat]?.forEach((test) => {
@@ -37,7 +36,8 @@ function RunTestSuites({ testRun, setTestRun, apiCollectionName, checkRemoveAll,
                 return { name: key, tests };
             });
     
-            const newTestingMethods = ["Intrusive", "Non_intrusive"].map((val) => {
+            // Generate Testing Methods Test Suites
+            const newTestingMethodsTestSuites = ["Intrusive", "Non_intrusive"].map((val) => {
                 const tests = [];
                 Object.keys(testRun?.tests || {}).forEach((category) => {
                     testRun.tests[category]?.forEach((test) => {
@@ -48,22 +48,21 @@ function RunTestSuites({ testRun, setTestRun, apiCollectionName, checkRemoveAll,
                 });
                 return { name: val, tests };
             });
-            console.log(newTestingMethods,newOwaspTop10List)
             if (
-                JSON.stringify(updatedData.owaspTop10List) !== JSON.stringify(newOwaspTop10List) ||
-                JSON.stringify(updatedData.testingMethods) !== JSON.stringify(newTestingMethods)
+                JSON.stringify(prev.owaspTop10List.testSuite) !== JSON.stringify(newOwaspTop10TestSuites) ||
+                JSON.stringify(prev.testingMethods.testSuite) !== JSON.stringify(newTestingMethodsTestSuites)
             ) {
                 return {
                     ...updatedData,
-                    owaspTop10List: newOwaspTop10List,
-                    testingMethods: newTestingMethods
+                    owaspTop10List: { rowName: "OWASP top 10", testSuite: newOwaspTop10TestSuites },
+                    testingMethods: { rowName: "Testing Methods", testSuite: newTestingMethodsTestSuites }
                 };
             }
     
             return prev;
         });
-    }, []);
-    
+
+    }, []);    
 
 
 
@@ -168,34 +167,6 @@ function RunTestSuites({ testRun, setTestRun, apiCollectionName, checkRemoveAll,
         else return `${countSelected} out of ${countTestSuitesTests(data)} selected`;
     }
 
-    function renderTestSuites(data) {
-        const formattedName = data.name.replaceAll("_", " ");
-        return (
-            <div className="testSuiteCard" style={{ marginLeft: "0.15rem" }}>
-                <Box minWidth="300px" maxWidth="300px" borderRadius={2} borderStyle="solid" insetInlineEnd={1}>
-                    <VerticalStack>
-                        <div >
-                            <Box paddingBlockStart={2} paddingBlockEnd={2} paddingInlineStart={4} paddingInlineEnd={4} borderRadiusEndStart={2} borderRadiusEndEnd="2" borderColor="border">
-                                <Checkbox
-                                    label={
-                                        <Tooltip content={formattedName}>
-                                            <Text variant="headingSm" fontWeight="medium" truncate={true}>{formattedName}</Text>
-                                        </Tooltip>
-                                    }
-                                    helpText={checkifSelected(data)}
-                                    onChange={() => { handleTestSuiteSelection(data) }}
-                                    checked={checkedSelected(data)}
-                                    disabled={checkDisableTestSuite(data)}
-                                />
-
-                            </Box>
-                        </div>
-                    </VerticalStack>
-                </Box>
-            </div>
-        );
-    }
-
     return (
         <Scrollable vertical={true} horizontal={false} shadow={false}>
             <div className="runTestSuitesModal" style={{ minHeight: "72vh" }}>
@@ -218,87 +189,20 @@ function RunTestSuites({ testRun, setTestRun, apiCollectionName, checkRemoveAll,
                                 onClick={handleRemoveAll}
                                 disabled={checkRemoveAll()}><div data-testid="remove_all_tests">Clear selection</div></Button></div>
                     </div>
-                    <VerticalStack>
-                        <HorizontalStack align="start">
-                            <div className="testSuiteDisclosureButton" style={{ paddingBottom: "0.5rem" }}>
-                                <Button
-                                    onClick={() => owaspTop10Toggle(!owaspTop10)}
-                                    ariaExpanded={open}
-                                    ariaControls="basic-collapsible"
-                                    plain
-                                    disclosure
-                                >
-                                    <span style={{ fontWeight: "550", color: " #202223" }}>
-                                        {"OWASP top 10"} <span style={{ paddingLeft: "0.2rem" }}> </span>
-                                    </span>
-                                    <Badge>{10}</Badge>
-                                </Button>
-                            </div>
-                        </HorizontalStack>
-                        <Collapsible
-                            open={owaspTop10}
-                            id="basic-collapsible"
-                            transition={{ duration: "500ms", timingFunction: "ease-in-out" }}
-                            expandOnPrint
-                        >
-                            {/* <div className="testSuiteHorizontalScroll" style={{ display: "flex" }}> */}
-                            <HorizontalStack gap={4} align={"start"} blockAlign={"center"}>
-
-                                {
-
-                                    data.owaspTop10List.map((val) => (
-                                        renderTestSuites(val)
-                                    ))
-                                }
-
-
-                            </HorizontalStack>
-                            {/* </div> */}
-                        </Collapsible>
-
-                    </VerticalStack>
-                    <VerticalStack>
-                        <HorizontalStack align="start">
-                            <div className="testSuiteDisclosureButton" style={{ paddingBottom: "0.5rem" }}>
-                                <Button
-                                    onClick={() => testingMethodsToggle(!testingMethods)}
-                                    ariaExpanded={open}
-                                    ariaControls="basic-collapsible"
-                                    plain
-                                    disclosure
-                                >
-                                    <span style={{ fontWeight: "550", color: " #202223" }}>
-                                        {"Testing Methods"} <span style={{ paddingLeft: "0.2rem" }}> </span>
-                                    </span>
-                                    <Badge>{2}</Badge>
-                                </Button>
-                            </div>
-                        </HorizontalStack>
-                        <Collapsible
-                            open={testingMethods}
-                            id="basic-collapsible"
-                            transition={{ duration: "500ms", timingFunction: "ease-in-out" }}
-                            expandOnPrint
-                        >
-                            <HorizontalStack gap={4} align={"start"} blockAlign={"center"}>
-
-                                {
-
-                                    data.testingMethods.map((val) => (
-                                        renderTestSuites(val)
-                                    ))
-                                }
-
-
-                            </HorizontalStack>
-                        </Collapsible>
-
-                    </VerticalStack>
+                    {
+                        Object.values(data).map((key) => {
+                            return (
+                                <RunTestSuiteRow 
+                                    data={key} 
+                                    checkifSelected={checkifSelected} 
+                                    checkedSelected={checkedSelected} 
+                                    handleTestSuiteSelection={handleTestSuiteSelection} 
+                                    checkDisableTestSuite={checkDisableTestSuite} 
+                                />
+                            );
+                        })   
+                    }
                 </VerticalStack>
-
-
-
-
             </div>
         </Scrollable>
     )
