@@ -12,6 +12,7 @@ import ThreatApiSubcategoryCount from "./components/ThreatApiSubcategoryCount";
 import api from "./api";
 import { HorizontalGrid, VerticalStack } from "@shopify/polaris";
 import TopThreatTypeChart from "./components/TopThreatTypeChart";
+import LocalStore from "../../../main/LocalStorageStore";
 function ThreatActorPage() {
   const [mapData, setMapData] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -22,6 +23,9 @@ function ThreatActorPage() {
     produce((draft, action) => func.dateRangeReducer(draft, action)),
     initialVal
   );
+
+  const subCategoryMap = LocalStore(state => state.subCategoryMap)
+  const categoryMap = LocalStore(state => state.categoryMap)
 
   useEffect(() => {
     const fetchActorsPerCountry = async () => {
@@ -62,8 +66,11 @@ function ThreatActorPage() {
 
         setSubCategoryCount(
           Object.keys(subCategoryRes).map((x) => {
+            let temp_name = x === "BUA" ? "NO_AUTH": x;
+            var name = subCategoryMap[x] ? subCategoryMap[x].testName : categoryMap[temp_name]?.displayName || ""
+            var usedName = name.length > 0 ? name : x.replaceAll("_", " ")
             return {
-              text: x.replaceAll("_", " "),
+              text: usedName,
               value: subCategoryRes[x],
               color: "#A5B4FC",
             };
@@ -72,8 +79,11 @@ function ThreatActorPage() {
 
         setCategoryCount(
           Object.keys(categoryRes).map((x) => {
+            let temp_name = x === "BUA" ? "NO_AUTH": x;
+            var name = categoryMap[temp_name]?.displayName || ""
+            var usedName = name.length > 0 ? name : x.replaceAll("_", " ")
             return {
-              text: x.replaceAll("_", " "),
+              text: usedName,
               value: categoryRes[x],
               color: "#A5B4FC",
             };
