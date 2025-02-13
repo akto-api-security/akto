@@ -125,7 +125,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
             metaDataObj = await transform.getAllSubcategoriesData(true, "runTests")
         }
         let categories = metaDataObj.categories
-        let businessLogicSubcategories = metaDataObj.subCategories
+        let businessLogicSubcategories = metaDataObj.subCategories.filter((subCategory) => {return !subCategory.inactive})
         const testRolesResponse = await testingApi.fetchTestRoles()
         var testRoles = testRolesResponse.testRoles.map(testRole => {
             return {
