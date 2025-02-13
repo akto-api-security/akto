@@ -240,8 +240,8 @@ function RunTestSuites({ testRun, setTestRun, apiCollectionName, checkRemoveAll,
                             <Box paddingBlockStart={2} paddingBlockEnd={2} paddingInlineStart={4} paddingInlineEnd={4} borderRadiusEndStart={2} borderRadiusEndEnd="2" borderColor="border">
                                 <Checkbox
                                     label={
-                                        <Tooltip content={data}>
-                                            <Text variant="headingSm" fontWeight="medium" truncate={true}>{data}</Text>
+                                        <Tooltip content={data.replaceAll("_", " ")}>
+                                            <Text variant="headingSm" fontWeight="medium" truncate={true}>{data.replaceAll("_", " ")}</Text>
                                         </Tooltip>
                                     }
                                     helpText={checkifTestingMethodSelected(formattedData)}
@@ -346,7 +346,7 @@ function RunTestSuites({ testRun, setTestRun, apiCollectionName, checkRemoveAll,
 
                                 {
 
-                                    [ "Intrusive","Non_intrusive"].map((val) => (
+                                    [ "Intrusive","Non_Intrusive"].map((val) => (
                                         renderTestingMethod(val)
                                     ))
                                 }
