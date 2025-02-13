@@ -101,7 +101,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         })
 
         observeApi.checkWebhook("MICROSOFT_TEAMS", "TESTING_RUN_RESULTS").then((resp) => {
-            console.log(resp.webhookPresent, resp)
+            // console.log(resp.webhookPresent, resp)
             const webhookPresent = resp.webhookPresent
             if(webhookPresent){
                 setTeamsTestingWebhookIntegrated(true)
@@ -265,7 +265,8 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
             let obj = {
                 label: x.testName,
                 value: x.name,
-                author: x.author
+                author: x.author,
+                nature:(x.attributes && x.attributes.nature )? x.attributes.nature._name:""
             }
             ret[x.superCategory.name].all.push(obj)
             ret[x.superCategory.name].selected.push(obj)
