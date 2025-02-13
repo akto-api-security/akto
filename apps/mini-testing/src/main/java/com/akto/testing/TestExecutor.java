@@ -142,7 +142,7 @@ public class TestExecutor {
         List<YamlTemplate> yamlTemplates = new ArrayList<>();
         final int TEST_LIMIT = 50;
         for (int i = 0; i < 100; i++) {
-            List<YamlTemplate> temp = dataActor.fetchYamlTemplates(false, i * TEST_LIMIT);
+            List<YamlTemplate> temp = dataActor.fetchYamlTemplates(true, i * TEST_LIMIT);
             if (temp == null || temp.isEmpty()) {
                 break;
             }
