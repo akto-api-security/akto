@@ -4,39 +4,83 @@ import { useEffect, useRef, useState } from "react";
 import "./run_test_suites.css"
 import createTestName from "./Utils"
 
+const owaspTop10List = {
+    "Broken Object Level Authorization": ["BOLA"],
+    "Broken Authentication": ["NO_AUTH"],
+    "Broken Object Property Level Authorization": ["EDE", "MA"],
+    "Unrestricted Resource Consumption": ["RL"],
+    "Broken Function Level Authorization": ["BFLA"],
+    "Unrestricted Access to Sensitive Business Flows": ["INPUT"],
+    "Server Side Request Forgery": ['SSRF'],
+    "Security Misconfiguration": ["SM", "UHM", "VEM", "MHH", "SVD", "CORS", "ILM"],
+    "Improper Inventory Management": ["IAM", "IIM"],
+    "Unsafe Consumption of APIs": ["COMMAND_INJECTION", "INJ", "CRLF", "SSTI", "LFI", "XSS", "INJECT"]
+}
+
 function RunTestSuites({ testRun, setTestRun, apiCollectionName, checkRemoveAll, handleRemoveAll, handleModifyConfig, activeFromTesting }) {
 
     const [owaspTop10, owaspTop10Toggle] = useState(true);
     const [testingMethods, testingMethodsToggle] = useState(true);
+    const [data, setData] = useState({ owaspTop10List: [], testingMethods: [] });
 
-    const owaspTop10List = {
-        "Broken Object Level Authorization": ["BOLA"],
-        "Broken Authentication": ["NO_AUTH"],
-        "Broken Object Property Level Authorization": ["EDE", "MA"],
-        "Unrestricted Resource Consumption": ["RL"],
-        "Broken Function Level Authorization": ["BFLA"],
-        "Unrestricted Access to Sensitive Business Flows": ["INPUT"],
-        "Server Side Request Forgery": ['SSRF'],
-        "Security Misconfiguration": ["SM", "UHM", "VEM", "MHH", "SVD", "CORS", "ILM"],
-        "Improper Inventory Management": ["IAM", "IIM"],
-        "Unsafe Consumption of APIs": ["COMMAND_INJECTION", "INJ", "CRLF", "SSTI", "LFI", "XSS", "INJECT"]
-    }
+    useEffect(() => {
+        setData((prev) => {
+            const updatedData = { ...prev };
+    
+            const newOwaspTop10List = Object.entries(owaspTop10List).map(([key, value]) => {
+                const tests = [];
+                value.forEach((cat) => {
+                    testRun?.tests?.[cat]?.forEach((test) => {
+                        tests.push(test.value);
+                    });
+                });
+                return { name: key, tests };
+            });
+    
+            const newTestingMethods = ["Intrusive", "Non_intrusive"].map((val) => {
+                const tests = [];
+                Object.keys(testRun?.tests || {}).forEach((category) => {
+                    testRun.tests[category]?.forEach((test) => {
+                        if (test.nature === val.toUpperCase()) {
+                            tests.push(test.value);
+                        }
+                    });
+                });
+                return { name: val, tests };
+            });
+            console.log(newTestingMethods,newOwaspTop10List)
+            if (
+                JSON.stringify(updatedData.owaspTop10List) !== JSON.stringify(newOwaspTop10List) ||
+                JSON.stringify(updatedData.testingMethods) !== JSON.stringify(newTestingMethods)
+            ) {
+                return {
+                    ...updatedData,
+                    owaspTop10List: newOwaspTop10List,
+                    testingMethods: newTestingMethods
+                };
+            }
+    
+            return prev;
+        });
+    }, []);
+    
 
-    function createAcronym(str) {
-        return str.split(/\s+/).map(word => word.charAt(0).toUpperCase()).join('');
-    }
 
-    function handleTestSuiteSelection(key, data) {
+
+    function handleTestSuiteSelection(data) {
         setTestRun(prev => {
             const updatedTests = { ...prev.tests };
-            const someSelected = data.some(category =>
-                updatedTests[category]?.some(test => test.selected)
+            const testSet = new Set(data.tests);
+
+            const someSelected = Object.keys(updatedTests).some(category =>
+                updatedTests[category]?.some(test => testSet.has(test.value) && test.selected)
             );
-            data.forEach(category => {
+
+            Object.keys(updatedTests).forEach(category => {
                 if (updatedTests[category]) {
                     updatedTests[category] = updatedTests[category].map(test => ({
                         ...test,
-                        selected: someSelected ? false : true
+                        selected: testSet.has(test.value)? (someSelected ? false : true): test.selected
                     }));
                 }
             });
@@ -54,11 +98,14 @@ function RunTestSuites({ testRun, setTestRun, apiCollectionName, checkRemoveAll,
     function countTestSuitesTests(data) {
         if (testRun === undefined) return;
         let count = 0;
-        const test = { ...testRun?.tests };
-        data.forEach(category => {
-            if (test[category]) {
-                count += test[category].length;
-            }
+        const updatedTests = { ...testRun?.tests };
+        const testSet = new Set(data.tests);
+        Object.keys(updatedTests).forEach(category => {
+            updatedTests[category]?.forEach(test => {
+                if (testSet.has(test.value)) {
+                    count++;
+                }
+            });
         });
         return count;
     }
@@ -67,17 +114,19 @@ function RunTestSuites({ testRun, setTestRun, apiCollectionName, checkRemoveAll,
         if (testRun === undefined) return;
         let atleastOne = false;
         let allSelected = true;;
-
-        for (const category of data) {
-            if (testRun.tests[category] && testRun.tests[category].length > 0) {
-                if (testRun.tests[category].some(test => !test.selected)) {
+        const updatedTests = { ...testRun?.tests };
+        const testSet = new Set(data.tests);
+        Object.keys(updatedTests).forEach(category => {
+            if (updatedTests[category] && updatedTests[category].length > 0) {
+                if (updatedTests[category].some(test => !test.selected && testSet.has(test.value))) {
                     allSelected = false;
                 }
-                if (testRun.tests[category].some(test => test.selected)) {
+                if (updatedTests[category].some(test => test.selected  && testSet.has(test.value))) {
                     atleastOne = true;
                 }
             }
-        }
+        });
+
         if (atleastOne && allSelected) return true;
         else if (atleastOne) return "indeterminate";
         else return false;
@@ -85,35 +134,42 @@ function RunTestSuites({ testRun, setTestRun, apiCollectionName, checkRemoveAll,
 
     function checkDisableTestSuite(data) {
         if (testRun === undefined) return 0;
-        for (const category of data) {
-            if (testRun.tests[category] && testRun.tests[category].length > 0) {
-                return false;
-            }
-        }
-        return true;
+        const updatedTests = { ...testRun?.tests };
+        const testSet = new Set(data.tests);
+        Object.keys(updatedTests).forEach(category => {
+            updatedTests[category]?.forEach(test => {
+                if (testSet.has(test.value)) {
+                    return true;
+                }
+            });
+        });
+        return false;
     }
 
     function checkifSelected(data) {
         let text = `${countTestSuitesTests(data)} tests`;
         let isSomeSelected = false;
         let countSelected = 0;
-        for (const category of data) {
-            if (testRun.tests[category] && testRun.tests[category].length > 0) {
-                if (testRun.tests[category].some(test => test.selected)) {
+        const updatedTests = { ...testRun?.tests };
+        const testSet = new Set(data.tests);
+        Object.keys(updatedTests).forEach(category => {
+            if (updatedTests[category] && updatedTests[category].length > 0) {
+                if (updatedTests[category].some(test => test.selected && testSet.has(test.value))) {
                     isSomeSelected = true;
                 }
-                testRun.tests[category]?.forEach(test => {
-                    if (test.selected) {
+                updatedTests[category]?.forEach(test => {
+                    if (test.selected && testSet.has(test.value)) {
                         countSelected++;
                     }
                 });
             }
-        }
+        });
         if (isSomeSelected === false) return text;
         else return `${countSelected} out of ${countTestSuitesTests(data)} selected`;
     }
 
-    function renderAktoTestSuites(data) {
+    function renderTestSuites(data) {
+        const formattedName = data.name.replaceAll("_", " ");
         return (
             <div className="testSuiteCard" style={{ marginLeft: "0.15rem" }}>
                 <Box minWidth="300px" maxWidth="300px" borderRadius={2} borderStyle="solid" insetInlineEnd={1}>
@@ -122,132 +178,14 @@ function RunTestSuites({ testRun, setTestRun, apiCollectionName, checkRemoveAll,
                             <Box paddingBlockStart={2} paddingBlockEnd={2} paddingInlineStart={4} paddingInlineEnd={4} borderRadiusEndStart={2} borderRadiusEndEnd="2" borderColor="border">
                                 <Checkbox
                                     label={
-                                        <Tooltip content={data?.key}>
-                                            <Text variant="headingSm" fontWeight="medium" truncate={true}>{data?.key}</Text>
+                                        <Tooltip content={formattedName}>
+                                            <Text variant="headingSm" fontWeight="medium" truncate={true}>{formattedName}</Text>
                                         </Tooltip>
                                     }
-                                    helpText={checkifSelected(data?.value)}
-                                    onChange={() => { handleTestSuiteSelection(data?.key, data?.value) }}
-                                    checked={checkedSelected(data?.value)}
-                                    disabled={checkDisableTestSuite(data?.value)}
-                                />
-
-                            </Box>
-                        </div>
-                    </VerticalStack>
-                </Box>
-            </div>
-        );
-    }
-
-    function handleTestingMethodTestSuiteSelection(data) {
-        setTestRun(prev => {
-            const updatedTests = { ...prev.tests };
-            let someSelected = false;
-            Object.keys(updatedTests).forEach(category => {
-                if (updatedTests[category]?.some(test => test.nature === data && test.selected)) {
-                    someSelected = true;
-                }
-            });
-
-            Object.keys(updatedTests).forEach(category => {
-                if (updatedTests[category]) {
-                    updatedTests[category] = updatedTests[category].map(test => ({
-                        ...test,
-                        selected: test.nature === data ? (someSelected ? false : true) : test.selected
-                    }));
-                }
-            });
-
-            let updatedTestName = createTestName(apiCollectionName, updatedTests, activeFromTesting, prev.testName);
-
-            return {
-                ...prev,
-                tests: updatedTests,
-                testName: updatedTestName
-            };
-        });
-    }
-
-    function checkedSelectedTestingMethod(data) {
-        if (!testRun) return false;
-        let atleastOne = false;
-        let allSelected = true;;
-
-        const updatedTests = { ...testRun.tests };
-        Object.keys(updatedTests).forEach(category => {
-            if (updatedTests[category]?.some(test => !test.selected && test.nature === data)) {
-                allSelected = false;
-            }
-            if (updatedTests[category]?.some(test => test.selected && test.nature === data)) {
-                atleastOne = true;
-            }
-        });
-        if (atleastOne && allSelected) return true;
-        else if (atleastOne) return "indeterminate";
-        else return false;
-    }
-
-    function checkDisableTestingMethodTestSuite(data) {
-        if (!testRun) return false;
-        const updatedTests = { ...testRun.tests };
-        Object.keys(updatedTests).forEach(category => {
-            if (updatedTests[category]?.some(test => test.nature === data)) {
-                return true;
-            }
-        });
-
-        return false;
-    }
-    function countTestingMethodTestSuitesTests(data) {
-        let count = 0;
-        const updatedTests = { ...testRun.tests };
-        Object.keys(updatedTests).forEach(category => {
-            updatedTests[category]?.forEach(test => {
-                if (test.nature === data) {
-                    count++;
-                }
-            });
-        });
-        return count;
-    }
-
-    function checkifTestingMethodSelected(data) {
-        let text = `${countTestingMethodTestSuitesTests(data)} tests`;
-        let isSomeSelected = false;
-        let countSelected = 0;
-        const updatedTests = { ...testRun.tests };
-        Object.keys(updatedTests).forEach(category => {
-            updatedTests[category]?.forEach(test => {
-                if (test.nature === data && test.selected === true) {
-                    isSomeSelected = true;
-                    countSelected++;
-                }
-            });
-        });
-
-        if (isSomeSelected === false) return text;
-        else return `${countSelected} out of ${countTestingMethodTestSuitesTests(data)} selected`;
-    }
-
-    function renderTestingMethod(data) {
-        const formattedData = data.toUpperCase();
-        return (
-            <div className="testSuiteCard" style={{ marginLeft: "0.15rem" }}>
-                <Box minWidth="300px" maxWidth="300px" borderRadius={2} borderStyle="solid" insetInlineEnd={1}>
-                    <VerticalStack>
-                        <div >
-                            <Box paddingBlockStart={2} paddingBlockEnd={2} paddingInlineStart={4} paddingInlineEnd={4} borderRadiusEndStart={2} borderRadiusEndEnd="2" borderColor="border">
-                                <Checkbox
-                                    label={
-                                        <Tooltip content={data}>
-                                            <Text variant="headingSm" fontWeight="medium" truncate={true}>{data}</Text>
-                                        </Tooltip>
-                                    }
-                                    helpText={checkifTestingMethodSelected(formattedData)}
-                                    onChange={() => { handleTestingMethodTestSuiteSelection(formattedData) }}
-                                    checked={checkedSelectedTestingMethod(formattedData)}
-                                    disabled={checkDisableTestingMethodTestSuite(formattedData)}
+                                    helpText={checkifSelected(data)}
+                                    onChange={() => { handleTestSuiteSelection(data) }}
+                                    checked={checkedSelected(data)}
+                                    disabled={checkDisableTestSuite(data)}
                                 />
 
                             </Box>
@@ -308,8 +246,8 @@ function RunTestSuites({ testRun, setTestRun, apiCollectionName, checkRemoveAll,
 
                                 {
 
-                                    Object.entries(owaspTop10List).map(([key, value]) => (
-                                        renderAktoTestSuites({ key, value })
+                                    data.owaspTop10List.map((val) => (
+                                        renderTestSuites(val)
                                     ))
                                 }
 
@@ -346,8 +284,8 @@ function RunTestSuites({ testRun, setTestRun, apiCollectionName, checkRemoveAll,
 
                                 {
 
-                                    [ "Intrusive","Non_intrusive"].map((val) => (
-                                        renderTestingMethod(val)
+                                    data.testingMethods.map((val) => (
+                                        renderTestSuites(val)
                                     ))
                                 }
 
