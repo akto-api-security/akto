@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from "react";
 import InfoCard from "../../dashboard/new_components/InfoCard";
-import ChartypeComponent from "../../testing/TestRunsPage/ChartypeComponent";
 import BarGraph from "../../../components/charts/BarGraph";
 
 const TopThreatTypeChart = ({ data }) => {
@@ -31,7 +30,7 @@ const TopThreatTypeChart = ({ data }) => {
           }}
           showYAxis={true}
           yAxisTitle="# of APIs"
-          barWidth={100}
+          barWidth={75}
           barGap={12}
           showGridLines={true}
         />
