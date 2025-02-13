@@ -266,7 +266,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                 label: x.testName,
                 value: x.name,
                 author: x.author,
-                nature:(x.attributes && x.attributes.nature )? x.attributes.nature._name:""
+                nature: x?.attributes?.nature?._name || ""
             }
             ret[x.superCategory.name].all.push(obj)
             ret[x.superCategory.name].selected.push(obj)

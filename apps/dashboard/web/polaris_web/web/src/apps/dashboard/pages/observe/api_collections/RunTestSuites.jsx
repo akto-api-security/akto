@@ -346,7 +346,7 @@ function RunTestSuites({ testRun, setTestRun, apiCollectionName, checkRemoveAll,
 
                                 {
 
-                                    ["Non_intrusive", "Intrusive"].map((val) => (
+                                    [ "Intrusive","Non_intrusive"].map((val) => (
                                         renderTestingMethod(val)
                                     ))
                                 }
