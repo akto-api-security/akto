@@ -12,7 +12,7 @@ import ThreatApiSubcategoryCount from "./components/ThreatApiSubcategoryCount";
 import api from "./api";
 import { HorizontalGrid, VerticalStack } from "@shopify/polaris";
 import TopThreatTypeChart from "./components/TopThreatTypeChart";
-import LocalStore from "../../../main/LocalStorageStore";
+import threatDetectionFunc from "./transform";
 function ThreatActorPage() {
   const [mapData, setMapData] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -23,9 +23,6 @@ function ThreatActorPage() {
     produce((draft, action) => func.dateRangeReducer(draft, action)),
     initialVal
   );
-
-  const subCategoryMap = LocalStore(state => state.subCategoryMap)
-  const categoryMap = LocalStore(state => state.categoryMap)
 
   useEffect(() => {
     const fetchActorsPerCountry = async () => {
@@ -47,49 +44,9 @@ function ThreatActorPage() {
     const fetchThreatCategoryCount = async () => {
       setLoading(true);
       const res = await api.fetchThreatCategoryCount();
-      if (res?.categoryCounts) {
-        const categoryRes = {};
-        const subCategoryRes = {};
-        for (const cc of res.categoryCounts) {
-          if (categoryRes[cc.category]) {
-            categoryRes[cc.category] += cc.count;
-          } else {
-            categoryRes[cc.category] = cc.count;
-          }
-
-          if (subCategoryRes[cc.subCategory]) {
-            subCategoryRes[cc.subCategory] += cc.count;
-          } else {
-            subCategoryRes[cc.subCategory] = cc.count;
-          }
-        }
-
-        setSubCategoryCount(
-          Object.keys(subCategoryRes).map((x) => {
-            let temp_name = x === "BUA" ? "NO_AUTH": x;
-            var name = subCategoryMap[x] ? subCategoryMap[x].testName : categoryMap[temp_name]?.displayName || ""
-            var usedName = name.length > 0 ? name : x.replaceAll("_", " ")
-            return {
-              text: usedName,
-              value: subCategoryRes[x],
-              color: "#A5B4FC",
-            };
-          })
-        );
-
-        setCategoryCount(
-          Object.keys(categoryRes).map((x) => {
-            let temp_name = x === "BUA" ? "NO_AUTH": x;
-            var name = categoryMap[temp_name]?.displayName || ""
-            var usedName = name.length > 0 ? name : x.replaceAll("_", " ")
-            return {
-              text: usedName,
-              value: categoryRes[x],
-              color: "#A5B4FC",
-            };
-          })
-        );
-      }
+      const finalObj = threatDetectionFunc.getGraphsData(res);
+      setCategoryCount(finalObj.categoryCountRes);
+      setSubCategoryCount(finalObj.subCategoryCount);
       setLoading(false);
     };
     fetchActorsPerCountry();
