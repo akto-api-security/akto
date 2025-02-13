@@ -202,6 +202,7 @@ function RunTestSuites({ testRun, setTestRun, apiCollectionName, checkRemoveAll,
                             );
                         })   
                     }
+
                 </VerticalStack>
             </div>
         </Scrollable>
