@@ -12,6 +12,7 @@ import ThreatApiSubcategoryCount from "./components/ThreatApiSubcategoryCount";
 import api from "./api";
 import { HorizontalGrid, VerticalStack } from "@shopify/polaris";
 import TopThreatTypeChart from "./components/TopThreatTypeChart";
+import threatDetectionFunc from "./transform";
 function ThreatActorPage() {
   const [mapData, setMapData] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -43,43 +44,9 @@ function ThreatActorPage() {
     const fetchThreatCategoryCount = async () => {
       setLoading(true);
       const res = await api.fetchThreatCategoryCount();
-      if (res?.categoryCounts) {
-        const categoryRes = {};
-        const subCategoryRes = {};
-        for (const cc of res.categoryCounts) {
-          if (categoryRes[cc.category]) {
-            categoryRes[cc.category] += cc.count;
-          } else {
-            categoryRes[cc.category] = cc.count;
-          }
-
-          if (subCategoryRes[cc.subCategory]) {
-            subCategoryRes[cc.subCategory] += cc.count;
-          } else {
-            subCategoryRes[cc.subCategory] = cc.count;
-          }
-        }
-
-        setSubCategoryCount(
-          Object.keys(subCategoryRes).map((x) => {
-            return {
-              text: x.replaceAll("_", " "),
-              value: subCategoryRes[x],
-              color: "#A5B4FC",
-            };
-          })
-        );
-
-        setCategoryCount(
-          Object.keys(categoryRes).map((x) => {
-            return {
-              text: x.replaceAll("_", " "),
-              value: categoryRes[x],
-              color: "#A5B4FC",
-            };
-          })
-        );
-      }
+      const finalObj = threatDetectionFunc.getGraphsData(res);
+      setCategoryCount(finalObj.categoryCountRes);
+      setSubCategoryCount(finalObj.subCategoryCount);
       setLoading(false);
     };
     fetchActorsPerCountry();

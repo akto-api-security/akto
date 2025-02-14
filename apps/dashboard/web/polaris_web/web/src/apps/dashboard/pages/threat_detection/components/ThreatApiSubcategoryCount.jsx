@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from "react";
-import { Box, Card, DataTable } from "@shopify/polaris";
+import React from "react";
+import { DataTable } from "@shopify/polaris";
 import InfoCard from "../../dashboard/new_components/InfoCard";
 
 const ThreatApiSubcategoryCount = ({ data }) => {

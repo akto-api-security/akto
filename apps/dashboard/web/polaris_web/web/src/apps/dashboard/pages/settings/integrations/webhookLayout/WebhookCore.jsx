@@ -113,6 +113,7 @@ function WebhookCore(props) {
     }, [])
 
     let customWebhookOptions = [
+        { "type":"TRAFFIC", "title": "Traffic alerts", "value": "TRAFFIC_ALERTS", "collectionSelection": false },
         { "type":"TRAFFIC", "title": "New endpoint", "value": "NEW_ENDPOINT", "collectionSelection": true, "collectionStateField": "newEndpointCollections" },
         { "type":"TRAFFIC", "title": "New endpoint count", "value": "NEW_ENDPOINT_COUNT", "collectionSelection": false },
         { "type":"TRAFFIC", "title": "New sensitive endpoint", "value": "NEW_SENSITIVE_ENDPOINT", "collectionSelection": true, "collectionStateField": "newSensitiveEndpointCollections" },
@@ -331,6 +332,8 @@ function WebhookCore(props) {
         <LegacyCard title={CardTitle} key="options" actions={[{content: actionContent, onAction: toggleShowOptions}]}>
             <LegacyCard.Section>
                 {CardComponent}
+                {(webhook.selectedWebhookOptions && !webhook.selectedWebhookOptions.includes("TRAFFIC_ALERTS")) ?
+                (<>
                 <Divider />
                 <div style={{ paddingTop: "10px" }}>
                     <Text variant="headingMd">Run every</Text>
@@ -346,6 +349,8 @@ function WebhookCore(props) {
                         </span>
                     ))}
                 </div>
+                </>) : null
+                }
                 <br />
                 {(webhook.selectedWebhookOptions && webhook.selectedWebhookOptions.includes("API_THREAT_PAYLOADS")) ? (
                     <>
