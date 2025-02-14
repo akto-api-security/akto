@@ -167,6 +167,10 @@ const tableFunc = {
   },
 
   convertValue(value) {
+    const countDecimals = value.split('.').length - 1;
+    if(countDecimals > 1){
+      return value;
+    }
     const intValue = parseInt(value, 10);
     if (!isNaN(intValue)) return intValue;
     return value;
