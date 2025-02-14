@@ -127,7 +127,7 @@ function SusDataTable({ currDateRange, rowClicked }) {
         apiCollectionName: collectionsMap[x.apiCollectionId] || "-",
         discoveredTs: func.prettifyEpoch(x.timestamp),
         sourceIPComponent: x?.ip || "-",
-        type: x?.type || (x?.filterId==="High4XXAlertFilter" ? "Anomaly-Based": "Rule-based")
+        type: x?.type || (x?.filterId==="High4XXAlertFilter" ? "Anomaly": "Rule-based")
       };
     });
     setLoading(false);
