@@ -260,9 +260,10 @@ public class RawApi {
         result.put("time",time+"");
         result.put("statusCode", this.response.getStatusCode()+"");
         result.put("type",type);
-        result.put("status", null);
+        result.put("status", "");
         result.put("contentType",contentType);
         result.put("source", source);
+        result.put("destIp", "");
 
         this.originalMessage = om.writeValueAsString(result);
     }

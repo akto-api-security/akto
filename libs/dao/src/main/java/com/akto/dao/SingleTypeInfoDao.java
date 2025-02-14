@@ -598,10 +598,7 @@ public class SingleTypeInfoDao extends AccountsContextDaoWithRbac<SingleTypeInfo
         return ret;
     }
 
-    public Map<ApiInfo.ApiInfoKey, List<String>> fetchRequestParameters(List<ApiInfo.ApiInfoKey> apiInfoKeys) {
-        Map<ApiInfo.ApiInfoKey, List<String>> result = new HashMap<>();
-        if (apiInfoKeys == null || apiInfoKeys.isEmpty()) return result;
-
+    public List<Bson> createPipelineForFetchRequestParams(List<ApiInfo.ApiInfoKey> apiInfoKeys){
         List<Bson> pipeline = new ArrayList<>();
 
         List<Bson> filters = new ArrayList<>();
@@ -639,7 +636,15 @@ public class SingleTypeInfoDao extends AccountsContextDaoWithRbac<SingleTypeInfo
         pipeline.add(Aggregates.project(projections));
 
         pipeline.add(Aggregates.group(groupedId,Accumulators.addToSet("params", "$param")));
+        return pipeline;
 
+    }
+
+    public Map<ApiInfo.ApiInfoKey, List<String>> fetchRequestParameters(List<ApiInfo.ApiInfoKey> apiInfoKeys) {
+        Map<ApiInfo.ApiInfoKey, List<String>> result = new HashMap<>();
+        if (apiInfoKeys == null || apiInfoKeys.isEmpty()) return result;
+
+        List<Bson> pipeline = createPipelineForFetchRequestParams(apiInfoKeys);
 
         MongoCursor<BasicDBObject> stiCursor = instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
         while (stiCursor.hasNext()) {
@@ -649,7 +654,6 @@ public class SingleTypeInfoDao extends AccountsContextDaoWithRbac<SingleTypeInfo
             ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(id.getInt("apiCollectionId"), id.getString("url"), URLMethods.Method.fromString(id.getString("method")));
             result.put(apiInfoKey, params);
         }
-
         return result;
     }
 

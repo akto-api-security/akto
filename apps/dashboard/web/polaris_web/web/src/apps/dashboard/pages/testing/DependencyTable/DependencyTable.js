@@ -1,5 +1,5 @@
-import { Box, Button, HorizontalStack, Icon, Link, Modal, Select, Spinner, Text, TextField, VerticalStack } from "@shopify/polaris";
-import { useEffect, useRef, useState } from "react";
+import { Button, HorizontalStack, Icon, Link, Popover, Spinner, Text } from "@shopify/polaris";
+import { useState } from "react";
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards";
 import GithubServerTable from "../../../components/tables/GithubServerTable";
 import { CellType } from "../../../components/tables/rows/GithubRow";
@@ -58,6 +58,7 @@ function DependencyTable() {
     const [runResults, setRunResults] = useState({})
     const [refresh, setRefresh] = useState(false)
     const [invokeLoading, setInvokeLoading] = useState(false)
+    const [invokeLoadingSecond, setInvokeLoadingSecond] = useState(false)
 
     const [active, setActive] = useState(false);
     const [editApiCollectionId, setEditApiCollectionId] = useState(null)
@@ -111,6 +112,10 @@ function DependencyTable() {
                 "childParamIsHeader": false,
                 "value": val
             })
+        })
+
+        res = res.sort((a, b) => {
+            return a.childParam.localeCompare(b.childParam)
         })
 
         return res
@@ -194,6 +199,15 @@ function DependencyTable() {
         setEditData(newEditData);
     }
 
+    function isBoolean(value) {
+        return (
+            typeof value === "boolean" || 
+            (typeof value === "string" && (value.toLowerCase() === "true" || value.toLowerCase() === "false"))
+        );
+    }
+
+    const isInvalidNumber = (value) => value.trim() === "" || isNaN(value);
+
     const convertDataToKVPairList = (data) => {
         let kvPairs = []
         data.forEach((x) => {
@@ -203,7 +217,7 @@ function DependencyTable() {
                 "isHeader": x["childParamIsHeader"],
                 "isUrlParam": x["childParamIsUrlParam"],
                 "value": x["value"],
-                "type": "STRING"
+                "type": isInvalidNumber(x["value"]) ? (isBoolean(x["value"]) ? "BOOLEAN" : "STRING") : "INTEGER"
             })
         })
 
@@ -253,10 +267,10 @@ function DependencyTable() {
 
     const components = [resultTable, modalComponent, globalVarModalComponent]
 
-    const invokeDependencyTable = () => {
-        if (invokeLoading) return
-        setInvokeLoading(true)
-        api.invokeDependencyTable(apiCollectionIds).then((resp) => {
+    const invokeDependencyTable = (sourceCodeApis, updateFunc) => {
+        if (invokeLoading || invokeLoadingSecond) return
+        updateFunc(true)
+        api.invokeDependencyTable(apiCollectionIds, sourceCodeApis).then((resp) => {
             let newCollectionId = resp["newCollectionId"]
             // let temp = {}
             // runResultList.forEach((runResult) => {
@@ -264,9 +278,11 @@ function DependencyTable() {
             //     temp[apiInfoKey["method"] + " " + apiInfoKey["url"]] = runResult
             // })
 
-            setInvokeLoading(false)
+            updateFunc(false)
             // setRunResults(temp)
             // setRefresh(!refresh)
+
+        if(!sourceCodeApis){
 
             const url = "/dashboard/observe/inventory/" + newCollectionId
 
@@ -279,13 +295,37 @@ function DependencyTable() {
             )
 
             func.setToast(true, false, forwardLink)
+        }
         })
     }
 
+    const [moreActions, setMoreActions] = useState(false)
+
     const secondaryActionsComponent = (
-        <Button onClick={invokeDependencyTable} primary  >
-            {invokeLoading ? <Spinner size="small" /> : "Invoke"}
-        </Button>
+        <Popover
+            active={moreActions}
+            activator={(
+                <Button onClick={() => setMoreActions(!moreActions)} disclosure removeUnderline>
+                    Invoke
+                </Button>
+            )}
+            autofocusTarget="first-node"
+            onClose={() => { setMoreActions(false) }}
+            preferredAlignment="right"
+        >
+            <Popover.Pane fixed>
+                <Popover.Section>
+                    <Button plain monochrome onClick={() => invokeDependencyTable(false, setInvokeLoading)} removeUnderline>
+                        {invokeLoading ? <Spinner size="small" /> : "Invoke"}
+                    </Button>
+                </Popover.Section>
+                <Popover.Section>
+                    <Button plain monochrome onClick={() => invokeDependencyTable(true, setInvokeLoadingSecond)} removeUnderline>
+                        {invokeLoadingSecond ? <Spinner size="small" /> : "Invoke for source code APIs"}
+                    </Button>
+                </Popover.Section>
+            </Popover.Pane>
+        </Popover>
     )
 
     const globalVarsComponent = (
