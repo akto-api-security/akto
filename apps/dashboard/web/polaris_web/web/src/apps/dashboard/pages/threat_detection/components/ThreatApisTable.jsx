@@ -3,7 +3,6 @@ import GithubServerTable from "../../../components/tables/GithubServerTable";
 import api from "../api";
 import { CellType } from "../../../components/tables/rows/GithubRow";
 import GetPrettifyEndpoint from "../../observe/GetPrettifyEndpoint";
-import PersistStore from "../../../../main/PersistStore";
 import func from "../../../../../util/func";
 
 const resourceName = {
@@ -63,8 +62,6 @@ function ThreatApiTable({ currDateRange, rowClicked }) {
   const endTimestamp = getTimeEpoch("until");
 
   const [loading, setLoading] = useState(true);
-  const collectionsMap = PersistStore((state) => state.collectionsMap);
-  const allCollections = PersistStore((state) => state.allCollections);
 
   useEffect(() => {}, []);
 

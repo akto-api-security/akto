@@ -17,18 +17,13 @@ const headers = [
     title: "Actor",
   },
   {
-    text: "Latest IP",
-    title: "Latest IP",
-    value: "latestIp",
-  },
-  {
     text: "Latest API",
     title: "Latest API",
     value: "latestApi",
   },
   {
-    text: "Discovered",
-    title: "Discovered",
+    text: "Detected at",
+    title: "Detected at",
     value: "discoveredAt",
     type: CellType.TEXT,
     sortActive: true,

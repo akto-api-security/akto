@@ -25,7 +25,7 @@ const headers = [
   {
     text: "Filter",
     value: "filterId",
-    title: "Threat filter",
+    title: "Attack type",
   },
   {
     text: "Collection",
@@ -36,7 +36,7 @@ const headers = [
   },
   {
     text: "Discovered",
-    title: "Discovered",
+    title: "Detected",
     value: "discoveredTs",
     type: CellType.TEXT,
     sortActive: true,
@@ -46,6 +46,11 @@ const headers = [
     title: "Source IP",
     value: "sourceIPComponent",
   },
+  {
+    text: "Type",
+    title: "Type",
+    value: "type",
+  }
 ];
 
 const sortOptions = [
@@ -122,6 +127,7 @@ function SusDataTable({ currDateRange, rowClicked }) {
         apiCollectionName: collectionsMap[x.apiCollectionId] || "-",
         discoveredTs: func.prettifyEpoch(x.timestamp),
         sourceIPComponent: x?.ip || "-",
+        type: x?.type || "-"
       };
     });
     setLoading(false);

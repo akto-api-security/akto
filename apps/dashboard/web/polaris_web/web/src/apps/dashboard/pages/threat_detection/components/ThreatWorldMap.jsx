@@ -1,5 +1,13 @@
 import { useEffect } from "react";
 import Highcharts from "highcharts/highmaps";
+import Exporting from "highcharts/modules/exporting";
+import ExportData from "highcharts/modules/export-data";
+import FullScreen from "highcharts/modules/full-screen";
+
+// Initialize modules
+Exporting(Highcharts);
+ExportData(Highcharts);
+FullScreen(Highcharts);
 
 function ThreatWorldMap({ data, style, loading }) {
   useEffect(() => {
@@ -43,6 +51,25 @@ function ThreatWorldMap({ data, style, loading }) {
               [179, -38], // New Zealand east
               [-68, -55], // Chile south
             ],
+          },
+        },
+
+        exporting: {
+          enabled: true, // Enables export menu
+          buttons: {
+            contextButton: {
+              menuItems: [
+                "viewFullscreen",
+                "separator",
+                "downloadPNG",
+                "downloadJPEG",
+                "downloadPDF",
+                "downloadSVG",
+                "separator",
+                "downloadCSV",
+                "downloadXLS"
+              ],
+            },
           },
         },
 
