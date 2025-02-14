@@ -146,7 +146,7 @@ function TestRunResultFlyout(props) {
     }]
 
     const handleClose = () => {
-        const navigateUrl = isIssuePage ? "/dashboard/issues" : window.location.pathname.split("result")[0]
+        const navigateUrl = window.location.pathname.split("result")[0]
         navigate(navigateUrl) 
     }
 
