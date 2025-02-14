@@ -139,7 +139,7 @@ public class DashboardAction extends UserAction {
                                                     .append(SingleTypeInfo._API_COLLECTION_ID,  "$" + TestingRunIssues.ID_API_COLLECTION_ID)
                                                     .append(KEY_SEVERITY, "$" + KEY_SEVERITY);
 
-        GroupByTimeRange.groupByAllRange(daysBetween, pipeline, TestingRunIssues.CREATION_TIME, "count", 15, groupedId);
+        String result = GroupByTimeRange.groupByAllRange(daysBetween, pipeline, TestingRunIssues.CREATION_TIME, "count", 15, groupedId);
         MongoCursor<BasicDBObject> issuesCursor = TestingRunIssuesDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
 
         while(issuesCursor.hasNext()){
@@ -147,7 +147,7 @@ public class DashboardAction extends UserAction {
             BasicDBObject o = (BasicDBObject) basicDBObject.get("_id");
             String severity = o.getString(KEY_SEVERITY, GlobalEnums.Severity.LOW.name());
             Map<Integer, Integer> trendData = severityWiseTrendData.computeIfAbsent(severity, k -> new HashMap<>());
-            int date = o.getInt("111");
+            int date = o.getInt(result);
             int count = trendData.getOrDefault(date,0);
             trendData.put(date, count+1);
             count = this.trendData.getOrDefault(date,0);

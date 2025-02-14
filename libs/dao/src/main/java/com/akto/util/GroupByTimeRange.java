@@ -11,17 +11,17 @@ import java.util.List;
 
 public class GroupByTimeRange {
 
-    public static void groupByAllRange(long daysBetween, List<Bson> pipeline, String timestampField, String groupByField, int maxGraphPoints, BasicDBObject groupedId) {
+    public static String groupByAllRange(long daysBetween, List<Bson> pipeline, String timestampField, String groupByField, int maxGraphPoints, BasicDBObject groupedId) {
         if (daysBetween <= maxGraphPoints) {
-            groupByDay(pipeline, timestampField, groupByField, groupedId);
+            return groupByDay(pipeline, timestampField, groupByField, groupedId);
         } else if (daysBetween <= (maxGraphPoints * 7)) {
-            groupByWeek(pipeline, timestampField, groupByField, groupedId);
+            return groupByWeek(pipeline, timestampField, groupByField, groupedId);
         } else {
-            groupByMonth(pipeline, timestampField, groupByField, groupedId);
+            return groupByMonth(pipeline, timestampField, groupByField, groupedId);
         }
     }
 
-    public static void groupByDay(List<Bson> pipeline, String timestampField, String groupByField, BasicDBObject groupedId) {
+    public static String groupByDay(List<Bson> pipeline, String timestampField, String groupByField, BasicDBObject groupedId) {
         Bson addFieldsStage = Aggregates.addFields(
                 new Field<>("day", new BasicDBObject("$dateToString",
                         new BasicDBObject("format", "%Y-%m-%d")
@@ -41,9 +41,10 @@ public class GroupByTimeRange {
         pipeline.add(addFieldsStage);
         pipeline.add(groupStage);
         pipeline.add(sortStage);
+        return groupedId != null ? "dayOfYear" : "";
     }
 
-    public static void groupByWeek(List<Bson> pipeline, String timestampField, String groupByField, BasicDBObject groupedId) {
+    public static String groupByWeek(List<Bson> pipeline, String timestampField, String groupByField, BasicDBObject groupedId) {
         Bson addFieldsStage = Aggregates.addFields(
                 new Field<>("week", new BasicDBObject("$week", new BasicDBObject("$toDate",
                         new BasicDBObject("$multiply", Arrays.asList("$"+timestampField, 1000))))
@@ -60,9 +61,10 @@ public class GroupByTimeRange {
         pipeline.add(addFieldsStage);
         pipeline.add(groupStage);
         pipeline.add(sortStage);
+        return groupedId != null ? "weekOfYear" : "";
     }
 
-    public static void groupByMonth(List<Bson> pipeline, String timestampField, String groupByField, BasicDBObject groupedId) {
+    public static String groupByMonth(List<Bson> pipeline, String timestampField, String groupByField, BasicDBObject groupedId) {
         Bson addFieldsStage = Aggregates.addFields(
                 new Field<>("month", new BasicDBObject("$month", new BasicDBObject("$toDate",
                         new BasicDBObject("$multiply", Arrays.asList("$"+timestampField, 1000))))
@@ -79,5 +81,6 @@ public class GroupByTimeRange {
         pipeline.add(addFieldsStage);
         pipeline.add(groupStage);
         pipeline.add(sortStage);
+        return groupedId != null ? "monthOfYear" : "";
     }
 }
