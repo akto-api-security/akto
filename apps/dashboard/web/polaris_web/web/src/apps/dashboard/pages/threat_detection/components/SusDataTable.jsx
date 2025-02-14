@@ -158,15 +158,15 @@ function SusDataTable({ currDateRange, rowClicked }) {
         title: "URL",
         choices: urlChoices,
       },
-      {
-        key: 'type',
-        label: "Type",
-        title: "Type",
-        choices: [
-          {label: 'Rule based', value: 'Rule-based'},
-          {label: 'Anomaly', value: 'Anomaly-based'},
-        ],
-      }
+      // {
+      //   key: 'type',
+      //   label: "Type",
+      //   title: "Type",
+      //   choices: [
+      //     {label: 'Rule based', value: 'Rule-based'},
+      //     {label: 'Anomaly', value: 'Anomaly-based'},
+      //   ],
+      // }
     ];
   }
 

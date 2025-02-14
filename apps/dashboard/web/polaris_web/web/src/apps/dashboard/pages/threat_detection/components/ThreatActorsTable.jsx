@@ -4,6 +4,7 @@ import api from "../api";
 import { CellType } from "../../../components/tables/rows/GithubRow";
 import GetPrettifyEndpoint from "../../observe/GetPrettifyEndpoint";
 import func from "../../../../../util/func";
+import PersistStore from "../../../../main/PersistStore";
 
 const resourceName = {
   singular: "actor",
@@ -65,6 +66,14 @@ function ThreatActorTable({ data, currDateRange, rowClicked }) {
   const onRowClick = (data) => {
     const actorIp = data.actor;
     const url = data.latestApiEndpoint
+
+    const tempKey = `/dashboard/protection/threat-activity/`
+    let filtersMap = PersistStore.getState().filtersMap;
+    if(filtersMap !== null && filtersMap.hasOwnProperty(tempKey)){
+      delete filtersMap[tempKey];
+      PersistStore.getState().setFiltersMap(filtersMap);
+    }
+
 
     const filters = `actor__${actorIp}&url__${url}`;
     const navigateUrl = `${window.location.origin}/dashboard/protection/threat-activity?filters=${encodeURIComponent(filters)}`;
