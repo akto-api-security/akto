@@ -6,7 +6,8 @@ import SusDataTable from "./components/SusDataTable";
 import values from "@/util/values";
 import { produce } from "immer"
 import func from "@/util/func";
-import transform from "../observe/transform";
+import tempFunc from "./dummyData";
+import SampleDetails from "./components/SampleDetails";
 function ThreatDetectionPage() {
 
     const [sampleData, setSampleData] = useState([])
@@ -14,21 +15,29 @@ function ThreatDetectionPage() {
     const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), initialVal);
     const [showDetails, setShowDetails] = useState(false);
     const rowClicked = (data) => {
-        let tmp = [data.sample];
-        let commonMessages = transform.getCommonSamples(tmp, [])
-        setSampleData(commonMessages)
-        const sameRow = func.deepComparison(commonMessages, sampleData);
+        console.log("called", data)
+        const tempData = tempFunc.getSampleDataOfUrl(data.url);
+        const sameRow = func.deepComparison(tempData, sampleData);
         if (!sameRow) {
+            setSampleData([{"message": JSON.stringify(tempData),  "highlightPaths": []}])
             setShowDetails(true)
         } else {
             setShowDetails(!showDetails)
         }
-    }
+      }
 
     const components = [
         <SusDataTable key={"sus-data-table"}
             currDateRange={currDateRange}
-            rowClicked={rowClicked} />,
+            rowClicked={rowClicked} 
+        />,
+        <SampleDetails
+            title={"Attacker payload"}
+            showDetails={showDetails}
+            setShowDetails={setShowDetails}
+            sampleData={sampleData}
+            key={"sus-sample-details"}
+        />
     ]
 
     return <PageWithMultipleCards

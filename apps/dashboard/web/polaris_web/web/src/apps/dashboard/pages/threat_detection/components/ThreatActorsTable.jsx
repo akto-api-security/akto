@@ -62,6 +62,14 @@ function ThreatActorTable({ data, currDateRange, rowClicked }) {
     return func.convertToDisambiguateLabelObj(value, null, 2);
   }
 
+  const onRowClick = (data) => {
+    const actorIp = data.actor;
+    const url = data.latestApiEndpoint
+
+    const navigateUrl = window.location.origin + "/dashboard/protection/threat-activity?filters=actor__"+actorIp + "&url__" + url;
+    window.open(navigateUrl, "_blank")
+  }
+
   async function fetchData(sortKey, sortOrder, skip) {
     setLoading(true);
     const sort = { [sortKey]: sortOrder };
@@ -89,6 +97,7 @@ function ThreatActorTable({ data, currDateRange, rowClicked }) {
   const key = startTimestamp + endTimestamp;
   return (
     <GithubServerTable
+      onRowClick={(data) => onRowClick(data)}
       key={key}
       pageLimit={50}
       headers={headers}
