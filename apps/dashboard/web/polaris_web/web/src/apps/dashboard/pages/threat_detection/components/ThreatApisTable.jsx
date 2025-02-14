@@ -90,10 +90,24 @@ function ThreatApiTable({ currDateRange, rowClicked }) {
     return { value: ret, total: total };
   }
 
+  const onRowClick = (data) => {
+    const tempArr = data?.id?.split("-");
+    let url = ""
+    if(tempArr.length > 0){
+      url = tempArr[1];
+    }
+    if(url.length > 0){
+      const navigateUrl = window.location.origin + "/dashboard/protection/threat-activity?filters=url__" + url;
+      window.open(navigateUrl, "_blank")
+    }
+   
+  }
+
   const key = startTimestamp + endTimestamp;
   return (
     <GithubServerTable
       key={key}
+      onRowClick={(data) => onRowClick(data)}
       pageLimit={50}
       headers={headers}
       resourceName={resourceName}
