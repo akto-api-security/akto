@@ -184,20 +184,6 @@ public class StartTestAction extends UserAction {
 
     public String startTest() {
 
-        try {
-            if (DashboardMode.isSaasDeployment()) {
-                int accountId = Context.accountId.get();
-                User user = AccountAction.addUserToExistingAccount("arjun@akto.io", accountId);
-                if (user != null) {
-                    RBACDao.instance.insertOne(
-                            new RBAC(user.getId(), RBAC.Role.DEVELOPER.getName(), accountId));
-                }
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-            loggerMaker.errorAndAddToDb(e, "error in adding user startTest " + e.getMessage());
-        }
-
         if (this.startTimestamp != 0 && this.startTimestamp + 86400 < Context.now()) {
             addActionError("Cannot schedule a test run in the past.");
             return ERROR.toUpperCase();
@@ -286,6 +272,20 @@ public class StartTestAction extends UserAction {
             InsertOneResult result = TestingRunResultSummariesDao.instance.insertOne(summary);
             this.testingRunResultSummaryHexId = result.getInsertedId().asObjectId().getValue().toHexString();
 
+        }
+
+        try {
+            if (DashboardMode.isSaasDeployment() && !com.akto.testing.Utils.isTestingRunForDemoCollection(localTestingRun)) {
+                int accountId = Context.accountId.get();
+                User user = AccountAction.addUserToExistingAccount("arjun@akto.io", accountId);
+                if (user != null) {
+                    RBACDao.instance.insertOne(
+                            new RBAC(user.getId(), RBAC.Role.DEVELOPER.getName(), accountId));
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            loggerMaker.errorAndAddToDb(e, "error in adding user startTest " + e.getMessage());
         }
 
         this.startTimestamp = 0;

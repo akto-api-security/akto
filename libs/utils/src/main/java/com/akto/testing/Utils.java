@@ -635,6 +635,9 @@ public class Utils {
 
     public static boolean isTestingRunForDemoCollection(TestingRun testingRun){
         TestingEndpoints endpoints = testingRun.getTestingEndpoints();
+        if(testingRun != null && testingRun.getName().equals("Onboarding demo test")){
+            return true;
+        }
         try {
             if(endpoints.getType().equals(TestingEndpoints.Type.COLLECTION_WISE)){
                 CollectionWiseTestingEndpoints testingEndpoints = (CollectionWiseTestingEndpoints) endpoints;
