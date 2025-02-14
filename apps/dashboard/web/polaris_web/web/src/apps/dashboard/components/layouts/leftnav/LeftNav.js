@@ -246,8 +246,8 @@ export default function LeftNav() {
                                 ),
                                 icon: DiamondAlertMinor,
                                 onClick: () => {
-                                    handleSelect("dashboard_threat_activity");
-                                    navigate("/dashboard/protection/threat-activity");
+                                    handleSelect("dashboard_threat_actor");
+                                    navigate("/dashboard/protection/threat-actor");
                                     setActive("normal");
                                 },
                                 selected: leftNavSelected.includes("_threat"),

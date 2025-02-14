@@ -30,7 +30,7 @@ const TopThreatTypeChart = ({ data }) => {
           }}
           showYAxis={true}
           yAxisTitle="# of APIs"
-          barWidth={75}
+          barWidth={100 - (data.length * 6)}
           barGap={12}
           showGridLines={true}
         />
