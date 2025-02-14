@@ -127,7 +127,7 @@ function SusDataTable({ currDateRange, rowClicked }) {
         apiCollectionName: collectionsMap[x.apiCollectionId] || "-",
         discoveredTs: func.prettifyEpoch(x.timestamp),
         sourceIPComponent: x?.ip || "-",
-        type: x?.type || "rule-based"
+        type: x?.type || (x?.filterId==="High4XXAlertFilter" ? "Anomaly-Based": "Rule-based")
       };
     });
     setLoading(false);
@@ -158,6 +158,15 @@ function SusDataTable({ currDateRange, rowClicked }) {
         title: "URL",
         choices: urlChoices,
       },
+      {
+        key: 'type',
+        label: "Type",
+        title: "Type",
+        choices: [
+          {label: 'Rule based', value: 'Rule-based'},
+          {label: 'Anomaly', value: 'Anomaly-based'},
+        ],
+      }
     ];
   }
 
