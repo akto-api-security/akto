@@ -255,6 +255,15 @@ export default function LeftNav() {
                                 key: "7",
                                 subNavigationItems: [
                                     {
+                                        label: "Threat Actors",
+                                        onClick: () => {
+                                            navigate("/dashboard/protection/threat-actor");
+                                            handleSelect("dashboard_threat_actor");
+                                            setActive("active");
+                                        },
+                                        selected: leftNavSelected === "dashboard_threat_actor",
+                                    },
+                                    {
                                         label: "Threat Activity",
                                         onClick: () => {
                                             navigate("/dashboard/protection/threat-activity");
@@ -263,15 +272,6 @@ export default function LeftNav() {
                                         },
                                         selected:
                                             leftNavSelected === "dashboard_threat_activity",
-                                    },
-                                    {
-                                        label: "Threat Actors",
-                                        onClick: () => {
-                                            navigate("/dashboard/protection/threat-actor");
-                                            handleSelect("dashboard_threat_actor");
-                                            setActive("active");
-                                        },
-                                        selected: leftNavSelected === "dashboard_threat_actor",
                                     },
                                     {
                                         label: "APIs Under Threat",

@@ -46,6 +46,11 @@ const headers = [
     title: "Source IP",
     value: "sourceIPComponent",
   },
+  {
+    text: "Type",
+    title: "Type",
+    value: "type",
+  }
 ];
 
 const sortOptions = [
@@ -122,6 +127,7 @@ function SusDataTable({ currDateRange, rowClicked }) {
         apiCollectionName: collectionsMap[x.apiCollectionId] || "-",
         discoveredTs: func.prettifyEpoch(x.timestamp),
         sourceIPComponent: x?.ip || "-",
+        type: x?.type || "-"
       };
     });
     setLoading(false);
