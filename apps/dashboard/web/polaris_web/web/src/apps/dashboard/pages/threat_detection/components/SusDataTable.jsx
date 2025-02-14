@@ -25,7 +25,7 @@ const headers = [
   {
     text: "Filter",
     value: "filterId",
-    title: "Threat filter",
+    title: "Attack type",
   },
   {
     text: "Collection",
@@ -36,7 +36,7 @@ const headers = [
   },
   {
     text: "Discovered",
-    title: "Discovered",
+    title: "Detected",
     value: "discoveredTs",
     type: CellType.TEXT,
     sortActive: true,
