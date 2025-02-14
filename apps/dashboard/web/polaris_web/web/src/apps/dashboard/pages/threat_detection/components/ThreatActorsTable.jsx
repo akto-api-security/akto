@@ -66,8 +66,9 @@ function ThreatActorTable({ data, currDateRange, rowClicked }) {
     const actorIp = data.actor;
     const url = data.latestApiEndpoint
 
-    const navigateUrl = window.location.origin + "/dashboard/protection/threat-activity?filters=actor__"+actorIp + "&url__" + url;
-    window.open(navigateUrl, "_blank")
+    const filters = `actor__${actorIp}&url__${url}`;
+    const navigateUrl = `${window.location.origin}/dashboard/protection/threat-activity?filters=${encodeURIComponent(filters)}`;
+    window.open(navigateUrl, "_blank");
   }
 
   async function fetchData(sortKey, sortOrder, skip) {
