@@ -509,7 +509,7 @@ function CompliancePage() {
 
         const sortedIssueItem = transform.sortIssues(issueItem, sortKey, sortOrder)
 
-        const issueTableData = await transform.convertToIssueTableData(sortedIssueItem, subCategoryMap)
+        const issueTableData = await transform.convertToIssueTableData(sortedIssueItem, subCategoryMap, true)
         ret.push(...issueTableData)
         setTableLoading(false)
         setLoading(false)
