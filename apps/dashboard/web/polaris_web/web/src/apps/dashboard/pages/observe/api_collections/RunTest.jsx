@@ -441,7 +441,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         return abc
     }, [])
 
-    const maxConcurrentRequestsOptions = [{ label: "Default", value: "-1" }, ...maxRequests]
+    const maxConcurrentRequestsOptions = [{ label: "Default", value: "-1" }, ...maxRequests, {label: '200', value: '200'}, {label: '500', value: '500'}, {label: '1000', value: '1000'}]
 
     function scheduleString() {
         if (testRun.hourlyLabel === "Now") {
