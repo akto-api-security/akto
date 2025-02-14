@@ -1121,7 +1121,7 @@ public class StartTestAction extends UserAction {
     private boolean testRunsByUser;
 
     private boolean getUserTestingRuns(){
-        Bson filter = Filters.ne(TestingRun.NAME, "Onboarding demo test");
+        Bson filter = Filters.ne(TestingRun.NAME, Constants.ONBOARDING_DEMO_TEST);
         return TestingRunDao.instance.getMCollection().find(filter).limit(1).first() != null;
     }
 

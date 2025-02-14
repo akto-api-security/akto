@@ -635,7 +635,7 @@ public class Utils {
 
     public static boolean isTestingRunForDemoCollection(TestingRun testingRun){
         TestingEndpoints endpoints = testingRun.getTestingEndpoints();
-        if(testingRun != null && testingRun.getName().equals("Onboarding demo test")){
+        if(testingRun != null && testingRun.getName() != null && testingRun.getName().equals(Constants.ONBOARDING_DEMO_TEST)){
             return true;
         }
         try {
