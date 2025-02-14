@@ -520,8 +520,8 @@ function CompliancePage() {
     const components = (
         <>
             <HorizontalGrid gap={5} columns={2} key={"critical-issues-graph-detail"}>
-                <CriticalFindingsGraph linkText={""} linkUrl={""}/>
-                <CriticalFindingsGraph linkText={""} linkUrl={""} complianceMode={complianceView}/>
+                <CriticalFindingsGraph startTimestamp={getTimeEpoch("since")} endTimestamp={getTimeEpoch("until")} linkText={""} linkUrl={""}/>
+                <CriticalFindingsGraph startTimestamp={getTimeEpoch("since")} endTimestamp={getTimeEpoch("until")} linkText={""} linkUrl={""} complianceMode={complianceView}/>
             </HorizontalGrid>
 
             <GithubServerTable
