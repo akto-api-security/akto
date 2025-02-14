@@ -15,7 +15,6 @@ function ThreatDetectionPage() {
     const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), initialVal);
     const [showDetails, setShowDetails] = useState(false);
     const rowClicked = (data) => {
-        console.log("called", data)
         const tempData = tempFunc.getSampleDataOfUrl(data.url);
         const sameRow = func.deepComparison(tempData, sampleData);
         if (!sameRow) {

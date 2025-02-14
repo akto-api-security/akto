@@ -4,6 +4,7 @@ import api from "../api";
 import { CellType } from "../../../components/tables/rows/GithubRow";
 import GetPrettifyEndpoint from "../../observe/GetPrettifyEndpoint";
 import func from "../../../../../util/func";
+import PersistStore from "../../../../main/PersistStore";
 
 const resourceName = {
   singular: "api",
@@ -96,6 +97,15 @@ function ThreatApiTable({ currDateRange, rowClicked }) {
     if(tempArr.length > 0){
       url = tempArr[1];
     }
+
+    let filtersMap = PersistStore.getState().filtersMap;
+    const tempKey = `/dashboard/protection/threat-activity/`
+    if(filtersMap !== null && filtersMap.hasOwnProperty(tempKey)){
+      delete filtersMap[tempKey];
+      PersistStore.getState().setFiltersMap(filtersMap);
+    }
+
+
     if(url.length > 0){
       const navigateUrl = window.location.origin + "/dashboard/protection/threat-activity?filters=url__" + url;
       window.open(navigateUrl, "_blank")
