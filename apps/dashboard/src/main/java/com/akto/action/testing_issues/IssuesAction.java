@@ -501,6 +501,7 @@ public class IssuesAction extends UserAction {
         infoObj.put("_name", testConfig.getId());
         infoObj.put("content", testConfig.getContent());
         infoObj.put("templateSource", testConfig.getTemplateSource());
+        infoObj.put("attributes", testConfig.getAttributes());
 
         String remediationContent = info.getRemediation();
 
