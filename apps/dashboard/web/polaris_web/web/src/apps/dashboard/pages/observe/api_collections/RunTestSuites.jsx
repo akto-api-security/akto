@@ -132,17 +132,18 @@ function RunTestSuites({ testRun, setTestRun, apiCollectionName, checkRemoveAll,
     }
 
     function checkDisableTestSuite(data) {
-        if (testRun === undefined) return 0;
+        if (testRun === undefined) return false;
         const updatedTests = { ...testRun?.tests };
         const testSet = new Set(data.tests);
+        let check = true;
         Object.keys(updatedTests).forEach(category => {
             updatedTests[category]?.forEach(test => {
                 if (testSet.has(test.value)) {
-                    return true;
+                    check = false;
                 }
             });
         });
-        return false;
+        return check;
     }
 
     function checkifSelected(data) {
