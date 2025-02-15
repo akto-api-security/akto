@@ -580,24 +580,6 @@ public class SingleTypeInfoDao extends AccountsContextDaoWithRbac<SingleTypeInfo
     public static final int LARGE_LIMIT = 10_000;
     public static final String _COUNT = "count";
 
-    public int countEndpoints(Bson filters) {
-        int ret = 0;
-
-        List<Bson> pipeline = getPipelineForEndpoints(filters);
-        pipeline.add(Aggregates.limit(LARGE_LIMIT));
-        pipeline.add(Aggregates.count());
-
-        MongoCursor<BasicDBObject> endpointsCursor = SingleTypeInfoDao.instance.getMCollection()
-                .aggregate(pipeline, BasicDBObject.class).cursor();
-
-        while (endpointsCursor.hasNext()) {
-            ret = endpointsCursor.next().getInt(_COUNT);
-            break;
-        }
-
-        return ret;
-    }
-
     public Map<ApiInfo.ApiInfoKey, List<String>> fetchRequestParameters(List<ApiInfo.ApiInfoKey> apiInfoKeys) {
         Map<ApiInfo.ApiInfoKey, List<String>> result = new HashMap<>();
         if (apiInfoKeys == null || apiInfoKeys.isEmpty()) return result;
@@ -718,18 +700,24 @@ public class SingleTypeInfoDao extends AccountsContextDaoWithRbac<SingleTypeInfo
     }
 
     public long fetchEndpointsCount(int startTimestamp, int endTimestamp, Set<Integer> deactivatedCollections) {
+        return fetchEndpointsCount(startTimestamp, endTimestamp, deactivatedCollections, true);
+    }
+
+    public long fetchEndpointsCount(int startTimestamp, int endTimestamp, Set<Integer> deactivatedCollections, boolean useRbacUserCollections) {
         List <Integer> nonHostApiCollectionIds = ApiCollectionsDao.instance.fetchNonTrafficApiCollectionsIds();
         nonHostApiCollectionIds.addAll(deactivatedCollections);
 
         Bson hostFilterQ = SingleTypeInfoDao.filterForHostHeader(0, false);
         Bson userCollectionFilter = Filters.empty();
-        try {
-            List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(),
-                    Context.accountId.get());
-            if (collectionIds != null) {
-                userCollectionFilter = Filters.in("collectionIds", collectionIds);
+        if (useRbacUserCollections) {
+            try {
+                List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(),
+                        Context.accountId.get());
+                if (collectionIds != null) {
+                    userCollectionFilter = Filters.in("collectionIds", collectionIds);
+                }
+            } catch (Exception e) {
             }
-        } catch (Exception e) {
         }
 
         Bson filterQWithTs = Filters.and(
@@ -740,7 +728,12 @@ public class SingleTypeInfoDao extends AccountsContextDaoWithRbac<SingleTypeInfo
                 userCollectionFilter
         );
 
-        long count = SingleTypeInfoDao.instance.count(filterQWithTs);
+        long count = 0;
+        if (useRbacUserCollections) {
+            count = SingleTypeInfoDao.instance.count(filterQWithTs);
+        } else {
+            count = SingleTypeInfoDao.instance.getMCollection().countDocuments(filterQWithTs);
+        }
 
         nonHostApiCollectionIds.removeAll(deactivatedCollections);
 
@@ -748,13 +741,17 @@ public class SingleTypeInfoDao extends AccountsContextDaoWithRbac<SingleTypeInfo
             List<Bson> pipeline = new ArrayList<>();
 
             pipeline.add(Aggregates.match(Filters.in("apiCollectionId", nonHostApiCollectionIds)));
-            try {
-                List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
-                if (collectionIds != null) {
-                    pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
+            if (useRbacUserCollections) {
+                try {
+                    List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(),
+                            Context.accountId.get());
+                    if (collectionIds != null) {
+                        pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
+                    }
+                } catch (Exception e) {
                 }
-            } catch (Exception e) {
             }
+
             BasicDBObject groupedId = 
                 new BasicDBObject("apiCollectionId", "$apiCollectionId")
                 .append("url", "$url")
@@ -763,10 +760,12 @@ public class SingleTypeInfoDao extends AccountsContextDaoWithRbac<SingleTypeInfo
             pipeline.add(Aggregates.match(Filters.gte("startTs", startTimestamp)));
             pipeline.add(Aggregates.match(Filters.lte("startTs", endTimestamp)));
             pipeline.add(Aggregates.sort(Sorts.descending("startTs")));
+            pipeline.add(Aggregates.count());
             MongoCursor<BasicDBObject> endpointsCursor = SingleTypeInfoDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
-            while(endpointsCursor.hasNext()) {
-                count += 1;
-                endpointsCursor.next();
+
+            while (endpointsCursor.hasNext()) {
+                count += endpointsCursor.next().getInt(_COUNT);
+                break;
             }
         }
 
