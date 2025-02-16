@@ -4,7 +4,6 @@ import InfoCard from '../../dashboard/new_components/InfoCard';
 import EmptyCard from '../../dashboard/new_components/EmptyCard';
 import testingApi from "../../testing/api.js"
 import testingFunc from "../../testing/transform.js"
-import func from "@/util/func";
 import BarGraph from '../../../components/charts/BarGraph.jsx';
 import LocalStore from "../../../../main/LocalStorageStore";
 

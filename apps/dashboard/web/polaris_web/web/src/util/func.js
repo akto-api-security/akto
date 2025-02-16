@@ -1814,6 +1814,30 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
     return initialIdx
   },
 
+  getEpochMillis(value, type) {
+    const [year, val] = value.split('_').map(Number);
+    let date;
+    
+    switch (type) {
+        case 'dayOfYear':
+            date = new Date(Date.UTC(year, 0, val)); // January 1st + (val - 1) days
+            break;
+        case 'monthOfYear':
+            date = new Date(Date.UTC(year, val - 1, 1)); // Month is 0-based
+            break;
+        case 'weekOfYear':
+            date = new Date(Date.UTC(year, 0, 1)); // Start of the year
+            const firstDay = date.getUTCDay(); // Get the first day of the year
+            const offset = firstDay === 0 ? 0 : 7 - firstDay; // Move to first Monday
+            date.setUTCDate(date.getUTCDate() + offset + (val - 1) * 7); // Add weeks
+            break;
+        default:
+            throw new Error("Invalid type. Must be 'day', 'month', or 'week'.");
+    }
+    
+    return date.getTime();
+}
+
 }
 
 export default func

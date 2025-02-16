@@ -1,5 +1,7 @@
 package com.akto.action;
 
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.regex.Pattern;
 
@@ -103,9 +105,12 @@ public class DashboardAction extends UserAction {
     }
 
     private List<String> severityToFetch;
-    private final Map<String, Map<Integer, Integer>> severityWiseTrendData= new HashMap<>();
-    private final Map<Integer, Integer> trendData = new HashMap<>();
+    private final Map<String, Integer> trendData = new HashMap<>();
+    BasicDBObject response;
+
     public String fetchCriticalIssuesTrend(){
+        Map<String, Map<String, Integer>> severityWiseTrendData= new HashMap<>();
+        response = new BasicDBObject();
         if(endTimeStamp == 0) endTimeStamp = Context.now();
         long daysBetween = (endTimeStamp - startTimeStamp) / Constants.ONE_DAY_TIMESTAMP;
         if (severityToFetch == null || severityToFetch.isEmpty()) severityToFetch = Arrays.asList("CRITICAL", "HIGH");
@@ -146,13 +151,25 @@ public class DashboardAction extends UserAction {
             BasicDBObject basicDBObject = issuesCursor.next();
             BasicDBObject o = (BasicDBObject) basicDBObject.get("_id");
             String severity = o.getString(KEY_SEVERITY, GlobalEnums.Severity.LOW.name());
-            Map<Integer, Integer> trendData = severityWiseTrendData.computeIfAbsent(severity, k -> new HashMap<>());
-            int date = o.getInt(result);
+            Map<String, Integer> trendData = severityWiseTrendData.computeIfAbsent(severity, k -> new HashMap<>());
+            int epochVal = 0;
+            if(result.equals("dayOfYear")){
+                String dateString = o.getString(result);
+                DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+                LocalDate localDate = LocalDate.parse(dateString, formatter);
+                epochVal = localDate.getDayOfYear();
+            }else{
+                epochVal = o.getInt(result);
+            }
+            int year = o.getInt("year");
+            String date = year + "_" + epochVal;
             int count = trendData.getOrDefault(date,0);
             trendData.put(date, count+1);
             count = this.trendData.getOrDefault(date,0);
             this.trendData.put(date, count+1);
         }
+        response.put("epochKey", result);
+        response.put("issuesTrend", severityWiseTrendData);
 
         return SUCCESS.toUpperCase();
     }
@@ -342,7 +359,7 @@ public class DashboardAction extends UserAction {
         this.severityToFetch = severityToFetch;
     }
 
-    public Map<Integer, Integer> getTrendData() {
+    public Map<String, Integer> getTrendData() {
         return trendData;
     }
 
@@ -378,7 +395,7 @@ public class DashboardAction extends UserAction {
         this.organization = organization;
     }
 
-    public Map<String, Map<Integer, Integer>> getSeverityWiseTrendData() {
-        return severityWiseTrendData;
+    public BasicDBObject getResponse() {
+        return response;
     }
 }
