@@ -20,12 +20,13 @@ const transform = {
             return 0;
         })
     },
-    async getNextUrl(issueId){
+    async getNextUrl(issueId, isCompliancePage){
         const res = await api.fetchTestingRunResult(issueId)
-        const hexId = `/dashboard/issues?result=${res.testingRunResult.hexId}`
+        const hexId = isCompliancePage ? `/dashboard/reports/compliance?result=${res.testingRunResult.hexId}` 
+        : `/dashboard/reports/issues?result=${res.testingRunResult.hexId}`
         history.navigate(hexId)
     },
-    getIssuesPageCollapsibleRow(urls) {
+    getIssuesPageCollapsibleRow(urls, isCompliancePage) {
         return(
         <tr style={{background: "#FAFBFB", padding: '0px !important', borderTop: '1px solid #dde0e4'}}>
             <td colSpan={'100%'} style={{padding: '0px !important'}}>
@@ -38,7 +39,7 @@ const transform = {
                         <Box paddingInlineStart={10}>
                         <IssuesCheckbox id={ele.id}/>
                         </Box>
-                        <Link monochrome onClick={() => this.getNextUrl(JSON.parse(ele.id))} removeUnderline >
+                        <Link monochrome onClick={() => this.getNextUrl(JSON.parse(ele.id), isCompliancePage)} removeUnderline >
                             {testingTransform.getUrlComp(ele.url)}
                         </Link>
                     </HorizontalStack>
@@ -49,11 +50,11 @@ const transform = {
         </tr>
         )
     },
-    convertToIssueTableData: async (rawData, subCategoryMap) => {
+    convertToIssueTableData: async (rawData, subCategoryMap, isCompliancePage = false) => {
         const processedData = await Promise.all(
             await Promise.all(rawData.map(async (issue, idx) => {
                 const key = `${issue.id.testSubCategory}|${issue.severity}|${issue.testRunIssueStatus}|${idx}`
-                let totalCompliance = issue.compliance.length
+                let totalCompliance = (issue.compliance || []).length
                 let maxShowCompliance = 2
                 let badge = totalCompliance > maxShowCompliance ? <Badge size="extraSmall">+{totalCompliance - maxShowCompliance}</Badge> : null
                 return {
@@ -86,7 +87,7 @@ const transform = {
                     collapsibleRow: transform.getIssuesPageCollapsibleRow(issue.urls.map(urlObj => ({
                         url: `${urlObj.method} ${urlObj.url}`,
                         id: urlObj.id,
-                    })))
+                    })), isCompliancePage)
                 }
             }))
         )

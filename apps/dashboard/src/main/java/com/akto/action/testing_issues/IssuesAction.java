@@ -211,7 +211,8 @@ public class IssuesAction extends UserAction {
         long daysBetween = (endTimeStamp - startEpoch) / ONE_DAY_TIMESTAMP;
         List<Bson> pipeline = new ArrayList<>();
 
-        Bson notIncludedCollections = UsageMetricCalculator.excludeDemosAndDeactivated("_id." + TestingIssuesId.API_KEY_INFO + "." + ApiInfo.ApiInfoKey.API_COLLECTION_ID);
+        Set<Integer> deactivatedCollections = UsageMetricCalculator.getDeactivated();
+        Bson notIncludedCollections = Filters.nin(ID + "." + TestingIssuesId.API_KEY_INFO + "." + ApiInfo.ApiInfoKey.API_COLLECTION_ID, deactivatedCollections);
 
         Bson filters = Filters.and(
                 notIncludedCollections,
@@ -480,11 +481,18 @@ public class IssuesAction extends UserAction {
         BasicDBObject infoObj = new BasicDBObject();
         BasicDBObject superCategory = new BasicDBObject();
         BasicDBObject severity = new BasicDBObject();
+
+        ComplianceMapping complianceMapping = info.getCompliance();
+
+        if (complianceMapping == null) {
+            complianceMapping = new ComplianceMapping(new HashMap<>(), "", "", 0);
+        }
+
         infoObj.put("issueDescription", info.getDescription());
         infoObj.put("issueDetails", info.getDetails());
         infoObj.put("issueImpact", info.getImpact());
         infoObj.put("issueTags", info.getTags());
-        infoObj.put("compliance", info.getCompliance());
+        infoObj.put("compliance", complianceMapping);
         infoObj.put("testName", info.getName());
         infoObj.put("references", info.getReferences());
         infoObj.put("cwe", info.getCwe());
@@ -493,6 +501,7 @@ public class IssuesAction extends UserAction {
         infoObj.put("_name", testConfig.getId());
         infoObj.put("content", testConfig.getContent());
         infoObj.put("templateSource", testConfig.getTemplateSource());
+        infoObj.put("attributes", testConfig.getAttributes());
 
         String remediationContent = info.getRemediation();
 

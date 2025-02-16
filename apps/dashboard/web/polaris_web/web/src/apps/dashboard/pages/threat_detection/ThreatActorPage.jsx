@@ -7,16 +7,17 @@ import { produce } from "immer";
 import func from "@/util/func";
 import ThreatActorTable from "./components/ThreatActorsTable";
 import ThreatWorldMap from "./components/ThreatWorldMap";
-import ThreatApiSubcategoryCount from "./components/ThreatApiSubcategoryCount";
+// import ThreatApiSubcategoryCount from "./components/ThreatApiSubcategoryCount";
 
 import api from "./api";
 import { HorizontalGrid, VerticalStack } from "@shopify/polaris";
 import TopThreatTypeChart from "./components/TopThreatTypeChart";
+import threatDetectionFunc from "./transform";
 function ThreatActorPage() {
   const [mapData, setMapData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [subCategoryCount, setSubCategoryCount] = useState([]);
-  const [categoryCount, setCategoryCount] = useState([]);
+  // const [categoryCount, setCategoryCount] = useState([]);
   const initialVal = values.ranges[3];
   const [currDateRange, dispatchCurrDateRange] = useReducer(
     produce((draft, action) => func.dateRangeReducer(draft, action)),
@@ -43,43 +44,9 @@ function ThreatActorPage() {
     const fetchThreatCategoryCount = async () => {
       setLoading(true);
       const res = await api.fetchThreatCategoryCount();
-      if (res?.categoryCounts) {
-        const categoryRes = {};
-        const subCategoryRes = {};
-        for (const cc of res.categoryCounts) {
-          if (categoryRes[cc.category]) {
-            categoryRes[cc.category] += cc.count;
-          } else {
-            categoryRes[cc.category] = cc.count;
-          }
-
-          if (subCategoryRes[cc.subCategory]) {
-            subCategoryRes[cc.subCategory] += cc.count;
-          } else {
-            subCategoryRes[cc.subCategory] = cc.count;
-          }
-        }
-
-        setSubCategoryCount(
-          Object.keys(subCategoryRes).map((x) => {
-            return {
-              text: x.replaceAll("_", " "),
-              value: subCategoryRes[x],
-              color: "#A5B4FC",
-            };
-          })
-        );
-
-        setCategoryCount(
-          Object.keys(categoryRes).map((x) => {
-            return {
-              text: x.replaceAll("_", " "),
-              value: categoryRes[x],
-              color: "#A5B4FC",
-            };
-          })
-        );
-      }
+      const finalObj = threatDetectionFunc.getGraphsData(res);
+      // setCategoryCount(finalObj.categoryCountRes);
+      setSubCategoryCount(finalObj.subCategoryCount);
       setLoading(false);
     };
     fetchActorsPerCountry();
@@ -94,21 +61,17 @@ function ThreatActorPage() {
             key={"top-threat-types"}
             data={subCategoryCount}
           />
-          <ThreatApiSubcategoryCount
-            key={"threat-categories"}
-            data={categoryCount}
+          <ThreatWorldMap
+            data={mapData}
+            style={{
+              width: "100%",
+              marginRight: "auto",
+            }}
+            loading={loading}
+            key={"threat-actor-world-map"}
           />
         </HorizontalGrid>
-        <ThreatWorldMap
-          data={mapData}
-          style={{
-            height: "300px",
-            width: "100%",
-            marginRight: "auto",
-          }}
-          loading={loading}
-          key={"threat-actor-world-map"}
-        />
+        
       </VerticalStack>
     );
   };

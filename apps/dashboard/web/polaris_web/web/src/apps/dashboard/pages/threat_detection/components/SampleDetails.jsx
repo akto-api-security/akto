@@ -2,7 +2,7 @@ import FlyLayout from "../../../components/layouts/FlyLayout";
 import SampleDataList from "../../../components/shared/SampleDataList";
 
 function SampleDetails(props) {
-    const { showDetails, setShowDetails, sampleData } = props
+    const { showDetails, setShowDetails, sampleData, title } = props
 
     const sampleDataComponent = sampleData.length > 0 ?
         <SampleDataList
@@ -15,6 +15,7 @@ function SampleDetails(props) {
 
     const components = [sampleDataComponent]
     return <FlyLayout
+        title={title || ""}
         show={showDetails}
         setShow={setShowDetails}
         components={components}

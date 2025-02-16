@@ -18,6 +18,7 @@ public class Constants {
     public static final int ONE_DAY_TIMESTAMP = ( 60 * 60 * 24 );
 
     public static final int TWO_HOURS_TIMESTAMP = ( 60 * 60 * 2 );
+    public static final String ONBOARDING_DEMO_TEST = "Onboarding demo test";
 
     public static final String AKTO_IGNORE_FLAG = "x-akto-ignore";
     public static final String AKTO_ATTACH_FILE = "x-akto-attach-file";
@@ -34,6 +35,9 @@ public class Constants {
     public static final boolean IS_NEW_TESTING_ENABLED = (StringUtils.hasLength(System.getenv("NEW_TESTING_ENABLED")) && System.getenv("NEW_TESTING_ENABLED").equals("true"));
     public static final String ALLOWED_ACCOUNT_IDS_FOR_INTERNAL_DASHBOARD = System.getenv("ALLOWED_ACCOUNT_IDS_FOR_INTERNAL_DASHBOARD");
 
+    public static final boolean KAFKA_DEBUG_MODE = (StringUtils.hasLength(System.getenv("KAFKA_DEBUG_MODE")) && System.getenv("KAFKA_DEBUG_MODE").equals("true"));
+    public static final int MAX_REQUEST_TIMEOUT = StringUtils.hasLength(System.getenv("MAX_REQUEST_TIMEOUT")) ? Integer.parseInt(System.getenv("MAX_REQUEST_TIMEOUT")) : 30000;
+    public static final int LINGER_MS_KAFKA = StringUtils.hasLength(System.getenv("LINGER_MS_KAFKA")) ?  Integer.parseInt(System.getenv("LINGER_MS_KAFKA")) : 15000;
     public static final String UNDERSCORE = "_";
 
     public final static String _AKTO = "AKTO";

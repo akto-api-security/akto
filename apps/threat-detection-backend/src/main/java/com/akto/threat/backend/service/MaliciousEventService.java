@@ -189,6 +189,7 @@ public class MaliciousEventService {
                 .setDetectedAt(evt.getDetectedAt())
                 .setCategory(evt.getCategory())
                 .setSubCategory(evt.getSubCategory())
+                .setApiCollectionId(evt.getLatestApiCollectionId())
                 .build());
       }
       return ListMaliciousRequestsResponse.newBuilder()

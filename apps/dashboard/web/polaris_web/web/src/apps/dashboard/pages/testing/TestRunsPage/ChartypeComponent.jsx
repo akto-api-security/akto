@@ -15,7 +15,9 @@ function ChartypeComponent({data, title,charTitle, chartSubtitle, reverse, isNor
                     <Box >
                         <div style={{display: "flex", gap: "8px", alignItems: "center", maxWidth: '200px'}} key={index}>
                             <span style={{background: data[key]?.color, borderRadius: "50%", width: "8px", height: "8px"}} />
-                            <TooltipText tooltip={key} text={key}/>
+                            <Box width='150px'>
+                                <TooltipText tooltip={key} text={key}/>
+                            </Box>
                         </div>
                     </Box>
                 ),
