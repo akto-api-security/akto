@@ -39,7 +39,7 @@ const convertFunc = {
                 lastUpdated: func.prettifyEpoch(test.updatedTs),
                 superCategory: test.superCategory.name,
                 type: test.templateSource._name,
-                category: test.superCategory.shortName,
+                category: test.superCategory.displayName,
                 inactive: test.inactive,
                 severity: test?.superCategory?.severity?._name || "",
                 nature : test?.attributes?.nature?._name || "",

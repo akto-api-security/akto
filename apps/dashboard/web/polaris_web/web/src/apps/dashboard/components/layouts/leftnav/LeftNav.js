@@ -8,6 +8,7 @@ import {
     AnalyticsFilledMinor,
     ReportFilledMinor,
     DiamondAlertMinor,
+    FinancesMinor,
 } from "@shopify/polaris-icons";
 import {useLocation, useNavigate} from "react-router-dom";
 
@@ -202,7 +203,7 @@ export default function LeftNav() {
                                     Test library
                                 </Text>
                             ),
-                            icon: FileFilledMinor,
+                            icon: FinancesMinor,
                             onClick: () => {
                                 handleSelect("dashboard_test_library_tests");
                                 navigate("/dashboard/test-library/tests");
