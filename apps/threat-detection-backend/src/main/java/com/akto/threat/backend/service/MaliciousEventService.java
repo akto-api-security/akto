@@ -157,6 +157,10 @@ public class MaliciousEventService {
       query.append("latestApiIp", new Document("$in", filter.getIpsList()));
     }
 
+    if (!filter.getTypesList().isEmpty()) {
+      query.append("type", new Document("$in", filter.getTypesList()));
+    }
+
     if (filter.hasDetectedAtTimeRange()) {
       TimeRangeFilter timeRange = filter.getDetectedAtTimeRange();
       long start = timeRange.hasStart() ? timeRange.getStart() : 0;
@@ -190,6 +194,7 @@ public class MaliciousEventService {
                 .setCategory(evt.getCategory())
                 .setSubCategory(evt.getSubCategory())
                 .setApiCollectionId(evt.getLatestApiCollectionId())
+                .setType(evt.getType())
                 .build());
       }
       return ListMaliciousRequestsResponse.newBuilder()

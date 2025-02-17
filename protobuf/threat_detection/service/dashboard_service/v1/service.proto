@@ -40,6 +40,7 @@ message ListMaliciousRequestsRequest {
       repeated string urls = 2;
       repeated string ips = 3;
       optional TimeRangeFilter detected_at_time_range = 4;
+      repeated string types = 5;
     }
 
     // The number of alerts to return

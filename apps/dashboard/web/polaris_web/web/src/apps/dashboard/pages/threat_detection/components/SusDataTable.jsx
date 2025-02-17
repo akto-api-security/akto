@@ -169,7 +169,7 @@ function SusDataTable({ currDateRange, rowClicked }) {
         label: "Type",
         title: "Type",
         choices: [
-          {label: 'Rule based', value: 'Rule-based'},
+          {label: 'Rule based', value: 'Rule-Based'},
           {label: 'Anomaly', value: 'Anomaly'},
         ],
       }
