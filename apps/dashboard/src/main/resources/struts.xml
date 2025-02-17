@@ -7714,7 +7714,7 @@
                 <param name="accessType">READ</param>
             </interceptor-ref>
             <result name="SUCCESS"  type="json">
-                <param name="root">severityWiseTrendData</param>
+                <param name="root">response</param>
             </result>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
