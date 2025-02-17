@@ -80,7 +80,7 @@ function TestsTablePage() {
                 severity: value.severity.length > 1 ? (
                     <div className={`badge-wrapper-${value.severity}`}>
                         <Badge status={func.getHexColorForSeverity(value.severity)}>
-                            {func.toSentenceCase(value.severity)}
+                            {func.toSentenceCase(value.severity.replace(/_/g, " "))}
                         </Badge>
                     </div>
                 ) : "",

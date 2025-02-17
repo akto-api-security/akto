@@ -20,7 +20,7 @@ function TestsFlyLayout({ data, showDetails, setShowDetails }) {
                                 {data?.severityText ? (
                                     <Box className={`badge-wrapper-${data?.severityText.toUpperCase()}`}>
                                         <Badge size="small" status={observeFunc.getColor(data.severityText)}>
-                                            {data.severityText}
+                                            {func.toSentenceCase(data?.severityText.replace(/_/g, " "))}
                                         </Badge>
                                     </Box>
                                 ) : null}
@@ -37,7 +37,7 @@ function TestsFlyLayout({ data, showDetails, setShowDetails }) {
             </Box>
         );
     };
-    
+
     const ref = useRef(null)
 
     const onClickFunc = () => {
