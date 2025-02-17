@@ -1,19 +1,28 @@
 package com.akto.action;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import org.bson.conversions.Bson;
 
+import com.akto.dao.AccountsDao;
+import com.akto.dao.RBACDao;
 import com.akto.dao.SingleTypeInfoDao;
+import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiInfo.ApiInfoKey;
+import com.akto.dto.RBAC.Role;
+import com.akto.dto.billing.Organization;
+import com.akto.dto.Account;
 import com.akto.dto.User;
 import com.akto.dto.traffic.Key;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.usage.UsageMetricCalculator;
+import com.akto.util.Constants;
+import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 
 public class InternalAction extends UserAction {
@@ -72,6 +81,86 @@ public class InternalAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    private int accountId;
+    private Role role;
+
+    private String accountKey;
+    private String keyType;
+
+    private BasicDBObject response;
+
+    public String goToAccount(){
+        if(AccountsDao.instance.count(Filters.eq(Constants.ID, accountId)) > 0){
+            RBACDao.instance.addUserRoleEntry(Context.userId.get(), accountId, role);
+            return SUCCESS.toUpperCase();
+        }else{
+            return ERROR.toUpperCase();
+        }
+    }
+
+    public String getOrganizationInfo(){
+        int accountId = -1;
+        Organization org= null;
+        try {
+            switch (keyType) {
+                case "accountId":
+                    accountId = Integer.parseInt(accountKey);
+                    break;
+                case "organizationName":
+                    org = OrganizationsDao.instance.findOne(
+                        Filters.regex(Organization.ADMIN_EMAIL, accountKey)
+                    );
+                case "orgId":
+                    org = OrganizationsDao.instance.findOne(
+                        Filters.regex(Organization.ADMIN_EMAIL, accountKey)
+                    );  
+                default:
+                    break;
+            }
+            if(org != null){
+                List<Integer> accounts = new ArrayList<Integer>(org.getAccounts());
+                accountId = accounts.get(0);
+            }
+            Account account =  AccountsDao.instance.findOne(Constants.ID, accountId);
+            response = new BasicDBObject();
+            response.put(Account.HYBRID_SAAS_ACCOUNT, account.getHybridSaasAccount());
+            response.put(Account.HYBRID_TESTING_ENABLED, account.getHybridTestingEnabled());
+
+            if(org == null){
+                org = OrganizationsDao.instance.findOne(Filters.in(Organization.ACCOUNTS, Arrays.asList(accountId)));
+            }
+            
+            String orgName = org.getName();
+            if(orgName.contains("@")){
+                String[] emailPart = orgName.split("@");
+                orgName = emailPart[1];
+            }
+
+            response.put(Organization.NAME, orgName);
+
+            try {
+                Context.accountId.set(accountId);
+                // TODO: figure out auth-mechanism type
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        
+            return SUCCESS.toUpperCase();
+
+        } catch (Exception e) {
+            addActionError("Error in getting organization info.");
+            e.printStackTrace();
+            return ERROR.toUpperCase();
+        }
+        
+    }
+
+    
+
+    public void setAccountId(int accountId) {
+        this.accountId = accountId;
+    }
+
     public String getHeaderKey() {
         return headerKey;
     }
@@ -94,5 +183,17 @@ public class InternalAction extends UserAction {
 
     public void setCount(int count) {
         this.count = count;
+    }
+
+    public void setAccountKey(String accountKey) {
+        this.accountKey = accountKey;
+    }
+
+    public void setKeyType(String keyType) {
+        this.keyType = keyType;
+    }
+
+    public BasicDBObject getResponse() {
+        return response;
     }
 }

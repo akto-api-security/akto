@@ -29,7 +29,7 @@ public class RBACDao extends CommonContextDao<RBAC> {
 
     //Caching for RBACDAO
     private static final ConcurrentHashMap<Pair<Integer, Integer>, Pair<Role, Integer>> userRolesMap = new ConcurrentHashMap<>();
-    private static final int EXPIRY_TIME = 15 * 60; // 15 minute
+    public static final int EXPIRY_TIME = 15 * 60; // 15 minute
     public void createIndicesIfAbsent() {
 
         boolean exists = false;
@@ -86,6 +86,11 @@ public class RBACDao extends CommonContextDao<RBAC> {
             actualRole = userRoleEntry.getFirst();
         }
         return actualRole;
+    }
+
+    public void addUserRoleEntry(int userId, int accountId, Role role){
+        Pair<Integer, Integer> key = new Pair<>(userId, accountId);
+        userRolesMap.put(key, new Pair<>(role, Context.now()));
     }
 
     public List<Integer> getUserCollectionsById(int userId, int accountId) {
