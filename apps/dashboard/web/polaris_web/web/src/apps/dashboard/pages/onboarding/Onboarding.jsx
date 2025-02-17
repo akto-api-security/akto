@@ -10,16 +10,16 @@ function Onboarding() {
     const openUrl = (url) =>{
       window.open(url)
     }
-    const avatar = (
-      <Avatar customer size='extraSmall' source='/public/discord.svg' name='discord' />
-    )
+    // const avatar = (
+    //   <Avatar customer size='extraSmall' source='/public/discord.svg' name='discord' />
+    // )
 
     const topbarButtons = (
       <ButtonGroup>
         <Button size="slim" onClick={() => openUrl("https://docs.akto.io")} icon={ClipboardMinor}> Docs </Button>
-        <Button size="slim" onClick={()=> openUrl("https://discord.com/invite/Wpc6xVME4s")} icon={avatar}>
+        {/* <Button size="slim" onClick={()=> openUrl("https://discord.com/invite/Wpc6xVME4s")} icon={avatar}>
           Discord
-        </Button>
+        </Button> */}
       </ButtonGroup>
     )
 
