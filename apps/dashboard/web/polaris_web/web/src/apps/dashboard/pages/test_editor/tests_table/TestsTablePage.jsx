@@ -76,6 +76,17 @@ const headings = [
         filterKey: "author",
     }
 ];
+const filterOptions = [
+    {
+        key: 'testingMethods',
+        label: "Testing Methods",
+        title: "Testing Methods",
+        choices: [
+            {label: 'Intrusive', value: "Intrusive"},
+            {label: 'Non intrusive', value: "Non intrusive"},
+        ]
+    }
+]
 
 let headers = JSON.parse(JSON.stringify(headings))
 
@@ -104,7 +115,7 @@ function TestsTablePage() {
                 testingMethods: value.nature.length ? func.toSentenceCase(value.nature.replace(/_/g, " ")) : "",
                 severityVal: severityOrder[value.severity] || 0,
                 content: value.content,
-                value: value.value,
+                value: value.value,  
             }
             if (value.isCustom) {
                 customData.push(data)
@@ -186,7 +197,7 @@ function TestsTablePage() {
             headers={headers}
             headings={headings}
             data={data[selectedTab]}
-            filters={[]}
+            filters={filterOptions}
         />,
         <TestsFlyLayout data={selectedTest} setShowDetails={setShowDetails} showDetails={showDetails} ></TestsFlyLayout>
     ]
