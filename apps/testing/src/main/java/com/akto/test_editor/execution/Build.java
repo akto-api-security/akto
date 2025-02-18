@@ -17,13 +17,13 @@ import com.akto.testing.ApiExecutor;
 import com.akto.util.Constants;
 import com.akto.util.HttpRequestResponseUtils;
 import com.akto.util.JSONUtils;
+import com.akto.util.grpc.ParameterTransformer;
 import com.akto.util.modifier.SetValueModifier;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mongodb.client.model.Filters;
 import joptsimple.internal.Strings;
 import org.bson.conversions.Bson;
-
 import java.net.URI;
 import java.util.*;
 
@@ -152,20 +152,27 @@ public class Build {
         public void setIsSuccess(boolean success) {
             this.success = success;
         }
-
-
     }
 
     Set<ApiInfo.ApiInfoKey> apisReplayedSet = new HashSet<>();
-    public static List<RunResult> runPerLevel(List<SampleData> sdList, Map<String, ModifyHostDetail> modifyHostDetailMap, Map<Integer, ReplaceDetail> replaceDetailsMap, Map<Integer, ReverseNode> parentToChildMap, Set<ApiInfo.ApiInfoKey> apisReplayedSet) {
+    public static List<RunResult> runPerLevel(List<SampleData> sdList, Map<String, ModifyHostDetail> modifyHostDetailMap, Map<Integer, ReplaceDetail> replaceDetailsMap, Map<Integer, ReverseNode> parentToChildMap, Set<ApiInfo.ApiInfoKey> apisReplayedSet, boolean sourceCodeApis) {
         List<RunResult> runResults = new ArrayList<>();
         for (SampleData sampleData: sdList) {
             Key id = sampleData.getId();
             try {
                 List<String> samples = sampleData.getSamples();
-                if (samples.isEmpty()) continue;;
+                ReplaceDetail replaceDetail = replaceDetailsMap.get(Objects.hash(id.getApiCollectionId(), id.getUrl(), id.getMethod().name()));
+                boolean usedReplaceDetail = false;
+                if (sourceCodeApis) {
+                    usedReplaceDetail = true;
+                    samples.addAll(ParameterTransformer.createSampleUsingReplaceDetails(id, replaceDetail.getKvPairs()));
+                }
 
-                String sample = samples.get(0);
+                if (samples.isEmpty()) continue;
+
+                // Use latest sample.
+                String sample = samples.get(samples.size()-1);
+
                 OriginalHttpRequest request = new OriginalHttpRequest();
                 request.buildFromSampleMessage(sample);
                 String newHost = findNewHost(request, modifyHostDetailMap);
@@ -174,8 +181,11 @@ public class Build {
                 originalHttpResponse.buildFromSampleMessage(sample);
 
                 // do modifications
-                ReplaceDetail replaceDetail = replaceDetailsMap.get(Objects.hash(id.getApiCollectionId(), id.getUrl(), id.getMethod().name()));
-                modifyRequest(request, replaceDetail);
+                if (!usedReplaceDetail) {
+                    modifyRequest(request, replaceDetail);
+                }
+
+                OriginalHttpRequest originalRequest = request.copy();
 
                 TestingRunConfig testingRunConfig = new TestingRunConfig(0, new HashMap<>(), new ArrayList<>(), null,newHost, null);
 
@@ -186,8 +196,19 @@ public class Build {
                     request.getHeaders().remove(Constants.AKTO_IGNORE_FLAG);
                     ReverseNode parentToChildNode = parentToChildMap.get(Objects.hash(id.getApiCollectionId()+"", id.getUrl(), id.getMethod().name()));
                     fillReplaceDetailsMap(parentToChildNode, response, replaceDetailsMap);
+
+                    /*
+                     * We do not want payload transformations being done by ApiExecutor,
+                     * primarily the test-pre script, to be shown,
+                     * but we needed them to hit the request.
+                     */
+                    if (sourceCodeApis) {
+                        request.setBody(originalRequest.getBody());
+                        request.setUrl(originalRequest.getUrl());
+                    }
+
                     RawApi rawApi = new RawApi(request, response, "");
-                    rawApi.fillOriginalMessage(Context.accountId.get(), Context.now(), "", "HAR");
+                    rawApi.fillOriginalMessage(Context.accountId.get(), Context.now(), "HTTP/1.1", "HAR");
                     RunResult runResult = new RunResult(
                             new ApiInfo.ApiInfoKey(id.getApiCollectionId(), id.getUrl(), id.getMethod()),
                             rawApi.getOriginalMessage(),
@@ -233,7 +254,7 @@ public class Build {
     }
 
 
-    public List<RunResult> run(List<Integer> apiCollectionsIds, List<ModifyHostDetail> modifyHostDetails, Map<Integer, ReplaceDetail> replaceDetailsMap) {
+    public List<RunResult> run(List<Integer> apiCollectionsIds, List<ModifyHostDetail> modifyHostDetails, Map<Integer, ReplaceDetail> replaceDetailsMap, boolean sourceCodeApis) {
         if (replaceDetailsMap == null) replaceDetailsMap = new HashMap<>();
         if (modifyHostDetails == null) modifyHostDetails = new ArrayList<>();
 
@@ -241,7 +262,6 @@ public class Build {
         for (ModifyHostDetail modifyHostDetail: modifyHostDetails) {
             modifyHostDetailMap.put(modifyHostDetail.getCurrentHost(), modifyHostDetail);
         }
-
 
         List<Node> nodes = DependencyFlowNodesDao.instance.findNodesForCollectionIds(apiCollectionsIds,false,0, 10_000);
         buildParentToChildMap(nodes, parentToChildMap);
@@ -251,12 +271,20 @@ public class Build {
         // loop over levels and make requests
         for (int level: levelsToSampleDataMap.keySet()) {
             List<SampleData> sdList =levelsToSampleDataMap.get(level);
-            sdList = fillSdList(sdList);
-            if (sdList.isEmpty()) continue;
+            List<SampleData> sdListDb = fillSdList(sdList);
+            if (sdListDb != null && !sdListDb.isEmpty()) {
+                sdList = sdListDb;
+            }
+            /*
+             * For source code APIs, the sample data is filled in the next step.
+             */
+            if (sdList.isEmpty() && !sourceCodeApis){
+                continue;
+            }
 
             loggerMaker.infoAndAddToDb("Running level: " + level, LoggerMaker.LogDb.DASHBOARD);
             try {
-                List<RunResult> runResultsPerLevel = runPerLevel(sdList, modifyHostDetailMap, replaceDetailsMap, parentToChildMap, apisReplayedSet);
+                List<RunResult> runResultsPerLevel = runPerLevel(sdList, modifyHostDetailMap, replaceDetailsMap, parentToChildMap, apisReplayedSet, sourceCodeApis);
                 runResults.addAll(runResultsPerLevel);
                 loggerMaker.infoAndAddToDb("Finished running level " + level, LoggerMaker.LogDb.DASHBOARD);
             } catch (Exception e) {
@@ -277,7 +305,7 @@ public class Build {
                 if (apisReplayedSet.contains(new ApiInfo.ApiInfoKey(key.getApiCollectionId(), key.getUrl(), key.getMethod()))) continue;
                 filtered.add(sampleData);
             }
-            List<RunResult> runResultsAll = runPerLevel(filtered, modifyHostDetailMap, replaceDetailsMap, parentToChildMap, apisReplayedSet);
+            List<RunResult> runResultsAll = runPerLevel(filtered, modifyHostDetailMap, replaceDetailsMap, parentToChildMap, apisReplayedSet, sourceCodeApis);
             runResults.addAll(runResultsAll);
             skip += limit;
             if (all.size() < limit) break;

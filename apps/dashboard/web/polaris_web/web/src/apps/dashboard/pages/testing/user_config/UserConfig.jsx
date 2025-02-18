@@ -69,8 +69,10 @@ function UserConfig() {
     async function addOrUpdateScript() {
         if (preRequestScript.id) {
             api.updateScript(preRequestScript.id, preRequestScript.javascript)
+            func.setToast(true, false, "Pre-request script updated")
         } else {
             api.addScript(preRequestScript)
+            func.setToast(true, false, "Pre-request script added")
         }
     }
 
