@@ -11,6 +11,7 @@ import useTable from "../../../components/tables/TableContext";
 import TestsFlyLayout from "./TestsFlyLayout";
 import HeadingWithTooltip from "../../../components/shared/HeadingWithTooltip";
 import TooltipText from "../../../components/shared/TooltipText";
+import LocalStore from "../../../../main/LocalStorageStore";
 
 const sortOptions = [
     { label: 'Severity', value: 'severity asc', directionLabel: 'Highest', sortKey: 'severityVal', columnIndex: 2 },
@@ -26,7 +27,7 @@ const headings = [
         value: "tests",
         textValue: "tests",
         sortActive: true,
-        maxWidth: "460px",
+        boxWidth: "465px",
     },
     {
         title: (
@@ -99,6 +100,7 @@ let headers = JSON.parse(JSON.stringify(headings))
 function TestsTablePage() {
     const [selectedTest, setSelectedTest] = useState({})
     const [data, setData] = useState({ 'all': [], 'by_akto': [], 'custom': [] })
+    const localSubCategoryMap = LocalStore.getState().subCategoryMap
 
     const severityOrder = { CRITICAL: 5, HIGH: 4, MEDIUM: 3, LOW: 2, dynamic_severity: 1 };
 
@@ -107,7 +109,7 @@ function TestsTablePage() {
         Object.entries(obj.mapTestToData).map(([key, value]) => {
             const data = {
                 name: key,
-                tests: <Box maxWidth="460px"><TooltipText text={key} tooltip={key} textProps={{fontWeight: 'medium'}} />
+                tests: <Box maxWidth="480px"><TooltipText text={key} tooltip={key} textProps={{fontWeight: 'medium'}} />
               </Box>,
                 severityText: value.severity.replace(/_/g, " ").toUpperCase(),
                 severity: value.severity.length > 1 ? (
@@ -121,7 +123,6 @@ function TestsTablePage() {
                 author: func.toSentenceCase(value.author),
                 testingMethods: value.nature.length ? func.toSentenceCase(value.nature.replace(/_/g, " ")) : "-",
                 severityVal: severityOrder[value.severity] || 0,
-                content: value.content,
                 value: value.value,  
             }
             if (value.isCustom) {
@@ -137,7 +138,17 @@ function TestsTablePage() {
 
     const fetchAllTests = async () => {
         try {
-            const metaDataObj = await transform.getAllSubcategoriesData(false, "testEditor");
+            let metaDataObj = {
+                subCategories: [],
+            }
+            if ((localSubCategoryMap && Object.keys(localSubCategoryMap).length > 0)) {
+                metaDataObj = {
+                    subCategories: Object.values(localSubCategoryMap),
+                }
+                
+            } else { 
+                metaDataObj = await transform.getAllSubcategoriesData(true, "runTests")
+            }
             if (!metaDataObj?.subCategories?.length) return;
 
             const obj = convertFunc.mapCategoryToSubcategory(metaDataObj.subCategories);
@@ -180,9 +191,6 @@ function TestsTablePage() {
 
     const handleSelectedTab = (selectedIndex) => {
         setSelected(selectedIndex)
-        setTimeout(() => {
-            setTableLoading(false)
-        }, 200)
     }
 
     function disambiguateLabel(key, value) {

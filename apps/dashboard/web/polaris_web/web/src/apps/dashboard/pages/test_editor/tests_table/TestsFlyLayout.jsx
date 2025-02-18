@@ -1,11 +1,11 @@
 import { Box, Button, HorizontalStack, VerticalStack, Text, Badge, Tooltip } from "@shopify/polaris";
 import FlyLayout from "../../../components/layouts/FlyLayout";
 import { FileMinor } from "@shopify/polaris-icons"
-import { useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import observeFunc from "../../observe/transform"
 import YamlComponent from "./YamlComponent";
 import func from "../../../../../util/func";
-
+import api from "../api";
 
 function TestsFlyLayout({ data, showDetails, setShowDetails }) {
 
@@ -40,6 +40,14 @@ function TestsFlyLayout({ data, showDetails, setShowDetails }) {
         );
     };
 
+    const [testContent, setTestContent] = useState("");
+    useEffect(() => {
+        if(!data || !data.value) return;
+        api.fetchTestContent(data?.value).then((resp) => {
+            setTestContent(resp);
+        })
+    },[data]);
+
     const ref = useRef(null)
 
     const onClickFunc = () => {
@@ -51,10 +59,10 @@ function TestsFlyLayout({ data, showDetails, setShowDetails }) {
     }
 
     const currentComponents = [
-        <TitleComponent openEditor={openEditor}/>,
+        <TitleComponent />,
         <Box paddingBlockStart={5} paddingInlineEnd={4} paddingInlineStart={4}>
 
-            <YamlComponent onClickFunc={onClickFunc} dataString={data?.content} language="text" minHeight="70vh"></YamlComponent>
+            <YamlComponent onClickFunc={onClickFunc} dataString={testContent} language="text" minHeight="70vh"></YamlComponent>
 
         </Box>
     ]

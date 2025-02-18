@@ -535,6 +535,29 @@ public class SaveTestEditorAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    public String fetchTestContent(){
+        if (originalTestId == null || originalTestId.trim().isEmpty()) {
+            addActionError("TestId cannot be null or empty");
+            return ERROR.toUpperCase();
+        }
+
+        YamlTemplate template;
+        try {
+            template = YamlTemplateDao.instance.findOne(Filters.eq(Constants.ID, originalTestId));
+        } catch (Exception e) {
+            addActionError("test not found or error in fetching test");
+            return ERROR.toUpperCase();
+        }
+
+        if (template == null) {
+            addActionError("test not found");
+            return ERROR.toUpperCase();
+        }
+
+        this.content = template.getContent();
+        return SUCCESS.toUpperCase();
+    }
+
     public static void main(String[] args) throws Exception {
         DaoInit.init(new ConnectionString("mongodb://localhost:27017/admini"));
         Context.accountId.set(1_000_000);
@@ -560,6 +583,10 @@ public class SaveTestEditorAction extends UserAction {
 
     public void setContent(String content) {
         this.content = content;
+    }
+
+    public String getContent() {
+        return content;
     }
 
     public String getTestingRunHexId() {
