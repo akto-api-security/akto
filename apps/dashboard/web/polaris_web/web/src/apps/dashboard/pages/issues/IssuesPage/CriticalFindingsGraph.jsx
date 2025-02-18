@@ -4,7 +4,6 @@ import InfoCard from '../../dashboard/new_components/InfoCard';
 import EmptyCard from '../../dashboard/new_components/EmptyCard';
 import testingApi from "../../testing/api.js"
 import testingFunc from "../../testing/transform.js"
-import func from "@/util/func";
 import BarGraph from '../../../components/charts/BarGraph.jsx';
 import LocalStore from "../../../../main/LocalStorageStore";
 
@@ -76,7 +75,7 @@ const CriticalFindingsGraph = ({ startTimestamp, endTimestamp, linkText, linkUrl
         titleToolTip="Overview of the most critical security issues detected, including the number of issues and APIs affected for each type of vulnerability."
         linkText={linkText}
         linkUrl={linkUrl}
-    /> : <EmptyCard title="Vulnerabilities findings" subTitleComponent={showTestingComponents ? <Text alignment='center' color='subdued'>No Vulnerabilities found</Text>: runTestEmptyCardComponent} />
+    /> : <EmptyCard title={complianceMode ? (complianceMode + " clauses") : "Vulnerabilities findings"} subTitleComponent={showTestingComponents ? <Text alignment='center' color='subdued'>No Vulnerabilities found</Text>: runTestEmptyCardComponent} />
 
     return (
         {...criticalFindings}

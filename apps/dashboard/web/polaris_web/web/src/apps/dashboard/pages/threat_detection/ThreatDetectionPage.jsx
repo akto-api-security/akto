@@ -2,13 +2,11 @@ import { useReducer, useState } from "react";
 import DateRangeFilter from "../../components/layouts/DateRangeFilter";
 import PageWithMultipleCards from "../../components/layouts/PageWithMultipleCards";
 import TitleWithInfo from "../../components/shared/TitleWithInfo";
-import FilterComponent from "./components/FilterComponent";
 import SusDataTable from "./components/SusDataTable";
 import values from "@/util/values";
 import { produce } from "immer"
 import func from "@/util/func";
-import transform from "../observe/transform";
-import { HorizontalGrid } from "@shopify/polaris";
+import tempFunc from "./dummyData";
 import SampleDetails from "./components/SampleDetails";
 function ThreatDetectionPage() {
 
@@ -17,31 +15,34 @@ function ThreatDetectionPage() {
     const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), initialVal);
     const [showDetails, setShowDetails] = useState(false);
     const rowClicked = (data) => {
-        let tmp = [data.sample];
-        let commonMessages = transform.getCommonSamples(tmp, [])
-        setSampleData(commonMessages)
-        const sameRow = func.deepComparison(commonMessages, sampleData);
+        const tempData = tempFunc.getSampleDataOfUrl(data.url);
+        const sameRow = func.deepComparison(tempData, sampleData);
         if (!sameRow) {
+            setSampleData([{"message": JSON.stringify(tempData),  "highlightPaths": []}])
             setShowDetails(true)
         } else {
             setShowDetails(!showDetails)
         }
-    }
-
-    const horizontalComponent = <HorizontalGrid columns={1} gap={2}>
-        <FilterComponent key={"filter-component"} />
-    </HorizontalGrid>
+      }
 
     const components = [
         <SusDataTable key={"sus-data-table"}
             currDateRange={currDateRange}
-            rowClicked={rowClicked} />,
+            rowClicked={rowClicked} 
+        />,
+        <SampleDetails
+            title={"Attacker payload"}
+            showDetails={showDetails}
+            setShowDetails={setShowDetails}
+            sampleData={sampleData}
+            key={"sus-sample-details"}
+        />
     ]
 
     return <PageWithMultipleCards
         title={
             <TitleWithInfo
-                titleText={"Threat Activity"}
+                titleText={"API Threat Activity"}
                 tooltipContent={"Identify malicious requests with Akto's powerful threat detection capabilities"}
             />
         }

@@ -263,7 +263,7 @@ public class IssuesAction extends UserAction {
     }
 
     private void filterIssuesDataByTimeRange(long daysBetween, List<Bson> pipeline, List<Integer> issuesList) {
-        GroupByTimeRange.groupByAllRange(daysBetween, pipeline, TestingRunIssues.CREATION_TIME, "totalIssues");
+        GroupByTimeRange.groupByAllRange(daysBetween, pipeline, TestingRunIssues.CREATION_TIME, "totalIssues", 30, null);
         MongoCursor<BasicDBObject> cursor = TestingRunIssuesDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
         while (cursor.hasNext()) {
             BasicDBObject document = cursor.next();
@@ -501,6 +501,7 @@ public class IssuesAction extends UserAction {
         infoObj.put("_name", testConfig.getId());
         infoObj.put("content", testConfig.getContent());
         infoObj.put("templateSource", testConfig.getTemplateSource());
+        infoObj.put("attributes", testConfig.getAttributes());
 
         String remediationContent = info.getRemediation();
 

@@ -18,6 +18,7 @@ public class Constants {
     public static final int ONE_DAY_TIMESTAMP = ( 60 * 60 * 24 );
 
     public static final int TWO_HOURS_TIMESTAMP = ( 60 * 60 * 2 );
+    public static final String ONBOARDING_DEMO_TEST = "Onboarding demo test";
 
     public static final String AKTO_IGNORE_FLAG = "x-akto-ignore";
     public static final String AKTO_ATTACH_FILE = "x-akto-attach-file";

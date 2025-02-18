@@ -3,8 +3,8 @@ import GithubServerTable from "../../../components/tables/GithubServerTable";
 import api from "../api";
 import { CellType } from "../../../components/tables/rows/GithubRow";
 import GetPrettifyEndpoint from "../../observe/GetPrettifyEndpoint";
-import PersistStore from "../../../../main/PersistStore";
 import func from "../../../../../util/func";
+import PersistStore from "../../../../main/PersistStore";
 
 const resourceName = {
   singular: "api",
@@ -63,8 +63,6 @@ function ThreatApiTable({ currDateRange, rowClicked }) {
   const endTimestamp = getTimeEpoch("until");
 
   const [loading, setLoading] = useState(true);
-  const collectionsMap = PersistStore((state) => state.collectionsMap);
-  const allCollections = PersistStore((state) => state.allCollections);
 
   useEffect(() => {}, []);
 
@@ -93,10 +91,33 @@ function ThreatApiTable({ currDateRange, rowClicked }) {
     return { value: ret, total: total };
   }
 
+  const onRowClick = (data) => {
+    const tempArr = data?.id?.split("-");
+    let url = ""
+    if(tempArr.length > 0){
+      url = tempArr[1];
+    }
+
+    let filtersMap = PersistStore.getState().filtersMap;
+    const tempKey = `/dashboard/protection/threat-activity/`
+    if(filtersMap !== null && filtersMap.hasOwnProperty(tempKey)){
+      delete filtersMap[tempKey];
+      PersistStore.getState().setFiltersMap(filtersMap);
+    }
+
+
+    if(url.length > 0){
+      const navigateUrl = window.location.origin + "/dashboard/protection/threat-activity?filters=url__" + url;
+      window.open(navigateUrl, "_blank")
+    }
+   
+  }
+
   const key = startTimestamp + endTimestamp;
   return (
     <GithubServerTable
       key={key}
+      onRowClick={(data) => onRowClick(data)}
       pageLimit={50}
       headers={headers}
       resourceName={resourceName}
