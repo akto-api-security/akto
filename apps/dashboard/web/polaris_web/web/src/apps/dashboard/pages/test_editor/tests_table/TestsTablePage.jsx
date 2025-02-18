@@ -10,6 +10,7 @@ import GithubSimpleTable from "../../../components/tables/GithubSimpleTable";
 import useTable from "../../../components/tables/TableContext";
 import TestsFlyLayout from "./TestsFlyLayout";
 import HeadingWithTooltip from "../../../components/shared/HeadingWithTooltip";
+import TooltipText from "../../../components/shared/TooltipText";
 
 const sortOptions = [
     { label: 'Severity', value: 'severity asc', directionLabel: 'Highest', sortKey: 'severityVal', columnIndex: 2 },
@@ -26,7 +27,6 @@ const headings = [
         textValue: "tests",
         sortActive: true,
         maxWidth: "460px",
-        type: "TEXT"
     },
     {
         title: (
@@ -34,11 +34,11 @@ const headings = [
                 title={"Severity"}
                 content={
                     <List>
-                        <List.Item><span style={{ fontWeight: "550" }}>Critical</span> - Immediate action; exploitable with severe impact</List.Item>
-                        <List.Item><span style={{ fontWeight: "550" }}>High</span> - Urgent action; significant security risk</List.Item>
-                        <List.Item><span style={{ fontWeight: "550" }}>Medium</span> - Moderate risk; potential for exploitation</List.Item>
-                        <List.Item><span style={{ fontWeight: "550" }}>Low</span> - Minor concerns; limited impact</List.Item>
-                        <List.Item><span style={{ fontWeight: "550" }}>Dynamic Severity</span> - Severity changes based on API context</List.Item>
+                        <List.Item><Text as="span" fontWeight="medium">Critical</Text> -  <Text as="span" color="subdued">Immediate action; exploitable with severe impact</Text></List.Item>
+                        <List.Item><Text as="span" fontWeight="medium">High</Text> - <Text as="span" color="subdued">Urgent action; significant security risk</Text></List.Item>
+                        <List.Item><Text as="span" fontWeight="medium">Medium</Text> -  <Text as="span" color="subdued">Moderate risk; potential for exploitation</Text></List.Item>
+                        <List.Item><Text as="span" fontWeight="medium">Low</Text> -  <Text as="span" color="subdued">Minor concerns; limited impact</Text></List.Item>
+                        <List.Item><Text as="span" fontWeight="medium">Dynamic Severity</Text> -  <Text as="span" color="subdued">Severity changes based on API context</Text></List.Item>
                     </List>
                 }
             />
@@ -48,7 +48,6 @@ const headings = [
         textValue: "severity",
         sortKey: "severityVal",
         sortActive: true,
-        showFilter: true,
         filterKey: "severityText",
     },
     {
@@ -62,11 +61,6 @@ const headings = [
         title: "Testing Methods",
         text: "Testing Methods",
         value: "testingMethods",
-    },
-    {
-        title: "Compliance",
-        text: "Compliance",
-        value: "compliance",
     },
     {
         title: "Author",
@@ -85,6 +79,18 @@ const filterOptions = [
             {label: 'Intrusive', value: "Intrusive"},
             {label: 'Non intrusive', value: "Non intrusive"},
         ]
+    },
+    {
+        key: 'severityText',
+        label: "Severity",
+        title: "Severity",
+        choices: [
+            {label: 'Critical', value: "CRITICAL"},
+            {label: 'High', value: "HIGH"},
+            {label: 'Medium', value: "MEDIUM"},
+            {label: 'Low', value: "LOW"},
+            {label: 'Dynamic Severity', value: "DYNAMIC SEVERITY"},
+        ]
     }
 ]
 
@@ -101,7 +107,8 @@ function TestsTablePage() {
         Object.entries(obj.mapTestToData).map(([key, value]) => {
             const data = {
                 name: key,
-                tests: key,
+                tests: <Box maxWidth="460px"><TooltipText text={key} tooltip={key} textProps={{fontWeight: 'medium'}} />
+              </Box>,
                 severityText: value.severity.replace(/_/g, " ").toUpperCase(),
                 severity: value.severity.length > 1 ? (
                     <div className={`badge-wrapper-${value.severity}`}>
@@ -112,7 +119,7 @@ function TestsTablePage() {
                 ) : "",
                 category: value.category,
                 author: func.toSentenceCase(value.author),
-                testingMethods: value.nature.length ? func.toSentenceCase(value.nature.replace(/_/g, " ")) : "",
+                testingMethods: value.nature.length ? func.toSentenceCase(value.nature.replace(/_/g, " ")) : "-",
                 severityVal: severityOrder[value.severity] || 0,
                 content: value.content,
                 value: value.value,  
