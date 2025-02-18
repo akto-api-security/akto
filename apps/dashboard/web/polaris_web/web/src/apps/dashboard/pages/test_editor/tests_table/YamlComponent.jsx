@@ -8,13 +8,13 @@ function YamlComponent({ dataString, onClickFunc, language, minHeight }) {
         <Box borderRadius="2" borderWidth="1" borderColor="border-subdued">
             <Box padding={"2"}>
                 <HorizontalStack padding="2" align='space-between'>
-                    <Text variant="headingSm">{"yaml"}</Text>
+                    <Text variant="headingSm">{"YAML"}</Text>
                     <Button icon={ClipboardMinor} plain onClick={() => onClickFunc()} />
                 </HorizontalStack>
             </Box>
             <Divider />
             <Box padding="05">
-                <SampleData data={data} minHeight={minHeight} language={language} />
+                <SampleData data={data} minHeight={minHeight} language={language} editorLanguage={"custom_yaml"} />
             </Box>
 
         </Box>

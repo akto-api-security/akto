@@ -278,6 +278,14 @@ const learnMoreObject = {
             }
         ]
     },
+    dashboard_test_library_tests:{
+        title:"Tests",
+        description:"View and manage your security test library, browse available tests, and run them against your APIs.",
+        docsLink:[{
+            content:"What is Dynamic Severity",
+            value:"https://docs.akto.io/test-editor/concepts/dynamic-severity"
+        }]
+    },
     dashboard_issues:{
         title: "API Issues",
         description: "Manage, export & share detailed report of vulnerabilities in your APIs.",
