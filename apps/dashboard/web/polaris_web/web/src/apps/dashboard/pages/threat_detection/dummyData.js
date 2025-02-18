@@ -15,7 +15,7 @@ const sampleDataMap = {
   "investments/trades": tradePayload,
   "investments/accounts": accountPayload,
   "rest/user/login": loginPayload,
-  "investments/watchlists/": xxPayload
+  "investments/watchlists": xxPayload
 }
 
 const tempFunc = {
