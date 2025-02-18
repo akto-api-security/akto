@@ -1,4 +1,4 @@
-import { Badge, IndexFiltersMode, Text } from "@shopify/polaris";
+import { Avatar, Badge, Box, HorizontalStack, IndexFiltersMode, List, Text, Tooltip } from "@shopify/polaris";
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards";
 import TitleWithInfo from "../../../components/shared/TitleWithInfo";
 
@@ -9,6 +9,7 @@ import { useEffect, useState } from "react";
 import GithubSimpleTable from "../../../components/tables/GithubSimpleTable";
 import useTable from "../../../components/tables/TableContext";
 import TestsFlyLayout from "./TestsFlyLayout";
+import HeadingWithTooltip from "../../../components/shared/HeadingWithTooltip";
 
 const sortOptions = [
     { label: 'Severity', value: 'severity asc', directionLabel: 'Highest', sortKey: 'severityVal', columnIndex: 2 },
@@ -24,10 +25,24 @@ const headings = [
         value: "tests",
         textValue: "tests",
         sortActive: true,
-
+        maxWidth: "460px",
+        type: "TEXT"
     },
     {
-        title: "Severity",
+        title: (
+            <HeadingWithTooltip
+                title={"Severity"}
+                content={
+                    <List>
+                        <List.Item><span style={{ fontWeight: "550" }}>Critical</span> - Immediate action; exploitable with severe impact</List.Item>
+                        <List.Item><span style={{ fontWeight: "550" }}>High</span> - Urgent action; significant security risk</List.Item>
+                        <List.Item><span style={{ fontWeight: "550" }}>Medium</span> - Moderate risk; potential for exploitation</List.Item>
+                        <List.Item><span style={{ fontWeight: "550" }}>Low</span> - Minor concerns; limited impact</List.Item>
+                        <List.Item><span style={{ fontWeight: "550" }}>Dynamic Severity</span> - Severity changes based on API context</List.Item>
+                    </List>
+                }
+            />
+        ),
         text: "Severity",
         value: "severity",
         textValue: "severity",
@@ -45,7 +60,7 @@ const headings = [
     },
     {
         title: "Testing Methods",
-        text: "testingMethods",
+        text: "Testing Methods",
         value: "testingMethods",
     },
     {
@@ -60,6 +75,17 @@ const headings = [
         showFilter: true,
         filterKey: "author",
     }
+];
+const filterOptions = [
+    {
+        key: 'testingMethods',
+        label: "Testing Methods",
+        title: "Testing Methods",
+        choices: [
+            {label: 'Intrusive', value: "Intrusive"},
+            {label: 'Non intrusive', value: "Non intrusive"},
+        ]
+    }
 ]
 
 let headers = JSON.parse(JSON.stringify(headings))
@@ -68,19 +94,19 @@ function TestsTablePage() {
     const [selectedTest, setSelectedTest] = useState({})
     const [data, setData] = useState({ 'all': [], 'by_akto': [], 'custom': [] })
 
-    const severityOrder = { CRITICAL: 5, HIGH: 4, MEDIUM: 3, dynamic_severity: 2, LOW: 1 };
+    const severityOrder = { CRITICAL: 5, HIGH: 4, MEDIUM: 3, LOW: 2, dynamic_severity: 1 };
 
     const mapTestData = (obj) => {
         const allData = [], customData = [], aktoData = [];
         Object.entries(obj.mapTestToData).map(([key, value]) => {
             const data = {
                 name: key,
-                tests: (<Text fontWeight="medium" variant="headingSm" as="h3" truncate>{key}</Text>),
-                severityText: value.severity,
+                tests: key,
+                severityText: value.severity.replace(/_/g, " ").toUpperCase(),
                 severity: value.severity.length > 1 ? (
                     <div className={`badge-wrapper-${value.severity}`}>
                         <Badge status={func.getHexColorForSeverity(value.severity)}>
-                            {func.toSentenceCase(value.severity)}
+                            {func.toSentenceCase(value.severity.replace(/_/g, " "))}
                         </Badge>
                     </div>
                 ) : "",
@@ -89,7 +115,7 @@ function TestsTablePage() {
                 testingMethods: value.nature.length ? func.toSentenceCase(value.nature.replace(/_/g, " ")) : "",
                 severityVal: severityOrder[value.severity] || 0,
                 content: value.content,
-                value: value.value,
+                value: value.value,  
             }
             if (value.isCustom) {
                 customData.push(data)
@@ -171,7 +197,7 @@ function TestsTablePage() {
             headers={headers}
             headings={headings}
             data={data[selectedTab]}
-            filters={[]}
+            filters={filterOptions}
         />,
         <TestsFlyLayout data={selectedTest} setShowDetails={setShowDetails} showDetails={showDetails} ></TestsFlyLayout>
     ]

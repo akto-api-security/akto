@@ -15,12 +15,12 @@ function TestsFlyLayout({ data, showDetails, setShowDetails }) {
                 <HorizontalStack align="space-between" wrap={false}>
                     <Box width="80%">
                         <VerticalStack gap="2">
-                            <div style={{ display: 'flex', gap: '4px' }} className='test-title'>
+                            <div style={{ display: 'flex', gap: '8px' }} className='test-title'>
                                 <Text truncate variant="headingSm" alignment="start">{data?.name}</Text>
                                 {data?.severityText ? (
                                     <Box className={`badge-wrapper-${data?.severityText.toUpperCase()}`}>
                                         <Badge size="small" status={observeFunc.getColor(data.severityText)}>
-                                            {data.severityText}
+                                            {func.toSentenceCase(data?.severityText.replace(/_/g, " "))}
                                         </Badge>
                                     </Box>
                                 ) : null}
@@ -32,12 +32,14 @@ function TestsFlyLayout({ data, showDetails, setShowDetails }) {
                             </HorizontalStack>
                         </VerticalStack>
                     </Box>
+                    <Tooltip content="Open in Test Editor">
                     <Button icon={FileMinor} onClick={openEditor}></Button>
+                    </Tooltip>
                 </HorizontalStack>
             </Box>
         );
     };
-    
+
     const ref = useRef(null)
 
     const onClickFunc = () => {
@@ -52,7 +54,7 @@ function TestsFlyLayout({ data, showDetails, setShowDetails }) {
         <TitleComponent openEditor={openEditor}/>,
         <Box paddingBlockStart={5} paddingInlineEnd={4} paddingInlineStart={4}>
 
-            <YamlComponent onClickFunc={onClickFunc} dataString={data?.content} language="text" minHeight="72vh"></YamlComponent>
+            <YamlComponent onClickFunc={onClickFunc} dataString={data?.content} language="text" minHeight="70vh"></YamlComponent>
 
         </Box>
     ]
