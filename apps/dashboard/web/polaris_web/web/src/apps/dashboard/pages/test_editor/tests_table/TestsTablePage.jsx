@@ -62,8 +62,6 @@ const headings = [
         title: "Testing Methods",
         text: "Testing Methods",
         value: "testingMethods",
-        showFilter: true,
-        filterKey: "testingMethods",
     },
     {
         title: "Compliance",
