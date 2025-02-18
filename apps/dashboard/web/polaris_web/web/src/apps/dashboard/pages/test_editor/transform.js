@@ -35,7 +35,7 @@ const convertFunc = {
                 totalAktoTests++
             }
             let dataObj = {
-                content: test.content,
+                content: test?.content||"",
                 lastUpdated: func.prettifyEpoch(test.updatedTs),
                 superCategory: test.superCategory.name,
                 type: test.templateSource._name,
