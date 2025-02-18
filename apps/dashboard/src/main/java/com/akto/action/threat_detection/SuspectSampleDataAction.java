@@ -31,6 +31,7 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
   long total;
   Map<String, Integer> sort;
   int startTimestamp, endTimestamp;
+  List<String> types;
 
   private final CloseableHttpClient httpClient;
 
@@ -54,6 +55,10 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
 
     if (this.urls != null && !this.urls.isEmpty()) {
       filter.put("urls", this.urls);
+    }
+
+    if(this.types != null && !this.types.isEmpty()){
+      filter.put("types", this.types);
     }
 
     Map<String, Integer> time_range = new HashMap<>();
@@ -98,7 +103,8 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
                             smr.getApiCollectionId(),
                             smr.getIp(),
                             smr.getCountry(),
-                            smr.getDetectedAt()))
+                            smr.getDetectedAt(),
+                            smr.getType()))
                     .collect(Collectors.toList());
                 this.total = m.getTotal();
               });
@@ -215,5 +221,13 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
 
   public void setMaliciousEvents(List<DashboardMaliciousEvent> maliciousRequests) {
     this.maliciousEvents = maliciousRequests;
+  }
+
+  public void setTypes(List<String> types) {
+    this.types = types;
+  }
+
+  public List<String> getTypes() {
+    return types;
   }
 }

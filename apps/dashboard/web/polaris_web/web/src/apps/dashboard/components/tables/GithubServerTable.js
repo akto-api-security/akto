@@ -103,6 +103,9 @@ function GithubServerTable(props) {
       queryFilters = tableFunc.getFiltersMapFromUrl(decodeURIComponent(searchParams.get("filters") || ""), props?.disambiguateLabel, handleRemoveAppliedFilter, currentPageKey)
     }
     const currentFilters = tableFunc.mergeFilters(queryFilters,initialStateFilters,props?.disambiguateLabel, handleRemoveAppliedFilter)
+    if(currentPageKey.includes('threat-activity') && currentFilters.length > 0){
+      fetchData('', currentFilters)
+    }
     setAppliedFilters(currentFilters)
     setSortSelected(tableFunc.getInitialSortSelected(props.sortOptions, pageFiltersMap))
   },[currentPageKey])
@@ -111,12 +114,19 @@ function GithubServerTable(props) {
     updateQueryParams("filters",tableFunc.getPrettifiedFilter(appliedFilters))
   },[appliedFilters])
 
-  async function fetchData(searchVal) {
+  async function fetchData(searchVal, tempFilters = []) {
     let [sortKey, sortOrder] = sortSelected.length == 0 ? ["", ""] : sortSelected[0].split(" ");
     let filters = props.headers.reduce((map, e) => { map[e.filterKey || e.value] = []; return map }, {})
-    appliedFilters.forEach((filter) => {
-      filters[filter.key] = filter.value
-    })
+    if(tempFilters.length === 0){
+      appliedFilters.forEach((filter) => {
+        filters[filter.key] = filter.value
+      })
+    }else{
+      tempFilters.forEach((filter) => {
+        filters[filter.key] = filter.value
+      })
+    }
+    
     let tempData = await props.fetchData(sortKey, sortOrder == 'asc' ? -1 : 1, page * pageLimit, pageLimit, filters, filterOperators, searchVal);
     tempData ? setData([...tempData.value]) : setData([])
     tempData ? setTotal(tempData.total) : setTotal(0)
@@ -129,12 +139,6 @@ function GithubServerTable(props) {
       })
     }
   }
-
-  useEffect(() => {
-    if(Number.isInteger(props?.pageTotalCount)) {
-      setTotal(props?.pageTotalCount)
-    }
-  }, [props?.pageTotalCount, data])
 
   const handleSelectedTab = (x) => {
     const tableTabs = props.tableTabs ? props.tableTabs : props.tabs

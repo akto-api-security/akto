@@ -95,7 +95,9 @@ function SusDataTable({ currDateRange, rowClicked }) {
     setLoading(true);
     let sourceIpsFilter = [],
       apiCollectionIdsFilter = [],
-      matchingUrlFilter = [];
+      matchingUrlFilter = [],
+      typeFilter = []
+      ;
     if (filters?.actor) {
       sourceIpsFilter = filters?.actor;
     }
@@ -105,12 +107,16 @@ function SusDataTable({ currDateRange, rowClicked }) {
     if (filters?.url) {
       matchingUrlFilter = filters?.url;
     }
+    if(filters?.type){
+      typeFilter = filters?.type
+    }
     const sort = { [sortKey]: sortOrder };
     const res = await api.fetchSuspectSampleData(
       skip,
       sourceIpsFilter,
       apiCollectionIdsFilter,
       matchingUrlFilter,
+      typeFilter,
       sort,
       startTimestamp,
       endTimestamp
@@ -127,7 +133,7 @@ function SusDataTable({ currDateRange, rowClicked }) {
         apiCollectionName: collectionsMap[x.apiCollectionId] || "-",
         discoveredTs: func.prettifyEpoch(x.timestamp),
         sourceIPComponent: x?.ip || "-",
-        type: x?.type || (x?.filterId==="High4XXAlertFilter" ? "Anomaly": "Rule-based")
+        type: x?.type || "-"
       };
     });
     setLoading(false);
@@ -158,15 +164,15 @@ function SusDataTable({ currDateRange, rowClicked }) {
         title: "URL",
         choices: urlChoices,
       },
-      // {
-      //   key: 'type',
-      //   label: "Type",
-      //   title: "Type",
-      //   choices: [
-      //     {label: 'Rule based', value: 'Rule-based'},
-      //     {label: 'Anomaly', value: 'Anomaly-based'},
-      //   ],
-      // }
+      {
+        key: 'type',
+        label: "Type",
+        title: "Type",
+        choices: [
+          {label: 'Rule based', value: 'Rule-Based'},
+          {label: 'Anomaly', value: 'Anomaly'},
+        ],
+      }
     ];
   }
 
