@@ -33,6 +33,7 @@ import DataTypes from "../dashboard/pages/observe/data_types/DataTypes";
 import IssuesPage from "../dashboard/pages/issues/IssuesPage/IssuesPage";
 import CompliancePage from "../dashboard/pages/issues/IssuesPage/CompliancePage";
 import QuickStart from "../dashboard/pages/quick_start/QuickStart";
+import AgentTeam from "../dashboard/pages/agent_team/AgentTeam";
 import Webhooks from "../dashboard/pages/settings/integrations/webhooks/Webhooks";
 import Webhook from "../dashboard/pages/settings/integrations/webhooks/Webhook";
 import TestRolesPage from "../dashboard/pages/testing/TestRolesPage/TestRolesPage";
@@ -214,6 +215,19 @@ const router = createBrowserRouter([
                     {
                         path: "quick-start",
                         element: <QuickStart/>,
+                    },
+                    {
+                        path: "agent-team",
+                        children: [
+                            {
+                                path: "members",
+                                element: <AgentTeam/>
+                            },
+                            {
+                                path: "hired-members",
+                                element: <AgentTeam/>
+                            }
+                        ]
                     },
                 ]
             },
