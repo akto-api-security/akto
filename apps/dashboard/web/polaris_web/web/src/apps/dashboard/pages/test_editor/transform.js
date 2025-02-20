@@ -46,6 +46,7 @@ const convertFunc = {
                 value: test.name,
                 isCustom: test?.templateSource?._name === "CUSTOM" || false,
                 author: test?.author || "",
+                compliance: Object.keys(test?.compliance?.mapComplianceToListClauses || {}),
             }
 
             mapTestToData[test.testName] = dataObj
