@@ -12,6 +12,7 @@ import TestsFlyLayout from "./TestsFlyLayout";
 import HeadingWithTooltip from "../../../components/shared/HeadingWithTooltip";
 import TooltipText from "../../../components/shared/TooltipText";
 import LocalStore from "../../../../main/LocalStorageStore";
+import ShowListInBadge from "../../../components/shared/ShowListInBadge";
 
 const sortOptions = [
     { label: 'Severity', value: 'severity asc', directionLabel: 'Highest', sortKey: 'severityVal', columnIndex: 2 },
@@ -19,6 +20,14 @@ const sortOptions = [
     { label: 'Test', value: 'test asc', directionLabel: 'A-Z', sortKey: 'name', columnIndex: 1 },
     { label: 'Test', value: 'test desc', directionLabel: 'Z-A', sortKey: 'name', columnIndex: 1 },
 ];
+
+const severityObj = {
+    "Critical": "Immediate action; exploitable with severe impact",
+    "High": "Urgent action; significant security risk",
+    "Medium": "Moderate risk; potential for exploitation",
+    "Low": "Minor concerns; limited impact",
+    "Dynamic Severity": "Severity changes based on API context"
+}
 
 const headings = [
     {
@@ -35,11 +44,9 @@ const headings = [
                 title={"Severity"}
                 content={
                     <List>
-                        <List.Item><Text as="span" fontWeight="medium">Critical</Text> -  <Text as="span" color="subdued">Immediate action; exploitable with severe impact</Text></List.Item>
-                        <List.Item><Text as="span" fontWeight="medium">High</Text> - <Text as="span" color="subdued">Urgent action; significant security risk</Text></List.Item>
-                        <List.Item><Text as="span" fontWeight="medium">Medium</Text> -  <Text as="span" color="subdued">Moderate risk; potential for exploitation</Text></List.Item>
-                        <List.Item><Text as="span" fontWeight="medium">Low</Text> -  <Text as="span" color="subdued">Minor concerns; limited impact</Text></List.Item>
-                        <List.Item><Text as="span" fontWeight="medium">Dynamic Severity</Text> -  <Text as="span" color="subdued">Severity changes based on API context</Text></List.Item>
+                        {Object.entries(severityObj).map(([key, value]) => (
+                            <List.Item key={key}><Text as="span" fontWeight="medium">{key}</Text> - <Text as="span" color="subdued">{value}</Text></List.Item>
+                        ))}
                     </List>
                 }
             />
@@ -49,6 +56,7 @@ const headings = [
         textValue: "severity",
         sortKey: "severityVal",
         sortActive: true,
+        showFilter: true,
         filterKey: "severityText",
     },
     {
@@ -62,11 +70,15 @@ const headings = [
         title: "Testing Methods",
         text: "Testing Methods",
         value: "testingMethods",
+        showFilter: true,
+        filterKey: 'testingMethods'
     },
     {
         title: "Compliance",
-        value: "compliance",
+        value: "complianceComp",
         text: "Compliance",
+        showFilter: true,
+        filterKey: 'compliance'
     },
     {
         title: "Author",
@@ -76,29 +88,7 @@ const headings = [
         filterKey: "author",
     }
 ];
-const filterOptions = [
-    {
-        key: 'testingMethods',
-        label: "Testing Methods",
-        title: "Testing Methods",
-        choices: [
-            {label: 'Intrusive', value: "Intrusive"},
-            {label: 'Non intrusive', value: "Non intrusive"},
-        ]
-    },
-    {
-        key: 'severityText',
-        label: "Severity",
-        title: "Severity",
-        choices: [
-            {label: 'Critical', value: "CRITICAL"},
-            {label: 'High', value: "HIGH"},
-            {label: 'Medium', value: "MEDIUM"},
-            {label: 'Low', value: "LOW"},
-            {label: 'Dynamic Severity', value: "DYNAMIC SEVERITY"},
-        ]
-    }
-]
+
 
 let headers = JSON.parse(JSON.stringify(headings))
 
@@ -112,9 +102,6 @@ function TestsTablePage() {
     const mapTestData = (obj) => {
         const allData = [], customData = [], aktoData = [];
         Object.entries(obj.mapTestToData).map(([key, value]) => {
-            let totalCompliance = (value?.compliance || []).length
-            let maxShowCompliance = 2
-            let badge = totalCompliance > maxShowCompliance ? <Badge size="extraSmall">+{totalCompliance - maxShowCompliance}</Badge> : null
             const data = {
                 name: key,
                 tests: <Box maxWidth="480px"><TooltipText text={key} tooltip={key} textProps={{fontWeight: 'medium'}} />
@@ -132,7 +119,17 @@ function TestsTablePage() {
                 testingMethods: value.nature.length ? func.toSentenceCase(value.nature.replace(/_/g, " ")) : "-",
                 severityVal: severityOrder[value.severity] || 0,
                 value: value.value,  
-                compliance: (totalCompliance === 0)? "-" : <HorizontalStack wrap={false} gap={1}>{value.compliance.slice(0, maxShowCompliance).map(x => <Avatar source={func.getComplianceIcon(x)} shape="square"  size="extraSmall"/>)}<Box>{badge}</Box></HorizontalStack>,
+                complianceComp: value?.compliance?.length > 0 ? (
+                    <ShowListInBadge
+                        itemsArr={value?.compliance.map(x => <Avatar source={func.getComplianceIcon(x)} shape="square"  size="extraSmall"/>)}
+                        maxItems={2}
+                        maxWidth={"250px"}
+                        status={"new"}
+                        itemWidth={"200px"}
+                        useBadge={false}
+                    />) 
+                : "-",
+                compliance: value?.compliance
             }
             if (value.isCustom) {
                 customData.push(data)
@@ -221,7 +218,7 @@ function TestsTablePage() {
             headers={headers}
             headings={headings}
             data={data[selectedTab]}
-            filters={filterOptions}
+            filters={[]}
         />,
         <TestsFlyLayout data={selectedTest} setShowDetails={setShowDetails} showDetails={showDetails} ></TestsFlyLayout>
     ]

@@ -6384,6 +6384,8 @@
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">TEST_EDITOR</param>
+                <param name="accessType">READ</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">

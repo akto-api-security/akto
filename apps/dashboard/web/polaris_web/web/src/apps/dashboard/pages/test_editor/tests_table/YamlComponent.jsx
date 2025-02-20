@@ -1,4 +1,4 @@
-import { Box, Button, Divider, HorizontalStack, LegacyCard, Text, VerticalStack } from "@shopify/polaris";
+import { Box, Button, Divider, HorizontalStack, Text } from "@shopify/polaris";
 import SampleData from "../../../components/shared/SampleData";
 import { ClipboardMinor } from "@shopify/polaris-icons"
 
