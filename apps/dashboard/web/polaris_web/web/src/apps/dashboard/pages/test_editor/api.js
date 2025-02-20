@@ -49,15 +49,6 @@ const testEditorRequests = {
             }
         })
     },
-    async fetchTestContent(testId) {
-        return await request({
-            url: '/api/fetchTestContent',
-            method: 'post',
-            data: {
-                originalTestId: testId,
-            }
-        })
-    }
 
 }
 
