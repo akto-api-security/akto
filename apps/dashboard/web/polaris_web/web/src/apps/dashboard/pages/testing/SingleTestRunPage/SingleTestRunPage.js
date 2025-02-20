@@ -15,7 +15,6 @@ import {
   ProgressBar,
   Tooltip,
   Banner,
-  Modal
 } from '@shopify/polaris';
 
 import {
@@ -25,9 +24,7 @@ import {
   ReportMinor,
   RefreshMajor,
   CustomersMinor,
-  EditMajor,
   PlusMinor,
-  SettingsMajor,
   SettingsMinor
 } from '@shopify/polaris-icons';
 import api from "../api";
@@ -46,14 +43,10 @@ import ReRunModal from "./ReRunModal";
 import TestingStore from "../testingStore";
 import { useSearchParams } from "react-router-dom";
 import TestRunResultPage from "../TestRunResultPage/TestRunResultPage";
-import { usePolling } from "../../../../main/PollingProvider";
 import LocalStore from "../../../../main/LocalStorageStore";
 import { produce } from "immer"
-import AdvancedSettingsComponent from "../../observe/api_collections/component/AdvancedSettingsComponent";
 import GithubServerTable from "../../../components/tables/GithubServerTable";
 import RunTest from '../../observe/api_collections/RunTest';
-import { filter } from 'lodash';
-
 let sortOptions = [
   { label: 'Severity', value: 'severity asc', directionLabel: 'Highest severity', sortKey: 'total_severity', columnIndex: 3 },
   { label: 'Severity', value: 'severity desc', directionLabel: 'Lowest severity', sortKey: 'total_severity', columnIndex: 3 },
@@ -265,7 +258,13 @@ function SingleTestRunPage() {
 
   const fetchTableData = async (sortKey, sortOrder, skip, limit, filters, filterOperators, queryValue) => {
     let testRunResultsRes = []
-    let testRunCountMap = []
+    let testRunCountMap = {
+      "ALL": 0,
+      "SKIPPED_EXEC_NEED_CONFIG": 0,
+      "VULNERABLE": 0,
+      "SKIPPED_EXEC_API_REQUEST_FAILED": 0,
+      "SKIPPED_EXEC": 0
+    }
     let totalIgnoredIssuesCount = 0
     let ignoredIssueListCount = 0
     const { testingRun, workflowTest, testingRunType } = testingRunResultSummariesObj
@@ -304,8 +303,10 @@ function SingleTestRunPage() {
         })
         if (!func.deepComparison(copyFilters, filters)) {
           setCopyFilters(filters)
-          api.fetchTestRunResultsCount(localSelectedTestRun.testingRunResultSummaryHexId).then((testCountMap) => {
-            testRunCountMap = testCountMap || []
+          await api.fetchTestRunResultsCount(localSelectedTestRun.testingRunResultSummaryHexId).then((testCountMap) => {
+            if(testCountMap !== null){
+              testRunCountMap = JSON.parse(JSON.stringify(testCountMap));
+            }
             //Assuming vulnerable count is after removing ignored issues aLL - (OOTHER COUNT + IGNORED)
             testRunCountMap['IGNORED_ISSUES'] = ignoredIssueListCount
             let countOthers = 0;
