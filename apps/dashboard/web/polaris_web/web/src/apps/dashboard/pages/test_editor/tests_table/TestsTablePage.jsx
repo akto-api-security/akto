@@ -64,6 +64,11 @@ const headings = [
         value: "testingMethods",
     },
     {
+        title: "Compliance",
+        value: "compliance",
+        text: "Compliance",
+    },
+    {
         title: "Author",
         text: "Author",
         value: "author",
@@ -107,6 +112,9 @@ function TestsTablePage() {
     const mapTestData = (obj) => {
         const allData = [], customData = [], aktoData = [];
         Object.entries(obj.mapTestToData).map(([key, value]) => {
+            let totalCompliance = (value?.compliance || []).length
+            let maxShowCompliance = 2
+            let badge = totalCompliance > maxShowCompliance ? <Badge size="extraSmall">+{totalCompliance - maxShowCompliance}</Badge> : null
             const data = {
                 name: key,
                 tests: <Box maxWidth="480px"><TooltipText text={key} tooltip={key} textProps={{fontWeight: 'medium'}} />
@@ -124,6 +132,7 @@ function TestsTablePage() {
                 testingMethods: value.nature.length ? func.toSentenceCase(value.nature.replace(/_/g, " ")) : "-",
                 severityVal: severityOrder[value.severity] || 0,
                 value: value.value,  
+                compliance: (totalCompliance === 0)? "-" : <HorizontalStack wrap={false} gap={1}>{value.compliance.slice(0, maxShowCompliance).map(x => <Avatar source={func.getComplianceIcon(x)} shape="square"  size="extraSmall"/>)}<Box>{badge}</Box></HorizontalStack>,
             }
             if (value.isCustom) {
                 customData.push(data)
@@ -147,7 +156,7 @@ function TestsTablePage() {
                 }
                 
             } else { 
-                metaDataObj = await transform.getAllSubcategoriesData(true, "runTests")
+                metaDataObj = await transform.getAllSubcategoriesData(true, "testEditor")
             }
             if (!metaDataObj?.subCategories?.length) return;
 
