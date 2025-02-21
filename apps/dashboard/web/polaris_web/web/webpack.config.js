@@ -62,7 +62,7 @@ module.exports = {
       {
         test: /\.(ts|tsx|js|jsx)$/,
         include: resolve(__dirname, 'src'),
-        exclude: /node_modules/,
+        exclude: /node_modules\/(?!(tiptap|tiptap-utils|are-you-es5|tiptap-extensions|monaco-yaml|monaco-worker-manager|monaco-marker-data-provider|monaco-editor)\/).*/,
         use: {
           loader: 'babel-loader',
           options: {
