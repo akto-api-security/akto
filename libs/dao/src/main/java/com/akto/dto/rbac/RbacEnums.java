@@ -14,7 +14,8 @@ public class RbacEnums {
         SETTINGS,
         ADMIN,
         DEBUG_INFO,
-        USER;
+        USER,
+        AI;
     
         public static AccessGroups[] getAccessGroups() {
             return values();
@@ -43,7 +44,9 @@ public class RbacEnums {
         BILLING(AccessGroups.SETTINGS),
         INVITE_MEMBERS(AccessGroups.DEBUG_INFO),
         ADMIN_ACTIONS(AccessGroups.ADMIN),
-        USER_ACTIONS(AccessGroups.USER);
+        USER_ACTIONS(AccessGroups.USER),
+        AI_AGENTS(AccessGroups.AI);
+
         private final AccessGroups accessGroup;
 
         Feature(AccessGroups accessGroup) {

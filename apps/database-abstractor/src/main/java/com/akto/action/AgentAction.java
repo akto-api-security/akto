@@ -156,33 +156,47 @@ public class AgentAction extends ActionSupport {
             return Action.ERROR.toUpperCase();
         }
 
-        List<Bson> filters = new ArrayList<>();
+        Bson filter = AgentSubProcessSingleAttemptDao.instance.getFiltersForAgentSubProcess(processId, subProcessId, attemptId);
 
-        filters.add(Filters.eq(AgentSubProcessSingleAttempt.PROCESS_ID, processId));
-        filters.add(Filters.eq(AgentSubProcessSingleAttempt.SUB_PROCESS_ID, subProcessId));
-        filters.add(Filters.eq(AgentSubProcessSingleAttempt.ATTEMPT_ID, attemptId));
+        AgentSubProcessSingleAttempt subProcess = AgentSubProcessSingleAttemptDao.instance.findOne(filter);
+
+        if (subProcess == null) {
+            addActionError("No subprocess found");
+            return Action.ERROR.toUpperCase();
+        }
+
+        State updatedState = null;
+        try {
+            updatedState = State.valueOf(state);
+        } catch (Exception e) {
+        }
 
         List<Bson> updates = new ArrayList<>();
+
+        if (updatedState!=null && State.RUNNING.equals(updatedState) && State.SCHEDULED.equals(subProcess.getState())) {
+            updates.add(Updates.set(AgentSubProcessSingleAttempt.START_TIMESTAMP, Context.now()));
+            updates.add(Updates.set(AgentSubProcessSingleAttempt._STATE, State.RUNNING));
+        }
 
         if (subProcessHeading != null) {
             updates.add(Updates.set(AgentSubProcessSingleAttempt.SUB_PROCESS_HEADING, subProcessHeading));
         }
-        updates.add(Updates.setOnInsert(AgentSubProcessSingleAttempt.START_TIMESTAMP, Context.now()));
+
         if (log != null) {
             updates.add(Updates.addToSet(AgentSubProcessSingleAttempt._LOGS, new AgentLog(log, Context.now())));
         }
-        if (processOutput == null) {
-            updates.add(Updates.set(AgentSubProcessSingleAttempt._STATE, State.RUNNING));
-        } else {
+
+        if (updatedState!=null && processOutput != null && State.COMPLETED.equals(updatedState)) {
             updates.add(Updates.set(AgentSubProcessSingleAttempt.PROCESS_OUTPUT, processOutput));
             updates.add(Updates.set(AgentSubProcessSingleAttempt._STATE, State.COMPLETED));
             updates.add(Updates.set(AgentSubProcessSingleAttempt.END_TIMESTAMP, Context.now()));
         }
 
         /*
-         * Upsert: true.
+         * Upsert: false 
+         * because the state is controlled by user inputs.
          */
-        subprocess = AgentSubProcessSingleAttemptDao.instance.updateOne(Filters.and(filters), Updates.combine(updates));
+        subprocess = AgentSubProcessSingleAttemptDao.instance.updateOneNoUpsert(filter, Updates.combine(updates));
 
         return Action.SUCCESS.toUpperCase();
     }
@@ -193,7 +207,7 @@ public class AgentAction extends ActionSupport {
      * 
      * subprocess complete
      * |-> user accepts -> accept state marked from dashboard
-     * and agent moves to next subprocess
+     * and agent moves to next subprocess, which is also created from dashboard.
      * |-> user declines -> declined state marked from dashboard
      * and new subprocess single attempt created from dashboard with user input.
      * 
@@ -215,13 +229,8 @@ public class AgentAction extends ActionSupport {
             return Action.ERROR.toUpperCase();
         }
 
-        List<Bson> filters = new ArrayList<>();
-
-        filters.add(Filters.eq(AgentSubProcessSingleAttempt.PROCESS_ID, processId));
-        filters.add(Filters.eq(AgentSubProcessSingleAttempt.SUB_PROCESS_ID, subProcessId));
-        filters.add(Filters.eq(AgentSubProcessSingleAttempt.ATTEMPT_ID, attemptId));
-
-        subprocess = AgentSubProcessSingleAttemptDao.instance.findOne(Filters.and(filters));
+        Bson filter = AgentSubProcessSingleAttemptDao.instance.getFiltersForAgentSubProcess(processId, subProcessId, attemptId);
+        subprocess = AgentSubProcessSingleAttemptDao.instance.findOne(filter);
 
         return Action.SUCCESS.toUpperCase();
     }
