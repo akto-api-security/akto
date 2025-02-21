@@ -12,8 +12,8 @@ import transform from "../../testing/transform";
 
 
 const sortOptions = [
-    { label: 'Template Name', value: 'template asc', directionLabel: 'A-Z', sortKey: 'name', columnIndex: 1 },
-    { label: 'Template Name', value: 'template desc', directionLabel: 'Z-A', sortKey: 'name', columnIndex: 1 },
+    { label: 'Template Name', value: 'template asc', directionLabel: 'A-Z', sortKey: 'testSuiteName', columnIndex: 1 },
+    { label: 'Template Name', value: 'template desc', directionLabel: 'Z-A', sortKey: 'testSuiteName', columnIndex: 1 },
 ];
 
 
@@ -105,24 +105,23 @@ function TestSuite() {
                 label: subCategory.testName,
                 value: subCategory.name,
                 author: subCategory.author,
-                categoryName: subCategory.superCategory.displayName
+                categoryName: subCategory.superCategory.displayName,
+                selected: true
             }
             subCategoryMap[subCategory.superCategory?.name].push(obj);
         });
         const updatedData = [];
         let id = 1;
         Object.entries(listData).forEach(([key, value]) => {
-            const categoryTests = [];
             const testSuiteSubCategoryMap = [];
+            let count = 0;
             value.forEach(cat => {
                 if (!subCategoryMap[cat] || !Array.isArray(subCategoryMap[cat]) || subCategoryMap[cat].length === 0) return;
 
                 const obj = { tests: [], displayName: "", selected: false };
                 obj.tests = subCategoryMap[cat];
+                count += obj.tests.length;
                 obj.displayName = subCategoryMap[cat][0].categoryName;
-                subCategoryMap[cat]?.forEach(test => {
-                    categoryTests.push(test);
-                });
                 testSuiteSubCategoryMap.push(obj);
             });
 
@@ -131,8 +130,7 @@ function TestSuite() {
                 testSuiteName: key,
                 name: (<Text variant="headingSm" fontWeight="medium" as="h2">{key}</Text>),
                 id: id++,
-                testCount: categoryTests.length,
-                tests: categoryTests,
+                testCount: count,
                 categoriesCovered: (
                     <ShowListInBadge
                         itemsArr={[...value]}
@@ -149,7 +147,6 @@ function TestSuite() {
             ...prevData,
             all_templates: [...updatedData],
         }));
-
         if (selectedTab !== "all_templates") {
             setSelectedTab("all_templates");
         }
