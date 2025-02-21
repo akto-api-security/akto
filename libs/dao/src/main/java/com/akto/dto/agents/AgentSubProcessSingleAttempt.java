@@ -41,6 +41,9 @@ public class AgentSubProcessSingleAttempt {
      * 
      */
     Map<String, Object> userInput;
+    final public static String USER_INPUT = "userInput";
+    int createdTimestamp;
+    final public static String CREATED_TIMESTAMP = "createdTimestamp";
     int startTimestamp;
     final public static String START_TIMESTAMP = "startTimestamp";
     int endTimestamp;
@@ -71,12 +74,13 @@ public class AgentSubProcessSingleAttempt {
     final public static String PROCESS_OUTPUT = "processOutput";
 
     public AgentSubProcessSingleAttempt(String processId, String subProcessId, String subProcessHeading,
-            Map<String, Object> userInput, int startTimestamp, int endTimestamp, State state, int attemptId,
-            List<AgentLog> logs, Map<String, Object> processOutput) {
+            Map<String, Object> userInput, int createdTimestamp, int startTimestamp, int endTimestamp, State state,
+            int attemptId, List<AgentLog> logs, Map<String, Object> processOutput) {
         this.processId = processId;
         this.subProcessId = subProcessId;
         this.subProcessHeading = subProcessHeading;
         this.userInput = userInput;
+        this.createdTimestamp = createdTimestamp;
         this.startTimestamp = startTimestamp;
         this.endTimestamp = endTimestamp;
         this.state = state;
@@ -166,6 +170,14 @@ public class AgentSubProcessSingleAttempt {
 
     public void setUserInput(Map<String, Object> userInput) {
         this.userInput = userInput;
+    }
+
+    public int getCreatedTimestamp() {
+        return createdTimestamp;
+    }
+
+    public void setCreatedTimestamp(int createdTimestamp) {
+        this.createdTimestamp = createdTimestamp;
     }
 
 }
