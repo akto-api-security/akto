@@ -5,7 +5,7 @@ import {
 } from '@shopify/polaris-icons';
 import "./flyLayoutSuite.css"
 
-function TestSuiteRow({ category, setFilteredCategories, isLast }) {
+function TestSuiteRow({ category, setFilteredCategories, setCategories, isLast }) {
     let displayName = category.displayName;
     let subCategories = category.tests;
 
@@ -26,7 +26,6 @@ function TestSuiteRow({ category, setFilteredCategories, isLast }) {
         <Box borderRadiusEndEnd={(isLast) ? 2 : 0} borderRadiusEndStart={(isLast) ? 2 : 0} borderColor="border-subdued" borderBlockStartWidth="1" >
             <div className="category-list" style={{ cursor: "pointer", ...(isLast && !category.selected && { borderBottomLeftRadius: "0.5rem", borderBottomRightRadius: "0.5rem" }) }}>
                 <Box onClick={() => { toggleOpen() }} paddingInlineStart={5} paddingBlockEnd={3} paddingBlockStart={3} paddingInlineEnd={5}>
-
                     <HorizontalStack align="space-between">
                         <HorizontalStack >
                             <Text fontWeight="medium" as="h3">{displayName}</Text>
@@ -36,25 +35,24 @@ function TestSuiteRow({ category, setFilteredCategories, isLast }) {
                             <Button plain monochrome size="micro" icon={category.selected ? ChevronUpMinor : ChevronDownMinor}></Button>
                         </HorizontalStack>
                     </HorizontalStack>
-
                 </Box>
             </div>
-            <div className="sub-category-lists">
-                <Collapsible open={category?.selected}>
-                    {subCategories.map((subCategory, index) => {
-                        return (
 
-                            <Box background="bg-subdued" borderRadiusEndEnd={(isLast && subCategories.length - 1 === index) ? 2 : 0} borderRadiusEndStart={(isLast && subCategories.length - 1 === index) ? 2 : 0} borderColor="border-subdued" borderBlockStartWidth="1" paddingInlineStart={10} paddingBlockEnd={2} paddingBlockStart={2} >
+            <Collapsible open={category?.selected}>
+                {subCategories.map((subCategory, index) => {
+                    return (
+                        <div style={{ backgroundColor: "#FAFBFB", cursor: "pointer", ...(isLast &&  subCategories.length - 1 === index && { borderBottomLeftRadius: "0.5rem", borderBottomRightRadius: "0.5rem" }) }} className="category-lists-item" key={index}>
+                            <Box borderColor="border-subdued" borderBlockStartWidth="1" paddingInlineStart={10} paddingBlockEnd={2} paddingBlockStart={2} >
                                 <HorizontalStack key={1} align="start">
-                                    <Link onClick={() => window.open(`${window.location.origin}/dashboard/test-editor/${subCategory.value}`)} monochrome removeUnderline >
+                                    <div onClick={() => window.open(`${window.location.origin}/dashboard/test-editor/${subCategory.value}`)}>
                                         <Text color="subdued" fontWeight="regular" as="h3">{subCategory.label}</Text>
-                                    </Link>
+                                    </div>
                                 </HorizontalStack>
                             </Box>
-                        )
-                    })}
-                </Collapsible>
-            </div>
+                        </div>
+                    )
+                })}
+            </Collapsible>
         </Box>
     )
 }
