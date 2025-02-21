@@ -43,7 +43,7 @@
     "zustand": "^4.3.8"
   },
   "scripts": {
-    "dev": "cross-env NODE_ENV=development VERSION=$RELEASE_VERSION webpack serve --open --config web/webpack.config.js",
+    "dev": "cross-env NODE_ENV=development webpack-dev-server --open --hot --config web/webpack.config.js",
     "build": "cross-env NODE_ENV=production VERSION=$RELEASE_VERSION webpack --progress --config web/webpack.config.js",
     "hot": "cross-env NODE_ENV=development VERSION=$RELEASE_VERSION webpack --watch --progress --config web/webpack.config.js"
   },
