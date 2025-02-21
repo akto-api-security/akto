@@ -14,10 +14,12 @@ function hashGenerator() {
 process.env.HASH = hashGenerator()
 
 module.exports = {
-  entry: {"babel-polyfill": "babel-polyfill", main: './web/src/apps/main/index.js',
-  'editor.worker': 'monaco-editor/esm/vs/editor/editor.worker.js',
-  'json.worker': 'monaco-editor/esm/vs/language/json/json.worker',
-},
+  entry: {
+    "babel-polyfill": "babel-polyfill",
+    main: './web/src/apps/main/index.js',
+    'editor.worker': 'monaco-editor/esm/vs/editor/editor.worker.js',
+    'json.worker': 'monaco-editor/esm/vs/language/json/json.worker',
+  },
   output: {
     path: path.resolve(__dirname, './dist'),
     publicPath: process.env.VERSION ==='' || process.env.VERSION.includes("akto-release-version") ? '/polaris_web/web/dist/':  'https://d1hvi6xs55woen.cloudfront.net/polaris_web/' + process.env.VERSION +  '/dist/',
@@ -58,18 +60,19 @@ module.exports = {
         ]
       },
       {
-        test: /\.(js|jsx)$/,
-        exclude: /node_modules\/(?!(tiptap|tiptap-utils|are-you-es5|tiptap-extensions|monaco-yaml|monaco-worker-manager|monaco-marker-data-provider|monaco-editor)\/).*/,
+        test: /\.(ts|tsx|js|jsx)$/,
+        include: resolve(__dirname, 'src'),
+        exclude: /node_modules/,
         use: {
           loader: 'babel-loader',
           options: {
             presets: [
               "@babel/preset-env",
-             ["@babel/preset-react", {"runtime": "automatic"}]
-          ]
+              ["@babel/preset-react", {"runtime": "automatic"}],
+              "@babel/preset-typescript"
+            ]
           }
         }
-
       },
       {
         test: /\.(png|jpg|gif|svg|eot|ttf|woff|woff2)$/,
@@ -79,9 +82,9 @@ module.exports = {
   },
   resolve: {
     alias: {
-      '@': resolve('/web/src')
+      '@': path.resolve(__dirname, '/web/src')
     },
-    extensions: ['*', '.js', '.jsx', '.json']
+    extensions: ['.ts', '.tsx', '.js', '.jsx', '.json', '*']
   },
   devServer: {
     historyApiFallback: true,
