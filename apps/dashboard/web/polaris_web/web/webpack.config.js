@@ -82,7 +82,7 @@ module.exports = {
   },
   resolve: {
     alias: {
-      '@': resolve(__dirname, '/web/src')
+      '@': resolve('/web/src')
     },
     extensions: ['.ts', '.tsx', '.js', '.jsx', '.json', '*']
   },
