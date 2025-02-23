@@ -1,40 +1,56 @@
 import { Button, HorizontalStack, Text, Box, Icon, TextField } from "@shopify/polaris"
-import { SearchMinor
+import {
+    SearchMinor
 } from '@shopify/polaris-icons';
 import { useEffect, useState } from "react";
 import TestSuiteRow from "./TestSuiteRow";
 import FlyLayout from "../../../components/layouts/FlyLayout";
+import transform from "./transform";
 
 function FlyLayoutSuite(props) {
-    const { show, setShow, width, selectedTestSuite} = props;
+    const { show, setShow, width, selectedTestSuite } = props;
     const [testSuiteName, setTestSuiteName] = useState("");
     const [testSearchValue, setTestSearchValue] = useState("");
     const [categories, setCategories] = useState([]);
     const [filteredCategories, setFilteredCategories] = useState([]);
     const [prevSearchValue, setPrevSearchValue] = useState("");
+    const [isEditMode, setIsEditMode] = useState(false);
 
     const handleExit = () => {
         setShow(false);
         setTestSearchValue("");
     }
-    
 
-    useEffect(() => {
-        if (selectedTestSuite?.allTest?.length) {
-            const deepCopy = JSON.parse(JSON.stringify(selectedTestSuite.allTest));
-            setCategories(deepCopy);
-            setTestSuiteName(selectedTestSuite.testSuiteName || "");
-        } else {
+    const updateTestSuite = async () => {
+        if (!selectedTestSuite?.tests?.length) {
             setCategories([]);
             setTestSuiteName("");
+            return;
         }
+
+        const subCategoryMap = await transform.getSubCategoryMap();
+        const selectedTestSuiteTestsSet = new Set(selectedTestSuite.tests);
+
+        // Updates the test suite categories and name based on the selected test suite.
+        const testSuiteSubCategoryMap = Object.entries(subCategoryMap).map(([_, tests]) => {
+                const filteredTests = tests.filter(test => selectedTestSuiteTestsSet.has(test.value));
+                if (filteredTests.length === 0) return null;
+
+                return {
+                    tests: filteredTests,
+                    displayName: tests[0]?.categoryName || "",
+                    selected: false
+                };
+            }).filter(Boolean);
+            
+        setCategories(testSuiteSubCategoryMap);
+        setTestSuiteName(selectedTestSuite.testSuiteName || "");
+    };
+
+
+    useEffect(() => {
+        updateTestSuite();
     }, [selectedTestSuite]);
-
-
-
-    function handleSearch(val) {
-        setTestSearchValue(val);
-    }
 
 
     useEffect(() => {
@@ -67,6 +83,48 @@ function FlyLayoutSuite(props) {
         setFilteredCategories(updatedCategories);
         setPrevSearchValue(testSearchValue);
     }, [testSearchValue, categories]);
+
+    async function handleSwitchMode() {
+        if (isEditMode) {
+            const subCategoryMap = await transform.getSubCategoryMap();
+
+            const testSuiteSubCategoryMap = Object.entries(subCategoryMap).map(([_, tests]) => {
+                return {
+                    tests: tests,
+                    displayName: tests[0]?.categoryName || "",
+                    selected: false
+                };
+            }).filter(Boolean);
+
+            if (selectedTestSuite?.tests?.length) {
+                const selectedTestSet = new Set(selectedTestSuite.tests);
+                Object.entries(testSuiteSubCategoryMap).forEach(([key, value]) => {
+                    value.tests.forEach(test => {
+                        if (selectedTestSet.has(test.value)) {
+                            test.selected = true;
+                        }
+                        else {
+                            test.selected = false;
+                        }
+                    });
+                });
+                setTestSuiteName(selectedTestSuite.testSuiteName || "");
+            }
+            setCategories(testSuiteSubCategoryMap);
+        }
+        else {
+            updateTestSuite();
+        }
+    }
+
+    useEffect(() => {
+        handleSwitchMode();
+    }, [isEditMode]);
+
+
+    function handleSearch(val) {
+        setTestSearchValue(val);
+    }
 
     function checkExpand() {
         return filteredCategories.some(category => !category.selected);
@@ -116,6 +174,10 @@ function FlyLayoutSuite(props) {
         return filteredCategories.reduce((count, category) => count + category.tests.length, 0);
     }
 
+    function switchMode() {
+        setIsEditMode(!isEditMode);
+    }
+
     const listComponents = (
         <div style={{ margin: "20px", borderRadius: "0.5rem", boxShadow: " 0px 0px 5px 0px #0000000D, 0px 1px 2px 0px #00000026" }}>
             <Box borderRadius="2" borderColor="border-subdued" >
@@ -129,14 +191,14 @@ function FlyLayoutSuite(props) {
                 </Box>
                 {filteredCategories.length > 0 && filteredCategories.map((category, index) => {
                     return (
-                        <TestSuiteRow isLast={index === filteredCategories.length - 1} key={index} category={category} setCategories={setCategories}  setFilteredCategories={setFilteredCategories} />
+                        <TestSuiteRow filteredCategories={filteredCategories} categories={categories} isEditMode={isEditMode} isLast={index === filteredCategories.length - 1} key={index} category={category} setCategories={setCategories} setFilteredCategories={setFilteredCategories} />
                     )
                 })}
             </Box>
         </div>
     );
 
-    const components = [headingComponents,listComponents];
+    const components = [headingComponents, listComponents];
 
 
 
@@ -150,7 +212,8 @@ function FlyLayoutSuite(props) {
             loading={false}
             showDivider={false}
             newComp={true}
-            isHandleClose={true}>
+            isHandleClose={true}
+            switchMode={switchMode}>
         </FlyLayout>
     )
 }

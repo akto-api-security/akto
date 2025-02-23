@@ -8,7 +8,7 @@ import LocalStore from "../../../../main/LocalStorageStore";
 import useTable from "../../../components/tables/TableContext"
 import func from "../../../../../util/func"
 import ShowListInBadge from "../../../components/shared/ShowListInBadge"
-import transform from "../../testing/transform";
+import transform from "./transform";
 
 
 const sortOptions = [
@@ -81,35 +81,7 @@ function TestSuite() {
 
     const fetchData = async () => {
         const listData = owaspTop10List;
-        let metaDataObj = {
-            categories: [],
-            subCategories: [],
-            testSourceConfigs: []
-        }
-        if ((localCategoryMap && Object.keys(localCategoryMap).length > 0) && (localSubCategoryMap && Object.keys(localSubCategoryMap).length > 0)) {
-            metaDataObj = {
-                categories: Object.values(localCategoryMap),
-                subCategories: Object.values(localSubCategoryMap),
-                testSourceConfigs: []
-            }
-
-        } else {
-            metaDataObj = await transform.getAllSubcategoriesData(true, "runTests")
-        }
-        const subCategoryMap = {};
-        metaDataObj.subCategories.forEach(subCategory => {
-            if (!subCategoryMap[subCategory?.superCategory?.name]) {
-                subCategoryMap[subCategory.superCategory?.name] = [];
-            }
-            let obj = {
-                label: subCategory.testName,
-                value: subCategory.name,
-                author: subCategory.author,
-                categoryName: subCategory.superCategory.displayName,
-                selected: true
-            }
-            subCategoryMap[subCategory.superCategory?.name].push(obj);
-        });
+        const subCategoryMap = await transform.getSubCategoryMap(localCategoryMap);
         const updatedData = [];
         let id = 1;
         Object.entries(listData).forEach(([key, value]) => {
@@ -117,20 +89,15 @@ function TestSuite() {
             let count = 0;
             value.forEach(cat => {
                 if (!subCategoryMap[cat] || !Array.isArray(subCategoryMap[cat]) || subCategoryMap[cat].length === 0) return;
-
-                const obj = { tests: [], displayName: "", selected: false };
-                obj.tests = subCategoryMap[cat];
-                count += obj.tests.length;
-                obj.displayName = subCategoryMap[cat][0].categoryName;
-                testSuiteSubCategoryMap.push(obj);
+                subCategoryMap[cat].forEach(test => { testSuiteSubCategoryMap.push(test.value) });
             });
 
             updatedData.push({
-                allTest: testSuiteSubCategoryMap,
+                tests: testSuiteSubCategoryMap,
                 testSuiteName: key,
                 name: (<Text variant="headingSm" fontWeight="medium" as="h2">{key}</Text>),
                 id: id++,
-                testCount: count,
+                testCount: testSuiteSubCategoryMap.length,
                 categoriesCovered: (
                     <ShowListInBadge
                         itemsArr={[...value]}
@@ -191,6 +158,7 @@ function TestSuite() {
             setSelectedTestSuite={setSelectedTestSuite}
             show={show}
             setShow={setShow}
+            localSubCategoryMap={localSubCategoryMap}
         />
 
     ]
