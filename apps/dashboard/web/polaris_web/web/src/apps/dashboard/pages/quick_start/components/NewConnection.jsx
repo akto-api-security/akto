@@ -132,7 +132,7 @@ function NewConnection() {
         
     return (
         <div style={{padding: '32px 15vw'}}>
-            <LegacyCard title="Your quick start guide">
+            <LegacyCard title="Your quick start guides">
                 <LegacyCard.Section>
                     <VerticalStack gap="5">
                         <p>Use this personalized guide to get your traffic and start testing.</p>
