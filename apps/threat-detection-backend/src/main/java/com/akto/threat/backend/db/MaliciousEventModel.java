@@ -18,6 +18,7 @@ public class MaliciousEventModel {
   private EventType eventType;
   private String category;
   private String subCategory;
+  private String type;
 
   public enum EventType {
     SINGLE,
@@ -228,4 +229,13 @@ public class MaliciousEventModel {
   public void setSubCategory(String subCategory) {
     this.subCategory = subCategory;
   }
+
+  public String getType() {
+    return type;
+  }
+
+  public void setType(String type) {
+    this.type = type;
+  }
+
 }

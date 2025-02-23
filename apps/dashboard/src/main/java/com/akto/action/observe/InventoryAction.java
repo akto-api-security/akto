@@ -940,7 +940,7 @@ public class InventoryAction extends UserAction {
         ArrayList<Bson> filterList = new ArrayList<>();
         filterList.add(Filters.gt("timestamp", startTimestamp));
         filterList.add(Filters.lt("timestamp", endTimestamp));
-        filterList.add(Filters.nin(SingleTypeInfo._COLLECTION_IDS, UsageMetricCalculator.getDeactivated()));
+        filterList.add(Filters.nin(SingleTypeInfo._API_COLLECTION_ID, UsageMetricCalculator.getDeactivated()));
 
         List<String> sensitiveInRequest = SingleTypeInfoDao.instance.sensitiveSubTypeInRequestNames();
         sensitiveInRequest.addAll(SingleTypeInfoDao.instance.sensitiveSubTypeNames());

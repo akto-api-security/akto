@@ -318,12 +318,13 @@ export default {
             data: {}
         })
     },
-    invokeDependencyTable(apiCollectionIds){
+    invokeDependencyTable(apiCollectionIds, sourceCodeApis){
         return request({
             url: '/api/invokeDependencyTable',
             method: 'post',
             data: {
-                apiCollectionIds
+                apiCollectionIds,
+                sourceCodeApis
             }
         })
     },

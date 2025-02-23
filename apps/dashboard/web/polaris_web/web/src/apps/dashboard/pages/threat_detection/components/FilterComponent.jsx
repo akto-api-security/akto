@@ -69,7 +69,7 @@ function FilterComponent() {
                 />
             </LegacyCard.Section>
             <LegacyCard.Section flush>
-                <SampleData data={ogData} editorLanguage="custom_yaml" minHeight="240px" readOnly={false} getEditorData={setData} />
+                <SampleData data={ogData} editorLanguage="custom_yaml" minHeight="65vh" readOnly={false} getEditorData={setData} />
             </LegacyCard.Section>
         </LegacyCard>
     )

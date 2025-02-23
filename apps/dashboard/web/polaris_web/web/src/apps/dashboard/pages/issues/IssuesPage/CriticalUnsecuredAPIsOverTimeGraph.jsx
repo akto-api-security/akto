@@ -4,26 +4,29 @@ import EmptyCard from '../../dashboard/new_components/EmptyCard'
 import { Link, Text } from '@shopify/polaris'
 import InfoCard from '../../dashboard/new_components/InfoCard'
 import dashboardApi from "../../dashboard/api.js"
+import func from '@/util/func.js'
 
-const CriticalUnsecuredAPIsOverTimeGraph = ({ linkText, linkUrl }) => {
+const CriticalUnsecuredAPIsOverTimeGraph = ({ startTimestamp, endTimestamp, linkText, linkUrl }) => {
     const [unsecuredAPIs, setUnsecuredAPIs] = useState([])
     const [showTestingComponents, setShowTestingComponents] = useState(false)
     const [isDataAvailable, setIsDataAvailable] = useState(false)
 
     function buildUnsecuredAPIs(input) {
 
+        const {epochKey, issuesTrend} = input;
+
         const SEVERITY_CONFIG = {
-            CRITICAL: { color: "#E45357", name: "Critical Issues", data: [] },
-            HIGH: { color: "#EF864C", name: "High Issues", data: [] }
+            CRITICAL: { color: "#DF2909", name: "Critical Issues", data: [] },
+            HIGH: { color: "#FED3D1", name: "High Issues", data: [] }
         };
-                
+
         const transformed = []
         let dataAvailability = false
-        for (const [severity, epochs] of Object.entries(input)) {
+        for (const [severity, epochs] of Object.entries(issuesTrend)) {
             const dataset = SEVERITY_CONFIG[severity] || SEVERITY_CONFIG.HIGH;
-            
+
             for (const epoch in epochs) {
-                dataset.data.push([Number(epoch) * 86400000, epochs[epoch]]);
+                dataset.data.push([func.getEpochMillis(epoch, epochKey), epochs[epoch]]);
                 dataAvailability = true
             }
         }
@@ -36,7 +39,7 @@ const CriticalUnsecuredAPIsOverTimeGraph = ({ linkText, linkUrl }) => {
 
     const fetchGraphData = async () => {
         setShowTestingComponents(false)
-        const criticalIssuesTrendResp = await dashboardApi.fetchCriticalIssuesTrend()
+        const criticalIssuesTrendResp = await dashboardApi.fetchCriticalIssuesTrend(startTimestamp, endTimestamp)
 
         buildUnsecuredAPIs(criticalIssuesTrendResp)
         setShowTestingComponents(true)
@@ -44,7 +47,7 @@ const CriticalUnsecuredAPIsOverTimeGraph = ({ linkText, linkUrl }) => {
 
     useEffect(() => {
         fetchGraphData()
-    }, [])
+    }, [startTimestamp, endTimestamp])
     
     const defaultChartOptions = {
         "legend": {

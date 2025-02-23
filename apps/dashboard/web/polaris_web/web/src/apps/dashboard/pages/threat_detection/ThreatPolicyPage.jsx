@@ -1,15 +1,12 @@
-import {useReducer, useState} from "react";
+import {useReducer} from "react";
 import DateRangeFilter from "../../components/layouts/DateRangeFilter";
 import PageWithMultipleCards from "../../components/layouts/PageWithMultipleCards";
 import TitleWithInfo from "../../components/shared/TitleWithInfo";
 import FilterComponent from "./components/FilterComponent";
-import SusDataTable from "./components/SusDataTable";
 import values from "@/util/values";
 import {produce} from "immer"
 import func from "@/util/func";
-import transform from "../observe/transform";
 import {HorizontalGrid} from "@shopify/polaris";
-import SampleDetails from "./components/SampleDetails";
 
 function ThreatPolicyPage() {
 

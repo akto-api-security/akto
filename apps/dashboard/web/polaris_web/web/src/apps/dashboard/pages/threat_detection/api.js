@@ -16,7 +16,7 @@ const threatDetectionRequests = {
         })
     },
 
-    fetchSuspectSampleData(skip, ips, apiCollectionIds, urls, sort, startTimestamp, endTimestamp) {
+    fetchSuspectSampleData(skip, ips, apiCollectionIds, urls, types, sort, startTimestamp, endTimestamp) {
         return request({
             url: '/api/fetchSuspectSampleData',
             method: 'post',
@@ -24,6 +24,7 @@ const threatDetectionRequests = {
                 skip: skip,
                 ips: ips,
                 urls: urls,
+                types: types,
                 apiCollectionIds: apiCollectionIds,
                 sort: sort,
                 startTimestamp: startTimestamp,

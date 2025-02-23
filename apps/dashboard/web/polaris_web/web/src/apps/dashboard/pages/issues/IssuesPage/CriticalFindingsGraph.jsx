@@ -4,11 +4,10 @@ import InfoCard from '../../dashboard/new_components/InfoCard';
 import EmptyCard from '../../dashboard/new_components/EmptyCard';
 import testingApi from "../../testing/api.js"
 import testingFunc from "../../testing/transform.js"
-import func from "@/util/func";
 import BarGraph from '../../../components/charts/BarGraph.jsx';
 import LocalStore from "../../../../main/LocalStorageStore";
 
-const CriticalFindingsGraph = ({ linkText, linkUrl, complianceMode }) => {
+const CriticalFindingsGraph = ({ startTimestamp, endTimestamp, linkText, linkUrl, complianceMode }) => {
     const subCategoryMap = LocalStore(state => state.subCategoryMap);
 
     const [criticalFindingsData, setCriticalFindingsData] = useState([])
@@ -28,7 +27,7 @@ const CriticalFindingsGraph = ({ linkText, linkUrl, complianceMode }) => {
 
     const fetchGraphData = async () => {
         setShowTestingComponents(false)
-        const subcategoryDataResp = await testingApi.getSummaryInfo(0, func.timeNow())
+        const subcategoryDataResp = await testingApi.getSummaryInfo(startTimestamp, endTimestamp)
         let tempResultSubCategoryMap = {}
         if (complianceMode) {
             Object.entries(subcategoryDataResp).forEach(([testId, count]) => {
@@ -47,8 +46,8 @@ const CriticalFindingsGraph = ({ linkText, linkUrl, complianceMode }) => {
 
     useEffect(() => {
         fetchGraphData()
-    }, [complianceMode])
-    
+    }, [startTimestamp, endTimestamp, complianceMode])
+
     const defaultChartOptions = {
         "legend": {
             enabled: false
@@ -76,7 +75,7 @@ const CriticalFindingsGraph = ({ linkText, linkUrl, complianceMode }) => {
         titleToolTip="Overview of the most critical security issues detected, including the number of issues and APIs affected for each type of vulnerability."
         linkText={linkText}
         linkUrl={linkUrl}
-    /> : <EmptyCard title="Vulnerabilities findings" subTitleComponent={showTestingComponents ? <Text alignment='center' color='subdued'>No Vulnerabilities found</Text>: runTestEmptyCardComponent} />
+    /> : <EmptyCard title={complianceMode ? (complianceMode + " clauses") : "Vulnerabilities findings"} subTitleComponent={showTestingComponents ? <Text alignment='center' color='subdued'>No Vulnerabilities found</Text>: runTestEmptyCardComponent} />
 
     return (
         {...criticalFindings}

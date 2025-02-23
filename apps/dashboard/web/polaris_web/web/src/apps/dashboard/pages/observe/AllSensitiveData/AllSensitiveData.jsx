@@ -309,10 +309,15 @@ function AllSensitiveData() {
         api.resetSampleData();
     }
 
+    function fillSensitiveDataTypes(){
+        api.fillSensitiveDataTypes();
+    }
+
     const secondaryActionsComp = (
         <HorizontalStack gap={"2"}>
             { (func.checkOnPrem() && window?.USER_NAME !== undefined && window.USER_NAME.includes("razorpay")) ? <Button onClick={resetSampleData}>Reset Sample Data</Button> : <></>}
             <Button onClick={displayGPT}>Ask AktoGPT</Button>
+            <Button onClick={fillSensitiveDataTypes}>Fill Data Types</Button>
         </HorizontalStack>
     )
 

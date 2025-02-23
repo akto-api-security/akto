@@ -1,5 +1,7 @@
 package com.akto.action;
 
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.regex.Pattern;
 
@@ -11,7 +13,6 @@ import com.akto.dto.billing.Organization;
 import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.type.SingleTypeInfo;
-import com.akto.listener.RuntimeListener;
 import com.akto.util.enums.GlobalEnums;
 import com.mongodb.client.model.*;
 import org.bson.conversions.Bson;
@@ -22,6 +23,8 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.usage.UsageMetricCalculator;
 import com.akto.util.ConnectionInfo;
+import com.akto.util.Constants;
+import com.akto.util.GroupByTimeRange;
 import com.akto.util.IssueTrendType;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
@@ -50,11 +53,11 @@ public class DashboardAction extends UserAction {
     public String findTotalIssues() {
         Set<Integer> demoCollections = new HashSet<>();
         demoCollections.addAll(deactivatedCollections);
-        demoCollections.add(RuntimeListener.LLM_API_COLLECTION_ID);
-        demoCollections.add(RuntimeListener.VULNERABLE_API_COLLECTION_ID);
-
-        ApiCollection juiceshopCollection = ApiCollectionsDao.instance.findByName("juice_shop_demo");
-        if (juiceshopCollection != null) demoCollections.add(juiceshopCollection.getId());
+//        demoCollections.add(RuntimeListener.LLM_API_COLLECTION_ID);
+//        demoCollections.add(RuntimeListener.VULNERABLE_API_COLLECTION_ID);
+//
+//        ApiCollection juiceshopCollection = ApiCollectionsDao.instance.findByName("juice_shop_demo");
+//        if (juiceshopCollection != null) demoCollections.add(juiceshopCollection.getId());
 
 
         if (startTimeStamp == 0) startTimeStamp = Context.now() - 24 * 1 * 60 * 60;
@@ -102,31 +105,28 @@ public class DashboardAction extends UserAction {
     }
 
     private List<String> severityToFetch;
-    private final Map<String, Map<Integer, Integer>> severityWiseTrendData= new HashMap<>();
-    private final Map<Integer, Integer> trendData = new HashMap<>();
+    private final Map<String, Integer> trendData = new HashMap<>();
+    BasicDBObject response;
+
     public String fetchCriticalIssuesTrend(){
+        Map<String, Map<String, Integer>> severityWiseTrendData= new HashMap<>();
+        response = new BasicDBObject();
         if(endTimeStamp == 0) endTimeStamp = Context.now();
+        long daysBetween = (endTimeStamp - startTimeStamp) / Constants.ONE_DAY_TIMESTAMP;
         if (severityToFetch == null || severityToFetch.isEmpty()) severityToFetch = Arrays.asList("CRITICAL", "HIGH");
 
         Set<Integer> demoCollections = new HashSet<>();
         demoCollections.addAll(deactivatedCollections);
-        demoCollections.add(RuntimeListener.LLM_API_COLLECTION_ID);
-        demoCollections.add(RuntimeListener.VULNERABLE_API_COLLECTION_ID);
 
-        ApiCollection juiceshopCollection = ApiCollectionsDao.instance.findByName("juice_shop_demo");
-        if (juiceshopCollection != null) demoCollections.add(juiceshopCollection.getId());
-        
-        List<GlobalEnums.TestRunIssueStatus> allowedStatus = Arrays.asList(GlobalEnums.TestRunIssueStatus.OPEN, GlobalEnums.TestRunIssueStatus.FIXED);
+
+        List<GlobalEnums.TestRunIssueStatus> allowedStatus = Arrays.asList(GlobalEnums.TestRunIssueStatus.OPEN);
         Bson issuesFilter = Filters.and(
                 Filters.in(KEY_SEVERITY, severityToFetch),
                 Filters.gte(TestingRunIssues.CREATION_TIME, startTimeStamp),
                 Filters.lte(TestingRunIssues.CREATION_TIME, endTimeStamp),
                 Filters.in(TestingRunIssues.TEST_RUN_ISSUES_STATUS, allowedStatus),
-                Filters.nin("_id.apiInfoKey.apiCollectionId", demoCollections)
+                Filters.nin(TestingRunIssues.ID_API_COLLECTION_ID, demoCollections)
         );
-
-        String dayOfYearFloat = "dayOfYearFloat";
-        String dayOfYear = "dayOfYear";
 
         List<Bson> pipeline = new ArrayList<>();
         pipeline.add(Aggregates.match(issuesFilter));
@@ -138,38 +138,38 @@ public class DashboardAction extends UserAction {
             }
         } catch(Exception e){
         }
-        pipeline.add(Aggregates.project(
-                Projections.fields(
-                        Projections.computed(dayOfYearFloat, new BasicDBObject("$divide", new Object[]{"$" + TestingRunIssues.CREATION_TIME, 86400})),
-                        Projections.include(KEY_SEVERITY)
-                )));
 
-        pipeline.add(Aggregates.project(
-                Projections.fields(
-                        Projections.computed(dayOfYear, new BasicDBObject("$floor", new Object[]{"$" + dayOfYearFloat})),
-                        Projections.include(KEY_SEVERITY)
-                )));
-
-        BasicDBObject groupedId = new BasicDBObject(dayOfYear, "$"+dayOfYear)
-                                                    .append("url", "$_id.apiInfoKey.url")
-                                                    .append("method", "$_id.apiInfoKey.method")
-                                                    .append("apiCollectionId", "$_id.apiInfoKey.apiCollectionId")
+        BasicDBObject groupedId = new BasicDBObject(SingleTypeInfo._URL, "$" + TestingRunIssues.ID_URL)
+                                                    .append(SingleTypeInfo._METHOD, "$" + TestingRunIssues.ID_METHOD)
+                                                    .append(SingleTypeInfo._API_COLLECTION_ID,  "$" + TestingRunIssues.ID_API_COLLECTION_ID)
                                                     .append(KEY_SEVERITY, "$" + KEY_SEVERITY);
-        pipeline.add(Aggregates.group(groupedId, Accumulators.sum("count", 1)));
 
+        String result = GroupByTimeRange.groupByAllRange(daysBetween, pipeline, TestingRunIssues.CREATION_TIME, "count", 15, groupedId);
         MongoCursor<BasicDBObject> issuesCursor = TestingRunIssuesDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
 
         while(issuesCursor.hasNext()){
             BasicDBObject basicDBObject = issuesCursor.next();
             BasicDBObject o = (BasicDBObject) basicDBObject.get("_id");
             String severity = o.getString(KEY_SEVERITY, GlobalEnums.Severity.LOW.name());
-            Map<Integer, Integer> trendData = severityWiseTrendData.computeIfAbsent(severity, k -> new HashMap<>());
-            int date = o.getInt(dayOfYear);
+            Map<String, Integer> trendData = severityWiseTrendData.computeIfAbsent(severity, k -> new HashMap<>());
+            int epochVal = 0;
+            if(result.equals("dayOfYear")){
+                String dateString = o.getString(result);
+                DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+                LocalDate localDate = LocalDate.parse(dateString, formatter);
+                epochVal = localDate.getDayOfYear();
+            }else{
+                epochVal = o.getInt(result);
+            }
+            int year = o.getInt("year");
+            String date = year + "_" + epochVal;
             int count = trendData.getOrDefault(date,0);
             trendData.put(date, count+1);
             count = this.trendData.getOrDefault(date,0);
             this.trendData.put(date, count+1);
         }
+        response.put("epochKey", result);
+        response.put("issuesTrend", severityWiseTrendData);
 
         return SUCCESS.toUpperCase();
     }
@@ -359,7 +359,7 @@ public class DashboardAction extends UserAction {
         this.severityToFetch = severityToFetch;
     }
 
-    public Map<Integer, Integer> getTrendData() {
+    public Map<String, Integer> getTrendData() {
         return trendData;
     }
 
@@ -395,7 +395,7 @@ public class DashboardAction extends UserAction {
         this.organization = organization;
     }
 
-    public Map<String, Map<Integer, Integer>> getSeverityWiseTrendData() {
-        return severityWiseTrendData;
+    public BasicDBObject getResponse() {
+        return response;
     }
 }

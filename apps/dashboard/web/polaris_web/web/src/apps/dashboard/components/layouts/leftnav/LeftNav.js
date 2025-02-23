@@ -8,6 +8,7 @@ import {
     AnalyticsFilledMinor,
     ReportFilledMinor,
     DiamondAlertMinor,
+    FinancesMinor,
 } from "@shopify/polaris-icons";
 import {useLocation, useNavigate} from "react-router-dom";
 
@@ -196,18 +197,39 @@ export default function LeftNav() {
                             key: "4",
                         },
                         {
+                            url: "#",
                             label: (
                                 <Text variant="bodyMd" fontWeight="medium">
-                                    Test Editor
+                                    Test library
                                 </Text>
                             ),
-                            icon: FileFilledMinor,
+                            icon: FinancesMinor,
                             onClick: () => {
-                                handleSelect("dashboard_test_editor");
-                                navigate("/dashboard/test-editor/REMOVE_TOKENS");
+                                handleSelect("dashboard_test_library_tests");
+                                navigate("/dashboard/test-library/tests");
                                 setActive("normal");
                             },
-                            selected: leftNavSelected.includes("dashboard_test_editor"),
+                            selected: leftNavSelected.includes("_test_library"),
+                            subNavigationItems: [
+                                {
+                                    label: "Tests",
+                                    onClick: () => {
+                                        navigate("/dashboard/test-library/tests");
+                                        handleSelect("dashboard_test_library_tests");
+                                        setActive("active");
+                                    },
+                                    selected: leftNavSelected === "dashboard_test_library_tests",
+                                },
+                                {
+                                    label: "Editor",
+                                    onClick: () => {
+                                        navigate("/dashboard/test-editor");
+                                        handleSelect("dashboard_test_library_test_editor");
+                                        setActive("active");
+                                    },
+                                    selected: leftNavSelected === "dashboard_test_library_test_editor",
+                                },
+                            ],
                             key: "5",
                         },
                         {
@@ -246,14 +268,23 @@ export default function LeftNav() {
                                 ),
                                 icon: DiamondAlertMinor,
                                 onClick: () => {
-                                    handleSelect("dashboard_threat_activity");
-                                    navigate("/dashboard/protection/threat-activity");
+                                    handleSelect("dashboard_threat_actor");
+                                    navigate("/dashboard/protection/threat-actor");
                                     setActive("normal");
                                 },
                                 selected: leftNavSelected.includes("_threat"),
                                 url: "#",
                                 key: "7",
                                 subNavigationItems: [
+                                    {
+                                        label: "Threat Actors",
+                                        onClick: () => {
+                                            navigate("/dashboard/protection/threat-actor");
+                                            handleSelect("dashboard_threat_actor");
+                                            setActive("active");
+                                        },
+                                        selected: leftNavSelected === "dashboard_threat_actor",
+                                    },
                                     {
                                         label: "Threat Activity",
                                         onClick: () => {
@@ -263,15 +294,6 @@ export default function LeftNav() {
                                         },
                                         selected:
                                             leftNavSelected === "dashboard_threat_activity",
-                                    },
-                                    {
-                                        label: "Threat Actors",
-                                        onClick: () => {
-                                            navigate("/dashboard/protection/threat-actor");
-                                            handleSelect("dashboard_threat_actor");
-                                            setActive("active");
-                                        },
-                                        selected: leftNavSelected === "dashboard_threat_actor",
                                     },
                                     {
                                         label: "APIs Under Threat",

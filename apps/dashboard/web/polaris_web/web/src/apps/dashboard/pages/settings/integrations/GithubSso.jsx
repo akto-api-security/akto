@@ -17,6 +17,8 @@ function GithubSso() {
     const [githubUrl, setGithubUrl] = useState("https://github.com")
     const [githubApiUrl, setGithubApiUrl] = useState("https://api.github.com")
 
+    const [isModalDisabled, setIsModalDisabled] = useState(false)
+
     const location = window.location ;
     const hostname = location.origin;
 
@@ -44,10 +46,13 @@ function GithubSso() {
     const addText = "Are you sure you want to add Github SSO Integration? This will enable all members of your GitHub account to access Akto dashboard."
 
     const handleDeleteGithubSso = async () => {
+        setIsModalDisabled(true)
         const response = await settingRequests.deleteGithubSso()
         if (response) {
             func.setToast(true, false, "Github SSO deleted successfully!")
             setComponentType(0);
+            setShowGithubSsoModal(false)
+            setIsModalDisabled(false)
         }
     }
 
@@ -71,6 +76,7 @@ function GithubSso() {
     }, [])
 
     const handleAddGithubSso = async () => {
+        setIsModalDisabled(true)
         const response = await settingRequests.addGithubSso(githubClientId, githubClientSecret, githubUrl, githubApiUrl)
         if (response) {
             if (response.error) {
@@ -79,6 +85,8 @@ function GithubSso() {
                 func.setToast(true, false, "Github SSO added successfully!")
                 window.location.reload()
             }
+            setShowGithubSsoModal(false)
+            setIsModalDisabled(false)
         }
     }
 
@@ -123,7 +131,8 @@ function GithubSso() {
             title="Are you sure?"
             primaryAction={{
                 content: githubPresent ? 'Delete Github SSO' : 'Add GitHub SSO',
-                onAction: githubPresent ? handleDeleteGithubSso : handleAddGithubSso
+                onAction: githubPresent ? handleDeleteGithubSso : handleAddGithubSso,
+                disabled: isModalDisabled
             }}
         >
             <Modal.Section>
