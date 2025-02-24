@@ -93,7 +93,9 @@ public class HomeAction implements Action, SessionAware, ServletResponseAware, S
             }
             return redirectToAuth0(servletRequest, servletResponse, accessToken, new BasicDBObject());
         }
-        // Use existing flow
+
+        String nodeEnv = System.getenv("NODE_ENV");
+        servletRequest.setAttribute("nodeEnv", nodeEnv != null ? nodeEnv : "production");
 
         return "SUCCESS";
     }

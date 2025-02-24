@@ -43,7 +43,8 @@
     "zustand": "^4.3.8"
   },
   "scripts": {
-    "dev": "cross-env NODE_ENV=development webpack-dev-server --open --hot --config web/webpack.config.js",
+    "rmdist": "rimraf web/dist",
+    "dev": "npm run rmdist && cross-env NODE_ENV=development webpack serve --config web/webpack.config.dev.js",
     "build": "cross-env NODE_ENV=production VERSION=$RELEASE_VERSION webpack --progress --config web/webpack.config.js",
     "hot": "cross-env NODE_ENV=development VERSION=$RELEASE_VERSION webpack --watch --progress --config web/webpack.config.js"
   },
@@ -75,6 +76,7 @@
     "@babel/preset-typescript": "^7.26.0",
     "@types/react": "^19.0.10",
     "@types/react-dom": "^19.0.4",
+    "@pmmmwh/react-refresh-webpack-plugin": "^0.5.15",
     "babel-eslint": "^10.1.0",
     "babel-loader": "^9.1.2",
     "babel-plugin-transform-object-rest-spread": "^6.26.0",
@@ -85,6 +87,7 @@
     "css-loader": "^6.8.1",
     "file-loader": "^6.2.0",
     "monaco-editor-webpack-plugin": "^7.1.0",
+    "react-refresh": "^0.16.0",
     "sass-loader": "^13.3.2",
     "style-loader": "^3.3.3",
     "terser-webpack-plugin": "^5.3.9",
