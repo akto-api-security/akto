@@ -78,9 +78,6 @@ module.exports = {
       "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, PATCH, OPTIONS",
       "Access-Control-Allow-Headers": "X-Requested-With, content-type, Authorization"
     },
-    devMiddleware: {
-      writeToDisk: true
-    },
     historyApiFallback: true,
     client: {
         overlay: true,
@@ -89,7 +86,6 @@ module.exports = {
   devtool: 'eval-source-map',
   plugins: [
     new ReactRefreshWebpackPlugin(),
-    new webpack.HotModuleReplacementPlugin()
   ],
   performance: {
     hints: false
