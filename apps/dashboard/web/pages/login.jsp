@@ -20,6 +20,7 @@
                 </script>
                 <script src="https://apis.google.com/js/client:platform.js?onload=start" async defer>
                 </script>
+                <script src="https://unpkg.com/@tailwindcss/browser@4"></script>
                 <script type="text/javascript">
                     (function (f, b) {
                         if (!b.__SV) {
