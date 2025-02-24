@@ -1,6 +1,7 @@
 import * as Select from '@radix-ui/react-select';
-import React, { useEffect, useState } from 'react';
+import React, { MouseEventHandler, useEffect, useState } from 'react';
 import { CaretDownMinor, CaretUpMinor, TickMinor } from '@shopify/polaris-icons';
+import { motion, AnimatePresence } from 'framer-motion';
 
 import { Icon, Text } from '@shopify/polaris';
 import { Model } from '../types';
@@ -31,7 +32,7 @@ export const ModelPicker = ({ availableModels, selectedModel, setSelectedModel }
     }
   };
 
-  const { isPaused } = useAgentsStore();
+  const { isPaused, setAttemptedOnPause } = useAgentsStore();
 
   useEffect(() => {
     if (availableModels.length > 0) {
@@ -39,41 +40,72 @@ export const ModelPicker = ({ availableModels, selectedModel, setSelectedModel }
     }
   }, [availableModels]);
 
+  const handleTriggerClick: MouseEventHandler<HTMLButtonElement> = (event) => {
+    if (isPaused) {
+      setAttemptedOnPause(true);
+      event.preventDefault();
+    } else {
+      setOpen(true);
+    }
+  }
+
+  const trigger = (
+    <button 
+      className="flex cursor-pointer text-xs items-center outline-none"
+      onClick={handleTriggerClick}
+    >
+      {open ? <Icon source={CaretUpMinor} color="subdued" /> : <Icon source={CaretDownMinor} color="subdued" />}
+      <Text as="span" color="subdued" variant="bodySm">
+        {selectedModel?.name}
+      </Text>
+    </button>
+  )
+
+
   return (
-    <Select.Root open={open} onOpenChange={setOpen} value={selectedModel?.id} onValueChange={onModelChange} defaultValue={availableModels[0].id}>
-      <Select.Trigger aria-label="Select model" asChild>
-        <button disabled={isPaused} onClick={() => setOpen(true)} className="flex cursor-pointer text-xs items-center outline-none">
-          {open ? <Icon source={CaretUpMinor} color="subdued" /> : <Icon source={CaretDownMinor} color="subdued" />}
-          <Text as="span" color="subdued" variant="bodySm">
-            {selectedModel?.name}
-          </Text>
-        </button>
-      </Select.Trigger>
-      {
-        open && (
-          <Select.Content
-            position="popper"
-            className="z-[1000] bg-white rounded-lg shadow-lg border border-gray-200 w-[200px] overflow-hidden"
-            sideOffset={5} 
-            side="top"
-          >   
-              <Select.Viewport className="p-1" key={availableModels.length}>
-              {availableModels.map((model) => (
-                <Select.Item
-                  key={model.id}
-                  value={model.id}
-                  className="flex outline-none items-center gap-2 px-6 py-2 text-xs hover:bg-gray-100 cursor-pointer h-[24px]"
-                >
-                  <Select.ItemText>{model.name}</Select.ItemText>
-                  <Select.ItemIndicator>
-                    <Icon source={TickMinor} color="subdued" />
-                  </Select.ItemIndicator>
-                </Select.Item>
+    <Select.Root 
+      onOpenChange={setOpen} 
+      value={selectedModel?.id} 
+      onValueChange={onModelChange} 
+      defaultValue={availableModels[0].id}
+    >
+      {isPaused ? trigger : <Select.Trigger aria-label="Select model" asChild disabled={isPaused}>{trigger}</Select.Trigger>}
+      <AnimatePresence>
+        <Select.Content
+          position="popper"
+          className="z-[1000] bg-white rounded-lg shadow-lg border border-gray-200 w-[200px] overflow-hidden"
+          sideOffset={5} 
+          side="top"
+          asChild
+        >   
+          <motion.div
+            initial={{ opacity: 0, y: -10, scaleY: 0, transformOrigin: 'bottom' }}
+            animate={{ opacity: 1, y: 0, scaleY: 1 }}
+            exit={{ opacity: 0, y: -10, scaleY: 0 }}
+            transition={{ 
+              type: "spring",
+              stiffness: 500,
+              damping: 30,
+              mass: 0.8
+            }}
+          >
+            <Select.Viewport className="p-1">
+              {availableModels.map((model, index) => (
+                  <Select.Item
+                    key={model.id}
+                    value={model.id}
+                    className="flex outline-none items-center gap-2 px-6 py-2 text-xs hover:bg-gray-100 cursor-pointer h-[24px]"
+                  >
+                    <Select.ItemText>{model.name}</Select.ItemText>
+                    <Select.ItemIndicator>
+                      <Icon source={TickMinor} color="subdued" />
+                    </Select.ItemIndicator>
+                  </Select.Item>
               ))}
             </Select.Viewport>
-          </Select.Content>
-        )
-      }
+          </motion.div>
+        </Select.Content>
+      </AnimatePresence>
     </Select.Root>
   );
 };

@@ -102,6 +102,9 @@
    --color-disabled: #ebebeb ;
    --color-options: #0d5aa7 ;
    --white: #ffffff;
+   --borderShadow-box-shadow: #AEB4B9;
+   --inset-box-shadow: 0px 1px 0px 0px #898F94 inset;
+   --agent-grey-background: #F6F6F7;
 
     --p-color-bg-primary: var(--akto-primary) !important;
     --p-color-bg-primary-hover: #5400CB !important;

@@ -14,6 +14,8 @@ interface AgentsStore {
     resumeAgent: () => void;
     discardPausedState: () => void;
     isPaused: boolean;
+    attemptedOnPause: boolean;
+    setAttemptedOnPause: (attempted: boolean) => void;
 }
 
 export const useAgentsStore = create<AgentsStore>((set) => ({
@@ -29,4 +31,6 @@ export const useAgentsStore = create<AgentsStore>((set) => ({
     pauseAgent: () => set({ isPaused: true }),
     resumeAgent: () => set({ isPaused: false }),
     discardPausedState: () => set({ isPaused: false }),
+    attemptedOnPause: false,
+    setAttemptedOnPause: (attempted) => set({ attemptedOnPause: attempted }),
 }));

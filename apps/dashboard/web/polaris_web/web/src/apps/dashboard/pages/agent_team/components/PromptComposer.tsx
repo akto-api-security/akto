@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
@@ -24,6 +24,7 @@ interface PromptComposerProps {
 }
 
 export const PromptComposer = ({ onSend }: PromptComposerProps) => {
+  const [isFocused, setIsFocused] = useState(false);
   const {
     currentPrompt,
     setCurrentPrompt,
@@ -31,12 +32,14 @@ export const PromptComposer = ({ onSend }: PromptComposerProps) => {
     selectedModel,
     setSelectedModel,
     isPaused,
+    setAttemptedOnPause
  } = useAgentsStore();
   const editor = useEditor({
     extensions: [
       StarterKit,
       Placeholder.configure({
         placeholder: 'Message member...',
+        showOnlyWhenEditable: false,
       }),
       ListItem,
       OrderedList,
@@ -51,7 +54,17 @@ export const PromptComposer = ({ onSend }: PromptComposerProps) => {
     onUpdate: ({ editor }) => {
       setCurrentPrompt(getPromptContent(editor));
     },
+    onFocus: () => {
+      setIsFocused(true);
+    },
+    onBlur: () => {
+      setIsFocused(false);
+    }
   });
+
+  useEffect(() => {
+    editor?.setEditable(!isPaused);
+  }, [isPaused]);
 
   if (!editor) return null;
 
@@ -67,13 +80,18 @@ export const PromptComposer = ({ onSend }: PromptComposerProps) => {
   }
 
   return (
-    <div className="flex flex-col gap-4 border border-1 border-[#AEB4B9] py-2 px-4 rounded-sm relative">
+    <div className={`flex flex-col gap-4 border border-1 border-[var(--borderShadow-box-shadow)] py-2 px-4 rounded-sm relative z-[500] bg-white ${isFocused ? 'ring ring-violet-200' : ''}`}>
       <PausedState onResume={() => {}} onDiscard={() => {}} />
       <div className="flex flex-col gap-2 justify-start">
-        <div className="w-fit">
-          <Button disabled={isPaused} icon={PlusMinor} size="micro">Add context</Button>
+        <div className="w-full" onClick={() => isPaused && setAttemptedOnPause(true)}>
+          <Button 
+            disabled={isPaused} 
+            icon={PlusMinor} 
+            size="micro" 
+            monochrome
+          >Add context</Button>
         </div>
-        <EditorContent disabled={isPaused} editor={editor} />
+        <EditorContent editor={editor} onClick={() => isPaused && setAttemptedOnPause(true)} />
       </div>
       <div className="flex justify-between items-center">
         <div className="flex items-center gap-1">
@@ -82,14 +100,16 @@ export const PromptComposer = ({ onSend }: PromptComposerProps) => {
          )}
         </div>
         <Tooltip content="Send">
-          <Button
-            disabled={!selectedModel || !currentPrompt || isPaused}
-            size="slim"
-            plain
-            icon={SendMajor}
-            accessibilityLabel="Send message to agent"
-            onClick={handleSend}
-          />
+          <div className="w-full" onClick={() => isPaused && setAttemptedOnPause(true)}>
+            <Button
+              disabled={!selectedModel || !currentPrompt || isPaused}
+              size="slim"
+              plain
+              icon={SendMajor}
+              accessibilityLabel="Send message to agent"
+              onClick={handleSend}
+            />
+          </div>
         </Tooltip>
       </div>
     </div>
