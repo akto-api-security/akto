@@ -136,7 +136,7 @@ function SampleDetails(props) {
                     </VerticalStack>
                     <HorizontalStack gap={"2"}>
                         <Modal
-                            activator={<Button onClick={() => showModal(false)}>Block IPs</Button>}
+                            activator={<Button size="slim" onClick={() => setShowModal(!showModal)}>Block IPs</Button>}
                             open={showModal}
                             onClose={() => setShowModal(false)}
                             primaryAction={{content: 'Save', onAction: () => setShowModal(false)}}
@@ -149,7 +149,7 @@ function SampleDetails(props) {
                                 </Text>
                             </Modal.Section>
                         </Modal>
-                        <Button disabled>Create Jira Ticket</Button>
+                        <Button size="slim" disabled>Create Jira Ticket</Button>
                     </HorizontalStack>
                 </HorizontalStack>
             </Box>
