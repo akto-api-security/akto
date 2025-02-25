@@ -5,6 +5,7 @@ import { CellType } from "../../../components/tables/rows/GithubRow";
 import GetPrettifyEndpoint from "../../observe/GetPrettifyEndpoint";
 import PersistStore from "../../../../main/PersistStore";
 import func from "../../../../../util/func";
+import { Badge } from "@shopify/polaris";
 
 const resourceName = {
   singular: "sample",
@@ -27,6 +28,11 @@ const headers = [
     text: "Filter",
     value: "filterId",
     title: "Attack type",
+  },
+  {
+    text: "Severity",
+    value: "severityComp",
+    title: "Severity",
   },
   {
     text: "Collection",
@@ -82,6 +88,7 @@ function SusDataTable({ currDateRange, rowClicked }) {
 
   const [loading, setLoading] = useState(true);
   const collectionsMap = PersistStore((state) => state.collectionsMap);
+  const threatFiltersMap = PersistStore((state) => state.threatFiltersMap);
 
   async function fetchData(
     sortKey,
@@ -123,6 +130,7 @@ function SusDataTable({ currDateRange, rowClicked }) {
     );
     let total = res.total;
     let ret = res?.maliciousEvents.map((x) => {
+      const severity = threatFiltersMap[x?.filterId]?.severity || "HIGH"
       return {
         ...x,
         id: x.id,
@@ -133,7 +141,11 @@ function SusDataTable({ currDateRange, rowClicked }) {
         apiCollectionName: collectionsMap[x.apiCollectionId] || "-",
         discoveredTs: func.prettifyEpoch(x.timestamp),
         sourceIPComponent: x?.ip || "-",
-        type: x?.type || "-"
+        type: x?.type || "-",
+        severityComp: (<div className={`badge-wrapper-${severity}`}>
+                          <Badge size="small">{func.toSentenceCase(severity)}</Badge>
+                      </div>
+        )
       };
     });
     setLoading(false);

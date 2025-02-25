@@ -15,6 +15,7 @@ import dashboardFunc from "./transform";
 import homeRequests from "./home/api";
 import WelcomeBackDetailsModal from "../components/WelcomeBackDetailsModal";
 import useTable from "../components/tables/TableContext";
+import threatDetectionRequests from "./threat_detection/api";
 
 function Dashboard() {
 
@@ -24,6 +25,8 @@ function Dashboard() {
     const setAllCollections = PersistStore(state => state.setAllCollections)
     const setCollectionsMap = PersistStore(state => state.setCollectionsMap)
     const setHostNameMap = PersistStore(state => state.setHostNameMap)
+    const threatFiltersMap = PersistStore(state => state.threatFiltersMap);
+    const setThreatFiltersMap = PersistStore(state => state.setThreatFiltersMap);
 
     const { selectItems } = useTable()
 
@@ -63,6 +66,18 @@ function Dashboard() {
         }
     }
 
+    const fetchFilterYamlTemplates = () => {
+        threatDetectionRequests.fetchFilterYamlTemplate().then((res) => {
+            let finalMap = {}
+            res.templates.forEach((x) => {
+                let trimmed = {...x, content: '', ...x.info}
+                delete trimmed['info']
+                finalMap[x.id] = trimmed;
+            })
+            setThreatFiltersMap(finalMap)
+        })
+    }
+
     useEffect(() => {
         if(trafficAlerts == null && window.USER_NAME.length > 0 && window.USER_NAME.includes('akto.io')){
             homeRequests.getTrafficAlerts().then((resp) => {
@@ -82,6 +97,9 @@ function Dashboard() {
         }
         if (!subCategoryMap || (Object.keys(subCategoryMap).length === 0)) {
             fetchMetadata();
+        }
+        if(!threatFiltersMap && func.isDemoAccount()){
+            fetchFilterYamlTemplates()
         }
         if(window.Beamer){
             window.Beamer.init();
