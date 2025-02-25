@@ -1,4 +1,4 @@
-import { Badge, Box, Button, Divider, HorizontalStack, Text, VerticalStack } from "@shopify/polaris";
+import { Badge, Box, Button, Divider, HorizontalStack, Modal, Text, VerticalStack } from "@shopify/polaris";
 import FlyLayout from "../../../components/layouts/FlyLayout";
 import SampleDataList from "../../../components/shared/SampleDataList";
 import LayoutWithTabs from "../../../components/layouts/LayoutWithTabs";
@@ -8,7 +8,6 @@ import testingApi from "../../testing/api"
 import MarkdownViewer from "../../../components/shared/MarkdownViewer";
 import TooltipText from "../../../components/shared/TooltipText";
 import ActivityTracker from "../../dashboard/components/ActivityTracker";
-import Dropdown from "../../../components/layouts/Dropdown";
 
 function SampleDetails(props) {
     const { showDetails, setShowDetails, data, title, moreInfoData, threatFiltersMap } = props
@@ -17,17 +16,7 @@ function SampleDetails(props) {
     let severity = currentTemplateObj?.severity || "HIGH"
     const [remediationText, setRemediationText] = useState("")
     const [latestActivity, setLatestActivity] = useState([])
-    const [blockingOption, setBlockingOption] = useState("")
-    const blockingOptions =  [
-        {
-            label: 'Block by IP',
-            value: "IP_BASED"
-        },
-        {
-            label: 'Block according to rule',
-            value: 'RULE_BASED'
-        }
-    ]
+    const [showModal, setShowModal] = useState(false);
 
     const fetchRemediationInfo = async() => {
         if(moreInfoData?.templateId !== undefined){
@@ -146,18 +135,20 @@ function SampleDetails(props) {
                         </HorizontalStack>
                     </VerticalStack>
                     <HorizontalStack gap={"2"}>
-                        <Dropdown
-                            menuItems={blockingOptions}
-                            initial={"RULE_BASED"}
-                            selected={(val) => {
-                                setBlockingOption((prev) => {
-                                    if(prev !== val){
-                                        return val;
-                                    }
-                                    return prev
-                                })
-                            }} 
-                        />
+                        <Modal
+                            activator={<Button onClick={() => showModal(false)}>Block IPs</Button>}
+                            open={showModal}
+                            onClose={() => setShowModal(false)}
+                            primaryAction={{content: 'Save', onAction: () => setShowModal(false)}}
+                            title={"Block IP ranges"}
+                        >
+                            <Modal.Section>
+                                <Text variant="bodyMd" color="subdued">
+                                    By blocking these IP ranges, no user will be able to access your application
+                                    Are you sure you want to block these IPs
+                                </Text>
+                            </Modal.Section>
+                        </Modal>
                         <Button disabled>Create Jira Ticket</Button>
                     </HorizontalStack>
                 </HorizontalStack>
