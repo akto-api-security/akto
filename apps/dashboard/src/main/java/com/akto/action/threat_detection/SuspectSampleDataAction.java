@@ -104,7 +104,8 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
                             smr.getIp(),
                             smr.getCountry(),
                             smr.getDetectedAt(),
-                            smr.getType()))
+                            smr.getType(),
+                            "b6d1e138-2700-43f7-b50f-4b431c61d862"))
                     .collect(Collectors.toList());
                 this.total = m.getTotal();
               });

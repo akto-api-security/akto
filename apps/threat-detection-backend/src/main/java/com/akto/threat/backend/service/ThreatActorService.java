@@ -107,7 +107,7 @@ public class ThreatActorService {
     return ListThreatActorResponse.newBuilder().addAllActors(actors).setTotal(total).build();
   }
 
-  public FetchMaliciousEventsResponse fetchMaliciousRequests(
+  public FetchMaliciousEventsResponse fetchAggregateMaliciousRequests(
       String accountId, FetchMaliciousEventsRequest request) {
 
     MongoCollection<Document> coll =

@@ -135,7 +135,7 @@ public class DashboardRouter implements ARouter {
             });
 
         router
-            .post("/fetchMaliciousRequests")
+            .post("/fetchAggregateMaliciousRequests")
             .blockingHandler(ctx -> {
                 RequestBody reqBody = ctx.body();
                 FetchMaliciousEventsRequest req = ProtoMessageUtils.<
@@ -151,7 +151,7 @@ public class DashboardRouter implements ARouter {
                 }
 
                 ProtoMessageUtils.toString(
-                    threatActorService.fetchMaliciousRequests(
+                    threatActorService.fetchAggregateMaliciousRequests(
                         ctx.get("accountId"),
                         req
                     )

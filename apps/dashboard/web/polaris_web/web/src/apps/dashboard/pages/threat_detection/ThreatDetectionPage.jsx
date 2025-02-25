@@ -19,12 +19,12 @@ function ThreatDetectionPage() {
 
     const threatFiltersMap = PersistStore((state) => state.filtersMap);
 
-    const rowClicked = (data) => {
+    const rowClicked = async(data) => {
         const sameRow = currentRefId === data?.refId
         if (!sameRow) {
             let rowData = [];
-            threatDetectionRequests.fetchMaliciousRequest(data?.refId).then((res) => {
-                rowData = [...res.requests]
+            await threatDetectionRequests.fetchMaliciousRequest(data?.refId).then((res) => {
+                rowData = [...res.maliciousPayloadsResponses]
             }) 
             setRowDataList(rowData)
             setCurrentRefId(data?.refId)

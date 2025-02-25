@@ -75,7 +75,7 @@ const threatDetectionRequests = {
     },
     fetchMaliciousRequest(refId){
         return request({
-            url: '/api/fetchMaliciousRequests',
+            url: '/api/fetchAggregateMaliciousRequests',
             method: 'post',
             data: {refId}
         })

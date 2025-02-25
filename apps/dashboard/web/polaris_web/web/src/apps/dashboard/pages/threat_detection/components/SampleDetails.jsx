@@ -42,14 +42,14 @@ function SampleDetails(props) {
     const aggregateActivity = () => {
         let timeMap = {};
         data.forEach((x) => {
-            const key = x.requestTime
+            const key = x.ts
             if(timeMap.hasOwnProperty(key)){
                 timeMap[key] = timeMap[key] + 1
             }else{
                 timeMap[key] = 1
             }
         })
-        const activityEvents =  Object.entries(data)
+        const activityEvents =  Object.entries(timeMap)
         .map(([key, value]) => ({
             description: `Attacker attacked ${value} times`,
             timestamp: Number(key)
@@ -98,35 +98,37 @@ function SampleDetails(props) {
     }
 
     function TitleComponent () {
-        <Box padding={"4"} paddingBlockStart={"0"}>
-            <HorizontalStack wrap={false} align="space-between" gap={"6"}>
-                <VerticalStack gap={"2"}>
+        return(
+            <Box padding={"4"} paddingBlockStart={"0"}>
+                <HorizontalStack wrap={false} align="space-between" gap={"6"}>
+                    <VerticalStack gap={"2"}>
+                        <HorizontalStack gap={"2"}>
+                            <Button onClick={() => openTest(moreInfoData?.templateId)} removeUnderline plain monochrome>
+                                <Box maxWidth="180px">
+                                    <TooltipText tooltip={moreInfoData?.templateId} text={moreInfoData?.templateId} />
+                                </Box>
+                            </Button> 
+                            <div className={`badge-wrapper-${severity}`}>
+                                <Badge size="small">{func.toSentenceCase(severity)}</Badge>
+                            </div>
+                        </HorizontalStack>
+                        <HorizontalStack gap={"2"}>
+                            <Text color="subdued" variant="bodySm">{moreInfoData.url}</Text>
+                            <Box width="1px" borderColor="border-subdued" borderInlineStartWidth="1" minHeight='16px'/>
+                            <Text color="subdued" variant="bodySm">{threatFiltersMap[moreInfoData?.templateId]?.category?.displayName || "-"}</Text>
+                        </HorizontalStack>
+                    </VerticalStack>
                     <HorizontalStack gap={"2"}>
-                        <Button onClick={() => openTest(moreInfoData?.templateId)} removeUnderline plain monochrome>
-                            <Box maxWidth="180px">
-                                <TooltipText tooltip={moreInfoData?.templateId} text={moreInfoData?.templateId} />
-                            </Box>
-                        </Button> 
-                        <div className={`badge-wrapper-${severity}`}>
-                            <Badge size="small">{func.toSentenceCase(severity)}</Badge>
-                        </div>
+                        <Dropdown
+                            menuItems={blockingOptions}
+                            initial={"RULE_BASED"}
+                            selected={setBlockingOption} 
+                        />
+                        <Button disabled>Create Jira Ticket</Button>
                     </HorizontalStack>
-                    <HorizontalStack gap={"2"}>
-                        <Text color="subdued" variant="bodySm">{moreInfoData.url}</Text>
-                        <Box width="1px" borderColor="border-subdued" borderInlineStartWidth="1" minHeight='16px'/>
-                        <Text color="subdued" variant="bodySm">{threatFiltersMap[moreInfoData?.templateId]?.category?.displayName || "-"}</Text>
-                    </HorizontalStack>
-                </VerticalStack>
-                <HorizontalStack gap={"2"}>
-                    <Dropdown
-                        menuItems={blockingOptions}
-                        initial={"RULE_BASED"}
-                        selected={setBlockingOption} 
-                    />
-                    <Button disabled>Create Jira Ticket</Button>
                 </HorizontalStack>
-            </HorizontalStack>
-        </Box>
+            </Box>
+        )
     }
 
     const tabsComponent = (

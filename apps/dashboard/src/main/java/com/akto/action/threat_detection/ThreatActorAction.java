@@ -118,7 +118,7 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
 
   public String fetchAggregateMaliciousRequests() {
     HttpPost post =
-        new HttpPost(String.format("%s/api/dashboard/fetchMaliciousRequests", this.getBackendUrl()));
+        new HttpPost(String.format("%s/api/dashboard/fetchAggregateMaliciousRequests", this.getBackendUrl()));
     post.addHeader("Authorization", "Bearer " + this.getApiToken());
     post.addHeader("Content-Type", "application/json");
 
