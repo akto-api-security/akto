@@ -84,6 +84,7 @@ import ThreatApiPage from "../dashboard/pages/threat_detection/ThreatApiPage";
 import ThreatActorPage from "../dashboard/pages/threat_detection/ThreatActorPage";
 import ThreatPolicyPage from "../dashboard/pages/threat_detection/ThreatPolicyPage";
 import TestsTablePage from "../dashboard/pages/test_editor/tests_table/TestsTablePage";
+import Splunk from "../dashboard/pages/settings/integrations/Splunk";
 
 // if you add a component in a new path, please verify the search implementation in function -> 'getSearchItemsArr' in func.js
 
@@ -261,6 +262,10 @@ const router = createBrowserRouter([
                     {
                         path: "integrations/postman",
                         element: <Postman/>,
+                    },
+                    {
+                        path: "integrations/splunk",
+                        element: <Splunk/>,
                     },
                     {
                         path: "integrations/jira",

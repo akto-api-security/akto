@@ -116,6 +116,24 @@ function Integrations() {
       source: '/public/gcp.svg'
     }
 
+    let splunkSiemObj ={
+      id: 'splunk_siem',
+      name:'Splunk',
+      source: '/public/splunk_logo.svg'
+    }
+
+    let awsWafObj ={
+      id: 'aws_waf',
+      name:'AWS WAF',
+      source: '/public/awswaf_logo.svg'
+    }
+
+    let f5WafObj ={
+      id: 'f5_waf',
+      name:'F5 WAF',
+      source: '/public/f5waf_logo.svg'
+    }
+
     let ssoItems = [githubSsoObj, oktaSsoObj, azureAdSsoObj, googleWorkSpaceObj]
     const [currItems , setCurrentItems] = useState(getTabItems('all'))
     const tabs = [
@@ -158,7 +176,17 @@ function Integrations() {
           id: 'cicd',
           content: <span>CI/CD <Badge status='new'>{getTabItems('cicd').length}</Badge></span>,
           component: <TabsList />
-      },
+        },
+        {
+          id: 'waf',
+          content: <span>WAF <Badge status='new'>{getTabItems('waf').length}</Badge></span>,
+          component: <TabsList />
+        },
+        {
+          id: 'siem',
+          content: <span>SIEM <Badge status='new'>{getTabItems('siem').length}</Badge></span>,
+          component: <TabsList />
+        },
     ]
 
   function getTabItems(tabId) {
@@ -169,6 +197,8 @@ function Integrations() {
     const aiItems = [aktoGptObj];
     const alertsItems = [slackObj, webhooksObj, teamsWebhooksObj];
     const automationItems = [aktoApiObj, ciCdObj, jiraObj];
+    const wafItems = [awsWafObj, f5WafObj];
+    const siemItems = [splunkSiemObj];
     switch (tabId) {
       case 'traffic':
         return trafficItems;
@@ -199,6 +229,16 @@ function Integrations() {
           return emptyItem;
         }
         return automationItems;
+      case 'waf':
+        if (!func.checkLocal()) {
+          return emptyItem;
+        }
+        return wafItems;
+      case 'siem':
+        if (!func.checkLocal()) {
+          return emptyItem;
+        }
+        return siemItems;
       default:
         let allItems = [...trafficItems, ...aiItems]
         if (!func.checkLocal()){
