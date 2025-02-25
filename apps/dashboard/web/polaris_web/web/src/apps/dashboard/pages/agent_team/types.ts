@@ -19,3 +19,5 @@ export type PromptPayload = {
     model: Model;
     prompt: PromptContent;
 }
+
+export type AgentState = 'paused' | 'idle' | 'thinking' | 'error';

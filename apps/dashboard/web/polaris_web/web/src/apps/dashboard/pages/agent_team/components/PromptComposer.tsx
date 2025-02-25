@@ -13,10 +13,10 @@ import { PauseMajor, PlusMinor, SendMajor, TimelineAttachmentMajor } from '@shop
 
 
 import { ModelPicker } from './ModelPicker';
-import { useAgentsStore } from '../agents.store';
+import { isBlockingState, useAgentsStore } from '../agents.store';
 import { PromptPayload } from '../types';
 import { getPromptContent } from '../utils';
-import { PausedState } from './PausedState';
+import { BlockedState } from './BlockedState';
 
 
 interface PromptComposerProps {
@@ -31,9 +31,11 @@ export const PromptComposer = ({ onSend }: PromptComposerProps) => {
     availableModels,
     selectedModel,
     setSelectedModel,
-    isPaused,
-    setAttemptedOnPause
+    agentState,
+    setAttemptedInBlockedState,
  } = useAgentsStore();
+
+  const isInBlockedState = isBlockingState(agentState);
   const editor = useEditor({
     extensions: [
       StarterKit,
@@ -63,8 +65,8 @@ export const PromptComposer = ({ onSend }: PromptComposerProps) => {
   });
 
   useEffect(() => {
-    editor?.setEditable(!isPaused);
-  }, [isPaused]);
+    editor?.setEditable(!isInBlockedState);
+  }, [isInBlockedState]);
 
   if (!editor) return null;
 
@@ -81,17 +83,17 @@ export const PromptComposer = ({ onSend }: PromptComposerProps) => {
 
   return (
     <div className={`flex flex-col gap-4 border border-1 border-[var(--borderShadow-box-shadow)] py-2 px-4 rounded-sm relative z-[500] bg-white ${isFocused ? 'ring ring-violet-200' : ''}`}>
-      <PausedState onResume={() => {}} onDiscard={() => {}} />
+      <BlockedState onResume={() => {}} onDiscard={() => {}} />
       <div className="flex flex-col gap-2 justify-start">
-        <div className="w-full" onClick={() => isPaused && setAttemptedOnPause(true)}>
+        <div className="w-full" onClick={() => isInBlockedState && setAttemptedInBlockedState(true)}>
           <Button 
-            disabled={isPaused} 
+            disabled={isInBlockedState} 
             icon={PlusMinor} 
             size="micro" 
             monochrome
           >Add context</Button>
         </div>
-        <EditorContent editor={editor} onClick={() => isPaused && setAttemptedOnPause(true)} />
+        <EditorContent editor={editor} onClick={() => isInBlockedState && setAttemptedInBlockedState(true)} />
       </div>
       <div className="flex justify-between items-center">
         <div className="flex items-center gap-1">
@@ -100,9 +102,9 @@ export const PromptComposer = ({ onSend }: PromptComposerProps) => {
          )}
         </div>
         <Tooltip content="Send">
-          <div className="w-full" onClick={() => isPaused && setAttemptedOnPause(true)}>
+          <div className="w-full" onClick={() => isInBlockedState && setAttemptedInBlockedState(true)}>
             <Button
-              disabled={!selectedModel || !currentPrompt || isPaused}
+              disabled={!selectedModel || !currentPrompt || isInBlockedState}
               size="slim"
               plain
               icon={SendMajor}

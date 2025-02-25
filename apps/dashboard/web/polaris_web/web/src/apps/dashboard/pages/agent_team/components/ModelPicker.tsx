@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 import { Icon, Text } from '@shopify/polaris';
 import { Model } from '../types';
-import { useAgentsStore } from '../agents.store';
+import { isBlockingState, useAgentsStore } from '../agents.store';
 
 export const MODELS: Model[] = [
   { id: 'claude-3-sonnet', name: 'Claude-3.5-sonnet' },
@@ -32,7 +32,9 @@ export const ModelPicker = ({ availableModels, selectedModel, setSelectedModel }
     }
   };
 
-  const { isPaused, setAttemptedOnPause } = useAgentsStore();
+  const { agentState, setAttemptedInBlockedState } = useAgentsStore();
+
+  const isInBlockedState = isBlockingState(agentState);
 
   useEffect(() => {
     if (availableModels.length > 0) {
@@ -41,8 +43,8 @@ export const ModelPicker = ({ availableModels, selectedModel, setSelectedModel }
   }, [availableModels]);
 
   const handleTriggerClick: MouseEventHandler<HTMLButtonElement> = (event) => {
-    if (isPaused) {
-      setAttemptedOnPause(true);
+    if (isInBlockedState) {
+      setAttemptedInBlockedState(true);
       event.preventDefault();
     } else {
       setOpen(true);
@@ -69,7 +71,7 @@ export const ModelPicker = ({ availableModels, selectedModel, setSelectedModel }
       onValueChange={onModelChange} 
       defaultValue={availableModels[0].id}
     >
-      {isPaused ? trigger : <Select.Trigger aria-label="Select model" asChild disabled={isPaused}>{trigger}</Select.Trigger>}
+      {isInBlockedState ? trigger : <Select.Trigger aria-label="Select model" asChild disabled={isInBlockedState}>{trigger}</Select.Trigger>}
       <AnimatePresence>
         <Select.Content
           position="popper"
@@ -84,9 +86,9 @@ export const ModelPicker = ({ availableModels, selectedModel, setSelectedModel }
             exit={{ opacity: 0, y: -10, scaleY: 0 }}
             transition={{ 
               type: "spring",
-              stiffness: 500,
-              damping: 30,
-              mass: 0.8
+              stiffness: 1000,
+              damping: 10,
+              mass: 1
             }}
           >
             <Select.Viewport className="p-1">
