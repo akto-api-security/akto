@@ -1,4 +1,4 @@
-import { Badge, Box, Button, HorizontalStack, Text, VerticalStack } from "@shopify/polaris";
+import { Badge, Box, Button, Divider, HorizontalStack, Text, VerticalStack } from "@shopify/polaris";
 import FlyLayout from "../../../components/layouts/FlyLayout";
 import SampleDataList from "../../../components/shared/SampleDataList";
 import LayoutWithTabs from "../../../components/layouts/LayoutWithTabs";
@@ -12,11 +12,13 @@ import Dropdown from "../../../components/layouts/Dropdown";
 
 function SampleDetails(props) {
     const { showDetails, setShowDetails, data, title, moreInfoData, threatFiltersMap } = props
+    const currentTemplateObj = threatFiltersMap[moreInfoData?.templateId]
 
-    const severity = threatFiltersMap[moreInfoData?.templateId]?.severity || "HIGH"
+    const severity = currentTemplateObj?.severity || "HIGH"
     const [remediationText, setRemediationText] = useState("")
     const [latestActivity, setLatestActivity] = useState([])
     const [blockingOption, setBlockingOption] = useState("")
+    const [fullDescription, setFullDescription] = useState(false)
     const blockingOptions =  [
         {
             label: 'Block by IP',
@@ -38,6 +40,32 @@ function SampleDetails(props) {
         }
         
     }
+    const overviewComp = (
+        <Box padding={"4"}>
+            <VerticalStack gap={"5"}>
+                <VerticalStack gap={"2"}>
+                    <Text variant="headingMd">Description</Text>
+                    <Text variant="bodyMd">{currentTemplateObj?.description || "-"}</Text>
+                </VerticalStack>
+                <Divider />
+                <VerticalStack gap={"2"}>
+                    <Text variant="headingMd">Details</Text>
+                    <Text variant="bodyMd">{currentTemplateObj?.details || "-"}</Text>
+                </VerticalStack>
+                <Divider />
+                <VerticalStack gap={"2"}>
+                    <Text variant="headingMd">Impact</Text>
+                    <Text variant="bodyMd">{currentTemplateObj?.impact || "-"}</Text>
+                </VerticalStack>
+            </VerticalStack>
+        </Box>
+    )
+
+    const overviewTab = {
+        id: "overview",
+        content: 'Overview',
+        component: currentTemplateObj && overviewComp
+    }
 
     const aggregateActivity = () => {
         let timeMap = {};
@@ -54,7 +82,7 @@ function SampleDetails(props) {
             description: `Attacker attacked ${value} times`,
             timestamp: Number(key)
         }))
-        .sort((a, b) => b.timestamp - a.timestamp);
+        .sort((a, b) => a.timestamp - b.timestamp);
         setLatestActivity(activityEvents)
     }
 
@@ -105,7 +133,7 @@ function SampleDetails(props) {
                         <HorizontalStack gap={"2"}>
                             <Button onClick={() => openTest(moreInfoData?.templateId)} removeUnderline plain monochrome>
                                 <Box maxWidth="180px">
-                                    <TooltipText tooltip={moreInfoData?.templateId} text={moreInfoData?.templateId} />
+                                    <TooltipText tooltip={moreInfoData?.templateId} text={moreInfoData?.templateId} textProps={{variant: 'headingMd'}}  />
                                 </Box>
                             </Button> 
                             <div className={`badge-wrapper-${severity}`}>
@@ -115,14 +143,21 @@ function SampleDetails(props) {
                         <HorizontalStack gap={"2"}>
                             <Text color="subdued" variant="bodySm">{moreInfoData.url}</Text>
                             <Box width="1px" borderColor="border-subdued" borderInlineStartWidth="1" minHeight='16px'/>
-                            <Text color="subdued" variant="bodySm">{threatFiltersMap[moreInfoData?.templateId]?.category?.displayName || "-"}</Text>
+                            <Text color="subdued" variant="bodySm">{currentTemplateObj?.category?.name || "-"}</Text>
                         </HorizontalStack>
                     </VerticalStack>
                     <HorizontalStack gap={"2"}>
                         <Dropdown
                             menuItems={blockingOptions}
                             initial={"RULE_BASED"}
-                            selected={setBlockingOption} 
+                            selected={(val) => {
+                                setBlockingOption((prev) => {
+                                    if(prev !== val){
+                                        return val;
+                                    }
+                                    return prev
+                                })
+                            }} 
                         />
                         <Button disabled>Create Jira Ticket</Button>
                     </HorizontalStack>
@@ -134,7 +169,7 @@ function SampleDetails(props) {
     const tabsComponent = (
         <LayoutWithTabs
             key={"tabs-comp"}
-            tabs={[timelineTab,ValuesTab, remediationTab]}
+            tabs={[overviewTab, timelineTab, ValuesTab, remediationTab]}
             currTab = {() => {}}
         />
     )
