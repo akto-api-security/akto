@@ -116,22 +116,22 @@ function Integrations() {
       source: '/public/gcp.svg'
     }
 
-    let splunkSiemObj ={
-      id: 'splunk_siem',
+    let splunkObj ={
+      id: 'splunk',
       name:'Splunk',
-      source: '/public/splunk_logo.svg'
+      source: '/public/splunk.svg'
     }
 
     let awsWafObj ={
       id: 'aws_waf',
       name:'AWS WAF',
-      source: '/public/awswaf_logo.svg'
+      source: '/public/awsWaf.svg'
     }
 
     let f5WafObj ={
       id: 'f5_waf',
       name:'F5 WAF',
-      source: '/public/f5waf_logo.svg'
+      source: '/public/F5.svg'
     }
 
     let ssoItems = [githubSsoObj, oktaSsoObj, azureAdSsoObj, googleWorkSpaceObj]
@@ -183,8 +183,8 @@ function Integrations() {
           component: <TabsList />
         },
         {
-          id: 'siem',
-          content: <span>SIEM <Badge status='new'>{getTabItems('siem').length}</Badge></span>,
+          id: 'splunk',
+          content: <span>SIEM <Badge status='new'>{getTabItems('splunk').length}</Badge></span>,
           component: <TabsList />
         },
     ]
@@ -198,7 +198,7 @@ function Integrations() {
     const alertsItems = [slackObj, webhooksObj, teamsWebhooksObj];
     const automationItems = [aktoApiObj, ciCdObj, jiraObj];
     const wafItems = [awsWafObj, f5WafObj];
-    const siemItems = [splunkSiemObj];
+    const siemItems = [splunkObj];
     switch (tabId) {
       case 'traffic':
         return trafficItems;
@@ -230,15 +230,15 @@ function Integrations() {
         }
         return automationItems;
       case 'waf':
-        if (!func.checkLocal()) {
-          return emptyItem;
+        if (func.checkLocal() || window.ACTIVE_ACCOUNT === 1669322524) {
+          return wafItems;
         }
-        return wafItems;
-      case 'siem':
-        if (!func.checkLocal()) {
-          return emptyItem;
+        return emptyItem;
+      case 'splunk':
+        if (func.checkLocal() || window.ACTIVE_ACCOUNT === 1669322524) {
+          return siemItems;
         }
-        return siemItems;
+        return emptyItem;
       default:
         let allItems = [...trafficItems, ...aiItems]
         if (!func.checkLocal()){
@@ -246,6 +246,9 @@ function Integrations() {
         }
         if(func.checkOnPrem()){
           allItems = [...allItems, ...reportingItems]
+        }
+        if (func.checkLocal() || window.ACTIVE_ACCOUNT === 1669322524) {
+          allItems = [...allItems, ...wafItems, ...siemItems]
         }
         return allItems;
     }
