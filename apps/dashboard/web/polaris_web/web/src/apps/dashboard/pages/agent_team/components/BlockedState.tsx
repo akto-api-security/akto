@@ -37,13 +37,13 @@ export const BlockedState = ({ onResume, onDiscard }: BlockedStateProps) => {
                     animate={attemptedInBlockedState ? "shake" : "visible"}
                     exit="exit"
                     variants={{
-                        initial: { opacity: 0, y: 10 },
-                        visible: { opacity: 1, y: 0 },
-                        exit: { opacity: 0, y: 10 },
+                        initial: { opacity: 1, scaleY: 0, transformOrigin: 'bottom' },
+                        visible: { opacity: 1, scaleY: 1, transformOrigin: 'bottom' },
+                        exit: { opacity: 1, scaleY: 0, transformOrigin: 'bottom' },
                         shake: {
                             x: [0, -10, 10, -10, 10, 0],
                             opacity: 1,
-                            y: 0,
+                            scaleY: 1,
                             transition: {
                                 duration: 0.4,
                                 ease: "easeInOut",

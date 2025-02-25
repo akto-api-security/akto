@@ -86,9 +86,9 @@ export const ModelPicker = ({ availableModels, selectedModel, setSelectedModel }
             exit={{ opacity: 0, y: -10, scaleY: 0 }}
             transition={{ 
               type: "spring",
-              stiffness: 1000,
-              damping: 10,
-              mass: 1
+              stiffness: 500,
+              damping: 30,
+              mass: 0.8
             }}
           >
             <Select.Viewport className="p-1">
