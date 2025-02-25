@@ -24,6 +24,7 @@ message ListMaliciousRequestsResponse {
       string category = 12;
       string sub_category = 13;
       string type = 14;
+      string ref_id = 15;
     }
     repeated MaliciousEvent malicious_events = 1;
     uint64 total = 2;

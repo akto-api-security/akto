@@ -12,13 +12,12 @@ import Dropdown from "../../../components/layouts/Dropdown";
 
 function SampleDetails(props) {
     const { showDetails, setShowDetails, data, title, moreInfoData, threatFiltersMap } = props
-    const currentTemplateObj = threatFiltersMap[moreInfoData?.templateId]
+    let currentTemplateObj = threatFiltersMap[moreInfoData?.templateId]
 
-    const severity = currentTemplateObj?.severity || "HIGH"
+    let severity = currentTemplateObj?.severity || "HIGH"
     const [remediationText, setRemediationText] = useState("")
     const [latestActivity, setLatestActivity] = useState([])
     const [blockingOption, setBlockingOption] = useState("")
-    const [fullDescription, setFullDescription] = useState(false)
     const blockingOptions =  [
         {
             label: 'Block by IP',
@@ -140,7 +139,7 @@ function SampleDetails(props) {
                                 <Badge size="small">{func.toSentenceCase(severity)}</Badge>
                             </div>
                         </HorizontalStack>
-                        <HorizontalStack gap={"2"}>
+                        <HorizontalStack gap={"1"} wrap={false}>
                             <Text color="subdued" variant="bodySm">{moreInfoData.url}</Text>
                             <Box width="1px" borderColor="border-subdued" borderInlineStartWidth="1" minHeight='16px'/>
                             <Text color="subdued" variant="bodySm">{currentTemplateObj?.category?.name || "-"}</Text>

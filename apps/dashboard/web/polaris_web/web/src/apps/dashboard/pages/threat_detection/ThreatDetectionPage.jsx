@@ -17,7 +17,7 @@ function ThreatDetectionPage() {
     const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), initialVal);
     const [showDetails, setShowDetails] = useState(false);
 
-    const threatFiltersMap = PersistStore((state) => state.filtersMap);
+    const threatFiltersMap = PersistStore((state) => state.threatFiltersMap);
 
     const rowClicked = async(data) => {
         const sameRow = currentRefId === data?.refId
