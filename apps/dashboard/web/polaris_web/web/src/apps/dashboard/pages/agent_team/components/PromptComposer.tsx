@@ -86,12 +86,12 @@ export const PromptComposer = ({ onSend }: PromptComposerProps) => {
       <BlockedState onResume={() => {}} onDiscard={() => {}} />
       <div className="flex flex-col gap-2 justify-start">
         <div className="w-full" onClick={() => isInBlockedState && setAttemptedInBlockedState(true)}>
-          <Button 
+          {/* <Button 
             disabled={isInBlockedState} 
             icon={PlusMinor} 
             size="micro" 
             monochrome
-          >Add context</Button>
+          >Add context</Button> */}
         </div>
         <EditorContent editor={editor} onClick={() => isInBlockedState && setAttemptedInBlockedState(true)} />
       </div>
