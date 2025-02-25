@@ -131,16 +131,15 @@ function TestsTablePage() {
                 : "-",
                 compliance: value?.compliance
             }
-            if(value?.inactive !== true){
-                if (value.isCustom) {
+            if (value.isCustom) {
+                if (value?.inactive === true) {
+                    deactivatedData.push(data)
+                } else {
                     customData.push(data)
                 }
-                else {
-                    aktoData.push(data)
-                }
-            }else{
-                deactivatedData.push(data)
-            } 
+            } else {
+                aktoData.push(data)
+            }
             allData.push(data)
         });
         return [allData, aktoData, customData, deactivatedData]
