@@ -94,13 +94,13 @@ let headers = JSON.parse(JSON.stringify(headings))
 
 function TestsTablePage() {
     const [selectedTest, setSelectedTest] = useState({})
-    const [data, setData] = useState({ 'all': [], 'by_akto': [], 'custom': [] })
+    const [data, setData] = useState({ 'all': [], 'by_akto': [], 'custom': [], 'inactive': [] })
     const localSubCategoryMap = LocalStore.getState().subCategoryMap
 
     const severityOrder = { CRITICAL: 5, HIGH: 4, MEDIUM: 3, LOW: 2, dynamic_severity: 1 };
 
     const mapTestData = (obj) => {
-        const allData = [], customData = [], aktoData = [];
+        const allData = [], customData = [], aktoData = [], deactivatedData = [];
         Object.entries(obj.mapTestToData).map(([key, value]) => {
             const data = {
                 name: key,
@@ -131,15 +131,19 @@ function TestsTablePage() {
                 : "-",
                 compliance: value?.compliance
             }
-            if (value.isCustom) {
-                customData.push(data)
-            }
-            else {
-                aktoData.push(data)
-            }
+            if(value?.inactive !== true){
+                if (value.isCustom) {
+                    customData.push(data)
+                }
+                else {
+                    aktoData.push(data)
+                }
+            }else{
+                deactivatedData.push(data)
+            } 
             allData.push(data)
         });
-        return [allData, aktoData, customData]
+        return [allData, aktoData, customData, deactivatedData]
     };
 
     const fetchAllTests = async () => {
@@ -158,11 +162,12 @@ function TestsTablePage() {
             if (!metaDataObj?.subCategories?.length) return;
 
             const obj = convertFunc.mapCategoryToSubcategory(metaDataObj.subCategories);
-            const [allData, aktoData, customData] = mapTestData(obj);
+            const [allData, aktoData, customData, deactivatedData] = mapTestData(obj);
             setData({
                 all: allData,
                 by_akto: aktoData,
-                custom: customData
+                custom: customData,
+                inactive: deactivatedData
             });
         } catch (error) {
             console.error("Error fetching tests:", error);
@@ -186,11 +191,11 @@ function TestsTablePage() {
         setSelectedTest(data);
     };
 
-    const [selected, setSelected] = useState(0)
-    const [selectedTab, setSelectedTab] = useState('all')
+    const [selected, setSelected] = useState(1)
+    const [selectedTab, setSelectedTab] = useState('by_akto')
 
     const { tabsInfo } = useTable()
-    const definedTableTabs = ['All', 'By Akto', 'Custom'];
+    const definedTableTabs = ['All', 'By Akto', 'Custom', 'Inactive'];
     const tableCountObj = func.getTabsCount(definedTableTabs, data)
     const tableTabs = func.getTableTabsContent(definedTableTabs, tableCountObj, setSelectedTab, selectedTab, tabsInfo)
 
