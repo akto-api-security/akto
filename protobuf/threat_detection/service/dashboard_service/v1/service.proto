@@ -83,6 +83,18 @@ message ListThreatActorResponse {
   uint64 total = 2;
 }
 
+message FetchMaliciousEventsRequest {
+  string ref_id = 1;
+}
+
+message FetchMaliciousEventsResponse {
+  message MaliciousPayloadsResponse {
+    string orig = 1;
+    uint64 ts = 2; 
+  }
+  repeated MaliciousPayloadsResponse malicious_payloads_response = 1;
+}
+
 message ListThreatApiRequest {
   message Filter {
     repeated string urls = 1;

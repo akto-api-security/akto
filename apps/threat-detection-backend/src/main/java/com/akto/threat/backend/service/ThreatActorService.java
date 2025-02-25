@@ -1,17 +1,24 @@
 package com.akto.threat.backend.service;
 
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchMaliciousEventsRequest;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchMaliciousEventsResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListThreatActorResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListThreatActorsRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatActorByCountryRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatActorByCountryResponse;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchMaliciousEventsResponse.MaliciousPayloadsResponse;
 import com.akto.threat.backend.constants.MongoDBCollection;
+import com.mongodb.client.FindIterable;
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoCursor;
+import com.mongodb.client.model.Filters;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import org.bson.Document;
+import org.bson.conversions.Bson;
 
 public class ThreatActorService {
 
@@ -98,6 +105,29 @@ public class ThreatActorService {
     }
 
     return ListThreatActorResponse.newBuilder().addAllActors(actors).setTotal(total).build();
+  }
+
+  public FetchMaliciousEventsResponse fetchMaliciousRequests(
+      String accountId, FetchMaliciousEventsRequest request) {
+
+    MongoCollection<Document> coll =
+        this.mongoClient
+            .getDatabase(accountId)
+            .getCollection(MongoDBCollection.ThreatDetection.AGGREGATE_SAMPLE_MALICIOUS_REQUESTS, Document.class);
+
+    String refId = request.getRefId();
+    
+    Bson filters = Filters.eq("refId", refId);
+    FindIterable<Document> respList = (FindIterable<Document>) coll.find(filters);
+    List<FetchMaliciousEventsResponse.MaliciousPayloadsResponse> maliciousPayloadsResponse = new ArrayList<>();
+    for (Document doc: respList) {
+      maliciousPayloadsResponse.add(
+        FetchMaliciousEventsResponse.MaliciousPayloadsResponse.newBuilder().
+        setOrig((doc.getString("orig"))).
+        setTs(doc.getLong("requestTime")).build());
+    }
+
+    return FetchMaliciousEventsResponse.newBuilder().addAllMaliciousPayloadsResponse(maliciousPayloadsResponse).build();
   }
 
   public ThreatActorByCountryResponse getThreatActorByCountry(

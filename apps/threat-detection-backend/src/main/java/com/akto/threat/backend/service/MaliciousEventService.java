@@ -28,6 +28,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
+
 import org.bson.Document;
 import org.bson.conversions.Bson;
 
@@ -48,6 +50,8 @@ public class MaliciousEventService {
     MaliciousEventMessage evt = request.getMaliciousEvent();
     String actor = evt.getActor();
     String filterId = evt.getFilterId();
+
+    String refId = UUID.randomUUID().toString();
 
     EventType eventType = evt.getEventType();
 
@@ -71,6 +75,7 @@ public class MaliciousEventService {
                 this.ipLookupClient.getCountryISOCodeGivenIp(evt.getLatestApiIp()).orElse(""))
             .setCategory(evt.getCategory())
             .setSubCategory(evt.getSubCategory())
+            .setRefId(refId)
             .build();
 
     if (MaliciousEventModel.EventType.AGGREGATED.equals(maliciousEventType)) {
@@ -86,6 +91,7 @@ public class MaliciousEventService {
                 .setRequestTime(sampleReq.getTimestamp())
                 .setApiCollectionId(sampleReq.getApiCollectionId())
                 .setFilterId(filterId)
+                .setRefId(refId)
                 .build());
       }
 
