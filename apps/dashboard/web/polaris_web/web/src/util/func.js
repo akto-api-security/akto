@@ -1836,6 +1836,9 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
     }
     
     return date.getTime();
+},
+isDemoAccount(){
+  return func.checkLocal() || window.ACTIVE_ACCOUNT === 1669322524
 }
 
 }

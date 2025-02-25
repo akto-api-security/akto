@@ -6,20 +6,33 @@ import SusDataTable from "./components/SusDataTable";
 import values from "@/util/values";
 import { produce } from "immer"
 import func from "@/util/func";
-import tempFunc from "./dummyData";
 import SampleDetails from "./components/SampleDetails";
+import threatDetectionRequests from "./api";
+import PersistStore from "../../../main/PersistStore";
 function ThreatDetectionPage() {
-
-    const [sampleData, setSampleData] = useState([])
+    const [currentRefId, setCurrentRefId] = useState('')
+    const [rowDataList, setRowDataList] = useState([])
+    const [moreInfoData, setMoreInfoData] = useState({})
     const initialVal = values.ranges[3]
     const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), initialVal);
     const [showDetails, setShowDetails] = useState(false);
+
+    const threatFiltersMap = PersistStore((state) => state.filtersMap);
+
     const rowClicked = (data) => {
-        const tempData = tempFunc.getSampleDataOfUrl(data.url);
-        const sameRow = func.deepComparison(tempData, sampleData);
+        const sameRow = currentRefId === data?.refId
         if (!sameRow) {
-            setSampleData([{"message": JSON.stringify(tempData),  "highlightPaths": []}])
+            let rowData = [];
+            threatDetectionRequests.fetchMaliciousRequest(data?.refId).then((res) => {
+                rowData = [...res.requests]
+            }) 
+            setRowDataList(rowData)
+            setCurrentRefId(data?.refId)
             setShowDetails(true)
+            setMoreInfoData({
+                url: data.url,
+                templateId: data.filterId,
+            })
         } else {
             setShowDetails(!showDetails)
         }
@@ -34,8 +47,10 @@ function ThreatDetectionPage() {
             title={"Attacker payload"}
             showDetails={showDetails}
             setShowDetails={setShowDetails}
-            sampleData={sampleData}
+            data={rowDataList}
             key={"sus-sample-details"}
+            moreInfoData={moreInfoData}
+            threatFiltersMap={threatFiltersMap}
         />
     ]
 
