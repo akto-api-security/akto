@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { AgentLog, AgentSubprocess } from "../types";
-import { getFakeSubProcess, appendLog } from "../utils";
+import { AgentLog, AgentSubprocess } from "../../types";
+import { getFakeSubProcess, appendLog } from "../../utils";
 import { Box, Button, Icon } from "@shopify/polaris";
 import { CaretDownMinor } from "@shopify/polaris-icons";
 
