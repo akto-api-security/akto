@@ -230,12 +230,12 @@ function Integrations() {
         }
         return automationItems;
       case 'waf':
-        if (func.checkLocal() || window.ACTIVE_ACCOUNT === 1669322524) {
+        if (func.isDemoAccount()) {
           return wafItems;
         }
         return emptyItem;
       case 'splunk':
-        if (func.checkLocal() || window.ACTIVE_ACCOUNT === 1669322524) {
+        if (func.isDemoAccount()) {
           return siemItems;
         }
         return emptyItem;
@@ -247,7 +247,7 @@ function Integrations() {
         if(func.checkOnPrem()){
           allItems = [...allItems, ...reportingItems]
         }
-        if (func.checkLocal() || window.ACTIVE_ACCOUNT === 1669322524) {
+        if (func.isDemoAccount()) {
           allItems = [...allItems, ...wafItems, ...siemItems]
         }
         return allItems;
