@@ -309,13 +309,13 @@ function SingleTestRunPage() {
             //Assuming vulnerable count is after removing ignored issues aLL - (OOTHER COUNT + IGNORED)
             localCountMap['IGNORED_ISSUES'] = ignoredIssueListCount
             let countOthers = 0;
-            Object.keys(testCountMap).forEach((x) => {
+            Object.keys(localCountMap).forEach((x) => {
               if (x !== 'ALL') {
-                countOthers += testCountMap[x]
+                countOthers += localCountMap[x]
               }
             })
-            localCountMap['SECURED'] = testCountMap['ALL'] >= countOthers ? testCountMap['ALL'] - countOthers : 0
-            const orderedValues = tableTabsOrder.map(key => testCountMap[tableTabMap[key]] || 0)
+            localCountMap['SECURED'] = localCountMap['ALL'] >= countOthers ? localCountMap['ALL'] - countOthers : 0
+            const orderedValues = tableTabsOrder.map(key => localCountMap[tableTabMap[key]] || 0)
             setTestRunResultsCount(orderedValues)
             setTestRunCountMap(JSON.parse(JSON.stringify(localCountMap)));
           })
