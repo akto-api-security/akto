@@ -15,7 +15,6 @@ import {
   ProgressBar,
   Tooltip,
   Banner,
-  Modal
 } from '@shopify/polaris';
 
 import {
@@ -25,9 +24,7 @@ import {
   ReportMinor,
   RefreshMajor,
   CustomersMinor,
-  EditMajor,
   PlusMinor,
-  SettingsMajor,
   SettingsMinor
 } from '@shopify/polaris-icons';
 import api from "../api";
@@ -46,14 +43,10 @@ import ReRunModal from "./ReRunModal";
 import TestingStore from "../testingStore";
 import { useSearchParams } from "react-router-dom";
 import TestRunResultPage from "../TestRunResultPage/TestRunResultPage";
-import { usePolling } from "../../../../main/PollingProvider";
 import LocalStore from "../../../../main/LocalStorageStore";
 import { produce } from "immer"
-import AdvancedSettingsComponent from "../../observe/api_collections/component/AdvancedSettingsComponent";
 import GithubServerTable from "../../../components/tables/GithubServerTable";
 import RunTest from '../../observe/api_collections/RunTest';
-import { filter } from 'lodash';
-
 let sortOptions = [
   { label: 'Severity', value: 'severity asc', directionLabel: 'Highest severity', sortKey: 'total_severity', columnIndex: 3 },
   { label: 'Severity', value: 'severity desc', directionLabel: 'Lowest severity', sortKey: 'total_severity', columnIndex: 3 },
@@ -127,6 +120,13 @@ function SingleTestRunPage() {
   const currentTestingRuns = []
   const [updateTable, setUpdateTable] = useState("")
   const [testRunResultsCount, setTestRunResultsCount] = useState({})
+  const [testRunCountMap, setTestRunCountMap] = useState({
+      "ALL": 0,
+      "SKIPPED_EXEC_NEED_CONFIG": 0,
+      "VULNERABLE": 0,
+      "SKIPPED_EXEC_API_REQUEST_FAILED": 0,
+      "SKIPPED_EXEC": 0
+    })  
   const [testMode, setTestMode] = useState(false)
 
   const initialTestingObj = { testsInitiated: 0, testsInsertedInDb: 0, testingRunId: -1 }
@@ -142,7 +142,6 @@ function SingleTestRunPage() {
   const [testingRunResultSummariesObj, setTestingRunResultSummariesObj] = useState({})
   const [allResultsLength, setAllResultsLength] = useState(undefined)
   const [currentSummary, setCurrentSummary] = useState('')
-  const [pageTotalCount, setPageTotalCount] = useState(0)
   const localCategoryMap = LocalStore.getState().categoryMap
   const localSubCategoryMap = LocalStore.getState().subCategoryMap
   const [useLocalSubCategoryData, setUseLocalSubCategoryData] = useState(false)
@@ -265,9 +264,9 @@ function SingleTestRunPage() {
 
   const fetchTableData = async (sortKey, sortOrder, skip, limit, filters, filterOperators, queryValue) => {
     let testRunResultsRes = []
-    let testRunCountMap = []
     let totalIgnoredIssuesCount = 0
     let ignoredIssueListCount = 0
+    let localCountMap = testRunCountMap;
     const { testingRun, workflowTest, testingRunType } = testingRunResultSummariesObj
     if (testingRun === undefined) {
       return { value: [], total: 0 }
@@ -291,7 +290,6 @@ function SingleTestRunPage() {
         })
         testRunResultsRes = ignoredTestRunResults
         totalIgnoredIssuesCount = ignoredTestRunResults.length
-        setPageTotalCount(selectedTab === 'ignored_issues' ? totalIgnoredIssuesCount : testRunCountMap[tableTabMap[selectedTab]])
       } else {
         await api.fetchTestingRunResults(localSelectedTestRun.testingRunResultSummaryHexId, tableTabMap[selectedTab], sortKey, sortOrder, skip, limit, filters, queryValue).then(({ testingRunResults, errorEnums, issueslistCount }) => {
           ignoredIssueListCount = issueslistCount
@@ -304,26 +302,30 @@ function SingleTestRunPage() {
         })
         if (!func.deepComparison(copyFilters, filters)) {
           setCopyFilters(filters)
-          api.fetchTestRunResultsCount(localSelectedTestRun.testingRunResultSummaryHexId).then((testCountMap) => {
-            testRunCountMap = testCountMap || []
+          await api.fetchTestRunResultsCount(localSelectedTestRun.testingRunResultSummaryHexId).then((testCountMap) => {
+            if(testCountMap !== null){
+              localCountMap = JSON.parse(JSON.stringify(testCountMap))  
+            }
             //Assuming vulnerable count is after removing ignored issues aLL - (OOTHER COUNT + IGNORED)
-            testRunCountMap['IGNORED_ISSUES'] = ignoredIssueListCount
+            localCountMap['IGNORED_ISSUES'] = ignoredIssueListCount
             let countOthers = 0;
             Object.keys(testCountMap).forEach((x) => {
               if (x !== 'ALL') {
                 countOthers += testCountMap[x]
               }
             })
-            testRunCountMap['SECURED'] = testCountMap['ALL'] >= countOthers ? testCountMap['ALL'] - countOthers : 0
+            localCountMap['SECURED'] = testCountMap['ALL'] >= countOthers ? testCountMap['ALL'] - countOthers : 0
             const orderedValues = tableTabsOrder.map(key => testCountMap[tableTabMap[key]] || 0)
             setTestRunResultsCount(orderedValues)
-            setPageTotalCount(testRunCountMap[tableTabMap[selectedTab]])
+            setTestRunCountMap(JSON.parse(JSON.stringify(localCountMap)));
           })
         }
       }
     }
+    const key = tableTabMap[selectedTab]
+    const total = (testRunCountMap[key] !== undefined && testRunCountMap[key] !== 0) ? testRunCountMap[key] : localCountMap[key]
     fillTempData(testRunResultsRes, selectedTab)
-    return { value: transform.getPrettifiedTestRunResults(testRunResultsRes), total: selectedTab === 'ignored_issues' ? totalIgnoredIssuesCount : testRunCountMap[tableTabMap[selectedTab]] }
+    return { value: transform.getPrettifiedTestRunResults(testRunResultsRes), total: selectedTab === 'ignored_issues' ? totalIgnoredIssuesCount : total }
   }
 
   useEffect(() => { handleAddSettings() }, [testingRunConfigSettings])
@@ -556,7 +558,6 @@ function SingleTestRunPage() {
           "selected": 1
         }}
         callFromOutside={updateTable}
-        pageTotalCount={pageTotalCount}
       />
     </>
   )

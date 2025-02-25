@@ -1,0 +1,62 @@
+
+.ProseMirror {
+  position: relative;
+  outline: none !important;
+  min-height: 24px;
+  max-height: 96px;
+  overflow-y: auto;
+  line-height: 24px;
+}
+
+.ProseMirror p {
+  margin: 0;
+  line-height: 24px;
+}
+
+.ProseMirror ul,
+.ProseMirror ol {
+  padding-inline-start: 16px;
+  margin-block-start: 8px;
+  margin-block-end: 8px;
+}
+
+.ProseMirror ul {
+  list-style-type: disc;
+}
+
+.ProseMirror ol {
+  list-style-type: decimal;
+}
+
+
+.ProseMirror p.is-editor-empty:first-child::before {
+  color: #9ca3af;
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+  position: absolute;
+}
+
+/* Custom scrollbar styles */
+.ProseMirror::-webkit-scrollbar {
+  width: 6px;
+}
+
+.ProseMirror::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.ProseMirror::-webkit-scrollbar-thumb {
+  background-color: rgba(0, 0, 0, 0.2);
+  border-radius: 3px;
+}
+
+.ProseMirror code {
+  background-color: #ECEBFF;
+  padding: 2px 4px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #374151;
+}

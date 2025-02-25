@@ -35,7 +35,7 @@ const TestEditor = () => {
 
 
     const handleExit = () => {
-        navigate("/dashboard/testing")
+        navigate("/dashboard/test-library/tests")
         setActive('active')
     }
 
