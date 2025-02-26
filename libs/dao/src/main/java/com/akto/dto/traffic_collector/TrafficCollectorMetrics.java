@@ -12,14 +12,17 @@ public class TrafficCollectorMetrics {
     private int bucketStartEpoch;
     public static final String BUCKET_END_EPOCH = "bucketEndEpoch";
     private int bucketEndEpoch;
+    public static final String VERSION = "version";
+    private String version;
 
 
-    public TrafficCollectorMetrics(String id, String runtimeId,  Map<String, Integer> requestsCountMapPerMinute, int bucketStartEpoch, int bucketEndEpoch) {
+    public TrafficCollectorMetrics(String id, String runtimeId,  Map<String, Integer> requestsCountMapPerMinute, int bucketStartEpoch, int bucketEndEpoch, String version) {
         this.id = id;
         this.runtimeId = runtimeId;
         this.requestsCountMapPerMinute = requestsCountMapPerMinute;
         this.bucketStartEpoch = bucketStartEpoch;
         this.bucketEndEpoch = bucketEndEpoch;
+        this.version = version;
     }
 
     public TrafficCollectorMetrics() {
@@ -33,6 +36,7 @@ public class TrafficCollectorMetrics {
                 ", requestsCountMapPerMinute=" + requestsCountMapPerMinute +
                 ", bucketStartEpoch=" + bucketStartEpoch +
                 ", bucketEndEpoch=" + bucketEndEpoch +
+                ", runtimeVersion=" + version +
                 '}';
     }
 
@@ -74,5 +78,13 @@ public class TrafficCollectorMetrics {
 
     public void setRuntimeId(String runtimeId) {
         this.runtimeId = runtimeId;
+    }
+
+    public String getVersion() {
+        return version;
+    }
+
+    public void setVersion(String version) {
+        this.version = version;
     }
 }

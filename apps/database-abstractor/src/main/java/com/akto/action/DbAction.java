@@ -383,7 +383,7 @@ public class DbAction extends ActionSupport {
 
         // update heartbeat
         try {
-            TrafficCollectorInfoDao.instance.updateHeartbeat(trafficCollectorMetrics.getId(), trafficCollectorMetrics.getRuntimeId());
+            TrafficCollectorInfoDao.instance.updateHeartbeat(trafficCollectorMetrics.getId(), trafficCollectorMetrics.getRuntimeId(), trafficCollectorMetrics.getVersion());
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error while updating heartbeat: " + e);
         }
