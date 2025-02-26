@@ -12,6 +12,11 @@ public class CodeAnalysisApiInfo {
     public static final String ID = "_id";
     private CodeAnalysisApiLocation location;
     public static final String LOCATION = "location";
+
+    public static final String DISCOVERED_TS = "discoveredTs";
+    private int discoveredTs;
+    public static final String LAST_SEEN_TS = "lastSeenTs";
+    private int lastSeenTs;
     
     public static class CodeAnalysisApiInfoKey {
         private ObjectId codeAnalysisCollectionId;
@@ -56,9 +61,11 @@ public class CodeAnalysisApiInfo {
     public CodeAnalysisApiInfo() {
     }
 
-    public CodeAnalysisApiInfo(CodeAnalysisApiInfoKey id, CodeAnalysisApiLocation location) {
+    public CodeAnalysisApiInfo(CodeAnalysisApiInfoKey id, CodeAnalysisApiLocation location, int discoveredTs, int lastSeenTs) {
         this.id = id;
         this.location = location;
+        this.discoveredTs = discoveredTs;
+        this.lastSeenTs = lastSeenTs;
     }
 
     public CodeAnalysisApiInfoKey getId() {
@@ -79,5 +86,21 @@ public class CodeAnalysisApiInfo {
 
     public String generateCodeAnalysisApisMapKey() {
         return id.getMethod() + " " + id.getEndpoint();
+    }
+
+    public int getDiscoveredTs() {
+        return discoveredTs;
+    }
+
+    public void setDiscoveredTs(int discoveredTs) {
+        this.discoveredTs = discoveredTs;
+    }
+
+    public int getLastSeenTs() {
+        return lastSeenTs;
+    }
+
+    public void setLastSeenTs(int lastSeenTs) {
+        this.lastSeenTs = lastSeenTs;
     }
 }

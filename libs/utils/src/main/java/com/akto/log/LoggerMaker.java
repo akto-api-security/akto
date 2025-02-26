@@ -7,14 +7,15 @@ import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.AccountSettings;
 import com.akto.dto.Config;
 import com.akto.dto.Log;
+import com.akto.util.Constants;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -32,15 +33,16 @@ public class LoggerMaker  {
     private final Class<?> aClass;
 
     private static String slackWebhookUrl;
+    private static String slackCyborgWebhookUrl;
 
     public static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
+    private static final ExecutorService service = Executors.newFixedThreadPool(1);
     private static final DataActor dataActor = DataActorFactory.fetchInstance();
 
     protected static final Logger internalLogger = LoggerFactory.getLogger(LoggerMaker.class);
 
     static {
         scheduler.scheduleAtFixedRate(new Runnable() {
-            
             @Override
             public void run() {
                 try {
@@ -56,6 +58,28 @@ public class LoggerMaker  {
                 }
             }
         }, 0, 1, TimeUnit.MINUTES);
+
+        scheduler.scheduleAtFixedRate(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    if (slackCyborgWebhookUrl != null) {
+                        return;
+                    }
+                    Config config = ConfigsDao.instance.findOne(Constants.ID, Config.SlackAlertCyborgConfig.CONFIG_ID);
+                    if (config != null) {
+                        Config.SlackAlertCyborgConfig slackCyborgWebhook = (Config.SlackAlertCyborgConfig) config;
+                        if (slackCyborgWebhook != null && slackCyborgWebhook.getSlackWebhookUrl() != null
+                                && !slackCyborgWebhook.getSlackWebhookUrl().isEmpty()) {
+                            slackCyborgWebhookUrl = slackCyborgWebhook.getSlackWebhookUrl();
+                            internalLogger.info("found slack cyborg config");
+                        }
+                    }
+                } catch (Exception e) {
+                    internalLogger.error("error in getting slack cyborg config: " + e.toString());
+                }
+            }
+        }, 2, 15, TimeUnit.MINUTES);
     }
 
     private static int logCount = 0;
@@ -65,7 +89,7 @@ public class LoggerMaker  {
     private LogDb db;
 
     public enum LogDb {
-        TESTING,RUNTIME,DASHBOARD,BILLING, ANALYSER
+        TESTING,RUNTIME,DASHBOARD,BILLING, ANALYSER, DB_ABS, THREAT_DETECTION
     }
 
     private static AccountSettings accountSettings = null;
@@ -130,6 +154,10 @@ public class LoggerMaker  {
         sendToSlack(slackWebhookUrl, err);
     }
 
+    protected static void sendToCyborgSlack(String err){
+        sendToSlack(slackCyborgWebhookUrl, err);
+    }
+
     protected String basicError(String err, LogDb db) {
         if(Context.accountId.get() != null){
             err = String.format("%s\nAccount id: %d", err, Context.accountId.get());
@@ -145,10 +173,18 @@ public class LoggerMaker  {
 
     public void errorAndAddToDb(String err, LogDb db) {
         try {
-            basicError(err, db);
+            String finalError = basicError(err, db);
 
             if (db.equals(LogDb.BILLING) || db.equals(LogDb.DASHBOARD)) {
                 sendToSlack(err);
+            } else if(LogDb.DB_ABS.equals(db)){
+                service.submit(() -> {
+                    try {
+                        sendToCyborgSlack(finalError);
+                    } catch (Exception e){
+                        internalLogger.error("Error in sending cyborg error logs %s" , e.getMessage());
+                    }
+                });
             }
         } catch (Exception e) {
             e.printStackTrace();
@@ -230,6 +266,10 @@ public class LoggerMaker  {
                     break;
                 case BILLING:
                     BillingLogsDao.instance.insertOne(log);
+                    break;
+                // Add db for db-abs
+                case THREAT_DETECTION:
+                    dataActor.insertProtectionLog(log);
                     break;
                 default:
                     break;

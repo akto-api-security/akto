@@ -8,6 +8,7 @@ import com.akto.dao.testing.TestingRunDao;
 import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dao.testing.TestingRunResultSummariesDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
+import com.akto.dao.traffic_metrics.RuntimeMetricsDao;
 import com.akto.dao.traffic_metrics.TrafficMetricsDao;
 import com.akto.dao.usage.UsageMetricsDao;
 import com.akto.dto.*;
@@ -30,12 +31,15 @@ import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.*;
 import com.akto.dto.testing.config.TestCollectionProperty;
+import com.akto.dto.testing.custom_groups.AllAPIsGroup;
+import com.akto.dto.testing.custom_groups.UnauthenticatedEndpoint;
 import com.akto.dto.testing.info.BFLATestInfo;
 import com.akto.dto.testing.info.TestInfo;
 import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.dto.third_party_access.Credential;
 import com.akto.dto.third_party_access.ThirdPartyAccess;
 import com.akto.dto.traffic.SampleData;
+import com.akto.dto.traffic_metrics.RuntimeMetrics;
 import com.akto.dto.traffic_metrics.TrafficMetrics;
 import com.akto.dto.traffic_metrics.TrafficMetricsAlert;
 import com.akto.dto.type.SingleTypeInfo;
@@ -199,6 +203,8 @@ public class DaoInit {
                 .builder(BelongsToPredicate.class).enableDiscriminator(true).build();
         ClassModel<YamlNodeDetails> yamlNodeDetails = ClassModel
                 .builder(YamlNodeDetails.class).enableDiscriminator(true).build();
+        ClassModel<UnauthenticatedEndpoint> unauthenticatedEndpointsClassModel = ClassModel
+                .builder(UnauthenticatedEndpoint.class).enableDiscriminator(true).build();
         // ClassModel<AwsResource> awsResourceModel =
         // ClassModel.builder(AwsResource.class).enableDiscriminator(true)
         // .build();
@@ -246,6 +252,10 @@ public class DaoInit {
         ClassModel<CodeAnalysisApiInfo.CodeAnalysisApiInfoKey> codeAnalysisApiInfoKeyClassModel = ClassModel.builder(CodeAnalysisApiInfo.CodeAnalysisApiInfoKey.class).enableDiscriminator(true).build();
         ClassModel<RiskScoreTestingEndpoints> riskScoreTestingEndpointsClassModel = ClassModel.builder(RiskScoreTestingEndpoints.class).enableDiscriminator(true).build();
         ClassModel<OrganizationFlags> OrganizationFlagsClassModel = ClassModel.builder(OrganizationFlags.class).enableDiscriminator(true).build();
+        ClassModel<SensitiveDataEndpoints> sensitiveDataEndpointsClassModel = ClassModel.builder(SensitiveDataEndpoints.class).enableDiscriminator(true).build();
+        ClassModel<AllAPIsGroup> allApisGroupClassModel = ClassModel.builder(AllAPIsGroup.class).enableDiscriminator(true).build();
+
+        ClassModel<RuntimeMetrics> RuntimeMetricsClassModel = ClassModel.builder(RuntimeMetrics.class).enableDiscriminator(true).build();
 
         CodecRegistry pojoCodecRegistry = fromProviders(PojoCodecProvider.builder().register(
                 configClassModel, signupInfoClassModel, apiAuthClassModel, attempResultModel, urlTemplateModel,
@@ -275,7 +285,7 @@ public class DaoInit {
                 yamlNodeDetails, multiExecTestResultClassModel, workflowTestClassModel, dependencyNodeClassModel, paramInfoClassModel,
                         nodeClassModel, connectionClassModel, edgeClassModel, replaceDetailClassModel, modifyHostDetailClassModel, fileUploadClassModel
                 ,fileUploadLogClassModel, codeAnalysisCollectionClassModel, codeAnalysisApiLocationClassModel, codeAnalysisApiInfoClassModel, codeAnalysisApiInfoKeyClassModel,
-                riskScoreTestingEndpointsClassModel, OrganizationFlagsClassModel).automatic(true).build());
+                riskScoreTestingEndpointsClassModel, OrganizationFlagsClassModel, sensitiveDataEndpointsClassModel, unauthenticatedEndpointsClassModel, allApisGroupClassModel, RuntimeMetricsClassModel).automatic(true).build());
 
         final CodecRegistry customEnumCodecs = CodecRegistries.fromCodecs(
                 new EnumCodec<>(Conditions.Operator.class),
@@ -374,6 +384,8 @@ public class DaoInit {
         DependencyFlowNodesDao.instance.createIndicesIfAbsent();
         CodeAnalysisCollectionDao.instance.createIndicesIfAbsent();
         CodeAnalysisApiInfoDao.instance.createIndicesIfAbsent();
+        RBACDao.instance.createIndicesIfAbsent();
+        RuntimeMetricsDao.instance.createIndicesIfAbsent();
     }
 
 }

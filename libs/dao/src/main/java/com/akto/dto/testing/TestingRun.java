@@ -1,5 +1,6 @@
 package com.akto.dto.testing;
 
+import com.akto.dto.ApiCollection;
 import org.bson.codecs.pojo.annotations.BsonIgnore;
 import org.bson.types.ObjectId;
 
@@ -40,9 +41,12 @@ public class TestingRun {
         ONE_TIME, RECURRING, CI_CD, CONTINUOUS_TESTING
     }
 
+    public static final String SEND_SLACK_ALERT = "sendSlackAlert";
+    private boolean sendSlackAlert = false;
+
     public TestingRun() { }
 
-    public TestingRun(int scheduleTimestamp, String userEmail, TestingEndpoints testingEndpoints, int testIdConfig, State state, int periodInSeconds, String name, String triggeredBy) {
+    public TestingRun(int scheduleTimestamp, String userEmail, TestingEndpoints testingEndpoints, int testIdConfig, State state, int periodInSeconds, String name, String triggeredBy, boolean sendSlackAlert) {
         this.scheduleTimestamp = scheduleTimestamp;
         this.testRunTime = -1;
         this.maxConcurrentRequests = -1;
@@ -55,8 +59,9 @@ public class TestingRun {
         this.periodInSeconds = periodInSeconds;
         this.name = name;
         this.triggeredBy = triggeredBy;
+        this.sendSlackAlert = sendSlackAlert;
     }
-    public TestingRun(int scheduleTimestamp, String userEmail, TestingEndpoints testingEndpoints, int testIdConfig, State state, int periodInSeconds, String name, int testRunTime, int maxConcurrentRequests) {
+    public TestingRun(int scheduleTimestamp, String userEmail, TestingEndpoints testingEndpoints, int testIdConfig, State state, int periodInSeconds, String name, int testRunTime, int maxConcurrentRequests, boolean sendSlackAlert) {
         this.scheduleTimestamp = scheduleTimestamp;
         this.testRunTime = testRunTime;
         this.maxConcurrentRequests = maxConcurrentRequests;
@@ -68,6 +73,7 @@ public class TestingRun {
         this.state = state;
         this.periodInSeconds = periodInSeconds;
         this.name = name;
+        this.sendSlackAlert = sendSlackAlert;
     }
 
     public TestingRunConfig getTestingRunConfig() {
@@ -191,6 +197,18 @@ public class TestingRun {
         this.triggeredBy = triggeredBy;
     }
 
+    public boolean isSendSlackAlert() {
+        return sendSlackAlert;
+    }
+
+    public boolean getSendSlackAlert() {
+        return sendSlackAlert;
+    }
+
+    public void setSendSlackAlert(boolean sendSlackAlert) {
+        this.sendSlackAlert = sendSlackAlert;
+    }
+
     @Override
     public String toString() {
         return "{" +
@@ -206,5 +224,14 @@ public class TestingRun {
             ", name='" + getName() + "'" +
             "}";
     }
+
+    public static String findTestType(TestingRun testingRun, TestingRunResultSummary trrs) {
+        String testType = "ONE_TIME";
+        if(testingRun.getPeriodInSeconds()>0) testType = "SCHEDULED DAILY";
+        if (trrs.getMetadata() != null) testType = "CI_CD";
+        return testType;
+    }
+
+
 
 }
