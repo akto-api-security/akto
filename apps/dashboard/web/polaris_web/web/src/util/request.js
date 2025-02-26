@@ -13,7 +13,17 @@ const service = axios.create({
 })
 
 const err = async (error) => {
-  const { status, data } = error.response
+  let status
+  let data
+  
+  if(error.response) {
+    status = error.response.status
+    data = error.response.data
+  } else {
+    status = -1
+    data = {}
+  }
+
   const { errors } = data
   const { actionErrors } = data
   const standardMessage = "OOPS! Something went wrong"
@@ -23,6 +33,9 @@ const err = async (error) => {
   }
 
   switch (status) {
+    case -1:
+      func.setToast(true, true, "Connection error. Please try again later.")
+      break;
     case 400:
       func.setToast(true, true, 'Bad Request ' + data.message);
       break;
@@ -116,7 +129,7 @@ service.interceptors.response.use((response) => {
   return response.data
 }, err)
 
-const black_list_apis = ['dashboard/accessToken', 'api/fetchBurpPluginInfo', 'api/fetchActiveLoaders', 'api/fetchAllSubCategories']
+const black_list_apis = ['dashboard/accessToken', 'api/fetchBurpPluginInfo', 'api/fetchActiveLoaders', 'api/fetchAllSubCategories', 'api/fetchVulnerableRequests', 'api/fetchActiveTestRunsStatus']
 async function raiseMixpanelEvent(api) {
   if (window?.Intercom) {
     if (api?.startsWith("/api/ingestPostman")) {

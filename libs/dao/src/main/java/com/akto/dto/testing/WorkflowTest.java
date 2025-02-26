@@ -24,6 +24,7 @@ public class WorkflowTest {
     List<String> nodes;
     List<String> edges;
 
+    public static final String MAP_NODE_ID_TO_WORKFLOW_NODE_DETAILS = "mapNodeIdToWorkflowNodeDetails";
     Map<String, WorkflowNodeDetails> mapNodeIdToWorkflowNodeDetails;
     State state;
 

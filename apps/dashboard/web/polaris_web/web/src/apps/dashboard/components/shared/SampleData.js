@@ -146,6 +146,7 @@ function SampleData(props) {
     const [showActionsModal, setShowActionsModal] = useState(false);
     const [showErrorModal, setShowErrorModal] = useState(false);
     const [selectedWord, setSelectedWord] = useState("");
+    const [dynamicHeight, setDynamicHeight] = useState(minHeight || '300px');
 
     if(minHeight==undefined){
       minHeight="300px";
@@ -168,6 +169,17 @@ function SampleData(props) {
         createInstance();
       }
     }, [])
+
+    useEffect(() => {
+      if (instance && props?.useDynamicHeight) {
+          const disposeOnContentSizeChange = instance.onDidContentSizeChange((e) => {
+            const contentHeight = e.contentHeight > 900 ? 900 : e.contentHeight // 3600 means 200 lines (18 == 1 line)
+            setDynamicHeight(`${contentHeight}px`)
+          })
+          return () => disposeOnContentSizeChange.dispose()
+      }
+
+  }, [instance])
 
     if (instance){
       if (!readOnly) {
@@ -265,6 +277,7 @@ function SampleData(props) {
           });
           
         }
+        instance.updateOptions({ tabSize: 2 })
         setInstance(instance)
 
     }
@@ -301,7 +314,7 @@ function SampleData(props) {
 
     return (
       <div>
-        <div ref={ref} style={{height:minHeight}} className={'editor ' + (data.headersMap ? 'new-diff' : '')}/>
+        <div ref={ref} style={{height:dynamicHeight}} className={'editor ' + (data.headersMap ? 'new-diff' : '')}/>
         <Modal
             open={showActionsModal}
             onClose={() => setShowActionsModal(false)}

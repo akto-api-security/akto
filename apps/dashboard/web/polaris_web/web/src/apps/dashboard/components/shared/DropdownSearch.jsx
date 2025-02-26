@@ -1,4 +1,4 @@
-import { Autocomplete, Avatar, Checkbox, Icon, TextContainer } from '@shopify/polaris';
+import { Autocomplete, Avatar, Checkbox, HorizontalStack, Icon, Link, Text, TextContainer } from '@shopify/polaris';
 import { SearchMinor, ChevronDownMinor } from '@shopify/polaris-icons';
 import React, { useState, useCallback, useEffect } from 'react';
 import func from "@/util/func";
@@ -6,7 +6,7 @@ function DropdownSearch(props) {
 
     const id = props.id ? props.id : "dropdown-search"
 
-    const { disabled, label, placeholder, optionsList, setSelected, value , avatarIcon, preSelected, allowMultiple, itemName, dropdownSearchKey, isNested} = props
+    const { disabled, label, placeholder, optionsList, setSelected, value , avatarIcon, preSelected, allowMultiple, itemName, dropdownSearchKey, isNested, sliceMaxVal} = props
 
     const deselectedOptions = optionsList
     const [selectedOptions, setSelectedOptions] = useState(preSelected ? preSelected : []);
@@ -65,9 +65,19 @@ function DropdownSearch(props) {
                 setLoading(true);
             }
 
+            const defaultSliceValue = sliceMaxVal || 20
+
             setTimeout(() => {
                 if (value === '' && selectedOptions.length === 0) {
-                    setOptions(deselectedOptions);
+                    const options = deselectedOptions.slice(0, defaultSliceValue);
+                    const title = deselectedOptions.length != defaultSliceValue && options.length >= defaultSliceValue
+                        ? `Showing ${options.length} result${func.addPlurality(options.length)} only. (type more to refine results)`
+                        : "Showing all results";
+                    const nestedOptions = [{
+                        title: title,
+                        options: options
+                    }]
+                    setOptions(nestedOptions);
                     setLoading(false);
                     return;
                 }
@@ -87,8 +97,17 @@ function DropdownSearch(props) {
                       });
                 }else{
                     resultOptions = deselectedOptions.filter((option) =>
-                    option[searchKey].match(filterRegex)
-                );
+                        option[searchKey].match(filterRegex)
+                    ).slice(0, defaultSliceValue);
+
+                    const title = deselectedOptions.length != defaultSliceValue && resultOptions.length >= defaultSliceValue
+                        ? `Showing ${resultOptions.length} result${func.addPlurality(resultOptions.length)} only. (type more to refine results)`
+                        : "Showing all results";
+
+                    resultOptions = [{
+                        title: title,
+                        options: resultOptions
+                    }]
                 }
                 setOptions(resultOptions);
                 setLoading(false);
@@ -174,7 +193,7 @@ function DropdownSearch(props) {
     );
 
     const showSelectAll = (allowMultiple && optionsList.length > 5)
-    const checkboxLabel = checked ? "Deselect all" : "Select all"
+    const checkboxLabel = checked ? <Link removeUnderline>Deselect all</Link> : <Link removeUnderline>Select all</Link>
 
     const emptyState = (
         <React.Fragment>
@@ -188,7 +207,7 @@ function DropdownSearch(props) {
     return (
             <Autocomplete
                 {...(allowMultiple ? {allowMultiple:true} : {} )}
-                options={options.slice(0,20)}
+                options={options.slice(0,sliceMaxVal || 20)}
                 selected={selectedOptions}
                 onSelect={updateSelection}
                 emptyState={emptyState}
@@ -196,10 +215,11 @@ function DropdownSearch(props) {
                 textField={textField}
                 preferredPosition='below'
                 {...(showSelectAll ? {actionBefore:{
-                    content:(<Checkbox label={checkboxLabel} checked={checked} onChange={() => selectAllFunc()}/>),
+                    content: checkboxLabel,
                     onAction: () => selectAllFunc(),
                 }} : {})}
-            />
+            >
+            </Autocomplete>
     );
 }
 

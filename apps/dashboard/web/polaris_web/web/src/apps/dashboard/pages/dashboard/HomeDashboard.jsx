@@ -9,7 +9,6 @@ import testingTransform from "../testing/transform"
 import StackedChart from '../../components/charts/StackedChart';
 import ChartypeComponent from '../testing/TestRunsPage/ChartypeComponent';
 import testingApi from "../testing/api"
-import testingFunc from "../testing/transform"
 import PersistStore from '../../../main/PersistStore';
 import { DashboardBanner } from './components/DashboardBanner';
 import SummaryCard from './new_components/SummaryCard';
@@ -24,11 +23,12 @@ import { produce } from 'immer';
 import EmptyCard from './new_components/EmptyCard';
 import TooltipText from '../../components/shared/TooltipText';
 import transform from '../observe/transform';
+import CriticalUnsecuredAPIsOverTimeGraph from '../issues/IssuesPage/CriticalUnsecuredAPIsOverTimeGraph';
+import CriticalFindingsGraph from '../issues/IssuesPage/CriticalFindingsGraph';
 
 function HomeDashboard() {
 
     const [loading, setLoading] = useState(true);
-    const [skip, setSkip] = useState(0)
     const [showBannerComponent, setShowBannerComponent] = useState(false)
     const [testSummaryInfo, setTestSummaryInfo] = useState([])
 
@@ -38,10 +38,8 @@ function HomeDashboard() {
     const [apiTypesData, setApiTypesData] = useState([{ "data": [], "color": "#D6BBFB" }])
     const [riskScoreData, setRiskScoreData] = useState([])
     const [newDomains, setNewDomains] = useState([])
-    const [criticalFindingsData, setCriticalFindingsData] = useState([])
     const [severityMap, setSeverityMap] = useState({})
     const [severityMapEmpty, setSeverityMapEmpty] = useState(true)
-    const [unsecuredAPIs, setUnsecuredAPIs] = useState([])
     const [totalIssuesCount, setTotalIssuesCount] = useState(0)
     const [oldIssueCount, setOldIssueCount] = useState(0)
     const [apiRiskScore, setApiRiskScore] = useState(0)
@@ -53,6 +51,7 @@ function HomeDashboard() {
     const initialStartTimestamp = func.timeNow() - 60 * 60 * 24
     const initialEndTimestamp = func.timeNow()
     const [showTestingComponents, setShowTestingComponents] = useState(false)
+    const [customRiskScoreAvg, setCustomRiskScoreAvg] = useState(0)
 
     const tempVal = { alias: "custom", title: "Custom", period: { since: new Date(initialStartTimestamp * 1000), until: new Date(initialEndTimestamp * 1000) } }
 
@@ -115,6 +114,7 @@ function HomeDashboard() {
                 finalResult.push({
                     "testName": x["name"],
                     "time": func.prettifyEpoch(x["run_time_epoch"]),
+                    "criticalCount": severityMap["critical"] ? severityMap["critical"] : "0",
                     "highCount": severityMap["high"] ? severityMap["high"] : "0",
                     "mediumCount": severityMap["medium"] ? severityMap["medium"] : "0",
                     "lowCount": severityMap["low"] ? severityMap["low"] : "0",
@@ -132,28 +132,22 @@ function HomeDashboard() {
         setLoading(true)
         // all apis 
         let apiPromises = [
-            testingApi.getSummaryInfo(0, func.timeNow()),
             observeApi.getUserEndpoints(),
-            api.fetchCriticalIssuesTrend(), // todo:
             api.findTotalIssues(startTimestamp, endTimestamp),
             api.fetchApiStats(startTimestamp, endTimestamp),
-            api.fetchEndpointsCount(startTimestamp, endTimestamp)
+            api.fetchEndpointsCount(startTimestamp, endTimestamp),
+            testingApi.fetchSeverityInfoForIssues({}, [], 0)
         ];
 
         let results = await Promise.allSettled(apiPromises);
 
-        let subcategoryDataResp = results[0].status === 'fulfilled' ? results[0].value : {};
-        let userEndpoints = results[1].status === 'fulfilled' ? results[1].value : true;
-        let criticalIssuesTrendResp = results[2].status === 'fulfilled' ? results[2].value : {}
-        let findTotalIssuesResp = results[3].status === 'fulfilled' ? results[3].value : {}
-        let apisStatsResp = results[4].status === 'fulfilled' ? results[4].value : {}
-        let fetchEndpointsCountResp = results[5].status === 'fulfilled' ? results[5].value : {}
+        let userEndpoints = results[0].status === 'fulfilled' ? results[0].value : true;
+        let findTotalIssuesResp = results[1].status === 'fulfilled' ? results[1].value : {}
+        let apisStatsResp = results[2].status === 'fulfilled' ? results[2].value : {}
+        let fetchEndpointsCountResp = results[3].status === 'fulfilled' ? results[3].value : {}
+        let issueSeverityMap = results[4].status === 'fulfilled' ? results[4].value : {}
 
         setShowBannerComponent(!userEndpoints)
-
-        buildUnsecuredAPIs(criticalIssuesTrendResp)
-
-        const tempResult = testingFunc.convertSubIntoSubcategory(subcategoryDataResp)
 
         buildMetrics(apisStatsResp.apiStatsEnd)
         testSummaryData()
@@ -162,8 +156,7 @@ function HomeDashboard() {
         buildAuthTypesData(apisStatsResp.apiStatsEnd)
         buildSetRiskScoreData(apisStatsResp.apiStatsEnd) //todo
         getCollectionsWithCoverage()
-        convertSubCategoryInfo(tempResult.subCategoryMap)
-        buildSeverityMap(apisStatsResp.apiStatsEnd)
+        buildSeverityMap(issueSeverityMap.severityInfo)
         buildIssuesSummary(findTotalIssuesResp)
 
         const fetchHistoricalDataResp = { "finalHistoricalData": finalHistoricalData, "initialHistoricalData": initialHistoricalData }
@@ -244,27 +237,10 @@ function HomeDashboard() {
             totalTestedApis += x.apisTested
         })
 
-        const tempRiskScore = totalAPIs ? (totalRiskScore / totalApis).toFixed(2) : 0
+        const tempRiskScore = totalApis ? (totalRiskScore / totalApis).toFixed(2) : 0
         setOldRiskScore(parseFloat(tempRiskScore))
-        const tempTestCoverate = totalAPIs ? (100 * totalTestedApis / totalApis).toFixed(2) : 0
+        const tempTestCoverate = totalApis ? (100 * totalTestedApis / totalApis).toFixed(2) : 0
         setOldTestCoverage(parseFloat(tempTestCoverate))
-    }
-
-    const generateByLineComponent = (val, time) => {
-        if (!val || isNaN(val)) return null
-        if (val === 0 ) {
-            return <Text>No change in {time}</Text>
-        }
-        const source = val > 0 ? ArrowUpMinor : ArrowDownMinor
-        return (
-            <HorizontalStack gap={1}>
-                <Box>
-                    <Icon source={source} color='subdued' />
-                </Box>
-                <Text color='subdued' fontWeight='medium'>{Math.abs(val)}</Text>
-                <Text color='subdued' fontWeight='semibold'>{time}</Text>
-            </HorizontalStack>
-        )
     }
 
     function generateChangeComponent(val, invertColor) {
@@ -359,6 +335,21 @@ function HomeDashboard() {
     function buildSetRiskScoreData(apiStats) {
         const totalApisCount = apiStats.totalAPIs
 
+        let tempScore = 0, tempTotal = 0
+        Object.keys(apiStats.riskScoreMap).forEach((x) => {
+            if(x > 1){
+                const apisVal = apiStats.riskScoreMap[x]
+                tempScore += (x * apisVal)
+                tempTotal += apisVal
+            }
+        })
+        if(tempScore > 0 && tempTotal > 0){
+            let val = (tempScore * 1.0)/tempTotal
+            if(val >= 2){
+                setCustomRiskScoreAvg(val)
+            }
+        }
+
         const sumOfRiskScores = Object.values(apiStats.riskScoreMap).reduce((acc, value) => acc + value, 0);
 
         // Calculate the additional APIs that should be added to risk score "0"
@@ -413,7 +404,7 @@ function HomeDashboard() {
             title: 'Total APIs',
             data: transform.formatNumberWithCommas(totalAPIs),
             variant: 'heading2xl',
-            byLineComponent: generateByLineComponent((totalAPIs - oldTotalApis), func.timeDifference(startTimestamp, endTimestamp)),
+            byLineComponent: observeFunc.generateByLineComponent((totalAPIs - oldTotalApis), func.timeDifference(startTimestamp, endTimestamp)),
             smoothChartComponent: (<SmoothAreaChart tickPositions={[oldTotalApis, totalAPIs]} />)
         },
         {
@@ -421,23 +412,25 @@ function HomeDashboard() {
             data: observeFunc.formatNumberWithCommas(totalIssuesCount),
             variant: 'heading2xl',
             color: 'critical',
-            byLineComponent: generateByLineComponent((totalIssuesCount - oldIssueCount), func.timeDifference(startTimestamp, endTimestamp)),
-            smoothChartComponent: (<SmoothAreaChart tickPositions={[oldIssueCount, totalIssuesCount]} />)
+            byLineComponent: observeFunc.generateByLineComponent((totalIssuesCount - oldIssueCount), func.timeDifference(startTimestamp, endTimestamp)),
+            smoothChartComponent: (<SmoothAreaChart tickPositions={[oldIssueCount, totalIssuesCount]} />),
         },
         {
             title: 'API Risk Score',
-            data: apiRiskScore,
+            data: customRiskScoreAvg !== 0 ? parseFloat(customRiskScoreAvg.toFixed(2))  : apiRiskScore,
             variant: 'heading2xl',
-            color: apiRiskScore > 2.5 ? 'critical' : 'warning',
-            byLineComponent: generateByLineComponent((apiRiskScore - oldRiskScore).toFixed(2), func.timeDifference(startTimestamp, endTimestamp)),
-            smoothChartComponent: (<SmoothAreaChart tickPositions={[oldRiskScore, apiRiskScore]} />)
+            color: (customRiskScoreAvg > 2.5 || apiRiskScore > 2.5) ? 'critical' : 'warning',
+            byLineComponent: observeFunc.generateByLineComponent((apiRiskScore - oldRiskScore).toFixed(2), func.timeDifference(startTimestamp, endTimestamp)),
+            smoothChartComponent: (<SmoothAreaChart tickPositions={[oldRiskScore, apiRiskScore]} />),
+            tooltipContent: 'This represents a cumulative risk score for the whole dashboard',
+            docsUrl: 'https://docs.akto.io/api-discovery/concepts/risk-score'
         },
         {
             title: 'Test Coverage',
             data: testCoverage + "%",
             variant: 'heading2xl',
             color: testCoverage > 80 ? 'success' : 'warning',
-            byLineComponent: generateByLineComponent((testCoverage - oldTestCoverage).toFixed(2), func.timeDifference(startTimestamp, endTimestamp)),
+            byLineComponent: observeFunc.generateByLineComponent((testCoverage - oldTestCoverage).toFixed(2), func.timeDifference(startTimestamp, endTimestamp)),
             smoothChartComponent: (<SmoothAreaChart tickPositions={[oldTestCoverage, testCoverage]} />)
         }
     ]
@@ -457,28 +450,37 @@ function HomeDashboard() {
         />
     ) : null
 
-    function buildSeverityMap(apiStats) {
-        const countMap = apiStats ? apiStats.criticalMap : {};
+    function buildSeverityMap(severityInfo) {
+        const countMap = { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0 }
+
+        if (severityInfo && severityInfo != undefined && severityInfo != null && severityInfo instanceof Object) {
+            for (const apiCollectionId in severityInfo) {
+                let temp = severityInfo[apiCollectionId]
+                for (const key in temp) {
+                    countMap[key] += temp[key]
+                }
+            }
+        }
 
         const result = {
             "Critical": {
                 "text": countMap.CRITICAL || 0,
-                "color": "#E45357",
-                "filterKey": "Critical",
+                "color": func.getHexColorForSeverity("CRITICAL"),
+                "filterKey": "Critical"
             },
             "High": {
                 "text": countMap.HIGH || 0,
-                "color": "#EF864C",
+                "color": func.getHexColorForSeverity("HIGH"),
                 "filterKey": "High"
             },
             "Medium": {
                 "text": countMap.MEDIUM || 0,
-                "color": "#F6C564",
+                "color": func.getHexColorForSeverity("MEDIUM"),
                 "filterKey": "Medium"
             },
             "Low": {
                 "text": countMap.LOW || 0,
-                "color": "#6FD1A6",
+                "color": func.getHexColorForSeverity("LOW"),
                 "filterKey": "Low"
             }
         };
@@ -488,26 +490,6 @@ function HomeDashboard() {
         const allZero = Object.values(result).every(item => item.text === 0);
         setSeverityMapEmpty(allZero)
     }
-
-    function buildUnsecuredAPIs(input) {
-        const CRITICAL_COLOR = "#E45357";
-        const transformed = [];
-
-        // Initialize objects for CRITICAL and HIGH data
-        const criticalData = { data: [], color: CRITICAL_COLOR };
-
-        // Iterate through the input to populate criticalData and highData
-        for (const epoch in input) {
-            const epochMillis = Number(epoch) * 86400000; // Convert days to milliseconds
-            criticalData.data.push([epochMillis, input[epoch]]);
-        }
-
-        // Push the results to the transformed array
-        transformed.push(criticalData);
-
-        setUnsecuredAPIs(transformed)
-    }
-
 
     const genreateDataTableRows = (collections) => {
         return collections.map((collection, index) => ([
@@ -523,15 +505,6 @@ function HomeDashboard() {
         ]
         ));
     }
-
-    function convertSubCategoryInfo(tempSubCategoryMap) {
-        const entries = Object.values(tempSubCategoryMap);
-        entries.sort((a, b) => b.text - a.text);
-        const topEntries = entries.slice(0, 5);
-        const data = topEntries.map(entry => [entry.filterKey, entry.text]);
-        setCriticalFindingsData([{ "data": data, "color": "#E45357" }])
-    }
-
 
     function extractCategoryNames(data) {
         if (!data || !Array.isArray(data) || data.length === 0) {
@@ -552,66 +525,15 @@ function HomeDashboard() {
                 />
             </div>
         }
-        title="Vulnerable APIs by Severity"
-        titleToolTip="Breakdown of vulnerable APIs categorized by severity level (Critical, High, Medium, Low). Click to see details for each category."
+        title="Issues by Severity"
+        titleToolTip="Breakdown of issues categorized by severity level (High, Medium, Low). Click to see details for each category."
         linkText="Fix critical issues"
         linkUrl="/dashboard/issues"
-    /> : <EmptyCard title="Vulnerable APIs by Severity" subTitleComponent={showTestingComponents ? <Text alignment='center' color='subdued'>No vulnerable APIs found</Text>: runTestEmptyCardComponent}/>
+    /> : <EmptyCard title="Issues by Severity" subTitleComponent={showTestingComponents ? <Text alignment='center' color='subdued'>No issues found for this time-frame</Text>: runTestEmptyCardComponent}/>
 
-    const criticalUnsecuredAPIsOverTime = (unsecuredAPIs && unsecuredAPIs.length > 0 && unsecuredAPIs[0].data && unsecuredAPIs[0].data.length > 0) ? <InfoCard
-        component={
-            <StackedChart
-                type='column'
-                color='#6200EA'
-                areaFillHex="true"
-                height="280"
-                background-color="#ffffff"
-                data={unsecuredAPIs}
-                defaultChartOptions={defaultChartOptions}
-                text="true"
-                yAxisTitle="Number of issues"
-                width={40}
-                gap={10}
-                showGridLines={true}
-                exportingDisabled={true}
-            />
-        }
-        title="Critical Unsecured APIs Over Time"
-        titleToolTip="Chart showing the number of critical unsecured APIs detected each month over the past year. Helps track security trends over time."
-        linkText="Fix critical issues"
-        linkUrl="/dashboard/issues"
-    /> : <EmptyCard title="Critical Unsecured APIs Over Time" subTitleComponent={showTestingComponents ? <Text alignment='center' color='subdued'>No Unsecured APIs found</Text>: runTestEmptyCardComponent} />
+    const criticalUnsecuredAPIsOverTime = <CriticalUnsecuredAPIsOverTimeGraph startTimestamp={startTimestamp} endTimestamp={endTimestamp} linkText={"Fix critical issues"} linkUrl={"/dashboard/issues"} />
 
-    const criticalFindings = (criticalFindingsData && criticalFindingsData.length > 0 && criticalFindingsData[0].data && criticalFindingsData[0].data.length > 0) ?
-        <InfoCard
-            component={
-                <StackedChart
-                    type='column'
-                    color='#6200EA'
-                    areaFillHex="true"
-                    height="280"
-                    background-color="#ffffff"
-                    data={criticalFindingsData}
-                    defaultChartOptions={defaultChartOptions}
-                    text="true"
-                    yAxisTitle="Number of issues"
-                    width={40}
-                    gap={10}
-                    showGridLines={true}
-                    customXaxis={
-                        {
-                            categories: extractCategoryNames(criticalFindingsData),
-                            crosshair: true
-                        }
-                    }
-                    exportingDisabled={true}
-                />
-            }
-            title="Critical Findings"
-            titleToolTip="Overview of the most critical security issues detected, including the number of issues and APIs affected for each type of vulnerability."
-            linkText="Fix critical issues"
-            linkUrl="/dashboard/issues"
-        /> : <EmptyCard title="Critical Findings" subTitleComponent={showTestingComponents ? <Text alignment='center' color='subdued'>No Critical findings found</Text>: runTestEmptyCardComponent} />
+    const criticalFindings = <CriticalFindingsGraph startTimestamp={startTimestamp} endTimestamp={endTimestamp} linkText={"Fix critical issues"} linkUrl={"/dashboard/issues"} />
 
     const apisByRiskscoreComponent = <InfoCard
         component={

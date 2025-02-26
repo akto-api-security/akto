@@ -85,6 +85,12 @@ public class HttpRequestResponseUtils {
 
     public static String convertGRPCEncodedToJson(byte[] rawRequest) {
         String base64 = Base64.getEncoder().encodeToString(rawRequest);
+
+        // empty grpc response, only headers present
+        if (rawRequest.length <= 5) {
+            return "{}";
+        }
+
         try {
             Map<Object, Object> map = ProtoBufUtils.getInstance().decodeProto(rawRequest);
             if (map.isEmpty()) {
@@ -159,10 +165,8 @@ public class HttpRequestResponseUtils {
         for (String key : jsonObject.keySet()) {
             // Encode the key and value, and append them to the string builder
             try {
-                formUrlEncoded.append(encode(key))
-                        .append("=")
-                        .append(encode(jsonObject.getString(key)))
-                        .append("&");
+                String tmp = encode(key) + "=" + encode(String.valueOf(jsonObject.get(key))) + "&";
+                formUrlEncoded.append(tmp);
             } catch (Exception e) {
                 e.printStackTrace();
             }

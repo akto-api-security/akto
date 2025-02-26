@@ -110,6 +110,19 @@ export default function Header() {
         })
     }
 
+    const getColorForIcon = () => {
+        switch (window.DASHBOARD_MODE){
+            case "ON_PREM":
+                return "onprem_icon";
+            case "LOCAL_DEPLOY":
+                if(window.IS_SAAS !== "true") 
+                    return "local_icon"
+                return "";
+            default:
+                return ""
+        }
+    }
+
     const userMenuMarkup = (
         <TopBar.UserMenu
             actions={[
@@ -200,7 +213,7 @@ export default function Header() {
             {(Object.keys(currentTestsObj).length > 0 && currentTestsObj?.testRunsArr?.length !== 0 && currentTestsObj?.totalTestsCompleted > 0) ? 
             <HorizontalStack gap={"2"}>
                 <Button plain monochrome onClick={() => {handleTestingNavigate()}}>
-                 <SemiCircleProgress key={"progress"} progress={progress} size={60} height={55} width={75}/>
+                 <SemiCircleProgress key={"progress"} progress={Math.min(progress, 100)} size={60} height={55} width={75}/>
                 </Button>
                 <VerticalStack gap={"0"}>
                     <Text fontWeight="medium">Test run status</Text>
@@ -209,8 +222,8 @@ export default function Header() {
             </HorizontalStack> : null}
              <TopBar.Menu
                 activatorContent={
-                    <span id="beamer-btn">
-                        <Icon source={NotificationMajor} />
+                    <span id="beamer-btn" className={getColorForIcon()}>
+                        <Icon source={NotificationMajor}/> 
                     </span>
                 }
                 actions={[]}

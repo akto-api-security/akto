@@ -35,9 +35,7 @@ import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Accumulators;
 import com.mongodb.client.model.Aggregates;
 import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.Sorts;
 
-import static com.akto.task.Cluster.callDibs;
 
 public class Crons {
 
@@ -135,37 +133,59 @@ public class Crons {
         }, 0 , 5, TimeUnit.MINUTES);
     }
 
-    public void insertHistoricalData() {
+    public static void insertHistoricalData(){
+        int currentTime = Context.now();
+        Map<Integer, HistoricalData> historicalDataMap = new HashMap<>();
+        MongoCursor<ApiInfo> cursor = ApiInfoDao.instance.getMCollection().find().cursor();
+
+        while (cursor.hasNext()) {
+            ApiInfo apiInfo = cursor.next();
+            List<Integer> collectionIds = apiInfo.getCollectionIds();
+            float riskScore = apiInfo.getRiskScore();
+
+            for (Integer collectionId : collectionIds) {
+                HistoricalData historicalData = historicalDataMap.getOrDefault(collectionId, new HistoricalData(collectionId, 0, 0, 0, currentTime));
+                historicalData.setTotalApis(historicalData.getTotalApis() + 1);
+                historicalData.setRiskScore(historicalData.getRiskScore() + riskScore);
+
+                if (apiInfo.getLastTested() > (Context.now() - 30 * 24 * 60 * 60)) {
+                    historicalData.setApisTested(historicalData.getApisTested() + 1);
+                }
+                historicalDataMap.put(collectionId, historicalData);
+            }
+        }
+
+        List<HistoricalData> values = new ArrayList<>(historicalDataMap.values());
+        HistoricalDataDao.instance.insertMany(values);
+
+        cursor.close();
+    }
+
+    public void insertHistoricalDataJob() {
         Runnable task = new Runnable() {
             public void run() {
                 AccountTask.instance.executeTaskHybridAccounts(new Consumer<Account>() {
                     @Override
                     public void accept(Account t) {
-                        int currentTime = Context.now();
-                        Map<Integer, HistoricalData> historicalDataMap = new HashMap<>();
-                        MongoCursor<ApiInfo> cursor = ApiInfoDao.instance.getMCollection().find().cursor();
+                        insertHistoricalData();
+                    }
+                }, "historical-data-scheduler");
+            }
+        };
 
-                        while (cursor.hasNext()) {
-                            ApiInfo apiInfo = cursor.next();
-                            List<Integer> collectionIds = apiInfo.getCollectionIds();
-                            float riskScore = apiInfo.getRiskScore();
+        long initialDelay = calculateInitialDelay();
+        long period = TimeUnit.DAYS.toMillis(1); // 24 hours period
 
-                            for (Integer collectionId : collectionIds) {
-                                HistoricalData historicalData = historicalDataMap.getOrDefault(collectionId, new HistoricalData(collectionId, 0, 0, 0, currentTime));
-                                historicalData.setTotalApis(historicalData.getTotalApis() + 1);
-                                historicalData.setRiskScore(historicalData.getRiskScore() + riskScore);
+        scheduler.scheduleAtFixedRate(task, initialDelay, period, TimeUnit.MILLISECONDS);
+    }
 
-                                if (apiInfo.getLastTested() > (Context.now() - 30 * 24 * 60 * 60)) {
-                                    historicalData.setApisTested(historicalData.getApisTested() + 1);
-                                }
-                                historicalDataMap.put(collectionId, historicalData);
-                            }
-                        }
-
-                        List<HistoricalData> values = new ArrayList<>(historicalDataMap.values());
-                        HistoricalDataDao.instance.insertMany(values);
-
-                        cursor.close();
+    public void insertHistoricalDataJobForOnPrem(){
+        Runnable task = new Runnable() {
+            public void run() {
+                AccountTask.instance.executeTask(new Consumer<Account>() {
+                    @Override
+                    public void accept(Account t) {
+                        insertHistoricalData();
                     }
                 }, "historical-data-scheduler");
             }

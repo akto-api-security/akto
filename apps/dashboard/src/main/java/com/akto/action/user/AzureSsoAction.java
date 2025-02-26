@@ -5,12 +5,13 @@ import com.opensymphony.xwork2.Action;
 import java.util.ArrayList;
 
 import com.akto.action.UserAction;
-import com.akto.dao.ConfigsDao;
+import com.akto.dao.SSOConfigsDao;
 import com.akto.dao.UsersDao;
 import com.akto.dao.context.Context;
-import com.akto.dto.Config;
 import com.akto.dto.User;
-import com.akto.util.DashboardMode;
+import com.akto.dto.Config.ConfigType;
+import com.akto.dto.sso.SAMLConfig;
+import com.akto.util.Constants;
 import com.akto.utils.sso.SsoUtils;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
@@ -20,86 +21,87 @@ import com.mongodb.client.result.DeleteResult;
 public class AzureSsoAction extends UserAction{
     
     private String x509Certificate ;
-    private String azureEntityId ;
+    private String ssoEntityId ;
     private String loginUrl ;
     private String acsUrl ;
     private String applicationIdentifier;
+    private ConfigType configType;
 
-    public String addAzureSsoInfo(){
+    private SAMLConfig getConfig(ConfigType configType, String domain){
+        SAMLConfig config = new SAMLConfig(configType,Context.accountId.get());
+        config.setX509Certificate(x509Certificate);
+        config.setEntityId(ssoEntityId);
+        config.setAcsUrl(acsUrl);
+        config.setLoginUrl(loginUrl);
+        config.setApplicationIdentifier(applicationIdentifier);
+        config.setOrganizationDomain(domain);
+        return config;
+    }
 
-        if(!DashboardMode.isOnPremDeployment()){
-            addActionError("This feature is only available in on-prem deployment");
-            return ERROR.toUpperCase();
-        }
-
+    public String addSamlSsoInfo(){
+        String userLogin = getSUser().getLogin();
+        String domain = userLogin.split("@")[1];
         if (SsoUtils.isAnySsoActive()) {
             addActionError("A SSO Integration already exists.");
             return ERROR.toUpperCase();
         }
-
-        Config.AzureConfig azureConfig = new Config.AzureConfig();
-        azureConfig.setX509Certificate(x509Certificate);
-        azureConfig.setAzureEntityId(azureEntityId);
-        azureConfig.setAcsUrl(acsUrl);
-        azureConfig.setLoginUrl(loginUrl);
-        azureConfig.setApplicationIdentifier(applicationIdentifier);
-
-        ConfigsDao.instance.insertOne(azureConfig);
+        
+        SAMLConfig samlConfig = getConfig(this.configType, domain);       
+        SSOConfigsDao.instance.insertOne(samlConfig);
 
         return Action.SUCCESS.toUpperCase();
     }
 
-    public String deleteAzureSso(){
-
-        if(!DashboardMode.isOnPremDeployment()){
-            addActionError("This feature is only available in on-prem deployment");
-            return ERROR.toUpperCase();
-        }
-
-        DeleteResult result = ConfigsDao.instance.deleteAll(Filters.eq("_id", "AZURE-ankush"));
+    private void deleteSAMLSettings(ConfigType configType){
+        int accountId = Context.accountId.get();
+        DeleteResult result = SSOConfigsDao.instance.deleteAll(Filters.eq(Constants.ID, String.valueOf(accountId)));
 
         if (result.getDeletedCount() > 0) {
             for (Object obj : UsersDao.instance.getAllUsersInfoForTheAccount(Context.accountId.get())) {
                 BasicDBObject detailsObj = (BasicDBObject) obj;
                 UsersDao.instance.updateOne("login", detailsObj.getString(User.LOGIN), Updates.set("refreshTokens", new ArrayList<>()));
-                UsersDao.instance.updateOne("login", detailsObj.getString(User.LOGIN), Updates.unset("signupInfoMap.AZURE"));
+                UsersDao.instance.updateOne("login", detailsObj.getString(User.LOGIN), Updates.unset("signupInfoMap." + this.configType.name()));
             }
         }
+    }
 
+    public String deleteSamlSso(){
+        deleteSAMLSettings(this.configType);
         return Action.SUCCESS.toUpperCase();
     }
 
     @Override
     public String execute() throws Exception {
-
-        if(!DashboardMode.isOnPremDeployment()){
-            addActionError("This feature is only available in on-prem deployment");
-            return ERROR.toUpperCase();
-        }
-        
-        Config.AzureConfig azureConfig = (Config.AzureConfig) ConfigsDao.instance.findOne("_id", "AZURE-ankush");
-        if (SsoUtils.isAnySsoActive() && azureConfig == null) {
+        String idString = String.valueOf(Context.accountId.get());
+        SAMLConfig samlConfig = (SAMLConfig) SSOConfigsDao.instance.findOne(
+            Filters.and(
+                Filters.eq(Constants.ID, idString),
+                Filters.eq("configType", configType.name())
+            )
+        );
+        if (SsoUtils.isAnySsoActive() && samlConfig == null) {
             addActionError("A different SSO Integration already exists.");
             return ERROR.toUpperCase();
         }
 
-        if (azureConfig != null) {
-            this.loginUrl = azureConfig.getLoginUrl();
-            this.azureEntityId = azureConfig.getAzureEntityId();
+        if (samlConfig != null) {
+            this.loginUrl = samlConfig.getLoginUrl();
+            this.ssoEntityId = samlConfig.getEntityId();
         }
 
         return SUCCESS.toUpperCase();
     }
+
     public void setX509Certificate(String x509Certificate) {
         this.x509Certificate = x509Certificate;
     }
 
-    public String getAzureEntityId() {
-        return azureEntityId;
+    public String getSsoEntityId() {
+        return ssoEntityId;
     }
 
-    public void setAzureEntityId(String azureEntityId) {
-        this.azureEntityId = azureEntityId;
+    public void setSsoEntityId(String ssoEntityId) {
+        this.ssoEntityId = ssoEntityId;
     }
 
     public String getLoginUrl() {
@@ -116,5 +118,9 @@ public class AzureSsoAction extends UserAction{
 
     public void setApplicationIdentifier(String applicationIdentifier) {
         this.applicationIdentifier = applicationIdentifier;
+    }
+
+    public void setConfigType(ConfigType configType) {
+        this.configType = configType;
     }
 }

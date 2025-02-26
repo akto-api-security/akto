@@ -1,5 +1,7 @@
 package com.akto.dto.testing;
 
+import java.util.List;
+
 import com.akto.dto.testing.TestResult.Confidence;
 
 public abstract class GenericTestResult {
@@ -43,5 +45,6 @@ public abstract class GenericTestResult {
             ", confidence='" + getConfidence() + "'" +
             "}";
     }
-    
+
+    public abstract List<String> getResponses();    
 }

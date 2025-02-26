@@ -8,11 +8,9 @@ import com.akto.dto.*;
 import com.akto.util.Pair;
 import org.bson.conversions.Bson;
 
-import com.akto.DaoInit;
 import com.akto.action.observe.Utils;
 import com.akto.dao.*;
 import com.akto.billing.UsageMetricUtils;
-import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.usage.MetricTypes;
@@ -24,7 +22,7 @@ import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.testing.CustomTestingEndpoints;
 import com.akto.dto.CollectionConditions.ConditionUtils;
-import com.akto.dto.billing.Organization;
+import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.listener.RuntimeListener;
 import com.akto.log.LoggerMaker;
@@ -44,11 +42,12 @@ import com.mongodb.client.result.DeleteResult;
 import com.mongodb.client.result.UpdateResult;
 import com.mongodb.client.model.Sorts;
 import com.mongodb.client.model.UnwindOptions;
+import com.mongodb.client.model.UpdateOptions;
 import com.opensymphony.xwork2.Action;
 
 public class ApiCollectionsAction extends UserAction {
 
-    private static final LoggerMaker loggerMaker = new LoggerMaker(ApiCollectionsAction.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(ApiCollectionsAction.class, LogDb.DASHBOARD);
 
     List<ApiCollection> apiCollections = new ArrayList<>();
     Map<Integer,Integer> testedEndpointsMaps = new HashMap<>();
@@ -85,7 +84,6 @@ public class ApiCollectionsAction extends UserAction {
             int apiCollectionId = apiCollection.getId();
             Integer count = countMap.get(apiCollectionId);
             int fallbackCount = apiCollection.getUrls()!=null ? apiCollection.getUrls().size() : apiCollection.getUrlsCount();
-		
             if (count != null && (apiCollection.getHostName() != null)) {
                 apiCollection.setUrlsCount(count);
             } else if(ApiCollection.Type.API_GROUP.equals(apiCollection.getType())){
@@ -170,8 +168,16 @@ public class ApiCollectionsAction extends UserAction {
         List<Bson> pipeLine = new ArrayList<>();
         pipeLine.add(Aggregates.project(Projections.fields(
             Projections.computed(ApiCollection.URLS_COUNT, new BasicDBObject("$size", new BasicDBObject("$ifNull", Arrays.asList("$urls", Collections.emptyList())))),
-            Projections.include(ApiCollection.ID, ApiCollection.NAME, ApiCollection.HOST_NAME, ApiCollection._TYPE, ApiCollection.USER_ENV_TYPE, ApiCollection._DEACTIVATED,ApiCollection.START_TS)
+            Projections.include(ApiCollection.ID, ApiCollection.NAME, ApiCollection.HOST_NAME, ApiCollection._TYPE, ApiCollection.USER_ENV_TYPE, ApiCollection._DEACTIVATED,ApiCollection.START_TS, ApiCollection.AUTOMATED)
         )));
+
+        try {
+            List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+            if(collectionIds != null) {
+                pipeLine.add(Aggregates.match(Filters.in(Constants.ID, collectionIds)));
+            }
+        } catch(Exception e){
+        }
         MongoCursor<BasicDBObject> cursor = ApiCollectionsDao.instance.getMCollection().aggregate(pipeLine, BasicDBObject.class).cursor();
         while(cursor.hasNext()){
             try {
@@ -183,6 +189,7 @@ public class ApiCollectionsAction extends UserAction {
                 apiCollection.setHostName(collection.getString(ApiCollection.HOST_NAME));
                 apiCollection.setDeactivated(collection.getBoolean(ApiCollection._DEACTIVATED));
                 apiCollection.setStartTs(collection.getInt(ApiCollection.START_TS));
+                apiCollection.setAutomated(collection.getBoolean(ApiCollection.AUTOMATED));
                 
                 String type = collection.getString(ApiCollection._TYPE);
                 if(type != null && type.length() > 0){
@@ -191,8 +198,7 @@ public class ApiCollectionsAction extends UserAction {
                 }
                 String userEnvType = collection.getString(ApiCollection.USER_ENV_TYPE);
                 if(userEnvType != null && userEnvType.length() > 0){
-                    ApiCollection.ENV_TYPE envEnum = ApiCollection.ENV_TYPE.valueOf(userEnvType);
-                    apiCollection.setUserSetEnvType(envEnum);
+                    apiCollection.setUserSetEnvType(userEnvType);
                 }
                 this.apiCollections.add(apiCollection);
             } catch (Exception e) {
@@ -215,7 +221,7 @@ public class ApiCollectionsAction extends UserAction {
     private String collectionName;
 
     private boolean isValidApiCollectionName(){
-        if (this.collectionName == null) {
+        if (this.collectionName == null || this.collectionName.length() == 0) {
             addActionError("Invalid collection name");
             return false;
         }
@@ -259,6 +265,27 @@ public class ApiCollectionsAction extends UserAction {
         this.apiCollections = new ArrayList<>();
         this.apiCollections.add(apiCollection);
 
+        try {
+            int userId = Context.userId.get();
+            int accountId = Context.accountId.get();
+    
+            /*
+             * Since admin has all access, we don't update any collections for them.
+             */
+            RBACDao.instance.getMCollection().updateOne(
+                    Filters.and(
+                            Filters.eq(RBAC.USER_ID, userId),
+                            Filters.eq(RBAC.ACCOUNT_ID, accountId),
+                            Filters.ne(RBAC.ROLE, RBAC.Role.ADMIN.getName())
+                    ),
+                    Updates.addToSet(RBAC.API_COLLECTIONS_ID, apiCollection.getId()),
+                    new UpdateOptions().upsert(false)
+            );
+    
+            UsersCollectionsList.deleteCollectionIdsFromCache(userId, accountId);
+        } catch(Exception e){
+        }
+        
         ActivitiesDao.instance.insertActivity("Collection created", "new Collection " + this.collectionName + " created");
 
         return Action.SUCCESS.toUpperCase();
@@ -278,6 +305,16 @@ public class ApiCollectionsAction extends UserAction {
                 continue;
             }
             apiCollectionIds.add(apiCollection.getId());
+        }
+
+        boolean hasApiGroups = false;
+
+        List<ApiCollection> apiGroupsList = ApiCollectionsDao.instance.fetchApiGroups();
+        for(ApiCollection apiGroup : apiGroupsList) {
+            if(apiCollectionIds.contains(apiGroup.getId())) {
+                hasApiGroups = true;
+                apiCollectionIds.remove(Integer.valueOf(apiGroup.getId()));
+            }
         }
 
         ApiCollectionsDao.instance.deleteAll(Filters.in("_id", apiCollectionIds));
@@ -321,6 +358,18 @@ public class ApiCollectionsAction extends UserAction {
             ApiCollectionUsers.updateApiCollection(collection.getConditions(), collection.getId());
         }
 
+        try {
+            int userId = Context.userId.get();
+            int accountId = Context.accountId.get();
+            UsersCollectionsList.deleteCollectionIdsFromCache(userId, accountId);
+        } catch (Exception e) {
+        }
+
+        if(hasApiGroups) {
+            addActionError("API groups cannot be deleted!");
+            return ERROR.toUpperCase();
+        }
+
         return SUCCESS.toUpperCase();
     }
 
@@ -346,8 +395,11 @@ public class ApiCollectionsAction extends UserAction {
             return ERROR.toUpperCase();
         }
 
+        loggerMaker.infoAndAddToDb("Started adding " + this.apiList.size() + " apis into custom collection.", LogDb.DASHBOARD);
+
         CustomTestingEndpoints condition = new CustomTestingEndpoints(apiList, CustomTestingEndpoints.Operator.OR);
         apiCollection.addToConditions(condition);
+        loggerMaker.infoAndAddToDb("Final conditions for collection: " +  apiCollection.getName() + " are: " + apiCollection.getConditions().toString());
         ApiCollectionUsers.updateApiCollection(apiCollection.getConditions(), apiCollection.getId());
         ApiCollectionUsers.addToCollectionsForCollectionId(apiCollection.getConditions(), apiCollection.getId());
 
@@ -439,6 +491,19 @@ public class ApiCollectionsAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    public String updateCustomCollection(){
+        Bson filter = Filters.eq(Constants.ID, this.apiCollectionId);
+        ApiCollection collection = ApiCollectionsDao.instance.findOne(filter);
+        if(collection == null){
+            addActionError("No collection with id exists.");
+            return ERROR.toUpperCase();
+        }
+        List<TestingEndpoints> conditions = generateConditions(this.conditions);
+        ApiCollectionsDao.instance.updateOneNoUpsert(filter, Updates.set(ApiCollection.CONDITIONS_STRING, conditions));
+        ApiCollectionUsers.computeCollectionsForCollectionId(conditions, collection.getId());
+        return SUCCESS.toUpperCase();
+    }
+
     int apiCount;
 
     public String getEndpointsListFromConditions() {
@@ -447,7 +512,7 @@ public class ApiCollectionsAction extends UserAction {
         InventoryAction inventoryAction = new InventoryAction();
         inventoryAction.attachAPIInfoListInResponse(list,-1);
         this.setResponse(inventoryAction.getResponse());
-        response.put("apiCount", ApiCollectionUsers.getApisCountFromConditions(conditions, new ArrayList<>(deactivatedCollections)));
+        response.put("apiCount", ApiCollectionUsers.getApisCountFromConditionsWithStis(conditions, new ArrayList<>(deactivatedCollections)));
         return SUCCESS.toUpperCase();
     }
     public String getEndpointsFromConditions(){
@@ -515,7 +580,7 @@ public class ApiCollectionsAction extends UserAction {
         sensitiveSubtypes.addAll(SingleTypeInfoDao.instance.sensitiveSubTypeNames());
 
         List<String> sensitiveSubtypesInRequest = SingleTypeInfoDao.instance.sensitiveSubTypeInRequestNames();
-        this.sensitiveUrlsInResponse = SingleTypeInfoDao.instance.getSensitiveApisCount(sensitiveSubtypes, true, Filters.empty());
+        this.sensitiveUrlsInResponse = SingleTypeInfoDao.instance.getSensitiveApisCount(sensitiveSubtypes, true, Filters.nin(SingleTypeInfo._API_COLLECTION_ID, deactivatedCollections));
 
         sensitiveSubtypes.addAll(sensitiveSubtypesInRequest);
         this.sensitiveSubtypesInCollection = SingleTypeInfoDao.instance.getSensitiveSubtypesDetectedForCollection(sensitiveSubtypes);
@@ -542,6 +607,14 @@ public class ApiCollectionsAction extends UserAction {
     public String fetchRiskScoreInfo(){
         Map<Integer, Double> riskScoreMap = new HashMap<>();
         List<Bson> pipeline = new ArrayList<>();
+
+        try {
+            List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+            if(collectionIds != null) {
+                pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
+            }
+        } catch(Exception e){
+        }
 
         /*
          * Use Unwind to unwind the collectionIds field resulting in a document for each collectionId in the collectionIds array
@@ -678,7 +751,7 @@ public class ApiCollectionsAction extends UserAction {
 
     List<Integer> apiCollectionIds;
 
-    private ENV_TYPE envType;
+    private String envType;
 
 	public String updateEnvType(){
         try {
@@ -686,9 +759,22 @@ public class ApiCollectionsAction extends UserAction {
             FindOneAndUpdateOptions updateOptions = new FindOneAndUpdateOptions();
             updateOptions.upsert(false);
 
+            /*
+            * User can only update collections which they have access to.
+            * so we remove entries which are not in the collections access list.
+            */
+            try {
+                List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+                if(collectionIds != null) {
+                    apiCollectionIds.removeIf(apiCollectionId -> !collectionIds.contains(apiCollectionId));
+                    filter =  Filters.in(Constants.ID, apiCollectionIds);
+                }
+            } catch(Exception e){
+            }
+
             UpdateResult result = ApiCollectionsDao.instance.getMCollection().updateMany(filter,
                                             Updates.set(ApiCollection.USER_ENV_TYPE,envType)
-                                    );;
+                                    );
             if(result == null){
                 return Action.ERROR.toUpperCase();
             }
@@ -697,6 +783,84 @@ public class ApiCollectionsAction extends UserAction {
             e.printStackTrace();
         }
         return Action.ERROR.toUpperCase();
+    }
+
+    public Map<String, List<Integer>> userCollectionMap = new HashMap<>();
+
+    public String updateUserCollections() {
+        int accountId = Context.accountId.get();
+
+        for(Map.Entry<String, List<Integer>> entry : userCollectionMap.entrySet()) {
+            int userId = Integer.parseInt(entry.getKey());
+            Set<Integer> apiCollections = new HashSet<>(entry.getValue());
+
+            /*
+             * Need actual role, not base role, 
+             * thus using direct Rbac query, not cached map.
+             */
+            RBAC rbac = RBACDao.instance.findOne(Filters.and(
+                    Filters.eq(RBAC.USER_ID, userId),
+                    Filters.eq(RBAC.ACCOUNT_ID, accountId)));
+            String role = rbac.getRole();
+            CustomRole customRole = CustomRoleDao.instance.findRoleByName(role);
+            /*
+             * If the role is custom role, only update the user with the delta.
+             */
+            if (customRole != null && customRole.getApiCollectionsId() != null
+                    && !customRole.getApiCollectionsId().isEmpty()) {
+                apiCollections.removeAll(customRole.getApiCollectionsId());
+            }
+
+            RBACDao.updateApiCollectionAccess(userId, accountId, apiCollections);
+            UsersCollectionsList.deleteCollectionIdsFromCache(userId, accountId);
+        }
+
+        return SUCCESS.toUpperCase();
+    }
+
+
+    HashMap<Integer, List<Integer>> usersCollectionList;
+    public String getAllUsersCollections() {
+        int accountId = Context.accountId.get();
+        this.usersCollectionList = RBACDao.instance.getAllUsersCollections(accountId);
+
+        return SUCCESS.toUpperCase();
+    }
+
+    public void setUserCollectionMap(Map<String, List<Integer>> userCollectionMap) {
+        this.userCollectionMap = userCollectionMap;
+    }
+
+    public HashMap<Integer, List<Integer>> getUsersCollectionList() {
+        return this.usersCollectionList;
+    }
+    public String editCollectionName() {
+        if(!isValidApiCollectionName()){
+            return ERROR.toUpperCase();
+        }
+
+        ApiCollection apiCollection = ApiCollectionsDao.instance.getMeta(apiCollectionId);
+        if (apiCollection == null) {
+            String errorMessage = "API collection not found";
+            addActionError(errorMessage);
+            return Action.ERROR.toUpperCase();
+        }
+
+        if (apiCollection.getHostName() != null) {
+            String errorMessage = "Unable to modify the Traffic API collection";
+            addActionError(errorMessage);
+            return Action.ERROR.toUpperCase();
+        }
+
+        ApiCollectionsDao.instance.updateOne(
+            Filters.eq(ApiCollection.ID, apiCollectionId),
+            Updates.combine(
+                Updates.set(ApiCollection.NAME, collectionName),
+                Updates.set("displayName", collectionName)
+            )
+        );
+
+        return Action.SUCCESS.toUpperCase();
     }
 
     public List<ApiCollection> getApiCollections() {
@@ -779,7 +943,7 @@ public class ApiCollectionsAction extends UserAction {
         this.redacted = redacted;
     }
 
-    public void setEnvType(ENV_TYPE envType) {
+    public void setEnvType(String envType) {
 		this.envType = envType;
 	}
 

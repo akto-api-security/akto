@@ -94,6 +94,21 @@ public class BackwardCompatibility {
     public static final String ADD_DEFAULT_FILTERS = "addDefaultFilters";
     private int addDefaultFilters;
 
+    public static final String MOVE_AZURE_SAML = "moveAzureSamlToNormalSaml";
+    private int moveAzureSamlToNormalSaml;
+
+    public static final String DELETE_OPTIONS_API = "deleteOptionsAPIs";
+    private int deleteOptionsAPIs;
+
+    public static final String MOVE_OKTA_OIDC_SSO = "moveOktaOidcSSO";
+    private int moveOktaOidcSSO;
+
+    public static final String MARK_SUMMARIES_NEW_FOR_VULNERABLE = "markSummariesVulnerable";
+    private int markSummariesVulnerable;
+
+    public static final String CHANGE_OPERATOR_CONDITION_IN_CDT = "changeOperatorConditionInCDT";
+    private int changeOperatorConditionInCDT;
+
     public BackwardCompatibility(int id, int dropFilterSampleData, int resetSingleTypeInfoCount, int dropWorkflowTestResult,
                                  int readyForNewTestingFramework,int addAktoDataTypes, boolean deploymentStatusUpdated,
                                  int authMechanismData, boolean mirroringLambdaTriggered, int deleteAccessListFromApiToken,
@@ -103,7 +118,8 @@ public class BackwardCompatibility {
                                  int loginSignupGroups, int vulnerableApiUpdationVersionV1, int riskScoreGroups,
                                  int deactivateCollections, int disableAwsSecretPii, int apiCollectionAutomatedField, 
                                  int automatedApiGroups, int addAdminRoleIfAbsent, int dropSpecialCharacterApiCollections, int fixApiAccessType,
-                                 int addDefaultFilters) {
+                                 int addDefaultFilters, int moveAzureSamlToNormalSaml, int deleteOptionsAPIs, int moveOktaOidcSSO, int markSummariesVulnerable,
+                                 int changeOperatorConditionInCDT) {
         this.id = id;
         this.dropFilterSampleData = dropFilterSampleData;
         this.resetSingleTypeInfoCount = resetSingleTypeInfoCount;
@@ -133,6 +149,11 @@ public class BackwardCompatibility {
         this.addAdminRoleIfAbsent = addAdminRoleIfAbsent;
         this.dropSpecialCharacterApiCollections = dropSpecialCharacterApiCollections;
         this.fixApiAccessType = fixApiAccessType;
+        this.moveAzureSamlToNormalSaml = moveAzureSamlToNormalSaml;
+        this.deleteOptionsAPIs = deleteOptionsAPIs;
+        this.moveOktaOidcSSO = moveOktaOidcSSO;
+        this.markSummariesVulnerable = markSummariesVulnerable;
+        this.changeOperatorConditionInCDT = changeOperatorConditionInCDT;
     }
 
     public BackwardCompatibility() {
@@ -400,5 +421,45 @@ public class BackwardCompatibility {
 
     public void setAddDefaultFilters(int addDefaultFilters) {
         this.addDefaultFilters = addDefaultFilters;
+    }
+
+    public int getMoveAzureSamlToNormalSaml() {
+        return moveAzureSamlToNormalSaml;
+    }
+
+    public void setMoveAzureSamlToNormalSaml(int moveAzureSamlToNormalSaml) {
+        this.moveAzureSamlToNormalSaml = moveAzureSamlToNormalSaml;
+    }
+
+    public int getDeleteOptionsAPIs() {
+        return deleteOptionsAPIs;
+    }
+
+    public void setDeleteOptionsAPIs(int deleteOptionsAPIs) {
+        this.deleteOptionsAPIs = deleteOptionsAPIs;
+    }
+
+    public int getMoveOktaOidcSSO() {
+        return moveOktaOidcSSO;
+    }
+
+    public void setMoveOktaOidcSSO(int moveOktaOidcSSO) {
+        this.moveOktaOidcSSO = moveOktaOidcSSO;
+    }
+
+    public int getMarkSummariesVulnerable() {
+        return markSummariesVulnerable;
+    }
+
+    public void setMarkSummariesVulnerable(int markSummariesVulnerable) {
+        this.markSummariesVulnerable = markSummariesVulnerable;
+    }
+
+    public int getChangeOperatorConditionInCDT() {
+        return changeOperatorConditionInCDT;
+    }
+
+    public void setChangeOperatorConditionInCDT(int changeOperatorConditionInCDT) {
+        this.changeOperatorConditionInCDT = changeOperatorConditionInCDT;
     }
 }

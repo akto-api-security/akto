@@ -9,6 +9,7 @@ import {ResourcesMajor,
   CalendarMinor,
   ReplayMinor,
   PlayMinor,
+  LockMajor
 } from '@shopify/polaris-icons';
 import React from 'react'
 import { Text,HorizontalStack, Badge, Link, List, Box, Icon, Avatar, Tag, Tooltip} from '@shopify/polaris';
@@ -22,6 +23,10 @@ import { CellType } from "@/apps/dashboard/components/tables/rows/GithubRow";
 import LocalStore from "../../../main/LocalStorageStore";
 
 let headers = [
+    {
+      title: '',
+      type: CellType.COLLAPSIBLE
+    },
     {
       value: "nameComp",
       title: 'Issue name',
@@ -53,16 +58,14 @@ let headers = [
       title: 'Scanned',
       sortActive: true
     },
-    {
-      title: '',
-      type: CellType.COLLAPSIBLE
-    }
 ]
 
 const MAX_SEVERITY_THRESHOLD = 100000;
 
 function getStatus(state) {
-  return state._name ? state._name : (state.name ? state.name : state)
+  if (state)
+    return state._name ? state._name : (state.name ? state.name : state)
+  return "UNKNOWN"
 }
 
 function getOrderPriority(state) {
@@ -81,7 +84,7 @@ function getTestingRunType(testingRun, testingRunResultSummary, cicd) {
   if (testingRunResultSummary.metadata != null || cicd) {
     return 'CI/CD';
   }
-  if (testingRun.state === "SCHEDULED" && testingRun.periodInSeconds !== 0) {
+  if (testingRun.periodInSeconds > 0) {
     return 'Recurring';
   }
   return 'One-time'
@@ -169,6 +172,7 @@ function getCveLink(item) {
 }
 
 const transform = {
+
   tagList: (list, linkType) => {
 
     let ret = list?.map((tag, index) => {
@@ -214,15 +218,16 @@ const transform = {
     },
     prepareCountIssues : (data) => {
       let obj={
-        'High': data['HIGH'] || 0,
-        'Medium': data['MEDIUM'] || 0,
-        'Low': data['LOW'] || 0
+        'Critical': (data && data['CRITICAL']) ? data['CRITICAL'] : 0,
+        'High': (data && data['HIGH']) ? data['HIGH'] : 0,
+        'Medium':(data && data['MEDIUM']) ? data['MEDIUM'] : 0,
+        'Low': (data && data['LOW']) ? data['LOW'] : 0
       };
       return obj;
     },
     prettifyTestName: (testName, icon, iconColor, iconToolTipContent)=>{
       return(
-        <HorizontalStack gap={4}>
+        <HorizontalStack wrap={false} gap={4}>
           <Tooltip content={iconToolTipContent} hoverDelay={"300"} dismissOnMouseOut>
             <Box><Icon source={icon} color={iconColor}/></Box>
           </Tooltip>
@@ -249,12 +254,9 @@ const transform = {
     if (testingRunResultSummary == null) {
       testingRunResultSummary = {};
     }
-    if (testingRunResultSummary.countIssues != null) {
-      testingRunResultSummary.countIssues = transform.prepareCountIssues(testingRunResultSummary.countIssues);
-    }
 
-    let state = data.state;
-    if (checkTestFailure(testingRunResultSummary.state, state)) {
+    let state = cicd ? testingRunResultSummary.state : data.state ;
+    if (cicd !== true && checkTestFailure(testingRunResultSummary.state, state)) {
       state = 'FAIL'
     }
 
@@ -278,10 +280,10 @@ const transform = {
       obj['name'] = data.name || "Test"
       obj['number_of_tests'] = data.testIdConfig == 1 ? "-" : getTestsInfo(testingRunResultSummary?.testResultsCount, state)
       obj['run_type'] = getTestingRunType(data, testingRunResultSummary, cicd);
-      obj['run_time_epoch'] = Math.max(data.scheduleTimestamp,data.endTimestamp)
+      obj['run_time_epoch'] = Math.max(data.scheduleTimestamp, (cicd ? testingRunResultSummary.endTimestamp : data.endTimestamp))
       obj['scheduleTimestamp'] = data.scheduleTimestamp
       obj['pickedUpTimestamp'] = data.pickedUpTimestamp
-      obj['run_time'] = getRuntime(data.scheduleTimestamp ,data.endTimestamp, state)
+      obj['run_time'] = getRuntime(data.scheduleTimestamp , (cicd ? testingRunResultSummary.endTimestamp : data.endTimestamp), state)
       obj['severity'] = func.getSeverity(testingRunResultSummary.countIssues)
       obj['total_severity'] = getTotalSeverity(testingRunResultSummary.countIssues);
       obj['severityStatus'] = func.getSeverityStatus(testingRunResultSummary.countIssues)
@@ -300,7 +302,7 @@ const transform = {
         const prettifiedTest={
           ...obj,
           testName: transform.prettifyTestName(data.name || "Test", iconObj.icon,iconObj.color, iconObj.tooltipContent),
-          severity: observeFunc.getIssuesList(transform.filterObjectByValueGreaterThanZero(testingRunResultSummary.countIssues || {"HIGH" : 0, "MEDIUM": 0, "LOW": 0}))
+          severity: observeFunc.getIssuesList(transform.filterObjectByValueGreaterThanZero(testingRunResultSummary.countIssues || {"CRITICAL": 0, "HIGH" : 0, "MEDIUM": 0, "LOW": 0}))
         }
         return prettifiedTest
       }else{
@@ -475,6 +477,27 @@ const transform = {
             </HorizontalStack>
           )
           break;
+        case "Compliance":
+          if (category?.compliance?.mapComplianceToListClauses && Object.keys(category?.compliance?.mapComplianceToListClauses).length > 0) {
+            sectionLocal.content = (
+              <HorizontalStack gap="2">
+                {
+                  Object.keys(category?.compliance?.mapComplianceToListClauses).map((compliance, index) => {
+                    return (
+                      <Tag key={index} background="white">
+                        <HorizontalStack wrap="false" gap={1}>
+                          <Avatar source={func.getComplianceIcon(compliance)} shape="square"  size="extraSmall"/>
+                          <Text>{compliance}</Text>
+                        </HorizontalStack>  
+                      </Tag>
+                    )
+                  })
+                }
+              </HorizontalStack>
+            )
+          }
+          break;
+
         case "References":
           if (category?.references == null || category?.references == undefined || category?.references.length == 0) {
             return;
@@ -593,10 +616,46 @@ const transform = {
     }
     return conditions;
   },
+  async getAllSubcategoriesData(fetchActive,type){
+    let finalDataSubCategories = [], promises = [], categories = [];
+    let testSourceConfigs = []
+    const limit = 50;
+    for(var i = 0 ; i < 25; i++){
+      promises.push(
+        api.fetchAllSubCategories(fetchActive, type, i * limit, limit)
+      )
+    }
+    const allResults = await Promise.allSettled(promises);
+    for (const result of allResults) {
+      if (result.status === "fulfilled"){
+        if(result?.value?.subCategories && result?.value?.subCategories !== undefined && result?.value?.subCategories.length > 0){
+          finalDataSubCategories.push(...result.value.subCategories);
+        }
+
+        if(result?.value?.categories && result?.value?.categories !== undefined && result?.value?.categories.length > 0){
+          if(categories.length === 0){
+            categories.push(...result.value.categories);
+          }
+        }
+
+        if (result?.value?.testSourceConfigs &&
+          result?.value?.testSourceConfigs !== undefined &&
+          result?.value?.testSourceConfigs.length > 0) {
+          testSourceConfigs = result?.value?.testSourceConfigs
+        }
+      }
+    }
+    return {
+      categories: categories,
+      subCategories: finalDataSubCategories,
+      testSourceConfigs: testSourceConfigs
+    }
+  },
   async setTestMetadata() {
-    const resp = await api.fetchAllSubCategories(true, "Dashboard");
+    const resp = await this.getAllSubcategoriesData(false, "Dashboard")
     let subCategoryMap = {};
     resp.subCategories.forEach((x) => {
+      func.trimContentFromSubCategory(x)
       subCategoryMap[x.name] = x;
     });
     let subCategoryFromSourceConfigMap = {};
@@ -639,6 +698,12 @@ getInfoSectionsHeaders(){
       tooltipContent: 'Category info about the test.'
     },
     {
+      icon: LockMajor,
+      title: "Compliance",
+      content: "",
+      tooltipContent: "Compliances for the above test"
+    },
+    {
       icon: CreditCardSecureMajor,
       title: "CWE",
       content: "",
@@ -660,7 +725,7 @@ getInfoSectionsHeaders(){
       icon: ResourcesMajor,
       title: "References",
       content: "",
-      tooltipContent: "References for the above test."
+      tooltipContent: "References for the above test"
     },
     {
       icon: ResourcesMajor,
@@ -674,6 +739,7 @@ getInfoSectionsHeaders(){
 convertSubIntoSubcategory(resp){
   let obj = {}
   let countObj = {
+    CRITICAL: 0,
     HIGH: 0,
     MEDIUM: 0,
     LOW: 0,
@@ -774,7 +840,7 @@ getPrettifiedTestRunResults(testRunResults){
   const errorsObject = TestingStore.getState().errorsObject
   let testRunResultsObj = {}
   testRunResults.forEach((test)=>{
-    let key = test.name + ': ' + test.vulnerable
+    let key = test.name + ': ' + test.vulnerable + ": " + test.severity
     let error_message = ""
     if(test?.errorsList.length > 0){
       const errorType = this.getTestErrorType(test.errorsList[0])
@@ -833,7 +899,9 @@ getPrettifiedTestRunResults(testRunResults){
     let prettifiedObj = {
       ...obj,
       nameComp: <div data-testid={obj.name}><Box maxWidth="250px"><TooltipText tooltip={obj.name} text={obj.name} textProps={{fontWeight: 'medium'}}/></Box></div>,
-      severityComp: obj?.vulnerable === true ? <Badge size="small" status={func.getTestResultStatus(obj?.severity[0])}>{obj?.severity[0]}</Badge> : <Text>-</Text>,
+      severityComp: obj?.vulnerable === true ? <div className={`badge-wrapper-${obj?.severity[0].toUpperCase()}`}>
+      <Badge size="small" status={func.getTestResultStatus(obj?.severity[0])}>{obj?.severity[0]}</Badge>
+  </div>: <Text>-</Text>,
       cweDisplayComp: obj?.cweDisplay?.length > 0 ? <HorizontalStack gap={1} wrap={false}>
         {obj.cweDisplay.map((ele,index)=>{
           return(
@@ -858,7 +926,7 @@ getTestingRunResultUrl(testingResult){
   return methodObj.method + " " + truncatedUrl
   
 },
-getRowInfo(severity, apiInfo,jiraIssueUrl, sensitiveData){
+getRowInfo(severity, apiInfo,jiraIssueUrl, sensitiveData, isIgnored){
   let auth_type = apiInfo["allAuthTypesFound"].join(", ")
   let access_type = null
   let access_types = apiInfo["apiAccessTypes"]
@@ -896,7 +964,7 @@ getRowInfo(severity, apiInfo,jiraIssueUrl, sensitiveData){
   const rowItems = [
     {
       title: 'Severity',
-      value: <Text fontWeight="semibold" color={observeFunc.getColor(severity)}>{severity}</Text>,
+      value: isIgnored ? <Text fontWeight="semibold">Ignored</Text> : <Text fontWeight="semibold"><span style={{color: observeFunc.getColor(severity)}}>{severity}</span></Text>,
       tooltipContent: "Severity of the test run result"
     },
     {
@@ -1002,7 +1070,7 @@ getActions(item){
   if(item.orderPriority === 1){
     actionsList[1].disabled = true
   }
-  if(item['run_type'] === 'One-time'){
+  if(item['run_type'] === 'One-time' || item['run_type'] === 'CI/CD'){
     section1.items.push(actionsList[1])
   }
   if(item['run_type'] !== 'CI/CD'){
@@ -1063,7 +1131,47 @@ getMissingConfigs(testResults){
   })
 
   return [...configsSet]
-}
+},
+  prepareConditionsForTesting(conditions){
+    let tempObj = {};
+    conditions.forEach((condition) => {
+      if(tempObj.hasOwnProperty(condition?.operator?.type)){
+        tempObj[condition?.operator?.type].push(condition.data)
+      }else{
+        tempObj[condition?.operator?.type] = [condition.data]
+      }
+    })
+
+    return Object.keys(tempObj).map((key) => {
+      return {
+        operatorType: key,
+        operationsGroupList: tempObj[key],
+      };
+    });
+  },
+  prepareEditableConfigObject(testRun,settings,hexId){
+    const tests = testRun.tests;
+    const selectedTests = []
+        Object.keys(tests).forEach(category => {
+            tests[category].forEach(test => {
+                if (test.selected) selectedTests.push(test.value)
+            })
+        })
+
+    return {
+      configsAdvancedSettings:settings,
+      testRoleId: testRun.testRoleId,
+      testSubCategoryList: selectedTests,
+      overriddenTestAppUrl: testRun.hasOverriddenTestAppUrl ? testRun.overriddenTestAppUrl : "",
+      maxConcurrentRequests: testRun.maxConcurrentRequests,
+      testingRunHexId: hexId,
+      testRunTime: testRun.testRunTime,
+      sendSlackAlert: testRun.sendSlackAlert,
+      sendMsTeamsAlert:testRun.sendMsTeamsAlert,
+      recurringDaily: testRun.recurringDaily,
+      continuousTesting: testRun.continuousTesting,
+    }
+  }
 }
 
 export default transform

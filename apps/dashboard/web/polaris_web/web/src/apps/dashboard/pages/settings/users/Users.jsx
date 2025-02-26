@@ -1,9 +1,14 @@
-import { ActionList, Avatar, Banner, Box, Button, Icon, LegacyCard, Link, Page, Popover, ResourceItem, ResourceList, Text } from "@shopify/polaris"
-import { DeleteMajor, TickMinor } from "@shopify/polaris-icons"
-import { useEffect, useState } from "react";
+import { ActionList, Avatar, Banner, Box, Button, HorizontalStack, Icon, LegacyCard, Link, Page, Popover, ResourceItem, ResourceList, Text, Modal, TextField } from "@shopify/polaris"
+import { DeleteMajor, TickMinor, PasskeyMajor } from "@shopify/polaris-icons"
+import { useEffect, useState, useRef } from "react";
 import settingRequests from "../api";
 import func from "@/util/func";
 import InviteUserModal from "./InviteUserModal";
+import PersistStore from "../../../../main/PersistStore";
+import SearchableResourceList from "../../../components/shared/SearchableResourceList";
+import ResourceListModal from "../../../components/shared/ResourceListModal";
+import observeApi from "../../observe/api";
+import { usersCollectionRenderItem } from "../rbac/utils";
 
 const Users = () => {
     const username = window.USER_NAME
@@ -18,10 +23,60 @@ const Users = () => {
 
     const [loading, setLoading] = useState(false)
     const [users, setUsers] = useState([])
+    const [usersCollection, setUsersCollection] = useState([])
     const [roleHierarchy, setRoleHierarchy] = useState([])
-    const rbacAccess = func.checkForRbacFeature();
+    const [allCollections, setAllCollections] = useState([])
+    let rbacAccess = func.checkForRbacFeatureBasic();
+    let rbacAccessAdvanced =  func.checkForRbacFeature()
+
+    const collectionsMap = PersistStore(state => state.collectionsMap)
+
+    const [selectedItems, setSelectedItems] = useState({})
+
+    const handleSelectedItems = (id, items) => {
+        setSelectedItems(prevSelectedItems => ({
+            ...prevSelectedItems,
+            [id]: items
+        }));
+    }
 
     const [roleSelectionPopup, setRoleSelectionPopup] = useState({})
+
+    const [passwordResetState, setPasswordResetState] = useState({
+        passwordResetLogin: "",
+        confirmPasswordResetActive: false,
+        passwordResetLinkActive: false,
+        passwordResetLink: ""
+    })
+      
+    const setPasswordResetStateHelper = (field, value) => {
+        setPasswordResetState(prevState => ({
+            ...prevState,
+            [field]: value
+        }))
+    }
+
+    const ref = useRef(null)
+
+    const resetPassword = async () => {
+        await settingRequests.resetUserPassword(passwordResetState.passwordResetLogin).then((resetPasswordLink) => {
+            setPasswordResetStateHelper("passwordResetLinkActive", true)
+            setPasswordResetStateHelper("passwordResetLink", resetPasswordLink)
+        })
+    }
+
+    const closePasswordResetToggle = () => {
+        setPasswordResetStateHelper("passwordResetLinkActive", false)
+        setPasswordResetStateHelper("confirmPasswordResetActive", false)
+        setPasswordResetStateHelper("passwordResetLink", "")
+    }
+
+    const handleCopyPasswordResetLink = () => {
+        func.copyToClipboard(passwordResetState.passwordResetLink, ref, "Password reset link copied to clipboard")
+    }
+
+    const [customRoles, setCustomRoles] = useState([])
+    const [defaultInviteRole, setDefaultInviteRole] = useState('MEMBER')
 
     let paidFeatureRoleOptions =  rbacAccess ? [
         {
@@ -31,10 +86,14 @@ const Users = () => {
         {
             content: 'Guest',
             role: 'GUEST',
-        }
+        }, ...customRoles
     ] : []
 
-    const rolesOptions = [
+    const websiteHostName = window.location.origin
+    const notOnPremHostnames = ["app.akto.io", "localhost", "127.0.0.1", "[::1]"]
+    const isOnPrem = websiteHostName && !notOnPremHostnames.includes(window.location.hostname)
+
+    let rolesOptions = [
         {
             items: [
             {
@@ -47,30 +106,65 @@ const Users = () => {
             }, ...paidFeatureRoleOptions]
         },
         {
-            items: [{
-                destructive: true,
-                content: 'Remove',
-                role: 'REMOVE',
-                icon: DeleteMajor
-            }]
+            items: [
+                isOnPrem && {
+                    destructive: false,
+                    content: 'Reset Password',
+                    role: 'RESET_PASSWORD',
+                    icon: PasskeyMajor
+                },
+                {
+                    destructive: true,
+                    content: 'Remove',
+                    role: 'REMOVE',
+                    icon: DeleteMajor
+                }
+            ]
         }
     ]
 
     const getRoleHierarchy = async() => {
-        let roleHierarchyResp = await settingRequests.getRoleHierarchy(window.USER_ROLE)
+        let roleHierarchyResp = await settingRequests.getRoleHierarchy()
         if(roleHierarchyResp.includes("MEMBER")){
             roleHierarchyResp.push("SECURITY ENGINEER")
         }
         if(window.USER_ROLE === 'ADMIN'){
             roleHierarchyResp.push('REMOVE')
+            roleHierarchyResp.push('RESET_PASSWORD')
         }
+
+        const customRolesResponse = await settingRequests.getCustomRoles()
+        if(customRolesResponse.roles){
+            setCustomRoles(customRolesResponse.roles.map(x => {
+
+                if(roleHierarchyResp.includes(x.baseRole)){
+                    roleHierarchyResp.push(x.name)
+                }
+                if(x.defaultInviteRole){
+                    setDefaultInviteRole(x.name)
+                }
+
+                return {
+                    content: x.name,
+                    role: x.name
+                }
+            }))
+        }
+
         setRoleHierarchy(roleHierarchyResp)
-        
+
     }
 
     useEffect(() => {
-        getTeamData();
+        if(userRole !== 'GUEST') {
+            getTeamData();
+        }
         getRoleHierarchy()
+
+        setAllCollections(Object.entries(collectionsMap).map(([id, collectionName]) => ({
+            id: parseInt(id, 10),
+            collectionName
+        })));
     }, [])
 
     const handleRoleSelectChange = async (id, newRole, login) => {
@@ -81,12 +175,25 @@ const Users = () => {
             return
         }
 
-        // Call Update Role API
-        setUsers(users.map(user => user.login === login ? { ...user, role: newRole } : user))
-        setRoleSelectionPopup(prevState => ({ ...prevState, [login]: false }))
-        await updateUserRole(login, newRole)
+        if(newRole === 'RESET_PASSWORD') {
+            setPasswordResetStateHelper("confirmPasswordResetActive", true)
+            setPasswordResetStateHelper("passwordResetLogin", login)
+            toggleRoleSelectionPopup(id)
+            return
+        }
 
-        toggleRoleSelectionPopup(id)
+        // Call Update Role API
+        await updateUserRole(login, newRole).then((res) => {
+            try {
+                setUsers(users.map(user => user.login === login ? { ...user, role: newRole } : user))
+                setRoleSelectionPopup(prevState => ({ ...prevState, [login]: false }))
+                toggleRoleSelectionPopup(id)
+                func.setToast(true, false, "Updated user role successfully")
+            } catch (error) {
+            }
+        })
+        
+        await getTeamData();
     }
 
     const toggleRoleSelectionPopup = (id) => {
@@ -101,7 +208,7 @@ const Users = () => {
             ...section,
             items: section.items.filter((c) => roleHierarchy.includes(c.role)).map(item => ({
                 ...item,
-                prefix: item.role === "REMOVE"?  <Box><Icon source={DeleteMajor}/></Box> : item.role === currentRole ? <Box><Icon source={TickMinor}/></Box> : <div style={{padding: "10px"}}/>
+                prefix: item.role === "REMOVE"?  <Box><Icon source={DeleteMajor}/></Box> : item.role === "RESET_PASSWORD" ? <Box><Icon source={PasskeyMajor}/></Box> : item.role === currentRole ? <Box><Icon source={TickMinor}/></Box> : <div style={{padding: "10px"}}/>
             }))
         }));
         return tempArr
@@ -121,7 +228,11 @@ const Users = () => {
     const getTeamData = async () => {
         setLoading(true);
         const usersResponse = await settingRequests.getTeamData()
-        setUsers(usersResponse.users)
+        if(userRole === 'ADMIN') {
+            const usersCollectionList = await observeApi.getAllUsersCollections()
+            setUsersCollection(usersCollectionList)
+        }
+        setUsers(usersResponse)
         setLoading(false)
     };
 
@@ -146,13 +257,17 @@ const Users = () => {
         func.setToast(true, false, "Role updated for " + login + " successfully")
     }
     
+    const getUserApiCollectionIds = (userId) => {
+        return usersCollection[userId] || [];
+    };
+
     return (
         <Page
             title="Users"
             primaryAction={{
                 content: 'Invite user',
                 onAction: () => toggleInviteUserModal(),
-                'disabled': (isLocalDeploy || userRole === 'GUEST')
+                'disabled': (isLocalDeploy || userRole === 'GUEST' || userRole === 'DEVELOPER')
             }}
             divider
         >
@@ -173,10 +288,10 @@ const Users = () => {
             
             <Banner>
                 <Text variant="headingMd">Role permissions</Text>
-                <Text variant="bodyMd">Each role have different permissions. <Link url="https://docs.akto.io/" target="_blank">Learn more</Link></Text>
+                <Text variant="bodyMd">Each role has different permissions. <Link url="https://docs.akto.io/" target="_blank">Learn more</Link></Text>
             </Banner>
 
-            <div style={{ paddingTop: "20px" }}>
+            {userRole !== 'GUEST' && <div style={{ paddingTop: "20px" }}>
                 <LegacyCard>
                     <ResourceList
                         resourceName={{ singular: 'user', plural: 'users' }}
@@ -185,14 +300,60 @@ const Users = () => {
                             const { id, name, login, role } = item;
                             const initials = func.initials(login)
                             const media = <Avatar user size="medium" name={login} initials={initials} />
-                            const shortcutActions = (username !== login && roleHierarchy.includes(role.toUpperCase())) ? 
+
+                            const updateUsersCollection = async () => {
+                                const collectionIdList = selectedItems[id];
+                                const userCollectionMap = {
+                                    [id]: collectionIdList
+                                };
+                                await observeApi.updateUserCollections(userCollectionMap)
+                                func.setToast(true, false, `User's ${selectedItems[id].length} collection${func.addPlurality(selectedItems[id].length)} have been updated!`)
+                                await getTeamData()
+                            }
+
+                            const userCollectionsHandler = () => {
+                                updateUsersCollection()
+                                return true
+                            }
+
+                            const handleSelectedItemsChange = (items) => {
+                                handleSelectedItems(id, items)
+                            }
+
+                            const userCollectionsModalComp = (
+                                <Box>
+                                    <SearchableResourceList
+                                        resourceName={'collection'}
+                                        items={allCollections}
+                                        renderItem={usersCollectionRenderItem}
+                                        isFilterControlEnabale={userRole === 'ADMIN'}
+                                        selectable={userRole === 'ADMIN'}
+                                        onSelectedItemsChange={handleSelectedItemsChange}
+                                        alreadySelectedItems={getUserApiCollectionIds(id)}
+                                    />
+                                </Box>
+                            )
+
+                            const shortcutActions = (username !== login && roleHierarchy.includes(role.toUpperCase())) ?
                                 [
                                     {
-                                        content: <Popover
+                                        content: (
+                                            <HorizontalStack gap={4}>
+                                                { (role === 'ADMIN' || userRole !== 'ADMIN' || !rbacAccessAdvanced) ? undefined :
+                                                    <ResourceListModal
+                                                        title={"Collection list"}
+                                                        activatorPlaceaholder={`${(usersCollection[id] || []).length} collections accessible`}
+                                                        isColoredActivator={true}
+                                                        component={userCollectionsModalComp}
+                                                        primaryAction={userCollectionsHandler}
+                                                    />
+                                                }
+
+                                                <Popover
                                                     active={roleSelectionPopup[id]}
                                                     onClose={() => toggleRoleSelectionPopup(id)}
                                                     activator={<Button disclosure onClick={() => toggleRoleSelectionPopup(id)}>{getRoleDisplayName(role)}</Button>}
-                                                 >
+                                                >
                                                     <ActionList
                                                         actionRole="menuitem"
                                                         sections={getRolesOptionsWithTick(role).map(section => ({
@@ -203,7 +364,9 @@ const Users = () => {
                                                             }))
                                                         }))}
                                                     />
-                                                 </Popover>
+                                                </Popover>
+                                            </HorizontalStack>
+                                        )
                                     }
                                 ] : [
                                     {
@@ -239,8 +402,55 @@ const Users = () => {
                     toggleInviteUserModal={toggleInviteUserModal}
                     roleHierarchy={roleHierarchy}
                     rolesOptions={rolesOptions}
+                    defaultInviteRole={defaultInviteRole}
                 />
-            </div>
+                <Modal
+                    small
+                    open={passwordResetState.confirmPasswordResetActive}
+                    onClose={() => setPasswordResetStateHelper("confirmPasswordResetActive", false)}
+                    title="Password Reset"
+                    primaryAction={{
+                        content: 'Generate',
+                        onAction: resetPassword,
+                    }}
+                    secondaryActions={[
+                        {
+                        content: 'Cancel',
+                        onAction: () => setPasswordResetStateHelper("confirmPasswordResetActive", false),
+                        },
+                    ]}
+                >
+                    <Modal.Section>
+                        <Text>Are you sure you want to generate a link to reset the password for <b>{passwordResetState.passwordResetLogin}</b>?</Text>
+                    </Modal.Section>
+                </Modal>
+
+                <Modal
+                    small
+                    open={passwordResetState.passwordResetLinkActive}
+                    onClose={closePasswordResetToggle}
+                    title="Password Reset"
+                    primaryAction={{
+                        content: 'Copy link',
+                        onAction: handleCopyPasswordResetLink,
+                    }}
+                    secondaryActions={[
+                        {
+                        content: 'Cancel',
+                        onAction: closePasswordResetToggle,
+                        },
+                    ]}
+                >
+                    <Modal.Section>
+                        <TextField
+                            label="Password reset link"
+                            disabled={true}
+                            value={passwordResetState.passwordResetLink}
+                        />
+                        <div ref={ref} />
+                    </Modal.Section>
+                </Modal>
+            </div>}
 
         </Page>
 

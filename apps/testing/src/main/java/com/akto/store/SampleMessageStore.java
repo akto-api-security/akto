@@ -136,6 +136,22 @@ public class SampleMessageStore {
         return filteredMessages;
     }
 
+    public List<RawApi> findSampleMessages(int k) {
+        List<RawApi> samples = new ArrayList<>();
+        if (sampleDataMap == null) return samples;
+
+        for (ApiInfoKey apiInfoKey : sampleDataMap.keySet()) {
+            List<String> messages = sampleDataMap.getOrDefault(apiInfoKey, new ArrayList<>());
+            if (!messages.isEmpty()) {
+                RawApi rawApi = RawApi.buildFromMessage(messages.get(0));
+                samples.add(rawApi);
+            }
+            if (samples.size() >= k) break;
+        }
+
+        return samples;
+    }
+
     public Map<String, SingleTypeInfo> getSingleTypeInfos() {
         return this.singleTypeInfos;
     }

@@ -81,13 +81,6 @@ const RequestEditor = ({sampleApiCall, updatedSampleData, onChangeApiRequest, te
           </div>
         </div>
       </div>
-      <Divider style={{marginTop: "12px"}}></Divider>
-      <div style={{paddingTop: "12px"}}>
-        <div className="request-title">Test Validator Code</div>
-        <div className="request-editor request-editor-payload">
-          <TemplateStringEditor usePureJs={true} defaultText={testValidatorCode} onChange={onChangeTestValidatorCode}/>
-        </div>
-      </div>
       <div style={{minHeight: "24px"}}></div>
     </div>
   )

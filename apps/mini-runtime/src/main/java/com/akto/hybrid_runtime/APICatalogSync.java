@@ -19,6 +19,7 @@ import com.akto.dto.type.SingleTypeInfo.Domain;
 import com.akto.dto.type.SingleTypeInfo.SubType;
 import com.akto.dto.type.SingleTypeInfo.SuperType;
 import com.akto.dto.type.URLMethods.Method;
+import com.akto.graphql.GraphQLUtils;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.data_actor.DataActor;
@@ -525,6 +526,11 @@ public class APICatalogSync {
         SuperType[] newTypes = new SuperType[tokens.length];
 
         int start = newUrl.getUrl().startsWith("http") ? 3 : 0;
+
+        if(HttpResponseParams.isGraphQLEndpoint(newUrl.getUrl())) {
+            return null; // Don't merge GraphQL endpoints
+        }
+
         for(int i = start; i < tokens.length; i ++) {
             String tempToken = tokens[i];
             if(DictionaryFilter.isEnglishWord(tempToken)) continue;
@@ -590,6 +596,11 @@ public class APICatalogSync {
 
         SuperType[] newTypes = new SuperType[newTokens.length];
         int templatizedStrTokens = 0;
+
+        if(HttpResponseParams.isGraphQLEndpoint(dbUrl.getUrl()) || HttpResponseParams.isGraphQLEndpoint(newUrl.getUrl())) {
+            return null; // Don't merge GraphQL endpoints
+        }
+
         for(int i = 0; i < newTokens.length; i ++) {
             String tempToken = newTokens[i];
             String dbToken = dbTokens[i];
@@ -778,9 +789,12 @@ public class APICatalogSync {
     }
 
     Map<String, SingleTypeInfo> convertToMap(List<SingleTypeInfo> l) {
+        Set<MergedUrls> mergedUrls = MergedUrlsDao.instance.getMergedUrls();
         Map<String, SingleTypeInfo> ret = new HashMap<>();
         for(SingleTypeInfo e: l) {
-            ret.put(e.composeKey(), e);
+            if(!mergedUrls.contains(new MergedUrls(e.getUrl(), e.getMethod(), e.getApiCollectionId()))) {
+                ret.put(e.composeKey(), e);
+            }
         }
 
         return ret;

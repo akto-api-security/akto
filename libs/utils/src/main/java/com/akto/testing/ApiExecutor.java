@@ -1,12 +1,13 @@
 package com.akto.testing;
 
 import com.akto.dao.context.Context;
-import com.akto.dao.testing.config.TestScriptsDao;
+import com.akto.dao.test_editor.TestEditorEnums;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
+import com.akto.dto.CollectionConditions.ConditionsType;
+import com.akto.dto.CollectionConditions.TestConfigsAdvancedSettings;
 import com.akto.dto.testing.TestingRunConfig;
 import com.akto.dto.testing.TestingRunResult;
-import com.akto.dto.testing.config.TestScript;
 import com.akto.dto.testing.rate_limit.RateLimitHandler;
 import com.akto.dto.type.URLMethods;
 import com.akto.log.LoggerMaker;
@@ -26,19 +27,11 @@ import java.net.URISyntaxException;
 import java.net.URL;
 import java.util.*;
 
-import javax.script.ScriptContext;
-import javax.script.ScriptEngine;
-import javax.script.ScriptEngineManager;
-import javax.script.SimpleScriptContext;
-import jdk.nashorn.api.scripting.ScriptObjectMirror;
-
 public class ApiExecutor {
-    private static final LoggerMaker loggerMaker = new LoggerMaker(ApiExecutor.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(ApiExecutor.class, LogDb.TESTING);
 
     // Load only first 1 MiB of response body into memory.
     private static final int MAX_RESPONSE_SIZE = 1024*1024;
-    private static Map<Integer, Integer> lastFetchedMap = new HashMap<>();
-    private static Map<Integer, TestScript> testScriptMap = new HashMap<>();
     
     private static OriginalHttpResponse common(Request request, boolean followRedirects, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck, String requestProtocol) throws Exception {
 
@@ -248,18 +241,32 @@ public class ApiExecutor {
         return replaceHostFromConfig(url, testingRunConfig);
     }
 
-    public static OriginalHttpResponse sendRequest(OriginalHttpRequest request, boolean followRedirects, TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck) throws Exception {
-        // don't lowercase url because query params will change and will result in incorrect request
-
-        String url = prepareUrl(request, testingRunConfig);
-
-        if (!(url.contains("insertRuntimeLog") || url.contains("insertTestingLog") || url.contains("insertProtectionLog"))) {
-            loggerMaker.infoAndAddToDb("Final url is: " + url, LogDb.TESTING);
+    public static OriginalHttpResponse sendRequest(OriginalHttpRequest request, boolean followRedirects, TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck, boolean useTestingRunConfig) throws Exception {
+        if(useTestingRunConfig) {
+            return sendRequest(request, followRedirects, testingRunConfig, debug, testLogs, skipSSRFCheck);
+        }else{
+            TestingRunConfig runConfig = new TestingRunConfig();
+            runConfig.setOverriddenTestAppUrl("");
+            runConfig.setConfigsAdvancedSettings(testingRunConfig.getConfigsAdvancedSettings());
+            return sendRequest(request, followRedirects, runConfig, debug, testLogs, skipSSRFCheck);
         }
-        request.setUrl(url);
 
+        
+    }
+
+    public static Request buildRequest(OriginalHttpRequest request, TestingRunConfig testingRunConfig) throws Exception{
+        boolean executeScript = testingRunConfig != null;
+        ApiExecutorUtil.calculateHashAndAddAuth(request, executeScript);
+        String url = prepareUrl(request, testingRunConfig);
+        request.setUrl(url);
         Request.Builder builder = new Request.Builder();
-        String type = request.findContentType();
+        addHeaders(request, builder);
+        builder = builder.url(request.getFullUrlWithParams());
+        Request okHttpRequest = builder.build();
+        return okHttpRequest;
+    }
+
+    private static void addHeaders(OriginalHttpRequest request, Request.Builder builder){
         // add headers
         List<String> forbiddenHeaders = Arrays.asList("content-length", "accept-encoding");
         Map<String, List<String>> headersMap = request.getHeaders();
@@ -275,14 +282,36 @@ public class ApiExecutor {
                 builder.addHeader(headerName, headerValue);
             }
         }
+    }
+
+    public static OriginalHttpResponse sendRequest(OriginalHttpRequest request, boolean followRedirects, TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck) throws Exception {
+        // don't lowercase url because query params will change and will result in incorrect request
+
+        if(testingRunConfig != null && testingRunConfig.getConfigsAdvancedSettings() != null && !testingRunConfig.getConfigsAdvancedSettings().isEmpty()){
+            calculateFinalRequestFromAdvancedSettings(request, testingRunConfig.getConfigsAdvancedSettings());
+        }
+
+        boolean executeScript = testingRunConfig != null;
+        ApiExecutorUtil.calculateHashAndAddAuth(request, executeScript);
+
+        String url = prepareUrl(request, testingRunConfig);
+
+        if (!(url.contains("insertRuntimeLog") || url.contains("insertTestingLog") || url.contains("insertProtectionLog"))) {
+            loggerMaker.infoAndAddToDb("Final url is: " + url, LogDb.TESTING);
+        }
+        request.setUrl(url);
+
+        Request.Builder builder = new Request.Builder();
+        addHeaders(request, builder);
+
+        String type = request.findContentType();
         URLMethods.Method method = URLMethods.Method.fromString(request.getMethod());
 
         builder = builder.url(request.getFullUrlWithParams());
 
-        boolean executeScript = testingRunConfig != null;
-        calculateHashAndAddAuth(request, executeScript);
-
         OriginalHttpResponse response = null;
+        HostValidator.validate(url);
+
         switch (method) {
             case GET:
             case HEAD:
@@ -356,71 +385,37 @@ public class ApiExecutor {
         
     }
 
-    private static void calculateHashAndAddAuth(OriginalHttpRequest originalHttpRequest, boolean executeScript) {
-        if (!executeScript) {
-            loggerMaker.infoAndAddToDb("invalid context for hash calculation, returning");
-            return;
+    private static void calculateFinalRequestFromAdvancedSettings(OriginalHttpRequest originalHttpRequest, List<TestConfigsAdvancedSettings> advancedSettings){
+        Map<String,List<ConditionsType>> headerConditions = new HashMap<>();
+        Map<String,List<ConditionsType>> payloadConditions = new HashMap<>();
+
+        for(TestConfigsAdvancedSettings settings: advancedSettings){
+            if(settings.getOperatorType().toLowerCase().contains("header")){
+                headerConditions.put(settings.getOperatorType(), settings.getOperationsGroupList());
+            }else{
+                payloadConditions.put(settings.getOperatorType(), settings.getOperationsGroupList());
+            }
         }
-        int accountId = Context.accountId.get();
-        try {
-            String script;
-            TestScript testScript = testScriptMap.getOrDefault(accountId, null);
-            int lastTestScriptFetched = lastFetchedMap.getOrDefault(accountId, 0);
-            if (Context.now() - lastTestScriptFetched > 5 * 60) {
-                testScript = TestScriptsDao.instance.fetchTestScript();
-                lastTestScriptFetched = Context.now();
-                testScriptMap.put(accountId, testScript);
-                lastFetchedMap.put(accountId, Context.now());
-            }
-            if (testScript != null && testScript.getJavascript() != null) {
-                script = testScript.getJavascript();
-            } else {
-                loggerMaker.infoAndAddToDb("returning from calculateHashAndAddAuth, no test script present");
-                return;
-            }
+        List<ConditionsType> emptyList = new ArrayList<>();
 
-            ScriptEngineManager manager = new ScriptEngineManager();
-            ScriptEngine engine = manager.getEngineByName("nashorn");
+        Utils.modifyHeaderOperations(originalHttpRequest, 
+            headerConditions.getOrDefault(TestEditorEnums.NonTerminalExecutorDataOperands.MODIFY_HEADER.name(), emptyList), 
+            headerConditions.getOrDefault(TestEditorEnums.NonTerminalExecutorDataOperands.ADD_HEADER.name(), emptyList),
+            headerConditions.getOrDefault(TestEditorEnums.TerminalExecutorDataOperands.DELETE_HEADER.name(), emptyList)
+        );
 
-            SimpleScriptContext sctx = ((SimpleScriptContext) engine.get("context"));
-            sctx.setAttribute("method", originalHttpRequest.getMethod(), ScriptContext.ENGINE_SCOPE);
-            sctx.setAttribute("headers", originalHttpRequest.getHeaders(), ScriptContext.ENGINE_SCOPE);
-            sctx.setAttribute("url", originalHttpRequest.getPath(), ScriptContext.ENGINE_SCOPE);
-            sctx.setAttribute("payload", originalHttpRequest.getBody(), ScriptContext.ENGINE_SCOPE);
-            sctx.setAttribute("queryParams", originalHttpRequest.getQueryParams(), ScriptContext.ENGINE_SCOPE);
-            engine.eval(script);
+        Utils.modifyBodyOperations(originalHttpRequest, 
+            payloadConditions.getOrDefault(TestEditorEnums.NonTerminalExecutorDataOperands.MODIFY_BODY_PARAM.name(), emptyList), 
+            payloadConditions.getOrDefault(TestEditorEnums.NonTerminalExecutorDataOperands.ADD_BODY_PARAM.name(), emptyList),
+            payloadConditions.getOrDefault(TestEditorEnums.TerminalExecutorDataOperands.DELETE_BODY_PARAM.name(), emptyList)
+        );
 
-            String method = (String) sctx.getAttribute("method");
-            Map<String, Object> headers = (Map) sctx.getAttribute("headers");
-            String url = (String) sctx.getAttribute("url");
-            String payload = (String) sctx.getAttribute("payload");
-            String queryParams = (String) sctx.getAttribute("queryParams");
-
-            Map<String, List<String>> hs = new HashMap<>();
-            for (String key: headers.keySet()) {
-                try {
-                    ScriptObjectMirror scm = ((ScriptObjectMirror) headers.get(key));
-                    List<String> val = new ArrayList<>();
-                    for (int i = 0; i < scm.size(); i++) {
-                        val.add((String) scm.get(Integer.toString(i)));
-                    }
-                    hs.put(key, val);
-                } catch (Exception e) {
-                    hs.put(key, (List) headers.get(key));
-                }
-            }
-
-            originalHttpRequest.setBody(payload);
-            originalHttpRequest.setMethod(method);
-            originalHttpRequest.setUrl(url);
-            originalHttpRequest.setHeaders(hs);
-            originalHttpRequest.setQueryParams(queryParams);
-
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("error in calculateHashAndAddAuth " + e.getMessage() + " url " + originalHttpRequest.getUrl());
-            e.printStackTrace();
-            return;
-        }
+        // modify query params as well from payload conditions only, not handling query conditions separately for now
+        Utils.modifyQueryOperations(originalHttpRequest, 
+            payloadConditions.getOrDefault(TestEditorEnums.NonTerminalExecutorDataOperands.MODIFY_BODY_PARAM.name(), emptyList), 
+            emptyList,
+            payloadConditions.getOrDefault(TestEditorEnums.TerminalExecutorDataOperands.DELETE_BODY_PARAM.name(), emptyList)
+        );
     }
 
     private static OriginalHttpResponse sendWithRequestBody(OriginalHttpRequest request, Request.Builder builder, boolean followRedirects, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck, String requestProtocol) throws Exception {
@@ -475,7 +470,12 @@ public class ApiExecutor {
 
         if (payload == null) payload = "";
         if (body == null) {// body not created by GRPC block yet
-            body = RequestBody.create(payload, MediaType.parse(contentType));
+            if (request.getHeaders().containsKey("charset")) {
+                body = RequestBody.create(payload, null);
+                request.getHeaders().remove("charset");
+            } else {
+                body = RequestBody.create(payload, MediaType.parse(contentType));
+            }
         }
         builder = builder.method(request.getMethod(), body);
         Request okHttpRequest = builder.build();

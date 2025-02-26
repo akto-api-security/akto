@@ -13,7 +13,7 @@ import {
   Text,
   Link} from '@shopify/polaris';
 import { GithubRow} from './rows/GithubRow';
-import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import "./style.css"
 import transform from '../../pages/observe/transform';
 import DropdownSearch from '../shared/DropdownSearch';
@@ -24,6 +24,7 @@ import { debounce } from 'lodash';
 
 import { useSearchParams } from 'react-router-dom';
 import TableStore from './TableStore';
+import func from '../../../../util/func';
 
 function GithubServerTable(props) {
 
@@ -38,10 +39,14 @@ function GithubServerTable(props) {
   const setFiltersMap = PersistStore(state => state.setFiltersMap)
   const tableInitialState = PersistStore(state => state.tableInitialState)
   const setTableInitialState = PersistStore(state => state.setTableInitialState)
+  const tableSelectedMap = PersistStore(state => state.tableSelectedTab)
+  const setTableSelectedMap = PersistStore(state => state.setTableSelectedTab)
   const currentPageKey = props?.filterStateUrl || (window.location.pathname + "/" +  window.location.hash)
   const pageFiltersMap = filtersMap[currentPageKey];
 
-  const { selectedItems, selectItems } = useTable();
+  const abortControllerRef = useRef(null);
+
+  const { selectedItems, selectItems, applyFilter } = useTable();
 
   const handleRemoveAppliedFilter = (key) => {
     let temp = appliedFilters
@@ -73,13 +78,25 @@ function GithubServerTable(props) {
   const pageLimit = props?.pageLimit || 20;
   const [appliedFilters, setAppliedFilters] = useState(initialStateFilters);
   const [queryValue, setQueryValue] = useState('');
-  const { applyFilter } = useTable()
   const [fullDataIds, setFullDataIds] = useState([])
 
   const [sortableColumns, setSortableColumns] = useState([])
   const [activeColumnSort, setActiveColumnSort] = useState({columnIndex: -1, sortDirection: 'descending'})
 
-  let filterOperators = props.headers.reduce((map, e) => { map[e.sortKey || e.value] = 'OR'; return map }, {})
+  let filterOperators = props.headers.reduce((map, e) => { map[e.sortKey || e.filterKey || e.value] = 'OR'; return map }, {})
+
+  useEffect(() => {
+    const handleEsc = (event) => {
+      if (event.key === "Escape") {
+        setMode(IndexFiltersMode.Default)
+      }
+    }
+
+    window.addEventListener("keydown", handleEsc)
+    return () => {
+      window.removeEventListener("keydown", handleEsc)
+    }
+  }, [])
 
   useEffect(()=> {
     let queryFilters 
@@ -89,7 +106,13 @@ function GithubServerTable(props) {
       queryFilters = tableFunc.getFiltersMapFromUrl(decodeURIComponent(searchParams.get("filters") || ""), props?.disambiguateLabel, handleRemoveAppliedFilter, currentPageKey)
     }
     const currentFilters = tableFunc.mergeFilters(queryFilters,initialStateFilters,props?.disambiguateLabel, handleRemoveAppliedFilter)
-    setAppliedFilters(currentFilters)
+    setAppliedFilters((prev) => {
+      if(func.deepComparison(prev, currentFilters)){
+        return prev
+      }else{
+        return currentFilters;
+      }
+    })
     setSortSelected(tableFunc.getInitialSortSelected(props.sortOptions, pageFiltersMap))
   },[currentPageKey])
 
@@ -97,16 +120,33 @@ function GithubServerTable(props) {
     updateQueryParams("filters",tableFunc.getPrettifiedFilter(appliedFilters))
   },[appliedFilters])
 
-  async function fetchData(searchVal) {
+  async function fetchData(searchVal, tempFilters = []) {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort(); // Cancel the previous request
+    }
+    abortControllerRef.current = new AbortController();
+    const { signal } = abortControllerRef.current;
+
     let [sortKey, sortOrder] = sortSelected.length == 0 ? ["", ""] : sortSelected[0].split(" ");
     let filters = props.headers.reduce((map, e) => { map[e.filterKey || e.value] = []; return map }, {})
-    appliedFilters.forEach((filter) => {
-      filters[filter.key] = filter.value
-    })
+    if(tempFilters.length === 0){
+      appliedFilters.forEach((filter) => {
+        filters[filter.key] = filter.value
+      })
+    }else{
+      tempFilters.forEach((filter) => {
+        filters[filter.key] = filter.value
+      })
+    }
+  
     let tempData = await props.fetchData(sortKey, sortOrder == 'asc' ? -1 : 1, page * pageLimit, pageLimit, filters, filterOperators, searchVal);
+    if(signal.aborted){
+      return;
+    }
     tempData ? setData([...tempData.value]) : setData([])
     tempData ? setTotal(tempData.total) : setTotal(0)
     tempData ? setFullDataIds(tempData?.fullDataIds) : setFullDataIds([])
+    
     applyFilter(tempData.total)
     if (!performance.getEntriesByType('navigation')[0].type === 'reload') {
       setTableInitialState({
@@ -119,6 +159,11 @@ function GithubServerTable(props) {
   const handleSelectedTab = (x) => {
     const tableTabs = props.tableTabs ? props.tableTabs : props.tabs
     if(tableTabs){
+      const id = tableTabs[x]?.id;
+      setTableSelectedMap({
+        ...tableSelectedMap,
+        [window.location.pathname]: id
+      })
       const primitivePath = window.location.origin + window.location.pathname + window.location?.search
       const newUrl = primitivePath + "#" +  tableTabs[x].id
       window.history.replaceState(null, null, newUrl)
@@ -141,7 +186,9 @@ function GithubServerTable(props) {
   },[props?.headers])
 
   useEffect(() => {
-    fetchData(queryValue)
+    if (props?.callFromOutside) {
+      fetchData(queryValue);
+    }    
   },[props?.callFromOutside])
 
   const handleSort = (col, dir) => {
@@ -267,7 +314,7 @@ function GithubServerTable(props) {
     });
 
   const customSelectionChange = (selectionType,toggleType, selection) => {
-    if(props?.treeView){
+    if(props?.treeView || props?.isMultipleItemsSelected === true){
       let tempItems = selection;
         if(typeof selectItems !== 'object'){
           tempItems = [selection]
@@ -369,6 +416,7 @@ function GithubServerTable(props) {
                 {...(props.hideQueryField ? { hideQueryField: props.hideQueryField } : {})}
                 onSort={setSortSelected}
                 cancelAction={{
+                  onAction: () => {},
                   disabled: false,
                   loading: false,
                 }}
@@ -407,6 +455,7 @@ function GithubServerTable(props) {
                 sortColumnIndex={activeColumnSort.columnIndex}
                 sortDirection={activeColumnSort.sortDirection}
                 onSort={handleSort}
+                lastColumnSticky={props?.lastColumnSticky || false}
               >
                 {rowMarkup}
               </IndexTable>

@@ -1,11 +1,18 @@
 package com.akto.dto;
 
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
+
+import com.akto.dao.ConfigsDao;
+import com.mongodb.client.model.Filters;
 import org.bson.codecs.pojo.annotations.BsonDiscriminator;
 
 @BsonDiscriminator
 public abstract class Config {
 
     public static final String CONFIG_SALT = "-ankush";
+    private static final Set<ConfigType> ssoConfigTypes = new HashSet(Arrays.asList( ConfigType.OKTA, ConfigType.AZURE, ConfigType.GOOGLE_SAML));
 
     public ConfigType getConfigType() {
         return configType;
@@ -23,13 +30,13 @@ public abstract class Config {
         this.id = id;
     }
 
-    String id;
+    public String id;
 
     public enum ConfigType {
-        SLACK, GOOGLE, WEBPUSH, PASSWORD, SALESFORCE, SENDGRID, AUTH0, GITHUB, STIGG, MIXPANEL, SLACK_ALERT, OKTA, AZURE, HYBRID_SAAS, SLACK_ALERT_USAGE;
+        SLACK, GOOGLE, WEBPUSH, PASSWORD, SALESFORCE, SENDGRID, AUTH0, GITHUB, STIGG, MIXPANEL, SLACK_ALERT, OKTA, AZURE, HYBRID_SAAS, SLACK_ALERT_USAGE, GOOGLE_SAML;
     }
 
-    ConfigType configType;
+    public ConfigType configType;
 
     @BsonDiscriminator
     public static class SlackConfig extends Config {
@@ -351,12 +358,24 @@ public abstract class Config {
         private String oktaDomainUrl;
         private String authorisationServerId;
         private String redirectUri;
-        
+        public static final String ORGANIZATION_DOMAIN = "organizationDomain";
+        private String organizationDomain;
+        public static final String ACCOUNT_ID = "accountId";
+        private int accountId;
+
         public static final String CONFIG_ID = ConfigType.OKTA.name() + CONFIG_SALT;
 
-        public OktaConfig() {
+        public OktaConfig(){
             this.configType = ConfigType.OKTA;
-            this.id = CONFIG_ID;
+        }
+
+        public static String getOktaId(int accountId){
+            return CONFIG_ID + "_" + accountId;
+        }
+
+        public OktaConfig(int id) {
+            this.configType = ConfigType.OKTA;
+            this.id = CONFIG_ID + "_" + id;
         }
         
         public String getClientId() {
@@ -393,6 +412,20 @@ public abstract class Config {
 
         public void setRedirectUri(String redirectUri) {
             this.redirectUri = redirectUri;
+        }
+
+        public String getOrganizationDomain() {
+            return organizationDomain;
+        }
+        public void setOrganizationDomain(String organizationDomain) {
+            this.organizationDomain = organizationDomain;
+        }
+
+        public int getAccountId() {
+            return accountId;
+        }
+        public void setAccountId(int accountId) {
+            this.accountId = accountId;
         }
     }
 
@@ -490,7 +523,6 @@ public abstract class Config {
             this.activeAccountsLabel = activeAccountsLabel;
         }
     }
-
     @BsonDiscriminator
     public static class AzureConfig extends Config{
         
@@ -547,6 +579,7 @@ public abstract class Config {
             this.applicationIdentifier = applicationIdentifier;
         }
     }
+
     @BsonDiscriminator
     public static class MixpanelConfig extends Config {
         private String projectToken;
@@ -653,4 +686,37 @@ public abstract class Config {
         }
     }
 
+    public static boolean isConfigSSOType(ConfigType configType){
+        if(configType == null){
+            return false;
+        }
+        return ssoConfigTypes.contains(configType);
+    }
+
+    public static OktaConfig getOktaConfig(int accountId) {
+        String id =  OktaConfig.getOktaId(accountId);
+        OktaConfig config = (OktaConfig) ConfigsDao.instance.findOne(
+                Filters.and(
+                    Filters.eq("_id", id),
+                    Filters.eq(OktaConfig.ACCOUNT_ID, accountId)
+                )
+        );
+        return config;
+    }
+
+    public static OktaConfig getOktaConfig(String userEmail){
+        if (userEmail == null || userEmail.trim().isEmpty()) {
+            return null;
+        }
+        String[] companyKeyArr = userEmail.split("@");
+        if(companyKeyArr == null || companyKeyArr.length < 2){
+            return null;
+        }
+
+        String domain = companyKeyArr[1];
+        OktaConfig config = (OktaConfig) ConfigsDao.instance.findOne(
+                Filters.eq(OktaConfig.ORGANIZATION_DOMAIN, domain)
+        );
+        return config;
+    }
 }

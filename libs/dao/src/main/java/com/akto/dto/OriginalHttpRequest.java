@@ -4,7 +4,6 @@ import com.akto.dto.type.RequestTemplate;
 import com.akto.util.HttpRequestResponseUtils;
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONObject;
-import com.ctc.wstx.shaded.msv_core.util.Uri;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
@@ -48,6 +47,22 @@ public class OriginalHttpRequest {
         );
     }
 
+    public void buildFromSampleMessage(String message, boolean useUrlToFillHost) {
+        buildFromSampleMessage(message);
+        if(useUrlToFillHost){
+            try {
+                if(this.headers.getOrDefault("host", null) == null){
+                    URI uri = new URI(this.url);
+                    String calculatedHost = uri.getHost() != null ? uri.getHost() : "";
+                    this.headers.put("host", Arrays.asList(calculatedHost));
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+            
+        }
+    }
+
     public void buildFromSampleMessage(String message) {
         Map<String, Object> json = gson.fromJson(message, Map.class);
 
@@ -66,6 +81,24 @@ public class OriginalHttpRequest {
         this.body = requestPayload.trim();
 
         this.headers = buildHeadersMap(json, "requestHeaders");
+    }
+
+    public void buildFromSampleMessageNew(HttpResponseParams responseParam) {
+        String rawUrl = responseParam.getRequestParams().getURL();
+        String[] rawUrlArr = rawUrl.split("\\?");
+        this.url = rawUrlArr[0];
+        if (rawUrlArr.length > 1) {
+            this.queryParams = rawUrlArr[1];
+        }
+
+        this.type = responseParam.getRequestParams().type;
+
+        this.method = responseParam.getRequestParams().getMethod();
+
+        String requestPayload = responseParam.getRequestParams().getPayload();
+        this.body = requestPayload.trim();
+
+        this.headers = responseParam.getRequestParams().getHeaders();
     }
 
     public String getJsonRequestBody() {
@@ -364,11 +397,16 @@ public class OriginalHttpRequest {
     }
 
     public String getPath(){
-        String path = URI.create(this.url).getPath();
-        if (path == null || path.isEmpty()) {
-            return "/";
+       try {
+            String path = URI.create(this.url).getPath();
+            if (path == null || path.isEmpty()) {
+                return "/";
+            }
+            return path;
+        } catch (Exception e) {
+            String strippedUrl = this.url.replaceAll("^(https?://[^/]+)", "");
+            return strippedUrl.isEmpty() ? "/" : strippedUrl;
         }
-        return path;
     }
 
     @Override

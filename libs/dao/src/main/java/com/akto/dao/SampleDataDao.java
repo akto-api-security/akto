@@ -1,23 +1,24 @@
 package com.akto.dao;
 
 import com.akto.dao.context.Context;
+import com.akto.dto.ApiCollectionUsers;
 import com.akto.dto.ApiInfo;
+import com.akto.dto.testing.TestingEndpoints;
+import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.URLMethods;
 import com.akto.dto.type.SingleTypeInfo;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.Indexes;
 import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Sorts;
-import org.bson.Document;
 import org.bson.conversions.Bson;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-public class SampleDataDao extends AccountsContextDao<SampleData> {
+public class SampleDataDao extends AccountsContextDaoWithRbac<SampleData> {
 
     public static final SampleDataDao instance = new SampleDataDao();
 
@@ -84,6 +85,18 @@ public class SampleDataDao extends AccountsContextDao<SampleData> {
                 Filters.eq("_id.url", url),
                 Filters.eq("_id.method", method.name())
         );
+    }
+
+
+    public static List<Bson> filterForMultipleSampleData(List<Key> sampleList) {
+        List<Bson> ret = new ArrayList<>();
+
+        for(Key key: sampleList) {
+            Bson f = filterForSampleData(key.getApiCollectionId(), key.getUrl(), key.getMethod());
+            ret.add(f);
+        }
+
+        return ret;
     }
 
     public List<SampleData> fetchSampleDataPaginated(int apiCollectionId, String lastFetchedUrl,
@@ -162,4 +175,8 @@ public class SampleDataDao extends AccountsContextDao<SampleData> {
     }
 
 
+    @Override
+    public String getFilterKeyString() {
+        return TestingEndpoints.getFilterPrefix(ApiCollectionUsers.CollectionType.Id_ApiCollectionId) + ApiInfo.ApiInfoKey.API_COLLECTION_ID;
+    }
 }

@@ -4,20 +4,21 @@ import SingleTestRunPage from "../dashboard/pages/testing/SingleTestRunPage/Sing
 import AllSensitiveData from "../dashboard/pages/observe/AllSensitiveData/AllSensitiveData";
 import ApiCollections from "../dashboard/pages/observe/api_collections/ApiCollections";
 import ApiQuery from "../dashboard/pages/observe/api_collections/APIQuery";
-import ApiEndpoints from  "../dashboard/pages/observe/api_collections/ApiEndpoints";
+import ApiEndpoints from "../dashboard/pages/observe/api_collections/ApiEndpoints";
 import SensitiveDataExposure from "../dashboard/pages/observe/SensitiveDataExposure/SensitiveDataExposure";
 import SingleRequest from "../dashboard/pages/observe/SingleRequest/SingleRequest";
 import PageObserve from "../dashboard/pages/observe/PageObserve"
 import PageTesting from "../dashboard/pages/testing/PageTesting";
 import {
-  createBrowserRouter,
-  RouterProvider,
-  Navigate,
+    createBrowserRouter,
+    RouterProvider,
+    Navigate,
 } from "react-router-dom";
 import BurpSuite from "../dashboard/pages/settings/integrations/BurpSuite";
 import Integrations from "../dashboard/pages/settings/integrations/Integrations";
 import Settings from "../dashboard/pages/settings/Settings";
 import Users from "../dashboard/pages/settings/users/Users";
+import Roles from "../dashboard/pages/settings/roles/Roles";
 import Postman from "../dashboard/pages/settings/integrations/Postman";
 import Jira from "../dashboard/pages/settings/integrations/Jira";
 import ApiTokens from "../dashboard/pages/settings/integrations/ApiTokens";
@@ -30,6 +31,7 @@ import Metrics from "../dashboard/pages/settings/metrics/Metrics";
 import TestEditor from "../dashboard/pages/test_editor/TestEditor";
 import DataTypes from "../dashboard/pages/observe/data_types/DataTypes";
 import IssuesPage from "../dashboard/pages/issues/IssuesPage/IssuesPage";
+import CompliancePage from "../dashboard/pages/issues/IssuesPage/CompliancePage";
 import QuickStart from "../dashboard/pages/quick_start/QuickStart";
 import Webhooks from "../dashboard/pages/settings/integrations/webhooks/Webhooks";
 import Webhook from "../dashboard/pages/settings/integrations/webhooks/Webhook";
@@ -49,318 +51,406 @@ import Slack from "../dashboard/pages/settings/integrations/Slack";
 import ApiChanges from "../dashboard/pages/observe/api_collections/ApiChanges";
 
 import Store from "../dashboard/store";
-import { generateSearchData } from "@/util/searchItems"
-import { useEffect } from "react";
+import {generateSearchData} from "@/util/searchItems"
+import {useEffect} from "react";
 import CICD from "../dashboard/pages/settings/integrations/CICD";
 import ErrorComponent from "../dashboard/components/shared/ErrorComponent";
 import OktaIntegration from "../dashboard/pages/settings/integrations/OktaIntegration";
-import AzureSso from "../dashboard/pages/settings/integrations/AzureSso";
+import AzureSso from "../dashboard/pages/settings/integrations/sso/AzureSso";
 
 import HomeDashboard from "../dashboard/pages/dashboard/HomeDashboard";
 import TestLibrary from "../dashboard/pages/settings/test_library/TestLibrary";
-import { useStiggContext } from '@stigg/react-sdk';
+import {useStiggContext} from '@stigg/react-sdk';
 import DependencyTable from "../dashboard/pages/testing/DependencyTable/DependencyTable";
 import TestRoleAccessMatrix from "../dashboard/pages/testing/TestRoleAccessMatrix/TestRoleAccessMatrix";
 import SignupPage from "../signup/pages/SignupPage";
 import PageCheckInbox from "../signup/pages/PageCheckInbox"
 import PageBusinessEmail from "../signup/pages/PageBusinessEmail"
 import TokenValidator from "./TokenValidator"
-import { TableContextProvider } from "@/apps/dashboard/components/tables/TableContext";
+import {TableContextProvider} from "@/apps/dashboard/components/tables/TableContext";
 import VulnerabilityReport from "../dashboard/pages/testing/vulnerability_report/VulnerabilityReport";
 import ThreatDetectionPage from "../dashboard/pages/threat_detection/ThreatDetectionPage";
 
-import { PollingProvider } from "./PollingProvider";
+import {PollingProvider} from "./PollingProvider";
 import Help from "../dashboard/pages/settings/help_and_support/Help";
 import AdvancedTrafficFilters from "../dashboard/pages/settings/traffic-conditions/AdvancedTrafficFilters";
+import GoogleSamlSso from "../dashboard/pages/settings/integrations/sso/GoogleSamlSso";
+import SignUpWithSSO from "../signup/components/SignUpWithSSO";
+
+import TeamsWebhooks from "../dashboard/pages/settings/integrations/teamsWebhooks/TeamsWebhooks";
+import TeamsWebhook from "../dashboard/pages/settings/integrations/teamsWebhooks/TeamsWebhook";
+import AuditLogs from "../dashboard/pages/settings/audit_logs/AuditLogs";
+import ThreatApiPage from "../dashboard/pages/threat_detection/ThreatApiPage";
+import ThreatActorPage from "../dashboard/pages/threat_detection/ThreatActorPage";
+import ThreatPolicyPage from "../dashboard/pages/threat_detection/ThreatPolicyPage";
+import TestsTablePage from "../dashboard/pages/test_editor/tests_table/TestsTablePage";
+import Splunk from "../dashboard/pages/settings/integrations/Splunk";
+import F5Waf from "../dashboard/pages/settings/integrations/F5Waf";
+import AWSWaf from "../dashboard/pages/settings/integrations/AWSWaf";
 
 // if you add a component in a new path, please verify the search implementation in function -> 'getSearchItemsArr' in func.js
 
 const router = createBrowserRouter([
-  {
-    path: "/dashboard",
-    element: <Dashboard/>,
-    children: [
-      {
-        path: "",
-        element: <HomePage />,
+    {
+        path: "/dashboard",
+        element: <Dashboard/>,
         children: [
-          {
-            path: "home",
-            element: <HomeDashboard />,
-          },
-          {
-            path: "testing",
-            element: <PageTesting />,
-            children:[
-              ...(["", "active", "cicd", "inactive"].map((i) => {
-                return {
-                  path: i,
-                  element: <TestRunsPage />
-                }
-              })),
-              {
-                path: ":hexId",
-                element: <SingleTestRunPage />
-              },
-              {
-                path:"roles",
-                element: <TestRolesPage/>
-              },
-              {
-                path:"roles/details",
-                element:<TestRoleSettings/>
-              },
-              {
-                path:"roles/access-matrix",
-                element:<TestRoleAccessMatrix/>
-              },
-              {
-                path:"user-config",
-                element:<UserConfig/>
-              },
-              {
-                path:"dependency",
-                element:<DependencyTable/>
-              }
-            ]
-          },
-          {
-            path: "observe",
-            element: <PageObserve/>,
-            children: [
-              {
-                path: "sensitive",
-                element: <AllSensitiveData/>
-              },
-              {
-                path: "inventory",
-                element: <ApiCollections/>
-              },
-              {
-                path: "query_mode",
-                element: <ApiQuery/>
-              },
-              {
-                path: "changes",
-                element: <ApiChanges/>
-              },
-              {
-                path: "inventory/:apiCollectionId",
-                element: <ApiEndpoints/>
-              },
-              {
-                path: "data-types",
-                element: <DataTypes/>
-              },
-              {
-                path: "sensitive/:subType",
-                element: <SensitiveDataExposure/>
-              },
-              {
-                path: "sensitive/:subType/:apiCollectionId/:urlAndMethod",
-                element: <SingleRequest/>
-              }
-            ]
-          },
-          {
-            path:"issues",
-            element:<IssuesPage/>
-          },
-          {
-            path: "quick-start",
-            element: <QuickStart/>,
-          },
-          {
-            path:"threat-detection",
-            element:<ThreatDetectionPage/>
-          },
-        ]
-      },
-      {
-        path: "settings",
-        element: <Settings />,
-        children: [
-          {
-            path: "users",
-            element: <Users />
-          },
-          {
-            path: "Help",
-            element: <Help />
-          },
-          {
-            path: "integrations",
-            element: <Integrations />,
-          },
-          {
-            path: "about",
-            element: <About />,
-          },
-          {
-            path: "metrics",
-            element: <Metrics />,
-          },
-          {
-            path: "integrations/burp",
-            element: <BurpSuite />,
-          },
-          {
-            path: "integrations/ci-cd",
-            element: <CICD />,
-          },
-          {
-            path: "integrations/postman",
-            element: <Postman />,
-          },
-          {
-            path: "integrations/jira",
-            element: <Jira />,
-          },
-          {
-            path: "integrations/akto_apis",
-            element: <ApiTokens />,
-          },
-          {
-            path: "integrations/akto_gpt",
-            element: <AktoGPT />,
-          },
-          {
-            path: "integrations/github_sso",
-            element: <GithubSso />
-          },
-          {
-            path: "integrations/okta_sso",
-            element: <OktaIntegration />
-          },
-          {
-            path: "integrations/azure_sso",
-            element: <AzureSso />
-          },
-          {
-            path: "integrations/github_app",
-            element: <GithubAppIntegration />
-          },
-          {
-            path: "integrations/slack",
-            element: <Slack />,
-          },
-          {
-            path: "integrations/webhooks",
-            element: <Webhooks />,
-          },
-          {
-            path: "integrations/webhooks/:webhookId",
-            element: <Webhook />,
-          },
-          {
-            path: "integrations/webhooks/create_custom_webhook",
-            element: <Webhook />,
-          },
-          {
-            path: "logs",
-            element: <HealthLogs />,
-          },
-          {
-            path: "auth-types",
-            element:<AuthTypes/>
-          },
-          {
-            path: "default-payloads",
-            element:<DefaultPayloads/>
-          },
-          {
-            path: 'advanced-filters',
-            element: <AdvancedTrafficFilters />
-          },
-          {
-            path: "auth-types/details",
-            element: <AuthTypeDetails/>
-          },
-          {
-            path: "tags",
-            element: <Tags/>
-          },
-          {
-            path: "tags/details",
-            element: <TagDetails/>
-          },
-          {
-            path: "test-library",
-            element: <TestLibrary/>
-          },
-          {
-            path: "billing",
-            element: <Billing/>
-          },
-          {
-            path: "self-hosted",
-            element: <SelfHosted/>
-          }
-        ]
-      },
-      {
-        path: "test-editor/:testId",
-        element: <TestEditor />
-      },
-      {
-        path: "test-editor",
-        element: <TestEditor />
-      },
-      {
-        path: "onboarding",
-        element: <Onboarding />
-      },
-      {
-        path: "testing/summary/:summaryId",
-        element: <VulnerabilityReport />
-      },
-      {
-        path: "issues/summary/:issuesFilter",
-        element: <VulnerabilityReport />
-      }
-    ],
-    errorElement: <ErrorComponent/>
-  },
-  {
-      path: "/login",
-      element: <SignupPage />,
-  },
-  {
-      path: "/",
-      element: <TokenValidator />,
-  },
-  {
-    path: "/signup",
-    element: <SignupPage />,
-  },
-  {
-    path: "/check-inbox",
-    element: <PageCheckInbox />
-  },
-  {
-    path: "/business-email",
-    element: <PageBusinessEmail />
-  },
-  // catches all undefined paths and redirects to homepage.
-  {
-    path: "*",
-    element: <Navigate to="/dashboard/home" />,
-  },
+            {
+                path: "",
+                element: <HomePage/>,
+                children: [
+                    {
+                        path: "home",
+                        element: <HomeDashboard/>,
+                    },
+                    {
+                        path: "testing",
+                        element: <PageTesting/>,
+                        children: [
+                            ...(["", "active", "cicd", "inactive"].map((i) => {
+                                return {
+                                    path: i,
+                                    element: <TestRunsPage/>
+                                }
+                            })),
+                            {
+                                path: ":hexId",
+                                element: <SingleTestRunPage/>
+                            },
+                            {
+                                path: "roles",
+                                element: <TestRolesPage/>
+                            },
+                            {
+                                path: "roles/details",
+                                element: <TestRoleSettings/>
+                            },
+                            {
+                                path: "roles/access-matrix",
+                                element: <TestRoleAccessMatrix/>
+                            },
+                            {
+                                path: "user-config",
+                                element: <UserConfig/>
+                            },
+                            {
+                                path: "dependency",
+                                element: <DependencyTable/>
+                            }
+                        ]
+                    },
+                    {
+                        path: "observe",
+                        element: <PageObserve/>,
+                        children: [
+                            {
+                                path: "sensitive",
+                                element: <AllSensitiveData/>
+                            },
+                            {
+                                path: "inventory",
+                                element: <ApiCollections/>
+                            },
+                            {
+                                path: "query_mode",
+                                element: <ApiQuery/>
+                            },
+                            {
+                                path: "changes",
+                                element: <ApiChanges/>
+                            },
+                            {
+                                path: "inventory/:apiCollectionId",
+                                element: <ApiEndpoints/>
+                            },
+                            {
+                                path: "data-types",
+                                element: <DataTypes/>
+                            },
+                            {
+                                path: "sensitive/:subType",
+                                element: <SensitiveDataExposure/>
+                            },
+                            {
+                                path: "sensitive/:subType/:apiCollectionId/:urlAndMethod",
+                                element: <SingleRequest/>
+                            }
+                        ]
+                    },
+                    {
+                        path:"test-library/tests",
+                        element:<TestsTablePage/>
+                    },
+                    {
+                        path: "issues",
+                        element: <IssuesPage/>
+                    },
+                    {
+                        path: "reports",
+                        children: [
+                            {
+                                path: "issues",
+                                element: <IssuesPage/>
+                            },
+                            {
+                                path: "compliance",
+                                element: <CompliancePage/>
+                            }
+                        ]
+                    },
+                    {
+                        path: "protection",
+                        children: [
+                            {
+                                path: "threat-activity",
+                                element: <ThreatDetectionPage/>
+                            },
+                            {
+                                path: "threat-api",
+                                element: <ThreatApiPage/>
+                            },
+                            {
+                                path: "threat-actor",
+                                element: <ThreatActorPage/>
+                            },
+                            {
+                                path: "threat-policy",
+                                element: <ThreatPolicyPage/>
+                            }
+                        ]
+                    },
+                    {
+                        path: "quick-start",
+                        element: <QuickStart/>,
+                    },
+                ]
+            },
+            {
+                path: "settings",
+                element: <Settings/>,
+                children: [
+                    {
+                        path: "users",
+                        element: <Users/>
+                    },
+                    {
+                        path: "roles",
+                        element: <Roles/>
+                    },
+                    {
+                        path: "Help",
+                        element: <Help/>
+                    },
+                    {
+                        path: "integrations",
+                        element: <Integrations/>,
+                    },
+                    {
+                        path: "about",
+                        element: <About/>,
+                    },
+                    {
+                        path: "metrics",
+                        element: <Metrics/>,
+                    },
+                    {
+                        path: "integrations/burp",
+                        element: <BurpSuite/>,
+                    },
+                    {
+                        path: "integrations/ci-cd",
+                        element: <CICD/>,
+                    },
+                    {
+                        path: "integrations/postman",
+                        element: <Postman/>,
+                    },
+                    {
+                        path: "integrations/splunk",
+                        element: <Splunk/>,
+                    },
+                    {
+                        path: "integrations/f5_waf",
+                        element: <F5Waf/>,
+                    },
+                    {
+                        path: "integrations/aws_waf",
+                        element: <AWSWaf/>,
+                    },
+                    {
+                        path: "integrations/jira",
+                        element: <Jira/>,
+                    },
+                    {
+                        path: "integrations/akto_apis",
+                        element: <ApiTokens/>,
+                    },
+                    {
+                        path: "integrations/akto_gpt",
+                        element: <AktoGPT/>,
+                    },
+                    {
+                        path: "integrations/github_sso",
+                        element: <GithubSso/>
+                    },
+                    {
+                        path: "integrations/okta_sso",
+                        element: <OktaIntegration/>
+                    },
+                    {
+                        path: "integrations/azure_sso",
+                        element: <AzureSso/>
+                    },
+                    {
+                        path: "integrations/google_workspace_sso",
+                        element: <GoogleSamlSso/>
+                    },
+                    {
+                        path: "integrations/github_app",
+                        element: <GithubAppIntegration/>
+                    },
+                    {
+                        path: "integrations/slack",
+                        element: <Slack/>,
+                    },
+                    {
+                        path: "integrations/webhooks",
+                        element: <Webhooks/>,
+                    },
+                    {
+                        path: "integrations/webhooks/:webhookId",
+                        element: <Webhook/>,
+                    },
+                    {
+                        path: "integrations/webhooks/create_custom_webhook",
+                        element: <Webhook/>,
+                    },
+                    {
+                        path: "integrations/teamsWebhooks",
+                        element: <TeamsWebhooks/>,
+                    },
+                    {
+                        path: "integrations/teamsWebhooks/:webhookId",
+                        element: <TeamsWebhook/>,
+                    },
+                    {
+                        path: "integrations/teamsWebhooks/create_custom_webhook",
+                        element: <TeamsWebhook/>,
+                    },
+
+                    {
+                        path: "logs",
+                        element: <HealthLogs/>,
+                    },
+                    {
+                        path: "auth-types",
+                        element: <AuthTypes/>
+                    },
+                    {
+                        path: "default-payloads",
+                        element: <DefaultPayloads/>
+                    },
+                    {
+                        path: 'advanced-filters',
+                        element: <AdvancedTrafficFilters/>
+                    },
+                    {
+                        path: "auth-types/details",
+                        element: <AuthTypeDetails/>
+                    },
+                    {
+                        path: "tags",
+                        element: <Tags/>
+                    },
+                    {
+                        path: "tags/details",
+                        element: <TagDetails/>
+                    },
+                    {
+                        path: "test-library",
+                        element: <TestLibrary/>
+                    },
+                    {
+                        path: "billing",
+                        element: <Billing/>
+                    },
+                    {
+                        path: "self-hosted",
+                        element: <SelfHosted/>
+                    },
+                    {
+                        path: 'audit-logs',
+                        element: <AuditLogs/>
+                    }
+                ]
+            },
+            {
+                path: "test-editor/:testId",
+                element: <TestEditor/>
+            },
+            {
+                path: "test-editor",
+                element: <TestEditor/>
+            },
+            {
+                path: "onboarding",
+                element: <Onboarding/>
+            },
+            {
+                path: "testing/summary/:reportId",
+                element: <VulnerabilityReport/>
+            },
+            {
+                path: "issues/summary/:reportId",
+                element: <VulnerabilityReport/>
+            }
+        ],
+        errorElement: <ErrorComponent/>
+    },
+    {
+        path: "/login",
+        element: <SignupPage/>,
+    },
+    {
+        path: "/",
+        element: <TokenValidator/>,
+    },
+    {
+        path: "/signup",
+        element: <SignupPage/>,
+    },
+    {
+        path: "/check-inbox",
+        element: <PageCheckInbox/>
+    },
+    {
+        path: "/business-email",
+        element: <PageBusinessEmail/>
+    },
+    {
+        path: "/sso-login",
+        element: <SignUpWithSSO/>
+    },
+    // catches all undefined paths and redirects to homepage.
+    {
+        path: "*",
+        element: <Navigate to="/dashboard/home"/>,
+    },
 ])
 
 function App() {
-  const setAllRoutes = Store(state => state.setAllRoutes)
-  const searchData= generateSearchData(router.routes)
-  const { stigg } = useStiggContext();
-  useEffect(() => {
-    stigg.setCustomerId(window.STIGG_CUSTOMER_ID, window.STIGG_CUSTOMER_TOKEN)
-    
-  })
+    const setAllRoutes = Store(state => state.setAllRoutes)
+    const searchData = generateSearchData(router.routes)
+    const {stigg} = useStiggContext();
+    useEffect(() => {
+        stigg.setCustomerId(window.STIGG_CUSTOMER_ID, window.STIGG_CUSTOMER_TOKEN)
+
+    })
 
 
-  useEffect(() => {
-    const script = document.createElement('script')
-    const scriptText = document.createTextNode(`
+    useEffect(() => {
+        const script = document.createElement('script')
+        const scriptText = document.createTextNode(`
     self.MonacoEnvironment = {
       getWorkerUrl: function (moduleId, label) {
           if (label === 'json') {
@@ -370,18 +460,18 @@ function App() {
       }
       };
     `);
-    setAllRoutes(searchData)
-    script.appendChild(scriptText);
-    document.body.appendChild(script)
-  }, [])
+        setAllRoutes(searchData)
+        script.appendChild(scriptText);
+        document.body.appendChild(script)
+    }, [])
 
-  return (
-    <PollingProvider>
-    <TableContextProvider>
-      <RouterProvider router={router} />
-    </TableContextProvider>
-    </PollingProvider>
-  );
+    return (
+        <PollingProvider>
+            <TableContextProvider>
+                <RouterProvider router={router}/>
+            </TableContextProvider>
+        </PollingProvider>
+    );
 }
 
 export default App;

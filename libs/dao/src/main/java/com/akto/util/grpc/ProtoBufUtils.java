@@ -10,6 +10,10 @@ import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 
+import static org.apache.commons.codec.binary.Base64.decodeBase64;
+import static org.apache.commons.codec.binary.Base64.encodeBase64String;
+
+
 public class ProtoBufUtils {
 
     public static final String RAW_QUERY = "raw_query";
@@ -121,11 +125,52 @@ public class ProtoBufUtils {
         Map<Object, Object> map = null;
         try {
             map = ProtoBufUtils.getInstance().mapper.readValue(payload, Map.class);
+            map = decodeBase64ValuesIfAny(map);
         } catch (Exception e) {
             throw new InvalidObjectException("Unable to parse payload");
         }
         return base64EncodedJsonToProtobuf(map);
     }
+
+    public static boolean isBase64Encoded(String value) {
+        if (value == null || value.trim().isEmpty()) {
+            return false;
+        }
+        try {
+            byte[] decodedBytes = decodeBase64(value);
+            String encodedAgain = encodeBase64String(decodedBytes).trim();
+            return encodedAgain.equals(value.trim()) || (encodedAgain + "=").equals(value.trim()) || (encodedAgain + "==").equals(value.trim());
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    /*
+     * This method enables us to send byte[] data which was encoded as base64.
+     */
+    private static Map<Object, Object> decodeBase64ValuesIfAny(Map<Object, Object> map) {
+        Map<Object, Object> processedMap = new HashMap<>();
+
+        for (Map.Entry<Object, Object> entry : map.entrySet()) {
+            Object key = entry.getKey();
+            Object value = entry.getValue();
+
+            // Check if the value is a string and is Base64-encoded
+            if (value instanceof String) {
+                String strValue = (String) value;
+
+                if (isBase64Encoded(strValue)) {
+                    processedMap.put(key, Base64.getDecoder().decode(strValue));
+                } else {
+                    processedMap.put(key, strValue);
+                }
+            } else {
+                processedMap.put(key, value);
+            }
+        }
+        return processedMap;
+    }
+
     public static String base64EncodedJsonToProtobuf(Map<Object, Object> jsonMap) throws IOException{
         byte[] protobufArray = encodeJsonToProtobuf(jsonMap);
         byte[] FIRST_BYTES = new byte[5];
@@ -180,6 +225,8 @@ public class ProtoBufUtils {
                 codedOutputStream.writeBytesNoTag(ByteString.copyFrom(nestedMessage));
             } else if (value instanceof Float) {
                 codedOutputStream.writeFixed32NoTag(Float.floatToIntBits((Float) value));
+            } else if(value instanceof byte[]){
+                codedOutputStream.writeBytesNoTag(ByteString.copyFrom((byte[]) value));
             } else {
                 throw new IOException("Unsupported type: " + value.getClass().getName());
             }
@@ -191,7 +238,7 @@ public class ProtoBufUtils {
             return WireFormat.WIRETYPE_VARINT;
         } else if (value instanceof Double) {
             return WireFormat.WIRETYPE_FIXED64;
-        } else if (value instanceof String) {
+        } else if (value instanceof String || value instanceof byte[]) {
             return WireFormat.WIRETYPE_LENGTH_DELIMITED;
         } else if (value instanceof Map) {
             return WireFormat.WIRETYPE_LENGTH_DELIMITED;

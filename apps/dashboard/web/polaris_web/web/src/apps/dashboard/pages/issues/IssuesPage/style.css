@@ -1,0 +1,17 @@
+/* unread */
+.custom-tag-true .Polaris-Tag {
+    background-color: #FFF4F4;
+}
+
+.custom-tag-true p {
+    color: #D72C0D;
+}
+
+/* read */
+.custom-tag-false .Polaris-Tag {
+    background-color: #F1F8F5;
+}
+
+.custom-tag-false p {
+    color: #008060;
+}

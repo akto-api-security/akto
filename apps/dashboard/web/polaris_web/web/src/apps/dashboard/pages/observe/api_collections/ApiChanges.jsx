@@ -1,4 +1,4 @@
-import { Card, Divider, HorizontalStack, Text, VerticalStack } from "@shopify/polaris"
+import { Card, Divider, Text, VerticalStack } from "@shopify/polaris"
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
 import { useEffect, useReducer, useState } from "react";
 import api from "../api";
@@ -20,14 +20,18 @@ import { useLocation } from "react-router-dom";
 function ApiChanges() {
 
     const allCollections = PersistStore(state => state.allCollections);
-    const collectionsMap = PersistStore(state => state.collectionsMap);
-    const [newEndpoints, setNewEndpoints] = useState({prettify: [], normal: []})
-    const [newParametersCount, setNewParametersCount] = useState(0)
     const [parametersTrend, setParametersTrend] = useState([])
-    const [sensitiveParams, setSensitiveParams] = useState([])
-    const [loading, setLoading] = useState(true);
+    const [endpointsTrend, setEndpointsTrend] = useState([])
+    const [loading, setLoading] = useState(false);
     const [apiDetail, setApiDetail] = useState({})
+    const [newParams, setNewParams] = useState([])
     const [tableHeaders,setTableHeaders] = useState([])
+    const [summaryCountObj,setSummaryCountObj] = useState({
+        "newEndpointsCount": 0,
+        "sensitiveEndpointsCount": 0,
+        "newParamsCount": 0,
+        "sensitiveParamsCount": 0,
+    })
 
     const location = useLocation()
     const showDetails = ObserveStore(state => state.inventoryFlyout)
@@ -62,38 +66,48 @@ function ApiChanges() {
     }
 
     async function fetchData() {
-        let apiCollection, apiCollectionUrls, apiInfoList;
+        setLoading(true)
         let apiPromises = [
-            api.loadRecentEndpoints(startTimestamp, endTimestamp),
-            api.loadRecentApiInfos(startTimestamp, endTimestamp),
-            api.fetchNewParametersTrend(startTimestamp, endTimestamp)
+            api.getSummaryInfoForChanges(startTimestamp, endTimestamp),
+            api.fetchNewParametersTrend(startTimestamp, endTimestamp),
+            api.fetchNewEndpointsTrendForHostCollections(startTimestamp, endTimestamp),
+            api.fetchNewEndpointsTrendForNonHostCollections(startTimestamp, endTimestamp)
         ];
         let results = await Promise.allSettled(apiPromises);
-        let endpointsFromStiResp = results[0].status === 'fulfilled' ? results[0].value : {"endpoints": []}
-        let endpointsFromApiInfos = results[1].status === 'fulfilled' ? results[1].value : {"apiInfoList" : []}
-        let parametersResp = results[2].status === 'fulfilled' ? results[2].value : {}
+        let countSummaryResp = results[0].status === 'fulfilled' ? results[0].value : {}
+        let parametersResp = results[1].status === 'fulfilled' ? results[1].value : {}
+        let hostTrend = results[2].status === 'fulfilled' ? results[2].value : {}
+        let nonHostTrend = results[3].status === 'fulfilled' ? results[3].value : {}
 
-        apiCollection = endpointsFromStiResp.endpoints.map(x => { return { ...x._id, startTs: x.startTs } })
-        apiCollectionUrls = endpointsFromStiResp.endpoints.map(x => x._id.url)
-        apiInfoList = endpointsFromApiInfos.apiInfoList
+        setSummaryCountObj((prev) => {
+            return{
+                ...prev,
+                newEndpointsCount:countSummaryResp.newEndpointsCount,
+                sensitiveEndpointsCount:countSummaryResp.sensitiveEndpointsCount,
+            }
+        })
+
+        const mergedArrObj = Object.values([...(hostTrend?.data?.endpoints || []), ...(nonHostTrend?.data?.endpoints || [])].reduce((acc, item) => {
+            acc[item._id] = acc[item._id] || { _id: item._id, count: 0 };
+            acc[item._id].count += item.count;
+            return acc;
+        }, {}));
 
         const trendObj = transform.findNewParametersCountTrend(parametersResp, startTimestamp, endTimestamp)
-        setNewParametersCount(trendObj.count)
         setParametersTrend(trendObj.trend)
 
-        let data = func.mergeApiInfoAndApiCollection(apiCollection, apiInfoList, collectionsMap);
-        let prettifiedData = transform.prettifyEndpointsData(data)
-        setNewEndpoints({prettify: prettifiedData, normal: data});
-
-        setLoading(false);
-        
-        await api.fetchSensitiveParamsForEndpoints(apiCollectionUrls).then(allSensitiveFields => {
-            let sensitiveParams = allSensitiveFields.data.endpoints
-            setSensitiveParams([...sensitiveParams]);
-            apiCollection = transform.fillSensitiveParams(sensitiveParams, apiCollection);
-            data = func.mergeApiInfoAndApiCollection(apiCollection, apiInfoList, collectionsMap);
-            prettifiedData = transform.prettifyEndpointsData(data)
-            setNewEndpoints({prettify: prettifiedData, normal: data});
+        const endpointsTrendObj = transform.findNewParametersCountTrend(mergedArrObj, startTimestamp, endTimestamp)
+        setLoading(false)
+        setEndpointsTrend(endpointsTrendObj.trend)
+        await api.fetchRecentParams(startTimestamp, endTimestamp).then((res) => {
+            const ret = res.data.endpoints.map((x,index) => transform.prepareEndpointForTable(x,index));
+            setNewParams(ret)
+            setSummaryCountObj((prev) => {
+                return{
+                    ...prev,
+                    newParamsCount: ret.length
+                }
+            })
         })
     }
 
@@ -107,35 +121,32 @@ function ApiChanges() {
         {
             title: "New endpoints",
             isComp: true,
-            data: <div data-testid="new_endpoints_count" style={{fontWeight: 600, color: '#1F2124', fontSize: '14px'}}>{transform.formatNumberWithCommas(newEndpoints.normal.length)}</div>,
+            data: <div data-testid="new_endpoints_count" style={{fontWeight: 600, color: '#1F2124', fontSize: '14px'}}>{summaryCountObj.newEndpointsCount}</div>,
         },
         {
             title: "New sensitive endpoints",
-            data: transform.formatNumberWithCommas(newEndpoints.normal.filter(x => x.sensitive && x.sensitive.size > 0).length),
+            data: transform.formatNumberWithCommas(summaryCountObj.sensitiveEndpointsCount),
             color: "critical",
         },
         {
             title: "New parameters",
-            data: transform.formatNumberWithCommas(newParametersCount)
+            data: transform.formatNumberWithCommas(summaryCountObj.newParamsCount)
         },
         {
             title: "New sensitive parameters",
-            data: transform.formatNumberWithCommas(sensitiveParams.filter(x => x.timestamp > startTimestamp && x.timestamp < endTimestamp && func.isSubTypeSensitive(x)).length),
+            data: transform.formatNumberWithCommas(summaryCountObj.sensitiveParamsCount),
             color: "critical",
         }
     ]
-    const endpointsTrend = transform.changesTrend(newEndpoints.normal, startTimestamp, endTimestamp)
-
     const tableComponent = (
         <ApiChangesTable
             handleRowClick={handleRowClick}
             tableLoading={loading}
             startTimeStamp={startTimestamp}
             endTimeStamp={endTimestamp}
-            newEndpoints={newEndpoints.prettify}
-            parametersCount={newParametersCount}
             key="table"
             tab={(location.state)?(location.state.tab):0 }
+            newParams={newParams}
         />
     )
 
@@ -164,7 +175,7 @@ function ApiChanges() {
             {
                 data: parametersTrend,
                 color: "#fca130",
-                name: "New parameters"
+                name: "Parameters detected"
             }
         ]
     }

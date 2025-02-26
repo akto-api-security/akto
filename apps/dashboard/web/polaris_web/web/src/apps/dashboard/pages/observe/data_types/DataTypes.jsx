@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useReducer } from 'react'
-import { LegacyCard, HorizontalGrid, TextField, VerticalStack, Text } from '@shopify/polaris'
+import { LegacyCard, HorizontalGrid, TextField, VerticalStack, Text, Form, HorizontalStack, Tag, Button, Box, Checkbox } from '@shopify/polaris'
 import Dropdown from '../../../components/layouts/Dropdown'
 import "./DataTypes.css"
 import ConditionsPicker from '../../../components/ConditionsPicker'
@@ -11,6 +11,9 @@ import {produce} from "immer"
 import DetailsPage from '../../../components/DetailsPage'
 import InformationBannerComponent from '../../quick_start/components/shared/InformationBannerComponent'
 import TitleWithInfo from '@/apps/dashboard/components/shared/TitleWithInfo'
+import { EmailMajor, CreditCardMajor, IdentityCardFilledMajor, PhoneMajor, CalendarMajor, LocationMajor, KeyMajor } from "@shopify/polaris-icons"
+
+const severitiesArr = func.getAktoSeverities()
 
 const statusItems = [
   {
@@ -24,6 +27,8 @@ const statusItems = [
     value: "false",
   }
 ]
+
+const severityItems = severitiesArr.map((x) => {return{value: x, label: func.toSentenceCase(x), id: func.toSentenceCase(x)}})
 
 const operatorOptions = [
   {
@@ -90,6 +95,8 @@ const requestItems = [
   }
 ]
 
+const defaultIcons = [ EmailMajor, CreditCardMajor, IdentityCardFilledMajor, PhoneMajor, CalendarMajor, LocationMajor, KeyMajor]
+
 function conditionStateReducer(draft, action) {
   try {
     switch (action.type) {
@@ -130,21 +137,18 @@ function DataTypes() {
 
   const location = useLocation();
   const navigate = useNavigate();
-  const isNew = location?.state == undefined || Object.keys(location?.state).length == 0
+  const isNew = location.state === null || location?.state === undefined || Object.keys(location?.state).length === 0
   const pageTitle = (isNew || (location?.state?.regexObj)) ? "Add data type" : "Configure data type"
   const currObj = location?.state?.regexObj ? transform.getRegexObj(location?.state?.regexObj) : transform.initialObj
   const initialState = pageTitle === "Add data type" ? isNew ? transform.initialObj : currObj : transform.fillInitialState(location.state);
 
-  const [currState, dispatchCurrState] = useReducer(produce((draft, action) => conditionStateReducer(draft, action)), currObj);
+  const [currState, dispatchCurrState] = useReducer(produce((draft, action) => conditionStateReducer(draft, action)), initialState);
   const [change, setChange] = useState(false)
+  const [tagValue, setTagValue] = useState('')
   const resetFunc =()=>{
     dispatchCurrState({type:"update", obj:initialState})
     setChange(false)
   }
-
-  useEffect(() => {
-      resetFunc()
-  },[])
 
   useEffect(() => {
     if (func.deepComparison(currState, initialState)) {
@@ -155,13 +159,23 @@ function DataTypes() {
   }, [currState])
 
   const saveAction = async () => {
-    console.log(currState)
     if (currState.dataType === 'Akto') {
+
+      const keyArr = currState.keyConditions.predicates.map(transform.convertMapFunction)
+      const valueArr = currState.valueConditions.predicates.map(transform.convertMapFunction)
+
       let obj = {
         name: currState.name,
         redacted:currState.redacted,
+        categoriesList: currState?.categoriesList || [],
+        operator: currState.operator,
+        keyConditionFromUsers: keyArr,
+        keyOperator: currState.keyConditions.operator,
+        valueConditionFromUsers: valueArr,
+        valueOperator: currState.valueConditions.operator,
+        dataTypePriority: currState?.priority ? currState.priority.toUpperCase() : "",
         ...transform.convertToSensitiveData(currState.sensitiveState),
-        
+        active: JSON.parse(currState.active)
       }
       api.saveAktoDataType(obj).then((response) => {
         func.setToast(true, false, "Data type updated successfully");
@@ -175,17 +189,22 @@ function DataTypes() {
     else {
       let payloadObj = transform.convertDataForCustomPayload(currState)
       api.saveCustomDataType(payloadObj).then((response) => {
-        if (pageTitle === "Add data type") {
-          func.setToast(true, false, "Data type added successfully");
-        } else {
-          func.setToast(true, false, "Data type updated successfully");
+        try {
+          if (pageTitle === "Add data type") {
+            func.setToast(true, false, "Data type added successfully");
+          } else {
+            func.setToast(true, false, "Data type updated successfully");
+          }
+          setChange(false);
+          navigate(null,
+            {
+              state: { name: response.customDataType.name, dataObj: response.customDataType, type: "Custom" },
+              replace: true
+            })
+        } catch (error) {
+          func.setToast(true, true, "Error in saving data type.")
         }
-        setChange(false);
-        navigate(null,
-          {
-            state: { name: response.customDataType.name, dataObj: response.customDataType, type: "Custom" },
-            replace: true
-          })
+        
       })
     }
   }
@@ -194,23 +213,87 @@ function DataTypes() {
     dispatchCurrState({type:"update", obj:obj})
   }
 
-  const errorMessage = func.nameValidationFunc(currState.name)
+  const handleTagsChange = (tagValue, type) =>{
+    const initialSet = new Set(currState.categoriesList);
+    if(type === 'add'){
+      if(initialSet.has(tagValue)){
+        func.setToast(true, true, 'Tag with this value already exists for the data type')
+        return;
+      }else{
+        setTagValue('')
+        initialSet.add(tagValue)
+      }
+    }else{
+      initialSet.delete(tagValue)
+    }
+    handleChange({categoriesList: [...initialSet]})
+  }
+
+  const errorMessage = isNew ? func.nameValidationFunc(currState.name) : ""
+  const columnsForGrid = currState.dataType === 'Custom' ? 3 : 2
+  let displayIcons = defaultIcons
+  let currIconString = initialState.iconString
+  if(typeof(currIconString) === 'string'){
+    currIconString = func.getIconFromString(initialState.iconString)
+  }
+  if(currIconString !== null && !defaultIcons.includes(currIconString)){
+    displayIcons.push(currIconString)
+  }
   const descriptionCard = (
     <LegacyCard title="Details" key="desc">
       <LegacyCard.Section>
-        <HorizontalGrid gap="4" columns={2}>
-          <TextField id={"name-field"} label="Name" helpText="Name the data type"
-            value={currState.name} placeholder='NEW_CUSTOM_DATA_TYPE'
-            {...pageTitle === "Add data type" ? {onChange: (val) => handleChange({name: val})} : {}}
-            requiredIndicator={true}
-            {...errorMessage.length > 0 ? {error: errorMessage} : {}}
-            />
-          {currState.dataType === 'Custom' ?
+        <VerticalStack gap={"5"}>
+          <HorizontalGrid gap="4" columns={columnsForGrid}>
+            <TextField id={"name-field"} label="Name" helpText="Name the data type"
+              value={currState.name} placeholder='NEW_CUSTOM_DATA_TYPE'
+              {...pageTitle === "Add data type" ? {onChange: (val) => handleChange({name: val})} : {}}
+              requiredIndicator={true}
+              {...errorMessage.length > 0 ? {error: errorMessage} : {}}
+              />
             <Dropdown id={"active-dropdown"} menuItems={statusItems}
               selected={(val) => { handleChange({ active: val }) }}
               initial={currState.active} label="Active" />
-            : null}
-        </HorizontalGrid>
+            <Dropdown
+              menuItems={severityItems}
+              initial={currState.priority}
+              selected={(val) => {handleChange({priority: val})}}
+              label={"Select severity of data type"}
+            />
+          </HorizontalGrid>
+
+          <HorizontalGrid gap={"4"} columns={['twoThirds', 'oneThird']}>
+            <VerticalStack gap={"2"}>
+                <Form onSubmit={() => handleTagsChange(tagValue, 'add')}>
+                    <TextField onChange={setTagValue} value={tagValue} label={<Text color="subdued" fontWeight="medium" variant="bodySm">Datatype Tags</Text>}/>
+                </Form>
+                <HorizontalStack gap={"2"}>
+                    {currState.categoriesList && currState.categoriesList.length > 0 && currState.categoriesList.map((tag, index) => {
+                        return(
+                            <Tag key={index} onRemove={() => handleTagsChange(tagValue, 'remove')}>
+                                <Text>{tag}</Text>
+                            </Tag>
+                        )
+                    })}
+                </HorizontalStack>
+            </VerticalStack>
+            {currState.dataType === 'Custom' && <Box>
+              <Text variant="bodyMd">
+                Choose Icon
+              </Text>
+              <HorizontalStack gap={2}>
+                {displayIcons.map((icon, index) => {
+                  return(
+                    <div className="tag-button" key={index}>
+                      <Button monochrome icon={icon} onClick={() => handleChange({iconString: icon})} pressed={(currState?.iconString === icon || currState?.iconString === icon?.displayName)} />
+                    </div>
+                  )
+                })}
+                
+              </HorizontalStack>
+            </Box>}
+          </HorizontalGrid>
+        </VerticalStack>
+        
       </LegacyCard.Section>
     </LegacyCard>
   )
@@ -310,7 +393,29 @@ function DataTypes() {
     </VerticalStack>
   )
 
-  let components = (!isNew && currState.dataType === 'Akto') ? [descriptionCard, requestCard, redactCard] : [descriptionCard, conditionsCard, requestCard, redactCard]
+  const TestTemplateCard = (
+    <VerticalStack gap="5" key="testTemplate">
+      <LegacyCard title={
+        <TitleWithInfo
+          textProps={{ variant: 'headingMd' }}
+          titleText={"Test templates"}
+          tooltipContent={"Create test template for this data type"}
+        />}
+      >
+        <div className='card-items'>
+          <InformationBannerComponent docsUrl={""} content="When enabled, test template is created and synced with this data type.">
+          </InformationBannerComponent>
+        </div>
+        <LegacyCard.Section>
+          <Checkbox label={"Create test template for this data type"} checked={!(currState.skipDataTypeTestTemplateMapping)} onChange={() => {
+            handleChange({ skipDataTypeTestTemplateMapping: !currState.skipDataTypeTestTemplateMapping })
+          }} />
+        </LegacyCard.Section>
+      </LegacyCard>
+    </VerticalStack>
+  )
+
+  let components = (!isNew && currState.dataType === 'Akto') ? [descriptionCard, conditionsCard, requestCard, redactCard] : [descriptionCard, conditionsCard, requestCard, redactCard, TestTemplateCard]
 
   return (
     <DetailsPage

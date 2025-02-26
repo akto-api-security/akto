@@ -51,16 +51,8 @@ function TestRolesPage(){
 
     const getActions = (item) => {
 
-        return [{
+        const actionItems = [{
             items: [
-                {
-                    content: 'Edit',
-                    onAction: () => navigate("details", {state: {
-                        name: item.name,
-                        endpoints: item.endpointLogicalGroup.testingEndpoints,
-                        authWithCondList: item.authWithCondList
-                    }})
-                },
                 {
                     content: 'Access matrix',
                     onAction: () => navigate("access-matrix", {state: {
@@ -71,24 +63,47 @@ function TestRolesPage(){
                 }
             ]
         }]
+
+        // if(item.name !== 'ATTACKER_TOKEN_ALL') {
+        if(item.createdBy !== 'System') {
+            const removeActionItem = {
+                content: 'Remove',
+                onAction: async () => {
+                    await api.deleteTestRole(item.name)
+                    setLoading(true)
+                    fetchData()
+                    func.setToast(true, false, "Test role has been deleted successfully.")
+                },
+                destructive: true
+            }
+            actionItems[0].items.push(removeActionItem)
+        }
+
+        return actionItems
+    }
+
+    async function fetchData(){
+        await api.fetchTestRoles().then((res) => {
+            setShowEmptyScreen(res.testRoles.length === 0)
+            setTestRoles(res.testRoles.map((testRole) => {
+                testRole.timestamp = func.prettifyEpoch(testRole.lastUpdatedTs)
+                testRole.id=testRole.name;
+                return testRole;
+            }));
+            setLoading(false);
+        })
     }
 
     useEffect(() => {
         setLoading(true);
-        
-        async function fetchData(){
-            await api.fetchTestRoles().then((res) => {
-                setShowEmptyScreen(res.testRoles.length === 0)
-                setTestRoles(res.testRoles.map((testRole) => {
-                    testRole.timestamp = func.prettifyEpoch(testRole.lastUpdatedTs)
-                    testRole.id=testRole.name;
-                    return testRole;
-                }));
-                setLoading(false);
-            })
-        }
         fetchData();
     }, [])
+
+    const onTestRoleClick = (item) => navigate("details", {state: {
+        name: item.name,
+        endpoints: item.endpointLogicalGroup.testingEndpoints,
+        authWithCondList: item.authWithCondList
+    }})
 
     return (
         <PageWithMultipleCards
@@ -114,6 +129,7 @@ function TestRolesPage(){
                     resourceName={resourceName} 
                     headers={headers}
                     loading={loading}
+                    onRowClick={onTestRoleClick}
                     getActions={getActions}
                     hasRowActions={true}
                 />

@@ -10,6 +10,7 @@ import java.util.Map;
 
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.*;
+import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.type.URLMethods;
 import com.akto.test_editor.execution.Memory;
 import org.json.JSONObject;
@@ -41,9 +42,11 @@ import com.akto.test_editor.execution.Executor;
 import com.akto.test_editor.execution.ExecutorAlgorithm;
 import com.akto.testing.ApiExecutor;
 import com.akto.testing.TestExecutor;
+import com.akto.testing.Utils;
 import com.akto.util.Constants;
 import static com.akto.runtime.utils.Utils.convertOriginalReqRespToString;
 import com.google.gson.Gson;
+import com.mongodb.client.model.Filters;
 
 public class YamlNodeExecutor extends NodeExecutor {
     
@@ -162,7 +165,8 @@ public class YamlNodeExecutor extends NodeExecutor {
                     memory.reset(apiInfoKey.getApiCollectionId(), apiInfoKey.getUrl(), apiInfoKey.getMethod().name());
                 }
                 tsAfterReq = Context.nowInMillis();
-                responseTimeArr.add(tsAfterReq - tsBeforeReq);
+                int responseTime = tsAfterReq - tsBeforeReq;
+                responseTimeArr.add(responseTime);
                 ExecutionResult attempt = new ExecutionResult(singleReq.getSuccess(), singleReq.getErrMsg(), testReq.getRequest(), testResponse);
                 TestResult res = executor.validate(attempt, sampleRawApi, varMap, logId, validatorNode, yamlNodeDetails.getApiInfoKey());
                 if (res != null) {
@@ -170,7 +174,7 @@ public class YamlNodeExecutor extends NodeExecutor {
                 }
                 vulnerable = res.getVulnerable();
                 try {
-                    message.add(convertOriginalReqRespToString(testReq.getRequest(), testResponse));
+                    message.add(convertOriginalReqRespToString(testReq.getRequest(), testResponse, responseTime));
                 } catch (Exception e) {
                     ;
                 }
@@ -265,7 +269,7 @@ public class YamlNodeExecutor extends NodeExecutor {
     public WorkflowTestResult.NodeResult processYamlNode(Node node, Map<String, Object> valuesMap, Boolean allowAllStatusCodes, YamlNodeDetails yamlNodeDetails, boolean debug, List<TestingRunResult.TestLog> testLogs) {
 
         String testSubCategory = yamlNodeDetails.getTestId();
-        Map<String, TestConfig> testConfigMap = YamlTemplateDao.instance.fetchTestConfigMap(false, false);
+        Map<String, TestConfig> testConfigMap = YamlTemplateDao.instance.fetchTestConfigMap(false, false, 0, 10_000, Filters.empty());
         TestConfig testConfig = testConfigMap.get(testSubCategory);
 
         ExecutorNode executorNode = yamlNodeDetails.getExecutorNode();
@@ -314,7 +318,12 @@ public class YamlNodeExecutor extends NodeExecutor {
         List<CustomAuthType> customAuthTypes = yamlNodeDetails.getCustomAuthTypes();
         TestingUtil testingUtil = new TestingUtil(authMechanism, messageStore, null, null, customAuthTypes);
         TestExecutor executor = new TestExecutor();
-        TestingRunResult testingRunResult = executor.runTestNew(yamlNodeDetails.getApiInfoKey(), null, testingUtil, null, testConfig, null, debug, testLogs);
+        ApiInfoKey infoKey = yamlNodeDetails.getApiInfoKey();
+        List<String> samples = testingUtil.getSampleMessages().get(infoKey);
+        TestingRunResult testingRunResult = Utils.generateFailedRunResultForMessage(null, infoKey, testConfig.getInfo().getCategory().getName(), testConfig.getInfo().getSubCategory(), null,samples , null);
+        if(testingRunResult == null){
+            testingRunResult = executor.runTestNew(infoKey, null, testingUtil, null, testConfig, null, debug, testLogs, samples.get(samples.size() - 1));
+        }
 
         List<String> errors = new ArrayList<>();
         List<String> messages = new ArrayList<>();

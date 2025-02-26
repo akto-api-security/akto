@@ -25,6 +25,16 @@ export default {
         })
         return resp.response.data
     },
+    fetchRecentParams(startTimestamp, endTimestamp){
+        return request({
+            url: '/api/fetchRecentParams',
+            method: 'post',
+            data: {
+                startTimestamp,
+                endTimestamp
+            }
+        })
+    },
     async fetchDataTypeNames() {
         const resp = await request({
             url: '/api/fetchDataTypeNames',
@@ -46,6 +56,13 @@ export default {
     resetSampleData() {
         return request({
             url: '/api/resetSampleData',
+            method: 'post',
+            data: {}
+        })
+    },
+    fillSensitiveDataTypes() {
+        return request({
+            url: '/api/fillSensitiveDataTypes',
             method: 'post',
             data: {}
         })
@@ -160,6 +177,25 @@ export default {
             data: { apiCollections: items }
         })
     },
+    
+    async updateUserCollections(userCollectionMap) {
+        return await request({
+            url: '/api/updateUserCollections',
+            method: 'post',
+            data: {
+                userCollectionMap: userCollectionMap,
+            }
+        })
+    },
+
+    async getAllUsersCollections() {
+        return await request({
+            url: '/api/getAllUsersCollections',
+            method: 'post',
+            data: {}
+        })
+    },
+
     askAi(data) {
         return request({
             url: '/api/ask_ai',
@@ -328,18 +364,33 @@ export default {
             data: {}
         })
     },
-    async loadRecentEndpoints (startTimestamp, endTimestamp) {
+    async loadRecentEndpoints (startTimestamp, endTimestamp, skip, limit, filters, filterOperators, searchString) {
         const resp = await request({
             url: '/api/loadRecentEndpoints',
+            method: 'post',
+            data: { startTimestamp, endTimestamp, skip, limit, filters, filterOperators, searchString}
+        })
+        return resp
+    },
+    async getSummaryInfoForChanges (startTimestamp, endTimestamp) {
+        const resp = await request({
+            url: '/api/getSummaryInfoForChanges',
             method: 'post',
             data: { startTimestamp, endTimestamp }
         })
         return resp
     },
-
-    async loadRecentApiInfos (startTimestamp, endTimestamp) {
+    async fetchNewEndpointsTrendForHostCollections (startTimestamp, endTimestamp) {
         const resp = await request({
-            url: '/api/loadRecentApiInfos',
+            url: '/api/fetchNewEndpointsTrendForHostCollections',
+            method: 'post',
+            data: { startTimestamp, endTimestamp }
+        })
+        return resp
+    },
+    async fetchNewEndpointsTrendForNonHostCollections (startTimestamp, endTimestamp) {
+        const resp = await request({
+            url: '/api/fetchNewEndpointsTrendForNonHostCollections',
             method: 'post',
             data: { startTimestamp, endTimestamp }
         })
@@ -529,20 +580,20 @@ export default {
             data: {}
         })
     },
-    scheduleTestForCollection(apiCollectionId, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting) {
+    scheduleTestForCollection(apiCollectionId, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, testConfigsAdvancedSettings, cleanUpTestingResources) {
         return request({
             url: '/api/startTest',
             method: 'post',
-            data: { apiCollectionId, type: "COLLECTION_WISE", startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting }
+            data: { apiCollectionId, type: "COLLECTION_WISE", startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, testConfigsAdvancedSettings, cleanUpTestingResources}
         }).then((resp) => {
             return resp
         })
     },
-    scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, source, testRoleId, continuousTesting) {
+    scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, source, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, testConfigsAdvancedSettings, cleanUpTestingResources) {
         return request({
             url: '/api/startTest',
             method: 'post',
-            data: {apiInfoKeyList, type: "CUSTOM", startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, source, testRoleId, continuousTesting}
+            data: {apiInfoKeyList, type: "CUSTOM", startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, source, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, testConfigsAdvancedSettings, cleanUpTestingResources}
         }).then((resp) => {
             return resp
         })        
@@ -559,6 +610,25 @@ export default {
         })
         return resp
     },
+
+    async fetchSlackWebhooks() {
+        const resp = await request({
+            url: '/api/fetchSlackWebhooks',
+            method: 'post',
+            data: {}
+        })
+        return resp
+    },
+
+    async checkWebhook(webhookType, webhookOption) {
+        const resp = await request({
+            url: '/api/checkWebhook',
+            method: 'post',
+            data: { webhookType, webhookOption }
+        })
+        return resp
+    },
+
     async fetchNewParametersTrend(startTimestamp, endTimestamp) {
         const resp = await request({
             url: '/api/fetchNewParametersTrend',
@@ -621,6 +691,15 @@ export default {
             method: 'post',
             data: {
                 collectionName, conditions
+            }
+        })
+    },
+    async updateCustomCollection(apiCollectionId, conditions) {
+        return await request({
+            url: '/api/updateCustomCollection',
+            method: 'post',
+            data: {
+                apiCollectionId, conditions
             }
         })
     },
@@ -733,5 +812,42 @@ export default {
                 apiCollectionId: apiInfoKey.apiCollectionId
             }
         })
-    }
+    },
+    fetchCountMapOfApis(){
+        return request({
+            url: "/api/fetchCountMapOfApis",
+            method: "post",
+            data: {}
+        })
+    },
+    resetDataTypeRetro(name){
+        return request({
+            url: '/api/resetDataTypeRetro',
+            method: 'post',
+            data: {
+                name: name,
+            }
+        })
+    },
+
+    async checkIfDependencyGraphAvailable(apiCollectionId, url, method) {
+        return await request({
+            url: '/api/checkIfDependencyGraphAvailable',
+            method: 'post',
+            data: {
+                apiCollectionId, url, method
+            }
+        })
+    },
+
+    async editCollectionName(apiCollectionId, collectionName) {
+        return await request({
+            url: '/api/editCollectionName',
+            method: 'post',
+            data: {
+                apiCollectionId, collectionName
+            }
+        })
+    },
+
 }

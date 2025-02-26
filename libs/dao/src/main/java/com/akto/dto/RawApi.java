@@ -1,11 +1,14 @@
 package com.akto.dto;
 
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 import com.akto.dto.type.RequestTemplate;
+import com.alibaba.fastjson2.JSON;
+import com.alibaba.fastjson2.JSONObject;
 import com.mongodb.BasicDBList;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mongodb.BasicDBObject;
@@ -25,6 +28,25 @@ public class RawApi {
         this.originalMessage = originalMessage;
     }
 
+    public static RawApi buildFromMessage(String message, boolean overrideHostHeader){
+        if(!overrideHostHeader){
+            return buildFromMessage(message);
+        }else{
+            try {
+                OriginalHttpRequest request = new OriginalHttpRequest();
+                request.buildFromSampleMessage(message, true);
+
+                OriginalHttpResponse response = new OriginalHttpResponse();
+                response.buildFromSampleMessage(message);
+
+                return new RawApi(request, response, message);
+            } catch (Exception e) {
+                e.printStackTrace();
+                return buildFromMessage(message);
+            }
+        }
+    }
+
     public static RawApi buildFromMessage(String message) {
         OriginalHttpRequest request = new OriginalHttpRequest();
         request.buildFromSampleMessage(message);
@@ -33,6 +55,16 @@ public class RawApi {
         response.buildFromSampleMessage(message);
 
         return new RawApi(request, response, message);
+    }
+
+    public static RawApi buildFromMessageNew(HttpResponseParams responseParam) {
+        OriginalHttpRequest request = new OriginalHttpRequest();
+        request.buildFromSampleMessageNew(responseParam);
+
+        OriginalHttpResponse response = new OriginalHttpResponse();
+        response.buildFromSampleMessageNew(responseParam);
+
+        return new RawApi(request, response, "");
     }
 
     public BasicDBObject fetchReqPayload() {
@@ -44,7 +76,7 @@ public class RawApi {
             reqBody = "{\"json\": "+reqBody+"}";
         }
         try {
-             payload = BasicDBObject.parse(reqBody);
+            payload = BasicDBObject.parse(reqBody);
         } catch (Exception e) {
             payload = new BasicDBObject();
         }
@@ -228,9 +260,10 @@ public class RawApi {
         result.put("time",time+"");
         result.put("statusCode", this.response.getStatusCode()+"");
         result.put("type",type);
-        result.put("status", null);
+        result.put("status", "");
         result.put("contentType",contentType);
         result.put("source", source);
+        result.put("destIp", "");
 
         this.originalMessage = om.writeValueAsString(result);
     }

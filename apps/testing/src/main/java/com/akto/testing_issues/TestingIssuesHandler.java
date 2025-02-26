@@ -19,6 +19,8 @@ import com.akto.util.enums.GlobalEnums.Severity;
 import com.akto.util.enums.GlobalEnums.TestRunIssueStatus;
 import com.mongodb.bulk.BulkWriteResult;
 import com.mongodb.client.model.*;
+
+import org.bson.BsonDocument;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 import org.slf4j.Logger;
@@ -59,12 +61,10 @@ public class TestingIssuesHandler {
             Bson query = Filters.eq(ID, issuesId);
             Bson updateStatusFields;
             Bson updateSeverityField;
-            if (runResult.isVulnerable()) {
-                if (status == TestRunIssueStatus.IGNORED) {
-                    updateStatusFields = Updates.set(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.IGNORED);
-                } else {
-                    updateStatusFields = Updates.set(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.OPEN);
-                }
+            if (status == TestRunIssueStatus.IGNORED) {
+                updateStatusFields = new BsonDocument();
+            } else if (runResult.isVulnerable()) {
+                updateStatusFields = Updates.set(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.OPEN);
             } else {
                 updateStatusFields = Updates.set(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.FIXED);
             }
@@ -112,6 +112,7 @@ public class TestingIssuesHandler {
         ObjectId summaryId = null;
 
         Map<String, Integer> countIssuesMap = new HashMap<>();
+        countIssuesMap.put(Severity.CRITICAL.toString(), 0);
         countIssuesMap.put(Severity.HIGH.toString(), 0);
         countIssuesMap.put(Severity.MEDIUM.toString(), 0);
         countIssuesMap.put(Severity.LOW.toString(), 0);
@@ -127,16 +128,24 @@ public class TestingIssuesHandler {
                 break;
             }
 
+            boolean shouldCountIssue = false;
             Severity severity = TestExecutor.getSeverityFromTestingRunResult(runResult);
-            int count = countIssuesMap.getOrDefault(severity.toString(), 0);
-            countIssuesMap.put(severity.toString(), count + 1);
 
             for (TestingRunIssues testingRunIssues : testingRunIssuesList) {
                 if (testingRunIssues.getId().equals(testingIssuesId)) {
                     doesExists = true;
+                    if(testingRunIssues.getTestRunIssueStatus().equals(TestRunIssueStatus.OPEN)) {
+                        shouldCountIssue = true;
+                    }
                     break;
                 }
             }
+
+            if(shouldCountIssue || !doesExists) {
+                int count = countIssuesMap.getOrDefault(severity.toString(), 0);
+                countIssuesMap.put(severity.toString(), count + 1);
+            }
+
             if (!doesExists) {
                 // name = category
                 String subCategory = runResult.getTestSubType();
@@ -159,6 +168,7 @@ public class TestingIssuesHandler {
             TestingRunResultSummariesDao.instance.updateOneNoUpsert(
                 Filters.eq("_id", summaryId),
                 Updates.combine(
+                    Updates.inc("countIssues.CRITICAL", countIssuesMap.get("CRITICAL")),
                     Updates.inc("countIssues.HIGH", countIssuesMap.get("HIGH")),
                     Updates.inc("countIssues.MEDIUM", countIssuesMap.get("MEDIUM")),
                     Updates.inc("countIssues.LOW", countIssuesMap.get("LOW"))

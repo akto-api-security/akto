@@ -40,7 +40,7 @@ public class GetRunningTestsStatus {
                     @Override
                     public void accept(Account t) {
                         try {
-                            int timeFilter = Context.now() - 30 * 60;
+                            int timeFilter = Context.now() - 6 * 60 * 60;
                             List<TestingRunResultSummary> currentRunningTests = TestingRunResultSummariesDao.instance.findAll(
                                 Filters.gte(TestingRunResultSummary.START_TIMESTAMP, timeFilter),
                                 Projections.include("_id", TestingRunResultSummary.STATE, TestingRunResultSummary.TESTING_RUN_ID) 
@@ -67,6 +67,24 @@ public class GetRunningTestsStatus {
 
     public ConcurrentHashMap<ObjectId, TestingRun.State> getCurrentRunningTestsMap() {
         return currentRunningTestsMap;
+    }
+
+    public boolean isTestRunning(ObjectId runId, boolean isSummary){
+        // handles cases for CICD as it has summary state as scheduled
+        boolean ans = isTestRunning(runId);
+        if(!ans){
+            /*
+                Here we check from scheduled state because the getCurrentState map is updated every minute, 
+                thus the value in the map might be old, but in reality it is running.
+                Therefore checking for "RUNNING" using "SCHEDULED"
+            */
+            if(getCurrentState(runId) != null && getCurrentState(runId).equals(TestingRun.State.SCHEDULED)){
+                return true;
+            }else{
+                return false;
+            }
+        }
+        return ans;
     }
 
     public boolean isTestRunning(ObjectId runId){

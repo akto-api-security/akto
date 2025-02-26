@@ -96,9 +96,9 @@ public class TestDBSync extends MongoBasedTest {
         for (int i = 2; i <= 30; i ++ ) {
             aggr.addURL(TestDump2.createSampleParams("user"+i, url+i));
         }
-        sync.computeDelta(aggr, true, 0);
+        sync.computeDelta(aggr, true, 0, false);
         sync.syncWithDB(false, true, SyncLimit.noLimit);
-        APICatalogSync.mergeUrlsAndSave(123, true, false, sync.existingAPIsInDb);
+        APICatalogSync.mergeUrlsAndSave(123, true, false, sync.existingAPIsInDb, false);
         sync.buildFromDB(false, true);
 
         assertEquals(0, sync.getDbState(123).getStrictURLToMethods().size());
@@ -144,7 +144,7 @@ public class TestDBSync extends MongoBasedTest {
         parser.syncFunction(responseParams, false, true, null);
         assertTrue(parser.getSyncCount() == 0);
 
-        APICatalogSync.mergeUrlsAndSave(123, true, false, parser.apiCatalogSync.existingAPIsInDb);
+        APICatalogSync.mergeUrlsAndSave(123, true, false, parser.apiCatalogSync.existingAPIsInDb, false);
         parser.apiCatalogSync.buildFromDB(false, true);
 
         SampleData sd = SampleDataDao.instance.findOne(Filters.eq("_id.url", "immediate/INTEGER"));
@@ -215,7 +215,7 @@ public class TestDBSync extends MongoBasedTest {
         for (int i = 1; i <= 30; i ++ ) {
             aggr.addURL(TestDump2.createSampleParams("user"+i, "/payment/id"+i));
         }
-        sync.computeDelta(aggr, true, 123);
+        sync.computeDelta(aggr, true, 123, false);
         sync.syncWithDB(false, true, SyncLimit.noLimit);
 
 
@@ -229,9 +229,9 @@ public class TestDBSync extends MongoBasedTest {
         URLAggregator aggr2 = new URLAggregator();
         aggr2.addURL(resp2);
         
-        sync.computeDelta(aggr2, true, 123);
+        sync.computeDelta(aggr2, true, 123, false);
         sync.syncWithDB(false, true, SyncLimit.noLimit);
-        APICatalogSync.mergeUrlsAndSave(123, true, false, sync.existingAPIsInDb);
+        APICatalogSync.mergeUrlsAndSave(123, true, false, sync.existingAPIsInDb, false);
         sync.buildFromDB(false, true);
 
         assertEquals(1, sync.getDbState(123).getStrictURLToMethods().size());
@@ -259,7 +259,7 @@ public class TestDBSync extends MongoBasedTest {
     @Test
     public void testFilterHttpResponseParamsEmpty() {
         HttpCallParser httpCallParser = new HttpCallParser("",0,0,0, true);
-        List<HttpResponseParams> ss = httpCallParser.filterHttpResponseParams(new ArrayList<>(), null, null);
+        List<HttpResponseParams> ss = httpCallParser.filterHttpResponseParams(new ArrayList<>(), null, null, true);
         assertEquals(ss.size(),0);
     }
 
@@ -283,7 +283,7 @@ public class TestDBSync extends MongoBasedTest {
         h2.requestParams.setApiCollectionId(1000);
         h2.setSource(Source.MIRRORING);
 
-        List<HttpResponseParams> ss = httpCallParser.filterHttpResponseParams(Arrays.asList(h1, h2), null, null);
+        List<HttpResponseParams> ss = httpCallParser.filterHttpResponseParams(Arrays.asList(h1, h2), null, null, true);
         assertEquals(ss.size(),2);
         assertEquals(h1.requestParams.getApiCollectionId(), 1000);
         assertTrue(h2.requestParams.getApiCollectionId() != 1000);
@@ -307,7 +307,7 @@ public class TestDBSync extends MongoBasedTest {
         h1.statusCode = 200;
         h1.requestParams.setApiCollectionId(vxlanId1);
 
-        List<HttpResponseParams> filterHttpResponseParamsList = httpCallParser.filterHttpResponseParams(Collections.singletonList(h1),null, null);
+        List<HttpResponseParams> filterHttpResponseParamsList = httpCallParser.filterHttpResponseParams(Collections.singletonList(h1),null, null, true);
 
         Assertions.assertEquals(filterHttpResponseParamsList.size(),1);
         Assertions.assertEquals(filterHttpResponseParamsList.get(0).requestParams.getApiCollectionId(),vxlanId1);
@@ -322,7 +322,7 @@ public class TestDBSync extends MongoBasedTest {
         h2.statusCode = 200;
         h2.requestParams.setApiCollectionId(vxlanId2);
 
-        filterHttpResponseParamsList = httpCallParser.filterHttpResponseParams(Collections.singletonList(h2),null, null);
+        filterHttpResponseParamsList = httpCallParser.filterHttpResponseParams(Collections.singletonList(h2),null, null, true);
 
         Assertions.assertEquals(filterHttpResponseParamsList.size(),1);
         Assertions.assertEquals(filterHttpResponseParamsList.get(0).requestParams.getApiCollectionId(),vxlanId2);
@@ -337,7 +337,7 @@ public class TestDBSync extends MongoBasedTest {
         h3.statusCode = 400;
         h3.requestParams.setApiCollectionId(vxlanId2);
 
-        filterHttpResponseParamsList = httpCallParser.filterHttpResponseParams(Collections.singletonList(h3),null, null);
+        filterHttpResponseParamsList = httpCallParser.filterHttpResponseParams(Collections.singletonList(h3),null, null, true);
 
         Assertions.assertEquals(filterHttpResponseParamsList.size(),0);
         ApiCollection apiCollection3 = ApiCollectionsDao.instance.findOne("_id", vxlanId3);
@@ -369,7 +369,7 @@ public class TestDBSync extends MongoBasedTest {
         h1.statusCode = 200;
         h1.setSource(Source.MIRRORING);
 
-        httpCallParser.filterHttpResponseParams(Collections.singletonList(h1),null, null);
+        httpCallParser.filterHttpResponseParams(Collections.singletonList(h1),null, null, true);
 
         List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(new BasicDBObject());
         Assertions.assertEquals(apiCollections.size(),2);
@@ -395,7 +395,7 @@ public class TestDBSync extends MongoBasedTest {
         h2.statusCode = 200;
         h2.setSource(Source.MIRRORING);
 
-        httpCallParser.filterHttpResponseParams(Collections.singletonList(h2),null, null);
+        httpCallParser.filterHttpResponseParams(Collections.singletonList(h2),null, null, true);
 
         apiCollections = ApiCollectionsDao.instance.findAll(new BasicDBObject());
         Assertions.assertEquals(apiCollections.size(),3);
@@ -419,7 +419,7 @@ public class TestDBSync extends MongoBasedTest {
         h3.statusCode = 200;
         h3.setSource(Source.MIRRORING);
 
-        httpCallParser.filterHttpResponseParams(Collections.singletonList(h3),null, null);
+        httpCallParser.filterHttpResponseParams(Collections.singletonList(h3),null, null, true);
 
         apiCollections = ApiCollectionsDao.instance.findAll(new BasicDBObject());
         Assertions.assertEquals(apiCollections.size(),4);
@@ -452,7 +452,7 @@ public class TestDBSync extends MongoBasedTest {
         );
         httpCallParser.getHostNameToIdMap().put("hostRandom 1234", dupId);
 
-        httpCallParser.filterHttpResponseParams(Collections.singletonList(h4),null, null);
+        httpCallParser.filterHttpResponseParams(Collections.singletonList(h4),null, null, true);
 
         apiCollections = ApiCollectionsDao.instance.findAll(new BasicDBObject());
         Assertions.assertEquals(apiCollections.size(),6);
@@ -476,7 +476,7 @@ public class TestDBSync extends MongoBasedTest {
         h1.statusCode = 200;
 
         HttpCallParser httpCallParser = new HttpCallParser("",0,0,0, true);
-        httpCallParser.filterHttpResponseParams(Collections.singletonList(h1),null, null);
+        httpCallParser.filterHttpResponseParams(Collections.singletonList(h1),null, null, true);
 
         List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(new BasicDBObject());
         Assertions.assertEquals(apiCollections.size(), 1);

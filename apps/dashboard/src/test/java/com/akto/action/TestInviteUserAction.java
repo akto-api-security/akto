@@ -2,13 +2,27 @@ package com.akto.action;
 
 import org.junit.Test;
 
+import com.akto.MongoBasedTest;
+import com.akto.dao.CustomRoleDao;
+import com.akto.dao.RBACDao;
+import com.akto.dao.UsersDao;
+import com.akto.dto.CustomRole;
+import com.akto.dto.RBAC;
+import com.akto.dto.User;
+import com.akto.dto.UserAccountEntry;
+import com.akto.dto.RBAC.Role;
+import com.mongodb.BasicDBObject;
+import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Updates;
+
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Map;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 
-public class TestInviteUserAction {
-
+public class TestInviteUserAction extends MongoBasedTest{
 
     @Test
     public void testValidateEmail() {
@@ -47,4 +61,49 @@ public class TestInviteUserAction {
 
         InviteUserAction.commonOrganisationsMap = new HashMap<>();
     }
+
+    @Test
+    public void testInviteUserAction() {
+        RBACDao.instance.deleteAll(new BasicDBObject());
+        UsersDao.instance.deleteAll(new BasicDBObject());
+        CustomRoleDao.instance.deleteAll(new BasicDBObject());
+        InviteUserAction inviteUserAction = new InviteUserAction();
+
+        UserAccountEntry userAccountEntry = new UserAccountEntry();
+        userAccountEntry.setAccountId(ACCOUNT_ID);
+        userAccountEntry.setDefault(true);
+        Map<String, UserAccountEntry> accountAccessMap = new HashMap<>();
+        accountAccessMap.put(ACCOUNT_ID+"", userAccountEntry);
+
+        Map<String, Object> session = new HashMap<>();
+        UsersDao.instance.insertOne(new User("test", "test@akto.io", accountAccessMap, null));
+        User user = UsersDao.instance.findOne(new BasicDBObject());
+        session.put("user", user);
+        inviteUserAction.setSession(session);
+
+        inviteUserAction.setInviteeEmail("dude@akto.io");
+        inviteUserAction.setInviteeRole(Role.DEVELOPER.name());
+
+        RBACDao.instance.insertOne(new RBAC(user.getId(), RBAC.Role.MEMBER.name(), ACCOUNT_ID));
+
+        assertEquals("SUCCESS",inviteUserAction.execute());
+
+        inviteUserAction.setInviteeRole(Role.ADMIN.name());
+
+        assertEquals("ERROR",inviteUserAction.execute());
+
+        CustomRole customRole = new CustomRole("CUSTOM_ROLE", Role.ADMIN.name(), new ArrayList<>(), false);
+        CustomRoleDao.instance.insertOne(customRole);
+
+        inviteUserAction.setInviteeRole("CUSTOM_ROLE");
+
+        assertEquals("ERROR",inviteUserAction.execute());
+
+        CustomRoleDao.instance.updateOne(Filters.eq(CustomRole._NAME, customRole.getName()), Updates.set(CustomRole.BASE_ROLE, Role.MEMBER.name()));
+
+        assertEquals("SUCCESS",inviteUserAction.execute());
+
+
+    }
+
 }

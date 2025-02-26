@@ -4,6 +4,7 @@ import com.akto.MongoBasedTest;
 import com.akto.dao.SampleDataDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiInfo;
+import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.testing.GenericTestResult;
 import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.TestingRunResult;
@@ -67,11 +68,13 @@ public class TestExecutorTest extends MongoBasedTest {
         Set<Integer> apiCollectionSet = new HashSet<>();
         apiCollectionSet.add(0);
         messageStore.fetchSampleMessages(apiCollectionSet);
-        AuthMechanismStore authMechanismStore = AuthMechanismStore.create();
+        AuthMechanismStore authMechanismStore = AuthMechanismStore.create(null);
         TestingUtil testingUtil = new TestingUtil(authMechanismStore.getAuthMechanism(), messageStore, new ArrayList<>(), "", new ArrayList<>());
 
-        String host = TestExecutor.findHost(apiInfoKey, testingUtil.getSampleMessages(), messageStore);
-        assertEquals(answer,host);
+        OriginalHttpRequest request = TestExecutor.findOriginalHttpRequest(apiInfoKey, testingUtil.getSampleMessages(),
+                messageStore);
+        String host = TestExecutor.findHostFromOriginalHttpRequest(request);
+        assertEquals(answer, host);
     }
 
     @Test

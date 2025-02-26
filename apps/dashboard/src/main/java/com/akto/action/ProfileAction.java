@@ -11,13 +11,13 @@ import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.Account;
 import com.akto.dto.AccountSettings;
-import com.akto.dto.JiraIntegration;
 import com.akto.dto.RBAC;
 import com.akto.dto.User;
 import com.akto.dto.UserAccountEntry;
 import com.akto.dto.ApiToken.Utility;
 import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.billing.Organization;
+import com.akto.dto.jira_integration.JiraIntegration;
 import com.akto.listener.InitializerListener;
 import com.akto.log.LoggerMaker;
 import com.akto.util.Constants;
@@ -118,7 +118,10 @@ public class ProfileAction extends UserAction {
         if(currAccount != null && !currAccount.getTimezone().isEmpty()){
             timeZone = currAccount.getTimezone();
         }
-        String dashboardVersion = accountSettings.getDashboardVersion();
+        String dashboardVersion = InitializerListener.aktoVersion;
+        if(accountSettings != null){
+            dashboardVersion = accountSettings.getDashboardVersion();
+        }
         String[] versions = dashboardVersion.split(" - ");
         User userFromDB = UsersDao.instance.findOne(Filters.eq(Constants.ID, user.getId()));
         RBAC.Role userRole = RBACDao.getCurrentRoleForUser(user.getId(), Context.accountId.get());
@@ -131,6 +134,8 @@ public class ProfileAction extends UserAction {
             }
         } catch (Exception e) {
         }
+
+        InitializerListener.insertStateInAccountSettings(accountSettings);
 
         Organization organization = OrganizationsDao.instance.findOne(
                 Filters.in(Organization.ACCOUNTS, sessionAccId)
@@ -226,6 +231,8 @@ public class ProfileAction extends UserAction {
             userDetails.append("stiggClientKey", OrganizationUtils.fetchClientKey(organizationId, organization.getAdminEmail()));
             userDetails.append("expired", organization.checkExpirationWithAktoSync());
             userDetails.append("hotjarSiteId", organization.getHotjarSiteId());
+            userDetails.append("planType", organization.getplanType());
+            userDetails.append("trialMsg", organization.gettrialMsg());
         }
 
         if (versions.length > 2) {

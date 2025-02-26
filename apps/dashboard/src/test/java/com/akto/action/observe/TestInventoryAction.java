@@ -65,6 +65,7 @@ public class TestInventoryAction extends MongoBasedTest {
         SingleTypeInfoDao.instance.insertMany(Arrays.asList(sti1, sti2, sti3, sti4, sti5, sti6, sti7));
 
         InventoryAction inventoryAction = new InventoryAction();
+        Context.userId.set(null);
         String result = inventoryAction.fetchEndpointsBasedOnHostName();
         assertEquals("ERROR", result);
 
@@ -150,6 +151,7 @@ public class TestInventoryAction extends MongoBasedTest {
         TrafficInfoDao.instance.insertOne(new TrafficInfo(new Key(apiCollectionId, url, URLMethods.Method.POST, -1, 0, 0), mapHoursToCount));
 
         InventoryAction inventoryAction = new InventoryAction();
+        Context.userId.set(null);
         inventoryAction.setUrl(url);
         inventoryAction.setMethod("POST");
         inventoryAction.setApiCollectionId(apiCollectionId);       
@@ -157,7 +159,7 @@ public class TestInventoryAction extends MongoBasedTest {
         assertEquals(Action.SUCCESS.toUpperCase(), result);
 
         BloomFilter<CharSequence> existingAPIsInDb = BloomFilter.create(Funnels.stringFunnel(Charsets.UTF_8), 1_000_000, 0.001 );
-        APICatalogSync.mergeUrlsAndSave(apiCollectionId, true, true, existingAPIsInDb);
+        APICatalogSync.mergeUrlsAndSave(apiCollectionId, true, true, existingAPIsInDb, false);
 
         List<SingleTypeInfo> singleTypeInfoObjectIdList  = SingleTypeInfoDao.instance.findAll(SingleTypeInfoDao.filterForSTIUsingURL(apiCollectionId, "api/books/OBJECT_ID", URLMethods.Method.POST));
         assertEquals(5, singleTypeInfoObjectIdList.size());
@@ -208,6 +210,7 @@ public class TestInventoryAction extends MongoBasedTest {
         RuntimeListener.addSampleData();
 
         InventoryAction inventoryAction = new InventoryAction();
+        Context.userId.set(null);
         List<BasicDBObject> basicDBObjects = inventoryAction.fetchRecentEndpoints(0, Context.now());
         assertEquals(endpointCount, basicDBObjects.size());
     }

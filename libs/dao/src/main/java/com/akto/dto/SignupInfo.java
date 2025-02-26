@@ -1,5 +1,6 @@
 package com.akto.dto;
 
+import com.akto.dto.Config.ConfigType;
 import com.mongodb.BasicDBObject;
 import org.bson.codecs.pojo.annotations.BsonDiscriminator;
 
@@ -388,16 +389,18 @@ public abstract class SignupInfo {
         private String accessToken;
         private String refreshToken;
         private int refreshTokenExpiry;
+        private String email;
         private String username;
 
         public GithubSignupInfo() {
 
         }
 
-        public GithubSignupInfo(String accessToken, String refreshToken, int refreshTokenExpiry, String username) {
+        public GithubSignupInfo(String accessToken, String refreshToken, int refreshTokenExpiry, String username, String email) {
             this.accessToken = accessToken;
             this.refreshToken = refreshToken;
             this.refreshTokenExpiry = refreshTokenExpiry;
+            this.email = email;
             this.username = username;
             this.configType = Config.ConfigType.GITHUB;
             this.key = this.configType.name();
@@ -434,6 +437,14 @@ public abstract class SignupInfo {
         public void setUsername(String username) {
             this.username = username;
         }
+
+        public String getEmail() {
+            return email;
+        }
+
+        public void setEmail(String email) {
+            this.email = email;
+        }
     }
 
     public static class OktaSignupInfo extends SignupInfo {
@@ -468,17 +479,17 @@ public abstract class SignupInfo {
         }
     }
 
-    public static class AzureSignupInfo extends SignupInfo {
+    public static class SamlSsoSignupInfo extends SignupInfo {
         private String username;
         private String email;
 
-        public AzureSignupInfo (){}
+        public SamlSsoSignupInfo (){}
 
-        public AzureSignupInfo (String username, String email) {
+        public SamlSsoSignupInfo (String username, String email, ConfigType configType) {
             this.username = username ;
             this.email = email;
-            this.configType = Config.ConfigType.AZURE;
-            this.key = this.configType.name();
+            this.configType = configType;
+            this.key = configType.name();
         }
 
         public String getEmail() {

@@ -47,7 +47,7 @@ public class ApiAccessTypePolicy {
      */
     );
 
-    static final private List<String> CLIENT_IP_HEADERS = Arrays.asList(
+    static final public List<String> CLIENT_IP_HEADERS = Arrays.asList(
             "x-forwarded-for",
             "x-real-ip",
             "x-cluster-client-ip",

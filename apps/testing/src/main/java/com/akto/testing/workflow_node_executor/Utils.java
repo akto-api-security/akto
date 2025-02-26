@@ -1,7 +1,12 @@
 package com.akto.testing.workflow_node_executor;
 
+import static com.akto.runtime.utils.Utils.parseCookie;
+import static org.mockito.Answers.values;
+
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -10,13 +15,11 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import javax.script.ScriptEngine;
-import javax.script.ScriptEngineManager;
-import javax.script.ScriptException;
-
-import com.akto.dto.ApiInfo;
 import com.akto.dto.testing.*;
 import com.akto.test_editor.execution.Memory;
+import com.akto.test_editor.filter.data_operands_impl.CookieExpireFilter;
+import com.akto.testing.TestExecutor;
+
 import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
 import org.json.JSONObject;
@@ -29,6 +32,7 @@ import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.RecordedLoginFlowInput;
 import com.akto.dto.api_workflow.Graph;
 import com.akto.dto.api_workflow.Node;
+import com.akto.dto.type.KeyTypes;
 import com.akto.dto.type.RequestTemplate;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -39,9 +43,13 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.Jws;
+import io.jsonwebtoken.Jwts;
+
 public class Utils {
     
-    private static final LoggerMaker loggerMaker = new LoggerMaker(Utils.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(Utils.class, LogDb.TESTING);
     private static final Gson gson = new Gson();
 
     public static WorkflowTestResult.NodeResult processOtpNode(Node node, Map<String, Object> valuesMap) {
@@ -52,7 +60,7 @@ public class Utils {
         BasicDBObject data = new BasicDBObject();
         String message;
 
-        OtpTestData otpTestData = fetchOtpTestData(node, 4);
+        OtpTestData otpTestData = fetchOtpTestData(node, 10);
         WorkflowNodeDetails workflowNodeDetails = node.getWorkflowNodeDetails();
         String uuid = workflowNodeDetails.getOtpRefUuid();
 
@@ -128,15 +136,13 @@ public class Utils {
         return verificationCode;
     }
 
-    public static WorkflowTestResult.NodeResult processRecorderNode(Node node, Map<String, Object> valuesMap) {
+    public static WorkflowTestResult.NodeResult processRecorderNode(Node node, Map<String, Object> valuesMap, RecordedLoginFlowInput recordedLoginFlowInput) {
 
         List<String> testErrors = new ArrayList<>();
         BasicDBObject resp = new BasicDBObject();
         BasicDBObject body = new BasicDBObject();
         BasicDBObject data = new BasicDBObject();
         String message;
-
-        RecordedLoginFlowInput recordedLoginFlowInput = RecordedLoginInputDao.instance.findOne(new BasicDBObject());
         
         String token = fetchToken(recordedLoginFlowInput, 5);
 
@@ -149,8 +155,17 @@ public class Utils {
             return new WorkflowTestResult.NodeResult(resp.toString(), false, testErrors);
         }
 
-        valuesMap.put(node.getId() + ".response.body.token", token);
+        // valuesMap.put(node.getId() + ".response.body.token", token);
         
+
+        BasicDBObject flattened = JSONUtils.flattenWithDots(BasicDBObject.parse(token));
+
+        for (String param: flattened.keySet()) {
+            String key = node.getId() + ".response.body" + "." + param;
+            valuesMap.put(key, flattened.get(param));
+	        loggerMaker.infoAndAddToDb("kv pair: " + key + " " + flattened.get(param));
+        }	
+
         data.put("token", token);
         body.put("body", data);
         resp.put("response", body);
@@ -190,8 +205,17 @@ public class Utils {
     }
 
     public static WorkflowTestResult.NodeResult processNode(Node node, Map<String, Object> valuesMap, Boolean allowAllStatusCodes, boolean debug, List<TestingRunResult.TestLog> testLogs, Memory memory) {
+        RecordedLoginFlowInput recordedLoginFlowInput = RecordedLoginInputDao.instance.findOne(new BasicDBObject());
+        return processNode(node, valuesMap, allowAllStatusCodes, debug, testLogs, memory, recordedLoginFlowInput);
+    }
+
+    public static WorkflowTestResult.NodeResult processNode(Node node, Map<String, Object> valuesMap, Boolean allowAllStatusCodes, boolean debug, List<TestingRunResult.TestLog> testLogs, Memory memory, AuthMechanism authMechanism) {
+        return processNode(node, valuesMap, allowAllStatusCodes, debug, testLogs, memory, authMechanism.getRecordedLoginFlowInput());
+    }
+
+    public static WorkflowTestResult.NodeResult processNode(Node node, Map<String, Object> valuesMap, Boolean allowAllStatusCodes, boolean debug, List<TestingRunResult.TestLog> testLogs, Memory memory, RecordedLoginFlowInput recordedLoginFlowInput) {
         if (node.getWorkflowNodeDetails().getType() == WorkflowNodeDetails.Type.RECORDED) {
-            return processRecorderNode(node, valuesMap);
+            return processRecorderNode(node, valuesMap, recordedLoginFlowInput);
         }
         else if (node.getWorkflowNodeDetails().getType() == WorkflowNodeDetails.Type.OTP) {
             return processOtpNode(node, valuesMap);
@@ -200,7 +224,6 @@ public class Utils {
             return processApiNode(node, valuesMap, allowAllStatusCodes, debug, testLogs, memory);
         }
     }
-
 
     public static WorkflowTestResult.NodeResult processApiNode(Node node, Map<String, Object> valuesMap, Boolean allowAllStatusCodes, boolean debug, List<TestingRunResult.TestLog> testLogs, Memory memory) {
         
@@ -246,7 +269,7 @@ public class Utils {
                 if (authMechanism.getRequestData() != null && authMechanism.getRequestData().size() > 0 && authMechanism.getRequestData().get(index).getAllowAllStatusCodes()) {
                     allowAllStatusCodes = authMechanism.getRequestData().get(0).getAllowAllStatusCodes();
                 }
-                nodeResult = processNode(node, valuesMap, allowAllStatusCodes, false, new ArrayList<>(), null);
+                nodeResult = processNode(node, valuesMap, allowAllStatusCodes, false, new ArrayList<>(), null, authMechanism);
             } catch (Exception e) {
                 ;
                 List<String> testErrors = new ArrayList<>();
@@ -257,8 +280,17 @@ public class Utils {
             JSONObject respString = new JSONObject();
             Map<String, Map<String, Object>> json = gson.fromJson(nodeResult.getMessage(), Map.class);
 
-            respString.put("headers", json.get("response").get("headers"));
-            respString.put("body", json.get("response").get("body"));
+            if (json.get("response").get("headers") != null) {
+                respString.put("headers", json.get("response").get("headers"));
+            } else {
+                respString.put("headers", "{}");
+            }
+            if (json.get("response").get("body") != null) {
+                respString.put("body", json.get("response").get("body"));
+            } else {
+                respString.put("body", "{}");
+            }
+            // respString.put("body", json.get("response").get("body").toString());
             responses.add(respString.toString());
             
             if (nodeResult.getErrors().size() > 0) {
@@ -274,11 +306,48 @@ public class Utils {
 
         for (AuthParam param : authMechanism.getAuthParams()) {
             try {
-                String value = executeCode(param.getValue(), valuesMap);
+                String value = executeCode(param.getValue(), valuesMap, false);
                 if (!param.getValue().equals(value) && value == null) {
                     return new LoginFlowResponse(responses, "auth param not found at specified path " + 
                     param.getValue(), false);
                 }
+
+                // checking on the value of if this is valid jwt token or valid cookie which has expiry time
+                String tempVal = new String(value);
+                if(tempVal.contains("Bearer")){
+                    tempVal = value.split("Bearer ")[1];
+                }
+                if(KeyTypes.isJWT(tempVal)){
+                    try {
+                        String[] parts = tempVal.split("\\.");
+                        if (parts.length != 3) {
+                            throw new IllegalArgumentException("Invalid JWT token format");
+                        }
+                        String payload = new String(Base64.getUrlDecoder().decode(parts[1]));
+                        JSONObject payloadJson = new JSONObject(payload);
+                        if (payloadJson.has("exp")) {
+                            int newExpiryTime = payloadJson.getInt("exp");
+                            TestExecutor.setExpiryTimeOfAuthToken(newExpiryTime);
+                        } else {
+                            throw new IllegalArgumentException("JWT does not have an 'exp' claim");
+                        }
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                }else{
+                    // check if this cookie with max-age or expiry time
+                    try {
+                        Map<String,String> cookieMap = parseCookie(Arrays.asList(value));
+                        int expiryTsEpoch = CookieExpireFilter.getMaxAgeFromCookie(cookieMap);
+                        if(expiryTsEpoch > 0){
+                            int newExpiryTime = Context.now() + expiryTsEpoch;
+                            TestExecutor.setExpiryTimeOfAuthToken(newExpiryTime);
+                        }
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                }
+
                 param.setValue(value);
             } catch(Exception e) {
                 return new LoginFlowResponse(responses, "error resolving auth param " + param.getValue(), false);
@@ -475,69 +544,17 @@ public class Utils {
         return request;
     }
 
+    public static String executeCode(String ogPayload, Map<String, Object> valuesMap, boolean shouldThrowException) throws Exception {
+        return replaceVariables(ogPayload,valuesMap, true, shouldThrowException);
+    }
 
     public static String executeCode(String ogPayload, Map<String, Object> valuesMap) throws Exception {
-        ScriptEngineManager factory = new ScriptEngineManager();
-        String variablesReplacedPayload = replaceVariables(ogPayload,valuesMap, true);
-
-        String regex = "\\#\\[(.*?)]#";
-        Pattern p = Pattern.compile(regex);
-        Matcher matcher = p.matcher(variablesReplacedPayload);
-        StringBuffer sb = new StringBuffer();
-
-        // create a Nashorn script engine
-        ScriptEngine engine = factory.getEngineByName("nashorn");
-
-        while (matcher.find()) {
-            String code = matcher.group(1);
-            code = code.trim();
-            if (!code.endsWith(";")) code = code+";";
-            try {
-                Object val = engine.eval(code);
-                matcher.appendReplacement(sb, val.toString());
-            } catch (final ScriptException se) {
-            }
-
-        }
-
-        matcher.appendTail(sb); 
-        return sb.toString();
+        return replaceVariables(ogPayload,valuesMap, true, true);
     }
 
 
-    public static String replaceVariables(String payload, Map<String, Object> valuesMap, boolean escapeString) throws Exception {
-        String regex = "\\$\\{(x\\d+\\.[\\w\\-\\[\\].]+|AKTO\\.changes_info\\..*?)\\}"; 
-        Pattern p = Pattern.compile(regex);
-
-        // replace with values
-        Matcher matcher = p.matcher(payload);
-        StringBuffer sb = new StringBuffer();
-        while (matcher.find()) {
-            String key = matcher.group(1);
-            if (key == null) continue;
-            Object obj = valuesMap.get(key);
-            if (obj == null) {
-                loggerMaker.errorAndAddToDb("couldn't find: " + key, LogDb.TESTING);
-                throw new Exception("Couldn't find " + key);
-            }
-            String val = obj.toString();
-            if (escapeString) {
-                val = val.replace("\\", "\\\\")
-                        .replace("\t", "\\t")
-                        .replace("\b", "\\b")
-                        .replace("\n", "\\n")
-                        .replace("\r", "\\r")
-                        .replace("\f", "\\f")
-                        .replace("\'", "\\'")
-                        .replace("\"", "\\\"");
-            }
-            matcher.appendReplacement(sb, "");
-            sb.append(val);
-        }
-
-        matcher.appendTail(sb);
-
-        return sb.toString();
+    public static String replaceVariables(String payload, Map<String, Object> valuesMap, boolean escapeString, boolean shouldThrowException) throws Exception {
+        return com.akto.testing.Utils.replaceVariables(payload, valuesMap, escapeString, shouldThrowException);
     }
 
     public static String generateKey(String nodeId, boolean isHeader, String param, boolean isRequest) {

@@ -30,6 +30,18 @@ public class CustomWebhook {
     private List<String> newSensitiveEndpointCollections;
     public static final String SELECTED_WEBHOOK_OPTIONS = "selectedWebhookOptions";
     private List<WebhookOptions> selectedWebhookOptions;
+    public static final String SEND_INSTANTLY = "sendInstantly";
+    private boolean sendInstantly;
+
+    private String dashboardUrl;
+    public static final String DASHBOARD_URL = "dashboardUrl";
+
+    private WebhookType webhookType;
+    public static final String WEBHOOK_TYPE = "webhookType";
+
+    public enum WebhookType {
+        DEFAULT, MICROSOFT_TEAMS
+    }
 
     public enum ActiveStatus{
         ACTIVE,INACTIVE;
@@ -42,7 +54,11 @@ public class CustomWebhook {
         NEW_SENSITIVE_ENDPOINT_COUNT("New Sensitive Endpoint Count", "${AKTO.changes_info.newSensitiveEndpointsCount}"),
         NEW_PARAMETER_COUNT("New Parameter Count", "${AKTO.changes_info.newParametersCount}"),
         NEW_SENSITIVE_PARAMETER_COUNT("New Sensitive Parameter Count", "${AKTO.changes_info.newSensitiveParametersCount}"),
-        API_THREAT_PAYLOADS("API Threat payloads", "${AKTO.changes_info.apiThreatPayloads}");
+        API_THREAT_PAYLOADS("API Threat payloads", "${AKTO.changes_info.apiThreatPayloads}"),
+        // optionReplaceString not being used for Testing Run results.
+        TESTING_RUN_RESULTS("Testing run results", "${AKTO.changes_info.apiTestingRunResults}"),
+        // optionReplaceString not being used for Traffic alerts.
+        TRAFFIC_ALERTS("Traffic alerts", "${AKTO.changes_info.apiTrafficAlerts}");
 
         final String optionName;
         final String optionReplaceString;
@@ -216,5 +232,28 @@ public class CustomWebhook {
     public void setBatchSize(int batchSize) {
         this.batchSize = batchSize;
     }
+
+    public WebhookType getWebhookType() {
+        return webhookType;
+    }
+
+    public void setWebhookType(WebhookType webhookType) {
+        this.webhookType = webhookType;
+    }
     
+    public boolean getSendInstantly() {
+        return sendInstantly;
+    }
+
+    public void setSendInstantly(boolean sendInstantly) {
+        this.sendInstantly = sendInstantly;
+    }
+
+    public String getDashboardUrl() {
+        return dashboardUrl;
+    }
+
+    public void setDashboardUrl(String dashboardUrl) {
+        this.dashboardUrl = dashboardUrl;
+    }
 }

@@ -1,7 +1,9 @@
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
-import { Text, Button, IndexFiltersMode, Box, Badge, Popover, ActionList, HorizontalStack, Icon} from "@shopify/polaris"
-import { HideMinor, ViewMinor,FileMinor } from '@shopify/polaris-icons';
+import { Text, Button, IndexFiltersMode, Box, Badge, Popover, ActionList, ResourceItem, Avatar,  HorizontalStack, Icon, TextField, Tooltip} from "@shopify/polaris"
+import { HideMinor, ViewMinor,FileMinor, FileFilledMinor } from '@shopify/polaris-icons';
 import api from "../api"
+import dashboardApi from "../../dashboard/api"
+import settingRequests from "../../settings/api"
 import { useEffect,useState, useRef } from "react"
 import func from "@/util/func"
 import GithubSimpleTable from "@/apps/dashboard/components/tables/GithubSimpleTable";
@@ -19,6 +21,8 @@ import CollectionsPageBanner from "./component/CollectionsPageBanner"
 import useTable from "@/apps/dashboard/components/tables/TableContext"
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo"
 import HeadingWithTooltip from "../../../components/shared/HeadingWithTooltip"
+import SearchableResourceList from "../../../components/shared/SearchableResourceList"
+import ResourceListModal from "../../../components/shared/ResourceListModal"
 import { saveAs } from 'file-saver'
 // import dummyJson from "../../../components/shared/treeView/dummyJson"
 import TreeViewTable from "../../../components/shared/treeView/TreeViewTable"
@@ -134,12 +138,15 @@ const headers = [
     }
 ];
 
+const tempSortOptions = [
+    { label: 'Name', value: 'customGroupsSort asc', directionLabel: 'A-Z', sortKey: 'customGroupsSort', columnIndex: 1 },
+    { label: 'Name', value: 'customGroupsSort desc', directionLabel: 'Z-A', sortKey: 'customGroupsSort', columnIndex: 1 },
+]
+
 
 const sortOptions = [
     { label: 'Endpoints', value: 'urlsCount asc', directionLabel: 'More', sortKey: 'urlsCount', columnIndex: 2 },
     { label: 'Endpoints', value: 'urlsCount desc', directionLabel: 'Less', sortKey: 'urlsCount' , columnIndex: 2},
-    { label: 'Name', value: 'displayName asc', directionLabel: 'A-Z', sortKey: 'displayName' },
-    { label: 'Name', value: 'displayName desc', directionLabel: 'Z-A', sortKey: 'displayName' },
     { label: 'Activity', value: 'deactivatedScore asc', directionLabel: 'Active', sortKey: 'deactivatedRiskScore' },
     { label: 'Activity', value: 'deactivatedScore desc', directionLabel: 'Inactive', sortKey: 'activatedRiskScore' },
     { label: 'Risk Score', value: 'score asc', directionLabel: 'High risk', sortKey: 'riskScore', columnIndex: 3 },
@@ -190,27 +197,39 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
 }
 
 function ApiCollections() {
+    const userRole = window.USER_ROLE
 
     const navigate = useNavigate();
-    const [data, setData] = useState({'hostname':[]})
+    const [data, setData] = useState({'all': [], 'hostname':[], 'groups': [], 'custom': [], 'deactivated': []})
     const [active, setActive] = useState(false);
     const [loading, setLoading] = useState(false)
-    const [selectedTab, setSelectedTab] = useState("hostname")
-    const [selected, setSelected] = useState(1)
+    
+   
     const [summaryData, setSummaryData] = useState({totalEndpoints:0 , totalTestedEndpoints: 0, totalSensitiveEndpoints: 0, totalCriticalEndpoints: 0})
     const [hasUsageEndpoints, setHasUsageEndpoints] = useState(true)
     const [envTypeMap, setEnvTypeMap] = useState({})
     const [refreshData, setRefreshData] = useState(false)
     const [popover,setPopover] = useState(false)
+    const [teamData, setTeamData] = useState([])
+    const [usersCollection, setUsersCollection] = useState([])
+    const [selectedItems, setSelectedItems] = useState([])
     const [normalData, setNormalData] = useState([])
     const [treeView, setTreeView] = useState(false);
     const [moreActions, setMoreActions] = useState(false);
+    const [textFieldActive, setTextFieldActive] = useState(false);
+    const [customEnv,setCustomEnv] = useState('')
 
     // const dummyData = dummyJson;
 
     const definedTableTabs = ['All', 'Hostname', 'Groups', 'Custom', 'Deactivated']
 
     const { tabsInfo, selectItems } = useTable()
+    const tableSelectedTab = PersistStore.getState().tableSelectedTab[window.location.pathname]
+    const initialSelectedTab = tableSelectedTab || "hostname";
+    const [selectedTab, setSelectedTab] = useState(initialSelectedTab)
+    let initialTabIdx = func.getTableTabIndexById(1, definedTableTabs, initialSelectedTab)
+    const [selected, setSelected] = useState(initialTabIdx)
+    
     const tableCountObj = func.getTabsCount(definedTableTabs, data)
     const tableTabs = func.getTableTabsContent(definedTableTabs, tableCountObj, setSelectedTab, selectedTab, tabsInfo)
 
@@ -252,6 +271,7 @@ function ApiCollections() {
     const setLastFetchedResp = PersistStore.getState().setLastFetchedResp
     const setLastFetchedSeverityResp = PersistStore.getState().setLastFetchedSeverityResp
     const setLastFetchedSensitiveResp = PersistStore.getState().setLastFetchedSensitiveResp
+    const [totalAPIs, setTotalAPIs] = useState(0)
 
     // as riskScore cron runs every 5 min, we will cache the data and refresh in 5 mins
     // similarly call sensitive and severityInfo
@@ -270,10 +290,11 @@ function ApiCollections() {
         let res = {}
         res.all = dataObj.prettify
         res.hostname = dataObj.prettify.filter((c) => c.hostName !== null && c.hostName !== undefined && !c.deactivated)
-        res.groups = dataObj.prettify.filter((c) => c.type === "API_GROUP" && !c.deactivated)
+        const allGroups = dataObj.prettify.filter((c) => c.type === "API_GROUP" && !c.deactivated);
+        res.groups = allGroups;
         res.custom = res.all.filter(x => !res.hostname.includes(x) && !x.deactivated && !res.groups.includes(x));
         setData(res);
-        if (res.hostname.length === 0) {
+        if (res.hostname.length === 0 && (tableSelectedTab === undefined || tableSelectedTab.length === 0)) {
             setTimeout(() => {
                 setSelectedTab("custom");
                 setSelected(3);
@@ -295,7 +316,8 @@ function ApiCollections() {
         let apiPromises = [
             api.getCoverageInfoForCollections(),
             api.getLastTrafficSeen(),
-            collectionApi.fetchCountForHostnameDeactivatedCollections()
+            collectionApi.fetchCountForHostnameDeactivatedCollections(),
+            dashboardApi.fetchEndpointsCount(0, 0)
         ];
         if(shouldCallHeavyApis){
             apiPromises = [
@@ -303,36 +325,47 @@ function ApiCollections() {
                 ...[api.getRiskScoreInfo(), api.getSensitiveInfoForCollections(), api.getSeverityInfoForCollections()]
             ]
         }
-        
+
+        if(userRole === 'ADMIN') {
+            apiPromises = [
+                ...apiPromises,
+                ...[api.getAllUsersCollections(), settingRequests.getTeamData()]
+            ]
+        }
+
         let results = await Promise.allSettled(apiPromises);
         let coverageInfo = results[0].status === 'fulfilled' ? results[0].value : {};
         // let coverageInfo = dummyData.coverageMap
         let trafficInfo = results[1].status === 'fulfilled' ? results[1].value : {};
         let deactivatedCountInfo = results[2].status === 'fulfilled' ? results[2].value : {};
+        let fetchEndpointsCountResp = results[3].status === 'fulfilled' ? results[3].value : {}
 
         let riskScoreObj = lastFetchedResp
         let sensitiveInfo = lastFetchedSensitiveResp
         let severityObj = lastFetchedSeverityResp
+        if (fetchEndpointsCountResp && fetchEndpointsCountResp.newCount) {
+            setTotalAPIs(fetchEndpointsCountResp.newCount)
+        }
 
         if(shouldCallHeavyApis){
-            if(results[3]?.status === "fulfilled"){
-                const res = results[3].value
+            if(results[4]?.status === "fulfilled"){
+                const res = results[4].value
                 riskScoreObj = {
                     criticalUrls: res.criticalEndpointsCount,
                     riskScoreMap: res.riskScoreOfCollectionsMap
-                } 
+                }
             }
 
-            if(results[4]?.status === "fulfilled"){
-                const res = results[4].value
+            if(results[5]?.status === "fulfilled"){
+                const res = results[5].value
                 sensitiveInfo ={ 
                     sensitiveUrls: res.sensitiveUrlsInResponse,
                     sensitiveInfoMap: res.sensitiveSubtypesInCollection
                 }
             }
 
-            if(results[5]?.status === "fulfilled"){
-                const res = results[5].value
+            if(results[6]?.status === "fulfilled"){
+                const res = results[6].value
                 severityObj = res
             }
 
@@ -343,6 +376,34 @@ function ApiCollections() {
             setLastFetchedSensitiveResp(sensitiveInfo)
 
         }
+
+        let usersCollectionList = []
+        let userList = []
+
+        const index = !shouldCallHeavyApis ? 4 : 7
+
+        if(userRole === 'ADMIN') {
+            if(results[index]?.status === "fulfilled") {
+                const res = results[index].value
+                usersCollectionList = res
+            }
+            
+            if(results[index+1]?.status === "fulfilled") {
+                const res = results[index+1].value
+                userList = res
+                if (userList) {
+                    userList = userList.filter(x => {
+                        if (x?.role === "ADMIN") {
+                            return false;
+                        }
+                        return true
+                    })
+                }
+            }
+        }
+
+        setUsersCollection(usersCollectionList)
+        setTeamData(userList)
 
         setHasUsageEndpoints(hasUserEndpoints)
         setCoverageMap(coverageInfo)
@@ -371,7 +432,8 @@ function ApiCollections() {
         tmp = {}
         tmp.all = dataObj.prettify
         tmp.hostname = dataObj.prettify.filter((c) => c.hostName !== null && c.hostName !== undefined && !c.deactivated)
-        tmp.groups = dataObj.prettify.filter((c) => c.type === "API_GROUP" && !c.deactivated)
+        const allGroupsForTmp = dataObj.prettify.filter((c) => c.type === "API_GROUP" && !c.deactivated);
+        tmp.groups = allGroupsForTmp;
         tmp.custom = tmp.all.filter(x => !tmp.hostname.includes(x) && !x.deactivated && !tmp.groups.includes(x));
         tmp.deactivated = deactivatedCollections
         setData(tmp);
@@ -392,10 +454,25 @@ function ApiCollections() {
     }
     async function handleCollectionsAction(collectionIdList, apiFunction, toastContent){
         const collectionIdListObj = collectionIdList.map(collectionId => ({ id: collectionId.toString() }))
-        await apiFunction(collectionIdListObj)
+        await apiFunction(collectionIdListObj).then(() => {
+            func.setToast(true, false, `${collectionIdList.length} API collection${func.addPlurality(collectionIdList.length)} ${toastContent} successfully`)
+        }).catch((error) => {
+            func.setToast(true, true, error.message || 'Something went wrong!')
+        })
         resetResourcesSelected();
         fetchData()
-        func.setToast(true, false, `${collectionIdList.length} API collection${func.addPlurality(collectionIdList.length)} ${toastContent} successfully`)
+    }
+    async function handleShareCollectionsAction(collectionIdList, userIdList, apiFunction){
+        const userCollectionMap = {};
+
+        for(const userId of userIdList) {
+            const intUserId = parseInt(userId, 10);
+            const userCollections = usersCollection[intUserId] || [];
+            userCollectionMap[intUserId] = [...new Set([...userCollections, ...collectionIdList])];
+        }
+
+        await apiFunction(userCollectionMap);
+        func.setToast(true, false, `${userIdList.length} Member${func.addPlurality(userIdList.length)}'s collections have been updated successfully`);
     }
 
     const exportCsv = (selectedResources = []) =>{
@@ -428,10 +505,6 @@ function ApiCollections() {
         }
         let actions = [
             {
-                content: `Remove collection${func.addPlurality(selectedResources.length)}`,
-                onAction: () => handleCollectionsAction(selectedResources, api.deleteMultipleCollections, "deleted")
-            },
-            {
                 content: 'Export as CSV',
                 onAction: () => exportCsv(selectedResources)
             }
@@ -439,6 +512,7 @@ function ApiCollections() {
 
         const deactivated = allCollections.filter(x => { return x.deactivated }).map(x => x.id);
         const activated = allCollections.filter(x => { return !x.deactivated }).map(x => x.id);
+        const apiGrous = allCollections.filter(x => { return x?.type === 'API_GROUP' }).map(x => x?.id)
         if (selectedResources.every(v => { return activated.includes(v) })) {
             actions.push(
                 {
@@ -460,6 +534,92 @@ function ApiCollections() {
                 }
             )
         }
+        if (selectedResources.every(v => { return !apiGrous.includes(v) })) {
+            actions.push(
+                {
+                    content: `Remove collection${func.addPlurality(selectedResources.length)}`,
+                    onAction: () => handleCollectionsAction(selectedResources, api.deleteMultipleCollections, "deleted")
+                }
+            )
+        }
+
+        const apiCollectionShareRenderItem = (item) => {
+            const { id, name, login, role } = item;
+            const initials = func.initials(login)
+            const media = <Avatar user size="medium" name={login} initials={initials} />
+            const shortcutActions = [
+                {
+                    content: <Text color="subdued">{role}</Text>,
+                    url: '#',
+                    onAction: ((event) => event.preventDefault())
+                }
+            ]
+
+            return (
+                <ResourceItem
+                    id={id}
+                    media={media}
+                    shortcutActions={shortcutActions}
+                    persistActions
+                >
+                    <Text variant="bodyMd" fontWeight="bold" as="h3">
+                        {name}
+                    </Text>
+                    <Text variant="bodyMd">
+                        {login}
+                    </Text>
+                </ResourceItem>
+            );
+        }
+
+        const shareCollectionHandler = () => {
+            if (selectedItems.length > 0) {
+                handleShareCollectionsAction(selectedResources, selectedItems, api.updateUserCollections);
+                return true
+            } else {
+                func.setToast(true, true, "No member is selected!");
+                return false
+            }
+        };
+
+        const handleSelectedItemsChange = (items) => {
+            setSelectedItems(items);
+        };
+
+        const shareComponentChildrens = (
+            <Box>
+                <Box padding={5} background="bg-subdued-hover">
+                    <Text fontWeight="medium">{`${selectedResources.length} collection${func.addPlurality(selectedResources.length)} selected`}</Text>
+                </Box>
+                    <SearchableResourceList
+                        resourceName={'user'}
+                        items={teamData}
+                        renderItem={apiCollectionShareRenderItem}
+                        isFilterControlEnabale={true}
+                        selectable={true}
+                        onSelectedItemsChange={handleSelectedItemsChange}
+                    />
+            </Box>
+        )
+
+        const shareContent = (
+            <ResourceListModal
+                isLarge={true}
+                activatorPlaceaholder={"Share"}
+                title={"Share collections"}
+                primaryAction={shareCollectionHandler}
+                component={shareComponentChildrens}
+            />
+        )
+
+    let rbacAccess = func.checkForRbacFeature();
+    if(userRole === 'ADMIN' && rbacAccess) {
+        actions.push(
+            {
+                content: shareContent,
+            }
+        )
+    }
 
         const toggleTypeContent = (
             <Popover
@@ -469,14 +629,28 @@ function ApiCollections() {
                 autofocusTarget="first-node"
             >
                 <Popover.Pane>
-                    <ActionList
+                    {textFieldActive ? 
+                    <Box padding={"1"}>
+                        <TextField onChange={setCustomEnv} value={customEnv} connectedRight={(
+                            <Tooltip content="Save your Custom env type" dismissOnMouseOut>
+                                <Button onClick={() => {
+                                    resetResourcesSelected();
+                                    updateEnvType(selectedResources, customEnv);
+                                    setTextFieldActive(false);
+                                }} plain icon={FileFilledMinor}/>
+                            </Tooltip>
+                        )}/>
+                    </Box>
+                        :<ActionList
                         actionRole="menuitem"
                         items={[
                             {content: 'Staging', onAction: () => updateEnvType(selectedResources, "STAGING")},
                             {content: 'Production', onAction: () => updateEnvType(selectedResources, "PRODUCTION")},
                             {content: 'Reset', onAction: () => updateEnvType(selectedResources, null)},
+                            {content: 'Add Custom', onAction: () => setTextFieldActive(!textFieldActive)}
                         ]}
-                    />
+                    
+                    />}
                 </Popover.Pane>
             </Popover>
         )
@@ -485,14 +659,18 @@ function ApiCollections() {
             content: toggleTypeContent
         }
 
-        return [...actions, toggleEnvType];
+        const bulkActionsOptions = [...actions];
+        if(selectedTab !== 'groups') {
+            bulkActionsOptions.push(toggleEnvType)
+        }
+        return bulkActionsOptions
     }
     const updateData = (dataMap) => {
         let copyObj = data;
         Object.keys(copyObj).forEach((key) => {
             data[key].length > 0 && data[key].forEach((c) => {
                 c['envType'] = dataMap[c.id]
-                c['envTypeComp'] = dataMap[c.id] ? <Badge size="small" status="info">{func.toSentenceCase(dataMap[c.id])}</Badge> : null
+                c['envTypeComp'] = dataMap[c.id] ? <Badge size="small" status="info">{dataMap[c.id]}</Badge> : null
             })
         })
         setData(copyObj)
@@ -531,7 +709,7 @@ function ApiCollections() {
       const summaryItems = [
         {
             title: "Total APIs",
-            data: transform.formatNumberWithCommas(summaryData.totalEndpoints),
+            data: transform.formatNumberWithCommas(totalAPIs),
         },
         {
             title: "Critical APIs",
@@ -601,7 +779,7 @@ function ApiCollections() {
             key={refreshData}
             pageLimit={100}
             data={data[selectedTab]} 
-            sortOptions={sortOptions} 
+            sortOptions={ selectedTab === 'groups' ? [...tempSortOptions, ...sortOptions] : sortOptions}
             resourceName={resourceName} 
             filters={[]}
             disambiguateLabel={disambiguateLabel} 

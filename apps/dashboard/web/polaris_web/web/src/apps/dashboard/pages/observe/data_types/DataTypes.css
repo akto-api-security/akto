@@ -2,3 +2,8 @@
     display: flex;
     justify-content: end;
 }
+
+.tag-button .Polaris-Button{
+    padding-bottom: 5px !important;
+    padding-top: 5px !important;
+}

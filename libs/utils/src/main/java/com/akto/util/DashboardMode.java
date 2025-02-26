@@ -1,7 +1,10 @@
 package com.akto.util;
 
+import com.akto.dao.SetupDao;
+import com.akto.dao.context.Context;
+import com.akto.dto.Setup;
 import com.akto.onprem.Constants;
-import org.apache.commons.lang3.StringUtils;
+import com.mongodb.BasicDBObject;
 
 public enum DashboardMode {
     LOCAL_DEPLOY, ON_PREM, STAIRWAY, SAAS;
@@ -52,7 +55,25 @@ public enum DashboardMode {
         return dashboardMode.equals(LOCAL_DEPLOY) && "true".equalsIgnoreCase(System.getenv("IS_SAAS"));
     }
 
+    private static boolean isSaasDeploymentGlobal = false;
+    private static int lastSaasFetched = 0;
+
     public static boolean isMetered() {
-        return isSaasDeployment() || isOnPremDeployment();
+
+        if (lastSaasFetched == 0 || lastSaasFetched < Context.now() - 30 * 60) {
+            boolean isSaasDeployment = isSaasDeployment();
+            try {
+                Setup setup = SetupDao.instance.findOne(new BasicDBObject());
+                if (setup != null) {
+                    String dashboardMode = setup.getDashboardMode();
+                    isSaasDeployment = dashboardMode.equalsIgnoreCase(DashboardMode.SAAS.name());
+                }
+            } catch (Exception e) {
+            }
+            isSaasDeploymentGlobal = isSaasDeployment;
+            lastSaasFetched = Context.now();
+        }
+
+        return isSaasDeploymentGlobal || isOnPremDeployment();
     }
 }

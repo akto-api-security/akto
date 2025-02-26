@@ -1,26 +1,33 @@
 import request from "../../../../util/request"
 
 export default {
-    fetchIssues(skip, limit, filterStatus, filterCollectionsId, filterSeverity, filterSubCategory, startEpoch) {
+    fetchIssues(skip, limit, filterStatus, filterCollectionsId, filterSeverity, filterSubCategory, sortKey, sortOrder, startEpoch, endTimeStamp, activeCollections, filterCompliance) {
         return request({
             url: 'api/fetchAllIssues',
             method: 'post',
-            data: {skip, limit, filterStatus, filterCollectionsId, filterSeverity, filterSubCategory, startEpoch}
+            data: {skip, limit, filterStatus, filterCollectionsId, filterSeverity, filterSubCategory, sortKey, sortOrder, startEpoch, endTimeStamp, activeCollections, filterCompliance}
         })
     },
-    fetchVulnerableTestingRunResultsFromIssues(filters, skip) {
+    fetchVulnerableTestingRunResultsFromIssues(filters, issuesIds , skip) {
         filters['skip'] = skip
         return request({
             url: 'api/fetchVulnerableTestingRunResultsFromIssues',
             method: 'post',
-            data: filters
+            data: {...filters, issuesIds}
         })
     },
-    bulkUpdateIssueStatus (issueIdArray, statusToBeUpdated, ignoreReason) {
+    fetchIssuesFromResultIds(issuesIds, issueStatusQuery) {
+        return request({
+            url: 'api/fetchIssuesFromResultIds',
+            method: 'post',
+            data: {issuesIds, issueStatusQuery}
+        })
+    },
+    bulkUpdateIssueStatus (issueIdArray, statusToBeUpdated, ignoreReason, testingRunResultHexIdsMap) {
         return request({
             url: 'api/bulkUpdateIssueStatus',
             method: 'post',
-            data: {issueIdArray, statusToBeUpdated, ignoreReason}
+            data: {issueIdArray, statusToBeUpdated, ignoreReason, testingRunResultHexIdsMap}
         })
     },
     fetchTestingRunResult (issueId) {
@@ -30,4 +37,25 @@ export default {
             data: {issueId}
         })
     },
+    findTotalIssuesByDay (startTimeStamp, endTimeStamp) {
+        return request({
+            url: 'api/findTotalIssuesByDay',
+            method: 'post',
+            data: {startEpoch: startTimeStamp, endTimeStamp}
+        })
+    },
+    fetchTestCoverageData (startTimeStamp, endTimeStamp) {
+        return request({
+            url: 'api/fetchTestCoverageData',
+            method: 'post',
+            data: {startTimeStamp, endTimeStamp}
+        })
+    },
+    bulkCreateJiraTickets(issuesIds, aktoDashboardHost, projId, issueType){
+        return request({
+            url: 'api/bulkCreateJiraTickets',
+            method: 'post',
+            data: {issuesIds, aktoDashboardHost, projId, issueType}
+        })
+    }
 }

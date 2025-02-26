@@ -63,6 +63,7 @@ const newParametersHeaders = [
         text: 'Name',
         value: 'name',
         title: 'Parameter Name',
+        showFilter: true
     },
     {
         text: 'Type',
@@ -70,6 +71,7 @@ const newParametersHeaders = [
         title: 'Parameter Type',
         type: CellType.TEXT,
         maxWidth: '100px',
+        showFilter: true,
         tooltipContent: "Data type associated with the parameter"
     },
     {
@@ -77,7 +79,6 @@ const newParametersHeaders = [
         title: 'Discovered',
         value: 'added',
         sortKey: 'timestamp',
-        showFilterMenu: true,
         type: CellType.TEXT,
         maxWidth: '120px',
         sortActive: true
@@ -103,8 +104,8 @@ const newParametersHeaders = [
         text: 'Location',
         title: 'Location',
         value: 'location',
+        showFilter: true,
         sortKey: 'isHeader',
-        showFilterMenu: true,
         type: CellType.TEXT,
         maxWidth: '120px',
         tooltipContent: "Location (request/response) of where the parameter is detected."
@@ -114,7 +115,7 @@ const newParametersHeaders = [
         title: 'Values',
         value: 'domain',
         maxWidth: '150px',
-        showFilterMenu: true,
+        showFilter: true,
         type: CellType.TEXT,
         tooltipContent: "Value of the parameter as detected in location"
     }
@@ -164,7 +165,7 @@ const parameterSortOptions = [
     { label: 'Discovered time', value: 'timestamp desc', directionLabel: 'Oldest', sortKey: 'timestamp', columnIndex: 3 },
 ];
 
-let paramFilters = [
+let filtersOptions = [
     {
         key: 'apiCollectionId',
         label: 'Collection',
@@ -186,22 +187,33 @@ let paramFilters = [
         ]
     },
     {
-        key: 'subType',
-        label: 'Type',
-        title: 'Type',
-        choices: []
+        key: 'responseCodes',
+        label: 'Response code',
+        title: 'Response code', 
+        choices: [
+            {label: '2xx', value: 200},
+            {label: '3xx', value: 300}
+        ]
     },
     {
-        key:'location',
-        label:'Location',
-        title:'Location',
-        choices:[
-            {label:"Header", value:"header"},
-            {label:"Payload", value:"payload"},
-            {label:"URL param", value:"urlParam"}
-        ],
+        key: 'accessType',
+        label: "Access types",
+        title: "Access types",
+        choices: [
+            {label: 'Internal', value: "PRIVATE"},
+            {label: 'Public', value: "PUBLIC"},
+            {label: "Third party", value: "THIRD_PARTY"},
+            {label: "Partner", value: "PARTNER"}
+        ]
+    },
+    {
+        key: 'collectionIds',
+        label: 'API groups',
+        title: 'API groups',
+        choices: [],
     }
 ]
+
 
 const apiChangesData = {
     getData(key){
@@ -219,12 +231,10 @@ const apiChangesData = {
                 headers: [...endpointHeadings, ...responseCodesArr],
                 resourceName: endpointResourceName,
                 sortOptions: endpointSortOptions,
+                filters: filtersOptions
             }
             return obj;
         }
-    },
-    getParamFilters(){
-        return paramFilters;
     }
 }
 

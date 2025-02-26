@@ -1,3 +1,119 @@
 .p-class {
     white-space: pre;
 }
+
+#create-jira-ticket-button {
+    text-wrap: nowrap;
+}
+
+.badge-wrapper-CRITICAL .Polaris-Badge {
+    background-color: #E45357 !important;
+    color: white !important;
+}
+
+.badge-wrapper-HIGH .Polaris-Badge {
+    background-color: #EF864C !important;
+    color: white !important;
+}
+
+.badge-wrapper-MEDIUM .Polaris-Badge {
+    background-color: #F6C564 !important;
+    color: white !important;
+}
+
+.badge-wrapper-LOW .Polaris-Badge {
+    background-color: #6FD1A6;
+    color: white !important;
+}
+
+#remediation-panel  h1 {
+  font-size: 1.25rem !important;
+  font-weight: 600 !important;
+  margin: 24px 0 !important;
+  border-bottom: 1px solid #e1e4e8 !important;
+  padding-bottom: 0.3em !important;
+}
+
+#remediation-panel  h2 {
+  font-size: 1.2rem !important;
+  font-weight: 600 !important;
+  margin: 16px 0 !important;
+  border-bottom: 1px solid #e1e4e8 !important;
+  padding-bottom: 0.3em !important;
+}
+
+#remediation-panel  h3 {
+  font-size: 1.1rem !important;
+  font-weight: 600 !important;
+  margin: 12px 0 !important;
+}
+
+#remediation-panel  h4 {
+  font-size: 1rem !important;
+  font-weight: 600 !important;
+  margin: 8px 0 !important;
+}
+
+
+
+/* Code blocks */
+#remediation-panel  pre {
+  background-color: #f6f8fa !important;
+  border: 1px solid #d1d5da !important;
+  border-radius: 6px !important;
+  padding: 16px !important;
+  overflow: auto !important;
+  font-family: SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace !important;
+  line-height: 1.45 !important;
+}
+
+#remediation-panel  code {
+  background-color: #f6f8fa !important;
+  padding: 0.2em 0.4em !important;
+  border-radius: 3px !important;
+  font-family: SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace !important;
+}
+
+/* Lists */
+#remediation-panel  ul, ol {
+  padding-left: 2em !important;
+}
+
+#remediation-panel  li {
+  margin-bottom: 0.5em !important;
+}
+
+/* Blockquotes */
+#remediation-panel  blockquote {
+  color: #6a737d !important;
+  border-left: 4px solid #dfe2e5 !important;
+  padding: 0 1em !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+}
+
+/* Tables */
+#remediation-panel  table {
+  border-collapse: collapse !important;
+  border-spacing: 0 !important;
+  margin: 16px 0 !important;
+  width: 100% !important;
+}
+
+#remediation-panel  table th,
+#remediation-panel  table td {
+  border: 1px solid #dfe2e5 !important;
+  padding: 6px 13px !important;
+}
+
+#remediation-panel  table th {
+  background-color: #f6f8fa !important;
+  font-weight: 600 !important;
+}
+
+/* Horizontal Rule */
+#remediation-panel  hr {
+  border: 0 !important;
+  border-top: 1px solid #e1e4e8 !important;
+  margin: 24px 0 !important;
+}

@@ -4,7 +4,7 @@ import { ChevronRightMinor, ChevronDownMinor } from "@shopify/polaris-icons"
 import { Badge, Box, Checkbox, HorizontalStack, Icon, Text, Tooltip } from '@shopify/polaris';
 
 function PrettifyDisplayName({name, level, isTerminal, isOpen, selectItems, collectionIds}) {
-    const selectedItems = TableStore.getState().selectedItems
+    const selectedItems = TableStore.getState().selectedItems.flat()
     const [checked, setChecked] = useState(false)
 
     const checkedVal = collectionIds.every(id => selectedItems.includes(id))

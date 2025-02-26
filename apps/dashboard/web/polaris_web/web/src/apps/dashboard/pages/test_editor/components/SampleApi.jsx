@@ -13,6 +13,7 @@ import PersistStore from "../../../../main/PersistStore";
 import editorSetup from "./editor_config/editorSetup";
 import SampleData from "../../../components/shared/SampleData";
 import transform from "../../../components/shared/customDiffEditor";
+import EmptySampleApi from "./EmptySampleApi";
 
 const SampleApi = () => {
 
@@ -30,6 +31,7 @@ const SampleApi = () => {
     const [testResult,setTestResult] = useState(null)
     const [showTestResult, setShowTestResult] = useState(false);
     const [editorData, setEditorData] = useState({message: ''})
+    const [showEmptyLayout, setShowEmptyLayout] = useState(false)
 
     const currentContent = TestEditorStore(state => state.currentContent)
     const selectedTest = TestEditorStore(state => state.selectedTest)
@@ -42,8 +44,17 @@ const SampleApi = () => {
     const mapCollectionIdToName = func.mapCollectionIdToName(allCollections)
 
     useEffect(()=>{
+        if(showEmptyLayout) return
         let testId = selectedTest.value
-        let selectedUrl = Object.keys(selectedSampleApi).length > 0 ? selectedSampleApi : vulnerableRequestsObj?.[testId]
+        let sampleData = null
+        if(sampleDataList?.length > 0) {
+            sampleData = {
+                apiCollectionId: sampleDataList[0].id.apiCollectionId,
+                method: {_name: sampleDataList[0].id.method},
+                url: sampleDataList[0].id.url
+            }
+        }
+        let selectedUrl = sampleData ? sampleData : Object.keys(selectedSampleApi).length > 0 ? selectedSampleApi : vulnerableRequestsObj?.[testId]
         setSelectedCollectionId(null)
         setCopyCollectionId(null)
         setTestResult(null)
@@ -60,6 +71,48 @@ const SampleApi = () => {
         }, 300)
         
     },[selectedTest])
+
+    useEffect(() => {
+        let testId = selectedTest.value
+        const mappedEndpoint = vulnerableRequestsObj?.[testId]
+        if(sampleDataList == null) {
+            return
+        }
+
+        if(sampleDataList.length === 0) {
+            setTimeout(()=> {
+                setShowEmptyLayout(true)
+                setSelectedCollectionId(0)
+                setCopyCollectionId(0)
+                setSelectedApiEndpoint('No endpoint found!')
+            },0)
+            setTimeout(() => {
+                setCopySelectedApiEndpoint('No endpoint found!')
+            }, 300)
+            return
+        }
+
+        setShowEmptyLayout(false)
+
+        const sampleDataId = sampleDataList[0].id
+
+        const collectionId = sampleDataId.apiCollectionId
+        const endpoint = func.toMethodUrlString({method: sampleDataId.method, url: sampleDataId.url})
+
+        if(mappedEndpoint?.apiCollectionId === collectionId && mappedEndpoint?.method?._name === sampleDataId.method && mappedEndpoint?.url === sampleDataId.url) {
+            return
+        }
+        
+        setTimeout(()=> {
+            setSelectedCollectionId(collectionId)
+            setCopyCollectionId(collectionId)
+            setSelectedApiEndpoint(endpoint)
+        },0)
+        setTimeout(() => {
+            setCopySelectedApiEndpoint(endpoint)
+        }, 300)
+
+    }, [sampleDataList])
 
     useEffect(() => {
         fetchApiEndpoints(copyCollectionId)
@@ -101,7 +154,8 @@ const SampleApi = () => {
     }
 
 
-    const allCollectionsOptions = allCollections.map(collection => {
+    const activatedCollections = allCollections.filter(collection => collection.deactivated === false)
+    const allCollectionsOptions = activatedCollections.map(collection => {
         return {
             label: collection.displayName,
             value: collection.id
@@ -125,10 +179,10 @@ const SampleApi = () => {
     })
 
     const fetchSampleData = async (collectionId, apiEndpointUrl, apiEndpointMethod) => {
+        setShowEmptyLayout(false)
         const sampleDataResponse = await testEditorRequests.fetchSampleData(collectionId, apiEndpointUrl, apiEndpointMethod)
         if (sampleDataResponse) {
             if (sampleDataResponse.sampleDataList.length > 0 && sampleDataResponse.sampleDataList[0].samples && sampleDataResponse.sampleDataList[0].samples.length > 0) {
-                setSampleDataList(null)
                 const sampleDataJson = JSON.parse(sampleDataResponse.sampleDataList[0].samples[sampleDataResponse.sampleDataList[0].samples.length - 1])
                 const requestJson = func.requestJson(sampleDataJson, [])
                 const responseJson = func.responseJson(sampleDataJson, [])
@@ -140,9 +194,13 @@ const SampleApi = () => {
 
                 setSelected(0)
             }else{
+                setSampleDataList(sampleDataResponse.sampleDataList)
                 setEditorData({message: ''})
+                setSampleData({})
             }
         }else{
+            setSampleDataList([])
+            setSampleData({})
             setEditorData({message: ''})
         }
     }
@@ -245,13 +303,29 @@ const SampleApi = () => {
                             </Tooltip>
                         </Box>
                     </Button>
-                    <Button id={"run-test"} loading={loading} primary onClick={runTest} size="slim">Run Test</Button>
+                    <Button id={"run-test"} disabled={showEmptyLayout || editorData?.message?.length === 0} loading={loading} primary onClick={runTest} size="slim">Run Test</Button>
                 </HorizontalStack>
             </div>
 
             <Divider />
-            <SampleData data={editorData} minHeight="80.4vh"  editorLanguage="custom_http" />
-            {resultComponent}
+            {
+                showEmptyLayout ?
+                <Box minHeight="84.4vh">
+                    <EmptySampleApi
+                        iconSrc={"/public/file_plus.svg"}
+                        headingText={"Discover APIs to get started"}
+                        description={"You have an inactive API collection or one with no data. Create or populate a collection now to get started."}
+                        buttonText={"Create new a API collection"}
+                        redirectUrl={"/dashboard/observe/inventory"}
+                    />
+                </Box> :
+                <>{
+                    editorData?.message?.length === 0 ?
+                    <Box padding={3} minHeight="84.4vh"><Text>Sample data is not available for this API endpoint. Please choose a different endpoint.</Text></Box>
+                        : <><SampleData data={editorData} minHeight="80.4vh"  editorLanguage="custom_http" />
+                        {resultComponent}</>
+                }</>
+            }
             <Modal
                 open={showTestResult}
                 onClose={() => closeModal()}
@@ -264,7 +338,7 @@ const SampleApi = () => {
                     testingRunResult={testResult?.testingRunResult}
                     runIssues={testResult?.testingRunIssues}
                     testSubCategoryMap={testResult?.subCategoryMap}
-                    testId={selectedTest.value}
+                    testId={selectedTest?.value}
                     source="editor"
                 />
                 </Box>

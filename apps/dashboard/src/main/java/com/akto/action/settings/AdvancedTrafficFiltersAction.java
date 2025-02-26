@@ -3,6 +3,10 @@ package com.akto.action.settings;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 import org.bson.conversions.Bson;
 
@@ -14,6 +18,8 @@ import com.akto.dao.runtime_filters.AdvancedTrafficFiltersDao;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.monitoring.FilterConfig;
 import com.akto.dto.test_editor.YamlTemplate;
+import com.akto.dto.usage.UsageMetric;
+import com.akto.usage.UsageMetricCalculator;
 import com.akto.util.Constants;
 import com.akto.utils.TrafficFilterUtil;
 import com.akto.utils.jobs.CleanInventory;
@@ -30,6 +36,8 @@ public class AdvancedTrafficFiltersAction extends UserAction {
     private String yamlContent;
     private String templateId;
     private boolean inactive;
+
+    private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
 
     public String fetchAllFilterTemplates(){
         List<YamlTemplate> yamlTemplates =  AdvancedTrafficFiltersDao.instance.findAll(
@@ -89,6 +97,8 @@ public class AdvancedTrafficFiltersAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    private boolean deleteAPIsInstantly;
+
     public String syncTrafficFromFilters(){
         FilterConfig filterConfig = new FilterConfig();
         try {
@@ -100,11 +110,25 @@ public class AdvancedTrafficFiltersAction extends UserAction {
                 throw new Exception("filter field cannot be empty");
             }
 
-            List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(
-                Filters.empty(), Projections.include(ApiCollection.HOST_NAME, ApiCollection.NAME));
-            YamlTemplate yamlTemplate = new YamlTemplate(filterConfig.getId(), Context.now(), getSUser().getLogin(), Context.now(), this.yamlContent, null);
+            Set<Integer> deactivatedCollections = UsageMetricCalculator.getDeactivated();
+            deactivatedCollections.add(0);
 
-            CleanInventory.cleanFilteredSampleDataFromAdvancedFilters(apiCollections,Arrays.asList(yamlTemplate),new ArrayList<>() , "", false, true);
+            List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(
+                Filters.nin(Constants.ID, deactivatedCollections), Projections.include(ApiCollection.HOST_NAME, ApiCollection.NAME));
+            YamlTemplate yamlTemplate = new YamlTemplate(filterConfig.getId(), Context.now(), getSUser().getLogin(), Context.now(), this.yamlContent, null, null);
+            int accountId = Context.accountId.get();
+            executorService.schedule( new Runnable() {
+                public void run() {
+                    Context.accountId.set(accountId);
+                    try {
+                        CleanInventory.cleanFilteredSampleDataFromAdvancedFilters(apiCollections,Arrays.asList(yamlTemplate),new ArrayList<>() , "",deleteAPIsInstantly, true);
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                }
+            }, 0 , TimeUnit.SECONDS);
+
+            deactivatedCollections.remove(0);
             return Action.SUCCESS.toUpperCase();
         } catch (Exception e) {
             e.printStackTrace();
@@ -127,6 +151,10 @@ public class AdvancedTrafficFiltersAction extends UserAction {
 
     public void setInactive(boolean inactive) {
         this.inactive = inactive;
+    }
+
+    public void setDeleteAPIsInstantly(boolean deleteAPIsInstantly) {
+        this.deleteAPIsInstantly = deleteAPIsInstantly;
     }
 
     

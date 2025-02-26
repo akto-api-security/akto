@@ -11,6 +11,7 @@ import com.akto.dto.testing.WorkflowTestResult.NodeResult;
 
 public class MultiExecTestResult extends GenericTestResult {
 
+    public static final String NODE_RESULT_MAP = "nodeResultMap";
     Map<String, NodeResult> nodeResultMap;
     private List<String> executionOrder;
 
@@ -65,6 +66,11 @@ public class MultiExecTestResult extends GenericTestResult {
                     error_messages = errors;
                 } else {
                     error_messages.add(TestError.NO_API_REQUEST.getMessage());
+                    /*
+                     * In case no API requests are created,
+                     * do not store the original message
+                     */
+                    originalMessage = "";
                 }
                 runResults.add(new TestResult(null, originalMessage, error_messages, 0, false, TestResult.Confidence.HIGH, null));
             }
@@ -85,4 +91,28 @@ public class MultiExecTestResult extends GenericTestResult {
         return runResults;
     }
 
+    @Override
+    public List<String> getResponses() {
+        List<String> ret = new ArrayList<>();
+        
+        Map<String, NodeResult> nodeResultMap = this.getNodeResultMap();
+        for (int i=0; i < this.executionOrder.size(); i++) {
+            String k = this.executionOrder.get(i);
+            NodeResult nodeRes = nodeResultMap.get(k);
+            List<String> messageList = Arrays.asList(nodeRes.getMessage().split("\"request\": "));
+
+            for (int j = 1; j<messageList.size(); j++) {
+                String message = "{\"request\": " + messageList.get(j);
+                if (j != messageList.size() - 1) {
+                    message = message.substring(0, message.length() - 3);
+                } else {
+                    message = message.substring(0, message.length() - 2);
+                    message = message + "}";
+                }
+                ret.add(message);
+            }       
+        }
+
+        return ret;
+    }
 }

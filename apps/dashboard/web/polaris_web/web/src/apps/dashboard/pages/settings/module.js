@@ -240,11 +240,11 @@ const settingFunctions = {
       return trafficData
     },
     testJiraIntegration: async function(userEmail, apiToken, baseUrl, projId){
-      let issueType = ""
+      let issueTypeMap = {}
       await settingRequests.testJiraIntegration(userEmail, apiToken, baseUrl, projId).then((resp)=>{
-        issueType = resp.issueType
+        issueTypeMap = resp
       })
-      return issueType
+      return issueTypeMap
     },
     fetchJiraIntegration: async function(){
       let jiraInteg = {}
@@ -253,9 +253,9 @@ const settingFunctions = {
       })
       return jiraInteg
     },
-    addJiraIntegration: async function(userEmail, apiToken, baseUrl, projId, issueType){
+    addJiraIntegration: async function(userEmail, apiToken, baseUrl, projId, projectAndIssueMap){
       let trafficData = {}
-      await settingRequests.addJiraIntegration(userEmail, apiToken, baseUrl, projId, issueType).then((resp)=>{
+      await settingRequests.addJiraIntegration(userEmail, apiToken, baseUrl, projId, projectAndIssueMap).then((resp)=>{
       })
       return trafficData
     },

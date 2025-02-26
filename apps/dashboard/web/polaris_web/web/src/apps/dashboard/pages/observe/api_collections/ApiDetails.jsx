@@ -16,10 +16,14 @@ import PersistStore from "../../../../main/PersistStore";
 import values from "@/util/values";
 
 import { HorizontalDotsMinor, FileMinor } from "@shopify/polaris-icons"
+import LocalStore from "../../../../main/LocalStorageStore";
 
 function ApiDetails(props) {
 
     const { showDetails, setShowDetails, apiDetail, headers, getStatus, isGptActive } = props
+
+    const localCategoryMap = LocalStore.getState().categoryMap
+    const localSubCategoryMap = LocalStore.getState().subCategoryMap
 
     const [sampleData, setSampleData] = useState([])
     const [paramList, setParamList] = useState([])
@@ -30,6 +34,9 @@ function ApiDetails(props) {
     const [badgeActive, setBadgeActive] = useState(false)
     const [showMoreActions, setShowMoreActions] = useState(false)
     const setSelectedSampleApi = PersistStore(state => state.setSelectedSampleApi)
+    const [disabledTabs, setDisabledTabs] = useState([])
+
+    const [useLocalSubCategoryData, setUseLocalSubCategoryData] = useState(false)
 
     const statusFunc = getStatus ? getStatus : (x) => {
         try {
@@ -48,6 +55,13 @@ function ApiDetails(props) {
             setLoading(true)
             const { apiCollectionId, endpoint, method } = apiDetail
             setSelectedUrl({ url: endpoint, method: method })
+            api.checkIfDependencyGraphAvailable(apiCollectionId, endpoint, method).then((resp) => {
+                if (!resp.dependencyGraphExists) {
+                    setDisabledTabs(["dependency"])
+                } else {
+                    setDisabledTabs([])
+                }
+            })
             let commonMessages = []
             await api.fetchSampleData(endpoint, apiCollectionId, method).then((res) => {
                 api.fetchSensitiveSampleData(endpoint, apiCollectionId, method).then(async (resp) => {
@@ -122,6 +136,13 @@ function ApiDetails(props) {
     }
 
     useEffect(() => {
+        if (
+            (localCategoryMap && Object.keys(localCategoryMap).length > 0) &&
+            (localSubCategoryMap && Object.keys(localSubCategoryMap).length > 0)
+        ) {
+            setUseLocalSubCategoryData(true)
+        }
+
         fetchData();
     }, [apiDetail])
 
@@ -239,6 +260,8 @@ function ApiDetails(props) {
                     apiCollectionId={apiDetail["apiCollectionId"]}
                     endpoints={[apiDetail]}
                     filtered={true}
+                    useLocalSubCategoryData={useLocalSubCategoryData}
+                    preActivator={false}
                 />
                 <Box>
                     <Tooltip content="Open URL in test editor" dismissOnMouseOut>
@@ -276,6 +299,7 @@ function ApiDetails(props) {
             key="tabs"
             tabs={[ValuesTab, SchemaTab, DependencyTab]}
             currTab={() => { }}
+            disabledTabs={disabledTabs}
         />
     ]
 

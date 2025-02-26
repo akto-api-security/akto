@@ -1,13 +1,12 @@
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
 import GithubServerTable from "../../../components/tables/GithubServerTable"
-import { useState } from "react";
+import { useReducer, useState } from "react";
 import api from "../api"
 import Store from "../../../store";
-import transform from "../transform";
 import func from "@/util/func";
-import { ClockMinor,DynamicSourceMinor,LinkMinor, MarkFulfilledMinor, ReportMinor, ExternalMinor } from '@shopify/polaris-icons';
+import { MarkFulfilledMinor, ReportMinor, ExternalMinor } from '@shopify/polaris-icons';
 import PersistStore from "../../../../main/PersistStore";
-import { Button } from "@shopify/polaris";
+import { Button, HorizontalGrid, HorizontalStack, IndexFiltersMode } from "@shopify/polaris";
 import EmptyScreensLayout from "../../../components/banners/EmptyScreensLayout";
 import { ISSUES_PAGE_DOCS_URL } from "../../../../main/onboardingData";
 import {SelectCollectionComponent} from "../../testing/TestRunsPage/TestrunsBannerComponent"
@@ -16,70 +15,29 @@ import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo";
 import { useSearchParams } from "react-router-dom";
 import TestRunResultPage from "../../testing/TestRunResultPage/TestRunResultPage";
 import LocalStore from "../../../../main/LocalStorageStore";
-
-const headers = [
-    {
-        text:"Issue",
-        value:"categoryName",
-        itemOrder:1
-    },
-    
-    {
-        text: "Collection",
-        value: "collection",
-        itemOrder: 3,
-        icon: DynamicSourceMinor,
-    },
-    {
-        text: "API Collection ID",
-        value: "apiCollectionId",
-    },
-    {
-        text: "Discovered",
-        value: "detected_timestamp",
-        itemOrder: 3,
-        icon: ClockMinor,
-    },
-    {
-        text: "Timestamp",
-        value: "timestamp",
-        sortActive: true
-    },
-    {
-        text: "Endpoint",
-        value: "url",
-        itemOrder: 3,
-        icon: LinkMinor,
-    },
-    {
-        text:"Severity",
-        value:"severity",
-        itemOrder:2
-    },
-    {
-        text:"Status",
-        value:"issueStatus"
-    },
-    {
-        text:"Ignore reason",
-        value:"ignoreReason",
-        itemCell:2
-    },
-    {
-        value: 'collectionIds'
-    },
-    {
-        text:"unread",
-        value:"unread",
-        itemOrder:2
-    },
-]
+import { CellType } from "../../../components/tables/rows/GithubRow.js";
+import DateRangeFilter from "../../../components/layouts/DateRangeFilter.jsx";
+import { produce } from "immer";
+import "./style.css"
+import transform from "../transform.js";
+import SummaryInfo from "./SummaryInfo.jsx";
+import useTable from "../../../components/tables/TableContext.js";
+import values from "@/util/values";
+import SpinnerCentered from "../../../components/progress/SpinnerCentered.jsx";
+import TableStore from "../../../components/tables/TableStore.js";
+import CriticalFindingsGraph from "./CriticalFindingsGraph.jsx";
+import CriticalUnsecuredAPIsOverTimeGraph from "./CriticalUnsecuredAPIsOverTimeGraph.jsx";
+import settingFunctions from "../../settings/module.js";
+import JiraTicketCreationModal from "../../../components/shared/JiraTicketCreationModal.jsx";
+import testingApi from "../../testing/api.js"
 
 const sortOptions = [
-    { label: 'Discovered time', value: 'timestamp asc', directionLabel: 'Newest', sortKey: 'timestamp', columnIndex: 5 },
-    { label: 'Discovered time', value: 'timestamp desc', directionLabel: 'Oldest', sortKey: 'timestamp', columnIndex: 5 },
-    { label: 'Issue', value: 'categoryName asc', directionLabel: 'A-Z', sortKey: 'categoryName', columnIndex: 1 },
-    { label: 'Issue', value: 'categoryName desc', directionLabel: 'Z-A', sortKey: 'categoryName', columnIndex: 1 },
+    { label: 'Severity', value: 'severity asc', directionLabel: 'Highest', sortKey: 'severity', columnIndex: 2 },
+    { label: 'Severity', value: 'severity desc', directionLabel: 'Lowest', sortKey: 'severity', columnIndex: 2 },
+    { label: 'Number of endpoints', value: 'numberOfEndpoints asc', directionLabel: 'More', sortKey: 'numberOfEndpoints', columnIndex: 5 },
+    { label: 'Number of endpoints', value: 'numberOfEndpoints desc', directionLabel: 'Less', sortKey: 'numberOfEndpoints', columnIndex: 5 },
+    { label: 'Discovered time', value: 'creationTime asc', directionLabel: 'Newest', sortKey: 'creationTime', columnIndex: 7 },
+    { label: 'Discovered time', value: 'creationTime desc', directionLabel: 'Oldest', sortKey: 'creationTime', columnIndex: 7 },
 ];
 
 let filtersOptions = [
@@ -94,6 +52,7 @@ let filtersOptions = [
         label: 'Severity',
         title: 'Severity',
         choices: [
+            {label: 'Critical', value: 'CRITICAL'},
             { label: "High", value: "HIGH" }, 
             { label: "Medium", value: "MEDIUM" },
             { label: "Low", value: "LOW" }
@@ -106,41 +65,25 @@ let filtersOptions = [
         choices:[]
     },
     {
-        key:"issueStatus",
-        label:"Status",
-        title:"Status",
-        singleSelect:true,
-        choices:[
-            { label:"Open", value:"OPEN" },
-            { label:"Fixed", value:"FIXED" },
-            { label:"Ignored", value:"IGNORED" },
-        ]
-    },
-    {
-        key:"startTimestamp",
-        label: "Time",
-        title:"Time",
-        singleSelect:true,
-        choices:[
-            { label:"Last 1 day", value:func.timeNow() - 24 * 60 * 60 },
-            { label:"Last week", value:func.timeNow() - 7 * 24 * 60 * 60 },
-            { label:"Last month", value:func.timeNow() + 60 - 30 * 24 * 60 * 60 },
-        ]
-    },
-    {
         key: 'collectionIds',
         label: 'API groups',
         title: 'API groups',
         choices: [],
-    }
-]
-
-let appliedFilters = [
+    },
     {
-        key: 'issueStatus',
-        label: 'Open',
-        value: ['OPEN'],
-        onRemove: () => {}
+        key: 'activeCollections',
+        label: 'Active collections',
+        title: 'Active collections',
+        choices: [
+            {
+                label:"Active collections",
+                value:true
+            },
+            {
+                label:"All collections",
+                value:false
+            }],
+        singleSelect:true
     }
 ]
 
@@ -149,21 +92,82 @@ const resourceName = {
     plural: 'issues',
 };
 
-async function getNextUrl(issueId){
-    const res = await api.fetchTestingRunResult(JSON.parse(issueId))
-    return "/dashboard/issues?result="+res.testingRunResult.hexId;
-}
+function IssuesPage() {
+    const [headers, setHeaders] = useState([
+        {
+          title: '',
+          type: CellType.COLLAPSIBLE
+        },
+        {
+            title: "Severity",
+            text: "Severity",
+            value: "severity",
+            sortActive: true
+        },
+        {
+            title: "Issue name",
+            text: "Issue name",
+            value: "issueName",
+        },
+        {
+            title: "Category",
+            text: "Category",
+            value: "category"
+        },
+        {
+            title: "Number of endpoints",
+            text: "Number of endpoints",
+            value: "numberOfEndpoints",
+            sortActive: true
+        },
+        {
+            title: "Domains",
+            text: "Domains",
+            value: "domains"
+        },
+        {
+            title: "Compliance",
+            text: "Compliance",
+            value: "compliance",
+            sortActive: true
+        },
+        {
+            title: "Discovered",
+            text: "Discovered",
+            value: "creationTime",
+            sortActive: true
+        },
+        {
+            value: 'collectionIds'
+        },
+    ])
 
-function IssuesPage(){
-
-    const [loading, setLoading] = useState(true);
     const subCategoryMap = LocalStore(state => state.subCategoryMap);
-    const subCategoryFromSourceConfigMap = PersistStore(state => state.subCategoryFromSourceConfigMap);
-    const [issueStatus, setIssueStatus] = useState([]);
     const [issuesFilters, setIssuesFilters] = useState({})
     const [key, setKey] = useState(false);
     const apiCollectionMap = PersistStore(state => state.collectionsMap);
     const [showEmptyScreen, setShowEmptyScreen] = useState(true)
+    const [selectedTab, setSelectedTab] = useState("open")
+    const [loading, setLoading] = useState(true)
+    const [selected, setSelected] = useState(0)
+    const [tableLoading, setTableLoading] = useState(false)
+    const [issuesDataCount, setIssuesDataCount] = useState([])
+    const [jiraModalActive, setJiraModalActive] = useState(false)
+    const [selectedIssuesItems, setSelectedIssuesItems] = useState([])
+    const [jiraProjectMaps,setJiraProjectMap] = useState({})
+    const [issueType, setIssueType] = useState('');
+    const [projId, setProjId] = useState('')
+
+    const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[5])
+
+    const getTimeEpoch = (key) => {
+        return Math.floor(Date.parse(currDateRange.period[key]) / 1000)
+    }
+
+    const startTimestamp = getTimeEpoch("since")
+    const endTimestamp = getTimeEpoch("until")
+
+    const hostNameMap = PersistStore.getState().hostNameMap
 
     const setToastConfig = Store(state => state.setToastConfig)
     const setToast = (isActive, isError, message) => {
@@ -174,26 +178,122 @@ function IssuesPage(){
         })
     }
 
+    const handleSelectedTab = (selectedIndex) => {
+        setTableLoading(true)
+        setSelected(selectedIndex)
+        setTimeout(()=> {
+            setTableLoading(false)
+        }, 200)
+    }
+
+    const definedTableTabs = ["Open", "Fixed", "Ignored"]
+
+    const { tabsInfo, selectItems } = useTable()
+    const tableCountObj = func.getTabsCount(definedTableTabs, {}, issuesDataCount)
+    const tableTabs = func.getTableTabsContent(definedTableTabs, tableCountObj, setSelectedTab, selectedTab, tabsInfo)
+
+    const resetResourcesSelected = () => {
+        TableStore.getState().setSelectedItems([])
+        selectItems([])
+        setKey(!key)
+        setSelectedIssuesItems([])
+    }
+    
+    useEffect(() => {
+        const statusHeader = {
+            title: "Status",
+            text: "Status",
+            value: "issueStatus"
+        }
+    
+        if (selectedTab.toUpperCase() === 'OPEN') {
+            if (!headers.some(header => header.value === "issueStatus")) {
+                setHeaders(prevHeaders => {
+                    const newHeaders = [...prevHeaders, statusHeader]
+                    return newHeaders
+                })
+            }
+        } else {
+            setHeaders(prevHeaders => prevHeaders.filter(header => header.value !== "issueStatus"))
+        }
+        resetResourcesSelected();
+    }, [selectedTab])
+
+    useEffect(() => {
+        setKey(!key)
+    }, [startTimestamp, endTimestamp])
+
     const [searchParams, setSearchParams] = useSearchParams();
-  const resultId = searchParams.get("result")
+    const resultId = searchParams.get("result")
+
+    const filterParams = searchParams.get('filters')
+    let initialValForResponseFilter = true
+    if(filterParams && filterParams !== undefined &&filterParams.split('activeCollections').length > 1){
+        let isRequestVal =  filterParams.split("activeCollections__")[1].split('&')[0]
+        if(isRequestVal.length > 0){
+            initialValForResponseFilter = (isRequestVal === 'true' || isRequestVal.includes('true'))
+        }
+    }
+
+    const appliedFilters = [
+        {
+            key: 'activeCollections',
+            value: [initialValForResponseFilter],
+            onRemove: () => {}
+        }
+    ]
 
     filtersOptions = func.getCollectionFilters(filtersOptions)
 
+    const handleSaveJiraAction = () => {
+        setToast(true, false, "Please wait while we create your Jira ticket.")
+        setJiraModalActive(false)
+        api.bulkCreateJiraTickets(selectedIssuesItems, window.location.origin, projId, issueType).then((res) => {
+            if(res?.errorMessage) {
+                setToast(true, false, res?.errorMessage)
+            } else {
+                setToast(true, false, `${selectedIssuesItems.length} jira ticket${selectedIssuesItems.length === 1 ? "" : "s"} created.`)
+            }
+            resetResourcesSelected()
+        })
+    }
+
     let promotedBulkActions = (selectedResources) => {
-        selectedResources = selectedResources.map((item) => JSON.parse(item));
-        
+        let items
+        if(selectedResources.length > 0 && typeof selectedResources[0][0] === 'string') {
+            const flatSelectedResources = selectedResources.flat()
+            items = flatSelectedResources.map((item) => JSON.parse(item))
+        } else {
+            items = selectedResources.map((item) => JSON.parse(item))
+        }
         
         function ignoreAction(ignoreReason){
-            api.bulkUpdateIssueStatus(selectedResources, "IGNORED", ignoreReason ).then((res) => {
-                setToast(true, false, `Issue${selectedResources.length==1 ? "" : "s"} ignored`)
-                setKey(!key);
+            api.bulkUpdateIssueStatus(items, "IGNORED", ignoreReason, {} ).then((res) => {
+                setToast(true, false, `Issue${items.length==1 ? "" : "s"} ignored`)
+                resetResourcesSelected()
             })
         }
         
         function reopenAction(){
-            api.bulkUpdateIssueStatus(selectedResources, "OPEN", "" ).then((res) => {
-                setToast(true, false, `Issue${selectedResources.length==1 ? "" : "s"} re-opened`)
-                setKey(!key);
+            api.bulkUpdateIssueStatus(items, "OPEN", "" ).then((res) => {
+                setToast(true, false, `Issue${items.length==1 ? "" : "s"} re-opened`)
+                resetResourcesSelected()
+            })
+        }
+
+        function createJiraTicketBulk () {
+            setSelectedIssuesItems(items)
+            settingFunctions.fetchJiraIntegration().then((jirIntegration) => {
+                if(jirIntegration.projectIdsMap !== null && Object.keys(jirIntegration.projectIdsMap).length > 0){
+                    setJiraProjectMap(jirIntegration.projectIdsMap)
+                    if(Object.keys(jirIntegration.projectIdsMap).length > 0){
+                        setProjId(Object.keys(jirIntegration.projectIdsMap)[0])
+                    }
+                }else{
+                    setProjId(jirIntegration.projId)
+                    setIssueType(jirIntegration.issueType)
+                }
+                setJiraModalActive(true)
             })
         }
         
@@ -208,6 +308,14 @@ function IssuesPage(){
         {
             content: 'No time to fix',
             onAction: () => { ignoreAction("No time to fix") }
+        },
+        {
+            content: 'Export selected Issues',
+            onAction: () => { openVulnerabilityReport(items) }
+        },
+        {
+            content: 'Create jira ticket',
+            onAction: () => { createJiraTicketBulk() }
         }]
         
         let reopen =  [{
@@ -216,18 +324,16 @@ function IssuesPage(){
         }]
         
         let ret = [];
-        let status = issueStatus[0];
+        let status = selectedTab.toUpperCase()
         
         switch (status) {
             case "OPEN": ret = [].concat(issues); break;
-            case "IGNORED": if (selectedResources.length == 1) {
-                ret = [].concat(issues);
-            }
+            case "IGNORED": 
                 ret = ret.concat(reopen);
-                appliedFilters[0].label = "Ignored"
-                appliedFilters[0].value = ["IGNORED"]
                 break;
             case "FIXED":
+            default:
+                ret = []
         }
 
         return ret;
@@ -253,55 +359,31 @@ function IssuesPage(){
             case "issueStatus":
             case "severity":
                 return func.convertToDisambiguateLabel(value, func.toSentenceCase, 2)
+            case "compliance":
+                return func.convertToDisambiguateLabel(value, func.toUpperCase(), 2)
             case "issueCategory":
                 return func.convertToDisambiguateLabelObj(value, null, 3)
             case "collectionIds":
             case "apiCollectionId":
                 return func.convertToDisambiguateLabelObj(value, apiCollectionMap, 2)
+            case "activeCollections":
+                if(value[0]){
+                    return "Active collections only"
+                }else{
+                    return "All collections"
+                }
             default:
               return value;
           }          
     }
 
-    async function fetchData(sortKey, sortOrder, skip, limit, filters, filterOperators, queryValue){
-        setLoading(true);
-        const res = await api.fetchIssues(skip, 1, null, null, null, null, 0)
-        if(res.totalIssuesCount === 0){
-            setShowEmptyScreen(true)
-            return {value:{} , total:0};
-        }
-        let total =0;
-        let ret = []
-        let filterCollectionsId = filters.apiCollectionId.concat(filters.collectionIds);
-        let filterSeverity = filters.severity
-        let filterSubCategory = []
-        filters?.issueCategory?.forEach((issue) => {
-            filterSubCategory = filterSubCategory.concat(categoryToSubCategories[issue])
+    const openVulnerabilityReport = async(items = []) => {
+        await testingApi.generatePDFReport(issuesFilters, items).then((res) => {
+          const responseId = res.split("=")[1];
+          window.open('/dashboard/issues/summary/' + responseId.split("}")[0], '_blank');
         })
-        let filterStatus = filters.issueStatus
-        setIssueStatus(filterStatus);
-        let startTimestamp = filters?.startTimestamp?.[0] || 0;
-        let obj = {
-            'filterStatus': filterStatus,
-            'filterCollectionsId': filterCollectionsId,
-            'filterSeverity': filterSeverity,
-            filterSubCategory: filterSubCategory,
-            startEpoch: startTimestamp
-        }
-        setIssuesFilters(obj)
-        await api.fetchIssues(skip, limit,filterStatus,filterCollectionsId,filterSeverity,filterSubCategory,startTimestamp).then((res) => {
-            total = res.totalIssuesCount;
-            ret = transform.prepareIssues(res, subCategoryMap, subCategoryFromSourceConfigMap, apiCollectionMap);
-            setLoading(false);
-        })
-        ret = func.sortFunc(ret, sortKey, sortOrder)
-        
-        return {value:ret , total:total};
-    }
 
-    const openVulnerabilityReport = () => {
-        let summaryId = btoa(JSON.stringify(issuesFilters))
-        window.open('/dashboard/issues/summary/' + summaryId, '_blank');
+        resetResourcesSelected();
     }
 
     const infoItems = [
@@ -325,18 +407,156 @@ function IssuesPage(){
   useEffect(() => {
     if (subCategoryMap && Object.keys(subCategoryMap).length > 0 && apiCollectionMap && Object.keys(apiCollectionMap).length > 0) {
         setShowEmptyScreen(false)
+        setLoading(false)
     }
   }, [subCategoryMap, apiCollectionMap])
+
+
+    const fetchTableData = async (sortKey, sortOrder, skip, limit, filters, filterOperators, queryValue) => {
+        setTableLoading(true)
+        let filterStatus = [selectedTab.toUpperCase()]
+        let filterSeverity = filters.severity
+        let filterCompliance = filters.compliance
+        const activeCollections = (filters?.activeCollections !== undefined && filters?.activeCollections.length > 0) ? filters?.activeCollections[0] : initialValForResponseFilter;
+        const apiCollectionId = filters.apiCollectionId || []
+        let filterCollectionsId = apiCollectionId.concat(filters.collectionIds)
+        let filterSubCategory = []
+        filters?.issueCategory?.forEach((issue) => {
+            filterSubCategory = filterSubCategory.concat(categoryToSubCategories[issue])
+        })
+
+        const collectionIdsArray = filterCollectionsId.map((x) => {return x.toString()})
+
+        let obj = {
+            'filterStatus': filterStatus,
+            'filterCollectionsId': collectionIdsArray,
+            'filterSeverity': filterSeverity,
+            'filterCompliance': filterCompliance,
+            filterSubCategory: filterSubCategory,
+            startEpoch: [startTimestamp.toString()],
+            endTimeStamp: [endTimestamp.toString()],
+            activeCollections: [activeCollections.toString()]
+        }
+        setIssuesFilters(obj)
+
+        let ret = []
+        let total = 0
+
+        let issueItem = []
+
+        await api.fetchIssues(skip, limit, filterStatus, filterCollectionsId, filterSeverity, filterSubCategory, sortKey, sortOrder, startTimestamp, endTimestamp, activeCollections, filterCompliance).then((issuesDataRes) => {
+            const uniqueIssuesMap = new Map()
+            issuesDataRes.issues.forEach(item => {
+                const key = `${item?.id?.testSubCategory}|${item?.severity}|${item?.unread.toString()}`
+                if (!uniqueIssuesMap.has(key)) {
+                    uniqueIssuesMap.set(key, {
+                        id: item?.id,
+                        severity: func.toSentenceCase(item?.severity),
+                        compliance: Object.keys(subCategoryMap[item?.id?.testSubCategory]?.compliance?.mapComplianceToListClauses || {}),
+                        severityType: item?.severity,
+                        issueName: item?.id?.testSubCategory,
+                        category: item?.id?.testSubCategory,
+                        numberOfEndpoints: 1,
+                        creationTime: item?.creationTime,
+                        issueStatus: item?.unread.toString(),
+                        testRunName: "Test Run",
+                        domains: [(hostNameMap[item?.id?.apiInfoKey?.apiCollectionId] !== null ? hostNameMap[item?.id?.apiInfoKey?.apiCollectionId] : apiCollectionMap[item?.id?.apiInfoKey?.apiCollectionId])],
+                        urls: [{
+                            method: item?.id?.apiInfoKey?.method,
+                            url: item?.id?.apiInfoKey?.url,
+                            id: JSON.stringify(item?.id),
+                        }],
+                        urlsKey: ['']
+                    })
+                } else {
+                    const existingIssue = uniqueIssuesMap.get(key)
+                    const domain = (hostNameMap[item?.id?.apiInfoKey?.apiCollectionId] !== null ? hostNameMap[item?.id?.apiInfoKey?.apiCollectionId] : apiCollectionMap[item?.id?.apiInfoKey?.apiCollectionId])
+                    if (!existingIssue.domains.includes(domain)) {
+                        existingIssue.domains.push(domain)
+                    }
+                    existingIssue.urls.push({
+                        method: item?.id?.apiInfoKey?.method,
+                        url: item?.id?.apiInfoKey?.url,
+                        id: JSON.stringify(item?.id),
+                    })
+                    existingIssue.numberOfEndpoints += 1
+                }
+            })
+            issueItem = Array.from(uniqueIssuesMap.values())
+
+            total = selectedTab.toUpperCase() === 'OPEN' ? issuesDataRes.openIssuesCount : selectedTab.toUpperCase() === 'FIXED' ? issuesDataRes.fixedIssuesCount : issuesDataRes.ignoredIssuesCount
+            setIssuesDataCount([issuesDataRes.openIssuesCount, issuesDataRes.fixedIssuesCount, issuesDataRes.ignoredIssuesCount])
+        }).catch((e) => {
+            func.setToast(true, true, e.message)
+            setTableLoading(false)
+            setLoading(false)
+        })
+
+        const sortedIssueItem = transform.sortIssues(issueItem, sortKey, sortOrder)
+
+        const issueTableData = await transform.convertToIssueTableData(sortedIssueItem, subCategoryMap)
+        ret.push(...issueTableData)
+        setTableLoading(false)
+        setLoading(false)
+
+        return {value: ret, total: total}
+    }
+
+    const components = (
+        <>
+            <SummaryInfo
+                key={"issues-summary-graph-details"}
+                startTimestamp={startTimestamp}
+                endTimestamp={endTimestamp}
+            />
+
+            <HorizontalGrid gap={5} columns={2} key={"critical-issues-graph-detail"}>
+                <CriticalUnsecuredAPIsOverTimeGraph startTimestamp={startTimestamp} endTimestamp={endTimestamp} linkText={""} linkUrl={""} />
+                <CriticalFindingsGraph startTimestamp={startTimestamp} endTimestamp={endTimestamp} linkText={""} linkUrl={""} />
+            </HorizontalGrid>
+
+            <GithubServerTable
+                key={key}
+                pageLimit={50}
+                fetchData={fetchTableData}
+                appliedFilters={appliedFilters}
+                sortOptions={sortOptions}
+                resourceName={resourceName}
+                filters={filtersOptions}
+                disambiguateLabel={disambiguateLabel}
+                headers={headers}
+                getStatus={() => { return "warning" }}
+                selected={selected}
+                onRowClick={() => {}}
+                onSelect={handleSelectedTab}
+                getFilteredItems={()=>{}}
+                mode={IndexFiltersMode.Default}
+                headings={headers}
+                useNewRow={true}
+                condensedHeight={true}
+                tableTabs={tableTabs}
+                selectable={true}
+                promotedBulkActions={promotedBulkActions}
+                loading={loading || tableLoading}
+                hideQueryField={true}
+                isMultipleItemsSelected={true}
+            />
+        </>
+    )
     
     return (
         <>
         <PageWithMultipleCards
-            title={<TitleWithInfo
-                    titleText={"Issues"}
-                    tooltipContent={"Issues are created when a test from test library has passed validation and thus a potential vulnerability is found."}
-                />}
+            title={
+                <HorizontalStack gap={4}>
+                    <TitleWithInfo
+                        titleText={"Issues"}
+                        tooltipContent={"Issues are created when a test from test library has passed validation and thus a potential vulnerability is found."}
+                    />
+                </HorizontalStack>
+            }
             isFirstPage={true}
-            components = {[
+            components = {loading ? [<SpinnerCentered />] : [
                 showEmptyScreen ? 
                 <EmptyScreensLayout key={"emptyScreen"}
                     iconSrc={"/public/alert_hexagon.svg"}
@@ -351,27 +571,22 @@ function IssuesPage(){
                 />
 
             
-            : <GithubServerTable
-                    key={key}
-                    headers={headers}
-                    resourceName={resourceName} 
-                    appliedFilters={appliedFilters}
-                    sortOptions={sortOptions}
-                    disambiguateLabel={disambiguateLabel}
-                    selectable = {true}
-                    loading={loading}
-                    fetchData={fetchData}
-                    filters={filtersOptions}
-                    promotedBulkActions={promotedBulkActions}
-                    hideQueryField={true}
-                    getNextUrl={getNextUrl}
-                    getStatus={func.getTestResultStatus}
-                    filterStateUrl={"/dashboard/issues"}
-                />
+            : components
             ]}
-            primaryAction={<Button primary onClick={() => openVulnerabilityReport()} disabled={showEmptyScreen}>Export vulnerability report</Button>}
+            primaryAction={<Button primary onClick={() => openVulnerabilityReport()} disabled={showEmptyScreen}>Export results</Button>}
+            secondaryActions={<DateRangeFilter initialDispatch={currDateRange} dispatch={(dateObj) => dispatchCurrDateRange({ type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias })} />}
         />
             {(resultId !== null && resultId.length > 0) ? <TestRunResultPage /> : null}
+            <JiraTicketCreationModal
+                modalActive={jiraModalActive}
+                setModalActive={setJiraModalActive}
+                handleSaveAction={handleSaveJiraAction}
+                jiraProjectMaps={jiraProjectMaps}
+                setProjId={setProjId}
+                setIssueType={setIssueType}
+                projId={projId}
+                issueType={issueType}
+            />
         </>
     )
 }

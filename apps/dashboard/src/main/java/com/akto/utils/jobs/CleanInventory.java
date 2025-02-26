@@ -19,6 +19,8 @@ import java.util.function.Function;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+import com.akto.dto.CodeAnalysisRepo;
+import com.mongodb.client.model.Updates;
 import org.bson.conversions.Bson;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -46,7 +48,9 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.parsers.HttpCallParser;
 import com.akto.test_editor.execution.ParseAndExecute;
 import com.akto.util.AccountTask;
+import com.akto.util.DashboardMode;
 import com.akto.util.Pair;
+import com.akto.utils.Utils;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Sorts;
@@ -125,6 +129,27 @@ public class CleanInventory {
         }
 
     }
+
+    private static void moveApisFromSampleData(List<Key> sampleDataIds) {
+        if (sampleDataIds.isEmpty()) return;
+        
+        List<SampleData> allSamples = SampleDataDao.instance.findAll(Filters.or(SampleDataDao.filterForMultipleSampleData(sampleDataIds)));
+        List<String> messages = new ArrayList<>();
+        for(SampleData sampleData: allSamples) {
+            messages.addAll(sampleData.getSamples());
+        }
+
+        if (allSamples.isEmpty() || messages.isEmpty()) return;
+        
+
+            try {
+                Utils.pushDataToKafka(allSamples.get(0).getId().getApiCollectionId(), "", messages, new ArrayList<>(), true, false);
+                loggerMaker.infoAndAddToDb("Successfully moved APIs.");
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("Error during move APIs: " + e.getMessage());
+                e.printStackTrace();
+            }
+    }
     
     public static void cleanFilteredSampleDataFromAdvancedFilters(List<ApiCollection> apiCollections, List<YamlTemplate> yamlTemplates, List<String> redundantUrlList, String filePath, boolean shouldDeleteRequest, boolean saveLogsToDB) throws IOException{
 
@@ -144,9 +169,11 @@ public class CleanInventory {
             skip += limit;
             List<Key> toBeDeleted = new ArrayList<>();
             List<Key> toMove = new ArrayList<>();
+            List<String> remainingSamples = new ArrayList<>();
             for(SampleData sampleData: sampleDataList) {
                 try {
                     List<String> samples = sampleData.getSamples();
+                    remainingSamples.clear();
                     if (samples == null || samples.isEmpty()) {
                         logger.info("[BadApisRemover] No samples found for : " + sampleData.getId());
                         continue;
@@ -154,13 +181,14 @@ public class CleanInventory {
 
                     ApiCollection apiCollection = apiCollectionMap.get(sampleData.getId().getApiCollectionId());
                     if (apiCollection == null) {
-                        logger.info("[BadApisRemover] No apiCollection found for : " + sampleData.getId());
+                        if(!DashboardMode.isMetered()){
+                            logger.info("[BadApisRemover] No apiCollection found for : " + sampleData.getId());
+                        }
                         continue;
                     }
 
                     
                     boolean isRedundant = false;
-                    boolean isAllowedFromTemplate = false;
                     boolean isNetsparkerPresent = false;
                     boolean movingApi = false;
                     for (String sample : samples) {
@@ -179,19 +207,18 @@ public class CleanInventory {
                                     if(filterType.equals(FILTER_TYPE.MODIFIED)){
                                         // filter passed and modified
                                         movingApi = true;
+                                        remainingSamples.add(sample);
                                         break;
                                     }else if(filterType.equals(FILTER_TYPE.ALLOWED)){
                                         // filter passed and not modified
-                                        isAllowedFromTemplate = true;
+                                        remainingSamples.add(sample);
                                     }else if(filterMap.size() == 1){
                                         // filter failed and id was default_delete
                                         String key = filterMap.entrySet().iterator().next().getKey();
-                                        if(key.equals("DEFAULT_BLOCK_FILTER")){
-                                            isAllowedFromTemplate = true;
+                                        if(!key.equals("DEFAULT_ALLOW_FILTER")){
+                                            remainingSamples.add(sample);
                                         }
                                     }
-                                }else{
-                                    break;
                                 }
                             }
                         }
@@ -205,21 +232,35 @@ public class CleanInventory {
                         }else{
                             logger.info("[BadApisUpdater] Updating bad from template API: " + sampleData.getId(), LogDb.DASHBOARD);
                         }
-                    }
+                    } else if (isRedundant || (remainingSamples.size() != samples.size())) {
+                        if (remainingSamples.isEmpty()) {
+                            // writer.write(sampleData.toString());
+                            // if api falls under redundant url and if block filter is passed or none of the filter from any of the filters is passed, we print this block
+                            int initialCount = collectionWiseDeletionCountMap.getOrDefault(sampleData.getId().getApiCollectionId(), 0);
+                            collectionWiseDeletionCountMap.put(sampleData.getId().getApiCollectionId(),initialCount + 1);
+                            toBeDeleted.add(sampleData.getId());
+                            if(saveLogsToDB){
+                                loggerMaker.infoAndAddToDb(
+                                        "Filter passed, deleting bad api found from filter: " + sampleData.getId(), LogDb.DASHBOARD
+                                );
+                            }else{
+                                logger.info("[BadApisRemover] " + isNetsparkerPresent + " Deleting bad samples from template: " + sampleData.getId(), LogDb.DASHBOARD);
+                            }
+                        } else {
+                            if (remainingSamples.size() != samples.size()) {
 
-                    else if (isRedundant || !isAllowedFromTemplate) {                                
-                        // writer.write(sampleData.toString());
-                        // if api falls under redundant url and if block filter is passed or none of the filter from any of the filters is passed, we print this block
-                        int initialCount = collectionWiseDeletionCountMap.getOrDefault(sampleData.getId().getApiCollectionId(), 0);
-                        collectionWiseDeletionCountMap.put(sampleData.getId().getApiCollectionId(),initialCount + 1);
-                        toBeDeleted.add(sampleData.getId());  
-                        if(saveLogsToDB){
-                            loggerMaker.infoAndAddToDb(
-                                "Filter passed, deleting bad api found from filter: " + sampleData.getId(), LogDb.DASHBOARD
-                            );
-                        }else{
-                            logger.info("[BadApisRemover] " + isNetsparkerPresent + " Deleting bad API from template: " + sampleData.getId(), LogDb.DASHBOARD);
-                        }           
+                                if (shouldDeleteRequest) {
+                                    SampleDataDao.instance.updateOneNoUpsert(Filters.eq("_id",sampleData.getId()), Updates.set(SampleData.SAMPLES,remainingSamples));
+                                }
+                                if(saveLogsToDB){
+                                    loggerMaker.infoAndAddToDb(
+                                            "Deleting bad samples from sample data " + sampleData.getId(), LogDb.DASHBOARD
+                                    );
+                                }else{
+                                    logger.info("[BadApisRemover] " + isNetsparkerPresent + " Deleting bad API from template: " + sampleData.getId(), LogDb.DASHBOARD);
+                                }
+                            }
+                        }
                     } else {
                         // other cases like: => filter from advanced filter is passed || filter from block filter fails
                         if(saveLogsToDB){
@@ -238,6 +279,11 @@ public class CleanInventory {
             if (shouldDeleteRequest) {
                 logger.info("starting deletion of apis");
                 deleteApis(toBeDeleted);
+            }
+
+            if (shouldDeleteRequest && toMove.size() > 0) {
+                logger.info("starting moving APIs");
+                moveApisFromSampleData(toMove);
             }
 
             // String shouldMove = System.getenv("MOVE_REDUNDANT_APIS");
@@ -325,6 +371,34 @@ public class CleanInventory {
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Couldn't complete scan for APIs remover: " + e.getMessage(), LogDb.DASHBOARD);
             e.printStackTrace();
+        }
+    }
+
+    public static void deleteOptionsAPIs(List<ApiCollection> apiCollections){
+        for (ApiCollection apiCollection: apiCollections) {
+            List<Key> toBeDeleted = new ArrayList<>();
+            if (apiCollection.getHostName() == null) {
+                continue;
+            }
+            List<BasicDBObject> endpoints = com.akto.action.observe.Utils.fetchEndpointsInCollectionUsingHost(apiCollection.getId(), 0);
+
+            if (endpoints == null || endpoints.isEmpty()) {
+                continue;
+            }
+            for (BasicDBObject singleTypeInfo: endpoints) {
+                singleTypeInfo = (BasicDBObject) (singleTypeInfo.getOrDefault("_id", new BasicDBObject()));
+                int apiCollectionId = singleTypeInfo.getInt("apiCollectionId");
+                String url = singleTypeInfo.getString("url");
+                String method = singleTypeInfo.getString("method");
+
+                Key key = new Key(apiCollectionId, url, Method.fromString(method), -1, 0, 0);
+
+                if (method.equalsIgnoreCase("options")) {
+                    toBeDeleted.add(key);
+                    continue;
+                }
+            }
+            deleteApis(toBeDeleted);
         }
     }
 

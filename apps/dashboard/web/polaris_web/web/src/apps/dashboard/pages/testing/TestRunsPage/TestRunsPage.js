@@ -2,6 +2,7 @@ import GithubServerTable from "../../../components/tables/GithubServerTable";
 import {Text,IndexFiltersMode, LegacyCard, HorizontalStack, Button, Collapsible, HorizontalGrid, Box, Divider} from '@shopify/polaris';
 import { ChevronDownMinor , ChevronUpMinor } from '@shopify/polaris-icons';
 import api from "../api";
+import testingApi from "../../testing/api";
 import { useEffect, useReducer, useState } from 'react';
 import transform from "../transform";
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards";
@@ -65,6 +66,12 @@ let headers = [
     sortActive: true
   },
   {
+    text: 'Total Apis',
+    title: 'Total Endpoints',
+    value: 'total_apis',
+    type: CellType.TEXT
+  },
+  {
     title: '',
     type: CellType.ACTION,
   }
@@ -126,16 +133,23 @@ const endTimestamp = getTimeEpoch("until") + 86400
 
 
 const [loading, setLoading] = useState(true);
-const [currentTab, setCurrentTab] = useState("one_time");
-const [updateTable, setUpdateTable] = useState(false);
+const [updateTable, setUpdateTable] = useState("");
 const [countMap, setCountMap] = useState({});
-const [selected, setSelected] = useState(1);
 
-const [severityCountMap, setSeverityCountMap] = useState({
-  HIGH: {text : 0, color: func.getColorForCharts("HIGH")},
-  MEDIUM: {text : 0, color: func.getColorForCharts("MEDIUM")},
-  LOW: {text : 0, color: func.getColorForCharts("LOW")},
-})
+const definedTableTabs = ['All', 'One time', 'Continuous Testing', 'Scheduled', 'CI/CD']
+const initialCount = [countMap['allTestRuns'], countMap['oneTime'], countMap['continuous'], countMap['scheduled'], countMap['cicd']]
+
+const { tabsInfo } = useTable()
+const tableSelectedTab = PersistStore.getState().tableSelectedTab[window.location.pathname]
+const initialSelectedTab = tableSelectedTab || "one_time";
+const [currentTab, setCurrentTab] = useState(initialSelectedTab);
+let initialTabIdx = func.getTableTabIndexById(1, definedTableTabs, initialSelectedTab)
+const [selected, setSelected] = useState(initialTabIdx)
+
+const tableCountObj = func.getTabsCount(definedTableTabs, {}, initialCount)
+const tableTabs = func.getTableTabsContent(definedTableTabs, tableCountObj, setCurrentTab, currentTab, tabsInfo)
+
+const [severityMap, setSeverityMap] = useState({})
 const [subCategoryInfo, setSubCategoryInfo] = useState({})
 const [collapsible, setCollapsible] = useState(true)
 const [hasUserInitiatedTestRuns, setHasUserInitiatedTestRuns] = useState(false)
@@ -143,7 +157,7 @@ const [hasUserInitiatedTestRuns, setHasUserInitiatedTestRuns] = useState(false)
 
 const refreshSummaries = () =>{
   setTimeout(() => {
-    setUpdateTable(!updateTable)
+    setUpdateTable(Date.now().toString())
   }, 5000)
 }
 
@@ -231,21 +245,45 @@ function processData(testingRuns, latestTestingRunResultSummaries, cicd){
     await api.getSummaryInfo(startTimestamp, endTimestamp).then((resp)=>{
       const severityObj = transform.convertSubIntoSubcategory(resp)
       setSubCategoryInfo(severityObj.subCategoryMap)
-      const severityMap = severityObj.countMap;
-      let tempMap = JSON.parse(JSON.stringify(severityCountMap))
-      Object.keys(tempMap).forEach((key) => {
-        tempMap[key].text = severityMap[key]
-      })
-      setSeverityCountMap(tempMap)
+    })
+    await testingApi.fetchSeverityInfoForIssues({}, [], 0).then(({ severityInfo }) => {
+      const countMap = { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0 }
+
+      if (severityInfo && severityInfo != undefined && severityInfo != null && severityInfo instanceof Object) {
+          for (const apiCollectionId in severityInfo) {
+              let temp = severityInfo[apiCollectionId]
+              for (const key in temp) {
+                  countMap[key] += temp[key]
+              }
+          }
+      }
+
+      const result = {
+          "CRITICAL": {
+              "text": countMap.CRITICAL || 0,
+              "color": func.getHexColorForSeverity("CRITICAL"),
+              "filterKey": "Critical"
+          },
+          "HIGH": {
+              "text": countMap.HIGH || 0,
+              "color": func.getHexColorForSeverity("HIGH"),
+              "filterKey": "High"
+          },
+          "MEDIUM": {
+              "text": countMap.MEDIUM || 0,
+              "color": func.getHexColorForSeverity("MEDIUM"),
+              "filterKey": "Medium"
+          },
+          "LOW": {
+              "text": countMap.LOW || 0,
+              "color": func.getHexColorForSeverity("LOW"),
+              "filterKey": "Low"
+          }
+      }
+
+      setSeverityMap(result)
     })
   }
-
-  const definedTableTabs = ['All', 'One time', 'Continuous Testing', 'Scheduled', 'CI/CD']
-  const initialCount = [countMap['allTestRuns'], countMap['oneTime'], countMap['continuous'], countMap['scheduled'], countMap['cicd']]
-
-  const { tabsInfo } = useTable()
-  const tableCountObj = func.getTabsCount(definedTableTabs, {}, initialCount)
-  const tableTabs = func.getTableTabsContent(definedTableTabs, tableCountObj, setCurrentTab, currentTab, tabsInfo)
 
   const fetchTotalCount = () =>{
     setLoading(true)
@@ -271,7 +309,7 @@ function processData(testingRuns, latestTestingRunResultSummaries, cicd){
 
 const iconSource = collapsible ? ChevronUpMinor : ChevronDownMinor
 const SummaryCardComponent = () =>{
-  let totalVulnerabilities = severityCountMap?.HIGH?.text + severityCountMap?.MEDIUM?.text +  severityCountMap?.LOW?.text 
+  let totalVulnerabilities = severityMap?.CRITICAL?.text + severityMap?.HIGH?.text + severityMap?.MEDIUM?.text + severityMap?.LOW?.text
   return(
     <LegacyCard>
       <LegacyCard.Section title={<Text fontWeight="regular" variant="bodySm" color="subdued">Vulnerabilities</Text>}>
@@ -284,8 +322,14 @@ const SummaryCardComponent = () =>{
           <LegacyCard.Subsection>
             <Box paddingBlockStart={3}><Divider/></Box>
             <HorizontalGrid columns={2} gap={6}>
-              <ChartypeComponent navUrl={"/dashboard/issues/"} data={subCategoryInfo} title={"Categories"} isNormal={true} boxHeight={'250px'}/>
-              <ChartypeComponent data={severityCountMap} reverse={true} title={"Severity"} charTitle={totalVulnerabilities} chartSubtitle={"Total Vulnerabilities"}/>
+              <ChartypeComponent chartSize={190} navUrl={"/dashboard/issues/"} data={subCategoryInfo} title={"Categories"} isNormal={true} boxHeight={'250px'}/>
+              <ChartypeComponent
+                  data={severityMap}
+                  navUrl={"/dashboard/issues/"} title={"Severity"} isNormal={true} boxHeight={'250px'} dataTableWidth="250px" boxPadding={8}
+                  pieInnerSize="50%"
+                  chartOnLeft={false}
+                  chartSize={190}
+              />
             </HorizontalGrid>
 
           </LegacyCard.Subsection>

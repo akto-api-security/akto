@@ -18,6 +18,7 @@ import org.apache.struts2.interceptor.ServletRequestAware;
 
 import javax.servlet.http.HttpServletRequest;
 
+import static com.akto.utils.Utils.createDashboardUrlFromRequest;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -79,6 +80,20 @@ public class ApiTokenAction extends UserAction implements ServletRequestAware {
                 )
         );
 
+        List<SlackWebhook> slackWebhooks = SlackWebhooksDao.instance.findAll(new BasicDBObject());
+        for(SlackWebhook sw: slackWebhooks) {
+            ApiToken slackToken = 
+                new ApiToken(sw.getId(), Context.accountId.get(), sw.getWebhook(), sw.getWebhook(), 
+                sw.getId(), sw.getUserEmail(), Utility.SLACK);
+                
+            apiTokenList.add(slackToken);
+        }
+
+        return SUCCESS.toUpperCase();
+    }
+
+    public String fetchSlackWebhooks() {
+        apiTokenList = new ArrayList<>();
         List<SlackWebhook> slackWebhooks = SlackWebhooksDao.instance.findAll(new BasicDBObject());
         for(SlackWebhook sw: slackWebhooks) {
             ApiToken slackToken = 
@@ -172,6 +187,6 @@ public class ApiTokenAction extends UserAction implements ServletRequestAware {
 
     @Override
     public void setServletRequest(HttpServletRequest request) {
-        this.dashboardUrl = request.getScheme() + "://" + request.getServerName() + ":" + request.getServerPort();
+        this.dashboardUrl = createDashboardUrlFromRequest(request);
     }
 }

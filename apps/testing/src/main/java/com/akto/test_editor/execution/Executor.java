@@ -2,6 +2,7 @@ package com.akto.test_editor.execution;
 
 import com.akto.dao.billing.OrganizationsDao;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -27,6 +28,7 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.rules.TestPlugin;
 import com.akto.test_editor.Utils;
 import com.akto.util.Constants;
+import com.akto.util.JSONUtils;
 import com.akto.util.modifier.JWTPayloadReplacer;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -48,7 +50,7 @@ import org.bson.types.ObjectId;
 
 public class Executor {
 
-    private static final LoggerMaker loggerMaker = new LoggerMaker(Executor.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(Executor.class, LogDb.TESTING);
 
     public final String _HOST = "host";
 
@@ -70,6 +72,10 @@ public class Executor {
         if (node.getChildNodes().size() < 2) {
             testLogs.add(new TestingRunResult.TestLog(TestingRunResult.TestLogType.ERROR, "executor child nodes is less than 2, returning empty execution result"));
             loggerMaker.errorAndAddToDb("executor child nodes is less than 2, returning empty execution result " + logId, LogDb.TESTING);
+            /*
+             * Do not store messages in case the execution block is invalid.
+             */
+            invalidExecutionResult.setOriginalMessage(null);
             result.add(invalidExecutionResult);
             yamlTestResult = new YamlTestResult(result, workflowTest);
             return yamlTestResult;
@@ -120,6 +126,7 @@ public class Executor {
                 loggerMaker.infoAndAddToDb(reason + ", going ahead with sample auth", LogDb.TESTING);
             }
         }
+        origRawApi = sampleRawApi.copy();
 
         boolean requestSent = false;
 
@@ -130,10 +137,25 @@ public class Executor {
                 apiInfoKeys.add(apiInfoKey);
                 memory = new Memory(apiInfoKeys, new HashMap<>());
             }
-            workflowTest = buildWorkflowGraph(reqNodes, rawApi, authMechanism, customAuthTypes, apiInfoKey, varMap, validatorNode);
-            result.add(triggerMultiExecution(workflowTest, reqNodes, rawApi, authMechanism, customAuthTypes, apiInfoKey, varMap, validatorNode, debug, testLogs, memory));
+            workflowTest = buildWorkflowGraph(reqNodes, sampleRawApi, authMechanism, customAuthTypes, apiInfoKey, varMap, validatorNode);
+            result.add(triggerMultiExecution(workflowTest, reqNodes, sampleRawApi, authMechanism, customAuthTypes, apiInfoKey, varMap, validatorNode, debug, testLogs, memory));
             yamlTestResult = new YamlTestResult(result, workflowTest);
             
+            return yamlTestResult;
+        }
+
+        if (executionType.equals("passive")) {
+            ExecutionResult attempt = new ExecutionResult(true, "", rawApi.getRequest(), rawApi.getResponse());
+            TestResult res = validate(attempt, sampleRawApi, varMap, logId, validatorNode, apiInfoKey);
+            if (res != null) {
+                /*
+                 * Since the original message and test message are same, saving only one.
+                 * Being set as message in the getter later.
+                 */
+                res.setOriginalMessage("");
+                result.add(res);
+            }
+            yamlTestResult = new YamlTestResult(result, workflowTest);
             return yamlTestResult;
         }
 
@@ -168,7 +190,7 @@ public class Executor {
                         // TODO: handle exception
                     }
                 }
-                testResponse = ApiExecutor.sendRequest(testReq.getRequest(), followRedirect, testingRunConfig, debug, testLogs, Utils.SKIP_SSRF_CHECK);
+                testResponse = ApiExecutor.sendRequest(testReq.getRequest(), followRedirect, testingRunConfig, debug, testLogs, Utils.SKIP_SSRF_CHECK, false);
                 requestSent = true;
                 ExecutionResult attempt = new ExecutionResult(singleReq.getSuccess(), singleReq.getErrMsg(), testReq.getRequest(), testResponse);
                 TestResult res = validate(attempt, sampleRawApi, varMap, logId, validatorNode, apiInfoKey);
@@ -184,12 +206,18 @@ public class Executor {
         }
         
         if(result.isEmpty()){
+            String message = rawApi.getOriginalMessage();
             if(requestSent){
                 error_messages.add(TestError.API_REQUEST_FAILED.getMessage());
             } else {
                 error_messages.add(TestError.NO_API_REQUEST.getMessage());
+                /*
+                 * In case no API requests are created,
+                 * do not store the original message
+                 */
+                message = "";
             }
-            result.add(new TestResult(null, rawApi.getOriginalMessage(), error_messages, 0, false, TestResult.Confidence.HIGH, null));
+            result.add(new TestResult(null, message, error_messages, 0, false, TestResult.Confidence.HIGH, null));
         }
 
         yamlTestResult = new YamlTestResult(result, workflowTest);
@@ -457,7 +485,7 @@ public class Executor {
         return removed;
     }
 
-    private ExecutorSingleOperationResp modifyAuthTokenInRawApi(TestRoles testRole, RawApi rawApi) {
+    public static ExecutorSingleOperationResp modifyAuthTokenInRawApi(TestRoles testRole, RawApi rawApi) {
         Map<String, List<String>> rawHeaders = rawApi.fetchReqHeaders();
         for(AuthWithCond authWithCond: testRole.getAuthWithCondList()) {
 
@@ -478,15 +506,23 @@ public class Executor {
                 if (authWithCond.getRecordedLoginFlowInput() != null) {
                     // handle json recording
                     RecordedLoginFlowInput recordedLoginFlowInput = authWithCond.getRecordedLoginFlowInput();
+                    Map<String, Object> valuesMap = new HashMap<>();
 
                     String token = com.akto.testing.workflow_node_executor.Utils.fetchToken(recordedLoginFlowInput, 5);
                     if (token == null) {
                         return new ExecutorSingleOperationResp(false, "Failed to replace roles_access_context: ");
+                    } else {
+                        loggerMaker.infoAndAddToDb("flattened here: " + token);
+                        BasicDBObject flattened = JSONUtils.flattenWithDots(BasicDBObject.parse(token));
+
+                        for (String param: flattened.keySet()) {
+                            String key = "x1.response.body." + param;
+                            valuesMap.put(key, flattened.get(param));
+                            loggerMaker.infoAndAddToDb("kv pair: " + key + " " + flattened.get(param));
+                        }	
+
                     }
 
-                    Map<String, Object> valuesMap = new HashMap<>();
-                    valuesMap.put("x1.response.body.token", token);
-        
                     for (AuthParam param : authMechanismForRole.getAuthParams()) {
                         try {
                             String value = com.akto.testing.workflow_node_executor.Utils.executeCode(param.getValue(), valuesMap);
@@ -500,6 +536,12 @@ public class Executor {
                     }
 
                     authMechanismForRole.setType(LoginFlowEnums.AuthMechanismTypes.HARDCODED.name());
+                    /*
+                     * We set the recorded login flow null
+                     * so that we calculate the tokens only once
+                     * and use them every time.
+                     */
+                    authWithCond.setRecordedLoginFlowInput(null);
                 } else {
                     if (AuthMechanismTypes.LOGIN_REQUEST.toString().equalsIgnoreCase(authMechanismForRole.getType())) {
                         try {
@@ -522,7 +564,12 @@ public class Executor {
                 if (!authParamList.isEmpty()) {
                     ExecutorSingleOperationResp ret = null;
                     for (AuthParam authParam1: authParamList) {
-                        ret = Operations.modifyHeader(rawApi, authParam1.getKey().toLowerCase(), authParam1.getValue());
+                        if(authParam1.authTokenPresent(rawApi.getRequest())){
+                            authParam1.addAuthTokens(rawApi.getRequest());
+                            ret = new ExecutorSingleOperationResp(true, "");
+                        } else {
+                            ret = new ExecutorSingleOperationResp(true, "key not present " + authParam1.getKey().toLowerCase());
+                        }
                     }
 
                     return ret;
@@ -531,6 +578,26 @@ public class Executor {
         }
 
         return null;
+    }
+
+    private static ConcurrentHashMap<String, TestRoles> roleCache = new ConcurrentHashMap<>();
+
+    public static void clearRoleCache() {
+        if (roleCache != null) {
+            roleCache.clear();
+        }
+    }
+
+    private synchronized static TestRoles fetchOrFindTestRole(String name) {
+        if (roleCache == null) {
+            roleCache = new ConcurrentHashMap<>();
+        }
+        if (roleCache.containsKey(name)) {
+            return roleCache.get(name);
+        }
+        TestRoles testRole = TestRolesDao.instance.findOne(TestRoles.NAME, name);
+        roleCache.put(name, testRole);
+        return roleCache.get(name);
     }
 
     public ExecutorSingleOperationResp runOperation(String operationType, RawApi rawApi, Object key, Object value, Map<String, Object> varMap, AuthMechanism authMechanism, List<CustomAuthType> customAuthTypes, ApiInfo.ApiInfoKey apiInfoKey) {
@@ -564,12 +631,14 @@ public class Executor {
 
                     keyStr = keyStr.replace(ACCESS_ROLES_CONTEXT, "");
                     keyStr = keyStr.substring(0,keyStr.length()-1).trim();
-                    TestRoles testRole = TestRolesDao.instance.findOne(TestRoles.NAME, keyStr);
+                    TestRoles testRole = fetchOrFindTestRole(keyStr);
                     if (testRole == null) {
                         return new ExecutorSingleOperationResp(false, "Test Role " + keyStr +  " Doesn't Exist ");
                     }
-
-                    ExecutorSingleOperationResp insertedAuthResp = modifyAuthTokenInRawApi(testRole, rawApi);
+                    ExecutorSingleOperationResp insertedAuthResp = new ExecutorSingleOperationResp(true, "");
+                    synchronized (testRole) {
+                        insertedAuthResp = modifyAuthTokenInRawApi(testRole, rawApi);
+                    }
                     if (insertedAuthResp != null) {
                         return insertedAuthResp;
                     }
@@ -656,7 +725,9 @@ public class Executor {
 
                     for (AuthParam authParam: authMechanism.getAuthParams()) {
                         authVal = authParam.getValue();
-                        ExecutorSingleOperationResp result = Operations.modifyHeader(rawApi, authParam.getKey(), authVal, true);
+                        ExecutorSingleOperationResp result = new ExecutorSingleOperationResp(true, "");
+                        boolean ret = authParam.addAuthTokens(rawApi.getRequest());
+                        result.setSuccess(ret);
                         modifiedAtLeastOne = modifiedAtLeastOne || result.getSuccess();
                     }
                 }

@@ -12,6 +12,7 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.runtime.Main;
 import com.akto.util.enums.GlobalEnums.YamlTemplateSource;
+import com.akto.util.Constants;
 import com.akto.util.DashboardMode;
 import com.akto.utils.TestTemplateUtils;
 import com.akto.utils.billing.OrganizationUtils;
@@ -268,15 +269,14 @@ private static final LoggerMaker loggerMaker = new LoggerMaker(AccountAction.cla
             }
         }
    
-        User user = initializeAccount(email, newAccountId, newAccountName,true, RBAC.Role.ADMIN);
+        User user = initializeAccount(email, newAccountId, newAccountName,true, RBAC.Role.ADMIN.name());
         getSession().put("user", user);
         getSession().put("accountId", newAccountId);
         return Action.SUCCESS.toUpperCase();
     }
 
-    public static User initializeAccount(String email, int newAccountId, String newAccountName, boolean isNew, RBAC.Role role) {
-        UsersDao.addAccount(email, newAccountId, newAccountName);
-        User user = UsersDao.instance.findOne(eq(User.LOGIN, email));
+    public static User initializeAccount(String email, int newAccountId, String newAccountName, boolean isNew, String role) {
+        User user = UsersDao.addAccount(email, newAccountId, newAccountName);
         RBACDao.instance.insertOne(new RBAC(user.getId(), role, newAccountId));
         Context.accountId.set(newAccountId);
         try {
@@ -291,12 +291,12 @@ private static final LoggerMaker loggerMaker = new LoggerMaker(AccountAction.cla
         return user;
     }
 
-    public static void addUserToExistingAccount(String email, int accountId){
+    public static User addUserToExistingAccount(String email, int accountId){
         Account account = AccountsDao.instance.findOne(eq("_id", accountId));
         UsersDao.addNewAccount(email, account);
-        User user = UsersDao.instance.findOne(eq(User.LOGIN, email));
         //RBACDao.instance.insertOne(new RBAC(user.getId(), RBAC.Role.MEMBER, accountId));
         Context.accountId.set(accountId);
+        return UsersDao.instance.findOne(eq(User.LOGIN, email));
     }
 
     private static void intializeCollectionsForTheAccount(int newAccountId) {
@@ -329,6 +329,9 @@ private static final LoggerMaker loggerMaker = new LoggerMaker(AccountAction.cla
                 AccountSettingsDao.instance.updateOnboardingFlag(true);
                 InitializerListener.insertPiiSources();
 
+                AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+                InitializerListener.insertStateInAccountSettings(accountSettings);
+                
                 try {
                     InitializerListener.executePIISourceFetch();
                 } catch (Exception e) {
@@ -342,7 +345,7 @@ private static final LoggerMaker loggerMaker = new LoggerMaker(AccountAction.cla
                         return;
                     }
                     loggerMaker.infoAndAddToDb(String.format("Updating akto test templates for new account: %d", newAccountId), LogDb.DASHBOARD);
-                    InitializerListener.processTemplateFilesZip(testingTemplates, InitializerListener._AKTO, YamlTemplateSource.AKTO_TEMPLATES.toString(), "");
+                    InitializerListener.processTemplateFilesZip(testingTemplates, Constants._AKTO, YamlTemplateSource.AKTO_TEMPLATES.toString(), "");
                 } catch (Exception e) {
                     loggerMaker.errorAndAddToDb(e,String.format("Error while adding test editor templates for new account %d, Error: %s", newAccountId, e.getMessage()), LogDb.DASHBOARD);
                 }

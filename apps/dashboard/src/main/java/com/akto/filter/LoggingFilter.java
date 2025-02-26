@@ -1,5 +1,6 @@
 package com.akto.filter;
 
+import com.akto.dao.context.Context;
 import com.akto.dto.User;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -9,16 +10,20 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
 import java.io.IOException;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class LoggingFilter implements Filter {
 
     private static final Logger logger = LoggerFactory.getLogger(LoggingFilter.class);
+    private static AtomicInteger apiCounter = new AtomicInteger();
 
     @Override
     public void init(FilterConfig filterConfig) { }
 
     @Override
     public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain) throws IOException, ServletException {
+        int startTs = Context.now();
+        apiCounter.incrementAndGet();
         chain.doFilter(request, response);
 
         try {
@@ -27,7 +32,8 @@ public class LoggingFilter implements Filter {
 
             int statusCode = httpServletResponse.getStatus();
             String uri = httpServletRequest.getRequestURI();
-            if(uri.contains("fetchActiveLoaders")){
+            if (uri.contains("fetchActiveLoaders") ||
+                    uri.contains("fetchActiveTestRunsStatus") || uri.contains("metrics") || uri.contains("favicon")) {
                 return;
             }
             String method = httpServletRequest.getMethod();
@@ -45,12 +51,14 @@ public class LoggingFilter implements Filter {
                 ip = httpServletRequest.getRemoteAddr();
             }
 
-            String result = "url="+uri + ";method="+method + ";statusCode="+statusCode + ";username="+username + ";ip="+ ip;
-
+            int endTs = Context.now();
+            String result = "url="+uri + ";method="+method + ";statusCode="+statusCode + ";username="+username + ";ip="+ ip + ";totalTime=" + (endTs - startTs) + ";apiCounterVal=" + apiCounter.get();
             logger.info(result);
 
         } catch (Exception e) {
             logger.error("Error: ", e);
+        } finally {
+            apiCounter.decrementAndGet();
         }
 
     }

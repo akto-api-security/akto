@@ -1,4 +1,4 @@
-import { ButtonGroup, HorizontalStack, TextField } from '@shopify/polaris'
+import { TextField } from '@shopify/polaris'
 import React, { useEffect, useState } from 'react'
 import Dropdown from './layouts/Dropdown';
 import DropdownSearch from './shared/DropdownSearch';
@@ -11,15 +11,16 @@ function ConditionComponent(props) {
     const { id, condition, index, param, selectOptions, dispatch } = props
 
     useEffect(()=>{
-        fetchApiEndpoints(condition)
+        if(condition?.type !== 'CONTAINS') {
+            fetchApiEndpoints(condition)
+        }
     },[condition])
     const allCollections = PersistStore(state => state.allCollections);
-    const allCollectionsOptions = allCollections.map(collection => {
-        return {
-            label: collection.displayName,
-            value: collection.id
-        }
-    })
+    const activatedCollections = allCollections.filter(collection => collection.deactivated === false)
+    const allCollectionsOptions = activatedCollections.map(collection => ({
+        label: collection.displayName,
+        value: collection.id
+    }))
     const getApiEndpointsOptions = (data) => {
         return data.map(apiEndpoint => {
             let str = func.toMethodUrlString(apiEndpoint);

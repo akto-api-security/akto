@@ -1,6 +1,5 @@
 package com.akto.test_editor;
 
-import java.util.*;
 import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
@@ -78,6 +77,10 @@ public class Utils {
                     continue;
                 }
                 Object value = basicDBObject.get(key);
+                if (key.equalsIgnoreCase(queryKey)) {
+                    basicDBObject.remove(key);
+                    return true;
+                }
                 if (!( (value instanceof BasicDBObject) || (value instanceof BasicDBList) )) {
                     if (key.equalsIgnoreCase(queryKey)) {
                         basicDBObject.remove(key);
@@ -102,56 +105,7 @@ public class Utils {
     }
 
     public static boolean modifyValueInPayload(Object obj, String parentKey, String queryKey, Object queryVal) {
-        boolean res = false;
-        if (obj instanceof BasicDBObject) {
-            BasicDBObject basicDBObject = (BasicDBObject) obj;
-
-            Set<String> keySet = basicDBObject.keySet();
-
-            for(String key: keySet) {
-                if (key == null) {
-                    continue;
-                }
-                Object value = basicDBObject.get(key);
-
-                if (!( (value instanceof BasicDBObject) || (value instanceof BasicDBList) )) {
-                    if (key.equalsIgnoreCase(queryKey)) {
-                        basicDBObject.remove(key);
-                        basicDBObject.put(queryKey, queryVal);
-                        return true;
-                    }
-                }
-
-                if (value instanceof BasicDBList) {
-                    BasicDBList valList = (BasicDBList) value;
-                    if (valList.size() == 0 && key.equalsIgnoreCase(queryKey)) {
-                        List<Object> queryList = Collections.singletonList(queryVal);
-                        basicDBObject.remove(key);
-                        basicDBObject.put(queryKey, queryList);
-                        return true;
-                    } else if (valList.size() > 0 && !( (valList.get(0) instanceof BasicDBObject) || (valList.get(0) instanceof BasicDBList) ) && key.equalsIgnoreCase(queryKey)) {
-                        List<Object> queryList = Collections.singletonList(queryVal);
-                        basicDBObject.remove(key);
-                        basicDBObject.put(queryKey, queryList);
-                        return true;
-                    }
-                }
-
-                res = modifyValueInPayload(value, key, queryKey, queryVal);
-                if (res) {
-                    break;
-                }
-            }
-        } else if (obj instanceof BasicDBList) {
-            for(Object elem: (BasicDBList) obj) {
-                res = modifyValueInPayload(elem, parentKey, queryKey, queryVal);
-                if (res) {
-                    break;
-                }
-            }
-        }
-
-        return res;
+        return com.akto.dto.test_editor.Util.modifyValueInPayload(obj, parentKey, queryKey, queryVal);
     }
 
     public static String applyRegexModifier(String data, String regex, String replaceWith) {
@@ -452,8 +406,8 @@ public class Utils {
 
     public static double calcStructureMatchPercentage(String payload, String compareWithPayload) {
 
-        boolean isOrigPAyloadJson = isJsonPayload(payload);
-        boolean isCurPAyloadJson = isJsonPayload(compareWithPayload);
+        boolean isOrigPAyloadJson = isValidJson(payload);
+        boolean isCurPAyloadJson = isValidJson(compareWithPayload);
         if (!isOrigPAyloadJson && !isCurPAyloadJson) {
             return 100;
         }
@@ -522,6 +476,18 @@ public class Utils {
             return false;
         }
         return true;
+    }
+
+    public static boolean isValidJson(String payload) {
+        try {
+            if (payload.length() == 0) {
+                return false;
+            }
+            mapper.readTree(payload);
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     public static UrlModifierPayload fetchUrlModifyPayload(String payload) {
@@ -912,6 +878,13 @@ public class Utils {
                     String regex = regexInfo.get("regex");
                     String replaceWith = regexInfo.get("replace_with");
                     newPayload = Utils.applyRegexModifier(payload, regex, replaceWith);
+                } else if (key instanceof String && key != "" && ((String) key).contains("regex_replace")) {
+                    Map<String, Map<String, String>> regexReplace = parseStringToMap((String) key);
+                    String payload = rawApi.getRequest().getBody();
+                    Map<String, String> regexInfo = regexReplace.get("regex_replace");
+                    String regex = regexInfo.get("regex");
+                    String replaceWith = regexInfo.get("replace_with");
+                    newPayload = Utils.applyRegexModifier(payload, regex, replaceWith);
                 } else {
                     newPayload = key.toString();
                 }
@@ -970,6 +943,35 @@ public class Utils {
                 return new ExecutorSingleOperationResp(false, "invalid operationType");
         }
             
+    }
+
+    public static Map<String, Map<String, String>> parseStringToMap(String mapString) {
+
+        mapString = mapString.trim();
+        if (mapString.startsWith("{") && mapString.endsWith("}")) {
+            mapString = mapString.substring(1, mapString.length() - 1);
+        }
+
+        Map<String, Map<String, String>> resultMap = new HashMap<>();
+        String[] entries = mapString.split("=", 2);
+
+        String outerKey = entries[0].trim();
+        String innerMapString = entries[1].trim();
+
+        innerMapString = innerMapString.substring(1, innerMapString.length() - 1);
+
+        Map<String, String> innerMap = new HashMap<>();
+        String[] innerEntries = innerMapString.split(", ");
+
+        for (String innerEntry : innerEntries) {
+            String[] innerKeyValue = innerEntry.split("=", 2);
+            String innerKey = innerKeyValue[0].trim();
+            String innerValue = innerKeyValue[1].trim();
+            innerMap.put(innerKey, innerValue);
+        }
+
+        resultMap.put(outerKey, innerMap);
+        return resultMap;
     }
 
 

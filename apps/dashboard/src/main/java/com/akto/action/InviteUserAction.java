@@ -1,17 +1,20 @@
 package com.akto.action;
 
+import com.akto.dao.CustomRoleDao;
 import com.akto.dao.PendingInviteCodesDao;
 import com.akto.dao.RBACDao;
 import com.akto.dao.UsersDao;
 import com.akto.dao.context.Context;
+import com.akto.dto.CustomRole;
 import com.akto.dto.PendingInviteCode;
-import com.akto.dto.RBAC;
+import com.akto.dto.RBAC.Role;
 import com.akto.dto.User;
 import com.akto.log.LoggerMaker;
 import com.akto.notifications.email.SendgridEmail;
 import com.akto.util.DashboardMode;
 import com.akto.utils.JWT;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Updates;
 import com.opensymphony.xwork2.Action;
 import com.sendgrid.helpers.mail.Mail;
 
@@ -22,6 +25,8 @@ import java.io.IOException;
 import java.security.NoSuchAlgorithmException;
 import java.security.spec.InvalidKeySpecException;
 import java.util.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class InviteUserAction extends UserAction{
 
@@ -35,6 +40,7 @@ public class InviteUserAction extends UserAction{
     public static final String AKTO_DOMAIN = "akto.io";
 
     public static Map<String, String> commonOrganisationsMap = new HashMap<>();
+    private static final ExecutorService executor = Executors.newFixedThreadPool(1);
 
     public static String validateEmail(String email, String adminLogin) {
         if (email == null) return INVALID_EMAIL_ERROR;
@@ -81,7 +87,7 @@ public class InviteUserAction extends UserAction{
     }
 
     private String finalInviteCode;
-    private RBAC.Role inviteeRole;
+    private String inviteeRole;
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(InviteUserAction.class, LoggerMaker.LogDb.DASHBOARD);
 
@@ -92,7 +98,7 @@ public class InviteUserAction extends UserAction{
 
         User admin = UsersDao.instance.getFirstUser(Context.accountId.get());
         if (admin == null) {
-            loggerMaker.infoAndAddToDb("admin is null");
+            loggerMaker.infoAndAddToDb("admin not found for organization");
             return ERROR.toUpperCase();
         }
 
@@ -104,9 +110,23 @@ public class InviteUserAction extends UserAction{
             return ERROR.toUpperCase();
         }
 
-        RBAC.Role userRole = RBACDao.getCurrentRoleForUser(user_id, Context.accountId.get());
+        Role userRole = RBACDao.getCurrentRoleForUser(user_id, Context.accountId.get());
+        Role baseRole = null;
 
-        if (!Arrays.asList(userRole.getRoleHierarchy()).contains(this.inviteeRole)) {
+        CustomRole customRole = CustomRoleDao.instance.findRoleByName(this.inviteeRole);
+
+        try {
+            if (customRole != null) {
+                baseRole = Role.valueOf(customRole.getBaseRole());
+            } else {
+                baseRole = Role.valueOf(this.inviteeRole);
+            }
+        } catch (Exception e) {
+            addActionError("Invalid role");
+            return ERROR.toUpperCase();
+        }
+
+        if (!Arrays.asList(userRole.getRoleHierarchy()).contains(baseRole)) {
             addActionError("User not allowed to invite for this role");
             return ERROR.toUpperCase();
         }
@@ -134,8 +154,21 @@ public class InviteUserAction extends UserAction{
 
         try {
             Jws<Claims> jws = JWT.parseJwt(inviteCode,"");
-            PendingInviteCodesDao.instance.insertOne(
-                    new PendingInviteCode(inviteCode, user_id, inviteeEmail,jws.getBody().getExpiration().getTime(),Context.accountId.get(), this.inviteeRole)
+            /*
+             * There should only be one invite code per user per account.
+             * So if we update with upsert:true per account-inviteeEmail
+             */
+            PendingInviteCodesDao.instance.updateOne(
+                    Filters.and(
+                        Filters.eq(PendingInviteCode.ACCOUNT_ID, Context.accountId.get()),
+                        Filters.eq(PendingInviteCode.INVITEE_EMAIL_ID, inviteeEmail)
+                    ),
+                    Updates.combine(
+                        Updates.set(PendingInviteCode.INVITEE_ROLE, this.inviteeRole),
+                        Updates.set(PendingInviteCode.INVITE_CODE, inviteCode),
+                        Updates.set(PendingInviteCode._EXPIRY, jws.getBody().getExpiration().getTime()),
+                        Updates.set(PendingInviteCode._ISSUER, user_id)
+                    )
             );
         } catch (NoSuchAlgorithmException | InvalidKeySpecException | IOException e) {
             e.printStackTrace();
@@ -147,15 +180,24 @@ public class InviteUserAction extends UserAction{
 
         String inviteFrom = getSUser().getName();
         Mail email = SendgridEmail.getInstance().buildInvitationEmail(inviteeName, inviteeEmail, inviteFrom, finalInviteCode);
+        if (!DashboardMode.isOnPremDeployment()) {
+            sendInviteEmail(email);
+        } else {
+            executor.submit(() -> {
+                sendInviteEmail(email);
+            });
+        }
+
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    private void sendInviteEmail(Mail email) {
         try {
             SendgridEmail.getInstance().send(email);
         } catch (IOException e) {
             loggerMaker.errorAndAddToDb("invite email sending failed" + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
             e.printStackTrace();
-//            return ERROR.toUpperCase();
         }
-
-        return Action.SUCCESS.toUpperCase();
     }
 
     private String invitationCodeToDelete;
@@ -184,11 +226,11 @@ public class InviteUserAction extends UserAction{
         return finalInviteCode;
     }
 
-    public RBAC.Role getInviteeRole() {
+    public String getInviteeRole() {
         return inviteeRole;
     }
 
-    public void setInviteeRole(RBAC.Role inviteeRole) {
+    public void setInviteeRole(String inviteeRole) {
         this.inviteeRole = inviteeRole;
     }
 }

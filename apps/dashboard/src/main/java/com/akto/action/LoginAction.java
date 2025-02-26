@@ -10,18 +10,27 @@ import com.akto.dto.Config;
 import com.akto.dto.SignupInfo;
 import com.akto.dto.SignupUserInfo;
 import com.akto.dto.User;
+import com.akto.dto.type.SingleTypeInfo;
+import com.akto.listener.InitializerListener;
 import com.akto.listener.RuntimeListener;
-import com.akto.log.LoggerMaker.LogDb;
+import com.akto.notifications.email.SendgridEmail;
+import com.akto.password_reset.PasswordResetUtils;
+import com.akto.util.DashboardMode;
 import com.akto.utils.Token;
 import com.akto.utils.JWT;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.FindOneAndUpdateOptions;
+import com.mongodb.client.model.PushOptions;
+import com.mongodb.client.model.ReturnDocument;
 import com.mongodb.client.model.Updates;
 import com.opensymphony.xwork2.Action;
 
+import com.sendgrid.helpers.mail.Mail;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.struts2.interceptor.ServletRequestAware;
 import org.apache.struts2.interceptor.ServletResponseAware;
+import org.bson.conversions.Bson;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,7 +45,7 @@ import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-import static com.akto.filter.UserDetailsFilter.LOGIN_URI;
+import static com.akto.util.Constants.TWO_HOURS_TIMESTAMP;
 
 // Validates user from the supplied username and password
 // Generates refresh token jwt using the username if valid user
@@ -142,6 +151,8 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
         }
     }
 
+    private final static int REFRESH_INTERVAL = 24 * 60 * 60; // one day.
+
     public static String loginUser(User user, HttpServletResponse servletResponse, boolean signedUp, HttpServletRequest servletRequest) {
         String refreshToken;
         Map<String,Object> claims = new HashMap<>();
@@ -183,17 +194,36 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
             session.setAttribute("user", user);
             session.setAttribute("login", Context.now());
             if (signedUp) {
-                UsersDao.instance.getMCollection().findOneAndUpdate(
+                User tempUser = UsersDao.instance.getMCollection().findOneAndUpdate(
                         Filters.eq("_id", user.getId()),
                         Updates.combine(
-                                Updates.set("refreshTokens", refreshTokens),
+                                Updates.pushEach("refreshTokens", Collections.singletonList(refreshToken), new PushOptions().slice(-10)),
                                 Updates.set(User.LAST_LOGIN_TS, Context.now())
-                        )
+                        ),
+                        new FindOneAndUpdateOptions().returnDocument(ReturnDocument.BEFORE)
                 );
+                /*
+                 * Creating datatype to template on user login.
+                 * TODO: Remove this job once templates for majority users are created.
+                 */
+                if ((tempUser.getLastLoginTs() + REFRESH_INTERVAL) < Context.now()) {
+                    service.submit(() -> {
+                        try {
+                            for (String accountIdStr : user.getAccounts().keySet()) {
+                                int accountId = Integer.parseInt(accountIdStr);
+                                Context.accountId.set(accountId);
+                                SingleTypeInfo.fetchCustomDataTypes(accountId);
+                                logger.info("updating data type test templates for account " + accountId);
+                                InitializerListener.executeDataTypeToTemplate();
+                            }
+                        } catch (Exception e) {
+                        }
+                    });
+                    service.submit(() ->{
+                        triggerVulnColUpdation(user);
+                    });
+                }
             }
-            service.submit(() ->{
-                triggerVulnColUpdation(user);
-            });
             return Action.SUCCESS.toUpperCase();
         } catch (NoSuchAlgorithmException | InvalidKeySpecException | IOException e) {
             e.printStackTrace();
@@ -201,6 +231,143 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
 
         return Action.ERROR.toUpperCase();
 
+    }
+
+    String code;
+
+    String forgotPasswordEmail;
+    public String sendPasswordResetLink() {
+        if(!DashboardMode.isOnPremDeployment()) {
+            code = "This feature is not available in your dashboard mode.";
+            return Action.ERROR.toUpperCase();
+        }
+
+        if(forgotPasswordEmail == null || forgotPasswordEmail.trim().isEmpty()) {
+            code = "Email cannot be empty.";
+            return Action.ERROR.toUpperCase();
+        }
+
+        String scheme = servletRequest.getScheme();
+        String serverName = servletRequest.getServerName();
+        int serverPort = servletRequest.getServerPort();
+        String websiteHostName;
+        if (serverPort == 80 || serverPort == 443) {
+            websiteHostName = scheme + "://" + serverName;
+        } else {
+            websiteHostName = scheme + "://" + serverName + ":" + serverPort;
+        }
+
+        if(websiteHostName == null || websiteHostName.trim().isEmpty()) {
+            code = "Something went wrong. Please try again later";
+            return Action.ERROR.toUpperCase();
+        }
+
+        setForgotPasswordEmail(forgotPasswordEmail.trim());
+
+        Bson filters = Filters.eq(User.LOGIN, forgotPasswordEmail);
+        User user = UsersDao.instance.findOne(filters);
+
+        if(user == null) {
+            logger.info("user not found while sending password reset link");
+            return Action.SUCCESS.toUpperCase();
+        }
+
+        int lastPasswordResetToken = user.getLastPasswordResetToken();
+        if(Context.now() - lastPasswordResetToken < TWO_HOURS_TIMESTAMP) {
+            return Action.ERROR.toUpperCase();
+        }
+
+        String resetUrl = PasswordResetUtils.insertPasswordResetToken(forgotPasswordEmail, websiteHostName);
+
+        if(resetUrl == null || resetUrl.trim().isEmpty()) {
+            logger.error("Error while generating password reset link");
+            code = "Something went wrong. Please try again later";
+            return Action.ERROR.toUpperCase();
+        }
+
+        Mail mail = SendgridEmail.getInstance().buildPasswordResetEmail(forgotPasswordEmail, resetUrl);
+
+        try {
+            SendgridEmail.getInstance().send(mail);
+        } catch (IOException e) {
+            logger.error("Error while sending password reset email: " + e.getMessage());
+            code = "Error while sending email.";
+            return Action.ERROR.toUpperCase();
+        }
+
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    String resetPasswordToken;
+    String newPassword;
+    public String resetPassword() {
+        if(!DashboardMode.isOnPremDeployment()) {
+            code = "This feature is not available in your dashboard mode.";
+            return Action.ERROR.toUpperCase();
+        }
+
+        if(resetPasswordToken == null || resetPasswordToken.trim().isEmpty()) {
+            code = "Token is expired or invalid.";
+            return Action.ERROR.toUpperCase();
+        }
+
+        if(newPassword == null || newPassword.trim().isEmpty()) {
+            code = "Password cannot be empty.";
+            return Action.ERROR.toUpperCase();
+        }
+
+        String validatePasswordStatus = SignupAction.validatePassword(newPassword);
+        if(validatePasswordStatus != null) {
+            code = validatePasswordStatus;
+            return Action.ERROR.toUpperCase();
+        }
+
+        User user = UsersDao.instance.findOne(
+                Filters.eq(User.PASSWORD_RESET_TOKEN, resetPasswordToken)
+        );
+
+        if(user == null) {
+            code = "Token is expired or invalid.";
+            return Action.ERROR.toUpperCase();
+        }
+
+        int getLastPasswordResetToken = user.getLastPasswordResetToken();
+        if(Context.now() - getLastPasswordResetToken > TWO_HOURS_TIMESTAMP) {
+            code = "Token is expired or invalid.";
+            return Action.ERROR.toUpperCase();
+        }
+
+
+        String salt = "39yu";
+        String passHash = Integer.toString((salt + newPassword).hashCode());
+        Map<String, SignupInfo> signupInfoMap = new HashMap<>();
+        SignupInfo.PasswordHashInfo signupInfo = new SignupInfo.PasswordHashInfo(passHash, salt);
+        signupInfoMap.put(signupInfo.getKey(), signupInfo);
+        UsersDao.instance.updateOne(
+                Filters.and(
+                        Filters.eq(User.PASSWORD_RESET_TOKEN, resetPasswordToken)
+                ),
+                Updates.combine(
+                        Updates.set(User.SIGNUP_INFO_MAP, signupInfoMap),
+                        Updates.set(User.PASSWORD_RESET_TOKEN, ""),
+                        Updates.set(User.LAST_PASSWORD_RESET, Context.now()),
+                        Updates.set(User.REFRESH_TOKEN, new ArrayList<String>())
+                )
+        );
+
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public void setForgotPasswordEmail(String forgotPasswordEmail) {
+        this.forgotPasswordEmail = forgotPasswordEmail;
+    }
+
+    public void setResetPasswordToken(String resetPasswordToken) {
+        this.resetPasswordToken = resetPasswordToken;
+    }
+
+    public void setNewPassword(String newPassword) {
+        this.newPassword = newPassword;
     }
 
     private String username;
@@ -212,6 +379,10 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
     }
     public void setPassword(String password) {
         this.password = password;
+    }
+
+    public String getCode() {
+        return code;
     }
 
     protected HttpServletResponse servletResponse;

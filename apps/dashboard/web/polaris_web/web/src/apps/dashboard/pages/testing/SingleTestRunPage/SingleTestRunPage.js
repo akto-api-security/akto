@@ -1,4 +1,3 @@
-import GithubSimpleTable from "../../../components/tables/GithubSimpleTable";
 import {
   Text,
   Button,
@@ -15,7 +14,7 @@ import {
   Card,
   ProgressBar,
   Tooltip,
-  Banner
+  Banner,
 } from '@shopify/polaris';
 
 import {
@@ -24,12 +23,14 @@ import {
   PriceLookupMinor,
   ReportMinor,
   RefreshMajor,
-  CustomersMinor
+  CustomersMinor,
+  PlusMinor,
+  SettingsMinor
 } from '@shopify/polaris-icons';
 import api from "../api";
 import func from '@/util/func';
 import { useParams } from 'react-router';
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useReducer } from 'react';
 import transform from "../transform";
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards";
 import WorkflowTestBuilder from "../workflow_test/WorkflowTestBuilder";
@@ -42,14 +43,15 @@ import ReRunModal from "./ReRunModal";
 import TestingStore from "../testingStore";
 import { useSearchParams } from "react-router-dom";
 import TestRunResultPage from "../TestRunResultPage/TestRunResultPage";
-import { usePolling } from "../../../../main/PollingProvider";
 import LocalStore from "../../../../main/LocalStorageStore";
-
-const sortOptions = [
-  { label: 'Severity', value: 'severity asc', directionLabel: 'Highest severity', sortKey: 'total_severity', columnIndex: 2},
-  { label: 'Severity', value: 'severity desc', directionLabel: 'Lowest severity', sortKey: 'total_severity', columnIndex: 2 },
-  { label: 'Run time', value: 'time asc', directionLabel: 'Newest run', sortKey: 'endTimestamp', columnIndex: 6 },
-  { label: 'Run time', value: 'time desc', directionLabel: 'Oldest run', sortKey: 'endTimestamp', columnIndex: 6 },
+import { produce } from "immer"
+import GithubServerTable from "../../../components/tables/GithubServerTable";
+import RunTest from '../../observe/api_collections/RunTest';
+let sortOptions = [
+  { label: 'Severity', value: 'severity asc', directionLabel: 'Highest severity', sortKey: 'total_severity', columnIndex: 3 },
+  { label: 'Severity', value: 'severity desc', directionLabel: 'Lowest severity', sortKey: 'total_severity', columnIndex: 3 },
+  { label: 'Run time', value: 'time asc', directionLabel: 'Newest run', sortKey: 'endTimestamp', columnIndex: 7 },
+  { label: 'Run time', value: 'time desc', directionLabel: 'Oldest run', sortKey: 'endTimestamp', columnIndex: 7 },
 ];
 
 const resourceName = {
@@ -57,27 +59,29 @@ const resourceName = {
   plural: 'test run results',
 };
 
-function disambiguateLabel(key, value) {
-  switch (key) {
-    case 'severityStatus':
-      return (value).map((val) => `${val} severity`).join(', ');
-    case 'urlFilters':
-      return value.length + ' API' + (value.length === 1 ? '' : 's')
-    case 'cwe':
-    case 'categoryFilter':
-    case 'testFilter':
-      return func.convertToDisambiguateLabelObj(value, null, 2)
-    default:
-      return value;
-  }
-}
-
 let filters = [
   {
     key: 'severityStatus',
     label: 'Severity',
     title: 'Severity',
-    choices: [],
+    choices: [
+      { label: 'Critical', value: 'CRITICAL' },
+      { label: 'High', value: 'HIGH' },
+      { label: 'Medium', value: 'MEDIUM' },
+      { label: 'Low', value: 'LOW' }
+    ],
+  },
+  {
+    key: 'method',
+    label: 'Method',
+    title: 'Method',
+    choices: [
+      { label: 'Get', value: 'GET' },
+      { label: 'Post', value: 'POST' },
+      { label: 'Put', value: 'PUT' },
+      { label: 'Patch', value: 'PATCH' },
+      { label: 'Delete', value: 'DELETE' }
+    ],
   },
   {
     key: 'categoryFilter',
@@ -86,209 +90,303 @@ let filters = [
     choices: [],
   },
   {
-    key: 'testFilter',
-    label: 'Test',
-    title: 'Test',
+    key: 'apiCollectionId',
+    label: 'Collection',
+    title: 'Collection',
     choices: [],
   },
   {
-    key: 'cwe',
-    label: 'CWE',
-    title: 'CWE',
+    key: 'collectionIds',
+    label: 'API groups',
+    title: 'API groups',
     choices: [],
-  },
-  {
-    key: 'urlFilters',
-    choices: [],
-    label: 'API',
-    title: 'API'
   }
 ]
 
 function SingleTestRunPage() {
 
-  const [testRunResults, setTestRunResults] = useState({ vulnerable: [], no_vulnerability_found: [], skipped: [], need_configurations: [] })
-  const [testRunResultsText, setTestRunResultsText] = useState({ vulnerable: [], no_vulnerability_found: [], skipped: [], need_configurations: [] })
-  const [ selectedTestRun, setSelectedTestRun ] = useState({});
+  const [testRunResultsText, setTestRunResultsText] = useState({ vulnerable: [], no_vulnerability_found: [], skipped: [], need_configurations: [], ignored_issues: [] })
+  const [selectedTestRun, setSelectedTestRun] = useState({});
   const subCategoryFromSourceConfigMap = PersistStore(state => state.subCategoryFromSourceConfigMap);
   const subCategoryMap = LocalStore(state => state.subCategoryMap);
-  const params= useParams()
+  const params = useParams()
   const [loading, setLoading] = useState(false);
-  const [tempLoading , setTempLoading] = useState({vulnerable: false, no_vulnerability_found: false, skipped: false, running: false,need_configurations:false})
+  const [tempLoading, setTempLoading] = useState({ vulnerable: false, no_vulnerability_found: false, skipped: false, running: false, need_configurations: false, ignored_issues: false })
   const [selectedTab, setSelectedTab] = useState("vulnerable")
   const [selected, setSelected] = useState(0)
-  const [workflowTest, setWorkflowTest ] = useState(false);
+  const [workflowTest, setWorkflowTest] = useState(false);
   const [secondaryPopover, setSecondaryPopover] = useState(false)
-  const  setErrorsObject = TestingStore((state) => state.setErrorsObject)
+  const setErrorsObject = TestingStore((state) => state.setErrorsObject)
   const currentTestingRuns = []
-  const [refresh, setRefresh] = useState(false)
+  const [updateTable, setUpdateTable] = useState("")
+  const [testRunResultsCount, setTestRunResultsCount] = useState({})
+  const [testRunCountMap, setTestRunCountMap] = useState({
+      "ALL": 0,
+      "SKIPPED_EXEC_NEED_CONFIG": 0,
+      "VULNERABLE": 0,
+      "SKIPPED_EXEC_API_REQUEST_FAILED": 0,
+      "SKIPPED_EXEC": 0
+    })  
+  const [testMode, setTestMode] = useState(false)
 
-  const initialTestingObj = {testsInitiated: 0,testsInsertedInDb: 0,testingRunId: -1}
+  const initialTestingObj = { testsInitiated: 0, testsInsertedInDb: 0, testingRunId: -1 }
   const [currentTestObj, setCurrentTestObj] = useState(initialTestingObj)
   const [missingConfigs, setMissingConfigs] = useState([])
+  const [showEditableSettings, setShowEditableSettings] = useState(false);
+  const [testingRunConfigSettings, setTestingRunConfigSettings] = useState([])
+  const [testingRunConfigId, setTestingRunConfigId] = useState(-1)
+  const apiCollectionMap = PersistStore(state => state.collectionsMap);
+
+  const filtersMap = PersistStore.getState().filtersMap;
+
+  const [testingRunResultSummariesObj, setTestingRunResultSummariesObj] = useState({})
+  const [allResultsLength, setAllResultsLength] = useState(undefined)
+  const [currentSummary, setCurrentSummary] = useState('')
+  const localCategoryMap = LocalStore.getState().categoryMap
+  const localSubCategoryMap = LocalStore.getState().subCategoryMap
+  const [useLocalSubCategoryData, setUseLocalSubCategoryData] = useState(false)
+
+  const tableTabMap = {
+    vulnerable: "VULNERABLE",
+    domain_unreachable: "SKIPPED_EXEC_API_REQUEST_FAILED",
+    skipped: "SKIPPED_EXEC",
+    need_configurations: "SKIPPED_EXEC_NEED_CONFIG",
+    no_vulnerability_found: "SECURED",
+    ignored_issues: "IGNORED_ISSUES"
+  }
+
+  const [copyFilters, setCopyFilters] = useState({})
 
   const refreshId = useRef(null);
   const hexId = params.hexId;
+  const [conditions, dispatchConditions] = useReducer(produce((draft, action) => func.conditionsReducer(draft, action)), []);
+
 
   const [searchParams, setSearchParams] = useSearchParams();
   const resultId = searchParams.get("result")
   const collectionsMap = PersistStore(state => state.collectionsMap)
   // const { currentTestsObj } = usePolling()
 
-  function fillData(data, key){
-    setTestRunResults((prev) => {
-      prev[key] = data;
-      return {...prev};
-    })
-    setTempLoading((prev) => {
-      prev[key] = false;
-      return {...prev};
-    });
+  function disambiguateLabel(key, value) {
+    switch (key) {
+      case 'method':
+      case 'severityStatus':
+        return func.convertToDisambiguateLabel(value, func.toSentenceCase, 2)
+      case "collectionIds":
+      case "apiCollectionId":
+        return func.convertToDisambiguateLabelObj(value, apiCollectionMap, 2)
+      case 'categoryFilter':
+      case 'testFilter':
+        return func.convertToDisambiguateLabelObj(value, null, 2)
+      default:
+        return value;
+    }
   }
 
-  function fillTempData(data, key){
+  const tableTabsOrder = [
+    "vulnerable",
+    "need_configurations",
+    "skipped",
+    "no_vulnerability_found",
+    "domain_unreachable",
+    "ignored_issues"
+  ]
+
+  function fillTempData(data, key) {
     setTestRunResultsText((prev) => {
       prev[key] = data;
-      return {...prev};
+      return { ...prev };
     })
   }
 
-  async function setSummary(summary){
+  async function setSummary(summary, initialCall = false) {
     setTempLoading((prev) => {
       prev.running = false;
       return prev;
     });
     clearInterval(refreshId.current);
     setSelectedTestRun((prev) => {
-      let tmp = {...summary};
-      tmp.countIssues = transform.prepareCountIssues(tmp.countIssues);
-      prev = {...prev, ...transform.prepareDataFromSummary(tmp, prev.testRunState)}
-
-      return {...prev};
-    });
-
-    await fetchTestingRunResultsData(summary.hexId);
-  }
-  async function fetchTestingRunResultsData(summaryHexId){
-    setLoading(false);
-    setTempLoading((prev) => {
-      prev.vulnerable = true;
-      prev.no_vulnerability_found = true;
-      prev.skipped = true;
-      prev.need_configurations = true
-      return {...prev};
-    });
-    let testRunResults = [];
-    await api.fetchTestingRunResults(summaryHexId, "VULNERABLE").then(({ testingRunResults }) => {
-      testRunResults = transform.prepareTestRunResults(hexId, testingRunResults, subCategoryMap, subCategoryFromSourceConfigMap)
-    })
-    fillTempData(testRunResults, 'vulnerable')
-    fillData(transform.getPrettifiedTestRunResults(testRunResults), 'vulnerable')
-
-    await api.fetchTestingRunResults(summaryHexId, "SKIPPED_EXEC_API_REQUEST_FAILED").then(({ testingRunResults, errorEnums }) => {
-      testRunResults = transform.prepareTestRunResults(hexId, testingRunResults, subCategoryMap, subCategoryFromSourceConfigMap)
-      errorEnums['UNKNOWN_ERROR_OCCURRED'] = "OOPS! Unknown error occurred."
-      setErrorsObject(errorEnums)
-    })
-    fillTempData(testRunResults, 'domain_unreachable')
-    fillData(transform.getPrettifiedTestRunResults(testRunResults), 'domain_unreachable')
-    await api.fetchTestingRunResults(summaryHexId, "SKIPPED_EXEC").then(({ testingRunResults, errorEnums }) => {
-      testRunResults = transform.prepareTestRunResults(hexId, testingRunResults, subCategoryMap, subCategoryFromSourceConfigMap)
-      errorEnums['UNKNOWN_ERROR_OCCURRED'] = "OOPS! Unknown error occurred."
-      setErrorsObject(errorEnums)
-    })
-    fillTempData(testRunResults, 'skipped')
-    fillData(transform.getPrettifiedTestRunResults(testRunResults), 'skipped')
-
-    await api.fetchTestingRunResults(summaryHexId, "SKIPPED_EXEC_NEED_CONFIG").then(({ testingRunResults }) => {
-      testRunResults = transform.prepareTestRunResults(hexId, testingRunResults, subCategoryMap, subCategoryFromSourceConfigMap)
-    })
-    fillTempData(testRunResults, 'need_configurations')
-    fillData(transform.getPrettifiedTestRunResults(testRunResults), 'need_configurations')
-    if(testRunResults.length > 0){
-      setMissingConfigs(transform.getMissingConfigs(testRunResults))
-    }
-
-    await api.fetchTestingRunResults(summaryHexId, "SECURED").then(({ testingRunResults }) => {
-      testRunResults = transform.prepareTestRunResults(hexId, testingRunResults, subCategoryMap, subCategoryFromSourceConfigMap)
-    })
-    fillTempData(testRunResults, 'no_vulnerability_found')
-    fillData(transform.getPrettifiedTestRunResults(testRunResults), 'no_vulnerability_found')
-  }
-  async function fetchData(setData) {
-    let localSelectedTestRun = {}
-    await api.fetchTestingRunResultSummaries(hexId).then(async ({ testingRun, testingRunResultSummaries, workflowTest, testingRunType }) => {
-      if(testingRun==undefined){
-        return {};
-      }
-
-      if(testingRun.testIdConfig == 1){
-        setWorkflowTest(workflowTest);
-      }
-      let cicd = testingRunType === "CI_CD";
-      localSelectedTestRun = transform.prepareTestRun(testingRun, testingRunResultSummaries[0], cicd, false);
-
-      if(setData){
-        setSelectedTestRun(localSelectedTestRun);
-      }
-      if((localSelectedTestRun.testingRunResultSummaryHexId) && ((testRunResults[selectedTab].length === 0) || setData)) {
-        await fetchTestingRunResultsData(localSelectedTestRun.testingRunResultSummaryHexId);
+      let tmp = { ...summary };
+      if (tmp === null || tmp?.countIssues === null || tmp?.countIssues === undefined) {
+        tmp.countIssues = {
+          "CRITICAL": 0,
+          "HIGH": 0,
+          "MEDIUM": 0,
+          "LOW": 0
         }
-      }) 
-      setLoading(false);
-    return localSelectedTestRun;
-}
-
-
-  useEffect(()=>{
-    async function loadData(){
-      if(Object.keys(subCategoryMap).length === 0 || testRunResults[selectedTab].length === 0){
-        setLoading(true);
-        await fetchData(true);
       }
+      tmp.countIssues = transform.prepareCountIssues(tmp.countIssues);
+      prev = { ...prev, ...transform.prepareDataFromSummary(tmp, prev.testRunState) }
+
+      return { ...prev };
+    });
+    setCurrentSummary(summary);
+    if (!initialCall) {
+      setUpdateTable(Date.now().toString())
     }
-    loadData();
-  }, [subCategoryMap])
+  }
 
   useEffect(() => {
-    if (resultId === null || resultId.length === 0) {
-      let found = false;
-        for (var ind in currentTestingRuns) {
-            let obj = currentTestingRuns[ind];
-            if (obj.testingRunId === hexId) {
-              found = true;
-                setCurrentTestObj(prevObj => {
-                    if (JSON.stringify(prevObj) !== JSON.stringify(obj)) {
-                        setRefresh(refresh => !refresh);
-                        return obj;
-                    }
-                    return prevObj; // No state change if object is the same
-                });
-                break;
-            }
-        }
+    setUpdateTable(Date.now().toString())
+    if (
+      (localCategoryMap && Object.keys(localCategoryMap).length > 0) &&
+      (localSubCategoryMap && Object.keys(localSubCategoryMap).length > 0)
+    ) {
+      setUseLocalSubCategoryData(true)
+    }
+  }, [testingRunResultSummariesObj])
 
-        if (!found) {
-            setCurrentTestObj(prevObj => {
-                if (JSON.stringify(prevObj) !== JSON.stringify(initialTestingObj)) {
-                    return initialTestingObj;
-                }
-                return prevObj; // No state change if object is the same
-            });
-        }
+  const fetchTestingRunResultSummaries = async () => {
+    let tempTestingRunResultSummaries = [];
+    await api.fetchTestingRunResultSummaries(hexId).then(({ testingRun, testingRunResultSummaries, workflowTest, testingRunType }) => {
+      tempTestingRunResultSummaries = testingRunResultSummaries
+      setTestingRunResultSummariesObj({
+        testingRun, workflowTest, testingRunType
+      })
+    })
+    const timeNow = func.timeNow()
+    const defaultIgnoreTime = LocalStore.getState().defaultIgnoreSummaryTime
+    tempTestingRunResultSummaries.sort((a, b) => {
+      const isAWithinTimeAndRunning = (timeNow - defaultIgnoreTime <= a.startTimestamp) && a.state === 'RUNNING';
+      const isBWithinTimeAndRunning = (timeNow - defaultIgnoreTime <= b.startTimestamp) && b.state === 'RUNNING';
+
+      if (isAWithinTimeAndRunning && isBWithinTimeAndRunning) {
+        return b.startTimestamp - a.startTimestamp;
+      }
+      if (isAWithinTimeAndRunning) return -1;
+      if (isBWithinTimeAndRunning) return 1;
+      return b.startTimestamp - a.startTimestamp;
+    })
+    if (tempTestingRunResultSummaries && tempTestingRunResultSummaries.length > 0) {
+      setSummary(tempTestingRunResultSummaries[0], true)
+    }
+  }
+
+  const fetchTableData = async (sortKey, sortOrder, skip, limit, filters, filterOperators, queryValue) => {
+    let testRunResultsRes = []
+    let totalIgnoredIssuesCount = 0
+    let ignoredIssueListCount = 0
+    let localCountMap = testRunCountMap;
+    const { testingRun, workflowTest, testingRunType } = testingRunResultSummariesObj
+    if (testingRun === undefined) {
+      return { value: [], total: 0 }
     }
 
-}, []);
+    if (testingRun.testIdConfig === 1) {
+      setWorkflowTest(workflowTest);
+    }
+    let cicd = testingRunType === "CI_CD";
+    const localSelectedTestRun = transform.prepareTestRun(testingRun, currentSummary, cicd, false);
+    setTestingRunConfigSettings(testingRun.testingRunConfig?.configsAdvancedSettings || [])
+    setTestingRunConfigId(testingRun.testingRunConfig?.id || -1)
 
-const promotedBulkActions = (selectedDataHexIds) => { 
-  return [
-  {
-    content: `Export ${selectedDataHexIds.length} record${selectedDataHexIds.length==1 ? '' : 's'}`,
-    onAction: () => {
-      func.downloadAsCSV((testRunResultsText[selectedTab]).filter((data) => {return selectedDataHexIds.includes(data.id)}), selectedTestRun)
-    },
-  },
-]};
+    setSelectedTestRun(localSelectedTestRun);
+    if (localSelectedTestRun.testingRunResultSummaryHexId) {
+      if (selectedTab === 'ignored_issues') {
+        let ignoredTestRunResults = []
+        await api.fetchIssuesByStatusAndSummaryId(localSelectedTestRun.testingRunResultSummaryHexId, ["IGNORED"], sortKey, sortOrder, skip, limit, filters).then((resp) => {
+          const ignoredIssuesTestingResult = resp?.testingRunResultList || [];
+          ignoredTestRunResults = transform.prepareTestRunResults(hexId, ignoredIssuesTestingResult, subCategoryMap, subCategoryFromSourceConfigMap)
+        })
+        testRunResultsRes = ignoredTestRunResults
+        totalIgnoredIssuesCount = ignoredTestRunResults.length
+      } else {
+        await api.fetchTestingRunResults(localSelectedTestRun.testingRunResultSummaryHexId, tableTabMap[selectedTab], sortKey, sortOrder, skip, limit, filters, queryValue).then(({ testingRunResults, errorEnums, issueslistCount }) => {
+          ignoredIssueListCount = issueslistCount
+          testRunResultsRes = transform.prepareTestRunResults(hexId, testingRunResults, subCategoryMap, subCategoryFromSourceConfigMap)
+          if (selectedTab === 'domain_unreachable' || selectedTab === 'skipped' || selectedTab === 'need_configurations') {
+            errorEnums['UNKNOWN_ERROR_OCCURRED'] = "OOPS! Unknown error occurred."
+            setErrorsObject(errorEnums)
+            setMissingConfigs(transform.getMissingConfigs(testRunResultsRes))
+          }
+        })
+        if (!func.deepComparison(copyFilters, filters)) {
+          setCopyFilters(filters)
+          await api.fetchTestRunResultsCount(localSelectedTestRun.testingRunResultSummaryHexId).then((testCountMap) => {
+            if(testCountMap !== null){
+              localCountMap = JSON.parse(JSON.stringify(testCountMap))  
+            }
+            //Assuming vulnerable count is after removing ignored issues aLL - (OOTHER COUNT + IGNORED)
+            localCountMap['IGNORED_ISSUES'] = ignoredIssueListCount
+            let countOthers = 0;
+            Object.keys(localCountMap).forEach((x) => {
+              if (x !== 'ALL') {
+                countOthers += localCountMap[x]
+              }
+            })
+            localCountMap['SECURED'] = localCountMap['ALL'] >= countOthers ? localCountMap['ALL'] - countOthers : 0
+            const orderedValues = tableTabsOrder.map(key => localCountMap[tableTabMap[key]] || 0)
+            setTestRunResultsCount(orderedValues)
+            setTestRunCountMap(JSON.parse(JSON.stringify(localCountMap)));
+          })
+        }
+      }
+    }
+    const key = tableTabMap[selectedTab]
+    const total = (testRunCountMap[key] !== undefined && testRunCountMap[key] !== 0) ? testRunCountMap[key] : localCountMap[key]
+    fillTempData(testRunResultsRes, selectedTab)
+    return { value: transform.getPrettifiedTestRunResults(testRunResultsRes), total: selectedTab === 'ignored_issues' ? totalIgnoredIssuesCount : total }
+  }
+
+  useEffect(() => { handleAddSettings() }, [testingRunConfigSettings])
+
+  useEffect(() => {
+    fetchTestingRunResultSummaries()
+    filters = func.getCollectionFilters(filters)
+    let result = []
+    let store = {}
+    Object.values(subCategoryMap).forEach((x) => {
+      let superCategory = x.superCategory
+      if (!store[superCategory.name]) {
+        result.push({ "label": superCategory.displayName, "value": superCategory.name })
+        store[superCategory.name] = []
+      }
+      store[superCategory.name].push(x._name);
+    })
+    filters.forEach(filter => {
+      if (filter.key === 'categoryFilter') {
+        filter.choices = [].concat(result)
+      }
+    })
+    if (resultId === null || resultId.length === 0) {
+      let found = false;
+      for (var ind in currentTestingRuns) {
+        let obj = currentTestingRuns[ind];
+        if (obj.testingRunId === hexId) {
+          found = true;
+          setCurrentTestObj(prevObj => {
+            if (JSON.stringify(prevObj) !== JSON.stringify(obj)) {
+              setUpdateTable(Date.now().toString());
+              return obj;
+            }
+            return prevObj; // No state change if object is the same
+          });
+          break;
+        }
+      }
+
+      if (!found) {
+        setCurrentTestObj(prevObj => {
+          if (JSON.stringify(prevObj) !== JSON.stringify(initialTestingObj)) {
+            return initialTestingObj;
+          }
+          return prevObj; // No state change if object is the same
+        });
+      }
+    }
+
+  }, []);
+
+  const promotedBulkActions = (selectedDataHexIds) => {
+    return [
+      {
+        content: `Export ${selectedDataHexIds.length} record${selectedDataHexIds.length == 1 ? '' : 's'}`,
+        onAction: () => {
+          func.downloadAsCSV((testRunResultsText[selectedTab]).filter((data) => { return selectedDataHexIds.includes(data.id) }), selectedTestRun)
+        },
+      },
+    ]
+  };
 
   function getHeadingStatus(selectedTestRun) {
 
@@ -306,12 +404,12 @@ const promotedBulkActions = (selectedDataHexIds) => {
       case "FAIL":
         return "Test execution has failed during run";
       default:
-        return "";
+        return "No summary for test exists";
     }
   }
 
-  const modifyData = (data, filters) =>{
-    if(filters?.urlFilters?.length > 0){
+  const modifyData = (data, filters) => {
+    if (filters?.urlFilters?.length > 0) {
       let filteredData = data.map(element => {
         let filteredUrls = element.urls.filter(obj => filters.urlFilters.includes(obj.url))
         return {
@@ -322,69 +420,134 @@ const promotedBulkActions = (selectedDataHexIds) => {
         }
       });
       return filteredData
-    }else{
+    } else {
       return data
     }
   }
 
-  const baseUrl = window.location.origin+"/dashboard/testing/roles/details?system=";
+  const baseUrl = window.location.origin + "/dashboard/testing/roles/details?system=";
 
   const bannerComp = (
-    missingConfigs.length > 0 ? 
-    <div className="banner-wrapper">
-      <Banner status="critical">
-        <HorizontalStack gap={3}>
-          <Box>
-            <Text fontWeight="semibold">
-              {`${missingConfigs.length} configuration${missingConfigs.length > 1 ? 's' : ''} missing: `}  
-            </Text>
-          </Box>
-          <HorizontalStack gap={2}>
-            {missingConfigs.map((config) => {
-              return(<Link url={baseUrl + config.toUpperCase()} key={config} target="_blank">
-                {config}
-              </Link>) 
-            })}
+    missingConfigs.length > 0 ?
+      <div className="banner-wrapper">
+        <Banner status="critical">
+          <HorizontalStack gap={3}>
+            <Box>
+              <Text fontWeight="semibold">
+                {`${missingConfigs.length} configuration${missingConfigs.length > 1 ? 's' : ''} missing: `}
+              </Text>
+            </Box>
+            <HorizontalStack gap={2}>
+              {missingConfigs.map((config) => {
+                return (<Link url={baseUrl + config.toUpperCase()} key={config} target="_blank">
+                  {config}
+                </Link>)
+              })}
+            </HorizontalStack>
           </HorizontalStack>
-        </HorizontalStack>
-      </Banner>
-    </div> : null
+        </Banner>
+      </div> : null
   )
 
-  const definedTableTabs = ['Vulnerable', 'Need configurations','Skipped', 'No vulnerability found','Domain unreachable']
+  const definedTableTabs = ['Vulnerable', 'Need configurations', 'Skipped', 'No vulnerability found', 'Domain unreachable', 'Ignored Issues']
 
   const { tabsInfo } = useTable()
-  const tableCountObj = func.getTabsCount(definedTableTabs, testRunResults)
+  const tableCountObj = func.getTabsCount(definedTableTabs, {}, Object.values(testRunResultsCount))
   const tableTabs = func.getTableTabsContent(definedTableTabs, tableCountObj, setSelectedTab, selectedTab, tabsInfo)
   const tableHeaders = transform.getHeaders(selectedTab)
 
   const handleSelectedTab = (selectedIndex) => {
-      setLoading(true)
-      setSelected(selectedIndex)
-      setTimeout(()=>{
-          setLoading(false)
-      },200)
+    setLoading(true)
+    setSelected(selectedIndex)
+    setUpdateTable("")
+
+    sortOptions = sortOptions.map(option => {
+      if (selectedIndex === 0 || selectedIndex == 5) {
+        if (option.label === 'Severity') {
+          return { ...option, columnIndex: 3 }
+        } else if (option.label === 'Run time') {
+          return { ...option, columnIndex: 7 }
+        }
+      } else if (selectedIndex === 1) {
+        if (option.label === 'Run time') {
+          return { ...option, columnIndex: 6 }
+        }
+      } else if (selectedIndex === 2) {
+        if (option.label === 'Run time') {
+          return { ...option, columnIndex: 6 }
+        }
+      } else if (selectedIndex === 3) {
+        if (option.label === 'Run time') {
+          return { ...option, columnIndex: 6 }
+        }
+      } else if (selectedIndex === 4) {
+        if (option.label === 'Run time') {
+          return { ...option, columnIndex: 7 }
+        }
+      }
+      return option
+    })
+
+    filters = filters.filter(filter => filter.key !== 'severityStatus')
+
+    if (selectedIndex === 0 || selectedIndex === 5) {
+      filters = [
+        {
+          key: 'severityStatus',
+          label: 'Severity',
+          title: 'Severity',
+          choices: [
+            { label: 'High', value: 'HIGH' },
+            { label: 'Medium', value: 'MEDIUM' },
+            { label: 'Low', value: 'LOW' }
+          ],
+        },
+        ...filters
+      ]
+    }
+
+    setTimeout(() => {
+      setLoading(false)
+    }, 200)
   }
 
+  function getCollectionId() {
+    const testingEndpoints = testingRunResultSummariesObj?.testingRun?.testingEndpoints;
+
+    if (!testingEndpoints) return undefined;
+
+    if (testingEndpoints.type === "COLLECTION_WISE") {
+      return testingEndpoints.apiCollectionId;
+    }
+
+    return (testingEndpoints.apisList?.length > 0) ? testingEndpoints.apisList[0].apiCollectionId : undefined;
+  }
+  
+  const [activeFromTesting, setActiveFromTesting] = useState(false)
+
   const resultTable = (
-    <GithubSimpleTable
+    <>
+      <RunTest activeFromTesting={activeFromTesting} setActiveFromTesting={setActiveFromTesting} preActivator={true} testIdConfig={testingRunResultSummariesObj?.testingRun} apiCollectionId={getCollectionId()} setTestMode={setTestMode} setShowEditableSettings={setShowEditableSettings} showEditableSettings={showEditableSettings} parentAdvanceSettingsConfig={conditions} useLocalSubCategoryData={useLocalSubCategoryData} testRunType={testingRunResultSummariesObj?.testingRunType}/>
+      <GithubServerTable
         key={"table"}
-        data={testRunResults[selectedTab]}
+        pageLimit={selectedTab === 'vulnerable' ? 150 : 50}
+        fetchData={fetchTableData}
         sortOptions={sortOptions}
         resourceName={resourceName}
+        hideQueryField={true}
         filters={filters}
         disambiguateLabel={disambiguateLabel}
         headers={tableHeaders}
         selectable={false}
         promotedBulkActions={promotedBulkActions}
-        loading={loading || ( tempLoading[selectedTab]) || tempLoading.running}
+        loading={loading}
         getStatus={func.getTestResultStatus}
         mode={IndexFiltersMode.Default}
         headings={tableHeaders}
         useNewRow={true}
         condensedHeight={true}
         useModifiedData={true}
-        modifyData={(data,filters) => modifyData(data,filters)}
+        modifyData={(data, filters) => modifyData(data, filters)}
         notHighlightOnselected={true}
         selected={selected}
         tableTabs={tableTabs}
@@ -393,9 +556,10 @@ const promotedBulkActions = (selectedDataHexIds) => {
         bannerComp={{
           "comp": bannerComp,
           "selected": 1
-          }
-        }
+        }}
+        callFromOutside={updateTable}
       />
+    </>
   )
 
   const workflowTestBuilder = (
@@ -411,63 +575,96 @@ const promotedBulkActions = (selectedDataHexIds) => {
 
   const metadataComponent = () => {
 
-    if(!selectedTestRun.metadata){
+    if (!selectedTestRun.metadata) {
       return undefined
     }
 
     return (
       <LegacyCard title="Metadata" sectioned key="metadata">
-      {
-        selectedTestRun.metadata ? Object.keys(selectedTestRun.metadata).map((key) => {
-          return (
-            <HorizontalStack key={key} spacing="tight">
-              <Text>{key} : {selectedTestRun.metadata[key]}</Text>
-            </HorizontalStack>
-          )
-        }) : ""
-      }
-    </LegacyCard>
+        {
+          selectedTestRun.metadata ? Object.keys(selectedTestRun.metadata).map((key) => {
+            return (
+              <HorizontalStack key={key} spacing="tight">
+                <Text>{key} : {selectedTestRun.metadata[key]}</Text>
+              </HorizontalStack>
+            )
+          }) : ""
+        }
+      </LegacyCard>
     )
   }
 
   const progress = useMemo(() => {
     return currentTestObj.testsInitiated === 0 ? 0 : Math.floor((currentTestObj.testsInsertedInDb * 100) / currentTestObj.testsInitiated);
-}, [currentTestObj.testingRunId]);
+  }, [currentTestObj.testingRunId]);
 
-const runningTestsComp = useMemo(() => (
+  const runningTestsComp = useMemo(() => (
     currentTestObj.testingRunId !== -1 ? (
-        <Card key={"test-progress"}>
-            <VerticalStack gap={"3"}>
-                <Text variant="headingSm">{`Running ${currentTestObj.testsInitiated} tests`}</Text>
-                <div style={{ display: "flex", gap: '4px', alignItems: 'center' }}>
-                    <ProgressBar progress={progress} color="primary" size="small" />
-                    <Text color="subdued">{`${progress}%`}</Text>
-                </div>
-            </VerticalStack>
-        </Card>
+      <Card key={"test-progress"}>
+        <VerticalStack gap={"3"}>
+          <Text variant="headingSm">{`Running ${currentTestObj.testsInitiated} tests`}</Text>
+          <div style={{ display: "flex", gap: '4px', alignItems: 'center' }}>
+            <ProgressBar progress={progress} color="primary" size="small" />
+            <Text color="subdued">{`${progress}%`}</Text>
+          </div>
+        </VerticalStack>
+      </Card>
     ) : null
-), [currentTestObj, progress]);
-  const components = [ 
-    runningTestsComp,<TrendChart key={tempLoading.running} hexId={hexId} setSummary={setSummary} show={selectedTestRun.run_type && selectedTestRun.run_type!=='One-time'}/> , 
-    metadataComponent(), loading ? <SpinnerCentered key="loading"/> : (!workflowTest ? resultTable : workflowTestBuilder)];
+  ), [currentTestObj, progress]);
 
-  const openVulnerabilityReport = () => {
-    let summaryId = selectedTestRun.testingRunResultSummaryHexId
-    window.open('/dashboard/testing/summary/' + summaryId, '_blank');
+
+  const components = [
+    runningTestsComp, <TrendChart key={tempLoading.running} hexId={hexId} setSummary={setSummary} show={selectedTestRun.run_type && selectedTestRun.run_type !== 'One-time'} />,
+    metadataComponent(), loading ? <SpinnerCentered key="loading" /> : (!workflowTest ? resultTable : workflowTestBuilder)];
+
+  const openVulnerabilityReport = async () => {
+    const currentPageKey = "/dashboard/testing/" + selectedTestRun?.id + "/#" + selectedTab
+    let selectedFilters = filtersMap[currentPageKey]?.filters || [];
+    let filtersObj = {
+      testingRunResultSummaryId: [currentSummary.hexId]
+    }
+
+    selectedFilters.forEach((filter) => {
+      filtersObj[filter.key] = filter.value
+    })
+
+    await api.generatePDFReport(filtersObj, []).then((res) => {
+      const responseId = res.split("=")[1];
+      window.open('/dashboard/testing/summary/' + responseId.split("}")[0], '_blank');
+    })
+  }
+
+  const handleAddSettings = () => {
+    if (conditions.length === 0 && testingRunConfigSettings.length > 0) {
+      testingRunConfigSettings.forEach((condition) => {
+        const operatorType = condition.operatorType
+        condition.operationsGroupList.forEach((obj) => {
+          const finalObj = { 'data': obj, 'operator': { 'type': operatorType } }
+          dispatchConditions({ type: "add", obj: finalObj })
+        })
+      })
+    }
+  }
+
+  const handleRefreshTableCount = async (summaryHexId) => {
+    await api.handleRefreshTableCount(summaryHexId).then((res) => {
+      func.setToast(true, false, "Re-calculating issues count")
+      setSecondaryPopover(false)
+    })
   }
 
   const EmptyData = () => {
-    return(
-      <div style={{margin: 'auto', marginTop: '20vh'}}>
+    return (
+      <div style={{ margin: 'auto', marginTop: '20vh' }}>
         <Box width="300px" padding={4}>
           <VerticalStack gap={5}>
             <HorizontalStack align="center">
-              <div style={{borderRadius: '50%', border: '6px solid white', padding: '4px', display: 'flex', alignItems: 'center', height: '50px', width: '50px'}}>
+              <div style={{ borderRadius: '50%', border: '6px solid white', padding: '4px', display: 'flex', alignItems: 'center', height: '50px', width: '50px' }}>
                 <Icon source={CircleInformationMajor} />
               </div>
             </HorizontalStack>
             <VerticalStack gap={2}>
-            <HorizontalStack align="center">
+              <HorizontalStack align="center">
                 <Text variant="bodyLg" fontWeight="semibold">
                   No test run data found
                 </Text>
@@ -482,50 +679,57 @@ const runningTestsComp = useMemo(() => (
     )
   }
 
-  const allResultsLength = testRunResults.skipped.length + testRunResults.need_configurations.length + testRunResults.no_vulnerability_found.length + testRunResults.vulnerable.length + progress
-  const useComponents = (!workflowTest && allResultsLength === 0 && (selectedTestRun.run_type && selectedTestRun.run_type!=='One-time')) ? [<EmptyData key="empty"/>] : components
+  useEffect(() => {
+    if (Object.values(testRunResultsCount).length === 0) {
+      setAllResultsLength(Object.values(testRunResultsCount).reduce((acc, val) => acc + val, 0))
+    }
+  }, [testRunResultsCount])
+  const useComponents = (!workflowTest && allResultsLength === undefined && (selectedTestRun.run_type && selectedTestRun.run_type === 'One-time')) ? [<EmptyData key="empty" />] : components
   const headingComp = (
     <Box paddingBlockStart={1}>
       <VerticalStack gap="2">
         <HorizontalStack gap="2" align="start">
-          { selectedTestRun?.icon && <Box>
-            <Icon color={selectedTestRun.iconColor} source={selectedTestRun.icon }></Icon>
+          {selectedTestRun?.icon && <Box>
+            <Icon color={selectedTestRun.iconColor} source={selectedTestRun.icon}></Icon>
           </Box>
           }
           <Box maxWidth="35vw">
-            <TooltipText 
-              tooltip={selectedTestRun?.name} 
-              text={selectedTestRun?.name || "Test run name"} 
-              textProps={{variant:"headingLg"}}/>
+            <TooltipText
+              tooltip={selectedTestRun?.name}
+              text={selectedTestRun?.name || "Test run name"}
+              textProps={{ variant: "headingLg" }} />
           </Box>
           {
-            selectedTestRun?.severity && 
-            selectedTestRun.severity
-            .map((item) =>
-            <Badge key={item} status={func.getTestResultStatus(item)}>
-              <Text fontWeight="regular">
-                {item}
-              </Text>
-            </Badge>
+            selectedTestRun?.severity &&
+            selectedTestRun.severity.map((item) => {
+              const sev = item.split(' ')
+              const tempSev = sev.length > 1 ? sev[1].toUpperCase() : ''
+              return (
+                <div className={`badge-wrapper-${tempSev}`}>
+                  <Badge key={item}>{item}</Badge>
+                </div>
+              )
+            }
+
             )}
-            <Button plain monochrome onClick={() => fetchData(true)}><Tooltip content="Refresh page" dismissOnMouseOut> <Icon source={RefreshMajor} /></Tooltip></Button>
+          <Button plain monochrome onClick={() => setUpdateTable(Date.now().toString())}><Tooltip content="Refresh page" dismissOnMouseOut> <Icon source={RefreshMajor} /></Tooltip></Button>
         </HorizontalStack>
         <HorizontalStack gap={"2"}>
           <HorizontalStack gap={"1"}>
-            <Box><Icon color="subdued" source={CustomersMinor}/></Box>
+            <Box><Icon color="subdued" source={CustomersMinor} /></Box>
             <Text color="subdued" fontWeight="medium" variant="bodyMd">created by:</Text>
             <Text color="subdued" variant="bodyMd">{selectedTestRun.userEmail}</Text>
           </HorizontalStack>
-          <Box width="1px" borderColor="border-subdued" borderInlineStartWidth="1" minHeight='16px'/>
+          <Box width="1px" borderColor="border-subdued" borderInlineStartWidth="1" minHeight='16px' />
           <Link monochrome target="_blank" url={"/dashboard/observe/inventory/" + selectedTestRun?.apiCollectionId} removeUnderline>
             <HorizontalStack gap={"1"}>
-              <Box><Icon color="subdued" source={ArchiveMinor}/></Box>
+              <Box><Icon color="subdued" source={ArchiveMinor} /></Box>
               <Text color="subdued" variant="bodyMd">{collectionsMap[selectedTestRun?.apiCollectionId]}</Text>
             </HorizontalStack>
           </Link>
-          <Box width="1px" borderColor="border-subdued" borderInlineStartWidth="1" minHeight='16px'/>
+          <Box width="1px" borderColor="border-subdued" borderInlineStartWidth="1" minHeight='16px' />
           <HorizontalStack gap={"1"}>
-            <Box><Icon color="subdued" source={PriceLookupMinor}/></Box>
+            <Box><Icon color="subdued" source={PriceLookupMinor} /></Box>
             <Text color="subdued" variant="bodyMd">{getHeadingStatus(selectedTestRun)}</Text>
           </HorizontalStack>
         </HorizontalStack>
@@ -534,13 +738,40 @@ const runningTestsComp = useMemo(() => (
   )
 
   let moreActionsList = transform.getActions(selectedTestRun)
-  moreActionsList.push({title: 'Export', items: [
-    {
-     content: 'Export vulnerability report', 
-     icon: ReportMinor, 
-     onAction: () => openVulnerabilityReport()
-    }
-  ]})
+  moreActionsList.push({
+    title: 'Export', items: [
+      {
+        content: 'Export vulnerability report',
+        icon: ReportMinor,
+        onAction: () => openVulnerabilityReport()
+      }
+    ]
+  })
+  moreActionsList.push({
+    title: 'Edit',
+    items: [
+      {
+        content: 'Tests',
+        icon: PlusMinor,
+        onAction: () => { setActiveFromTesting(true) }
+      },
+      {
+        content: 'Configurations',
+        icon: SettingsMinor,
+        onAction: () => { setShowEditableSettings(true); handleAddSettings() }
+      }
+    ]
+  })
+  moreActionsList.push({
+    title: 'More',
+    items: [
+      {
+        content: 'Re-Calculate Issues Count',
+        icon: RefreshMajor,
+        onAction: () => { handleRefreshTableCount(currentSummary.hexId) }
+      }
+    ]
+  })
   const moreActionsComp = (
     <Popover
       active={secondaryPopover}
@@ -552,7 +783,7 @@ const runningTestsComp = useMemo(() => (
         actionRole="menuitem"
         sections={moreActionsList}
       />
-       
+
     </Popover>
   )
 
@@ -561,13 +792,13 @@ const runningTestsComp = useMemo(() => (
       <PageWithMultipleCards
         title={headingComp}
         backUrl={`/dashboard/testing/`}
-        primaryAction={!workflowTest ? <Box paddingInlineEnd={1}><Button primary onClick={() => 
+        primaryAction={!workflowTest ? <Box paddingInlineEnd={1}><Button primary onClick={() =>
           func.downloadAsCSV((testRunResultsText[selectedTab]), selectedTestRun)
-          }>Export results</Button></Box>: undefined}
-        secondaryActions={!workflowTest ? moreActionsComp: undefined}
+        }>Export results</Button></Box> : undefined}
+        secondaryActions={!workflowTest ? moreActionsComp : undefined}
         components={useComponents}
       />
-      <ReRunModal selectedTestRun={selectedTestRun} shouldRefresh={false}/>
+      <ReRunModal selectedTestRun={selectedTestRun} shouldRefresh={false} />
       {(resultId !== null && resultId.length > 0) ? <TestRunResultPage /> : null}
     </>
   );

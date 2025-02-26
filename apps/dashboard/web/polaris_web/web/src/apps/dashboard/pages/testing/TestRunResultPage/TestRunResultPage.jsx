@@ -10,6 +10,7 @@ import Store from '../../../store';
 import TestRunResultFull from './TestRunResultFull';
 import TestRunResultFlyout from './TestRunResultFlyout';
 import LocalStore from '../../../../main/LocalStorageStore';
+import observeFunc from "../../observe/transform"
 
 let headerDetails = [
   {
@@ -70,7 +71,8 @@ function TestRunResultPage(props) {
   const [infoState, setInfoState] = useState([])
   const [loading, setLoading] = useState(true);
   const [showDetails, setShowDetails] = useState(true)
-  const collectionsMap = PersistStore(state => state.collectionsMap)
+  const [remediation, setRemediation] = useState("")
+  const hostNameMap = PersistStore(state => state.hostNameMap)
 
   const useFlyout = location.pathname.includes("test-editor") ? false : true
 
@@ -110,8 +112,11 @@ function TestRunResultPage(props) {
     
   }
 
-  async function createJiraTicketApiCall(hostStr, endPointStr, issueUrl, issueDescription, issueTitle, testingIssueId) {
-    let jiraInteg = await api.createJiraTicket(hostStr, endPointStr, issueUrl, issueDescription, issueTitle, testingIssueId);
+  async function createJiraTicketApiCall(hostStr, endPointStr, issueUrl, issueDescription, issueTitle, testingIssueId,projId, issueType) {
+    const jiraMetaData = {
+      issueTitle,hostStr,endPointStr,issueUrl,issueDescription,testingIssueId
+    }
+    let jiraInteg = await api.createJiraTicket(jiraMetaData, projId, issueType);
     return jiraInteg.jiraTicketKey
   }
 
@@ -136,12 +141,14 @@ function TestRunResultPage(props) {
     setLoading(false);
   }, 500)
 }
-  async function createJiraTicket(issueDetails){
+  async function createJiraTicket(issueId, projId, issueType){
 
-    if (Object.keys(issueDetails).length == 0) {
+    if (Object.keys(issueId).length === 0) {
       return
     }
-    let url = issueDetails.id.apiInfoKey.url
+    const url = issueId.apiInfoKey.url
+    const hostName = hostNameMap[issueId.apiInfoKey.id] ? hostNameMap[issueId.apiInfoKey.id] : observeFunc.getHostName(url)
+    
     let pathname = "Endpoint - ";
     try {
       if (url.startsWith("http")) {
@@ -152,32 +159,26 @@ function TestRunResultPage(props) {
     } catch (err) {
       pathname += url;
     }
-    let host = "Host - ";
-    try {
-      if (url.startsWith("http")) {
-        host += new URL(url).host;
-      } else {
-        host += collectionsMap[issueDetails.id.apiInfoKey.apiCollectionId] !== null ? collectionsMap[issueDetails.id.apiInfoKey.apiCollectionId] : " ";
-      }
-    } catch (err) {
-      host += collectionsMap[issueDetails.id.apiInfoKey.apiCollectionId] !== null ? collectionsMap[issueDetails.id.apiInfoKey.apiCollectionId] : " ";
-    }
+    
     // break into host and path
     let description = "Description - " + getDescriptionText(true)
     
     let tmp = testSubCategoryMap ? testSubCategoryMap : subCategoryMap
-    let issueTitle = tmp[issueDetails.id?.testSubCategory]?.testName
+    let issueTitle = tmp[issueId?.testSubCategory]?.testName
 
     setToast(true,false,"Creating Jira Ticket")
 
     let jiraTicketKey = ""
-    await createJiraTicketApiCall(host, pathname, window.location.href, description, issueTitle, issueDetails.id).then(async(res)=> {
+    await createJiraTicketApiCall("Host - "+hostName, pathname, window.location.href, description, issueTitle, issueId, projId, issueType).then(async(res)=> {
+      if(res?.errorMessage) {
+        setToast(true, true, res?.errorMessage)
+      }
       jiraTicketKey = res
       await fetchData();
       setToast(true,false,"Jira Ticket Created, scroll down to view")
     })
 
-    if (selectedTestRunResult == null || selectedTestRunResult.testResults == null || selectedTestRunResult.testResults.length == 0) {
+    if (selectedTestRunResult == null || selectedTestRunResult.testResults == null || selectedTestRunResult.testResults.length === 0) {
       return
     }
 
@@ -209,6 +210,7 @@ function TestRunResultPage(props) {
       const moreInfoSections = transform.getInfoSectionsHeaders()
       setJiraIssueUrl(jiraIssueCopy)
       setInfoState(transform.fillMoreInformation(subCategoryMap[runIssues?.id?.testSubCategory],moreInfoSections, runIssuesArr, jiraIssueCopy, onClickButton))
+      setRemediation(subCategoryMap[runIssues?.id?.testSubCategory]?.remediation)
       // setJiraIssueUrl(jiraIssueUrl)
       // setInfoState(transform.fillMoreInformation(subCategoryMap[runIssues?.id?.testSubCategory],moreInfoSections, runIssuesArr))
     } else {
@@ -224,7 +226,8 @@ function TestRunResultPage(props) {
     useFlyout ?
     <>
     <TestRunResultFlyout
-      selectedTestRunResult={selectedTestRunResult} 
+      selectedTestRunResult={selectedTestRunResult}
+      remediationSrc={remediation}
       testingRunResult={testingRunResult} 
       loading={loading} 
       issueDetails={issueDetails} 

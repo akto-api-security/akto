@@ -4,6 +4,7 @@ import com.akto.dao.AccountsContextDao;
 import com.akto.dao.AuthMechanismsDao;
 import com.akto.dao.MCollection;
 import com.akto.dao.context.Context;
+import com.akto.dto.RawApi;
 import com.akto.dto.SensitiveSampleData;
 import com.akto.dto.testing.AuthMechanism;
 import com.akto.dto.testing.TestRoles;
@@ -19,6 +20,8 @@ import org.bson.Document;
 import org.bson.types.ObjectId;
 
 import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 
 public class TestRolesDao extends AccountsContextDao<TestRoles> {
     @Override
@@ -59,14 +62,52 @@ public class TestRolesDao extends AccountsContextDao<TestRoles> {
         return role;
     }
 
-    public AuthMechanism fetchAttackerToken(int apiCollectionId) {
+    public AuthMechanism fetchAttackerToken(int apiCollectionId, RawApi rawApi) {
         TestRoles testRoles = TestRolesDao.instance.findOne(TestRoles.NAME, "ATTACKER_TOKEN_ALL");
         if (testRoles != null && testRoles.getAuthWithCondList().size() > 0) {
-            return testRoles.getAuthWithCondList().get(0).getAuthMechanism();
-        } else {
-            // return AuthMechanismsDao.instance.findOne(new BasicDBObject());
-            return null;
+            List<AuthWithCond> authWithCondList = testRoles.getAuthWithCondList();
+            AuthWithCond firstAuth = authWithCondList.get(0);
+            AuthMechanism defaultAuthMechanism = firstAuth.getAuthMechanism();
+            if(firstAuth.getRecordedLoginFlowInput()!=null){
+                defaultAuthMechanism.setRecordedLoginFlowInput(firstAuth.getRecordedLoginFlowInput());
+            }
+            if (rawApi == null) {
+                return defaultAuthMechanism;
+            } else {
+                try {
+                    Map<String, List<String>> reqHeaders = rawApi.getRequest().getHeaders();
+                    for (AuthWithCond authWithCond: authWithCondList)  {
+                        Map<String, String> headerKVPairs = authWithCond.getHeaderKVPairs();
+                        if (headerKVPairs == null) continue;
+
+                        boolean allHeadersMatched = true;
+                        for(String hKey: headerKVPairs.keySet()) {
+                            String hVal = authWithCond.getHeaderKVPairs().get(hKey);
+                            if (reqHeaders.containsKey(hKey.toLowerCase())) {
+                                if (!reqHeaders.get(hKey.toLowerCase()).contains(hVal)) {
+                                    allHeadersMatched = false;
+                                    break;
+                                }
+                            }
+                        }
+
+                        if (allHeadersMatched) {
+                            defaultAuthMechanism = authWithCond.getAuthMechanism();
+                            if(authWithCond.getRecordedLoginFlowInput()!=null){
+                                defaultAuthMechanism.setRecordedLoginFlowInput(authWithCond.getRecordedLoginFlowInput());
+                            }
+                            return defaultAuthMechanism;
+                        }
+                    }
+                } catch (Exception e) {
+                    return defaultAuthMechanism;
+                }
+            }
+
+            return defaultAuthMechanism;
         }
+
+        return null;
     }
 
     public BasicDBObject fetchAttackerTokenDoc(int apiCollectionId) {

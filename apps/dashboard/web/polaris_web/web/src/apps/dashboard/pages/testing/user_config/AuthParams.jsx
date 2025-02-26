@@ -5,7 +5,7 @@ import Dropdown from "../../../components/layouts/Dropdown";
 import Store from "../../../store";
 
 
-function AuthParams({ authParams, setAuthParams }) {
+function AuthParams({ authParams, setAuthParams, hideTitle }) {
 
     const setToastConfig = Store(state => state.setToastConfig)
 
@@ -49,7 +49,7 @@ function AuthParams({ authParams, setAuthParams }) {
     }
 
     return (
-        <LegacyCard title="Extract">
+        <LegacyCard title={hideTitle ? '' : "Extract"}>
             <br />
             <Divider />
             <LegacyCard.Section>
@@ -60,7 +60,7 @@ function AuthParams({ authParams, setAuthParams }) {
                                 <div style={{ display: "grid", gridTemplateColumns: "auto max-content auto max-content auto max-content", gap: "30px", alignItems: "center"}}>
                                     <Dropdown
                                         id={"auth-param-menu"}
-                                        menuItems={authParamOptions} initial={authParam.where === "HEADER" ? "Header": "Body"}
+                                        menuItems={authParamOptions} initial={authParam.where}
                                         selected={(authParamLocation) => handleUpdate(index, "where", authParamLocation)} />
                                     <Text variant="bodyMd">Key: </Text>
                                     <TextField id={`auth-param-key-${index}`} value={authParam.key} onChange={(key) => handleUpdate(index, "key", key)} />
