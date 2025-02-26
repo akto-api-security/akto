@@ -25,6 +25,7 @@ public class CollectionWiseTestingEndpoints extends TestingEndpoints {
 
     @Override
     public List<ApiInfo.ApiInfoKey> returnApis() {
+        // handle this for mini-testing
         return SingleTypeInfoDao.instance.fetchEndpointsInCollection(apiCollectionId);
     }
 

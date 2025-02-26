@@ -56,6 +56,8 @@ public class SampleDataDao extends AccountsContextDao<SampleData> {
         MCollection.createIndexIfAbsent(getDBName(), getCollName(),
                 new String[] { SingleTypeInfo._COLLECTION_IDS, ApiInfo.ID_URL, ApiInfo.ID_METHOD }, true);
 
+        // index on sampleDataIds.
+
     }
 
     public SampleData fetchSampleDataForApi(int apiCollectionId, String url, URLMethods.Method method) {

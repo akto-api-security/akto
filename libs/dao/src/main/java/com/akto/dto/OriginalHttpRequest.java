@@ -363,6 +363,12 @@ public class OriginalHttpRequest {
         return true;
     }
 
+    public static String extractAktoUUid(String message) {
+        Map<String, Object> json = gson.fromJson(message, Map.class);
+
+        return (String) json.get("akto_uuid");
+    }
+
     public String getPath(){
         String path = URI.create(this.url).getPath();
         if (path == null || path.isEmpty()) {

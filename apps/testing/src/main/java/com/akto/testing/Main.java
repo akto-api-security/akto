@@ -648,7 +648,9 @@ public class Main {
                 testingRun.getHexId(),
                 summaryId.toHexString()
         );
-        SlackSender.sendAlert(accountId, apiTestStatusAlert);
+        if (testingRun.getSendSlackAlert()) {
+            SlackSender.sendAlert(accountId, apiTestStatusAlert);
+        }
 
         AktoMixpanel aktoMixpanel = new AktoMixpanel();
         aktoMixpanel.sendEvent(distinct_id, "Test executed", props);

@@ -4,6 +4,7 @@ import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 
 import com.akto.DaoInit;
@@ -16,7 +17,6 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.parsers.HttpCallParser;
 import com.akto.util.filter.DictionaryFilter;
-import com.akto.runtime.utils.Utils;
 import com.akto.util.AccountTask;
 import com.akto.util.DashboardMode;
 import com.google.gson.Gson;
@@ -45,6 +45,14 @@ public class Main {
 
     // this sync threshold time is used for deleting sample data
     public static final int sync_threshold_time = 120;
+
+    private static int debugPrintCounter = 500;
+    private static void printL(Object o) {
+        if (debugPrintCounter > 0) {
+            debugPrintCounter--;
+            logger.info(o.toString());
+        }
+    }   
 
     public static boolean isOnprem = false;
 
@@ -94,6 +102,24 @@ public class Main {
     }
 
     public static Kafka kafkaProducer = null;
+    private static void buildKafka() {
+        logger.info("Building kafka...................");
+        AccountTask.instance.executeTask(t -> {
+            int accountId = Context.accountId.get();
+            AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter(accountId));
+            if (accountSettings != null && accountSettings.getCentralKafkaIp()!= null) {
+                String centralKafkaBrokerUrl = accountSettings.getCentralKafkaIp();
+                int centralKafkaBatchSize = AccountSettings.DEFAULT_CENTRAL_KAFKA_BATCH_SIZE;
+                int centralKafkaLingerMS = AccountSettings.DEFAULT_CENTRAL_KAFKA_LINGER_MS;
+                if (centralKafkaBrokerUrl != null) {
+                    kafkaProducer = new Kafka(centralKafkaBrokerUrl, centralKafkaLingerMS, centralKafkaBatchSize);
+                    logger.info("Connected to central kafka @ " + Context.now());
+                }
+        } else {
+                logger.info(String.valueOf(accountSettings));
+            }
+        }, "build-kafka-task");
+    }
 
     public static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
 
@@ -156,24 +182,28 @@ public class Main {
 
         DaoInit.init(new ConnectionString(mongoURI));
         loggerMaker.infoAndAddToDb("Runtime starting at " + Context.now() + "....", LogDb.RUNTIME);
-        try {
-            initializeRuntime();
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "Error in initializeRuntime " + e.getMessage(), LogDb.RUNTIME);
-        }
+        initializeRuntime();
 
-        APIConfig apiConfig = null;
-        try {
-            apiConfig = APIConfigsDao.instance.findOne(Filters.eq("name", configName));
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "Error while fetching api config " + e.getMessage(), LogDb.RUNTIME);
-        }
+        String centralKafkaTopicName = AccountSettings.DEFAULT_CENTRAL_KAFKA_TOPIC_NAME;
+
+        buildKafka();
+        scheduler.scheduleAtFixedRate(new Runnable() {
+            public void run() {
+                if (kafkaProducer == null || !kafkaProducer.producerReady) {
+                    buildKafka();
+                }
+            }
+        }, 5, 5, TimeUnit.MINUTES);
+
+
+        APIConfig apiConfig;
+        apiConfig = APIConfigsDao.instance.findOne(Filters.eq("name", configName));
         if (apiConfig == null) {
             apiConfig = new APIConfig(configName,"access-token", 1, 10_000_000, sync_threshold_time); // this sync threshold time is used for deleting sample data
         }
 
         final Main main = new Main();
-        Properties properties = Utils.configProperties(kafkaBrokerUrl, groupIdConfig, maxPollRecordsConfig);
+        Properties properties = main.configProperties(kafkaBrokerUrl, groupIdConfig, maxPollRecordsConfig);
         main.consumer = new KafkaConsumer<>(properties);
 
         final Thread mainThread = Thread.currentThread();
@@ -220,11 +250,15 @@ public class Main {
                     HttpResponseParams httpResponseParams;
                     try {
                          
-                        Utils.printL(r.value());
+                        printL(r.value());
                         lastSyncOffset++;
 
                         if (lastSyncOffset % 100 == 0) {
                             logger.info("Committing offset at position: " + lastSyncOffset);
+                        }
+
+                        if (tryForCollectionName(r.value())) {
+                            continue;
                         }
 
                         httpResponseParams = HttpCallParser.parseKafkaMessage(r.value());
@@ -287,6 +321,24 @@ public class Main {
                         loggerMaker.infoAndAddToDb("Initiating sync function for account: " + accountId, LogDb.RUNTIME);
                         parser.syncFunction(accWiseResponse, syncImmediately, fetchAllSTI, accountInfo.accountSettings);
                         loggerMaker.debugInfoAddToDb("Sync function completed for account: " + accountId, LogDb.RUNTIME);
+
+                        // send to central kafka
+                        if (kafkaProducer != null) {
+                            loggerMaker.infoAndAddToDb("Sending " + accWiseResponse.size() +" records to context analyzer", LogDb.RUNTIME);
+                            for (HttpResponseParams httpResponseParams: accWiseResponse) {
+                                try {
+                                    loggerMaker.debugInfoAddToDb("Sending to kafka data for account: " + httpResponseParams.getAccountId(), LogDb.RUNTIME);
+                                    kafkaProducer.send(httpResponseParams.getOrig(), centralKafkaTopicName);
+                                } catch (Exception e) {
+                                    // force close it
+                                    loggerMaker.errorAndAddToDb("Closing kafka: " + e.getMessage(), LogDb.RUNTIME);
+                                    kafkaProducer.close();
+                                    loggerMaker.infoAndAddToDb("Successfully closed kafka", LogDb.RUNTIME);
+                                }
+                            }
+                        } else {
+                            loggerMaker.errorAndAddToDb("Kafka producer is null", LogDb.RUNTIME);
+                        }
                     } catch (Exception e) {
                         loggerMaker.errorAndAddToDb(e.toString(), LogDb.RUNTIME);
                     }
@@ -297,7 +349,7 @@ public class Main {
           // nothing to catch. This exception is called from the shutdown hook.
         } catch (Exception e) {
             exceptionOnCommitSync.set(true);
-            Utils.printL(e);
+            printL(e);
             loggerMaker.errorAndAddToDb("Error in main runtime: " + e.getMessage(),LogDb.RUNTIME);
             e.printStackTrace();
             System.exit(0);
@@ -417,5 +469,19 @@ public class Main {
             }
             ApiCollectionsDao.instance.insertOne(new ApiCollection(0, "Default", Context.now(), urls, null, 0, false, true));
         }
+    }
+
+
+    public static Properties configProperties(String kafkaBrokerUrl, String groupIdConfig, int maxPollRecordsConfig) {
+        Properties properties = new Properties();
+        properties.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, kafkaBrokerUrl);
+        properties.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
+        properties.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
+        properties.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, maxPollRecordsConfig);
+        properties.put(ConsumerConfig.GROUP_ID_CONFIG, groupIdConfig);
+        properties.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
+        properties.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, false);
+
+        return properties;
     }
 }

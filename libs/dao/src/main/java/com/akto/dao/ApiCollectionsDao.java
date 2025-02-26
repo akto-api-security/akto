@@ -91,20 +91,33 @@ public class ApiCollectionsDao extends AccountsContextDao<ApiCollection> {
         return apiCollectionMap;
     }
 
+    public Map<Integer, ApiCollection> generateApiCollectionMap(List<ApiCollection> apiCollections) {
+        Map<Integer, ApiCollection> apiCollectionMap = new HashMap<>();
+        for (ApiCollection apiCollection: apiCollections) {
+            apiCollectionMap.put(apiCollection.getId(), apiCollection);
+        }
+
+        return apiCollectionMap;
+    }
+
     public List<ApiCollection> fetchApiGroups() {
         return ApiCollectionsDao.instance.findAll(Filters.eq(ApiCollection._TYPE, ApiCollection.Type.API_GROUP.toString()));
     }
 
     public List<ApiCollection> fetchNonApiGroupsIds() {
         return ApiCollectionsDao.instance.findAll(
-                Filters.or(
-                        Filters.exists(ApiCollection._TYPE, false),
-                        Filters.ne(ApiCollection._TYPE, ApiCollection.Type.API_GROUP.toString())),
+                nonApiGroupFilter(),
                 Projections.include(ApiCollection.ID));
     }
 
+    public Bson nonApiGroupFilter() {
+        return Filters.or(
+                Filters.exists(ApiCollection._TYPE, false),
+                Filters.ne(ApiCollection._TYPE, ApiCollection.Type.API_GROUP.toString()));
+    }
+
     public ApiCollection findByName(String name) {
-        List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(new BasicDBObject());
+        List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(nonApiGroupFilter());
         for (ApiCollection apiCollection: apiCollections) {
             if (apiCollection.getDisplayName() == null) continue;
             if (apiCollection.getDisplayName().equalsIgnoreCase(name)) {

@@ -338,8 +338,8 @@ public class ApiInfo {
 
     public void setId(ApiInfoKey id) {
         this.collectionIds = Util.replaceElementInList(this.collectionIds, 
-        id == null ? null : id.getApiCollectionId(),
-        this.id == null ? null : this.id.getApiCollectionId());
+        id == null ? null : (Integer)id.getApiCollectionId(),
+        this.id == null ? null : (Integer)this.id.getApiCollectionId());
         this.id = id;
     }
 

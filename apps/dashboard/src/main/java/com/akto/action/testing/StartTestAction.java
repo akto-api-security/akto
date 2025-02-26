@@ -70,7 +70,7 @@ public class StartTestAction extends UserAction {
     private Map<ObjectId, TestingRunResultSummary> latestTestingRunResultSummaries;
     private Map<String, String> sampleDataVsCurlMap;
     private String overriddenTestAppUrl;
-    private static final LoggerMaker loggerMaker = new LoggerMaker(StartTestAction.class, LogDb.DASHBOARD);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(StartTestAction.class);
     private TestingRunType testingRunType;
     private String searchString;
     private boolean continuousTesting;
@@ -105,6 +105,7 @@ public class StartTestAction extends UserAction {
     }
 
     private CallSource source;
+    private boolean sendSlackAlert = false;
 
     private TestingRun createTestingRun(int scheduleTimestamp, int periodInSeconds) {
         User user = getSUser();
@@ -158,7 +159,7 @@ public class StartTestAction extends UserAction {
 
         return new TestingRun(scheduleTimestamp, user.getLogin(),
                 testingEndpoints, testIdConfig, State.SCHEDULED, periodInSeconds, testName, this.testRunTime,
-                this.maxConcurrentRequests);
+                this.maxConcurrentRequests, this.sendSlackAlert);
     }
 
     private List<String> selectedTests;
@@ -503,7 +504,7 @@ public class StartTestAction extends UserAction {
     List<TestingRunResult> testingRunResults;
     private boolean fetchOnlyVulnerable;
     public enum QueryMode {
-        VULNERABLE, SECURED, SKIPPED_EXEC_NEED_CONFIG, SKIPPED_EXEC_NO_ACTION, SKIPPED_EXEC, ALL, SKIPPED_EXEC_API_REQUEST_FAILED;
+        VULNERABLE, SECURED, SKIPPED_EXEC_NEED_CONFIG, SKIPPED_EXEC_NO_ACTION, SKIPPED_EXEC, ALL;
     }
     private QueryMode queryMode;
 
@@ -517,8 +518,7 @@ public class StartTestAction extends UserAction {
             addActionError("Invalid test summary id");
             return ERROR.toUpperCase();
         }
-        if (testingRunResultSummaryHexId != null) loggerMaker.infoAndAddToDb("fetchTestingRunResults called for hexId=" + testingRunResultSummaryHexId);
-        if (queryMode != null) loggerMaker.infoAndAddToDb("fetchTestingRunResults called for queryMode="+queryMode);
+
         List<Bson> testingRunResultFilters = new ArrayList<>();
 
         testingRunResultFilters.add(Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, testingRunResultSummaryId));
@@ -532,27 +532,14 @@ public class StartTestAction extends UserAction {
                 case VULNERABLE:
                     testingRunResultFilters.add(Filters.eq(TestingRunResult.VULNERABLE, true));
                     break;
-                case SKIPPED_EXEC_API_REQUEST_FAILED:
-                    testingRunResultFilters.add(Filters.eq(TestingRunResult.VULNERABLE, false));
-                    testingRunResultFilters.add(Filters.in(TestingRunResultDao.ERRORS_KEY, TestResult.API_CALL_FAILED_ERROR_STRING));
-                    break;
                 case SKIPPED_EXEC:
                     testingRunResultFilters.add(Filters.eq(TestingRunResult.VULNERABLE, false));
                     testingRunResultFilters.add(Filters.in(TestingRunResultDao.ERRORS_KEY, TestResult.TestError.getErrorsToSkipTests()));
                     break;
                 case SECURED:
                     testingRunResultFilters.add(Filters.eq(TestingRunResult.VULNERABLE, false));
-                    List<String> errorsToSkipTest = TestResult.TestError.getErrorsToSkipTests();
-                    errorsToSkipTest.add(TestResult.API_CALL_FAILED_ERROR_STRING);
-                    testingRunResultFilters.add(
-                        Filters.or(
-                            Filters.exists(WorkflowTestingEndpoints._WORK_FLOW_TEST),
-                            Filters.and(
-                                Filters.nin(TestingRunResultDao.ERRORS_KEY, errorsToSkipTest),
-                                Filters.ne(TestingRunResult.REQUIRES_CONFIG, true)
-                            )
-                        )
-                    );
+                    testingRunResultFilters.add(Filters.nin(TestingRunResultDao.ERRORS_KEY, TestResult.TestError.getErrorsToSkipTests()));
+                    testingRunResultFilters.add(Filters.eq(TestingRunResult.REQUIRES_CONFIG, false));
                     break;
                 case SKIPPED_EXEC_NEED_CONFIG:
                     testingRunResultFilters.add(Filters.eq(TestingRunResult.REQUIRES_CONFIG, true));
@@ -566,16 +553,9 @@ public class StartTestAction extends UserAction {
                 this.errorEnums.put(testError, testError.getMessage());
             }
         }
-        if(queryMode == QueryMode.SKIPPED_EXEC_API_REQUEST_FAILED){
-            this.errorEnums.put(TestError.NO_API_REQUEST, TestError.NO_API_REQUEST.getMessage());
-        }
 
-        try {
-            this.testingRunResults = TestingRunResultDao.instance
-                    .fetchLatestTestingRunResult(Filters.and(testingRunResultFilters));
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "error in fetchLatestTestingRunResult: " + e);
-        }
+        this.testingRunResults = TestingRunResultDao.instance
+                .fetchLatestTestingRunResult(Filters.and(testingRunResultFilters));
 
         return SUCCESS.toUpperCase();
     }
@@ -1255,4 +1235,7 @@ public class StartTestAction extends UserAction {
         this.continuousTesting = continuousTesting;
     }
 
+    public void setSendSlackAlert(boolean sendSlackAlert) {
+        this.sendSlackAlert = sendSlackAlert;
+    }
 }

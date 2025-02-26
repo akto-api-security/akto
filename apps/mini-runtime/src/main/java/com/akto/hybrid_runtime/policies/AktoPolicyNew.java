@@ -5,6 +5,7 @@ import com.akto.dao.context.Context;
 import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.runtime_filters.RuntimeFilter;
+import com.akto.runtime.policies.*;
 import com.akto.dto.type.APICatalog;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
@@ -20,7 +21,7 @@ import com.mongodb.client.model.*;
 import org.bson.conversions.Bson;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import com.akto.runtime.policies.ApiAccessTypePolicy;
+
 
 import java.util.*;
 
@@ -31,7 +32,7 @@ public class AktoPolicyNew {
     private List<RuntimeFilter> filters = new ArrayList<>();
     private Map<Integer, ApiInfoCatalog> apiInfoCatalogMap = new HashMap<>();
     boolean processCalledAtLeastOnce = false;
-    ApiAccessTypePolicy apiAccessTypePolicy = new ApiAccessTypePolicy(null);
+    ApiAccessTypePolicy apiAccessTypePolicy = new ApiAccessTypePolicy(null, null);
     boolean redact = false;
 
     private DataActor dataActor = DataActorFactory.fetchInstance();
@@ -51,12 +52,21 @@ public class AktoPolicyNew {
         fetchFilters();
 
         AccountSettings accountSettings = dataActor.fetchAccountSettings();
+        int accountId = Context.accountId.get();
+        redact = accountId == 1718042191;
         if (accountSettings != null) {
             List<String> cidrList = accountSettings.getPrivateCidrList();
             if ( cidrList != null && !cidrList.isEmpty()) {
                 apiAccessTypePolicy.setPrivateCidrList(cidrList);
             }
-            redact = accountSettings.isRedactPayload();
+            List<String> partnerIpsList = new ArrayList<>();
+            if (accountSettings.getPartnerIpList() != null) {
+                partnerIpsList = accountSettings.getPartnerIpList();
+            }
+            apiAccessTypePolicy.setPartnerIpList(partnerIpsList);
+            accountId = accountSettings.getId();
+            Context.accountId.set(accountId);
+            redact = accountId == 1718042191 || accountSettings.isRedactPayload();
         }
 
         apiInfoCatalogMap = new HashMap<>();
@@ -128,19 +138,6 @@ public class AktoPolicyNew {
 
     }
 
-    public void main(List<HttpResponseParams> httpResponseParamsList, List<String> partnerIpsList) throws Exception {
-        if (httpResponseParamsList == null) httpResponseParamsList = new ArrayList<>();
-        loggerMaker.infoAndAddToDb("AktoPolicy main: httpResponseParamsList size: " + httpResponseParamsList.size(), LogDb.RUNTIME);
-        for (HttpResponseParams httpResponseParams: httpResponseParamsList) {
-            try {
-                process(httpResponseParams, partnerIpsList);
-            } catch (Exception e) {
-                loggerMaker.errorAndAddToDb(e.toString(), LogDb.RUNTIME);
-                ;
-            }
-        }
-    }
-
     public static ApiInfoKey generateFromHttpResponseParams(HttpResponseParams httpResponseParams) {
         int apiCollectionId = httpResponseParams.getRequestParams().getApiCollectionId();
         String url = httpResponseParams.getRequestParams().getURL();
@@ -155,7 +152,7 @@ public class AktoPolicyNew {
         return new ApiInfo.ApiInfoKey(apiCollectionId, url, method);
     }
 
-    public void process(HttpResponseParams httpResponseParams, List<String> partnerIpsList) throws Exception {
+    public void process(HttpResponseParams httpResponseParams) throws Exception {
         List<CustomAuthType> customAuthTypes = SingleTypeInfo.getCustomAuthType(Integer.parseInt(httpResponseParams.getAccountId()));
         ApiInfo.ApiInfoKey apiInfoKey = generateFromHttpResponseParams(httpResponseParams);
         PolicyCatalog policyCatalog = getApiInfoFromMap(apiInfoKey);
@@ -188,7 +185,7 @@ public class AktoPolicyNew {
                     break;
                 case DETERMINE_API_ACCESS_TYPE:
                     try {
-                        apiAccessTypePolicy.findApiAccessType(httpResponseParams, apiInfo, filter, partnerIpsList);
+                        apiAccessTypePolicy.findApiAccessType(httpResponseParams, apiInfo);
                     } catch (Exception ignored) {}
                     break;
                 default:
@@ -206,17 +203,8 @@ public class AktoPolicyNew {
             }
         }
 
-        if (apiInfo.getDiscoveredTimestamp() == 0) {
-            apiInfo.setDiscoveredTimestamp(httpResponseParams.getTimeOrNow());
-        }
-
         apiInfo.setLastSeen(httpResponseParams.getTimeOrNow());
 
-        if (apiInfo.getResponseCodes() == null) apiInfo.setResponseCodes(new ArrayList<>());
-        if (!apiInfo.getResponseCodes().contains(statusCode)) apiInfo.getResponseCodes().add(statusCode);
-
-        ApiInfo.ApiType apiType = ApiInfo.findApiTypeFromResponseParams(httpResponseParams);
-        if (apiType != null) apiInfo.setApiType(apiType);
     }
 
     public PolicyCatalog getApiInfoFromMap(ApiInfo.ApiInfoKey apiInfoKey) {
@@ -341,7 +329,7 @@ public class AktoPolicyNew {
             subUpdates.add(Updates.set(ApiInfo.LAST_SEEN, apiInfo.getLastSeen()));
 
             subUpdates.add(Updates.setOnInsert(SingleTypeInfo._COLLECTION_IDS, Arrays.asList(apiInfo.getId().getApiCollectionId())));
-            
+
             updates.add(
                     new UpdateOneModel<>(
                             ApiInfoDao.getFilter(apiInfo.getId()),

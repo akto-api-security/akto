@@ -12,12 +12,11 @@ public class Account {
     private int statusChangeTimestamp = 0;
 
     private boolean hybridSaasAccount;
+    public static final String HYBRID_TESTING_ENABLED = "hybridTestingEnabled";
+    private boolean hybridTestingEnabled;
     private boolean mergingRunning = false;
 
     private int mergingInitiateTs = 0;
-
-    public static final String HYBRID_TESTING_ENABLED = "hybridTestingEnabled";
-    private boolean hybridTestingEnabled;
 
     public Account() {}
 

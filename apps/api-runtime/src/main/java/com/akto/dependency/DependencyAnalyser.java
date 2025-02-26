@@ -5,10 +5,13 @@ import com.akto.dependency.store.BFStore;
 import com.akto.dependency.store.HashSetStore;
 import com.akto.dependency.store.Store;
 import com.akto.dao.DependencyNodeDao;
+import com.akto.dto.ApiCollection;
 import com.akto.dto.DependencyNode;
 import com.akto.dto.HttpRequestParams;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.type.*;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.parsers.HttpCallParser;
 import com.akto.runtime.APICatalogSync;
 import com.akto.runtime.URLAggregator;
@@ -22,29 +25,34 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.*;
 import org.bson.Document;
 import org.bson.conversions.Bson;
-import com.akto.log.LoggerMaker;
-import com.akto.log.LoggerMaker.LogDb;
 
 import java.util.*;
 
 import static com.akto.util.HttpRequestResponseUtils.extractValuesFromPayload;
-import static com.akto.runtime.utils.Utils.parseCookie;
 
 public class DependencyAnalyser {
     Store valueStore; // this is to store all the values seen in response payload
     Store urlValueStore; // this is to store all the url$value seen in response payload
     Store urlParamValueStore; // this is to store all the url$param$value seen in response payload
-    private static final LoggerMaker loggerMaker = new LoggerMaker(DependencyAnalyser.class, LogDb.RUNTIME);
 
     Map<String, Set<String>> urlsToResponseParam = new HashMap<>();
 
     Map<Integer, DependencyNode> nodes = new HashMap<>();
     public Map<Integer, APICatalog> dbState = new HashMap<>();
+    public Map<Integer, ApiCollection> apiCollectionsMap = new HashMap<>();
+    private boolean isOnPrem = false;
+    private boolean isHybrid = false;
+    private static final LoggerMaker loggerMaker = new LoggerMaker(DependencyAnalyser.class, LogDb.RUNTIME);
 
 
-    public DependencyAnalyser(Map<Integer, APICatalog> dbState, boolean useMap) {
+    public DependencyAnalyser(Map<Integer, APICatalog> dbState, boolean isOnPrem, boolean isHybrid, Map<Integer, ApiCollection> apiCollectionsMap) {
+        this.apiCollectionsMap = apiCollectionsMap;
+        this.isHybrid = isHybrid;
+        this.isOnPrem = isOnPrem;
+        loggerMaker.infoAndAddToDb("IsHybrid: " + isHybrid);
+        loggerMaker.infoAndAddToDb("IsOnPrem: " + isOnPrem);
 
-        if (useMap) {
+        if (!isOnPrem && !isHybrid) {
             valueStore = new HashSetStore(10_000);
             urlValueStore= new HashSetStore(10_000);
             urlParamValueStore = new HashSetStore(10_000);
@@ -67,6 +75,16 @@ public class DependencyAnalyser {
             return;
         }
 
+        ApiCollection apiCollection = apiCollectionsMap.get(finalApiCollectionId);
+        // for on prem customers always run dependency graph
+        // for saas customers, run if flag is set true
+        boolean runDependencyAnalyser = apiCollection == null || apiCollection.isRunDependencyAnalyser();
+        if (!isOnPrem && (isHybrid && !runDependencyAnalyser)) {
+            return;
+        }
+
+        boolean doInterCollectionMatch = apiCollection != null && apiCollection.isMatchDependencyWithOtherCollections();
+
         if (!HttpResponseParams.validHttpResponseCode(responseParams.statusCode)) return;
 
         HttpRequestParams requestParams = responseParams.getRequestParams();
@@ -87,6 +105,7 @@ public class DependencyAnalyser {
 
         String combinedUrl = apiCollectionId + "#" + url + "#" + method;
         boolean isHar = url.startsWith("http");
+        doInterCollectionMatch = !isHar && doInterCollectionMatch;
 
         // different URL variables and corresponding examples. Use accordingly
         // urlWithParams : /api/books/2?user=User1
@@ -112,7 +131,7 @@ public class DependencyAnalyser {
         for (String param: responseHeaders.keySet()) {
             List<String> values = responseHeaders.get(param);
             if (param.equalsIgnoreCase("set-cookie")) {
-                Map<String,String> cookieMap = parseCookie(values);
+                Map<String,String> cookieMap = AuthPolicy.parseCookie(values);
                 for (String cookieKey: cookieMap.keySet()) {
                     String cookieVal = cookieMap.get(cookieKey);
                     if (!filterValues(cookieVal)) continue;
@@ -146,26 +165,24 @@ public class DependencyAnalyser {
         Map<String, Set<Object>> reqFlattened = JSONUtils.flatten(reqPayload);
 
         for (String requestParam: reqFlattened.keySet()) {
-            processRequestParam(requestParam, reqFlattened.get(requestParam), combinedUrl, false, false, isHar);
+            processRequestParam(requestParam, reqFlattened.get(requestParam), combinedUrl, false, false, doInterCollectionMatch);
         }
 
         if (APICatalog.isTemplateUrl(url)) {
             String ogUrl = urlStatic.getUrl();
             String[] ogUrlSplit = ogUrl.split("/");
-            if (ogUrlSplit.length > 0) {
-                URLTemplate urlTemplate = APICatalogSync.createUrlTemplate(url, URLMethods.Method.fromString(method));
-                for (int i = 0; i < urlTemplate.getTypes().length; i++) {
-                    SingleTypeInfo.SuperType superType = urlTemplate.getTypes()[i];
-                    if (superType == null) continue;
-                    int idx = ogUrl.startsWith("http") ? i:i+1;
-                    Object s = ogUrlSplit[idx]; // because ogUrl=/api/books/123 while template url=api/books/INTEGER
-                    if (superType.equals(SingleTypeInfo.SuperType.INTEGER)) {
-                        s = Integer.parseInt(ogUrlSplit[idx]);
-                    }
-                    Set<Object> val = new HashSet<>();
-                    val.add(s);
-                    processRequestParam(i+"", val, combinedUrl, true, false, isHar);
+            URLTemplate urlTemplate = APICatalogSync.createUrlTemplate(url, URLMethods.Method.fromString(method));
+            for (int i = 0; i < urlTemplate.getTypes().length; i++) {
+                SingleTypeInfo.SuperType superType = urlTemplate.getTypes()[i];
+                if (superType == null) continue;
+                int idx = ogUrl.startsWith("http") ? i:i+1;
+                Object s = ogUrlSplit[idx]; // because ogUrl=/api/books/123 while template url=api/books/INTEGER
+                if (superType.equals(SingleTypeInfo.SuperType.INTEGER)) {
+                    s = Integer.parseInt(ogUrlSplit[idx]);
                 }
+                Set<Object> val = new HashSet<>();
+                val.add(s);
+                processRequestParam(i+"", val, combinedUrl, true, false, doInterCollectionMatch);
             }
         }
 
@@ -175,10 +192,10 @@ public class DependencyAnalyser {
             List<String> values = requestHeaders.get(param);
 
             if (param.equals("cookie")) {
-                Map<String,String> cookieMap = parseCookie(values);
+                Map<String,String> cookieMap = AuthPolicy.parseCookie(values);
                 for (String cookieKey: cookieMap.keySet()) {
                     String cookieValue = cookieMap.get(cookieKey);
-                    processRequestParam(cookieKey, new HashSet<>(Collections.singletonList(cookieValue)), combinedUrl, false, true, isHar);
+                    processRequestParam(cookieKey, new HashSet<>(Collections.singletonList(cookieValue)), combinedUrl, false, true, doInterCollectionMatch);
                 }
             } else {
                 Set<Object> valuesSet = new HashSet<>();
@@ -190,23 +207,23 @@ public class DependencyAnalyser {
                         valuesSet.add(v);
                     }
                 }
-                processRequestParam(param, valuesSet, combinedUrl, false, true, isHar);
+                processRequestParam(param, valuesSet, combinedUrl, false, true, doInterCollectionMatch);
             }
 
         }
     }
 
-    private void processRequestParam(String requestParam, Set<Object> reqFlattenedValuesSet, String originalCombinedUrl, boolean isUrlParam, boolean isHeader, boolean isHar) {
+    private void processRequestParam(String requestParam, Set<Object> reqFlattenedValuesSet, String originalCombinedUrl, boolean isUrlParam, boolean isHeader, boolean doInterCollectionMatch) {
         for (Object val : reqFlattenedValuesSet) {
             if (filterValues(val) && valueSeen(val)) {
-                processValueForUrls(requestParam, val, originalCombinedUrl, isUrlParam, isHeader, isHar);
+                processValueForUrls(requestParam, val, originalCombinedUrl, isUrlParam, isHeader, doInterCollectionMatch);
             }
         }
     }
 
-    private void processValueForUrls(String requestParam, Object val, String originalCombinedUrl, boolean isUrlParam, boolean isHeader, boolean isHar) {
+    private void processValueForUrls(String requestParam, Object val, String originalCombinedUrl, boolean isUrlParam, boolean isHeader, boolean doInterCollectionMatch) {
         for (String url : urlsToResponseParam.keySet()) {
-            if (isHar) {
+            if (!doInterCollectionMatch) {
                 // har files should be matched with the endpoints in their collection only
                 String apiCollectionId = url.split("#")[0];
                 String originalApiCollectionId = originalCombinedUrl.split("#")[0];
@@ -454,7 +471,6 @@ public class DependencyAnalyser {
                 bulkUpdates3.add(updateOneModel3);
             }
         }
-
         loggerMaker.infoAndAddToDb("dependency analyser bulkUpdates1 size: " + bulkUpdates1.size());
         loggerMaker.infoAndAddToDb("dependency analyser bulkUpdates2 size: " + bulkUpdates2.size());
         loggerMaker.infoAndAddToDb("dependency analyser bulkUpdates3 size: " + bulkUpdates3.size());

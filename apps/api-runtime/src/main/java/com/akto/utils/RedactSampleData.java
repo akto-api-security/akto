@@ -169,11 +169,6 @@ public class RedactSampleData {
 
         httpResponseParams.requestParams.setPayload(requestPayload);
 
-        // ip
-        if(redactAll) {
-            httpResponseParams.setSourceIP(redactValue);
-        }
-
         return convertHttpRespToOriginalString(httpResponseParams);
 
     }

@@ -2,6 +2,7 @@ package com.akto.dto.traffic;
 
 import java.util.Arrays;
 import java.util.List;
+
 import com.akto.util.Util;
 
 public class SampleData {
@@ -9,6 +10,9 @@ public class SampleData {
 
     public static final String SAMPLES = "samples";
     List<String> samples;
+    public static final String SAMPLE_IDS = "sampleIds";
+    List<String> sampleIds;
+
     List<Integer> collectionIds;
 
     public SampleData() {
@@ -28,8 +32,8 @@ public class SampleData {
 
     public void setId(Key id) {
         this.collectionIds = Util.replaceElementInList(this.collectionIds, 
-        id == null ? null : id.getApiCollectionId(), 
-        this.id == null ? null : this.id.getApiCollectionId());
+        id == null ? null : (Integer)id.getApiCollectionId(), 
+        this.id == null ? null : (Integer)this.id.getApiCollectionId());
         this.id = id;
     }
 
@@ -47,6 +51,14 @@ public class SampleData {
 
     public void setCollectionIds(List<Integer> collectionIds) {
         this.collectionIds = collectionIds;
+    }
+
+    public List<String> getSampleIds() {
+        return sampleIds;
+    }
+
+    public void setSampleIds(List<String> sampleIds) {
+        this.sampleIds = sampleIds;
     }
 
     @Override

@@ -71,6 +71,7 @@ public class URLTemplate {
 
             if (thisToken == null) {
                 SuperType type = types[i];
+
                 if (DictionaryFilter.isEnglishWord(thatToken)) return false;
                 switch(type) {
                     case BOOLEAN:

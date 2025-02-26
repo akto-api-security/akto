@@ -93,6 +93,17 @@
             </modules>
         </profile>
         <profile>
+            <id>mini-testing</id>
+            <activation>
+                <file>
+                    <exists>mini-testing/pom.xml</exists>
+                </file>
+            </activation>
+            <modules>
+                <module>mini-testing</module>
+            </modules>
+        </profile>
+        <profile>
             <id>billing</id>
             <activation>
                 <file>

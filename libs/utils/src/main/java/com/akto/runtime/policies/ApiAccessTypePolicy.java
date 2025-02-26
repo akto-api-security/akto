@@ -3,8 +3,8 @@ package com.akto.runtime.policies;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.ApiInfo.ApiAccessType;
-import com.akto.dto.runtime_filters.RuntimeFilter;
-
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.web.util.matcher.IpAddressMatcher;
 
 import java.util.ArrayList;
@@ -13,39 +13,24 @@ import java.util.List;
 
 public class ApiAccessTypePolicy {
     private List<String> privateCidrList;
+    private List<String> partnerIpList;
 
 	public static final String X_FORWARDED_FOR = "x-forwarded-for";
+    private static final Logger logger = LoggerFactory.getLogger(ApiAccessTypePolicy.class);
 
-    public ApiAccessTypePolicy(List<String> privateCidrList) {
+    public ApiAccessTypePolicy(List<String> privateCidrList, List<String> partnerIpList) {
         this.privateCidrList = privateCidrList;
+        this.partnerIpList = partnerIpList;
     }
 
     // RFC standard list. To be used later.
     static final private List<String> STANDARD_PRIVATE_IP_RANGES = Arrays.asList(
-            /*
-             * localhost IP
-             * 127.0.0.1/32
-             */
-    
-            /*
-             * private internets : https://datatracker.ietf.org/doc/html/rfc1918#section-3
-             */
             "10.0.0.0/8",
+            "100.64.0.0/10",
             "172.16.0.0/12",
-            "192.168.0.0/16"
-    /*
-     * reserved for IANA : https://datatracker.ietf.org/doc/html/rfc6598
-     * "100.64.0.0/10",
-     */
-    /*
-     * reserved for IANA: https://datatracker.ietf.org/doc/html/rfc6890
-     * "192.0.0.0/24",
-     */
-    /*
-     * Used for benchmarking: https://datatracker.ietf.org/doc/html/rfc2544
-     * "198.18.0.0/15"
-     */
-    );
+            "192.0.0.0/24",
+            "198.18.0.0/15",
+            "192.168.0.0/16");
 
     static final private List<String> CLIENT_IP_HEADERS = Arrays.asList(
             "x-forwarded-for",
@@ -56,7 +41,8 @@ public class ApiAccessTypePolicy {
             "x-client-ip",
             "client-ip");
 
-    public static List<String> getSourceIps(HttpResponseParams httpResponseParams){
+    public void findApiAccessType(HttpResponseParams httpResponseParams, ApiInfo apiInfo) {
+        if (privateCidrList == null || privateCidrList.isEmpty()) return ;
         List<String> clientIps = new ArrayList<>();
         for (String header : CLIENT_IP_HEADERS) {
             List<String> headerValues = httpResponseParams.getRequestParams().getHeaders().get(header);
@@ -67,7 +53,7 @@ public class ApiAccessTypePolicy {
 
         List<String> ipList = new ArrayList<>();
         for (String ip: clientIps) {
-            String[] parts = ip.trim().split("\\s*,\\s*"); // This approach splits the string by commas and also trims any whitespace around the individual elements. 
+            String[] parts = ip.trim().split("\\s*,\\s*"); // This approach splits the string by commas and also trims any whitespaces around the individual elements. 
             ipList.addAll(Arrays.asList(parts));
         }
 
@@ -76,14 +62,9 @@ public class ApiAccessTypePolicy {
         if (sourceIP != null && !sourceIP.isEmpty() && !sourceIP.equals("null")) {
             ipList.add(sourceIP);
         }
-        return ipList;
-    }
-
-    public void findApiAccessType(HttpResponseParams httpResponseParams, ApiInfo apiInfo, RuntimeFilter filter, List<String> partnerIpList) {
-        if (privateCidrList == null || privateCidrList.isEmpty()) return ;
-        List<String> ipList = getSourceIps(httpResponseParams);
-
+        
         String destIP = httpResponseParams.getDestIP();
+
         if (destIP != null && !destIP.isEmpty() && !destIP.equals("null")) {
             ipList.add(destIP);
         }
@@ -166,5 +147,14 @@ public class ApiAccessTypePolicy {
 
     public void setPrivateCidrList(List<String> privateCidrList) {
         this.privateCidrList = privateCidrList;
+    }
+
+    public List<String> getPartnerIpList() {
+        return partnerIpList;
+    }
+
+
+    public void setPartnerIpList(List<String> partnerIpList) {
+        this.partnerIpList = partnerIpList;
     }
 }

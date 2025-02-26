@@ -22,8 +22,16 @@ public class TestResult extends GenericTestResult {
 
     private boolean requiresConfig;
 
+    /*
+     * This field is being used as severity.
+     * Thus keeping this in sync with "enum severity".
+     */
     public enum Confidence {
-        HIGH, MEDIUM, LOW
+        CRITICAL,
+        HIGH,
+        MEDIUM,
+        LOW,
+        INFO
     }
 
     public enum TestError {

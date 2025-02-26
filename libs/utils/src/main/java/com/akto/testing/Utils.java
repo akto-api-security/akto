@@ -26,6 +26,7 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.test_editor.filter.Filter;
 import com.akto.test_editor.filter.data_operands_impl.ValidationResult;
 import com.akto.util.JSONUtils;
+import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 
 import okhttp3.MediaType;

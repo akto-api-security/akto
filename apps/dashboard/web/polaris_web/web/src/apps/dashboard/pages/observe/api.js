@@ -43,13 +43,6 @@ export default {
             }
         })
     },
-    resetSampleData() {
-        return request({
-            url: '/api/resetSampleData',
-            method: 'post',
-            data: {}
-        })
-    },
     async fetchSampleData(url, apiCollectionId, method) {
         const resp = await request({
             url: '/api/fetchSampleData',
@@ -212,30 +205,12 @@ export default {
             }
         })
     },
-    downloadOpenApiFileForSelectedApis(apiInfoKeyList, apiCollectionId) {
-        return request({
-            url: '/api/generateOpenApiFile',
-            method: 'post',
-            data: {
-                apiInfoKeyList, apiCollectionId
-            }
-        })
-    },
     exportToPostman(apiCollectionId) {
         return request({
             url: '/api/createPostmanApi',
             method: 'post',
             data: {
                 apiCollectionId
-            }
-        })
-    },
-    exportToPostmanForSelectedApis(apiInfoKeyList, apiCollectionId) {
-        return request({
-            url: '/api/createPostmanApi',
-            method: 'post',
-            data: {
-                apiInfoKeyList, apiCollectionId
             }
         })
     },
@@ -251,52 +226,12 @@ export default {
             return resp
         })
     },
-
-    async fetchAPIsFromSourceCode(apiCollectionId) {
-        return await request({
-            url: '/api/fetchCodeAnalysisApiInfos',
-            method: 'post',
-            data: {
-                apiCollectionId: apiCollectionId,
-            }
-        })
-    },
-
-    async fetchApisFromStis(apiCollectionId) {
-        return await request({
-            url: '/api/fetchApiInfosFromSTIs',
-            method: 'post',
-            data: {
-                apiCollectionId: apiCollectionId,
-            }
-        })
-    },
-
-    async fetchApiInfosForCollection(apiCollectionId) {
-        return await request({
-            url: '/api/fetchApiInfosForCollection',
-            method: 'post',
-            data: {
-                apiCollectionId: apiCollectionId,
-            }
-        })
-    },
     redactCollection(apiCollectionId, redacted){
         return request({
             url: '/api/redactCollection',
             method: 'post',
             data:{
                 apiCollectionId,redacted
-            }
-        })
-    },
-
-    deleteApis(apiList){
-        return request({
-            url: '/api/deleteApis',
-            method: 'post',
-            data: {
-                apiList
             }
         })
     },
@@ -331,15 +266,6 @@ export default {
     async loadRecentEndpoints (startTimestamp, endTimestamp) {
         const resp = await request({
             url: '/api/loadRecentEndpoints',
-            method: 'post',
-            data: { startTimestamp, endTimestamp }
-        })
-        return resp
-    },
-
-    async loadRecentApiInfos (startTimestamp, endTimestamp) {
-        const resp = await request({
-            url: '/api/loadRecentApiInfos',
             method: 'post',
             data: { startTimestamp, endTimestamp }
         })
@@ -529,20 +455,20 @@ export default {
             data: {}
         })
     },
-    scheduleTestForCollection(apiCollectionId, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting) {
+    scheduleTestForCollection(apiCollectionId, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert) {
         return request({
             url: '/api/startTest',
             method: 'post',
-            data: { apiCollectionId, type: "COLLECTION_WISE", startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting }
+            data: { apiCollectionId, type: "COLLECTION_WISE", startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert}
         }).then((resp) => {
             return resp
         })
     },
-    scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, source, testRoleId, continuousTesting) {
+    scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, source, testRoleId, continuousTesting, sendSlackAlert) {
         return request({
             url: '/api/startTest',
             method: 'post',
-            data: {apiInfoKeyList, type: "CUSTOM", startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, source, testRoleId, continuousTesting}
+            data: {apiInfoKeyList, type: "CUSTOM", startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, source, testRoleId, continuousTesting, sendSlackAlert}
         }).then((resp) => {
             return resp
         })        
@@ -559,6 +485,16 @@ export default {
         })
         return resp
     },
+
+    async fetchSlackWebhooks() {
+        const resp = await request({
+            url: '/api/fetchSlackWebhooks',
+            method: 'post',
+            data: {}
+        })
+        return resp
+    },
+
     async fetchNewParametersTrend(startTimestamp, endTimestamp) {
         const resp = await request({
             url: '/api/fetchNewParametersTrend',
@@ -622,17 +558,6 @@ export default {
             data: {
                 collectionName, conditions
             }
-        })
-    },
-    async getEndpointsListFromConditions(conditions) {
-        return await request({
-            url: '/api/getEndpointsListFromConditions',
-            method: 'post',
-            data: {
-                conditions
-            }
-        }).then((resp) => {
-            return resp
         })
     },
     async getEndpointsFromConditions(conditions) {

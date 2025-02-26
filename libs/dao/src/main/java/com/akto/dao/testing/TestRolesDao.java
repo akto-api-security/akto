@@ -69,6 +69,15 @@ public class TestRolesDao extends AccountsContextDao<TestRoles> {
         }
     }
 
+    public AuthMechanism fetchAttackerToken(int apiCollectionId, TestRoles testRoles) {
+        if (testRoles != null && testRoles.getAuthWithCondList().size() > 0) {
+            return testRoles.getAuthWithCondList().get(0).getAuthMechanism();
+        } else {
+            // return AuthMechanismsDao.instance.findOne(new BasicDBObject());
+            return null;
+        }
+    }
+
     public BasicDBObject fetchAttackerTokenDoc(int apiCollectionId) {
         MongoCursor<BasicDBObject> cursor = MCollection.getMCollection(getDBName(), getCollName(), BasicDBObject.class).find(new BasicDBObject(TestRoles.NAME, "ATTACKER_TOKEN_ALL")).cursor();
         if(cursor.hasNext()) {

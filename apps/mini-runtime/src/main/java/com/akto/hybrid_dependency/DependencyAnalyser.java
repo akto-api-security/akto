@@ -1,10 +1,18 @@
 package com.akto.hybrid_dependency;
 
+import com.akto.dao.SensitiveSampleDataDao;
 import com.akto.dao.context.Context;
+import com.akto.data_actor.DataActor;
+import com.akto.data_actor.DataActorFactory;
+import com.akto.dependency_analyser.DependencyAnalyserUtils;
+import com.akto.dto.bulk_updates.BulkUpdates;
+import com.akto.dto.bulk_updates.UpdatePayload;
 import com.akto.hybrid_dependency.store.BFStore;
 import com.akto.hybrid_dependency.store.HashSetStore;
 import com.akto.hybrid_dependency.store.Store;
 import com.akto.dao.DependencyNodeDao;
+import com.akto.dao.SingleTypeInfoDao;
+import com.akto.dto.ApiCollection;
 import com.akto.dto.DependencyNode;
 import com.akto.dto.HttpRequestParams;
 import com.akto.dto.HttpResponseParams;
@@ -14,6 +22,7 @@ import com.akto.hybrid_runtime.APICatalogSync;
 import com.akto.hybrid_runtime.URLAggregator;
 import com.akto.hybrid_runtime.policies.AuthPolicy;
 import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.HTTPHeadersExample;
 import com.akto.util.JSONUtils;
 import com.google.common.base.Charsets;
@@ -32,21 +41,32 @@ public class DependencyAnalyser {
     Store valueStore; // this is to store all the values seen in response payload
     Store urlValueStore; // this is to store all the url$value seen in response payload
     Store urlParamValueStore; // this is to store all the url$param$value seen in response payload
-    private static final LoggerMaker loggerMaker = new LoggerMaker(DependencyAnalyser.class, LoggerMaker.LogDb.RUNTIME);
 
     Map<String, Set<String>> urlsToResponseParam = new HashMap<>();
 
     Map<Integer, DependencyNode> nodes = new HashMap<>();
     public Map<Integer, APICatalog> dbState = new HashMap<>();
+    public Map<Integer, ApiCollection> apiCollectionsMap = new HashMap<>();
+    private boolean isOnPrem = false;
+    private boolean isHybrid = false;
 
+    private DataActor dataActor = DataActorFactory.fetchInstance();
+    private static final LoggerMaker loggerMaker = new LoggerMaker(DependencyAnalyser.class, LogDb.RUNTIME);
 
-    public DependencyAnalyser(Map<Integer, APICatalog> dbState, boolean useMap) {
+    public DependencyAnalyser(Map<Integer, APICatalog> dbState, boolean isOnPrem, boolean isHybrid, Map<Integer, ApiCollection> apiCollectionsMap) {
+        this.apiCollectionsMap = apiCollectionsMap;
+        this.isHybrid = isHybrid;
+        this.isOnPrem = isOnPrem;
+        loggerMaker.infoAndAddToDb("IsHybrid: " + isHybrid);
+        loggerMaker.infoAndAddToDb("IsOnPrem: " + isOnPrem);
 
-        if (useMap) {
+        if (!isOnPrem && !isHybrid) {
+            loggerMaker.infoAndAddToDb("Using HashMap");
             valueStore = new HashSetStore(10_000);
             urlValueStore= new HashSetStore(10_000);
             urlParamValueStore = new HashSetStore(10_000);
         } else {
+            loggerMaker.infoAndAddToDb("Using Bloofilter");
             valueStore = new BFStore(BloomFilter.create(Funnels.stringFunnel(Charsets.UTF_8), 100_000_000, 0.01));
             urlValueStore = new BFStore(BloomFilter.create(Funnels.stringFunnel(Charsets.UTF_8), 100_000_000, 0.01));
             urlParamValueStore = new BFStore(BloomFilter.create(Funnels.stringFunnel(Charsets.UTF_8), 100_000_000, 0.01));
@@ -64,6 +84,16 @@ public class DependencyAnalyser {
         } catch (Exception e) {
             return;
         }
+
+        ApiCollection apiCollection = apiCollectionsMap.get(finalApiCollectionId);
+        // for on prem customers always run dependency graph
+        // for saas customers, run if flag is set true
+        boolean runDependencyAnalyser = apiCollection == null || apiCollection.isRunDependencyAnalyser();
+        if (!isOnPrem && (isHybrid && !runDependencyAnalyser)) {
+            return;
+        }
+
+        boolean doInterCollectionMatch = apiCollection != null && apiCollection.isMatchDependencyWithOtherCollections();
 
         if (!HttpResponseParams.validHttpResponseCode(responseParams.statusCode)) return;
 
@@ -84,6 +114,8 @@ public class DependencyAnalyser {
         url = realUrl(apiCollectionId, urlStatic).getUrl();
 
         String combinedUrl = apiCollectionId + "#" + url + "#" + method;
+        boolean isHar = url.startsWith("http");
+        doInterCollectionMatch = !isHar && doInterCollectionMatch;
 
         // different URL variables and corresponding examples. Use accordingly
         // urlWithParams : /api/books/2?user=User1
@@ -143,26 +175,24 @@ public class DependencyAnalyser {
         Map<String, Set<Object>> reqFlattened = JSONUtils.flatten(reqPayload);
 
         for (String requestParam: reqFlattened.keySet()) {
-            processRequestParam(requestParam, reqFlattened.get(requestParam), combinedUrl, false, false);
+            processRequestParam(requestParam, reqFlattened.get(requestParam), combinedUrl, false, false, doInterCollectionMatch);
         }
 
         if (APICatalog.isTemplateUrl(url)) {
             String ogUrl = urlStatic.getUrl();
             String[] ogUrlSplit = ogUrl.split("/");
-            if (ogUrlSplit.length > 0) {
-                URLTemplate urlTemplate = APICatalogSync.createUrlTemplate(url, URLMethods.Method.fromString(method));
-                for (int i = 0; i < urlTemplate.getTypes().length; i++) {
-                    SingleTypeInfo.SuperType superType = urlTemplate.getTypes()[i];
-                    if (superType == null) continue;
-                    int idx = ogUrl.startsWith("http") ? i:i+1;
-                    Object s = ogUrlSplit[idx]; // because ogUrl=/api/books/123 while template url=api/books/INTEGER
-                    if (superType.equals(SingleTypeInfo.SuperType.INTEGER)) {
-                        s = Integer.parseInt(ogUrlSplit[idx]);
-                    }
-                    Set<Object> val = new HashSet<>();
-                    val.add(s);
-                    processRequestParam(i+"", val, combinedUrl, true, false);
+            URLTemplate urlTemplate = APICatalogSync.createUrlTemplate(url, URLMethods.Method.fromString(method));
+            for (int i = 0; i < urlTemplate.getTypes().length; i++) {
+                SingleTypeInfo.SuperType superType = urlTemplate.getTypes()[i];
+                if (superType == null) continue;
+                int idx = ogUrl.startsWith("http") ? i:i+1;
+                Object s = ogUrlSplit[idx]; // because ogUrl=/api/books/123 while template url=api/books/INTEGER
+                if (superType.equals(SingleTypeInfo.SuperType.INTEGER)) {
+                    s = Integer.parseInt(ogUrlSplit[idx]);
                 }
+                Set<Object> val = new HashSet<>();
+                val.add(s);
+                processRequestParam(i+"", val, combinedUrl, true, false, doInterCollectionMatch);
             }
         }
 
@@ -175,7 +205,7 @@ public class DependencyAnalyser {
                 Map<String,String> cookieMap = AuthPolicy.parseCookie(values);
                 for (String cookieKey: cookieMap.keySet()) {
                     String cookieValue = cookieMap.get(cookieKey);
-                    processRequestParam(cookieKey, new HashSet<>(Collections.singletonList(cookieValue)), combinedUrl, false, true);
+                    processRequestParam(cookieKey, new HashSet<>(Collections.singletonList(cookieValue)), combinedUrl, false, true, doInterCollectionMatch);
                 }
             } else {
                 Set<Object> valuesSet = new HashSet<>();
@@ -187,22 +217,32 @@ public class DependencyAnalyser {
                         valuesSet.add(v);
                     }
                 }
-                processRequestParam(param, valuesSet, combinedUrl, false, true);
+                processRequestParam(param, valuesSet, combinedUrl, false, true, doInterCollectionMatch);
             }
 
         }
     }
 
-    private void processRequestParam(String requestParam, Set<Object> reqFlattenedValuesSet, String originalCombinedUrl, boolean isUrlParam, boolean isHeader) {
+    private void processRequestParam(String requestParam, Set<Object> reqFlattenedValuesSet, String originalCombinedUrl, boolean isUrlParam, boolean isHeader, boolean doInterCollectionMatch) {
         for (Object val : reqFlattenedValuesSet) {
             if (filterValues(val) && valueSeen(val)) {
-                processValueForUrls(requestParam, val, originalCombinedUrl, isUrlParam, isHeader);
+                processValueForUrls(requestParam, val, originalCombinedUrl, isUrlParam, isHeader, doInterCollectionMatch);
             }
         }
     }
 
-    private void processValueForUrls(String requestParam, Object val, String originalCombinedUrl, boolean isUrlParam, boolean isHeader) {
+    private void processValueForUrls(String requestParam, Object val, String originalCombinedUrl, boolean isUrlParam, boolean isHeader, boolean doInterCollectionMatch) {
         for (String url : urlsToResponseParam.keySet()) {
+            if (!doInterCollectionMatch) {
+                // har files should be matched with the endpoints in their collection only
+                String apiCollectionId = url.split("#")[0];
+                String originalApiCollectionId = originalCombinedUrl.split("#")[0];
+                if (!apiCollectionId.equals(originalApiCollectionId)) continue;
+            } else {
+                // mirroring apis should be matched with the endpoints in mirroring collections only
+                String urlRespVal = url.split("#")[1];
+                if (urlRespVal.startsWith("http")) continue;
+            }
             if (!url.equals(originalCombinedUrl) && urlValSeen(url, val)) {
                 processUrlForParam(url, requestParam, val, originalCombinedUrl, isUrlParam, isHeader);
             }
@@ -346,112 +386,22 @@ public class DependencyAnalyser {
 
     public void syncWithDb() {
         loggerMaker.infoAndAddToDb("Syncing dependency analyser nodes");
-        ArrayList<WriteModel<DependencyNode>> bulkUpdates1 = new ArrayList<>();
-        ArrayList<WriteModel<DependencyNode>> bulkUpdates2 = new ArrayList<>();
-        ArrayList<WriteModel<DependencyNode>> bulkUpdates3 = new ArrayList<>();
-
         loggerMaker.infoAndAddToDb("dependency analyser nodes size: " + nodes.size());
         mergeNodes();
+        List<DependencyNode> nodeList = new ArrayList<>();
 
         for (DependencyNode dependencyNode: nodes.values()) {
 
-            String urlResp = dependencyNode.getUrlResp();
-            String apiCollectionIdResp = dependencyNode.getApiCollectionIdResp();
-            String methodResp = dependencyNode.getMethodResp();
-
-            String urlReq = dependencyNode.getUrlReq();
-            String apiCollectionIdReq = dependencyNode.getApiCollectionIdReq();
-            String methodReq = dependencyNode.getMethodReq();
-
-            if (apiCollectionIdResp.equals(apiCollectionIdReq) && urlResp.equals(urlReq) && methodResp.equals(methodReq)) continue;
-
-            for (DependencyNode.ParamInfo paramInfo: dependencyNode.getParamInfos()) {
-                Bson filter1 = Filters.and(
-                        Filters.eq(DependencyNode.API_COLLECTION_ID_REQ, apiCollectionIdReq),
-                        Filters.eq(DependencyNode.URL_REQ, urlReq),
-                        Filters.eq(DependencyNode.METHOD_REQ, methodReq),
-                        Filters.eq(DependencyNode.API_COLLECTION_ID_RESP, apiCollectionIdResp),
-                        Filters.eq(DependencyNode.URL_RESP, urlResp),
-                        Filters.eq(DependencyNode.METHOD_RESP, methodResp)
-                );
-
-                Bson update1 = Updates.push(DependencyNode.PARAM_INFOS, new Document("$each", Collections.emptyList()));
-
-                // this update is to make sure the document exist else create new one
-                UpdateOneModel<DependencyNode> updateOneModel1 = new UpdateOneModel<>(
-                        filter1, update1, new UpdateOptions().upsert(true)
-                );
-
-
-                Bson filter2 = Filters.and(
-                        Filters.eq(DependencyNode.API_COLLECTION_ID_REQ, apiCollectionIdReq),
-                        Filters.eq(DependencyNode.URL_REQ, urlReq),
-                        Filters.eq(DependencyNode.METHOD_REQ, methodReq),
-                        Filters.eq(DependencyNode.API_COLLECTION_ID_RESP, apiCollectionIdResp),
-                        Filters.eq(DependencyNode.URL_RESP, urlResp),
-                        Filters.eq(DependencyNode.METHOD_RESP, methodResp),
-                        Filters.not(Filters.elemMatch(DependencyNode.PARAM_INFOS,
-                                Filters.and(
-                                        Filters.eq(DependencyNode.ParamInfo.REQUEST_PARAM, paramInfo.getRequestParam()),
-                                        Filters.eq(DependencyNode.ParamInfo.RESPONSE_PARAM, paramInfo.getResponseParam()),
-                                        Filters.eq(DependencyNode.ParamInfo.IS_URL_PARAM, paramInfo.isUrlParam()),
-                                        Filters.eq(DependencyNode.ParamInfo.IS_HEADER, paramInfo.isHeader())
-                                )
-                        ))
-                );
-
-                Bson update2 = Updates.push(DependencyNode.PARAM_INFOS,
-                        new BasicDBObject(DependencyNode.ParamInfo.REQUEST_PARAM, paramInfo.getRequestParam())
-                                .append(DependencyNode.ParamInfo.RESPONSE_PARAM, paramInfo.getResponseParam())
-                                .append(DependencyNode.ParamInfo.IS_URL_PARAM, paramInfo.isUrlParam())
-                                .append(DependencyNode.ParamInfo.IS_HEADER, paramInfo.isHeader())
-                                .append(DependencyNode.ParamInfo.COUNT, 0)
-                );
-
-                // this update is to add paramInfo if it doesn't exist. If exists nothing happens
-                UpdateOneModel<DependencyNode> updateOneModel2 = new UpdateOneModel<>(
-                        filter2, update2, new UpdateOptions().upsert(false)
-                );
-
-                Bson filter3 = Filters.and(
-                        Filters.eq(DependencyNode.API_COLLECTION_ID_REQ, apiCollectionIdReq),
-                        Filters.eq(DependencyNode.URL_REQ, urlReq),
-                        Filters.eq(DependencyNode.METHOD_REQ, methodReq),
-                        Filters.eq(DependencyNode.API_COLLECTION_ID_RESP, apiCollectionIdResp),
-                        Filters.eq(DependencyNode.URL_RESP, urlResp),
-                        Filters.eq(DependencyNode.METHOD_RESP, methodResp),
-                        Filters.eq(DependencyNode.PARAM_INFOS + "." + DependencyNode.ParamInfo.REQUEST_PARAM, paramInfo.getRequestParam()),
-                        Filters.eq(DependencyNode.PARAM_INFOS + "." + DependencyNode.ParamInfo.RESPONSE_PARAM, paramInfo.getResponseParam()),
-                        Filters.eq(DependencyNode.PARAM_INFOS + "." + DependencyNode.ParamInfo.IS_URL_PARAM, paramInfo.isUrlParam()),
-                        Filters.eq(DependencyNode.PARAM_INFOS + "." + DependencyNode.ParamInfo.IS_HEADER, paramInfo.isHeader())
-                );
-
-                Bson update3 = Updates.combine(
-                        Updates.inc(DependencyNode.PARAM_INFOS + ".$." + DependencyNode.ParamInfo.COUNT, paramInfo.getCount()),
-                        Updates.set(DependencyNode.LAST_UPDATED, dependencyNode.getLastUpdated())
-                );
-
-                // this update runs everytime to update the count
-                UpdateOneModel<DependencyNode> updateOneModel3 = new UpdateOneModel<>(
-                        filter3, update3,  new UpdateOptions().upsert(false)
-                );
-
-                bulkUpdates1.add(updateOneModel1);
-                bulkUpdates2.add(updateOneModel2);
-                bulkUpdates3.add(updateOneModel3);
+            nodeList.add(dependencyNode);
+            if (nodeList.size() % 100 == 0) {
+                dataActor.bulkWriteDependencyNodes(nodeList);
+                nodeList = new ArrayList<>();
             }
         }
 
-        // ordered has to be true or else won't work
-
-        loggerMaker.infoAndAddToDb("dependency analyser bulkUpdates1 size: " + bulkUpdates1.size());
-        loggerMaker.infoAndAddToDb("dependency analyser bulkUpdates2 size: " + bulkUpdates2.size());
-        loggerMaker.infoAndAddToDb("dependency analyser bulkUpdates3 size: " + bulkUpdates3.size());
-
-
-        if (bulkUpdates1.size() > 0) DependencyNodeDao.instance.getMCollection().bulkWrite(bulkUpdates1, new BulkWriteOptions().ordered(false));
-        if (bulkUpdates2.size() > 0) DependencyNodeDao.instance.getMCollection().bulkWrite(bulkUpdates2, new BulkWriteOptions().ordered(false));
-        if (bulkUpdates3.size() > 0) DependencyNodeDao.instance.getMCollection().bulkWrite(bulkUpdates3, new BulkWriteOptions().ordered(false));
+        if (nodeList.size() > 0) {
+            dataActor.bulkWriteDependencyNodes(nodeList);
+        }
 
         nodes = new HashMap<>();
     }

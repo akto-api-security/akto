@@ -149,17 +149,6 @@ public class TestRolesAction extends UserAction {
             return ERROR.toUpperCase();
         }
 
-        boolean isAttackerRole = false;
-        TestRoles attackerRole = TestCollectionPropertiesDao.fetchTestToleForProp(0,
-                TestCollectionProperty.Id.ATTACKER_TOKEN);
-        if (attackerRole != null && attackerRole.getId() != null) {
-            isAttackerRole = role.getId().equals(attackerRole.getId());
-        }
-        if (isAttackerRole) {
-            addActionError("Unable to update endpoint conditions for attacker role");
-            return ERROR.toUpperCase();
-        }
-
         Conditions orConditions = null;
         if (this.orConditions != null) {
             orConditions = new Conditions();

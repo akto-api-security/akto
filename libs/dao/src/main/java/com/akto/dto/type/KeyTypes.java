@@ -4,6 +4,7 @@ import java.util.*;
 import java.util.regex.Pattern;
 
 import com.akto.dao.context.Context;
+import com.akto.dto.AktoDataType;
 import com.akto.dto.CustomDataType;
 import com.akto.dto.IgnoreData;
 import com.akto.dto.SensitiveParamInfo;
@@ -110,7 +111,48 @@ public class KeyTypes {
         return true;
     }
 
-    private static SubType getSubtype(Object o,String key, boolean checkForSubtypes){
+    private static boolean aktoDataTypeChanged(String name) {
+        Map<String, AktoDataType> aktoDataTypeMap = SingleTypeInfo.getAktoDataTypeMap(Context.accountId.get());
+        AktoDataType aktoDataType = aktoDataTypeMap.get(name);
+        return aktoDataType != null && (aktoDataType.getKeyConditions() != null || aktoDataType.getValueConditions() != null);
+    }
+
+    private static boolean matchesAktoDataType(String name, Object key, Object value) {
+        Map<String, AktoDataType> aktoDataTypeMap = SingleTypeInfo.getAktoDataTypeMap(Context.accountId.get());
+        AktoDataType aktoDataType = aktoDataTypeMap.get(name);
+        return aktoDataType != null && aktoDataType.validate(value, key);
+    }
+
+    private static SubType matchesSubType(SingleTypeInfo.SubType subType, Object key, Object val) {
+        String name = subType.getName();
+        // check if user has overriden the default behaviour of the subtype
+        if (aktoDataTypeChanged(name)) {
+            if (matchesAktoDataType(name, key, val)) {
+                return subType;
+            }
+        } else {
+            switch (name) {
+                case "CREDIT_CARD":
+                    if (isCreditCard(val.toString())) return subType;
+                    break;
+                case "JWT":
+                    if (isJWT(val.toString())) return subType;
+                    break;
+                case "IP_ADDRESS":
+                    if (isIP(val.toString())) return subType;
+                    break;
+                case "PHONE_NUMBER":
+                    if (isPhoneNumber(val.toString())) return subType;
+                    break;
+                default:
+                    return null;
+            }
+        }
+
+        return null;
+    }
+
+    private static SubType getSubtype(Object o,String key, boolean checkForSubtypes, boolean isHeader){
         if (o == null) {
             return SingleTypeInfo.NULL;
         }
@@ -129,13 +171,13 @@ public class KeyTypes {
         }
 
         String oString = o.toString();
-        if (checkForSubtypes && isCreditCard(oString)) {
+        if (checkForSubtypes && !isHeader  && matchesSubType(SingleTypeInfo.CREDIT_CARD, key, oString) != null) {
             return SingleTypeInfo.CREDIT_CARD;
         }
 
-        if (NumberUtils.isDigits(oString)) {
-            if (oString.length() < 19) {
-                o = Long.parseLong(oString);
+        if (NumberUtils.isDigits(o.toString())) {
+            if (o.toString().length() < 19) {
+                o = Long.parseLong(o.toString());
             }
         }
 
@@ -153,8 +195,8 @@ public class KeyTypes {
             return SingleTypeInfo.INTEGER_32;
         }
 
-        if (NumberUtils.isParsable(oString)) {
-            o = Float.parseFloat(oString);
+        if (NumberUtils.isParsable(o.toString())) {
+            o = Float.parseFloat(o.toString());
         }
 
         if (o instanceof Float || o instanceof Double) {
@@ -162,22 +204,32 @@ public class KeyTypes {
         }
 
         if (o instanceof String) {
+            String str = o.toString();
             for(Map.Entry<SubType, Pattern> entry: patternToSubType.entrySet()) {
                 Pattern pattern = entry.getValue();
                 SubType subType = entry.getKey();
-                if( ( checkForSubtypes || subType.getName().equals("URL") ) && pattern.matcher(oString).matches()) {
-                    return subType;
+                String name = subType.getName();
+
+                if (aktoDataTypeChanged(name)) {
+                    if (matchesAktoDataType(name, key, oString)) {
+                        return subType;
+                    }
+                } else {
+                    if( ( checkForSubtypes || subType.getName().equals("URL") ) && pattern.matcher(oString).matches()) {
+                        return subType;
+                    }
                 }
             }
-            if (checkForSubtypes && isJWT(oString)) {
+
+            if (checkForSubtypes && matchesSubType(SingleTypeInfo.JWT, key, oString) != null) {
                 return SingleTypeInfo.JWT;
             }
 
-            if (checkForSubtypes && isPhoneNumber(oString)) {
+            if (checkForSubtypes && matchesSubType(SingleTypeInfo.PHONE_NUMBER, key, oString) != null) {
                 return SingleTypeInfo.PHONE_NUMBER;
             }
 
-            if (checkForSubtypes && isIP(oString)) {
+            if (checkForSubtypes && matchesSubType(SingleTypeInfo.IP_ADDRESS, key, oString) != null) {
                 return SingleTypeInfo.IP_ADDRESS;
             }
 
@@ -189,7 +241,7 @@ public class KeyTypes {
 
     public static SubType findSubType(Object o,String key, ParamId paramId, boolean executeCheckForSubtypes){
         if(executeCheckForSubtypes){
-            return getSubtype(o, key, true);
+            return getSubtype(o, key, true, paramId == null ? false: paramId.isHeader());
         }else{
             return findSubType(o, key, paramId);
         }
@@ -208,7 +260,7 @@ public class KeyTypes {
             checkForSubtypes = checkForSubtypesTest(paramId, ignoreData);
         }
 
-        return getSubtype(o, key, checkForSubtypes);
+        return getSubtype(o, key, checkForSubtypes, paramId == null ? false: paramId.isHeader());
     }
 
     public Map<SubType,SingleTypeInfo> getOccurrences() {
@@ -250,10 +302,11 @@ public class KeyTypes {
 
     public static boolean isPhoneNumber(String mobileNumber) {
         boolean lengthCondition = mobileNumber.length() < 8 || mobileNumber.length() > 16;
-        if (lengthCondition) return false;
         boolean alphabetsCondition = mobileNumber.toLowerCase() != mobileNumber.toUpperCase(); // contains alphabets
 
-        if (alphabetsCondition) return false;
+        if (lengthCondition || alphabetsCondition) {
+            return false;
+        }
 
         PhoneNumberUtil phoneNumberUtil = PhoneNumberUtil.getInstance();
 
@@ -293,17 +346,17 @@ public class KeyTypes {
     }
 
     public static boolean isCreditCard(String s) {
-        if (s.length() < 12 || s.length() > 23) return false;
-        char firstChar = s.charAt(0);
-        if (!Character.isDigit(firstChar)) return false;
-        if (!s.toLowerCase().equals(s.toUpperCase())) return false; // only numbers
+        if (s.length() < 12) return false;
         String cc = s.replaceAll(" ", "").replaceAll("-", "");
-        return creditCardValidator.isValid(cc);    }
+        if (cc.length() > 23) return false;
+        if (!cc.toLowerCase().equals(cc.toUpperCase())) return false; // only numbers
+        return creditCardValidator.isValid(cc);
+    }
 
     public static boolean isIP(String s) {
         // for edge cases look at test cases of this function
-        boolean canBeIpv4 = s.length() > 6 && s.length() <= 15 && s.contains(".");
-        boolean canBeIpv6 = (s.length() <= 45 && s.contains(":"));
+        boolean canBeIpv4 = (s.length() > 6) || (s.length() <= 15) && (s.split(".").length == 4);
+        boolean canBeIpv6 = (s.length() < 45 && s.split(":").length > 6);
         if (!(canBeIpv4 || canBeIpv6)) return false;
         return ipAddressValidator.isValid(s);
     }

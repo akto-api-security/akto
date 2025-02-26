@@ -1,5 +1,5 @@
-import { Box, Button, DataTable, Divider, Modal, Text, TextField, Icon, Checkbox, Badge, Banner,HorizontalGrid, HorizontalStack, Link, VerticalStack, Tooltip, Popover, ActionMenu, OptionList } from "@shopify/polaris";
-import { TickMinor, CancelMajor, SearchMinor } from "@shopify/polaris-icons"
+import { Box, Button, DataTable, Divider, Modal, Text, TextField, Icon, Checkbox, ButtonGroup, Badge, Banner,HorizontalGrid, HorizontalStack, Link, VerticalStack } from "@shopify/polaris";
+import { TickMinor, CancelMajor } from "@shopify/polaris-icons"
 import { useEffect, useRef, useState } from "react";
 import { default as observeApi } from "../api";
 import { default as testingApi } from "../../testing/api";
@@ -9,12 +9,12 @@ import func from "@/util/func"
 import { useNavigate } from "react-router-dom"
 import PersistStore from "../../../../main/PersistStore";
 
-function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOutside, closeRunTest, selectedResourcesForPrimaryAction }) {
+function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOutside, closeRunTest }) {
 
     const initialState = {
         categories: [],
         tests: {},
-        selectedCategory: "BOLA",
+        selectedCategory: "",
         recurringDaily: false,
         continuousTesting: false,
         overriddenTestAppUrl: "",
@@ -22,13 +22,14 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         startTimestamp: func.timeNow(),
         hourlyLabel: "Now",
         testRunTime: -1,
-        testRunTimeLabel: "30 minutes",
+        testRunTimeLabel: "Till complete",
         runTypeLabel: "Now",
         maxConcurrentRequests: -1,
         testName: "",
         authMechanismPresent: false,
         testRoleLabel: "No test role selected",
         testRoleId: "",
+        sendSlackAlert: false
     }
 
     const navigate = useNavigate()
@@ -59,6 +60,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
     const initialArr = ['akto','custom']
 
     const [optionsSelected, setOptionsSelected] = useState(initialArr)
+    const [slackIntegrated, setSlackIntegrated] = useState(false)
 
     function nameSuffixes(tests) {
         return Object.entries(tests)
@@ -83,6 +85,11 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
     async function fetchData() {
         setLoading(true)
 
+        observeApi.fetchSlackWebhooks().then((resp) => {
+            const apiTokenList = resp.apiTokenList
+            setSlackIntegrated(apiTokenList && apiTokenList.length > 0)
+        })
+
         const allSubCategoriesResponse = await testingApi.fetchAllSubCategories(true, "runTests")
         const testRolesResponse = await testingApi.fetchTestRoles()
         var testRoles = testRolesResponse.testRoles.map(testRole => {
@@ -96,13 +103,12 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         const businessLogicSubcategories = allSubCategoriesResponse.subCategories
         const categories = allSubCategoriesResponse.categories
         const { selectedCategory, mapCategoryToSubcategory } = populateMapCategoryToSubcategory(businessLogicSubcategories)
+
         // Store all tests
         const processMapCategoryToSubcategory = {}
-        if(Object.keys(businessLogicSubcategories).length > 0){
-            Object.keys(mapCategoryToSubcategory).map(category => {
-                processMapCategoryToSubcategory[category] = [...mapCategoryToSubcategory[category]["all"]]
-            })
-        }
+        Object.keys(mapCategoryToSubcategory).map(category => {
+            processMapCategoryToSubcategory[category] = [...mapCategoryToSubcategory[category]["all"]]
+        })
 
         // Set if a test is selected or not
         Object.keys(processMapCategoryToSubcategory).map(category => {
@@ -126,7 +132,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
             ...prev,
             categories: categories,
             tests: processMapCategoryToSubcategory,
-            selectedCategory: Object.keys(processMapCategoryToSubcategory).length > 0 ? Object.keys(processMapCategoryToSubcategory)[0] : "",
+            selectedCategory: Object.keys(processMapCategoryToSubcategory)[0],
             testName: testName,
             authMechanismPresent: authMechanismPresent
         }))
@@ -163,6 +169,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
             ret[x.superCategory.name].all.push(obj)
             ret[x.superCategory.name].selected.push(obj)
         })
+
         //store this
         return {
             selectedCategory: Object.keys(ret)[0],
@@ -172,80 +179,16 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
 
     const activator = (
         <div ref={runTestRef}>
-            <Button onClick={toggleRunTest} primary disabled={disabled || testRun.selectedCategory.length === 0} ><div data-testid="run_test_button">Run test</div></Button>
+            <Button onClick={toggleRunTest} primary disabled={disabled} ><div data-testid="run_test_button">Run test</div></Button>
         </div>
     );
 
-    const filterFunc = (test, selectedVal = []) => {
-        const useFilterArr = selectedVal.length > 0 ? selectedVal : optionsSelected
-        let ans = false;
-        sectionsForFilters.forEach((filter) => {
-            const filterKey = filter.filterKey;
-            if(filterKey === 'author'){
-                if(useFilterArr.includes('custom')){
-                    ans = useFilterArr.includes(test[filterKey].toLowerCase()) || test[filterKey].toLowerCase() !== 'akto'
-                }else{
-                    ans = useFilterArr.length > 0 && useFilterArr.includes(test[filterKey].toLowerCase())
-                }
-            }
-            else if(useFilterArr.includes(test[filterKey].toLowerCase())){
-                ans = true
-            }
-        })
-        return ans;
-    }
-
-    const resetSearchFunc = () => {
-        setShowSearch(false);
-        setSearchValue('');
-    }
-
     let categoryRows = [], testRows = []
-
-    const handleTestsSelected = (test) => {
-        let localCopy = JSON.parse(JSON.stringify(testRun.tests))
-        localCopy[testRun.selectedCategory] = localCopy[testRun.selectedCategory].map(curTest =>
-            curTest.label === test.label ?
-            {
-                ...curTest,
-                selected: !curTest.selected
-            } : curTest
-        ) 
-        const testName = convertToLowerCaseWithUnderscores(apiCollectionName) + "_" + nameSuffixes(localCopy).join("_")
-        setTestRun(prev => ({
-            ...prev,
-            tests: {
-                ...prev.tests,
-                [testRun.selectedCategory]: prev.tests[testRun.selectedCategory].map(curTest =>
-                    curTest.label === test.label ?
-                        {
-                            ...curTest,
-                            selected: !curTest.selected
-                        } : curTest)
-            },
-            testName:testName
-        }))
-    }
-
-    const selectOnlyFilteredTests = (selected) => {
-        const filteredTests = testRun.selectedCategory.length > 0 ? testRun.tests[testRun.selectedCategory].filter(x => filterFunc(x, selected)).map(item => item.value) : []
-        setTestRun(prev => ({
-            ...prev,
-            tests: {
-                ...prev.tests,
-                [testRun.selectedCategory]: prev.tests[testRun.selectedCategory].map((curTest) => {
-                    return {
-                        ...curTest,
-                        selected: filteredTests.length > 0 && filteredTests.includes(curTest.value)
-                    }
-                })
-            }
-        }))
-    }
 
     if (!loading) {
         categoryRows = testRun.categories.map(category => {
             const tests = testRun.tests[category.name]
+
             if (tests) {
                 let selected = 0
                 const total = tests.length
@@ -258,9 +201,9 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                 return ([(
                     <div
                         style={{ display: "grid", gridTemplateColumns: "auto max-content", alignItems: "center" }}
-                        onClick={() => { setTestRun(prev => ({ ...prev, selectedCategory: category.name })); resetSearchFunc(); setOptionsSelected(initialArr)}}>
+                        onClick={() => setTestRun(prev => ({ ...prev, selectedCategory: category.name }))}>
                         <div>
-                            <Text variant="headingMd" fontWeight="bold" color={category.name === testRun.selectedCategory ? "success" : ""}>{category.displayName}</Text>
+                            <Text variany="headingMd" fontWeight="bold" color={category.name === testRun.selectedCategory ? "success" : ""}>{category.displayName}</Text>
                             <Text>{selected} out of {total} selected</Text>
                         </div>
                         {selected > 0 && <Icon source={TickMinor} color="base" />}
@@ -272,8 +215,32 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
 
         })
 
-        const filteredTests = testRun.selectedCategory.length > 0 ? testRun.tests[testRun.selectedCategory].filter(x => (x.label.toLowerCase().includes(searchValue.toLowerCase()) && filterFunc(x))) : []
-        testRows = filteredTests.map(test => {
+        const handleTestsSelected = (test) => {
+            let localCopy = JSON.parse(JSON.stringify(testRun.tests))
+            localCopy[testRun.selectedCategory] = localCopy[testRun.selectedCategory].map(curTest =>
+                curTest.label === test.label ?
+                {
+                    ...curTest,
+                    selected: !curTest.selected
+                } : curTest
+            ) 
+            const testName = convertToLowerCaseWithUnderscores(apiCollectionName) + "_" + nameSuffixes(localCopy).join("_")
+            setTestRun(prev => ({
+                ...prev,
+                tests: {
+                    ...prev.tests,
+                    [testRun.selectedCategory]: prev.tests[testRun.selectedCategory].map(curTest =>
+                        curTest.label === test.label ?
+                            {
+                                ...curTest,
+                                selected: !curTest.selected
+                            } : curTest)
+                },
+                testName:testName
+            }))
+        }
+
+        testRows = testRun.tests[testRun.selectedCategory].map(test => {
             const isCustom = test?.author !== "AKTO"
             const label = (
                 <span style={{display: 'flex', gap: '4px', alignItems: 'flex-start'}}>
@@ -321,7 +288,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         return abc
     }, [])
 
-    const testRunTimeOptions = [ ...runTimeMinutes, ...runTimeHours]
+    const testRunTimeOptions = [{ label: "Till complete", value: "Till complete" }, ...runTimeMinutes, ...runTimeHours]
 
     const runTypeOptions = [{ label: "Daily", value: "Daily" }, { label: "Continuously", value: "Continuously" }, { label: "Now", value: "Now" }]
 
@@ -432,7 +399,6 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         )
 
         func.setToast(true, false, <div data-testid="test_run_created_message">{forwardLink}</div>)
-
     }
 
     function getLabel(objList, value) {
@@ -469,6 +435,17 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
 
     const handleInputValue = (val) => {
         setSearchValue(val);
+    }
+
+    function generateLabelForSlackIntegration() {
+        return <HorizontalStack gap={1}>
+            <Link url='/dashboard/settings/integrations/slack' target="_blank" rel="noopener noreferrer" style={{ color: "#3385ff", textDecoration: 'none' }}>
+                Enable
+            </Link>
+            <Text>
+                Slack integration to send alerts post completion
+            </Text>
+        </HorizontalStack>
     }
 
     return (
@@ -548,34 +525,13 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                                 </div>
                             </div>
                             <div>
-                                <div style={{ padding: !showSearch ? "13px" : "9px", alignItems: "center", justifyContent: 'space-between', display: 'flex' }}>
+                                <div style={{ padding: "15px", alignItems: "center" }}>
                                     <HorizontalStack gap={"2"}>
                                         <Checkbox
                                             checked={allTestsSelectedOfCategory}
                                             onChange={(val) => toggleTestsSelection(val)}
                                         />
                                         <Text variant="headingMd">Tests</Text>
-                                    </HorizontalStack>
-                                    <HorizontalStack gap={"2"}>
-                                        <Popover
-                                            activator={<Button plain size="slim" onClick={() => setShowFiltersOption(!showFiltersOption)}>More filters</Button>}
-                                            onClose={() => setShowFiltersOption(false)}
-                                            active={showFiltersOption}
-                                        >
-                                            <Popover.Pane fixed>
-                                                <OptionList
-                                                    onChange={(x) => {setOptionsSelected(x); selectOnlyFilteredTests(x);}}
-                                                    allowMultiple
-                                                    sections={sectionsForFilters}
-                                                    selected={optionsSelected}
-                                                />
-                                            </Popover.Pane>
-                                        </Popover>
-                                        {showSearch ? <TextField onChange={handleInputValue} value={searchValue} autoFocus
-                                    focused /> : null}
-                                        <Tooltip content={"Click to search"} dismissOnMouseOut>
-                                            <Button size="slim" icon={SearchMinor} onClick={() => setShowSearch(!showSearch)}/>
-                                        </Tooltip>
                                     </HorizontalStack>
                                 </div>
                                 <Divider />
@@ -699,19 +655,30 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                             </HorizontalGrid>
 
                             <Checkbox
-                                label="Use different target for testing"
-                                checked={testRun.hasOverriddenTestAppUrl}
-                                onChange={() => setTestRun(prev => ({ ...prev, hasOverriddenTestAppUrl: !prev.hasOverriddenTestAppUrl }))}
+                                label={slackIntegrated ? "Send slack alert post test completion" : generateLabelForSlackIntegration()}
+                                checked={testRun.sendSlackAlert}
+                                onChange={() => setTestRun(prev => ({ ...prev, sendSlackAlert: !prev.sendSlackAlert}))}
+                                disabled={!slackIntegrated}
                             />
-                            {testRun.hasOverriddenTestAppUrl &&
-                                <div style={{ width: '400px'}}> 
-                                    <TextField
-                                        placeholder="Override test app host"
-                                        value={testRun.overriddenTestAppUrl}
-                                        onChange={(overriddenTestAppUrl) => setTestRun(prev => ({ ...prev, overriddenTestAppUrl: overriddenTestAppUrl }))}
-                                    />
-                                </div>
-                            }
+
+                            <HorizontalGrid columns={2}>
+                                <Checkbox
+                                    label="Use different target for testing"
+                                    checked={testRun.hasOverriddenTestAppUrl}
+                                    onChange={() => setTestRun(prev => ({ ...prev, hasOverriddenTestAppUrl: !prev.hasOverriddenTestAppUrl }))}
+                                />
+                                {testRun.hasOverriddenTestAppUrl &&
+                                    <div style={{ width: '400px'}}> 
+                                        <TextField
+                                            placeholder="Override test app host"
+                                            value={testRun.overriddenTestAppUrl}
+                                            onChange={(overriddenTestAppUrl) => setTestRun(prev => ({ ...prev, overriddenTestAppUrl: overriddenTestAppUrl }))}
+                                        />
+                                    </div>
+                                }
+                            </HorizontalGrid>
+
+
                         </VerticalStack>
 
                     </Modal.Section>

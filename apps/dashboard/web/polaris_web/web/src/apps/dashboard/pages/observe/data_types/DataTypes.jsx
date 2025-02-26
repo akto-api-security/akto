@@ -157,9 +157,20 @@ function DataTypes() {
   const saveAction = async () => {
     console.log(currState)
     if (currState.dataType === 'Akto') {
+
+      const keyArr = currState.keyConditions.predicates.map(transform.convertMapFunction)
+      const valueArr = currState.valueConditions.predicates.map(transform.convertMapFunction)
+
       let obj = {
         name: currState.name,
         redacted:currState.redacted,
+        categoriesList: currState?.categoriesList || [],
+        operator: currState.operator,
+        keyConditionFromUsers: keyArr,
+        keyOperator: currState.keyConditions.operator,
+        valueConditionFromUsers: valueArr,
+        valueOperator: currState.valueConditions.operator,
+        dataTypePriority: currState?.priority ? currState.priority.toUpperCase() : "",
         ...transform.convertToSensitiveData(currState.sensitiveState),
         
       }
@@ -310,7 +321,29 @@ function DataTypes() {
     </VerticalStack>
   )
 
-  let components = (!isNew && currState.dataType === 'Akto') ? [descriptionCard, requestCard, redactCard] : [descriptionCard, conditionsCard, requestCard, redactCard]
+  const TestTemplateCard = (
+    <VerticalStack gap="5" key="testTemplate">
+      <LegacyCard title={
+        <TitleWithInfo
+          textProps={{ variant: 'headingMd' }}
+          titleText={"Test templates"}
+          tooltipContent={"Create test template for this data type"}
+        />}
+      >
+        <div className='card-items'>
+          <InformationBannerComponent docsUrl={""} content="When enabled, test template is created and synced with this data type.">
+          </InformationBannerComponent>
+        </div>
+        <LegacyCard.Section>
+          <Checkbox label={"Create test template for this data type"} checked={!(currState.skipDataTypeTestTemplateMapping)} onChange={() => {
+            handleChange({ skipDataTypeTestTemplateMapping: !currState.skipDataTypeTestTemplateMapping })
+          }} />
+        </LegacyCard.Section>
+      </LegacyCard>
+    </VerticalStack>
+  )
+
+  let components = (!isNew && currState.dataType === 'Akto') ? [descriptionCard, conditionsCard, requestCard, redactCard] : [descriptionCard, conditionsCard, requestCard, redactCard, TestTemplateCard]
 
   return (
     <DetailsPage

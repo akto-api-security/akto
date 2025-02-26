@@ -257,7 +257,7 @@ public class TestDependencyAnalyser extends MongoBasedTest {
         templateURLToMethods.put(APICatalogSync.createUrlTemplate("api/hotel/INTEGER", URLMethods.Method.POST), null);
         apiCatalog.setTemplateURLToMethods(templateURLToMethods);
         dbState.put(1000, apiCatalog);
-        DependencyAnalyser dependencyAnalyser = new DependencyAnalyser(dbState, false);
+        DependencyAnalyser dependencyAnalyser = new DependencyAnalyser(dbState,false, false, new HashMap<>());
         dependencyAnalyser.nodes = nodes;
 
         assertEquals(6, dependencyAnalyser.nodes.size());

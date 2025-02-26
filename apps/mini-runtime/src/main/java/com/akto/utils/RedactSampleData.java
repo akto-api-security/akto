@@ -40,6 +40,8 @@ public class RedactSampleData {
         return redact(HttpCallParser.parseKafkaMessage(sample), false);
     }
 
+    private static final String HOST = "host";
+
     public static String redactCookie(Map<String, List<String>> headers, String header) {
         String cookie = "";
         List<String> cookieList = headers.getOrDefault(header, new ArrayList<>());
@@ -83,6 +85,9 @@ public class RedactSampleData {
     private static void handleHeaders(Map<String, List<String>> responseHeaders, boolean redactAll) {
         if(redactAll){
             for (String header : responseHeaders.keySet()) {
+                if(header.equals(HOST)){
+                    continue;
+                }
                 if (header.equalsIgnoreCase(AuthPolicy.COOKIE_NAME)) {
                     String cookie = redactCookie(responseHeaders, header);
                     responseHeaders.put(header, Collections.singletonList(cookie));
@@ -98,6 +103,9 @@ public class RedactSampleData {
             List<String> values = entry.getValue();
             SingleTypeInfo.SubType subType = KeyTypes.findSubType(values.get(0), key, null);
             if(SingleTypeInfo.isRedacted(subType.getName())){
+                if(key.equals(HOST)){
+                    continue;
+                }
                 if (key.equalsIgnoreCase(AuthPolicy.COOKIE_NAME)) {
                     String cookie = redactCookie(responseHeaders, key);
                     responseHeaders.put(key, Collections.singletonList(cookie));
@@ -168,11 +176,6 @@ public class RedactSampleData {
         }
 
         httpResponseParams.requestParams.setPayload(requestPayload);
-
-        // ip
-        if(redactAll) {
-            httpResponseParams.setSourceIP(redactValue);
-        }
 
         return convertHttpRespToOriginalString(httpResponseParams);
 

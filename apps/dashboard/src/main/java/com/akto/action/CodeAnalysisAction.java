@@ -57,7 +57,7 @@ public class CodeAnalysisAction extends UserAction {
     public void sendMixpanelEvent() {
         try {
             int accountId = Context.accountId.get();
-            DashboardMode dashboardMode = DashboardMode.getDashboardMode();        
+            DashboardMode dashboardMode = DashboardMode.getDashboardMode();
             RBAC record = RBACDao.instance.findOne(RBAC.ACCOUNT_ID, accountId, RBAC.ROLE, Role.ADMIN);
             if (record == null) {
                 return;
@@ -88,7 +88,7 @@ public class CodeAnalysisAction extends UserAction {
                         }
                     }
                 }
-            } 
+            }
             props.put("codeAnalysisApiCount", codeAnalysisApiCount);
             props.put("fileExtensions", fileExtensions);
 
@@ -98,7 +98,7 @@ public class CodeAnalysisAction extends UserAction {
             loggerMaker.errorAndAddToDb("Error sending CODE_ANALYSIS_SYNC mixpanel event: " + e.getMessage(), LogDb.DASHBOARD);
         }
     }
-    
+
     public String syncExtractedAPIs() {
         loggerMaker.infoAndAddToDb("Syncing code analysis endpoints for collection: " + apiCollectionName, LogDb.DASHBOARD);
 
@@ -133,7 +133,7 @@ public class CodeAnalysisAction extends UserAction {
         /*
          * In some cases it is not possible to determine the type of template url from source code
          * In such cases, we can use the information from traffic endpoints to match the traffic and source code endpoints
-         * 
+         *
          * Eg:
          * Source code endpoints:
          * GET /books/STRING -> GET /books/AKTO_TEMPLATE_STR -> GET /books/INTEGER
@@ -183,7 +183,7 @@ public class CodeAnalysisAction extends UserAction {
 
             trafficApiEndpointAktoTemplateStrToOriginalMap.put(trafficApiEndpointAktoTemplateStr, trafficApiEndpoint);
         }
-        
+
         Map<String, CodeAnalysisApi> tempCodeAnalysisApisMap = new HashMap<>(codeAnalysisApisMap);
         for (Map.Entry<String, CodeAnalysisApi> codeAnalysisApiEntry: codeAnalysisApisMap.entrySet()) {
             String codeAnalysisApiKey = codeAnalysisApiEntry.getKey();
@@ -199,11 +199,11 @@ public class CodeAnalysisAction extends UserAction {
             }
 
             if(codeAnalysisApiEndpointAktoTemplateStr.contains("AKTO_TEMPLATE_STR") && trafficApiEndpointAktoTemplateStrToOriginalMap.containsKey(codeAnalysisApiEndpointAktoTemplateStr)) {
-               CodeAnalysisApi newCodeAnalysisApi = new CodeAnalysisApi(
-                    codeAnalysisApi.getMethod(), 
-                    trafficApiEndpointAktoTemplateStrToOriginalMap.get(codeAnalysisApiEndpointAktoTemplateStr), 
+                CodeAnalysisApi newCodeAnalysisApi = new CodeAnalysisApi(
+                        codeAnalysisApi.getMethod(),
+                        trafficApiEndpointAktoTemplateStrToOriginalMap.get(codeAnalysisApiEndpointAktoTemplateStr),
                     codeAnalysisApi.getLocation(), codeAnalysisApi.getRequestBody(), codeAnalysisApi.getResponseBody());
-                
+
                 tempCodeAnalysisApisMap.remove(codeAnalysisApiKey);
                 tempCodeAnalysisApisMap.put(newCodeAnalysisApi.generateCodeAnalysisApisMapKey(), newCodeAnalysisApi);
             }
@@ -224,7 +224,7 @@ public class CodeAnalysisAction extends UserAction {
                 for(Map.Entry<String, CodeAnalysisApi> codeAnalysisApiEntry: tempCodeAnalysisApisMap.entrySet()) {
                     CodeAnalysisApi codeAnalysisApi = codeAnalysisApiEntry.getValue();
                     String codeAnalysisApiEndpoint = codeAnalysisApi.getEndpoint();
-                   
+
                     String trafficApiMethod = "", trafficApiEndpoint = "";
                     try {
                         String[] trafficApiKeyParts = trafficApiKey.split(" ");
@@ -237,10 +237,10 @@ public class CodeAnalysisAction extends UserAction {
 
                     if (codeAnalysisApiEndpoint.equals(trafficApiEndpoint)) {
                         CodeAnalysisApi newCodeAnalysisApi = new CodeAnalysisApi(
-                            trafficApiMethod, 
-                            trafficApiEndpoint, 
+                                trafficApiMethod,
+                                trafficApiEndpoint,
                             codeAnalysisApi.getLocation(), codeAnalysisApi.getRequestBody(), codeAnalysisApi.getResponseBody());
-                        
+
                         tempCodeAnalysisApisMap.put(newCodeAnalysisApi.generateCodeAnalysisApisMapKey(), newCodeAnalysisApi);
                         break;
                     }
@@ -256,13 +256,13 @@ public class CodeAnalysisAction extends UserAction {
             codeAnalysisCollectionId = new ObjectId();
 
             CodeAnalysisCollection codeAnalysisCollection = CodeAnalysisCollectionDao.instance.updateOne(
-                Filters.eq("codeAnalysisCollectionName", apiCollectionName),
-                Updates.combine(
-                        Updates.setOnInsert(CodeAnalysisCollection.ID, codeAnalysisCollectionId),
-                        Updates.setOnInsert(CodeAnalysisCollection.NAME, apiCollectionName),
+                    Filters.eq("codeAnalysisCollectionName", apiCollectionName),
+                    Updates.combine(
+                            Updates.setOnInsert(CodeAnalysisCollection.ID, codeAnalysisCollectionId),
+                            Updates.setOnInsert(CodeAnalysisCollection.NAME, apiCollectionName),
                         Updates.set(CodeAnalysisCollection.PROJECT_DIR, projectDir),
                         Updates.setOnInsert(CodeAnalysisCollection.API_COLLECTION_ID, apiCollection.getId())
-                )
+                    )
             );
 
             // Set code analysis collection id if existing collection is updated
@@ -282,21 +282,21 @@ public class CodeAnalysisAction extends UserAction {
             List<WriteModel<SingleTypeInfo>> bulkUpdatesSTI = new ArrayList<>();
 
             for(Map.Entry<String, CodeAnalysisApi> codeAnalysisApiEntry: codeAnalysisApisMap.entrySet()) {
-                    CodeAnalysisApi codeAnalysisApi = codeAnalysisApiEntry.getValue();
-                    CodeAnalysisApiInfo.CodeAnalysisApiInfoKey codeAnalysisApiInfoKey = new CodeAnalysisApiInfo.CodeAnalysisApiInfoKey(codeAnalysisCollectionId, codeAnalysisApi.getMethod(), codeAnalysisApi.getEndpoint());
+                CodeAnalysisApi codeAnalysisApi = codeAnalysisApiEntry.getValue();
+                CodeAnalysisApiInfo.CodeAnalysisApiInfoKey codeAnalysisApiInfoKey = new CodeAnalysisApiInfo.CodeAnalysisApiInfoKey(codeAnalysisCollectionId, codeAnalysisApi.getMethod(), codeAnalysisApi.getEndpoint());
 
-                    bulkUpdates.add(
+                bulkUpdates.add(
                         new UpdateOneModel<>(
-                            Filters.eq(CodeAnalysisApiInfo.ID, codeAnalysisApiInfoKey),
-                            Updates.combine(
-                                Updates.setOnInsert(CodeAnalysisApiInfo.ID, codeAnalysisApiInfoKey),
+                                Filters.eq(CodeAnalysisApiInfo.ID, codeAnalysisApiInfoKey),
+                                Updates.combine(
+                                        Updates.setOnInsert(CodeAnalysisApiInfo.ID, codeAnalysisApiInfoKey),
                                 Updates.set(CodeAnalysisApiInfo.LOCATION, codeAnalysisApi.getLocation()),
                                 Updates.setOnInsert(CodeAnalysisApiInfo.DISCOVERED_TS, now),
                                 Updates.set(CodeAnalysisApiInfo.LAST_SEEN_TS, now)
-                            ),
-                            new UpdateOptions().upsert(true)
+                                ),
+                                new UpdateOptions().upsert(true)
                         )
-                    );
+                );
 
                 String requestBody = codeAnalysisApi.getRequestBody();
                 String responseBody = codeAnalysisApi.getResponseBody();
@@ -345,7 +345,7 @@ public class CodeAnalysisAction extends UserAction {
                 sendMixpanelEvent();
             }
         }, 0, TimeUnit.SECONDS);
-        
+
 
         return SUCCESS.toUpperCase();
     }

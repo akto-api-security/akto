@@ -1,0 +1,22 @@
+services:
+  db:
+    image: postgres
+    restart: always
+    # user: shivansh
+    environment:
+      POSTGRES_PASSWORD: example
+      POSTGRES_USER: shivansh
+      PGUSER: shivansh
+      POSTGRES_DB: shivansh
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready"]
+      interval: 1s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - pgdata:/var/lib/postgresql/data 
+    ports: 
+      - 5432:5432
+ 
+volumes:
+  pgdata:

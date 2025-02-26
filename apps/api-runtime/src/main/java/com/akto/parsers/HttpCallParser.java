@@ -1,5 +1,6 @@
 package com.akto.parsers;
 
+import com.akto.RuntimeMode;
 import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.billing.OrganizationsDao;
@@ -7,34 +8,23 @@ import com.akto.dao.context.Context;
 import com.akto.dao.traffic_metrics.TrafficMetricsDao;
 import com.akto.dependency.DependencyAnalyser;
 import com.akto.dto.*;
-import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.billing.SyncLimit;
-import com.akto.dto.monitoring.FilterConfig;
-import com.akto.dto.monitoring.FilterConfig.FILTER_TYPE;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.settings.DefaultPayload;
-import com.akto.dto.test_editor.ExecutorNode;
-import com.akto.dto.testing.custom_groups.AllAPIsGroup;
 import com.akto.dto.traffic_metrics.TrafficMetrics;
-import com.akto.dto.type.URLMethods.Method;
 import com.akto.dto.usage.MetricTypes;
 import com.akto.graphql.GraphQLUtils;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.runtime.parser.SampleParser;
 import com.akto.runtime.APICatalogSync;
 import com.akto.runtime.Main;
-import com.akto.runtime.RuntimeUtil;
 import com.akto.runtime.URLAggregator;
-import com.akto.runtime.utils.Utils;
-import com.akto.test_editor.execution.ParseAndExecute;
-import com.akto.test_editor.execution.VariableResolver;
-import com.akto.test_editor.filter.data_operands_impl.ValidationResult;
 import com.akto.usage.UsageMetricCalculator;
-import com.akto.util.DbMode;
-import com.akto.util.Pair;
 import com.akto.util.http_util.CoreHTTPClient;
 import com.akto.util.Constants;
+import com.akto.util.DbMode;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.*;
 import okhttp3.*;
@@ -43,7 +33,6 @@ import org.bson.conversions.Bson;
 
 import java.io.IOException;
 import java.util.*;
-import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -52,20 +41,20 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static com.akto.runtime.RuntimeUtil.matchesDefaultPayload;
-import static com.akto.testing.Utils.validateFilter;
 
 public class HttpCallParser {
     private final int sync_threshold_count;
     private final int sync_threshold_time;
     private int sync_count = 0;
     private int last_synced;
-    private static final LoggerMaker loggerMaker = new LoggerMaker(HttpCallParser.class, LogDb.RUNTIME);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(HttpCallParser.class);
     public APICatalogSync apiCatalogSync;
     public DependencyAnalyser dependencyAnalyser;
     private Map<String, Integer> hostNameToIdMap = new HashMap<>();
     private Map<TrafficMetrics.Key, TrafficMetrics> trafficMetricsMap = new HashMap<>();
     public static final ScheduledExecutorService trafficMetricsExecutor = Executors.newScheduledThreadPool(1);
     private static final String trafficMetricsUrl = "https://logs.akto.io/traffic-metrics";
+    private Map<Integer, ApiCollection> apiCollectionsMap = new HashMap<>();
     private static final OkHttpClient client = CoreHTTPClient.client.newBuilder()
             .writeTimeout(1, TimeUnit.SECONDS)
             .readTimeout(1, TimeUnit.SECONDS)
@@ -96,21 +85,12 @@ public class HttpCallParser {
         this.sync_threshold_time = sync_threshold_time;
         apiCatalogSync = new APICatalogSync(userIdentifier, thresh, fetchAllSTI);
         apiCatalogSync.buildFromDB(false, fetchAllSTI);
-        this.dependencyAnalyser = new DependencyAnalyser(apiCatalogSync.dbState, !Main.isOnprem);
+        apiCollectionsMap = ApiCollectionsDao.instance.getApiCollectionsMetaMap();
+        this.dependencyAnalyser = new DependencyAnalyser(apiCatalogSync.dbState, Main.isOnprem, RuntimeMode.isHybridDeployment(), apiCollectionsMap);
     }
-
-    public HttpCallParser(int sync_threshold_count, int sync_threshold_time) {
-        this.sync_threshold_count = sync_threshold_count;
-        this.sync_threshold_time = sync_threshold_time;
-    }
-
+    
     public static HttpResponseParams parseKafkaMessage(String message) throws Exception {
-        try {
-            return com.akto.runtime.utils.Utils.parseKafkaMessage(message);
-        } catch (Exception e) {
-            throw e;
-        }
-        
+        return SampleParser.parseSampleMessage(message);
     }
 
     public static String getHeaderValue(Map<String,List<String>> headers, String headerKey) {
@@ -175,64 +155,8 @@ public class HttpCallParser {
         }
     }
 
-    public static FILTER_TYPE isValidResponseParam(HttpResponseParams responseParam, Map<String, FilterConfig> filterMap, Map<String, List<ExecutorNode>> executorNodesMap){
-        FILTER_TYPE filterType = FILTER_TYPE.UNCHANGED;
-        String message = responseParam.getOrig();
-        RawApi rawApi = RawApi.buildFromMessage(message);
-        int apiCollectionId = responseParam.requestParams.getApiCollectionId();
-        String url = responseParam.getRequestParams().getURL();
-        Method method = Method.fromString(responseParam.getRequestParams().getMethod());
-        ApiInfoKey apiInfoKey = new ApiInfoKey(apiCollectionId, url, method);
-        for (Entry<String, FilterConfig> apiFilterEntry : filterMap.entrySet()) {
-            try {
-                FilterConfig apiFilter = apiFilterEntry.getValue();
-                Map<String, Object> varMap = apiFilter.resolveVarMap();
-                VariableResolver.resolveWordList(varMap, new HashMap<ApiInfoKey, List<String>>() {
-                    {
-                        put(apiInfoKey, Arrays.asList(message));
-                    }
-                }, apiInfoKey);
-                String filterExecutionLogId = UUID.randomUUID().toString();
-                ValidationResult res = validateFilter(apiFilter.getFilter().getNode(), rawApi,
-                        apiInfoKey, varMap, filterExecutionLogId);
-                if (res.getIsValid()) {
-                    // handle custom filters here
-                    if(apiFilter.getId().equals(FilterConfig.DEFAULT_BLOCK_FILTER)){
-                        return FILTER_TYPE.BLOCKED;
-                    }
-
-                    // handle execute here
-                    List<ExecutorNode> nodes = executorNodesMap.getOrDefault(apiFilter.getId(), new ArrayList<>());
-                    if(!nodes.isEmpty()){
-                        RawApi modifiedApi = new ParseAndExecute().execute(nodes, rawApi, apiInfoKey, varMap, filterExecutionLogId);
-                        responseParam = Utils.convertRawApiToHttpResponseParams(modifiedApi, responseParam);
-                        filterType = FILTER_TYPE.MODIFIED;
-                    }else{
-                        filterType = FILTER_TYPE.ALLOWED;
-                    }
-                    
-                }
-            } catch (Exception e) {
-                loggerMaker.errorAndAddToDb(e, String.format("Error in httpCallFilter %s", e.toString()));
-                filterType = FILTER_TYPE.ERROR;
-            }
-        }
-        return filterType;
-    }
 
     int numberOfSyncs = 0;
-
-    public static Pair<HttpResponseParams,FILTER_TYPE> applyAdvancedFilters(HttpResponseParams responseParams, Map<String, List<ExecutorNode>> executorNodesMap,  Map<String,FilterConfig> filterMap){
-        if (filterMap != null && !filterMap.isEmpty()) {
-            FILTER_TYPE filterType = isValidResponseParam(responseParams, filterMap, executorNodesMap);
-            if(filterType.equals(FILTER_TYPE.BLOCKED)){
-                return new Pair<HttpResponseParams,FilterConfig.FILTER_TYPE>(null, FILTER_TYPE.BLOCKED);
-            }else{
-                return new Pair<HttpResponseParams,FilterConfig.FILTER_TYPE>(responseParams, filterType);
-            }
-        }
-        return new Pair<HttpResponseParams,FilterConfig.FILTER_TYPE>(responseParams, FILTER_TYPE.ERROR);
-    }
 
     public void syncFunction(List<HttpResponseParams> responseParams, boolean syncImmediately, boolean fetchAllSTI, AccountSettings accountSettings)  {
         // USE ONLY filteredResponseParams and not responseParams
@@ -240,14 +164,7 @@ public class HttpCallParser {
         if (accountSettings != null && accountSettings.getDefaultPayloads() != null) {
             filteredResponseParams = filterDefaultPayloads(filteredResponseParams, accountSettings.getDefaultPayloads());
         }
-        List<String> redundantList = new ArrayList<>();
-        if(accountSettings !=null && !accountSettings.getAllowRedundantEndpointsList().isEmpty()){
-            redundantList = accountSettings.getAllowRedundantEndpointsList();
-        }
-        Pattern regexPattern = Utils.createRegexPatternFromList(redundantList);
-        filteredResponseParams = filterHttpResponseParams(filteredResponseParams, redundantList, regexPattern);
-        
-
+        filteredResponseParams = filterHttpResponseParams(filteredResponseParams, accountSettings);
         boolean isHarOrPcap = aggregate(filteredResponseParams, aggregatorMap);
 
         for (int apiCollectionId: aggregatorMap.keySet()) {
@@ -255,15 +172,9 @@ public class HttpCallParser {
             apiCatalogSync.computeDelta(aggregator, false, apiCollectionId);
         }
 
-        if (DbMode.dbType.equals(DbMode.DbType.MONGO_DB)) {
-            for (HttpResponseParams responseParam: filteredResponseParams) {
-                try{
-                    dependencyAnalyser.analyse(responseParam.getOrig(), responseParam.requestParams.getApiCollectionId());
-                } catch (Exception e){
-                    loggerMaker.errorAndAddToDb(e, "error in analyzing dependency: " + e);
-                }
-            }
-        }
+          for (HttpResponseParams responseParam: filteredResponseParams) {
+              dependencyAnalyser.analyse(responseParam.getOrig(), responseParam.requestParams.getApiCollectionId());
+          }
 
         this.sync_count += filteredResponseParams.size();
         int syncThresh = numberOfSyncs < 10 ? 10000 : sync_threshold_count;
@@ -273,15 +184,16 @@ public class HttpCallParser {
             SyncLimit syncLimit = featureAccess.fetchSyncLimit();
 
             numberOfSyncs++;
+            apiCollectionsMap = ApiCollectionsDao.instance.getApiCollectionsMetaMap();
             apiCatalogSync.syncWithDB(syncImmediately, fetchAllSTI, syncLimit);
             if (DbMode.dbType.equals(DbMode.DbType.MONGO_DB)) {
                 dependencyAnalyser.dbState = apiCatalogSync.dbState;
+                dependencyAnalyser.apiCollectionsMap = apiCollectionsMap;
                 dependencyAnalyser.syncWithDb();
             }
             syncTrafficMetricsWithDB();
             this.last_synced = Context.now();
             this.sync_count = 0;
-            ApiCollectionUsers.computeCollectionsForCollectionId(Arrays.asList(new AllAPIsGroup()),AllAPIsGroup.ALL_APIS_GROUP_ID);
         }
 
     }
@@ -418,9 +330,14 @@ public class HttpCallParser {
         trafficMetrics.inc(value);
     }
 
-    public static final String CONTENT_TYPE = "CONTENT-TYPE";
+    public boolean isRedundantEndpoint(String url, List<String> discardedUrlList){
+        StringJoiner joiner = new StringJoiner("|", ".*\\.(", ")(\\?.*)?");
+        for (String extension : discardedUrlList) {
+            joiner.add(extension);
+        }
+        String regex = joiner.toString();
 
-    public static boolean isRedundantEndpoint(String url, Pattern pattern){
+        Pattern pattern = Pattern.compile(regex);
         Matcher matcher = pattern.matcher(url);
         return matcher.matches();
     }
@@ -433,92 +350,9 @@ public class HttpCallParser {
         return res;
     }
 
-    public int createApiCollectionId(HttpResponseParams httpResponseParam){
-        int apiCollectionId;
-        Map<String, List<String>> reqHeaders = httpResponseParam.getRequestParams().getHeaders();
-        String hostName = getHeaderValue(reqHeaders, "host");
-
-        if (hostName != null && !hostNameToIdMap.containsKey(hostName) && RuntimeUtil.hasSpecialCharacters(hostName)) {
-            hostName = "Special_Char_Host";
-        }
-
-        if (StringUtils.isEmpty(hostName)) {
-            hostName = getHeaderValue(reqHeaders, "authority");
-            if (StringUtils.isEmpty(hostName)) {
-                hostName = getHeaderValue(reqHeaders, ":authority");
-            }
-
-            if (!StringUtils.isEmpty(hostName)) {
-                reqHeaders.put("host", Collections.singletonList(hostName));
-            }
-        }
-
-        int vxlanId = httpResponseParam.requestParams.getApiCollectionId();
-        if (useHostCondition(hostName, httpResponseParam.getSource())) {
-            hostName = hostName.toLowerCase();
-            hostName = hostName.trim();
-
-            String key = hostName;
-
-            if (hostNameToIdMap.containsKey(key)) {
-                apiCollectionId = hostNameToIdMap.get(key);
-
-            } else {
-                int id = hostName.hashCode();
-                try {
-
-                    apiCollectionId = createCollectionBasedOnHostName(id, hostName);
-
-                    hostNameToIdMap.put(key, apiCollectionId);
-                } catch (Exception e) {
-                    loggerMaker.errorAndAddToDb("Failed to create collection for host : " + hostName, LogDb.RUNTIME);
-                    createCollectionSimple(vxlanId);
-                    hostNameToIdMap.put("null " + vxlanId, vxlanId);
-                    apiCollectionId = httpResponseParam.requestParams.getApiCollectionId();
-                }
-            }
-
-        } else {
-            String key = "null" + " " + vxlanId;
-            if (!hostNameToIdMap.containsKey(key)) {
-                createCollectionSimple(vxlanId);
-                hostNameToIdMap.put(key, vxlanId);
-            }
-
-            apiCollectionId = vxlanId;
-        }
-        return apiCollectionId;
-    }
-
-    private boolean isBlankResponseBodyForGET(String method, String contentType, String matchContentType,
-            String responseBody) {
-        boolean res = true;
-        if (contentType == null || contentType.length() == 0)
-            return false;
-        res &= contentType.contains(matchContentType);
-        res &= "GET".equals(method.toUpperCase());
-
-        /*
-         * To be sure that the content type
-         * header matches the actual payload.
-         * 
-         * We will need to add more type validation as needed.
-         */
-        if (matchContentType.contains("html")) {
-            res &= responseBody.startsWith("<") && responseBody.endsWith(">");
-        } else {
-            res &= false;
-        }
-        return res;
-    }
-
-    public List<HttpResponseParams> filterHttpResponseParams(List<HttpResponseParams> httpResponseParamsList, List<String> redundantUrlsList, Pattern pattern) {
+    public List<HttpResponseParams> filterHttpResponseParams(List<HttpResponseParams> httpResponseParamsList, AccountSettings accountSettings) {
         List<HttpResponseParams> filteredResponseParams = new ArrayList<>();
         int originalSize = httpResponseParamsList.size();
-
-        // create executor nodes from filters
-        Map<String, List<ExecutorNode>> executorNodesMap = ParseAndExecute.createExecutorNodeMap(apiCatalogSync.advancedFilterMap);
-
         for (HttpResponseParams httpResponseParam: httpResponseParamsList) {
 
             if (httpResponseParam.getSource().equals(HttpResponseParams.Source.MIRRORING)) {
@@ -537,8 +371,8 @@ public class HttpCallParser {
             if (ignoreAktoFlag != null) continue;
 
             // check for garbage points here
-            if(redundantUrlsList != null && !redundantUrlsList.isEmpty()){
-                if(isRedundantEndpoint(httpResponseParam.getRequestParams().getURL(), pattern)){
+            if(accountSettings != null && accountSettings.getAllowRedundantEndpointsList() != null){
+                if(isRedundantEndpoint(httpResponseParam.getRequestParams().getURL(), accountSettings.getAllowRedundantEndpointsList())){
                     continue;
                 }
                 List<String> contentTypeList = (List<String>) httpResponseParam.getRequestParams().getHeaders().getOrDefault("content-type", new ArrayList<>());
@@ -549,40 +383,58 @@ public class HttpCallParser {
                 if(isInvalidContentType(contentType)){
                     continue;
                 }
+            }
 
-                try {
-                    List<String> responseContentTypeList = (List<String>) httpResponseParam.getHeaders().getOrDefault("content-type", new ArrayList<>());
-                    String allContentTypes = responseContentTypeList.toString();
-                    String method = httpResponseParam.getRequestParams().getMethod();
-                    String responseBody = httpResponseParam.getPayload();
-                    boolean ignore = false;
-                    for (String extension : redundantUrlsList) {
-                        if(extension.startsWith(CONTENT_TYPE)){
-                            String matchContentType = extension.split(" ")[1];
-                            if(isBlankResponseBodyForGET(method, allContentTypes, matchContentType, responseBody)){
-                                ignore = true;
-                                break;
-                            }
-                        }
-                    }
-                    if(ignore){
-                        continue;
-                    }
-    
-                } catch(Exception e){
-                    loggerMaker.errorAndAddToDb(e, "Error while ignoring content-type redundant samples " + e.toString(), LogDb.RUNTIME);
+            Map<String, List<String>> reqHeaders = httpResponseParam.getRequestParams().getHeaders();
+            String hostName = getHeaderValue(reqHeaders, "host");
+
+            if (StringUtils.isEmpty(hostName)) {
+                hostName = getHeaderValue(reqHeaders, "authority");
+                if (StringUtils.isEmpty(hostName)) {
+                    hostName = getHeaderValue(reqHeaders, ":authority");
                 }
 
+                if (!StringUtils.isEmpty(hostName)) {
+                    reqHeaders.put("host", Collections.singletonList(hostName));
+                }
             }
 
-            Pair<HttpResponseParams,FILTER_TYPE> temp = applyAdvancedFilters(httpResponseParam, executorNodesMap, apiCatalogSync.advancedFilterMap);
-            HttpResponseParams param = temp.getFirst();
-            if(param == null || temp.getSecond().equals(FILTER_TYPE.UNCHANGED)){
-                continue;
-            }else{
-                httpResponseParam = param;
+            int vxlanId = httpResponseParam.requestParams.getApiCollectionId();
+            int apiCollectionId ;
+
+            if (useHostCondition(hostName, httpResponseParam.getSource())) {
+                hostName = hostName.toLowerCase();
+                hostName = hostName.trim();
+
+                String key = hostName;
+
+                if (hostNameToIdMap.containsKey(key)) {
+                    apiCollectionId = hostNameToIdMap.get(key);
+
+                } else {
+                    int id = hostName.hashCode();
+                    try {
+
+                        apiCollectionId = createCollectionBasedOnHostName(id, hostName);
+
+                        hostNameToIdMap.put(key, apiCollectionId);
+                    } catch (Exception e) {
+                        loggerMaker.errorAndAddToDb("Failed to create collection for host : " + hostName, LogDb.RUNTIME);
+                        createCollectionSimple(vxlanId);
+                        hostNameToIdMap.put("null " + vxlanId, vxlanId);
+                        apiCollectionId = httpResponseParam.requestParams.getApiCollectionId();
+                    }
+                }
+
+            } else {
+                String key = "null" + " " + vxlanId;
+                if (!hostNameToIdMap.containsKey(key)) {
+                    createCollectionSimple(vxlanId);
+                    hostNameToIdMap.put(key, vxlanId);
+                }
+
+                apiCollectionId = vxlanId;
             }
-            int apiCollectionId = createApiCollectionId(httpResponseParam);
 
             httpResponseParam.requestParams.setApiCollectionId(apiCollectionId);
 

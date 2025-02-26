@@ -1,7 +1,10 @@
 package com.akto.dto.testing;
 
 import com.akto.dto.ApiInfo;
+import com.akto.dto.CollectionConditions.TestConfigsAdvancedSettings;
+
 import org.bson.codecs.pojo.annotations.BsonId;
+import org.bson.codecs.pojo.annotations.BsonIgnore;
 import org.bson.types.ObjectId;
 
 import java.util.List;
@@ -15,19 +18,33 @@ public class TestingRunConfig {
     private Map<Integer, List<ApiInfo.ApiInfoKey>> collectionWiseApiInfoKey;
     private List<String> testSubCategoryList;
     private ObjectId authMechanismId;
+    @BsonIgnore
+    String strAuthMechanismId;
 
     private String testRoleId;
     private String overriddenTestAppUrl;
+
+    private List<TestConfigsAdvancedSettings> configsAdvancedSettings;
+    private boolean cleanUp;
+
     public TestingRunConfig() {}
+
+    public TestingRunConfig(int id, Map<Integer, List<ApiInfo.ApiInfoKey>> collectionWiseApiInfoKey,
+            List<String> testSubCategoryList, ObjectId authMechanismId, String overriddenTestAppUrl,
+            String testRoleId) {
+        this(id, collectionWiseApiInfoKey, testSubCategoryList, authMechanismId, overriddenTestAppUrl, testRoleId, false);
+    }
+
     public TestingRunConfig(int id, Map<Integer, List<ApiInfo.ApiInfoKey>> collectionWiseApiInfoKey,
                             List<String> testSubCategoryList,
-                            ObjectId authMechanismId, String overriddenTestAppUrl, String testRoleId) {
+                            ObjectId authMechanismId, String overriddenTestAppUrl, String testRoleId, boolean cleanUp) {
         this.id = id;
         this.collectionWiseApiInfoKey = collectionWiseApiInfoKey;
         this.testSubCategoryList = testSubCategoryList;
         this.authMechanismId = authMechanismId;
         this.overriddenTestAppUrl = overriddenTestAppUrl;
         this.testRoleId = testRoleId;
+        this.cleanUp = cleanUp;
     }
 
     public List<String> getTestSubCategoryList() {
@@ -94,6 +111,8 @@ public class TestingRunConfig {
         if(this.testRoleId == null) {
             this.testRoleId = that.testRoleId;
         }
+
+        this.cleanUp = that.cleanUp;
     }
     
     public String getTestRoleId() {
@@ -103,4 +122,30 @@ public class TestingRunConfig {
     public void setTestRoleId(String testRoleId) {
         this.testRoleId = testRoleId;
     }
+
+    public String getStrAuthMechanismId() {
+        if (strAuthMechanismId == null && this.authMechanismId!=null) {
+            return this.authMechanismId.toHexString();
+        }
+        return strAuthMechanismId;
+    }
+    public void setStrAuthMechanismId(String strAuthMechanismId) {
+        this.strAuthMechanismId = strAuthMechanismId;
+    }
+
+    public List<TestConfigsAdvancedSettings> getConfigsAdvancedSettings() {
+        return configsAdvancedSettings;
+    }
+    public void setConfigsAdvancedSettings(List<TestConfigsAdvancedSettings> configsAdvancedSettings) {
+        this.configsAdvancedSettings = configsAdvancedSettings;
+    }
+
+    public boolean getCleanUp() {
+        return this.cleanUp;
+    }
+
+    public void setCleanUp(boolean cleanUp) {
+        this.cleanUp = cleanUp;
+    }
+
 }

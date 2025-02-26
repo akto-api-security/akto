@@ -25,10 +25,11 @@ public class InsertRecordsInKafka {
 
     public static final String RUNTIME_TOPIC = "akto.api.logs";
     public static final String ANALYSE_TOPIC = "akto.central";
-    public static final String KAFKA_URL = "localhost:29092";
+    public static final String KAFKA_URL = "10.191.63.199:9092";
 
     public static void main(String[] args) throws InterruptedException {
 //        insertSampleDataIntoKafka();
+        insertRandomRecords();
         checkKafkaQueueSize(RUNTIME_TOPIC, "asdfd3", KAFKA_URL);
         //209447
         try {
@@ -73,11 +74,11 @@ public class InsertRecordsInKafka {
     }
 
     public static void insertRandomRecords() throws InterruptedException {
-        String kafkaBrokerUrl = "localhost:29092";
+        String kafkaBrokerUrl = "10.191.63.199:9092";
 
         Kafka kafka = new Kafka(kafkaBrokerUrl, 1000, 999900);
 
-        for (int apiCollectionId=0; apiCollectionId < 10; apiCollectionId++ ) {
+        for (int apiCollectionId=0; apiCollectionId < 50; apiCollectionId++ ) {
             for (String url: Arrays.asList("a", "b", "c", "d", "e", "f", "g", "h", "1", "i", "j", "2", "bc/d", "c/d/e/f", "a/b")) {
                 for (String method: Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS")) {
                     for (int ip=0; ip<255; ip++) {

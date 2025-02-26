@@ -11,13 +11,6 @@ import com.akto.dto.*;
 import com.akto.dto.billing.SyncLimit;
 import com.akto.dto.dependency_flow.DependencyFlow;
 import com.akto.dto.filter.MergedUrls;
-import com.akto.dao.monitoring.FilterYamlTemplateDao;
-import com.akto.dao.runtime_filters.AdvancedTrafficFiltersDao;
-import com.akto.dto.*;
-import com.akto.dto.billing.SyncLimit;
-import com.akto.dto.dependency_flow.DependencyFlow;
-import com.akto.dto.monitoring.FilterConfig;
-import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.traffic.TrafficInfo;
@@ -36,10 +29,7 @@ import com.akto.task.Cluster;
 import com.akto.types.CappedSet;
 import com.akto.usage.UsageMetricCalculator;
 import com.akto.usage.UsageMetricHandler;
-import com.akto.util.JSONUtils;
 import com.akto.utils.RedactSampleData;
-import com.alibaba.fastjson2.JSON;
-import com.alibaba.fastjson2.JSONObject;
 import com.google.api.client.util.Charsets;
 import com.google.common.hash.BloomFilter;
 import com.google.common.hash.Funnels;
@@ -54,8 +44,9 @@ import org.bson.types.ObjectId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-
 import java.util.Map.Entry;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.regex.Pattern;
 
 import static com.akto.dto.type.KeyTypes.patternToSubType;
 
@@ -77,8 +68,6 @@ public class APICatalogSync {
 
     public static Set<MergedUrls> mergedUrls;
 
-    public Map<String, FilterConfig> advancedFilterMap =  new HashMap<>();
-
     public APICatalogSync(String userIdentifier,int thresh, boolean fetchAllSTI) {
         this(userIdentifier, thresh, fetchAllSTI, true);
     }
@@ -94,10 +83,6 @@ public class APICatalogSync {
         mergedUrls = new HashSet<>();
         if (buildFromDb) {
             buildFromDB(false, fetchAllSTI);
-            AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
-            if (accountSettings != null && accountSettings.getPartnerIpList() != null) {
-                partnerIpsList = accountSettings.getPartnerIpList();
-            }
         }
     }
 
@@ -137,9 +122,10 @@ public class APICatalogSync {
         }
 
         requestTemplate.processHeaders(requestParams.getHeaders(), baseURL.getUrl(), methodStr, -1, userId, requestParams.getApiCollectionId(), responseParams.getOrig(), sensitiveParamInfoBooleanMap, timestamp);
-        JSONObject jsonObject = RequestTemplate.parseRequestPayloadToJsonObject(requestParams.getPayload(), urlWithParams);
-        Map<String, Set<Object>> flattened = JSONUtils.flattenJSONObject(jsonObject);
-        deletedInfo.addAll(requestTemplate.process2(flattened, baseURL.getUrl(), methodStr, -1, userId, requestParams.getApiCollectionId(), responseParams.getOrig(), sensitiveParamInfoBooleanMap, timestamp));
+        BasicDBObject requestPayload = RequestTemplate.parseRequestPayload(requestParams, urlWithParams);
+        if (requestPayload != null) {
+            deletedInfo.addAll(requestTemplate.process2(requestPayload, baseURL.getUrl(), methodStr, -1, userId, requestParams.getApiCollectionId(), responseParams.getOrig(), sensitiveParamInfoBooleanMap, timestamp));
+        }
         requestTemplate.recordMessage(responseParams.getOrig());
 
         Map<Integer, RequestTemplate> responseTemplates = requestTemplate.getResponseTemplates();
@@ -161,15 +147,15 @@ public class APICatalogSync {
                 respPayload = "{\"json\": "+respPayload+"}";
             }
 
-            JSONObject payload;
+
+            BasicDBObject payload;
             try {
-                payload = JSON.parseObject(respPayload);
+                payload = BasicDBObject.parse(respPayload);
             } catch (Exception e) {
-                payload = JSON.parseObject("{}");
+                payload = BasicDBObject.parse("{}");
             }
 
-            flattened = JSONUtils.flattenJSONObject(payload);
-            deletedInfo.addAll(responseTemplate.process2(flattened, baseURL.getUrl(), methodStr, statusCode, userId, requestParams.getApiCollectionId(), responseParams.getOrig(), sensitiveParamInfoBooleanMap, timestamp));
+            deletedInfo.addAll(responseTemplate.process2(payload, baseURL.getUrl(), methodStr, statusCode, userId, requestParams.getApiCollectionId(), responseParams.getOrig(), sensitiveParamInfoBooleanMap, timestamp));
             responseTemplate.processHeaders(responseParams.getHeaders(), baseURL.getUrl(), method.name(), statusCode, userId, requestParams.getApiCollectionId(), responseParams.getOrig(), sensitiveParamInfoBooleanMap, timestamp);
             if (!responseParams.getIsPending()) {
                 responseTemplate.processTraffic(responseParams.getTime());
@@ -222,7 +208,7 @@ public class APICatalogSync {
             Set<HttpResponseParams> value = entry.getValue();
             for (HttpResponseParams responseParams: value) {
                 try {
-                    aktoPolicyNew.process(responseParams, partnerIpsList);
+                    aktoPolicyNew.process(responseParams);
                 } catch (Exception e) {
                     e.printStackTrace();
                     throw new RuntimeException(e);
@@ -718,7 +704,9 @@ public class APICatalogSync {
 
     public static URLTemplate tryParamteresingUrl(URLStatic newUrl){
         String[] tokens = tokenize(newUrl.getUrl());
-        boolean tokensBelowThreshold = tokens.length < 2;
+        if(tokens.length < 2){
+            return null;
+        }
         Pattern pattern = patternToSubType.get(SingleTypeInfo.UUID);
         boolean allNull = true;
         SuperType[] newTypes = new SuperType[tokens.length];
@@ -741,7 +729,7 @@ public class APICatalogSync {
 
             if(tokens[i] != null){
                 SubType tempSubType = KeyTypes.findSubType(tokens[i], ""+i, null,true);
-                if(!tokensBelowThreshold && isValidSubtype(tempSubType)){
+                if(isValidSubtype(tempSubType)){
                     newTypes[i] = SuperType.STRING;
                     tokens[i] = null;
                 }else if(isAlphanumericString(tempToken)){
@@ -762,7 +750,7 @@ public class APICatalogSync {
         try {
             for(MergedUrls mergedUrl : mergedUrls) {
                 if(mergedUrl.getUrl().equals(urlTemplate.getTemplateString()) &&
-                   mergedUrl.getMethod().equals(urlTemplate.getMethod().name())) {
+                        mergedUrl.getMethod().equals(urlTemplate.getMethod().name())) {
                     return null;
                 }
             }
@@ -1577,8 +1565,7 @@ public class APICatalogSync {
             this.delta = new HashMap<>();
         }
 
-        List<YamlTemplate> advancedFilterTemplates = AdvancedTrafficFiltersDao.instance.findAll(Filters.ne(YamlTemplate.INACTIVE, true));
-        advancedFilterMap = FilterYamlTemplateDao.instance.fetchFilterConfig(false, advancedFilterTemplates, true);
+
         try {
             // fetchAllSTI check added to make sure only runs in dashboard
             if (!fetchAllSTI) {
@@ -1726,11 +1713,6 @@ public class APICatalogSync {
     private static Set<Integer> demosAndDeactivatedCollections = UsageMetricCalculator.getDemosAndDeactivated();
 
     private static void fillExistingAPIsInDb(SingleTypeInfo sti, BloomFilter<CharSequence> existingAPIsInDb) {
-
-        if(existingAPIsInDb==null){
-            return;
-        }
-
         if (demosAndDeactivatedCollections.contains(sti.getApiCollectionId())) {
             return;
         }
@@ -1740,7 +1722,7 @@ public class APICatalogSync {
         }
     }
 
-    public static Map<Integer, APICatalog> build(List<SingleTypeInfo> allParams, BloomFilter<CharSequence> existingAPIsInDb) {
+    private static Map<Integer, APICatalog> build(List<SingleTypeInfo> allParams, BloomFilter<CharSequence> existingAPIsInDb) {
         Map<Integer, APICatalog> ret = new HashMap<>();
         
         for (SingleTypeInfo param: allParams) {
@@ -1757,7 +1739,6 @@ public class APICatalogSync {
     }
 
     int counter = 0;
-    List<String> partnerIpsList = new ArrayList<>();
     
     public void syncWithDB(boolean syncImmediately, boolean fetchAllSTI, SyncLimit syncLimit) {
         loggerMaker.infoAndAddToDb("Started sync with db! syncImmediately="+syncImmediately + " fetchAllSTI="+fetchAllSTI, LogDb.RUNTIME);
@@ -1777,9 +1758,6 @@ public class APICatalogSync {
         boolean redact = false;
         if (accountSettings != null) {
             redact =  accountSettings.isRedactPayload();
-            if (accountSettings.getPartnerIpList() != null) {
-                partnerIpsList = accountSettings.getPartnerIpList();
-            }
         }
 
         counter++;

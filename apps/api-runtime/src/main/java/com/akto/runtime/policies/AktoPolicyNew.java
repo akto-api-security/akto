@@ -31,7 +31,7 @@ public class AktoPolicyNew {
     private List<RuntimeFilter> filters = new ArrayList<>();
     private Map<Integer, ApiInfoCatalog> apiInfoCatalogMap = new HashMap<>();
     boolean processCalledAtLeastOnce = false;
-    ApiAccessTypePolicy apiAccessTypePolicy = new ApiAccessTypePolicy(null);
+    ApiAccessTypePolicy apiAccessTypePolicy = new ApiAccessTypePolicy(null, null);
     boolean redact = false;
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(AktoPolicyNew.class);
@@ -54,6 +54,11 @@ public class AktoPolicyNew {
             if ( cidrList != null && !cidrList.isEmpty()) {
                 apiAccessTypePolicy.setPrivateCidrList(cidrList);
             }
+            List<String> partnerIpsList = new ArrayList<>();
+            if (accountSettings.getPartnerIpList() != null) {
+                partnerIpsList = accountSettings.getPartnerIpList();
+            }
+            apiAccessTypePolicy.setPartnerIpList(partnerIpsList);
             redact = accountSettings.isRedactPayload();
         }
 
@@ -187,7 +192,7 @@ public class AktoPolicyNew {
                     break;
                 case DETERMINE_API_ACCESS_TYPE:
                     try {
-                        apiAccessTypePolicy.findApiAccessType(httpResponseParams, apiInfo, filter, partnerIpsList);
+                        apiAccessTypePolicy.findApiAccessType(httpResponseParams, apiInfo);
                     } catch (Exception ignored) {}
                     break;
                 default:

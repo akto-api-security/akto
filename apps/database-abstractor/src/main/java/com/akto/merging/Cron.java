@@ -3,6 +3,7 @@ package com.akto.merging;
 import com.akto.dao.context.Context;
 import com.akto.data_actor.DbLayer;
 import com.akto.dto.Account;
+import com.akto.dto.dependency_flow.DependencyFlow;
 import com.akto.log.LoggerMaker;
 import com.akto.util.AccountTask;
 
@@ -62,6 +63,9 @@ public class Cron {
                             " accountId " + accountId + e.getMessage(), LoggerMaker.LogDb.RUNTIME);
                 }
             }
+            DependencyFlow dependencyFlow = new DependencyFlow();
+            dependencyFlow.run(null);
+            dependencyFlow.syncWithDb();
         } catch (Exception e) {
             String err = e.getStackTrace().length > 0 ? e.getStackTrace()[0].toString() : e.getMessage();
             loggerMaker.errorAndAddToDb("error in mergeUrlsAndSave: " + " accountId " + accountId

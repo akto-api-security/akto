@@ -7,7 +7,6 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 
-import com.akto.DaoInit;
 import com.akto.RuntimeMode;
 import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.*;
@@ -17,19 +16,17 @@ import com.akto.dto.type.SingleTypeInfo;
 import com.akto.kafka.Kafka;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-import com.akto.runtime.utils.Utils;
+import com.akto.metrics.AllMetrics;
+import com.akto.sql.SampleDataAltDb;
 import com.akto.hybrid_parsers.HttpCallParser;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
-import com.akto.database_abstractor_authenticator.JwtAuthenticator;
 import com.akto.util.DashboardMode;
 import com.akto.util.filter.DictionaryFilter;
 import com.google.gson.Gson;
-import com.mongodb.ConnectionString;
-import com.mongodb.client.model.Filters;
-
-import org.apache.commons.lang3.StringUtils;
 import org.apache.kafka.clients.consumer.*;
+import org.apache.kafka.common.Metric;
+import org.apache.kafka.common.MetricName;
 import org.apache.kafka.common.errors.WakeupException;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.slf4j.Logger;
@@ -43,12 +40,20 @@ public class Main {
     public static final String VPC_CIDR = "vpc_cidr";
     public static final String ACCOUNT_ID = "account_id";
     private static final Logger logger = LoggerFactory.getLogger(Main.class);
-    private static final LoggerMaker loggerMaker = new LoggerMaker(Main.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(Main.class, LogDb.RUNTIME);
 
-    private static final DataActor dataActor = DataActorFactory.fetchInstance();
+    public static final DataActor dataActor = DataActorFactory.fetchInstance();
 
     // this sync threshold time is used for deleting sample data
     public static final int sync_threshold_time = 120;
+
+    private static int debugPrintCounter = 500;
+    private static void printL(Object o) {
+        if (debugPrintCounter > 0) {
+            debugPrintCounter--;
+            logger.info(o.toString());
+        }
+    }   
 
     public static boolean isOnprem = false;
 
@@ -72,10 +77,6 @@ public class Main {
                 if (json.containsKey(VPC_CIDR)) {
                     List<String> cidrList = (List<String>) json.get(VPC_CIDR);
                     logger.info("cidrList: " + cidrList);
-                    // For old deployments, we won't receive ACCOUNT_ID. If absent, we assume 1_000_000.
-                    String accountIdStr = (String) (json.get(ACCOUNT_ID));
-                    int accountId = StringUtils.isNumeric(accountIdStr) ? Integer.parseInt(accountIdStr) : 1_000_000;
-                    Context.accountId.set(accountId);
                     dataActor.updateCidrList(cidrList);
                 }
             }
@@ -93,6 +94,21 @@ public class Main {
     }
 
     public static Kafka kafkaProducer = null;
+    private static void buildKafka() {
+        logger.info("Building kafka...................");
+        AccountSettings accountSettings = dataActor.fetchAccountSettings();
+        if (accountSettings != null && accountSettings.getCentralKafkaIp()!= null) {
+            String centralKafkaBrokerUrl = accountSettings.getCentralKafkaIp();
+            int centralKafkaBatchSize = AccountSettings.DEFAULT_CENTRAL_KAFKA_BATCH_SIZE;
+            int centralKafkaLingerMS = AccountSettings.DEFAULT_CENTRAL_KAFKA_LINGER_MS;
+            if (centralKafkaBrokerUrl != null) {
+                kafkaProducer = new Kafka(centralKafkaBrokerUrl, centralKafkaLingerMS, centralKafkaBatchSize);
+                logger.info("Connected to central kafka @ " + Context.now());
+            }
+        } else {
+            logger.info(String.valueOf(accountSettings));
+        }
+    }
 
     public static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
 
@@ -125,11 +141,20 @@ public class Main {
         }
     }
 
+    public static String getTopicName(){
+        String topicName = System.getenv("AKTO_KAFKA_TOPIC_NAME");
+        if (topicName == null) {
+            topicName = "akto.api.logs";
+        }
+        DictionaryFilter.readDictionaryBinary();
+        return topicName;
+    }
+
     // REFERENCE: https://www.oreilly.com/library/view/kafka-the-definitive/9781491936153/ch04.html (But how do we Exit?)
     public static void main(String[] args) {
         //String mongoURI = System.getenv("AKTO_MONGO_CONN");;
         String configName = System.getenv("AKTO_CONFIG_NAME");
-        String topicName = System.getenv("AKTO_KAFKA_TOPIC_NAME");
+        String topicName = getTopicName();
         String kafkaBrokerUrl = "kafka1:19092"; //System.getenv("AKTO_KAFKA_BROKER_URL");
         String isKubernetes = System.getenv("IS_KUBERNETES");
         if (isKubernetes != null && isKubernetes.equalsIgnoreCase("true")) {
@@ -142,14 +167,22 @@ public class Main {
         boolean fetchAllSTI = true;
         Map<Integer, AccountInfo> accountInfoMap =  new HashMap<>();
 
-        boolean isDashboardInstance = instanceType != null && instanceType.equals("DASHBOARD");
+        boolean isDashboardInstance = false;
         if (isDashboardInstance) {
             syncImmediately = true;
             fetchAllSTI = false;
         }
         int maxPollRecordsConfig = Integer.parseInt(System.getenv("AKTO_KAFKA_MAX_POLL_RECORDS_CONFIG"));
 
-        if (topicName == null) topicName = "akto.api.logs";
+        AccountSettings aSettings = dataActor.fetchAccountSettings();
+        if (aSettings == null) {
+            loggerMaker.errorAndAddToDb("error fetch account settings, exiting process");
+            System.exit(0);
+        }
+
+        DataControlFetcher.init(dataActor);
+
+        aSettings = dataActor.fetchAccountSettings();
 
         //DaoInit.init(new ConnectionString(mongoURI));
         DictionaryFilter.readDictionaryBinary();
@@ -158,26 +191,42 @@ public class Main {
 
         dataActor.modifyHybridSaasSetting(RuntimeMode.isHybridDeployment());
 
+        initializeRuntime();
+
+        String centralKafkaTopicName = AccountSettings.DEFAULT_CENTRAL_KAFKA_TOPIC_NAME;
+
+        buildKafka();
+        scheduler.scheduleAtFixedRate(new Runnable() {
+            public void run() {
+                if (kafkaProducer == null || !kafkaProducer.producerReady) {
+                    buildKafka();
+                }
+            }
+        }, 5, 5, TimeUnit.MINUTES);
+
         try {
-            initializeRuntime();
-        } catch (Exception e){
-            loggerMaker.errorAndAddToDb(e, "Error in initializeRuntime " + e.getMessage(), LogDb.RUNTIME);
+            com.akto.sql.Main.createSampleDataTable();
+            SampleDataAltDb.createIndex();
+        } catch(Exception e){
+            logger.error("Unable to connect to postgres sql db", e);
         }
+
+        try {
+            CleanPostgres.cleanPostgresCron();
+        } catch(Exception e){
+            logger.error("Unable to clean postgres", e);
+        }
+
 
         dataActor.modifyHybridSaasSetting(RuntimeMode.isHybridDeployment());
 
-        APIConfig apiConfig = null;
-        try {
-            apiConfig = dataActor.fetchApiConfig(configName);;
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "Error while fetching api config " + e.getMessage(), LogDb.RUNTIME);
-        }
+        APIConfig apiConfig = dataActor.fetchApiConfig(configName);
         if (apiConfig == null) {
             apiConfig = new APIConfig(configName,"access-token", 1, 10_000_000, sync_threshold_time); // this sync threshold time is used for deleting sample data
         }
 
         final Main main = new Main();
-        Properties properties = Utils.configProperties(kafkaBrokerUrl, groupIdConfig, maxPollRecordsConfig);
+        Properties properties = main.configProperties(kafkaBrokerUrl, groupIdConfig, maxPollRecordsConfig);
         main.consumer = new KafkaConsumer<>(properties);
 
         final Thread mainThread = Thread.currentThread();
@@ -197,6 +246,48 @@ public class Main {
                 }
             }
         });
+
+
+        scheduler.scheduleAtFixedRate(()-> {
+            try {
+
+                Map<MetricName, ? extends Metric> metrics = main.consumer.metrics();
+
+                for (Map.Entry<MetricName, ? extends Metric> entry : metrics.entrySet()) {
+                    MetricName key = entry.getKey();
+                    Metric value = entry.getValue();
+
+                    if(key.name().equals("records-lag-max")){
+                        double val = value.metricValue().equals(Double.NaN) ? 0d: (double) value.metricValue();
+                        AllMetrics.instance.setKafkaRecordsLagMax((float) val);
+                    }
+                    if(key.name().equals("records-consumed-rate")){
+                        double val = value.metricValue().equals(Double.NaN) ? 0d: (double) value.metricValue();
+                        AllMetrics.instance.setKafkaRecordsConsumedRate((float) val);
+                    }
+
+                    if(key.name().equals("fetch-latency-avg")){
+                        double val = value.metricValue().equals(Double.NaN) ? 0d: (double) value.metricValue();
+                        AllMetrics.instance.setKafkaFetchAvgLatency((float) val);
+                    }
+
+                    if(key.name().equals("bytes-consumed-rate")){
+                        double val = value.metricValue().equals(Double.NaN) ? 0d: (double) value.metricValue();
+                        AllMetrics.instance.setKafkaBytesConsumedRate((float) val);
+                    }
+                }
+
+
+                AllMetrics.instance.setTotalSampleDataCount(SampleDataAltDb.totalNumberOfRecords());
+                loggerMaker.infoAndAddToDb("Total number of records in postgres: " + SampleDataAltDb.totalNumberOfRecords(), LogDb.RUNTIME);
+                long dbSizeInMb = SampleDataAltDb.getDbSizeInMb();
+                AllMetrics.instance.setPgDataSizeInMb(dbSizeInMb);
+                loggerMaker.infoAndAddToDb("Postgres size: " + dbSizeInMb + " MB", LogDb.RUNTIME);
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e, "Failed to get total number of records from postgres");
+            }
+
+        }, 0, 1, TimeUnit.MINUTES);
 
         Map<String, HttpCallParser> httpCallParserMap = new HashMap<>();
 
@@ -219,18 +310,28 @@ public class Main {
                 } catch (Exception e) {
                     throw e;
                 }
-                
+                long start = System.currentTimeMillis();
                 // TODO: what happens if exception
                 Map<String, List<HttpResponseParams>> responseParamsToAccountMap = new HashMap<>();
                 for (ConsumerRecord<String,String> r: records) {
                     HttpResponseParams httpResponseParams;
                     try {
                          
-                        Utils.printL(r.value());
+                        printL(r.value());
+                        AllMetrics.instance.setRuntimeKafkaRecordCount(1);
+                        AllMetrics.instance.setRuntimeKafkaRecordSize(r.value().length());
+
                         lastSyncOffset++;
+                        if (DataControlFetcher.stopIngestionFromKafka()) {
+                            continue;
+                        }
 
                         if (lastSyncOffset % 100 == 0) {
                             logger.info("Committing offset at position: " + lastSyncOffset);
+                        }
+
+                        if (tryForCollectionName(r.value())) {
+                            continue;
                         }
 
                         httpResponseParams = HttpCallParser.parseKafkaMessage(r.value());
@@ -305,17 +406,35 @@ public class Main {
                         parser.syncFunction(accWiseResponse, syncImmediately, fetchAllSTI, accountInfo.accountSettings);
                         loggerMaker.debugInfoAddToDb("Sync function completed for account: " + accountId, LogDb.RUNTIME);
 
+                        // send to central kafka
+                        if (kafkaProducer != null) {
+                            loggerMaker.infoAndAddToDb("Sending " + accWiseResponse.size() +" records to context analyzer", LogDb.RUNTIME);
+                            for (HttpResponseParams httpResponseParams: accWiseResponse) {
+                                try {
+                                    loggerMaker.debugInfoAddToDb("Sending to kafka data for account: " + httpResponseParams.getAccountId(), LogDb.RUNTIME);
+                                    kafkaProducer.send(httpResponseParams.getOrig(), centralKafkaTopicName);
+                                } catch (Exception e) {
+                                    // force close it
+                                    loggerMaker.errorAndAddToDb("Closing kafka: " + e.getMessage(), LogDb.RUNTIME);
+                                    kafkaProducer.close();
+                                    loggerMaker.infoAndAddToDb("Successfully closed kafka", LogDb.RUNTIME);
+                                }
+                            }
+                        } else {
+                            loggerMaker.errorAndAddToDb("Kafka producer is null", LogDb.RUNTIME);
+                        }
                     } catch (Exception e) {
                         loggerMaker.errorAndAddToDb(e.toString(), LogDb.RUNTIME);
                     }
                 }
+                AllMetrics.instance.setRuntimeProcessLatency(System.currentTimeMillis()-start);
             }
 
         } catch (WakeupException ignored) {
           // nothing to catch. This exception is called from the shutdown hook.
         } catch (Exception e) {
             exceptionOnCommitSync.set(true);
-            Utils.printL(e);
+            printL(e);
             loggerMaker.errorAndAddToDb("Error in main runtime: " + e.getMessage(),LogDb.RUNTIME);
             e.printStackTrace();
             System.exit(0);
@@ -405,6 +524,9 @@ public class Main {
         Account account = dataActor.fetchActiveAccount();
         Context.accountId.set(account.getId());
 
+        AllMetrics.instance.init();
+        loggerMaker.infoAndAddToDb("All metrics initialized", LogDb.RUNTIME);
+
         Setup setup = dataActor.fetchSetup();
 
         String dashboardMode = "saas";
@@ -413,10 +535,6 @@ public class Main {
         }
 
         isOnprem = dashboardMode.equalsIgnoreCase(DashboardMode.ON_PREM.name());
-
-        List<CustomDataType> customDataTypes = dataActor.fetchCustomDataTypes();
-        List<AktoDataType> aktoDataTypes = dataActor.fetchAktoDataTypes();
-        List<CustomAuthType> customAuthTypes = dataActor.fetchCustomAuthTypes();
         
         RuntimeVersion runtimeVersion = new RuntimeVersion();
         try {
@@ -425,8 +543,22 @@ public class Main {
             loggerMaker.errorAndAddToDb("error while updating dashboard version: " + e.getMessage(), LogDb.RUNTIME);
         }
 
-        SingleTypeInfo.initFromRuntime(customDataTypes, aktoDataTypes, customAuthTypes, account.getId());
+        initFromRuntime(account.getId());
         
+    }
+
+    public static void initFromRuntime(int accountId) {
+        scheduler.scheduleAtFixedRate(new Runnable() {
+            public void run() {
+                List<CustomDataType> customDataTypes = dataActor.fetchCustomDataTypes();
+                System.out.println("customdata type " + customDataTypes.size());
+                List<AktoDataType> aktoDataTypes = dataActor.fetchAktoDataTypes();
+                List<CustomAuthType> customAuthTypes = dataActor.fetchCustomAuthTypes();
+                SingleTypeInfo.fetchCustomDataTypes(accountId, customDataTypes, aktoDataTypes);
+                SingleTypeInfo.fetchCustomAuthTypes(accountId, customAuthTypes);
+            }
+        }, 0, 5, TimeUnit.MINUTES);
+
     }
 
     public static void initializeRuntimeHelper() {
@@ -444,5 +576,19 @@ public class Main {
         SingleTypeInfoDao.instance.createIndicesIfAbsent();
         SensitiveSampleDataDao.instance.createIndicesIfAbsent();
         SampleDataDao.instance.createIndicesIfAbsent();
+    }
+
+
+    public static Properties configProperties(String kafkaBrokerUrl, String groupIdConfig, int maxPollRecordsConfig) {
+        Properties properties = new Properties();
+        properties.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, kafkaBrokerUrl);
+        properties.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
+        properties.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
+        properties.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, maxPollRecordsConfig);
+        properties.put(ConsumerConfig.GROUP_ID_CONFIG, groupIdConfig);
+        properties.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
+        properties.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, false);
+
+        return properties;
     }
 }

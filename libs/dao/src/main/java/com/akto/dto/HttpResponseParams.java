@@ -3,7 +3,9 @@ package com.akto.dto;
 
 import com.akto.dao.context.Context;
 
-import java.util.*;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 public class HttpResponseParams {
 
@@ -73,29 +75,6 @@ public class HttpResponseParams {
                 this.orig,
                 this.sourceIP
         );
-    }
-
-    private static final Set<String> allowedPath = new HashSet<>();
-
-    static {
-        allowedPath.add("graphql");
-        allowedPath.add("graph");
-    }
-    public static final String QUERY = "query";
-
-
-    public static boolean isGraphql(HttpResponseParams responseParams) {
-        boolean isAllowedForParse = false;
-        String path = responseParams.getRequestParams().getURL();
-        String requestPayload = responseParams.getRequestParams().getPayload();
-
-        for (String graphqlPath : allowedPath) {
-            if (path != null && path.contains(graphqlPath)) {
-                isAllowedForParse = true;
-                break;
-            }
-        }
-        return isAllowedForParse && requestPayload.contains(QUERY);
     }
 
     public int getTimeOrNow() {
@@ -177,9 +156,5 @@ public class HttpResponseParams {
 
     public void setDirection(String direction) {
         this.direction = direction;
-    }
-
-    public void setRequestParams(HttpRequestParams requestParams) {
-        this.requestParams = requestParams;
     }
 }
