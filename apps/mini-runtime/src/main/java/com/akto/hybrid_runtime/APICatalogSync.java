@@ -25,6 +25,7 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
 import com.akto.hybrid_runtime.policies.AktoPolicyNew;
+import com.akto.runtime.utils.Utils;
 import com.akto.util.filter.DictionaryFilter;
 import com.akto.types.CappedSet;
 import com.akto.util.JSONUtils;
@@ -1425,6 +1426,10 @@ public class APICatalogSync {
 
             SingleTypeInfo dbInfo = dbInfoMap.get(key);
             SingleTypeInfo deltaInfo = deltaInfoMap.get(key);
+
+            if (Utils.printDebugUrlLog(deltaInfo.getUrl())) {
+                loggerMaker.infoAndAddToDb("Found debug url in getDBUpdatesForParamsHybrid " + deltaInfo.getUrl());
+            }
 
             int inc = deltaInfo.getCount() - (dbInfo == null ? 0 : dbInfo.getCount());
             long lastSeenDiff = deltaInfo.getLastSeen() - (dbInfo == null ? 0 : dbInfo.getLastSeen());

@@ -30,6 +30,7 @@ import com.akto.dto.usage.MetricTypes;
 import com.akto.graphql.GraphQLUtils;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.runtime.utils.Utils;
 import com.akto.util.filter.DictionaryFilter;
 import com.akto.runtime.merge.MergeOnHostOnly;
 import com.akto.runtime.policies.AktoPolicyNew;
@@ -1300,6 +1301,11 @@ public class APICatalogSync {
         for(String key: deltaInfoMap.keySet()) {
             SingleTypeInfo dbInfo = dbInfoMap.get(key);
             SingleTypeInfo deltaInfo = deltaInfoMap.get(key);
+
+            if (Utils.printDebugUrlLog(deltaInfo.getUrl())) {
+                loggerMaker.infoAndAddToDb("Found debug url in getDBUpdatesForParams " + deltaInfo.getUrl());
+            }
+
             Bson update;
 
             int inc = deltaInfo.getCount() - (dbInfo == null ? 0 : dbInfo.getCount());
