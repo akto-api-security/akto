@@ -1,6 +1,5 @@
 import React, { useReducer } from 'react';
-import { VerticalStack, HorizontalGrid, Checkbox, TextField, Text, Popover, Icon } from '@shopify/polaris';
-import { CalendarMajor } from '@shopify/polaris-icons';
+import { VerticalStack, HorizontalGrid, Checkbox, TextField } from '@shopify/polaris';
 import Dropdown from "../../../components/layouts/Dropdown";
 import SingleDate from "../../../components/layouts/SingleDate";
 import func from "@/util/func"
@@ -10,7 +9,11 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
     const reducer = (state, action) => {
         switch (action.type) {
           case "update":
-            const scheduledEpoch =new Date(action.obj['selectedDate']).getTime() / 1000;
+            let scheduledEpoch = new Date(action.obj['selectedDate']).getTime() / 1000;
+            const timeNow = new Date().getTime() / 1000;
+            if(Math.abs(timeNow - scheduledEpoch) < 86400){
+                scheduledEpoch = func.timeNow()
+            }
             setTestRun(prev => ({
                 ...prev,
                 startTimestamp: scheduledEpoch
@@ -53,7 +56,7 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
                             data={state.data}
                             dataKey="selectedDate"
                             preferredPosition="above"
-                            disableDatesBefore={new Date()}
+                            disableDatesBefore={new Date(new Date().setDate(new Date().getDate() - 1))}
                             label="Select date"
                             allowRange={false}
                             readOnly={true}
@@ -66,14 +69,16 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
                     menuItems={hourlyTimes}
                     initial={testRun.hourlyLabel}
                     selected={(hour) => {
-                        let startTimestamp = testRun.startTimestamp;
+                        let scheduledEpoch = new Date(state.data).getTime() / 1000;
                         if (hour !== "Now"){
-                            startTimestamp += parseInt(hour) * 60 * 60;
+                            scheduledEpoch += parseInt(hour) * 60 * 60;
+                        }else{
+                            scheduledEpoch = testRun.startTimestamp
                         }
                         const hourlyTime = getLabel(hourlyTimes, hour);
                         setTestRun(prev => ({
                             ...prev,
-                            startTimestamp,
+                            startTimestamp: scheduledEpoch,
                             hourlyLabel: hourlyTime ? hourlyTime.label : ""
                         }));
                     }} />
