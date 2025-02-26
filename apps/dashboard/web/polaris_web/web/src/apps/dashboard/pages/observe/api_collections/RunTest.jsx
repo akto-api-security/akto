@@ -631,10 +631,10 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
             func.setToast(true, false, "Modified testing run config successfully")
             setShowEditableSettings(false)
         })
-
-        if (activeFromTesting) {
-            transform.rerunTest(testIdConfig.hexId, null, true)
+        if(activeFromTesting){
+            toggleRunTest();
         }
+        
     }
 
     const handleAddSettings = (parentAdvanceSettingsConfig) => {
@@ -702,8 +702,8 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                     </ButtonGroup>
                 </HorizontalStack>}
                 primaryAction={{
-                    content: activeFromTesting ? "Save & Re-run" : scheduleString(),
-                    onAction: activeFromTesting ? handleModifyConfig : handleRun,
+                    content: activeFromTesting ? "Save" : scheduleString(),
+                    onAction: handleModifyConfig,
                     disabled: (countAllSelectedTests() === 0) || !testRun.authMechanismPresent
                 }}
                 secondaryActions={[
