@@ -703,7 +703,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                 </HorizontalStack>}
                 primaryAction={{
                     content: activeFromTesting ? "Save" : scheduleString(),
-                    onAction: handleModifyConfig,
+                    onAction: activeFromTesting ? handleModifyConfig : handleRun,
                     disabled: (countAllSelectedTests() === 0) || !testRun.authMechanismPresent
                 }}
                 secondaryActions={[
