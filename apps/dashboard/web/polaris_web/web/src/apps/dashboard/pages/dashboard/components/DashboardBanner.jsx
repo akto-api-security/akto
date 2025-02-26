@@ -29,7 +29,7 @@ function DashboardBanner() {
             title: "Start testing",
             icon: MarketingMinor,
             showRedirect: true,
-            description: "400+ built-in tests covering OWASP Top 10, HackerOne top 10 and all the business logic vulnerabilities for your API Security testing needs.",
+            description: "150+ built-in tests covering OWASP Top 10, HackerOne top 10 and all the business logic vulnerabilities for your API Security testing needs.",
             redirectUrl: "/dashboard/testing",
         },
         {

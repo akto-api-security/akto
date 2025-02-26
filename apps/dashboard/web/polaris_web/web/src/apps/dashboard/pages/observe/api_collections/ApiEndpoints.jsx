@@ -234,22 +234,16 @@ function ApiEndpoints() {
             })
 
             shadowApis = Object.entries(shadowApis).map(([ codeAnalysisApiKey, codeAnalysisApi ]) => {
-                const {id, lastSeenTs, discoveredTs, location,  } = codeAnalysisApi
-                const { method, endpoint} = id
+                const { method, endpoint, location } = codeAnalysisApi
 
                 return {
                     id: codeAnalysisApiKey,
                     endpointComp: <GetPrettifyEndpoint method={method} url={endpoint} isNew={false} />,
                     method: method,
                     endpoint: endpoint,
-                    apiCollectionId: apiCollectionId,
                     codeAnalysisEndpoint: true,
                     sourceLocation: location.filePath, 
                     sourceLocationComp: <SourceLocation location={location} />,
-                    parameterisedEndpoint: method + " " + endpoint,
-                    apiCollectionName: collectionsMap[apiCollectionId],
-                    last_seen: func.prettifyEpoch(lastSeenTs),
-                    added: func.prettifyEpoch(discoveredTs)
                 }
             })
         }
@@ -313,6 +307,9 @@ function ApiEndpoints() {
     }
 
     function handleRowClick(data) {
+        // Don't show api details for Code analysis endpoints
+        if (data.codeAnalysisEndpoint) 
+            return
         
         let tmp = { ...data, endpointComp: "", sensitiveTagsComp: "" }
         
@@ -568,7 +565,6 @@ function ApiEndpoints() {
                 endpoints={filteredEndpoints}
                 filtered={loading ? false : filteredEndpoints.length !== endpointData["all"].length}
                 runTestFromOutside={runTests}
-                closeRunTest={() => setRunTests(false)}
                 disabled={showEmptyScreen}
             />
         </HorizontalStack>

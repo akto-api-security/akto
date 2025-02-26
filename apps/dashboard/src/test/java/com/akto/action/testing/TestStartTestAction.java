@@ -4,7 +4,6 @@ import com.akto.MongoBasedTest;
 import com.akto.action.ApiTokenAction;
 import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.ApiTokensDao;
-import com.akto.dao.RBACDao;
 import com.akto.dao.UsersDao;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
@@ -13,11 +12,9 @@ import com.akto.dao.testing.TestingRunResultSummariesDao;
 import com.akto.dto.AccountSettings;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiToken;
-import com.akto.dto.RBAC;
 import com.akto.dto.User;
 import com.akto.dto.UserAccountEntry;
 import com.akto.dto.ApiToken.Utility;
-import com.akto.dto.RBAC.Role;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.testing.*;
 import com.akto.dto.testing.TestingRun.State;
@@ -54,17 +51,17 @@ public class TestStartTestAction extends MongoBasedTest {
         TestingRunDao.instance.getMCollection().drop();
 
         CollectionWiseTestingEndpoints collectionWiseTestingEndpoints = new CollectionWiseTestingEndpoints(1000);
-        TestingRun testingRun1 = new TestingRun(Context.now(), "", collectionWiseTestingEndpoints,0, TestingRun.State.SCHEDULED, 0, "test", "", false);
+        TestingRun testingRun1 = new TestingRun(Context.now(), "", collectionWiseTestingEndpoints,0, TestingRun.State.SCHEDULED, 0, "test", "");
 
         CustomTestingEndpoints customTestingEndpoints = new CustomTestingEndpoints(Collections.singletonList(new ApiInfo.ApiInfoKey(0, "url", URLMethods.Method.GET)));
-        TestingRun testingRun2 = new TestingRun(Context.now(), "", customTestingEndpoints ,0, TestingRun.State.SCHEDULED, 1, "test", "", false);
+        TestingRun testingRun2 = new TestingRun(Context.now(), "", customTestingEndpoints ,0, TestingRun.State.SCHEDULED, 1, "test", "");
 
         WorkflowTestingEndpoints workflowTestingEndpoints = new WorkflowTestingEndpoints();
-        TestingRun testingRun3 = new TestingRun(Context.now(), "",  workflowTestingEndpoints,1, TestingRun.State.SCHEDULED, 0, "test", "", false);
+        TestingRun testingRun3 = new TestingRun(Context.now(), "",  workflowTestingEndpoints,1, TestingRun.State.SCHEDULED, 0, "test", "");
 
-        TestingRun testingRun4 = new TestingRun(Context.now(), "", collectionWiseTestingEndpoints,0, TestingRun.State.RUNNING, 0, "test", "", false);
+        TestingRun testingRun4 = new TestingRun(Context.now(), "", collectionWiseTestingEndpoints,0, TestingRun.State.RUNNING, 0, "test", "");
         // already completed test
-        TestingRun testingRun5 = new TestingRun(Context.now(), "", collectionWiseTestingEndpoints,0, TestingRun.State.COMPLETED, 0, "test", "", false);
+        TestingRun testingRun5 = new TestingRun(Context.now(), "", collectionWiseTestingEndpoints,0, TestingRun.State.COMPLETED, 0, "test", "");
 
         TestingRunDao.instance.insertMany(Arrays.asList(testingRun1, testingRun2, testingRun3, testingRun4, testingRun5 ));
 
@@ -95,7 +92,7 @@ public class TestStartTestAction extends MongoBasedTest {
 
         List<TestingRunResultSummary> testingRunResultSummaryList = new ArrayList<>();
         ObjectId testingRunId = new ObjectId();
-        TestingRun testingRun = new TestingRun(0, "avneesh@akto.io", new CollectionWiseTestingEndpoints(0), 0,  State.COMPLETED, 0, "test", "", false);
+        TestingRun testingRun = new TestingRun(0, "avneesh@akto.io", new CollectionWiseTestingEndpoints(0), 0,  State.COMPLETED, 0, "test", "");
         testingRun.setId(testingRunId);
         for (int startTimestamp=0; startTimestamp < 30; startTimestamp++) {
             TestingRunResultSummary testingRunResultSummary = new TestingRunResultSummary(
@@ -126,7 +123,7 @@ public class TestStartTestAction extends MongoBasedTest {
         TestingRunDao.instance.getMCollection().drop();
 
         CollectionWiseTestingEndpoints collectionWiseTestingEndpoints = new CollectionWiseTestingEndpoints(1000);
-        TestingRun testingRun = new TestingRun(Context.now(), "", collectionWiseTestingEndpoints,0, TestingRun.State.COMPLETED, 0, "test", "", false);
+        TestingRun testingRun = new TestingRun(Context.now(), "", collectionWiseTestingEndpoints,0, TestingRun.State.COMPLETED, 0, "test", "");
         TestingRunDao.instance.insertOne(testingRun);
         String testingRunHexId = testingRun.getHexId();
 
@@ -172,17 +169,10 @@ public class TestStartTestAction extends MongoBasedTest {
         accountAccessMap.put(ACCOUNT_ID+"", userAccountEntry);
         
         User user = new User();
-        String login="test@akto.io";
-        user.setLogin(login);
+        user.setLogin("test@akto.io");
         user.setAccounts(accountAccessMap);
 
         UsersDao.instance.insertOne(user);
-
-        user = UsersDao.instance.findOne(Filters.eq(User.LOGIN, login));
-
-        RBAC rbac = new RBAC(user.getId(), Role.ADMIN, ACCOUNT_ID);
-        RBACDao.instance.insertOne(rbac);
-
         AccountSettings acc = new AccountSettings();
         acc.setDashboardVersion("test - test - test");
         acc.setId(ACCOUNT_ID);
@@ -232,7 +222,7 @@ public class TestStartTestAction extends MongoBasedTest {
         
         CollectionWiseTestingEndpoints collectionWiseTestingEndpoints = new CollectionWiseTestingEndpoints(1000);
         TestingRun testingRun = new TestingRun(Context.now(), "", collectionWiseTestingEndpoints, 0,
-                TestingRun.State.COMPLETED, 0, "test", "", false);
+                TestingRun.State.COMPLETED, 0, "test", "");
         TestingRunDao.instance.insertOne(testingRun);
         String testingRunHexId = testingRun.getHexId();
 

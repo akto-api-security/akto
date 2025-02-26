@@ -5,14 +5,12 @@ import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.AccountsDao;
 import com.akto.dao.JiraIntegrationDao;
-import com.akto.dao.RBACDao;
 import com.akto.dao.UsersDao;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.Account;
 import com.akto.dto.AccountSettings;
 import com.akto.dto.JiraIntegration;
-import com.akto.dto.RBAC;
 import com.akto.dto.User;
 import com.akto.dto.UserAccountEntry;
 import com.akto.dto.ApiToken.Utility;
@@ -113,7 +111,6 @@ public class ProfileAction extends UserAction {
         String dashboardVersion = accountSettings.getDashboardVersion();
         String[] versions = dashboardVersion.split(" - ");
         User userFromDB = UsersDao.instance.findOne(Filters.eq(Constants.ID, user.getId()));
-        RBAC.Role userRole = RBACDao.getCurrentRoleForUser(user.getId(), Context.accountId.get());
 
         boolean jiraIntegrated = false;
         try {
@@ -134,8 +131,7 @@ public class ProfileAction extends UserAction {
                 .append("cloudType", Utils.getCloudType())
                 .append("accountName", accountName)
                 .append("aktoUIMode", userFromDB.getAktoUIMode().name())
-                .append("jiraIntegrated", jiraIntegrated)
-                .append("userRole", userRole.toString().toUpperCase());
+                .append("jiraIntegrated", jiraIntegrated);;
 
         if (DashboardMode.isOnPremDeployment()) {
             userDetails.append("userHash", Intercom.getUserHash(user.getLogin()));

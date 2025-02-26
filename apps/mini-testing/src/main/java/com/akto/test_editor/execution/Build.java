@@ -1,9 +1,11 @@
 package com.akto.test_editor.execution;
 
-import com.akto.dao.DependencyFlowNodesDao;
-import com.akto.dao.SampleDataDao;
 import com.akto.dao.context.Context;
+import com.akto.data_actor.DataActor;
+import com.akto.data_actor.DataActorFactory;
+import com.akto.data_actor.DbLayer;
 import com.akto.dto.ApiInfo;
+import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.RawApi;
@@ -13,7 +15,7 @@ import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.URLMethods;
 import com.akto.log.LoggerMaker;
-import com.akto.runtime.policies.AuthPolicy;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.testing.ApiExecutor;
 import com.akto.util.Constants;
 import com.akto.util.HttpRequestResponseUtils;
@@ -21,21 +23,20 @@ import com.akto.util.JSONUtils;
 import com.akto.util.modifier.SetValueModifier;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.mongodb.client.model.Filters;
 import joptsimple.internal.Strings;
-import org.bson.conversions.Bson;
-
 import java.net.URI;
 import java.util.*;
 
 import static com.akto.util.HttpRequestResponseUtils.FORM_URL_ENCODED_CONTENT_TYPE;
 import static com.akto.util.HttpRequestResponseUtils.extractValuesFromPayload;
+import static com.akto.runtime.utils.Utils.parseCookie;
 
 public class Build {
 
     private Map<Integer, ReverseNode> parentToChildMap = new HashMap<>();
 
-    private static final LoggerMaker loggerMaker = new LoggerMaker(Build.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(Build.class, LogDb.TESTING);
+    private static final DataActor dataActor = DataActorFactory.fetchInstance();
 
     public static void buildParentToChildMap(Collection<Node> nodes, Map<Integer, ReverseNode> parentToChildMap) {
         for (Node node: nodes) {
@@ -243,7 +244,21 @@ public class Build {
         }
 
 
-        List<Node> nodes = DependencyFlowNodesDao.instance.findNodesForCollectionIds(apiCollectionsIds,false,0, 10_000);
+        List<Node> nodes = new ArrayList<>();
+        int skip = 0;
+        do {
+            try {
+
+                nodes = dataActor.fetchNodesForCollectionIds(apiCollectionsIds, false, skip);
+                if (nodes == null || (nodes.size() <= DbLayer.NODE_LIMIT)) {
+                    break;
+                }
+                skip += DbLayer.NODE_LIMIT;
+            } catch (Exception e) {
+                break;
+            }
+        } while (true);
+
         buildParentToChildMap(nodes, parentToChildMap);
         Map<Integer, List<SampleData>> levelsToSampleDataMap = buildLevelsToSampleDataMap(nodes);
 
@@ -266,10 +281,10 @@ public class Build {
         }
 
         loggerMaker.infoAndAddToDb("Running independent APIs", LoggerMaker.LogDb.DASHBOARD);
-        int skip = 0;
-        int limit = 1000;
+        skip = 0;
+        int limit = DbLayer.SAMPLE_DATA_LIMIT;
         while (true) {
-            List<SampleData> all = SampleDataDao.instance.findAll(Filters.in("_id.apiCollectionId", apiCollectionsIds), skip,limit, null);
+            List<SampleData> all = dataActor.fetchSampleData(new HashSet<>(apiCollectionsIds), skip);
             if (all.isEmpty()) break;
             List<SampleData> filtered = new ArrayList<>();
             for (SampleData sampleData: all) {
@@ -338,17 +353,13 @@ public class Build {
     public static List<SampleData> fillSdList(List<SampleData> sdList) {
         if (sdList == null || sdList.isEmpty()) return new ArrayList<>();
 
-        List<Bson> filters = new ArrayList<>();
+        List<ApiInfoKey> endpoints = new ArrayList<>();
         for (SampleData sampleData: sdList) {
             // todo: batch for bigger lists
             Key id = sampleData.getId();
-            filters.add(Filters.and(
-                    Filters.eq("_id.apiCollectionId", id.getApiCollectionId()),
-                    Filters.eq("_id.url", id.getUrl()),
-                    Filters.eq("_id.method", id.getMethod().name())
-            ));
+            endpoints.add(new ApiInfoKey(id.getApiCollectionId(), id.getUrl(), id.getMethod()));
         }
-        return SampleDataDao.instance.findAll(Filters.or(filters));
+        return dataActor.fetchSampleDataForEndpoints(endpoints);
     }
 
 
@@ -408,7 +419,7 @@ public class Build {
             if (values == null) continue;
 
             if (headerKey.equalsIgnoreCase("set-cookie")) {
-                Map<String, String> cookieMap = AuthPolicy.parseCookie(values);
+                Map<String, String> cookieMap =  parseCookie(values);
                 for (String cookieKey : cookieMap.keySet()) {
                     String cookieVal = cookieMap.get(cookieKey);
                     valuesMap.put(cookieKey, new HashSet<>(Collections.singletonList(cookieVal)));

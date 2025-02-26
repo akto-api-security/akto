@@ -41,6 +41,15 @@ public class ApiAccessTypePolicy {
             "x-client-ip",
             "client-ip");
 
+    public String cleanIp(String ip) {
+        try {
+            String[] parts = ip.split(":");
+            return parts[0];
+        } catch (Exception e) {
+        }
+        return ip;
+    }
+
     public void findApiAccessType(HttpResponseParams httpResponseParams, ApiInfo apiInfo) {
         if (privateCidrList == null || privateCidrList.isEmpty()) return ;
         List<String> clientIps = new ArrayList<>();
@@ -60,13 +69,13 @@ public class ApiAccessTypePolicy {
         String sourceIP = httpResponseParams.getSourceIP();
 
         if (sourceIP != null && !sourceIP.isEmpty() && !sourceIP.equals("null")) {
-            ipList.add(sourceIP);
+            ipList.add(cleanIp(sourceIP));
         }
         
         String destIP = httpResponseParams.getDestIP();
 
         if (destIP != null && !destIP.isEmpty() && !destIP.equals("null")) {
-            ipList.add(destIP);
+            ipList.add(cleanIp(destIP));
         }
 
         if (ipList.isEmpty() ) return;

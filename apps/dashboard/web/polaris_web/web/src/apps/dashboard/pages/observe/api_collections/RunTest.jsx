@@ -9,7 +9,7 @@ import func from "@/util/func"
 import { useNavigate } from "react-router-dom"
 import PersistStore from "../../../../main/PersistStore";
 
-function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOutside, closeRunTest }) {
+function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOutside }) {
 
     const initialState = {
         categories: [],
@@ -29,7 +29,6 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         authMechanismPresent: false,
         testRoleLabel: "No test role selected",
         testRoleId: "",
-        sendSlackAlert: false
     }
 
     const navigate = useNavigate()
@@ -43,24 +42,6 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
     const [active, setActive] = useState(runTestFromOutside || false);
 
     const runTestRef = useRef(null);
-    const [searchValue, setSearchValue] = useState('')
-    const [showSearch, setShowSearch] = useState(false)
-    const [showFiltersOption, setShowFiltersOption] = useState(false);
-    const sectionsForFilters = [
-        {
-            title: 'Author',
-            filterKey: 'author',
-            options: [
-                {value: 'akto', label: 'Akto default'},
-                {value: 'custom', label: 'Custom tests'}
-            ]
-        }
-    ]
-
-    const initialArr = ['akto','custom']
-
-    const [optionsSelected, setOptionsSelected] = useState(initialArr)
-    const [slackIntegrated, setSlackIntegrated] = useState(false)
 
     function nameSuffixes(tests) {
         return Object.entries(tests)
@@ -84,11 +65,6 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
 
     async function fetchData() {
         setLoading(true)
-
-        observeApi.fetchSlackWebhooks().then((resp) => {
-            const apiTokenList = resp.apiTokenList
-            setSlackIntegrated(apiTokenList && apiTokenList.length > 0)
-        })
 
         const allSubCategoriesResponse = await testingApi.fetchAllSubCategories(true, "runTests")
         const testRolesResponse = await testingApi.fetchTestRoles()
@@ -147,12 +123,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         }
     }, [apiCollectionName,runTestFromOutside])
 
-    const toggleRunTest = () => {
-        setActive(prev => !prev)
-        if(active){
-            closeRunTest()
-        }
-    }
+    const toggleRunTest = () => setActive(prev => !prev)
 
     function populateMapCategoryToSubcategory(businessLogicSubcategories) {
         let ret = {}
@@ -360,30 +331,13 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
             })
         })
 
-        let apiInfoKeyList;
-        if(!selectedResourcesForPrimaryAction || selectedResourcesForPrimaryAction.length === 0) {
-            apiInfoKeyList = endpoints.map(endpoint => ({
-                apiCollectionId: endpoint.apiCollectionId,
-                method: endpoint.method,
-                url: endpoint.endpoint
-            }))
-        } else {
-            apiInfoKeyList = selectedResourcesForPrimaryAction.map(str => {
-                const parts = str.split('###')
-                
-                const method = parts[0]
-                const url = parts[1]
-                const apiCollectionId = parseInt(parts[2], 10)
+        const apiInfoKeyList = endpoints.map(endpoint => ({
+            apiCollectionId: endpoint.apiCollectionId,
+            method: endpoint.method,
+            url: endpoint.endpoint
+        }))
 
-                return {
-                  apiCollectionId: apiCollectionId,
-                  method: method,
-                  url: url
-                }
-            })
-        }
-
-        if (filtered || selectedResourcesForPrimaryAction.length > 0) {
+        if (filtered) {
             await observeApi.scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, "TESTING_UI", testRoleId, continuousTesting)
         } else {
             await observeApi.scheduleTestForCollection(collectionId, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting)
@@ -399,6 +353,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         )
 
         func.setToast(true, false, <div data-testid="test_run_created_message">{forwardLink}</div>)
+
     }
 
     function getLabel(objList, value) {
@@ -431,21 +386,6 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         setTestRun(prev => {
             return { ...prev, tests: copyTestRun.tests, testName: convertToLowerCaseWithUnderscores(apiCollectionName) + "_" + nameSuffixes(copyTestRun.tests).join("_") }
         })
-    }
-
-    const handleInputValue = (val) => {
-        setSearchValue(val);
-    }
-
-    function generateLabelForSlackIntegration() {
-        return <HorizontalStack gap={1}>
-            <Link url='/dashboard/settings/integrations/slack' target="_blank" rel="noopener noreferrer" style={{ color: "#3385ff", textDecoration: 'none' }}>
-                Enable
-            </Link>
-            <Text>
-                Slack integration to send alerts post completion
-            </Text>
-        </HorizontalStack>
     }
 
     return (
@@ -655,30 +595,19 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                             </HorizontalGrid>
 
                             <Checkbox
-                                label={slackIntegrated ? "Send slack alert post test completion" : generateLabelForSlackIntegration()}
-                                checked={testRun.sendSlackAlert}
-                                onChange={() => setTestRun(prev => ({ ...prev, sendSlackAlert: !prev.sendSlackAlert}))}
-                                disabled={!slackIntegrated}
+                                label="Use different target for testing"
+                                checked={testRun.hasOverriddenTestAppUrl}
+                                onChange={() => setTestRun(prev => ({ ...prev, hasOverriddenTestAppUrl: !prev.hasOverriddenTestAppUrl }))}
                             />
-
-                            <HorizontalGrid columns={2}>
-                                <Checkbox
-                                    label="Use different target for testing"
-                                    checked={testRun.hasOverriddenTestAppUrl}
-                                    onChange={() => setTestRun(prev => ({ ...prev, hasOverriddenTestAppUrl: !prev.hasOverriddenTestAppUrl }))}
-                                />
-                                {testRun.hasOverriddenTestAppUrl &&
-                                    <div style={{ width: '400px'}}> 
-                                        <TextField
-                                            placeholder="Override test app host"
-                                            value={testRun.overriddenTestAppUrl}
-                                            onChange={(overriddenTestAppUrl) => setTestRun(prev => ({ ...prev, overriddenTestAppUrl: overriddenTestAppUrl }))}
-                                        />
-                                    </div>
-                                }
-                            </HorizontalGrid>
-
-
+                            {testRun.hasOverriddenTestAppUrl &&
+                                <div style={{ width: '400px'}}> 
+                                    <TextField
+                                        placeholder="Override test app host"
+                                        value={testRun.overriddenTestAppUrl}
+                                        onChange={(overriddenTestAppUrl) => setTestRun(prev => ({ ...prev, overriddenTestAppUrl: overriddenTestAppUrl }))}
+                                    />
+                                </div>
+                            }
                         </VerticalStack>
 
                     </Modal.Section>

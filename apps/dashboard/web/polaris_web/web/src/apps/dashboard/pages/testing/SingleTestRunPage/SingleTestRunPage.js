@@ -217,7 +217,7 @@ function SingleTestRunPage() {
       if(setData){
         setSelectedTestRun(localSelectedTestRun);
       }
-      if((localSelectedTestRun.testingRunResultSummaryHexId) && ((testRunResults[selectedTab].length === 0) || setData)) {
+      if((localSelectedTestRun.testingRunResultSummaryHexId && testRunResults[selectedTab].length === 0) || setData) {
         await fetchTestingRunResultsData(localSelectedTestRun.testingRunResultSummaryHexId);
         }
       }) 
@@ -414,8 +414,9 @@ const promotedBulkActions = (selectedDataHexIds) => {
       </VerticalStack>
     </Card> : null
   )
+
   const components = [ 
-    runningTestsComp,<TrendChart key={tempLoading.running} hexId={hexId} setSummary={setSummary} show={selectedTestRun.run_type && selectedTestRun.run_type!=='One-time'}/> , 
+    runningTestsComp,<TrendChart key={tempLoading.running} hexId={hexId} setSummary={setSummary} show={selectedTestRun.run_type && selectedTestRun.run_type!='One-time'}/> , 
     metadataComponent(), loading ? <SpinnerCentered key="loading"/> : (!workflowTest ? resultTable : workflowTestBuilder)];
 
   const openVulnerabilityReport = () => {

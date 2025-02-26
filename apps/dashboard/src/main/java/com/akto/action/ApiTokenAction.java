@@ -91,20 +91,6 @@ public class ApiTokenAction extends UserAction implements ServletRequestAware {
         return SUCCESS.toUpperCase();
     }
 
-    public String fetchSlackWebhooks() {
-        apiTokenList = new ArrayList<>();
-        List<SlackWebhook> slackWebhooks = SlackWebhooksDao.instance.findAll(new BasicDBObject());
-        for(SlackWebhook sw: slackWebhooks) {
-            ApiToken slackToken = 
-                new ApiToken(sw.getId(), Context.accountId.get(), sw.getWebhook(), sw.getWebhook(), 
-                sw.getId(), sw.getUserEmail(), Utility.SLACK);
-                
-            apiTokenList.add(slackToken);
-        }
-
-        return SUCCESS.toUpperCase();
-    }
-
     private String error;
     private String webhookUrl;
     private String dashboardUrl;

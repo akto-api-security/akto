@@ -36,22 +36,19 @@ import com.akto.test_editor.execution.Executor;
 import com.akto.test_editor.execution.VariableResolver;
 import com.akto.testing.yaml_tests.YamlTestTemplate;
 import com.akto.testing_issues.TestingIssuesHandler;
-import com.akto.testing_utils.TestingUtils;
 import com.akto.usage.UsageMetricCalculator;
 import com.akto.util.Constants;
 import com.akto.util.JSONUtils;
 import com.akto.util.enums.GlobalEnums.Severity;
 import com.akto.util.enums.LoginFlowEnums;
+import com.alibaba.fastjson2.JSON;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
-import com.mongodb.MongoInterruptedException;
-import org.apache.commons.lang3.StringUtils;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.*;
 
 import org.bson.types.ObjectId;
 import org.json.JSONObject;
-import org.mortbay.util.ajax.JSON;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -150,7 +147,7 @@ public class TestExecutor {
         List<TestRoles> testRoles = sampleMessageStore.fetchTestRoles();
         AuthMechanism authMechanism = authMechanismStore.getAuthMechanism();;
 
-        Map<String, TestConfig> testConfigMap = YamlTemplateDao.instance.fetchTestConfigMap(false, true);
+        Map<String, TestConfig> testConfigMap = YamlTemplateDao.instance.fetchTestConfigMap(false, false);
 
         List<CustomAuthType> customAuthTypes = CustomAuthTypeDao.instance.findAll(CustomAuthType.ACTIVE,true);
         TestingUtil testingUtil = new TestingUtil(authMechanism, sampleMessageStore, testRoles, testingRun.getUserEmail(), customAuthTypes);

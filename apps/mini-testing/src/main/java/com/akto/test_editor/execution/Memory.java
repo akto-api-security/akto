@@ -1,8 +1,10 @@
 package com.akto.test_editor.execution;
 
-import com.akto.dao.DependencyFlowNodesDao;
-import com.akto.dao.SampleDataDao;
+import com.akto.data_actor.DataActor;
+import com.akto.data_actor.DataActorFactory;
+import com.akto.dependency_flow.TreeHelper;
 import com.akto.dto.ApiInfo;
+import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.RawApi;
@@ -11,22 +13,19 @@ import com.akto.dto.testing.TestingRunConfig;
 import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.dto.type.URLMethods.Method;
 import com.akto.testing.ApiExecutor;
-import com.akto.types.CappedSet;
 import com.akto.util.Constants;
-import com.mongodb.client.model.Filters;
-import org.bson.conversions.Bson;
-
 import java.util.*;
 
 import static com.akto.test_editor.execution.Build.*;
-
 
 public class Memory {
 
     Map<Integer, RawApi> resultMap = new HashMap<>();
     private final Map<Integer, ReverseNode>  parentToChildMap = new HashMap<>();
     private final Map<Integer, Node> nodesMap = new HashMap<>();
+    private static final DataActor dataActor = DataActorFactory.fetchInstance();
 
     Map<Integer, SampleData> sampleDataMap = new HashMap<>();
     private Map<ApiInfo.ApiInfoKey, SingleTypeInfo.ParamId> assetsMap = new HashMap<>();
@@ -36,13 +35,7 @@ public class Memory {
 
     public void findAssets(ApiInfo.ApiInfoKey apiInfoKey) {
         List<SingleTypeInfo.ParamId> results = new ArrayList<>();
-        Node node = DependencyFlowNodesDao.instance.findOne(
-                Filters.and(
-                        Filters.eq("apiCollectionId", apiInfoKey.getApiCollectionId()+""),
-                        Filters.eq("url", apiInfoKey.getUrl()),
-                        Filters.eq("method", apiInfoKey.getMethod().name())
-                )
-        );
+        Node node = dataActor.fetchDependencyFlowNodesByApiInfoKey(apiInfoKey.getApiCollectionId(), apiInfoKey.getUrl(), apiInfoKey.getMethod().name());
 
         if (node == null || node.getConnections() == null) return;
 
@@ -74,18 +67,14 @@ public class Memory {
             treeHelper.buildTree(apiInfoKey.getApiCollectionId()+"", apiInfoKey.getUrl(), apiInfoKey.getMethod().name());
         }
         Collection<Node> nodes = treeHelper.result.values();
-        List<Bson> filters = new ArrayList<>();
+        List<ApiInfoKey> endpoints = new ArrayList<>();
         for (Node node: nodes) {
             nodesMap.put(node.hashCode(), node);
-            filters.add(Filters.and(
-                    Filters.eq("_id.apiCollectionId", Integer.parseInt(node.getApiCollectionId())),
-                    Filters.eq("_id.url", node.getUrl()),
-                    Filters.eq("_id.method", node.getMethod())
-            ));
+            endpoints.add(new ApiInfoKey(Integer.parseInt(node.getApiCollectionId()), node.getUrl(), Method.valueOf(node.getMethod())));
         }
 
         // fetch sample data
-        List<SampleData> sdList = SampleDataDao.instance.findAll(Filters.or(filters));
+        List<SampleData> sdList = dataActor.fetchSampleDataForEndpoints(endpoints);
         for (SampleData sampleData: sdList) {
             Key id = sampleData.getId();
             sampleDataMap.put(Objects.hash(id.getApiCollectionId(), id.getUrl(), id.getMethod().name()), sampleData);
@@ -120,13 +109,7 @@ public class Memory {
     public RawApi findAssetGetterRequest(ApiInfo.ApiInfoKey apiInfoKey) {
         SingleTypeInfo.ParamId paramId = assetsMap.get(apiInfoKey);
         // find getter API
-        Node node = DependencyFlowNodesDao.instance.findOne(
-                Filters.and(
-                        Filters.eq("apiCollectionId", apiInfoKey.getApiCollectionId()+""),
-                        Filters.eq("url", apiInfoKey.getUrl()),
-                        Filters.eq("method", apiInfoKey.getMethod().name())
-                )
-        );
+        Node node = dataActor.fetchDependencyFlowNodesByApiInfoKey(apiInfoKey.getApiCollectionId(), apiInfoKey.getUrl(), apiInfoKey.getMethod().name());
         if (node == null || node.getConnections() == null) return null;
 
         Map<String, Connection> connections = node.getConnections();

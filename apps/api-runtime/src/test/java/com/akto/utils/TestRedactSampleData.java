@@ -259,7 +259,7 @@ public class TestRedactSampleData {
         respPayloadMap.put("success", true);
         respPayloadMap.put("id", 12345);
         respPayloadMap.put("teams", Arrays.asList("A", "B", "C"));
-        respPayloadMap.put("privateJet", "null");
+        respPayloadMap.put("privateJet", null);
         respPayloadMap.put("bikes", Collections.emptyList());
         respPayloadMap.put("friends", Arrays.asList(friend1, friend2));
 

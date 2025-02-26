@@ -11,7 +11,7 @@ import java.util.List;
 public class Utils {
 
     public final static int DELTA_PERIOD_VALUE = 60 * 24 * 60 * 60;
-    public static final int LIMIT = -1;
+    public static final int LIMIT = 2000;
 
     public static List<BasicDBObject> fetchEndpointsInCollectionUsingHost(int apiCollectionId, int skip) {
 

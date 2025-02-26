@@ -91,6 +91,13 @@ public class AdminSettingsAction extends UserAction {
     public String toggleTelemetry() {
         if (!DashboardMode.isOnPremDeployment()) return Action.ERROR.toUpperCase();
 
+        User user = getSUser();
+        if (user == null) return ERROR.toUpperCase();
+        boolean isAdmin = RBACDao.instance.isAdmin(user.getId(), Context.accountId.get());
+        if (!isAdmin) {
+            addActionError("Only admin can add change this setting");
+            return Action.ERROR.toUpperCase();
+        }
         AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
         TelemetrySettings telemetrySettings = accountSettings.getTelemetrySettings();
         telemetrySettings.setCustomerEnabled(enableTelemetry);
@@ -134,6 +141,10 @@ public class AdminSettingsAction extends UserAction {
 
     private boolean redactPayload;
     public String toggleRedactFeature() {
+        User user = getSUser();
+        if (user == null) return ERROR.toUpperCase();
+        boolean isAdmin = RBACDao.instance.isAdmin(user.getId(), Context.accountId.get());
+        if (!isAdmin) return ERROR.toUpperCase();
 
         AccountSettingsDao.instance.getMCollection().updateOne(
                 AccountSettingsDao.generateFilter(),

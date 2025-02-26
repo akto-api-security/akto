@@ -1227,8 +1227,8 @@ mapCollectionIdToHostName(apiCollections){
     }
   },
 
-  getSensitiveIcons(data) {
-    const key = data.toUpperCase().replace(/ /g, '_');
+  getSensitiveIcons(data){
+    const key = data.toUpperCase();
     switch (key) {
         case "DATABASE":
           return DynamicSourceMinor;
@@ -1244,41 +1244,41 @@ mapCollectionIdToHostName(apiCollections){
           return KeyMajor;
         case "EMAIL":
           return InviteMinor;
-        case "CREDIT_CARD":
+        case "CREDIT CARD":
           return CreditCardMajor;
         case "SSN":
           return IdentityCardMajor;
         case "ADDRESS":
           return LocationsMinor;
-        case "IP_ADDRESS":
+        case "IP ADDRESS":
           return LocationsMinor;
-        case "PHONE_NUMBER":
+        case "PHONE NUMBER":
           return PhoneMajor;
         case "UUID":
           return IdentityCardMajor;
-        case "DATA_FILE":
+        case "DATA FILE":
           return FileMinor;
         case "IMAGE":
           return ImageMajor;
-        case "US_ADDRESS":
-          return LocationsMinor;
-        case "IBAN_EUROPE":
+        case "US ADDRESS":
+          return LocationsMinor
+        case "IBAN EUROPE":
           return BankMajor;
-        case "JAPANESE_SOCIAL_INSURANCE_NUMBER":
+        case "JAPANESE SOCIAL INSURANCE NUMBER":
           return HashtagMinor;
-        case "GERMAN_INSURANCE_IDENTITY_NUMBER":
+        case "GERMAN INSURANCE IDENTITY NUMBER":
           return IdentityCardMajor;
-        case "CANADIAN_SOCIAL_IDENTITY_NUMBER":
+        case "CANADIAN SOCIAL IDENTITY NUMBER":
           return IdentityCardMajor;
-        case "FINNISH_PERSONAL_IDENTITY_NUMBER":
+        case "FINNISH PERSONAL IDENTITY NUMBER":
           return IdentityCardMajor;
-        case "UK_NATIONAL_INSURANCE_NUMBER":
+        case "UK NATIONAL INSURANCE NUMBER":
           return HashtagMinor;
-        case "INDIAN_UNIQUE_HEALTH_IDENTIFICATION":
+        case "INDIAN UNIQUE HEALTH IDENTIFICATION":
           return IdentityCardMajor;
-        case "US_MEDICARE_HEALTH_INSURANCE_CLAIM_NUMBER":
+        case "US MEDICARE HEALTH INSURANCE CLAIM NUMBER":
           return HashtagMinor;
-        case "PAN_CARD":
+        case "PAN CARD":
           return IdentityCardMajor;
         case "ENCRYPT":
           return LockMinor;
@@ -1307,9 +1307,9 @@ mapCollectionIdToHostName(apiCollections){
         case "DOB":
           return CalendarMinor;
         case "BIRTH":
-          return CalendarTimeMinor;
+          return CalendarTimeMinor
         default: 
-          return KeyMajor;
+            return KeyMajor;
     }
   },
   getCollectionFilters(filters) {
@@ -1431,7 +1431,7 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
       const tabId = this.getKeyFromName(tab)
       return {
           content: tab,
-          badge: selectedTab === (tabId && currentCount !==0) ? currentCount.toString() : countObj[tabId].toString(),
+          badge: selectedTab === tabId ? currentCount.toString() : countObj[tabId].toString(),
           onAction: () => { setSelectedTab(tabId) },
           id: this.getKeyFromName(tabId),
           index: ind 
@@ -1484,33 +1484,6 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
       return true;
     }
     return false;
-  },
-  checkUserValidForIntegrations(){
-    const userRole = window.USER_ROLE
-    return !(userRole === "GUEST" || userRole === "MEMBER")
-  },
-  capitalizeFirstLetter(str) {
-    if (!str) return str;
-    return str.charAt(0).toUpperCase() + str.slice(1);
-  },
-  getDaySuffix(day) {
-    if (day > 3 && day < 21) return 'th';
-    switch (day % 10) {
-        case 1: return 'st';
-        case 2: return 'nd';
-        case 3: return 'rd';
-        default: return 'th';
-    }
-  },
-  formatReportDate(date) {
-    const day = date.getDate();
-    const month = date.toLocaleString('default', { month: 'long' });
-    const year = date.getFullYear();
-    const daySuffix = func.getDaySuffix(day);
-    return `${day}${daySuffix} ${month}, ${year}`;
-  },
-  sleep(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
   }
 }
 

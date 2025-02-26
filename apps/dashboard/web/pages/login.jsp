@@ -67,7 +67,6 @@
                     window.STIGG_CUSTOMER_TOKEN='${requestScope.stiggCustomerToken}'
                     window.STIGG_CLIENT_KEY='${requestScope.stiggClientKey}'
                     window.JIRA_INTEGRATED ='${requestScope.jiraIntegrated}'
-                    window.USER_ROLE ='${requestScope.userRole}'
 
                     window.STIGG_IS_OVERAGE='${requestScope.stiggIsOverage}'
                     window.USAGE_PAUSED=JSON.parse('${requestScope.usagePaused}' || '{}');

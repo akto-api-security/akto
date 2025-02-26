@@ -1,39 +1,49 @@
 package com.akto.hybrid_parsers;
 
 import com.akto.RuntimeMode;
-import com.akto.dao.ApiCollectionsDao;
-import com.akto.dao.billing.OrganizationsDao;
+import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.context.Context;
 import com.akto.dao.traffic_metrics.TrafficMetricsDao;
 import com.akto.hybrid_dependency.DependencyAnalyser;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
+import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.*;
+import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.billing.Organization;
+import com.akto.dto.billing.SyncLimit;
 import com.akto.dto.bulk_updates.BulkUpdates;
 import com.akto.dto.bulk_updates.UpdatePayload;
+import com.akto.dto.monitoring.FilterConfig;
+import com.akto.dto.monitoring.FilterConfig.FILTER_TYPE;
 import com.akto.dto.settings.DefaultPayload;
+import com.akto.dto.test_editor.ExecutorNode;
 import com.akto.dto.traffic_metrics.TrafficMetrics;
+import com.akto.dto.type.URLMethods.Method;
+import com.akto.dto.usage.MetricTypes;
 import com.akto.graphql.GraphQLUtils;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.runtime.RuntimeUtil;
 import com.akto.runtime.parser.SampleParser;
+import com.akto.runtime.utils.Utils;
+import com.akto.test_editor.execution.ParseAndExecute;
+import com.akto.test_editor.execution.VariableResolver;
+import com.akto.test_editor.filter.data_operands_impl.ValidationResult;
 import com.akto.hybrid_runtime.APICatalogSync;
 import com.akto.hybrid_runtime.Main;
 import com.akto.hybrid_runtime.MergeLogicLocal;
 import com.akto.hybrid_runtime.URLAggregator;
-import com.akto.util.JSONUtils;
+import com.akto.util.Pair;
 import com.akto.util.Constants;
-import com.akto.util.HttpRequestResponseUtils;
 import com.akto.util.http_util.CoreHTTPClient;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.*;
 import okhttp3.*;
-import org.apache.commons.lang3.math.NumberUtils;
-import org.bson.conversions.Bson;
 
 import java.io.IOException;
 import java.util.*;
+import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -43,6 +53,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static com.akto.runtime.RuntimeUtil.matchesDefaultPayload;
+import static com.akto.testing.Utils.validateFilter;
 
 public class HttpCallParser {
     private final int sync_threshold_count;
@@ -56,11 +67,9 @@ public class HttpCallParser {
     private Map<TrafficMetrics.Key, TrafficMetrics> trafficMetricsMap = new HashMap<>();
     public static final ScheduledExecutorService trafficMetricsExecutor = Executors.newScheduledThreadPool(1);
     private static final String trafficMetricsUrl = "https://logs.akto.io/traffic-metrics";
-    private static final OkHttpClient client = CoreHTTPClient.client.newBuilder()
-            .writeTimeout(1, TimeUnit.SECONDS)
-            .readTimeout(1, TimeUnit.SECONDS)
-            .callTimeout(1, TimeUnit.SECONDS)
-            .build();
+
+    // Using default timeouts [10 seconds], as this is a slow API.
+    private static final OkHttpClient client = CoreHTTPClient.client.newBuilder().build();
     
     private static final ExecutorService service = Executors.newFixedThreadPool(1);
     private static boolean pgMerging = false;
@@ -90,13 +99,12 @@ public class HttpCallParser {
         this.sync_threshold_time = sync_threshold_time;
         apiCatalogSync = new APICatalogSync(userIdentifier, thresh, fetchAllSTI);
         apiCatalogSync.buildFromDB(false, fetchAllSTI);
-        boolean useMap = !(Main.isOnprem || RuntimeMode.isHybridDeployment());
         apiCollectionsMap = new HashMap<>();
         List<ApiCollection> apiCollections = dataActor.fetchAllApiCollectionsMeta();
         for (ApiCollection apiCollection: apiCollections) {
             apiCollectionsMap.put(apiCollection.getId(), apiCollection);
         }
-        this.dependencyAnalyser = new DependencyAnalyser(apiCatalogSync.dbState, Main.isOnprem, RuntimeMode.isHybridDeployment(), apiCollectionsMap);
+        //this.dependencyAnalyser = new DependencyAnalyser(apiCatalogSync.dbState, Main.isOnprem, RuntimeMode.isHybridDeployment(), apiCollectionsMap);
     }
     
     public static HttpResponseParams parseKafkaMessage(String message) throws Exception {
@@ -156,13 +164,109 @@ public class HttpCallParser {
 
     int numberOfSyncs = 0;
 
+    private static int lastSyncLimitFetch = 0;
+    private static final int REFRESH_INTERVAL = 60 * 10; // 10 minutes.
+    private static SyncLimit syncLimit = FeatureAccess.fullAccess.fetchSyncLimit();
+    /*
+     * This is the epoch for August 27, 2024 7:15:31 AM GMT .
+     * Enabling this feature for all users after this timestamp.
+     */
+    private static final int DAY_0_EPOCH = 1724742931;
+
+    private SyncLimit fetchSyncLimit() {
+        try {
+            if ((lastSyncLimitFetch + REFRESH_INTERVAL) >= Context.now()) {
+                return syncLimit;
+            }
+
+            AccountSettings accountSettings = dataActor.fetchAccountSettings();
+            int accountId = Context.accountId.get();
+            if (accountSettings != null) {
+                accountId = accountSettings.getId();
+            }
+
+            /*
+             * If a user is using on-prem mini-runtime, no limits would apply there.
+             */
+            if(accountId < DAY_0_EPOCH){
+                return syncLimit;
+            }
+
+            Organization organization = dataActor.fetchOrganization(accountId);
+            FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccess(organization, MetricTypes.ACTIVE_ENDPOINTS);
+            syncLimit = featureAccess.fetchSyncLimit();
+            lastSyncLimitFetch = Context.now();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "error in fetching sync limit from feature access " + e.toString());
+        }
+        return syncLimit;
+    }
+
+      public static FILTER_TYPE isValidResponseParam(HttpResponseParams responseParam, Map<String, FilterConfig> filterMap, Map<String, List<ExecutorNode>> executorNodesMap){
+        FILTER_TYPE filterType = FILTER_TYPE.UNCHANGED;
+        String message = responseParam.getOrig();
+        RawApi rawApi = RawApi.buildFromMessage(message);
+        int apiCollectionId = responseParam.requestParams.getApiCollectionId();
+        String url = responseParam.getRequestParams().getURL();
+        Method method = Method.fromString(responseParam.getRequestParams().getMethod());
+        ApiInfoKey apiInfoKey = new ApiInfoKey(apiCollectionId, url, method);
+        for (Entry<String, FilterConfig> apiFilterEntry : filterMap.entrySet()) {
+            try {
+                FilterConfig apiFilter = apiFilterEntry.getValue();
+                Map<String, Object> varMap = apiFilter.resolveVarMap();
+                VariableResolver.resolveWordList(varMap, new HashMap<ApiInfoKey, List<String>>() {
+                    {
+                        put(apiInfoKey, Arrays.asList(message));
+                    }
+                }, apiInfoKey);
+                String filterExecutionLogId = UUID.randomUUID().toString();
+                ValidationResult res = validateFilter(apiFilter.getFilter().getNode(), rawApi,
+                        apiInfoKey, varMap, filterExecutionLogId);
+                if (res.getIsValid()) {
+                    // handle custom filters here
+                    if(apiFilter.getId().equals(FilterConfig.DEFAULT_BLOCK_FILTER)){
+                        return FILTER_TYPE.BLOCKED;
+                    }
+
+                    // handle execute here
+                    List<ExecutorNode> nodes = executorNodesMap.getOrDefault(apiFilter.getId(), new ArrayList<>());
+                    if(!nodes.isEmpty()){
+                        RawApi modifiedApi = new ParseAndExecute().execute(nodes, rawApi, apiInfoKey, varMap, filterExecutionLogId);
+                        responseParam = Utils.convertRawApiToHttpResponseParams(modifiedApi, responseParam);
+                        filterType = FILTER_TYPE.MODIFIED;
+                    }else{
+                        filterType = FILTER_TYPE.ALLOWED;
+                    }
+                    
+                }
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e, String.format("Error in httpCallFilter %s", e.toString()));
+                filterType = FILTER_TYPE.ERROR;
+            }
+        }
+        return filterType;
+    }
+
+
+    public static Pair<HttpResponseParams,FILTER_TYPE> applyAdvancedFilters(HttpResponseParams responseParams, Map<String, List<ExecutorNode>> executorNodesMap,  Map<String,FilterConfig> filterMap){
+        if (filterMap != null && !filterMap.isEmpty()) {
+            FILTER_TYPE filterType = isValidResponseParam(responseParams, filterMap, executorNodesMap);
+            if(filterType.equals(FILTER_TYPE.BLOCKED)){
+                return new Pair<HttpResponseParams,FilterConfig.FILTER_TYPE>(null, FILTER_TYPE.BLOCKED);
+            }else{
+                return new Pair<HttpResponseParams,FilterConfig.FILTER_TYPE>(responseParams, filterType);
+            }
+        }
+        return new Pair<HttpResponseParams,FilterConfig.FILTER_TYPE>(responseParams, FILTER_TYPE.ERROR);
+    }
+
     public void syncFunction(List<HttpResponseParams> responseParams, boolean syncImmediately, boolean fetchAllSTI, AccountSettings accountSettings)  {
         // USE ONLY filteredResponseParams and not responseParams
         List<HttpResponseParams> filteredResponseParams = responseParams;
         if (accountSettings != null && accountSettings.getDefaultPayloads() != null) {
             filteredResponseParams = filterDefaultPayloads(filteredResponseParams, accountSettings.getDefaultPayloads());
         }
-        filteredResponseParams = filterHttpResponseParams(filteredResponseParams);
+        filteredResponseParams = filterHttpResponseParams(filteredResponseParams, accountSettings);
         boolean isHarOrPcap = aggregate(filteredResponseParams, aggregatorMap);
 
         for (int apiCollectionId: aggregatorMap.keySet()) {
@@ -170,9 +274,9 @@ public class HttpCallParser {
             apiCatalogSync.computeDelta(aggregator, false, apiCollectionId);
         }
 
-         for (HttpResponseParams responseParam: filteredResponseParams) {
-             dependencyAnalyser.analyse(responseParam.getOrig(), responseParam.requestParams.getApiCollectionId());
-         }
+        //  for (HttpResponseParams responseParam: filteredResponseParams) {
+        //      dependencyAnalyser.analyse(responseParam.getOrig(), responseParam.requestParams.getApiCollectionId());
+        //  }
 
         this.sync_count += filteredResponseParams.size();
         int syncThresh = numberOfSyncs < 10 ? 10000 : sync_threshold_count;
@@ -182,31 +286,35 @@ public class HttpCallParser {
             for (ApiCollection apiCollection: apiCollections) {
                 apiCollectionsMap.put(apiCollection.getId(), apiCollection);
             }
-            apiCatalogSync.syncWithDB(syncImmediately, fetchAllSTI);
-            dependencyAnalyser.dbState = apiCatalogSync.dbState;
-            dependencyAnalyser.syncWithDb();
+            SyncLimit syncLimit = fetchSyncLimit();
+            apiCatalogSync.syncWithDB(syncImmediately, fetchAllSTI, syncLimit);
+            // dependencyAnalyser.dbState = apiCatalogSync.dbState;
+            // dependencyAnalyser.syncWithDb();
             syncTrafficMetricsWithDB();
             this.last_synced = Context.now();
             this.sync_count = 0;
-            /*
-             * submit a job only if it is not running.
-             */
-            loggerMaker.infoAndAddToDb("Current pg merging status " + pgMerging);
-            if (!pgMerging) {
-                int accountId = Context.accountId.get();
-                pgMerging = true;
-                service.submit(() -> {
-                    Context.accountId.set(accountId);
-                    try {
-                        loggerMaker.infoAndAddToDb("Running merging job for sql");
-                        MergeLogicLocal.mergingJob(apiCatalogSync.dbState);
-                        loggerMaker.infoAndAddToDb("completed merging job for sql");
-                    } catch (Exception e) {
-                        loggerMaker.errorAndAddToDb(e, "error in sql merge job");
-                    } finally {
-                        pgMerging = false;
-                    }
-                });
+
+            if (accountSettings != null && accountSettings.isRedactPayload()) {
+                loggerMaker.infoAndAddToDb("Current pg merging status " + pgMerging);
+                /*
+                 * submit a job only if it is not running.
+                 */
+                if (!pgMerging) {
+                    int accountId = Context.accountId.get();
+                    pgMerging = true;
+                    service.submit(() -> {
+                        Context.accountId.set(accountId);
+                        try {
+                            loggerMaker.infoAndAddToDb("Running merging job for sql");
+                            MergeLogicLocal.mergingJob(apiCatalogSync.dbState);
+                            loggerMaker.infoAndAddToDb("completed merging job for sql");
+                        } catch (Exception e) {
+                            loggerMaker.errorAndAddToDb(e, "error in sql merge job");
+                        } finally {
+                            pgMerging = false;
+                        }
+                    });
+                }
             }
         }
 
@@ -256,7 +364,7 @@ public class HttpCallParser {
                 count += countMap.get(ts);
             }
 
-            if (organization != null && Main.isOnprem) {
+            if (organization != null && (Main.isOnprem || RuntimeMode.isHybridDeployment())) {
                 String metricKey = key.getName().name() + "|" + key.getIp() + "|" + key.getHost() + "|" + key.getVxlanID() + "|" + organization.getId() + "|" + accountId;
                 count += (int) metricsData.getOrDefault(metricKey, 0);
                 metricsData.put(metricKey, count);
@@ -267,7 +375,7 @@ public class HttpCallParser {
         }
 
         if (bulkUpdates.size() > 0) {
-            if (metricsData.size() != 0 && Main.isOnprem) {
+            if (metricsData.size() != 0 && (Main.isOnprem || RuntimeMode.isHybridDeployment())) {
                 queue.add(metricsData);
             }
             List<Object> writesForTraffic = new ArrayList<>();
@@ -347,9 +455,102 @@ public class HttpCallParser {
         trafficMetrics.inc(value);
     }
 
-    public List<HttpResponseParams> filterHttpResponseParams(List<HttpResponseParams> httpResponseParamsList) {
+    public static final String CONTENT_TYPE = "CONTENT-TYPE";
+
+    public boolean isRedundantEndpoint(String url, Pattern pattern){
+        Matcher matcher = pattern.matcher(url);
+        return matcher.matches();
+    }
+
+    private boolean isInvalidContentType(String contentType){
+        boolean res = false;
+        if(contentType == null || contentType.length() == 0) return res;
+
+        res = contentType.contains("javascript") || contentType.contains("png");
+        return res;
+    }
+
+    public int createApiCollectionId(HttpResponseParams httpResponseParam){
+        int apiCollectionId;
+        String hostName = getHeaderValue(httpResponseParam.getRequestParams().getHeaders(), "host");
+
+        if (hostName != null && !hostNameToIdMap.containsKey(hostName) && RuntimeUtil.hasSpecialCharacters(hostName)) {
+            hostName = "Special_Char_Host";
+        }
+
+        int vxlanId = httpResponseParam.requestParams.getApiCollectionId();
+        String vpcId = System.getenv("VPC_ID");
+
+        if (useHostCondition(hostName, httpResponseParam.getSource())) {
+            hostName = hostName.toLowerCase();
+            hostName = hostName.trim();
+
+            String key = hostName;
+
+            if (hostNameToIdMap.containsKey(key)) {
+                apiCollectionId = hostNameToIdMap.get(key);
+
+            } else {
+                int id = hostName.hashCode();
+                try {
+
+                    apiCollectionId = createCollectionBasedOnHostName(id, hostName);
+
+                    hostNameToIdMap.put(key, apiCollectionId);
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb("Failed to create collection for host : " + hostName, LogDb.RUNTIME);
+                    createCollectionSimpleForVpc(vxlanId, vpcId);
+                    hostNameToIdMap.put("null " + vxlanId, vxlanId);
+                    apiCollectionId = httpResponseParam.requestParams.getApiCollectionId();
+                }
+            }
+
+        } else {
+            String key = "null" + " " + vxlanId;
+            if (!hostNameToIdMap.containsKey(key)) {
+                createCollectionSimpleForVpc(vxlanId, vpcId);
+                hostNameToIdMap.put(key, vxlanId);
+            }
+
+            apiCollectionId = vxlanId;
+        }
+        return apiCollectionId;
+    }
+
+
+
+    private boolean isBlankResponseBodyForGET(String method, String contentType, String matchContentType,
+            String responseBody) {
+        boolean res = true;
+        if (contentType == null || contentType.length() == 0)
+            return false;
+        res &= contentType.contains(matchContentType);
+        res &= "GET".equals(method.toUpperCase());
+
+        /*
+         * To be sure that the content type
+         * header matches the actual payload.
+         * 
+         * We will need to add more type validation as needed.
+         */
+        if (matchContentType.contains("html")) {
+            res &= responseBody.startsWith("<") && responseBody.endsWith(">");
+        } else {
+            res &= false;
+        }
+        return res;
+    }
+
+    public List<HttpResponseParams> filterHttpResponseParams(List<HttpResponseParams> httpResponseParamsList, AccountSettings accountSettings) {
         List<HttpResponseParams> filteredResponseParams = new ArrayList<>();
         int originalSize = httpResponseParamsList.size();
+
+        List<String> redundantList = new ArrayList<>();
+        if(accountSettings !=null && !accountSettings.getAllowRedundantEndpointsList().isEmpty()){
+            redundantList = accountSettings.getAllowRedundantEndpointsList();
+        }
+        Pattern regexPattern = Utils.createRegexPatternFromList(redundantList);
+        Map<String, List<ExecutorNode>> executorNodesMap = ParseAndExecute.createExecutorNodeMap(apiCatalogSync.advancedFilterMap);
         for (HttpResponseParams httpResponseParam: httpResponseParamsList) {
 
             if (httpResponseParam.getSource().equals(HttpResponseParams.Source.MIRRORING)) {
@@ -371,45 +572,54 @@ public class HttpCallParser {
                 continue;
             }
 
-            String hostName = getHeaderValue(httpResponseParam.getRequestParams().getHeaders(), "host");
+            // check for garbage points here
+            if(!redundantList.isEmpty()){
+                if(isRedundantEndpoint(httpResponseParam.getRequestParams().getURL(),regexPattern)){
+                    continue;
+                }
+                List<String> contentTypeList = (List<String>) httpResponseParam.getRequestParams().getHeaders().getOrDefault("content-type", new ArrayList<>());
+                String contentType = null;
+                if(!contentTypeList.isEmpty()){
+                    contentType = contentTypeList.get(0);
+                }
+                if(isInvalidContentType(contentType)){
+                    continue;
+                }
 
-
-            int vxlanId = httpResponseParam.requestParams.getApiCollectionId();
-            int apiCollectionId ;
-
-            if (useHostCondition(hostName, httpResponseParam.getSource())) {
-                hostName = hostName.toLowerCase();
-                hostName = hostName.trim();
-
-                String key = hostName;
-
-                if (hostNameToIdMap.containsKey(key)) {
-                    apiCollectionId = hostNameToIdMap.get(key);
-
-                } else {
-                    int id = hostName.hashCode();
-                    try {
-
-                        apiCollectionId = createCollectionBasedOnHostName(id, hostName);
-
-                        hostNameToIdMap.put(key, apiCollectionId);
-                    } catch (Exception e) {
-                        loggerMaker.errorAndAddToDb("Failed to create collection for host : " + hostName, LogDb.RUNTIME);
-                        createCollectionSimple(vxlanId);
-                        hostNameToIdMap.put("null " + vxlanId, vxlanId);
-                        apiCollectionId = httpResponseParam.requestParams.getApiCollectionId();
+                try {
+                    List<String> responseContentTypeList = (List<String>) httpResponseParam.getHeaders().getOrDefault("content-type", new ArrayList<>());
+                    String allContentTypes = responseContentTypeList.toString();
+                    String method = httpResponseParam.getRequestParams().getMethod();
+                    String responseBody = httpResponseParam.getPayload();
+                    boolean ignore = false;
+                    for (String extension : accountSettings.getAllowRedundantEndpointsList()) {
+                        if(extension.startsWith(CONTENT_TYPE)){
+                            String matchContentType = extension.split(" ")[1];
+                            if(isBlankResponseBodyForGET(method, allContentTypes, matchContentType, responseBody)){
+                                ignore = true;
+                                break;
+                            }
+                        }
                     }
+                    if(ignore){
+                        continue;
+                    }
+    
+                } catch(Exception e){
+                    loggerMaker.errorAndAddToDb(e, "Error while ignoring content-type redundant samples " + e.toString(), LogDb.RUNTIME);
                 }
 
-            } else {
-                String key = "null" + " " + vxlanId;
-                if (!hostNameToIdMap.containsKey(key)) {
-                    createCollectionSimple(vxlanId);
-                    hostNameToIdMap.put(key, vxlanId);
-                }
-
-                apiCollectionId = vxlanId;
             }
+
+            Pair<HttpResponseParams,FILTER_TYPE> temp = applyAdvancedFilters(httpResponseParam, executorNodesMap, apiCatalogSync.advancedFilterMap);
+            HttpResponseParams param = temp.getFirst();
+            if(param == null || temp.getSecond().equals(FILTER_TYPE.UNCHANGED)){
+                continue;
+            }else{
+                httpResponseParam = param;
+            }
+            
+            int apiCollectionId = createApiCollectionId(httpResponseParam);
 
             httpResponseParam.requestParams.setApiCollectionId(apiCollectionId);
 

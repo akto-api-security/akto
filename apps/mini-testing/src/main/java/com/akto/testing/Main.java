@@ -1,10 +1,11 @@
 package com.akto.testing;
 
+import com.akto.RuntimeMode;
 import com.akto.billing.UsageMetricUtils;
+import com.akto.crons.GetRunningTestsStatus;
 import com.akto.dao.context.Context;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
-import com.akto.data_actor.DbLayer;
 import com.akto.dto.*;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.test_run_findings.TestingRunIssues;
@@ -14,6 +15,7 @@ import com.akto.dto.testing.TestingRun.State;
 import com.akto.dto.testing.rate_limit.ApiRateLimit;
 import com.akto.dto.testing.rate_limit.GlobalApiRateLimit;
 import com.akto.dto.testing.rate_limit.RateLimitHandler;
+import com.akto.dto.type.SingleTypeInfo;
 import com.akto.github.GithubUtils;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -26,7 +28,6 @@ import com.akto.notifications.slack.SlackSender;
 import com.akto.util.DashboardMode;
 import com.akto.util.EmailAccountName;
 import com.akto.util.enums.GlobalEnums;
-import com.mongodb.ConnectionString;
 import com.mongodb.client.model.*;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
@@ -80,6 +81,7 @@ public class Main {
         return ret;
     }
     private static final int LAST_TEST_RUN_EXECUTION_DELTA = 5 * 60;
+    private static final int MAX_RETRIES_FOR_FAILED_SUMMARIES = 3;
 
     private static void setTestingRunConfig(TestingRun testingRun, TestingRunResultSummary trrs) {
         long timestamp = testingRun.getId().getTimestamp();
@@ -90,12 +92,26 @@ public class Main {
         TestingRunConfig baseConfig = null;
 
         if (trrs != null && trrs.getTestIdConfig() > 1) {
+            loggerMaker.infoAndAddToDb("evaluating first trrs condition");
             configFromTrrs = dataActor.findTestingRunConfig(trrs.getTestIdConfig());
             loggerMaker.infoAndAddToDb("Found testing run trrs config with id :" + configFromTrrs.getId(), LogDb.TESTING);
         }
 
         if (testingRun.getTestIdConfig() > 1) {
-            baseConfig = dataActor.findTestingRunConfig(testingRun.getTestIdConfig());
+            loggerMaker.infoAndAddToDb("evaluating second trrs condition");
+            int maxRetries = 5;
+            for (int i = 0; i < maxRetries; i++) {
+                loggerMaker.infoAndAddToDb("fetching baseconfig in second trrs condition");
+                baseConfig = dataActor.findTestingRunConfig(testingRun.getTestIdConfig());
+                if (baseConfig != null) {
+                    break;
+                }
+                try {
+                    Thread.sleep(1000);
+                } catch (Exception e) {
+                }
+            }
+
             loggerMaker.infoAndAddToDb("Found testing run base config with id :" + baseConfig.getId(), LogDb.TESTING);
         }
 
@@ -112,8 +128,24 @@ public class Main {
         }
     }
 
+    private static boolean matrixAnalyzerRunning = false;
+
+    public static void singleTypeInfoInit(int accountId) {
+        scheduler.scheduleAtFixedRate(new Runnable() {
+            public void run() {
+                List<CustomDataType> customDataTypes = dataActor.fetchCustomDataTypes();
+                loggerMaker.infoAndAddToDb("customDataType size: " + customDataTypes.size());
+                List<AktoDataType> aktoDataTypes = dataActor.fetchAktoDataTypes();
+                List<CustomAuthType> customAuthTypes = dataActor.fetchCustomAuthTypes();
+                SingleTypeInfo.fetchCustomDataTypes(accountId, customDataTypes, aktoDataTypes);
+                SingleTypeInfo.fetchCustomAuthTypes(accountId, customAuthTypes);
+            }
+        }, 0, 5, TimeUnit.MINUTES);
+    }
+
     public static void main(String[] args) throws InterruptedException {
         AccountSettings accountSettings = dataActor.fetchAccountSettings();
+        dataActor.modifyHybridTestingSetting(RuntimeMode.isHybridDeployment());
         setupRateLimitWatcher(accountSettings);
 
         if (!SKIP_SSRF_CHECK) {
@@ -129,17 +161,21 @@ public class Main {
 
         schedulerAccessMatrix.scheduleAtFixedRate(new Runnable() {
             public void run() {
+                if (matrixAnalyzerRunning) {
+                    return;
+                }
                 Context.accountId.set(accountSettings.getId());
                 AccessMatrixAnalyzer matrixAnalyzer = new AccessMatrixAnalyzer();
                 try {
+                    matrixAnalyzerRunning = true;
                     matrixAnalyzer.run();
                 } catch (Exception e) {
                     loggerMaker.infoAndAddToDb("could not run matrixAnalyzer: " + e.getMessage(), LogDb.TESTING);
+                } finally {
+                    matrixAnalyzerRunning = false;
                 }
             }
         }, 0, 1, TimeUnit.MINUTES);
-
-
 
         loggerMaker.infoAndAddToDb("sun.arch.data.model: " +  System.getProperty("sun.arch.data.model"), LogDb.TESTING);
         loggerMaker.infoAndAddToDb("os.arch: " + System.getProperty("os.arch"), LogDb.TESTING);
@@ -147,10 +183,13 @@ public class Main {
         
         Map<Integer, Integer> logSentMap = new HashMap<>();
 
-        Context.accountId.set(accountSettings.getId());
+        int accountId = accountSettings.getId();
+        Context.accountId.set(accountId);
+        GetRunningTestsStatus.getRunningTests().getStatusOfRunningTests();
+
+        singleTypeInfoInit(accountId);
 
         while (true) {
-            int accountId = accountSettings.getId();
             int start = Context.now();
             long startDetailed = System.currentTimeMillis();
             int delta = start - 20*60;
@@ -180,7 +219,7 @@ public class Main {
                     dataActor.updateTestRunResultSummaryNoUpsert(trrs.getId().toHexString());
                     loggerMaker.infoAndAddToDb("Stopped TRRS: " + trrs.getId());
                 }
-                return;
+                continue;
             }
 
             loggerMaker.infoAndAddToDb("Starting test for accountID: " + accountId);
@@ -211,6 +250,8 @@ public class Main {
                 }
                 setTestingRunConfig(testingRun, trrs);
 
+                boolean maxRetriesReached = false;
+
                 if (isSummaryRunning || isTestingRunRunning) {
                     loggerMaker.infoAndAddToDb("TRRS or TR is in running state, checking if it should run it or not");
                     TestingRunResultSummary testingRunResultSummary;
@@ -220,7 +261,6 @@ public class Main {
                         Map<ObjectId, TestingRunResultSummary> objectIdTestingRunResultSummaryMap = dataActor.fetchTestingRunResultSummaryMap(testingRun.getId().toHexString());
                         testingRunResultSummary = objectIdTestingRunResultSummaryMap.get(testingRun.getId());
                     }
-
                     if (testingRunResultSummary != null) {
                         List<TestingRunResult> testingRunResults = dataActor.fetchLatestTestingRunResult(testingRunResultSummary.getId().toHexString());
                         if (testingRunResults != null && !testingRunResults.isEmpty()) {
@@ -232,13 +272,29 @@ public class Main {
                             } else {
                                 loggerMaker.infoAndAddToDb("Test run was executed long ago, TRR_ID:"
                                         + testingRunResult.getHexId() + ", TRRS_ID:" + testingRunResultSummary.getHexId() + " TR_ID:" + testingRun.getHexId(), LogDb.TESTING);
-                                TestingRunResultSummary summary = dataActor.markTestRunResultSummaryFailed(testingRunResultSummary.getId().toHexString());
+                                int maxRunTime = testingRun.getTestRunTime() <= 0 ? 30*60 : testingRun.getTestRunTime(); 
+                                Bson filterQ = Filters.and(
+                                    Filters.gte(TestingRunResultSummary.START_TIMESTAMP, (Context.now() - ((MAX_RETRIES_FOR_FAILED_SUMMARIES + 1) * maxRunTime))),
+                                    Filters.eq(TestingRunResultSummary.TESTING_RUN_ID, testingRun.getId()),
+                                    Filters.eq(TestingRunResultSummary.STATE, State.FAILED)
+                                );
+
+                                int countFailedSummaries = (int) dataActor.countTestingRunResultSummaries(filterQ);
+                                TestingRunResultSummary runResultSummary = dataActor.fetchTestingRunResultSummary(testingRunResultSummary.getId().toHexString());
+                                TestingRunResultSummary summary;
+                                if(countFailedSummaries >= (MAX_RETRIES_FOR_FAILED_SUMMARIES - 1)){
+                                    summary = dataActor.updateIssueCountInSummary(testingRunResultSummary.getId().toHexString(), runResultSummary.getCountIssues());
+                                    loggerMaker.infoAndAddToDb("Max retries level reached for TRR_ID: " + testingRun.getHexId(), LogDb.TESTING);
+                                    maxRetriesReached = true;
+                                }else{
+                                    summary = dataActor.markTestRunResultSummaryFailed(testingRunResultSummary.getId().toHexString());
+                                }
+    
+                                runResultSummary = dataActor.fetchTestingRunResultSummary(testingRunResultSummary.getId().toHexString());
                                 if (summary == null) {
                                     loggerMaker.infoAndAddToDb("Skipping because some other thread picked it up, TRRS_ID:" + testingRunResultSummary.getHexId() + " TR_ID:" + testingRun.getHexId(), LogDb.TESTING);
                                     return;
                                 }
-
-                                TestingRunResultSummary runResultSummary = dataActor.fetchTestingRunResultSummary(testingRunResultSummary.getId().toHexString());
                                 GithubUtils.publishGithubComments(runResultSummary);
                             }
                         } else {
@@ -251,15 +307,19 @@ public class Main {
                         }
 
                         // insert new summary based on old summary
-                        if (summaryId != null) {
-                            trrs.setId(new ObjectId());
-                            trrs.setStartTimestamp(start);
-                            trrs.setState(State.RUNNING);
-                            dataActor.insertTestingRunResultSummary(trrs);
-                            summaryId = trrs.getId();
-                        } else {
-                            trrs = dataActor.createTRRSummaryIfAbsent(testingRun.getHexId(), start);
-                            summaryId = trrs.getId();
+                        if(maxRetriesReached){
+                            loggerMaker.infoAndAddToDb("Exiting out as maxRetries have been reached for testingRun: " + testingRun.getHexId(), LogDb.TESTING);
+                        }else{
+                            if (summaryId != null) {
+                                trrs.setId(new ObjectId());
+                                trrs.setStartTimestamp(start);
+                                trrs.setState(State.RUNNING);
+                                dataActor.insertTestingRunResultSummary(trrs);
+                                summaryId = trrs.getId();
+                            } else {
+                                trrs = dataActor.createTRRSummaryIfAbsent(testingRun.getHexId(), start);
+                                summaryId = trrs.getId();
+                            }
                         }
                     } else {
                         loggerMaker.infoAndAddToDb("No summary found. Let's run it as usual");
@@ -279,10 +339,13 @@ public class Main {
 
                     }
                 }
-                testExecutor.init(testingRun, summaryId);
-                AllMetrics.instance.setTestingRunCount(1);
+                if(!maxRetriesReached){
+                    testExecutor.init(testingRun, summaryId);
+                    AllMetrics.instance.setTestingRunCount(1);
+                }
                 //raiseMixpanelEvent(summaryId, testingRun, accountId);
             } catch (Exception e) {
+                e.printStackTrace();
                 loggerMaker.errorAndAddToDb(e, "Error in init " + e);
             }
             int scheduleTs = 0;
@@ -293,7 +356,9 @@ public class Main {
                 scheduleTs = testingRun.getScheduleTimestamp() + 5 * 60;
             }
 
-            dataActor.updateTestingRunAndMarkCompleted(testingRun.getId().toHexString(), scheduleTs);
+            if(GetRunningTestsStatus.getRunningTests().isTestRunning(testingRun.getId())){
+                dataActor.updateTestingRunAndMarkCompleted(testingRun.getId().toHexString(), scheduleTs);
+            }
 
             if(summaryId != null && testingRun.getTestIdConfig() != 1){
                 TestExecutor.updateTestSummary(summaryId);

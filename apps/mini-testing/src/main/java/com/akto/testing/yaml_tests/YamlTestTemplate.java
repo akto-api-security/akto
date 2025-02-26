@@ -31,14 +31,14 @@ public class YamlTestTemplate extends SecurityTestTemplate {
     @Override
     public boolean filter() {
         // loggerMaker.infoAndAddToDb("filter started" + logId, LogDb.TESTING);
-        List<String> authHeaders = AuthValidator.getHeaders(this.auth, this.authMechanism);
+        List<String> authHeaders = AuthValidator.getHeaders(this.auth, this.authMechanism, this.customAuthTypes);
         // loggerMaker.infoAndAddToDb("found authHeaders " + authHeaders + " " + logId, LogDb.TESTING);
         if (authHeaders != null && authHeaders.size() > 0) {
             this.varMap.put("auth_headers", authHeaders);
         }
         if (this.auth != null && this.auth.getAuthenticated() != null) {
             // loggerMaker.infoAndAddToDb("validating auth, authenticated value is " + this.auth.getAuthenticated() + " " + logId, LogDb.TESTING);
-            boolean validAuthHeaders = AuthValidator.validate(this.auth, this.rawApi, this.authMechanism);
+            boolean validAuthHeaders = AuthValidator.validate(this.auth, this.rawApi, this.authMechanism, this.customAuthTypes);
             if (!validAuthHeaders) {
                 // loggerMaker.infoAndAddToDb("invalid auth, skipping filter " + logId, LogDb.TESTING);
                 return false;

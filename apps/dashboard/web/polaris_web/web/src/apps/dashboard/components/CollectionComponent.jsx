@@ -1,4 +1,4 @@
-import { Button, TextField } from '@shopify/polaris';
+import { Button } from '@shopify/polaris';
 import { DeleteMinor } from "@shopify/polaris-icons"
 import React, { useState, useEffect } from 'react'
 import DropdownSearch from './shared/DropdownSearch';
@@ -24,7 +24,6 @@ function CollectionComponent(props) {
 
     const { condition, index, dispatch, operatorComponent } = props
     const [apiEndpoints, setApiEndpoints] = useState({})
-    const [regexText, setRegexText] = useState('')
 
     useEffect(() => {
         fetchApiEndpoints(condition.data)
@@ -142,10 +141,6 @@ function CollectionComponent(props) {
                 return {}
             case "METHOD":
                 return {method:"GET"}
-            case "REGEX":
-                return {}
-            default:
-                return {}
         }
     }
 
@@ -159,23 +154,13 @@ function CollectionComponent(props) {
             {
                 label: 'Method',
                 value: 'METHOD'
-            },
-            {
-                label: 'Matches regex',
-                value: 'REGEX'
-            },
-        ]}
+            }]}
             initial={condition.type}
             selected={(value) => {
                 dispatch({ type: "overwrite", index: index, key: "data", obj: getDefaultValues(value) })
                 dispatch({ type: "updateKey", index: index, key: "type", obj: value })
             }} />
     )
-
-    const handleRegexText = (val) => {
-        setRegexText(val)
-        dispatch({ type: "overwrite", index: index, key: "data", obj: {"regex":val } })
-    }
 
     const component = (condition, index) => {
         switch (condition.type) {
@@ -193,10 +178,6 @@ function CollectionComponent(props) {
                             dispatch({ type: "update", index: index, key: "data", obj: { "method": value } })
                         }} />
                 </>;
-            case "REGEX":
-                return(
-                    <TextField onChange={(val) => handleRegexText(val)} value={regexText} />
-                )
             default: break;
         }
     }
