@@ -1838,7 +1838,7 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
     return date.getTime();
 },
 
-prettifyFutureEpoch(epoch) {
+  prettifyFutureEpoch(epoch) {
       if (!epoch) return "Never";
       
       const now = Math.floor(Date.now() / 1000);
@@ -1885,6 +1885,9 @@ prettifyFutureEpoch(epoch) {
         day: 'numeric',
         year: 'numeric'
       })} ${timeStr}`;
+  },
+  isDemoAccount(){
+    return window.ACTIVE_ACCOUNT === 1669322524
   }
 
 }

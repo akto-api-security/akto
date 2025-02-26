@@ -28,7 +28,7 @@ const tempFunc = {
     }
     const sampleKey =  key.startsWith("/") ? key.slice(1) : key;
     return sampleDataMap[sampleKey];
-  },
+  }
 }
 
 export default tempFunc;

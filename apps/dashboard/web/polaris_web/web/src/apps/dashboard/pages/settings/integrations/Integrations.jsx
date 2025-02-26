@@ -116,6 +116,24 @@ function Integrations() {
       source: '/public/gcp.svg'
     }
 
+    let splunkObj ={
+      id: 'splunk',
+      name:'Splunk',
+      source: '/public/splunk.svg'
+    }
+
+    let awsWafObj ={
+      id: 'aws_waf',
+      name:'AWS WAF',
+      source: '/public/awsWaf.svg'
+    }
+
+    let f5WafObj ={
+      id: 'f5_waf',
+      name:'F5 WAF',
+      source: '/public/F5.svg'
+    }
+
     let ssoItems = [githubSsoObj, oktaSsoObj, azureAdSsoObj, googleWorkSpaceObj]
     const [currItems , setCurrentItems] = useState(getTabItems('all'))
     const tabs = [
@@ -158,7 +176,17 @@ function Integrations() {
           id: 'cicd',
           content: <span>CI/CD <Badge status='new'>{getTabItems('cicd').length}</Badge></span>,
           component: <TabsList />
-      },
+        },
+        {
+          id: 'waf',
+          content: <span>WAF <Badge status='new'>{getTabItems('waf').length}</Badge></span>,
+          component: <TabsList />
+        },
+        {
+          id: 'splunk',
+          content: <span>SIEM <Badge status='new'>{getTabItems('splunk').length}</Badge></span>,
+          component: <TabsList />
+        },
     ]
 
   function getTabItems(tabId) {
@@ -169,6 +197,8 @@ function Integrations() {
     const aiItems = [aktoGptObj];
     const alertsItems = [slackObj, webhooksObj, teamsWebhooksObj];
     const automationItems = [aktoApiObj, ciCdObj, jiraObj];
+    const wafItems = [awsWafObj, f5WafObj];
+    const siemItems = [splunkObj];
     switch (tabId) {
       case 'traffic':
         return trafficItems;
@@ -199,6 +229,16 @@ function Integrations() {
           return emptyItem;
         }
         return automationItems;
+      case 'waf':
+        if (func.isDemoAccount()) {
+          return wafItems;
+        }
+        return emptyItem;
+      case 'splunk':
+        if (func.isDemoAccount()) {
+          return siemItems;
+        }
+        return emptyItem;
       default:
         let allItems = [...trafficItems, ...aiItems]
         if (!func.checkLocal()){
@@ -206,6 +246,9 @@ function Integrations() {
         }
         if(func.checkOnPrem()){
           allItems = [...allItems, ...reportingItems]
+        }
+        if (func.isDemoAccount()) {
+          allItems = [...allItems, ...wafItems, ...siemItems]
         }
         return allItems;
     }
