@@ -231,8 +231,6 @@ public abstract class DataActor {
 
     public abstract void modifyHybridTestingSetting(boolean hybridTestingEnabled);
 
-    public abstract void insertTestingLog(Log log);
-
     public abstract EndpointLogicalGroup fetchEndpointLogicalGroupById(String endpointLogicalGroupId);
 
     public abstract DataControlSettings fetchDataControlSettings(String prevResult, String prevCommand);
@@ -243,15 +241,7 @@ public abstract class DataActor {
 
     public abstract void insertRuntimeMetricsData(BasicDBList metricsData);
 
-    public abstract void bulkWriteSuspectSampleData(List<Object> writesForSuspectSampleData);
-
-    public abstract List<YamlTemplate> fetchFilterYamlTemplates();
-
-    public abstract void insertProtectionLog(Log log);
-
     public abstract List<YamlTemplate> fetchActiveAdvancedFilters();
-
-    public abstract Set<MergedUrls> fetchMergedUrls();
 
     public abstract List<TestingRunResultSummary> fetchStatusOfTests();
     public abstract void createCollectionSimpleForVpc(int vxlanId, String vpcId);

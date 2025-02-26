@@ -240,26 +240,6 @@ public class DbActor extends DataActor {
         return DbLayer.fetchOrganization(accountId);
     }
 
-    public void bulkWriteSuspectSampleData(List<Object> writesForSuspectSampleData) {
-        ArrayList<WriteModel<SuspectSampleData>> writes = new ArrayList<>();
-        for (Object obj: writesForSuspectSampleData) {
-            WriteModel<SuspectSampleData> write = (WriteModel<SuspectSampleData>)obj;
-            writes.add(write);
-        }
-        DbLayer.bulkWriteSuspectSampleData(writes);
-    }
-
-    public List<YamlTemplate> fetchFilterYamlTemplates() {
-        return DbLayer.fetchFilterYamlTemplates();
-    }
-
-    public void insertTestingLog(Log log) {
-        DbLayer.insertTestingLog(log);
-    }
-
-    public void insertProtectionLog(Log log) {
-        DbLayer.insertProtectionLog(log);
-    }
     @Override
     public List<CodeAnalysisRepo> findReposToRun() {
         return Collections.emptyList();
@@ -273,10 +253,6 @@ public class DbActor extends DataActor {
     @Override
     public void updateRepoLastRun(CodeAnalysisRepo codeAnalysisRepo) {
         return;
-    }
-
-    public Set<MergedUrls> fetchMergedUrls() {
-        return DbLayer.fetchMergedUrls();
     }
 
     // testing queries
