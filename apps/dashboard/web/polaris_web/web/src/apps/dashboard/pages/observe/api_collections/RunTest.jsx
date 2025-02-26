@@ -1,10 +1,9 @@
-import { Box, Button, DataTable, Divider, Modal, Text, TextField, Icon, Checkbox, Badge, Banner, InlineGrid, HorizontalStack, Link, VerticalStack, Tooltip, Popover, ActionMenu, OptionList, ActionList, ButtonGroup } from "@shopify/polaris";
-import { TickMinor, CancelMajor, SearchMinor, NoteMinor, AppsMinor, AppsFilledMajor } from "@shopify/polaris-icons";
-import { useEffect, useReducer, useRef, useState } from "react";
+import { Box, Button, DataTable, Divider, Modal, Text, TextField, Icon, Checkbox, Badge, Banner, HorizontalStack, Link, VerticalStack, Tooltip, Popover, OptionList, ButtonGroup } from "@shopify/polaris";
+import { TickMinor, CancelMajor, SearchMinor, NoteMinor, AppsFilledMajor } from "@shopify/polaris-icons";
 import api, { default as observeApi } from "../api";
+import { useEffect, useReducer, useRef, useState } from "react";
 import { default as testingApi } from "../../testing/api";
 import SpinnerCentered from "../../../components/progress/SpinnerCentered"
-import Dropdown from "../../../components/layouts/Dropdown";
 import func from "@/util/func"
 import { useNavigate } from "react-router-dom"
 import PersistStore from "../../../../main/PersistStore";
@@ -450,15 +449,14 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
             } else if (testRun.continuousTesting) {
                 return <div data-testid="schedule_run_button">Run continuous testing</div>
             } else {
-                return <div data-testid="schedule_run_button">Run once now</div>
+                return <div data-testid="schedule_run_button">Run once at {func.prettifyFutureEpoch(testRun.startTimestamp)}</div>
             }
         } else {
             if (testRun.recurringDaily) {
                 return <div data-testid="schedule_run_button">Run daily at {testRun.hourlyLabel}</div>
 
             } else {
-                return <div data-testid="schedule_run_button">Run today at {testRun.hourlyLabel}</div>
-
+                return <div data-testid="schedule_run_button">Run once at {func.prettifyFutureEpoch(testRun.startTimestamp)}</div>
             }
         }
     }
