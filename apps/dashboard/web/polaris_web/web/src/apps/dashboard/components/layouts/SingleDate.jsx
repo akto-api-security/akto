@@ -77,7 +77,7 @@ function SingleDate(props) {
     }, [data]);
     return (
       <VerticalStack inlineAlign="center" gap="400">
-        <Box minWidth="276px" padding={{ xs: 200 }}>
+        <Box minWidth="100%" padding={{ xs: 200 }}>
           <Popover
             active={popoverActive}
             autofocusTarget="none"
@@ -92,8 +92,9 @@ function SingleDate(props) {
                 prefix={<Icon source={CalendarMinor} />}
                 value={inputValue}
                 onFocus={() => setPopoverActive(true)}
-                onChange={handleInputValueChange}
+                onChange={props?.readOnly ? () => {} : handleInputValueChange}
                 autoComplete="off"
+                label={props?.label}
               />
             }
           >
@@ -104,6 +105,7 @@ function SingleDate(props) {
                 selected={data}
                 onMonthChange={handleMonthChange}
                 onChange={handleDateSelection}
+                disableDatesBefore={props?.disableDatesBefore}
               />
             </Card>
           </Popover>

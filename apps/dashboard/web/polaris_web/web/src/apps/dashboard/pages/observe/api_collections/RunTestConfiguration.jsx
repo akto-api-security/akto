@@ -1,9 +1,28 @@
-import React from 'react';
-import { VerticalStack, HorizontalGrid, Checkbox, TextField, Text } from '@shopify/polaris';
+import React, { useReducer } from 'react';
+import { VerticalStack, HorizontalGrid, Checkbox, TextField, Text, Popover, Icon } from '@shopify/polaris';
+import { CalendarMajor } from '@shopify/polaris-icons';
 import Dropdown from "../../../components/layouts/Dropdown";
+import SingleDate from "../../../components/layouts/SingleDate";
 import func from "@/util/func"
 
 const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes, testRunTimeOptions, testRolesArr, maxConcurrentRequestsOptions, slackIntegrated, generateLabelForSlackIntegration,getLabel, timeFieldsDisabled, teamsTestingWebhookIntegrated, generateLabelForTeamsIntegration}) => {
+
+    const reducer = (state, action) => {
+        switch (action.type) {
+          case "update":
+            const scheduledEpoch =new Date(action.obj['selectedDate']).getTime() / 1000;
+            setTestRun(prev => ({
+                ...prev,
+                startTimestamp: scheduledEpoch
+            }));
+            return {[action.key]: action.obj['selectedDate'] }
+          default:
+            return state;
+        }
+    };
+    const initialState = {data: new Date()};
+    const [state, dispatch] = useReducer(reducer, initialState);
+
     return (
         <VerticalStack gap={"4"}>
             <HorizontalGrid gap={"4"} columns={"3"}>
@@ -27,20 +46,30 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
                             runTypeLabel: runType.label
                         }));
                     }} />
+                {testRun.runTypeLabel === "Once" && (
+                    <div style={{ width: "100%" }}>
+                        <SingleDate 
+                            dispatch={dispatch}
+                            data={state.data}
+                            dataKey="selectedDate"
+                            preferredPosition="above"
+                            disableDatesBefore={new Date()}
+                            label="Select date"
+                            allowRange={false}
+                            readOnly={true}
+                        />
+                    </div>
+                )}
                 <Dropdown
                     label="Select Time:"
                     disabled={testRun.continuousTesting === true || timeFieldsDisabled}
                     menuItems={hourlyTimes}
                     initial={testRun.hourlyLabel}
                     selected={(hour) => {
-                        let startTimestamp;
-
-                        if (hour === "Now") startTimestamp = func.timeNow();
-                        else {
-                            const dayStart = +func.dayStart(+new Date());
-                            startTimestamp = parseInt(dayStart / 1000) + parseInt(hour) * 60 * 60;
+                        let startTimestamp = testRun.startTimestamp;
+                        if (hour !== "Now"){
+                            startTimestamp += parseInt(hour) * 60 * 60;
                         }
-
                         const hourlyTime = getLabel(hourlyTimes, hour);
                         setTestRun(prev => ({
                             ...prev,
@@ -48,6 +77,8 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
                             hourlyLabel: hourlyTime ? hourlyTime.label : ""
                         }));
                     }} />
+            </HorizontalGrid>
+            <HorizontalGrid gap={"4"} columns={"3"}>
                 <Dropdown
                     label="Test run time:"
                     menuItems={testRunTimeOptions}
@@ -65,12 +96,9 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
                             testRunTimeLabel: testRunTimeOption.label
                         }));
                     }} />
-            </HorizontalGrid>
-            <HorizontalGrid gap={"4"} columns={"2"}>
-                <div style={{ marginTop: '-10px' }}>
-                    <Text>Select Test Role</Text>
                     <Dropdown
                         menuItems={testRolesArr}
+                        label="Select Test Role"
                         initial={testRun.testRoleLabel}
                         selected={(requests) => {
                             let testRole;
@@ -83,11 +111,9 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
                                 testRoleLabel: testRoleOption.label
                             }));
                         }} />
-                </div>
-                <div style={{ marginTop: '-10px' }}>
-                    <Text>Max Concurrent Requests</Text>
                     <Dropdown
                         menuItems={maxConcurrentRequestsOptions}
+                        label="Max Concurrent Requests"
                         initial={getLabel(maxConcurrentRequestsOptions, testRun.maxConcurrentRequests.toString()).label}
                         selected={(requests) => {
                             let maxConcurrentRequests;
@@ -102,7 +128,6 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
                                 maxConcurrentRequestsLabel: maxConcurrentRequestsOption.label
                             }));
                         }} />
-                </div>
             </HorizontalGrid>
             <Checkbox
                 label={slackIntegrated ? "Send slack alert post test completion" : generateLabelForSlackIntegration()}
