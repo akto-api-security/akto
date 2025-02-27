@@ -8206,7 +8206,35 @@
             </result>
         </action>
 
-        <action name="api/getAgents" class="com.akto.action.agents.AgentAction" method="getAgents">
+        <action name="api/getMemberAgents" class="com.akto.action.agents.AgentAction" method="getMemberAgents">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">AI_AGENTS</param>
+                <param name="accessType">READ</param>
+            </interceptor-ref>
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <interceptor-ref name="usageInterceptor">
+                <param name="featureLabel">AI_AGENTS</param>
+            </interceptor-ref>
+            <result name="SUCCESS"  type="json"></result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="UNAUTHORIZED" type="json">
+                 <param name="statusCode">403</param>
+                 <param name="ignoreHierarchy">false</param>
+                 <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/getAgentModels" class="com.akto.action.agents.AgentAction" method="getAgentModels">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">

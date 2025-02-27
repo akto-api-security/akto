@@ -72,8 +72,15 @@ public class AgentAction extends UserAction {
 
     AgentSubProcessSingleAttempt subprocess;
 
-    public String getAgents() {
+    public String getMemberAgents() {
         agents = Agent.values();
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    Model[] models;
+
+    public String getAgentModels() {
+        models = Model.values();
         return Action.SUCCESS.toUpperCase();
     }
 
@@ -97,7 +104,7 @@ public class AgentAction extends UserAction {
         return Action.SUCCESS.toUpperCase();
     }
 
-    public String getSubProcess(){
+    public String getSubProcess() {
 
         if (processId == null || processId.isEmpty()) {
             addActionError("Process id is invalid");
@@ -113,7 +120,8 @@ public class AgentAction extends UserAction {
             return Action.ERROR.toUpperCase();
         }
 
-        Bson filter = AgentSubProcessSingleAttemptDao.instance.getFiltersForAgentSubProcess(processId, subProcessId, attemptId);
+        Bson filter = AgentSubProcessSingleAttemptDao.instance.getFiltersForAgentSubProcess(processId, subProcessId,
+                attemptId);
         subprocess = AgentSubProcessSingleAttemptDao.instance.findOne(filter);
 
         return Action.SUCCESS.toUpperCase();
@@ -199,6 +207,10 @@ public class AgentAction extends UserAction {
         this.agent = agent;
     }
 
+    public Agent[] getAgents() {
+        return agents;
+    }
+
     public void setAgents(Agent[] agents) {
         this.agents = agents;
     }
@@ -258,5 +270,14 @@ public class AgentAction extends UserAction {
     public void setSubProcesses(List<AgentSubProcessSingleAttempt> subProcesses) {
         this.subProcesses = subProcesses;
     }
+
+    public Model[] getModels() {
+        return models;
+    }
+
+    public void setModels(Model[] models) {
+        this.models = models;
+    }
+    
 
 }

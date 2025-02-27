@@ -671,6 +671,19 @@ const learnMoreObject = {
                 value: "https://www.youtube.com/watch?v=4BIBra9J0Ek"
             }
         ]
+    },
+    // TODO: update docs links
+    dashboard_agent_team_members: {
+        docsLink: [
+            {
+                content: "Using agents",
+                value: "https://docs.akto.io/"
+            },
+            {
+                content: "Discover agents",
+                value: "https://docs.akto.io/"
+            }
+        ],
     }
 }
 
