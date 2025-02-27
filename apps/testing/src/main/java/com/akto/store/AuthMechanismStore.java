@@ -1,10 +1,8 @@
 package com.akto.store;
 
-import com.akto.dao.AuthMechanismsDao;
 import com.akto.dao.testing.TestRolesDao;
 import com.akto.dto.RawApi;
 import com.akto.dto.testing.AuthMechanism;
-import com.mongodb.BasicDBObject;
 
 public class AuthMechanismStore {
     private AuthMechanism authMechanism;

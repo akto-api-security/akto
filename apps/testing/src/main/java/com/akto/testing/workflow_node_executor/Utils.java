@@ -36,6 +36,7 @@ import com.akto.dto.type.KeyTypes;
 import com.akto.dto.type.RequestTemplate;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.store.TestRolesCache;
 import com.akto.util.JSONUtils;
 import com.akto.util.RecordedLoginFlowUtil;
 import com.google.gson.Gson;
@@ -144,7 +145,7 @@ public class Utils {
         BasicDBObject data = new BasicDBObject();
         String message;
         
-        String token = fetchToken(recordedLoginFlowInput, 5);
+        String token = fetchToken(null, recordedLoginFlowInput, 5);
 
         if (token == null){
             message = "error processing reorder node";
@@ -172,9 +173,20 @@ public class Utils {
         return new WorkflowTestResult.NodeResult(resp.toString(), false, testErrors);
     }
 
-    public static String fetchToken(RecordedLoginFlowInput recordedLoginFlowInput, int retries) {
+    public static String fetchToken(String roleName, RecordedLoginFlowInput recordedLoginFlowInput, int retries) {
 
+        // need to cache
         String token = null;
+        String roleKey = roleName + "_" + Context.accountId.get();
+        if(roleName != null){
+            token = TestRolesCache.getTokenForRole(roleKey);
+            loggerMaker.infoAndAddToDb(roleKey + " token from cache: " + token, LogDb.TESTING);
+            if (token != null) {
+                return token;
+            }
+        }
+
+        
         for (int i=0; i<retries; i++) {
             
             String payload = recordedLoginFlowInput.getContent().toString();
@@ -200,7 +212,11 @@ public class Utils {
                 break;
             }
         }
-
+        if(roleName == null){
+            return token;
+        }
+        loggerMaker.infoAndAddToDb(roleKey + " token inserting into cache: " + token, LogDb.TESTING);
+        TestRolesCache.putToken(roleKey, token, Context.now());
         return token;
     }
 

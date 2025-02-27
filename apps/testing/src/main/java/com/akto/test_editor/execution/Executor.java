@@ -26,9 +26,11 @@ import com.akto.dto.type.KeyTypes;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.rules.TestPlugin;
+import com.akto.store.TestRolesCache;
 import com.akto.test_editor.Utils;
 import com.akto.util.Constants;
 import com.akto.util.JSONUtils;
+import com.akto.util.Pair;
 import com.akto.util.modifier.JWTPayloadReplacer;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -107,6 +109,9 @@ public class Executor {
             yamlTestResult = new YamlTestResult(result, workflowTest);
             return yamlTestResult;
         }
+
+        // new role being updated here without using modify_header {normal role replace here}
+
         if (testingRunConfig != null && StringUtils.isNotBlank(testingRunConfig.getTestRoleId())) {
             TestRoles role = TestRolesDao.instance.findOne(Filters.eq("_id", new ObjectId(testingRunConfig.getTestRoleId())));
             if (role != null) {
@@ -508,7 +513,7 @@ public class Executor {
                     RecordedLoginFlowInput recordedLoginFlowInput = authWithCond.getRecordedLoginFlowInput();
                     Map<String, Object> valuesMap = new HashMap<>();
 
-                    String token = com.akto.testing.workflow_node_executor.Utils.fetchToken(recordedLoginFlowInput, 5);
+                    String token = com.akto.testing.workflow_node_executor.Utils.fetchToken(testRole.getName(), recordedLoginFlowInput, 5);
                     if (token == null) {
                         return new ExecutorSingleOperationResp(false, "Failed to replace roles_access_context: ");
                     } else {
@@ -545,9 +550,22 @@ public class Executor {
                 } else {
                     if (AuthMechanismTypes.LOGIN_REQUEST.toString().equalsIgnoreCase(authMechanismForRole.getType())) {
                         try {
-                            LoginFlowResponse loginFlowResponse = TestExecutor.executeLoginFlow(authMechanismForRole, null);
-                            if (!loginFlowResponse.getSuccess())
-                                throw new Exception(loginFlowResponse.getError());
+                            LoginFlowResponse loginFlowResponse= new LoginFlowResponse();
+                            String roleKey = testRole.getName() + "_" + Context.accountId.get();
+                            if(TestRolesCache.getTokenForRole(roleKey) == null){
+                                loginFlowResponse = TestExecutor.executeLoginFlow(authMechanismForRole, null);
+                                if (!loginFlowResponse.getSuccess())
+                                    throw new Exception(loginFlowResponse.getError());
+                                else{
+                                    String responseString = loginFlowResponse.toString();
+                                    TestRolesCache.putToken(roleKey, responseString, Context.now());
+                                }
+                            }else{
+                                loggerMaker.infoAndAddToDb("got login response from cache " + testRole.getName(), LogDb.TESTING);
+                                String responseString = TestRolesCache.getTokenForRole(roleKey);
+                                loginFlowResponse = LoginFlowResponse.getLoginFlowResponse(responseString);
+                            }
+                            
     
                             authMechanismForRole.setType(LoginFlowEnums.AuthMechanismTypes.HARDCODED.name());
                         } catch (Exception e) {
@@ -628,7 +646,7 @@ public class Executor {
 
                 String ACCESS_ROLES_CONTEXT = "${roles_access_context.";
                 if (keyStr.startsWith(ACCESS_ROLES_CONTEXT)) {
-
+                    // role being updated here for without
                     keyStr = keyStr.replace(ACCESS_ROLES_CONTEXT, "");
                     keyStr = keyStr.substring(0,keyStr.length()-1).trim();
                     TestRoles testRole = fetchOrFindTestRole(keyStr);
