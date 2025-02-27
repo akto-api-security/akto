@@ -51,7 +51,7 @@ function TestsFlyLayout({ data, showDetails, setShowDetails }) {
     const ref = useRef(null)
 
     const onClickFunc = () => {
-        func.copyToClipboard(data?.content, ref,"Test details copied to clipboard successfully!")
+        func.copyToClipboard(testContent, ref, "Test details copied to clipboard successfully!")
     }
 
     const openEditor = () => {
