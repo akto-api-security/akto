@@ -50,6 +50,12 @@ public class HomeAction implements Action, SessionAware, ServletResponseAware, S
     @Override
     public String execute() {
 
+        try {
+            String nodeEnv = System.getenv("NODE_ENV");
+            servletRequest.setAttribute("nodeEnv", nodeEnv != null ? nodeEnv : "production");    
+        } catch(Exception e){
+        }
+
         servletRequest.setAttribute("isSaas", InitializerListener.isSaas);
         if(DashboardMode.isOnPremDeployment()){
             if (GithubLogin.getGithubUrl() != null) {
@@ -93,7 +99,6 @@ public class HomeAction implements Action, SessionAware, ServletResponseAware, S
             }
             return redirectToAuth0(servletRequest, servletResponse, accessToken, new BasicDBObject());
         }
-        // Use existing flow
 
         return "SUCCESS";
     }

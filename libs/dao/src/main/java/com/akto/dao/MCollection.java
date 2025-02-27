@@ -389,8 +389,23 @@ public abstract class MCollection<T> {
         ObjectId objectId = findNthDocumentIdFromEnd((int) deleteCount);
         if (objectId == null) return;
 
+        logger.info("Starting trimCappedCollections for " + this.getCollName() + " account " + this.getDBName() + " at " + Context.now());
         DeleteResult deleteResult = this.getMCollection().deleteMany(lt(ID, objectId));
-        logger.info("Trimmed : " + deleteResult.getDeletedCount());
+        logger.info("Trimmed : " + deleteResult.getDeletedCount() + " for collection: " + this.getCollName() + " for account: " + this.getDBName());
+        logger.info("Completed trimCappedCollections for " + this.getCollName() + " account " + this.getDBName() + " at " + Context.now());
+    }
+
+    public boolean dropCollectionWithCondition(long maxDocuments, long dropThreshold) {
+        long count = this.getMCollection().estimatedDocumentCount();
+        if (count <= maxDocuments)
+            return false;
+
+        if (count >= (dropThreshold * maxDocuments)) {
+            this.getMCollection().drop();
+            logger.info(" Dropped collection: " + this.getCollName() + " for account: " + this.getDBName());
+            return true;
+        }
+        return false;
     }
 
     public Document getCollectionStats(){

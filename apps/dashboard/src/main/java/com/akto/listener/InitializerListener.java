@@ -2357,7 +2357,7 @@ public class InitializerListener implements ServletContextListener {
                     if (DashboardMode.isMetered()) {
                         setupUsageScheduler();
                     }
-                    trimCappedCollections();
+                    trimCappedCollectionsJob();
                     setUpPiiAndTestSourcesScheduler();
                     setUpTrafficAlertScheduler();
                     // setUpAktoMixpanelEndpointsScheduler();
@@ -2454,9 +2454,31 @@ public class InitializerListener implements ServletContextListener {
         }
     }
 
-    public static void trimCappedCollections() {
-        if (DbMode.allowCappedCollections()) return;
+    private void trimCappedCollectionsJob() {
+        scheduler.scheduleAtFixedRate(new Runnable() {
+            public void run() {
+                logger.info("Starting trimCappedCollectionsJob for all accounts at " + Context.now());
 
+                AccountTask.instance.executeTask(new Consumer<Account>() {
+                    @Override
+                    public void accept(Account t) {
+                        try {
+                            trimCappedCollections();
+                        } catch (Exception e) {
+                            loggerMaker.errorAndAddToDb(e,
+                                    String.format("Error while running trimCappedCollections for account %d %s",
+                                            Context.accountId.get(), e.toString()),
+                                    LogDb.DASHBOARD);
+                        }
+                    }
+                }, "trim-capped-collections");
+
+                logger.info("Completed trimCappedCollectionsJob for all accounts at " + Context.now());
+            }
+        }, 0,1, TimeUnit.DAYS);
+    }
+
+    public static void trimCappedCollections() {
         clear(LoadersDao.instance, LoadersDao.maxDocuments);
         clear(RuntimeLogsDao.instance, RuntimeLogsDao.maxDocuments);
         clear(LogsDao.instance, LogsDao.maxDocuments);
@@ -2465,7 +2487,11 @@ public class InitializerListener implements ServletContextListener {
         clear(AnalyserLogsDao.instance, AnalyserLogsDao.maxDocuments);
         clear(ActivitiesDao.instance, ActivitiesDao.maxDocuments);
         clear(BillingLogsDao.instance, BillingLogsDao.maxDocuments);
-        clearRbacCollection(TestingRunResultDao.instance, TestingRunResultDao.maxDocuments);
+        /*
+         * Removed the clear/delete function for Testing run results,
+         * as it might delete vulnerable test results as well.
+         * We eventually delete testing run results directly from the testing module.
+         */
         clear(SuspectSampleDataDao.instance, SuspectSampleDataDao.maxDocuments);
         clear(RuntimeMetricsDao.instance, RuntimeMetricsDao.maxDocuments);
         clear(ProtectionLogsDao.instance, ProtectionLogsDao.maxDocuments);
@@ -2473,14 +2499,33 @@ public class InitializerListener implements ServletContextListener {
 
     public static void clear(AccountsContextDao mCollection, int maxDocuments) {
         try {
-            mCollection.trimCollection(maxDocuments);
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("Error while trimming collection " + mCollection.getCollName() + " : " + e.getMessage(), LogDb.DASHBOARD);
-        }
-    }
+            /*
+             * If capped collections are allowed (mongoDB) and 
+             * the collection is actually capped, only then skip.
+             */
+            if (DbMode.allowCappedCollections() && mCollection.isCapped()) return;
 
-    public static void clearRbacCollection(AccountsContextDaoWithRbac mCollection, int maxDocuments) {
-        try {
+            /*
+             * Primarily for initial cleanup. 
+             * In cases the data up till now has accumulated to a very large size,
+             * we do not want to overwhelm the db in those cases
+             * as .drop() is far cheaper operation that .deleteMany()
+             * and the data is majorly transient
+             */
+            boolean droppedIfGreaterThanThreeTimes = false;
+            if(DbMode.allowCappedCollections()){
+                droppedIfGreaterThanThreeTimes = mCollection.dropCollectionWithCondition(maxDocuments, 3);
+            }
+
+            if(droppedIfGreaterThanThreeTimes){
+                /*
+                 * Not creating capped collections again,
+                 * because eventually we want to move away from capped collections 
+                 * because they add serious startup time to mongo.
+                 */
+                return;
+            }
+
             mCollection.trimCollection(maxDocuments);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error while trimming collection " + mCollection.getCollName() + " : " + e.getMessage(), LogDb.DASHBOARD);

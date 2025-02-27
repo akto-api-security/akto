@@ -84,6 +84,7 @@ import AuditLogs from "../dashboard/pages/settings/audit_logs/AuditLogs";
 import ThreatApiPage from "../dashboard/pages/threat_detection/ThreatApiPage";
 import ThreatActorPage from "../dashboard/pages/threat_detection/ThreatActorPage";
 import ThreatPolicyPage from "../dashboard/pages/threat_detection/ThreatPolicyPage";
+import TestsTablePage from "../dashboard/pages/test_editor/tests_table/TestsTablePage";
 
 // if you add a component in a new path, please verify the search implementation in function -> 'getSearchItemsArr' in func.js
 
@@ -173,6 +174,10 @@ const router = createBrowserRouter([
                                 element: <SingleRequest/>
                             }
                         ]
+                    },
+                    {
+                        path:"test-library/tests",
+                        element:<TestsTablePage/>
                     },
                     {
                         path: "issues",

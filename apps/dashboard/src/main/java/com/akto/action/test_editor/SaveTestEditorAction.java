@@ -1,13 +1,10 @@
 package com.akto.action.test_editor;
 
-import com.akto.DaoInit;
 import com.akto.action.UserAction;
 import com.akto.action.testing_issues.IssuesAction;
 import com.akto.dao.AccountSettingsDao;
-import com.akto.dao.AuthMechanismsDao;
 import com.akto.dao.CustomAuthTypeDao;
 import com.akto.dao.SampleDataDao;
-import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.TestConfigYamlParser;
 import com.akto.dao.test_editor.YamlTemplateDao;
@@ -16,9 +13,7 @@ import com.akto.dao.testing.TestRolesDao;
 import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dto.AccountSettings;
 import com.akto.dto.ApiInfo;
-import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.CustomAuthType;
-import com.akto.dto.User;
 import com.akto.dto.test_editor.Category;
 import com.akto.dto.test_editor.Info;
 import com.akto.dto.test_editor.TestConfig;
@@ -31,12 +26,8 @@ import com.akto.dto.testing.GenericTestResult;
 import com.akto.dto.testing.MultiExecTestResult;
 import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.TestingRunConfig;
-import com.akto.dto.testing.TestResult.Confidence;
 import com.akto.dto.testing.TestingRunResult;
-import com.akto.dto.testing.WorkflowNodeDetails;
-import com.akto.dto.testing.WorkflowTestResult.NodeResult;
 import com.akto.dto.traffic.SampleData;
-import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
 import com.akto.listener.InitializerListener;
 import com.akto.log.LoggerMaker;
@@ -50,13 +41,11 @@ import com.akto.testing.Utils;
 import com.akto.util.Constants;
 import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.Severity;
-import com.akto.util.enums.GlobalEnums.YamlTemplateSource;
 import com.akto.utils.GithubSync;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator;
 import com.mongodb.BasicDBObject;
-import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Updates;
@@ -67,9 +56,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -535,31 +521,28 @@ public class SaveTestEditorAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
-    public static void main(String[] args) throws Exception {
-        DaoInit.init(new ConnectionString("mongodb://localhost:27017/admini"));
-        Context.accountId.set(1_000_000);
-        String folderPath = "/Users/shivamrawat/akto_code_openSource/akto/libs/dao/src/main/java/com/akto/dao/test_editor/inbuilt_test_yaml_files";
-        Path dir = Paths.get(folderPath);
-        List<String> files = new ArrayList<>();
-        Files.walk(dir).forEach(path -> showFile(path.toFile(), files));
-        for (String filePath : files) {
-            logger.info(filePath);
-            List<String> lines = Files.readAllLines(Paths.get(filePath));
-            String content  = String.join("\n", lines);
-            SaveTestEditorAction saveTestEditorAction = new SaveTestEditorAction();
-            saveTestEditorAction.setContent(content);
-            Map<String,Object> session = new HashMap<>();
-            User user = new User();
-            user.setLogin("AKTO");
-            session.put("user",user);
-            saveTestEditorAction.setSession(session);
-            String success = SUCCESS.toUpperCase();
-            logger.info(success);
+    public String fetchTestContent(){
+        if (originalTestId == null || originalTestId.trim().isEmpty()) {
+            addActionError("TestId cannot be null or empty");
+            return ERROR.toUpperCase();
         }
+
+        YamlTemplate template =  YamlTemplateDao.instance.findOne(Filters.eq(Constants.ID, originalTestId), Projections.include(YamlTemplate.CONTENT));
+        if (template == null) {
+            addActionError("test not found");
+            return ERROR.toUpperCase();
+        }
+
+        this.content = template.getContent();
+        return SUCCESS.toUpperCase();
     }
 
     public void setContent(String content) {
         this.content = content;
+    }
+
+    public String getContent() {
+        return content;
     }
 
     public String getTestingRunHexId() {
