@@ -7,7 +7,7 @@ import "./style.css"
 
 function FlyLayout(props) {
 
-    const { title, titleComp,  show, setShow, components,loading, showDivider, newComp, handleClose, isHandleClose, width, switchMode} = props
+    const { title, titleComp,  show, setShow, components,loading, showDivider, newComp, handleClose, isHandleClose, width, variant = "default"} = props
     const handleExit = () => {
         setShow(!show)
         if(isHandleClose){
@@ -15,6 +15,7 @@ function FlyLayout(props) {
         }
     }
     const divWidth = width || "50vw";
+    const scrollableHeight = variant === "testSuiteFlyout" ? "calc(100vh - 106px)"  : "92vh";
     return (
         <div className={"flyLayout " + (show ? "show" : "")} style={{width: divWidth}}>
             <div className="innerFlyLayout">
@@ -28,13 +29,10 @@ function FlyLayout(props) {
                                         {title}
                                     </Text>
                                 }
-                                <HorizontalStack>
-                                {switchMode? <Button icon={EditMinor} onClick={() => { switchMode()}} plain></Button>:null}
                                 <Button icon={CancelMajor} onClick={() => { handleExit()}} plain></Button>
-                                </HorizontalStack>
                             </HorizontalStack>
                         </Box>
-                        <Scrollable style={{ height: "92vh" }} shadow>
+                        <Scrollable style={{ height: scrollableHeight}} shadow>
                         <Box paddingBlockEnd={"20"}>
                         <VerticalStack>
                         {
@@ -58,6 +56,7 @@ function FlyLayout(props) {
                         </VerticalStack>
                         </Box>
                         </Scrollable>
+                        
                     </VerticalStack>
                     }
                 </Box>      

@@ -5,12 +5,12 @@ import {
 } from '@shopify/polaris-icons';
 import "./flyLayoutSuite.css"
 
-function TestSuiteRow({ category, setFilteredCategories, categories, setCategories, isLast, isEditMode, filteredCategories }) {
+function TestSuiteRow({ category, categories, setCategories, isLast, isEditMode, filteredCategories }) {
     let displayName = category.displayName;
     let subCategories = category.tests;
 
     function toggleOpen() {
-        setFilteredCategories(prev => 
+        setCategories(prev => 
             prev.map(cat => 
                 cat.displayName === displayName ? { ...cat, selected: !cat.selected } : cat
             )
@@ -20,10 +20,6 @@ function TestSuiteRow({ category, setFilteredCategories, categories, setCategori
     function changeTestSelection(subCategory) {
         setCategories(prev => {
             const updatedCategories = [...prev];
-            const helperMap = {};
-            filteredCategories.forEach(element => {
-                helperMap[element.displayName] = element.selected;
-            });
             updatedCategories.forEach(element => {
                 if (element.displayName === subCategory.categoryName) {
                     element.tests.forEach(test => {
@@ -32,9 +28,7 @@ function TestSuiteRow({ category, setFilteredCategories, categories, setCategori
                         }
                     });
                 }
-                element.selected = helperMap[element.displayName];
             });
-            console.log(updatedCategories);
             return updatedCategories
         });
     }
@@ -43,7 +37,7 @@ function TestSuiteRow({ category, setFilteredCategories, categories, setCategori
         let atleastOne = false;
         let allSelected = true;
 
-        const updatedCategories = [...categories];
+        const updatedCategories = [...filteredCategories];
         updatedCategories.forEach(element => {
             if (element.displayName === displayName) {
                 element.tests.forEach(test => {
@@ -61,14 +55,9 @@ function TestSuiteRow({ category, setFilteredCategories, categories, setCategori
         else return false;
     }
 
-    function ChangeSubCategorySelection() {
+    function changeSubCategorySelection() {
         setCategories(prev => {
             const updatedCategories = [...prev];
-
-            const helperMap = {};
-            filteredCategories.forEach(element => {
-                helperMap[element.displayName] = element.selected;
-            });
 
             let someSelected = false;
             updatedCategories.forEach(element => {
@@ -80,17 +69,42 @@ function TestSuiteRow({ category, setFilteredCategories, categories, setCategori
                     });
                 }
             });
+            
+            const selectedFromFilterCategories = new Set();
+            filteredCategories.forEach(element => {
+                if (element.displayName === displayName) {
+                    element.tests.forEach(test => {
+                        selectedFromFilterCategories.add(test.value);
+                    });
+                }
+            });
+
             updatedCategories.forEach(element => {
                 if (element.displayName === displayName) {
                     element.tests.forEach(test => {
+                        if(selectedFromFilterCategories.has(test.value))
                         test.selected = someSelected ? false : true;
                     });
                 }
-                element.selected = helperMap[element.displayName];
             });
             return updatedCategories;
         }
         );
+    }
+
+    function countSelectedTestForCategory() {
+        let count = 0;
+        filteredCategories.forEach(element => {
+            if (element.displayName === displayName) {
+                element.tests.forEach(test => {
+                    if (test.selected) {
+                        count++;
+                    }
+                });
+            }
+        }
+        );
+        return count;
     }
 
     return (
@@ -98,13 +112,13 @@ function TestSuiteRow({ category, setFilteredCategories, categories, setCategori
             <div className="category-list" style={{ cursor: "pointer", ...(isLast && !category.selected && { borderBottomLeftRadius: "0.5rem", borderBottomRightRadius: "0.5rem" }) }}>
                 <Box paddingInlineStart={5} paddingBlockEnd={3} paddingBlockStart={3} paddingInlineEnd={5}>
                     <div style={{ display: "flex" }}>
-                        {isEditMode?<Checkbox checked={checkSubCategorySelected()} onChange={() => { ChangeSubCategorySelection() }} />:null}
+                        {isEditMode?<Checkbox checked={checkSubCategorySelected()} onChange={() => { changeSubCategorySelection() }} />:null}
                         <div onClick={toggleOpen} style={{display:"flex", alignContent:"center" ,justifyContent:"space-between", ...(isEditMode?{minWidth:"96%"}:{minWidth:"100%"})}} >
                             <HorizontalStack>
                                 <Text fontWeight="medium" as="h3">{displayName}</Text>
                             </HorizontalStack>                  
                             <HorizontalStack gap={4}>
-                                <span style={{ color: "#6D7175" }}>{`${category.tests.length}`}</span>
+                                <span style={{ color: "#6D7175" }}>{isEditMode?`${countSelectedTestForCategory()}/${category.tests.length}`:`${category.tests.length}`}</span>
                                 <Button plain monochrome size="micro" icon={category.selected ? ChevronUpMinor : ChevronDownMinor}></Button>
                             </HorizontalStack>
                         </div>
@@ -119,8 +133,8 @@ function TestSuiteRow({ category, setFilteredCategories, categories, setCategori
                             <Box borderColor="border-subdued" borderBlockStartWidth="1" paddingInlineStart={10} paddingBlockEnd={2} paddingBlockStart={2} >
                                 <HorizontalStack key={1} align="start">
                                     {isEditMode ? <Checkbox checked={subCategory.selected} onChange={() => { changeTestSelection(subCategory) }} /> : null}
-                                    <div onClick={() => window.open(`${window.location.origin}/dashboard/test-editor/${subCategory.value}`)}>
-                                        <Text color="subdued" fontWeight="regular" as="h3">{subCategory.label}</Text>
+                                    <div style={{width:"96%"}} onClick={() => window.open(`${window.location.origin}/dashboard/test-editor/${subCategory.value}`)}>
+                                        <Text color="subdued" fontWeight="regular" as="h3" truncate>{subCategory.label}</Text>
                                     </div>
                                 </HorizontalStack>
                             </Box>
