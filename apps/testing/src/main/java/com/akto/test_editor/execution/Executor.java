@@ -113,13 +113,15 @@ public class Executor {
         // new role being updated here without using modify_header {normal role replace here}
 
         if (testingRunConfig != null && StringUtils.isNotBlank(testingRunConfig.getTestRoleId())) {
-            TestRoles role = TestRolesDao.instance.findOne(Filters.eq("_id", new ObjectId(testingRunConfig.getTestRoleId())));
+            TestRoles role = fetchOrFindTestRole(testingRunConfig.getTestRoleId(), true);
             if (role != null) {
                 EndpointLogicalGroup endpointLogicalGroup = role.fetchEndpointLogicalGroup();
                 if (endpointLogicalGroup != null && endpointLogicalGroup.getTestingEndpoints() != null  && endpointLogicalGroup.getTestingEndpoints().containsApi(apiInfoKey)) {
                     if (role.getDefaultAuthMechanism() != null) {
-                        loggerMaker.infoAndAddToDb("attempting to override auth " + logId, LogDb.TESTING);
-                        modifyAuthTokenInRawApi(role, sampleRawApi);
+                        synchronized(role) {
+                            loggerMaker.infoAndAddToDb("attempting to override auth " + logId, LogDb.TESTING);
+                            modifyAuthTokenInRawApi(role, sampleRawApi);
+                        }
                     } else {
                         loggerMaker.infoAndAddToDb("Default auth mechanism absent: " + logId, LogDb.TESTING);
                     }
@@ -490,7 +492,7 @@ public class Executor {
         return removed;
     }
 
-    public static ExecutorSingleOperationResp modifyAuthTokenInRawApi(TestRoles testRole, RawApi rawApi) {
+    public synchronized static ExecutorSingleOperationResp modifyAuthTokenInRawApi(TestRoles testRole, RawApi rawApi) {
         Map<String, List<String>> rawHeaders = rawApi.fetchReqHeaders();
         for(AuthWithCond authWithCond: testRole.getAuthWithCondList()) {
 
@@ -515,8 +517,10 @@ public class Executor {
 
                     String token = null;
                     if(TestRolesCache.getTokenForRole(testRole.getName() + "_" + Context.accountId.get(), testRole.getLastUpdatedTs()) != null){
+                        loggerMaker.infoAndAddToDb("got login response from cache " + testRole.getName(), LogDb.TESTING);
                         token = TestRolesCache.getTokenForRole(testRole.getName() + "_" + Context.accountId.get(), testRole.getLastUpdatedTs());
                     }else{
+                        loggerMaker.infoAndAddToDb("trying to fetch token for role " + testRole.getName(), LogDb.TESTING);
                         token = com.akto.testing.workflow_node_executor.Utils.fetchToken(testRole.getName(), recordedLoginFlowInput, 5);
                     }
                     if (token == null) {
@@ -559,10 +563,8 @@ public class Executor {
                             LoginFlowResponse loginFlowResponse= new LoginFlowResponse();
                             String roleKey = testRole.getName() + "_" + Context.accountId.get();
                             if(TestRolesCache.getTokenForRole(roleKey, testRole.getLastUpdatedTs()) == null){
-                                synchronized (testRole) {
-                                    loginFlowResponse = TestExecutor.executeLoginFlow(authMechanismForRole, null, testRole.getName());
-                                }
-                                
+                                loggerMaker.infoAndAddToDb("trying to fetch token of step builder type for role " + testRole.getName(), LogDb.TESTING);
+                                loginFlowResponse = TestExecutor.executeLoginFlow(authMechanismForRole, null, testRole.getName());
                                 if (!loginFlowResponse.getSuccess())
                                     throw new Exception(loginFlowResponse.getError());
                                 else{
@@ -615,16 +617,22 @@ public class Executor {
         }
     }
 
-    private synchronized static TestRoles fetchOrFindTestRole(String name) {
+    private synchronized static TestRoles fetchOrFindTestRole(String name, boolean isId) {
         if (roleCache == null) {
             roleCache = new ConcurrentHashMap<>();
         }
         if (roleCache.containsKey(name)) {
             return roleCache.get(name);
         }
-        TestRoles testRole = TestRolesDao.instance.findOne(TestRoles.NAME, name);
-        roleCache.put(name, testRole);
-        return roleCache.get(name);
+        if(!isId){
+            TestRoles testRole = TestRolesDao.instance.findOne(TestRoles.NAME, name);
+            roleCache.put(name, testRole);
+            return roleCache.get(name);
+        }else{
+            TestRoles testRole = TestRolesDao.instance.findOne(Constants.ID, new ObjectId(name));
+            roleCache.put(name, testRole);
+            return roleCache.get(name);
+        }
     }
 
     public ExecutorSingleOperationResp runOperation(String operationType, RawApi rawApi, Object key, Object value, Map<String, Object> varMap, AuthMechanism authMechanism, List<CustomAuthType> customAuthTypes, ApiInfo.ApiInfoKey apiInfoKey) {
@@ -658,7 +666,7 @@ public class Executor {
                     // role being updated here for without
                     keyStr = keyStr.replace(ACCESS_ROLES_CONTEXT, "");
                     keyStr = keyStr.substring(0,keyStr.length()-1).trim();
-                    TestRoles testRole = fetchOrFindTestRole(keyStr);
+                    TestRoles testRole = fetchOrFindTestRole(keyStr, false);
                     if (testRole == null) {
                         return new ExecutorSingleOperationResp(false, "Test Role " + keyStr +  " Doesn't Exist ");
                     }
