@@ -513,11 +513,17 @@ public class Executor {
                     RecordedLoginFlowInput recordedLoginFlowInput = authWithCond.getRecordedLoginFlowInput();
                     Map<String, Object> valuesMap = new HashMap<>();
 
-                    String token = com.akto.testing.workflow_node_executor.Utils.fetchToken(testRole.getName(), recordedLoginFlowInput, 5);
+                    String token = null;
+                    if(TestRolesCache.getTokenForRole(testRole.getName() + "_" + Context.accountId.get(), testRole.getLastUpdatedTs()) != null){
+                        token = TestRolesCache.getTokenForRole(testRole.getName() + "_" + Context.accountId.get(), testRole.getLastUpdatedTs());
+                    }else{
+                        token = com.akto.testing.workflow_node_executor.Utils.fetchToken(testRole.getName(), recordedLoginFlowInput, 5);
+                    }
                     if (token == null) {
                         return new ExecutorSingleOperationResp(false, "Failed to replace roles_access_context: ");
                     } else {
                         loggerMaker.infoAndAddToDb("flattened here: " + token);
+                        TestRolesCache.putToken(testRole.getName() + "_" + Context.accountId.get(), token, Context.now());
                         BasicDBObject flattened = JSONUtils.flattenWithDots(BasicDBObject.parse(token));
 
                         for (String param: flattened.keySet()) {
@@ -552,8 +558,11 @@ public class Executor {
                         try {
                             LoginFlowResponse loginFlowResponse= new LoginFlowResponse();
                             String roleKey = testRole.getName() + "_" + Context.accountId.get();
-                            if(TestRolesCache.getTokenForRole(roleKey) == null){
-                                loginFlowResponse = TestExecutor.executeLoginFlow(authMechanismForRole, null);
+                            if(TestRolesCache.getTokenForRole(roleKey, testRole.getLastUpdatedTs()) == null){
+                                synchronized (testRole) {
+                                    loginFlowResponse = TestExecutor.executeLoginFlow(authMechanismForRole, null, testRole.getName());
+                                }
+                                
                                 if (!loginFlowResponse.getSuccess())
                                     throw new Exception(loginFlowResponse.getError());
                                 else{
@@ -562,7 +571,7 @@ public class Executor {
                                 }
                             }else{
                                 loggerMaker.infoAndAddToDb("got login response from cache " + testRole.getName(), LogDb.TESTING);
-                                String responseString = TestRolesCache.getTokenForRole(roleKey);
+                                String responseString = TestRolesCache.getTokenForRole(roleKey, testRole.getLastUpdatedTs());
                                 loginFlowResponse = LoginFlowResponse.getLoginFlowResponse(responseString);
                             }
                             

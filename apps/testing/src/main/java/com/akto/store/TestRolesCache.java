@@ -8,6 +8,7 @@ import com.akto.util.Pair;
 public class TestRolesCache {
     private static final ConcurrentHashMap<String, Pair<String, Integer>> tokensMap = new ConcurrentHashMap<>();
     private static final int DEFAULT_EXPIRY_TIME = 30 * 60; // 30 minutes
+    private static final ConcurrentHashMap<String, Integer> tokenExpiryMap = new ConcurrentHashMap<>();
 
     // in case of multiple headers, parse this token string, storing the token as json string
 
@@ -15,10 +16,25 @@ public class TestRolesCache {
         tokensMap.put(roleName, new Pair<>(token, fetchTime));
     }
 
-    public static String getTokenForRole(String roleName) {
+    public static void addTokenExpiry(String roleName, int expiryTime) {
+        tokenExpiryMap.put(roleName, expiryTime);
+    }
+
+    public static String getTokenForRole(String roleName, int updatedTs) {
         Pair<String, Integer> tokenPair = tokensMap.get(roleName);
         if (tokenPair == null) {
             return null;
+        }
+        if(tokenPair.getSecond() < updatedTs) {
+            tokensMap.remove(roleName);
+            return null;
+        }
+        int expiryTime = tokenExpiryMap.get(roleName);
+        if(expiryTime != 0){
+            if(expiryTime < Context.now()){
+                tokensMap.remove(roleName);
+                return null;
+            }
         }
         if (Context.now() - tokenPair.getSecond() > DEFAULT_EXPIRY_TIME) {
             tokensMap.remove(roleName);

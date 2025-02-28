@@ -526,7 +526,7 @@ public class TestExecutor {
         for (int i=0; i<retries; i++) {
             try {
                 logger.info("retry attempt: " + i + " for login flow");
-                loginFlowResponse = executeLoginFlow(authMechanism, null);
+                loginFlowResponse = executeLoginFlow(authMechanism, null, null);
                 if (loginFlowResponse.getSuccess()) {
                     loggerMaker.infoAndAddToDb("login flow success", LogDb.TESTING);
                     break;
@@ -538,7 +538,7 @@ public class TestExecutor {
         return loginFlowResponse;
     }
 
-    public static LoginFlowResponse executeLoginFlow(AuthMechanism authMechanism, LoginFlowParams loginFlowParams) throws Exception {
+    public static LoginFlowResponse executeLoginFlow(AuthMechanism authMechanism, LoginFlowParams loginFlowParams, String roleName) throws Exception {
 
         if (authMechanism.getType() == null) {
             loggerMaker.infoAndAddToDb("auth type value is null", LogDb.TESTING);
@@ -555,7 +555,7 @@ public class TestExecutor {
         WorkflowTest workflowObj = convertToWorkflowGraph(authMechanism.getRequestData(), loginFlowParams);
         ApiWorkflowExecutor apiWorkflowExecutor = new ApiWorkflowExecutor();
         LoginFlowResponse loginFlowResp;
-        loginFlowResp =  com.akto.testing.workflow_node_executor.Utils.runLoginFlow(workflowObj, authMechanism, loginFlowParams);
+        loginFlowResp =  com.akto.testing.workflow_node_executor.Utils.runLoginFlow(workflowObj, authMechanism, loginFlowParams, roleName);
         return loginFlowResp;
     }
 

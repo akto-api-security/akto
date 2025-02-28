@@ -1,7 +1,6 @@
 package com.akto.testing.workflow_node_executor;
 
 import static com.akto.runtime.utils.Utils.parseCookie;
-import static org.mockito.Answers.values;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -44,9 +43,6 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 
-import io.jsonwebtoken.Claims;
-import io.jsonwebtoken.Jws;
-import io.jsonwebtoken.Jwts;
 
 public class Utils {
     
@@ -177,16 +173,6 @@ public class Utils {
 
         // need to cache
         String token = null;
-        String roleKey = roleName + "_" + Context.accountId.get();
-        if(roleName != null){
-            token = TestRolesCache.getTokenForRole(roleKey);
-            loggerMaker.infoAndAddToDb(roleKey + " token from cache: " + token, LogDb.TESTING);
-            if (token != null) {
-                return token;
-            }
-        }
-
-        
         for (int i=0; i<retries; i++) {
             
             String payload = recordedLoginFlowInput.getContent().toString();
@@ -215,8 +201,6 @@ public class Utils {
         if(roleName == null){
             return token;
         }
-        loggerMaker.infoAndAddToDb(roleKey + " token inserting into cache: " + token, LogDb.TESTING);
-        TestRolesCache.putToken(roleKey, token, Context.now());
         return token;
     }
 
@@ -263,7 +247,7 @@ public class Utils {
 
     }
 
-    public static LoginFlowResponse runLoginFlow(WorkflowTest workflowTest, AuthMechanism authMechanism, LoginFlowParams loginFlowParams) throws Exception {
+    public static LoginFlowResponse runLoginFlow(WorkflowTest workflowTest, AuthMechanism authMechanism, LoginFlowParams loginFlowParams, String roleName) throws Exception {
         Graph graph = new Graph();
         graph.buildGraph(workflowTest);
 
@@ -343,6 +327,9 @@ public class Utils {
                         JSONObject payloadJson = new JSONObject(payload);
                         if (payloadJson.has("exp")) {
                             int newExpiryTime = payloadJson.getInt("exp");
+                            if(roleName != null){
+                                TestRolesCache.addTokenExpiry(roleName, newExpiryTime);
+                            }
                             TestExecutor.setExpiryTimeOfAuthToken(newExpiryTime);
                         } else {
                             throw new IllegalArgumentException("JWT does not have an 'exp' claim");
@@ -357,6 +344,9 @@ public class Utils {
                         int expiryTsEpoch = CookieExpireFilter.getMaxAgeFromCookie(cookieMap);
                         if(expiryTsEpoch > 0){
                             int newExpiryTime = Context.now() + expiryTsEpoch;
+                            if(roleName != null){
+                                TestRolesCache.addTokenExpiry(roleName, newExpiryTime);
+                            }
                             TestExecutor.setExpiryTimeOfAuthToken(newExpiryTime);
                         }
                     } catch (Exception e) {
