@@ -359,8 +359,8 @@ public class IssuesAction extends UserAction {
                     filtersForNewCollection.add(baseFilter);
                 }
             }
+            this.testingRunResults = new ArrayList<>();
             if (issues.isEmpty()) {
-                this.testingRunResults = new ArrayList<>();
                 // this.sampleDataVsCurlMap = new HashMap<>();
                 return SUCCESS.toUpperCase();
             }
