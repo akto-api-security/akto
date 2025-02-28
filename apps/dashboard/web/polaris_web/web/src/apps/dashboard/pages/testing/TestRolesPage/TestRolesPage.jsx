@@ -107,7 +107,7 @@ function TestRolesPage(){
                 testRole.id=testRole.name;
                 testRole.createdAt = func.prettifyEpoch(testRole.createdTs)
                 all.push(testRole)
-                if(testRole.createdBy === 'System' || testRole.createdBy === 'AKTO') {
+                if(testRole.createdBy === 'System') {
                     system.push(testRole)
                 } else {
                     custom.push(testRole)
