@@ -2,9 +2,12 @@ package com.akto.dto.testing;
 
 import java.util.ArrayList;
 
+import com.google.gson.Gson;
+
 public class LoginFlowResponse {
     
     private ArrayList<Object> responses;
+    private static final Gson gson = new Gson();
 
     private String error;
 
@@ -40,6 +43,16 @@ public class LoginFlowResponse {
 
     public void setError(String error) {
         this.error = error;
+    }
+
+    public static LoginFlowResponse getLoginFlowResponse(String responseString) {
+        LoginFlowResponse response = gson.fromJson(responseString, LoginFlowResponse.class);
+        return response;
+    }
+
+    @Override
+    public String toString() {
+        return gson.toJson(this);
     }
 
 }

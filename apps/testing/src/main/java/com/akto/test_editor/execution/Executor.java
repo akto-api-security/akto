@@ -26,9 +26,11 @@ import com.akto.dto.type.KeyTypes;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.rules.TestPlugin;
+import com.akto.store.TestRolesCache;
 import com.akto.test_editor.Utils;
 import com.akto.util.Constants;
 import com.akto.util.JSONUtils;
+import com.akto.util.Pair;
 import com.akto.util.modifier.JWTPayloadReplacer;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -107,14 +109,19 @@ public class Executor {
             yamlTestResult = new YamlTestResult(result, workflowTest);
             return yamlTestResult;
         }
+
+        // new role being updated here without using modify_header {normal role replace here}
+
         if (testingRunConfig != null && StringUtils.isNotBlank(testingRunConfig.getTestRoleId())) {
-            TestRoles role = TestRolesDao.instance.findOne(Filters.eq("_id", new ObjectId(testingRunConfig.getTestRoleId())));
+            TestRoles role = fetchOrFindTestRole(testingRunConfig.getTestRoleId(), true);
             if (role != null) {
                 EndpointLogicalGroup endpointLogicalGroup = role.fetchEndpointLogicalGroup();
                 if (endpointLogicalGroup != null && endpointLogicalGroup.getTestingEndpoints() != null  && endpointLogicalGroup.getTestingEndpoints().containsApi(apiInfoKey)) {
                     if (role.getDefaultAuthMechanism() != null) {
-                        loggerMaker.infoAndAddToDb("attempting to override auth " + logId, LogDb.TESTING);
-                        modifyAuthTokenInRawApi(role, sampleRawApi);
+                        synchronized(role) {
+                            loggerMaker.infoAndAddToDb("attempting to override auth " + logId, LogDb.TESTING);
+                            modifyAuthTokenInRawApi(role, sampleRawApi);
+                        }
                     } else {
                         loggerMaker.infoAndAddToDb("Default auth mechanism absent: " + logId, LogDb.TESTING);
                     }
@@ -485,7 +492,7 @@ public class Executor {
         return removed;
     }
 
-    public static ExecutorSingleOperationResp modifyAuthTokenInRawApi(TestRoles testRole, RawApi rawApi) {
+    public synchronized static ExecutorSingleOperationResp modifyAuthTokenInRawApi(TestRoles testRole, RawApi rawApi) {
         Map<String, List<String>> rawHeaders = rawApi.fetchReqHeaders();
         for(AuthWithCond authWithCond: testRole.getAuthWithCondList()) {
 
@@ -508,11 +515,19 @@ public class Executor {
                     RecordedLoginFlowInput recordedLoginFlowInput = authWithCond.getRecordedLoginFlowInput();
                     Map<String, Object> valuesMap = new HashMap<>();
 
-                    String token = com.akto.testing.workflow_node_executor.Utils.fetchToken(recordedLoginFlowInput, 5);
+                    String token = null;
+                    if(TestRolesCache.getTokenForRole(testRole.getName() + "_" + Context.accountId.get(), testRole.getLastUpdatedTs()) != null){
+                        loggerMaker.infoAndAddToDb("got login response from cache " + testRole.getName(), LogDb.TESTING);
+                        token = TestRolesCache.getTokenForRole(testRole.getName() + "_" + Context.accountId.get(), testRole.getLastUpdatedTs());
+                    }else{
+                        loggerMaker.infoAndAddToDb("trying to fetch token for role " + testRole.getName(), LogDb.TESTING);
+                        token = com.akto.testing.workflow_node_executor.Utils.fetchToken(testRole.getName(), recordedLoginFlowInput, 5);
+                    }
                     if (token == null) {
                         return new ExecutorSingleOperationResp(false, "Failed to replace roles_access_context: ");
                     } else {
                         loggerMaker.infoAndAddToDb("flattened here: " + token);
+                        TestRolesCache.putToken(testRole.getName() + "_" + Context.accountId.get(), token, Context.now());
                         BasicDBObject flattened = JSONUtils.flattenWithDots(BasicDBObject.parse(token));
 
                         for (String param: flattened.keySet()) {
@@ -545,9 +560,23 @@ public class Executor {
                 } else {
                     if (AuthMechanismTypes.LOGIN_REQUEST.toString().equalsIgnoreCase(authMechanismForRole.getType())) {
                         try {
-                            LoginFlowResponse loginFlowResponse = TestExecutor.executeLoginFlow(authMechanismForRole, null);
-                            if (!loginFlowResponse.getSuccess())
-                                throw new Exception(loginFlowResponse.getError());
+                            LoginFlowResponse loginFlowResponse= new LoginFlowResponse();
+                            String roleKey = testRole.getName() + "_" + Context.accountId.get();
+                            if(TestRolesCache.getTokenForRole(roleKey, testRole.getLastUpdatedTs()) == null){
+                                loggerMaker.infoAndAddToDb("trying to fetch token of step builder type for role " + testRole.getName(), LogDb.TESTING);
+                                loginFlowResponse = TestExecutor.executeLoginFlow(authMechanismForRole, null, testRole.getName());
+                                if (!loginFlowResponse.getSuccess())
+                                    throw new Exception(loginFlowResponse.getError());
+                                else{
+                                    String responseString = loginFlowResponse.toString();
+                                    TestRolesCache.putToken(roleKey, responseString, Context.now());
+                                }
+                            }else{
+                                loggerMaker.infoAndAddToDb("got login response from cache " + testRole.getName(), LogDb.TESTING);
+                                String responseString = TestRolesCache.getTokenForRole(roleKey, testRole.getLastUpdatedTs());
+                                loginFlowResponse = LoginFlowResponse.getLoginFlowResponse(responseString);
+                            }
+                            
     
                             authMechanismForRole.setType(LoginFlowEnums.AuthMechanismTypes.HARDCODED.name());
                         } catch (Exception e) {
@@ -588,16 +617,22 @@ public class Executor {
         }
     }
 
-    private synchronized static TestRoles fetchOrFindTestRole(String name) {
+    private synchronized static TestRoles fetchOrFindTestRole(String name, boolean isId) {
         if (roleCache == null) {
             roleCache = new ConcurrentHashMap<>();
         }
         if (roleCache.containsKey(name)) {
             return roleCache.get(name);
         }
-        TestRoles testRole = TestRolesDao.instance.findOne(TestRoles.NAME, name);
-        roleCache.put(name, testRole);
-        return roleCache.get(name);
+        if(!isId){
+            TestRoles testRole = TestRolesDao.instance.findOne(TestRoles.NAME, name);
+            roleCache.put(name, testRole);
+            return roleCache.get(name);
+        }else{
+            TestRoles testRole = TestRolesDao.instance.findOne(Constants.ID, new ObjectId(name));
+            roleCache.put(name, testRole);
+            return roleCache.get(name);
+        }
     }
 
     public ExecutorSingleOperationResp runOperation(String operationType, RawApi rawApi, Object key, Object value, Map<String, Object> varMap, AuthMechanism authMechanism, List<CustomAuthType> customAuthTypes, ApiInfo.ApiInfoKey apiInfoKey) {
@@ -628,10 +663,10 @@ public class Executor {
 
                 String ACCESS_ROLES_CONTEXT = "${roles_access_context.";
                 if (keyStr.startsWith(ACCESS_ROLES_CONTEXT)) {
-
+                    // role being updated here for without
                     keyStr = keyStr.replace(ACCESS_ROLES_CONTEXT, "");
                     keyStr = keyStr.substring(0,keyStr.length()-1).trim();
-                    TestRoles testRole = fetchOrFindTestRole(keyStr);
+                    TestRoles testRole = fetchOrFindTestRole(keyStr, false);
                     if (testRole == null) {
                         return new ExecutorSingleOperationResp(false, "Test Role " + keyStr +  " Doesn't Exist ");
                     }
