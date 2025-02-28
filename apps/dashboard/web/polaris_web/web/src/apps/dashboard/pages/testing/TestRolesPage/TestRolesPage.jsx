@@ -58,7 +58,7 @@ function TestRolesPage(){
     const [showEmptyScreen, setShowEmptyScreen] = useState(false)
     const navigate = useNavigate()
 
-    const [data, setData] = useState({ 'all': [], 'by_akto': [], 'custom': []})
+    const [data, setData] = useState({ 'all': [], 'system': [], 'custom': []})
 
     const handleRedirect = () => {
         navigate("details")
@@ -101,26 +101,26 @@ function TestRolesPage(){
     async function fetchData(){
         await api.fetchTestRoles().then((res) => {
             setShowEmptyScreen(res.testRoles.length === 0)
-            const all = [], akto = [], custom = []
+            const all = [], system = [], custom = []
             res.testRoles.forEach((testRole) => {
                 testRole.timestamp = func.prettifyEpoch(testRole.lastUpdatedTs)
                 testRole.id=testRole.name;
                 testRole.createdAt = func.prettifyEpoch(testRole.createdTs)
                 all.push(testRole)
                 if(testRole.createdBy === 'System' || testRole.createdBy === 'AKTO') {
-                    akto.push(testRole)
+                    system.push(testRole)
                 } else {
                     custom.push(testRole)
                 }
             })
-            setData({ 'all': all, 'by_akto': akto, 'custom': custom})
+            setData({ 'all': all, 'system': system, 'custom': custom})
             setLoading(false);
         })
     }
     const [selected, setSelected] = useState(0)
     const [selectedTab, setSelectedTab] = useState('all')
     const { tabsInfo } = useTable()
-    const definedTableTabs = ['All', 'By Akto', 'Custom'];
+    const definedTableTabs = ['All', 'System', 'Custom'];
     const tableCountObj = func.getTabsCount(definedTableTabs, data)
     const tableTabs = func.getTableTabsContent(definedTableTabs, tableCountObj, setSelectedTab, selectedTab, tabsInfo)
 
