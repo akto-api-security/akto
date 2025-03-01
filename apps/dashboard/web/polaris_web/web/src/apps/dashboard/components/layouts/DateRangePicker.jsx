@@ -226,6 +226,8 @@ function DateRangePicker(props) {
                       onChange={handleCalendarChange}
                       multiMonth={shouldShowMultiMonth}
                       allowRange
+                      disableDatesBefore={activeDateRange.alias === "includingFuture" ? undefined : undefined}
+                      disableDatesAfter={activeDateRange.alias === "includingFuture" ? undefined : new Date()}
                     />
                   </div>
                 </VerticalStack>

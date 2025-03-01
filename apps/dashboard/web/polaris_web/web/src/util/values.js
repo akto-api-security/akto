@@ -76,6 +76,14 @@ const ranges = [
             since: new Date(0),
             until: todayDayEnd,
         }
+    },
+    {
+        title: 'All dates (past & future)',
+        alias: "includingFuture",
+        period:{
+            since: new Date(0),
+            until: new Date(new Date().setFullYear(today.getFullYear() + 1)),
+        }
     }
 ];
 
