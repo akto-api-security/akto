@@ -169,7 +169,7 @@ export default function LeftNav() {
                                     selected: leftNavSelected === "dashboard_testing_user_config",
                                 },
                                 {
-                                    label:"Test suites",
+                                    label:"Test Suite",
                                     onClick:()=>{
                                         navigate("/dashboard/testing/test-suite");
                                         handleSelect("dashboard_testing_test_suite");

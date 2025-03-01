@@ -520,5 +520,32 @@ export default {
             method: 'post',
             data: {testingRunResultSummaryHexId}
         })
+    },
+    createNewTestSuite(testSuiteName,subCategoryList) {
+        return request({
+            url: '/api/createTestSuite',
+            method: 'post',
+            data: {testSuiteName,subCategoryList}
+        })
+    },
+    fetchAllTestSuites() {
+        return request({
+            url: '/api/fetchAllTestSuites',
+            method: 'get',
+        })
+    },
+    modifyTestSuite(testSuiteId, testSuiteName, subCategoryList) {
+        return request({
+            url: '/api/modifyTestSuite',
+            method: 'post',
+            data: {testSuiteId, testSuiteName, subCategoryList}
+        })
+    },
+    deleteTestSuite(testSuiteId) {
+        return request({
+            url: '/api/deleteTestSuite',
+            method: 'post',
+            data: {testSuiteId}
+        })
     }
 }
