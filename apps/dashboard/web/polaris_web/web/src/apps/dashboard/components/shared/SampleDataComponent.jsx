@@ -19,6 +19,8 @@ function SampleDataComponent(props) {
     const [lineNumbers, setLineNumbers] = useState({request: [], response: []})
     const [currentIndex, setCurrentIndex] = useState({request: 0, response: 0})
     const [responseTime, setResponseTime] = useState(undefined)
+    const [sourceIP, setSourceIP] = useState(undefined)
+    const [destIP, setDestIP] = useState(undefined)
 
     const ref = useRef(null)
 
@@ -31,6 +33,8 @@ function SampleDataComponent(props) {
         }
         let responseJson = func.responseJson(parsed, sampleData?.highlightPaths)
         let requestJson = func.requestJson(parsed, sampleData?.highlightPaths)
+        setSourceIP(requestJson?.sourceIP)
+        setDestIP(requestJson?.destIP)
 
         let responseTime = parsed?.responseTime;
         setResponseTime(responseTime)
@@ -207,6 +211,7 @@ function SampleDataComponent(props) {
                     <HorizontalStack padding="2" align='space-between'>
                         {func.toSentenceCase(type)} 
                         { type=="response" && responseTime ? (` (${responseTime} ms)`) : "" }
+                        { type=="request" && sourceIP && destIP ? (` (${sourceIP} -> ${destIP})`) : "" }
                         <HorizontalStack gap={2}>
                         {isNewDiff ? <HorizontalStack gap="2">
                                 <Box borderInlineEndWidth='1' borderColor="border-subdued" padding="1">
