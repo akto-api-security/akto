@@ -18,7 +18,7 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
                 ...prev,
                 startTimestamp: scheduledEpoch
             }));
-            return {[action.key]: action.obj['selectedDate'] }
+            return {...state, [action.key]: action.obj['selectedDate'] }
           default:
             return state;
         }
@@ -41,12 +41,20 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
                             continuousTesting = true;
                         } else if (runType === 'Daily') {
                             recurringDaily = true;
+                        } else if (runType === 'Once') {
+                            // Always ensure we have a date when switching to Once
+                            dispatch({
+                                type: "update",
+                                key: "data",
+                                obj: { selectedDate: state.data || new Date() }
+                            });
                         }
+                        
                         setTestRun(prev => ({
                             ...prev,
                             recurringDaily,
                             continuousTesting,
-                            runTypeLabel: runType.label
+                            runTypeLabel: runType
                         }));
                     }} />
                 {testRun.runTypeLabel === "Once" && (

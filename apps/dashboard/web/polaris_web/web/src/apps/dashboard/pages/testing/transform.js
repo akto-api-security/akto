@@ -112,17 +112,15 @@ function getRuntime(scheduleTimestamp, endTimestamp, state) {
   if (status === 'RUNNING') {
     return <div data-testid="test_run_status">Currently running</div>;
   }
-  const currTime = Date.now();
+  if (status === 'SCHEDULED') {
+    return <div data-testid="test_run_status">Scheduled for {func.prettifyFutureEpoch(scheduleTimestamp)}</div>;
+  }
+  const currTimeMs = Date.now();
+  const scheduleTimeMs = scheduleTimestamp * 1000; // Convert seconds to milliseconds
   if (endTimestamp <= 0) {
-    if (currTime > scheduleTimestamp) {
-      return <div data-testid="test_run_status">Was scheduled for {func.prettifyEpoch(scheduleTimestamp)}</div>;
-
-    } else {
-      return <div data-testid="test_run_status">Next run in {func.prettifyEpoch(scheduleTimestamp)}</div>;
-    }
+    return <div data-testid="test_run_status">Last run {func.prettifyEpoch(scheduleTimestamp)}</div>;
   }
   return <div data-testid="test_run_status">Last run {func.prettifyEpoch(endTimestamp)}</div>;
-
 }
 
 function getAlternateTestsInfo(state) {

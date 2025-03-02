@@ -449,7 +449,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
             } else if (testRun.continuousTesting) {
                 return <div data-testid="schedule_run_button">Run continuous testing</div>
             } else {
-                return <div data-testid="schedule_run_button">Run once at {func.prettifyFutureEpoch(testRun.startTimestamp)}</div>
+                return <div data-testid="schedule_run_button">Run once {func.prettifyFutureEpoch(testRun.startTimestamp)}</div>
             }
         } else {
             if (testRun.recurringDaily) {
