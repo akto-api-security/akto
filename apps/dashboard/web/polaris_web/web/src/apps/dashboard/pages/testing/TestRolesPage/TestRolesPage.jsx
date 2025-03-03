@@ -103,13 +103,13 @@ function TestRolesPage(){
                 testRole.timestamp = func.prettifyEpoch(testRole.lastUpdatedTs)
                 testRole.id=testRole.name;
                 testRole.createdAt = func.prettifyEpoch(testRole.createdTs)
+                testRole.nameComp = (<Box maxWidth="40vw"><TooltipText tooltip={testRole.name} text={testRole.name} textProps={{fontWeight: 'medium'}}/></Box>)
                 all.push(testRole)
                 if(testRole.createdBy === 'System') {
                     system.push(testRole)
                 } else {
                     custom.push(testRole)
                 }
-                testRole.nameComp = <Box maxWidth="40vw"><TooltipText tooltip={testRole.name} text={testRole.name}/></Box>
             })
             setData({ 'all': all, 'system': system, 'custom': custom})
             setLoading(false);
