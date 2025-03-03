@@ -396,10 +396,6 @@ public class DbLayer {
         LogsDao.instance.insertOne(log);
     }
 
-    public static void insertPupeteerLog(Log log) {
-        PupeteerLogsDao.instance.insertOne(log);
-    }
-
     public static void insertProtectionLog(Log log) {
         ProtectionLogsDao.instance.insertOne(log);
     }
