@@ -85,6 +85,8 @@ public class TelemetryJob {
                 return AnalyserLogsDao.instance;
             case BILLING:
                 return BillingLogsDao.instance;
+            case PUPPETEER:
+                return PupeteerLogsDao.instance;
             default:
                 return LogsDao.instance;
         }

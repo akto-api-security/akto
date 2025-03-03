@@ -18,6 +18,7 @@ import com.akto.dao.ApiInfoDao;
 import com.akto.dao.CustomAuthTypeDao;
 import com.akto.dao.CustomDataTypeDao;
 import com.akto.dao.LogsDao;
+import com.akto.dao.PupeteerLogsDao;
 import com.akto.dao.ProtectionLogsDao;
 import com.akto.dao.RuntimeFilterDao;
 import com.akto.dao.RuntimeLogsDao;
@@ -393,6 +394,10 @@ public class DbLayer {
 
     public static void insertTestingLog(Log log) {
         LogsDao.instance.insertOne(log);
+    }
+
+    public static void insertPupeteerLog(Log log) {
+        PupeteerLogsDao.instance.insertOne(log);
     }
 
     public static void insertProtectionLog(Log log) {
