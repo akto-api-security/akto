@@ -35,6 +35,8 @@ const headers = [
         title:"Author",
         text:"Created by",
         value:"createdBy",
+        showFilter:true,
+        filterKey:"createdBy",
     },
     {
         title: '',
@@ -161,6 +163,7 @@ function TestRolesPage(){
                     key="table"
                     selected={selected}
                     data={data[selectedTab]}
+                    disambiguateLabel={(key,value) => func.convertToDisambiguateLabelObj(value, null, 2)}
                     onSelect={handleSelectedTab}
                     mode={IndexFiltersMode.Default}
                     tableTabs={tableTabs}
