@@ -145,6 +145,7 @@ function SingleTestRunPage() {
   const localCategoryMap = LocalStore.getState().categoryMap
   const localSubCategoryMap = LocalStore.getState().subCategoryMap
   const [useLocalSubCategoryData, setUseLocalSubCategoryData] = useState(false)
+  const [copyUpdateTable, setCopyUpdateTable] = useState("");
 
   const tableTabMap = {
     vulnerable: "VULNERABLE",
@@ -300,8 +301,12 @@ function SingleTestRunPage() {
             setMissingConfigs(transform.getMissingConfigs(testRunResultsRes))
           }
         })
-        if (!func.deepComparison(copyFilters, filters)) {
-          setCopyFilters(filters)
+        if (!func.deepComparison(copyFilters, filters) || copyUpdateTable !== updateTable) {
+          if(copyUpdateTable !== updateTable){
+            setCopyUpdateTable(updateTable)
+          }else{
+            setCopyFilters(filters)
+          }
           await api.fetchTestRunResultsCount(localSelectedTestRun.testingRunResultSummaryHexId).then((testCountMap) => {
             if(testCountMap !== null){
               localCountMap = JSON.parse(JSON.stringify(testCountMap))  
