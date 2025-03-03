@@ -43,13 +43,13 @@ function ChartypeComponent({data, title,charTitle, chartSubtitle, reverse, isNor
     )
 
     return (
-        <Box padding={boxPadding !== undefined ? boxPadding : 4}>
+        <Box className={"issues-severity-graph-container"} padding={boxPadding !== undefined ? boxPadding : 4}>
             <HorizontalStack wrap={false} gap={8} align={spaceBetween || ''}>
                 {chartOnLeft ? chartComponent: null}
                 <VerticalStack gap="2">
                     <Text fontWeight="semibold" variant="bodySm">{title}</Text>
                     <Scrollable style={{maxHeight: boxHeight}} focusable shadow>
-                        <Box width={dataTableWidth ? dataTableWidth : '260px'}>
+                        <Box className={"issues-severity-graph-table-container"} width={dataTableWidth ? dataTableWidth : '260px'}>
                             <DataTable headings={[]}
                                 columnContentTypes={[
                                     'text',
