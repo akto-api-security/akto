@@ -1836,7 +1836,59 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
     }
     
     return date.getTime();
-}
+},
+
+  prettifyFutureEpoch(epoch) {
+      if (!epoch) return "Never";
+      
+      const now = Math.floor(Date.now() / 1000);
+      const diffSeconds = epoch - now;
+      
+      if (diffSeconds < 0){
+        if(diffSeconds < -86400){
+          return this.prettifyEpoch(epoch);
+        } else {
+          return "Now";
+        }
+      }
+      
+      const date = new Date(epoch * 1000);
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      
+      // Format time
+      const timeStr = date.toLocaleTimeString('en-US', { 
+        hour: 'numeric', 
+        minute: '2-digit',
+        hour12: true 
+      });
+      
+      // If same day
+      if (date.toDateString() === new Date().toDateString()) {
+        return `today ${timeStr}`;
+      }
+      
+      // If tomorrow
+      if (date.toDateString() === tomorrow.toDateString()) {
+        return `tomorrow ${timeStr}`;
+      }
+      
+      // If within 7 days
+      const daysDiff = Math.floor(diffSeconds / (24 * 60 * 60));
+      if (daysDiff < 7) {
+        return `${date.toLocaleDateString('en-US', { weekday: 'long' })} ${timeStr}`;
+      }
+      
+      // Otherwise show full date and time
+      return `${date.toLocaleDateString('en-US', { 
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric'
+      })} ${timeStr}`;
+  },
+  isDemoAccount(){
+    return window.ACTIVE_ACCOUNT === 1669322524
+  }
 
 }
 

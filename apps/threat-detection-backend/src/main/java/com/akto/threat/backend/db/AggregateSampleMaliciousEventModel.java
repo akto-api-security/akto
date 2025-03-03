@@ -15,6 +15,7 @@ public class AggregateSampleMaliciousEventModel {
   private String orig;
   private int apiCollectionId;
   private long requestTime;
+  private String refId;
 
   public AggregateSampleMaliciousEventModel() {}
 
@@ -29,6 +30,7 @@ public class AggregateSampleMaliciousEventModel {
     this.requestTime = builder.requestTime;
     this.url = builder.url;
     this.apiCollectionId = builder.apiCollectionId;
+    this.refId = builder.refId;
   }
 
   public static class Builder {
@@ -41,6 +43,7 @@ public class AggregateSampleMaliciousEventModel {
     private Method method;
     private String orig;
     private long requestTime;
+    private String refId;
 
     public Builder setFilterId(String filterId) {
       this.filterId = filterId;
@@ -87,6 +90,11 @@ public class AggregateSampleMaliciousEventModel {
       return this;
     }
 
+    public Builder setRefId(String refId) {
+      this.refId = refId;
+      return this;
+    }  
+
     public AggregateSampleMaliciousEventModel build() {
       return new AggregateSampleMaliciousEventModel(this);
     }
@@ -130,6 +138,10 @@ public class AggregateSampleMaliciousEventModel {
 
   public int getApiCollectionId() {
     return apiCollectionId;
+  }
+
+  public String getRefId() {
+    return refId;
   }
 
   public static Builder newBuilder() {

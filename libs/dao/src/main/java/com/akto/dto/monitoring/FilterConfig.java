@@ -25,6 +25,7 @@ public class FilterConfig {
     public static final String _CONTENT = "content";
     private String content;
     private AggregationRules aggregationRules;
+    public static final String _INFO = "info";
     private Info info;
     public static final String DEFAULT_ALLOW_FILTER = "DEFAULT_ALLOW_FILTER";
     public static final String DEFAULT_BLOCK_FILTER = "DEFAULT_BLOCK_FILTER";

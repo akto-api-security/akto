@@ -155,18 +155,9 @@ const [collapsible, setCollapsible] = useState(true)
 const [hasUserInitiatedTestRuns, setHasUserInitiatedTestRuns] = useState(false)
 
 
-const refreshSummaries = () =>{
-  setTimeout(() => {
-    setUpdateTable(Date.now().toString())
-  }, 5000)
-}
 
 function processData(testingRuns, latestTestingRunResultSummaries, cicd){
   let testRuns = transform.prepareTestRuns(testingRuns, latestTestingRunResultSummaries, cicd, true);
-  const updatedRuns = testRuns.filter((test) => test.orderPriority !== 1)
-  if(updatedRuns.length !== testRuns.length){
-    refreshSummaries()
-  }
   return testRuns;
 }
 

@@ -1,7 +1,6 @@
 package com.akto.testing.workflow_node_executor;
 
 import static com.akto.runtime.utils.Utils.parseCookie;
-import static org.mockito.Answers.values;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -36,6 +35,7 @@ import com.akto.dto.type.KeyTypes;
 import com.akto.dto.type.RequestTemplate;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.store.TestRolesCache;
 import com.akto.util.JSONUtils;
 import com.akto.util.RecordedLoginFlowUtil;
 import com.google.gson.Gson;
@@ -43,9 +43,6 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 
-import io.jsonwebtoken.Claims;
-import io.jsonwebtoken.Jws;
-import io.jsonwebtoken.Jwts;
 
 public class Utils {
     
@@ -144,7 +141,7 @@ public class Utils {
         BasicDBObject data = new BasicDBObject();
         String message;
         
-        String token = fetchToken(recordedLoginFlowInput, 5);
+        String token = fetchToken(null, recordedLoginFlowInput, 5);
 
         if (token == null){
             message = "error processing reorder node";
@@ -172,8 +169,9 @@ public class Utils {
         return new WorkflowTestResult.NodeResult(resp.toString(), false, testErrors);
     }
 
-    public static String fetchToken(RecordedLoginFlowInput recordedLoginFlowInput, int retries) {
+    public static String fetchToken(String roleName, RecordedLoginFlowInput recordedLoginFlowInput, int retries) {
 
+        // need to cache
         String token = null;
         for (int i=0; i<retries; i++) {
             
@@ -200,7 +198,9 @@ public class Utils {
                 break;
             }
         }
-
+        if(roleName == null){
+            return token;
+        }
         return token;
     }
 
@@ -247,7 +247,7 @@ public class Utils {
 
     }
 
-    public static LoginFlowResponse runLoginFlow(WorkflowTest workflowTest, AuthMechanism authMechanism, LoginFlowParams loginFlowParams) throws Exception {
+    public static LoginFlowResponse runLoginFlow(WorkflowTest workflowTest, AuthMechanism authMechanism, LoginFlowParams loginFlowParams, String roleName) throws Exception {
         Graph graph = new Graph();
         graph.buildGraph(workflowTest);
 
@@ -327,6 +327,9 @@ public class Utils {
                         JSONObject payloadJson = new JSONObject(payload);
                         if (payloadJson.has("exp")) {
                             int newExpiryTime = payloadJson.getInt("exp");
+                            if(roleName != null){
+                                TestRolesCache.addTokenExpiry(roleName, newExpiryTime);
+                            }
                             TestExecutor.setExpiryTimeOfAuthToken(newExpiryTime);
                         } else {
                             throw new IllegalArgumentException("JWT does not have an 'exp' claim");
@@ -341,6 +344,9 @@ public class Utils {
                         int expiryTsEpoch = CookieExpireFilter.getMaxAgeFromCookie(cookieMap);
                         if(expiryTsEpoch > 0){
                             int newExpiryTime = Context.now() + expiryTsEpoch;
+                            if(roleName != null){
+                                TestRolesCache.addTokenExpiry(roleName, newExpiryTime);
+                            }
                             TestExecutor.setExpiryTimeOfAuthToken(newExpiryTime);
                         }
                     } catch (Exception e) {

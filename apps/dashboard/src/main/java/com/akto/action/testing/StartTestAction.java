@@ -1226,7 +1226,7 @@ public class StartTestAction extends UserAction {
                     }
 
                     if (editableTestingRunConfig.getMaxConcurrentRequests() > 0
-                            && editableTestingRunConfig.getMaxConcurrentRequests() <= 100 && editableTestingRunConfig
+                            && editableTestingRunConfig.getMaxConcurrentRequests() <= 500 && editableTestingRunConfig
                                     .getMaxConcurrentRequests() != existingTestingRun.getMaxConcurrentRequests()) {
                         updates.add(Updates.set(TestingRun.MAX_CONCURRENT_REQUEST,
                                 editableTestingRunConfig.getMaxConcurrentRequests()));

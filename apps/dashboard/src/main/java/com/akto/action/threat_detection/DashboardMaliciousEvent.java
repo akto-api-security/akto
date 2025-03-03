@@ -14,6 +14,7 @@ public class DashboardMaliciousEvent {
   private String country;
   private long timestamp;
   private String type;
+  private String refId;
 
   public DashboardMaliciousEvent() {}
 
@@ -27,7 +28,8 @@ public class DashboardMaliciousEvent {
       String ip,
       String country,
       long timestamp,
-      String type) {
+      String type,
+      String refId) {
     this.id = id;
     this.actor = actor;
     this.filter_id = filter;
@@ -38,6 +40,7 @@ public class DashboardMaliciousEvent {
     this.country = country;
     this.timestamp = timestamp;
     this.type = type;
+    this.refId = refId;
   }
 
   public String getId() {
@@ -118,6 +121,14 @@ public class DashboardMaliciousEvent {
 
   public void setType(String type) {
     this.type = type;
+  }
+
+  public String getRefId() {
+    return refId;
+  }
+
+  public void setRefId(String refId) {
+    this.refId = refId;
   }
 
 }

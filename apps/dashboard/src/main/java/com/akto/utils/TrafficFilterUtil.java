@@ -28,6 +28,7 @@ public class TrafficFilterUtil {
                 template.append(FilterConfig._AUTHOR, config.getAuthor());
                 template.append(FilterConfig.CREATED_AT, config.getCreatedAt());
                 template.append(FilterConfig.UPDATED_AT, config.getUpdatedAt());
+                template.append(FilterConfig._INFO, config.getInfo());
                 templates.add(template);
             }
         }
