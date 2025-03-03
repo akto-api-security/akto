@@ -2,18 +2,15 @@ import { useEffect, useState } from "react"
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
 import GithubSimpleTable from "../../../components/tables/GithubSimpleTable"
 import api from "../api"
-import { Button, IndexFiltersMode } from "@shopify/polaris"
+import { Box, Button, IndexFiltersMode } from "@shopify/polaris"
 import { useNavigate } from "react-router-dom"
 import func from "@/util/func"
-import {
-    ProfileMinor,
-    CalendarMinor
-  } from '@shopify/polaris-icons';
 import EmptyScreensLayout from "../../../components/banners/EmptyScreensLayout"
 import { ROLES_PAGE_DOCS_URL } from "../../../../main/onboardingData"
 import { CellType } from "../../../components/tables/rows/GithubRow"
 import TitleWithInfo from "../../../components/shared/TitleWithInfo"
 import useTable from "../../../components/tables/TableContext"
+import TooltipText from "../../../components/shared/TooltipText"
 
 
 const sortOptions = [
@@ -25,7 +22,7 @@ const headers = [
     {
         title:"Test Role",
         text:"Name",
-        value:"name",
+        value:"nameComp",
     },
     {
         title:"Created",
@@ -44,8 +41,6 @@ const headers = [
         type: CellType.ACTION,
     }
 ]
-
-let heading = JSON.parse(JSON.stringify(headers))
 
 const resourceName = {
     singular: 'test role',
@@ -112,6 +107,7 @@ function TestRolesPage(){
                 } else {
                     custom.push(testRole)
                 }
+                testRole.nameComp = <Box maxWidth="40vw"><TooltipText tooltip={testRole.name} text={testRole.name}/></Box>
             })
             setData({ 'all': all, 'system': system, 'custom': custom})
             setLoading(false);
@@ -132,8 +128,8 @@ function TestRolesPage(){
 
     const onTestRoleClick = (item) => navigate("details", {state: {
         name: item.name,
-        endpoints: item.endpointLogicalGroup.testingEndpoints,
-        authWithCondList: item.authWithCondList
+        endpoints: item?.endpointLogicalGroup?.testingEndpoints || [],
+        authWithCondList: item?.authWithCondList || []
     }})
 
     const handleSelectedTab = (selectedIndex) => {
@@ -170,7 +166,7 @@ function TestRolesPage(){
                     tableTabs={tableTabs}
                     resourceName={resourceName} 
                     headers={headers}
-                    headings={heading}
+                    headings={headers}
                     loading={loading}
                     onRowClick={onTestRoleClick}
                     getActions={getActions}
