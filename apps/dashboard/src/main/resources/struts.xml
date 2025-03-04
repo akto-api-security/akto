@@ -3807,7 +3807,8 @@
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">TEST_SUITE</param>
-                <param name="accessType">WRITE</param>
+                <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User created a test suite</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -3820,11 +3821,6 @@
                 <param name="statusCode">422</param>
                 <param name="ignoreHierarchy">false</param>
                 <param name="includeProperties">^actionErrors.*</param>
-            </result>
-            <result name="UNAUTHORIZED" type="json">
-                 <param name="statusCode">403</param>
-                 <param name="ignoreHierarchy">false</param>
-                 <param name="includeProperties">^actionErrors.*</param>
             </result>
         </action>
         <action name="api/modifyTestSuite" class="com.akto.action.testing.TestSuiteAction" method="modifyTestSuite">
@@ -3832,7 +3828,8 @@
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">TEST_SUITE</param>
-                <param name="accessType">WRITE</param>
+                <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User modified a test suite</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -3845,11 +3842,6 @@
                 <param name="statusCode">422</param>
                 <param name="ignoreHierarchy">false</param>
                 <param name="includeProperties">^actionErrors.*</param>
-            </result>
-            <result name="UNAUTHORIZED" type="json">
-                 <param name="statusCode">403</param>
-                 <param name="ignoreHierarchy">false</param>
-                 <param name="includeProperties">^actionErrors.*</param>
             </result>
         </action>
         <action name="api/fetchAllTestSuites" class="com.akto.action.testing.TestSuiteAction" method="getAllTestSuites">
@@ -3873,11 +3865,6 @@
                 <param name="ignoreHierarchy">false</param>
                 <param name="includeProperties">^actionErrors.*</param>
             </result>
-            <result name="UNAUTHORIZED" type="json">
-                 <param name="statusCode">403</param>
-                 <param name="ignoreHierarchy">false</param>
-                 <param name="includeProperties">^actionErrors.*</param>
-            </result>
         </action>
 
         <action name="api/deleteTestSuite" class="com.akto.action.testing.TestSuiteAction" method="deleteTestSuite">
@@ -3885,7 +3872,8 @@
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">TEST_SUITE</param>
-                <param name="accessType">DELETE</param>
+                <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User deleted a test suite</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -3899,11 +3887,6 @@
                 <param name="statusCode">422</param>
                 <param name="ignoreHierarchy">false</param>
                 <param name="includeProperties">^actionErrors.*</param>
-            </result>
-            <result name="UNAUTHORIZED" type="json">
-                 <param name="statusCode">403</param>
-                 <param name="ignoreHierarchy">false</param>
-                 <param name="includeProperties">^actionErrors.*</param>
             </result>
         </action>
 

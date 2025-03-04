@@ -532,21 +532,22 @@ export default {
     fetchAllTestSuites() {
         return request({
             url: '/api/fetchAllTestSuites',
-            method: 'get',
+            method: 'post',
+            data: {}
         })
     },
-    modifyTestSuite(testSuiteId, testSuiteName, subCategoryList) {
+    modifyTestSuite(testSuiteHexId, testSuiteName, subCategoryList) {
         return request({
             url: '/api/modifyTestSuite',
             method: 'post',
-            data: {testSuiteId, testSuiteName, subCategoryList}
+            data: {testSuiteHexId, testSuiteName, subCategoryList}
         })
     },
-    deleteTestSuite(testSuiteId) {
+    deleteTestSuite(testSuiteHexId) {
         return request({
             url: '/api/deleteTestSuite',
             method: 'post',
-            data: {testSuiteId}
+            data: {testSuiteHexId}
         })
     }
 }

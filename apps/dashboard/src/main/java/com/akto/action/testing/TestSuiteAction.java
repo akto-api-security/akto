@@ -1,144 +1,130 @@
 package com.akto.action.testing;
 
 import com.akto.action.UserAction;
+import com.akto.dao.RBACDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.testing.config.TestSuiteDao;
+import com.akto.dto.RBAC;
 import com.akto.dto.User;
-import com.akto.dto.testing.config.TestSuite;
+import com.akto.dto.testing.config.TestSuites;
 import com.akto.util.Constants;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
-import java.util.UUID;
 
 import org.bson.conversions.Bson;
+import org.bson.types.ObjectId;
+import org.springframework.util.StringUtils;
 
 public class TestSuiteAction extends UserAction {
-    private int testSuiteId;
+    private String testSuiteHexId;
     private String testSuiteName;
     private List<String> subCategoryList;
-    private List<TestSuite> testSuiteList;
+    private List<TestSuites> testSuiteList;
 
     public String createTestSuite() {
         if (this.testSuiteName == null || this.testSuiteName.trim().isEmpty()) {
             addActionError("Invalid test suite name");
             return ERROR.toUpperCase();
         }
+
+        int existingCount = (int) TestSuiteDao.instance.count(Filters.eq(TestSuites.FIELD_NAME, this.testSuiteName));
+        if (existingCount > 0) {
+            addActionError("Test suite with same name already exists");
+            return ERROR.toUpperCase();
+        }
+
         if (this.subCategoryList == null) {
             addActionError("Invalid sub category list");
             return ERROR.toUpperCase();
         }
-        int id = UUID.randomUUID().hashCode() & 0xfffffff;
-        long createdAt = System.currentTimeMillis() / 1000l;
-        long lastUpdated = createdAt;
 
         User user = getSUser();
         if (user == null) {
             addActionError("User not authenticated.");
             return ERROR.toUpperCase();
         }
+        int timeNow = Context.now();
 
         TestSuiteDao.instance.insertOne(
-                new TestSuite(id, this.testSuiteName, this.subCategoryList, user.getLogin(), lastUpdated, createdAt));
+                new TestSuites(this.testSuiteName, this.subCategoryList, user.getLogin(), timeNow, timeNow));
 
-        this.testSuiteId = id;
         return SUCCESS.toUpperCase();
     }
 
     public String modifyTestSuite() {
 
-        if (this.testSuiteId < 0) {
+        if (StringUtils.hasText(this.testSuiteHexId)) {
             addActionError("Invalid test suite id");
             return ERROR.toUpperCase();
         }
-        if (this.testSuiteName == null || this.testSuiteName.trim().isEmpty()) {
-            addActionError("Invalid test suite name");
-            return ERROR.toUpperCase();
-        }
-        if (this.subCategoryList == null) {
-            addActionError("Invalid sub category list");
-            return ERROR.toUpperCase();
-        }
-        TestSuite existingTestSuite = TestSuiteDao.instance.findOne(Filters.eq(Constants.ID, this.testSuiteId));
 
+        ObjectId testSuiteId = new ObjectId(this.testSuiteHexId);
+
+        TestSuites existingTestSuite = TestSuiteDao.instance.findOne(Filters.eq(Constants.ID, testSuiteId));
         if (existingTestSuite == null) {
             addActionError("Test suite not found");
             return ERROR.toUpperCase();
         }
 
+        if(!(getSUser().getLogin().equals(existingTestSuite.getCreatedBy()) || RBACDao.getCurrentRoleForUser(Context.userId.get(), Context.accountId.get()).equals(RBAC.Role.ADMIN))) {
+            addActionError("User not authorized to modify test suite");
+            return ERROR.toUpperCase();
+        }
+        
         List<Bson> updates = new ArrayList<>();
-        if (!testSuiteName.isEmpty() && !testSuiteName.equals(existingTestSuite.getName())) {
-            updates.add(Updates.set(TestSuite.FIELD_NAME, this.testSuiteName));
+        if (StringUtils.hasText(this.testSuiteName)) {
+            updates.add(Updates.set(TestSuites.FIELD_NAME, this.testSuiteName));
         }
 
-        if (!Objects.equals(subCategoryList, existingTestSuite.getSubCategoryList())) {
-            updates.add(Updates.set(TestSuite.FIELD_SUB_CATEGORY_LIST, this.subCategoryList));
+        if (this.subCategoryList != null && !this.subCategoryList.isEmpty()) {
+            updates.add(Updates.set(TestSuites.FIELD_SUB_CATEGORY_LIST, this.subCategoryList));
         }
-
-        if (!updates.isEmpty()) {
-            updates.add(Updates.set(TestSuite.FIELD_LAST_UPDATED, (long) (System.currentTimeMillis() / 1000l)));
-            TestSuiteDao.instance.updateOne(
-                    Filters.eq(Constants.ID, this.testSuiteId),
-                    Updates.combine(updates));
-        }
+        updates.add(Updates.set(TestSuites.FIELD_LAST_UPDATED, (long) (System.currentTimeMillis() / 1000l)));
+        TestSuiteDao.instance.updateOne(
+                Filters.eq(Constants.ID, testSuiteId),
+                Updates.combine(updates));
 
         return SUCCESS.toUpperCase();
     }
 
     public String getAllTestSuites() {
-        User user = getSUser();
-        if (user == null) {
-            addActionError("User not authenticated.");
-            return ERROR.toUpperCase();
-        }
-        this.testSuiteList = TestSuiteDao.instance.findAll(
-                Filters.eq(TestSuite.FIELD_CREATED_BY, user.getLogin()));
+        this.testSuiteList = TestSuiteDao.instance.findAll(Filters.empty());
         return SUCCESS.toUpperCase();
     }
 
     public String deleteTestSuite() {
-        if (this.testSuiteId < 0) {
+        ObjectId testSuiteId = null;
+        try {
+            testSuiteId = new ObjectId(this.testSuiteHexId);
+        } catch (Exception e) {
             addActionError("Invalid test suite id");
             return ERROR.toUpperCase();
         }
     
-        TestSuiteDao.instance.deleteAll(Filters.eq(Constants.ID, this.testSuiteId));
+        TestSuiteDao.instance.deleteAll(Filters.eq(Constants.ID, testSuiteId));
         return SUCCESS.toUpperCase();
-    }
-    
-
-    public String getTestSuiteName() {
-        return testSuiteName;
     }
 
     public void setTestSuiteName(String testSuiteName) {
         this.testSuiteName = testSuiteName;
     }
 
-    public List<String> getSubCategoryList() {
-        return subCategoryList;
+    public void setTestSuiteHexId(String testSuiteHexId) {
+        this.testSuiteHexId = testSuiteHexId;
     }
 
     public void setSubCategoryList(List<String> subCategoryList) {
         this.subCategoryList = subCategoryList;
     }
 
-    public int getTestSuiteId() {
-        return testSuiteId;
-    }
-
-    public void setTestSuiteId(int testSuiteId) {
-        this.testSuiteId = testSuiteId;
-    }
-
-    public List<TestSuite> getTestSuiteList() {
+    public List<TestSuites> getTestSuiteList() {
         return testSuiteList;
     }
 
-    public void setTestSuiteList(List<TestSuite> testSuites) {
+    public void setTestSuiteList(List<TestSuites> testSuites) {
         this.testSuiteList = testSuites;
     }
 

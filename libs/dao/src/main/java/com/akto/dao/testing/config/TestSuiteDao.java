@@ -1,9 +1,9 @@
 package com.akto.dao.testing.config;
 
 import com.akto.dao.AccountsContextDao;
-import com.akto.dto.testing.config.TestSuite;
+import com.akto.dto.testing.config.TestSuites;
 
-public class TestSuiteDao extends AccountsContextDao<TestSuite>{
+public class TestSuiteDao extends AccountsContextDao<TestSuites>{
 
     public static final TestSuiteDao instance = new TestSuiteDao();
 
@@ -13,8 +13,8 @@ public class TestSuiteDao extends AccountsContextDao<TestSuite>{
     }
 
     @Override
-    public Class<TestSuite> getClassT() {
-        return TestSuite.class;
+    public Class<TestSuites> getClassT() {
+        return TestSuites.class;
     }
     
 }

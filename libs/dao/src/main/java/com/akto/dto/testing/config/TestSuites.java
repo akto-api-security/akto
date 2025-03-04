@@ -3,42 +3,30 @@ package com.akto.dto.testing.config;
 import java.util.List;
 import java.util.Objects;
 
-import org.bson.codecs.pojo.annotations.BsonId;
 
-public class TestSuite {
-    @BsonId
-    private int id;
+public class TestSuites {
+
     private String name;
     private List<String> subCategoryList;
     private String createdBy;
     private long lastUpdated;
     private long createdAt;
 
-    public static final String FIELD_ID = "_id";
     public static final String FIELD_NAME = "name";
     public static final String FIELD_SUB_CATEGORY_LIST = "subCategoryList";
     public static final String FIELD_CREATED_BY = "createdBy";
     public static final String FIELD_LAST_UPDATED = "lastUpdated";
     public static final String FIELD_CREATED_AT = "createdAt";
 
-    public TestSuite() {
+    public TestSuites() {
     }
 
-    public TestSuite(int id, String name, List<String> subCategoryList, String createdBy, long lastUpdated, long createdAt) {
-        this.id = id;
+    public TestSuites(String name, List<String> subCategoryList, String createdBy, long lastUpdated, long createdAt) {
         this.name = name;
         this.subCategoryList = subCategoryList;
         this.createdBy = createdBy;
         this.lastUpdated = lastUpdated;
         this.createdAt = createdAt;
-    }
-
-    public int getId() {
-        return id;
-    }
-
-    public void setId(int id) {
-        this.id = id;
     }
 
     public long getCreatedAt() {
@@ -81,7 +69,6 @@ public class TestSuite {
                 ", createdBy='" + createdBy + '\'' +
                 ", lastUpdated=" + lastUpdated +
                 ", createdAt=" + createdAt +
-                ", id=" + id +
                 '}';
     }
 
@@ -92,10 +79,9 @@ public class TestSuite {
         if (obj == null || getClass() != obj.getClass())
             return false;
 
-        TestSuite testSuite = (TestSuite) obj;
+        TestSuites testSuite = (TestSuites) obj;
 
-        return id == testSuite.id &&
-                lastUpdated == testSuite.lastUpdated &&
+        return lastUpdated == testSuite.lastUpdated &&
                 createdAt == testSuite.createdAt &&
                 Objects.equals(name, testSuite.name) &&
                 Objects.equals(createdBy, testSuite.createdBy) &&
