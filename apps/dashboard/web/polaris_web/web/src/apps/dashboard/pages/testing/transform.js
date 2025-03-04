@@ -113,10 +113,8 @@ function getRuntime(scheduleTimestamp, endTimestamp, state) {
     return <div data-testid="test_run_status">Currently running</div>;
   }
   if (status === 'SCHEDULED') {
-    return <div data-testid="test_run_status">Scheduled for {func.prettifyFutureEpoch(scheduleTimestamp)}</div>;
+    return <div data-testid="test_run_status">Scheduled for {func.prettifyFutureEpoch(scheduleTimestamp, true)}</div>;
   }
-  const currTimeMs = Date.now();
-  const scheduleTimeMs = scheduleTimestamp * 1000; // Convert seconds to milliseconds
   if (endTimestamp <= 0) {
     return <div data-testid="test_run_status">Last run {func.prettifyEpoch(scheduleTimestamp)}</div>;
   }
