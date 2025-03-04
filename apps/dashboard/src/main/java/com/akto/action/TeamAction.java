@@ -143,7 +143,9 @@ public class TeamAction extends UserAction implements ServletResponseAware, Serv
             if (customRole != null) {
                 requestedRole = Role.valueOf(customRole.getBaseRole());
             } else {
-                requestedRole = Role.valueOf(reqUserRole);
+                if(reqUserRole != null && !action.equals(ActionType.REMOVE_USER)){
+                    requestedRole = Role.valueOf(reqUserRole);
+                }
             }
         } catch (Exception e) {
             addActionError("Invalid user role");
