@@ -180,15 +180,15 @@ function Dashboard() {
         }
     };
 
-    useEffect(() => {
-        initializeTimer();
-        document.addEventListener('visibilitychange', handleVisibilityChange);
-        return () => {
-            document.removeEventListener('visibilitychange', handleVisibilityChange);
-            clearTimeout(timeoutRef.current);
-        };
+    // useEffect(() => {
+    //     initializeTimer();
+    //     document.addEventListener('visibilitychange', handleVisibilityChange);
+    //     return () => {
+    //         document.removeEventListener('visibilitychange', handleVisibilityChange);
+    //         clearTimeout(timeoutRef.current);
+    //     };
 
-    },[])
+    // },[])
 
     const shouldShowWelcomeBackModal = window.IS_SAAS === "true" && window?.USER_NAME?.length > 0 && (window?.USER_FULL_NAME?.length === 0 || (window?.USER_ROLE === 'ADMIN' && window?.ORGANIZATION_NAME?.length === 0))
 

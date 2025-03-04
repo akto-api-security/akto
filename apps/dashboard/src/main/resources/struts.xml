@@ -526,6 +526,15 @@
             </result>
         </action>
 
+        <action name="callback-jumpcloud-saml" class="com.akto.action.SignupAction" method="registerViaAzure">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"   type="json"/>
+            <result name="ERROR" type="json">
+                <param name="root">code</param>
+            </result>
+        </action>
+
         <action name="api/deleteGithubSso" class="com.akto.action.user.GithubSsoAction" method="deleteGithubSso">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
