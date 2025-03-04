@@ -21,6 +21,9 @@ public class TestRolesCache {
     }
 
     public static String getTokenForRole(String roleName, int updatedTs) {
+        if(tokensMap.isEmpty()){
+            return null;
+        }
         Pair<String, Integer> tokenPair = tokensMap.get(roleName);
         if (tokenPair == null) {
             return null;
@@ -29,7 +32,7 @@ public class TestRolesCache {
             tokensMap.remove(roleName);
             return null;
         }
-        int expiryTime = tokenExpiryMap.get(roleName);
+        int expiryTime = tokenExpiryMap.getOrDefault(roleName, 0);
         if(expiryTime != 0){
             if(expiryTime < Context.now()){
                 tokensMap.remove(roleName);

@@ -303,6 +303,14 @@ public class TestExecutor {
             }
 
             final int maxRunTime = tempRunTime;
+            if(Constants.IS_NEW_TESTING_ENABLED){
+                try {
+                    Producer.createTopic(Constants.LOCAL_KAFKA_BROKER_URL, Constants.TEST_RESULTS_TOPIC_NAME);
+                    Thread.sleep(2000);
+                } catch (Exception e) {
+                    // e.printStackTrace();
+                }
+            }
             for (ApiInfo.ApiInfoKey apiInfoKey: apiInfoKeyList) {
                 List<String> messages = testingUtil.getSampleMessages().get(apiInfoKey);
                 if(Constants.IS_NEW_TESTING_ENABLED){
