@@ -14,6 +14,8 @@ import com.akto.dto.traffic_metrics.TrafficMetrics;
 import com.akto.dto.type.SingleTypeInfo;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.*;
+import com.sun.org.apache.bcel.internal.classfile.Code;
+import org.apache.commons.lang3.StringUtils;
 import org.bson.Document;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
@@ -215,9 +217,10 @@ public class DbActor extends DataActor {
     @Override
     public List<CodeAnalysisRepo> findReposToRun() {
         return CodeAnalysisRepoDao.instance.findAll(
-                Filters.expr(
-                        Document.parse("{ $gt: [ \"$" + CodeAnalysisRepo.SCHEDULE_TIME + "\", \"$" + CodeAnalysisRepo.LAST_RUN + "\" ] }")
-                )
+                Filters.eq(CodeAnalysisRepo.CODE_ANALYSIS_RUN_STATE, CodeAnalysisRepo.CodeAnalysisRunState.SCHEDULED)
+//                Filters.expr(
+//                        Document.parse("{ $gt: [ \"$" + CodeAnalysisRepo.SCHEDULE_TIME + "\", \"$" + CodeAnalysisRepo.LAST_RUN + "\" ] }")
+//                )
         );
     }
 
@@ -233,6 +236,9 @@ public class DbActor extends DataActor {
             return;
         }
         String apiCollectionName = codeAnalysisRepo.getProjectName() + "/" + codeAnalysisRepo.getRepoName();
+        if (!StringUtils.isEmpty(codeAnalysisRepo.getApiCollectionName())) {
+            apiCollectionName = codeAnalysisRepo.getApiCollectionName();
+        }
 
         // Ensure batch size is not exceeded
         if (codeAnalysisApisList.size() > MAX_BATCH_SIZE) {
@@ -468,7 +474,10 @@ public class DbActor extends DataActor {
                     sourceCodeFilter
             );
 
-            CodeAnalysisRepoDao.instance.updateOneNoUpsert(filters, Updates.set(CodeAnalysisRepo.LAST_RUN, Context.now()));
+            Bson updates = Updates.combine(
+                    Updates.set(CodeAnalysisRepo.LAST_RUN, Context.now()),
+                    Updates.set(CodeAnalysisRepo.CODE_ANALYSIS_RUN_STATE, CodeAnalysisRepo.CodeAnalysisRunState.COMPLETED));
+            CodeAnalysisRepoDao.instance.updateOneNoUpsert(filters, updates);
         }
     }
 
@@ -495,7 +504,10 @@ public class DbActor extends DataActor {
                 sourceCodeFilter
         );
 
-        CodeAnalysisRepoDao.instance.updateOneNoUpsert(filters, Updates.set(CodeAnalysisRepo.LAST_RUN, Context.now()));
+        Bson updates = Updates.combine(
+                Updates.set(CodeAnalysisRepo.LAST_RUN, Context.now()),
+                Updates.set(CodeAnalysisRepo.CODE_ANALYSIS_RUN_STATE, CodeAnalysisRepo.CodeAnalysisRunState.COMPLETED));
+        CodeAnalysisRepoDao.instance.updateOneNoUpsert(filters, updates);
     }
 
     public Set<MergedUrls> fetchMergedUrls() {

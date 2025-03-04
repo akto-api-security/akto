@@ -351,7 +351,8 @@ public class DaoInit {
                 new EnumCodec<>(CustomAuthType.TypeOfToken.class),
                 new EnumCodec<>(TrafficAlerts.ALERT_TYPE.class),
                 new EnumCodec<>(ApiInfo.ApiType.class),
-                new EnumCodec<>(CodeAnalysisRepo.SourceCodeType.class)
+                new EnumCodec<>(CodeAnalysisRepo.SourceCodeType.class),
+                new EnumCodec<>(CodeAnalysisRepo.CodeAnalysisRunState.class)
         );
 
         return fromRegistries(MongoClientSettings.getDefaultCodecRegistry(), pojoCodecRegistry,

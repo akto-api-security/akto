@@ -9,6 +9,7 @@ import com.akto.dto.*;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.types.CappedSet;
 import com.opensymphony.xwork2.ActionSupport;
+import org.apache.commons.lang3.StringUtils;
 import org.bson.Document;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
@@ -40,6 +41,10 @@ public class CodeAnalysisAction extends ActionSupport {
 
     public String syncExtractedAPIs() {
         String apiCollectionName = projectName + "/" + repoName;
+        if (!StringUtils.isEmpty(codeAnalysisRepo.getApiCollectionName())) {
+            apiCollectionName = codeAnalysisRepo.getApiCollectionName();
+        }
+
         loggerMaker.infoAndAddToDb("Syncing code analysis endpoints for collection: " + apiCollectionName, LogDb.DASHBOARD);
 
         if (codeAnalysisApisList == null) {
@@ -301,8 +306,11 @@ public class CodeAnalysisAction extends ActionSupport {
                     Filters.eq(CodeAnalysisRepo.PROJECT_NAME, this.codeAnalysisRepo.getProjectName()),
                     sourceCodeFilter
             );
+            Bson updates = Updates.combine(
+                    Updates.set(CodeAnalysisRepo.LAST_RUN, Context.now()),
+                    Updates.set(CodeAnalysisRepo.CODE_ANALYSIS_RUN_STATE, CodeAnalysisRepo.CodeAnalysisRunState.COMPLETED));
 
-            CodeAnalysisRepoDao.instance.updateOneNoUpsert(filters, Updates.set(CodeAnalysisRepo.LAST_RUN, Context.now()));
+            CodeAnalysisRepoDao.instance.updateOneNoUpsert(filters, updates);
             loggerMaker.infoAndAddToDb("Updated last run for project:" + codeAnalysisRepo.getProjectName() + " repo:" + codeAnalysisRepo.getRepoName(), LogDb.DASHBOARD);
         }
 
@@ -343,15 +351,21 @@ public class CodeAnalysisAction extends ActionSupport {
                 sourceCodeFilter
         );
 
-        CodeAnalysisRepoDao.instance.updateOneNoUpsert(filters, Updates.set(CodeAnalysisRepo.LAST_RUN, Context.now()));
+        Bson updates = Updates.combine(
+                Updates.set(CodeAnalysisRepo.LAST_RUN, Context.now()),
+                Updates.set(CodeAnalysisRepo.CODE_ANALYSIS_RUN_STATE, CodeAnalysisRepo.CodeAnalysisRunState.COMPLETED));
+
+        CodeAnalysisRepoDao.instance.updateOneNoUpsert(filters, updates);
         loggerMaker.infoAndAddToDb("Updated last run for project:" + codeAnalysisRepo.getProjectName() + " repo:" + codeAnalysisRepo.getRepoName(), LogDb.DASHBOARD);
         return SUCCESS.toUpperCase();
     }
     public String findReposToRun() {
         reposToRun = CodeAnalysisRepoDao.instance.findAll(
-                Filters.expr(
-                        Document.parse("{ $gt: [ \"$" + CodeAnalysisRepo.SCHEDULE_TIME + "\", \"$" + CodeAnalysisRepo.LAST_RUN + "\" ] }")
-                )
+                Filters.eq(CodeAnalysisRepo.CODE_ANALYSIS_RUN_STATE, CodeAnalysisRepo.CodeAnalysisRunState.SCHEDULED)
+//
+//                Filters.expr(
+//                        Document.parse("{ $gt: [ \"$" + CodeAnalysisRepo.SCHEDULE_TIME + "\", \"$" + CodeAnalysisRepo.LAST_RUN + "\" ] }")
+//                )
         );
         return SUCCESS.toUpperCase();
     }

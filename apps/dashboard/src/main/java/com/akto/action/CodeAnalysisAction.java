@@ -367,6 +367,7 @@ public class CodeAnalysisAction extends UserAction {
                         Filters.eq(CodeAnalysisRepo.SOURCE_CODE_TYPE, c.getSourceCodeType())
                 ),
                 Updates.combine(
+                        Updates.setOnInsert(CodeAnalysisRepo.CODE_ANALYSIS_RUN_STATE, CodeAnalysisRepo.CodeAnalysisRunState.SCHEDULED),
                         Updates.setOnInsert(CodeAnalysisRepo.LAST_RUN, 0),
                         Updates.setOnInsert(CodeAnalysisRepo.SCHEDULE_TIME, Context.now())
                 ),
@@ -390,7 +391,8 @@ public class CodeAnalysisAction extends UserAction {
                             Filters.eq(CodeAnalysisRepo.REPO_NAME, c.getRepoName()),
                             Filters.eq(CodeAnalysisRepo.PROJECT_NAME, c.getProjectName())
                     ),
-                    Updates.set(CodeAnalysisRepo.SCHEDULE_TIME, Context.now()),
+                    Updates.combine(Updates.set(CodeAnalysisRepo.SCHEDULE_TIME, Context.now()),
+                            Updates.setOnInsert(CodeAnalysisRepo.CODE_ANALYSIS_RUN_STATE, CodeAnalysisRepo.CodeAnalysisRunState.SCHEDULED)),
                     new UpdateOptions().upsert(false)
             ));
         }

@@ -14,23 +14,54 @@ public class CodeAnalysisRepo {
     public static final String LAST_RUN = "lastRun";
     private int scheduleTime;
     public static final String SCHEDULE_TIME = "scheduleTime";
+    private String apiCollectionName;
+    public static final String API_COLLECTION_NAME = "apiCollectionName";
+
+    public CodeAnalysisRunState getCodeAnalysisRunState() {
+        if (codeAnalysisRunState == null) {
+            if (this.lastRun > this.scheduleTime) {
+                return CodeAnalysisRunState.COMPLETED;
+            }
+            return CodeAnalysisRunState.SCHEDULED;
+        }
+        return codeAnalysisRunState;
+    }
+
+    public void setCodeAnalysisRunState(CodeAnalysisRunState codeAnalysisRunState) {
+        this.codeAnalysisRunState = codeAnalysisRunState;
+    }
+
+    public String getApiCollectionName() {
+        return apiCollectionName;
+    }
+
+    public void setApiCollectionName(String apiCollectionName) {
+        this.apiCollectionName = apiCollectionName;
+    }
 
     public enum SourceCodeType {
         BITBUCKET, GITHUB
     }
 
+    public enum CodeAnalysisRunState {
+        SCHEDULED, STARTED, API_ENDPOINT_EXTRACTION_COMPLETED, COMPLETED, FAILED, STOPPED
+    }
+
+    private CodeAnalysisRunState codeAnalysisRunState;
+    public static final String CODE_ANALYSIS_RUN_STATE = "codeAnalysisRunState";
     private SourceCodeType sourceCodeType;
     public static final String SOURCE_CODE_TYPE = "sourceCodeType";
 
     @BsonIgnore
     private String hexId;
 
-    public CodeAnalysisRepo(ObjectId id, String projectName, String repoName, int lastRun, int scheduleTime) {
+    public CodeAnalysisRepo(ObjectId id, String projectName, String repoName, int lastRun, int scheduleTime, CodeAnalysisRunState codeAnalysisRunState) {
         this.id = id;
         this.projectName = projectName;
         this.repoName = repoName;
         this.lastRun = lastRun;
         this.scheduleTime = scheduleTime;
+        this.codeAnalysisRunState = codeAnalysisRunState;
     }
 
     public CodeAnalysisRepo() {
