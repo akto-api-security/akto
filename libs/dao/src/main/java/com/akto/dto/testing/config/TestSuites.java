@@ -3,14 +3,20 @@ package com.akto.dto.testing.config;
 import java.util.List;
 import java.util.Objects;
 
+import org.bson.codecs.pojo.annotations.BsonIgnore;
+import org.bson.types.ObjectId;
+
 
 public class TestSuites {
 
+    private ObjectId id;
     private String name;
     private List<String> subCategoryList;
     private String createdBy;
     private long lastUpdated;
     private long createdAt;
+    @BsonIgnore
+    private String hexId;
 
     public static final String FIELD_NAME = "name";
     public static final String FIELD_SUB_CATEGORY_LIST = "subCategoryList";
@@ -60,6 +66,26 @@ public class TestSuites {
     public void setSubCategoryList(List<String> subCategoryList) {
         this.subCategoryList = subCategoryList;
     }
+
+    public ObjectId getId() {
+        return id;
+    }
+
+    public void setId(ObjectId id) {
+        this.id = id;
+    }
+
+    public String getHexId() {
+        if (hexId == null) {
+            return (this.id != null) ? this.id.toHexString() : null;
+        }
+        return this.hexId;
+    }    
+
+    public void setHexId(String hexId) {
+        this.hexId = hexId;
+    }
+
 
     @Override
     public String toString() {

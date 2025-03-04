@@ -111,7 +111,7 @@ function TestSuiteRow({ category, categories, setCategories, isLast, isEditMode,
         <Box borderRadiusEndEnd={(isLast) ? 2 : 0} borderRadiusEndStart={(isLast) ? 2 : 0} borderColor="border-subdued" borderBlockStartWidth="1" >
             <div className="category-list" style={{ cursor: "pointer", ...(isLast && !category.selected && { borderBottomLeftRadius: "0.5rem", borderBottomRightRadius: "0.5rem" }) }}>
                 <Box paddingInlineStart={5} paddingBlockEnd={3} paddingBlockStart={3} paddingInlineEnd={5}>
-                    <div style={{ display: "flex" }}>
+                    <HorizontalStack>
                         {isEditMode?<Checkbox checked={checkSubCategorySelected()} onChange={() => { changeSubCategorySelection() }} />:null}
                         <div onClick={toggleOpen} style={{display:"flex", alignContent:"center" ,justifyContent:"space-between", ...(isEditMode?{minWidth:"96%"}:{minWidth:"100%"})}} >
                             <HorizontalStack>
@@ -122,7 +122,7 @@ function TestSuiteRow({ category, categories, setCategories, isLast, isEditMode,
                                 <Button plain monochrome size="micro" icon={category.selected ? ChevronUpMinor : ChevronDownMinor}></Button>
                             </HorizontalStack>
                         </div>
-                    </div>
+                    </HorizontalStack>
                 </Box>
             </div>
 
