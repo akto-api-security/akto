@@ -56,7 +56,7 @@ public class TestSuiteAction extends UserAction {
 
     public String modifyTestSuite() {
 
-        if (StringUtils.hasText(this.testSuiteHexId)) {
+        if (!StringUtils.hasText(this.testSuiteHexId)) {
             addActionError("Invalid test suite id");
             return ERROR.toUpperCase();
         }
