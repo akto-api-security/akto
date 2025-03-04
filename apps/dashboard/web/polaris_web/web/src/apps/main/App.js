@@ -31,6 +31,7 @@ import Metrics from "../dashboard/pages/settings/metrics/Metrics";
 import TestEditor from "../dashboard/pages/test_editor/TestEditor";
 import DataTypes from "../dashboard/pages/observe/data_types/DataTypes";
 import IssuesPage from "../dashboard/pages/issues/IssuesPage/IssuesPage";
+import CompliancePage from "../dashboard/pages/issues/IssuesPage/CompliancePage";
 import QuickStart from "../dashboard/pages/quick_start/QuickStart";
 import Webhooks from "../dashboard/pages/settings/integrations/webhooks/Webhooks";
 import Webhook from "../dashboard/pages/settings/integrations/webhooks/Webhook";
@@ -83,6 +84,10 @@ import ThreatApiPage from "../dashboard/pages/threat_detection/ThreatApiPage";
 import ThreatActorPage from "../dashboard/pages/threat_detection/ThreatActorPage";
 import ThreatPolicyPage from "../dashboard/pages/threat_detection/ThreatPolicyPage";
 import TestSuite from "../dashboard/pages/testing/testSuite/TestSuite";
+import TestsTablePage from "../dashboard/pages/test_editor/tests_table/TestsTablePage";
+import Splunk from "../dashboard/pages/settings/integrations/Splunk";
+import F5Waf from "../dashboard/pages/settings/integrations/F5Waf";
+import AWSWaf from "../dashboard/pages/settings/integrations/AWSWaf";
 
 // if you add a component in a new path, please verify the search implementation in function -> 'getSearchItemsArr' in func.js
 
@@ -178,8 +183,25 @@ const router = createBrowserRouter([
                         ]
                     },
                     {
+                        path:"test-library/tests",
+                        element:<TestsTablePage/>
+                    },
+                    {
                         path: "issues",
                         element: <IssuesPage/>
+                    },
+                    {
+                        path: "reports",
+                        children: [
+                            {
+                                path: "issues",
+                                element: <IssuesPage/>
+                            },
+                            {
+                                path: "compliance",
+                                element: <CompliancePage/>
+                            }
+                        ]
                     },
                     {
                         path: "protection",
@@ -247,6 +269,18 @@ const router = createBrowserRouter([
                     {
                         path: "integrations/postman",
                         element: <Postman/>,
+                    },
+                    {
+                        path: "integrations/splunk",
+                        element: <Splunk/>,
+                    },
+                    {
+                        path: "integrations/f5_waf",
+                        element: <F5Waf/>,
+                    },
+                    {
+                        path: "integrations/aws_waf",
+                        element: <AWSWaf/>,
                     },
                     {
                         path: "integrations/jira",

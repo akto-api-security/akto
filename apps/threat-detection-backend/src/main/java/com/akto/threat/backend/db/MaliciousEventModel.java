@@ -18,6 +18,8 @@ public class MaliciousEventModel {
   private EventType eventType;
   private String category;
   private String subCategory;
+  private String type;
+  private String refId;
 
   public enum EventType {
     SINGLE,
@@ -55,6 +57,7 @@ public class MaliciousEventModel {
     private long detectedAt;
     private String category;
     private String subCategory;
+    private String refId;
 
     public Builder setFilterId(String filterId) {
       this.filterId = filterId;
@@ -116,9 +119,16 @@ public class MaliciousEventModel {
       return this;
     }
 
+    public Builder setRefId(String refId) {
+      this.refId = refId;
+      return this;
+    }
+
     public MaliciousEventModel build() {
       return new MaliciousEventModel(this);
     }
+
+    
   }
 
   public String getId() {
@@ -228,4 +238,21 @@ public class MaliciousEventModel {
   public void setSubCategory(String subCategory) {
     this.subCategory = subCategory;
   }
+
+  public String getType() {
+    return type;
+  }
+
+  public void setType(String type) {
+    this.type = type;
+  }
+
+  public String getRefId() {
+    return refId;
+  }
+
+  public void setRefId(String refId) {
+    this.refId = refId;
+  }
+
 }

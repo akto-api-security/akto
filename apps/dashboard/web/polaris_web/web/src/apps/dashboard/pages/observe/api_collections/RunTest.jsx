@@ -1,10 +1,9 @@
-import { Box, Button, DataTable, Divider, Modal, Text, TextField, Icon, Checkbox, Badge, Banner, InlineGrid, HorizontalStack, Link, VerticalStack, Tooltip, Popover, ActionMenu, OptionList, ActionList, ButtonGroup } from "@shopify/polaris";
-import { TickMinor, CancelMajor, SearchMinor, NoteMinor, AppsMinor, AppsFilledMajor } from "@shopify/polaris-icons";
-import { useEffect, useReducer, useRef, useState } from "react";
+import { Box, Button, DataTable, Divider, Modal, Text, TextField, Icon, Checkbox, Badge, Banner, HorizontalStack, Link, VerticalStack, Tooltip, Popover, OptionList, ButtonGroup } from "@shopify/polaris";
+import { TickMinor, CancelMajor, SearchMinor, NoteMinor, AppsFilledMajor } from "@shopify/polaris-icons";
 import api, { default as observeApi } from "../api";
+import { useEffect, useReducer, useRef, useState } from "react";
 import { default as testingApi } from "../../testing/api";
 import SpinnerCentered from "../../../components/progress/SpinnerCentered"
-import Dropdown from "../../../components/layouts/Dropdown";
 import func from "@/util/func"
 import { useNavigate } from "react-router-dom"
 import PersistStore from "../../../../main/PersistStore";
@@ -31,7 +30,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         hourlyLabel: "Now",
         testRunTime: -1,
         testRunTimeLabel: "30 minutes",
-        runTypeLabel: "Now",
+        runTypeLabel: "Once",
         maxConcurrentRequests: -1,
         testName: "",
         authMechanismPresent: false,
@@ -101,7 +100,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         })
 
         observeApi.checkWebhook("MICROSOFT_TEAMS", "TESTING_RUN_RESULTS").then((resp) => {
-            console.log(resp.webhookPresent, resp)
+            // console.log(resp.webhookPresent, resp)
             const webhookPresent = resp.webhookPresent
             if(webhookPresent){
                 setTeamsTestingWebhookIntegrated(true)
@@ -125,7 +124,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
             metaDataObj = await transform.getAllSubcategoriesData(true, "runTests")
         }
         let categories = metaDataObj.categories
-        let businessLogicSubcategories = metaDataObj.subCategories
+        let businessLogicSubcategories = metaDataObj.subCategories.filter((subCategory) => {return !subCategory.inactive})
         const testRolesResponse = await testingApi.fetchTestRoles()
         var testRoles = testRolesResponse.testRoles.map(testRole => {
             return {
@@ -205,8 +204,8 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
 
                 handleAddSettings(parentAdvanceSettingsConfig);
                 const getRunTypeLabel = (runType) => {
-                    if (!runType) return "Now";
-                    if (runType === "CI-CD" || runType === "ONE_TIME") return "Now";
+                    if (!runType) return "Once";
+                    if (runType === "CI-CD" || runType === "ONE_TIME") return "Once";
                     else if (runType === "RECURRING") return "Daily";
                     else if (runType === "CONTINUOUS_TESTING") return "Continuously";
                 }
@@ -265,7 +264,8 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
             let obj = {
                 label: x.testName,
                 value: x.name,
-                author: x.author
+                author: x.author,
+                nature: x?.attributes?.nature?._name || ""
             }
             ret[x.superCategory.name].all.push(obj)
             ret[x.superCategory.name].selected.push(obj)
@@ -430,7 +430,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
 
     const testRunTimeOptions = [...runTimeMinutes, ...runTimeHours]
 
-    const runTypeOptions = [{ label: "Daily", value: "Daily" }, { label: "Continuously", value: "Continuously" }, { label: "Now", value: "Now" }]
+    const runTypeOptions = [{ label: "Daily", value: "Daily" }, { label: "Continuously", value: "Continuously" }, { label: "Once", value: "Once" }]
 
     const maxRequests = hours.reduce((abc, x) => {
         if (x < 11) {
@@ -440,7 +440,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         return abc
     }, [])
 
-    const maxConcurrentRequestsOptions = [{ label: "Default", value: "-1" }, ...maxRequests]
+    const maxConcurrentRequestsOptions = [{ label: "Default", value: "-1" }, ...maxRequests, {label: '200', value: '200'}, {label: '300', value: '300'}, {label: '500', value: '500'}]
 
     function scheduleString() {
         if (testRun.hourlyLabel === "Now") {
@@ -449,15 +449,14 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
             } else if (testRun.continuousTesting) {
                 return <div data-testid="schedule_run_button">Run continuous testing</div>
             } else {
-                return <div data-testid="schedule_run_button">Run once now</div>
+                return <div data-testid="schedule_run_button">Run once at {func.prettifyFutureEpoch(testRun.startTimestamp)}</div>
             }
         } else {
             if (testRun.recurringDaily) {
                 return <div data-testid="schedule_run_button">Run daily at {testRun.hourlyLabel}</div>
 
             } else {
-                return <div data-testid="schedule_run_button">Run today at {testRun.hourlyLabel}</div>
-
+                return <div data-testid="schedule_run_button">Run once at {func.prettifyFutureEpoch(testRun.startTimestamp)}</div>
             }
         }
     }
@@ -630,10 +629,10 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
             func.setToast(true, false, "Modified testing run config successfully")
             setShowEditableSettings(false)
         })
-
-        if (activeFromTesting) {
-            transform.rerunTest(testIdConfig.hexId, null, true)
+        if(activeFromTesting){
+            toggleRunTest();
         }
+        
     }
 
     const handleAddSettings = (parentAdvanceSettingsConfig) => {
@@ -701,7 +700,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                     </ButtonGroup>
                 </HorizontalStack>}
                 primaryAction={{
-                    content: activeFromTesting ? "Save & Re-run" : scheduleString(),
+                    content: activeFromTesting ? "Save" : scheduleString(),
                     onAction: activeFromTesting ? handleModifyConfig : handleRun,
                     disabled: (countAllSelectedTests() === 0) || !testRun.authMechanismPresent
                 }}

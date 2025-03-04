@@ -13,7 +13,6 @@ import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.loaders.LoadersDao;
 import com.akto.dao.notifications.CustomWebhooksDao;
-import com.akto.dao.notifications.CustomWebhooksResultDao;
 import com.akto.dao.notifications.EventsMetricsDao;
 import com.akto.dao.notifications.SlackWebhooksDao;
 import com.akto.dao.pii.PIISourceDao;
@@ -47,12 +46,12 @@ import com.akto.dto.notifications.CustomWebhook;
 import com.akto.dto.notifications.CustomWebhook.ActiveStatus;
 import com.akto.dto.notifications.CustomWebhook.WebhookOptions;
 import com.akto.dto.notifications.CustomWebhook.WebhookType;
-import com.akto.dto.notifications.CustomWebhookResult;
 import com.akto.dto.notifications.SlackWebhook;
 import com.akto.dto.pii.PIISource;
 import com.akto.dto.pii.PIIType;
 import com.akto.dto.settings.DefaultPayload;
 import com.akto.dto.sso.SAMLConfig;
+import com.akto.dto.test_editor.Category;
 import com.akto.dto.test_editor.TestConfig;
 import com.akto.dto.test_editor.TestLibrary;
 import com.akto.dto.test_editor.YamlTemplate;
@@ -72,6 +71,9 @@ import com.akto.log.CacheLoggerMaker;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.mixpanel.AktoMixpanel;
+import com.akto.notifications.TrafficUpdates;
+import com.akto.notifications.TrafficUpdates.AlertResult;
+import com.akto.notifications.TrafficUpdates.AlertType;
 import com.akto.notifications.slack.DailyUpdate;
 import com.akto.notifications.slack.TestSummaryGenerator;
 import com.akto.notifications.webhook.WebhookSender;
@@ -80,14 +82,12 @@ import com.akto.runtime.RuntimeUtil;
 import com.akto.stigg.StiggReporterClient;
 import com.akto.task.Cluster;
 import com.akto.telemetry.TelemetryJob;
-import com.akto.test_editor.TemplateSettingsUtil;
 import com.akto.testing.ApiExecutor;
 import com.akto.testing.HostDNSLookup;
 import com.akto.testing.TemplateMapper;
 import com.akto.usage.UsageMetricCalculator;
 import com.akto.usage.UsageMetricHandler;
 import com.akto.testing.workflow_node_executor.Utils;
-import com.akto.util.enums.GlobalEnums;
 import com.akto.util.filter.DictionaryFilter;
 import com.akto.utils.jobs.JobUtils;
 import com.akto.utils.jobs.MatchingJob;
@@ -115,7 +115,6 @@ import com.akto.utils.jobs.CleanInventory;
 import com.akto.utils.jobs.DeactivateCollections;
 import com.akto.utils.billing.OrganizationUtils;
 import com.akto.utils.crons.Crons;
-import com.akto.utils.notifications.TrafficUpdates;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.akto.billing.UsageMetricUtils;
 import com.google.gson.Gson;
@@ -128,6 +127,7 @@ import com.mongodb.bulk.BulkWriteResult;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.*;
 import com.mongodb.client.result.DeleteResult;
+import com.mongodb.client.result.UpdateResult;
 import com.slack.api.Slack;
 import com.slack.api.util.http.SlackHttpClient;
 import com.slack.api.webhook.WebhookResponse;
@@ -137,6 +137,7 @@ import okhttp3.OkHttpClient;
 
 import org.apache.commons.csv.CSVRecord;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.EnumUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
@@ -167,7 +168,6 @@ import static com.akto.runtime.RuntimeUtil.matchesDefaultPayload;
 import static com.akto.task.Cluster.callDibs;
 import static com.akto.utils.billing.OrganizationUtils.syncOrganizationWithAkto;
 import static com.mongodb.client.model.Filters.eq;
-import static com.akto.runtime.utils.Utils.convertOriginalReqRespToString;
 import static com.akto.utils.Utils.deleteApis;
 
 public class InitializerListener implements ServletContextListener {
@@ -237,19 +237,35 @@ public class InitializerListener implements ServletContextListener {
                                 }
                             }
 
-
                             // look back period 6 days
                             loggerMaker.infoAndAddToDb("starting traffic alert scheduler", LoggerMaker.LogDb.DASHBOARD);
                             TrafficUpdates trafficUpdates = new TrafficUpdates(60*60*24*6);
                             trafficUpdates.populate(deactivatedHosts);
 
+                            boolean slackWebhookFound = true;
                             List<SlackWebhook> listWebhooks = SlackWebhooksDao.instance.findAll(new BasicDBObject());
                             if (listWebhooks == null || listWebhooks.isEmpty()) {
                                 loggerMaker.infoAndAddToDb("No slack webhooks found", LogDb.DASHBOARD);
+                                slackWebhookFound = false;
+                            }
+
+                            boolean teamsWebhooksFound = true;
+                            List<CustomWebhook> teamsWebhooks = CustomWebhooksDao.instance.findAll(
+                                    Filters.and(
+                                            Filters.eq(
+                                                    CustomWebhook.WEBHOOK_TYPE,
+                                                    CustomWebhook.WebhookType.MICROSOFT_TEAMS.name()),
+                                            Filters.in(CustomWebhook.SELECTED_WEBHOOK_OPTIONS,
+                                                    CustomWebhook.WebhookOptions.TRAFFIC_ALERTS.name())));
+
+                            if (teamsWebhooks == null || teamsWebhooks.isEmpty()) {
+                                loggerMaker.infoAndAddToDb("No teams webhooks found", LogDb.DASHBOARD);
+                                teamsWebhooksFound = false;
+                            }
+
+                            if (!(slackWebhookFound || teamsWebhooksFound)) {
                                 return;
                             }
-                            SlackWebhook webhook = listWebhooks.get(0);
-                            loggerMaker.infoAndAddToDb("Slack Webhook found: " + webhook.getWebhook(), LogDb.DASHBOARD);
 
                             int thresholdSeconds = defaultTrafficAlertThresholdSeconds;
                             AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
@@ -261,7 +277,24 @@ public class InitializerListener implements ServletContextListener {
                             loggerMaker.infoAndAddToDb("threshold seconds: " + thresholdSeconds, LoggerMaker.LogDb.DASHBOARD);
 
                             if (thresholdSeconds > 0) {
-                                trafficUpdates.sendAlerts(webhook.getWebhook(),webhook.getDashboardUrl()+"/dashboard/settings#Metrics", thresholdSeconds, deactivatedHosts);
+                                Map<AlertType, AlertResult> alertMap = trafficUpdates.createAlerts(thresholdSeconds, deactivatedHosts);
+                                if (slackWebhookFound && listWebhooks != null && !listWebhooks.isEmpty()) {
+                                    SlackWebhook webhook = listWebhooks.get(0);
+                                    loggerMaker.infoAndAddToDb("Slack Webhook found: " + webhook.getWebhook(),
+                                            LogDb.DASHBOARD);
+                                    trafficUpdates.sendSlackAlerts(webhook.getWebhook(),
+                                            getMetricsUrl(webhook.getDashboardUrl()), thresholdSeconds,
+                                            alertMap);
+                                }
+
+                                if (teamsWebhooksFound && teamsWebhooks != null && !teamsWebhooks.isEmpty()) {
+                                    for (CustomWebhook webhook : teamsWebhooks) {
+                                        trafficUpdates.sendTeamsAlerts(webhook,
+                                        getMetricsUrl(webhook.getDashboardUrl()),
+                                                thresholdSeconds, alertMap);
+                                    }
+                                }
+                                trafficUpdates.updateAlertSentTs(alertMap);
                             }
                         } catch (Exception e) {
                             loggerMaker.errorAndAddToDb(e,"Error while running traffic alerts: " + e.getMessage(), LogDb.DASHBOARD);
@@ -270,6 +303,10 @@ public class InitializerListener implements ServletContextListener {
                 }, "traffic-alerts-scheduler");
             }
         }, 0, 4, TimeUnit.HOURS);
+    }
+
+    private static String getMetricsUrl(String ogUrl){
+        return ogUrl + "/dashboard/settings/metrics";
     }
 
     public void setUpAktoMixpanelEndpointsScheduler(){
@@ -553,6 +590,7 @@ public class InitializerListener implements ServletContextListener {
             }
             return FileUtils.readFileToString(new File(fileUrl), StandardCharsets.UTF_8);
         } catch (Exception e){
+            e.printStackTrace();
             loggerMaker.errorAndAddToDb(e, String.format("failed to fetch PII file %s from github, trying locally", piiSource.getFileUrl()), LogDb.DASHBOARD);
             return loadPIIFileFromResources(piiSource.getFileUrl());
         }
@@ -561,8 +599,10 @@ public class InitializerListener implements ServletContextListener {
     public static void executePIISourceFetch() {
         List<PIISource> piiSources = PIISourceDao.instance.findAll("active", true);
         Map<String, CustomDataType> customDataTypesMap = new HashMap<>();
+        loggerMaker.infoAndAddToDb("logging pii source size " + piiSources.size());
         for (PIISource piiSource : piiSources) {
             String id = piiSource.getId();
+            loggerMaker.infoAndAddToDb("pii source id " + id);
             Map<String, PIIType> currTypes = piiSource.getMapNameToPIIType();
             if (currTypes == null) {
                 currTypes = new HashMap<>();
@@ -583,6 +623,7 @@ public class InitializerListener implements ServletContextListener {
                     customDataTypesMap.put(customDataType.getName(), customDataType);
                 }
             }
+            loggerMaker.infoAndAddToDb("customDataTypesMap size " + customDataTypesMap.size());
 
             List<Bson> piiUpdates = new ArrayList<>();
 
@@ -614,6 +655,7 @@ public class InitializerListener implements ServletContextListener {
                 if (userHasChangedCondition || hasNotChangedCondition) {
                     continue;
                 } else {
+                    loggerMaker.infoAndAddToDb("found different " + piiType.getName());
                     Severity dtSeverity = null;
                     List<String> categoriesList = null;
                     categoriesList = (List<String>) dt.get(AktoDataType.TAGS_LIST);
@@ -643,8 +685,10 @@ public class InitializerListener implements ServletContextListener {
                     }
 
                     if (existingCDT == null) {
+                        loggerMaker.infoAndAddToDb("inserting different " + piiType.getName());
                         CustomDataTypeDao.instance.insertOne(newCDT);
                     } else {
+                        loggerMaker.infoAndAddToDb("updating different " + piiType.getName());
                         List<Bson> updates = getCustomDataTypeUpdates(existingCDT, newCDT);
                         if (!updates.isEmpty()) {
                             CustomDataTypeDao.instance.updateOne(
@@ -723,7 +767,7 @@ public class InitializerListener implements ServletContextListener {
                 active,
                 ((piiType.getOnKey() || piiType.getOnKeyAndPayload()) ? keyConditions : null),
                 ((piiType.getOnKey() && !piiType.getOnKeyAndPayload()) ? null : valueConditions),
-                Operator.OR,
+                piiType.getOnKeyAndPayload() ? Operator.AND : Operator.OR,
                 ignoreData,
                 false,
                 true
@@ -938,14 +982,18 @@ public class InitializerListener implements ServletContextListener {
         }
 
         /*
-         * TESTING_RUN_RESULTS type webhooks are 
+         * TESTING_RUN_RESULTS type webhooks are
          * triggered only on test complete not periodically.
+         * 
+         * TRAFFIC_ALERTS type webhooks have a separate cron.
          */
 
         if (webhook.getSelectedWebhookOptions() != null &&
                 !webhook.getSelectedWebhookOptions().isEmpty()
-                && webhook.getSelectedWebhookOptions()
-                        .contains(CustomWebhook.WebhookOptions.TESTING_RUN_RESULTS)) {
+                && (webhook.getSelectedWebhookOptions()
+                        .contains(CustomWebhook.WebhookOptions.TESTING_RUN_RESULTS)
+                        || webhook.getSelectedWebhookOptions()
+                                .contains(CustomWebhook.WebhookOptions.TRAFFIC_ALERTS))) {
             return;
         }
 
@@ -2309,7 +2357,7 @@ public class InitializerListener implements ServletContextListener {
                     if (DashboardMode.isMetered()) {
                         setupUsageScheduler();
                     }
-                    trimCappedCollections();
+                    trimCappedCollectionsJob();
                     setUpPiiAndTestSourcesScheduler();
                     setUpTrafficAlertScheduler();
                     // setUpAktoMixpanelEndpointsScheduler();
@@ -2406,18 +2454,45 @@ public class InitializerListener implements ServletContextListener {
         }
     }
 
-    public static void trimCappedCollections() {
-        if (DbMode.allowCappedCollections()) return;
+    private void trimCappedCollectionsJob() {
+        scheduler.scheduleAtFixedRate(new Runnable() {
+            public void run() {
+                logger.info("Starting trimCappedCollectionsJob for all accounts at " + Context.now());
 
+                AccountTask.instance.executeTask(new Consumer<Account>() {
+                    @Override
+                    public void accept(Account t) {
+                        try {
+                            trimCappedCollections();
+                        } catch (Exception e) {
+                            loggerMaker.errorAndAddToDb(e,
+                                    String.format("Error while running trimCappedCollections for account %d %s",
+                                            Context.accountId.get(), e.toString()),
+                                    LogDb.DASHBOARD);
+                        }
+                    }
+                }, "trim-capped-collections");
+
+                logger.info("Completed trimCappedCollectionsJob for all accounts at " + Context.now());
+            }
+        }, 0,1, TimeUnit.DAYS);
+    }
+
+    public static void trimCappedCollections() {
         clear(LoadersDao.instance, LoadersDao.maxDocuments);
         clear(RuntimeLogsDao.instance, RuntimeLogsDao.maxDocuments);
         clear(LogsDao.instance, LogsDao.maxDocuments);
+        clear(PupeteerLogsDao.instance, PupeteerLogsDao.maxDocuments);
         clear(DashboardLogsDao.instance, DashboardLogsDao.maxDocuments);
         clear(TrafficMetricsDao.instance, TrafficMetricsDao.maxDocuments);
         clear(AnalyserLogsDao.instance, AnalyserLogsDao.maxDocuments);
         clear(ActivitiesDao.instance, ActivitiesDao.maxDocuments);
         clear(BillingLogsDao.instance, BillingLogsDao.maxDocuments);
-        clearRbacCollection(TestingRunResultDao.instance, TestingRunResultDao.maxDocuments);
+        /*
+         * Removed the clear/delete function for Testing run results,
+         * as it might delete vulnerable test results as well.
+         * We eventually delete testing run results directly from the testing module.
+         */
         clear(SuspectSampleDataDao.instance, SuspectSampleDataDao.maxDocuments);
         clear(RuntimeMetricsDao.instance, RuntimeMetricsDao.maxDocuments);
         clear(ProtectionLogsDao.instance, ProtectionLogsDao.maxDocuments);
@@ -2425,14 +2500,33 @@ public class InitializerListener implements ServletContextListener {
 
     public static void clear(AccountsContextDao mCollection, int maxDocuments) {
         try {
-            mCollection.trimCollection(maxDocuments);
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("Error while trimming collection " + mCollection.getCollName() + " : " + e.getMessage(), LogDb.DASHBOARD);
-        }
-    }
+            /*
+             * If capped collections are allowed (mongoDB) and 
+             * the collection is actually capped, only then skip.
+             */
+            if (DbMode.allowCappedCollections() && mCollection.isCapped()) return;
 
-    public static void clearRbacCollection(AccountsContextDaoWithRbac mCollection, int maxDocuments) {
-        try {
+            /*
+             * Primarily for initial cleanup. 
+             * In cases the data up till now has accumulated to a very large size,
+             * we do not want to overwhelm the db in those cases
+             * as .drop() is far cheaper operation that .deleteMany()
+             * and the data is majorly transient
+             */
+            boolean droppedIfGreaterThanThreeTimes = false;
+            if(DbMode.allowCappedCollections()){
+                droppedIfGreaterThanThreeTimes = mCollection.dropCollectionWithCondition(maxDocuments, 3);
+            }
+
+            if(droppedIfGreaterThanThreeTimes){
+                /*
+                 * Not creating capped collections again,
+                 * because eventually we want to move away from capped collections 
+                 * because they add serious startup time to mongo.
+                 */
+                return;
+            }
+
             mCollection.trimCollection(maxDocuments);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error while trimming collection " + mCollection.getCollName() + " : " + e.getMessage(), LogDb.DASHBOARD);
@@ -2443,7 +2537,23 @@ public class InitializerListener implements ServletContextListener {
         return new HashSet<>(Arrays.asList("akto-api-security/tests-library:standard", "akto-api-security/tests-library:pro"));
     }
 
-    public static void insertAktoTestLibraries(AccountSettings accountSettings) {
+    public static void insertStateInAccountSettings(AccountSettings accountSettings) {
+        if (DashboardMode.isMetered()) {
+            insertAktoTestLibraries(accountSettings);
+        }
+        
+        insertCompliances(accountSettings);
+    }
+
+    private static void insertCompliances(AccountSettings accountSettings) {
+        boolean complianceInfosAlreadyPresent = accountSettings != null && accountSettings.getComplianceInfosUpdatedTs() > 0;
+
+        if (!complianceInfosAlreadyPresent) {
+            AccountSettingsDao.instance.updateOne(AccountSettingsDao.generateFilter(), Updates.set(AccountSettings.COMPLIANCE_INFOS_UPDATED_TS, 1));
+        }
+    }
+
+    private static void insertAktoTestLibraries(AccountSettings accountSettings) {
         List<TestLibrary> testLibraries = accountSettings == null ? new ArrayList<>() : accountSettings.getTestLibraries();
         Set<String> aktoTestLibraries = getAktoDefaultTestLibs();
 
@@ -2999,13 +3109,34 @@ public class InitializerListener implements ServletContextListener {
         }
     }
 
+    private static void updateCustomDataTypeOperator(BackwardCompatibility backwardCompatibility){
+        if(backwardCompatibility.getChangeOperatorConditionInCDT() == 0){
+            CustomDataTypeDao.instance.updateOneNoUpsert(
+                Filters.and(
+                    Filters.eq(CustomDataType.NAME, "TOKEN"),
+                    Filters.or(
+                        Filters.exists(CustomDataType.USER_MODIFIED_TIMESTAMP, false),
+                        Filters.eq(CustomDataType.USER_MODIFIED_TIMESTAMP, 0)
+                    )  
+                ),
+                Updates.set(CustomDataType.OPERATOR, Operator.AND) 
+            );
+
+            BackwardCompatibilityDao.instance.updateOne(
+                Filters.eq("_id", backwardCompatibility.getId()),
+                Updates.set(BackwardCompatibility.CHANGE_OPERATOR_CONDITION_IN_CDT, Context.now())
+            );
+        }
+    }
+
     public static void setBackwardCompatibilities(BackwardCompatibility backwardCompatibility){
         if (DashboardMode.isMetered()) {
             initializeOrganizationAccountBelongsTo(backwardCompatibility);
             setOrganizationsInBilling(backwardCompatibility);
         }
-        markSummariesAsVulnerable(backwardCompatibility);
         setAktoDefaultNewUI(backwardCompatibility);
+        updateCustomDataTypeOperator(backwardCompatibility);
+        markSummariesAsVulnerable(backwardCompatibility);
         dropLastCronRunInfoField(backwardCompatibility);
         fetchIntegratedConnections(backwardCompatibility);
         dropFilterSampleDataCollection(backwardCompatibility);
@@ -3174,11 +3305,12 @@ public class InitializerListener implements ServletContextListener {
 
                 try {
                     processRemedationFilesZip(testingTemplates);
+                    processComplianceInfosFromZip(testingTemplates);
                 } catch (Exception e) {
                     e.printStackTrace();
                     loggerMaker.infoAndAddToDb("Unable to import remediations", LogDb.DASHBOARD);
                 }
-
+                Map<String, ComplianceInfo> complianceCommonMap = getFromCommonDb();
                 Map<String, byte[]> allYamlTemplates = TestTemplateUtils.getZipFromMultipleRepoAndBranch(getAktoDefaultTestLibs());
                 AccountTask.instance.executeTask((account) -> {
                     try {
@@ -3199,6 +3331,11 @@ public class InitializerListener implements ServletContextListener {
                                 byte[] zipFile = allYamlTemplates.get(testLibrary.getRepositoryUrl());
                                 processTemplateFilesZip(zipFile, Constants._AKTO, YamlTemplateSource.AKTO_TEMPLATES.toString(), "");
                             }
+                        }
+
+                        if (accountSettings.getComplianceInfosUpdatedTs() > 0) {                            
+                            addComplianceFromCommonToAccount(complianceCommonMap);
+                            replaceComplianceFromCommonToAccount(complianceCommonMap);    
                         }
                         
                     } catch (Exception e) {
@@ -3287,6 +3424,174 @@ public class InitializerListener implements ServletContextListener {
                 cacheLoggerMaker.errorAndAddToDb(ex,
                         String.format("Error while processing Test template files zip. Error %s", ex.getMessage()),
                         LogDb.DASHBOARD);
+            }
+        } else {
+            loggerMaker.infoAndAddToDb("Received null zip file");
+        }        
+    }
+
+    private static Map<String, ComplianceInfo> getFromCommonDb() {
+        Bson emptyFilter = Filters.empty();
+        List<ComplianceInfo> complianceInfosInDb = ComplianceInfosDao.instance.findAll(emptyFilter);
+        Map<String, ComplianceInfo> mapIdToComplianceInDb = complianceInfosInDb.stream().collect(Collectors.toMap(ComplianceInfo::getId, Function.identity()));
+        return mapIdToComplianceInDb;        
+    }
+
+    public static void replaceComplianceFromCommonToAccount(Map<String, ComplianceInfo> mapIdToComplianceInCommon) {
+        try {
+            String ic = "info.compliance.";
+            for(String fileSourceId: mapIdToComplianceInCommon.keySet()) {
+                ComplianceInfo complianceInfoInCommon = mapIdToComplianceInCommon.get(fileSourceId);
+
+                Bson filters = 
+                    Filters.and(
+                        Filters.eq("info.compliance.source", fileSourceId), 
+                        Filters.ne(ic+ComplianceInfo.HASH, complianceInfoInCommon.getHash())
+                    );
+
+                Bson updates = Updates.combine(
+                    Updates.set(ic+ComplianceInfo.HASH, complianceInfoInCommon.getHash()),
+                    Updates.set(ic+ComplianceInfo.MAP_COMPLIANCE_TO_LIST_CLAUSES, complianceInfoInCommon.getMapComplianceToListClauses())
+                );                 
+                UpdateResult updateResult = YamlTemplateDao.instance.updateMany(filters, updates);
+                loggerMaker.infoAndAddToDb("replaceComplianceFromCommonToAccount: " + Context.accountId.get() + " : " +fileSourceId+" "+ updateResult);
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error in replaceComplianceFromCommonToAccount: " + Context.accountId.get() + " : " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
+    public static void addComplianceFromCommonToAccount(Map<String, ComplianceInfo> mapIdToComplianceInCommon) {
+        try {
+            
+            for(String fileSourceId: mapIdToComplianceInCommon.keySet()) {
+                ComplianceInfo complianceInfoInCommon = mapIdToComplianceInCommon.get(fileSourceId);
+                String compId = complianceInfoInCommon.getId().split("/")[1].split("\\.")[0].toUpperCase();
+
+                boolean isCategoryTemplate = EnumUtils.getEnum(TestCategory.class, compId.toUpperCase()) != null;
+
+                if (isCategoryTemplate) continue;
+
+                Bson filters = 
+                    Filters.and(
+                        Filters.eq(Constants.ID, compId), 
+                        Filters.or(Filters.exists("info.compliance", false), Filters.ne("info.compliance.source", fileSourceId))
+                    );
+
+                ComplianceMapping complianceMapping = ComplianceMapping.createFromInfo(complianceInfoInCommon);    
+                UpdateResult updateResult = YamlTemplateDao.instance.updateMany(filters, Updates.set("info.compliance", complianceMapping));
+                loggerMaker.infoAndAddToDb("addComplianceFromCommonToAccount for test id: " + Context.accountId.get() + " : " + compId + " " + updateResult);
+            }            
+
+
+            for(String fileSourceId: mapIdToComplianceInCommon.keySet()) {
+                ComplianceInfo complianceInfoInCommon = mapIdToComplianceInCommon.get(fileSourceId);
+                String compId = complianceInfoInCommon.getId().split("/")[1].split("\\.")[0].toUpperCase();
+
+                boolean isCategoryTemplate = EnumUtils.getEnum(TestCategory.class, compId.toUpperCase()) != null;
+
+                if (!isCategoryTemplate) continue;
+
+                Bson filters = 
+                    Filters.and(
+                        Filters.eq("info.category.name", compId.toUpperCase()), 
+                        Filters.exists("info.compliance", false)
+                    );
+
+                ComplianceMapping complianceMapping = ComplianceMapping.createFromInfo(complianceInfoInCommon);    
+                UpdateResult updateResult = YamlTemplateDao.instance.updateMany(filters, Updates.set("info.compliance", complianceMapping));
+                loggerMaker.infoAndAddToDb("addComplianceFromCommonToAccount for category: " + Context.accountId.get() + " : " + compId + " "  + updateResult);
+            }            
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error in addComplianceFromCommonToAccount: " + Context.accountId.get() + " : " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
+    public static void processComplianceInfosFromZip(byte[] zipFile) {
+        if (zipFile != null) {
+            try (ByteArrayInputStream inputStream = new ByteArrayInputStream(zipFile);
+                    ZipInputStream zipInputStream = new ZipInputStream(inputStream)) {
+
+                ZipEntry entry;
+
+                int countUnchangedCompliances = 0;
+                int countTotalCompliances = 0;
+
+                Map<String, ComplianceInfo> mapIdToComplianceInDb = getFromCommonDb();
+
+                while ((entry = zipInputStream.getNextEntry()) != null) {
+                    if (!entry.isDirectory()) {
+                        String entryName = entry.getName();
+
+                        boolean isCompliance = entryName.contains("compliance/");
+                        if (!isCompliance) {
+                            loggerMaker.infoAndAddToDb(
+                                    String.format("%s not a compliance file, skipping", entryName),
+                                    LogDb.DASHBOARD);
+                            continue;
+                        }
+
+                        if (!entryName.endsWith(".conf") && !entryName.endsWith(".yml") && !entryName.endsWith(".yaml")) {
+                            loggerMaker.infoAndAddToDb(
+                                    String.format("%s not a yaml file, skipping", entryName),
+                                    LogDb.DASHBOARD);
+                            continue;
+                        }
+
+                        String[] filePathTokens = entryName.split("/");
+
+                        if (filePathTokens.length <= 1) {
+                            loggerMaker.infoAndAddToDb(
+                                String.format("%s has no directory patthern", entryName),
+                                LogDb.DASHBOARD);
+                            continue;
+                        }
+
+                        String fileSourceId = "compliance/"+filePathTokens[filePathTokens.length-1];
+
+                        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+                        byte[] buffer = new byte[1024];
+                        int bytesRead;
+                        while ((bytesRead = zipInputStream.read(buffer)) != -1) {
+                            outputStream.write(buffer, 0, bytesRead);
+                        }
+
+                        String templateContent = new String(outputStream.toByteArray(), "UTF-8");
+                        int templateHashCode = templateContent.hashCode();
+
+                        Map<String, List<String>> contentMap = TestConfigYamlParser.parseComplianceTemplate(templateContent);
+
+                        ComplianceInfo complianceInfoInDb = mapIdToComplianceInDb.get(fileSourceId);
+                        countTotalCompliances++;
+
+                        if (complianceInfoInDb == null) {
+                            ComplianceInfo newComplianceInfo = new ComplianceInfo(fileSourceId, contentMap, Constants._AKTO, templateHashCode, "");
+                            loggerMaker.infoAndAddToDb("Inserting compliance content: " + entryName + " c=" + templateContent + " ci: " + newComplianceInfo, LogDb.DASHBOARD);
+                            ComplianceInfosDao.instance.insertOne(newComplianceInfo);
+
+                        } else if (complianceInfoInDb.getHash() == templateHashCode ) {
+                            countUnchangedCompliances++;
+                        } else {
+                            Bson updates = Updates.combine(Updates.set(ComplianceInfo.MAP_COMPLIANCE_TO_LIST_CLAUSES, contentMap), Updates.set(ComplianceInfo.HASH, templateHashCode));
+                            loggerMaker.infoAndAddToDb("Updating compliance content: " + entryName, LogDb.DASHBOARD);
+                            ComplianceInfosDao.instance.updateOne(Constants.ID, fileSourceId, updates);
+                        }
+                    }
+
+                    zipInputStream.closeEntry();
+                }
+
+                if (countTotalCompliances != countUnchangedCompliances) {
+                    loggerMaker.infoAndAddToDb(countUnchangedCompliances + "/" + countTotalCompliances + "compliances unchanged", LogDb.DASHBOARD);
+                }
+        
+            } catch (Exception ex) {
+                cacheLoggerMaker.errorAndAddToDb(ex,
+                        String.format("Error while processing Test template files zip. Error %s", ex.getMessage()),
+                        LogDb.DASHBOARD);
+                        ex.printStackTrace();
             }
         } else {
             loggerMaker.infoAndAddToDb("Received null zip file");

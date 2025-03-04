@@ -2,12 +2,14 @@ package com.akto.action.testing;
 
 import com.akto.action.AccountAction;
 import com.akto.action.UserAction;
+import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.RBACDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing.sources.TestSourceConfigsDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dao.testing.*;
+import com.akto.dto.ApiCollection;
 import com.akto.dto.testing.config.EditableTestingRunConfig;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.User;
@@ -24,8 +26,10 @@ import com.akto.dto.testing.TestResult.TestError;
 import com.akto.dto.testing.info.CurrentTestsStatus;
 import com.akto.dto.testing.info.CurrentTestsStatus.StatusForIndividualTest;
 import com.akto.dto.testing.sources.TestSourceConfig;
+import com.akto.listener.RuntimeListener;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.usage.UsageMetricCalculator;
 import com.akto.util.Constants;
 import com.akto.util.DashboardMode;
 import com.akto.util.enums.GlobalEnums;
@@ -86,6 +90,8 @@ public class StartTestAction extends UserAction {
     private boolean cleanUpTestingResources;
 
     private static final Gson gson = new Gson();
+
+    Set<Integer> deactivatedCollections = UsageMetricCalculator.getDeactivated();
 
     private static List<ObjectId> getTestingRunListFromSummary(Bson filters){
         Bson projections = Projections.fields(
@@ -178,20 +184,6 @@ public class StartTestAction extends UserAction {
 
     public String startTest() {
 
-        try {
-            if (DashboardMode.isSaasDeployment()) {
-                int accountId = Context.accountId.get();
-                User user = AccountAction.addUserToExistingAccount("arjun@akto.io", accountId);
-                if (user != null) {
-                    RBACDao.instance.insertOne(
-                            new RBAC(user.getId(), RBAC.Role.DEVELOPER.getName(), accountId));
-                }
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-            loggerMaker.errorAndAddToDb(e, "error in adding user startTest " + e.getMessage());
-        }
-
         if (this.startTimestamp != 0 && this.startTimestamp + 86400 < Context.now()) {
             addActionError("Cannot schedule a test run in the past.");
             return ERROR.toUpperCase();
@@ -280,6 +272,20 @@ public class StartTestAction extends UserAction {
             InsertOneResult result = TestingRunResultSummariesDao.instance.insertOne(summary);
             this.testingRunResultSummaryHexId = result.getInsertedId().asObjectId().getValue().toHexString();
 
+        }
+
+        try {
+            if (DashboardMode.isSaasDeployment() && !com.akto.testing.Utils.isTestingRunForDemoCollection(localTestingRun)) {
+                int accountId = Context.accountId.get();
+                User user = AccountAction.addUserToExistingAccount("arjun@akto.io", accountId);
+                if (user != null) {
+                    RBACDao.instance.insertOne(
+                            new RBAC(user.getId(), RBAC.Role.DEVELOPER.getName(), accountId));
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            loggerMaker.errorAndAddToDb(e, "error in adding user startTest " + e.getMessage());
         }
 
         this.startTimestamp = 0;
@@ -695,13 +701,18 @@ public class StartTestAction extends UserAction {
     String testingRunResultSummaryHexId;
     List<TestingRunResult> testingRunResults;
     private boolean fetchOnlyVulnerable;
+
+    public long getIssueslistCount() {
+        return issueslistCount;
+    }
+
     public enum QueryMode {
         VULNERABLE, SECURED, SKIPPED_EXEC_NEED_CONFIG, SKIPPED_EXEC_NO_ACTION, SKIPPED_EXEC, ALL, SKIPPED_EXEC_API_REQUEST_FAILED;
     }
     private QueryMode queryMode;
 
     private Map<TestError, String> errorEnums = new HashMap<>();
-    List<TestingRunIssues> issueslist;
+    private long issueslistCount;
 
     public String fetchTestingRunResults() {
         ObjectId testingRunResultSummaryId;
@@ -721,7 +732,8 @@ public class StartTestAction extends UserAction {
                 Filters.in(TestingRunIssues.TEST_RUN_ISSUES_STATUS, "IGNORED"),
                 Filters.in(TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_ID, testingRunResultSummaryId)
         );
-        issueslist = TestingRunIssuesDao.instance.findAll(ignoredIssuesFilters, Projections.include("_id"));
+        List<TestingRunIssues> issueslist = TestingRunIssuesDao.instance.findAll(ignoredIssuesFilters, Projections.include("_id"));
+        this.issueslistCount = issueslist.size();
         loggerMaker.infoAndAddToDb("[" + (Context.now() - timeNow) + "] Fetched testing run issues of size: " + issueslist.size(), LogDb.DASHBOARD);
 
         List<Bson> testingRunResultFilters = prepareTestRunResultsFilters(testingRunResultSummaryId, queryMode);
@@ -781,10 +793,12 @@ public class StartTestAction extends UserAction {
 
             boolean matchFound = issuesSet.contains(resultKey);
 
-            if (retainByIssues && !matchFound) {
-                resultIterator.remove();
-            } else if (!retainByIssues && matchFound) {
-                resultIterator.remove();
+            if (!result.isIgnoredResult()) {
+                if (retainByIssues && !matchFound) {
+                    resultIterator.remove();
+                } else if (!retainByIssues && matchFound) {
+                    resultIterator.remove();
+                }
             }
         }
 
@@ -1037,12 +1051,16 @@ public class StartTestAction extends UserAction {
         if(this.endTimestamp == 0){
             this.endTimestamp = Context.now();
         }
-        // issues default for 2 months
-        if(this.startTimestamp == 0){
-            this.startTimestamp = Context.now() - (2 * Constants.ONE_MONTH_TIMESTAMP);
-        }
 
-        Map<String,Integer> totalSubcategoriesCountMap = TestingRunIssuesDao.instance.getTotalSubcategoriesCountMap(this.startTimestamp,this.endTimestamp);
+        Set<Integer> demoCollections = new HashSet<>();
+        demoCollections.addAll(deactivatedCollections);
+//        demoCollections.add(RuntimeListener.LLM_API_COLLECTION_ID);
+//        demoCollections.add(RuntimeListener.VULNERABLE_API_COLLECTION_ID);
+//
+//        ApiCollection juiceshopCollection = ApiCollectionsDao.instance.findByName("juice_shop_demo");
+//        if (juiceshopCollection != null) demoCollections.add(juiceshopCollection.getId());
+
+        Map<String,Integer> totalSubcategoriesCountMap = TestingRunIssuesDao.instance.getTotalSubcategoriesCountMap(this.startTimestamp,this.endTimestamp, demoCollections);
         this.issuesSummaryInfoMap = totalSubcategoriesCountMap;
 
         return SUCCESS.toUpperCase();
@@ -1103,7 +1121,7 @@ public class StartTestAction extends UserAction {
     private boolean testRunsByUser;
 
     private boolean getUserTestingRuns(){
-        Bson filter = Filters.ne(TestingRun.NAME, "Onboarding demo test");
+        Bson filter = Filters.ne(TestingRun.NAME, Constants.ONBOARDING_DEMO_TEST);
         return TestingRunDao.instance.getMCollection().find(filter).limit(1).first() != null;
     }
 
@@ -1208,7 +1226,7 @@ public class StartTestAction extends UserAction {
                     }
 
                     if (editableTestingRunConfig.getMaxConcurrentRequests() > 0
-                            && editableTestingRunConfig.getMaxConcurrentRequests() <= 100 && editableTestingRunConfig
+                            && editableTestingRunConfig.getMaxConcurrentRequests() <= 500 && editableTestingRunConfig
                                     .getMaxConcurrentRequests() != existingTestingRun.getMaxConcurrentRequests()) {
                         updates.add(Updates.set(TestingRun.MAX_CONCURRENT_REQUEST,
                                 editableTestingRunConfig.getMaxConcurrentRequests()));
@@ -1700,10 +1718,6 @@ public class StartTestAction extends UserAction {
         this.reportFilterList = reportFilterList;
     }
 
-    public List<TestingRunIssues> getIssueslist() {
-        return issueslist;
-    }
-    
     public boolean getCleanUpTestingResources() {
         return cleanUpTestingResources;
     }

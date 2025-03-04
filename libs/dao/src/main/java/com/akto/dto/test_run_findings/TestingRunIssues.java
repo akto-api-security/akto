@@ -1,5 +1,7 @@
 package com.akto.dto.test_run_findings;
 
+import com.akto.dto.ApiInfo.ApiInfoKey;
+import com.akto.util.Constants;
 import com.akto.util.enums.GlobalEnums;
 
 import java.util.Arrays;
@@ -28,6 +30,10 @@ public class TestingRunIssues {
     public static final String UNREAD = "unread";
     private boolean unread;
     private List<Integer> collectionIds;
+
+    public static final String ID_API_COLLECTION_ID = Constants.ID + "." + TestingIssuesId.API_KEY_INFO + "." + ApiInfoKey.API_COLLECTION_ID;
+    public static final String ID_URL = Constants.ID + "." + TestingIssuesId.API_KEY_INFO + "." + ApiInfoKey.URL;
+    public static final String ID_METHOD = Constants.ID + "." + TestingIssuesId.API_KEY_INFO + "." + ApiInfoKey.METHOD;
 
     public TestingRunIssues(TestingIssuesId id, GlobalEnums.Severity severity, GlobalEnums.TestRunIssueStatus status,
                             int creationTime, int lastSeen, ObjectId latestTestingRunSummaryId, String jiraIssueUrl, int lastUpdated) {

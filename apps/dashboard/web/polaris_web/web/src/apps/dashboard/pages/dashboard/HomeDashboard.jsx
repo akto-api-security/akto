@@ -237,9 +237,9 @@ function HomeDashboard() {
             totalTestedApis += x.apisTested
         })
 
-        const tempRiskScore = totalAPIs ? (totalRiskScore / totalApis).toFixed(2) : 0
+        const tempRiskScore = totalApis ? (totalRiskScore / totalApis).toFixed(2) : 0
         setOldRiskScore(parseFloat(tempRiskScore))
-        const tempTestCoverate = totalAPIs ? (100 * totalTestedApis / totalApis).toFixed(2) : 0
+        const tempTestCoverate = totalApis ? (100 * totalTestedApis / totalApis).toFixed(2) : 0
         setOldTestCoverage(parseFloat(tempTestCoverate))
     }
 
@@ -531,9 +531,9 @@ function HomeDashboard() {
         linkUrl="/dashboard/issues"
     /> : <EmptyCard title="Issues by Severity" subTitleComponent={showTestingComponents ? <Text alignment='center' color='subdued'>No issues found for this time-frame</Text>: runTestEmptyCardComponent}/>
 
-    const criticalUnsecuredAPIsOverTime = <CriticalUnsecuredAPIsOverTimeGraph linkText={"Fix critical issues"} linkUrl={"/dashboard/issues"} />
+    const criticalUnsecuredAPIsOverTime = <CriticalUnsecuredAPIsOverTimeGraph startTimestamp={startTimestamp} endTimestamp={endTimestamp} linkText={"Fix critical issues"} linkUrl={"/dashboard/issues"} />
 
-    const criticalFindings = <CriticalFindingsGraph linkText={"Fix critical issues"} linkUrl={"/dashboard/issues"} />
+    const criticalFindings = <CriticalFindingsGraph startTimestamp={startTimestamp} endTimestamp={endTimestamp} linkText={"Fix critical issues"} linkUrl={"/dashboard/issues"} />
 
     const apisByRiskscoreComponent = <InfoCard
         component={

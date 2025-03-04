@@ -1273,6 +1273,9 @@ getDeprecatedEndpoints(apiInfoList, unusedEndpoints, apiCollectionId) {
 
   return combinedArr
  },
+ getComplianceIcon: (complianceName) => {
+  return "/public/"+complianceName.toUpperCase()+".svg";
+},
 
  convertToDisambiguateLabel(value, convertFunc, maxAllowed){
   if (value.length > maxAllowed) {
@@ -1810,6 +1813,82 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
     }
     return initialIdx
   },
+
+  getEpochMillis(value, type) {
+    const [year, val] = value.split('_').map(Number);
+    let date;
+    
+    switch (type) {
+        case 'dayOfYear':
+            date = new Date(Date.UTC(year, 0, val)); // January 1st + (val - 1) days
+            break;
+        case 'monthOfYear':
+            date = new Date(Date.UTC(year, val - 1, 1)); // Month is 0-based
+            break;
+        case 'weekOfYear':
+            date = new Date(Date.UTC(year, 0, 1)); // Start of the year
+            const firstDay = date.getUTCDay(); // Get the first day of the year
+            const offset = firstDay === 0 ? 0 : 7 - firstDay; // Move to first Monday
+            date.setUTCDate(date.getUTCDate() + offset + (val - 1) * 7); // Add weeks
+            break;
+        default:
+            throw new Error("Invalid type. Must be 'day', 'month', or 'week'.");
+    }
+    
+    return date.getTime();
+},
+
+  prettifyFutureEpoch(epoch) {
+      if (!epoch) return "Never";
+      
+      const now = Math.floor(Date.now() / 1000);
+      const diffSeconds = epoch - now;
+      
+      if (diffSeconds < 0){
+        if(diffSeconds < -86400){
+          return this.prettifyEpoch(epoch);
+        } else {
+          return "Now";
+        }
+      }
+      
+      const date = new Date(epoch * 1000);
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      
+      // Format time
+      const timeStr = date.toLocaleTimeString('en-US', { 
+        hour: 'numeric', 
+        minute: '2-digit',
+        hour12: true 
+      });
+      
+      // If same day
+      if (date.toDateString() === new Date().toDateString()) {
+        return `today ${timeStr}`;
+      }
+      
+      // If tomorrow
+      if (date.toDateString() === tomorrow.toDateString()) {
+        return `tomorrow ${timeStr}`;
+      }
+      
+      // If within 7 days
+      const daysDiff = Math.floor(diffSeconds / (24 * 60 * 60));
+      if (daysDiff < 7) {
+        return `${date.toLocaleDateString('en-US', { weekday: 'long' })} ${timeStr}`;
+      }
+      
+      // Otherwise show full date and time
+      return `${date.toLocaleDateString('en-US', { 
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric'
+      })} ${timeStr}`;
+  },
+  isDemoAccount(){
+    return window.ACTIVE_ACCOUNT === 1669322524
+  }
 
 }
 

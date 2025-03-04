@@ -23,6 +23,8 @@ message ListMaliciousRequestsResponse {
       threat_detection.message.malicious_event.event_type.v1.EventType event_type = 11;
       string category = 12;
       string sub_category = 13;
+      string type = 14;
+      string ref_id = 15;
     }
     repeated MaliciousEvent malicious_events = 1;
     uint64 total = 2;
@@ -39,6 +41,7 @@ message ListMaliciousRequestsRequest {
       repeated string urls = 2;
       repeated string ips = 3;
       optional TimeRangeFilter detected_at_time_range = 4;
+      repeated string types = 5;
     }
 
     // The number of alerts to return
@@ -79,6 +82,18 @@ message ListThreatActorResponse {
   }
   repeated ThreatActor actors = 1;
   uint64 total = 2;
+}
+
+message FetchMaliciousEventsRequest {
+  string ref_id = 1;
+}
+
+message FetchMaliciousEventsResponse {
+  message MaliciousPayloadsResponse {
+    string orig = 1;
+    uint64 ts = 2; 
+  }
+  repeated MaliciousPayloadsResponse malicious_payloads_response = 1;
 }
 
 message ListThreatApiRequest {

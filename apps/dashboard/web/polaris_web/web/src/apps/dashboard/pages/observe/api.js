@@ -60,6 +60,13 @@ export default {
             data: {}
         })
     },
+    fillSensitiveDataTypes() {
+        return request({
+            url: '/api/fillSensitiveDataTypes',
+            method: 'post',
+            data: {}
+        })
+    },
     async fetchSampleData(url, apiCollectionId, method) {
         const resp = await request({
             url: '/api/fetchSampleData',

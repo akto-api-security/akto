@@ -266,6 +266,8 @@ public class DaoInit {
         ClassModel<AllAPIsGroup> allApisGroupClassModel = ClassModel.builder(AllAPIsGroup.class).enableDiscriminator(true).build();
 
         ClassModel<Remediation> remediationClassModel = ClassModel.builder(Remediation.class).enableDiscriminator(true).build();
+        ClassModel<ComplianceMapping> complianceMappingModel = ClassModel.builder(ComplianceMapping.class).enableDiscriminator(true).build();
+        ClassModel<ComplianceInfo> complianceInfoModel = ClassModel.builder(ComplianceInfo.class).enableDiscriminator(true).build();
         ClassModel<RuntimeMetrics> RuntimeMetricsClassModel = ClassModel.builder(RuntimeMetrics.class).enableDiscriminator(true).build();
         ClassModel<CodeAnalysisApi>  codeAnalysisApiModel = ClassModel.builder(CodeAnalysisApi.class).enableDiscriminator(true).build();
         ClassModel<CodeAnalysisRepo> codeAnalysisRepoModel = ClassModel.builder(CodeAnalysisRepo.class).enableDiscriminator(true).build();
@@ -304,9 +306,7 @@ public class DaoInit {
                         nodeClassModel, connectionClassModel, edgeClassModel, replaceDetailClassModel, modifyHostDetailClassModel, fileUploadClassModel
                 ,fileUploadLogClassModel, codeAnalysisCollectionClassModel, codeAnalysisApiLocationClassModel, codeAnalysisApiInfoClassModel, codeAnalysisApiInfoKeyClassModel,
                 riskScoreTestingEndpointsClassModel, OrganizationFlagsClassModel, sensitiveDataEndpointsClassModel, unauthenticatedEndpointsClassModel, allApisGroupClassModel,
-                eventsExampleClassModel, remediationClassModel, RuntimeMetricsClassModel, codeAnalysisRepoModel, 
-                codeAnalysisApiModel, historicalDataClassModel, configSettingClassModel, 
-                configSettingsConditionTypeClassModel, roleClassModel, testingInstanceHeartBeat).automatic(true).build());
+                eventsExampleClassModel, remediationClassModel, complianceInfoModel, complianceMappingModel, RuntimeMetricsClassModel, codeAnalysisRepoModel, codeAnalysisApiModel, historicalDataClassModel, configSettingClassModel, configSettingsConditionTypeClassModel, roleClassModel, testingInstanceHeartBeat).automatic(true).build());
 
         final CodecRegistry customEnumCodecs = CodecRegistries.fromCodecs(
                 new EnumCodec<>(Conditions.Operator.class),
@@ -418,6 +418,7 @@ public class DaoInit {
         VulnerableTestingRunResultDao.instance.createIndicesIfAbsent();
         CustomRoleDao.instance.createIndicesIfAbsent();
         TestingInstanceHeartBeatDao.instance.createIndexIfAbsent();
+        PupeteerLogsDao.instance.createIndicesIfAbsent();
     }
 
 }

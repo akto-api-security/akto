@@ -34,14 +34,19 @@ const convertFunc = {
                 aktoTests[test.superCategory.name].push(obj)
                 totalAktoTests++
             }
-
             let dataObj = {
-                content: test.content,
+                content: test?.content||"",
                 lastUpdated: func.prettifyEpoch(test.updatedTs),
                 superCategory: test.superCategory.name,
                 type: test.templateSource._name,
                 category: test.superCategory.displayName,
-                inactive: test.inactive
+                inactive: test.inactive,
+                severity: test?.superCategory?.severity?._name || "",
+                nature : test?.attributes?.nature?._name || "",
+                value: test.name,
+                isCustom: test?.templateSource?._name === "CUSTOM" || false,
+                author: test?.author || "",
+                compliance: Object.keys(test?.compliance?.mapComplianceToListClauses || {}),
             }
 
             mapTestToData[test.testName] = dataObj

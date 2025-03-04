@@ -321,7 +321,7 @@ public class Main {
     
                 // Pause for 1 second
                 try {
-                    Thread.sleep(1000);
+                    Thread.sleep(15000);
                 } catch (InterruptedException e) {
                     System.err.println("Memory monitor thread interrupted: " + e.getMessage());
                     break; // Exit the loop if thread is interrupted
@@ -334,10 +334,7 @@ public class Main {
 
     public static void main(String[] args) throws InterruptedException {
         String mongoURI = System.getenv("AKTO_MONGO_CONN");
-        ReadPreference readPreference = ReadPreference.secondary();
-        if(DashboardMode.isOnPremDeployment()){
-            readPreference = ReadPreference.primary();
-        }
+        ReadPreference readPreference = ReadPreference.primary();
         WriteConcern writeConcern = WriteConcern.W1;
         DaoInit.init(new ConnectionString(mongoURI), readPreference, writeConcern);
 

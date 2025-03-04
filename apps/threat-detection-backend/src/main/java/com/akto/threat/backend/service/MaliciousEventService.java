@@ -28,6 +28,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
+
 import org.bson.Document;
 import org.bson.conversions.Bson;
 
@@ -48,6 +50,8 @@ public class MaliciousEventService {
     MaliciousEventMessage evt = request.getMaliciousEvent();
     String actor = evt.getActor();
     String filterId = evt.getFilterId();
+
+    String refId = UUID.randomUUID().toString();
 
     EventType eventType = evt.getEventType();
 
@@ -71,6 +75,7 @@ public class MaliciousEventService {
                 this.ipLookupClient.getCountryISOCodeGivenIp(evt.getLatestApiIp()).orElse(""))
             .setCategory(evt.getCategory())
             .setSubCategory(evt.getSubCategory())
+            .setRefId(refId)
             .build();
 
     if (MaliciousEventModel.EventType.AGGREGATED.equals(maliciousEventType)) {
@@ -86,6 +91,7 @@ public class MaliciousEventService {
                 .setRequestTime(sampleReq.getTimestamp())
                 .setApiCollectionId(sampleReq.getApiCollectionId())
                 .setFilterId(filterId)
+                .setRefId(refId)
                 .build());
       }
 
@@ -157,6 +163,10 @@ public class MaliciousEventService {
       query.append("latestApiIp", new Document("$in", filter.getIpsList()));
     }
 
+    if (!filter.getTypesList().isEmpty()) {
+      query.append("type", new Document("$in", filter.getTypesList()));
+    }
+
     if (filter.hasDetectedAtTimeRange()) {
       TimeRangeFilter timeRange = filter.getDetectedAtTimeRange();
       long start = timeRange.hasStart() ? timeRange.getStart() : 0;
@@ -189,6 +199,9 @@ public class MaliciousEventService {
                 .setDetectedAt(evt.getDetectedAt())
                 .setCategory(evt.getCategory())
                 .setSubCategory(evt.getSubCategory())
+                .setApiCollectionId(evt.getLatestApiCollectionId())
+                .setType(evt.getType())
+                .setRefId(evt.getRefId())
                 .build());
       }
       return ListMaliciousRequestsResponse.newBuilder()

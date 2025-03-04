@@ -29,6 +29,7 @@ import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.parsers.HttpCallParser;
+import com.akto.test_editor.Utils;
 import com.akto.testing.ApiExecutor;
 import com.akto.util.Constants;
 import com.akto.util.http_util.CoreHTTPClient;
@@ -90,6 +91,7 @@ public class JiraIntegrationAction extends UserAction {
 
             Request.Builder builder = new Request.Builder();
             builder.addHeader("Authorization", "Basic " + authHeader);
+            builder.addHeader("Accept-Encoding", "gzip");
             builder = builder.url(url);
             Request okHttpRequest = builder.build();
             Call call = client.newCall(okHttpRequest);
@@ -102,6 +104,19 @@ public class JiraIntegrationAction extends UserAction {
                     addActionError("Error while testing jira integration, received null response");
                     loggerMaker.errorAndAddToDb("error while testing jira integration, received null response", LoggerMaker.LogDb.DASHBOARD);
                     return Action.ERROR.toUpperCase();
+                }
+                if (!Utils.isJsonPayload(responsePayload)) {
+                    builder.removeHeader("Accept-Encoding");
+                    builder = builder.url(url);
+                    okHttpRequest = builder.build();
+                    call = client.newCall(okHttpRequest);
+                    response = call.execute();
+                    responsePayload = response.body().string();
+                    if (responsePayload == null) {
+                        addActionError("Error while testing jira integration, received null response");
+                        loggerMaker.errorAndAddToDb("error while testing jira integration, received null response", LoggerMaker.LogDb.DASHBOARD);
+                        return Action.ERROR.toUpperCase();
+                    }
                 }
             } catch (Exception e) {
                 e.printStackTrace();

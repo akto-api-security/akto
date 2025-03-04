@@ -17,7 +17,6 @@ import com.akto.dto.billing.Organization;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.TestingRunResult;
-import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.usage.MetricTypes;
 import com.akto.dto.usage.UsageMetric;
 import com.akto.dto.usage.metadata.ActiveAccounts;
@@ -127,15 +126,12 @@ public class UsageMetricCalculator {
         return invalidErrors;
     }
 
-    public static int calculateActiveEndpoints(UsageMetric usageMetric) {
-        int measureEpoch = usageMetric.getMeasureEpoch();
-        int activeEndpoints = SingleTypeInfoDao.instance.countEndpoints(
-                Filters.and(Filters.or(
-                        Filters.gt(SingleTypeInfo.LAST_SEEN, measureEpoch),
-                        Filters.gt(SingleTypeInfo._TIMESTAMP, measureEpoch)),
-                excludeDemosAndDeactivated(SingleTypeInfo._API_COLLECTION_ID)));
-        
-        return activeEndpoints;
+    public static int calculateActiveEndpoints() {
+        /*
+         * Count all endpoints.
+         * Same query being used on dashboard.
+         */
+        return (int)SingleTypeInfoDao.instance.fetchEndpointsCount(0, Context.now(), getDemosAndDeactivated(), false);
     }
 
     public static int calculateCustomTests(UsageMetric usageMetric) {
@@ -230,7 +226,7 @@ public class UsageMetricCalculator {
         if (metricType != null) {
             switch (metricType) {
                 case ACTIVE_ENDPOINTS:
-                    usage = calculateActiveEndpoints(usageMetric);
+                    usage = calculateActiveEndpoints();
                     break;
                 case CUSTOM_TESTS:
                     usage = calculateCustomTests(usageMetric);

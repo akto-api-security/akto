@@ -75,6 +75,7 @@ public class IssuesAction extends UserAction {
     private List<TestRunIssueStatus> filterStatus;
     private List<Integer> filterCollectionsId;
     private List<Severity> filterSeverity;
+    private List<String> filterCompliance;
     private List<String> filterSubCategory;
     private List<TestingRunIssues> similarlyAffectedIssues;
     private boolean activeCollections;
@@ -210,7 +211,8 @@ public class IssuesAction extends UserAction {
         long daysBetween = (endTimeStamp - startEpoch) / ONE_DAY_TIMESTAMP;
         List<Bson> pipeline = new ArrayList<>();
 
-        Bson notIncludedCollections = UsageMetricCalculator.excludeDemosAndDeactivated("_id." + TestingIssuesId.API_KEY_INFO + "." + ApiInfo.ApiInfoKey.API_COLLECTION_ID);
+        Set<Integer> deactivatedCollections = UsageMetricCalculator.getDeactivated();
+        Bson notIncludedCollections = Filters.nin(ID + "." + TestingIssuesId.API_KEY_INFO + "." + ApiInfo.ApiInfoKey.API_COLLECTION_ID, deactivatedCollections);
 
         Bson filters = Filters.and(
                 notIncludedCollections,
@@ -261,7 +263,7 @@ public class IssuesAction extends UserAction {
     }
 
     private void filterIssuesDataByTimeRange(long daysBetween, List<Bson> pipeline, List<Integer> issuesList) {
-        GroupByTimeRange.groupByAllRange(daysBetween, pipeline, TestingRunIssues.CREATION_TIME, "totalIssues");
+        GroupByTimeRange.groupByAllRange(daysBetween, pipeline, TestingRunIssues.CREATION_TIME, "totalIssues", 30, null);
         MongoCursor<BasicDBObject> cursor = TestingRunIssuesDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
         while (cursor.hasNext()) {
             BasicDBObject document = cursor.next();
@@ -357,8 +359,8 @@ public class IssuesAction extends UserAction {
                     filtersForNewCollection.add(baseFilter);
                 }
             }
+            this.testingRunResults = new ArrayList<>();
             if (issues.isEmpty()) {
-                this.testingRunResults = new ArrayList<>();
                 // this.sampleDataVsCurlMap = new HashMap<>();
                 return SUCCESS.toUpperCase();
             }
@@ -479,10 +481,18 @@ public class IssuesAction extends UserAction {
         BasicDBObject infoObj = new BasicDBObject();
         BasicDBObject superCategory = new BasicDBObject();
         BasicDBObject severity = new BasicDBObject();
+
+        ComplianceMapping complianceMapping = info.getCompliance();
+
+        if (complianceMapping == null) {
+            complianceMapping = new ComplianceMapping(new HashMap<>(), "", "", 0);
+        }
+
         infoObj.put("issueDescription", info.getDescription());
         infoObj.put("issueDetails", info.getDetails());
         infoObj.put("issueImpact", info.getImpact());
         infoObj.put("issueTags", info.getTags());
+        infoObj.put("compliance", complianceMapping);
         infoObj.put("testName", info.getName());
         infoObj.put("references", info.getReferences());
         infoObj.put("cwe", info.getCwe());
@@ -491,6 +501,7 @@ public class IssuesAction extends UserAction {
         infoObj.put("_name", testConfig.getId());
         infoObj.put("content", testConfig.getContent());
         infoObj.put("templateSource", testConfig.getTemplateSource());
+        infoObj.put("attributes", testConfig.getAttributes());
 
         String remediationContent = info.getRemediation();
 
@@ -1051,5 +1062,13 @@ public class IssuesAction extends UserAction {
 
     public void setActiveCollections(boolean activeCollections) {
         this.activeCollections = activeCollections;
+    }
+
+    public List<String> getFilterCompliance() {
+        return filterCompliance;
+    }
+
+    public void setFilterCompliance(List<String> filterCompliance) {
+        this.filterCompliance = filterCompliance;
     }
 }

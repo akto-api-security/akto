@@ -19,6 +19,7 @@ import java.util.regex.Pattern;
 
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
+import org.springframework.util.StringUtils;
 
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.context.Context;
@@ -561,9 +562,9 @@ public class Utils {
         List<GenericTestResult> testResults = new ArrayList<>();
         String failMessage = errorMessage;
 
-        if(deactivatedCollections.contains(apiInfoKey.getApiCollectionId())){
+        if(!StringUtils.hasLength(errorMessage) && deactivatedCollections.contains(apiInfoKey.getApiCollectionId())){
             failMessage = TestError.DEACTIVATED_ENDPOINT.getMessage();
-        }else if(messages == null || messages.isEmpty()){
+        }else if(!StringUtils.hasLength(errorMessage) && (messages == null || messages.isEmpty())){
             failMessage = TestError.NO_PATH.getMessage();
         }
             
@@ -634,6 +635,9 @@ public class Utils {
 
     public static boolean isTestingRunForDemoCollection(TestingRun testingRun){
         TestingEndpoints endpoints = testingRun.getTestingEndpoints();
+        if(testingRun != null && testingRun.getName() != null && testingRun.getName().equals(Constants.ONBOARDING_DEMO_TEST)){
+            return true;
+        }
         try {
             if(endpoints.getType().equals(TestingEndpoints.Type.COLLECTION_WISE)){
                 CollectionWiseTestingEndpoints testingEndpoints = (CollectionWiseTestingEndpoints) endpoints;

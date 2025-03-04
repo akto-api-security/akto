@@ -11,6 +11,7 @@ import com.akto.action.testing.StartTestAction;
 import com.akto.dao.AccountSettingsDao;
 import com.akto.dto.testing.AuthParamData;
 import com.akto.dto.testing.TestingEndpoints;
+import com.akto.util.Constants;
 import com.akto.util.enums.LoginFlowEnums;
 
 public class OnboardingAction extends UserAction {
@@ -56,7 +57,7 @@ public class OnboardingAction extends UserAction {
         startTestAction.setTestIdConfig(0);
         startTestAction.setType(TestingEndpoints.Type.COLLECTION_WISE);
         startTestAction.setSelectedTests(selectedTests);
-        startTestAction.setTestName("Onboarding demo test");
+        startTestAction.setTestName(Constants.ONBOARDING_DEMO_TEST);
         startTestAction.setTestRunTime(-1);
         startTestAction.setMaxConcurrentRequests(100);
         startTestAction.startTest();

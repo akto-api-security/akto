@@ -5,6 +5,7 @@ import { CellType } from "../../../components/tables/rows/GithubRow";
 import GetPrettifyEndpoint from "../../observe/GetPrettifyEndpoint";
 import PersistStore from "../../../../main/PersistStore";
 import func from "../../../../../util/func";
+import { Badge } from "@shopify/polaris";
 
 const resourceName = {
   singular: "sample",
@@ -21,11 +22,17 @@ const headers = [
     text: "Actor",
     value: "actorComp",
     title: "Actor",
+    filterKey: 'actor'
   },
   {
     text: "Filter",
     value: "filterId",
-    title: "Threat filter",
+    title: "Attack type",
+  },
+  {
+    text: "Severity",
+    value: "severityComp",
+    title: "Severity",
   },
   {
     text: "Collection",
@@ -36,7 +43,7 @@ const headers = [
   },
   {
     text: "Discovered",
-    title: "Discovered",
+    title: "Detected",
     value: "discoveredTs",
     type: CellType.TEXT,
     sortActive: true,
@@ -46,6 +53,11 @@ const headers = [
     title: "Source IP",
     value: "sourceIPComponent",
   },
+  {
+    text: "Type",
+    title: "Type",
+    value: "type",
+  }
 ];
 
 const sortOptions = [
@@ -76,7 +88,7 @@ function SusDataTable({ currDateRange, rowClicked }) {
 
   const [loading, setLoading] = useState(true);
   const collectionsMap = PersistStore((state) => state.collectionsMap);
-  const allCollections = PersistStore((state) => state.allCollections);
+  const threatFiltersMap = PersistStore((state) => state.threatFiltersMap);
 
   async function fetchData(
     sortKey,
@@ -90,9 +102,11 @@ function SusDataTable({ currDateRange, rowClicked }) {
     setLoading(true);
     let sourceIpsFilter = [],
       apiCollectionIdsFilter = [],
-      matchingUrlFilter = [];
-    if (filters?.sourceIps) {
-      sourceIpsFilter = filters?.sourceIps;
+      matchingUrlFilter = [],
+      typeFilter = []
+      ;
+    if (filters?.actor) {
+      sourceIpsFilter = filters?.actor;
     }
     if (filters?.apiCollectionId) {
       apiCollectionIdsFilter = filters?.apiCollectionId;
@@ -100,18 +114,23 @@ function SusDataTable({ currDateRange, rowClicked }) {
     if (filters?.url) {
       matchingUrlFilter = filters?.url;
     }
+    if(filters?.type){
+      typeFilter = filters?.type
+    }
     const sort = { [sortKey]: sortOrder };
     const res = await api.fetchSuspectSampleData(
       skip,
       sourceIpsFilter,
       apiCollectionIdsFilter,
       matchingUrlFilter,
+      typeFilter,
       sort,
       startTimestamp,
       endTimestamp
     );
     let total = res.total;
     let ret = res?.maliciousEvents.map((x) => {
+      const severity = threatFiltersMap[x?.filterId]?.severity || "HIGH"
       return {
         ...x,
         id: x.id,
@@ -122,6 +141,11 @@ function SusDataTable({ currDateRange, rowClicked }) {
         apiCollectionName: collectionsMap[x.apiCollectionId] || "-",
         discoveredTs: func.prettifyEpoch(x.timestamp),
         sourceIPComponent: x?.ip || "-",
+        type: x?.type || "-",
+        severityComp: (<div className={`badge-wrapper-${severity}`}>
+                          <Badge size="small">{func.toSentenceCase(severity)}</Badge>
+                      </div>
+        )
       };
     });
     setLoading(false);
@@ -130,13 +154,6 @@ function SusDataTable({ currDateRange, rowClicked }) {
 
   async function fillFilters() {
     const res = await api.fetchFiltersThreatTable();
-    let apiCollectionFilterChoices = allCollections
-      .filter((x) => {
-        return x.type !== "API_GROUP";
-      })
-      .map((x) => {
-        return { label: x.displayName, value: x.id };
-      });
     let urlChoices = res?.urls
       .map((x) => {
         const url = x || "/"
@@ -148,9 +165,9 @@ function SusDataTable({ currDateRange, rowClicked }) {
 
     filters = [
       {
-        key: "sourceIps",
-        label: "Source IP",
-        title: "Source IP",
+        key: "actor",
+        label: "Actor",
+        title: "Actor",
         choices: ipChoices,
       },
       {
@@ -159,6 +176,15 @@ function SusDataTable({ currDateRange, rowClicked }) {
         title: "URL",
         choices: urlChoices,
       },
+      {
+        key: 'type',
+        label: "Type",
+        title: "Type",
+        choices: [
+          {label: 'Rule based', value: 'Rule-Based'},
+          {label: 'Anomaly', value: 'Anomaly'},
+        ],
+      }
     ];
   }
 
@@ -179,6 +205,7 @@ function SusDataTable({ currDateRange, rowClicked }) {
   return (
     <GithubServerTable
       key={key}
+      onRowClick={(data) => rowClicked(data)}
       pageLimit={50}
       headers={headers}
       resourceName={resourceName}
