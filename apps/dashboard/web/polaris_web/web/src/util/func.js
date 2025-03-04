@@ -1707,7 +1707,7 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
       return true;
     }
     const userRole = window.USER_ROLE
-    return !(userRole === "GUEST" || userRole === "MEMBER")
+    return !(userRole === "GUEST" || userRole === "DEVELOPER")
   },
   capitalizeFirstLetter(str) {
     if (!str) return str;
