@@ -30,7 +30,6 @@ import com.akto.store.TestRolesCache;
 import com.akto.test_editor.Utils;
 import com.akto.util.Constants;
 import com.akto.util.JSONUtils;
-import com.akto.util.Pair;
 import com.akto.util.modifier.JWTPayloadReplacer;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -44,7 +43,6 @@ import static com.akto.test_editor.Utils.headerValuesUnchanged;
 import static com.akto.runtime.utils.Utils.convertOriginalReqRespToString;
 import static com.akto.testing.Utils.compareWithOriginalResponse;
 
-import com.mongodb.client.model.Filters;
 
 import org.apache.commons.lang3.StringUtils;
 import org.bson.types.ObjectId;
@@ -516,8 +514,10 @@ public class Executor {
                     Map<String, Object> valuesMap = new HashMap<>();
 
                     String token = null;
+                    boolean isRoleFromCache = false;
                     if(TestRolesCache.getTokenForRole(testRole.getName() + "_" + Context.accountId.get(), testRole.getLastUpdatedTs()) != null){
                         loggerMaker.infoAndAddToDb("got login response from cache " + testRole.getName(), LogDb.TESTING);
+                        isRoleFromCache = true;
                         token = TestRolesCache.getTokenForRole(testRole.getName() + "_" + Context.accountId.get(), testRole.getLastUpdatedTs());
                     }else{
                         loggerMaker.infoAndAddToDb("trying to fetch token for role " + testRole.getName(), LogDb.TESTING);
@@ -527,7 +527,9 @@ public class Executor {
                         return new ExecutorSingleOperationResp(false, "Failed to replace roles_access_context: ");
                     } else {
                         loggerMaker.infoAndAddToDb("flattened here: " + token);
-                        TestRolesCache.putToken(testRole.getName() + "_" + Context.accountId.get(), token, Context.now());
+                        if(!isRoleFromCache){
+                            TestRolesCache.putToken(testRole.getName() + "_" + Context.accountId.get(), token, Context.now());
+                        }
                         BasicDBObject flattened = JSONUtils.flattenWithDots(BasicDBObject.parse(token));
 
                         for (String param: flattened.keySet()) {

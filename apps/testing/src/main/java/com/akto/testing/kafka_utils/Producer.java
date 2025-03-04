@@ -9,6 +9,7 @@ import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.kafka.clients.admin.DeleteTopicsResult;
 import org.apache.kafka.clients.admin.ListTopicsResult;
+import org.apache.kafka.clients.admin.NewTopic;
 import org.bson.types.ObjectId;
 
 import com.akto.dto.billing.SyncLimit;
@@ -51,6 +52,24 @@ public class Producer {
             deleteTopicsResult.all().get(); // Wait for deletion to complete
 
             System.out.println("Topic \"" + topicName + "\" has been deleted successfully.");
+            Thread.sleep(3000); 
+        }
+    }
+
+    public static void createTopic(String bootstrapServers, String topicName) 
+        throws ExecutionException, InterruptedException {
+        Properties adminProps = new Properties();
+        adminProps.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+
+        try (AdminClient adminClient = AdminClient.create(adminProps)) {
+            ListTopicsResult listTopicsResult = adminClient.listTopics();
+            if (!listTopicsResult.names().get().contains(topicName)) {
+                System.out.println("Topic \"" + topicName + "\" does not exist.");
+                return;
+            }
+            NewTopic newTopic = new NewTopic(topicName, 1, (short) 1);  // Partitions = 1, Replicas = 1
+            adminClient.createTopics(Collections.singletonList(newTopic)).all().get();
+            System.out.println("Topic \"" + topicName + "\" created successfully.");
         }
     }
 
