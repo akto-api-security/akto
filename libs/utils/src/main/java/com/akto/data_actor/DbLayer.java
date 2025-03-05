@@ -497,8 +497,10 @@ public class DbLayer {
 
     public static TestingRun findPendingTestingRun(int delta, String miniTestingServiceName) {
 
-        Bson miniTestingServiceNameFilter;
-        miniTestingServiceNameFilter = Filters.eq(TestingRun.MINI_TESTING_SERVICE_NAME, miniTestingServiceName);
+        Bson miniTestingServiceNameFilter = Filters.empty();
+        if(miniTestingServiceName != null && !miniTestingServiceName.trim().isEmpty()) {
+            miniTestingServiceNameFilter = Filters.eq(TestingRun.MINI_TESTING_SERVICE_NAME, miniTestingServiceName);
+        }
 
         Bson filter1 = Filters.and(Filters.eq(TestingRun.STATE, TestingRun.State.SCHEDULED),
                 Filters.lte(TestingRun.SCHEDULE_TIMESTAMP, Context.now()),
@@ -522,8 +524,10 @@ public class DbLayer {
 
     public static TestingRunResultSummary findPendingTestingRunResultSummary(int now, int delta, String miniTestingServiceName) {
 
-        Bson miniTestingServiceNameFilter;
-        miniTestingServiceNameFilter = Filters.eq(TestingRun.MINI_TESTING_SERVICE_NAME, miniTestingServiceName);
+        Bson miniTestingServiceNameFilter = Filters.empty();
+        if(miniTestingServiceName != null && !miniTestingServiceName.trim().isEmpty()) {
+            miniTestingServiceNameFilter = Filters.eq(TestingRun.MINI_TESTING_SERVICE_NAME, miniTestingServiceName);
+        }
 
         Bson filter1 = Filters.and(
             Filters.eq(TestingRun.STATE, TestingRun.State.SCHEDULED),
@@ -1025,7 +1029,7 @@ public class DbLayer {
                         Filters.eq("miniTestingHeartbeat.miniTestingServiceName", serviceName)
                 )
         );
-        serviceExists = account != null;
+        serviceExists = account != null && (serviceName != null && !serviceName.trim().isEmpty());
 
         if (serviceExists) {
             AccountsDao.instance.updateOne(
