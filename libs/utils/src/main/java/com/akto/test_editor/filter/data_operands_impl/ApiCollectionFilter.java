@@ -29,7 +29,10 @@ public class ApiCollectionFilter extends DataOperandsImpl {
             return new ValidationResult(result, ValidationResult.GET_QUERYSET_CATCH_ERROR);
         }
 
-        Bson fQuery = Filters.in(ApiCollection.NAME, querySet);
+        Bson fQuery = Filters.or(
+            Filters.in(ApiCollection.NAME, querySet),
+            Filters.in(ApiCollection.HOST_NAME, querySet)
+        );
         List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(fQuery);
         List<Integer> apiCollectionIds = new ArrayList<>();
         for(ApiCollection apiCollection: apiCollections) {
