@@ -410,7 +410,7 @@ function GithubServerTable(props) {
                 sortOptions={props.sortOptions}
                 sortSelected={sortSelected}
                 queryValue={queryValue}
-                queryPlaceholder={`Searching in ${transform.formatNumberWithCommas(total)} ${total == 1 ? props.resourceName.singular : props.resourceName.plural}`}
+                queryPlaceholder={`Search in ${transform.formatNumberWithCommas(total)} ${total == 1 ? props.resourceName.singular : props.resourceName.plural}`}
                 onQueryChange={handleFiltersQueryChange}
                 onQueryClear={handleFiltersQueryClear}
                 {...(props.hideQueryField ? { hideQueryField: props.hideQueryField } : {})}
