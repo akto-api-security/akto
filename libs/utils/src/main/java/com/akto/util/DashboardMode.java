@@ -1,10 +1,15 @@
 package com.akto.util;
 
+import com.akto.dao.context.Context;
+import com.akto.data_actor.DataActor;
+import com.akto.data_actor.DataActorFactory;
+import com.akto.dto.Setup;
 import com.akto.onprem.Constants;
-import org.apache.commons.lang3.StringUtils;
 
 public enum DashboardMode {
     LOCAL_DEPLOY, ON_PREM, STAIRWAY, SAAS;
+
+    public static final DataActor dataActor = DataActorFactory.fetchInstance();
 
     public static boolean isKubernetes() {
         String isKubernetes = System.getenv("IS_KUBERNETES");
@@ -52,7 +57,25 @@ public enum DashboardMode {
         return dashboardMode.equals(LOCAL_DEPLOY) && "true".equalsIgnoreCase(System.getenv("IS_SAAS"));
     }
 
+    private static boolean isSaasDeploymentGlobal = false;
+    private static int lastSaasFetched = 0;
+
     public static boolean isMetered() {
-        return isSaasDeployment() || isOnPremDeployment();
+
+        if (lastSaasFetched == 0 || lastSaasFetched < Context.now() - 30 * 60) {
+            boolean isSaasDeployment = isSaasDeployment();
+            try {
+                Setup setup = dataActor.fetchSetup();
+                if (setup != null) {
+                    String dashboardMode = setup.getDashboardMode();
+                    isSaasDeployment = dashboardMode.equalsIgnoreCase(DashboardMode.SAAS.name());
+                }
+            } catch (Exception e) {
+            }
+            isSaasDeploymentGlobal = isSaasDeployment;
+            lastSaasFetched = Context.now();
+        }
+
+        return isSaasDeploymentGlobal || isOnPremDeployment();
     }
 }
