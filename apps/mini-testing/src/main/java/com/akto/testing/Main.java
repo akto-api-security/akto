@@ -250,17 +250,14 @@ public class Main {
     public static void modifyHybridTestingSettingWithCustomName() {
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
-                if(customMiniTestingServiceName == null || customMiniTestingServiceName.trim().isEmpty()) {
-                    customMiniTestingServiceName = "Default_" + UUID.randomUUID().toString().substring(0, 4);
-                }
                 dataActor.modifyHybridTestingSettingWithCustomName(RuntimeMode.isHybridDeployment(), customMiniTestingServiceName);
             }
-        }, 0, 5, TimeUnit.MINUTES);
+        }, 0, 1, TimeUnit.MINUTES);
     }
 
     public static void main(String[] args) throws InterruptedException {
         AccountSettings accountSettings = dataActor.fetchAccountSettings();
-        if(customMiniTestingServiceName == null) {
+        if(customMiniTestingServiceName == null || customMiniTestingServiceName.trim().isEmpty()) {
             customMiniTestingServiceName = "Default_" + UUID.randomUUID().toString().substring(0, 4);
         }
         modifyHybridTestingSettingWithCustomName();
