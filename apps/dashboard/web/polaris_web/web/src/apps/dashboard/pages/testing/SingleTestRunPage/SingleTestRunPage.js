@@ -90,6 +90,12 @@ let filters = [
     choices: [],
   },
   {
+    key: 'testFilter',
+    label: 'Issue name',
+    title: 'Issue name',
+    choices: [],
+  },
+  {
     key: 'apiCollectionId',
     label: 'Collection',
     title: 'Collection',
@@ -280,6 +286,10 @@ function SingleTestRunPage() {
     const localSelectedTestRun = transform.prepareTestRun(testingRun, currentSummary, cicd, false);
     setTestingRunConfigSettings(testingRun.testingRunConfig?.configsAdvancedSettings || [])
     setTestingRunConfigId(testingRun.testingRunConfig?.id || -1)
+    
+    if(filters?.testFilter.length > 0){
+      filters.cater
+    }
 
     setSelectedTestRun(localSelectedTestRun);
     if (localSelectedTestRun.testingRunResultSummaryHexId) {
@@ -340,6 +350,7 @@ function SingleTestRunPage() {
     filters = func.getCollectionFilters(filters)
     let result = []
     let store = {}
+    let testFilter = []
     Object.values(subCategoryMap).forEach((x) => {
       let superCategory = x.superCategory
       if (!store[superCategory.name]) {
@@ -347,10 +358,14 @@ function SingleTestRunPage() {
         store[superCategory.name] = []
       }
       store[superCategory.name].push(x._name);
+      testFilter.push({"label": x.testName, "value": x._name})
     })
     filters.forEach(filter => {
       if (filter.key === 'categoryFilter') {
         filter.choices = [].concat(result)
+      }
+      else if (filter.key === 'testFilter') {
+        filter.choices = [].concat(testFilter)
       }
     })
     if (resultId === null || resultId.length === 0) {
