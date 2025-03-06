@@ -589,7 +589,7 @@ function IssuesPage() {
                     .map(x => [x.text, x.textValue ? x.textValue : x.value])
                     .filter(x => x[0]?.length > 0)
             ),
-            urls: "urls"
+            URLs: "urls"
         };
 
 
@@ -682,27 +682,27 @@ function IssuesPage() {
             
             : components
             ]}
-            primaryAction={ <Popover
+            primaryAction={<Button primary onClick={() => openVulnerabilityReport()} disabled={showEmptyScreen}>Export results</Button>}
+            secondaryActions={
+            <HorizontalStack  gap={2}>
+                <DateRangeFilter initialDispatch={currDateRange} dispatch={(dateObj) => dispatchCurrDateRange({ type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias })} />
+                <Popover
                 active={popOverActive}
-                activator={<Button primary onClick={() => setPopOverActive((prev)=>!prev)} disabled={showEmptyScreen} disclosure>Export results</Button>}
+                activator={<Button onClick={() => setPopOverActive((prev)=>!prev)} disabled={showEmptyScreen} disclosure>More Actions</Button>}
                 autofocusTarget="first-node"
                 onClose={() => setPopOverActive(false)}
-              >
+                >
                 <ActionList
                   actionRole="menuitem"
                   items={[
-                    {
-                      content: 'Export results',
-                      onAction: openVulnerabilityReport,
-                    },
                     {
                       content: 'Export results as CSV',
                       onAction: exportCsv,
                     },
                   ]}
                 />
-              </Popover>}
-            secondaryActions={<DateRangeFilter initialDispatch={currDateRange} dispatch={(dateObj) => dispatchCurrDateRange({ type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias })} />}
+              </Popover>
+            </HorizontalStack>}
         />
             {(resultId !== null && resultId.length > 0) ? <TestRunResultPage /> : null}
             <JiraTicketCreationModal
