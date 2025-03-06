@@ -82,6 +82,7 @@ public class JwtAuthenticator {
     }
 
     private static PublicKey getPublicKey() throws NoSuchAlgorithmException, InvalidKeySpecException, IOException {
+        
         HybridSaasConfig config = null;
         try {
             config = (HybridSaasConfig) ConfigsDao.instance.findOne("_id", Config.ConfigType.HYBRID_SAAS.name());
