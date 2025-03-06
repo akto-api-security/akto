@@ -25,6 +25,9 @@ import java.nio.file.Paths;
 import java.nio.file.Files;
 
 public class JwtAuthenticator {
+    private static HybridSaasConfig cachedConfig = null;
+    private static long cacheTimestamp = 0;
+    private static final long CACHE_DURATION_MS = 3600000;
 
     public static String createJWT(Map<String, Object> claims, String issuer, String subject, int expiryUnit, int expiryDuration)
             throws NoSuchAlgorithmException, InvalidKeySpecException, IOException {
@@ -83,9 +86,16 @@ public class JwtAuthenticator {
     }
 
     private static PublicKey getPublicKey() throws NoSuchAlgorithmException, InvalidKeySpecException, IOException {
+        long currentTime = System.currentTimeMillis();
         HybridSaasConfig config = null;
         try {
-            config = (HybridSaasConfig) ConfigsDao.instance.findOne("_id", Config.ConfigType.HYBRID_SAAS.name());
+            if (cachedConfig != null && (currentTime - cacheTimestamp) < CACHE_DURATION_MS) {
+                config = cachedConfig;
+            } else {
+                config = (HybridSaasConfig) ConfigsDao.instance.findOne("_id", Config.ConfigType.HYBRID_SAAS.name());
+                cachedConfig = config;
+                cacheTimestamp = currentTime;
+            }
         } catch (Exception e) {
             System.out.println(e);
             throw e;
