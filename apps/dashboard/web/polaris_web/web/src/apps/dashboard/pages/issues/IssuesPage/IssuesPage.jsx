@@ -65,6 +65,12 @@ let filtersOptions = [
         choices:[]
     },
     {
+        key: `issueName`,
+        label: 'Issue name',
+        title: 'Issue name',
+        choices: [],
+    },
+    {
         key: 'collectionIds',
         label: 'API groups',
         title: 'API groups',
@@ -341,6 +347,7 @@ function IssuesPage() {
     
     let store = {}
     let result = []
+    let issueName = []
     Object.values(subCategoryMap).forEach((x) => {
         let superCategory = x.superCategory
         if (!store[superCategory.name]) {
@@ -348,8 +355,10 @@ function IssuesPage() {
             store[superCategory.name] = []
         }
         store[superCategory.name].push(x._name);
+        issueName.push({"label": x.testName, "value": x._name})
     })
     filtersOptions[2].choices = [].concat(result)
+    filtersOptions[3].choices = [].concat(issueName)
     let categoryToSubCategories = store
 
     function disambiguateLabel(key, value) {
@@ -361,6 +370,7 @@ function IssuesPage() {
                 return func.convertToDisambiguateLabel(value, func.toSentenceCase, 2)
             case "compliance":
                 return func.convertToDisambiguateLabel(value, func.toUpperCase(), 2)
+            case "issueName":
             case "issueCategory":
                 return func.convertToDisambiguateLabelObj(value, null, 3)
             case "collectionIds":
@@ -424,7 +434,7 @@ function IssuesPage() {
         filters?.issueCategory?.forEach((issue) => {
             filterSubCategory = filterSubCategory.concat(categoryToSubCategories[issue])
         })
-
+        filterSubCategory = [...filterSubCategory, ...filters?.issueName]
         const collectionIdsArray = filterCollectionsId.map((x) => {return x.toString()})
 
         let obj = {
