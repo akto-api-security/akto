@@ -1,4 +1,4 @@
-import { Button, Icon, Text } from '@shopify/polaris';
+import { Box, Button, HorizontalStack, Icon, Text } from '@shopify/polaris';
 import { PauseMajor } from '@shopify/polaris-icons';
 import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -19,7 +19,7 @@ export const BlockedState = ({ onResume, onDiscard }: BlockedStateProps) => {
         onResume();
     }
 
-    const isPaused = agentState === 'paused';
+    const isPaused = true;
     const isThinking = agentState === 'thinking';
 
     const show = isPaused || isThinking;
@@ -53,44 +53,62 @@ export const BlockedState = ({ onResume, onDiscard }: BlockedStateProps) => {
                             }
                         }
                     }}
-                    className="absolute min-h-[38px] -top-[38px] py-2 px-3 w-[90%] left-1/2 -translate-x-1/2 bg-[var(--agent-grey-background)] border border-[var(--borderShadow-box-shadow)] rounded-t-sm flex justify-between items-center z-[100]"
+                    id="blocked-state-container"
                 >
-                    {
-                        isPaused && (
+                    <Box
+                        background="bg"
+                        borderColor="border"
+                        paddingBlockStart="2"
+                        paddingBlockEnd="2"
+                        paddingInlineStart="3"
+                        paddingInlineEnd="3"
+                        borderRadiusStartEnd="1"
+                        borderRadiusStartStart="1"
+                        borderWidth="1"
+                        id="blocked-state-inner-container"
+                    >
+                        <HorizontalStack align="space-between">
+                        {
+                            isPaused && (
                             <>
-                                <div className="flex items-center">
+                                <HorizontalStack align="center">
                                     <Icon source={PauseMajor} color="subdued" />
                                     <Text as="span" variant="bodySm" color="subdued">
                                         Paused (Member is waiting for your response)
                                     </Text>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <button
+                                </ HorizontalStack>
+                                <HorizontalStack align="center" gap="2">
+                                    <Button
                                         onClick={handleDiscard}
-                                        id="discard-button"
+                                        plain
+                                        monochrome
+                                        removeUnderline
+                                        size="micro"
                                     >
                                         Discard
-                                    </button>
-                                    <button
+                                    </Button>
+                                    <Button
                                         onClick={handleResume}
-                                        id="approve-button"
-                                        className="hover:bg-[var(--akto-primary)/80] cursor-pointer"
+                                        primary
+                                        size="micro"
                                     >
                                         Approve
-                                    </button>
-                                </div>
+                                    </Button>
+                                </HorizontalStack>
                             </>
-                    )}
-                    {
-                        isThinking && (
-                            <>
-                                <Text as="span" variant="bodySm" color="subdued">
-                                    Thinking
-                                    <span className="inline-block animate-[ellipsis_1s_steps(4,end)_infinite]">...</span>
-                                </Text>
-                            </>
-                        )
-                    }
+                        )}
+                        {
+                            isThinking && (
+                                <>
+                                    <Text as="span" color="subdued">
+                                        Thinking
+                                        <span id="thinking-ellipsis">...</span>
+                                    </Text>
+                                </>
+                            )
+                        }
+                        </HorizontalStack>
+                    </Box>
                 </motion.div>
             )}
         </AnimatePresence>

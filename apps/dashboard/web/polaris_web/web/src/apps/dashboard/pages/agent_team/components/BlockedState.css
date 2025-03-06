@@ -14,6 +14,28 @@
     line-height: 16px; /* 133.333% */
 }
 
+#blocked-state-container {
+    position: absolute;
+    min-height: 38px;
+    top: -38px;
+    transform: translateX(-50%);
+    width: 90%;
+    left: 50%;
+    transform: translateX(-50%) !important;
+}
+
+#blocked-state-inner-container {
+  /* box-shadow: 0px 1px 0px 0px #898F94 inset; */
+}
+
+#thinking-ellipsis {
+    overflow: hidden;
+    display: inline-block;
+    vertical-align: bottom;
+    animation: ellipsis 1.5s steps(4, end) infinite;
+    width: 0;
+}
+
 #discard-button {
     display: flex;
     align-items: center;
@@ -29,12 +51,9 @@
 
 @keyframes ellipsis {
   0% {
-    clip-path: inset(0 100% 0 0);
-  }
-  50% {
-    clip-path: inset(0 0 0 0);
+    width: 0px;
   }
   100% {
-    clip-path: inset(0 0 0 0);
+    width: 1.2em; /* Adjust based on your font size */
   }
 }

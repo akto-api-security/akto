@@ -7,9 +7,9 @@ import OrderedList from '@tiptap/extension-ordered-list';
 import BulletList from '@tiptap/extension-bullet-list';
 import './composer.styles.css';
 
-import { Button, Icon, Tooltip, Text } from '@shopify/polaris';
+import { Button, Icon, Tooltip, Text, VerticalStack, Box, HorizontalStack } from '@shopify/polaris';
 
-import { PauseMajor, PlusMinor, SendMajor, TimelineAttachmentMajor } from '@shopify/polaris-icons';
+import { SendMajor } from '@shopify/polaris-icons';
 
 
 import { ModelPicker } from './ModelPicker';
@@ -82,38 +82,24 @@ export const PromptComposer = ({ onSend }: PromptComposerProps) => {
   }
 
   return (
-    <div className={`flex flex-col gap-4 border border-1 border-[var(--borderShadow-box-shadow)] py-2 px-4 rounded-sm relative z-[500] bg-white ${isFocused ? 'ring ring-violet-200' : ''}`}>
+    <Box
+      paddingBlockStart="2"
+      paddingBlockEnd="2"
+      paddingInlineStart="3"
+      paddingInlineEnd="3"
+      borderRadius="1"
+      borderWidth="1"
+      borderColor="border"
+      position="relative"
+    >
       <BlockedState onResume={() => {}} onDiscard={() => {}} />
-      <div className="flex flex-col gap-2 justify-start">
-        <div className="w-full" onClick={() => isInBlockedState && setAttemptedInBlockedState(true)}>
-          {/* <Button 
-            disabled={isInBlockedState} 
-            icon={PlusMinor} 
-            size="micro" 
-            monochrome
-          >Add context</Button> */}
-        </div>
-        <EditorContent editor={editor} onClick={() => isInBlockedState && setAttemptedInBlockedState(true)} />
-      </div>
-      <div className="flex justify-between items-center">
-        <div className="flex items-center gap-1">
-         {availableModels.length > 0 && (
+      <VerticalStack gap="4">
+        <EditorContent editor={editor} />
+        <HorizontalStack align="space-between">
           <ModelPicker availableModels={availableModels} selectedModel={selectedModel} setSelectedModel={setSelectedModel} />
-         )}
-        </div>
-        <Tooltip content="Send">
-          <div className="w-full" onClick={() => isInBlockedState && setAttemptedInBlockedState(true)}>
-            <Button
-              disabled={!selectedModel || !currentPrompt || isInBlockedState}
-              size="slim"
-              plain
-              icon={SendMajor}
-              accessibilityLabel="Send message to agent"
-              onClick={handleSend}
-            />
-          </div>
-        </Tooltip>
-      </div>
-    </div>
+          <Button icon={SendMajor} onClick={handleSend} plain />
+        </HorizontalStack>
+      </VerticalStack>
+    </Box>
   );
 };
