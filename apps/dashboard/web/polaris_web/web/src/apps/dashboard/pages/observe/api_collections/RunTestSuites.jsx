@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import "./run_test_suites.css"
 import createTestName from "./Utils"
 import RunTestSuiteRow from "./RunTestSuiteRow";
+import testingApi from "../../testing/api";
+import func from "../../../../../util/func";
 
 const owaspTop10List = {
     "Broken Object Level Authorization": ["BOLA"],
@@ -20,50 +22,61 @@ const owaspTop10List = {
 
 function RunTestSuites({ testRun, setTestRun, apiCollectionName, checkRemoveAll, handleRemoveAll, handleModifyConfig, activeFromTesting }) {
 
-    const [data, setData] = useState({ owaspTop10List: {}, testingMethods:{} });
+    const [data, setData] = useState({ owaspTop10List: {}, testingMethods:{}, custom : {} });
 
-    useEffect(() => {
-        setData((prev) => {
-            const updatedData = { ...prev };
-            // Generate OWASP Top 10 Test Suites
-            const newOwaspTop10TestSuites = Object.entries(owaspTop10List).map(([key, value]) => {
-                const tests = [];
-                value.forEach((cat) => {
-                    testRun?.tests?.[cat]?.forEach((test) => {
-                        tests.push(test.value);
-                    });
+
+    async function fetchData() {
+
+        // Generate OWASP Top 10 Test Suites
+        const newOwaspTop10TestSuites = Object.entries(owaspTop10List).map(([key, value]) => {
+            const tests = [];
+            value.forEach((cat) => {
+                testRun?.tests?.[cat]?.forEach((test) => {
+                    tests.push(test.value);
                 });
-                return { name: key, tests };
             });
-    
-            // Generate Testing Methods Test Suites
-            const newTestingMethodsTestSuites = ["Intrusive", "Non_intrusive"].map((val) => {
-                const tests = [];
-                Object.keys(testRun?.tests || {}).forEach((category) => {
-                    testRun.tests[category]?.forEach((test) => {
-                        if (test.nature === val.toUpperCase()) {
-                            tests.push(test.value);
-                        }
-                    });
-                });
-                return { name: val, tests };
-            });
-            if (
-                JSON.stringify(prev.owaspTop10List.testSuite) !== JSON.stringify(newOwaspTop10TestSuites) ||
-                JSON.stringify(prev.testingMethods.testSuite) !== JSON.stringify(newTestingMethodsTestSuites)
-            ) {
-                return {
-                    ...updatedData,
-                    owaspTop10List: { rowName: "OWASP top 10", testSuite: newOwaspTop10TestSuites },
-                    testingMethods: { rowName: "Testing Methods", testSuite: newTestingMethodsTestSuites }
-                };
-            }
-    
-            return prev;
+            return { name: key, tests };
         });
 
-    }, []);    
+        // Generate Testing Methods Test Suites
+        const newTestingMethodsTestSuites = ["Intrusive", "Non_intrusive"].map((val) => {
+            const tests = [];
+            Object.keys(testRun?.tests || {}).forEach((category) => {
+                testRun.tests[category]?.forEach((test) => {
+                    if (test.nature === val.toUpperCase()) {
+                        tests.push(test.value);
+                    }
+                });
+            });
+            return { name: val, tests };
+        });
 
+        // Fetch Custom Test Suite
+        const fetchedTestSuite = await testingApi.fetchAllTestSuites();
+        const fetchedData = fetchedTestSuite.map((testSuiteItem) => {
+            return { name: testSuiteItem.name, tests: testSuiteItem.subCategoryList }
+
+        });
+        setData(prev => {
+            if (
+                !func.deepArrayComparison(prev?.owaspTop10List?.testSuite||[],newOwaspTop10TestSuites) ||
+                !func.deepArrayComparison(prev?.testingMethods?.testSuite||[], newTestingMethodsTestSuites) ||
+                !func.deepArrayComparison(prev?.custom?.testSuite||[], fetchedData)
+            ) {
+                return {
+                    ...prev,
+                    owaspTop10List: { rowName: "OWASP top 10", testSuite: newOwaspTop10TestSuites },
+                    testingMethods: { rowName: "Testing Methods", testSuite: newTestingMethodsTestSuites },
+                    custom: { rowName: "Custom", testSuite: fetchedData }
+                };
+            }
+            return prev;
+        });
+    }
+    
+    useEffect(() => {
+        fetchData();
+    }, []);   
 
 
     function handleTestSuiteSelection(data) {
@@ -170,7 +183,7 @@ function RunTestSuites({ testRun, setTestRun, apiCollectionName, checkRemoveAll,
 
     return (
         <Scrollable vertical={true} horizontal={false} shadow={false}>
-            <div className="runTestSuitesModal" style={{ minHeight: "72vh" }}>
+            <div className="runTestSuitesModal" style={{ minHeight: "72vh",paddingBlockEnd:"1rem" }}>
                 <VerticalStack gap={5}>
                     <div style={{ display: "grid", gridTemplateColumns: "max-content auto max-content", alignItems: "center", gap: "10px" }}>
                         <Text variant="headingMd">Name:</Text>
