@@ -50,7 +50,7 @@ public class TestApiCollectionsAction extends MongoBasedTest {
     public void testMaxSize() {
         ApiCollectionsDao.instance.getMCollection().drop();
         ApiCollectionsAction apiCollectionsAction = new ApiCollectionsAction();
-        String name = "Avneesh.123-_33333333333333333333333333333333333333333333";
+        String name = "Avneesh.123-_33333333333333333333333333333333333333333333_33333333333333333333333333333333333333333333";
         apiCollectionsAction.setCollectionName(name);
         String result = apiCollectionsAction.createCollection();
         assertEquals(result, "ERROR");
