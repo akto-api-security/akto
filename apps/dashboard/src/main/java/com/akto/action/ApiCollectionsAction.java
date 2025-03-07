@@ -217,7 +217,7 @@ public class ApiCollectionsAction extends UserAction {
         return Action.SUCCESS.toUpperCase();
     }
 
-    static int maxCollectionNameLength = 25;
+    static int maxCollectionNameLength = 60;
     private String collectionName;
 
     private boolean isValidApiCollectionName(){
