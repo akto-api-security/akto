@@ -255,8 +255,13 @@ function SingleTestRunPage() {
       store[superCategory.name].push(x._name);
       issueName.push({"label": x.testName, "value": x._name})
   })
-  filterOptions[2].choices = [].concat(result)
-  filterOptions[3].choices = [].concat(issueName)
+  filterOptions.forEach((filter) => {
+    if (filter.key === 'categoryFilter') {
+      filter.choices = [].concat(result)
+    } else if (filter.key === 'testFilter') { 
+      filter.choices = [].concat(issueName)
+    }
+  })
 
   const fetchTestingRunResultSummaries = async () => {
     let tempTestingRunResultSummaries = [];
