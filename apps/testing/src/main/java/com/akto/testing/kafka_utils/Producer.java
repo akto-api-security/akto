@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.ExecutionException;
 
+import com.akto.dto.testing.TestingRunResult;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.kafka.clients.admin.DeleteTopicsResult;
@@ -73,7 +74,7 @@ public class Producer {
         }
     }
 
-    public void initProducer(TestingRun testingRun, ObjectId summaryId, SyncLimit syncLimit, boolean doInitOnly){
+    public void initProducer(TestingRun testingRun, ObjectId summaryId, SyncLimit syncLimit, boolean doInitOnly, List<TestingRunResult> testingRunResultList){
         TestExecutor executor = new TestExecutor();
         if(!doInitOnly){
             try {
@@ -82,6 +83,6 @@ public class Producer {
                 e.printStackTrace();
             }
         }
-        executor.init(testingRun, summaryId, syncLimit, doInitOnly);
+        executor.init(testingRun, summaryId, syncLimit, doInitOnly, testingRunResultList);
     }
 }

@@ -393,7 +393,8 @@ public class Main {
                 TestingRunConfig baseConfig = TestingRunConfigDao.instance.findOne(Constants.ID, testingRun.getTestIdConfig());
                 testingRun.setTestingRunConfig(baseConfig);
                 ObjectId summaryId = new ObjectId(testingRunSummaryId);
-                testingProducer.initProducer(testingRun, summaryId, featureAccess.fetchSyncLimit(), true);
+                //todo: rerun case check shivam
+                testingProducer.initProducer(testingRun, summaryId, featureAccess.fetchSyncLimit(), true, null);
                 int maxRunTime = testingRun.getTestRunTime() <= 0 ? 30*60 : testingRun.getTestRunTime();
                 testingConsumer.init(maxRunTime);
 
@@ -466,6 +467,7 @@ public class Main {
                 }
                 TestingRunResultSummary trrs = findPendingTestingRunResultSummary(defaultTime);
                 boolean isSummaryRunning = trrs != null && trrs.getState().equals(State.RUNNING);
+                boolean isTestingRunResultRerunCase = trrs != null && trrs.getOriginalTestingRunResultSummaryId() != null;
                 TestingRun testingRun;
                 ObjectId summaryId = null;
                 if (trrs == null) {
@@ -476,8 +478,22 @@ public class Main {
                     testingRun = TestingRunDao.instance.findOne("_id", trrs.getTestingRunId());
                 }
 
+                List<TestingRunResult> testingRunResultList = null;
                 if (testingRun == null) {
                     return;
+                }
+
+                if (isTestingRunResultRerunCase) {
+                    summaryId = trrs.getOriginalTestingRunResultSummaryId();
+                    testingRunResultList = TestingRunResultDao.instance.fetchLatestTestingRunResult(Filters.and(
+                            Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID,summaryId),
+                            Filters.eq(TestingRunResult.RERUN, true)
+                    ));
+                    if (testingRunResultList == null) {//test shouldn't run
+                        TestingRunResultSummariesDao.instance.deleteAll(Filters.eq(TestingRunResultSummariesDao.ID, trrs.getId()));
+                        loggerMaker.infoAndAddToDb("deleting trrs for rerun case, no testing run result found, TRRS_ID: " + trrs.getId().toHexString());
+                        return;
+                    }
                 }
 
                 if (!TestingInstanceHeartBeatDao.instance.isTestEligibleForInstance(testingRun.getHexId())) {
@@ -492,16 +508,21 @@ public class Main {
                         loggerMaker.infoAndAddToDb("Stopping TRRS: " + trrs.getId());
 
                         // get count issues here
-                        Map<String,Integer> finalCountMap = Utils.finalCountIssuesMap(trrs.getId());
-                        loggerMaker.infoAndAddToDb("Final count map calculated is " + finalCountMap.toString());
-                        TestingRunResultSummariesDao.instance.updateOneNoUpsert(
-                                Filters.eq(Constants.ID, trrs.getId()),
-                                Updates.combine(
-                                    Updates.set(TestingRunResultSummary.STATE, State.STOPPED),
-                                    Updates.set(TestingRunResultSummary.COUNT_ISSUES, finalCountMap)
-                                )
-                        );
-                        loggerMaker.infoAndAddToDb("Stopped TRRS: " + trrs.getId());
+                        if (isTestingRunResultRerunCase) {
+                            TestingRunResultSummariesDao.instance.deleteAll(Filters.eq(TestingRunResultSummariesDao.ID, trrs.getId()));
+                            loggerMaker.infoAndAddToDb("Deleted for TestingRunResult rerun case for stopped testrun TRRS: " + trrs.getId());
+                        } else {
+                            Map<String,Integer> finalCountMap = Utils.finalCountIssuesMap(trrs.getId());
+                            loggerMaker.infoAndAddToDb("Final count map calculated is " + finalCountMap.toString());
+                            TestingRunResultSummariesDao.instance.updateOneNoUpsert(
+                                    Filters.eq(Constants.ID, trrs.getId()),
+                                    Updates.combine(
+                                            Updates.set(TestingRunResultSummary.STATE, State.STOPPED),
+                                            Updates.set(TestingRunResultSummary.COUNT_ISSUES, finalCountMap)
+                                    )
+                            );
+                            loggerMaker.infoAndAddToDb("Stopped TRRS: " + trrs.getId());
+                        }
                     }
                     return;
                 }
@@ -518,9 +539,14 @@ public class Main {
                             Filters.eq(Constants.ID, testingRun.getId()),
                             Updates.set(TestingRun.STATE, TestingRun.State.FAILED));
 
-                    TestingRunResultSummariesDao.instance.getMCollection().withWriteConcern(writeConcern).findOneAndUpdate(
-                            Filters.eq(Constants.ID, summaryId),
-                            Updates.set(TestingRun.STATE, TestingRun.State.FAILED));
+                    if (isTestingRunResultRerunCase) {
+                        TestingRunResultSummariesDao.instance.deleteAll(Filters.eq(TestingRunResultSummariesDao.ID, trrs.getId()));
+                        loggerMaker.infoAndAddToDb("Deleted for TestingRunResult rerun case for failed testrun TRRS: " + trrs.getId());
+                    } else {
+                        TestingRunResultSummariesDao.instance.getMCollection().withWriteConcern(writeConcern).findOneAndUpdate(
+                                Filters.eq(Constants.ID, summaryId),
+                                Updates.set(TestingRun.STATE, TestingRun.State.FAILED));
+                    }
                     return;
                 }
 
@@ -550,6 +576,7 @@ public class Main {
                     }
                     setTestingRunConfig(testingRun, trrs);
                     boolean maxRetriesReached = false;
+                    //todo: check for running case shivam
                     if (isSummaryRunning || isTestingRunRunning) {
                         loggerMaker.infoAndAddToDb("TRRS or TR is in running state, checking if it should run it or not");
                         TestingRunResultSummary testingRunResultSummary;
@@ -683,11 +710,11 @@ public class Main {
                         // init producer and the consumer here
                         // producer for testing is currently calls init functions from test-executor
                         if(Constants.IS_NEW_TESTING_ENABLED){
-                            testingProducer.initProducer(testingRun, summaryId, syncLimit, false);  
+                            testingProducer.initProducer(testingRun, summaryId, syncLimit, false, testingRunResultList);
                             testingConsumer.init(maxRunTime);  
                         }else{
                             TestExecutor testExecutor = new TestExecutor();
-                            testExecutor.init(testingRun, summaryId, syncLimit, false);
+                            testExecutor.init(testingRun, summaryId, syncLimit, false, testingRunResultList);
                         }                   
                     }
                     

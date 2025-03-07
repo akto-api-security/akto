@@ -32,7 +32,12 @@ public class TestingRunResultSummary {
     private int testInitiatedCount;
 
     private int testIdConfig;
-
+    /*
+    * originalTestingRunResultSummaryId this will be used to trigger running testingRunResults
+    *
+    * */
+    private ObjectId originalTestingRunResultSummaryId;
+    public static final String ORIGINAL_TESTING_RUN_SUMMARY_ID = "originalTestingRunResultSummaryId";
     public static final String IS_NEW_TESTING_RUN_RESULT_SUMMARY = "isNewTestingSummary";
     private boolean isNewTestingSummary = true;
 
@@ -182,5 +187,13 @@ public class TestingRunResultSummary {
 
     public void setNewTestingSummary(boolean isNewTestingSummary) {
         this.isNewTestingSummary = isNewTestingSummary;
+    }
+
+    public ObjectId getOriginalTestingRunResultSummaryId() {
+        return originalTestingRunResultSummaryId;
+    }
+
+    public void setOriginalTestingRunResultSummaryId(ObjectId originalTestingRunResultSummaryId) {
+        this.originalTestingRunResultSummaryId = originalTestingRunResultSummaryId;
     }
 }

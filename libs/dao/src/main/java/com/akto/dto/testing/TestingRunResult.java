@@ -20,12 +20,13 @@ public class TestingRunResult implements Comparable<TestingRunResult> {
 
     public static final String TEST_RUN_ID = "testRunId";
     private ObjectId testRunId;
-
     @BsonIgnore
     private String testRunHexId;
 
     public static final String API_INFO_KEY = "apiInfoKey";
     private ApiInfo.ApiInfoKey apiInfoKey;
+    public static final String RERUN = "rerun";
+    private boolean rerun;
     public static final String TEST_SUPER_TYPE = "testSuperType";
     private String testSuperType;
     public static final String TEST_SUB_TYPE = "testSubType";
@@ -59,6 +60,14 @@ public class TestingRunResult implements Comparable<TestingRunResult> {
 
     @BsonIgnore
     private List<TestLog> testLogs = new ArrayList<>();
+
+    public boolean isRerun() {
+        return rerun;
+    }
+
+    public void setRerun(boolean rerun) {
+        this.rerun = rerun;
+    }
 
     public static class TestLog {
         TestLogType testLogType;
