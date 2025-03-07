@@ -73,6 +73,43 @@ public class AgentSubProcessSingleAttempt {
     Map<String, Object> processOutput;
     final public static String PROCESS_OUTPUT = "processOutput";
 
+    public static class CurrentProcessState {
+        String processId;
+        String subProcessId;
+        int attemptId;
+
+        public CurrentProcessState(String processId, String subProcessId, int attemptId) {
+            this.processId = processId;
+            this.subProcessId = subProcessId;
+            this.attemptId = attemptId;
+        }
+
+        public String getProcessId() {
+            return processId;
+        }
+
+        public void setProcessId(String processId) {
+            this.processId = processId;
+        }
+
+        public String getSubProcessId() {
+            return subProcessId;
+        }
+
+        public void setSubProcessId(String subProcessId) {
+            this.subProcessId = subProcessId;
+        }
+
+        public int getAttemptId() {
+            return attemptId;
+        }
+
+        public void setAttemptId(int attemptId) {
+            this.attemptId = attemptId;
+        }
+        
+    }
+
     public AgentSubProcessSingleAttempt(String processId, String subProcessId, String subProcessHeading,
             Map<String, Object> userInput, int createdTimestamp, int startTimestamp, int endTimestamp, State state,
             int attemptId, List<AgentLog> logs, Map<String, Object> processOutput) {

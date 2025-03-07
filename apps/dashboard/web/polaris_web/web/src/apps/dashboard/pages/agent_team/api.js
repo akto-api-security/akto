@@ -16,10 +16,11 @@ const api = {
     },
 
     createAgentRun: async (data) => {
+        console.log(data)
         return await request({
             url: '/api/createAgentRun',
             method: 'post',
-            data: { data }
+            data: data 
         })
     },
 

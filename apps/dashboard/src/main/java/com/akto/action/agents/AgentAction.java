@@ -13,7 +13,11 @@ import com.akto.dao.agents.AgentRunDao;
 import com.akto.dao.agents.AgentSubProcessSingleAttemptDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.agents.*;
+import com.akto.dto.agents.AgentSubProcessSingleAttempt.CurrentProcessState;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Updates;
 import com.opensymphony.xwork2.Action;
 
@@ -191,6 +195,89 @@ public class AgentAction extends UserAction {
         return Action.SUCCESS.toUpperCase();
     }
 
+    BasicDBObject response;
+    private static final ObjectMapper objectMapper = new ObjectMapper();
+    public String feedDataToAgent(){
+        try {
+            AgentRun agentRun = AgentRunDao.instance.findOne(Filters.eq(AgentRun._STATE, State.SCHEDULED.toString()));
+            response = new BasicDBObject();
+            if(agentRun != null){
+                // case 1: info about the agent as the agent is just triggered
+                response.put("type", "init");
+                response.put("data", agentRun);
+            }else{
+                // case 2: info about the agent as the agent is running
+                AgentRun agentRunRunning = AgentRunDao.instance.findOne(Filters.eq(AgentRun._STATE, State.RUNNING.toString()), Projections.include(AgentRun.PROCESS_ID));
+                if(agentRunRunning != null){
+                    response.put("type", "subTask");
+                    // get subprocess data of the latest one only, i am assuming that if chosen retry attempt, the data of later will get cleaned up from mongo, the new one would be inserted
+                    AgentSubProcessSingleAttempt subprocess = AgentSubProcessSingleAttemptDao.instance.findLatestOne(Filters.eq(AgentSubProcessSingleAttempt.PROCESS_ID, agentRunRunning.getProcessId()));
+                    response.put("data", subprocess);
+                }
+
+                // else case is nothing is running or scheduled, hence empty object is sufficient for 
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ERROR.toUpperCase();
+        }
+        
+        return SUCCESS.toUpperCase();
+    }
+
+    public String receiveDataFromAgent(){
+        String type = response.getString("type");
+        CurrentProcessState currentStep = null;
+        try {
+            BasicDBObject stepObj = (BasicDBObject) response.get("stepInfo");
+            currentStep = objectMapper.readValue(stepObj.toJson(), CurrentProcessState.class);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ERROR.toUpperCase();
+        }
+        switch (type) {
+            case "logs":
+                List<AgentLog> logs = (List<AgentLog>) response.get("response");
+                
+                AgentSubProcessSingleAttemptDao.instance.updateOne(
+                    Filters.and(
+                        Filters.eq(AgentSubProcessSingleAttempt.PROCESS_ID, currentStep.getProcessId()),
+                        Filters.eq(AgentSubProcessSingleAttempt.SUB_PROCESS_ID, currentStep.getSubProcessId()),
+                        Filters.eq(AgentSubProcessSingleAttempt.ATTEMPT_ID, currentStep.getAttemptId())
+                    ),
+                    Updates.addEachToSet(AgentSubProcessSingleAttempt._LOGS, logs)
+                );
+                break;
+
+            case "stateChange":
+                State state = State.valueOf(response.getString("state"));
+                BasicDBObject processOutput = (BasicDBObject) response.get("response");
+                try {
+                    objectMapper.readValue(processOutput.toJson(), Map.class);
+                    AgentSubProcessSingleAttemptDao.instance.updateOne(
+                        Filters.and(
+                            Filters.eq(AgentSubProcessSingleAttempt.PROCESS_ID, currentStep.getProcessId()),
+                            Filters.eq(AgentSubProcessSingleAttempt.SUB_PROCESS_ID, currentStep.getSubProcessId()),
+                            Filters.eq(AgentSubProcessSingleAttempt.ATTEMPT_ID, currentStep.getAttemptId())
+                        ),
+                        Updates.combine(
+                            Updates.set(AgentSubProcessSingleAttempt._STATE, state),
+                            Updates.set(AgentSubProcessSingleAttempt.PROCESS_OUTPUT, processOutput)
+                        )
+                    );
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    return ERROR.toUpperCase();
+                }
+                break;
+        
+            default:
+                break;
+        }
+        response.put("success", "200 ok");
+        return SUCCESS.toUpperCase();
+    }
+
     public Map<String, Object> getData() {
         return data;
     }
@@ -279,5 +366,12 @@ public class AgentAction extends UserAction {
         this.models = models;
     }
     
+    public BasicDBObject getResponse() {
+        return response;
+    }
+
+    public void setResponse(BasicDBObject response) {
+        this.response = response;
+    }
 
 }
