@@ -212,7 +212,9 @@ function SampleDataComponent(props) {
                     <HorizontalStack padding="2" align='space-between'>
                         {func.toSentenceCase(type)} 
                         { type==="response" && responseTime ? (` (${responseTime} ms)`) : "" }
-                        { type==="request" && (ipObj?.sourceIP.length>0 || ipObj?.destIP.length>0) ? (` (${ipObj?.sourceIP} -> ${ipObj?.destIP})`) : "" }
+                        { type==="request" && (ipObj?.sourceIP.length>0 || ipObj?.destIP.length>0) ? 
+                            (` (${ipObj?.sourceIP ? `Src: ${ipObj.sourceIP}` : ""}${ipObj?.sourceIP && ipObj?.destIP ? " & " : ""}${ipObj?.destIP ? `Dest: ${ipObj.destIP}` : ""})`) 
+                            : "" }
                         <HorizontalStack gap={2}>
                         {isNewDiff ? <HorizontalStack gap="2">
                                 <Box borderInlineEndWidth='1' borderColor="border-subdued" padding="1">
