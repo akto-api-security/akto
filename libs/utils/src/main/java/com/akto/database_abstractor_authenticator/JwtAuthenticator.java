@@ -25,7 +25,6 @@ import java.nio.file.Paths;
 import java.nio.file.Files;
 
 public class JwtAuthenticator {
-
     public static String createJWT(Map<String, Object> claims, String issuer, String subject, int expiryUnit, int expiryDuration)
             throws NoSuchAlgorithmException, InvalidKeySpecException, IOException {
 
@@ -83,6 +82,7 @@ public class JwtAuthenticator {
     }
 
     private static PublicKey getPublicKey() throws NoSuchAlgorithmException, InvalidKeySpecException, IOException {
+        
         HybridSaasConfig config = null;
         try {
             config = (HybridSaasConfig) ConfigsDao.instance.findOne("_id", Config.ConfigType.HYBRID_SAAS.name());
