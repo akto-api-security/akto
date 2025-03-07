@@ -6,7 +6,7 @@ import Store from "../../../store";
 import func from "@/util/func";
 import { MarkFulfilledMinor, ReportMinor, ExternalMinor } from '@shopify/polaris-icons';
 import PersistStore from "../../../../main/PersistStore";
-import { ActionList, Button, HorizontalGrid, HorizontalStack, IndexFiltersMode, Popover, Text, Tooltip } from "@shopify/polaris";
+import { ActionList, Button, HorizontalGrid, HorizontalStack, IndexFiltersMode, Popover } from "@shopify/polaris";
 import EmptyScreensLayout from "../../../components/banners/EmptyScreensLayout";
 import { ISSUES_PAGE_DOCS_URL } from "../../../../main/onboardingData";
 import {SelectCollectionComponent} from "../../testing/TestRunsPage/TestrunsBannerComponent"
@@ -30,6 +30,7 @@ import CriticalUnsecuredAPIsOverTimeGraph from "./CriticalUnsecuredAPIsOverTimeG
 import settingFunctions from "../../settings/module.js";
 import JiraTicketCreationModal from "../../../components/shared/JiraTicketCreationModal.jsx";
 import testingApi from "../../testing/api.js"
+import { saveAs } from 'file-saver'
 
 const sortOptions = [
     { label: 'Severity', value: 'severity asc', directionLabel: 'Highest', sortKey: 'severity', columnIndex: 2 },
@@ -517,41 +518,30 @@ function IssuesPage() {
     }
 
     async function modifyDataForCSV(){
-        const filters ={
-            "severity": [],
-            "issueName": [],
-            "category": [],
-            "numberOfEndpoints": [],
-            "domains": [],
-            "compliance": [],
-            "creationTime": [],
-            "collectionIds": [],
-            "issueStatus": [],
-            "activeCollections": [],
-            "issueCategory": [ ]
-        }
-
+        const filters= {}
         const filtersFromPersistStore = PersistStore.getState().filtersMap;
-        Object.values(filtersFromPersistStore).forEach((item) => {
-            item?.filters.forEach((filter) => {
-                filters[filter.key] = filter.value
-            })
-        });
+        const currentPageKey = "/dashboard/reports/issues/#" + selectedTab
+        let selectedFilters = filtersFromPersistStore[currentPageKey]?.filters || [];
+        selectedFilters.forEach((filter) => {
+            filters[filter.key] = filter.value
+        })
 
         let filterStatus = [selectedTab.toUpperCase()]
-        let filterSeverity = filters.severity
-        let filterCompliance = filters.compliance
+        let filterSeverity = filters?.severity || []
+        let filterCompliance = filters?.compliance || []
         const activeCollections = (filters?.activeCollections !== undefined && filters?.activeCollections.length > 0) ? filters?.activeCollections[0] : initialValForResponseFilter;
-        const apiCollectionId = filters.apiCollectionId || []
-        let filterCollectionsId = apiCollectionId.concat(filters.collectionIds)
+        const apiCollectionId = filters?.apiCollectionId || []
+        let filterCollectionsId = (apiCollectionId || []).concat(filters?.collectionIds || [])
         let filterSubCategory = []
         filters?.issueCategory?.forEach((issue) => {
             filterSubCategory = filterSubCategory.concat(categoryToSubCategories[issue])
         })
-
+        if(filters?.issueName !== undefined && filters?.issueName.length > 0){
+            filterSubCategory = filterSubCategory.concat(filters?.issueName)
+        }
         let issueItem = []
 
-        await api.fetchIssues(0, 2000, filterStatus, filterCollectionsId, filterSeverity, filterSubCategory, "severity", -1, startTimestamp, endTimestamp, activeCollections, filterCompliance).then((issuesDataRes) => {
+        await api.fetchIssues(0, 20000, filterStatus, filterCollectionsId, filterSeverity, filterSubCategory, "severity", -1, startTimestamp, endTimestamp, activeCollections, filterCompliance).then((issuesDataRes) => {
             const uniqueIssuesMap = new Map()
             issuesDataRes.issues.forEach(item => {
                 const key = `${item?.id?.testSubCategory}|${item?.severity}|${item?.unread.toString()}`
@@ -608,8 +598,6 @@ function IssuesPage() {
         allIssues.forEach(i => {
             csv += Object.values(headerTextToValueMap)
                 .map(h => (Array.isArray(i[h]) ? `"${i[h].join(" ")}"` : (i[h] || "-"))).join(",") + "\r\n";
-
-
         })
         let blob = new Blob([csv], {
             type: "application/csvcharset=UTF-8"
