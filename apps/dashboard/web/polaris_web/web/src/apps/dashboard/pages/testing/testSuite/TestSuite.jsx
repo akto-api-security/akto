@@ -161,6 +161,10 @@ function TestSuite() {
                 }]
         }]
     }
+
+    function disambiguateLabel(key, value) {
+        return func.convertToDisambiguateLabel(value, func.toSentenceCase, 2)
+    }
     
 
     const components = [
@@ -172,6 +176,7 @@ function TestSuite() {
             selected={selected}
             onSelect={handleSelectedTab}
             onRowClick={handleRowClick}
+            disambiguateLabel={disambiguateLabel}
             resourceName={resourceName}
             useNewRow={true}
             headers={headings}
