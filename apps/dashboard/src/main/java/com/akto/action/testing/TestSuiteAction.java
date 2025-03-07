@@ -13,6 +13,9 @@ import com.mongodb.client.model.Updates;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
@@ -24,17 +27,38 @@ public class TestSuiteAction extends UserAction {
     private List<String> subCategoryList;
     private List<TestSuites> testSuiteList;
 
+    private String generateUniqueTestSuiteName(String baseName) {
+        Pattern regexPattern = Pattern.compile("^" + Pattern.quote(baseName) + "(?: \\((\\d+)\\))?$",
+                Pattern.CASE_INSENSITIVE);
+
+        List<String> existingNames = TestSuiteDao.instance.findAll(Filters.regex("name", regexPattern))
+                .stream()
+                .map(TestSuites::getName)
+                .collect(Collectors.toList());
+
+        int maxCount = -1;
+        for (String name : existingNames) {
+
+            Matcher matcher = regexPattern.matcher(name);
+            if (matcher.matches()) {
+                if (matcher.group(1) != null) {
+                    int currentCount = Integer.parseInt(matcher.group(1));
+                    maxCount = Math.max(maxCount, currentCount);
+                } else {
+                    maxCount = Math.max(maxCount, 0);
+                }
+            }
+        }
+        return maxCount == -1 ? baseName : baseName + " (" + (maxCount + 1) + ")";
+    }
+
     public String createTestSuite() {
         if (this.testSuiteName == null || this.testSuiteName.trim().isEmpty()) {
             addActionError("Invalid test suite name");
             return ERROR.toUpperCase();
         }
 
-        int existingCount = (int) TestSuiteDao.instance.count(Filters.eq(TestSuites.FIELD_NAME, this.testSuiteName));
-        if (existingCount > 0) {
-            addActionError("Test suite with same name already exists");
-            return ERROR.toUpperCase();
-        }
+        String newTestSuiteName = generateUniqueTestSuiteName(this.testSuiteName);
 
         if (this.subCategoryList == null) {
             addActionError("Invalid sub category list");
@@ -49,7 +73,7 @@ public class TestSuiteAction extends UserAction {
         int timeNow = Context.now();
 
         TestSuiteDao.instance.insertOne(
-                new TestSuites(this.testSuiteName, this.subCategoryList, user.getLogin(), timeNow, timeNow));
+                new TestSuites(newTestSuiteName, this.subCategoryList, user.getLogin(), timeNow, timeNow));
 
         return SUCCESS.toUpperCase();
     }
@@ -79,7 +103,7 @@ public class TestSuiteAction extends UserAction {
             updates.add(Updates.set(TestSuites.FIELD_NAME, this.testSuiteName));
         }
 
-        if (this.subCategoryList != null && !this.subCategoryList.isEmpty()) {
+        if (this.subCategoryList != null) {
             updates.add(Updates.set(TestSuites.FIELD_SUB_CATEGORY_LIST, this.subCategoryList));
         }
         updates.add(Updates.set(TestSuites.FIELD_LAST_UPDATED, (long) (System.currentTimeMillis() / 1000l)));

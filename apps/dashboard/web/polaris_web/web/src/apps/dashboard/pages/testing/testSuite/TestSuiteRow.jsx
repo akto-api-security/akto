@@ -1,6 +1,7 @@
 import { Button, HorizontalStack, Text, ResourceList, Collapsible, ResourceItem, Checkbox, Box, Link } from "@shopify/polaris"
 import {
     ChevronDownMinor,
+    ChevronRightMinor,
     ChevronUpMinor
 } from '@shopify/polaris-icons';
 import "./flyLayoutSuite.css"
@@ -111,15 +112,15 @@ function TestSuiteRow({ category, categories, setCategories, isLast, isEditMode,
         <Box borderRadiusEndEnd={(isLast) ? 2 : 0} borderRadiusEndStart={(isLast) ? 2 : 0} borderColor="border-subdued" borderBlockStartWidth="1" >
             <div className="category-list" style={{ cursor: "pointer", ...(isLast && !category.selected && { borderBottomLeftRadius: "0.5rem", borderBottomRightRadius: "0.5rem" }) }}>
                 <Box paddingInlineStart={5} paddingBlockEnd={3} paddingBlockStart={3} paddingInlineEnd={5}>
-                    <HorizontalStack>
+                    <HorizontalStack wrap="false">
                         {isEditMode?<Checkbox checked={checkSubCategorySelected()} onChange={() => { changeSubCategorySelection() }} />:null}
-                        <div onClick={toggleOpen} style={{display:"flex", alignContent:"center" ,justifyContent:"space-between", ...(isEditMode?{minWidth:"96%"}:{minWidth:"100%"})}} >
+                        <div onClick={toggleOpen} style={{display:"flex",flex:"1", alignContent:"center" ,justifyContent:"space-between"}} >
                             <HorizontalStack>
                                 <Text fontWeight="medium" as="h3">{displayName}</Text>
                             </HorizontalStack>                  
                             <HorizontalStack gap={4}>
                                 <span style={{ color: "#6D7175" }}>{isEditMode?`${countSelectedTestForCategory()}/${category.tests.length}`:`${category.tests.length}`}</span>
-                                <Button plain monochrome size="micro" icon={category.selected ? ChevronUpMinor : ChevronDownMinor}></Button>
+                                <Button plain monochrome size="micro" icon={category.selected ? ChevronDownMinor : ChevronRightMinor}></Button>
                             </HorizontalStack>
                         </div>
                     </HorizontalStack>
@@ -131,9 +132,9 @@ function TestSuiteRow({ category, categories, setCategories, isLast, isEditMode,
                     return (
                         <div style={{ backgroundColor: "#FAFBFB", cursor: "pointer", ...(isLast && subCategories.length - 1 === index && { borderBottomLeftRadius: "0.5rem", borderBottomRightRadius: "0.5rem" }) }} className="category-lists-item" key={index}>
                             <Box borderColor="border-subdued" borderBlockStartWidth="1" paddingInlineStart={10} paddingBlockEnd={2} paddingBlockStart={2} >
-                                <HorizontalStack key={1} align="start">
+                                <HorizontalStack wrap={false} key={1} align="start">
                                     {isEditMode ? <Checkbox checked={subCategory.selected} onChange={() => { changeTestSelection(subCategory) }} /> : null}
-                                    <div style={{width:"96%"}} onClick={() => window.open(`${window.location.origin}/dashboard/test-editor/${subCategory.value}`)}>
+                                    <div onClick={() => window.open(`${window.location.origin}/dashboard/test-editor/${subCategory.value}`)} style={{overflow: "hidden", paddingInlineEnd:"1rem"}}>
                                         <Text color="subdued" fontWeight="regular" as="h3" truncate>{subCategory.label}</Text>
                                     </div>
                                 </HorizontalStack>
