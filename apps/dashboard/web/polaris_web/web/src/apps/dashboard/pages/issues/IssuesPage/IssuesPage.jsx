@@ -6,7 +6,7 @@ import Store from "../../../store";
 import func from "@/util/func";
 import { MarkFulfilledMinor, ReportMinor, ExternalMinor } from '@shopify/polaris-icons';
 import PersistStore from "../../../../main/PersistStore";
-import { Button, HorizontalGrid, HorizontalStack, IndexFiltersMode } from "@shopify/polaris";
+import { ActionList, Button, HorizontalGrid, HorizontalStack, IndexFiltersMode, Popover } from "@shopify/polaris";
 import EmptyScreensLayout from "../../../components/banners/EmptyScreensLayout";
 import { ISSUES_PAGE_DOCS_URL } from "../../../../main/onboardingData";
 import {SelectCollectionComponent} from "../../testing/TestRunsPage/TestrunsBannerComponent"
@@ -30,6 +30,7 @@ import CriticalUnsecuredAPIsOverTimeGraph from "./CriticalUnsecuredAPIsOverTimeG
 import settingFunctions from "../../settings/module.js";
 import JiraTicketCreationModal from "../../../components/shared/JiraTicketCreationModal.jsx";
 import testingApi from "../../testing/api.js"
+import { saveAs } from 'file-saver'
 
 const sortOptions = [
     { label: 'Severity', value: 'severity asc', directionLabel: 'Highest', sortKey: 'severity', columnIndex: 2 },
@@ -108,6 +109,7 @@ function IssuesPage() {
             title: "Severity",
             text: "Severity",
             value: "severity",
+            textValue: "severityVal",
             sortActive: true
         },
         {
@@ -129,13 +131,15 @@ function IssuesPage() {
         {
             title: "Domains",
             text: "Domains",
-            value: "domains"
+            value: "domains",
+            textValue:"domainVal"
         },
         {
             title: "Compliance",
             text: "Compliance",
             value: "compliance",
-            sortActive: true
+            sortActive: true,
+            textValue: "complianceVal"
         },
         {
             title: "Discovered",
@@ -321,7 +325,8 @@ function IssuesPage() {
         },
         {
             content: 'Create jira ticket',
-            onAction: () => { createJiraTicketBulk() }
+            onAction: () => { createJiraTicketBulk() },
+            disabled: (window.JIRA_INTEGRATED === 'false')
         }]
         
         let reopen =  [{
@@ -512,6 +517,96 @@ function IssuesPage() {
         return {value: ret, total: total}
     }
 
+    async function modifyDataForCSV(){
+        const filters= {}
+        const filtersFromPersistStore = PersistStore.getState().filtersMap;
+        const currentPageKey = "/dashboard/reports/issues/#" + selectedTab
+        let selectedFilters = filtersFromPersistStore[currentPageKey]?.filters || [];
+        selectedFilters.forEach((filter) => {
+            filters[filter.key] = filter.value
+        })
+
+        let filterStatus = [selectedTab.toUpperCase()]
+        let filterSeverity = filters?.severity || []
+        let filterCompliance = filters?.compliance || []
+        const activeCollections = (filters?.activeCollections !== undefined && filters?.activeCollections.length > 0) ? filters?.activeCollections[0] : initialValForResponseFilter;
+        const apiCollectionId = filters?.apiCollectionId || []
+        let filterCollectionsId = (apiCollectionId || []).concat(filters?.collectionIds || [])
+        let filterSubCategory = []
+        filters?.issueCategory?.forEach((issue) => {
+            filterSubCategory = filterSubCategory.concat(categoryToSubCategories[issue])
+        })
+        if(filters?.issueName !== undefined && filters?.issueName.length > 0){
+            filterSubCategory = filterSubCategory.concat(filters?.issueName)
+        }
+        let issueItem = []
+
+        await api.fetchIssues(0, 20000, filterStatus, filterCollectionsId, filterSeverity, filterSubCategory, "severity", -1, startTimestamp, endTimestamp, activeCollections, filterCompliance).then((issuesDataRes) => {
+            const uniqueIssuesMap = new Map()
+            issuesDataRes.issues.forEach(item => {
+                const key = `${item?.id?.testSubCategory}|${item?.severity}|${item?.unread.toString()}`
+                if (!uniqueIssuesMap.has(key)){
+                    const issue = {
+                        id: item?.id,
+                        severityVal: func.toSentenceCase(item?.severity),
+                        complianceVal: Object.keys(subCategoryMap[item?.id?.testSubCategory]?.compliance?.mapComplianceToListClauses || {}),
+                        issueName: item?.id?.testSubCategory,
+                        category: subCategoryMap[item?.id?.testSubCategory]?.superCategory?.shortName,
+                        numberOfEndpoints: 1,
+                        creationTime: func.prettifyEpoch(item?.creationTime),
+                        issueStatus: item?.unread.toString() === 'false' ? "read" : "unread",
+                        domainVal:[(hostNameMap[item?.id?.apiInfoKey?.apiCollectionId] !== null ? hostNameMap[item?.id?.apiInfoKey?.apiCollectionId] : apiCollectionMap[item?.id?.apiInfoKey?.apiCollectionId])],
+                        urls:[`${item?.id?.apiInfoKey?.method} ${item?.id?.apiInfoKey?.url}`]
+                    }
+                    uniqueIssuesMap.set(key, issue)
+                }
+                else {
+                    const existingIssue = uniqueIssuesMap.get(key)
+                    const domain = (hostNameMap[item?.id?.apiInfoKey?.apiCollectionId] !== null ? hostNameMap[item?.id?.apiInfoKey?.apiCollectionId] : apiCollectionMap[item?.id?.apiInfoKey?.apiCollectionId])
+                    if (!existingIssue.domainVal.includes(domain)) {
+                        existingIssue.domainVal.push(domain)
+                    }
+                    existingIssue.urls.push(`${item?.id?.apiInfoKey?.method} ${item?.id?.apiInfoKey?.url}`)
+                    existingIssue.numberOfEndpoints += 1
+                }
+            })
+            issueItem = Array.from(uniqueIssuesMap.values())
+            
+        }).catch((e) => {
+            func.setToast(true, true, e.message)
+        })
+        return issueItem;
+
+    }
+    
+
+
+    async function exportCsv() {
+        func.setToast(true, false, "CSV export in progress")
+        let headerTextToValueMap = {
+            ...Object.fromEntries(
+                headers
+                    .map(x => [x.text, x.textValue ? x.textValue : x.value])
+                    .filter(x => x[0]?.length > 0)
+            ),
+            URLs: "urls"
+        };
+
+
+        let csv = Object.keys(headerTextToValueMap).join(",") + "\r\n"
+        const allIssues = await modifyDataForCSV()
+        allIssues.forEach(i => {
+            csv += Object.values(headerTextToValueMap)
+                .map(h => (Array.isArray(i[h]) ? `"${i[h].join(" ")}"` : (i[h] || "-"))).join(",") + "\r\n";
+        })
+        let blob = new Blob([csv], {
+            type: "application/csvcharset=UTF-8"
+        });
+        saveAs(blob, ("All issues") + ".csv");
+        func.setToast(true, false, <div data-testid="csv_download_message">CSV exported successfully</div>)
+
+    }
+
     const components = (
         <>
             <SummaryInfo
@@ -553,6 +648,8 @@ function IssuesPage() {
             />
         </>
     )
+
+    const [popOverActive, setPopOverActive] = useState(false)
     
     return (
         <>
@@ -584,7 +681,26 @@ function IssuesPage() {
             : components
             ]}
             primaryAction={<Button primary onClick={() => openVulnerabilityReport()} disabled={showEmptyScreen}>Export results</Button>}
-            secondaryActions={<DateRangeFilter initialDispatch={currDateRange} dispatch={(dateObj) => dispatchCurrDateRange({ type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias })} />}
+            secondaryActions={
+            <HorizontalStack  gap={2}>
+                <DateRangeFilter initialDispatch={currDateRange} dispatch={(dateObj) => dispatchCurrDateRange({ type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias })} />
+                <Popover
+                active={popOverActive}
+                activator={<Button onClick={() => setPopOverActive((prev)=>!prev)} disabled={showEmptyScreen} disclosure>More Actions</Button>}
+                autofocusTarget="first-node"
+                onClose={() => setPopOverActive(false)}
+                >
+                <ActionList
+                  actionRole="menuitem"
+                  items={[
+                    {
+                      content: 'Export results as CSV',
+                      onAction: exportCsv,
+                    },
+                  ]}
+                />
+              </Popover>
+            </HorizontalStack>}
         />
             {(resultId !== null && resultId.length > 0) ? <TestRunResultPage /> : null}
             <JiraTicketCreationModal
