@@ -257,7 +257,7 @@ export default function LeftNav() {
                             subNavigationItems: reportsSubNavigationItems,
                             key: "6",
                         },
-                        window?.STIGG_FEATURE_WISE_ALLOWED?.THREAT_DETECTION?.isGranted ?
+                        window?.STIGG_FEATURE_WISE_ALLOWED?.THREAT_DETECTION?.isGranted || true ?
                              {
                                 label: (
                                     <Text variant="bodyMd" fontWeight="medium">

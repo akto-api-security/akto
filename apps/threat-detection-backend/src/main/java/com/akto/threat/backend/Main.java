@@ -46,27 +46,27 @@ public class Main {
             .build();
 
     MongoClient threatProtectionMongo = MongoClients.create(clientSettings);
-    KafkaConfig internalKafkaConfig =
-        KafkaConfig.newBuilder()
-            .setBootstrapServers(System.getenv("THREAT_EVENTS_KAFKA_BROKER_URL"))
-            .setGroupId("akto.threat_protection.flush_db")
-            .setConsumerConfig(
-                KafkaConsumerConfig.newBuilder()
-                    .setMaxPollRecords(100)
-                    .setPollDurationMilli(100)
-                    .build())
-            .setProducerConfig(
-                KafkaProducerConfig.newBuilder().setBatchSize(100).setLingerMs(1000).build())
-            .setKeySerializer(Serializer.STRING)
-            .setValueSerializer(Serializer.STRING)
-            .build();
+    // KafkaConfig internalKafkaConfig =
+    //     KafkaConfig.newBuilder()
+    //         .setBootstrapServers(System.getenv("THREAT_EVENTS_KAFKA_BROKER_URL"))
+    //         .setGroupId("akto.threat_protection.flush_db")
+    //         .setConsumerConfig(
+    //             KafkaConsumerConfig.newBuilder()
+    //                 .setMaxPollRecords(100)
+    //                 .setPollDurationMilli(100)
+    //                 .build())
+    //         .setProducerConfig(
+    //             KafkaProducerConfig.newBuilder().setBatchSize(100).setLingerMs(1000).build())
+    //         .setKeySerializer(Serializer.STRING)
+    //         .setValueSerializer(Serializer.STRING)
+    //         .build();
 
-    IPLookupClient ipLookupClient = new IPLookupClient(getMaxmindFile());
+    IPLookupClient ipLookupClient = null;//new IPLookupClient(getMaxmindFile());
 
-    new FlushMessagesToDB(internalKafkaConfig, threatProtectionMongo).run();
+    //new FlushMessagesToDB(internalKafkaConfig, threatProtectionMongo).run();
 
     MaliciousEventService maliciousEventService =
-        new MaliciousEventService(internalKafkaConfig, threatProtectionMongo, ipLookupClient);
+        new MaliciousEventService(null, threatProtectionMongo, ipLookupClient);
 
     ThreatActorService threatActorService = new ThreatActorService(threatProtectionMongo);
     ThreatApiService threatApiService = new ThreatApiService(threatProtectionMongo);
