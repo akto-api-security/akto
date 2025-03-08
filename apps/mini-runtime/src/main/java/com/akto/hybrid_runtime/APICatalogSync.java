@@ -36,6 +36,7 @@ import com.akto.hybrid_runtime.policies.AktoPolicyNew;
 import com.akto.types.CappedSet;
 import com.akto.util.filter.DictionaryFilter;
 import com.akto.utils.RedactSampleData;
+import com.akto.utils.ParamFilter;
 import com.google.api.client.util.Charsets;
 import com.google.common.hash.BloomFilter;
 import com.google.common.hash.Funnels;
@@ -1446,7 +1447,8 @@ public class APICatalogSync {
 
             // todo: redactCollectionLevel
             DbUpdateReturnHybrid dbUpdateReturn = getDBUpdatesForParamsHybrid(deltaCatalog, dbCatalog, redact, redactCollectionLevel);
-            writesForParams.addAll(dbUpdateReturn.bulkUpdatesForSingleTypeInfo);
+            ArrayList<BulkUpdates> filteredWrites = ParamFilter.filterForNew(dbUpdateReturn.bulkUpdatesForSingleTypeInfo, demosAndDeactivatedCollections, Context.accountId.get());
+            writesForParams.addAll(filteredWrites);
             writesForSensitiveSampleData.addAll(dbUpdateReturn.bulkUpdatesForSampleData);
             writesForSensitiveParamInfo.addAll(dbUpdateReturn.bulkUpdatesForSensitiveParamInfo);
             writesForTraffic.addAll(getDBUpdatesForTrafficHybrid(apiCollectionId, deltaCatalog));
