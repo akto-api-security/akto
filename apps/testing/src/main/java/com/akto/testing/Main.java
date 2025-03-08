@@ -39,6 +39,7 @@ import com.akto.task.Cluster;
 import com.akto.test_editor.execution.Executor;
 import com.akto.testing.kafka_utils.ConsumerUtil;
 import com.akto.testing.kafka_utils.Producer;
+import com.akto.testing.kafka_utils.TestingConfigurations;
 import com.akto.util.AccountTask;
 import com.akto.util.Constants;
 import com.akto.util.DashboardMode;
@@ -332,6 +333,40 @@ public class Main {
 
     private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
 
+    //returns true if test is not supposed to run
+    private static boolean handleRerunTestingRunResult(TestingRunResultSummary originalSummary) {
+        TestingConfigurations config = TestingConfigurations.getInstance();
+        config.setRerunTestingRunResultSummary(null);
+
+        if (originalSummary == null || originalSummary.getOriginalTestingRunResultSummaryId() == null) {
+            config.setTestingRunResultList(null);
+            return false;
+        }
+
+        ObjectId summaryId = originalSummary.getOriginalTestingRunResultSummaryId();
+        List<TestingRunResult> testingRunResultList = TestingRunResultDao.instance.findAll(
+                Filters.and(
+                        Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, summaryId),
+                        Filters.eq(TestingRunResult.RERUN, true)
+                ),
+                Projections.include(
+                        TestingRunResult.TEST_RUN_ID,
+                        TestingRunResult.API_INFO_KEY,
+                        TestingRunResult.TEST_SUB_TYPE
+                )
+        );
+
+        if (testingRunResultList == null) {
+            TestingRunResultSummariesDao.instance.deleteAll(Filters.eq(TestingRunResultSummariesDao.ID, originalSummary.getId()));
+            loggerMaker.infoAndAddToDb("Deleting TRRS for rerun case, no testing run result found, TRRS_ID: " + originalSummary.getId().toHexString());
+            return true;
+        }
+
+        config.setRerunTestingRunResultSummary(originalSummary);
+        config.setTestingRunResultList(testingRunResultList);
+        return false;
+    }
+
     public static void main(String[] args) throws InterruptedException {
         String mongoURI = System.getenv("AKTO_MONGO_CONN");
         ReadPreference readPreference = ReadPreference.primary();
@@ -389,28 +424,31 @@ public class Main {
 
                 String testingRunId = currentTestInfo.getString("testingRunId");
                 String testingRunSummaryId = currentTestInfo.getString("summaryId");
-                TestingRun testingRun = TestingRunDao.instance.findOne(Filters.eq(Constants.ID, new ObjectId(testingRunId)));
-                TestingRunConfig baseConfig = TestingRunConfigDao.instance.findOne(Constants.ID, testingRun.getTestIdConfig());
-                testingRun.setTestingRunConfig(baseConfig);
+                //check if currently running testrun is part of rerun
                 ObjectId summaryId = new ObjectId(testingRunSummaryId);
-                //todo: rerun case check shivam
-                testingProducer.initProducer(testingRun, summaryId, featureAccess.fetchSyncLimit(), true, null);
-                int maxRunTime = testingRun.getTestRunTime() <= 0 ? 30*60 : testingRun.getTestRunTime();
-                testingConsumer.init(maxRunTime);
+                TestingRunResultSummary rerunTestingRunResultSummary = TestingRunResultSummariesDao.instance.findOne(TestingRunResultSummary.ORIGINAL_TESTING_RUN_SUMMARY_ID, summaryId);
+                //fill testingRunResult in TestingConfigurations
+                if(!handleRerunTestingRunResult(rerunTestingRunResultSummary)) {
+                    TestingRun testingRun = TestingRunDao.instance.findOne(Filters.eq(Constants.ID, new ObjectId(testingRunId)));
+                    TestingRunConfig baseConfig = TestingRunConfigDao.instance.findOne(Constants.ID, testingRun.getTestIdConfig());
+                    testingRun.setTestingRunConfig(baseConfig);
+                    testingProducer.initProducer(testingRun, summaryId, featureAccess.fetchSyncLimit(), true);
+                    int maxRunTime = testingRun.getTestRunTime() <= 0 ? 30*60 : testingRun.getTestRunTime();
+                    testingConsumer.init(maxRunTime);
 
-                // mark the test completed here
-                testCompletion.markTestAsCompleteAndRunFunctions(testingRun, summaryId);
+                    // mark the test completed here
+                    testCompletion.markTestAsCompleteAndRunFunctions(testingRun, summaryId);
 
-                if (StringUtils.hasLength(AKTO_SLACK_WEBHOOK) && !isTestingRunForDemoCollection(testingRun)) {
-                    try {
-                        CustomTextAlert customTextAlert = new CustomTextAlert("Test completed for accountId=" + accountId + " testingRun=" + testingRun.getHexId() + " summaryId=" + summaryId.toHexString() + " : @Arjun you are up now. Make your time worth it. :)");
-                        SLACK_INSTANCE.send(AKTO_SLACK_WEBHOOK, customTextAlert.toJson());  
-                    } catch (Exception e) {
-                        logger.error("Error sending slack alert for completion of test", e);
+                    if (StringUtils.hasLength(AKTO_SLACK_WEBHOOK) && !isTestingRunForDemoCollection(testingRun)) {
+                        try {
+                            CustomTextAlert customTextAlert = new CustomTextAlert("Test completed for accountId=" + accountId + " testingRun=" + testingRun.getHexId() + " summaryId=" + summaryId.toHexString() + " : @Arjun you are up now. Make your time worth it. :)");
+                            SLACK_INSTANCE.send(AKTO_SLACK_WEBHOOK, customTextAlert.toJson());
+                        } catch (Exception e) {
+                            logger.error("Error sending slack alert for completion of test", e);
+                        }
                     }
-                    
                 }
-                
+
                 deleteScheduler.execute(() -> {
                     Context.accountId.set(accountId);
                     try {
@@ -465,6 +503,7 @@ public class Main {
                 if(accountSettings != null){
                     defaultTime =  accountSettings.getTimeForScheduledSummaries();
                 }
+                TestingConfigurations config = TestingConfigurations.getInstance();
                 TestingRunResultSummary trrs = findPendingTestingRunResultSummary(defaultTime);
                 boolean isSummaryRunning = trrs != null && trrs.getState().equals(State.RUNNING);
                 boolean isTestingRunResultRerunCase = trrs != null && trrs.getOriginalTestingRunResultSummaryId() != null;
@@ -473,27 +512,17 @@ public class Main {
                 if (trrs == null) {
                     testingRun = findPendingTestingRun(defaultTime);
                 } else {
-                    summaryId = trrs.getId();
+                    summaryId = isTestingRunResultRerunCase ? trrs.getOriginalTestingRunResultSummaryId() : trrs.getId();
                     loggerMaker.infoAndAddToDb("Found trrs " + trrs.getHexId() +  " for account: " + accountId);
                     testingRun = TestingRunDao.instance.findOne("_id", trrs.getTestingRunId());
                 }
 
-                List<TestingRunResult> testingRunResultList = null;
                 if (testingRun == null) {
                     return;
                 }
 
-                if (isTestingRunResultRerunCase) {
-                    summaryId = trrs.getOriginalTestingRunResultSummaryId();
-                    testingRunResultList = TestingRunResultDao.instance.fetchLatestTestingRunResult(Filters.and(
-                            Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID,summaryId),
-                            Filters.eq(TestingRunResult.RERUN, true)
-                    ));
-                    if (testingRunResultList == null) {//test shouldn't run
-                        TestingRunResultSummariesDao.instance.deleteAll(Filters.eq(TestingRunResultSummariesDao.ID, trrs.getId()));
-                        loggerMaker.infoAndAddToDb("deleting trrs for rerun case, no testing run result found, TRRS_ID: " + trrs.getId().toHexString());
-                        return;
-                    }
+                if (handleRerunTestingRunResult(trrs)) {
+                    return;
                 }
 
                 if (!TestingInstanceHeartBeatDao.instance.isTestEligibleForInstance(testingRun.getHexId())) {
@@ -510,6 +539,8 @@ public class Main {
                         // get count issues here
                         if (isTestingRunResultRerunCase) {
                             TestingRunResultSummariesDao.instance.deleteAll(Filters.eq(TestingRunResultSummariesDao.ID, trrs.getId()));
+                            config.setTestingRunResultList(null);
+                            config.setRerunTestingRunResultSummary(null);
                             loggerMaker.infoAndAddToDb("Deleted for TestingRunResult rerun case for stopped testrun TRRS: " + trrs.getId());
                         } else {
                             Map<String,Integer> finalCountMap = Utils.finalCountIssuesMap(trrs.getId());
@@ -541,6 +572,8 @@ public class Main {
 
                     if (isTestingRunResultRerunCase) {
                         TestingRunResultSummariesDao.instance.deleteAll(Filters.eq(TestingRunResultSummariesDao.ID, trrs.getId()));
+                        config.setTestingRunResultList(null);
+                        config.setRerunTestingRunResultSummary(null);
                         loggerMaker.infoAndAddToDb("Deleted for TestingRunResult rerun case for failed testrun TRRS: " + trrs.getId());
                     } else {
                         TestingRunResultSummariesDao.instance.getMCollection().withWriteConcern(writeConcern).findOneAndUpdate(
@@ -576,7 +609,7 @@ public class Main {
                     }
                     setTestingRunConfig(testingRun, trrs);
                     boolean maxRetriesReached = false;
-                    //todo: check for running case shivam
+                    //todo: shivam resolve this running
                     if (isSummaryRunning || isTestingRunRunning) {
                         loggerMaker.infoAndAddToDb("TRRS or TR is in running state, checking if it should run it or not");
                         TestingRunResultSummary testingRunResultSummary;
@@ -710,11 +743,11 @@ public class Main {
                         // init producer and the consumer here
                         // producer for testing is currently calls init functions from test-executor
                         if(Constants.IS_NEW_TESTING_ENABLED){
-                            testingProducer.initProducer(testingRun, summaryId, syncLimit, false, testingRunResultList);
+                            testingProducer.initProducer(testingRun, summaryId, syncLimit, false);
                             testingConsumer.init(maxRunTime);  
                         }else{
                             TestExecutor testExecutor = new TestExecutor();
-                            testExecutor.init(testingRun, summaryId, syncLimit, false, testingRunResultList);
+                            testExecutor.init(testingRun, summaryId, syncLimit, false);
                         }                   
                     }
                     

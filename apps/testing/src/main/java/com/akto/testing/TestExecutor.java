@@ -97,9 +97,9 @@ public class TestExecutor {
         expiryTimeOfAuthToken = newExpiryTime;
     }
 
-    public void init(TestingRun testingRun, ObjectId summaryId, SyncLimit syncLimit, boolean shouldInitOnly, List<TestingRunResult> testingRunResultList) {
+    public void init(TestingRun testingRun, ObjectId summaryId, SyncLimit syncLimit, boolean shouldInitOnly) {
         if (testingRun.getTestIdConfig() != 1) {
-            apiWiseInit(testingRun, summaryId, false, new ArrayList<>(), syncLimit, shouldInitOnly, testingRunResultList);
+            apiWiseInit(testingRun, summaryId, false, new ArrayList<>(), syncLimit, shouldInitOnly);
         } else {
             workflowInit(testingRun, summaryId, false, new ArrayList<>());
         }
@@ -152,7 +152,7 @@ public class TestExecutor {
         );
     }
 
-    public void apiWiseInit(TestingRun testingRun, ObjectId summaryId, boolean debug, List<TestingRunResult.TestLog> testLogs, SyncLimit syncLimit, boolean shouldInitOnly, List<TestingRunResult> testingRunResultList) {
+    public void apiWiseInit(TestingRun testingRun, ObjectId summaryId, boolean debug, List<TestingRunResult.TestLog> testLogs, SyncLimit syncLimit, boolean shouldInitOnly) {
 
         // write producer running here as producer has been initiated now
         int accountId = Context.accountId.get();
@@ -166,9 +166,32 @@ public class TestExecutor {
             dbObject.put("testingRunId", testingRun.getId().toHexString()); 
             writeJsonContentInFile(Constants.TESTING_STATE_FOLDER_PATH, Constants.TESTING_STATE_FILE_NAME, dbObject);
         }
-        
-        TestingEndpoints testingEndpoints = testingRun.getTestingEndpoints();
 
+        TestingEndpoints testingEndpoints = testingRun.getTestingEndpoints();
+        List<ApiInfoKey> apiInfoKeyList;
+        Map<ApiInfoKey, List<String>> apiInfoKeySubcategoryMap = null;
+        Set<String> testingSubCategorySet = new HashSet<>();
+        if (TestingConfigurations.getInstance().getTestingRunResultList() != null) {
+
+            Set<ApiInfoKey> apiInfoKeySet = new HashSet<>();
+            apiInfoKeySubcategoryMap = new HashMap<>();
+
+            for (TestingRunResult testingRunResult: TestingConfigurations.getInstance().getTestingRunResultList()) {
+                apiInfoKeySubcategoryMap
+                        .computeIfAbsent(testingRunResult.getApiInfoKey(), k -> new ArrayList<>())
+                        .add(testingRunResult.getTestSubType());
+                apiInfoKeySet.add(testingRunResult.getApiInfoKey());
+
+                testingSubCategorySet.add(testingRunResult.getTestSubType());
+            }
+
+            apiInfoKeyList = new ArrayList<>(apiInfoKeySet);
+        } else {
+            apiInfoKeyList = testingEndpoints.returnApis();
+        }
+
+        final Map<ApiInfoKey, List<String>> finalApiInfoKeySubcategoryMap = apiInfoKeySubcategoryMap;
+        
         if (testingRun.getTestingRunConfig() != null) {
             TestingRunResultSummariesDao.instance.updateOneNoUpsert(Filters.eq(Constants.ID, summaryId),
                     Updates.set(TestingRunResultSummary.TESTS_INITIATED_COUNT,
@@ -176,29 +199,12 @@ public class TestExecutor {
         }
 
         SampleMessageStore sampleMessageStore = SampleMessageStore.create();
-        sampleMessageStore.fetchSampleMessages(Main.extractApiCollectionIds(testingRun.getTestingEndpoints().returnApis()));
+        sampleMessageStore.fetchSampleMessages(Main.extractApiCollectionIds(apiInfoKeyList));
 
         List<RawApi> rawApis = sampleMessageStore.findSampleMessages(1);
         RawApi randomRawApi = !rawApis.isEmpty() ? rawApis.get(0) : null;
         AuthMechanismStore authMechanismStore = AuthMechanismStore.create(randomRawApi);
 
-        List<ApiInfoKey> apiInfoKeyList;
-        Map<ApiInfoKey, List<String>> apiInfoKeySubcategoryMap = null;
-        if (testingRunResultList != null) {
-            Set<ApiInfoKey> apiInfoKeySet = new HashSet<>();
-            apiInfoKeySubcategoryMap = new HashMap<>();
-            for (TestingRunResult testingRunResult: testingRunResultList) {
-                apiInfoKeySubcategoryMap
-                        .computeIfAbsent(testingRunResult.getApiInfoKey(), k -> new ArrayList<>())
-                        .add(testingRunResult.getTestSubType());
-                apiInfoKeySet.add(testingRunResult.getApiInfoKey());
-            }
-            apiInfoKeyList = new ArrayList<>(apiInfoKeySet);
-        } else {
-            apiInfoKeyList = testingEndpoints.returnApis();
-        }
-
-        final Map<ApiInfoKey, List<String>> finalApiInfoKeySubcategoryMap = apiInfoKeySubcategoryMap;
         if (apiInfoKeyList == null || apiInfoKeyList.isEmpty()) return;
         loggerMaker.infoAndAddToDb("APIs found: " + apiInfoKeyList.size(), LogDb.TESTING);
 
@@ -209,7 +215,13 @@ public class TestExecutor {
         List<TestRoles> testRoles = sampleMessageStore.fetchTestRoles();
         AuthMechanism authMechanism = authMechanismStore.getAuthMechanism();
 
-        List<String> testingRunSubCategories = testingRun.getTestingRunConfig().getTestSubCategoryList();
+        //Updating the subcategory list if its individual run
+        List<String> testingRunSubCategories;
+        if (testingSubCategorySet.isEmpty()) {
+            testingRunSubCategories = testingRun.getTestingRunConfig().getTestSubCategoryList();
+        } else {
+            testingRunSubCategories = new ArrayList<>(testingSubCategorySet);
+        }
 
         Map<String, TestConfig> testConfigMap = YamlTemplateDao.instance.fetchTestConfigMap(false, true, 0, 10_000, Filters.in("_id", testingRunSubCategories));
 
@@ -491,6 +503,11 @@ public class TestExecutor {
                         Updates.set(TestingRunResultSummary.COUNT_ISSUES, finalCountMap),
                         Updates.set(TestingRunResultSummary.STATE, updatedState)),
                 options);
+
+        TestingRunResultSummariesDao.instance.deleteAll(Filters.eq(TestingRunResultSummary.ID,
+                TestingConfigurations.getInstance().getRerunTestingRunResultSummary()));
+        loggerMaker.infoAndAddToDb("Deleting rerun testing result summary after completion of test: TRRS_ID:" + TestingConfigurations.getInstance().getRerunTestingRunResultSummary().getHexId());
+
         GithubUtils.publishGithubComments(testingRunResultSummary);
 
         Map<String , Integer> totalCountIssues = testingRunResultSummary.getCountIssues();
@@ -738,6 +755,11 @@ public class TestExecutor {
         if (resultSize > 0) {
             loggerMaker.infoAndAddToDb("testingRunResults size: " + resultSize, LogDb.TESTING);
             trim(testingRunResults);
+            TestingRunResult originalTestingRunResultForRerun = TestingConfigurations.getInstance().getTestingRunResultForApiKeyInfo(testingRunResults.get(0).getApiInfoKey(), testingRunResults.get(0).getTestSubType());
+            if (originalTestingRunResultForRerun != null) {
+                loggerMaker.infoAndAddToDb("Deleting original testingRunResults for rerun after replaced with run TRR_ID: " + originalTestingRunResultForRerun.getHexId());
+                TestingRunResultDao.instance.deleteAll(Filters.eq(TestingRunResultDao.ID, originalTestingRunResultForRerun.getId()));
+            }
             TestingRunResultDao.instance.insertMany(testingRunResults);
             loggerMaker.infoAndAddToDb("Inserted testing results", LogDb.TESTING);
 

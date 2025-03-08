@@ -74,7 +74,7 @@ public class Producer {
         }
     }
 
-    public void initProducer(TestingRun testingRun, ObjectId summaryId, SyncLimit syncLimit, boolean doInitOnly, List<TestingRunResult> testingRunResultList){
+    public void initProducer(TestingRun testingRun, ObjectId summaryId, SyncLimit syncLimit, boolean doInitOnly){
         TestExecutor executor = new TestExecutor();
         if(!doInitOnly){
             try {
@@ -83,6 +83,6 @@ public class Producer {
                 e.printStackTrace();
             }
         }
-        executor.init(testingRun, summaryId, syncLimit, doInitOnly, testingRunResultList);
+        executor.init(testingRun, summaryId, syncLimit, doInitOnly);
     }
 }
