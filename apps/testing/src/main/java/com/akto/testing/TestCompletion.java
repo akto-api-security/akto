@@ -71,11 +71,10 @@ public class TestCompletion {
 
         if(organization != null && organization.getTestTelemetryEnabled()){
             logger.info("Test telemetry enabled for account: " + accountId + ", sending results");
-            ObjectId finalSummaryId = summaryId;
             testTelemetryScheduler.execute(() -> {
                 Context.accountId.set(accountId);
                 try {
-                    com.akto.onprem.Constants.sendTestResults(finalSummaryId, organization);
+                    com.akto.onprem.Constants.sendTestResults(summaryId, organization);
                     logger.info("Test telemetry sent for account: " + accountId);
                 } catch (Exception e) {
                     logger.error("Error in sending test telemetry for account: " + accountId + " " + e.getMessage());
