@@ -36,6 +36,7 @@ public class RbacEnums {
         AUTH_TYPE(AccessGroups.TESTING),
         ISSUES(AccessGroups.TESTING),
         TEST_EDITOR(AccessGroups.TEST_LIBRARY),
+        TEST_SUITE(AccessGroups.TEST_LIBRARY),
         EXTERNAL_TEST_LIBRARY(AccessGroups.TEST_LIBRARY),
         INTEGRATIONS(AccessGroups.SETTINGS),
         METRICS(AccessGroups.DEBUG_INFO),

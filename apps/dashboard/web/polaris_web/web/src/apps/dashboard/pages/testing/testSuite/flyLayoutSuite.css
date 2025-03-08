@@ -1,0 +1,3 @@
+.category-list:hover, .category-lists-item:hover{
+    background-color: var(--p-color-bg-hover) !important;
+}
