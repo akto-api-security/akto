@@ -28,14 +28,18 @@ import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.BufferedReader;
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
+import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
 import javax.script.ScriptContext;
@@ -98,12 +102,7 @@ public class ApiExecutor {
         }
         boolean isCyborgCall = request.url().toString().contains("cyborg.akto.io");
         long start = System.currentTimeMillis();
-        System.out.println("-------- logs ---------");
-        System.out.println(request.url());
-        System.out.println(request.headers());
-        System.out.println("req len: " + request.body().contentLength());
-        System.out.println("req len: " + bodyToString(request.body()));
-        System.out.println("-------- logs ---------");
+
         Call call = client.newCall(request);
         Response response = null;
         String body;
@@ -120,7 +119,19 @@ public class ApiExecutor {
                 throw new Exception("Couldn't read response body");
             }
             try {
-                body = responseBody.string();
+                boolean isGzip = false;
+                body = null;
+                for (String headerName: response.headers().names()) {
+                    if (headerName.toLowerCase().equals("content-encoding") && response.header(headerName).contains("gzip")) {
+                        isGzip = true;
+                        body = decompress(responseBody.bytes());
+                        break;
+                    }
+                }
+
+                if (!isGzip) {
+                    body = responseBody.string();
+                }   
             } catch (IOException e) {
                 if (!(request.url().toString().contains("insertRuntimeLog") || request.url().toString().contains("insertTestingLog"))) {
                     loggerMaker.errorAndAddToDb("Error while parsing response body: " + e, LogDb.TESTING);
@@ -545,13 +556,14 @@ public class ApiExecutor {
 
         RequestBody body = null;
         boolean isCyborgCall = request.getUrl().toString().contains("cyborg.akto.io");
-        if (isCyborgCall && StringUtils.isNotBlank(payload)) {
+        if (isCyborgCall && StringUtils.isNotBlank(payload) && payload.length() > 150) {
             try (ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
                 GZIPOutputStream gzipOutputStream = new GZIPOutputStream(byteArrayOutputStream)) {
                 gzipOutputStream.write(payload.getBytes(StandardCharsets.UTF_8));
                 gzipOutputStream.close();
                 body = RequestBody.create(byteArrayOutputStream.toByteArray(), MediaType.parse(contentType));
                 builder.addHeader("Content-Encoding", "gzip");
+                builder.addHeader("Accept-Encoding", "gzip");
             } catch (IOException e) {
                 System.out.println("unable to zip payload: " +  payload);
             }
@@ -564,6 +576,24 @@ public class ApiExecutor {
         return common(okHttpRequest, followRedirects, debug, testLogs, skipSSRFCheck, nonTestingContext);
     }
 
+    public static String decompress(final byte[] compressed) throws IOException {
+        final StringBuilder outStr = new StringBuilder();
+        if ((compressed == null) || (compressed.length == 0)) {
+            return "";
+        }
+        final GZIPInputStream gis = new GZIPInputStream(new ByteArrayInputStream(compressed));
+        final BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(gis, "UTF-8"));
+
+        String line;
+        while ((line = bufferedReader.readLine()) != null) {
+            outStr.append(line);
+        }
+        return outStr.toString();
+    }
+
+    public static boolean isCompressed(final byte[] compressed) {
+        return (compressed[0] == (byte) (GZIPInputStream.GZIP_MAGIC)) && (compressed[1] == (byte) (GZIPInputStream.GZIP_MAGIC >> 8));
+    }
 
     private static String bodyToString(final RequestBody request){
         try {
@@ -574,22 +604,6 @@ public class ApiExecutor {
         } 
         catch (final IOException e) {
             return "did not work";
-        }
-}
-
-    public static void main(String[] args) {
-        try {
-            OriginalHttpRequest request = new OriginalHttpRequest();
-            request.setUrl("https://cyborg.akto.io/api/fetchAccountSettings");
-            HashMap<String, List<String>> headers = new HashMap<>();
-            headers.put("authorization", Collections.singletonList("eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoiaW52aXRlX3VzZXIiLCJhY2NvdW50SWQiOjE2NjcyMzU3MzgsImlhdCI6MTc0MTUwNzgzMywiZXhwIjoxNzU3NDA1NDMzfQ.NBB1rnJb9fAHvIV9XRSthMzHZb6EOPZa9c1rQ2OrjaYAVrHCigYGV4ei67N0h6KN4xvANXTmcz7fvrdO-PZb2Xwx9Jl5QAJWaQCDiIEyTfQ_Bq7u3K_LOM2YL7EQIe6dODTBUOj0CFCNXiVn7glb4MJ40jXGnQaambZqmVqLajSmu64zAxB-GCi5M-32DOqPRMgjP4mTHltBWiQIV6dlP0KFgyoucAiVtx73GiqzRa2KYV_0d52e6z_sjSKAl6mdE_5zRi5wELSunRkVA9AnSyC2O8diVGUsLM8RcoMocrlffkdqHqv022ExylK7c5me_C1I3XAVXYbvbmcCsi0L-A"));
-            request.setMethod("POST");
-            request.setHeaders(headers);
-            request.setBody("{}");
-            OriginalHttpResponse response = sendRequest(request, true, null, false, null);
-            System.out.println(response.getBody());
-        } catch (Exception e) {
-            e.printStackTrace();
         }
     }
 }
