@@ -27,12 +27,15 @@ import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
+import java.util.zip.GZIPOutputStream;
 
 import javax.script.ScriptContext;
 import javax.script.ScriptEngine;
@@ -533,7 +536,23 @@ public class ApiExecutor {
         }
 
         if (payload == null) payload = "";
-        RequestBody body = RequestBody.create(payload, MediaType.parse(contentType));
+
+        RequestBody body = null;
+        boolean isCyborgCall = request.getUrl().toString().contains("cyborg.akto.io");
+        if (isCyborgCall && StringUtils.isNotBlank(payload)) {
+            try (ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+                GZIPOutputStream gzipOutputStream = new GZIPOutputStream(byteArrayOutputStream)) {
+                gzipOutputStream.write(payload.getBytes(StandardCharsets.UTF_8));
+                gzipOutputStream.close();
+                body = RequestBody.create(byteArrayOutputStream.toByteArray(), MediaType.parse(contentType));
+                builder.addHeader("Content-Encoding", "gzip");
+            } catch (IOException e) {
+                System.out.println("unable to zip payload");
+            }
+        }
+        if (body == null) {
+            body = RequestBody.create(payload, MediaType.parse(contentType));
+        }
         builder = builder.method(request.getMethod(), body);
         Request okHttpRequest = builder.build();
         return common(okHttpRequest, followRedirects, debug, testLogs, skipSSRFCheck, nonTestingContext);
