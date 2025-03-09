@@ -146,3 +146,15 @@ message ThreatCategoryWiseCountResponse {
 
   repeated SubCategoryCount  category_wise_counts = 1;
 }
+
+message ThreatSeverityWiseCountRequest {
+}
+
+message ThreatSeverityWiseCountResponse {
+  message SeverityCount {
+    string severity = 1;
+    uint32 count = 2;
+  }
+
+  repeated SeverityCount  category_wise_counts = 1;
+}

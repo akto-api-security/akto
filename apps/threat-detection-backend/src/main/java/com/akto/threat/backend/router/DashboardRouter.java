@@ -7,6 +7,7 @@ import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.Li
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListThreatApiRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatActorByCountryRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatCategoryWiseCountRequest;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatSeverityWiseCountRequest;
 import com.akto.proto.utils.ProtoMessageUtils;
 import com.akto.threat.backend.service.MaliciousEventService;
 import com.akto.threat.backend.service.ThreatActorService;
@@ -124,12 +125,24 @@ public class DashboardRouter implements ARouter {
             });
 
         router
-            .get("/get_subcategory_wise_count")
+
+        .get("/get_subcategory_wise_count")
             .blockingHandler(ctx -> {
                 ProtoMessageUtils.toString(
                     threatApiService.getSubCategoryWiseCount(
                         ctx.get("accountId"),
                         ThreatCategoryWiseCountRequest.newBuilder().build()
+                    )
+                ).ifPresent(s -> ctx.response().setStatusCode(200).end(s));
+            });
+
+            router
+            .get("/get_severity_wise_count")
+            .blockingHandler(ctx -> {
+                ProtoMessageUtils.toString(
+                    threatApiService.getSeverityWiseCount(
+                        ctx.get("accountId"),
+                        ThreatSeverityWiseCountRequest.newBuilder().build()
                     )
                 ).ifPresent(s -> ctx.response().setStatusCode(200).end(s));
             });

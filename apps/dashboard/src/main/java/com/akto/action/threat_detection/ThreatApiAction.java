@@ -8,6 +8,7 @@ import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.type.URLMethods;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListThreatApiResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatCategoryWiseCountResponse;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatSeverityWiseCountResponse;
 import com.akto.proto.utils.ProtoMessageUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.HashMap;
@@ -96,6 +97,34 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
                               ? categoryDisplayNames.get(smr.getCategory())
                               : smr.getCategory();
                           return new ThreatCategoryCount(displayName, smr.getSubCategory(), smr.getCount());
+                        })
+                    .collect(Collectors.toList());
+              });
+    } catch (Exception e) {
+      e.printStackTrace();
+      return ERROR.toUpperCase();
+    }
+
+    return SUCCESS.toUpperCase();
+  }
+
+  public String fetchCountBySeverity() {
+    HttpGet get = new HttpGet(
+        String.format("%s/api/dashboard/get_severity_wise_count", this.getBackendUrl()));
+    get.addHeader("Authorization", "Bearer " + this.getApiToken());
+    get.addHeader("Content-Type", "application/json");
+
+    try (CloseableHttpResponse resp = this.httpClient.execute(get)) {
+      String responseBody = EntityUtils.toString(resp.getEntity());
+
+      ProtoMessageUtils.<ThreatSeverityWiseCountResponse>toProtoMessage(
+        ThreatSeverityWiseCountResponse.class, responseBody)
+          .ifPresent(
+              m -> {
+                this.categoryCounts = m.getCategoryWiseCountsList().stream()
+                    .map(
+                        smr -> {
+                          return new ThreatCategoryCount("", smr.getSeverity(), smr.getCount());
                         })
                     .collect(Collectors.toList());
               });

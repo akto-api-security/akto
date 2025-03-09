@@ -41,7 +41,7 @@ public class MaliciousEventService {
 
   public MaliciousEventService(
       KafkaConfig kafkaConfig, MongoClient mongoClient, IPLookupClient ipLookupClient) {
-    this.kafka = null;//ew Kafka(kafkaConfig);
+    this.kafka = new Kafka(kafkaConfig);
     this.mongoClient = mongoClient;
     this.ipLookupClient = ipLookupClient;
   }
@@ -92,6 +92,7 @@ public class MaliciousEventService {
                 .setApiCollectionId(sampleReq.getApiCollectionId())
                 .setFilterId(filterId)
                 .setRefId(refId)
+                .setSeverity(evt.getSeverity())
                 .build());
       }
 

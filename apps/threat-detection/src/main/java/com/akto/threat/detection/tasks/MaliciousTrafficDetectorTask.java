@@ -174,6 +174,7 @@ public class MaliciousTrafficDetectorTask implements Task {
     ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(apiCollectionId, url, method);
 
     for (FilterConfig apiFilter : apiFilters.values()) {
+      String severity = apiFilter.getInfo().getSeverity();
       boolean hasPassedFilter = validateFilterForRequest(apiFilter, rawApi, apiInfoKey, message);
 
       // If a request passes any of the filter, then it's a malicious request,
@@ -272,6 +273,7 @@ public class MaliciousTrafficDetectorTask implements Task {
             .setDetectedAt(responseParam.getTime())
             .setCategory(apiFilter.getInfo().getCategory().getName())
             .setSubCategory(apiFilter.getInfo().getSubCategory())
+            .setSeverity(apiFilter.getInfo().getSeverity())
             .build();
     MaliciousEventKafkaEnvelope envelope =
         MaliciousEventKafkaEnvelope.newBuilder()
