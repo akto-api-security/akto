@@ -21,6 +21,7 @@ import com.akto.util.Constants;
 
 import kotlin.Pair;
 import okhttp3.*;
+import okio.Buffer;
 import okio.BufferedSink;
 
 import org.apache.commons.lang3.StringUtils;
@@ -97,7 +98,12 @@ public class ApiExecutor {
         }
         boolean isCyborgCall = request.url().toString().contains("cyborg.akto.io");
         long start = System.currentTimeMillis();
-
+        System.out.println("-------- logs ---------");
+        System.out.println(request.url());
+        System.out.println(request.headers());
+        System.out.println("req len: " + request.body().contentLength());
+        System.out.println("req len: " + bodyToString(request.body()));
+        System.out.println("-------- logs ---------");
         Call call = client.newCall(request);
         Response response = null;
         String body;
@@ -547,7 +553,7 @@ public class ApiExecutor {
                 body = RequestBody.create(byteArrayOutputStream.toByteArray(), MediaType.parse(contentType));
                 builder.addHeader("Content-Encoding", "gzip");
             } catch (IOException e) {
-                System.out.println("unable to zip payload");
+                System.out.println("unable to zip payload: " +  payload);
             }
         }
         if (body == null) {
@@ -556,5 +562,34 @@ public class ApiExecutor {
         builder = builder.method(request.getMethod(), body);
         Request okHttpRequest = builder.build();
         return common(okHttpRequest, followRedirects, debug, testLogs, skipSSRFCheck, nonTestingContext);
+    }
+
+
+    private static String bodyToString(final RequestBody request){
+        try {
+            final RequestBody copy = request;
+            final Buffer buffer = new Buffer();
+            copy.writeTo(buffer);
+            return buffer.readUtf8();
+        } 
+        catch (final IOException e) {
+            return "did not work";
+        }
+}
+
+    public static void main(String[] args) {
+        try {
+            OriginalHttpRequest request = new OriginalHttpRequest();
+            request.setUrl("https://cyborg.akto.io/api/fetchAccountSettings");
+            HashMap<String, List<String>> headers = new HashMap<>();
+            headers.put("authorization", Collections.singletonList("eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoiaW52aXRlX3VzZXIiLCJhY2NvdW50SWQiOjE2NjcyMzU3MzgsImlhdCI6MTc0MTUwNzgzMywiZXhwIjoxNzU3NDA1NDMzfQ.NBB1rnJb9fAHvIV9XRSthMzHZb6EOPZa9c1rQ2OrjaYAVrHCigYGV4ei67N0h6KN4xvANXTmcz7fvrdO-PZb2Xwx9Jl5QAJWaQCDiIEyTfQ_Bq7u3K_LOM2YL7EQIe6dODTBUOj0CFCNXiVn7glb4MJ40jXGnQaambZqmVqLajSmu64zAxB-GCi5M-32DOqPRMgjP4mTHltBWiQIV6dlP0KFgyoucAiVtx73GiqzRa2KYV_0d52e6z_sjSKAl6mdE_5zRi5wELSunRkVA9AnSyC2O8diVGUsLM8RcoMocrlffkdqHqv022ExylK7c5me_C1I3XAVXYbvbmcCsi0L-A"));
+            request.setMethod("POST");
+            request.setHeaders(headers);
+            request.setBody("{}");
+            OriginalHttpResponse response = sendRequest(request, true, null, false, null);
+            System.out.println(response.getBody());
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 }
