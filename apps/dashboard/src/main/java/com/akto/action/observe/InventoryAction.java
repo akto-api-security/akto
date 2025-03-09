@@ -1008,8 +1008,6 @@ public class InventoryAction extends UserAction {
 
 
         SampleData sampleData = SampleDataDao.instance.fetchSampleDataForApi(apiCollectionId, url, urlMethod);
-        List<String> samples = sampleData.getSamples();
-        loggerMaker.infoAndAddToDb("Found " + samples.size() + " samples for API: " + apiCollectionId + " " + url + method, LogDb.DASHBOARD);
 
         Bson stiFilter = SingleTypeInfoDao.filterForSTIUsingURL(apiCollectionId, url, urlMethod);
         SingleTypeInfoDao.instance.deleteAll(stiFilter);
@@ -1023,6 +1021,11 @@ public class InventoryAction extends UserAction {
         loggerMaker.infoAndAddToDb("Cleanup done", LogDb.DASHBOARD);
 
         List<HttpResponseParams> responses = new ArrayList<>();
+        if (sampleData == null || sampleData.getSamples() == null) {
+            return SUCCESS.toUpperCase();            
+        }
+        List<String> samples = sampleData.getSamples();
+        loggerMaker.infoAndAddToDb("Found " + samples.size() + " samples for API: " + apiCollectionId + " " + url + method, LogDb.DASHBOARD);
         for (String sample : samples) {
             try {
                 HttpResponseParams httpResponseParams = HttpCallParser.parseKafkaMessage(sample);
