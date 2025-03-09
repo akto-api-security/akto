@@ -191,7 +191,7 @@ public class ParamFilter {
                         }
                         ret.add(writesForSti.get(index));
                     }
-                    int newSize = writesForSti.size();
+                    int newSize = ret.size();
                     loggerMaker.infoAndAddToDb(String.format("Original writes: %d Final writes: %d", size, newSize));
                     return ret;
                 } else {
