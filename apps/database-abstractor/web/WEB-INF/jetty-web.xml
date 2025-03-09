@@ -18,6 +18,9 @@
                 <Item>/*</Item>   
             </Array>
             </Set>
+            <Set name="inflateBufferSize"><Property name="jetty.gzip.inflateBufferSize" default="1024"/></Set>
+
+
         </New>
 
         <!-- package name might have changed in Jetty 9; possibly org.eclipse.jetty.server.handler.gzip.GzipHandler
