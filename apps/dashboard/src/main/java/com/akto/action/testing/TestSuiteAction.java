@@ -28,6 +28,8 @@ public class TestSuiteAction extends UserAction {
     private List<TestSuites> testSuiteList;
 
     private String generateUniqueTestSuiteName(String baseName) {
+        String copiedString = new String(baseName);
+        baseName = baseName.replaceAll("\\s*\\(\\d+\\)$", "");
         Pattern regexPattern = Pattern.compile("^" + Pattern.quote(baseName) + "(?: \\((\\d+)\\))?$",
                 Pattern.CASE_INSENSITIVE);
 
@@ -49,7 +51,7 @@ public class TestSuiteAction extends UserAction {
                 }
             }
         }
-        return maxCount == -1 ? baseName : baseName + " (" + (maxCount + 1) + ")";
+        return maxCount == -1 ? copiedString : baseName + " (" + (maxCount + 1) + ")";
     }
 
     public String createTestSuite() {
