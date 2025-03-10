@@ -20,11 +20,12 @@ export const Subprocess = ({ subprocessId, processId }: SubprocessProps) => {
             const response = await api.getSubProcess({
                 processId,
                 subprocessId,
+                attemptId: 0,
             });
             setSubprocess(response.subProcess);
         }
 
-        const interval = setInterval(fetchSubprocess, 5000);
+        const interval = setInterval(fetchSubprocess, 2000);
 
         return () => clearInterval(interval);
     }, [subprocessId, processId]);

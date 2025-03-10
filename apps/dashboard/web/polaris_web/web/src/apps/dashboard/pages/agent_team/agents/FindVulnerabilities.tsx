@@ -29,14 +29,14 @@ export const FindVulnerabilitiesAgent = () => {
         const subprocesses = response.subprocesses as AgentSubprocess[];
         console.log({ subprocesses });
         setSubprocesses(subprocesses);
-       }, 5000);
+       }, 2000);
     }
 
     useEffect(() => {
         let interval: NodeJS.Timeout;
         
         if (!currentAgentRun || currentAgentRun?.state !== State.RUNNING) {
-            interval = setInterval(getAllAgentRuns, 5000);
+            interval = setInterval(getAllAgentRuns, 2000);
         }
 
         if (currentAgentRun?.state === State.RUNNING) {

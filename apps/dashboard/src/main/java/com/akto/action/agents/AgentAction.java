@@ -29,7 +29,8 @@ public class AgentAction extends UserAction {
     List<AgentRun> agentRuns;
 
     public String getAllAgentRuns() {
-        agentRuns = AgentRunDao.instance.findAll(Filters.empty());
+        Bson filter = Filters.eq(AgentRun._STATE, State.RUNNING);
+        agentRuns = AgentRunDao.instance.findAll(filter);
         return Action.SUCCESS.toUpperCase();
     }
 
