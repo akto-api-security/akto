@@ -26,6 +26,14 @@ public class AgentAction extends UserAction {
     Map<String, Object> data;
     String agent;
 
+    List<AgentRun> agentRuns;
+
+    public String getAllAgentRuns() {
+        Bson filter = Filters.eq(AgentRun._STATE, State.RUNNING);
+        agentRuns = AgentRunDao.instance.findAll(filter);
+        return Action.SUCCESS.toUpperCase();
+    }
+
     public String createAgentRun() {
 
         if (data == null || data.isEmpty()) {
@@ -59,6 +67,8 @@ public class AgentAction extends UserAction {
 
         agentRun = new AgentRun(processId, data, agentModule,
                 Context.now(), 0, 0, State.SCHEDULED);
+
+        System.out.println("agentRun: " + agentRun);
 
         AgentRunDao.instance.insertOne(agentRun);
 
@@ -279,6 +289,13 @@ public class AgentAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    public List<AgentRun> getAgentRuns() {
+        return agentRuns;
+    }
+
+    public void setAgentRuns(List<AgentRun> agentRuns) {
+        this.agentRuns = agentRuns;
+    }
     public Map<String, Object> getData() {
         return data;
     }

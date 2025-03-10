@@ -45,6 +45,14 @@ const api = {
             method: 'post',
             data:  data 
         })
+    },
+
+    getAllAgentRuns: async () => {
+        return await request({
+            url: '/api/getAllAgentRuns',
+            method: 'post',
+            data: {}
+        })
     }
 }
 

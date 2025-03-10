@@ -6,7 +6,7 @@ import { AgentHeader } from './AgentHeader';
 import { useAgentsStore } from '../agents.store';
 import { Button, Scrollable } from '@shopify/polaris';
 import { Subprocess } from './agentResponses/Subprocess';
-import { AuthOptions } from './agentResponses/AuthOptions';
+import { FindVulnerabilitiesAgent } from '../agents/FindVulnerabilities';
 
 interface AgentWindowProps {
     agent: Agent | null;
@@ -20,6 +20,15 @@ function AgentWindow({ agent, onClose, open }: AgentWindowProps) {
     //test subprocess
     const [testSubprocess, setTestSubprocess] = useState<boolean>(false);
 
+    console.log({ agent })
+
+    const renderAgentWindow = () => {
+        switch (agent?.id) {
+            case 'FIND_VULNERABILITIES_FROM_SOURCE_CODE':
+                return <FindVulnerabilitiesAgent />
+        }
+    }
+
     return (
         <Drawer.Root open={open} direction="right" dismissible={false}>
             <Drawer.Portal>
@@ -31,14 +40,7 @@ function AgentWindow({ agent, onClose, open }: AgentWindowProps) {
                             <div className="flex-1 min-h-0">
                                 <Scrollable className="h-full">
                                    <div className="pt-2 flex flex-col gap-2">
-                                        {/* To implement */}
-                                        <Button onClick={() => setTestSubprocess(!testSubprocess)}>Test Subprocess</Button>
-                                        {
-                                                testSubprocess && (
-                                                    <Subprocess subprocessId="1" processId="1" />
-                                                )
-                                        }
-                                        <AuthOptions options={['JWT', 'API Key', 'Bearer Token', 'Basic Auth']} onSelect={() => {}} />
+                                        {renderAgentWindow()}
                                    </div>
                                 </Scrollable>
                             </div>

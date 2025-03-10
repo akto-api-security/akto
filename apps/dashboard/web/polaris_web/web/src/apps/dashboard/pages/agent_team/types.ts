@@ -35,10 +35,10 @@ export enum State {
 export type AgentRun = {
     processId: string;
     agentInitDocument?: Record<string, any>;
-    agent: Agent;
+    agent: string;
     createdTimestamp: number;
-    startedTimestamp: number;
-    endedTimestamp: number;
+    startTimestamp: number;
+    endTimestamp: number;
     state: State;
 }
 
@@ -60,4 +60,3 @@ export type AgentSubprocess = {
     attemptId: string;
     processOutput: Record<string, any>;
 }
-

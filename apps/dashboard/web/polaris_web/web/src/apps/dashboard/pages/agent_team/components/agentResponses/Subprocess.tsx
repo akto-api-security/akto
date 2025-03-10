@@ -4,6 +4,7 @@ import { AgentLog, AgentSubprocess } from "../../types";
 import { getFakeSubProcess, appendLog } from "../../utils";
 import { Box, Button, Icon } from "@shopify/polaris";
 import { CaretDownMinor } from "@shopify/polaris-icons";
+import api from "../../api";
 
 type SubprocessProps = {
     subprocessId: string;
@@ -15,22 +16,16 @@ export const Subprocess = ({ subprocessId, processId }: SubprocessProps) => {
     const [expanded, setExpanded] = useState(true);
 
     useEffect(() => {
-        // Fake polling: This is where we get the subprocess data from the backend
-        const initialSubprocess = getFakeSubProcess(subprocessId, processId);
-        setSubprocess(initialSubprocess);
-
-        let counter = 0;
-        const interval = setInterval(() => {
-            setSubprocess(prevSubprocess => {
-                if (!prevSubprocess) return initialSubprocess;
-                return appendLog(prevSubprocess);
+        const fetchSubprocess = async () => {
+            const response = await api.getSubProcess({
+                processId,
+                subprocessId,
+                attemptId: 0,
             });
-            
-            counter++;
-            if (counter >= 10) {
-                clearInterval(interval);
-            }
-        }, 1000);
+            setSubprocess(response.subProcess);
+        }
+
+        const interval = setInterval(fetchSubprocess, 2000);
 
         return () => clearInterval(interval);
     }, [subprocessId, processId]);

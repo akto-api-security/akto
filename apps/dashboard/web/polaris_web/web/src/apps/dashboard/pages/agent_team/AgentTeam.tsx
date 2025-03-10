@@ -40,8 +40,8 @@ const AGENTS: Agent[] = [
         image: '/public/agents/secret-agent-3.svg',
     },
     {
-        id: 'source-code-security-scanner-4',
-        name: 'Source Code Security Scanner 4',
+        id: 'FIND_VULNERABILITIES_FROM_SOURCE_CODE',
+        name: 'Find Vulnerabilities from Source Code',
         description: 'An intelligent member that analyzes your source code for security vulnerabilities by examining authentication mechanisms, API endpoints, and data flow patterns.',
         image: '/public/agents/secret-agent-4.svg',
     }
