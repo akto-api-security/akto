@@ -202,7 +202,6 @@ public class AgentAction extends UserAction {
     }
 
     BasicDBObject response;
-    private static final ObjectMapper objectMapper = new ObjectMapper();
     public String feedDataToAgent(){
         try {
             AgentRun agentRun = AgentRunDao.instance.findOne(Filters.eq(AgentRun._STATE, State.SCHEDULED.toString()));
@@ -231,44 +230,40 @@ public class AgentAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    String type;
+    public void setType(String type) {
+        this.type = type;
+    }
+
+    List<AgentLog> logs;
+
+    public void setLogs(List<AgentLog> logs) {
+        this.logs = logs;
+    }
+
     public String receiveDataFromAgent(){
-        String type = response.getString("type");
-        CurrentProcessState currentStep = null;
-        try {
-            BasicDBObject stepObj = (BasicDBObject) response.get("stepInfo");
-            currentStep = objectMapper.readValue(stepObj.toJson(), CurrentProcessState.class);
-        } catch (Exception e) {
-            e.printStackTrace();
-            return ERROR.toUpperCase();
-        }
+        response = new BasicDBObject();
+        Bson filter = Filters.and(
+            Filters.eq(AgentSubProcessSingleAttempt.PROCESS_ID, this.processId),
+            Filters.eq(AgentSubProcessSingleAttempt.SUB_PROCESS_ID, this.subProcessId),
+            Filters.eq(AgentSubProcessSingleAttempt.ATTEMPT_ID, this.attemptId)
+        );
         switch (type) {
             case "logs":
-                List<AgentLog> logs = (List<AgentLog>) response.get("response");
-                
                 AgentSubProcessSingleAttemptDao.instance.updateOne(
-                    Filters.and(
-                        Filters.eq(AgentSubProcessSingleAttempt.PROCESS_ID, currentStep.getProcessId()),
-                        Filters.eq(AgentSubProcessSingleAttempt.SUB_PROCESS_ID, currentStep.getSubProcessId()),
-                        Filters.eq(AgentSubProcessSingleAttempt.ATTEMPT_ID, currentStep.getAttemptId())
-                    ),
-                    Updates.addEachToSet(AgentSubProcessSingleAttempt._LOGS, logs)
+                    filter,
+                    Updates.addEachToSet(AgentSubProcessSingleAttempt._LOGS, this.logs)
                 );
                 break;
 
             case "stateChange":
-                State state = State.valueOf(response.getString("state"));
-                BasicDBObject processOutput = (BasicDBObject) response.get("response");
+                State state = State.valueOf(this.state);
                 try {
-                    objectMapper.readValue(processOutput.toJson(), Map.class);
                     AgentSubProcessSingleAttemptDao.instance.updateOne(
-                        Filters.and(
-                            Filters.eq(AgentSubProcessSingleAttempt.PROCESS_ID, currentStep.getProcessId()),
-                            Filters.eq(AgentSubProcessSingleAttempt.SUB_PROCESS_ID, currentStep.getSubProcessId()),
-                            Filters.eq(AgentSubProcessSingleAttempt.ATTEMPT_ID, currentStep.getAttemptId())
-                        ),
+                        filter,
                         Updates.combine(
                             Updates.set(AgentSubProcessSingleAttempt._STATE, state),
-                            Updates.set(AgentSubProcessSingleAttempt.PROCESS_OUTPUT, processOutput)
+                            Updates.set(AgentSubProcessSingleAttempt.PROCESS_OUTPUT, this.data)
                         )
                     );
                 } catch (Exception e) {
@@ -374,10 +369,6 @@ public class AgentAction extends UserAction {
     
     public BasicDBObject getResponse() {
         return response;
-    }
-
-    public void setResponse(BasicDBObject response) {
-        this.response = response;
     }
 
 }

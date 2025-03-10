@@ -73,7 +73,7 @@ public class AgentSubProcessSingleAttempt {
     Map<String, Object> processOutput;
     final public static String PROCESS_OUTPUT = "processOutput";
 
-    public static class CurrentProcessState {
+    public class CurrentProcessState {
         String processId;
         String subProcessId;
         int attemptId;
@@ -82,6 +82,9 @@ public class AgentSubProcessSingleAttempt {
             this.processId = processId;
             this.subProcessId = subProcessId;
             this.attemptId = attemptId;
+        }
+
+        public CurrentProcessState() {
         }
 
         public String getProcessId() {
