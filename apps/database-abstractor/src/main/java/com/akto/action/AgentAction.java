@@ -134,7 +134,7 @@ public class AgentAction extends ActionSupport {
     }
 
     int attemptId;
-    int subProcessId;
+    String subProcessId;
     String subProcessHeading;
     String log;
     Map<String, Object> processOutput;
@@ -283,11 +283,11 @@ public class AgentAction extends ActionSupport {
         this.attemptId = attemptId;
     }
 
-    public int getSubProcessId() {
+    public String getSubProcessId() {
         return subProcessId;
     }
 
-    public void setSubProcessId(int subProcessId) {
+    public void setSubProcessId(String subProcessId) {
         this.subProcessId = subProcessId;
     }
 

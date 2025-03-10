@@ -70,7 +70,7 @@ public class AgentAction extends UserAction {
     AgentRun agentRun;
 
     String processId;
-    int subProcessId;
+    String subProcessId;
     int attemptId;
     String state;
 
@@ -124,8 +124,11 @@ public class AgentAction extends UserAction {
             return Action.ERROR.toUpperCase();
         }
 
-        Bson filter = AgentSubProcessSingleAttemptDao.instance.getFiltersForAgentSubProcess(processId, subProcessId,
-                attemptId);
+        Bson filter = Filters.and(
+            Filters.eq(AgentSubProcessSingleAttempt.PROCESS_ID, this.processId.toString()),
+            Filters.eq(AgentSubProcessSingleAttempt.SUB_PROCESS_ID, this.subProcessId),
+            Filters.eq(AgentSubProcessSingleAttempt.ATTEMPT_ID, this.attemptId)
+        );
         subprocess = AgentSubProcessSingleAttemptDao.instance.findOne(filter);
 
         return Action.SUCCESS.toUpperCase();
@@ -148,8 +151,11 @@ public class AgentAction extends UserAction {
             return Action.ERROR.toUpperCase();
         }
 
-        Bson filter = AgentSubProcessSingleAttemptDao.instance.getFiltersForAgentSubProcess(processId, subProcessId,
-                attemptId);
+        Bson filter = Filters.and(
+            Filters.eq(AgentSubProcessSingleAttempt.PROCESS_ID, this.processId),
+            Filters.eq(AgentSubProcessSingleAttempt.SUB_PROCESS_ID, this.subProcessId),
+            Filters.eq(AgentSubProcessSingleAttempt.ATTEMPT_ID, this.attemptId)
+        );
 
         List<Bson> updates = new ArrayList<>();
 
@@ -318,11 +324,11 @@ public class AgentAction extends UserAction {
         this.processId = processId;
     }
 
-    public int getSubProcessId() {
+    public String getSubProcessId() {
         return subProcessId;
     }
 
-    public void setSubProcessId(int subProcessId) {
+    public void setSubProcessId(String subProcessId) {
         this.subProcessId = subProcessId;
     }
 

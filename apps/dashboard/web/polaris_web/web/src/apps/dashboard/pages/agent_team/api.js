@@ -16,7 +16,6 @@ const api = {
     },
 
     createAgentRun: async (data) => {
-        console.log(data)
         return await request({
             url: '/api/createAgentRun',
             method: 'post',
@@ -28,7 +27,7 @@ const api = {
         return await request({
             url: '/api/getAllSubProcesses',
             method: 'post',
-            data: { data }
+            data: data 
         })
     },
 
@@ -36,7 +35,7 @@ const api = {
         return await request({
             url: '/api/getSubProcess',
             method: 'post',
-            data: { data }
+            data: data 
         })
     },
 
@@ -44,7 +43,7 @@ const api = {
         return await request({
             url: '/api/updateAgentSubprocess',
             method: 'post',
-            data: { data }
+            data:  data 
         })
     }
 }

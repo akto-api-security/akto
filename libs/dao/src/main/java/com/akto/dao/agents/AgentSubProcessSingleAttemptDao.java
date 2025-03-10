@@ -15,7 +15,7 @@ public class AgentSubProcessSingleAttemptDao extends AccountsContextDao<AgentSub
 
     // TODO: create indices
 
-    public Bson getFiltersForAgentSubProcess(String processId, int subProcessId, int attemptId) {
+    public Bson getFiltersForAgentSubProcess(String processId, String subProcessId, int attemptId) {
         List<Bson> filters = new ArrayList<>();
 
         filters.add(Filters.eq(AgentSubProcessSingleAttempt.PROCESS_ID, processId));
