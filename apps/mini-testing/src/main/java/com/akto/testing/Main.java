@@ -356,7 +356,7 @@ public class Main {
                 scheduleTs = testingRun.getScheduleTimestamp() + 5 * 60;
             }
 
-            if(GetRunningTestsStatus.getRunningTests().isTestRunning(testingRun.getId())){
+            if(testingRun!=null && testingRun.getId()!=null){
                 dataActor.updateTestingRunAndMarkCompleted(testingRun.getId().toHexString(), scheduleTs);
             }
 
