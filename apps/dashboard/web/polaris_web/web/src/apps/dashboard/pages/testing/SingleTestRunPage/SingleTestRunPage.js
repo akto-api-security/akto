@@ -45,6 +45,7 @@ import { useSearchParams } from "react-router-dom";
 import TestRunResultPage from "../TestRunResultPage/TestRunResultPage";
 import LocalStore from "../../../../main/LocalStorageStore";
 import { produce } from "immer"
+import { history } from "@/util/history";
 import GithubServerTable from "../../../components/tables/GithubServerTable";
 import RunTest from '../../observe/api_collections/RunTest';
 import IssuesCheckbox from '../../issues/IssuesPage/IssuesCheckbox';
