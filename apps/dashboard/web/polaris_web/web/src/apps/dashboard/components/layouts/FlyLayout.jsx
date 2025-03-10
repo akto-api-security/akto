@@ -32,7 +32,7 @@ function FlyLayout(props) {
                                 <Button icon={CancelMajor} onClick={() => { handleExit()}} plain></Button>
                             </HorizontalStack>
                         </Box>
-                        <Scrollable style={{ height: scrollableHeight}} shadow>
+                        <Scrollable style={{ height: scrollableHeight}} >
                         <Box paddingBlockEnd={"20"}>
                         <VerticalStack>
                         {
