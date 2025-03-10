@@ -33,6 +33,7 @@ public class Main {
 
     ConnectionString connectionString =
         new ConnectionString(System.getenv("AKTO_THREAT_PROTECTION_MONGO_CONN"));
+    System.out.println("connectionString: " + connectionString);
     CodecRegistry pojoCodecRegistry =
         fromProviders(PojoCodecProvider.builder().automatic(true).build());
     CodecRegistry codecRegistry =

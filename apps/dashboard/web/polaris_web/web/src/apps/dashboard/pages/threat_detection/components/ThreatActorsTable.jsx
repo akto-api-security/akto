@@ -5,7 +5,7 @@ import { CellType } from "../../../components/tables/rows/GithubRow";
 import GetPrettifyEndpoint from "../../observe/GetPrettifyEndpoint";
 import func from "../../../../../util/func";
 import PersistStore from "../../../../main/PersistStore";
-
+import dayjs from "dayjs";
 const resourceName = {
   singular: "actor",
   plural: "actors",
@@ -84,13 +84,14 @@ function ThreatActorTable({ data, currDateRange, rowClicked }) {
     setLoading(true);
     const sort = { [sortKey]: sortOrder };
     const res = await api.fetchThreatActors(skip, sort);
+    console.log("resta", res);
     let total = res.total;
     let ret = res?.actors?.map((x) => {
       return {
         ...x,
         actor: x.id,
         latestIp: x.latestApiIp,
-        discoveredAt: func.prettifyEpoch(x.discoveredAt),
+        discoveredAt: dayjs(x.discoveredAt).format('YYYY-MM-DD, HH:mm:ss A'),
         latestApi: (
           <GetPrettifyEndpoint
             method={x.latestApiMethod}

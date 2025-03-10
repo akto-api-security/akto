@@ -79,7 +79,21 @@ const threatDetectionRequests = {
             method: 'post',
             data: {refId}
         })
+    },
+    fetchCountBySeverity() {
+        // TODO:@devshekhawat remove this mock data
+        return {            
+            apis: null,
+            categoryCounts: [
+                {category: "", count: 100, subCategory: "CRITICAL"},
+                {category: "", count: 71, subCategory: "HIGH"},
+                {category: "", count: 21, subCategory: "MEDIUM"}, 
+                {category: "", count: 12, subCategory: "LOW"}
+            ],
+            skip: 0,
+            sort: null,
+            total: 0
+        }
     }
 }
-
 export default threatDetectionRequests

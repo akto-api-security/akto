@@ -13,6 +13,7 @@ import api from "./api";
 import { HorizontalGrid, VerticalStack } from "@shopify/polaris";
 import TopThreatTypeChart from "./components/TopThreatTypeChart";
 import threatDetectionFunc from "./transform";
+import { ThreatSummary } from "./components/ThreatSummary";
 function ThreatActorPage() {
   const [mapData, setMapData] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -77,6 +78,7 @@ function ThreatActorPage() {
   };
 
   const components = [
+    <ThreatSummary />,
     <ChartComponent />,
     <ThreatActorTable
       key={"threat-actor-data-table"}
