@@ -39,6 +39,18 @@ const headers = [
         filterKey:"createdBy",
     },
     {
+        title: "No. of Auths",
+        value : "numAuths",
+    },
+    {
+        title: "Type of Auth",
+        value : "authType",
+    },    
+    {
+        title:"No. of tests",
+        value:"testCountForRole",
+    },
+    {
         title: '',
         type: CellType.ACTION,
     }
@@ -61,18 +73,28 @@ function TestRolesPage(){
         navigate("details")
     }
 
+    const deleteTestRole = async (item,e) => {
+        if(e.stopPropagation) e.stopPropagation()
+        await api.deleteTestRole(item.name)
+        setLoading(true)
+        fetchData()
+        func.setToast(true, false, "Test role has been deleted successfully.")
+    }
+
+    const handleAccessMatrix = (item) => {
+        navigate("access-matrix", {state: {
+            name: item.name,
+            endpoints: item.endpointLogicalGroup.testingEndpoints,
+            authWithCondList: item.authWithCondList
+        }})
+    }
 
     const getActions = (item) => {
 
         const actionItems = [{
             items: [
                 {
-                    content: 'Access matrix',
-                    onAction: () => navigate("access-matrix", {state: {
-                        name: item.name,
-                        endpoints: item.endpointLogicalGroup.testingEndpoints,
-                        authWithCondList: item.authWithCondList
-                    }})
+                    content:<Button monochrome plain onClick={()=>handleAccessMatrix(item)} removeUnderline>Access matrix</Button>,
                 }
             ]
         }]
@@ -80,14 +102,7 @@ function TestRolesPage(){
         // if(item.name !== 'ATTACKER_TOKEN_ALL') {
         if(item.createdBy !== 'System') {
             const removeActionItem = {
-                content: 'Remove',
-                onAction: async () => {
-                    await api.deleteTestRole(item.name)
-                    setLoading(true)
-                    fetchData()
-                    func.setToast(true, false, "Test role has been deleted successfully.")
-                },
-                destructive: true
+                content: <Button plain onClick={(e)=>deleteTestRole(item,e)} destructive removeUnderline>Delete</Button>,
             }
             actionItems[0].items.push(removeActionItem)
         }
@@ -95,8 +110,20 @@ function TestRolesPage(){
         return actionItems
     }
 
+    function checkAuthType(item){
+        let authSet = new Set();
+        item.authWithCondList?.forEach((auth) => {
+            let type = auth?.authMechanism?.type.toLowerCase();
+            if(type === 'login_request') type = 'automated'
+            authSet.add(func.capitalizeFirstLetter(type))
+        })
+        let authType = Array.from(authSet).join(" & ")
+        return authType.length === 0? '-' : authType
+    }
+
     async function fetchData(){
         await api.fetchTestRoles().then((res) => {
+            console.log(res)
             setShowEmptyScreen(res.testRoles.length === 0)
             const all = [], system = [], custom = []
             res.testRoles.forEach((testRole) => {
@@ -104,6 +131,8 @@ function TestRolesPage(){
                 testRole.id=testRole.name;
                 testRole.createdAt = func.prettifyEpoch(testRole.createdTs)
                 testRole.nameComp = (<Box maxWidth="40vw"><TooltipText tooltip={testRole.name} text={testRole.name} textProps={{fontWeight: 'medium'}}/></Box>)
+                testRole.numAuths = testRole?.authWithCondList?.length||0
+                testRole.authType = checkAuthType(testRole)
                 all.push(testRole)
                 if(testRole.createdBy === 'System') {
                     system.push(testRole)
