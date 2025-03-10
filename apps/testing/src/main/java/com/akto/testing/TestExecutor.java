@@ -504,9 +504,11 @@ public class TestExecutor {
                         Updates.set(TestingRunResultSummary.STATE, updatedState)),
                 options);
 
-        TestingRunResultSummariesDao.instance.deleteAll(Filters.eq(TestingRunResultSummary.ID,
-                TestingConfigurations.getInstance().getRerunTestingRunResultSummary()));
-        loggerMaker.infoAndAddToDb("Deleting rerun testing result summary after completion of test: TRRS_ID:" + TestingConfigurations.getInstance().getRerunTestingRunResultSummary().getHexId());
+        if (TestingConfigurations.getInstance().getRerunTestingRunResultSummary() != null) {
+            TestingRunResultSummariesDao.instance.deleteAll(Filters.eq(TestingRunResultSummary.ID,
+                    TestingConfigurations.getInstance().getRerunTestingRunResultSummary().getId()));
+            loggerMaker.infoAndAddToDb("Deleting rerun testing result summary after completion of test: TRRS_ID:" + TestingConfigurations.getInstance().getRerunTestingRunResultSummary().getHexId());
+        }
 
         GithubUtils.publishGithubComments(testingRunResultSummary);
 

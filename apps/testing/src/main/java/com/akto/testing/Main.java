@@ -362,6 +362,10 @@ public class Main {
             return true;
         }
 
+        //Updating start time stamp as current time stamp in case of rerun
+        TestingRunResultSummariesDao.instance.updateOneNoUpsert(Filters.eq(TestingRunResultSummary.ID, summaryId),
+                Updates.set(TestingRunResultSummary.START_TIMESTAMP, Context.now()));
+
         config.setRerunTestingRunResultSummary(originalSummary);
         config.setTestingRunResultList(testingRunResultList);
         return false;

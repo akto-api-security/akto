@@ -800,28 +800,6 @@ getUrlComp(url){
   )
 },
 
-getCollapsibleRow(urls, severity){
-  const borderStyle = '4px solid ' + func.getHexColorForSeverity(severity?.toUpperCase());
-  return(
-    <tr style={{background: "#FAFBFB", borderLeft: borderStyle, padding: '0px !important', borderTop: '1px solid #dde0e4'}}>
-      <td colSpan={7} style={{padding: '0px !important'}}>
-          {urls.map((ele,index)=>{
-            const borderStyle = index < (urls.length - 1) ? {borderBlockEndWidth : 1} : {}
-            return( 
-              <Box padding={"2"} paddingInlineEnd={"4"} paddingInlineStart={"4"} key={index}
-                  borderColor="border-subdued" {...borderStyle}
-              >
-                <Link monochrome onClick={() => history.navigate(ele.nextUrl)} removeUnderline >
-                  {this.getUrlComp(ele.url)}
-                </Link>
-              </Box>
-            )
-          })}
-      </td>
-    </tr>
-  )
-},
-
 getTestErrorType(message){
   const errorsObject = TestingStore.getState().errorsObject
   for(var key in errorsObject){
@@ -832,7 +810,7 @@ getTestErrorType(message){
   return "UNKNOWN_ERROR_OCCURRED"
 },
 
-getPrettifiedTestRunResults(testRunResults){
+getPrettifiedTestRunResults(testRunResults, getCollapsibleRow){
   const errorsObject = TestingStore.getState().errorsObject
   let testRunResultsObj = {}
   testRunResults.forEach((test)=>{
@@ -850,14 +828,14 @@ getPrettifiedTestRunResults(testRunResults){
               return(
                 config.length > 0 ?
                   <div className="div-link" onClick={(e) => {e.stopPropagation();window.open(baseUrl + config.toUpperCase(), "_blank")}} key={index}>
-                    <span style={{ lineHeight: '16px', fontSize: '14px', color: "#B98900"}}>{func.toSentenceCase(config || "")}</span>
+                    <span style={{ lineHeight: '16px', fontSize: '14px', color: "#B98900"}}>{func.toSentenceCase(config || "")} this is test</span>
                   </div>
                 : null
               )
             })}
           </HorizontalStack>
         )
-      }else{
+      } else{
         error_message = errorsObject[errorType]
       }
     }
@@ -865,7 +843,7 @@ getPrettifiedTestRunResults(testRunResults){
     if(testRunResultsObj.hasOwnProperty(key)){
       let endTimestamp = Math.max(test.endTimestamp, testRunResultsObj[key].endTimestamp)
       let urls = testRunResultsObj[key].urls
-      urls.push({url: test.url, nextUrl: test.nextUrl})
+      urls.push({url: test.url, nextUrl: test.nextUrl, testRunResultsId: test.id})
       let obj = {
         ...test,
         urls: urls,
@@ -877,7 +855,7 @@ getPrettifiedTestRunResults(testRunResults){
       delete obj["errorsList"]
       testRunResultsObj[key] = obj
     }else{
-      let urls = [{url: test.url, nextUrl: test.nextUrl}]
+      let urls = [{url: test.url, nextUrl: test.nextUrl, testRunResultsId: test.id}]
       let obj={
         ...test,
         urls:urls,
@@ -907,7 +885,7 @@ getPrettifiedTestRunResults(testRunResults){
       </HorizontalStack> : <Text>-</Text>,
       totalUrls: obj.urls.length,
       scanned_time_comp: <Text variant="bodyMd">{func.prettifyEpoch(obj?.endTimestamp)}</Text>,
-      collapsibleRow: this.getCollapsibleRow(obj.urls, obj?.severity[0]),
+      collapsibleRow: getCollapsibleRow(obj.urls, obj?.severity[0]),
       urlFilters: obj.urls.map((ele) => ele.url)
     }
     prettifiedResults.push(prettifiedObj)
@@ -1015,8 +993,8 @@ stopTest(hexId){
   });
 },
 
-rerunTest(hexId, refreshSummaries, shouldRefresh){
-  api.rerunTest(hexId).then((resp) => {
+rerunTest(hexId, refreshSummaries, shouldRefresh, selectedTestRunForRerun){
+  api.rerunTest(hexId, selectedTestRunForRerun).then((resp) => {
     window.location.reload()
     func.setToast(true, false, "Test re-run initiated")
     if(shouldRefresh){

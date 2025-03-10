@@ -30,7 +30,7 @@ import {
 import api from "../api";
 import func from '@/util/func';
 import { useParams } from 'react-router';
-import { useState, useEffect, useRef, useMemo, useReducer } from 'react';
+import { useState, useEffect, useRef, useMemo, useReducer, useCallback } from 'react';
 import transform from "../transform";
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards";
 import WorkflowTestBuilder from "../workflow_test/WorkflowTestBuilder";
@@ -47,6 +47,7 @@ import LocalStore from "../../../../main/LocalStorageStore";
 import { produce } from "immer"
 import GithubServerTable from "../../../components/tables/GithubServerTable";
 import RunTest from '../../observe/api_collections/RunTest';
+import IssuesCheckbox from '../../issues/IssuesPage/IssuesCheckbox';
 let sortOptions = [
   { label: 'Severity', value: 'severity asc', directionLabel: 'Highest severity', sortKey: 'total_severity', columnIndex: 3 },
   { label: 'Severity', value: 'severity desc', directionLabel: 'Lowest severity', sortKey: 'total_severity', columnIndex: 3 },
@@ -113,6 +114,7 @@ function SingleTestRunPage() {
 
   const [testRunResultsText, setTestRunResultsText] = useState({ vulnerable: [], no_vulnerability_found: [], skipped: [], need_configurations: [], ignored_issues: [] })
   const [selectedTestRun, setSelectedTestRun] = useState({});
+  const [selectedTestRunForRerun, setSelectedTestRunForRerun] = useState([])
   const subCategoryFromSourceConfigMap = PersistStore(state => state.subCategoryFromSourceConfigMap);
   const params = useParams()
   const [loading, setLoading] = useState(false);
@@ -366,7 +368,44 @@ function SingleTestRunPage() {
     const key = tableTabMap[selectedTab]
     const total = (testRunCountMap[key] !== undefined && testRunCountMap[key] !== 0) ? testRunCountMap[key] : localCountMap[key]
     fillTempData(testRunResultsRes, selectedTab)
-    return { value: transform.getPrettifiedTestRunResults(testRunResultsRes), total: selectedTab === 'ignored_issues' ? totalIgnoredIssuesCount : total }
+    return { value: transform.getPrettifiedTestRunResults(testRunResultsRes, getCollapsibleRow), total: selectedTab === 'ignored_issues' ? totalIgnoredIssuesCount : total }
+  }
+
+  const handleCheckboxChange = (testRunResultsId, checked) => {
+    setSelectedTestRunForRerun((prevState) => {
+      const updatedSelection = checked
+        ? [...prevState, testRunResultsId]
+        : prevState.filter((id) => id !== testRunResultsId);
+      return updatedSelection;
+    });
+  };
+
+  const getCollapsibleRow = (urls, severity) => {
+    const borderStyle = '4px solid ' + func.getHexColorForSeverity(severity?.toUpperCase());
+    return(
+      <tr style={{background: "#FAFBFB", borderLeft: borderStyle, padding: '0px !important', borderTop: '1px solid #dde0e4'}}>
+        <td colSpan={7} style={{padding: '0px !important'}}>
+            {urls.map((ele,index)=>{
+              const borderStyle = index < (urls.length - 1) ? {borderBlockEndWidth : 1} : {}
+              return( 
+                <Box padding={"2"} paddingInlineEnd={"4"} paddingInlineStart={"4"} key={index}
+                    borderColor="border-subdued" {...borderStyle}
+                >
+                  <IssuesCheckbox 
+                    id={ele.testRunResultsId} 
+                    selectedTestRunForRerun={selectedTestRunForRerun} 
+                    handleChangeFromProp={handleCheckboxChange}
+                    checked={selectedTestRunForRerun.includes(ele.testRunResultsId)}
+                  />
+                  <Link monochrome onClick={() => history.navigate(ele.nextUrl)} removeUnderline >
+                    {transform.getUrlComp(ele.url)}
+                  </Link>
+                </Box>
+              )
+            })}
+        </td>
+      </tr>
+    )
   }
 
   useEffect(() => { handleAddSettings() }, [testingRunConfigSettings])
@@ -405,9 +444,9 @@ function SingleTestRunPage() {
   const promotedBulkActions = (selectedDataHexIds) => {
     return [
       {
-        content: `Export ${selectedDataHexIds.length} record${selectedDataHexIds.length == 1 ? '' : 's'}`,
+        content: `Rerun ${selectedTestRunForRerun.length} test${selectedTestRunForRerun.length === 1 ? '' : 's'}`,
         onAction: () => {
-          func.downloadAsCSV((testRunResultsText[selectedTab]).filter((data) => { return selectedDataHexIds.includes(data.id) }), selectedTestRun)
+          transform.rerunTest(selectedTestRun.id, null, false, selectedTestRunForRerun)
         },
       },
     ]
@@ -441,7 +480,7 @@ function SingleTestRunPage() {
           ...element,
           urls: filteredUrls,
           totalUrls: filteredUrls.length,
-          collapsibleRow: transform.getCollapsibleRow(filteredUrls)
+          collapsibleRow: getCollapsibleRow(filteredUrls)
         }
       });
       return filteredData
@@ -577,7 +616,7 @@ function SingleTestRunPage() {
         filters={filterOptions}
         disambiguateLabel={disambiguateLabel}
         headers={tableHeaders}
-        selectable={false}
+        selectable={true}
         promotedBulkActions={promotedBulkActions}
         loading={loading}
         getStatus={func.getTestResultStatus}
