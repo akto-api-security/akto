@@ -73,6 +73,8 @@ public class InviteUserAction extends UserAction{
         if (inviteeDomain == null || adminDomain == null) return false;
         if (inviteeDomain.equalsIgnoreCase(adminDomain)) return true;
 
+        if (("consulting-for."+adminDomain).equals(inviteeDomain)) return true;
+
         String inviteeOrg = commonOrganisationsMap.get(inviteeDomain);
         String adminOrg = commonOrganisationsMap.get(adminDomain);
 

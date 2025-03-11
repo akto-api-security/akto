@@ -1,9 +1,31 @@
-import React from 'react';
-import { VerticalStack, HorizontalGrid, Checkbox, TextField, Text } from '@shopify/polaris';
+import React, { useReducer } from 'react';
+import { VerticalStack, HorizontalGrid, Checkbox, TextField } from '@shopify/polaris';
 import Dropdown from "../../../components/layouts/Dropdown";
+import SingleDate from "../../../components/layouts/SingleDate";
 import func from "@/util/func"
 
 const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes, testRunTimeOptions, testRolesArr, maxConcurrentRequestsOptions, slackIntegrated, generateLabelForSlackIntegration,getLabel, timeFieldsDisabled, teamsTestingWebhookIntegrated, generateLabelForTeamsIntegration}) => {
+
+    const reducer = (state, action) => {
+        switch (action.type) {
+          case "update":
+            let scheduledEpoch = new Date(action.obj['selectedDate']).getTime() / 1000;
+            const timeNow = new Date().getTime() / 1000;
+            if(Math.abs(timeNow - scheduledEpoch) < 86400){
+                scheduledEpoch = func.timeNow()
+            }
+            setTestRun(prev => ({
+                ...prev,
+                startTimestamp: scheduledEpoch
+            }));
+            return {...state, [action.key]: action.obj['selectedDate'] }
+          default:
+            return state;
+        }
+    };
+    const initialState = {data: new Date()};
+    const [state, dispatch] = useReducer(reducer, initialState);
+
     return (
         <VerticalStack gap={"4"}>
             <HorizontalGrid gap={"4"} columns={"3"}>
@@ -19,35 +41,57 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
                             continuousTesting = true;
                         } else if (runType === 'Daily') {
                             recurringDaily = true;
+                        } else if (runType === 'Once') {
+                            // Always ensure we have a date when switching to Once
+                            dispatch({
+                                type: "update",
+                                key: "data",
+                                obj: { selectedDate: state.data || new Date() }
+                            });
                         }
+                        
                         setTestRun(prev => ({
                             ...prev,
                             recurringDaily,
                             continuousTesting,
-                            runTypeLabel: runType.label
+                            runTypeLabel: runType
                         }));
                     }} />
+                {testRun.runTypeLabel === "Once" && (
+                    <div style={{ width: "100%" }}>
+                        <SingleDate 
+                            dispatch={dispatch}
+                            data={state.data}
+                            dataKey="selectedDate"
+                            preferredPosition="above"
+                            disableDatesBefore={new Date(new Date().setDate(new Date().getDate() - 1))}
+                            label="Select date"
+                            allowRange={false}
+                            readOnly={true}
+                        />
+                    </div>
+                )}
                 <Dropdown
                     label="Select Time:"
                     disabled={testRun.continuousTesting === true || timeFieldsDisabled}
                     menuItems={hourlyTimes}
                     initial={testRun.hourlyLabel}
                     selected={(hour) => {
-                        let startTimestamp;
-
-                        if (hour === "Now") startTimestamp = func.timeNow();
-                        else {
-                            const dayStart = +func.dayStart(+new Date());
-                            startTimestamp = parseInt(dayStart / 1000) + parseInt(hour) * 60 * 60;
+                        let scheduledEpoch = new Date(state.data).getTime() / 1000;
+                        if (hour !== "Now"){
+                            scheduledEpoch += parseInt(hour) * 60 * 60;
+                        }else{
+                            scheduledEpoch = testRun.startTimestamp
                         }
-
                         const hourlyTime = getLabel(hourlyTimes, hour);
                         setTestRun(prev => ({
                             ...prev,
-                            startTimestamp,
+                            startTimestamp: scheduledEpoch,
                             hourlyLabel: hourlyTime ? hourlyTime.label : ""
                         }));
                     }} />
+            </HorizontalGrid>
+            <HorizontalGrid gap={"4"} columns={"3"}>
                 <Dropdown
                     label="Test run time:"
                     menuItems={testRunTimeOptions}
@@ -65,12 +109,9 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
                             testRunTimeLabel: testRunTimeOption.label
                         }));
                     }} />
-            </HorizontalGrid>
-            <HorizontalGrid gap={"4"} columns={"2"}>
-                <div style={{ marginTop: '-10px' }}>
-                    <Text>Select Test Role</Text>
                     <Dropdown
                         menuItems={testRolesArr}
+                        label="Select Test Role"
                         initial={testRun.testRoleLabel}
                         selected={(requests) => {
                             let testRole;
@@ -83,11 +124,9 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
                                 testRoleLabel: testRoleOption.label
                             }));
                         }} />
-                </div>
-                <div style={{ marginTop: '-10px' }}>
-                    <Text>Max Concurrent Requests</Text>
                     <Dropdown
                         menuItems={maxConcurrentRequestsOptions}
+                        label="Max Concurrent Requests"
                         initial={getLabel(maxConcurrentRequestsOptions, testRun.maxConcurrentRequests.toString()).label}
                         selected={(requests) => {
                             let maxConcurrentRequests;
@@ -102,7 +141,6 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
                                 maxConcurrentRequestsLabel: maxConcurrentRequestsOption.label
                             }));
                         }} />
-                </div>
             </HorizontalGrid>
             <Checkbox
                 label={slackIntegrated ? "Send slack alert post test completion" : generateLabelForSlackIntegration()}

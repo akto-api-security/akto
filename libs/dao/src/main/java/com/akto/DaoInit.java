@@ -420,6 +420,7 @@ public class DaoInit {
         VulnerableTestingRunResultDao.instance.createIndicesIfAbsent();
         CustomRoleDao.instance.createIndicesIfAbsent();
         TestingInstanceHeartBeatDao.instance.createIndexIfAbsent();
+        PupeteerLogsDao.instance.createIndicesIfAbsent();
     }
 
 }
