@@ -64,12 +64,12 @@ export type AgentLog = {
 
 export type AgentSubprocess = {
     processId: string;
-    subprocessId: string;
-    subprocessHeading: string | null;
+    subProcessId: string;
+    subProcessHeading: string | null;
     userInput: Record<string, any> | null;
     createdTimestamp: number;
-    startedTimestamp: number;
-    endedTimestamp: number;
+    startTimestamp: number;
+    endTimestamp: number;
     state: State;
     logs: AgentLog[] | null;
     attemptId: number;

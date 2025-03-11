@@ -18,7 +18,7 @@ public class AgentHelperAction extends UserAction {
     public String fetchAllResponsesForApiCollectionOrdered() {
 
         limit = Math.min(Math.max(1, limit), 10);
-        skip = Math.min(Math.max(0,skip), limit);
+        skip = Math.max(0, skip);
 
         List<SampleData> sampleData = SampleDataDao.instance.findAll(Filters.eq(
                 "_id.apiCollectionId", apiCollectionId), skip, limit, Sorts.descending("_id"));
@@ -58,5 +58,13 @@ public class AgentHelperAction extends UserAction {
 
     public void setLimit(int limit) {
         this.limit = limit;
+    }
+
+    public SampleData getSample() {
+        return sample;
+    }
+
+    public void setSample(SampleData sample) {
+        this.sample = sample;
     }
 }

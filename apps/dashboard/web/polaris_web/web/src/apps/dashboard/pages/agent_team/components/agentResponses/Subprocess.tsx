@@ -14,13 +14,13 @@ export const Subprocess = ({currentAgentType, processId, subProcessFromProp}: {c
     useEffect(() => {
         const fetchSubprocess = async () => {
             const response = await api.getSubProcess({
-                processId,
-                subprocessId: currentSubprocess,
+                processId: processId,
+                subProcessId: currentSubprocess,
                 attemptId: currentAttempt,
             });
 
             let subProcess = response.subprocess as AgentSubprocess;
-            let subId = subProcess.subprocessId;
+            let subId = subProcess.subProcessId;
 
             // handle new subprocess creation from here
             // assuming there is no discard/approve button for now
@@ -74,7 +74,7 @@ export const Subprocess = ({currentAgentType, processId, subProcessFromProp}: {c
                     <CaretDownMinor height={20} width={20} />
                 </motion.div>
                 <span className="text-sm text-[var(--text-default)]">
-                    {subprocess.subprocessHeading}
+                    {subprocess.subProcessHeading}
                 </span>
             </button>
             

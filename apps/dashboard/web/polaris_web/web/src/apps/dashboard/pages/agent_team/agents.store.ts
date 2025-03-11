@@ -51,6 +51,9 @@ export const useAgentsStore = create<AgentsStore>()(
                             "1": "Find backend directory",
                             "2": "Find language and framework",
                             "3": "Detect auth mechanism type",
+                        },
+                        "FIND_SENSITIVE_DATA_TYPES":{
+                            "1":"Find sensitive data types in response payload"
                         }
                     },
                 setAgentSteps: (state:Record<string, Record<string, any>> ) => set({ agentSteps: state }),
