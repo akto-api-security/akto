@@ -4,6 +4,8 @@ import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.Li
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListThreatApiResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatCategoryWiseCountRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatCategoryWiseCountResponse;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatSeverityWiseCountRequest;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatSeverityWiseCountResponse;
 import com.akto.threat.backend.constants.MongoDBCollection;
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoCollection;
@@ -146,6 +148,48 @@ public class ThreatApiService {
     }
 
     return ThreatCategoryWiseCountResponse.newBuilder()
+        .addAllCategoryWiseCounts(categoryWiseCounts)
+        .build();
+  }
+
+  public ThreatSeverityWiseCountResponse getSeverityWiseCount(
+      String accountId, ThreatSeverityWiseCountRequest req) {
+    MongoCollection<Document> coll =
+        this.mongoClient
+            .getDatabase(accountId)
+            .getCollection(MongoDBCollection.ThreatDetection.MALICIOUS_EVENTS, Document.class);
+
+    List<Document> pipeline = new ArrayList<>();
+    pipeline.add(
+        new Document("$sort", new Document("category", 1).append("detectedAt", -1))); // sort
+    pipeline.add(
+        new Document(
+            "$group",
+            new Document(
+                    "_id",
+                    new Document("severity", "$severity"))
+                .append("count", new Document("$sum", 1))));
+
+    pipeline.add(
+        new Document(
+            "$sort",
+            new Document("severity", -1).append("severity", -1).append("count", -1))); // sort
+
+    List<ThreatSeverityWiseCountResponse.SeverityCount> categoryWiseCounts = new ArrayList<>();
+
+    try (MongoCursor<Document> cursor = coll.aggregate(pipeline).cursor()) {
+      while (cursor.hasNext()) {
+        Document doc = cursor.next();
+        Document agg = (Document) doc.get("_id");
+        categoryWiseCounts.add(
+            ThreatSeverityWiseCountResponse.SeverityCount.newBuilder()
+                .setSeverity(agg.getString("severity"))
+                .setCount(doc.getInteger("count", 0))
+                .build());
+      }
+    }
+
+    return ThreatSeverityWiseCountResponse.newBuilder()
         .addAllCategoryWiseCounts(categoryWiseCounts)
         .build();
   }

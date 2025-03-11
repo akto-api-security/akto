@@ -49,7 +49,7 @@ public class Main {
     MongoClient threatProtectionMongo = MongoClients.create(clientSettings);
     // KafkaConfig internalKafkaConfig =
     //     KafkaConfig.newBuilder()
-    //         .setBootstrapServers(System.getenv("THREAT_EVENTS_KAFKA_BROKER_URL"))
+    //         .setBootstrapServers("localhost:29092")
     //         .setGroupId("akto.threat_protection.flush_db")
     //         .setConsumerConfig(
     //             KafkaConsumerConfig.newBuilder()
@@ -64,7 +64,7 @@ public class Main {
 
     IPLookupClient ipLookupClient = null;//new IPLookupClient(getMaxmindFile());
 
-    //new FlushMessagesToDB(internalKafkaConfig, threatProtectionMongo).run();
+    //new FlushMessagesToDB(null, threatProtectionMongo).run();
 
     MaliciousEventService maliciousEventService =
         new MaliciousEventService(null, threatProtectionMongo, ipLookupClient);
