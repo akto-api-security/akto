@@ -4,39 +4,64 @@ import {  AgentSubprocess, State } from "../../types";
 import { CaretDownMinor } from "@shopify/polaris-icons";
 import api from "../../api";
 import { useAgentsStore } from "../../agents.store";
+import STEPS_PER_AGENT_ID from "../../constants";
 
-export const Subprocess = ({currentAgentType, processId, subProcessFromProp}: {currentAgentType: string, processId:string, subProcessFromProp: AgentSubprocess}) => {
+export const Subprocess = ({agentId, currentAgentType, processId, subProcessFromProp}: {agentId: string, currentAgentType: string, processId:string, subProcessFromProp: AgentSubprocess}) => {
     const [subprocess, setSubprocess] = useState<AgentSubprocess | null>(null);
     const [expanded, setExpanded] = useState(true);
 
-    const {agentSteps, setAgentSteps, setCurrentAttempt, setCurrentSubprocess, currentSubprocess, currentAttempt } = useAgentsStore();
+    const {agentSteps, setAgentSteps, setCurrentAttempt, setCurrentSubprocess, currentSubprocess, currentAttempt, setAgentState } = useAgentsStore();
 
     useEffect(() => {
         const fetchSubprocess = async () => {
             const response = await api.getSubProcess({
-                processId,
-                subprocessId: currentSubprocess,
+                processId: processId,
+                subProcessId: currentSubprocess,
                 attemptId: currentAttempt,
             });
 
             let subProcess = response.subprocess as AgentSubprocess;
-            let subId = subProcess.subprocessId;
+            let subId = subProcess.subProcessId;
 
-            // handle new subprocess creation from here
-            // assuming there is no discard/approve button for now
-            if(response.subProcess !== null && response.subProcess.state === State.PENDING) {
-                // create new subprocess without retry attempt now
-                const newSubId = (Number(currentSubprocess) + 1).toLocaleString()
-                subId = newSubId;
-                const newRes = await api.updateAgentSubprocess({
-                    processId: processId,
-                    subProcessId: newSubId,
-                    attemptId: 1
-                });
-                subProcess = newRes.subprocess as AgentSubprocess;
-                setCurrentSubprocess(newSubId);
-                setCurrentAttempt(1);
+            /* handle new subprocess creation from here
+             State => ACCEPTED.
+             Since we already know, how many total steps are going to be there,
+             we cross check if this would have been the last step.
+            */
+            if(subProcess !== null && subProcess.state === State.ACCEPTED ) {
+                const newSubIdNumber = Number(currentSubprocess) + 1;
+                if (newSubIdNumber > STEPS_PER_AGENT_ID[agentId]) {
+                    // TODO: complete the agent run and mark the agent run as complete.
+                } else {
+                    // create new subprocess without retry attempt now
+                    const newSubId = (newSubIdNumber).toLocaleString()
+                    subId = newSubId;
+                    const newRes = await api.updateAgentSubprocess({
+                        processId: processId,
+                        subProcessId: newSubId,
+                        attemptId: 1
+                    });
+                    subProcess = newRes.subprocess as AgentSubprocess;
+                    setCurrentSubprocess(newSubId);
+                    setCurrentAttempt(1);
+                }
             }
+
+            /*
+            PENDING => completed by the agent
+            blocked on user to accept / discard (provide solution) / retry with hint.
+            */ 
+            if(subProcess !== null && subProcess.state === State.COMPLETED) {
+                setAgentState("paused")
+            }
+
+            /*
+            DISCARDED => discarded by the user.
+            */
+            if(subProcess !== null && subProcess.state === State.DISCARDED) {
+                // TODO: handle how to take input from user
+            }
+
             const existingData = {...agentSteps[currentAgentType]};
             let newData = {...existingData}
             const logs = subProcess?.logs || [];
@@ -74,7 +99,7 @@ export const Subprocess = ({currentAgentType, processId, subProcessFromProp}: {c
                     <CaretDownMinor height={20} width={20} />
                 </motion.div>
                 <span className="text-sm text-[var(--text-default)]">
-                    {subprocess.subprocessHeading}
+                    {subprocess.subProcessHeading}
                 </span>
             </button>
             

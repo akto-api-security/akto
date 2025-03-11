@@ -45,6 +45,8 @@ export enum State {
     DISCARDED = 'DISCARDED',
     ACCEPTED = 'ACCEPTED',
     PENDING = 'PENDING',
+    RE_ATTEMPT = "RE_ATTEMPT",
+    USER_PROVIDED_SOLUTION = "USER_PROVIDED_SOLUTION"
 }
 
 export type AgentRun = {
@@ -64,12 +66,12 @@ export type AgentLog = {
 
 export type AgentSubprocess = {
     processId: string;
-    subprocessId: string;
-    subprocessHeading: string | null;
+    subProcessId: string;
+    subProcessHeading: string | null;
     userInput: Record<string, any> | null;
     createdTimestamp: number;
-    startedTimestamp: number;
-    endedTimestamp: number;
+    startTimestamp: number;
+    endTimestamp: number;
     state: State;
     logs: AgentLog[] | null;
     attemptId: number;

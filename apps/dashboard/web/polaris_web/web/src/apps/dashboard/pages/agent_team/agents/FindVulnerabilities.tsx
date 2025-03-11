@@ -5,17 +5,28 @@ import { Subprocess } from '../components/agentResponses/Subprocess';
 import { useAgentsStore } from '../agents.store';
 import api from '../api';
 
-export const FindVulnerabilitiesAgent = () => {
+export const FindVulnerabilitiesAgent = (props) => {
+
+    const {agentId} = props
+
     const [currentAgentRun, setCurrentAgentRun] = useState<AgentRun | null>(null);
     const [subprocesses, setSubprocesses] = useState<AgentSubprocess[]>([]);
 
-    const { agentSteps, setAgentSteps, setCurrentAttempt, setCurrentSubprocess } = useAgentsStore();
+    // ?? Where exactly is agent steps being used.
+    // I didn't find any use case, we can remove it.
+    const { agentSteps, setAgentSteps, setCurrentAttempt, setCurrentSubprocess, setCurrentProcessId} = useAgentsStore();
 
     const getAllAgentRuns = async () => {
         try {
-            const response = (await api.getAllAgentRuns("FIND_VULNERABILITIES_FROM_SOURCE_CODE"));
+            const response = (await api.getAllAgentRuns(agentId));
             const agentRuns = response.agentRuns as AgentRun[];
             setCurrentAgentRun(agentRuns[0]);
+            if (agentRuns.length > 0 && agentRuns[0]?.processId) {
+                setCurrentProcessId(agentRuns[0]?.processId)
+            } else {
+                // TODO: handle cases here, because the above API only gets "RUNNING" Agents.
+                // setCurrentProcessId("")
+            }
         } catch(error) {
             
         }
@@ -32,10 +43,16 @@ export const FindVulnerabilitiesAgent = () => {
         
         if(subprocesses.length > 0) { 
             // if page-reload, this will be called to fill the data required in the localstorage
-            const existingData = {...agentSteps["FIND_VULNERABILITIES_FROM_SOURCE_CODE"]};
+            const existingData = {...agentSteps[agentId]};
             let newData = {...existingData}
+            let newestSubprocess = subprocesses[0]
             subprocesses.forEach((subprocess) => {
-                const subProcessId: string = subprocess.subprocessId;
+                
+                if(subprocess.createdTimestamp > newestSubprocess.createdTimestamp){
+                    newestSubprocess = subprocess
+                }
+
+                const subProcessId: string = subprocess.subProcessId;
                 const logs = subprocess?.logs || [];
                 const processOutput = subprocess?.processOutput || {};
                 newData[subProcessId] = {
@@ -44,8 +61,10 @@ export const FindVulnerabilitiesAgent = () => {
                     processOutput: processOutput
                 }
             });
-            const finalMap = {...agentSteps, "FIND_VULNERABILITIES_FROM_SOURCE_CODE": newData};
+            const finalMap = {...agentSteps, [agentId]: newData};
             setAgentSteps(finalMap);
+            setCurrentSubprocess(newestSubprocess.subProcessId)
+            setCurrentAttempt(newestSubprocess.attemptId)
         }
         if(subprocesses.length === 0) {
             // create first subprocess of the agent run here
@@ -84,7 +103,7 @@ export const FindVulnerabilitiesAgent = () => {
         <Scrollable className="h-full">
             <VerticalStack gap="2">
                 {subprocesses.length > 0 && subprocesses.map((subprocess, index) => (
-                    <Subprocess currentAgentType={"FIND_VULNERABILITIES_FROM_SOURCE_CODE"} processId={currentAgentRun?.processId || ""} key={subprocess.subprocessId} subProcessFromProp={subprocesses[index]} />
+                    <Subprocess agentId={agentId} currentAgentType={agentId} processId={currentAgentRun?.processId || ""} key={subprocess.subProcessId} subProcessFromProp={subprocesses[index]} />
                 ))}
             </VerticalStack>
         </Scrollable>

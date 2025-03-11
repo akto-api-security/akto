@@ -234,6 +234,16 @@ public class AgentAction extends UserAction {
         return Action.SUCCESS.toUpperCase();
     }
 
+    String subProcessHeading;
+
+    public String getSubProcessHeading() {
+        return subProcessHeading;
+    }
+
+    public void setSubProcessHeading(String subProcessHeading) {
+        this.subProcessHeading = subProcessHeading;
+    }
+
     BasicDBObject response;
     public String feedDataToAgent(){
         try {
@@ -304,7 +314,12 @@ public class AgentAction extends UserAction {
                     return ERROR.toUpperCase();
                 }
                 break;
-        
+            case "subProcessHeading":
+            AgentSubProcessSingleAttemptDao.instance.updateOne(
+                filter,
+                Updates.set(AgentSubProcessSingleAttempt.SUB_PROCESS_HEADING, subProcessHeading)
+            );
+            break;
             default:
                 break;
         }
