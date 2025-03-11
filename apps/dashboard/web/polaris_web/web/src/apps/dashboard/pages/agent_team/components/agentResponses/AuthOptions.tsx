@@ -1,4 +1,4 @@
-import { Box, Button, Text, Icon } from '@shopify/polaris';
+import { Text, Icon } from '@shopify/polaris';
 import { KeyMajor } from '@shopify/polaris-icons';
 import React, { useState } from 'react';
 

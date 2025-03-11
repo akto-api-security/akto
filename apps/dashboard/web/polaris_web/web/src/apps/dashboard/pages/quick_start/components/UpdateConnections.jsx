@@ -8,8 +8,6 @@ import TitleWithInfo from '@/apps/dashboard/components/shared/TitleWithInfo';
 import FlyLayout from '../../../components/layouts/FlyLayout';
 
 function UpdateConnections(props) {
-
-    const { myConnections } = props; 
     const obj = quickStartFunc.getConnectorsListCategorized()
     const [newCol, setNewCol] = useState(0)
 

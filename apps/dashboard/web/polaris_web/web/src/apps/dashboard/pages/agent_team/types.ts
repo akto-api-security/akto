@@ -3,6 +3,20 @@ export type Model = {
     name: string;
 }
 
+export type RepoType = {
+    id: string;
+    logo: string;
+    text: string;
+    onClickFunc: () => void;
+}
+
+export type RepoPayload = {
+    repo: string;
+    project: string;
+    lastRun: number;
+    scheduleTime: number;
+}
+
 export type Agent = {
     id: string;
     name: string;

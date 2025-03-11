@@ -85,7 +85,6 @@ import ThreatApiPage from "../dashboard/pages/threat_detection/ThreatApiPage";
 import ThreatActorPage from "../dashboard/pages/threat_detection/ThreatActorPage";
 import ThreatPolicyPage from "../dashboard/pages/threat_detection/ThreatPolicyPage";
 import TestsTablePage from "../dashboard/pages/test_editor/tests_table/TestsTablePage";
-import TempAgent from "../dashboard/pages/temp/TempAgent";
 
 // if you add a component in a new path, please verify the search implementation in function -> 'getSearchItemsArr' in func.js
 
@@ -98,10 +97,6 @@ const router = createBrowserRouter([
                 path: "",
                 element: <HomePage/>,
                 children: [
-                    {
-                        path: "temp",
-                        element: <TempAgent/>,
-                    },
                     {
                         path: "home",
                         element: <HomeDashboard/>,

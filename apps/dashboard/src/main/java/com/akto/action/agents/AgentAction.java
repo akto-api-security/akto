@@ -5,6 +5,9 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 import org.bson.conversions.Bson;
 
@@ -13,8 +16,6 @@ import com.akto.dao.agents.AgentRunDao;
 import com.akto.dao.agents.AgentSubProcessSingleAttemptDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.agents.*;
-import com.akto.dto.agents.AgentSubProcessSingleAttempt.CurrentProcessState;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
@@ -33,6 +34,8 @@ public class AgentAction extends UserAction {
         agentRuns = AgentRunDao.instance.findAll(filter);
         return Action.SUCCESS.toUpperCase();
     }
+
+    private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
 
     public String createAgentRun() {
 
@@ -67,10 +70,26 @@ public class AgentAction extends UserAction {
 
         agentRun = new AgentRun(processId, data, agentModule,
                 Context.now(), 0, 0, State.SCHEDULED);
-
-        System.out.println("agentRun: " + agentRun);
-
         AgentRunDao.instance.insertOne(agentRun);
+
+        // TODO: Use health check for dashboard to trigger the agent module.
+        int accountId = Context.accountId.get();
+        executorService.schedule( new Runnable() {
+            public void run() {
+                Context.accountId.set(accountId);
+                try {
+                    AgentRunDao.instance.updateOne(
+                        Filters.eq(AgentRun.PROCESS_ID, processId),
+                        Updates.combine(
+                            Updates.setOnInsert(AgentRun.START_TIMESTAMP, Context.now()),
+                            Updates.set(AgentRun._STATE, State.RUNNING)
+                        )
+                    );
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+        }, 5000 , TimeUnit.SECONDS);
 
         return Action.SUCCESS.toUpperCase();
     }

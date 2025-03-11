@@ -1,8 +1,6 @@
-import React, { useEffect, useState } from 'react';
-import api from '../../quick_start/api';
+import React, { useEffect, useRef, useState } from 'react';
 import agentTeamApi from '../api';
-import { HorizontalStack, VerticalStack } from '@shopify/polaris';
-import { AgentOptions } from '../components/agentResponses/AuthOptions';
+import { Scrollable, VerticalStack } from '@shopify/polaris';
 import { AgentRun, AgentSubprocess, State } from '../types';
 import { Subprocess } from '../components/agentResponses/Subprocess';
 
@@ -24,37 +22,37 @@ export const FindVulnerabilitiesAgent = () => {
        // polling for all subprocesses;
        setInterval(async () => {
         const response = await agentTeamApi.getAllSubProcesses({
-            processId,
+            processId
         });
         const subprocesses = response.subprocesses as AgentSubprocess[];
         console.log({ subprocesses });
         setSubprocesses(subprocesses);
        }, 2000);
     }
+    const intervalRef = useRef<number | null>(null);
 
     useEffect(() => {
-        let interval: NodeJS.Timeout;
-        
         if (!currentAgentRun || currentAgentRun?.state !== State.RUNNING) {
-            interval = setInterval(getAllAgentRuns, 2000);
-        }
-
-        if (currentAgentRun?.state === State.RUNNING) {
+            intervalRef.current = setInterval(getAllAgentRuns, 2000);
+        } else {
             getAllSubProcesses({ processId: currentAgentRun.processId });
         }
-
+    
         return () => {
-            if (interval) {
-                clearInterval(interval);
+            if (intervalRef.current) {
+                clearInterval(intervalRef.current);
+                intervalRef.current = null;
             }
-        }
+        };
     }, [currentAgentRun]);
 
     return (
-        <VerticalStack gap="2">
-            {subprocesses.map((subprocess) => (
-                <Subprocess key={subprocess.subprocessId} subprocessId={subprocess.subprocessId} processId={subprocess.processId} />
-            ))}
-        </VerticalStack>
+        <Scrollable className="h-full">
+            <VerticalStack gap="2">
+                {subprocesses.map((subprocess) => (
+                    <Subprocess key={subprocess.subprocessId} subprocessId={subprocess.subprocessId} processId={subprocess.processId} />
+                ))}
+            </VerticalStack>
+        </Scrollable>
     )
 }

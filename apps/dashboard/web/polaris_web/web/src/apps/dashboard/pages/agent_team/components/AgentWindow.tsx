@@ -1,12 +1,11 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Drawer } from 'vaul';
 import { PromptComposer } from './PromptComposer';
 import { Agent } from '../types';
 import { AgentHeader } from './AgentHeader';
-import { useAgentsStore } from '../agents.store';
-import { Button, Scrollable } from '@shopify/polaris';
-import { Subprocess } from './agentResponses/Subprocess';
 import { FindVulnerabilitiesAgent } from '../agents/FindVulnerabilities';
+import { Scrollable, VerticalStack } from '@shopify/polaris';
+import RepositoryInitializer from './RepositoryInitializer';
 
 interface AgentWindowProps {
     agent: Agent | null;
@@ -15,17 +14,15 @@ interface AgentWindowProps {
 }
 
 function AgentWindow({ agent, onClose, open }: AgentWindowProps) {
-    const { agentState, setAgentState } = useAgentsStore();
-
-    //test subprocess
-    const [testSubprocess, setTestSubprocess] = useState<boolean>(false);
-
-    console.log({ agent })
-
     const renderAgentWindow = () => {
         switch (agent?.id) {
             case 'FIND_VULNERABILITIES_FROM_SOURCE_CODE':
-                return <FindVulnerabilitiesAgent />
+                return (
+                    <VerticalStack gap={"4"}>
+                        <RepositoryInitializer/>
+                        <FindVulnerabilitiesAgent />
+                    </VerticalStack>
+                )
         }
     }
 
@@ -33,7 +30,7 @@ function AgentWindow({ agent, onClose, open }: AgentWindowProps) {
         <Drawer.Root open={open} direction="right" dismissible={false}>
             <Drawer.Portal>
                 <Drawer.Overlay className="fixed inset-0 bg-black/40" />
-                <Drawer.Content className="fixed inset-y-0 right-0 w-[50vw] min-w-[600px] bg-white z-[400] h-[calc(100vh-56px)] top-[56px]">
+                <Drawer.Content className="fixed inset-y-0 right-0 w-[50vw] min-w-[600px] bg-white z-[100] h-[calc(100vh-56px)] top-[56px]">
                     <div className="flex flex-col h-full">
                         <AgentHeader onClose={onClose} agent={agent} />
                         <div className="h-[calc(100vh-172px)] flex flex-col overflow-y-auto px-4 pb-5">
