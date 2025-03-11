@@ -14,6 +14,7 @@ import { HorizontalGrid, VerticalStack } from "@shopify/polaris";
 import TopThreatTypeChart from "./components/TopThreatTypeChart";
 import threatDetectionFunc from "./transform";
 import { ThreatSummary } from "./components/ThreatSummary";
+import { ThreatActivityTimeline } from "./components/ThreatActivityTimeline";
 function ThreatActorPage() {
   const [mapData, setMapData] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -58,10 +59,7 @@ function ThreatActorPage() {
     return (
       <VerticalStack gap={4} columns={2}>
         <HorizontalGrid gap={4} columns={2}>
-          <TopThreatTypeChart
-            key={"top-threat-types"}
-            data={subCategoryCount}
-          />
+          <ThreatActivityTimeline />
           <ThreatWorldMap
             data={mapData}
             style={{
@@ -78,7 +76,7 @@ function ThreatActorPage() {
   };
 
   const components = [
-    <ThreatSummary />,
+    <ThreatSummary startTimestamp={currDateRange.startTimestamp} endTimestamp={currDateRange.endTimestamp} />,
     <ChartComponent />,
     <ThreatActorTable
       key={"threat-actor-data-table"}
