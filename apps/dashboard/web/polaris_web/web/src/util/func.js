@@ -1887,7 +1887,7 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
       })} ${timeStr}`;
   },
   isDemoAccount(){
-    return window.ACTIVE_ACCOUNT === 1669322524
+    return window.ACTIVE_ACCOUNT === 1669322524 || this.checkLocal()
   }
 
 }
