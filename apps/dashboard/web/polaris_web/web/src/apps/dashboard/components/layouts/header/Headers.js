@@ -126,9 +126,9 @@ export default function Header() {
     const userMenuMarkup = (
         <TopBar.UserMenu
             actions={[
-                {
-                    items: accountsItems
-                },
+                // {
+                //     items: accountsItems
+                // },
                 {
                     items: [
                         (window.IS_SAAS !== "true" && (window?.DASHBOARD_MODE === 'LOCAL_DEPLOY' || window?.DASHBOARD_MODE === "ON_PREM")) ? {} :
