@@ -1,10 +1,12 @@
 package com.akto.threat.backend.router;
 
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.DailyActorsCountRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchAlertFiltersRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchMaliciousEventsRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListMaliciousRequestsRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListThreatActorsRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListThreatApiRequest;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatActivityTimelineRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatActorByCountryRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatCategoryWiseCountRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatSeverityWiseCountRequest;
@@ -167,6 +169,56 @@ public class DashboardRouter implements ARouter {
                     threatActorService.fetchAggregateMaliciousRequests(
                         ctx.get("accountId"),
                         req
+                    )
+                ).ifPresent(s -> ctx.response().setStatusCode(200).end(s));
+            });
+
+        router
+            .post("/get_daily_actor_count")
+            .blockingHandler(ctx -> {
+                RequestBody reqBody = ctx.body();
+                DailyActorsCountRequest req = ProtoMessageUtils.<
+                DailyActorsCountRequest
+                >toProtoMessage(
+                    DailyActorsCountRequest.class,
+                    reqBody.asString()
+                ).orElse(null);
+
+                if (req == null) {
+                    ctx.response().setStatusCode(400).end("Invalid request");
+                    return;
+                }
+
+                ProtoMessageUtils.toString(
+                    threatActorService.getDailyActorCounts(
+                        ctx.get("accountId"),
+                        req.getStartTs(),
+                        req.getEndTs()
+                    )
+                ).ifPresent(s -> ctx.response().setStatusCode(200).end(s));
+            });
+        
+        router
+            .post("/get_threat_activity_timeline")
+            .blockingHandler(ctx -> {
+                RequestBody reqBody = ctx.body();
+                ThreatActivityTimelineRequest req = ProtoMessageUtils.<
+                ThreatActivityTimelineRequest
+                >toProtoMessage(
+                    ThreatActivityTimelineRequest.class,
+                    reqBody.asString()
+                ).orElse(null);
+
+                if (req == null) {
+                    ctx.response().setStatusCode(400).end("Invalid request");
+                    return;
+                }
+
+                ProtoMessageUtils.toString(
+                    threatActorService.getThreatActivityTimeline(
+                        ctx.get("accountId"),
+                        req.getStartTs(),
+                        req.getEndTs()
                     )
                 ).ifPresent(s -> ctx.response().setStatusCode(200).end(s));
             });

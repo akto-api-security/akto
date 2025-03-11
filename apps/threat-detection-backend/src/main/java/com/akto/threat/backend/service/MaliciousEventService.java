@@ -41,7 +41,7 @@ public class MaliciousEventService {
 
   public MaliciousEventService(
       KafkaConfig kafkaConfig, MongoClient mongoClient, IPLookupClient ipLookupClient) {
-    this.kafka = new Kafka(kafkaConfig);
+    this.kafka = null;//new Kafka(kafkaConfig);
     this.mongoClient = mongoClient;
     this.ipLookupClient = ipLookupClient;
   }
