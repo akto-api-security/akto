@@ -8,6 +8,7 @@ public enum State {
     SCHEDULED,
     FAILED,
     DISCARDED,
-    ACCEPTED
+    ACCEPTED,
+    PENDING
 
 }

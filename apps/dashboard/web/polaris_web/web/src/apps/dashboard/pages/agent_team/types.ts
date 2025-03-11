@@ -43,7 +43,8 @@ export enum State {
     SCHEDULED = 'SCHEDULED',
     FAILED = 'FAILED',
     DISCARDED = 'DISCARDED',
-    ACCEPTED = 'ACCEPTED'
+    ACCEPTED = 'ACCEPTED',
+    PENDING = 'PENDING',
 }
 
 export type AgentRun = {

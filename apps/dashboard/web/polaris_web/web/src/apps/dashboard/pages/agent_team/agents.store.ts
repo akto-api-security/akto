@@ -19,8 +19,8 @@ interface AgentsStore {
     setAttemptedInBlockedState: (attempted: boolean) => void;
     agentState: AgentState;
     setAgentState: (state: AgentState) => void;
-    agentSteps: Map<string, Record<string, string>>;
-    setAgentSteps: (key: string, value: Record<string, any>) => void;
+    agentSteps: Record<string, Record<string, any>>;
+    setAgentSteps: (state:  Record<string, Record<string, any>>) => void;
     selectedRepository: string | null;
     setSelectedRepository: (repo: string) => void;
     currentSubprocess: string | null;
@@ -47,22 +47,13 @@ export const useAgentsStore = create<AgentsStore>()(
                     set({ attemptedInBlockedState: attempted }),
                 agentState: "idle",
                 setAgentState: (state: AgentState) => set({ agentState: state }),
-                agentSteps: new Map([
-                    [
-                        "FIND_VULNERABILITIES_FROM_SOURCE_CODE",
-                        {
+                agentSteps: {"FIND_VULNERABILITIES_FROM_SOURCE_CODE":{
                             "1": "Find backend directory",
                             "2": "Find language and framework",
                             "3": "Detect auth mechanism type",
-                        },
-                    ],
-                ]),
-                setAgentSteps: (key: string, value: Record<string, string>) =>
-                    set((state) => {
-                        const updatedSteps = new Map(state.agentSteps);
-                        updatedSteps.set(key, value);
-                        return { agentSteps: updatedSteps };
-                }),
+                        }
+                    },
+                setAgentSteps: (state:Record<string, Record<string, any>> ) => set({ agentSteps: state }),
                 selectedRepository: null,
                 setSelectedRepository: (repo: string) => set({ selectedRepository: repo }),
                 currentSubprocess: '0',
