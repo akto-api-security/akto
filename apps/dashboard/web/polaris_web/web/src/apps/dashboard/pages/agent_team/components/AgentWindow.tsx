@@ -27,7 +27,7 @@ function AgentWindow({ agent, onClose, open }: AgentWindowProps) {
             case 'FIND_SENSITIVE_DATA_TYPES':
                 return (
                     <VerticalStack gap={"4"}>
-                        <SensitiveDataAgentInitializer />
+                        <SensitiveDataAgentInitializer agentType={agent.id}/>
                         <FindVulnerabilitiesAgent />
                     </VerticalStack>
                 )
