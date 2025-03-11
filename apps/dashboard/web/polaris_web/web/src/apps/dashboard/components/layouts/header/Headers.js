@@ -209,13 +209,13 @@ export default function Header() {
 
 
     const secondaryMenuMarkup = (
-        <HorizontalStack gap="4">
+        <HorizontalStack gap="200">
             {(Object.keys(currentTestsObj).length > 0 && currentTestsObj?.testRunsArr?.length !== 0 && currentTestsObj?.totalTestsCompleted > 0) ? 
-            <HorizontalStack gap="4">
+            <HorizontalStack gap="100">
                 <Button plain monochrome onClick={() => {handleTestingNavigate()}}>
                  <SemiCircleProgress key={"progress"} progress={Math.min(progress, 100)} size={60} height={55} width={75}/>
                 </Button>
-                <VerticalStack gap={"0"}>
+                <VerticalStack gap="100">
                     <Text fontWeight="medium">Test run status</Text>
                     <Text color="subdued" variant="bodySm">{`${currentTestsObj.totalTestsQueued} tests queued`}</Text>
                 </VerticalStack>
