@@ -318,6 +318,7 @@ export default function LeftNav() {
                             : {},
                     ]}
                 />
+                {/* Settings navigation section commented out
                 <Navigation.Section
                     items={[
                         {
@@ -336,6 +337,7 @@ export default function LeftNav() {
                         },
                     ]}
                 />
+                */}
             </Navigation>
         </div>
     );
