@@ -20,9 +20,13 @@ interface AgentsStore {
     agentState: AgentState;
     setAgentState: (state: AgentState) => void;
     agentSteps: Map<string, Record<string, string>>;
-    setAgentSteps: (key: string, value: Record<string, string>) => void;
+    setAgentSteps: (key: string, value: Record<string, any>) => void;
     selectedRepository: string | null;
     setSelectedRepository: (repo: string) => void;
+    currentSubprocess: string | null;
+    setCurrentSubprocess: (subprocess: string) => void;
+    currentAttempt: number 
+    setCurrentAttempt: (subprocess: number) => void;
 }
 
 // Zustand Store with Middleware
@@ -61,7 +65,10 @@ export const useAgentsStore = create<AgentsStore>()(
                 }),
                 selectedRepository: null,
                 setSelectedRepository: (repo: string) => set({ selectedRepository: repo }),
-
+                currentSubprocess: '0',
+                setCurrentSubprocess: (subprocess: string) => set({ currentSubprocess: subprocess }),
+                currentAttempt: 0,
+                setCurrentAttempt: (attempt: number) => set({ currentAttempt: attempt }),
             }),
             { name: "agentsStore", storage: createJSONStorage(() => localStorage) }
         )

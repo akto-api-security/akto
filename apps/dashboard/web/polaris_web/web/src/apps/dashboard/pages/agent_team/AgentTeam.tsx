@@ -1,14 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { useAgentsStore } from './agents.store';
 import { Agent, Model } from './types';
-import { PromptComposer } from './components/PromptComposer';
 import AgentWindow from './components/AgentWindow';
-import { Button, Text } from '@shopify/polaris';
+import { Button } from '@shopify/polaris';
 import PageWithMultipleCards from '../../components/layouts/PageWithMultipleCards';
 import GridRows from '../../components/shared/GridRows';
 import AgentRowCard from './AgentRowCard';
 import TitleWithInfo from "../../../../apps/dashboard/components/shared/TitleWithInfo"
-import api from './api';
+
 
 // TODO: get these models from backend
 const MODELS: Model[] = [

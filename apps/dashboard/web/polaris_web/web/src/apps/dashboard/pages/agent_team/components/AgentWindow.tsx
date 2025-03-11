@@ -20,7 +20,7 @@ function AgentWindow({ agent, onClose, open }: AgentWindowProps) {
             case 'FIND_VULNERABILITIES_FROM_SOURCE_CODE':
                 return (
                     <VerticalStack gap={"4"}>
-                        <RepositoryInitializer />
+                        <RepositoryInitializer agentType={agent.id}/>
                         <FindVulnerabilitiesAgent />
                     </VerticalStack>
                 )

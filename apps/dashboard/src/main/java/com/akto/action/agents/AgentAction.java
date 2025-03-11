@@ -16,6 +16,7 @@ import com.akto.dao.agents.AgentRunDao;
 import com.akto.dao.agents.AgentSubProcessSingleAttemptDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.agents.*;
+import com.amazonaws.util.StringUtils;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
@@ -31,6 +32,9 @@ public class AgentAction extends UserAction {
 
     public String getAllAgentRuns() {
         Bson filter = Filters.eq(AgentRun._STATE, State.RUNNING);
+        if(!StringUtils.isNullOrEmpty(this.agent)){
+            filter = Filters.and(filter, Filters.eq("agent", agent));
+        }
         agentRuns = AgentRunDao.instance.findAll(filter);
         return Action.SUCCESS.toUpperCase();
     }
@@ -89,7 +93,7 @@ public class AgentAction extends UserAction {
                     e.printStackTrace();
                 }
             }
-        }, 5000 , TimeUnit.SECONDS);
+        }, 5 , TimeUnit.SECONDS);
 
         return Action.SUCCESS.toUpperCase();
     }

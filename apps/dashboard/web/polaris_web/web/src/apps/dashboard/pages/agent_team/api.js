@@ -47,11 +47,11 @@ const api = {
         })
     },
 
-    getAllAgentRuns: async () => {
+    getAllAgentRuns: async (agent) => {
         return await request({
             url: '/api/getAllAgentRuns',
             method: 'post',
-            data: {}
+            data: {agent}
         })
     }
 }
