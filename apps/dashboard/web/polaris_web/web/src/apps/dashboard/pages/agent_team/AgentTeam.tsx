@@ -34,9 +34,9 @@ const AGENTS: Agent[] = [
         image: '/public/agents/secret-agent-2.svg',
     },
     {
-        id: 'source-code-security-scanner-3',
-        name: 'Source Code Security Scanner 3',
-        description: 'An intelligent member that analyzes your source code for security vulnerabilities by examining authentication mechanisms, API endpoints, and data flow patterns.',
+        id: 'FIND_SENSITIVE_DATA_TYPES',
+        name: 'Sensitive data type scanner',
+        description: 'An intelligent member that analyzes your APIs for sensitive data types.',
         image: '/public/agents/secret-agent-3.svg',
     },
     {
@@ -77,11 +77,13 @@ function AgentTeam() {
     const closeAction = () => {
         setCurrentAgent(null)
         setNewCol(0)
+        setShowAgentWindow(false)
     }
 
     const onButtonClick = (agent: Agent | null ) => {
         setNewCol(1)
         setCurrentAgent(agent)
+        setShowAgentWindow(true)
     }
 
     const agents = (
@@ -94,6 +96,8 @@ function AgentTeam() {
     )
 
     const pageComponents = [agents]
+
+    const [showAgentWindow, setShowAgentWindow] = useState(false)
 
     return (
         <>
@@ -114,7 +118,7 @@ function AgentTeam() {
                     <Button id={"Knowledge-base"} onClick={() => {}}>Knowledge base</Button>
                 ]}
             />
-            <AgentWindow agent={currentAgent} onClose={closeAction} open={currentAgent !== null} />
+            <AgentWindow agent={currentAgent} onClose={closeAction} open={showAgentWindow} />
         </>
     )
 }
