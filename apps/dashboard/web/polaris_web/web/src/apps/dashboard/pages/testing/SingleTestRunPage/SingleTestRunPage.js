@@ -116,7 +116,6 @@ function SingleTestRunPage() {
 
   const [testRunResultsText, setTestRunResultsText] = useState({ vulnerable: [], no_vulnerability_found: [], skipped: [], need_configurations: [], ignored_issues: [] })
   const [selectedTestRun, setSelectedTestRun] = useState({});
-  const [selectedTestRunForRerun, setSelectedTestRunForRerun] = useState([])
   const subCategoryFromSourceConfigMap = PersistStore(state => state.subCategoryFromSourceConfigMap);
   const params = useParams()
   const [loading, setLoading] = useState(false);

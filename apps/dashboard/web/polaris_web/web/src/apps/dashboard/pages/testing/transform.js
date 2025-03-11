@@ -828,7 +828,7 @@ getPrettifiedTestRunResults(testRunResults, getCollapsibleRow){
               return(
                 config.length > 0 ?
                   <div className="div-link" onClick={(e) => {e.stopPropagation();window.open(baseUrl + config.toUpperCase(), "_blank")}} key={index}>
-                    <span style={{ lineHeight: '16px', fontSize: '14px', color: "#B98900"}}>{func.toSentenceCase(config || "")} this is test</span>
+                    <span style={{ lineHeight: '16px', fontSize: '14px', color: "#B98900"}}>{func.toSentenceCase(config || "")}</span>
                   </div>
                 : null
               )
