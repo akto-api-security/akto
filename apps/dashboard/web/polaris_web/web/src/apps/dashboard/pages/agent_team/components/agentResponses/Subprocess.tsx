@@ -1,32 +1,61 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import {  AgentSubprocess } from "../../types";
+import {  AgentSubprocess, State } from "../../types";
 import { CaretDownMinor } from "@shopify/polaris-icons";
 import api from "../../api";
+import { useAgentsStore } from "../../agents.store";
 
-type SubprocessProps = {
-    subprocessId: string;
-    processId: string;
-}
-
-export const Subprocess = ({ subprocessId, processId }: SubprocessProps) => {
+export const Subprocess = ({currentAgentType, processId, subProcessFromProp}: {currentAgentType: string, processId:string, subProcessFromProp: AgentSubprocess}) => {
     const [subprocess, setSubprocess] = useState<AgentSubprocess | null>(null);
     const [expanded, setExpanded] = useState(true);
+
+    const {agentSteps, setAgentSteps, setCurrentAttempt, setCurrentSubprocess, currentSubprocess, currentAttempt } = useAgentsStore();
 
     useEffect(() => {
         const fetchSubprocess = async () => {
             const response = await api.getSubProcess({
                 processId,
-                subprocessId,
-                attemptId: 0,
+                subprocessId: currentSubprocess,
+                attemptId: currentAttempt,
             });
-            setSubprocess(response.subProcess);
+
+            let subProcess = response.subprocess as AgentSubprocess;
+            let subId = subProcess.subprocessId;
+
+            // handle new subprocess creation from here
+            // assuming there is no discard/approve button for now
+            if(response.subProcess !== null && response.subProcess.state === State.PENDING) {
+                // create new subprocess without retry attempt now
+                const newSubId = (Number(currentSubprocess) + 1).toLocaleString()
+                subId = newSubId;
+                const newRes = await api.updateAgentSubprocess({
+                    processId: processId,
+                    subProcessId: newSubId,
+                    attemptId: 1
+                });
+                subProcess = newRes.subprocess as AgentSubprocess;
+                setCurrentSubprocess(newSubId);
+                setCurrentAttempt(1);
+            }
+            const existingData = {...agentSteps[currentAgentType]};
+            let newData = {...existingData}
+            const logs = subProcess?.logs || [];
+            const processOutput = subProcess?.processOutput || {};
+            newData[subId] = {
+                heading: newData[subId]?.heading || newData[subId],
+                logs: logs || [],
+                processOutput: processOutput || {}
+            }
+            const finalMap = {...agentSteps, [currentAgentType]: newData};
+            setAgentSteps(finalMap);
+            setSubprocess(subProcess);
+
         }
 
         const interval = setInterval(fetchSubprocess, 2000);
 
         return () => clearInterval(interval);
-    }, [subprocessId, processId]);
+    }, [currentSubprocess]);
 
     if (!subprocess) {
         return null;
@@ -61,7 +90,7 @@ export const Subprocess = ({ subprocessId, processId }: SubprocessProps) => {
                 >
                     <div className="bg-[#F6F6F7] ml-2.5 pt-0 space-y-1 border-l border-[#D2D5D8]">
                         <AnimatePresence initial={false}>
-                            {subprocess.logs.map((log, index) => (
+                            {subprocess?.logs?.map((log, index) => (
                                 <motion.p 
                                     key={`${index}-${log.log}`}
                                     initial={{ opacity: 0, y: -10 }}
