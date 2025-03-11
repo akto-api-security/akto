@@ -11,12 +11,13 @@ import { Button, Icon, Tooltip, Text } from '@shopify/polaris';
 
 import { PauseMajor, PlusMinor, SendMajor, TimelineAttachmentMajor } from '@shopify/polaris-icons';
 
-
 import { ModelPicker } from './ModelPicker';
 import { isBlockingState, useAgentsStore } from '../agents.store';
-import { PromptPayload } from '../types';
+import { PromptPayload, State } from '../types';
 import { getPromptContent } from '../utils';
 import { BlockedState } from './BlockedState';
+import api from '../api';
+import func from '../../../../../util/func';
 
 
 interface PromptComposerProps {
@@ -81,9 +82,32 @@ export const PromptComposer = ({ onSend }: PromptComposerProps) => {
     onSend(prompt);
   }
 
+
+  const { currentProcessId, currentSubprocess, currentAttempt } = useAgentsStore();
+
+  async function onResume() {
+    await api.updateAgentSubprocess({
+      processId: currentProcessId,
+      subProcessId: currentSubprocess,
+      attemptId: currentAttempt,
+      updatedState: State.ACCEPTED.toString()
+    });
+    func.setToast(true, false, "Member solution accepted")
+  }
+
+  async function onDiscard() {
+    await api.updateAgentSubprocess({
+      processId: currentProcessId,
+      subProcessId: currentSubprocess,
+      attemptId: currentAttempt,
+      updatedState: State.DISCARDED.toString()
+    });
+    func.setToast(true, false, "Member solution discarded")
+  }
+
   return (
     <div className={`flex flex-col gap-4 border border-1 border-[var(--borderShadow-box-shadow)] py-2 px-4 rounded-sm relative z-[500] bg-white ${isFocused ? 'ring ring-violet-200' : ''}`}>
-      <BlockedState onResume={() => {}} onDiscard={() => {}} />
+      <BlockedState onResume={onResume} onDiscard={onDiscard} />
       <div className="flex flex-col gap-2 justify-start">
         <div className="w-full" onClick={() => isInBlockedState && setAttemptedInBlockedState(true)}>
           {/* <Button 

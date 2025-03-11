@@ -45,6 +45,8 @@ export enum State {
     DISCARDED = 'DISCARDED',
     ACCEPTED = 'ACCEPTED',
     PENDING = 'PENDING',
+    RE_ATTEMPT = "RE_ATTEMPT",
+    USER_PROVIDED_SOLUTION = "USER_PROVIDED_SOLUTION"
 }
 
 export type AgentRun = {

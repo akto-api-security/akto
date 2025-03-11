@@ -3,7 +3,7 @@ import { PromptComposer } from './PromptComposer';
 import { Agent } from '../types';
 import { AgentHeader } from './AgentHeader';
 import { FindVulnerabilitiesAgent } from '../agents/FindVulnerabilities';
-import { Scrollable, VerticalStack } from '@shopify/polaris';
+import { Box, Scrollable, VerticalStack } from '@shopify/polaris';
 import RepositoryInitializer from './RepositoryInitializer';
 import SensitiveDataAgentInitializer from './SensitiveDataAgentInitializer';
 import FlyLayout from '../../../components/layouts/FlyLayout';
@@ -42,7 +42,9 @@ function AgentWindow({ agent, onClose, open }: AgentWindowProps) {
             <div className="flex-1 min-h-0">
                 <Scrollable className="h-full">
                     <div className="pt-2 flex flex-col gap-2">
+                        <Box paddingBlockEnd={"8"}>
                         {renderAgentWindow()}
+                        </Box>
                     </div>
                 </Scrollable>
             </div>

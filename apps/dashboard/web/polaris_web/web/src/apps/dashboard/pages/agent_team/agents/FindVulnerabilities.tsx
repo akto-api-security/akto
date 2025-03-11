@@ -14,13 +14,19 @@ export const FindVulnerabilitiesAgent = (props) => {
 
     // ?? Where exactly is agent steps being used.
     // I didn't find any use case, we can remove it.
-    const { agentSteps, setAgentSteps, setCurrentAttempt, setCurrentSubprocess } = useAgentsStore();
+    const { agentSteps, setAgentSteps, setCurrentAttempt, setCurrentSubprocess, setCurrentProcessId} = useAgentsStore();
 
     const getAllAgentRuns = async () => {
         try {
             const response = (await api.getAllAgentRuns(agentId));
             const agentRuns = response.agentRuns as AgentRun[];
             setCurrentAgentRun(agentRuns[0]);
+            if (agentRuns.length > 0 && agentRuns[0]?.processId) {
+                setCurrentProcessId(agentRuns[0]?.processId)
+            } else {
+                // TODO: handle cases here, because the above API only gets "RUNNING" Agents.
+                // setCurrentProcessId("")
+            }
         } catch(error) {
             
         }
@@ -97,7 +103,7 @@ export const FindVulnerabilitiesAgent = (props) => {
         <Scrollable className="h-full">
             <VerticalStack gap="2">
                 {subprocesses.length > 0 && subprocesses.map((subprocess, index) => (
-                    <Subprocess currentAgentType={agentId} processId={currentAgentRun?.processId || ""} key={subprocess.subProcessId} subProcessFromProp={subprocesses[index]} />
+                    <Subprocess agentId={agentId} currentAgentType={agentId} processId={currentAgentRun?.processId || ""} key={subprocess.subProcessId} subProcessFromProp={subprocesses[index]} />
                 ))}
             </VerticalStack>
         </Scrollable>

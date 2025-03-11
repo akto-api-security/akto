@@ -23,6 +23,8 @@ interface AgentsStore {
     setAgentSteps: (state:  Record<string, Record<string, any>>) => void;
     selectedRepository: string | null;
     setSelectedRepository: (repo: string) => void;
+    currentProcessId: string | null;
+    setCurrentProcessId: (currentProcessId: string) => void;
     currentSubprocess: string | null;
     setCurrentSubprocess: (subprocess: string) => void;
     currentAttempt: number 
@@ -61,6 +63,8 @@ export const useAgentsStore = create<AgentsStore>()(
                 setSelectedRepository: (repo: string) => set({ selectedRepository: repo }),
                 currentSubprocess: '0',
                 setCurrentSubprocess: (subprocess: string) => set({ currentSubprocess: subprocess }),
+                currentProcessId:"",
+                setCurrentProcessId: (currentProcessId: string) => set({ currentProcessId: currentProcessId }),
                 currentAttempt: 0,
                 setCurrentAttempt: (attempt: number) => set({ currentAttempt: attempt }),
             }),
