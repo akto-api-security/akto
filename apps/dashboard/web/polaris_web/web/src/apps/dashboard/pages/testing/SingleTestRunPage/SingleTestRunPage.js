@@ -49,6 +49,7 @@ import { history } from "@/util/history";
 import GithubServerTable from "../../../components/tables/GithubServerTable";
 import RunTest from '../../observe/api_collections/RunTest';
 import IssuesCheckbox from '../../issues/IssuesPage/IssuesCheckbox';
+import TableStore from '../../../components/tables/TableStore'
 let sortOptions = [
   { label: 'Severity', value: 'severity asc', directionLabel: 'Highest severity', sortKey: 'total_severity', columnIndex: 3 },
   { label: 'Severity', value: 'severity desc', directionLabel: 'Lowest severity', sortKey: 'total_severity', columnIndex: 3 },
@@ -372,38 +373,29 @@ function SingleTestRunPage() {
     return { value: transform.getPrettifiedTestRunResults(testRunResultsRes, getCollapsibleRow), total: selectedTab === 'ignored_issues' ? totalIgnoredIssuesCount : total }
   }
 
-  const handleCheckboxChange = (testRunResultsId, checked) => {
-    setSelectedTestRunForRerun((prevState) => {
-      const updatedSelection = checked
-        ? [...prevState, testRunResultsId]
-        : prevState.filter((id) => id !== testRunResultsId);
-      return updatedSelection;
-    });
-  };
-
   const getCollapsibleRow = (urls, severity) => {
     const borderStyle = '4px solid ' + func.getHexColorForSeverity(severity?.toUpperCase());
     return(
       <tr style={{background: "#FAFBFB", borderLeft: borderStyle, padding: '0px !important', borderTop: '1px solid #dde0e4'}}>
-        <td colSpan={7} style={{padding: '0px !important'}}>
-            {urls.map((ele,index)=>{
-              const borderStyle = index < (urls.length - 1) ? {borderBlockEndWidth : 1} : {}
-              return( 
-                <Box padding={"2"} paddingInlineEnd={"4"} paddingInlineStart={"4"} key={index}
-                    borderColor="border-subdued" {...borderStyle}
-                >
+        <td colSpan={8} style={{padding: '0px !important', width: '100%'}}>
+          {urls.map((ele,index)=>{
+            const borderStyle = index < (urls.length - 1) ? {borderBlockEndWidth : 1} : {}
+            return( 
+              <Box padding={"2"} paddingInlineStart={"4"} key={index}
+                  borderColor="border-subdued" {...borderStyle}
+                  width="100%"
+              >
+                <HorizontalStack gap="2" align="start" blockAlign="center">
                   <IssuesCheckbox 
-                    id={ele.testRunResultsId} 
-                    selectedTestRunForRerun={selectedTestRunForRerun} 
-                    handleChangeFromProp={handleCheckboxChange}
-                    checked={selectedTestRunForRerun.includes(ele.testRunResultsId)}
+                    id={ele.testRunResultsId}
                   />
                   <Link monochrome onClick={() => history.navigate(ele.nextUrl)} removeUnderline >
                     {transform.getUrlComp(ele.url)}
                   </Link>
-                </Box>
-              )
-            })}
+                </HorizontalStack>
+              </Box>
+            )
+          })}
         </td>
       </tr>
     )
@@ -442,12 +434,16 @@ function SingleTestRunPage() {
 
   }, []);
 
-  const promotedBulkActions = (selectedDataHexIds) => {
+  const promotedBulkActions = () => {
+    let totalSelectedItemsSet = new Set(TableStore.getState().selectedItems.flat())
+
     return [
       {
-        content: `Rerun ${selectedTestRunForRerun.length} test${selectedTestRunForRerun.length === 1 ? '' : 's'}`,
+        content: `Rerun ${totalSelectedItemsSet.size} test${totalSelectedItemsSet.size === 1 ? '' : 's'}`,
         onAction: () => {
-          transform.rerunTest(selectedTestRun.id, null, false, selectedTestRunForRerun)
+        if (totalSelectedItemsSet.size > 0) {
+          transform.rerunTest(selectedTestRun.id, null, false, [...totalSelectedItemsSet])
+        }
         },
       },
     ]
@@ -624,10 +620,11 @@ function SingleTestRunPage() {
         mode={IndexFiltersMode.Default}
         headings={tableHeaders}
         useNewRow={true}
+        isMultipleItemsSelected={true}
         condensedHeight={true}
         useModifiedData={true}
         modifyData={(data, filters) => modifyData(data, filters)}
-        notHighlightOnselected={true}
+        notHighlightOnselected={false}
         selected={selected}
         tableTabs={tableTabs}
         onSelect={handleSelectedTab}

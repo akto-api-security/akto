@@ -890,6 +890,14 @@ getPrettifiedTestRunResults(testRunResults, getCollapsibleRow){
     }
     prettifiedResults.push(prettifiedObj)
   })
+  for (let prettifiedObj of prettifiedResults){
+    let testingRunResultsIds = []
+    for (let url of prettifiedObj.urls) {
+      testingRunResultsIds.push(url.testRunResultsId)
+    }
+    prettifiedObj["id"] = testingRunResultsIds
+    
+  }
   return prettifiedResults
 },
 getTestingRunResultUrl(testingResult){
