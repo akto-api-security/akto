@@ -10,6 +10,7 @@ import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.Th
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatActorByCountryRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatActorByCountryResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchMaliciousEventsResponse.MaliciousPayloadsResponse;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListThreatActorResponse.ActivityData;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatActivityTimelineResponse.ActivityTimeline;
 import com.akto.threat.backend.constants.MongoDBCollection;
 import com.mongodb.client.FindIterable;
@@ -17,6 +18,7 @@ import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Sorts;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -101,6 +103,23 @@ public class ThreatActorService {
     try (MongoCursor<Document> cursor = coll.aggregate(pipeline).cursor()) {
       while (cursor.hasNext()) {
         Document doc = cursor.next();
+        
+        Bson filters = Filters.eq("actor", doc.getString("_id"));
+        Bson sort2 = Sorts.descending("detectedAt");
+        MongoCursor<Document> cursor2 = coll.find(filters).sort(sort2).limit(40).cursor();
+        List<ActivityData> activityDataList = new ArrayList<>();
+        while (cursor2.hasNext()) {
+            Document doc2 = cursor2.next();
+            activityDataList.add(
+                ActivityData.newBuilder()
+                .setUrl(doc2.getString("latestApiEndpoint"))
+                .setDetectedAt(doc2.getLong("detectedAt"))
+                .setSubCategory(doc2.getString("subCategory"))
+                .setSeverity(doc2.getString("severity"))
+                .build()
+            );
+        }
+
         actors.add(
             ListThreatActorResponse.ThreatActor.newBuilder()
                 .setId(doc.getString("_id"))
@@ -109,6 +128,7 @@ public class ThreatActorService {
                 .setLatestApiIp(doc.getString("latestApiIp"))
                 .setDiscoveredAt(doc.getLong("discoveredAt"))
                 .setCountry(doc.getString("country"))
+                .addAllActivityData(activityDataList)
                 .build());
       }
     }

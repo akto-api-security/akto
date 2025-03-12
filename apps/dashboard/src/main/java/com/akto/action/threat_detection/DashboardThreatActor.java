@@ -1,5 +1,7 @@
 package com.akto.action.threat_detection;
 
+import java.util.List;
+
 import com.akto.dto.type.URLMethods.Method;
 
 public class DashboardThreatActor {
@@ -10,6 +12,7 @@ public class DashboardThreatActor {
   private Method latestApiMethod;
   private long discoveredAt;
   private String country;
+  private List<ActivityData> activity;
 
   public DashboardThreatActor(
       String id,
@@ -17,7 +20,8 @@ public class DashboardThreatActor {
       String latestApiIp,
       Method latestApiMethod,
       long discoveredAt,
-      String country) {
+      String country,
+      List<ActivityData> activity) {
 
     this.id = id;
     this.latestApiEndpoint = latestApiEndpoint;
@@ -25,6 +29,7 @@ public class DashboardThreatActor {
     this.latestApiMethod = latestApiMethod;
     this.discoveredAt = discoveredAt;
     this.country = country;
+    this.activity = activity;
   }
 
   public String getId() {
@@ -73,5 +78,13 @@ public class DashboardThreatActor {
 
   public void setCountry(String country) {
     this.country = country;
+  }
+  
+  public List<ActivityData> getActivity() {
+    return activity;
+  }
+
+  public void setActivity(List<ActivityData> activity) {
+    this.activity = activity;
   }
 }
