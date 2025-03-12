@@ -61,7 +61,7 @@ public class AgentAction extends UserAction {
             return Action.ERROR.toUpperCase();
         }
 
-        AgentRun existingScheduledOrRunningRuns = AgentRunDao.instance.findOne(Filters.nin(
+        AgentRun existingScheduledOrRunningRuns = AgentRunDao.instance.findOne(Filters.in(
                 AgentRun._STATE, Arrays.asList(State.SCHEDULED, State.RUNNING)));
 
         if (existingScheduledOrRunningRuns != null) {

@@ -1,0 +1,12 @@
+import request from "@/util/request";
+const api = {
+    createSensitiveResponseDataTypes: async (data) => {
+        return await request({
+            url: '/api/createSensitiveResponseDataTypes',
+            method: 'post',
+            data: data 
+        })
+    },
+}
+
+export default api;
