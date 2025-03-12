@@ -60,7 +60,7 @@ public class SplunkEvent {
         try {
             response =  client.newCall(request).execute();
         } catch (IOException e) {
-            System.out.println("Error while executing request " + request.url() + ": " + e.getMessage());
+            loggerMaker.errorAndAddToDb("Error while executing request " + request.url() + ": " + e.getMessage());
         } finally {
             if (response != null) {
                 response.close();

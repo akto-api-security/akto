@@ -191,11 +191,10 @@ public class ThreatActorService {
                 Updates.set("splunkToken", req.getSplunkToken())
             );
             SplunkIntegrationModel splunkIntegrationModel = SplunkIntegrationModel.newBuilder().setAccountId(accId).setSplunkToken(req.getSplunkToken()).setSplunkUrl(req.getSplunkUrl()).build();
-            UpdateResult res = this.mongoClient
+            this.mongoClient
             .getDatabase(accountId + "")
             .getCollection(MongoDBCollection.ThreatDetection.SPLUNK_INTEGRATION_CONFIG, Document.class)
             .updateOne(filters, updates);
-            System.out.println(res);
             // add update logic
         } else {
             SplunkIntegrationModel splunkIntegrationModel = SplunkIntegrationModel.newBuilder().setAccountId(accId).setSplunkToken(req.getSplunkToken()).setSplunkUrl(req.getSplunkUrl()).build();

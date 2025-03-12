@@ -222,7 +222,7 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
             loggerMaker.infoAndAddToDb("init aws client, for threat actor block");
         } catch (Exception e) {
             e.printStackTrace();
-            System.out.println("error initialising aws client");
+            loggerMaker.errorAndAddToDb("error initialising aws client " + e.getMessage());
         }
 
         try {
