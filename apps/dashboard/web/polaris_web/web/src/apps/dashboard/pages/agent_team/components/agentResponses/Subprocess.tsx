@@ -5,12 +5,36 @@ import { CaretDownMinor } from "@shopify/polaris-icons";
 import api from "../../api";
 import { useAgentsStore } from "../../agents.store";
 import STEPS_PER_AGENT_ID from "../../constants";
+import { VerticalStack, Text } from "@shopify/polaris";
+import OutputSelector from "./OutputSelector";
+import { intermediateStore } from "../../intermediate.store";
 
 export const Subprocess = ({agentId, processId, subProcessFromProp, finalCTAShow, setFinalCTAShow}: {agentId: string, processId:string, subProcessFromProp: AgentSubprocess, finalCTAShow: boolean, setFinalCTAShow: (show: boolean) => void}) => {
-    const [subprocess, setSubprocess] = useState<AgentSubprocess | null>(null);
+    const [subprocess, setSubprocess] = useState<AgentSubprocess | null>(subProcessFromProp);
     const [expanded, setExpanded] = useState(true);
 
     const {setCurrentAttempt, setCurrentSubprocess, currentSubprocess, currentAttempt, setAgentState } = useAgentsStore();
+    const  { setFilteredUserInput } = intermediateStore();
+
+    const createNewSubprocess = async (newSubIdNumber: number) => {
+        let subProcess: AgentSubprocess;
+        const newSubId = (newSubIdNumber).toLocaleString()
+        const newRes = await api.updateAgentSubprocess({
+            processId: processId,
+            subProcessId: newSubId,
+            attemptId: 1
+        });
+        subProcess = newRes.subprocess as AgentSubprocess;
+        setCurrentSubprocess(newSubId);
+        setCurrentAttempt(1);
+        setAgentState('thinking');
+        return subProcess;
+    }
+
+    const handleSelect = (selectedChoices: any) => {
+        console.log(selectedChoices);
+        setFilteredUserInput(selectedChoices);
+    }
 
     useEffect(() => {
         const fetchSubprocess = async () => {
@@ -19,9 +43,8 @@ export const Subprocess = ({agentId, processId, subProcessFromProp, finalCTAShow
                 subProcessId: currentSubprocess,
                 attemptId: currentAttempt,
             });
-
             let subProcess = response.subprocess as AgentSubprocess;
-            let subId = subProcess.subProcessId;
+            let inputAcknowledged = response.inputAcknowledged as boolean;
 
             /* handle new subprocess creation from here
              State => ACCEPTED.
@@ -35,16 +58,7 @@ export const Subprocess = ({agentId, processId, subProcessFromProp, finalCTAShow
                     await api.updateAgentRun({ processId: processId, state: "COMPLETED" })
                 } else {
                     // create new subprocess without retry attempt now
-                    const newSubId = (newSubIdNumber).toLocaleString()
-                    subId = newSubId;
-                    const newRes = await api.updateAgentSubprocess({
-                        processId: processId,
-                        subProcessId: newSubId,
-                        attemptId: 1
-                    });
-                    subProcess = newRes.subprocess as AgentSubprocess;
-                    setCurrentSubprocess(newSubId);
-                    setCurrentAttempt(1);
+                    subProcess = await createNewSubprocess(newSubIdNumber);
                 }
             }
 
@@ -60,9 +74,16 @@ export const Subprocess = ({agentId, processId, subProcessFromProp, finalCTAShow
             DISCARDED => discarded by the user.
             */
             if(subProcess !== null && subProcess.state === State.DISCARDED) {
-                // TODO: handle how to take input from user
+                if(inputAcknowledged){
+                    const newSubIdNumber = Number(currentSubprocess) + 1;
+                    subProcess = await createNewSubprocess(newSubIdNumber);
+                }
             }
-            setSubprocess(subProcess);
+            if(subProcess !== null) {
+                setSubprocess(subProcess);
+            }else{
+                setAgentState("idle")
+            }
 
         }
 
@@ -82,6 +103,7 @@ export const Subprocess = ({agentId, processId, subProcessFromProp, finalCTAShow
     }
 
     return (
+        <VerticalStack gap ="4">
         <div className={`rounded-lg overflow-hidden border border-[#C9CCCF] bg-[#F6F6F7] p-2 flex flex-col ${expanded ? "gap-1" : "gap-0"}`}>
             <button
                 className="bg-[#F6F6F7] w-full flex items-center cursor-pointer"
@@ -126,5 +148,21 @@ export const Subprocess = ({agentId, processId, subProcessFromProp, finalCTAShow
                 </motion.div>
             </AnimatePresence>
         </div>
+        {subprocess.state === State.COMPLETED && subprocess.processOutput !== null && 
+            <OutputSelector
+                processOutput={subprocess.processOutput}
+                onHandleSelect={(selectedChoices: any) => {
+                    handleSelect(selectedChoices);
+                }}
+            />
+        }
+        {subprocess.state === State.ACCEPTED &&  subprocess.processOutput !== null && 
+            <Text variant="bodyMd" as="span">{subprocess.processOutput?.outputMessage}</Text>
+        }
+        {subprocess.state === State.DISCARDED &&  subprocess.userInput !== null && 
+            <Text variant="bodyMd" as="span">{subprocess.userInput?.inputMessage}</Text>
+        }
+        </VerticalStack>
+        
     );
 }
