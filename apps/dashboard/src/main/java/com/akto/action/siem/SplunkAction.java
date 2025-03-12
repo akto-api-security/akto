@@ -3,6 +3,7 @@ package com.akto.action.siem;
 import org.bson.conversions.Bson;
 
 import com.akto.action.UserAction;
+import com.akto.action.threat_detection.ThreatActorAction;
 import com.akto.dao.ConfigsDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.Config;
@@ -34,6 +35,14 @@ public class SplunkAction extends UserAction {
         );
         Config.SplunkSiemConfig existingConfig = (Config.SplunkSiemConfig) ConfigsDao.instance.findOne(filters);
 
+        ThreatActorAction threatActorAction = new ThreatActorAction();
+        threatActorAction.setSplunkToken(splunkToken);
+        threatActorAction.setSplunkUrl(splunkUrl);
+        String resp = threatActorAction.sendIntegrationDataToThreatBackend();
+        if (resp == ERROR.toUpperCase()) {
+            addActionError("Error saving integration");
+            return ERROR.toUpperCase();
+        }
         if (existingConfig != null) {
             Bson updates = Updates.combine(
                 Updates.set("splunkUrl", splunkUrl),

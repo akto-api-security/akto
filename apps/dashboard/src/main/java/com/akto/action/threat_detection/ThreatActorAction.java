@@ -49,6 +49,8 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
   Map<String, Integer> sort;
   int startTimestamp, endTimestamp;
   String refId;
+  String splunkUrl;
+  String splunkToken;
 
   private final CloseableHttpClient httpClient;
 
@@ -269,6 +271,48 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
         }
     }
 
+    public String sendIntegrationDataToThreatBackend() {
+      HttpPost post =
+          new HttpPost(String.format("%s/api/dashboard/addSplunkIntegration", "http://localhost:9090"));
+      post.addHeader("Authorization", "Bearer " + this.getApiToken());
+      post.addHeader("Content-Type", "application/json");
+  
+      Map<String, Object> body =
+          new HashMap<String, Object>() {
+            {
+              put("splunk_url", splunkUrl);
+              put("splunk_token", splunkToken);
+            }
+          };
+      String msg = objectMapper.valueToTree(body).toString();
+  
+      StringEntity requestEntity = new StringEntity(msg, ContentType.APPLICATION_JSON);
+      post.setEntity(requestEntity);
+  
+      try (CloseableHttpResponse resp = this.httpClient.execute(post)) {
+        String responseBody = EntityUtils.toString(resp.getEntity());
+  
+        ProtoMessageUtils.<FetchMaliciousEventsResponse>toProtoMessage(
+          FetchMaliciousEventsResponse.class, responseBody)
+            .ifPresent(
+                m -> {
+                  this.maliciousPayloadsResponses =
+                      m.getMaliciousPayloadsResponseList().stream()
+                          .map(
+                              smr ->
+                                  new MaliciousPayloadsResponse(
+                                      smr.getOrig(),
+                                      smr.getTs()))
+                          .collect(Collectors.toList());
+                });
+      } catch (Exception e) {
+        e.printStackTrace();
+        return ERROR.toUpperCase();
+      }
+  
+      return SUCCESS.toUpperCase();
+    }
+
   public int getSkip() {
     return skip;
   }
@@ -320,4 +364,21 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
   public void setRefId(String refId) {
     this.refId = refId;
   }
+
+  public String getSplunkUrl() {
+    return splunkUrl;
+  }
+
+  public void setSplunkUrl(String splunkUrl) {
+    this.splunkUrl = splunkUrl;
+  }
+
+  public String getSplunkToken() {
+    return splunkToken;
+  }
+
+  public void setSplunkToken(String splunkToken) {
+    this.splunkToken = splunkToken;
+  }
+
 }

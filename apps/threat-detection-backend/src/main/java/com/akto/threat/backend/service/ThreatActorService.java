@@ -4,15 +4,21 @@ import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.Fe
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchMaliciousEventsResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListThreatActorResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListThreatActorsRequest;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.SplunkIntegrationRequest;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.SplunkIntegrationRespone;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatActorByCountryRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatActorByCountryResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchMaliciousEventsResponse.MaliciousPayloadsResponse;
 import com.akto.threat.backend.constants.MongoDBCollection;
+import com.akto.threat.backend.db.MaliciousEventModel;
+import com.akto.threat.backend.db.SplunkIntegrationModel;
 import com.mongodb.client.FindIterable;
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Updates;
+import com.mongodb.client.result.UpdateResult;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -167,4 +173,40 @@ public class ThreatActorService {
 
     return ThreatActorByCountryResponse.newBuilder().addAllCountries(actorsByCountryCount).build();
   }
+
+  public SplunkIntegrationRespone addSplunkIntegration(
+      String accountId, SplunkIntegrationRequest req) {
+
+        int accId = Integer.parseInt(accountId);
+        MongoCollection<SplunkIntegrationModel> coll =
+            this.mongoClient
+                .getDatabase(accountId)
+                .getCollection(MongoDBCollection.ThreatDetection.SPLUNK_INTEGRATION_CONFIG, SplunkIntegrationModel.class);
+
+        Bson filters = Filters.eq("accountId", accId);
+        FindIterable<SplunkIntegrationModel> doc = coll.find(filters);
+        if (doc != null) {
+            Bson updates = Updates.combine(
+                Updates.set("splunkUrl", req.getSplunkUrl()),
+                Updates.set("splunkToken", req.getSplunkToken())
+            );
+            SplunkIntegrationModel splunkIntegrationModel = SplunkIntegrationModel.newBuilder().setAccountId(accId).setSplunkToken(req.getSplunkToken()).setSplunkUrl(req.getSplunkUrl()).build();
+            UpdateResult res = this.mongoClient
+            .getDatabase(accountId + "")
+            .getCollection(MongoDBCollection.ThreatDetection.SPLUNK_INTEGRATION_CONFIG, Document.class)
+            .updateOne(filters, updates);
+            System.out.println(res);
+            // add update logic
+        } else {
+            SplunkIntegrationModel splunkIntegrationModel = SplunkIntegrationModel.newBuilder().setAccountId(accId).setSplunkToken(req.getSplunkToken()).setSplunkUrl(req.getSplunkUrl()).build();
+            this.mongoClient
+            .getDatabase(accountId + "")
+            .getCollection(MongoDBCollection.ThreatDetection.SPLUNK_INTEGRATION_CONFIG, SplunkIntegrationModel.class)
+            .insertOne(splunkIntegrationModel);
+        }
+        
+        return SplunkIntegrationRespone.newBuilder().build();
+        
+
+    }
 }
