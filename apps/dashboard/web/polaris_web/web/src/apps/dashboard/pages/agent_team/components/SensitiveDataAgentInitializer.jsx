@@ -26,12 +26,12 @@ function SensitiveDataAgentInitializer(props) {
             setSelected={(x) => {
                 setSelectedCollection(x);
             }}
-            value={selectedCollection != -1 ? allCollections.filter(x => x.id == selectedCollection)[0].displayName : "Select collections"}
+            value={selectedCollection !== -1 ? allCollections.filter(x => x.id === selectedCollection)[0].displayName : "Select collections"}
         />)
     }
 
     async function startSensitiveDataAgent(collectionId) {
-        if (collectionId == -1) {
+        if (collectionId === -1) {
             func.setToast(true, true, "Please select collections to run the agent")
             return
         }
