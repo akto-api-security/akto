@@ -7,7 +7,7 @@ import api from '../api';
 
 export const FindVulnerabilitiesAgent = (props) => {
 
-    const {agentId} = props
+    const {agentId, finalCTAShow, setFinalCTAShow} = props
 
     const [currentAgentRun, setCurrentAgentRun] = useState<AgentRun | null>(null);
     const [subprocesses, setSubprocesses] = useState<AgentSubprocess[]>([]);
@@ -89,7 +89,13 @@ export const FindVulnerabilitiesAgent = (props) => {
         <Scrollable className="h-full">
             <VerticalStack gap="2">
                 {subprocesses.length > 0 && subprocesses.map((subprocess, index) => (
-                    <Subprocess agentId={agentId} processId={currentAgentRun?.processId || ""} key={subprocess.subProcessId} subProcessFromProp={subprocesses[index]} />
+                    <Subprocess 
+                    agentId={agentId} 
+                    processId={currentAgentRun?.processId || ""} 
+                    key={subprocess.subProcessId} 
+                    subProcessFromProp={subprocesses[index]} 
+                    finalCTAShow={finalCTAShow}
+                    setFinalCTAShow={setFinalCTAShow} />
                 ))}
             </VerticalStack>
         </Scrollable>
