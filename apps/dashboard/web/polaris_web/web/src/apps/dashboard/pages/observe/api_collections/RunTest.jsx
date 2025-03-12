@@ -218,7 +218,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                     testRunTime: testIdConfig.testRunTime,
                     testRoleId: testIdConfig.testingRunConfig.testRoleId,
                     testRunTimeLabel: (testIdConfig.testRunTime === -1) ? "30 minutes" : getLabel(testRunTimeOptions, testIdConfig.testRunTime.toString())?.label,
-                    testRoleLabel: getLabel(testRolesArr, testIdConfig.testingRunConfig.testRoleId).label,
+                    testRoleLabel: getLabel(testRolesArr, testIdConfig?.testingRunConfig?.testRoleId).label,
                     runTypeLabel: getRunTypeLabel(testRunType),
                     testName: testIdConfig.name,
                     sendSlackAlert: testIdConfig?.sendSlackAlert,
@@ -547,8 +547,11 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
     }
 
     function getLabel(objList, value) {
+        if(value === null || objList.length === 0){
+            return {label: ''}
+        }
         const obj = objList.find(obj => obj.value === value)
-        return obj
+        return obj !== null ? obj : {label: ''}
     }
 
     function getCurrentStatus() {
