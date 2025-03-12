@@ -19,7 +19,7 @@ interface AgentsStore {
     setAttemptedInBlockedState: (attempted: boolean) => void;
     agentState: AgentState;
     setAgentState: (state: AgentState) => void;
-    agentSteps: Map<string, Record<string, string>>;
+    agentSteps: Record<string, Record<string, string>>;
     setAgentSteps: (key: string, value: Record<string, string>) => void;
     selectedRepository: string | null;
     setSelectedRepository: (repo: string) => void;
@@ -43,22 +43,26 @@ export const useAgentsStore = create<AgentsStore>()(
                     set({ attemptedInBlockedState: attempted }),
                 agentState: "idle",
                 setAgentState: (state: AgentState) => set({ agentState: state }),
-                agentSteps: new Map([
-                    [
-                        "FIND_VULNERABILITIES_FROM_SOURCE_CODE",
-                        {
-                            "1": "Find backend directory",
-                            "2": "Find language and framework",
-                            "3": "Detect auth mechanism type",
-                        },
-                    ],
-                ]),
+                agentSteps: {
+                    "FIND_VULNERABILITIES_FROM_SOURCE_CODE": {
+                        "1": "Find backend directory",
+                        "2": "Find language and framework",
+                        "3": "Detect auth mechanism type",
+                    },
+                    "FIND_APIS_FROM_SOURCE_CODE": {
+                        "1": "Find backend directory",
+                        "2": "Find language and framework",
+                        "3": "Find api endpoints",
+                        "4": "Find schema for endpoints"
+                    },
+                },
                 setAgentSteps: (key: string, value: Record<string, string>) =>
-                    set((state) => {
-                        const updatedSteps = new Map(state.agentSteps);
-                        updatedSteps.set(key, value);
-                        return { agentSteps: updatedSteps };
-                }),
+                    set((state) => ({
+                        agentSteps: {
+                            ...state.agentSteps,
+                            [key]: value
+                        }
+                    })),
                 selectedRepository: null,
                 setSelectedRepository: (repo: string) => set({ selectedRepository: repo }),
 

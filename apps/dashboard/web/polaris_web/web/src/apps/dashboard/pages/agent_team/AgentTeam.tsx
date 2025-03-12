@@ -44,7 +44,13 @@ const AGENTS: Agent[] = [
         name: 'Find Vulnerabilities from Source Code',
         description: 'An intelligent member that analyzes your source code for security vulnerabilities by examining authentication mechanisms, API endpoints, and data flow patterns.',
         image: '/public/agents/secret-agent-4.svg',
-    }
+    },
+    {
+        id: 'FIND_APIS_FROM_SOURCE_CODE',
+        name: 'Find APIs from Source Code',
+        description: 'An intelligent member that analyzes your source code for API endpoints and request response schema.',
+        image: '/public/agents/secret-agent-5.svg',
+    },
 ]
 
 function AgentTeam() {
