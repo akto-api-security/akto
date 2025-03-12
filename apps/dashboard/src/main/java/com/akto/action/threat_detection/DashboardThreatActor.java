@@ -12,6 +12,7 @@ public class DashboardThreatActor {
   private Method latestApiMethod;
   private long discoveredAt;
   private String country;
+  private String latestAttack;
   private List<ActivityData> activity;
 
   public DashboardThreatActor(
@@ -21,6 +22,7 @@ public class DashboardThreatActor {
       Method latestApiMethod,
       long discoveredAt,
       String country,
+      String latestAttack,
       List<ActivityData> activity) {
 
     this.id = id;
@@ -29,6 +31,7 @@ public class DashboardThreatActor {
     this.latestApiMethod = latestApiMethod;
     this.discoveredAt = discoveredAt;
     this.country = country;
+    this.latestAttack = latestAttack;
     this.activity = activity;
   }
 
@@ -87,4 +90,13 @@ public class DashboardThreatActor {
   public void setActivity(List<ActivityData> activity) {
     this.activity = activity;
   }
+
+  public String getLatestAttack() {
+    return latestAttack;
+  }
+
+  public void setLatestAttack(String latestAttack) {
+    this.latestAttack = latestAttack;
+  }
+
 }

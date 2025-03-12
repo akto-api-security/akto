@@ -86,6 +86,7 @@ message ListThreatActorResponse {
     uint64 discovered_at = 5;
     string country = 6;
     repeated ActivityData activity_data = 7;
+    string latest_subcategory = 8;
   }
   repeated ThreatActor actors = 1;
   uint64 total = 2;

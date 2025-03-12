@@ -36,6 +36,13 @@ const headers = [
     type: CellType.TEXT,
     sortActive: true,
   },
+  {
+    text: "Latest Attack",
+    title: "Latest Attack",
+    value: "latestAttack",
+    type: CellType.TEXT,
+    sortActive: true,
+  },
 ];
 
 const sortOptions = [
@@ -117,6 +124,7 @@ function ThreatActorTable({ data, currDateRange, handleRowClick }) {
           latestIp: x.latestApiIp,
           discoveredAt: dayjs(x.discoveredAt).format('YYYY-MM-DD, HH:mm:ss A'),
           sensitiveData: observeFunc.prettifySubtypes(sensitiveData, false),
+          latestAttack: x.latestAttack,
           latestApi: (
             <GetPrettifyEndpoint
               method={x.latestApiMethod}

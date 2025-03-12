@@ -57,6 +57,11 @@ const headers = [
     text: "Type",
     title: "Type",
     value: "type",
+  },
+  {
+    text: "SubCategory",
+    title: "SubCategory",
+    value: "subCategory",
   }
 ];
 
@@ -134,6 +139,7 @@ function SusDataTable({ currDateRange, rowClicked }) {
       return {
         ...x,
         id: x.id,
+        subCategory: x?.subCategory,
         actorComp: x?.actor,
         endpointComp: (
           <GetPrettifyEndpoint method={x.method} url={x.url} isNew={false} />
