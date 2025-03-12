@@ -1,17 +1,24 @@
 package com.akto.threat.backend.tasks;
 
+import com.akto.dao.context.Context;
 import com.akto.kafka.KafkaConfig;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.runtime.utils.Utils;
 import com.akto.threat.backend.constants.KafkaTopic;
 import com.akto.threat.backend.constants.MongoDBCollection;
 import com.akto.threat.backend.db.AggregateSampleMaliciousEventModel;
 import com.akto.threat.backend.db.MaliciousEventModel;
+import com.akto.threat.backend.db.SplunkIntegrationModel;
+import com.akto.threat.backend.utils.SplunkEvent;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
+import com.mongodb.client.FindIterable;
 import com.mongodb.client.MongoClient;
+import com.mongodb.client.MongoCollection;
 import com.mongodb.client.model.BulkWriteOptions;
+import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.InsertOneModel;
 import com.mongodb.client.model.WriteModel;
 import java.time.Duration;
@@ -23,6 +30,8 @@ import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.common.serialization.StringDeserializer;
+import org.bson.Document;
+import org.bson.conversions.Bson;
 
 public class FlushMessagesToDB {
 
@@ -32,6 +41,9 @@ public class FlushMessagesToDB {
 
   private static final ObjectMapper mapper = new ObjectMapper();
   private static final Gson gson = new Gson();
+  ExecutorService executorService = Executors.newFixedThreadPool(3);
+  private static int lastSplunkConfigFetched = 0;
+  SplunkIntegrationModel splunkConfig = null;
 
   public FlushMessagesToDB(KafkaConfig kafkaConfig, MongoClient mongoClient) {
     String kafkaBrokerUrl = kafkaConfig.getBootstrapServers();
@@ -111,7 +123,11 @@ public class FlushMessagesToDB {
         events.forEach(
             event -> {
               bulkUpdates.add(new InsertOneModel<>(event));
+              executorService.submit(() ->{
+                  sendEventToSplunk(event, accountId);
+              });
             });
+
 
         this.mClient
             .getDatabase(accountId + "")
@@ -130,5 +146,27 @@ public class FlushMessagesToDB {
       default:
         throw new IllegalArgumentException("Invalid event type");
     }
+  }
+
+  private void sendEventToSplunk(AggregateSampleMaliciousEventModel event, String accountId) {
+
+    if (Context.now() - lastSplunkConfigFetched > 30 * 60) {
+      lastSplunkConfigFetched = Context.now();
+      MongoCollection<Document> coll =
+            this.mClient
+                .getDatabase(accountId)
+                .getCollection(MongoDBCollection.ThreatDetection.SPLUNK_INTEGRATION_CONFIG, Document.class);
+
+        int accId = Integer.parseInt(accountId);
+        Bson filters = Filters.eq("accountId", accId);
+        Document doc = coll.find(filters).cursor().next();
+        splunkConfig = SplunkIntegrationModel.newBuilder().setAccountId(accId).setSplunkToken(doc.getString("splunkToken")).setSplunkUrl(doc.getString("splunkUrl")).build();
+    }
+
+    if (splunkConfig == null) {
+      return;
+    }
+    SplunkEvent.sendEvent(event, splunkConfig);
+
   }
 }

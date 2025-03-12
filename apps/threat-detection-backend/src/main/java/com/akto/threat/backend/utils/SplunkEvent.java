@@ -3,8 +3,10 @@ package com.akto.threat.backend.utils;
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 
+import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.threat.backend.db.AggregateSampleMaliciousEventModel;
+import com.akto.threat.backend.db.SplunkIntegrationModel;
 import com.akto.util.http_util.CoreHTTPClient;
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONObject;
@@ -24,9 +26,12 @@ public class SplunkEvent {
             .callTimeout(1, TimeUnit.SECONDS)
             .build();
 
-    public static void sendEvent(AggregateSampleMaliciousEventModel event) {
-        // read from config
+    private static final LoggerMaker loggerMaker = new LoggerMaker(SplunkEvent.class, LogDb.THREAT_DETECTION);
 
+    public static void sendEvent(AggregateSampleMaliciousEventModel event, SplunkIntegrationModel splunkConfig) {
+        if (splunkConfig == null || splunkConfig.getSplunkUrl() == null || splunkConfig.getSplunkUrl() == null) {
+            return;
+        }
         JSONObject jsonObject = JSON.parseObject(event.getOrig());
         BasicDBObject obj = new BasicDBObject();
         BasicDBObject eventObj = new BasicDBObject();
@@ -46,10 +51,10 @@ public class SplunkEvent {
         MediaType mediaType = MediaType.parse("application/json");
         RequestBody body = RequestBody.create(obj.toJson(), mediaType);
         Request request = new Request.Builder()
-                .url("http://localhost:8088/services/collector")
+                .url(splunkConfig.getSplunkUrl())
                 .method("POST", body)
                 .addHeader("Content-Type", "application/json")
-                .addHeader("Authorization", "Splunk fbf5060a-81d0-45ed-b98e-39ea6cfe7778")
+                .addHeader("Authorization", splunkConfig.getSplunkToken())
                 .build();
         Response response = null;
         try {
@@ -62,9 +67,9 @@ public class SplunkEvent {
             }
         }
         if (response!= null && response.isSuccessful()) {
-            System.out.println("Updated traffic_metrics");
+            loggerMaker.infoAndAddToDb("Sent splunk event");
         } else {
-            System.out.println("Traffic_metrics not sent");
+            loggerMaker.errorAndAddToDb("error sending splunk event " + response);
         }
 
     }
