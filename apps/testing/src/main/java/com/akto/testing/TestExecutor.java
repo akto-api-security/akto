@@ -762,6 +762,21 @@ public class TestExecutor {
             if (originalTestingRunResultForRerun != null) {
                 loggerMaker.infoAndAddToDb("Deleting original testingRunResults for rerun after replaced with run TRR_ID: " + originalTestingRunResultForRerun.getHexId());
                 TestingRunResultDao.instance.deleteAll(Filters.eq(TestingRunResultDao.ID, originalTestingRunResultForRerun.getId()));
+                /*
+                * delete from vulnerableTestResults as well.
+                * assuming if original was vulnerable, entry will be in VulnerableTestingRunResultDao
+                * for API_INFO_KEY, TEST_RUN_RESULT_SUMMARY_ID, TEST_SUB_TYPE, VulnerableTestingRunResultDao will have
+                * single entry
+                * */
+                if (originalTestingRunResultForRerun.isVulnerable()) {
+                    Bson filters = Filters.and(
+                            Filters.eq(TestingRunResult.API_INFO_KEY, originalTestingRunResultForRerun.getApiInfoKey()),
+                            Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, originalTestingRunResultForRerun.getTestRunResultSummaryId()),
+                            Filters.eq(TestingRunResult.TEST_SUB_TYPE, originalTestingRunResultForRerun.getTestSubType())
+                    );
+                    loggerMaker.infoAndAddToDb("Deleting from vulnerableTestingRunResults if present for rerun after replaced with run TRR_ID: " + originalTestingRunResultForRerun.getHexId());
+                    VulnerableTestingRunResultDao.instance.deleteAll(filters);
+                }
             }
             TestingRunResultDao.instance.insertMany(testingRunResults);
             loggerMaker.infoAndAddToDb("Inserted testing results", LogDb.TESTING);

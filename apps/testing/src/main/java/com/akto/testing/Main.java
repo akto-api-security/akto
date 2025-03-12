@@ -352,7 +352,9 @@ public class Main {
                 Projections.include(
                         TestingRunResult.TEST_RUN_ID,
                         TestingRunResult.API_INFO_KEY,
-                        TestingRunResult.TEST_SUB_TYPE
+                        TestingRunResult.TEST_SUB_TYPE,
+                        TestingRunResult.VULNERABLE,
+                        TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID
                 )
         );
 
