@@ -18,7 +18,7 @@ import PersistStore from "../../../main/PersistStore";
 import observeFunc from "../observe/transform";
 import TooltipText from "../../components/shared/TooltipText";
 import TestingStore from "./testingStore";
-
+import IssuesCheckbox from "../issues/IssuesPage/IssuesCheckbox";
 import { CellType } from "@/apps/dashboard/components/tables/rows/GithubRow";
 import LocalStore from "../../../main/LocalStorageStore";
 
@@ -800,26 +800,32 @@ getUrlComp(url){
   )
 },
 
-getCollapsibleRow(urls, severity){
-  const borderStyle = '4px solid ' + func.getHexColorForSeverity(severity?.toUpperCase());
-  return(
-    <tr style={{background: "#FAFBFB", borderLeft: borderStyle, padding: '0px !important', borderTop: '1px solid #dde0e4'}}>
-      <td colSpan={7} style={{padding: '0px !important'}}>
+getCollapsibleRow(urls, severity) {
+    const borderStyle = '4px solid ' + func.getHexColorForSeverity(severity?.toUpperCase());
+    return(
+      <tr style={{background: "#FAFBFB", borderLeft: borderStyle, padding: '0px !important', borderTop: '1px solid #dde0e4'}}>
+        <td colSpan={8} style={{padding: '0px !important', width: '100%'}}>
           {urls.map((ele,index)=>{
             const borderStyle = index < (urls.length - 1) ? {borderBlockEndWidth : 1} : {}
             return(
-              <Box padding={"2"} paddingInlineEnd={"4"} paddingInlineStart={"4"} key={index}
+              <Box padding={"2"} paddingInlineStart={"4"} key={index}
                   borderColor="border-subdued" {...borderStyle}
+                  width="100%"
               >
-                <Link monochrome onClick={() => history.navigate(ele.nextUrl)} removeUnderline >
-                  {this.getUrlComp(ele.url)}
-                </Link>
+                <HorizontalStack gap="2" align="start" blockAlign="center">
+                  <IssuesCheckbox
+                    id={ele.testRunResultsId}
+                  />
+                  <Link monochrome onClick={() => history.navigate(ele.nextUrl)} removeUnderline >
+                    {transform.getUrlComp(ele.url)}
+                  </Link>
+                </HorizontalStack>
               </Box>
             )
           })}
-      </td>
-    </tr>
-  )
+        </td>
+      </tr>
+    )
 },
 
 getTestErrorType(message){

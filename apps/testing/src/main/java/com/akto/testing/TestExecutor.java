@@ -508,6 +508,7 @@ public class TestExecutor {
             TestingRunResultSummariesDao.instance.deleteAll(Filters.eq(TestingRunResultSummary.ID,
                     TestingConfigurations.getInstance().getRerunTestingRunResultSummary().getId()));
             loggerMaker.infoAndAddToDb("Deleting rerun testing result summary after completion of test: TRRS_ID:" + TestingConfigurations.getInstance().getRerunTestingRunResultSummary().getHexId());
+            TestingConfigurations.getInstance().setRerunTestingRunResultSummary(null);
         }
 
         GithubUtils.publishGithubComments(testingRunResultSummary);

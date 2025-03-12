@@ -81,7 +81,7 @@ export default {
         const resp = await request({
             url: '/api/startTest',
             method: 'post',
-            data: { testingRunResultSummaryHexId,  selectedTestRunResultHexIds}
+            data: { testingRunHexId, testingRunResultSummaryHexId,  selectedTestRunResultHexIds}
         })
         return resp
     },

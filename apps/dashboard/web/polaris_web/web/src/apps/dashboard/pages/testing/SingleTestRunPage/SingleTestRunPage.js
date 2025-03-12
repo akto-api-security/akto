@@ -47,7 +47,6 @@ import LocalStore from "../../../../main/LocalStorageStore";
 import { produce } from "immer"
 import GithubServerTable from "../../../components/tables/GithubServerTable";
 import RunTest from '../../observe/api_collections/RunTest';
-import IssuesCheckbox from '../../issues/IssuesPage/IssuesCheckbox';
 import TableStore from '../../../components/tables/TableStore'
 let sortOptions = [
   { label: 'Severity', value: 'severity asc', directionLabel: 'Highest severity', sortKey: 'total_severity', columnIndex: 3 },
