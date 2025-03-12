@@ -72,6 +72,12 @@ message ListThreatActorsRequest {
 }
 
 message ListThreatActorResponse {
+  message ActivityData {
+    string url = 1;
+    string sub_category = 2;
+    uint64 detected_at = 3;
+    string severity = 4;
+  }
   message ThreatActor {
     string id = 1;
     string latest_api_ip = 2;
@@ -79,6 +85,7 @@ message ListThreatActorResponse {
     string latest_api_method = 4;
     uint64 discovered_at = 5;
     string country = 6;
+    repeated ActivityData activity_data = 7;
   }
   repeated ThreatActor actors = 1;
   uint64 total = 2;
