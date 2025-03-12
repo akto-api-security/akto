@@ -800,6 +800,28 @@ getUrlComp(url){
   )
 },
 
+getCollapsibleRow(urls, severity){
+  const borderStyle = '4px solid ' + func.getHexColorForSeverity(severity?.toUpperCase());
+  return(
+    <tr style={{background: "#FAFBFB", borderLeft: borderStyle, padding: '0px !important', borderTop: '1px solid #dde0e4'}}>
+      <td colSpan={7} style={{padding: '0px !important'}}>
+          {urls.map((ele,index)=>{
+            const borderStyle = index < (urls.length - 1) ? {borderBlockEndWidth : 1} : {}
+            return(
+              <Box padding={"2"} paddingInlineEnd={"4"} paddingInlineStart={"4"} key={index}
+                  borderColor="border-subdued" {...borderStyle}
+              >
+                <Link monochrome onClick={() => history.navigate(ele.nextUrl)} removeUnderline >
+                  {this.getUrlComp(ele.url)}
+                </Link>
+              </Box>
+            )
+          })}
+      </td>
+    </tr>
+  )
+},
+
 getTestErrorType(message){
   const errorsObject = TestingStore.getState().errorsObject
   for(var key in errorsObject){
@@ -810,7 +832,7 @@ getTestErrorType(message){
   return "UNKNOWN_ERROR_OCCURRED"
 },
 
-getPrettifiedTestRunResults(testRunResults, getCollapsibleRow){
+getPrettifiedTestRunResults(testRunResults){
   const errorsObject = TestingStore.getState().errorsObject
   let testRunResultsObj = {}
   testRunResults.forEach((test)=>{
@@ -885,7 +907,7 @@ getPrettifiedTestRunResults(testRunResults, getCollapsibleRow){
       </HorizontalStack> : <Text>-</Text>,
       totalUrls: obj.urls.length,
       scanned_time_comp: <Text variant="bodyMd">{func.prettifyEpoch(obj?.endTimestamp)}</Text>,
-      collapsibleRow: getCollapsibleRow(obj.urls, obj?.severity[0]),
+      collapsibleRow: this.getCollapsibleRow(obj.urls, obj?.severity[0]),
       urlFilters: obj.urls.map((ele) => ele.url)
     }
     prettifiedResults.push(prettifiedObj)

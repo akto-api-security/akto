@@ -30,7 +30,7 @@ import {
 import api from "../api";
 import func from '@/util/func';
 import { useParams } from 'react-router';
-import { useState, useEffect, useRef, useMemo, useReducer, useCallback } from 'react';
+import { useState, useEffect, useRef, useMemo, useReducer } from 'react';
 import transform from "../transform";
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards";
 import WorkflowTestBuilder from "../workflow_test/WorkflowTestBuilder";
@@ -45,7 +45,6 @@ import { useSearchParams } from "react-router-dom";
 import TestRunResultPage from "../TestRunResultPage/TestRunResultPage";
 import LocalStore from "../../../../main/LocalStorageStore";
 import { produce } from "immer"
-import { history } from "@/util/history";
 import GithubServerTable from "../../../components/tables/GithubServerTable";
 import RunTest from '../../observe/api_collections/RunTest';
 import IssuesCheckbox from '../../issues/IssuesPage/IssuesCheckbox';
@@ -369,35 +368,7 @@ function SingleTestRunPage() {
     const key = tableTabMap[selectedTab]
     const total = (testRunCountMap[key] !== undefined && testRunCountMap[key] !== 0) ? testRunCountMap[key] : localCountMap[key]
     fillTempData(testRunResultsRes, selectedTab)
-    return { value: transform.getPrettifiedTestRunResults(testRunResultsRes, getCollapsibleRow), total: selectedTab === 'ignored_issues' ? totalIgnoredIssuesCount : total }
-  }
-
-  const getCollapsibleRow = (urls, severity) => {
-    const borderStyle = '4px solid ' + func.getHexColorForSeverity(severity?.toUpperCase());
-    return(
-      <tr style={{background: "#FAFBFB", borderLeft: borderStyle, padding: '0px !important', borderTop: '1px solid #dde0e4'}}>
-        <td colSpan={8} style={{padding: '0px !important', width: '100%'}}>
-          {urls.map((ele,index)=>{
-            const borderStyle = index < (urls.length - 1) ? {borderBlockEndWidth : 1} : {}
-            return( 
-              <Box padding={"2"} paddingInlineStart={"4"} key={index}
-                  borderColor="border-subdued" {...borderStyle}
-                  width="100%"
-              >
-                <HorizontalStack gap="2" align="start" blockAlign="center">
-                  <IssuesCheckbox 
-                    id={ele.testRunResultsId}
-                  />
-                  <Link monochrome onClick={() => history.navigate(ele.nextUrl)} removeUnderline >
-                    {transform.getUrlComp(ele.url)}
-                  </Link>
-                </HorizontalStack>
-              </Box>
-            )
-          })}
-        </td>
-      </tr>
-    )
+    return { value: transform.getPrettifiedTestRunResults(testRunResultsRes), total: selectedTab === 'ignored_issues' ? totalIgnoredIssuesCount : total }
   }
 
   useEffect(() => { handleAddSettings() }, [testingRunConfigSettings])
@@ -476,7 +447,7 @@ function SingleTestRunPage() {
           ...element,
           urls: filteredUrls,
           totalUrls: filteredUrls.length,
-          collapsibleRow: getCollapsibleRow(filteredUrls)
+          collapsibleRow: transform.getCollapsibleRow(filteredUrls)
         }
       });
       return filteredData

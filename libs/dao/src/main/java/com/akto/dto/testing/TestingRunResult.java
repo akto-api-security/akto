@@ -20,6 +20,7 @@ public class TestingRunResult implements Comparable<TestingRunResult> {
 
     public static final String TEST_RUN_ID = "testRunId";
     private ObjectId testRunId;
+
     @BsonIgnore
     private String testRunHexId;
 
