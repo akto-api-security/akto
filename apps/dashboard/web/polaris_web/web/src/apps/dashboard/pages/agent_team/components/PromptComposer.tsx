@@ -90,7 +90,7 @@ export const PromptComposer = ({ onSend }: PromptComposerProps) => {
       processId: currentProcessId,
       subProcessId: currentSubprocess,
       attemptId: currentAttempt,
-      updatedState: State.ACCEPTED.toString()
+      state: State.ACCEPTED.toString()
     });
     func.setToast(true, false, "Member solution accepted")
   }
@@ -100,7 +100,7 @@ export const PromptComposer = ({ onSend }: PromptComposerProps) => {
       processId: currentProcessId,
       subProcessId: currentSubprocess,
       attemptId: currentAttempt,
-      updatedState: State.DISCARDED.toString()
+      state: State.DISCARDED.toString()
     });
     func.setToast(true, false, "Member solution discarded")
   }

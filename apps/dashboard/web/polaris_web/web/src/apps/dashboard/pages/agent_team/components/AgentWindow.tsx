@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { PromptComposer } from './PromptComposer';
 import { Agent } from '../types';
 import { AgentHeader } from './AgentHeader';
@@ -7,6 +7,7 @@ import { Box, Scrollable, VerticalStack } from '@shopify/polaris';
 import RepositoryInitializer from './RepositoryInitializer';
 import SensitiveDataAgentInitializer from './SensitiveDataAgentInitializer';
 import FlyLayout from '../../../components/layouts/FlyLayout';
+import SensitiveDataTypeCTA from './finalctas/SensitiveDataTypeCTA';
 
 interface AgentWindowProps {
     agent: Agent | null;
@@ -15,22 +16,36 @@ interface AgentWindowProps {
 }
 
 function AgentWindow({ agent, onClose, open }: AgentWindowProps) {
+
+    const [finalCTAShow, setFinalCTAShow] = useState(false)
+
     const renderAgentWindow = () => {
         switch (agent?.id) {
             case 'FIND_VULNERABILITIES_FROM_SOURCE_CODE':
                 return (
                     <VerticalStack gap={"4"}>
                         <RepositoryInitializer agentType={agent.id}/>
-                        <FindVulnerabilitiesAgent agentId={agent.id}/>
+                        <FindVulnerabilitiesAgent agentId={agent.id} finalCTAShow={finalCTAShow} setFinalCTAShow={setFinalCTAShow}/>
                     </VerticalStack>
                 )
             case 'FIND_SENSITIVE_DATA_TYPES':
                 return (
                     <VerticalStack gap={"4"}>
                         <SensitiveDataAgentInitializer agentType={agent.id}/>
-                        <FindVulnerabilitiesAgent agentId={agent.id}/>
+                        <FindVulnerabilitiesAgent agentId={agent.id} finalCTAShow={finalCTAShow} setFinalCTAShow={setFinalCTAShow}/>
                     </VerticalStack>
                 )
+            default:
+                return (<></>)
+        }
+    }
+
+    function AgentFinalCTA() {
+        switch (agent?.id) {
+            case 'FIND_VULNERABILITIES_FROM_SOURCE_CODE':
+                return (<></>)
+            case 'FIND_SENSITIVE_DATA_TYPES':
+                return (<SensitiveDataTypeCTA show={finalCTAShow} setShow={setFinalCTAShow}/>)
             default:
                 return (<></>)
         }
@@ -44,6 +59,7 @@ function AgentWindow({ agent, onClose, open }: AgentWindowProps) {
                     <div className="pt-2 flex flex-col gap-2">
                         <Box paddingBlockEnd={"8"}>
                         {renderAgentWindow()}
+                        <AgentFinalCTA />
                         </Box>
                     </div>
                 </Scrollable>

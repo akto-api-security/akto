@@ -98,6 +98,26 @@ public class AgentAction extends UserAction {
         return Action.SUCCESS.toUpperCase();
     }
 
+    public String updateAgentRun() {
+        State updatedState = null;
+        try {
+            updatedState = State.valueOf(state);
+        } catch (Exception e) {
+        }
+
+        if (updatedState != null) {
+            List<Bson> updates = new ArrayList<>();
+            updates.add(Updates.set(AgentRun._STATE, updatedState));
+            if (updatedState.equals(State.COMPLETED)) {
+                updates.add(Updates.set(AgentRun.END_TIMESTAMP, Context.now()));
+            }
+            AgentRunDao.instance.updateOne(
+                    Filters.eq(AgentRun.PROCESS_ID, processId),
+                    Updates.combine(updates));
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
     Agent[] agents;
 
     AgentRun agentRun;
@@ -193,7 +213,6 @@ public class AgentAction extends UserAction {
         List<Bson> updates = new ArrayList<>();
 
         updates.add(Updates.setOnInsert(AgentSubProcessSingleAttempt.CREATED_TIMESTAMP, Context.now()));
-        updates.add(Updates.setOnInsert(AgentSubProcessSingleAttempt._STATE, State.SCHEDULED));
 
         State updatedState = null;
         try {
@@ -209,12 +228,20 @@ public class AgentAction extends UserAction {
             }
 
             if (State.COMPLETED.equals(subProcess.getState())
-                    && (State.ACCEPTED.equals(updatedState) || State.DISCARDED.equals(updatedState))) {
+                    && (State.ACCEPTED.equals(updatedState) ||
+                            State.DISCARDED.equals(updatedState) ||
+                            State.USER_PROVIDED_SOLUTION.equals(updatedState) ||
+                            State.RE_ATTEMPT.equals(updatedState))) {
                 updates.add(Updates.set(AgentSubProcessSingleAttempt._STATE, updatedState));
+
             } else {
                 addActionError("Invalid state");
                 return Action.ERROR.toUpperCase();
             }
+
+            // TODO: handle more state conditions
+        }else {
+            updates.add(Updates.setOnInsert(AgentSubProcessSingleAttempt._STATE, State.SCHEDULED));
         }
 
         /*

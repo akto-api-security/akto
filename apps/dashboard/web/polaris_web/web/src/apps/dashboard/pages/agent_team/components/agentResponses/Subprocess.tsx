@@ -6,7 +6,7 @@ import api from "../../api";
 import { useAgentsStore } from "../../agents.store";
 import STEPS_PER_AGENT_ID from "../../constants";
 
-export const Subprocess = ({agentId, currentAgentType, processId, subProcessFromProp}: {agentId: string, currentAgentType: string, processId:string, subProcessFromProp: AgentSubprocess}) => {
+export const Subprocess = ({agentId, currentAgentType, processId, subProcessFromProp, finalCTAShow, setFinalCTAShow}: {agentId: string, currentAgentType: string, processId:string, subProcessFromProp: AgentSubprocess, finalCTAShow: boolean, setFinalCTAShow: (show: boolean) => void}) => {
     const [subprocess, setSubprocess] = useState<AgentSubprocess | null>(null);
     const [expanded, setExpanded] = useState(true);
 
@@ -31,7 +31,8 @@ export const Subprocess = ({agentId, currentAgentType, processId, subProcessFrom
             if(subProcess !== null && subProcess.state === State.ACCEPTED ) {
                 const newSubIdNumber = Number(currentSubprocess) + 1;
                 if (newSubIdNumber > STEPS_PER_AGENT_ID[agentId]) {
-                    // TODO: complete the agent run and mark the agent run as complete.
+                    setFinalCTAShow(true)
+                    await api.updateAgentRun({ processId: processId, state: "COMPLETED" })
                 } else {
                     // create new subprocess without retry attempt now
                     const newSubId = (newSubIdNumber).toLocaleString()
@@ -78,9 +79,15 @@ export const Subprocess = ({agentId, currentAgentType, processId, subProcessFrom
         }
 
         const interval = setInterval(fetchSubprocess, 2000);
-
+        /*
+        We do not want to refresh current subprocess, 
+        if we're already at final CTA.
+        */
+        if (finalCTAShow) {
+            clearInterval(interval);
+        }
         return () => clearInterval(interval);
-    }, [currentSubprocess]);
+    }, [currentSubprocess, finalCTAShow]);
 
     if (!subprocess) {
         return null;

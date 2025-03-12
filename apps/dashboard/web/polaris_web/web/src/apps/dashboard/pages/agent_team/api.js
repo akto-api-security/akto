@@ -53,7 +53,15 @@ const api = {
             method: 'post',
             data: {agent}
         })
-    }
+    },
+
+    updateAgentRun: async (data) => {
+        return await request({
+            url: '/api/updateAgentRun',
+            method: 'post',
+            data: data 
+        })
+    },
 }
 
 export default api;
