@@ -340,11 +340,12 @@ function FlyLayoutSuite(props) {
         </div>
     );
 
-    const footer = isEditMode === true? (
-        <div style={{ position: "fixed", bottom: "0px", opacity: "1", width: "100%", background: "white" }}>
+    const footer = isEditMode ? (
+        <div style={{ position: "fixed", bottom: "0", left: "0", right: "0", opacity: "1", background: "white", zIndex: 10 }}>
             <Box borderColor="border-subdued" borderBlockStartWidth="1" padding={"4"} >
-                <HorizontalStack align="space-between">
-                    <Button primary onClick={() => {handleTestSuiteSave()}}>Save</Button>
+                <HorizontalStack align="end" gap="3">
+                    <Button onClick={switchMode}>Cancel</Button>
+                    <Button primary onClick={() => handleTestSuiteSave()}>Save</Button>
                 </HorizontalStack>
             </Box>
         </div>
