@@ -105,7 +105,7 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
                                     smr.getDiscoveredAt(),
                                     smr.getCountry(),
                                     smr.getActivityDataList().stream()
-                                    .map(subData -> new ActivityData(subData.getUrl(), subData.getSeverity(), subData.getSeverity(), subData.getDetectedAt()))
+                                    .map(subData -> new ActivityData(subData.getUrl(), subData.getSeverity(), subData.getSubCategory(), subData.getDetectedAt()))
                                     .collect(Collectors.toList())))
                         .collect(Collectors.toList());
 
