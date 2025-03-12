@@ -6,7 +6,7 @@ import api from "../../api";
 import { useAgentsStore } from "../../agents.store";
 import STEPS_PER_AGENT_ID from "../../constants";
 
-export const Subprocess = ({agentId, currentAgentType, processId, subProcessFromProp, finalCTAShow, setFinalCTAShow}: {agentId: string, currentAgentType: string, processId:string, subProcessFromProp: AgentSubprocess, finalCTAShow: boolean, setFinalCTAShow: (show: boolean) => void}) => {
+export const Subprocess = ({agentId, processId, subProcessFromProp, finalCTAShow, setFinalCTAShow}: {agentId: string, processId:string, subProcessFromProp: AgentSubprocess, finalCTAShow: boolean, setFinalCTAShow: (show: boolean) => void}) => {
     const [subprocess, setSubprocess] = useState<AgentSubprocess | null>(null);
     const [expanded, setExpanded] = useState(true);
 

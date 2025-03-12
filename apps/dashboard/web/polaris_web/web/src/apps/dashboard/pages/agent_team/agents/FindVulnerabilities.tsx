@@ -91,7 +91,6 @@ export const FindVulnerabilitiesAgent = (props) => {
                 {subprocesses.length > 0 && subprocesses.map((subprocess, index) => (
                     <Subprocess 
                     agentId={agentId} 
-                    currentAgentType={agentId} 
                     processId={currentAgentRun?.processId || ""} 
                     key={subprocess.subProcessId} 
                     subProcessFromProp={subprocesses[index]} 
