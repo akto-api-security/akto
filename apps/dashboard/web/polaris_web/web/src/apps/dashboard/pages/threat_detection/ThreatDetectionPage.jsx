@@ -131,9 +131,9 @@ function ThreatDetectionPage() {
                             }}
                             showYAxis={true}
                             yAxisTitle="Number of APIs"
-                            barWidth={52}
-                            barGap={12}
                             showGridLines={true}
+                            barWidth={100 - (severityCountMap.length * 6)}
+                            barGap={12}
                         />
                     }
                 />

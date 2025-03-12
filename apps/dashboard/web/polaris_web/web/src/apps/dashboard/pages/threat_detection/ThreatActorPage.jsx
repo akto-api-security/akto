@@ -6,6 +6,7 @@ import values from "@/util/values";
 import { produce } from "immer";
 import func from "@/util/func";
 import ThreatActorTable from "./components/ThreatActorsTable";
+import { ActorDetails } from "./components/ActorDetails";
 import ThreatWorldMap from "./components/ThreatWorldMap";
 // import ThreatApiSubcategoryCount from "./components/ThreatApiSubcategoryCount";
 
@@ -19,6 +20,8 @@ function ThreatActorPage() {
   const [mapData, setMapData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [subCategoryCount, setSubCategoryCount] = useState([]);
+  const [actorDetails, setActorDetails] = useState(null);
+  const [showActorDetails, setShowActorDetails] = useState(false);
   // const [categoryCount, setCategoryCount] = useState([]);
   const initialVal = values.ranges[3];
   const [currDateRange, dispatchCurrDateRange] = useReducer(
@@ -78,6 +81,12 @@ function ThreatActorPage() {
     );
   };
 
+  const onRowClick = (data) => {
+    console.log('row clicked', data);
+    setActorDetails(data);
+    setShowActorDetails(true);
+  }
+
   const components = [
     <ThreatSummary startTimestamp={parseInt(currDateRange.period.since.getTime()/1000)} endTimestamp={parseInt(currDateRange.period.until.getTime()/1000)} />,
     <ChartComponent />,
@@ -85,7 +94,9 @@ function ThreatActorPage() {
       key={"threat-actor-data-table"}
       currDateRange={currDateRange}
       loading={loading}
+      handleRowClick={onRowClick}
     />,
+    ...(showActorDetails ? [<ActorDetails actorDetails={actorDetails} setShowActorDetails={setShowActorDetails} />] : [])
   ];
 
   return (

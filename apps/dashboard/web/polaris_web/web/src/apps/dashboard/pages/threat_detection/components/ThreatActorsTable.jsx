@@ -6,6 +6,7 @@ import GetPrettifyEndpoint from "../../observe/GetPrettifyEndpoint";
 import func from "../../../../../util/func";
 import PersistStore from "../../../../main/PersistStore";
 import observeFunc from "../../observe/transform";
+import Store from "../../../store";
 import dayjs from "dayjs";
 const resourceName = {
   singular: "actor",
@@ -56,8 +57,17 @@ const sortOptions = [
 
 let filters = [];
 
-function ThreatActorTable({ data, currDateRange, rowClicked }) {
+function ThreatActorTable({ data, currDateRange, handleRowClick }) {
   const [loading, setLoading] = useState(false);
+
+  const setToastConfig = Store(state => state.setToastConfig)
+    const setToast = (isActive, isError, message) => {
+        setToastConfig({
+          isActive: isActive,
+          isError: isError,
+          message: message
+        })
+    }
 
   const getTimeEpoch = (key) => {
     return Math.floor(Date.parse(currDateRange.period[key]) / 1000);
@@ -70,62 +80,57 @@ function ThreatActorTable({ data, currDateRange, rowClicked }) {
   }
 
   const onRowClick = (data) => {
-    const actorIp = data.actor;
-    const url = data.latestApiEndpoint
-
-    const tempKey = `/dashboard/protection/threat-activity/`
-    let filtersMap = PersistStore.getState().filtersMap;
-    if(filtersMap !== null && filtersMap.hasOwnProperty(tempKey)){
-      delete filtersMap[tempKey];
-      PersistStore.getState().setFiltersMap(filtersMap);
-    }
-
-
-    const filters = `actor__${actorIp}&url__${url}`;
-    const navigateUrl = `${window.location.origin}/dashboard/protection/threat-activity?filters=${encodeURIComponent(filters)}`;
-    window.open(navigateUrl, "_blank");
+    handleRowClick(data);
   }
 
   async function fetchData(sortKey, sortOrder, skip) {
     setLoading(true);
     const sort = { [sortKey]: sortOrder };
-    const res = await api.fetchThreatActors(skip, sort);
-    let total = res.total;
+    let total = 0;
+    let ret = [];
+    try {
+      const res = await api.fetchThreatActors(skip, sort);
+      total = res.total;
 
-    const allEndpoints = res?.actors?.map(x => x.latestApiEndpoint);
+      const allEndpoints = res?.actors?.map(x => x.latestApiEndpoint);
 
-    const sensitiveDataResponse = await api.fetchSensitiveParamsForEndpoints(allEndpoints);
+      const sensitiveDataResponse = await api.fetchSensitiveParamsForEndpoints(allEndpoints);
 
-    // Store the sensitive data for each endpoint in a map
-    const sensitiveDataMap = sensitiveDataResponse.data.endpoints.reduce((map, endpoint) => {
-      if (map[endpoint.url] && !map[endpoint.url].includes(endpoint.subType.name)) {
-        map[endpoint.url].push(endpoint.subType.name);
-      } else {
-        map[endpoint.url] = [endpoint.subType.name];
-      }
-      return map;
-    }, {});
 
-    
-    let ret = await Promise.all(res?.actors?.map(async x => {
-      // Get the sensitive data for the endpoint
-      const sensitiveData = sensitiveDataMap[x.latestApiEndpoint] || [];
-      return {
-        ...x,
-        actor: x.id,
-        latestIp: x.latestApiIp,
-        discoveredAt: dayjs(x.discoveredAt).format('YYYY-MM-DD, HH:mm:ss A'),
-        sensitiveData: observeFunc.prettifySubtypes(sensitiveData, false),
-        latestApi: (
-          <GetPrettifyEndpoint
-            method={x.latestApiMethod}
-            url={x.latestApiEndpoint}
-            isNew={false}
-          />
-        ),
-      };
-    }));
-    setLoading(false);
+      // Store the sensitive data for each endpoint in a map
+      const sensitiveDataMap = sensitiveDataResponse.data.endpoints.reduce((map, endpoint) => {
+        if (map[endpoint.url] && !map[endpoint.url].includes(endpoint.subType.name)) {
+          map[endpoint.url].push(endpoint.subType.name);
+        } else {
+          map[endpoint.url] = [endpoint.subType.name];
+        }
+        return map;
+      }, {});
+
+      
+      ret = await Promise.all(res?.actors?.map(async x => {
+        // Get the sensitive data for the endpoint
+        const sensitiveData = sensitiveDataMap[x.latestApiEndpoint] || [];
+        return {
+          ...x,
+          actor: x.id,
+          latestIp: x.latestApiIp,
+          discoveredAt: dayjs(x.discoveredAt).format('YYYY-MM-DD, HH:mm:ss A'),
+          sensitiveData: observeFunc.prettifySubtypes(sensitiveData, false),
+          latestApi: (
+            <GetPrettifyEndpoint
+              method={x.latestApiMethod}
+              url={x.latestApiEndpoint}
+              isNew={false}
+            />
+          ),
+        };
+      }));
+    } catch (e) {
+      setToast(true, true, "Error fetching threat actors");
+    } finally {
+      setLoading(false);
+    }
     return { value: ret, total: total };
   }
 

@@ -14,53 +14,33 @@ const resourceName = {
 
 const headers = [
   {
+    text: "Endpoint",
+    value: "endpointComp",
+    title: "Endpoint",
+  },
+  {
+    text: "Actor",
+    value: "actorComp",
+    title: "Actor",
+    filterKey: 'actor'
+  },
+  {
+    text: "Filter",
+    value: "filterId",
+    title: "Attack type",
+  },
+  {
     text: "Severity",
     value: "severityComp",
     title: "Severity",
   },
   {
-    text: "Api Endpoints",
-    value: "endpointComp",
-    title: "Endpoint",
+    text: "Collection",
+    value: "apiCollectionName",
+    title: "Collection",
+    maxWidth: "95px",
+    type: CellType.TEXT,
   },
-  {
-    text: "Request",
-    value: "requestCount",
-    title: "Request",
-  },
-  {
-    text: "Threat Request",
-    value: "threatRequestCount",
-    title: "Threat Request",
-  },
-  {
-    text: "Category",
-    value: "category",
-    title: "Category",
-  },
-  {
-    text: "Sub Category",
-    value: "subCategory",
-    title: "Sub Category",
-  },
-  {
-    text: "Threat Actors",
-    value: "actorComp",
-    title: "Threat Actors",
-    filterKey: 'actor'
-  },
-  // {
-  //   text: "Filter",
-  //   value: "filterId",
-  //   title: "Attack type",
-  // },
-  // {
-  //   text: "Collection",
-  //   value: "apiCollectionName",
-  //   title: "Collection",
-  //   maxWidth: "95px",
-  //   type: CellType.TEXT,
-  // },
   {
     text: "Discovered",
     title: "Detected",
@@ -68,16 +48,16 @@ const headers = [
     type: CellType.TEXT,
     sortActive: true,
   },
-  // {
-  //   text: "Source IP",
-  //   title: "Source IP",
-  //   value: "sourceIPComponent",
-  // },
-  // {
-  //   text: "Type",
-  //   title: "Type",
-  //   value: "type",
-  // }
+  {
+    text: "Source IP",
+    title: "Source IP",
+    value: "sourceIPComponent",
+  },
+  {
+    text: "Type",
+    title: "Type",
+    value: "type",
+  }
 ];
 
 const sortOptions = [
