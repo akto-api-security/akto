@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { HorizontalStack, Text, VerticalStack } from "@shopify/polaris"
 import DropdownSearch from "../../../../components/shared/DropdownSearch"
 
@@ -32,8 +32,11 @@ function OutputSelector({onHandleSelect, processOutput} : OutputSelectorProps) {
     }
     const messageString = processOutput?.outputMessage + "\n We are moving forward with the following option(s):\n" + getStringMessage(processOutput?.selectionType, processOutput?.outputOptions); 
 
-    const initialValue = processOutput?.selectionType === 'single' ? getMessageFromObj(processOutput?.outputOptions[0], "value") : processOutput?.outputOptions.map((option: any) => option?.value);
-    const [filteredChoices, setFilteredChoices] = React.useState<any[]>(initialValue);
+    const allowMultiple = processOutput?.selectionType === "multiple"
+    const initialValue = !allowMultiple ?
+        getMessageFromObj(processOutput?.outputOptions[0], "value") :
+        processOutput?.outputOptions.map((option: any) => (option.value != undefined ? option.value : option));
+    const [filteredChoices, setFilteredChoices] = useState(initialValue);
     const handleSelected = (selectedChoices: any) => { 
         setFilteredChoices(selectedChoices);
         onHandleSelect(selectedChoices);
@@ -45,17 +48,17 @@ function OutputSelector({onHandleSelect, processOutput} : OutputSelectorProps) {
             <HorizontalStack gap={"2"}>
                 <Text variant="bodyMd" as="span">For editing or more info: </Text>
                 <DropdownSearch
-                    allowMultiple={processOutput?.selectionType === "multiple"}
-                    options={processOutput?.outputOptions.map((option: any) => {
+                    allowMultiple={allowMultiple}
+                    optionsList={processOutput?.outputOptions.map((option: any) => {
                         return {
-                            label: option?.textValue,
-                            value: option?.value,
+                            label: option.textValue!=undefined ? option?.textValue : option,
+                            value: option.value!=undefined ? option.value : option,
                         }
                     })}
                     placeHolder={"Edit choice(s)"}
-                    setSelected={handleSelected}
+                    setSelected={(selectedChoices) => handleSelected(selectedChoices)}
                     preSelected={filteredChoices}
-                    value={`${filteredChoices.length} choices selected`}
+                    value={`${filteredChoices.length} choice${filteredChoices.length==1 ? "" : "s"} selected`}
                 />
             </HorizontalStack>
 
