@@ -42,6 +42,7 @@ public class MaliciousEventModel {
     this.eventType = builder.eventType;
     this.category = builder.category;
     this.subCategory = builder.subCategory;
+    this.refId = builder.refId;
   }
 
   public static class Builder {

@@ -497,7 +497,35 @@ const settingRequests = {
             method: 'post',
             data: {roleName}
         })
-    }
+    },
+    addAwsWafIntegration(awsAccessKey, awsSecretKey, region, ruleSetId, ruleSetName) {
+        return request({
+            url: '/api/addAwsWafIntegration',
+            method: 'post',
+            data: {awsAccessKey, awsSecretKey, region, ruleSetId, ruleSetName}
+        })
+    },
+    fetchAwsWafIntegration() {
+        return request({
+            url: '/api/fetchAwsWafIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+    addSplunkIntegration(splunkUrl, splunkToken) {
+        return request({
+            url: '/api/addSplunkIntegration',
+            method: 'post',
+            data: {splunkUrl, splunkToken}
+        })
+    },
+    fetchSplunkIntegration() {
+        return request({
+            url: '/api/fetchSplunkIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
 }
 
 export default settingRequests

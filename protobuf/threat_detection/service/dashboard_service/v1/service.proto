@@ -146,3 +146,12 @@ message ThreatCategoryWiseCountResponse {
 
   repeated SubCategoryCount  category_wise_counts = 1;
 }
+
+message SplunkIntegrationRequest {
+  string splunk_url = 1;
+  string splunk_token = 2;
+}
+
+message SplunkIntegrationRespone {
+
+}
