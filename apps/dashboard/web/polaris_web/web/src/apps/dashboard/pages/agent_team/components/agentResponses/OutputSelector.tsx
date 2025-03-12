@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { HorizontalStack, Text, VerticalStack } from "@shopify/polaris"
 import DropdownSearch from "../../../../components/shared/DropdownSearch"
 
@@ -39,8 +39,11 @@ function OutputSelector({onHandleSelect, processOutput} : OutputSelectorProps) {
     const [filteredChoices, setFilteredChoices] = useState(initialValue);
     const handleSelected = (selectedChoices: any) => { 
         setFilteredChoices(selectedChoices);
-        onHandleSelect(selectedChoices);
     }
+
+    useEffect(() => {
+        onHandleSelect(filteredChoices)
+    },[filteredChoices])
 
     return (
         <VerticalStack gap={"3"}>
