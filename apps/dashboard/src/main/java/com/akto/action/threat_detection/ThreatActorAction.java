@@ -273,7 +273,7 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
 
     public String sendIntegrationDataToThreatBackend() {
       HttpPost post =
-          new HttpPost(String.format("%s/api/dashboard/addSplunkIntegration", "http://localhost:9090"));
+          new HttpPost(String.format("%s/api/dashboard/addSplunkIntegration", this.getBackendUrl()));
       post.addHeader("Authorization", "Bearer " + this.getApiToken());
       post.addHeader("Content-Type", "application/json");
   
