@@ -6,11 +6,11 @@ import api from "../../api";
 import { useAgentsStore } from "../../agents.store";
 import STEPS_PER_AGENT_ID from "../../constants";
 
-export const Subprocess = ({agentId, currentAgentType, processId, subProcessFromProp}: {agentId: string, currentAgentType: string, processId:string, subProcessFromProp: AgentSubprocess}) => {
+export const Subprocess = ({agentId, processId, subProcessFromProp}: {agentId: string, processId:string, subProcessFromProp: AgentSubprocess}) => {
     const [subprocess, setSubprocess] = useState<AgentSubprocess | null>(null);
     const [expanded, setExpanded] = useState(true);
 
-    const {agentSteps, setAgentSteps, setCurrentAttempt, setCurrentSubprocess, currentSubprocess, currentAttempt, setAgentState } = useAgentsStore();
+    const {setCurrentAttempt, setCurrentSubprocess, currentSubprocess, currentAttempt, setAgentState } = useAgentsStore();
 
     useEffect(() => {
         const fetchSubprocess = async () => {
@@ -61,18 +61,6 @@ export const Subprocess = ({agentId, currentAgentType, processId, subProcessFrom
             if(subProcess !== null && subProcess.state === State.DISCARDED) {
                 // TODO: handle how to take input from user
             }
-
-            const existingData = {...agentSteps[currentAgentType]};
-            let newData = {...existingData}
-            const logs = subProcess?.logs || [];
-            const processOutput = subProcess?.processOutput || {};
-            newData[subId] = {
-                heading: newData[subId]?.heading || newData[subId],
-                logs: logs || [],
-                processOutput: processOutput || {}
-            }
-            const finalMap = {...agentSteps, [currentAgentType]: newData};
-            setAgentSteps(finalMap);
             setSubprocess(subProcess);
 
         }

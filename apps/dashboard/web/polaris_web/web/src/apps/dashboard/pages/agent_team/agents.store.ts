@@ -19,8 +19,6 @@ interface AgentsStore {
     setAttemptedInBlockedState: (attempted: boolean) => void;
     agentState: AgentState;
     setAgentState: (state: AgentState) => void;
-    agentSteps: Record<string, Record<string, any>>;
-    setAgentSteps: (state:  Record<string, Record<string, any>>) => void;
     selectedRepository: string | null;
     setSelectedRepository: (repo: string) => void;
     currentProcessId: string | null;
@@ -49,16 +47,6 @@ export const useAgentsStore = create<AgentsStore>()(
                     set({ attemptedInBlockedState: attempted }),
                 agentState: "idle",
                 setAgentState: (state: AgentState) => set({ agentState: state }),
-                agentSteps: {"FIND_VULNERABILITIES_FROM_SOURCE_CODE":{
-                            "1": "Find backend directory",
-                            "2": "Find language and framework",
-                            "3": "Detect auth mechanism type",
-                        },
-                        "FIND_SENSITIVE_DATA_TYPES":{
-                            "1":"Find sensitive data types in response payload"
-                        }
-                    },
-                setAgentSteps: (state:Record<string, Record<string, any>> ) => set({ agentSteps: state }),
                 selectedRepository: null,
                 setSelectedRepository: (repo: string) => set({ selectedRepository: repo }),
                 currentSubprocess: '0',

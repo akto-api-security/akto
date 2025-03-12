@@ -14,7 +14,7 @@ export const FindVulnerabilitiesAgent = (props) => {
 
     // ?? Where exactly is agent steps being used.
     // I didn't find any use case, we can remove it.
-    const { agentSteps, setAgentSteps, setCurrentAttempt, setCurrentSubprocess, setCurrentProcessId} = useAgentsStore();
+    const { setCurrentAttempt, setCurrentSubprocess, setCurrentProcessId} = useAgentsStore();
 
     const getAllAgentRuns = async () => {
         try {
@@ -43,26 +43,12 @@ export const FindVulnerabilitiesAgent = (props) => {
         
         if(subprocesses.length > 0) { 
             // if page-reload, this will be called to fill the data required in the localstorage
-            const existingData = {...agentSteps[agentId]};
-            let newData = {...existingData}
             let newestSubprocess = subprocesses[0]
             subprocesses.forEach((subprocess) => {
-                
                 if(subprocess.createdTimestamp > newestSubprocess.createdTimestamp){
                     newestSubprocess = subprocess
                 }
-
-                const subProcessId: string = subprocess.subProcessId;
-                const logs = subprocess?.logs || [];
-                const processOutput = subprocess?.processOutput || {};
-                newData[subProcessId] = {
-                    heading: newData[subProcessId]?.heading || newData[subProcessId],
-                    logs: logs,
-                    processOutput: processOutput
-                }
             });
-            const finalMap = {...agentSteps, [agentId]: newData};
-            setAgentSteps(finalMap);
             setCurrentSubprocess(newestSubprocess.subProcessId)
             setCurrentAttempt(newestSubprocess.attemptId)
         }
@@ -103,7 +89,7 @@ export const FindVulnerabilitiesAgent = (props) => {
         <Scrollable className="h-full">
             <VerticalStack gap="2">
                 {subprocesses.length > 0 && subprocesses.map((subprocess, index) => (
-                    <Subprocess agentId={agentId} currentAgentType={agentId} processId={currentAgentRun?.processId || ""} key={subprocess.subProcessId} subProcessFromProp={subprocesses[index]} />
+                    <Subprocess agentId={agentId} processId={currentAgentRun?.processId || ""} key={subprocess.subProcessId} subProcessFromProp={subprocesses[index]} />
                 ))}
             </VerticalStack>
         </Scrollable>

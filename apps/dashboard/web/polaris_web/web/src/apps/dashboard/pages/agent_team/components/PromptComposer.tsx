@@ -7,9 +7,9 @@ import OrderedList from '@tiptap/extension-ordered-list';
 import BulletList from '@tiptap/extension-bullet-list';
 import './composer.styles.css';
 
-import { Button, Icon, Tooltip, Text } from '@shopify/polaris';
+import { Button, Tooltip } from '@shopify/polaris';
 
-import { PauseMajor, PlusMinor, SendMajor, TimelineAttachmentMajor } from '@shopify/polaris-icons';
+import { SendMajor } from '@shopify/polaris-icons';
 
 import { ModelPicker } from './ModelPicker';
 import { isBlockingState, useAgentsStore } from '../agents.store';
@@ -26,6 +26,7 @@ interface PromptComposerProps {
 
 export const PromptComposer = ({ onSend }: PromptComposerProps) => {
   const [isFocused, setIsFocused] = useState(false);
+  const { currentProcessId, currentSubprocess, currentAttempt } = useAgentsStore();
   const {
     currentPrompt,
     setCurrentPrompt,
@@ -81,10 +82,7 @@ export const PromptComposer = ({ onSend }: PromptComposerProps) => {
 
     onSend(prompt);
   }
-
-
-  const { currentProcessId, currentSubprocess, currentAttempt } = useAgentsStore();
-
+  
   async function onResume() {
     await api.updateAgentSubprocess({
       processId: currentProcessId,
