@@ -1,5 +1,5 @@
 import { TopBar, Icon, Text, ActionList, Modal, TextField, HorizontalStack, Box, Avatar, VerticalStack, Button, Scrollable } from '@shopify/polaris';
-import { NotificationMajor, CustomerPlusMajor, LogOutMinor, NoteMinor, ResourcesMajor, UpdateInventoryMajor, PageMajor, DynamicSourceMajor, PhoneMajor, ChatMajor } from '@shopify/polaris-icons';
+import { NotificationMajor, CustomerPlusMajor, LogOutMinor, NoteMinor, ResourcesMajor, UpdateInventoryMajor, PageMajor, DynamicSourceMajor, PhoneMajor, ChatMajor, SettingsMajor } from '@shopify/polaris-icons';
 import { useState, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Store from '../../../store';
@@ -209,18 +209,18 @@ export default function Header() {
 
 
     const secondaryMenuMarkup = (
-        <HorizontalStack gap={"4"}>
+        <HorizontalStack gap="200">
             {(Object.keys(currentTestsObj).length > 0 && currentTestsObj?.testRunsArr?.length !== 0 && currentTestsObj?.totalTestsCompleted > 0) ? 
-            <HorizontalStack gap={"2"}>
+            <HorizontalStack gap="100">
                 <Button plain monochrome onClick={() => {handleTestingNavigate()}}>
                  <SemiCircleProgress key={"progress"} progress={Math.min(progress, 100)} size={60} height={55} width={75}/>
                 </Button>
-                <VerticalStack gap={"0"}>
+                <VerticalStack gap="100">
                     <Text fontWeight="medium">Test run status</Text>
                     <Text color="subdued" variant="bodySm">{`${currentTestsObj.totalTestsQueued} tests queued`}</Text>
                 </VerticalStack>
             </HorizontalStack> : null}
-             <TopBar.Menu
+            <TopBar.Menu
                 activatorContent={
                     <span id="beamer-btn" className={getColorForIcon()}>
                         <Icon source={NotificationMajor}/> 
@@ -228,8 +228,12 @@ export default function Header() {
                 }
                 actions={[]}
             />
+            <TopBar.Menu
+                activatorContent={
+                    <Button plain monochrome icon={SettingsMajor} onClick={() => navigate("/dashboard/settings/about")} />
+                }
+            />
         </HorizontalStack>
-        
     );
 
     const topBarMarkup = (
