@@ -274,6 +274,7 @@ public class MaliciousTrafficDetectorTask implements Task {
             .setCategory(apiFilter.getInfo().getCategory().getName())
             .setSubCategory(apiFilter.getInfo().getSubCategory())
             .setSeverity(apiFilter.getInfo().getSeverity())
+            .setType("Rule-Based")
             .build();
     MaliciousEventKafkaEnvelope envelope =
         MaliciousEventKafkaEnvelope.newBuilder()

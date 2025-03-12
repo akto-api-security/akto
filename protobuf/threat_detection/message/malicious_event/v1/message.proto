@@ -20,6 +20,7 @@ message MaliciousEventMessage {
   string category = 10;
   string sub_category = 11;
   string severity = 12;
+  string type = 13;
 }
 
 message MaliciousEventKafkaEnvelope {

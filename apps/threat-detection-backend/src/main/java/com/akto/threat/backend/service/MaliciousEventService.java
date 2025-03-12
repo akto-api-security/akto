@@ -76,6 +76,8 @@ public class MaliciousEventService {
             .setCategory(evt.getCategory())
             .setSubCategory(evt.getSubCategory())
             .setRefId(refId)
+            .setSeverity(evt.getSeverity())
+            .setType(evt.getType())
             .build();
 
     if (MaliciousEventModel.EventType.AGGREGATED.equals(maliciousEventType)) {
