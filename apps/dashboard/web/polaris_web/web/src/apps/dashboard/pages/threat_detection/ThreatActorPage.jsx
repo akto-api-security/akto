@@ -59,7 +59,10 @@ function ThreatActorPage() {
     return (
       <VerticalStack gap={4} columns={2}>
         <HorizontalGrid gap={4} columns={2}>
-          <ThreatActivityTimeline />
+          <ThreatActivityTimeline
+            startTimestamp={parseInt(currDateRange.period.since.getTime()/1000)}
+            endTimestamp={parseInt(currDateRange.period.until.getTime()/1000)}
+          />
           <ThreatWorldMap
             data={mapData}
             style={{
@@ -76,7 +79,7 @@ function ThreatActorPage() {
   };
 
   const components = [
-    <ThreatSummary startTimestamp={currDateRange.startTimestamp} endTimestamp={currDateRange.endTimestamp} />,
+    <ThreatSummary startTimestamp={parseInt(currDateRange.period.since.getTime()/1000)} endTimestamp={parseInt(currDateRange.period.until.getTime()/1000)} />,
     <ChartComponent />,
     <ThreatActorTable
       key={"threat-actor-data-table"}

@@ -1,62 +1,10 @@
 import { useState, useEffect } from "react";
-import { Box, Card, HorizontalGrid, HorizontalStack, Text, VerticalStack } from "@shopify/polaris"
-import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo"
 import PropTypes from "prop-types";
-import { SummaryLineChart } from "./SummaryLineChart";
 import func from "@/util/func";
 import SummaryCard from '../../dashboard/new_components/SummaryCard'
 import observeFunc from "../../observe/transform.js"
 import SmoothAreaChart from '../../dashboard/new_components/SmoothChart'
-
-const THREAT_SUMMARY_DATA = {
-    "apis": null,
-    "categoryCounts": null,
-    "dailyThreatActorsCount": "SUCCESS",
-    "endTimestamp": 0,
-    "skip": 0,
-    "sort": null,
-    "startTimestamp": 0,
-    "total": 0,
-    "actorsCounts": [
-      {
-        "ts": 1741660863,
-        "totalActors": 2,
-        "severityActors": 3
-      },
-      {
-        "ts": 1741660863,
-        "totalActors": 5,
-        "severityActors": 1
-      },
-      {
-        "ts": 1741660863,
-        "totalActors": 2,
-        "severityActors": 2
-      },
-      {
-        "ts": 1741660863,
-        "totalActors": 1,
-        "severityActors": 2
-      },
-      {
-        "ts": 1741660863,
-        "totalActors": 4,
-        "severityActors": 1
-      },
-      {
-        "ts": 1741660863,
-        "totalActors": 2,
-        "severityActors": 1
-      },
-      {
-        "ts": 1741660863,
-        "totalActors": 4,
-        "severityActors": 0
-      },
-    ],
-    "totalActors": 20,
-    "criticalActors": 10
-  }
+import api from "../api";
 
 export const ThreatSummary = ({ startTimestamp, endTimestamp }) => {
     const [criticalActors, setCriticalActors] = useState([]);
@@ -64,16 +12,20 @@ export const ThreatSummary = ({ startTimestamp, endTimestamp }) => {
     const [criticalActorsDelta, setCriticalActorsDelta] = useState(0);
     const [totalActorsDelta, setTotalActorsDelta] = useState(0);
 
-    const getThreatActorsCount = async () => {
-        const actorsCountByDay = THREAT_SUMMARY_DATA.actorsCounts;
-        const criticalActors = actorsCountByDay.map(item => item.severityActors);
+    const fetchThreatActorsCount = async () => {
+        const response = await api.getDailyThreatActorsCount(startTimestamp, endTimestamp);
+        console.log({ response });
+        const actorsCountByDay =  response.actorsCounts;
+        console.log({ actorsCountByDay });
+        const criticalActors = actorsCountByDay.map(item => item.criticalActors);
         const activeActors = actorsCountByDay.map(item => item.totalActors);
+        console.log({ criticalActors, activeActors });
         observeFunc.setIssuesState(criticalActors, setCriticalActors, setCriticalActorsDelta, true);
         observeFunc.setIssuesState(activeActors, setActiveActors, setTotalActorsDelta, true);
     }
 
     useEffect(() => {
-        getThreatActorsCount();
+        fetchThreatActorsCount();
     }, [startTimestamp, endTimestamp]);
 
     const summaryInfo = [

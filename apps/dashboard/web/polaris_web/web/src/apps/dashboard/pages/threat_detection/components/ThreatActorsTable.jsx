@@ -5,6 +5,7 @@ import { CellType } from "../../../components/tables/rows/GithubRow";
 import GetPrettifyEndpoint from "../../observe/GetPrettifyEndpoint";
 import func from "../../../../../util/func";
 import PersistStore from "../../../../main/PersistStore";
+import observeFunc from "../../observe/transform";
 import dayjs from "dayjs";
 const resourceName = {
   singular: "actor",
@@ -21,6 +22,11 @@ const headers = [
     text: "Latest API",
     title: "Latest API",
     value: "latestApi",
+  },
+  {
+    text: "Sensitive Data",
+    title: "Sensitive Data",
+    value: "sensitiveData",
   },
   {
     text: "Detected at",
@@ -84,14 +90,32 @@ function ThreatActorTable({ data, currDateRange, rowClicked }) {
     setLoading(true);
     const sort = { [sortKey]: sortOrder };
     const res = await api.fetchThreatActors(skip, sort);
-    console.log("resta", res);
     let total = res.total;
-    let ret = res?.actors?.map((x) => {
+
+    const allEndpoints = res?.actors?.map(x => x.latestApiEndpoint);
+
+    const sensitiveDataResponse = await api.fetchSensitiveParamsForEndpoints(allEndpoints);
+
+    // Store the sensitive data for each endpoint in a map
+    const sensitiveDataMap = sensitiveDataResponse.data.endpoints.reduce((map, endpoint) => {
+      if (map[endpoint.url] && !map[endpoint.url].includes(endpoint.subType.name)) {
+        map[endpoint.url].push(endpoint.subType.name);
+      } else {
+        map[endpoint.url] = [endpoint.subType.name];
+      }
+      return map;
+    }, {});
+
+    
+    let ret = await Promise.all(res?.actors?.map(async x => {
+      // Get the sensitive data for the endpoint
+      const sensitiveData = sensitiveDataMap[x.latestApiEndpoint] || [];
       return {
         ...x,
         actor: x.id,
         latestIp: x.latestApiIp,
         discoveredAt: dayjs(x.discoveredAt).format('YYYY-MM-DD, HH:mm:ss A'),
+        sensitiveData: observeFunc.prettifySubtypes(sensitiveData, false),
         latestApi: (
           <GetPrettifyEndpoint
             method={x.latestApiMethod}
@@ -100,7 +124,7 @@ function ThreatActorTable({ data, currDateRange, rowClicked }) {
           />
         ),
       };
-    });
+    }));
     setLoading(false);
     return { value: ret, total: total };
   }

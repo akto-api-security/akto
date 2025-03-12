@@ -81,19 +81,34 @@ const threatDetectionRequests = {
         })
     },
     fetchCountBySeverity() {
-        // TODO:@devshekhawat remove this mock data
-        return {            
-            apis: null,
-            categoryCounts: [
-                {category: "", count: 100, subCategory: "CRITICAL"},
-                {category: "", count: 71, subCategory: "HIGH"},
-                {category: "", count: 21, subCategory: "MEDIUM"}, 
-                {category: "", count: 12, subCategory: "LOW"}
-            ],
-            skip: 0,
-            sort: null,
-            total: 0
-        }
-    }
+        return request({
+            url: '/api/fetchCountBySeverity',
+            method: 'post',
+            data: {}
+        })
+    },
+    getThreatActivityTimeline(startTs, endTs) {
+        return request({
+            url: '/api/getThreatActivityTimeline',
+            method: 'post',
+            data: {startTs, endTs}
+        })
+    },
+    getDailyThreatActorsCount(startTs, endTs) {
+        return request({
+            url: '/api/getDailyThreatActorsCount',
+            method: 'post',
+            data: {startTs, endTs}
+        })
+    },
+    fetchSensitiveParamsForEndpoints (urls) {
+        return request({
+            url: '/api/fetchSensitiveParamsForEndpoints',
+            method: 'post',
+            data: {urls}
+        }).then((resp) => {
+            return resp
+        })
+    },
 }
 export default threatDetectionRequests
