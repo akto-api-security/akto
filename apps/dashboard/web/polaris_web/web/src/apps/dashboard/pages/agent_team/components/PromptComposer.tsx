@@ -18,6 +18,7 @@ import { getPromptContent } from '../utils';
 import { BlockedState } from './BlockedState';
 import api from '../api';
 import func from '../../../../../util/func';
+import { intermediateStore } from '../intermediate.store';
 
 
 interface PromptComposerProps {
@@ -27,6 +28,7 @@ interface PromptComposerProps {
 export const PromptComposer = ({ onSend }: PromptComposerProps) => {
   const [isFocused, setIsFocused] = useState(false);
   const { currentProcessId, currentSubprocess, currentAttempt } = useAgentsStore();
+  const { filteredUserInput } = intermediateStore();
   const {
     currentPrompt,
     setCurrentPrompt,
@@ -84,11 +86,16 @@ export const PromptComposer = ({ onSend }: PromptComposerProps) => {
   }
   
   async function onResume() {
+
+    // when selected choices are provided by the user, accepted case should be returned to the agent
+    // agent if gets user-input, with the accepted state, it should take that into account
+
     await api.updateAgentSubprocess({
       processId: currentProcessId,
       subProcessId: currentSubprocess,
       attemptId: currentAttempt,
-      updatedState: State.ACCEPTED.toString()
+      state: State.ACCEPTED.toString(),
+      data: filteredUserInput
     });
     func.setToast(true, false, "Member solution accepted")
   }
@@ -98,7 +105,8 @@ export const PromptComposer = ({ onSend }: PromptComposerProps) => {
       processId: currentProcessId,
       subProcessId: currentSubprocess,
       attemptId: currentAttempt,
-      updatedState: State.DISCARDED.toString()
+      state: State.DISCARDED.toString(),
+      data: filteredUserInput
     });
     func.setToast(true, false, "Member solution discarded")
   }
