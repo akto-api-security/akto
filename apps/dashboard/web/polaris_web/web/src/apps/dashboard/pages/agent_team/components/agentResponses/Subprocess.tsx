@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import {  AgentSubprocess, State } from "../../types";
+import {  AgentRun, AgentSubprocess, State } from "../../types";
 import { CaretDownMinor } from "@shopify/polaris-icons";
 import api from "../../api";
 import { useAgentsStore } from "../../agents.store";
@@ -44,18 +44,27 @@ export const Subprocess = ({agentId, processId, subProcessFromProp, finalCTAShow
                 attemptId: currentAttempt,
             });
             let subProcess = response.subprocess as AgentSubprocess;
+            let agentRun = response.agentRun as AgentRun
             let inputAcknowledged = response.inputAcknowledged as boolean;
+
+            if(subProcess !== null && subProcess.state === State.RUNNING) {
+                setAgentState("thinking")
+            }
 
             /* handle new subprocess creation from here
              State => ACCEPTED.
              Since we already know, how many total steps are going to be there,
              we cross check if this would have been the last step.
             */
-            if(subProcess !== null && subProcess.state === State.ACCEPTED ) {
+            if (subProcess !== null && subProcess.state === State.ACCEPTED) {
                 const newSubIdNumber = Number(currentSubprocess) + 1;
                 if (newSubIdNumber > STEPS_PER_AGENT_ID[agentId]) {
-                    setFinalCTAShow(true)
-                    await api.updateAgentRun({ processId: processId, state: "COMPLETED" })
+                    if(agentRun.state !== "COMPLETED"){
+                        setFinalCTAShow(true)
+                        await api.updateAgentRun({ processId: processId, state: "COMPLETED" })
+                    } else {
+                        setAgentState("idle")
+                    }
                 } else {
                     // create new subprocess without retry attempt now
                     subProcess = await createNewSubprocess(newSubIdNumber);
