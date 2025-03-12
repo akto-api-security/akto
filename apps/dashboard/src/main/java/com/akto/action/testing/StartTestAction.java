@@ -236,25 +236,24 @@ public class StartTestAction extends UserAction {
 
                 } else {
 
-                    List<ObjectId> testingRunResultIds = new ArrayList<>();
-                    for (String testingRunResultHexId : selectedTestRunResultHexIds) {
-                        testingRunResultIds.add(new ObjectId(testingRunResultHexId));
+                    if (this.testingRunResultSummaryHexId != null) {
+                        List<ObjectId> testingRunResultIds = new ArrayList<>();
+                        for (String testingRunResultHexId : selectedTestRunResultHexIds) {
+                            testingRunResultIds.add(new ObjectId(testingRunResultHexId));
+                        }
+
+                        TestingRunResultDao.instance.updateManyNoUpsert(Filters.in(TestingRunResultDao.ID, testingRunResultIds),
+                                Updates.set(TestingRunResult.RERUN,true));
+
+                        TestingRunResultSummary summary = new TestingRunResultSummary(Context.now(), 0, new HashMap<>(),
+                                0, localTestingRun.getId(), localTestingRun.getId().toHexString(), 0, localTestingRun.getTestIdConfig(),0 );
+                        summary.setState(TestingRun.State.SCHEDULED);
+                        summary.setOriginalTestingRunResultSummaryId(new ObjectId(testingRunResultSummaryHexId));
+                        loggerMaker.infoAndAddToDb("Rerun test triggered at " + Context.now(), LogDb.DASHBOARD);
+
+                        InsertOneResult result = TestingRunResultSummariesDao.instance.insertOne(summary);
+                        this.testingRunResultSummaryHexId = result.getInsertedId().asObjectId().getValue().toHexString();
                     }
-
-                    TestingRunResultDao.instance.updateManyNoUpsert(Filters.in(TestingRunResultDao.ID, testingRunResultIds),
-                            Updates.set(TestingRunResult.RERUN,true));
-
-                    Map<ObjectId, TestingRunResultSummary> testingRunResultSummaryMap = TestingRunResultSummariesDao.instance.fetchLatestTestingRunResultSummaries(Collections.singletonList(new ObjectId(this.testingRunHexId)));
-
-                    TestingRunResultSummary summary = new TestingRunResultSummary(Context.now(), 0, new HashMap<>(),
-                            0, localTestingRun.getId(), localTestingRun.getId().toHexString(), 0, localTestingRun.getTestIdConfig(),0 );
-                    summary.setState(TestingRun.State.SCHEDULED);
-                    summary.setOriginalTestingRunResultSummaryId(testingRunResultSummaryMap.get(localTestingRun.getId()).getId());
-                    loggerMaker.infoAndAddToDb("Rerun test triggered at " + Context.now(), LogDb.DASHBOARD);
-
-                    InsertOneResult result = TestingRunResultSummariesDao.instance.insertOne(summary);
-                    this.testingRunResultSummaryHexId = result.getInsertedId().asObjectId().getValue().toHexString();
-
                 }
 
             } else {

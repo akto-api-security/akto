@@ -1001,8 +1001,8 @@ stopTest(hexId){
   });
 },
 
-rerunTest(hexId, refreshSummaries, shouldRefresh, selectedTestRunForRerun){
-  api.rerunTest(hexId, selectedTestRunForRerun).then((resp) => {
+rerunTest(hexId, refreshSummaries, shouldRefresh, selectedTestRunForRerun, testingRunResultSummaryHexId){
+  api.rerunTest(hexId, selectedTestRunForRerun, testingRunResultSummaryHexId).then((resp) => {
     window.location.reload()
     func.setToast(true, false, "Test re-run initiated")
     if(shouldRefresh){

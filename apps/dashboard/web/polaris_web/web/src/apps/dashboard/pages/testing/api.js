@@ -68,8 +68,7 @@ export default {
         })
         return resp        
     },
-    async rerunTest(testingRunHexId, selectedTestRunForRerun ){
-        console.log("running test")
+    async rerunTest(testingRunHexId, selectedTestRunForRerun, testingRunResultSummaryHexId ){
         if (selectedTestRunForRerun === []) {
             const resp = await request({
                 url: '/api/startTest',
@@ -82,7 +81,7 @@ export default {
         const resp = await request({
             url: '/api/startTest',
             method: 'post',
-            data: { testingRunHexId,  selectedTestRunResultHexIds}
+            data: { testingRunResultSummaryHexId,  selectedTestRunResultHexIds}
         })
         return resp
     },

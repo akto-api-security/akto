@@ -441,7 +441,7 @@ function SingleTestRunPage() {
         content: `Rerun ${totalSelectedItemsSet.size} test${totalSelectedItemsSet.size === 1 ? '' : 's'}`,
         onAction: () => {
         if (totalSelectedItemsSet.size > 0) {
-          transform.rerunTest(selectedTestRun.id, null, false, [...totalSelectedItemsSet])
+          transform.rerunTest(selectedTestRun.id, null, false, [...totalSelectedItemsSet], selectedTestRun.testingRunResultSummaryHexId)
         }
         },
       },
