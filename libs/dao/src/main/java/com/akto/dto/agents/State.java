@@ -18,6 +18,6 @@ public enum State {
     // => creates a new subprocess with attemptId+1
     // => preserves agent solution here.
     ACCEPTED, // subprocess accepted by user.
-    PENDING // subprocess ...
-
+    PENDING, // subprocess ...
+    AGENT_ACKNOWLEDGED, // agent acknowledged the user-input
 }

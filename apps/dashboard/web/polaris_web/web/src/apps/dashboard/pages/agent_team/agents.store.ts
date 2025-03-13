@@ -27,6 +27,7 @@ interface AgentsStore {
     setCurrentSubprocess: (subprocess: string) => void;
     currentAttempt: number 
     setCurrentAttempt: (subprocess: number) => void;
+    resetStore: () => void;
 }
 
 // Zustand Store with Middleware
@@ -55,6 +56,15 @@ export const useAgentsStore = create<AgentsStore>()(
                 setCurrentProcessId: (currentProcessId: string) => set({ currentProcessId: currentProcessId }),
                 currentAttempt: 0,
                 setCurrentAttempt: (attempt: number) => set({ currentAttempt: attempt }),
+
+                resetStore: () => set({
+                    attemptedInBlockedState: false,
+                    agentState: "idle",
+                    selectedRepository: null,
+                    currentSubprocess: '0',
+                    currentProcessId: "",
+                    currentAttempt: 0,
+                }),
             }),
             { name: "agentsStore", storage: createJSONStorage(() => localStorage) }
         )

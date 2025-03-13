@@ -14,7 +14,7 @@ export const FindVulnerabilitiesAgent = (props) => {
 
     // ?? Where exactly is agent steps being used.
     // I didn't find any use case, we can remove it.
-    const { setCurrentAttempt, setCurrentSubprocess, setCurrentProcessId} = useAgentsStore();
+    const { setCurrentAttempt, setCurrentSubprocess, setCurrentProcessId, resetStore} = useAgentsStore();
 
     const getAllAgentRuns = async () => {
         try {
@@ -26,9 +26,10 @@ export const FindVulnerabilitiesAgent = (props) => {
             } else {
                 // TODO: handle cases here, because the above API only gets "RUNNING" Agents.
                 // setCurrentProcessId("")
+                resetStore();
             }
         } catch(error) {
-            
+            resetStore();
         }
     }
 
@@ -90,9 +91,9 @@ export const FindVulnerabilitiesAgent = (props) => {
             <VerticalStack gap="2">
                 {subprocesses.length > 0 && subprocesses.map((subprocess, index) => (
                     <Subprocess 
+                    key={subprocess.subProcessId}
                     agentId={agentId} 
                     processId={currentAgentRun?.processId || ""} 
-                    key={subprocess.subProcessId} 
                     subProcessFromProp={subprocesses[index]} 
                     finalCTAShow={finalCTAShow}
                     setFinalCTAShow={setFinalCTAShow} />

@@ -6,7 +6,7 @@ import api from "../../api";
 import { useAgentsStore } from "../../agents.store";
 import STEPS_PER_AGENT_ID from "../../constants";
 import { VerticalStack, Text } from "@shopify/polaris";
-import OutputSelector from "./OutputSelector";
+import OutputSelector, { getMessageFromObj } from "./OutputSelector";
 import { intermediateStore } from "../../intermediate.store";
 
 export const Subprocess = ({agentId, processId, subProcessFromProp, finalCTAShow, setFinalCTAShow}: {agentId: string, processId:string, subProcessFromProp: AgentSubprocess, finalCTAShow: boolean, setFinalCTAShow: (show: boolean) => void}) => {
@@ -15,6 +15,7 @@ export const Subprocess = ({agentId, processId, subProcessFromProp, finalCTAShow
 
     const {setCurrentAttempt, setCurrentSubprocess, currentSubprocess, currentAttempt, setAgentState } = useAgentsStore();
     const  { setFilteredUserInput } = intermediateStore();
+
 
     const createNewSubprocess = async (newSubIdNumber: number) => {
         let subProcess: AgentSubprocess;
@@ -38,6 +39,9 @@ export const Subprocess = ({agentId, processId, subProcessFromProp, finalCTAShow
 
     useEffect(() => {
         const fetchSubprocess = async () => {
+            // if(currentSubprocess !== subProcessFromProp.subProcessId){
+            //     return;
+            // }
             const response = await api.getSubProcess({
                 processId: processId,
                 subProcessId: currentSubprocess,
@@ -45,7 +49,6 @@ export const Subprocess = ({agentId, processId, subProcessFromProp, finalCTAShow
             });
             let subProcess = response.subprocess as AgentSubprocess;
             let agentRun = response.agentRun as AgentRun
-            let inputAcknowledged = response.inputAcknowledged as boolean;
 
             if(subProcess !== null && subProcess.state === State.RUNNING) {
                 setAgentState("thinking")
@@ -68,6 +71,7 @@ export const Subprocess = ({agentId, processId, subProcessFromProp, finalCTAShow
                 } else {
                     // create new subprocess without retry attempt now
                     subProcess = await createNewSubprocess(newSubIdNumber);
+                    setSubprocess(subProcess);
                 }
             }
 
@@ -77,19 +81,42 @@ export const Subprocess = ({agentId, processId, subProcessFromProp, finalCTAShow
             */ 
             if(subProcess !== null && subProcess.state === State.COMPLETED) {
                 setAgentState("paused")
+                const allowMultiple = subProcess.processOutput?.selectionType === "multiple"
+                const initialValue = !allowMultiple ?
+                    getMessageFromObj(subProcess.processOutput?.outputOptions[0], "textValue") :
+                    subProcess.processOutput?.outputOptions.map((option: any) => (option.value !== undefined ? option.value : option));
+                
+                    // set filtered input default here if needed
             }
 
             /*
-            DISCARDED => discarded by the user.
+            DISCARDED => discarded by the user => hence re-attempting the whole subprocess.
             */
-            if(subProcess !== null && subProcess.state === State.DISCARDED) {
-                if(inputAcknowledged){
-                    const newSubIdNumber = Number(currentSubprocess) + 1;
-                    subProcess = await createNewSubprocess(newSubIdNumber);
-                }
+            if(subProcess !== null && subProcess.state === State.RE_ATTEMPT) {
+                const tempRes = await api.updateAgentSubprocess({
+                    processId: processId,
+                    subProcessId: currentSubprocess,
+                    attemptId: currentAttempt + 1
+                });
+                subProcess = tempRes.subprocess as AgentSubprocess;
+                setSubprocess(subProcess);
+                setCurrentAttempt(currentAttempt + 1);
+                setAgentState("thinking")
             }
+
+            if(subProcess !== null && subProcess.state === State.AGENT_ACKNOWLEDGED) {
+                subProcess = await createNewSubprocess(Number(currentSubprocess) + 1);
+                setFilteredUserInput(null);
+                setSubprocess(subProcess);
+            }
+
             if(subProcess !== null) {
                 setSubprocess(subProcess);
+                if(subProcess.state === State.USER_PROVIDED_SOLUTION){
+                    // waiting for agent to acknowledge the solution that user provided.
+                    // setFilteredUserInput(null); 
+                    setAgentState("idle")
+                }
             }else{
                 setAgentState("idle")
             }
@@ -172,6 +199,5 @@ export const Subprocess = ({agentId, processId, subProcessFromProp, finalCTAShow
             <Text variant="bodyMd" as="span">{subprocess.userInput?.inputMessage}</Text>
         }
         </VerticalStack>
-        
     );
 }
