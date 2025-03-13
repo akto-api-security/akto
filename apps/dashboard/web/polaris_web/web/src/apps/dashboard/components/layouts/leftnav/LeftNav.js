@@ -1,6 +1,5 @@
 import {Navigation, Text} from "@shopify/polaris";
 import {
-    SettingsFilledMinor,
     AppsFilledMajor,
     InventoryFilledMajor,
     MarketingFilledMinor,
@@ -316,24 +315,6 @@ export default function LeftNav() {
                                 ],
                             }
                             : {},
-                    ]}
-                />
-                <Navigation.Section
-                    items={[
-                        {
-                            label: (
-                                <Text variant="bodyMd" fontWeight="medium">
-                                    Settings
-                                </Text>
-                            ),
-                            icon: SettingsFilledMinor,
-                            onClick: () => {
-                                navigate("/dashboard/settings/about");
-                                setActive("normal");
-                            },
-                            selected: currPathString === "settings",
-                            key: "7",
-                        },
                     ]}
                 />
             </Navigation>
