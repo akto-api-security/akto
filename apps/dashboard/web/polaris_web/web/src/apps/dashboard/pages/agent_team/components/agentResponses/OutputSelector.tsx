@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { HorizontalStack, Text, VerticalStack } from "@shopify/polaris"
+import { HorizontalStack, Text, TextField, VerticalStack } from "@shopify/polaris"
 import DropdownSearch from "../../../../components/shared/DropdownSearch"
 
 interface OutputSelectorProps {
@@ -7,17 +7,17 @@ interface OutputSelectorProps {
   processOutput: Record<string, any>;
 }
 
-function OutputSelector({onHandleSelect, processOutput} : OutputSelectorProps) {
-
-    const getMessageFromObj = (obj: any, key:string) => {
-        if(typeof obj === "string"){
-            return obj;
-        }else{
-            if(obj[key]){
-                return obj[key];
-            }
+export const getMessageFromObj = (obj: any, key:string) => {
+    if(typeof obj === "string"){
+        return obj;
+    }else{
+        if(obj[key]){
+            return obj[key];
         }
     }
+}
+
+function OutputSelector({onHandleSelect, processOutput} : OutputSelectorProps) {
 
     const getStringMessage = (type: string, options: any[]) =>{
         let maxOutputOptions = type === "multiple" ? 3 : 1;
@@ -30,12 +30,12 @@ function OutputSelector({onHandleSelect, processOutput} : OutputSelectorProps) {
         }
         return messageString;
     }
-    const messageString = processOutput?.outputMessage + "\n We are moving forward with the following option(s):\n" + getStringMessage(processOutput?.selectionType, processOutput?.outputOptions); 
+    const messageString = processOutput?.outputMessage + "\n We are moving forward with the following option(s):\n"; 
 
     const allowMultiple = processOutput?.selectionType === "multiple"
     const initialValue = !allowMultiple ?
-        getMessageFromObj(processOutput?.outputOptions[0], "value") :
-        processOutput?.outputOptions.map((option: any) => (option.value != undefined ? option.value : option));
+        getMessageFromObj(processOutput?.outputOptions[0], "textValue") :
+        processOutput?.outputOptions.map((option: any) => (option.value !== undefined ? option.value : option));
     const [filteredChoices, setFilteredChoices] = useState(initialValue);
     const handleSelected = (selectedChoices: any) => { 
         setFilteredChoices(selectedChoices);
@@ -47,22 +47,25 @@ function OutputSelector({onHandleSelect, processOutput} : OutputSelectorProps) {
 
     return (
         <VerticalStack gap={"3"}>
-            <Text variant="bodyMd" as="span">{messageString}</Text>
+            <VerticalStack gap={"1"}>
+                <Text variant="bodyMd" as="span">{messageString}</Text>
+                <Text variant="headingSm" color="subdued"  as="span">{getStringMessage(processOutput?.selectionType, processOutput?.outputOptions)}</Text>
+            </VerticalStack>
             <HorizontalStack gap={"2"}>
                 <Text variant="bodyMd" as="span">For editing or more info: </Text>
-                <DropdownSearch
+                {processOutput?.outputOptions.length > 1 ? <DropdownSearch
                     allowMultiple={allowMultiple}
                     optionsList={processOutput?.outputOptions.map((option: any) => {
                         return {
-                            label: option.textValue!=undefined ? option?.textValue : option,
-                            value: option.value!=undefined ? option.value : option,
+                            label: option.textValue!==undefined ? option?.textValue : option,
+                            value: option.value!==undefined ? option.value : option,
                         }
                     })}
                     placeHolder={"Edit choice(s)"}
-                    setSelected={(selectedChoices) => handleSelected(selectedChoices)}
+                    setSelected={(selectedChoices: any) => handleSelected(selectedChoices)}
                     preSelected={filteredChoices}
-                    value={`${filteredChoices.length} choice${filteredChoices.length==1 ? "" : "s"} selected`}
-                />
+                    value={processOutput?.selectedType === 'multiple' ?`${filteredChoices.length} choice${filteredChoices.length===1 ? "" : "s"} selected` : filteredChoices}
+                /> : <TextField labelHidden={true} label="" autoComplete="off" value={filteredChoices as string} onChange={(val:string) => setFilteredChoices(val)}/>}
             </HorizontalStack>
 
         </VerticalStack>

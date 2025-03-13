@@ -9,6 +9,7 @@ import SensitiveDataAgentInitializer from './SensitiveDataAgentInitializer';
 import FlyLayout from '../../../components/layouts/FlyLayout';
 import SensitiveDataTypeCTA from './finalctas/SensitiveDataTypeCTA';
 import ApiGroupAgentInitializer from './ApiGroupAgentInitializer';
+import { useAgentsStore } from '../agents.store';
 
 interface AgentWindowProps {
     agent: Agent | null;
@@ -19,13 +20,14 @@ interface AgentWindowProps {
 function AgentWindow({ agent, onClose, open }: AgentWindowProps) {
 
     const [finalCTAShow, setFinalCTAShow] = useState(false)
+    const { currentProcessId } = useAgentsStore()
 
     const renderAgentWindow = () => {
         switch (agent?.id) {
             case 'FIND_VULNERABILITIES_FROM_SOURCE_CODE':
                 return (
                     <VerticalStack gap={"4"}>
-                        <RepositoryInitializer agentType={agent.id}/>
+                        {(currentProcessId === null || currentProcessId.length === 0) ? <RepositoryInitializer agentType={agent.id}/> : null}
                         <FindVulnerabilitiesAgent agentId={agent.id} finalCTAShow={finalCTAShow} setFinalCTAShow={setFinalCTAShow}/>
                     </VerticalStack>
                 )
@@ -72,7 +74,7 @@ function AgentWindow({ agent, onClose, open }: AgentWindowProps) {
                     </div>
                 </Scrollable>
             </div>
-            <PromptComposer onSend={console.log} />
+            <PromptComposer agentId ={agent?.id} onSend={console.log} />
         </div>
     </div >]
 

@@ -328,13 +328,18 @@ public class AgentAction extends UserAction {
 
             case "stateChange":
                 State state = State.valueOf(this.state);
+
+                Bson update = Updates.set(AgentSubProcessSingleAttempt._STATE, state);
+                if(this.data != null && !this.data.isEmpty()){
+                    update = Updates.combine(
+                        update,
+                        Updates.set(AgentSubProcessSingleAttempt.PROCESS_OUTPUT, this.data)
+                    );
+                }
                 try {
                     AgentSubProcessSingleAttemptDao.instance.updateOne(
                         filter,
-                        Updates.combine(
-                            Updates.set(AgentSubProcessSingleAttempt._STATE, state),
-                            Updates.set(AgentSubProcessSingleAttempt.PROCESS_OUTPUT, this.data)
-                        )
+                        update
                     );
                 } catch (Exception e) {
                     e.printStackTrace();
