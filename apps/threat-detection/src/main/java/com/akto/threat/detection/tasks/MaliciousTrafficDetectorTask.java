@@ -130,6 +130,7 @@ public class MaliciousTrafficDetectorTask implements Task {
 
     List<YamlTemplate> templates = dataActor.fetchFilterYamlTemplates();
     apiFilters = FilterYamlTemplateDao.fetchFilterConfig(false, templates, false);
+    System.out.println("total filters fetched " + apiFilters.size());
     this.filterLastUpdatedAt = now;
     return apiFilters;
   }
@@ -180,7 +181,13 @@ public class MaliciousTrafficDetectorTask implements Task {
         URLMethods.Method.fromString(responseParam.getRequestParams().getMethod());
     ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(apiCollectionId, url, method);
 
+    int cnt = 0;
     for (FilterConfig apiFilter : apiFilters.values()) {
+      cnt++;
+      if (cnt > 3) {
+        System.out.println("breaking out of loop");
+        break;
+      }
       String severity = apiFilter.getInfo().getSeverity();
       boolean hasPassedFilter = validateFilterForRequest(apiFilter, rawApi, apiInfoKey, message);
 
