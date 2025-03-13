@@ -21,6 +21,7 @@ import com.akto.proto.generated.threat_detection.message.malicious_event.v1.Mali
 import com.akto.proto.generated.threat_detection.message.sample_request.v1.SampleMaliciousRequest;
 import com.akto.proto.generated.threat_detection.message.sample_request.v1.SampleRequestKafkaEnvelope;
 import com.akto.proto.http_response_param.v1.HttpResponseParam;
+import com.akto.proto.http_response_param.v1.StringList;
 import com.akto.rules.TestPlugin;
 import com.akto.test_editor.execution.VariableResolver;
 import com.akto.test_editor.filter.data_operands_impl.ValidationResult;
@@ -30,6 +31,10 @@ import com.akto.threat.detection.constants.KafkaTopic;
 import com.akto.threat.detection.kafka.KafkaProtoProducer;
 import com.akto.threat.detection.smart_event_detector.window_based.WindowBasedThresholdNotifier;
 import com.akto.util.HttpRequestResponseUtils;
+import com.alibaba.fastjson2.JSONObject;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.mongodb.BasicDBObject;
+
 import io.lettuce.core.RedisClient;
 import java.time.Duration;
 import java.util.*;
@@ -56,6 +61,8 @@ public class MaliciousTrafficDetectorTask implements Task {
   private final KafkaProtoProducer internalKafka;
 
   private static final DataActor dataActor = DataActorFactory.fetchInstance();
+
+  private static final ObjectMapper objectMapper = new ObjectMapper();
 
   public MaliciousTrafficDetectorTask(
       KafkaConfig trafficConfig, KafkaConfig internalConfig, RedisClient redisClient) {
@@ -298,11 +305,12 @@ public class MaliciousTrafficDetectorTask implements Task {
 
     Map<String, List<String>> reqHeaders = (Map) httpResponseParamProto.getRequestHeadersMap();
 
-    // for (Map.Entry<String, StringList> entry :
-    // httpResponseParamProto.getRequestHeadersMap().entrySet()) {
-    //     ArrayList<String> list = new ArrayList<>(entry.getValue().getValuesList());
-    //     reqHeaders.put(entry.getKey(), list);
-    // }
+    Map<String, String> reqHeadersStr = new HashMap<>();
+
+    for (Map.Entry<String, StringList> entry :
+      httpResponseParamProto.getRequestHeadersMap().entrySet()) {
+          reqHeadersStr.put(entry.getKey(), entry.getValue().getValuesList().get(0));
+    }
 
     HttpRequestParams requestParams =
         new HttpRequestParams(
@@ -323,11 +331,56 @@ public class MaliciousTrafficDetectorTask implements Task {
 
     HttpResponseParams.Source source = HttpResponseParams.Source.valueOf(sourceStr);
     Map<String, List<String>> respHeaders = (Map) httpResponseParamProto.getResponseHeadersMap();
+    Map<String, String> respHeadersStr = new HashMap<>();
 
-    // for (Map.Entry<String, StringList> entry :
-    // httpResponseParamProto.getResponseHeadersMap().entrySet()) {
-    //   ArrayList<String> list = new ArrayList<>(entry.getValue().getValuesList());
-    //   respHeaders.put(entry.getKey(), list);
+    for (Map.Entry<String, StringList> entry :
+    httpResponseParamProto.getResponseHeadersMap().entrySet()) {
+      respHeadersStr.put(entry.getKey(), entry.getValue().getValuesList().get(0));
+    }
+
+    String reqHeaderStr2 = "";
+    try {
+      reqHeaderStr2 = objectMapper.writeValueAsString(reqHeadersStr); 
+    } catch (Exception e) {
+      // TODO: handle exception
+    }
+
+    String respHeaderStr2 = "";
+    try {
+      respHeaderStr2 = objectMapper.writeValueAsString(respHeadersStr); 
+    } catch (Exception e) {
+      // TODO: handle exception
+    }
+
+
+    BasicDBObject origObj = new BasicDBObject();
+    origObj.put("method", httpResponseParamProto.getMethod());
+    origObj.put("requestPayload", httpResponseParamProto.getRequestPayload());
+    origObj.put("responsePayload", httpResponseParamProto.getResponsePayload());
+    origObj.put("ip", httpResponseParamProto.getIp());
+    origObj.put("source", sourceStr);
+    origObj.put("type", httpResponseParamProto.getType());
+    origObj.put("akto_vxlan_id", httpResponseParamProto.getAktoVxlanId());
+    origObj.put("path", httpResponseParamProto.getPath());
+    origObj.put("requestHeaders", reqHeaderStr2);
+    origObj.put("responseHeaders", respHeaderStr2);
+    origObj.put("time", httpResponseParamProto.getTime());
+    origObj.put("akto_account_id", httpResponseParamProto.getAktoAccountId());
+    origObj.put("statusCode", httpResponseParamProto.getStatusCode());
+    origObj.put("status", httpResponseParamProto.getStatus());
+
+    String origStr = origObj.toJson();
+
+    // JSONObject json = new JSONObject(origObj);
+    // String origStr2 = json.toString();
+
+    // ObjectMapper objectMapper = new ObjectMapper();
+    // String origStr3;
+    // try {
+    //   origStr3 = objectMapper.writeValueAsString(origObj); // Ensures properly escaped JSON
+    //   System.out.println(origStr3);      
+    // } catch (Exception e) {
+    //   // TODO: handle exception
     // }
 
     return new HttpResponseParams(
@@ -341,7 +394,7 @@ public class MaliciousTrafficDetectorTask implements Task {
         httpResponseParamProto.getAktoAccountId(),
         httpResponseParamProto.getIsPending(),
         source,
-        "{\"method\":\"GET\",\"requestPayload\":\"{}\",\"responsePayload\":\"{\\\"sold\\\":7,\\\"string\\\":256,\\\"connector\\\":1,\\\"pending\\\":5,\\\"available\\\":679,\\\"verified\\\":1}\",\"ip\":\"null\",\"source\":\"HAR\",\"type\":\"HTTP/2\",\"akto_vxlan_id\":\"1661807253\",\"path\":\"https://petstore.swagger.io/v2/store/inventory?random=hehe\",\"requestHeaders\":\"{\\\"TE\\\":\\\"trailers\\\",\\\"Accept\\\":\\\"application/json\\\",\\\"User-Agent\\\":\\\"Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:95.0) Gecko/20100101 Firefox/95.0\\\",\\\"Referer\\\":\\\"https://petstore.swagger.io/\\\",\\\"Connection\\\":\\\"keep-alive\\\",\\\"Sec-Fetch-Dest\\\":\\\"empty\\\",\\\"Sec-Fetch-Site\\\":\\\"same-origin\\\",\\\"Host\\\":\\\"petstore.swagger.io\\\",\\\"Accept-Language\\\":\\\"en-US,en;q=0.5\\\",\\\"Accept-Encoding\\\":\\\"gzip, deflate, br\\\",\\\"Sec-Fetch-Mode\\\":\\\"cors\\\"}\",\"responseHeaders\":\"{\\\"date\\\":\\\"Tue, 04 Jan 2022 20:11:27 GMT\\\",\\\"access-control-allow-origin\\\":\\\"*\\\",\\\"server\\\":\\\"Jetty(9.2.9.v20150224)\\\",\\\"access-control-allow-headers\\\":\\\"Content-Type, api_key, Authorization\\\",\\\"X-Firefox-Spdy\\\":\\\"h2\\\",\\\"content-type\\\":\\\"application/json\\\",\\\"access-control-allow-methods\\\":\\\"GET, POST, DELETE, PUT\\\"}\",\"time\":\"1641327087\",\"contentType\":\"application/json\",\"akto_account_id\":\"1000000\",\"statusCode\":\"200\",\"status\":\"OK\"}",
+        origStr,
         httpResponseParamProto.getIp(),
         httpResponseParamProto.getDestIp(),
         httpResponseParamProto.getDirection());
