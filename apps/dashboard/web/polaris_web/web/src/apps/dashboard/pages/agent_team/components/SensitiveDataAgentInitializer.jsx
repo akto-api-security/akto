@@ -9,29 +9,17 @@ function SensitiveDataAgentInitializer(props) {
 
     const { agentType } = props
 
-    const [selectedCollection, setSelectedCollection] = useState(-1);
+    const [selectedCollections, setSelectedCollections] = useState([]);
     const allCollections = PersistStore(state => state.allCollections)
+    const optionsList = allCollections.filter(x => !x.deactivated).map((x) => {
+        return {
+            label: x.displayName,
+            value: x.id,
+        }
+    })
 
-    function CollectionDropDown() {
-        return (<DropdownSearch
-            placeholder="Select collections"
-            optionsList={
-                allCollections.filter(x => !x.deactivated).map((x) => {
-                    return {
-                        label: x.displayName,
-                        value: x.id,
-                    }
-                })
-            }
-            setSelected={(x) => {
-                setSelectedCollection(x);
-            }}
-            value={selectedCollection !== -1 ? allCollections.filter(x => x.id === selectedCollection)[0].displayName : "Select collections"}
-        />)
-    }
-
-    async function startSensitiveDataAgent(collectionId) {
-        if (collectionId === -1) {
+    async function startSensitiveDataAgent(collectionIds) {
+        if (collectionIds.length === 0) {
             func.setToast(true, true, "Please select collections to run the agent")
             return
         }
@@ -39,14 +27,14 @@ function SensitiveDataAgentInitializer(props) {
         await agentApi.createAgentRun({
             agent: agentType,
             data: {
-                apiCollectionIds: [collectionId]
+                apiCollectionIds: collectionIds
             }
         })
         func.setToast(true, false, "Agent run scheduled")
     }
 
     function StartButton() {
-        return <Button onClick={() => startSensitiveDataAgent(selectedCollection)} >
+        return <Button onClick={() => startSensitiveDataAgent(selectedCollections)} >
             Let's start!!
         </Button>
     }
@@ -59,7 +47,14 @@ function SensitiveDataAgentInitializer(props) {
                         Hey! Let's select an API collection to run the sensitive data type scanner on.
                     </Text>
                     <Box width='350px' paddingInlineStart={"2"}>
-                        <CollectionDropDown />
+                        <DropdownSearch
+                            placeholder={"Select collections"}
+                            allowMultiple
+                            optionsList={optionsList}
+                            setSelected={setSelectedCollections}
+                            preSelected={selectedCollections}
+                            value={`${selectedCollections.length} collections selected`}
+                        />
                     </Box>
                     <StartButton />
                 </VerticalStack>

@@ -8,6 +8,7 @@ import RepositoryInitializer from './RepositoryInitializer';
 import SensitiveDataAgentInitializer from './SensitiveDataAgentInitializer';
 import FlyLayout from '../../../components/layouts/FlyLayout';
 import SensitiveDataTypeCTA from './finalctas/SensitiveDataTypeCTA';
+import ApiGroupAgentInitializer from './ApiGroupAgentInitializer';
 
 interface AgentWindowProps {
     agent: Agent | null;
@@ -32,6 +33,13 @@ function AgentWindow({ agent, onClose, open }: AgentWindowProps) {
                 return (
                     <VerticalStack gap={"4"}>
                         <SensitiveDataAgentInitializer agentType={agent.id}/>
+                        <FindVulnerabilitiesAgent agentId={agent.id} finalCTAShow={finalCTAShow} setFinalCTAShow={setFinalCTAShow}/>
+                    </VerticalStack>
+                )
+            case 'GROUP_API':
+                return(
+                    <VerticalStack gap={"4"}>
+                        <ApiGroupAgentInitializer agentType={agent.id}/>
                         <FindVulnerabilitiesAgent agentId={agent.id} finalCTAShow={finalCTAShow} setFinalCTAShow={setFinalCTAShow}/>
                     </VerticalStack>
                 )
