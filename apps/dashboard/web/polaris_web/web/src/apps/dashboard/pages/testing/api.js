@@ -68,13 +68,22 @@ export default {
         })
         return resp        
     },
-    async rerunTest(testingRunHexId){
+    async rerunTest(testingRunHexId, selectedTestRunForRerun, testingRunResultSummaryHexId ){
+        if (selectedTestRunForRerun === []) {
+            const resp = await request({
+                url: '/api/startTest',
+                method: 'post',
+                data: { testingRunHexId }
+            })
+            return resp        
+        }
+        let selectedTestRunResultHexIds = selectedTestRunForRerun
         const resp = await request({
             url: '/api/startTest',
             method: 'post',
-            data: { testingRunHexId }
+            data: { testingRunHexId, testingRunResultSummaryHexId,  selectedTestRunResultHexIds}
         })
-        return resp        
+        return resp
     },
     fetchAffectedEndpoints (issueId) {
         return request({
