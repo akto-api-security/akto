@@ -1707,7 +1707,7 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
       return true;
     }
     const userRole = window.USER_ROLE
-    return !(userRole === "GUEST" || userRole === "MEMBER")
+    return !(userRole === "GUEST" || userRole === "DEVELOPER")
   },
   capitalizeFirstLetter(str) {
     if (!str) return str;
@@ -1838,17 +1838,17 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
     return date.getTime();
 },
 
-  prettifyFutureEpoch(epoch) {
+  prettifyFutureEpoch(epoch, testsPage=false) {
       if (!epoch) return "Never";
       
       const now = Math.floor(Date.now() / 1000);
       const diffSeconds = epoch - now;
       
       if (diffSeconds < 0){
-        if(diffSeconds < -86400){
+        if(diffSeconds < -86400 || testsPage){
           return this.prettifyEpoch(epoch);
         } else {
-          return "Now";
+          return "now";
         }
       }
       
