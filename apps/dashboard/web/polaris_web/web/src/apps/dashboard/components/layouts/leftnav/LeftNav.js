@@ -1,4 +1,4 @@
-import {Navigation, Text, Modal, TextField, ActionList, Select, VerticalStack} from "@shopify/polaris";
+import {Box, Navigation, Text} from "@shopify/polaris";
 import {
     SettingsFilledMinor,
     AppsFilledMajor,
@@ -17,6 +17,7 @@ import Store from "../../../store";
 import api from "../../../../signup/api";
 import {useState} from "react";
 import func from "@/util/func";
+import Dropdown from "../Dropdown";
 
 export default function LeftNav() {
     const navigate = useNavigate();
@@ -79,14 +80,16 @@ export default function LeftNav() {
                 <Navigation.Section
                     items={[
                         {
-                            label: (window.IS_SAAS === "true" || window?.DASHBOARD_MODE === "ON_PREM") ? (
-                                <div className="account-selector-wrapper">
-                                    <Select
-                                        options={accountOptions}
-                                        onChange={handleAccountChange}
-                                        value={activeAccount?.toString()}
+                            label: (!func.checkLocal()) ? (
+                                <Box paddingBlockEnd={"2"}>
+                                    <Dropdown
+                                        id={`select-account`}
+                                        menuItems={accountOptions}
+                                        initial={() => accounts[activeAccount]}
+                                        selected={(type) => handleAccountChange(type)}
                                     />
-                                </div>
+                                </Box>
+
                             ) : null
                         },
                         {

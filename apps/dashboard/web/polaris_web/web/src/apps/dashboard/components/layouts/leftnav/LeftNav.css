@@ -13,36 +13,8 @@
     width: 0.1875rem !important;
 }
 
-/* Account selector styles */
-.account-selector-wrapper {
-    padding: 0;
-    margin-bottom: 0.5rem;
-}
-
-.account-selector-wrapper .Polaris-Select {
-    width: 100%;
-}
-
-/* Remove hover background from account selector */
-.account-selector-wrapper:hover {
-    background: none !important;
-}
-
-.account-selector-wrapper .Polaris-Select__Content:hover {
-    background: none !important;
-}
-
-/* Remove hover from parent navigation item */
-.account-selector-wrapper:parent {
-    background: none !important;
-}
-
-.Polaris-Navigation__Item:has(.account-selector-wrapper):hover {
-    background: none !important;
-}
-
 /* Fix navigation height and scrolling */
 .Polaris-Navigation {
     height: calc(100% - 70px);
-    overflow-y: auto;
+    overflow-y: hidden !important;
 }
