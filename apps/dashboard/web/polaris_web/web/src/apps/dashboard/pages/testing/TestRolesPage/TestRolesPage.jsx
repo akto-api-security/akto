@@ -73,12 +73,10 @@ function TestRolesPage(){
         navigate("details")
     }
 
-    const deleteTestRole = async (item,e) => {
-        if(e.stopPropagation) e.stopPropagation()
-        await api.deleteTestRole(item.name)
-        setLoading(true)
-        fetchData()
-        func.setToast(true, false, "Test role has been deleted successfully.")
+    const deleteTestRole = async (item, e) => {
+        if (e.stopPropagation) e.stopPropagation()
+        const message = "Are you sure you want to delete this role? This action cannot be undone."
+        func.showConfirmationModal(message, "Delete test role", async () => { await api.deleteTestRole(item.name); setLoading(true); fetchData(); func.setToast(true, false, "Test role has been deleted successfully.") })
     }
 
     const handleAccessMatrix = (item) => {
