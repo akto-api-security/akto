@@ -11,7 +11,9 @@ public enum Agent {
     CREATE_TEST_TEMPLATES("Edward", "Test template creator",
             "An intelligent member that creates test templates specific to your APIs"),
     GROUP_APIS("Suzy", "API grouping tool",
-            "An intelligent member that groups your APIs based on their probable services");
+            "An intelligent member that groups your APIs based on their probable services"),
+    FIND_FALSE_POSITIVE("Lizzie", "Test false positive finder",
+            "An intelligent member that finds false positives in your test results");
 
     private final String agentEnglishName;
 

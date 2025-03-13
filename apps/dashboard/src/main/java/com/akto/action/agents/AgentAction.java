@@ -16,6 +16,7 @@ import com.akto.dao.agents.AgentRunDao;
 import com.akto.dao.agents.AgentSubProcessSingleAttemptDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.agents.*;
+import com.amazonaws.util.StringUtils;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
@@ -31,6 +32,9 @@ public class AgentAction extends UserAction {
 
     public String getAllAgentRuns() {
         Bson filter = Filters.eq(AgentRun._STATE, State.RUNNING);
+        if(!StringUtils.isNullOrEmpty(this.agent)){
+            filter = Filters.and(filter, Filters.eq("agent", agent));
+        }
         agentRuns = AgentRunDao.instance.findAll(filter);
         return Action.SUCCESS.toUpperCase();
     }
@@ -57,7 +61,7 @@ public class AgentAction extends UserAction {
             return Action.ERROR.toUpperCase();
         }
 
-        AgentRun existingScheduledOrRunningRuns = AgentRunDao.instance.findOne(Filters.nin(
+        AgentRun existingScheduledOrRunningRuns = AgentRunDao.instance.findOne(Filters.in(
                 AgentRun._STATE, Arrays.asList(State.SCHEDULED, State.RUNNING)));
 
         if (existingScheduledOrRunningRuns != null) {
@@ -89,8 +93,28 @@ public class AgentAction extends UserAction {
                     e.printStackTrace();
                 }
             }
-        }, 5000 , TimeUnit.SECONDS);
+        }, 5 , TimeUnit.SECONDS);
 
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String updateAgentRun() {
+        State updatedState = null;
+        try {
+            updatedState = State.valueOf(state);
+        } catch (Exception e) {
+        }
+
+        if (updatedState != null) {
+            List<Bson> updates = new ArrayList<>();
+            updates.add(Updates.set(AgentRun._STATE, updatedState));
+            if (updatedState.equals(State.COMPLETED)) {
+                updates.add(Updates.set(AgentRun.END_TIMESTAMP, Context.now()));
+            }
+            AgentRunDao.instance.updateOne(
+                    Filters.eq(AgentRun.PROCESS_ID, processId),
+                    Updates.combine(updates));
+        }
         return Action.SUCCESS.toUpperCase();
     }
 
@@ -189,7 +213,6 @@ public class AgentAction extends UserAction {
         List<Bson> updates = new ArrayList<>();
 
         updates.add(Updates.setOnInsert(AgentSubProcessSingleAttempt.CREATED_TIMESTAMP, Context.now()));
-        updates.add(Updates.setOnInsert(AgentSubProcessSingleAttempt._STATE, State.SCHEDULED));
 
         State updatedState = null;
         try {
@@ -205,12 +228,20 @@ public class AgentAction extends UserAction {
             }
 
             if (State.COMPLETED.equals(subProcess.getState())
-                    && (State.ACCEPTED.equals(updatedState) || State.DISCARDED.equals(updatedState))) {
+                    && (State.ACCEPTED.equals(updatedState) ||
+                            State.DISCARDED.equals(updatedState) ||
+                            State.USER_PROVIDED_SOLUTION.equals(updatedState) ||
+                            State.RE_ATTEMPT.equals(updatedState))) {
                 updates.add(Updates.set(AgentSubProcessSingleAttempt._STATE, updatedState));
+
             } else {
                 addActionError("Invalid state");
                 return Action.ERROR.toUpperCase();
             }
+
+            // TODO: handle more state conditions
+        }else {
+            updates.add(Updates.setOnInsert(AgentSubProcessSingleAttempt._STATE, State.SCHEDULED));
         }
 
         /*
@@ -228,6 +259,16 @@ public class AgentAction extends UserAction {
         subprocess = AgentSubProcessSingleAttemptDao.instance.updateOne(filter, Updates.combine(updates));
 
         return Action.SUCCESS.toUpperCase();
+    }
+
+    String subProcessHeading;
+
+    public String getSubProcessHeading() {
+        return subProcessHeading;
+    }
+
+    public void setSubProcessHeading(String subProcessHeading) {
+        this.subProcessHeading = subProcessHeading;
     }
 
     BasicDBObject response;
@@ -287,20 +328,30 @@ public class AgentAction extends UserAction {
 
             case "stateChange":
                 State state = State.valueOf(this.state);
+
+                Bson update = Updates.set(AgentSubProcessSingleAttempt._STATE, state);
+                if(this.data != null && !this.data.isEmpty()){
+                    update = Updates.combine(
+                        update,
+                        Updates.set(AgentSubProcessSingleAttempt.PROCESS_OUTPUT, this.data)
+                    );
+                }
                 try {
                     AgentSubProcessSingleAttemptDao.instance.updateOne(
                         filter,
-                        Updates.combine(
-                            Updates.set(AgentSubProcessSingleAttempt._STATE, state),
-                            Updates.set(AgentSubProcessSingleAttempt.PROCESS_OUTPUT, this.data)
-                        )
+                        update
                     );
                 } catch (Exception e) {
                     e.printStackTrace();
                     return ERROR.toUpperCase();
                 }
                 break;
-        
+            case "subProcessHeading":
+            AgentSubProcessSingleAttemptDao.instance.updateOne(
+                filter,
+                Updates.set(AgentSubProcessSingleAttempt.SUB_PROCESS_HEADING, subProcessHeading)
+            );
+            break;
             default:
                 break;
         }

@@ -47,13 +47,21 @@ const api = {
         })
     },
 
-    getAllAgentRuns: async () => {
+    getAllAgentRuns: async (agent) => {
         return await request({
             url: '/api/getAllAgentRuns',
             method: 'post',
-            data: {}
+            data: {agent}
         })
-    }
+    },
+
+    updateAgentRun: async (data) => {
+        return await request({
+            url: '/api/updateAgentRun',
+            method: 'post',
+            data: data 
+        })
+    },
 }
 
 export default api;
