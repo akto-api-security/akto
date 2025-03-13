@@ -75,7 +75,7 @@ function TestRolesPage(){
 
     const deleteTestRole = async (item, e) => {
         if (e.stopPropagation) e.stopPropagation()
-        const message = "Are you sure you want to delete this role? This action cannot be undone."
+        const message = `This will permanently delete the ${item?.name||""} role. Do you want to continue?`
         func.showConfirmationModal(message, "Delete test role", async () => { await api.deleteTestRole(item.name); setLoading(true); fetchData(); func.setToast(true, false, "Test role has been deleted successfully.") })
     }
 

@@ -30,6 +30,12 @@ function ConfirmationModal(props) {
                     closeModal()
                 }
             }}
+            secondaryActions={[
+                {
+                    content: 'Cancel',
+                    onAction: () => closeModal()
+                }
+            ]}
         >
             <Modal.Section>
                 <Text>{modalContent}</Text>
