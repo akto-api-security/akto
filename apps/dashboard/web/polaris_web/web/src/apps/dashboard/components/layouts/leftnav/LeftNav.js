@@ -1,4 +1,4 @@
-import {Navigation, Text} from "@shopify/polaris";
+import {Box, Navigation, Text} from "@shopify/polaris";
 import {
     AppsFilledMajor,
     InventoryFilledMajor,
@@ -11,8 +11,12 @@ import {useLocation, useNavigate} from "react-router-dom";
 
 import "./LeftNav.css";
 import PersistStore from "../../../../main/PersistStore";
+import LocalStore from "../../../../main/LocalStorageStore";
+import Store from "../../../store";
+import api from "../../../../signup/api";
 import {useState} from "react";
 import func from "@/util/func";
+import Dropdown from "../Dropdown";
 
 export default function LeftNav() {
     const navigate = useNavigate();
@@ -23,10 +27,27 @@ export default function LeftNav() {
 
     const active = PersistStore((state) => state.active);
     const setActive = PersistStore((state) => state.setActive);
+    const accounts = Store(state => state.accounts) || {};
+    const activeAccount = Store(state => state.activeAccount);
+    const resetAll = PersistStore(state => state.resetAll);
+    const resetStore = LocalStore(state => state.resetStore);
 
     const handleSelect = (selectedId) => {
         setLeftNavSelected(selectedId);
     };
+
+    const handleAccountChange = async (selected) => {
+        await api.goToAccount(selected);
+        func.setToast(true, false, `Switched to account ${accounts[selected]}`);
+        resetAll();
+        resetStore();
+        window.location.href = '/dashboard/observe/inventory';
+    };
+
+    const accountOptions = Object.keys(accounts).map(accountId => ({
+        label: accounts[accountId],
+        value: accountId
+    }));
 
     let reportsSubNavigationItems = [
         {
@@ -57,6 +78,19 @@ export default function LeftNav() {
             <Navigation location="/">
                 <Navigation.Section
                     items={[
+                        {
+                            label: (!func.checkLocal()) ? (
+                                <Box paddingBlockEnd={"2"}>
+                                    <Dropdown
+                                        id={`select-account`}
+                                        menuItems={accountOptions}
+                                        initial={() => accounts[activeAccount]}
+                                        selected={(type) => handleAccountChange(type)}
+                                    />
+                                </Box>
+
+                            ) : null
+                        },
                         {
                             label: (
                                 <Text variant="bodyMd" fontWeight="medium">
@@ -315,7 +349,7 @@ export default function LeftNav() {
                                 ],
                             }
                             : {},
-                    ]}
+                    ].filter(item => item.label !== null)}
                 />
             </Navigation>
         </div>

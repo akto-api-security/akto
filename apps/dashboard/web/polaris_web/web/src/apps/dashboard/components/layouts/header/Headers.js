@@ -35,8 +35,6 @@ export default function Header() {
 
     const username = Store((state) => state.username)
     const storeAccessToken = PersistStore(state => state.storeAccessToken)
-    const accounts = Store(state => state.accounts)
-    const activeAccount = Store(state => state.activeAccount)
     const resetAll = PersistStore(state => state.resetAll)
     const resetStore = LocalStore(state => state.resetStore)
 
@@ -86,20 +84,6 @@ export default function Header() {
         }
     }, 500);
 
-    const accountsItems = Object.keys(accounts).map(accountId => {
-        return {
-            id: accountId,
-            content: (<div style={{ color: accountId === activeAccount.toString() ? "var(--akto-primary)" :  "var(--p-text)"  }}>{accounts[accountId]}</div>),
-            onAction: async () => {
-                await api.goToAccount(accountId)
-                func.setToast(true, false, `Switched to account ${accounts[accountId]}`)
-                resetAll();
-                resetStore();
-                window.location.href = '/dashboard/observe/inventory'
-            }
-        }
-    })
-
     function createNewAccount() {
         api.saveToAccount(newAccount).then(resp => {
           setShowCreateAccount(false)
@@ -126,9 +110,6 @@ export default function Header() {
     const userMenuMarkup = (
         <TopBar.UserMenu
             actions={[
-                {
-                    items: accountsItems
-                },
                 {
                     items: [
                         (window.IS_SAAS !== "true" && (window?.DASHBOARD_MODE === 'LOCAL_DEPLOY' || window?.DASHBOARD_MODE === "ON_PREM")) ? {} :
