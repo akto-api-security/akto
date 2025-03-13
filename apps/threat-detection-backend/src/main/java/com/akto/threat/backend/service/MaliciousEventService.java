@@ -41,7 +41,7 @@ public class MaliciousEventService {
 
   public MaliciousEventService(
       KafkaConfig kafkaConfig, MongoClient mongoClient, IPLookupClient ipLookupClient) {
-    this.kafka = null;//new Kafka(kafkaConfig);
+    this.kafka = new Kafka(kafkaConfig);
     this.mongoClient = mongoClient;
     this.ipLookupClient = ipLookupClient;
   }
@@ -72,7 +72,7 @@ public class MaliciousEventService {
             .setEventType(maliciousEventType)
             .setLatestApiIp(evt.getLatestApiIp())
             .setCountry(
-                "IN")
+                this.ipLookupClient.getCountryISOCodeGivenIp(evt.getLatestApiIp()).orElse(""))
             .setCategory(evt.getCategory())
             .setSubCategory(evt.getSubCategory())
             .setRefId(refId)

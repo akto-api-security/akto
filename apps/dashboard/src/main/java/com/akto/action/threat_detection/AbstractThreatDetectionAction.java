@@ -37,6 +37,6 @@ public class AbstractThreatDetectionAction extends UserAction {
   }
 
   public String getBackendUrl() {
-    return "http://localhost:9090";//backendUrl;
+    return backendUrl;
   }
 }
