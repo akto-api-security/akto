@@ -308,10 +308,10 @@ public class MaliciousTrafficDetectorTask implements Task {
 
     Map<String, String> reqHeadersStr = new HashMap<>();
 
-    for (Map.Entry<String, StringList> entry :
-      httpResponseParamProto.getRequestHeadersMap().entrySet()) {
-          reqHeadersStr.put(entry.getKey(), entry.getValue().getValuesList().get(0));
-    }
+    // for (Map.Entry<String, StringList> entry :
+    //   httpResponseParamProto.getRequestHeadersMap().entrySet()) {
+    //       reqHeadersStr.put(entry.getKey(), entry.getValue().getValuesList().get(0));
+    // }
 
     HttpRequestParams requestParams =
         new HttpRequestParams(
@@ -334,24 +334,24 @@ public class MaliciousTrafficDetectorTask implements Task {
     Map<String, List<String>> respHeaders = (Map) httpResponseParamProto.getResponseHeadersMap();
     Map<String, String> respHeadersStr = new HashMap<>();
 
-    for (Map.Entry<String, StringList> entry :
-    httpResponseParamProto.getResponseHeadersMap().entrySet()) {
-      respHeadersStr.put(entry.getKey(), entry.getValue().getValuesList().get(0));
-    }
+    // for (Map.Entry<String, StringList> entry :
+    // httpResponseParamProto.getResponseHeadersMap().entrySet()) {
+    //   respHeadersStr.put(entry.getKey(), entry.getValue().getValuesList().get(0));
+    // }
 
     String reqHeaderStr2 = "";
-    try {
-      reqHeaderStr2 = objectMapper.writeValueAsString(reqHeadersStr); 
-    } catch (Exception e) {
-      // TODO: handle exception
-    }
+    // try {
+    //   reqHeaderStr2 = objectMapper.writeValueAsString(reqHeadersStr); 
+    // } catch (Exception e) {
+    //   // TODO: handle exception
+    // }
 
     String respHeaderStr2 = "";
-    try {
-      respHeaderStr2 = objectMapper.writeValueAsString(respHeadersStr); 
-    } catch (Exception e) {
-      // TODO: handle exception
-    }
+    // try {
+    //   respHeaderStr2 = objectMapper.writeValueAsString(respHeadersStr); 
+    // } catch (Exception e) {
+    //   // TODO: handle exception
+    // }
 
 
     BasicDBObject origObj = new BasicDBObject();
