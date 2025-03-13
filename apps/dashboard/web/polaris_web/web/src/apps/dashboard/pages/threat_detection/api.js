@@ -79,7 +79,36 @@ const threatDetectionRequests = {
             method: 'post',
             data: {refId}
         })
-    }
+    },
+    fetchCountBySeverity() {
+        return request({
+            url: '/api/fetchCountBySeverity',
+            method: 'post',
+            data: {}
+        })
+    },
+    getThreatActivityTimeline(startTs, endTs) {
+        return request({
+            url: '/api/getThreatActivityTimeline',
+            method: 'post',
+            data: {startTs, endTs}
+        })
+    },
+    getDailyThreatActorsCount(startTs, endTs) {
+        return request({
+            url: '/api/getDailyThreatActorsCount',
+            method: 'post',
+            data: {startTs, endTs}
+        })
+    },
+    fetchSensitiveParamsForEndpoints (urls) {
+        return request({
+            url: '/api/fetchSensitiveParamsForEndpoints',
+            method: 'post',
+            data: {urls}
+        }).then((resp) => {
+            return resp
+        })
+    },
 }
-
 export default threatDetectionRequests

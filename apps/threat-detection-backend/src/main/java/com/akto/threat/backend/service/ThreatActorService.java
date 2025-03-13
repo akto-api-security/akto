@@ -82,7 +82,8 @@ public class ThreatActorService {
                 .append("latestApiMethod", new Document("$last", "$latestApiMethod"))
                 .append("latestApiIp", new Document("$last", "$latestApiIp"))
                 .append("country", new Document("$last", "$country"))
-                .append("discoveredAt", new Document("$last", "$detectedAt"))));
+                .append("discoveredAt", new Document("$last", "$detectedAt"))
+                .append("latestSubCategory", new Document("$last", "$subCategory"))));
 
     List<Document> countPipeline = new ArrayList<>(base);
     countPipeline.add(new Document("$count", "total"));
@@ -129,6 +130,7 @@ public class ThreatActorService {
                 .setDiscoveredAt(doc.getLong("discoveredAt"))
                 .setCountry(doc.getString("country"))
                 .addAllActivityData(activityDataList)
+                .setLatestSubcategory(doc.getString("latestSubCategory"))
                 .build());
       }
     }

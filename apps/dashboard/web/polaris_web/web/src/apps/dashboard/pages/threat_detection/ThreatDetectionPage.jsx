@@ -1,4 +1,4 @@
-import { useReducer, useState } from "react";
+import { useReducer, useState, useEffect } from "react";
 import DateRangeFilter from "../../components/layouts/DateRangeFilter";
 import PageWithMultipleCards from "../../components/layouts/PageWithMultipleCards";
 import TitleWithInfo from "../../components/shared/TitleWithInfo";
@@ -11,7 +11,28 @@ import threatDetectionRequests from "./api";
 import PersistStore from "../../../main/PersistStore";
 import tempFunc from "./dummyData";
 import NormalSampleDetails from "./components/NormalSampleDetails";
+import { HorizontalGrid, VerticalStack } from "@shopify/polaris";
+import TopThreatTypeChart from "./components/TopThreatTypeChart";
+import api from "./api";
+import threatDetectionFunc from "./transform";
+import InfoCard from "../dashboard/new_components/InfoCard";
+import BarGraph from "../../components/charts/BarGraph";
+
+const convertToGraphData = (severityMap) => {
+    let dataArr = []
+    Object.keys(severityMap).forEach((x) => {
+        const color = func.getHexColorForSeverity(x)
+        let text = func.toSentenceCase(x)
+        const value =  severityMap[x]
+        dataArr.push({
+            text, value, color
+        })
+    })
+    return dataArr
+}
+
 function ThreatDetectionPage() {
+    const [loading, setLoading] = useState(false);
     const [currentRefId, setCurrentRefId] = useState('')
     const [rowDataList, setRowDataList] = useState([])
     const [moreInfoData, setMoreInfoData] = useState({})
@@ -20,6 +41,8 @@ function ThreatDetectionPage() {
     const [showDetails, setShowDetails] = useState(false);
     const [sampleData, setSampleData] = useState([])
     const [showNewTab, setShowNewTab] = useState(false)
+    const [subCategoryCount, setSubCategoryCount] = useState([]);
+    const [severityCountMap, setSeverityCountMap] = useState([]);
 
     const threatFiltersMap = PersistStore((state) => state.threatFiltersMap);
 
@@ -56,7 +79,73 @@ function ThreatDetectionPage() {
         
       }
 
+      const fetchCountBySeverity = async () => {
+        setLoading(true);
+        let severityMap = {
+            CRITICAL: 0,
+            HIGH: 0,
+            MEDIUM: 0,
+            LOW: 0,
+        }
+        const res = await api.fetchCountBySeverity();
+        res.categoryCounts.forEach(({ subCategory, count }) => {
+            severityMap[subCategory] = count;
+        });
+        setSeverityCountMap(convertToGraphData(severityMap));
+        setLoading(false);
+    };
+
+      useEffect(() => {
+        const fetchThreatCategoryCount = async () => {
+            setLoading(true);
+            const res = await api.fetchThreatCategoryCount();
+            const finalObj = threatDetectionFunc.getGraphsData(res);
+            setSubCategoryCount(finalObj.subCategoryCount);
+            setLoading(false);
+          };
+
+        fetchThreatCategoryCount();
+        fetchCountBySeverity();
+      }, []);
+
+      const ChartComponent = () => {
+        return (
+          <VerticalStack gap={4} columns={2}>
+            <HorizontalGrid gap={4} columns={2}>
+              <TopThreatTypeChart
+                key={"top-threat-types"}
+                data={subCategoryCount}
+              />
+              <InfoCard
+                    title={"Threats by severity"}
+                    titleToolTip={"Number of APIs per each category"}
+                    component={
+                        <BarGraph
+                            data={severityCountMap}
+                            areaFillHex="true"
+                            height={"280px"}
+                            defaultChartOptions={{
+                                "legend": {
+                                    enabled: false
+                                },
+                            }}
+                            showYAxis={true}
+                            yAxisTitle="Number of APIs"
+                            showGridLines={true}
+                            barWidth={100 - (severityCountMap.length * 6)}
+                            barGap={12}
+                        />
+                    }
+                />
+            </HorizontalGrid>
+            
+          </VerticalStack>
+        );
+      };
+
+
     const components = [
+        <ChartComponent />,
         <SusDataTable key={"sus-data-table"}
             currDateRange={currDateRange}
             rowClicked={rowClicked} 
