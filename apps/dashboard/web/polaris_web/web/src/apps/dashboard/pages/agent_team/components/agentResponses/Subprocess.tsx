@@ -14,7 +14,7 @@ export const Subprocess = ({agentId, processId, subProcessFromProp, finalCTAShow
     const [expanded, setExpanded] = useState(true);
 
     const {setCurrentAttempt, setCurrentSubprocess, currentSubprocess, currentAttempt, setAgentState } = useAgentsStore();
-    const  { setFilteredUserInput } = intermediateStore();
+    const  { setFilteredUserInput, setOutputOptions } = intermediateStore();
 
 
     const createNewSubprocess = async (newSubIdNumber: number) => {
@@ -32,8 +32,9 @@ export const Subprocess = ({agentId, processId, subProcessFromProp, finalCTAShow
         return subProcess;
     }
 
-    const handleSelect = (selectedChoices: any) => {
+    const handleSelect = (selectedChoices: any, outputOptions: any) => {
         console.log(selectedChoices);
+        setOutputOptions(outputOptions);
         setFilteredUserInput(selectedChoices);
     }
 
@@ -187,8 +188,8 @@ export const Subprocess = ({agentId, processId, subProcessFromProp, finalCTAShow
         {subprocess.state === State.COMPLETED && subprocess.processOutput !== null && 
             <OutputSelector
                 processOutput={subprocess.processOutput}
-                onHandleSelect={(selectedChoices: any) => {
-                    handleSelect(selectedChoices);
+                onHandleSelect={(selectedChoices: any, outputOptions: any) => {
+                    handleSelect(selectedChoices, outputOptions);
                 }}
             />
         }

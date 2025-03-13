@@ -27,24 +27,26 @@ function AgentWindow({ agent, onClose, open }: AgentWindowProps) {
             case 'FIND_VULNERABILITIES_FROM_SOURCE_CODE':
                 return (
                     <VerticalStack gap={"4"}>
-                        {(currentProcessId === null || currentProcessId.length === 0) ? <RepositoryInitializer agentType={agent.id}/> : null}
+                        {(currentProcessId === null || currentProcessId.length === 0) ? <RepositoryInitializer agentType={agent.id}/> : <></>}
                         <FindVulnerabilitiesAgent agentId={agent.id} finalCTAShow={finalCTAShow} setFinalCTAShow={setFinalCTAShow}/>
                     </VerticalStack>
                 )
             case 'FIND_SENSITIVE_DATA_TYPES':
                 return (
                     <VerticalStack gap={"4"}>
-                        <SensitiveDataAgentInitializer agentType={agent.id}/>
+                        {(currentProcessId === null || currentProcessId.length === 0) ? <SensitiveDataAgentInitializer agentType={agent.id}/> : <></> }
                         <FindVulnerabilitiesAgent agentId={agent.id} finalCTAShow={finalCTAShow} setFinalCTAShow={setFinalCTAShow}/>
                     </VerticalStack>
                 )
-            case 'GROUP_API':
+            case 'GROUP_APIS':
                 return(
                     <VerticalStack gap={"4"}>
-                        <ApiGroupAgentInitializer agentType={agent.id}/>
+                        {(currentProcessId === null || currentProcessId.length === 0) ? <ApiGroupAgentInitializer agentType={agent.id}/> : <></> }
                         <FindVulnerabilitiesAgent agentId={agent.id} finalCTAShow={finalCTAShow} setFinalCTAShow={setFinalCTAShow}/>
                     </VerticalStack>
                 )
+            case 'FIND_FALSE_POSITIVE':
+                return (<></>)
             default:
                 return (<></>)
         }
@@ -56,6 +58,10 @@ function AgentWindow({ agent, onClose, open }: AgentWindowProps) {
                 return (<></>)
             case 'FIND_SENSITIVE_DATA_TYPES':
                 return (<SensitiveDataTypeCTA show={finalCTAShow} setShow={setFinalCTAShow}/>)
+            case 'GROUP_APIS':
+                return (<></>)
+            case 'FIND_FALSE_POSITIVE':
+                return (<></>)
             default:
                 return (<></>)
         }

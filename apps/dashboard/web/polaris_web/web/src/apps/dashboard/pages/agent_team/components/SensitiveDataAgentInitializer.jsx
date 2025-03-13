@@ -18,7 +18,7 @@ function SensitiveDataAgentInitializer(props) {
         }
     })
 
-    async function startSensitiveDataAgent(collectionIds) {
+    async function startAgent(collectionIds) {
         if (collectionIds.length === 0) {
             func.setToast(true, true, "Please select collections to run the agent")
             return
@@ -34,7 +34,7 @@ function SensitiveDataAgentInitializer(props) {
     }
 
     function StartButton() {
-        return <Button onClick={() => startSensitiveDataAgent(selectedCollections)} >
+        return <Button onClick={() => startAgent(selectedCollections)} >
             Let's start!!
         </Button>
     }
@@ -44,7 +44,7 @@ function SensitiveDataAgentInitializer(props) {
             <Box as='div' paddingBlockStart={"5"}>
                 <VerticalStack gap={"4"}>
                     <Text as='span' variant='bodyMd'>
-                        Hey! Let's select an API collection to run the sensitive data type scanner on.
+                        Hey! Let's select API collections to run the sensitive data type scanner on.
                     </Text>
                     <Box width='350px' paddingInlineStart={"2"}>
                         <DropdownSearch

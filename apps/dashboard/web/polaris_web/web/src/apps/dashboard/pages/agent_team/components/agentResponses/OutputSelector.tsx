@@ -3,7 +3,7 @@ import { HorizontalStack, Text, TextField, VerticalStack } from "@shopify/polari
 import DropdownSearch from "../../../../components/shared/DropdownSearch"
 
 interface OutputSelectorProps {
-  onHandleSelect: (selectedChoice: any) => void;
+  onHandleSelect: (selectedChoice: any, outputOptions: any) => void;
   processOutput: Record<string, any>;
 }
 
@@ -42,7 +42,7 @@ function OutputSelector({onHandleSelect, processOutput} : OutputSelectorProps) {
     }
 
     useEffect(() => {
-        onHandleSelect(filteredChoices)
+        onHandleSelect(filteredChoices, processOutput)
     },[filteredChoices])
 
     return (
