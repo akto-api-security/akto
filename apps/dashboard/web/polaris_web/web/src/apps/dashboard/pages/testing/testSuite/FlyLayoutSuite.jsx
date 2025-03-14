@@ -341,7 +341,7 @@ function FlyLayoutSuite(props) {
     );
 
     const footer = isEditMode ? (
-        <div style={{ position: "fixed", bottom: "0", left: "0", right: "0", opacity: "1", background: "white", zIndex: 10 }}>
+        <div style={{ position: "fixed", bottom: "0", opacity: "1", background: "white", zIndex: 10, width:"50vw" }}>
             <Box borderColor="border-subdued" borderBlockStartWidth="1" padding={"4"} >
                 <HorizontalStack align="end" gap="3">
                     <Button onClick={switchMode}>Cancel</Button>
