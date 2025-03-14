@@ -104,7 +104,7 @@ function TestSuite() {
         });
 
         
-        fetchedData.forEach((testSuiteItem) => {
+        (fetchedData || []).forEach((testSuiteItem) => {
             const categoriesCoveredList = [];
             const testSet = new Set(testSuiteItem?.subCategoryList||[]);
             Object.entries(subCategoryMap).forEach(([key, value]) => {
