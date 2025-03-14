@@ -8,6 +8,8 @@ import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.Li
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListThreatApiRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatActivityTimelineRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatActorByCountryRequest;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatActorFilterRequest;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatActorFilterResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatCategoryWiseCountRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatSeverityWiseCountRequest;
 import com.akto.proto.utils.ProtoMessageUtils;
@@ -127,7 +129,17 @@ public class DashboardRouter implements ARouter {
             });
 
         router
+            .get("/fetch_filters_for_threat_actors")
+            .blockingHandler(ctx -> {
+                ProtoMessageUtils.toString(
+                    dsService.fetchThreatActorFilters(
+                        ctx.get("accountId"),
+                        ThreatActorFilterRequest.newBuilder().build()
+                    )
+                ).ifPresent(s -> ctx.response().setStatusCode(200).end(s));
+            });
 
+        router
         .get("/get_subcategory_wise_count")
             .blockingHandler(ctx -> {
                 ProtoMessageUtils.toString(

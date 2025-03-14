@@ -32,8 +32,9 @@ import PersistStore from "../../../../main/PersistStore";
         setData(activityLog);
       } else {
         setSelected(index);
-        setData(activityLog.filter(log => log.severity.toLowerCase() === item.toLowerCase()));
-      }
+        const filteredData = activityLog.filter(log => log.severity.toLowerCase() === item.toLowerCase());
+        setData(filteredData);
+      } 
     }
 
   
@@ -53,7 +54,6 @@ import PersistStore from "../../../../main/PersistStore";
     };
 
     const handleRowClick = (url) => {
-        console.log('clicked', url);
         const actorIp = actorDetails.latestApiIp;
         const tempKey = `/dashboard/protection/threat-activity/`
         let filtersMap = PersistStore.getState().filtersMap;
@@ -70,34 +70,34 @@ import PersistStore from "../../../../main/PersistStore";
   
     const rowMarkup = data.map(
       (
-        {detectedAt, subCategory, url, severity},
+        {detectedAt, subCategory, url, severity, method},
         index,
       ) => (
         <IndexTable.Row
           onClick={() => handleRowClick(url)}
-          id={detectedAt}
-          key={detectedAt}
+          id={`${detectedAt}-${index}`}
+          key={`${detectedAt}-${url}-${index}-${severity}`}
           position={index}
         >
           <IndexTable.Cell>
             <Text variant="bodyMd" fontWeight="bold" as="span">
-              {dayjs(detectedAt*1000).format('hh:mm A')}
+              {detectedAt ? dayjs(detectedAt*1000).format('hh:mm A') : "-"}
             </Text>
           </IndexTable.Cell>
           <IndexTable.Cell>
             <Text variant="bodyMd" fontWeight="medium" as="span">
-              {subCategory}
+              {subCategory || "-"}
             </Text>
           </IndexTable.Cell>
           <IndexTable.Cell>
-            <div key={severity} className={`badge-wrapper-${severity.toUpperCase()}`}>
+            {severity ? (<div key={severity} className={`badge-wrapper-${severity.toUpperCase()}`}>
               <Badge status={func.getHexColorForSeverity(severity)}>{func.toSentenceCase(severity)}</Badge>
-            </div>
+            </div>) : "-"}
           </IndexTable.Cell>
           <IndexTable.Cell>
             <GetPrettifyEndpoint
                 maxWidth={'200px'}
-                method={'GET'}
+                method={method || "GET"}
                 url={url}
                 isNew={false}
             />

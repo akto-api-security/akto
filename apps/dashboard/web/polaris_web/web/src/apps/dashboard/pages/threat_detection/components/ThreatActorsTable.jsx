@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import GithubServerTable from "../../../components/tables/GithubServerTable";
 import api from "../api";
 import { CellType } from "../../../components/tables/rows/GithubRow";
@@ -83,10 +83,10 @@ const sortOptions = [
   },
 ];
 
+let filters = [];
+
 function ThreatActorTable({ data, currDateRange, handleRowClick }) {
   const [loading, setLoading] = useState(false);
-  const [attackTypeChoices, setAttackTypeChoices] = useState([]);
-  const [countryChoices, setCountryChoices] = useState([]);
 
   const setToastConfig = Store(state => state.setToastConfig)
     const setToast = (isActive, isError, message) => {
@@ -117,11 +117,8 @@ function ThreatActorTable({ data, currDateRange, handleRowClick }) {
     let total = 0;
     let ret = [];
     try {
-      const res = await api.fetchThreatActors(skip, sort, filters.latestAttack || [], filters.country || []);
+      const res = await api.fetchThreatActors(skip, sort, filters.latestAttack || [], filters.country || [], startTimestamp, endTimestamp);
       total = res.total;
-
-      setAttackTypeChoices(Array.from(new Set(res?.actors?.map(x => x.latestAttack))));
-      setCountryChoices(Array.from(new Set(res?.actors?.map(x => x.country))));
       const allEndpoints = res?.actors?.map(x => x.latestApiEndpoint);
 
       const sensitiveDataResponse = await api.fetchSensitiveParamsForEndpoints(allEndpoints);
@@ -165,8 +162,8 @@ function ThreatActorTable({ data, currDateRange, handleRowClick }) {
             </Text>
           ) : "-",
           latestIp: x.latestApiIp || "-",
-          discoveredAt: x.discoveredAt ? dayjs(x.discoveredAt).format('YYYY-MM-DD, HH:mm:ss A') : "-",
-          sensitiveData: x.sensitiveData && x.sensitiveData.length > 0 ? observeFunc.prettifySubtypes(x.sensitiveData, false) : "-",
+          discoveredAt: x.discoveredAt ? dayjs(x.discoveredAt*1000).format('YYYY-MM-DD, HH:mm:ss A') : "-",
+          sensitiveData: sensitiveData && sensitiveData.length > 0 ? observeFunc.prettifySubtypes(sensitiveData, false) : "-",
           latestAttack: x.latestAttack || "-",
           accessType: accessTypes.length > 0 ? getAccessType(accessTypes) : "-",
           status: "Active",
@@ -182,14 +179,14 @@ function ThreatActorTable({ data, currDateRange, handleRowClick }) {
               />
             </Tooltip>
           ),
-          latestApi: x.latestApiEndpoint ? (
+          latestApi: (
             <GetPrettifyEndpoint
               maxWidth={"300px"}
               method={x.latestApiMethod}
               url={x.latestApiEndpoint}
               isNew={false}
             />
-          ) : "-",
+          ),
         };
       }));
     } catch (e) {
@@ -202,28 +199,38 @@ function ThreatActorTable({ data, currDateRange, handleRowClick }) {
 
   const key = startTimestamp + endTimestamp;
 
-  const filters = [
-    {
-      key: 'latestAttack',
-      label: 'Latest attack sub-category',
-      type: 'select',
-      choices: attackTypeChoices.map(x => ({
-        label: x,
-        value: x
-      })),
-      multiple: true
-    },
-    {
-      key: 'country',
-      label: 'Country',
-      type: 'select',
-      choices: countryChoices.map(x => ({
-        label: x,
-        value: x
-      })),
-      multiple: true
-    }
-  ]
+  async function fillFilters() {
+    const res = await api.fetchThreatActorFilters();
+    const attackTypeChoices = res?.latestAttack.map(x => ({
+      label: x,
+      value: x
+    }));
+    const countryChoices = res?.country.map(x => ({
+      label: x,
+      value: x
+    }));
+
+    filters = [
+      {
+        key: 'latestAttack',
+        label: 'Latest attack sub-category',
+        type: 'select',
+        choices: attackTypeChoices,
+        multiple: true
+      },
+      {
+        key: 'country',
+        label: 'Country',
+        type: 'select',
+        choices: countryChoices,
+        multiple: true
+      }
+    ]
+  }
+
+  useEffect(() => {
+    fillFilters();
+  }, []);
 
   return (
     <GithubServerTable

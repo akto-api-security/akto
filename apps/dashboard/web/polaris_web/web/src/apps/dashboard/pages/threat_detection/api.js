@@ -40,7 +40,7 @@ const threatDetectionRequests = {
             data: {}
         })
     },
-    fetchThreatActors(skip, sort, latestAttack, country) {
+    fetchThreatActors(skip, sort, latestAttack, country, startTs, endTs) {
         return request({
             url: '/api/fetchThreatActors',
             method: 'post',
@@ -48,7 +48,9 @@ const threatDetectionRequests = {
                 skip: skip,
                 sort: sort,
                 latestAttack: latestAttack,
-                country: country
+                country: country,
+                startTs: startTs,
+                endTs: endTs
             }
         })
     },
@@ -69,11 +71,11 @@ const threatDetectionRequests = {
             data: {}
         })
     },
-    fetchThreatCategoryCount() {
+    fetchThreatCategoryCount(startTs, endTs) {
         return request({
             url: '/api/fetchThreatCategoryCount',
-            method: 'get',
-            data: {}
+            method: 'post',
+            data: {startTs, endTs}
         })
     },
     fetchMaliciousRequest(refId){
@@ -83,11 +85,11 @@ const threatDetectionRequests = {
             data: {refId}
         })
     },
-    fetchCountBySeverity() {
+    fetchCountBySeverity(startTs, endTs) {
         return request({
             url: '/api/fetchCountBySeverity',
             method: 'post',
-            data: {}
+            data: {startTs, endTs}
         })
     },
     getThreatActivityTimeline(startTs, endTs) {
@@ -118,6 +120,13 @@ const threatDetectionRequests = {
             url: '/api/getAccessTypes',
             method: 'post',
             data: {urls}
+        })
+    },
+    fetchThreatActorFilters() {
+        return request({
+            url: '/api/fetchFiltersForThreatActors',
+            method: 'post',
+            data: {}
         })
     }
 }

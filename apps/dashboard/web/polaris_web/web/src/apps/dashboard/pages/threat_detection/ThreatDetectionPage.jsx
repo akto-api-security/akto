@@ -31,6 +31,41 @@ const convertToGraphData = (severityMap) => {
     return dataArr
 }
 
+const ChartComponent = ({ subCategoryCount, severityCountMap }) => {
+    return (
+      <VerticalStack gap={4} columns={2}>
+        <HorizontalGrid gap={4} columns={2}>
+          <TopThreatTypeChart
+            key={"top-threat-types"}
+            data={subCategoryCount}
+          />
+          <InfoCard
+                title={"Threats by severity"}
+                titleToolTip={"Number of APIs per each category"}
+                component={
+                    <BarGraph
+                        data={severityCountMap}
+                        areaFillHex="true"
+                        height={"280px"}
+                        defaultChartOptions={{
+                            "legend": {
+                                enabled: false
+                            },
+                        }}
+                        showYAxis={true}
+                        yAxisTitle="Number of APIs"
+                        showGridLines={true}
+                        barWidth={100 - (severityCountMap.length * 6)}
+                        barGap={12}
+                    />
+                }
+            />
+        </HorizontalGrid>
+        
+      </VerticalStack>
+    );
+  };
+
 function ThreatDetectionPage() {
     const [loading, setLoading] = useState(false);
     const [currentRefId, setCurrentRefId] = useState('')
@@ -45,6 +80,9 @@ function ThreatDetectionPage() {
     const [severityCountMap, setSeverityCountMap] = useState([]);
 
     const threatFiltersMap = PersistStore((state) => state.threatFiltersMap);
+
+    const startTimestamp = parseInt(currDateRange.period.since.getTime()/1000)
+    const endTimestamp = parseInt(currDateRange.period.until.getTime()/1000)
 
     const rowClicked = async(data) => {
         if(data?.refId === undefined || data?.refId.length === 0){
@@ -79,73 +117,37 @@ function ThreatDetectionPage() {
         
       }
 
-      const fetchCountBySeverity = async () => {
-        setLoading(true);
-        let severityMap = {
-            CRITICAL: 0,
-            HIGH: 0,
-            MEDIUM: 0,
-            LOW: 0,
-        }
-        const res = await api.fetchCountBySeverity();
-        res.categoryCounts.forEach(({ subCategory, count }) => {
-            severityMap[subCategory] = count;
-        });
-        setSeverityCountMap(convertToGraphData(severityMap));
-        setLoading(false);
-    };
-
       useEffect(() => {
         const fetchThreatCategoryCount = async () => {
             setLoading(true);
-            const res = await api.fetchThreatCategoryCount();
+            const res = await api.fetchThreatCategoryCount(startTimestamp, endTimestamp);
             const finalObj = threatDetectionFunc.getGraphsData(res);
             setSubCategoryCount(finalObj.subCategoryCount);
             setLoading(false);
           };
 
+          const fetchCountBySeverity = async () => {
+            setLoading(true);
+            let severityMap = {
+                CRITICAL: 0,
+                HIGH: 0,
+                MEDIUM: 0,
+                LOW: 0,
+            }
+            const res = await api.fetchCountBySeverity(startTimestamp, endTimestamp);
+            res.categoryCounts.forEach(({ subCategory, count }) => {
+                severityMap[subCategory] = count;
+            });
+            setSeverityCountMap(convertToGraphData(severityMap));
+            setLoading(false);
+        };
+
         fetchThreatCategoryCount();
         fetchCountBySeverity();
-      }, []);
-
-      const ChartComponent = () => {
-        return (
-          <VerticalStack gap={4} columns={2}>
-            <HorizontalGrid gap={4} columns={2}>
-              <TopThreatTypeChart
-                key={"top-threat-types"}
-                data={subCategoryCount}
-              />
-              <InfoCard
-                    title={"Threats by severity"}
-                    titleToolTip={"Number of APIs per each category"}
-                    component={
-                        <BarGraph
-                            data={severityCountMap}
-                            areaFillHex="true"
-                            height={"280px"}
-                            defaultChartOptions={{
-                                "legend": {
-                                    enabled: false
-                                },
-                            }}
-                            showYAxis={true}
-                            yAxisTitle="Number of APIs"
-                            showGridLines={true}
-                            barWidth={100 - (severityCountMap.length * 6)}
-                            barGap={12}
-                        />
-                    }
-                />
-            </HorizontalGrid>
-            
-          </VerticalStack>
-        );
-      };
-
+      }, [startTimestamp, endTimestamp]);
 
     const components = [
-        <ChartComponent />,
+        <ChartComponent subCategoryCount={subCategoryCount} severityCountMap={severityCountMap} />,
         <SusDataTable key={"sus-data-table"}
             currDateRange={currDateRange}
             rowClicked={rowClicked} 
