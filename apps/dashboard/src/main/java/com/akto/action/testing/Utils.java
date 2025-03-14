@@ -41,6 +41,9 @@ public class Utils {
                     break;
                 case "severityStatus":
                     filterList.add(Filters.in(TestingRunResult.TEST_RESULTS + ".0." + GenericTestResult._CONFIDENCE, value));
+                case "testFilter":
+                    filterList.add(Filters.in(TestingRunResult.TEST_SUB_TYPE, value));
+                    break;
                 default:
                     break;
             }

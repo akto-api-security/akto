@@ -18,7 +18,7 @@ import PersistStore from "../../../main/PersistStore";
 import observeFunc from "../observe/transform";
 import TooltipText from "../../components/shared/TooltipText";
 import TestingStore from "./testingStore";
-
+import IssuesCheckbox from "../issues/IssuesPage/IssuesCheckbox";
 import { CellType } from "@/apps/dashboard/components/tables/rows/GithubRow";
 import LocalStore from "../../../main/LocalStorageStore";
 
@@ -112,17 +112,13 @@ function getRuntime(scheduleTimestamp, endTimestamp, state) {
   if (status === 'RUNNING') {
     return <div data-testid="test_run_status">Currently running</div>;
   }
-  const currTime = Date.now();
+  if (status === 'SCHEDULED') {
+    return <div data-testid="test_run_status">Scheduled for {func.prettifyFutureEpoch(scheduleTimestamp, true)}</div>;
+  }
   if (endTimestamp <= 0) {
-    if (currTime > scheduleTimestamp) {
-      return <div data-testid="test_run_status">Was scheduled for {func.prettifyEpoch(scheduleTimestamp)}</div>;
-
-    } else {
-      return <div data-testid="test_run_status">Next run in {func.prettifyEpoch(scheduleTimestamp)}</div>;
-    }
+    return <div data-testid="test_run_status">Last run {func.prettifyEpoch(scheduleTimestamp)}</div>;
   }
   return <div data-testid="test_run_status">Last run {func.prettifyEpoch(endTimestamp)}</div>;
-
 }
 
 function getAlternateTestsInfo(state) {
@@ -804,26 +800,32 @@ getUrlComp(url){
   )
 },
 
-getCollapsibleRow(urls, severity){
-  const borderStyle = '4px solid ' + func.getHexColorForSeverity(severity?.toUpperCase());
-  return(
-    <tr style={{background: "#FAFBFB", borderLeft: borderStyle, padding: '0px !important', borderTop: '1px solid #dde0e4'}}>
-      <td colSpan={7} style={{padding: '0px !important'}}>
+getCollapsibleRow(urls, severity) {
+    const borderStyle = '4px solid ' + func.getHexColorForSeverity(severity?.toUpperCase());
+    return(
+      <tr style={{background: "#FAFBFB", borderLeft: borderStyle, padding: '0px !important', borderTop: '1px solid #dde0e4'}}>
+        <td colSpan={8} style={{padding: '0px !important', width: '100%'}}>
           {urls.map((ele,index)=>{
             const borderStyle = index < (urls.length - 1) ? {borderBlockEndWidth : 1} : {}
-            return( 
-              <Box padding={"2"} paddingInlineEnd={"4"} paddingInlineStart={"4"} key={index}
+            return(
+              <Box padding={"2"} paddingInlineStart={"4"} key={index}
                   borderColor="border-subdued" {...borderStyle}
+                  width="100%"
               >
-                <Link monochrome onClick={() => history.navigate(ele.nextUrl)} removeUnderline >
-                  {this.getUrlComp(ele.url)}
-                </Link>
+                <HorizontalStack gap="2" align="start" blockAlign="center">
+                  <IssuesCheckbox
+                    id={ele.testRunResultsId}
+                  />
+                  <Link monochrome onClick={() => history.navigate(ele.nextUrl)} removeUnderline >
+                    {transform.getUrlComp(ele.url)}
+                  </Link>
+                </HorizontalStack>
               </Box>
             )
           })}
-      </td>
-    </tr>
-  )
+        </td>
+      </tr>
+    )
 },
 
 getTestErrorType(message){
@@ -861,7 +863,7 @@ getPrettifiedTestRunResults(testRunResults){
             })}
           </HorizontalStack>
         )
-      }else{
+      } else{
         error_message = errorsObject[errorType]
       }
     }
@@ -869,7 +871,7 @@ getPrettifiedTestRunResults(testRunResults){
     if(testRunResultsObj.hasOwnProperty(key)){
       let endTimestamp = Math.max(test.endTimestamp, testRunResultsObj[key].endTimestamp)
       let urls = testRunResultsObj[key].urls
-      urls.push({url: test.url, nextUrl: test.nextUrl})
+      urls.push({url: test.url, nextUrl: test.nextUrl, testRunResultsId: test.id})
       let obj = {
         ...test,
         urls: urls,
@@ -881,7 +883,7 @@ getPrettifiedTestRunResults(testRunResults){
       delete obj["errorsList"]
       testRunResultsObj[key] = obj
     }else{
-      let urls = [{url: test.url, nextUrl: test.nextUrl}]
+      let urls = [{url: test.url, nextUrl: test.nextUrl, testRunResultsId: test.id}]
       let obj={
         ...test,
         urls:urls,
@@ -916,6 +918,14 @@ getPrettifiedTestRunResults(testRunResults){
     }
     prettifiedResults.push(prettifiedObj)
   })
+  for (let prettifiedObj of prettifiedResults){
+    let testingRunResultsIds = []
+    for (let url of prettifiedObj.urls) {
+      testingRunResultsIds.push(url.testRunResultsId)
+    }
+    prettifiedObj["id"] = testingRunResultsIds
+    
+  }
   return prettifiedResults
 },
 getTestingRunResultUrl(testingResult){
@@ -1019,8 +1029,8 @@ stopTest(hexId){
   });
 },
 
-rerunTest(hexId, refreshSummaries, shouldRefresh){
-  api.rerunTest(hexId).then((resp) => {
+rerunTest(hexId, refreshSummaries, shouldRefresh, selectedTestRunForRerun, testingRunResultSummaryHexId){
+  api.rerunTest(hexId, selectedTestRunForRerun, testingRunResultSummaryHexId).then((resp) => {
     window.location.reload()
     func.setToast(true, false, "Test re-run initiated")
     if(shouldRefresh){

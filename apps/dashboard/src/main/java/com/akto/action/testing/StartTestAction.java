@@ -182,6 +182,7 @@ public class StartTestAction extends UserAction {
     private List<String> selectedTests;
     private List<TestConfigsAdvancedSettings> testConfigsAdvancedSettings;
 
+    private List<String> selectedTestRunResultHexIds;
     public String startTest() {
 
         if (this.startTimestamp != 0 && this.startTimestamp + 86400 < Context.now()) {
@@ -226,11 +227,35 @@ public class StartTestAction extends UserAction {
             this.testIdConfig = 0;
         } else {
             if(this.metadata == null || this.metadata.isEmpty()){
-                TestingRunDao.instance.updateOne(
-                    Filters.eq(Constants.ID, localTestingRun.getId()),
-                    Updates.combine(
-                            Updates.set(TestingRun.STATE, TestingRun.State.SCHEDULED),
-                            Updates.set(TestingRun.SCHEDULE_TIMESTAMP, scheduleTimestamp)));
+                if (selectedTestRunResultHexIds == null || selectedTestRunResultHexIds.isEmpty()) {
+                    TestingRunDao.instance.updateOne(
+                            Filters.eq(Constants.ID, localTestingRun.getId()),
+                            Updates.combine(
+                                    Updates.set(TestingRun.STATE, TestingRun.State.SCHEDULED),
+                                    Updates.set(TestingRun.SCHEDULE_TIMESTAMP, scheduleTimestamp)));
+
+                } else {
+
+                    if (this.testingRunResultSummaryHexId != null) {
+                        List<ObjectId> testingRunResultIds = new ArrayList<>();
+                        for (String testingRunResultHexId : selectedTestRunResultHexIds) {
+                            testingRunResultIds.add(new ObjectId(testingRunResultHexId));
+                        }
+
+                        TestingRunResultDao.instance.updateManyNoUpsert(Filters.in(TestingRunResultDao.ID, testingRunResultIds),
+                                Updates.set(TestingRunResult.RERUN,true));
+
+                        TestingRunResultSummary summary = new TestingRunResultSummary(Context.now(), 0, new HashMap<>(),
+                                0, localTestingRun.getId(), localTestingRun.getId().toHexString(), 0, localTestingRun.getTestIdConfig(),0 );
+                        summary.setState(TestingRun.State.SCHEDULED);
+                        summary.setOriginalTestingRunResultSummaryId(new ObjectId(testingRunResultSummaryHexId));
+                        loggerMaker.infoAndAddToDb("Rerun test triggered at " + Context.now(), LogDb.DASHBOARD);
+
+                        InsertOneResult result = TestingRunResultSummariesDao.instance.insertOne(summary);
+                        this.testingRunResultSummaryHexId = result.getInsertedId().asObjectId().getValue().toHexString();
+                    }
+                }
+
             } else {
                 // CI-CD test.
                 /*
@@ -704,6 +729,14 @@ public class StartTestAction extends UserAction {
 
     public long getIssueslistCount() {
         return issueslistCount;
+    }
+
+    public List<String> getSelectedTestRunResultHexIds() {
+        return selectedTestRunResultHexIds;
+    }
+
+    public void setSelectedTestRunResultHexIds(List<String> selectedTestRunResultHexIds) {
+        this.selectedTestRunResultHexIds = selectedTestRunResultHexIds;
     }
 
     public enum QueryMode {
@@ -1226,7 +1259,7 @@ public class StartTestAction extends UserAction {
                     }
 
                     if (editableTestingRunConfig.getMaxConcurrentRequests() > 0
-                            && editableTestingRunConfig.getMaxConcurrentRequests() <= 100 && editableTestingRunConfig
+                            && editableTestingRunConfig.getMaxConcurrentRequests() <= 500 && editableTestingRunConfig
                                     .getMaxConcurrentRequests() != existingTestingRun.getMaxConcurrentRequests()) {
                         updates.add(Updates.set(TestingRun.MAX_CONCURRENT_REQUEST,
                                 editableTestingRunConfig.getMaxConcurrentRequests()));

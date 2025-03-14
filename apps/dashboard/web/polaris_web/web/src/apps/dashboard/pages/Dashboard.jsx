@@ -15,6 +15,7 @@ import dashboardFunc from "./transform";
 import homeRequests from "./home/api";
 import WelcomeBackDetailsModal from "../components/WelcomeBackDetailsModal";
 import useTable from "../components/tables/TableContext";
+import threatDetectionRequests from "./threat_detection/api";
 
 function Dashboard() {
 
@@ -24,6 +25,8 @@ function Dashboard() {
     const setAllCollections = PersistStore(state => state.setAllCollections)
     const setCollectionsMap = PersistStore(state => state.setCollectionsMap)
     const setHostNameMap = PersistStore(state => state.setHostNameMap)
+    const threatFiltersMap = PersistStore(state => state.threatFiltersMap);
+    const setThreatFiltersMap = PersistStore(state => state.setThreatFiltersMap);
 
     const { selectItems } = useTable()
 
@@ -63,6 +66,18 @@ function Dashboard() {
         }
     }
 
+    const fetchFilterYamlTemplates = () => {
+        threatDetectionRequests.fetchFilterYamlTemplate().then((res) => {
+            let finalMap = {}
+            res.templates.forEach((x) => {
+                let trimmed = {...x, content: '', ...x.info}
+                delete trimmed['info']
+                finalMap[x.id] = trimmed;
+            })
+            setThreatFiltersMap(finalMap)
+        })
+    }
+
     useEffect(() => {
         if(trafficAlerts == null && window.USER_NAME.length > 0 && window.USER_NAME.includes('akto.io')){
             homeRequests.getTrafficAlerts().then((resp) => {
@@ -82,6 +97,9 @@ function Dashboard() {
         }
         if (!subCategoryMap || (Object.keys(subCategoryMap).length === 0)) {
             fetchMetadata();
+        }
+        if(!threatFiltersMap && func.isDemoAccount()){
+            fetchFilterYamlTemplates()
         }
         if(window.Beamer){
             window.Beamer.init();
@@ -162,15 +180,15 @@ function Dashboard() {
         }
     };
 
-    useEffect(() => {
-        initializeTimer();
-        document.addEventListener('visibilitychange', handleVisibilityChange);
-        return () => {
-            document.removeEventListener('visibilitychange', handleVisibilityChange);
-            clearTimeout(timeoutRef.current);
-        };
+    // useEffect(() => {
+    //     initializeTimer();
+    //     document.addEventListener('visibilitychange', handleVisibilityChange);
+    //     return () => {
+    //         document.removeEventListener('visibilitychange', handleVisibilityChange);
+    //         clearTimeout(timeoutRef.current);
+    //     };
 
-    },[])
+    // },[])
 
     const shouldShowWelcomeBackModal = window.IS_SAAS === "true" && window?.USER_NAME?.length > 0 && (window?.USER_FULL_NAME?.length === 0 || (window?.USER_ROLE === 'ADMIN' && window?.ORGANIZATION_NAME?.length === 0))
 
@@ -196,7 +214,7 @@ function Dashboard() {
                         })}
                     </VerticalStack>
             </div> : null}
-            {func.checkLocal() && !(location.pathname.includes("test-editor") || location.pathname.includes("settings") || location.pathname.includes("onboarding") || location.pathname.includes("summary")) ?<div className="call-banner">
+            {func.checkLocal() && !(location.pathname.includes("test-editor") || location.pathname.includes("settings") || location.pathname.includes("onboarding") || location.pathname.includes("summary")) ?<div className="call-banner" style={{marginBottom: "1rem"}}>
                 <Banner hideIcon={true}>
                     <Text variant="headingMd">Need a 1:1 experience?</Text>
                     <Button plain monochrome onClick={() => {

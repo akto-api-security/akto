@@ -1,20 +1,22 @@
-import {Navigation, Text} from "@shopify/polaris";
+import {Box, Navigation, Text} from "@shopify/polaris";
 import {
-    SettingsFilledMinor,
     AppsFilledMajor,
     InventoryFilledMajor,
     MarketingFilledMinor,
-    FileFilledMinor,
-    AnalyticsFilledMinor,
     ReportFilledMinor,
     DiamondAlertMinor,
+    FinancesMinor,
 } from "@shopify/polaris-icons";
 import {useLocation, useNavigate} from "react-router-dom";
 
 import "./LeftNav.css";
 import PersistStore from "../../../../main/PersistStore";
+import LocalStore from "../../../../main/LocalStorageStore";
+import Store from "../../../store";
+import api from "../../../../signup/api";
 import {useState} from "react";
 import func from "@/util/func";
+import Dropdown from "../Dropdown";
 
 export default function LeftNav() {
     const navigate = useNavigate();
@@ -25,10 +27,27 @@ export default function LeftNav() {
 
     const active = PersistStore((state) => state.active);
     const setActive = PersistStore((state) => state.setActive);
+    const accounts = Store(state => state.accounts) || {};
+    const activeAccount = Store(state => state.activeAccount);
+    const resetAll = PersistStore(state => state.resetAll);
+    const resetStore = LocalStore(state => state.resetStore);
 
     const handleSelect = (selectedId) => {
         setLeftNavSelected(selectedId);
     };
+
+    const handleAccountChange = async (selected) => {
+        await api.goToAccount(selected);
+        func.setToast(true, false, `Switched to account ${accounts[selected]}`);
+        resetAll();
+        resetStore();
+        window.location.href = '/dashboard/observe/inventory';
+    };
+
+    const accountOptions = Object.keys(accounts).map(accountId => ({
+        label: accounts[accountId],
+        value: accountId
+    }));
 
     let reportsSubNavigationItems = [
         {
@@ -59,6 +78,19 @@ export default function LeftNav() {
             <Navigation location="/">
                 <Navigation.Section
                     items={[
+                        {
+                            label: (!func.checkLocal()) ? (
+                                <Box paddingBlockEnd={"2"}>
+                                    <Dropdown
+                                        id={`select-account`}
+                                        menuItems={accountOptions}
+                                        initial={() => accounts[activeAccount]}
+                                        selected={(type) => handleAccountChange(type)}
+                                    />
+                                </Box>
+
+                            ) : null
+                        },
                         {
                             label: (
                                 <Text variant="bodyMd" fontWeight="medium">
@@ -192,22 +224,52 @@ export default function LeftNav() {
                                     },
                                     selected: leftNavSelected === "dashboard_testing_user_config",
                                 },
+                                {
+                                    label:"Test Suite",
+                                    onClick:()=>{
+                                        navigate("/dashboard/testing/test-suite");
+                                        handleSelect("dashboard_testing_test_suite");
+                                        setActive("active");
+                                    },
+                                    selected: leftNavSelected === "dashboard_testing_test_suite",
+                                }
                             ],
                             key: "4",
                         },
                         {
+                            url: "#",
                             label: (
                                 <Text variant="bodyMd" fontWeight="medium">
-                                    Test Editor
+                                    Test library
                                 </Text>
                             ),
-                            icon: FileFilledMinor,
+                            icon: FinancesMinor,
                             onClick: () => {
-                                handleSelect("dashboard_test_editor");
-                                navigate("/dashboard/test-editor/REMOVE_TOKENS");
+                                handleSelect("dashboard_test_library_tests");
+                                navigate("/dashboard/test-library/tests");
                                 setActive("normal");
                             },
-                            selected: leftNavSelected.includes("dashboard_test_editor"),
+                            selected: leftNavSelected.includes("_test_library"),
+                            subNavigationItems: [
+                                {
+                                    label: "Tests",
+                                    onClick: () => {
+                                        navigate("/dashboard/test-library/tests");
+                                        handleSelect("dashboard_test_library_tests");
+                                        setActive("active");
+                                    },
+                                    selected: leftNavSelected === "dashboard_test_library_tests",
+                                },
+                                {
+                                    label: "Editor",
+                                    onClick: () => {
+                                        navigate("/dashboard/test-editor");
+                                        handleSelect("dashboard_test_library_test_editor");
+                                        setActive("active");
+                                    },
+                                    selected: leftNavSelected === "dashboard_test_library_test_editor",
+                                },
+                            ],
                             key: "5",
                         },
                         {
@@ -237,8 +299,8 @@ export default function LeftNav() {
                             subNavigationItems: reportsSubNavigationItems,
                             key: "6",
                         },
-                        window?.STIGG_FEATURE_WISE_ALLOWED?.THREAT_DETECTION?.isGranted
-                            ? {
+                        window?.STIGG_FEATURE_WISE_ALLOWED?.THREAT_DETECTION?.isGranted ?
+                             {
                                 label: (
                                     <Text variant="bodyMd" fontWeight="medium">
                                         API Protection
@@ -296,25 +358,7 @@ export default function LeftNav() {
                                 ],
                             }
                             : {},
-                    ]}
-                />
-                <Navigation.Section
-                    items={[
-                        {
-                            label: (
-                                <Text variant="bodyMd" fontWeight="medium">
-                                    Settings
-                                </Text>
-                            ),
-                            icon: SettingsFilledMinor,
-                            onClick: () => {
-                                navigate("/dashboard/settings/about");
-                                setActive("normal");
-                            },
-                            selected: currPathString === "settings",
-                            key: "7",
-                        },
-                    ]}
+                    ].filter(item => item.label !== null)}
                 />
             </Navigation>
         </div>

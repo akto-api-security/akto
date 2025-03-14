@@ -1,12 +1,13 @@
 import { Button, HorizontalStack, Text, VerticalStack, Box, Spinner, Divider, Scrollable } from "@shopify/polaris"
 import {
-    CancelMajor
+    CancelMajor,
+    EditMinor
 } from '@shopify/polaris-icons';
 import "./style.css"
 
 function FlyLayout(props) {
 
-    const { title, titleComp,  show, setShow, components,loading, showDivider, newComp, handleClose, isHandleClose, width} = props
+    const { title, titleComp,  show, setShow, components,loading, showDivider, newComp, handleClose, isHandleClose, width, variant = "default"} = props
     const handleExit = () => {
         setShow(!show)
         if(isHandleClose){
@@ -14,6 +15,7 @@ function FlyLayout(props) {
         }
     }
     const divWidth = width || "50vw";
+    const scrollableHeight = variant === "testSuiteFlyout" ? "calc(100vh - 106px)"  : "92vh";
     return (
         <div className={"flyLayout " + (show ? "show" : "")} style={{width: divWidth}}>
             <div className="innerFlyLayout">
@@ -30,7 +32,7 @@ function FlyLayout(props) {
                                 <Button icon={CancelMajor} onClick={() => { handleExit()}} plain></Button>
                             </HorizontalStack>
                         </Box>
-                        <Scrollable style={{ height: "92vh" }} shadow>
+                        <Scrollable style={{ height: scrollableHeight}} >
                         <Box paddingBlockEnd={"20"}>
                         <VerticalStack>
                         {
@@ -54,6 +56,7 @@ function FlyLayout(props) {
                         </VerticalStack>
                         </Box>
                         </Scrollable>
+                        
                     </VerticalStack>
                     }
                 </Box>      

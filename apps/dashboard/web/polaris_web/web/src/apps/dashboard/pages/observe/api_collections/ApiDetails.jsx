@@ -262,6 +262,7 @@ function ApiDetails(props) {
                     filtered={true}
                     useLocalSubCategoryData={useLocalSubCategoryData}
                     preActivator={false}
+                    disabled={window.USER_ROLE === "GUEST"}
                 />
                 <Box>
                     <Tooltip content="Open URL in test editor" dismissOnMouseOut>

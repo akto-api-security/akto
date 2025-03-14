@@ -13,7 +13,7 @@ import {
   Text,
   Link} from '@shopify/polaris';
 import { GithubRow} from './rows/GithubRow';
-import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import "./style.css"
 import transform from '../../pages/observe/transform';
 import DropdownSearch from '../shared/DropdownSearch';
@@ -24,6 +24,7 @@ import { debounce } from 'lodash';
 
 import { useSearchParams } from 'react-router-dom';
 import TableStore from './TableStore';
+import func from '../../../../util/func';
 
 function GithubServerTable(props) {
 
@@ -42,6 +43,8 @@ function GithubServerTable(props) {
   const setTableSelectedMap = PersistStore(state => state.setTableSelectedTab)
   const currentPageKey = props?.filterStateUrl || (window.location.pathname + "/" +  window.location.hash)
   const pageFiltersMap = filtersMap[currentPageKey];
+
+  const abortControllerRef = useRef(null);
 
   const { selectedItems, selectItems, applyFilter } = useTable();
 
@@ -103,10 +106,13 @@ function GithubServerTable(props) {
       queryFilters = tableFunc.getFiltersMapFromUrl(decodeURIComponent(searchParams.get("filters") || ""), props?.disambiguateLabel, handleRemoveAppliedFilter, currentPageKey)
     }
     const currentFilters = tableFunc.mergeFilters(queryFilters,initialStateFilters,props?.disambiguateLabel, handleRemoveAppliedFilter)
-    if(currentPageKey.includes('threat-activity') && currentFilters.length > 0){
-      fetchData('', currentFilters)
-    }
-    setAppliedFilters(currentFilters)
+    setAppliedFilters((prev) => {
+      if(func.deepComparison(prev, currentFilters)){
+        return prev
+      }else{
+        return currentFilters;
+      }
+    })
     setSortSelected(tableFunc.getInitialSortSelected(props.sortOptions, pageFiltersMap))
   },[currentPageKey])
 
@@ -115,6 +121,12 @@ function GithubServerTable(props) {
   },[appliedFilters])
 
   async function fetchData(searchVal, tempFilters = []) {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort(); // Cancel the previous request
+    }
+    abortControllerRef.current = new AbortController();
+    const { signal } = abortControllerRef.current;
+
     let [sortKey, sortOrder] = sortSelected.length == 0 ? ["", ""] : sortSelected[0].split(" ");
     let filters = props.headers.reduce((map, e) => { map[e.filterKey || e.value] = []; return map }, {})
     if(tempFilters.length === 0){
@@ -126,11 +138,15 @@ function GithubServerTable(props) {
         filters[filter.key] = filter.value
       })
     }
-    
+  
     let tempData = await props.fetchData(sortKey, sortOrder == 'asc' ? -1 : 1, page * pageLimit, pageLimit, filters, filterOperators, searchVal);
+    if(signal.aborted){
+      return;
+    }
     tempData ? setData([...tempData.value]) : setData([])
     tempData ? setTotal(tempData.total) : setTotal(0)
     tempData ? setFullDataIds(tempData?.fullDataIds) : setFullDataIds([])
+    
     applyFilter(tempData.total)
     if (!performance.getEntriesByType('navigation')[0].type === 'reload') {
       setTableInitialState({
@@ -317,6 +333,22 @@ function GithubServerTable(props) {
           selectItems([])
           TableStore.getState().setSelectedItems([])
         }else{
+        //todo: handle
+          if (data) {
+            if (toggleType) {
+              let allItemsSet = new Set()
+              for (let row of data) {
+                  if (row?.id instanceof Array) {
+                    row?.id.forEach(item => allItemsSet.add(item));
+                  }
+              }
+              selectItems([...allItemsSet])
+              TableStore.getState().setSelectedItems([...allItemsSet])
+            } else {
+              selectItems([])
+              TableStore.getState().setSelectedItems([])
+            }
+          }
         }
       }
     }
@@ -394,7 +426,7 @@ function GithubServerTable(props) {
                 sortOptions={props.sortOptions}
                 sortSelected={sortSelected}
                 queryValue={queryValue}
-                queryPlaceholder={`Searching in ${transform.formatNumberWithCommas(total)} ${total == 1 ? props.resourceName.singular : props.resourceName.plural}`}
+                queryPlaceholder={`Search in ${transform.formatNumberWithCommas(total)} ${total == 1 ? props.resourceName.singular : props.resourceName.plural}`}
                 onQueryChange={handleFiltersQueryChange}
                 onQueryClear={handleFiltersQueryClear}
                 {...(props.hideQueryField ? { hideQueryField: props.hideQueryField } : {})}

@@ -83,6 +83,11 @@ import AuditLogs from "../dashboard/pages/settings/audit_logs/AuditLogs";
 import ThreatApiPage from "../dashboard/pages/threat_detection/ThreatApiPage";
 import ThreatActorPage from "../dashboard/pages/threat_detection/ThreatActorPage";
 import ThreatPolicyPage from "../dashboard/pages/threat_detection/ThreatPolicyPage";
+import TestSuite from "../dashboard/pages/testing/testSuite/TestSuite";
+import TestsTablePage from "../dashboard/pages/test_editor/tests_table/TestsTablePage";
+import Splunk from "../dashboard/pages/settings/integrations/Splunk";
+import F5Waf from "../dashboard/pages/settings/integrations/F5Waf";
+import AWSWaf from "../dashboard/pages/settings/integrations/AWSWaf";
 
 // if you add a component in a new path, please verify the search implementation in function -> 'getSearchItemsArr' in func.js
 
@@ -132,6 +137,10 @@ const router = createBrowserRouter([
                             {
                                 path: "dependency",
                                 element: <DependencyTable/>
+                            },
+                            {
+                              path:"test-suite",
+                              element:<TestSuite/>
                             }
                         ]
                     },
@@ -172,6 +181,10 @@ const router = createBrowserRouter([
                                 element: <SingleRequest/>
                             }
                         ]
+                    },
+                    {
+                        path:"test-library/tests",
+                        element:<TestsTablePage/>
                     },
                     {
                         path: "issues",
@@ -256,6 +269,18 @@ const router = createBrowserRouter([
                     {
                         path: "integrations/postman",
                         element: <Postman/>,
+                    },
+                    {
+                        path: "integrations/splunk",
+                        element: <Splunk/>,
+                    },
+                    {
+                        path: "integrations/f5_waf",
+                        element: <F5Waf/>,
+                    },
+                    {
+                        path: "integrations/aws_waf",
+                        element: <AWSWaf/>,
                     },
                     {
                         path: "integrations/jira",

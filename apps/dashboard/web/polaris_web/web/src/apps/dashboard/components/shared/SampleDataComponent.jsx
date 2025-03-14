@@ -19,6 +19,7 @@ function SampleDataComponent(props) {
     const [lineNumbers, setLineNumbers] = useState({request: [], response: []})
     const [currentIndex, setCurrentIndex] = useState({request: 0, response: 0})
     const [responseTime, setResponseTime] = useState(undefined)
+    const [ipObj, setIpObj] = useState({sourceIP: "", destIP: ""})
 
     const ref = useRef(null)
 
@@ -29,6 +30,10 @@ function SampleDataComponent(props) {
         } catch {
           parsed = undefined
         }
+        if (parsed?.ip != null && parsed?.destIp != null) {
+            setIpObj({sourceIP: parsed?.ip, destIP: parsed?.destIp})
+        }
+        
         let responseJson = func.responseJson(parsed, sampleData?.highlightPaths)
         let requestJson = func.requestJson(parsed, sampleData?.highlightPaths)
 
@@ -206,7 +211,10 @@ function SampleDataComponent(props) {
                 <Box padding={"2"}>
                     <HorizontalStack padding="2" align='space-between'>
                         {func.toSentenceCase(type)} 
-                        { type=="response" && responseTime ? (` (${responseTime} ms)`) : "" }
+                        { type==="response" && responseTime ? (` (${responseTime} ms)`) : "" }
+                        { type==="request" && (ipObj?.sourceIP.length>0 || ipObj?.destIP.length>0) ? 
+                            (` (${ipObj?.sourceIP ? `Src: ${ipObj.sourceIP}` : ""}${ipObj?.sourceIP && ipObj?.destIP ? " & " : ""}${ipObj?.destIP ? `Dest: ${ipObj.destIP}` : ""})`) 
+                            : "" }
                         <HorizontalStack gap={2}>
                         {isNewDiff ? <HorizontalStack gap="2">
                                 <Box borderInlineEndWidth='1' borderColor="border-subdued" padding="1">

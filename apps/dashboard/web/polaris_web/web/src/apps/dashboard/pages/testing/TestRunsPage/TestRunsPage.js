@@ -123,7 +123,7 @@ function TestRunsPage() {
 
   filters = func.getCollectionFilters(filters)
 
-const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[4]);
+const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[5]);
 const getTimeEpoch = (key) => {
     return Math.floor(Date.parse(currDateRange.period[key]) / 1000)
 }
@@ -155,18 +155,9 @@ const [collapsible, setCollapsible] = useState(true)
 const [hasUserInitiatedTestRuns, setHasUserInitiatedTestRuns] = useState(false)
 
 
-const refreshSummaries = () =>{
-  setTimeout(() => {
-    setUpdateTable(Date.now().toString())
-  }, 5000)
-}
 
 function processData(testingRuns, latestTestingRunResultSummaries, cicd){
   let testRuns = transform.prepareTestRuns(testingRuns, latestTestingRunResultSummaries, cicd, true);
-  const updatedRuns = testRuns.filter((test) => test.orderPriority !== 1)
-  if(updatedRuns.length !== testRuns.length){
-    refreshSummaries()
-  }
   return testRuns;
 }
 

@@ -726,7 +726,7 @@ function ApiEndpoints(props) {
                 filtered={loading ? false : filteredEndpoints.length !== endpointData["all"].length}
                 runTestFromOutside={runTests}
                 closeRunTest={() => setRunTests(false)}
-                disabled={showEmptyScreen}
+                disabled={showEmptyScreen || window.USER_ROLE === "GUEST"}
                 selectedResourcesForPrimaryAction={selectedResourcesForPrimaryAction}
                 preActivator={false}
             />

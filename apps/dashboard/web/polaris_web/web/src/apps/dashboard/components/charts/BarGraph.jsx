@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 import HighchartsReact from "highcharts-react-official"
 import Highcharts from "highcharts"
 import { useRef } from "react";
@@ -82,6 +82,22 @@ function BarGraph({defaultChartOptions, backgroundColor, height, title, data, xA
         }],
         ...defaultChartOptions,
     };
+
+    useEffect(() => {
+        const mediaQueryList = window.matchMedia('print')
+
+        const handlePrint = (e) => {
+            const chart = chartComponentRef.current.chart
+            if (e.matches) {
+                chart.setSize(600, 400, false)
+            } else {
+                chart.setSize(null, null, false)
+            }
+        }
+
+        mediaQueryList.addEventListener('change', handlePrint)
+        return () => mediaQueryList.removeEventListener('change', handlePrint)
+    }, [])
 
     return (
         <HighchartsReact 

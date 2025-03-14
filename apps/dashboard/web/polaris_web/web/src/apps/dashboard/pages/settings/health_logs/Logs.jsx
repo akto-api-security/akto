@@ -23,6 +23,7 @@ const Logs = () => {
         { label: "Runtime", value: "RUNTIME" },
         { label: "Dashboard", value: "DASHBOARD" },
         { label: "Testing", value: "TESTING" },
+        { label: "Puppeteer", value: "PUPPETEER" },
     ];
   
     const handleSelectLogGroup = (logGroup) => {
