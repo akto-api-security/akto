@@ -63,6 +63,14 @@ public class ThreatActorService {
       match.append("latestApiIp", new Document("$in", filter.getLatestIpsList()));
     }
 
+    if (!filter.getLatestAttackList().isEmpty()) {
+      match.append("subCategory", new Document("$in", filter.getLatestAttackList()));
+    }
+
+    if (!filter.getCountryList().isEmpty()) {
+      match.append("country", new Document("$in", filter.getCountryList()));
+    }
+
     if (filter.hasDetectedAtTimeRange()) {
       long start = filter.getDetectedAtTimeRange().getStart();
       long end = filter.getDetectedAtTimeRange().getEnd();

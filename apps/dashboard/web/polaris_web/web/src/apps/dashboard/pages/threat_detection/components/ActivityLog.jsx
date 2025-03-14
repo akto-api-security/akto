@@ -1,19 +1,16 @@
 import {
-    TextField,
     IndexTable,
     LegacyCard,
     IndexFilters,
     useSetIndexFiltersMode,
-    useIndexResourceState,
     Text,
-    ChoiceList,
-    RangeSlider,
     useBreakpoints,
-    Badge
+    Badge,
+    Box
   } from '@shopify/polaris';
 import dayjs from 'dayjs';
 import func from '@/util/func';
-import {useState, useCallback} from 'react';
+import {useState} from 'react';
 import GetPrettifyEndpoint from '../../observe/GetPrettifyEndpoint';
 import PersistStore from "../../../../main/PersistStore";
   
@@ -51,7 +48,7 @@ import PersistStore from "../../../../main/PersistStore";
     const {mode, setMode} = useSetIndexFiltersMode();
   
     const resourceName = {
-      singular: 'activity',
+      singular: 'activitysdc',
       plural: 'activities',
     };
 
@@ -110,26 +107,45 @@ import PersistStore from "../../../../main/PersistStore";
     );
   
     return (
-      <LegacyCard>
-        <IndexFilters
-          tabs={tabs}
-          mode={mode}
-          setMode={setMode}
-          selected={selected}
-        />
-        <IndexTable
-            condensed={useBreakpoints().smDown}
-            resourceName={resourceName}
-            itemCount={data.length}
-            headings={[
-                {title: 'Time'},
-                {title: 'Attack type'},
-                {title: 'Severity'},
-                {title: 'Api Endpoint'},
-            ]}
-        >
-          {rowMarkup}
-        </IndexTable>
-      </LegacyCard>
+      <> 
+      <style>
+        {`
+          #activity-log-card .Polaris-IndexTable__TableHeading--first,
+          #activity-log-card .Polaris-IndexTable__TableCell--first {
+            display: none;
+          }
+          #activity-log-card .Polaris-IndexTable__TableHeading,
+          #activity-log-card .Polaris-IndexTable__TableCell {
+            padding-left: 16px;
+          }
+        `}
+      </style>
+      <Box id="activity-log-card">
+        <LegacyCard className="activity-log-card">
+          <IndexFilters
+            tabs={tabs}
+            mode={mode}
+            setMode={setMode}
+            selected={selected}
+            hideFilters
+            hideQueryField
+            canCreateNewView={false}
+          />
+          <IndexTable
+              condensed={useBreakpoints().smDown}
+              resourceName={resourceName}
+              itemCount={data.length}
+              headings={[
+                  {title: 'Time'},
+                  {title: 'Attack type'},
+                  {title: 'Severity'},
+                  {title: 'Api Endpoint'},
+              ]}
+          >
+            {rowMarkup}
+          </IndexTable>
+        </LegacyCard>
+      </Box>
+      </>
     );
   }

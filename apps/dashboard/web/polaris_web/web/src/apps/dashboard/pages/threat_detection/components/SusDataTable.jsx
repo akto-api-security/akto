@@ -6,7 +6,7 @@ import GetPrettifyEndpoint from "../../observe/GetPrettifyEndpoint";
 import PersistStore from "../../../../main/PersistStore";
 import func from "../../../../../util/func";
 import { Badge } from "@shopify/polaris";
-
+import dayjs from "dayjs";
 const resourceName = {
   singular: "sample",
   plural: "samples",
@@ -14,12 +14,22 @@ const resourceName = {
 
 const headers = [
   {
-    text: "Endpoint",
-    value: "endpointComp",
-    title: "Endpoint",
+    text: "Severity",
+    value: "severityComp",
+    title: "Severity",
   },
   {
-    text: "Actor",
+    text: "Api Endpoint",
+    value: "endpointComp",
+    title: "Api Endpoint",
+  },
+  {
+    text: "Subcategory",
+    value: "subCategory",
+    title: "Subcategory",
+  },
+  {
+    text: "Threat Actor",
     value: "actorComp",
     title: "Actor",
     filterKey: 'actor'
@@ -28,11 +38,6 @@ const headers = [
     text: "Filter",
     value: "filterId",
     title: "Attack type",
-  },
-  {
-    text: "Severity",
-    value: "severityComp",
-    title: "Severity",
   },
   {
     text: "Collection",
@@ -48,21 +53,6 @@ const headers = [
     type: CellType.TEXT,
     sortActive: true,
   },
-  {
-    text: "Source IP",
-    title: "Source IP",
-    value: "sourceIPComponent",
-  },
-  {
-    text: "Type",
-    title: "Type",
-    value: "type",
-  },
-  {
-    text: "SubCategory",
-    title: "SubCategory",
-    value: "subCategory",
-  }
 ];
 
 const sortOptions = [
@@ -95,6 +85,8 @@ function SusDataTable({ currDateRange, rowClicked }) {
   const collectionsMap = PersistStore((state) => state.collectionsMap);
   const threatFiltersMap = PersistStore((state) => state.threatFiltersMap);
 
+  const [subCategoryChoices, setSubCategoryChoices] = useState([]);
+
   async function fetchData(
     sortKey,
     sortOrder,
@@ -108,8 +100,8 @@ function SusDataTable({ currDateRange, rowClicked }) {
     let sourceIpsFilter = [],
       apiCollectionIdsFilter = [],
       matchingUrlFilter = [],
-      typeFilter = []
-      ;
+      typeFilter = [],
+      subCategoryFilter = [];
     if (filters?.actor) {
       sourceIpsFilter = filters?.actor;
     }
@@ -122,6 +114,9 @@ function SusDataTable({ currDateRange, rowClicked }) {
     if(filters?.type){
       typeFilter = filters?.type
     }
+    if(filters?.subCategory){
+      subCategoryFilter = filters?.subCategory
+    }
     const sort = { [sortKey]: sortOrder };
     const res = await api.fetchSuspectSampleData(
       skip,
@@ -131,8 +126,11 @@ function SusDataTable({ currDateRange, rowClicked }) {
       typeFilter,
       sort,
       startTimestamp,
-      endTimestamp
+      endTimestamp,
+      subCategoryFilter
     );
+    const distinctSubCategories = Array.from(new Set(res?.maliciousEvents.map((x) => x?.subCategory)));
+    setSubCategoryChoices(distinctSubCategories);
     let total = res.total;
     let ret = res?.maliciousEvents.map((x) => {
       const severity = threatFiltersMap[x?.filterId]?.severity || "HIGH"
@@ -142,10 +140,11 @@ function SusDataTable({ currDateRange, rowClicked }) {
         subCategory: x?.subCategory,
         actorComp: x?.actor,
         endpointComp: (
-          <GetPrettifyEndpoint method={x.method} url={x.url} isNew={false} />
+          <GetPrettifyEndpoint maxWidth="300px" method={x.method} url={x.url} isNew={false} />
         ),
         apiCollectionName: collectionsMap[x.apiCollectionId] || "-",
-        discoveredTs: func.prettifyEpoch(x.timestamp),
+        discoveredTs: dayjs(x.timestamp).format("DD-MM-YYYY HH:mm:ss"),
+        subCategoryComp: x?.subCategory || "-",
         sourceIPComponent: x?.ip || "-",
         type: x?.type || "-",
         severityComp: (<div className={`badge-wrapper-${severity}`}>
@@ -169,6 +168,10 @@ function SusDataTable({ currDateRange, rowClicked }) {
       return { label: x, value: x };
     });
 
+    let subCategoryChoices = res?.subCategory.map((x) => {
+      return { label: x, value: x };
+    });
+
     filters = [
       {
         key: "actor",
@@ -181,6 +184,12 @@ function SusDataTable({ currDateRange, rowClicked }) {
         label: "URL",
         title: "URL",
         choices: urlChoices,
+      },
+      {
+        key: "subCategory",
+        label: "Subcategory",
+        title: "Subcategory",
+        choices: subCategoryChoices,
       },
       {
         key: 'type',

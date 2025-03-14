@@ -136,8 +136,11 @@ public class MaliciousEventService {
     Set<String> urls =
         MaliciousEventService.<String>findDistinctFields(
             coll, "latestApiEndpoint", String.class, Filters.empty());
+    Set<String> subCategories =
+        MaliciousEventService.<String>findDistinctFields(
+            coll, "subCategory", String.class, Filters.empty());
 
-    return FetchAlertFiltersResponse.newBuilder().addAllActors(actors).addAllUrls(urls).build();
+    return FetchAlertFiltersResponse.newBuilder().addAllActors(actors).addAllUrls(urls).addAllSubCategory(subCategories).build();
   }
 
   public ListMaliciousRequestsResponse listMaliciousRequests(
@@ -168,6 +171,10 @@ public class MaliciousEventService {
 
     if (!filter.getTypesList().isEmpty()) {
       query.append("type", new Document("$in", filter.getTypesList()));
+    }
+
+    if (!filter.getSubCategoryList().isEmpty()) {
+      query.append("subCategory", new Document("$in", filter.getSubCategoryList()));
     }
 
     if (filter.hasDetectedAtTimeRange()) {

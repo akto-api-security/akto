@@ -1,15 +1,19 @@
 import { Box, VerticalStack, HorizontalStack, Text, Divider, Grid, HorizontalGrid, LegacyCard } from "@shopify/polaris"
 import FlyLayout from "../../../components/layouts/FlyLayout"
-import LayoutWithTabs from "../../../components/layouts/LayoutWithTabs"
 import { ActivityLog } from "./ActivityLog"
 
 export const ActorDetails = ({ actorDetails, setShowActorDetails }) => {
     const ThreatActorHeader = () => {
         return (
-            <Box padding={"0"} paddingBlockStart={"0"} borderColor="border">
-                <HorizontalStack wrap={false} align="space-between" gap={"6"}>
+            <Box borderColor="border" padding={"4"} paddingBlockStart={"0"} paddingInlineStart={"0"}>
+               <VerticalStack gap={"2"}>
                     <Text variant="bodyMd" fontWeight="medium">{actorDetails.id}</Text>
-                </HorizontalStack>
+                    <HorizontalStack gap={"2"}>
+                        <Text variant="bodySm" color="subdued">Status: Active</Text>
+                        <Text variant="bodySm" color="subdued">|</Text>
+                        <Text variant="bodySm" color="subdued">Discovered: {actorDetails.discoveredAt}</Text>
+                    </HorizontalStack>
+               </VerticalStack>
             </Box>
         )
     }
@@ -33,25 +37,10 @@ export const ActorDetails = ({ actorDetails, setShowActorDetails }) => {
         <ActivityLog activityLog={actorDetails.activity} actorDetails={actorDetails} />
     )
 
-    const overviewTab = {
-        id: "overview",
-        content: 'Overview',
-        component: overviewComp
-    }
-
-    const activityTab = {
-        id: "activity",
-        content: `Activity Log - ${actorDetails.activity.length}`,
-        component: activityComp
-    }
-
     const components = [
         <ThreatActorHeader />,
-        <Divider />,
-        <LayoutWithTabs
-            tabs={[overviewTab, activityTab]}
-            currTab={() => {}}
-        />
+        // <Divider />,
+        <ActivityLog activityLog={actorDetails.activity} actorDetails={actorDetails} />
     ]
     return (
         <FlyLayout
