@@ -8,8 +8,8 @@ function RunTestSuiteRow({data,checkifSelected,checkedSelected,handleTestSuiteSe
     function renderTestSuites(data) {
         const formattedName = data.name.replaceAll("_", " ");
         return (
-            <div className="testSuiteCard" style={{ marginLeft: "0.15rem" }}>
-                <Box minWidth="300px" maxWidth="300px" borderRadius={2} borderStyle="solid" insetInlineEnd={1}>
+            <div className="testSuiteCard" style={{ marginLeft: "0.2rem", width:"31.5%" }}>
+                <Box minWidth="100%" borderRadius={2} borderStyle="solid" insetInlineEnd={1}>
                     <VerticalStack>
                         <div >
                             <Box paddingBlockStart={2} paddingBlockEnd={2} paddingInlineStart={4} paddingInlineEnd={4} borderRadiusEndStart={2} borderRadiusEndEnd="2" borderColor="border">
@@ -57,7 +57,7 @@ function RunTestSuiteRow({data,checkifSelected,checkedSelected,handleTestSuiteSe
                 transition={{ duration: "500ms", timingFunction: "ease-in-out" }}
                 expandOnPrint
             >
-                <HorizontalStack gap={4} align={"start"} blockAlign={"center"}>
+                <HorizontalStack gap={5} align={"start"} blockAlign={"center"}>
 
                     {
 

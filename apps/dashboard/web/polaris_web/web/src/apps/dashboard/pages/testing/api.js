@@ -530,5 +530,33 @@ export default {
             method: 'post',
             data: {testingRunResultSummaryHexId}
         })
+    },
+    createNewTestSuite(testSuiteName,subCategoryList) {
+        return request({
+            url: '/api/createTestSuite',
+            method: 'post',
+            data: {testSuiteName,subCategoryList}
+        })
+    },
+    fetchAllTestSuites() {
+        return request({
+            url: '/api/fetchAllTestSuites',
+            method: 'post',
+            data: {}
+        })
+    },
+    modifyTestSuite(testSuiteHexId, testSuiteName, subCategoryList) {
+        return request({
+            url: '/api/modifyTestSuite',
+            method: 'post',
+            data: {testSuiteHexId, testSuiteName, subCategoryList}
+        })
+    },
+    deleteTestSuite(testSuiteHexId) {
+        return request({
+            url: '/api/deleteTestSuite',
+            method: 'post',
+            data: {testSuiteHexId}
+        })
     }
 }
