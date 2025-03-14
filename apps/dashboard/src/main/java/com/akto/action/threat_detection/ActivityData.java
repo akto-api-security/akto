@@ -6,12 +6,14 @@ public class ActivityData {
     private String severity;
     private String subCategory;
     private long detectedAt;
+    private String method;
 
-    public ActivityData(String url, String severity, String subCategory, long detectedAt) {
+    public ActivityData(String url, String severity, String subCategory, long detectedAt, String method) {
         this.url = url;
         this.severity = severity;
         this.subCategory = subCategory;
         this.detectedAt = detectedAt;
+        this.method = method;
     }
 
     public String getUrl() {
@@ -37,6 +39,14 @@ public class ActivityData {
     }
     public void setDetectedAt(long detectedAt) {
         this.detectedAt = detectedAt;
+    }
+
+    public String getMethod() {
+        return method;
+    }
+
+    public void setMethod(String method) {
+        this.method = method;
     }
 
 }

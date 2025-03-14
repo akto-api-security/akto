@@ -83,12 +83,22 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
   }
 
   public String fetchThreatCategoryCount() {
-    HttpGet get = new HttpGet(
+    HttpPost post = new HttpPost(
         String.format("%s/api/dashboard/get_subcategory_wise_count", this.getBackendUrl()));
-    get.addHeader("Authorization", "Bearer " + this.getApiToken());
-    get.addHeader("Content-Type", "application/json");
+    post.addHeader("Authorization", "Bearer " + this.getApiToken());
+    post.addHeader("Content-Type", "application/json");
 
-    try (CloseableHttpResponse resp = this.httpClient.execute(get)) {
+    Map<String, Object> body = new HashMap<String, Object>() {
+      {
+        put("start_ts", startTs);
+        put("end_ts", endTs);
+      }
+    };
+    String msg = objectMapper.valueToTree(body).toString();
+    StringEntity requestEntity = new StringEntity(msg, ContentType.APPLICATION_JSON);
+    post.setEntity(requestEntity);
+
+    try (CloseableHttpResponse resp = this.httpClient.execute(post)) {
       String responseBody = EntityUtils.toString(resp.getEntity());
 
       ProtoMessageUtils.<ThreatCategoryWiseCountResponse>toProtoMessage(
@@ -115,12 +125,23 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
   }
 
   public String fetchCountBySeverity() {
-    HttpGet get = new HttpGet(
+    HttpPost post = new HttpPost(
         String.format("%s/api/dashboard/get_severity_wise_count", this.getBackendUrl()));
-    get.addHeader("Authorization", "Bearer " + this.getApiToken());
-    get.addHeader("Content-Type", "application/json");
 
-    try (CloseableHttpResponse resp = this.httpClient.execute(get)) {
+    post.addHeader("Authorization", "Bearer " + this.getApiToken());
+    post.addHeader("Content-Type", "application/json");
+
+    Map<String, Object> body = new HashMap<String, Object>() {
+      {
+        put("start_ts", startTs);
+        put("end_ts", endTs);
+      }
+    };
+    String msg = objectMapper.valueToTree(body).toString();
+    StringEntity requestEntity = new StringEntity(msg, ContentType.APPLICATION_JSON);
+    post.setEntity(requestEntity);
+
+    try (CloseableHttpResponse resp = this.httpClient.execute(post)) {
       String responseBody = EntityUtils.toString(resp.getEntity());
 
       ProtoMessageUtils.<ThreatSeverityWiseCountResponse>toProtoMessage(

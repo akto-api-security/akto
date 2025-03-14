@@ -33,6 +33,8 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
   String refId;
   List<String> latestAttack;
   List<String> country;
+  int startTs;
+  int endTs;
   private final CloseableHttpClient httpClient;
 
   private final ObjectMapper objectMapper = new ObjectMapper();
@@ -111,6 +113,8 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
             put("limit", LIMIT);
             put("sort", sort);
             put("filter", filter);
+            put("start_ts", startTs);
+            put("end_ts", endTs);
           }
         };
     String msg = objectMapper.valueToTree(body).toString();
@@ -138,7 +142,7 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
                                     smr.getCountry(),
                                     smr.getLatestSubcategory(),
                                     smr.getActivityDataList().stream()
-                                    .map(subData -> new ActivityData(subData.getUrl(), subData.getSeverity(), subData.getSubCategory(), subData.getDetectedAt()))
+                                    .map(subData -> new ActivityData(subData.getUrl(), subData.getSeverity(), subData.getSubCategory(), subData.getDetectedAt(), subData.getMethod()))
                                     .collect(Collectors.toList())))
                         .collect(Collectors.toList());
 
@@ -259,6 +263,22 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
   
   public void setCountry(List<String> country) {
     this.country = country;
+  }
+
+  public int getStartTs() {
+    return startTs;
+  }
+
+  public void setStartTs(int startTs) {
+    this.startTs = startTs;
+  }
+
+  public int getEndTs() {
+    return endTs;
+  }
+
+  public void setEndTs(int endTs) {
+    this.endTs = endTs;
   }
   
 }

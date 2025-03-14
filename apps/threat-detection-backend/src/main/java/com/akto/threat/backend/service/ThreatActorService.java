@@ -77,6 +77,12 @@ public class ThreatActorService {
       match.append("detectedAt", new Document("$gte", start).append("$lte", end));
     }
 
+    if (request.getStartTs() != 0 && request.getEndTs() != 0) {
+        long start = request.getStartTs();
+        long end = request.getEndTs();
+        match.append("detectedAt", new Document("$gte", start).append("$lte", end));
+    } 
+
     if (!match.isEmpty()) {
       base.add(new Document("$match", match));
     }
@@ -125,6 +131,7 @@ public class ThreatActorService {
                 .setDetectedAt(doc2.getLong("detectedAt"))
                 .setSubCategory(doc2.getString("subCategory"))
                 .setSeverity(doc2.getString("severity"))
+                .setMethod(doc2.getString("latestApiMethod"))
                 .build()
             );
         }

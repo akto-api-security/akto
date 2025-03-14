@@ -422,9 +422,12 @@ public class InventoryAction extends UserAction {
     }
 
     public String getAccessTypes() {
+        response = new BasicDBObject();
+        if (urls == null || urls.size() == 0 ){
+            return Action.SUCCESS.toUpperCase();
+        }
         Bson filter = Filters.in(ApiInfo.ID_URL, urls);
         List<ApiInfo> apiInfos = ApiInfoDao.instance.findAll(filter, 0, 2000, null, Projections.include(ApiInfo.API_ACCESS_TYPES, ApiInfo.ID_URL));
-        response = new BasicDBObject();
         response.put("apiInfos", apiInfos);
         return Action.SUCCESS.toUpperCase();
     }

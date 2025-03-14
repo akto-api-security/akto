@@ -117,6 +117,12 @@ public class ThreatApiService {
             .getCollection(MongoDBCollection.ThreatDetection.MALICIOUS_EVENTS, Document.class);
 
     List<Document> pipeline = new ArrayList<>();
+    if (req.getStartTs() != 0 || req.getEndTs() != 0) {
+      Document matchFilter = new Document("$match", 
+        new Document("detectedAt", new Document("$gte", req.getStartTs()).append("$lte", req.getEndTs()))
+      );
+      pipeline.add(matchFilter); 
+    }
     pipeline.add(
         new Document("$sort", new Document("category", 1).append("detectedAt", -1))); // sort
     pipeline.add(
@@ -160,6 +166,10 @@ public class ThreatApiService {
             .getCollection(MongoDBCollection.ThreatDetection.MALICIOUS_EVENTS, Document.class);
 
     List<Document> pipeline = new ArrayList<>();
+    Document matchFilter = new Document("$match", 
+      new Document("detectedAt", new Document("$gte", req.getStartTs()).append("$lte", req.getEndTs()))
+    );
+    pipeline.add(matchFilter);
     pipeline.add(
         new Document("$sort", new Document("category", 1).append("detectedAt", -1))); // sort
     pipeline.add(

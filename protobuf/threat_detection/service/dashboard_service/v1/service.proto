@@ -73,6 +73,8 @@ message ListThreatActorsRequest {
   uint32 limit = 2;
   map<string, int32> sort = 3;
   Filter filter = 4;
+  uint32 start_ts = 5;
+  uint32 end_ts = 6;
 }
 
 message ListThreatActorResponse {
@@ -81,6 +83,7 @@ message ListThreatActorResponse {
     string sub_category = 2;
     uint64 detected_at = 3;
     string severity = 4;
+    string method = 5;
   }
   message ThreatActor {
     string id = 1;
@@ -147,6 +150,8 @@ message ThreatActorByCountryResponse {
 }
 
 message ThreatCategoryWiseCountRequest {
+  uint32 start_ts = 1;
+  uint32 end_ts = 2;
 }
 
 message ThreatActorFilterRequest {
@@ -168,6 +173,8 @@ message ThreatCategoryWiseCountResponse {
 }
 
 message ThreatSeverityWiseCountRequest {
+  uint32 start_ts = 1;
+  uint32 end_ts = 2;
 }
 
 message ThreatSeverityWiseCountResponse {

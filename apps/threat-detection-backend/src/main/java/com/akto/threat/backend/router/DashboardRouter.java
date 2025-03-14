@@ -140,23 +140,49 @@ public class DashboardRouter implements ARouter {
             });
 
         router
-        .get("/get_subcategory_wise_count")
+        .post("/get_subcategory_wise_count")
             .blockingHandler(ctx -> {
+                RequestBody reqBody = ctx.body();
+                ThreatCategoryWiseCountRequest req = ProtoMessageUtils.<
+                    ThreatCategoryWiseCountRequest
+                >toProtoMessage(
+                    ThreatCategoryWiseCountRequest.class,
+                    reqBody.asString()
+                ).orElse(null);
+
+                if (req == null) {
+                    ctx.response().setStatusCode(400).end("Invalid request");
+                    return;
+                }
+
                 ProtoMessageUtils.toString(
                     threatApiService.getSubCategoryWiseCount(
                         ctx.get("accountId"),
-                        ThreatCategoryWiseCountRequest.newBuilder().build()
+                        req
                     )
                 ).ifPresent(s -> ctx.response().setStatusCode(200).end(s));
             });
 
             router
-            .get("/get_severity_wise_count")
+            .post("/get_severity_wise_count")
             .blockingHandler(ctx -> {
+                RequestBody reqBody = ctx.body();
+                ThreatSeverityWiseCountRequest req = ProtoMessageUtils.<
+                    ThreatSeverityWiseCountRequest
+                >toProtoMessage(
+                    ThreatSeverityWiseCountRequest.class,
+                    reqBody.asString()
+                ).orElse(null);
+
+                if (req == null) {
+                    ctx.response().setStatusCode(400).end("Invalid request");
+                    return;
+                }
+
                 ProtoMessageUtils.toString(
                     threatApiService.getSeverityWiseCount(
                         ctx.get("accountId"),
-                        ThreatSeverityWiseCountRequest.newBuilder().build()
+                        req
                     )
                 ).ifPresent(s -> ctx.response().setStatusCode(200).end(s));
             });

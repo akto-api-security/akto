@@ -98,7 +98,7 @@ function Dashboard() {
         if (!subCategoryMap || (Object.keys(subCategoryMap).length === 0)) {
             fetchMetadata();
         }
-        if(!threatFiltersMap){
+        if(!threatFiltersMap && func.isDemoAccount()){
             fetchFilterYamlTemplates()
         }
         if(window.Beamer){
