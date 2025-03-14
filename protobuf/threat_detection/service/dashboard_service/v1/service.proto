@@ -149,6 +149,14 @@ message ThreatActorByCountryResponse {
 message ThreatCategoryWiseCountRequest {
 }
 
+message ThreatActorFilterRequest {
+}
+
+message ThreatActorFilterResponse {
+  repeated string sub_categories = 1;
+  repeated string countries = 2;
+}
+
 message ThreatCategoryWiseCountResponse {
   message SubCategoryCount {
     string category = 1;

@@ -10,6 +10,8 @@ import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.Fe
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchAlertFiltersResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListMaliciousRequestsRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListMaliciousRequestsResponse;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatActorFilterRequest;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatActorFilterResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.TimeRangeFilter;
 import com.akto.proto.generated.threat_detection.service.malicious_alert_service.v1.RecordMaliciousEventRequest;
 import com.akto.threat.backend.client.IPLookupClient;
@@ -119,6 +121,24 @@ public class MaliciousEventService {
       result.add(cursor.next());
     }
     return result;
+  }
+
+  public  ThreatActorFilterResponse fetchThreatActorFilters(
+      String accountId, ThreatActorFilterRequest request) {
+    MongoCollection<MaliciousEventModel> coll =
+        this.mongoClient
+            .getDatabase(accountId)
+            .getCollection("malicious_events", MaliciousEventModel.class);
+
+    Set<String> latestAttack =
+        MaliciousEventService.<String>findDistinctFields(
+            coll, "subCategory", String.class, Filters.empty());
+
+    Set<String> countries =
+        MaliciousEventService.<String>findDistinctFields(
+            coll, "country", String.class, Filters.empty());
+
+    return ThreatActorFilterResponse.newBuilder().addAllSubCategories(latestAttack).addAllCountries(countries).build();
   }
 
   public FetchAlertFiltersResponse fetchAlertFilters(

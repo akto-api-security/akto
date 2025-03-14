@@ -18,25 +18,6 @@ export const ActorDetails = ({ actorDetails, setShowActorDetails }) => {
         )
     }
 
-    const overviewComp = (
-       <Box padding={"4"}>
-            <HorizontalGrid columns={3} gap={"4"}>
-                    <VerticalStack gap={"2"}>
-                        <Text fontWeight="bold" variant="bodySm">Status</Text>
-                        <Text variant="bodyMd">Active</Text>
-                    </VerticalStack>
-                    <VerticalStack gap={"2"}>
-                        <Text fontWeight="bold" variant="bodySm">Discovered</Text>
-                        <Text variant="bodyMd">{actorDetails.discoveredAt}</Text>
-                    </VerticalStack>
-            </HorizontalGrid>
-       </Box>
-    )
-
-    const activityComp = (
-        <ActivityLog activityLog={actorDetails.activity} actorDetails={actorDetails} />
-    )
-
     const components = [
         <ThreatActorHeader />,
         // <Divider />,

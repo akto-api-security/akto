@@ -26,7 +26,7 @@ const ThreatActivityTimeline = ({ startTimestamp, endTimestamp, onSubCategoryCli
     }
 
     const fetchThreatActivityTimeline = async () => {
-        const response = await api.getThreatActivityTimeline(1741564800, endTimestamp);
+        const response = await api.getThreatActivityTimeline(startTimestamp, endTimestamp);
         const sortedTimelines = response.threatActivityTimelines.sort((a, b) => a.ts - b.ts);
         setSortedTimelines(sortedTimelines);
         const distinctSubCategories = [...new Set(response.threatActivityTimelines.flatMap(item => item.subCategoryWiseData.map(subItem => subItem.subcategory)))];
