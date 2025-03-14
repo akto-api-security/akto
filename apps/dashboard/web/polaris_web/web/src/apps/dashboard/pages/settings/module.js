@@ -220,6 +220,20 @@ const settingFunctions = {
       })
       return arr
     },
+    fetchTrafficCollectorInfos: async function(startTimestamp, endTimestamp) {
+      let res = []
+      await settingRequests.fetchTrafficCollectorInfos(startTimestamp, endTimestamp).then((resp) => {
+        res = resp
+      })
+      return res
+    },
+    fetchTrafficCollectorMetrics: async function(id, startTimestamp, endTimestamp) {
+      let res = []
+      await settingRequests.fetchTrafficCollectorMetrics(id, startTimestamp, endTimestamp).then((resp) => {
+        res = resp
+      })
+      return res
+    },
     fetchGraphData: async function(groupBy, startTimestamp, endTimestamp, names, host){
       let trafficData = {}
       await settingRequests.fetchTrafficMetrics(groupBy, startTimestamp, endTimestamp, names, host).then((resp)=>{
