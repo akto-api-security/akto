@@ -1,5 +1,5 @@
 import { TopBar, Icon, Text, ActionList, Modal, TextField, HorizontalStack, Box, Avatar, VerticalStack, Button, Scrollable } from '@shopify/polaris';
-import { NotificationMajor, CustomerPlusMajor, LogOutMinor, NoteMinor, ResourcesMajor, UpdateInventoryMajor, PageMajor, DynamicSourceMajor, PhoneMajor, ChatMajor } from '@shopify/polaris-icons';
+import { NotificationMajor, CustomerPlusMajor, LogOutMinor, NoteMinor, ResourcesMajor, UpdateInventoryMajor, PageMajor, DynamicSourceMajor, PhoneMajor, ChatMajor, SettingsMajor } from '@shopify/polaris-icons';
 import { useState, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Store from '../../../store';
@@ -35,8 +35,6 @@ export default function Header() {
 
     const username = Store((state) => state.username)
     const storeAccessToken = PersistStore(state => state.storeAccessToken)
-    const accounts = Store(state => state.accounts)
-    const activeAccount = Store(state => state.activeAccount)
     const resetAll = PersistStore(state => state.resetAll)
     const resetStore = LocalStore(state => state.resetStore)
 
@@ -86,20 +84,6 @@ export default function Header() {
         }
     }, 500);
 
-    const accountsItems = Object.keys(accounts).map(accountId => {
-        return {
-            id: accountId,
-            content: (<div style={{ color: accountId === activeAccount.toString() ? "var(--akto-primary)" :  "var(--p-text)"  }}>{accounts[accountId]}</div>),
-            onAction: async () => {
-                await api.goToAccount(accountId)
-                func.setToast(true, false, `Switched to account ${accounts[accountId]}`)
-                resetAll();
-                resetStore();
-                window.location.href = '/dashboard/observe/inventory'
-            }
-        }
-    })
-
     function createNewAccount() {
         api.saveToAccount(newAccount).then(resp => {
           setShowCreateAccount(false)
@@ -126,9 +110,6 @@ export default function Header() {
     const userMenuMarkup = (
         <TopBar.UserMenu
             actions={[
-                {
-                    items: accountsItems
-                },
                 {
                     items: [
                         (window.IS_SAAS !== "true" && (window?.DASHBOARD_MODE === 'LOCAL_DEPLOY' || window?.DASHBOARD_MODE === "ON_PREM")) ? {} :
@@ -209,18 +190,18 @@ export default function Header() {
 
 
     const secondaryMenuMarkup = (
-        <HorizontalStack gap={"4"}>
+        <HorizontalStack gap="1">
             {(Object.keys(currentTestsObj).length > 0 && currentTestsObj?.testRunsArr?.length !== 0 && currentTestsObj?.totalTestsCompleted > 0) ? 
-            <HorizontalStack gap={"2"}>
+            <HorizontalStack gap="1">
                 <Button plain monochrome onClick={() => {handleTestingNavigate()}}>
                  <SemiCircleProgress key={"progress"} progress={Math.min(progress, 100)} size={60} height={55} width={75}/>
                 </Button>
-                <VerticalStack gap={"0"}>
+                <VerticalStack gap="1">
                     <Text fontWeight="medium">Test run status</Text>
                     <Text color="subdued" variant="bodySm">{`${currentTestsObj.totalTestsQueued} tests queued`}</Text>
                 </VerticalStack>
             </HorizontalStack> : null}
-             <TopBar.Menu
+            <TopBar.Menu
                 activatorContent={
                     <span id="beamer-btn" className={getColorForIcon()}>
                         <Icon source={NotificationMajor}/> 
@@ -228,8 +209,12 @@ export default function Header() {
                 }
                 actions={[]}
             />
+            <TopBar.Menu
+                activatorContent={
+                    <Button plain monochrome icon={SettingsMajor} onClick={() => navigate("/dashboard/settings/about")} />
+                }
+            />
         </HorizontalStack>
-        
     );
 
     const topBarMarkup = (
