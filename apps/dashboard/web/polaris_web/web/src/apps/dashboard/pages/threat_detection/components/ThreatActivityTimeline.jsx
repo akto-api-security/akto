@@ -7,7 +7,7 @@ import { Spinner } from "@shopify/polaris";
 import api from "../api";
 
 
-export const ThreatActivityTimeline = ({ startTimestamp, endTimestamp }) => {
+const ThreatActivityTimeline = ({ startTimestamp, endTimestamp, onSubCategoryClick }) => {
     const [seriesData, setSeriesData] = useState([]);
     const [loading, setLoading] = useState(false);
     const [sortedTimelines, setSortedTimelines] = useState([]);
@@ -39,13 +39,21 @@ export const ThreatActivityTimeline = ({ startTimestamp, endTimestamp }) => {
                     subItem => subItem.subcategory === subCategory
                 );
                 return found ? found.activityCount : 0;
-            })
+            }),
+            events: {
+                click: (e) => {
+                    onSubCategoryClick(subCategory);
+                }
+            }
         }));
 
         setSeriesData(series);
         setLoading(false);
     }
-
+    
+    useEffect(() => {
+        console.log('$$$ fetching threat activity timeline');
+    }, []);
 
     useEffect(() => {
         fetchThreatActivityTimeline();
@@ -98,3 +106,5 @@ export const ThreatActivityTimeline = ({ startTimestamp, endTimestamp }) => {
         />
     )
 }
+
+export default ThreatActivityTimeline;

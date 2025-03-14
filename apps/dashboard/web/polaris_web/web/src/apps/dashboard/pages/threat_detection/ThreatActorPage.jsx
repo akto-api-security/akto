@@ -15,14 +15,41 @@ import { HorizontalGrid, VerticalStack } from "@shopify/polaris";
 import TopThreatTypeChart from "./components/TopThreatTypeChart";
 import threatDetectionFunc from "./transform";
 import { ThreatSummary } from "./components/ThreatSummary";
-import { ThreatActivityTimeline } from "./components/ThreatActivityTimeline";
+import ThreatActivityTimeline from "./components/ThreatActivityTimeline";
+import React from "react";
+
+const ChartComponent = ({ mapData, loading, onSubCategoryClick, currDateRange }) => {
+    return (
+        <VerticalStack gap={4} columns={2}>
+            <HorizontalGrid gap={4} columns={2}>
+                <ThreatActivityTimeline
+                    onSubCategoryClick={onSubCategoryClick}
+                    startTimestamp={parseInt(currDateRange.period.since.getTime()/1000)}
+                    endTimestamp={parseInt(currDateRange.period.until.getTime()/1000)}
+                />
+                <ThreatWorldMap
+                    data={mapData}
+                    style={{
+                        width: "100%",
+                        marginRight: "auto",
+                    }}
+                    loading={loading}
+                    key={"threat-actor-world-map"}
+                />
+            </HorizontalGrid>
+        </VerticalStack>
+    );
+};
+
+const MemoizedChartComponent = React.memo(ChartComponent);
+
 function ThreatActorPage() {
   const [mapData, setMapData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [subCategoryCount, setSubCategoryCount] = useState([]);
   const [actorDetails, setActorDetails] = useState(null);
   const [showActorDetails, setShowActorDetails] = useState(false);
-  // const [categoryCount, setCategoryCount] = useState([]);
+
   const initialVal = values.ranges[3];
   const [currDateRange, dispatchCurrDateRange] = useReducer(
     produce((draft, action) => func.dateRangeReducer(draft, action)),
@@ -58,38 +85,23 @@ function ThreatActorPage() {
     fetchThreatCategoryCount();
   }, []);
 
-  const ChartComponent = () => {
-    return (
-      <VerticalStack gap={4} columns={2}>
-        <HorizontalGrid gap={4} columns={2}>
-          <ThreatActivityTimeline
-            startTimestamp={parseInt(currDateRange.period.since.getTime()/1000)}
-            endTimestamp={parseInt(currDateRange.period.until.getTime()/1000)}
-          />
-          <ThreatWorldMap
-            data={mapData}
-            style={{
-              width: "100%",
-              marginRight: "auto",
-            }}
-            loading={loading}
-            key={"threat-actor-world-map"}
-          />
-        </HorizontalGrid>
-        
-      </VerticalStack>
-    );
-  };
+  const onSubCategoryClick = (subCategory) => {
+    console.log({ subCategory });
+  }
 
   const onRowClick = (data) => {
-    console.log('row clicked', data);
     setActorDetails(data);
     setShowActorDetails(true);
   }
 
   const components = [
     <ThreatSummary startTimestamp={parseInt(currDateRange.period.since.getTime()/1000)} endTimestamp={parseInt(currDateRange.period.until.getTime()/1000)} />,
-    <ChartComponent />,
+    <MemoizedChartComponent 
+      mapData={mapData}
+      loading={loading}
+      onSubCategoryClick={onSubCategoryClick}
+      currDateRange={currDateRange}
+    />,
     <ThreatActorTable
       key={"threat-actor-data-table"}
       currDateRange={currDateRange}

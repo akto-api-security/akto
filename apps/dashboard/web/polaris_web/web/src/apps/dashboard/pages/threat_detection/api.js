@@ -16,7 +16,7 @@ const threatDetectionRequests = {
         })
     },
 
-    fetchSuspectSampleData(skip, ips, apiCollectionIds, urls, types, sort, startTimestamp, endTimestamp) {
+    fetchSuspectSampleData(skip, ips, apiCollectionIds, urls, types, sort, startTimestamp, endTimestamp, subCategory) {
         return request({
             url: '/api/fetchSuspectSampleData',
             method: 'post',
@@ -28,7 +28,8 @@ const threatDetectionRequests = {
                 apiCollectionIds: apiCollectionIds,
                 sort: sort,
                 startTimestamp: startTimestamp,
-                endTimestamp: endTimestamp
+                endTimestamp: endTimestamp,
+                subCategory: subCategory
             }
         })
     },
@@ -39,13 +40,15 @@ const threatDetectionRequests = {
             data: {}
         })
     },
-    fetchThreatActors(skip, sort) {
+    fetchThreatActors(skip, sort, latestAttack, country) {
         return request({
             url: '/api/fetchThreatActors',
             method: 'post',
             data: {
                 skip: skip,
-                sort: sort
+                sort: sort,
+                latestAttack: latestAttack,
+                country: country
             }
         })
     },
@@ -110,5 +113,12 @@ const threatDetectionRequests = {
             return resp
         })
     },
+    getAccessTypes(urls) {
+        return request({
+            url: '/api/getAccessTypes',
+            method: 'post',
+            data: {urls}
+        })
+    }
 }
 export default threatDetectionRequests

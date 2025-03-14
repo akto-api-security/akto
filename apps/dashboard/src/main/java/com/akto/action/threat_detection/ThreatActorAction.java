@@ -30,7 +30,8 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
   Map<String, Integer> sort;
   int startTimestamp, endTimestamp;
   String refId;
-
+  List<String> latestAttack;
+  List<String> country;
   private final CloseableHttpClient httpClient;
 
   private final ObjectMapper objectMapper = new ObjectMapper();
@@ -72,13 +73,21 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
         new HttpPost(String.format("%s/api/dashboard/list_threat_actors", this.getBackendUrl()));
     post.addHeader("Authorization", "Bearer " + this.getApiToken());
     post.addHeader("Content-Type", "application/json");
+    Map<String, Object> filter = new HashMap<>();
 
+    if(this.latestAttack != null && !this.latestAttack.isEmpty()){
+      filter.put("latestAttack", this.latestAttack);
+    }
+    if(this.country != null && !this.country.isEmpty()){
+      filter.put("country", this.country);
+    }
     Map<String, Object> body =
         new HashMap<String, Object>() {
           {
             put("skip", skip);
             put("limit", LIMIT);
             put("sort", sort);
+            put("filter", filter);
           }
         };
     String msg = objectMapper.valueToTree(body).toString();
@@ -169,6 +178,14 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
     this.skip = skip;
   }
 
+  public List<String> getLatestAttack() {
+    return latestAttack;
+  }
+
+  public void setLatestAttack(List<String> latestAttack) {
+    this.latestAttack = latestAttack;
+  }
+
   public static int getLimit() {
     return LIMIT;
   }
@@ -212,4 +229,13 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
   public void setRefId(String refId) {
     this.refId = refId;
   }
+
+  public List<String> getCountry() {
+    return country;
+  }
+  
+  public void setCountry(List<String> country) {
+    this.country = country;
+  }
+  
 }

@@ -8,6 +8,9 @@ import PersistStore from "../../../../main/PersistStore";
 import observeFunc from "../../observe/transform";
 import Store from "../../../store";
 import dayjs from "dayjs";
+import { flags } from "./flags/index.mjs";
+import { Tooltip, Text } from "@shopify/polaris";
+import { useSearchParams } from "react-router-dom";
 const resourceName = {
   singular: "actor",
   plural: "actors",
@@ -15,9 +18,19 @@ const resourceName = {
 
 const headers = [
   {
-    text: "Actor",
+    text: "Actor Id",
     value: "actor",
-    title: "Actor",
+    title: "Actor Id",
+  },
+  {
+    text: "Country",
+    title: "Country",
+    value: "country",
+  },
+  {
+    text: "Actor Ip",
+    title: "Actor Ip",
+    value: "latestIp",
   },
   {
     text: "Latest API",
@@ -25,21 +38,29 @@ const headers = [
     value: "latestApi",
   },
   {
+    text: "Latest Attack",
+    title: "Latest Attack",
+    value: "latestAttack",
+  },
+  {
+    text: "Access Type",
+    title: "Access Type",
+    value: "accessType",
+  },
+  {
     text: "Sensitive Data",
     title: "Sensitive Data",
     value: "sensitiveData",
   },
   {
+    text: "Status",
+    title: "Status",
+    value: "status",
+  },
+  {
     text: "Detected at",
     title: "Detected at",
     value: "discoveredAt",
-    type: CellType.TEXT,
-    sortActive: true,
-  },
-  {
-    text: "Latest Attack",
-    title: "Latest Attack",
-    value: "latestAttack",
     type: CellType.TEXT,
     sortActive: true,
   },
@@ -62,10 +83,10 @@ const sortOptions = [
   },
 ];
 
-let filters = [];
-
 function ThreatActorTable({ data, currDateRange, handleRowClick }) {
   const [loading, setLoading] = useState(false);
+  const [attackTypeChoices, setAttackTypeChoices] = useState([]);
+  const [countryChoices, setCountryChoices] = useState([]);
 
   const setToastConfig = Store(state => state.setToastConfig)
     const setToast = (isActive, isError, message) => {
@@ -90,19 +111,26 @@ function ThreatActorTable({ data, currDateRange, handleRowClick }) {
     handleRowClick(data);
   }
 
-  async function fetchData(sortKey, sortOrder, skip) {
+  async function fetchData(sortKey, sortOrder, skip, limit, filters) {
     setLoading(true);
     const sort = { [sortKey]: sortOrder };
     let total = 0;
     let ret = [];
     try {
-      const res = await api.fetchThreatActors(skip, sort);
+      const res = await api.fetchThreatActors(skip, sort, filters.latestAttack || [], filters.country || []);
       total = res.total;
 
+      setAttackTypeChoices(Array.from(new Set(res?.actors?.map(x => x.latestAttack))));
+      setCountryChoices(Array.from(new Set(res?.actors?.map(x => x.country))));
       const allEndpoints = res?.actors?.map(x => x.latestApiEndpoint);
 
       const sensitiveDataResponse = await api.fetchSensitiveParamsForEndpoints(allEndpoints);
+      const accessTypesResponse = await api.getAccessTypes(allEndpoints);
 
+      const accessTypesMap = accessTypesResponse.apiInfos.reduce((map, apiInfo) => {
+        map[apiInfo.id.url] = apiInfo.apiAccessTypes;
+        return map;
+      }, {});
 
       // Store the sensitive data for each endpoint in a map
       const sensitiveDataMap = sensitiveDataResponse.data.endpoints.reduce((map, endpoint) => {
@@ -114,24 +142,54 @@ function ThreatActorTable({ data, currDateRange, handleRowClick }) {
         return map;
       }, {});
 
+      const getAccessType = (accessTypes) => {
+       if (!accessTypes || accessTypes.length === 0) {
+        return null;
+       }
+       if (accessTypes.includes("PUBLIC")) {
+        return "Public";
+       }
+       return "Private";
+      }
+
       
       ret = await Promise.all(res?.actors?.map(async x => {
         // Get the sensitive data for the endpoint
         const sensitiveData = sensitiveDataMap[x.latestApiEndpoint] || [];
+        const accessTypes = accessTypesMap[x.latestApiEndpoint] || [];
         return {
           ...x,
-          actor: x.id,
-          latestIp: x.latestApiIp,
-          discoveredAt: dayjs(x.discoveredAt).format('YYYY-MM-DD, HH:mm:ss A'),
-          sensitiveData: observeFunc.prettifySubtypes(sensitiveData, false),
-          latestAttack: x.latestAttack,
-          latestApi: (
+          actor: x.id ? (
+            <Text variant="bodyMd" fontWeight="medium">
+              {x.id}
+            </Text>
+          ) : "-",
+          latestIp: x.latestApiIp || "-",
+          discoveredAt: x.discoveredAt ? dayjs(x.discoveredAt).format('YYYY-MM-DD, HH:mm:ss A') : "-",
+          sensitiveData: x.sensitiveData && x.sensitiveData.length > 0 ? observeFunc.prettifySubtypes(x.sensitiveData, false) : "-",
+          latestAttack: x.latestAttack || "-",
+          accessType: accessTypes.length > 0 ? getAccessType(accessTypes) : "-",
+          status: "Active",
+          latestAttack: x.latestAttack || "-",
+          country: (
+            <Tooltip
+              content={x.country || "Unknown"}
+            >
+              <img
+                src={x.country ? (x.country in flags ? flags[x.country] : flags["earth"]) : flags["earth"]}
+                alt={x.country}
+                style={{ width: '20px', height: '20px', marginRight: '5px' }}
+              />
+            </Tooltip>
+          ),
+          latestApi: x.latestApiEndpoint ? (
             <GetPrettifyEndpoint
+              maxWidth={"300px"}
               method={x.latestApiMethod}
               url={x.latestApiEndpoint}
               isNew={false}
             />
-          ),
+          ) : "-",
         };
       }));
     } catch (e) {
@@ -143,6 +201,30 @@ function ThreatActorTable({ data, currDateRange, handleRowClick }) {
   }
 
   const key = startTimestamp + endTimestamp;
+
+  const filters = [
+    {
+      key: 'latestAttack',
+      label: 'Latest attack sub-category',
+      type: 'select',
+      choices: attackTypeChoices.map(x => ({
+        label: x,
+        value: x
+      })),
+      multiple: true
+    },
+    {
+      key: 'country',
+      label: 'Country',
+      type: 'select',
+      choices: countryChoices.map(x => ({
+        label: x,
+        value: x
+      })),
+      multiple: true
+    }
+  ]
+
   return (
     <GithubServerTable
       onRowClick={(data) => onRowClick(data)}
