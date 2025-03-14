@@ -89,6 +89,7 @@ public class AuthValidator {
             List<String> customAuthTypePayloadKeys = customAuthType.getPayloadKeys();
             for (String payloadAuthKey: customAuthTypePayloadKeys) {
                 Operations.deleteBodyParam(rawApi, payloadAuthKey);
+                Operations.deleteQueryParam(rawApi, payloadAuthKey).getErrMsg().isEmpty();
             }
         }
 
