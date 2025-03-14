@@ -14,15 +14,10 @@ const ThreatActivityTimeline = ({ startTimestamp, endTimestamp, onSubCategoryCli
 
     const COLORMAP = {
         0: 'rgb(133, 62, 232)',
-        1: 'rgb(133, 62, 232, 0.9)',
-        2: 'rgb(133, 62, 232, 0.8)',
-        3: 'rgb(133, 62, 232, 0.7)',
-        4: 'rgb(133, 62, 232, 0.6)',
-        5: 'rgba(133, 62, 232, 0.5)',
-        6: 'rgba(133, 62, 232, 0.4)',
-        7: 'rgba(133, 62, 232, 0.3)',
-        8: 'rgba(133, 62, 232, 0.2)',
-        9: 'rgba(133, 62, 232, 0.1)',
+        1: 'rgb(133, 62, 232, 0.8)',
+        2: 'rgb(133, 62, 232, 0.6)',
+        3: 'rgb(133, 62, 232, 0.4)',
+        4: 'rgb(133, 62, 232, 0.2)',
     }
 
     const fetchThreatActivityTimeline = async () => {
@@ -32,7 +27,7 @@ const ThreatActivityTimeline = ({ startTimestamp, endTimestamp, onSubCategoryCli
         const distinctSubCategories = [...new Set(response.threatActivityTimelines.flatMap(item => item.subCategoryWiseData.map(subItem => subItem.subcategory)))];
         console.log({ response });
         const series = distinctSubCategories.map((subCategory, index) => ({
-            color: COLORMAP[index],
+            color: COLORMAP[index % 5],
             name: subCategory,
             data: sortedTimelines.map(item => {
                 const found = item.subCategoryWiseData.find(
