@@ -983,6 +983,34 @@
             </result>
         </action>
 
+        <action name="api/getAccessTypes" class="com.akto.action.observe.InventoryAction" method="getAccessTypes">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="collectionInterceptor"/>
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">API_COLLECTIONS</param>
+                <param name="accessType">READ</param>
+            </interceptor-ref>
+
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS"   type="json">
+                <param name="root">response</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="UNAUTHORIZED" type="json">
+                 <param name="statusCode">403</param>
+                 <param name="ignoreHierarchy">false</param>
+                 <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
 
         <!--  DO NOT CHANGE THE PATH NAME BEING USED BY EXTERNAL API -->
         <action name="api/loadRecentEndpoints" class="com.akto.action.observe.InventoryAction" method="loadRecentEndpoints">
@@ -7690,6 +7718,25 @@
             </result>
         </action>
 
+        <action name="api/fetchFiltersForThreatActors"
+            class="com.akto.action.threat_detection.ThreatActorAction" method="fetchThreatActorFilters">
+            <interceptor-ref name="json" />
+            <interceptor-ref name="defaultStack" />
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param
+                    name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS" type="json"> </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param
+                    name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
 
         <action name="api/fetchThreatActors"
             class="com.akto.action.threat_detection.ThreatActorAction" method="fetchThreatActors">
@@ -7771,6 +7818,7 @@
         <action name="api/fetchThreatCategoryCount"
             class="com.akto.action.threat_detection.ThreatApiAction"
             method="fetchThreatCategoryCount">
+            <interceptor-ref name="json" />
             <interceptor-ref name="defaultStack" />
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -7786,6 +7834,67 @@
                     name="includeProperties">^actionErrors.*</param>
             </result>
         </action>
+
+        <action name="api/fetchCountBySeverity"
+            class="com.akto.action.threat_detection.ThreatApiAction"
+            method="fetchCountBySeverity">
+            <interceptor-ref name="json" />
+            <interceptor-ref name="defaultStack" />
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param
+                    name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS" type="json"> </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param
+                    name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/getDailyThreatActorsCount"
+            class="com.akto.action.threat_detection.ThreatApiAction"
+            method="getDailyThreatActorsCount">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param
+                    name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS" type="json"> </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param
+                    name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/getThreatActivityTimeline"
+            class="com.akto.action.threat_detection.ThreatApiAction"
+            method="getThreatActivityTimeline">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param
+                    name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS" type="json"> </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param
+                    name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
         <action name="api/fetchApiStats" class="com.akto.action.ApiCollectionsAction" method="fetchApiStats">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />

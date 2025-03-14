@@ -19,6 +19,8 @@ message MaliciousEventMessage {
   threat_detection.message.malicious_event.event_type.v1.EventType event_type = 9;
   string category = 10;
   string sub_category = 11;
+  string severity = 12;
+  string type = 13;
 }
 
 message MaliciousEventKafkaEnvelope {
