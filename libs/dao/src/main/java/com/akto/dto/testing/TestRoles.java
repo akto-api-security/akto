@@ -22,6 +22,9 @@ public class TestRoles {
     @BsonIgnore
     private EndpointLogicalGroup endpointLogicalGroup;
 
+    @BsonIgnore
+    private long testCountForRole;
+
     private String createdBy;
     private int createdTs;
     public static final String LAST_UPDATED_TS = "lastUpdatedTs";
@@ -135,4 +138,13 @@ public class TestRoles {
         }
         return null;
     }
+
+    public long getTestCountForRole() {
+        return testCountForRole;
+    }
+    
+    public void setTestCountForRole(long testCountForRole) {
+        this.testCountForRole = testCountForRole;
+    }
+
 }
