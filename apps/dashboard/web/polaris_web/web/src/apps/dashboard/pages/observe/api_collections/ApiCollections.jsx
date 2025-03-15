@@ -306,7 +306,7 @@ function ApiCollections() {
             envTypeObj[c.id] = c.envType
         })
         setEnvTypeMap(envTypeObj)
-        setAllCollections(apiCollectionsResp.apiCollections || [])
+        setAllCollections(apiCollectionsResp.apiCollections.filter(x => x?.deactivated !== true) || [])
 
         const shouldCallHeavyApis = (func.timeNow() - lastFetchedInfo.lastRiskScoreInfo) >= (5 * 60)
         // const shouldCallHeavyApis = false;
@@ -425,8 +425,8 @@ function ApiCollections() {
         summary.totalSensitiveEndpoints = sensitiveInfo.sensitiveUrls
         setSummaryData(summary)
 
-        setCollectionsMap(func.mapCollectionIdToName(tmp))
-        const allHostNameMap = func.mapCollectionIdToHostName(tmp)
+        setCollectionsMap(func.mapCollectionIdToName(tmp.filter(x => !x?.deactivated)))
+        const allHostNameMap = func.mapCollectionIdToHostName(tmp.filter(x => !x?.deactivated))
         setHostNameMap(allHostNameMap)
 
         tmp = {}

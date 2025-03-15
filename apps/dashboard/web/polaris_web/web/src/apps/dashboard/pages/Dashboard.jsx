@@ -42,6 +42,7 @@ function Dashboard() {
     const setSendEventOnLogin = LocalStore(state => state.setSendEventOnLogin)
     const fetchAllCollections = async () => {
         let apiCollections = await homeFunctions.getAllCollections()
+        apiCollections = apiCollections.filter((x) => x?.deactivated !== true)
         const allCollectionsMap = func.mapCollectionIdToName(apiCollections)
         const allHostNameMap = func.mapCollectionIdToHostName(apiCollections)
         setHostNameMap(allHostNameMap)
