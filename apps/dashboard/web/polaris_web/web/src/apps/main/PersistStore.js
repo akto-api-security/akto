@@ -38,13 +38,14 @@ let persistStore = (set) => ({
     setActive: (selected) => set({ active: selected }),
     setCollectionsMap: (collectionsMap) => set({ collectionsMap }),
     setAllCollections: (allCollections) => {
-        const optimizedCollections = allCollections.map(({ id, displayName, urlsCount, deactivated, type, automated }) => ({
+        const optimizedCollections = allCollections.map(({ id, displayName, urlsCount, deactivated, type, automated, startTs }) => ({
             id,
             displayName,
             urlsCount,
             deactivated, 
             type,
-            automated
+            automated,
+            startTs
         }));
         set({ allCollections: optimizedCollections });
     },

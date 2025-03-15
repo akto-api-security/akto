@@ -154,6 +154,7 @@ function ApiEndpoints(props) {
     const setShowDetails = ObserveStore(state => state.setInventoryFlyout)
     const collectionsMap = PersistStore(state => state.collectionsMap)
     const allCollections = PersistStore(state => state.allCollections);
+    const hostNameMap = PersistStore(state => state.hostNameMap);
     const setCollectionsMap = PersistStore(state => state.setCollectionsMap)
     const setAllCollections = PersistStore(state => state.setAllCollections)
 
@@ -665,7 +666,7 @@ function ApiEndpoints(props) {
                                     </div> :
                                     null
                             }
-                            { !isApiGroup && !(collectionsObj?.hostName && collectionsObj?.hostName?.length > 0) ?
+                            { !isApiGroup && !(hostNameMap.hasOwnProperty(collectionsObj?.id)) ?
                                 <UploadFile
                                 fileFormat=".har"
                                 fileChanged={file => handleFileChange(file)}

@@ -769,7 +769,7 @@ function ApiCollections() {
     const tableComponent = (
         treeView ?
         <TreeViewTable
-            collectionsArr={normalData.filter((x) => x?.type !== "API_GROUP")}
+            collectionsArr={normalData.filter((x) => (!x?.deactivated && x?.type !== "API_GROUP"))}
             sortOptions={sortOptions}
             resourceName={resourceName}
             tableHeaders={headers.filter((x) => x.shouldMerge !== undefined)}
