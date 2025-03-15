@@ -237,10 +237,10 @@ public class ThreatActorService {
   public ThreatActivityTimelineResponse getThreatActivityTimeline(String accountId, long startTs, long endTs) {
     
         List<ThreatActivityTimelineResponse.ActivityTimeline> timeline = new ArrayList<>();
-        long sevenDaysInSeconds = TimeUnit.DAYS.toSeconds(7);
-        if (sevenDaysInSeconds < endTs - sevenDaysInSeconds) {
-            startTs = endTs - sevenDaysInSeconds;
-        }
+        // long sevenDaysInSeconds = TimeUnit.DAYS.toSeconds(7);
+        // if (startTs < endTs - sevenDaysInSeconds) {
+        //     startTs = endTs - sevenDaysInSeconds;
+        // }
         MongoCollection<Document> coll = this.mongoClient
             .getDatabase(accountId)
             .getCollection(MongoDBCollection.ThreatDetection.MALICIOUS_EVENTS, Document.class);
@@ -253,7 +253,7 @@ public class ThreatActorService {
         // Stage 2: Project required fields and normalize timestamp to daily granularity
         new Document("$project", new Document("dayStart",
             new Document("$dateTrunc", new Document("date", 
-                new Document("$toDate", new Document("$multiply", Arrays.asList("$detectedAt", 1000))))
+                new Document("$toDate", new Document("$multiply", Arrays.asList("$detectedAt", 1000L))))
                     .append("unit", "day")))
             .append("subCategory", "$subCategory")),
 

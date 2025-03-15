@@ -16,7 +16,7 @@ const threatDetectionRequests = {
         })
     },
 
-    fetchSuspectSampleData(skip, ips, apiCollectionIds, urls, types, sort, startTimestamp, endTimestamp, subCategory) {
+    fetchSuspectSampleData(skip, ips, apiCollectionIds, urls, types, sort, startTimestamp, endTimestamp) {
         return request({
             url: '/api/fetchSuspectSampleData',
             method: 'post',
@@ -28,8 +28,7 @@ const threatDetectionRequests = {
                 apiCollectionIds: apiCollectionIds,
                 sort: sort,
                 startTimestamp: startTimestamp,
-                endTimestamp: endTimestamp,
-                subCategory: subCategory
+                endTimestamp: endTimestamp
             }
         })
     },

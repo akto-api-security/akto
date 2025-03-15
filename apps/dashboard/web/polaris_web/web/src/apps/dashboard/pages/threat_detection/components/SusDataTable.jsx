@@ -24,11 +24,6 @@ const headers = [
     title: "Api Endpoint",
   },
   {
-    text: "Subcategory",
-    value: "subCategory",
-    title: "Subcategory",
-  },
-  {
     text: "Threat Actor",
     value: "actorComp",
     title: "Actor",
@@ -85,7 +80,6 @@ function SusDataTable({ currDateRange, rowClicked }) {
   const collectionsMap = PersistStore((state) => state.collectionsMap);
   const threatFiltersMap = PersistStore((state) => state.threatFiltersMap);
 
-  const [subCategoryChoices, setSubCategoryChoices] = useState([]);
 
   async function fetchData(
     sortKey,
@@ -100,8 +94,7 @@ function SusDataTable({ currDateRange, rowClicked }) {
     let sourceIpsFilter = [],
       apiCollectionIdsFilter = [],
       matchingUrlFilter = [],
-      typeFilter = [],
-      subCategoryFilter = [];
+      typeFilter = [];
     if (filters?.actor) {
       sourceIpsFilter = filters?.actor;
     }
@@ -114,9 +107,6 @@ function SusDataTable({ currDateRange, rowClicked }) {
     if(filters?.type){
       typeFilter = filters?.type
     }
-    if(filters?.subCategory){
-      subCategoryFilter = filters?.subCategory
-    }
     const sort = { [sortKey]: sortOrder };
     const res = await api.fetchSuspectSampleData(
       skip,
@@ -126,25 +116,21 @@ function SusDataTable({ currDateRange, rowClicked }) {
       typeFilter,
       sort,
       startTimestamp,
-      endTimestamp,
-      subCategoryFilter
+      endTimestamp
     );
-    const distinctSubCategories = Array.from(new Set(res?.maliciousEvents.map((x) => x?.subCategory)));
-    setSubCategoryChoices(distinctSubCategories);
+//    setSubCategoryChoices(distinctSubCategories);
     let total = res.total;
     let ret = res?.maliciousEvents.map((x) => {
       const severity = threatFiltersMap[x?.filterId]?.severity || "HIGH"
       return {
         ...x,
         id: x.id,
-        subCategory: x?.subCategory,
         actorComp: x?.actor,
         endpointComp: (
           <GetPrettifyEndpoint maxWidth="300px" method={x.method} url={x.url} isNew={false} />
         ),
         apiCollectionName: collectionsMap[x.apiCollectionId] || "-",
-        discoveredTs: dayjs(x.timestamp).format("DD-MM-YYYY HH:mm:ss"),
-        subCategoryComp: x?.subCategory || "-",
+        discoveredTs: dayjs(x.timestamp*1000).format("DD-MM-YYYY HH:mm:ss"),
         sourceIPComponent: x?.ip || "-",
         type: x?.type || "-",
         severityComp: (<div className={`badge-wrapper-${severity}`}>
@@ -168,9 +154,6 @@ function SusDataTable({ currDateRange, rowClicked }) {
       return { label: x, value: x };
     });
 
-    let subCategoryChoices = res?.subCategory.map((x) => {
-      return { label: x, value: x };
-    });
 
     filters = [
       {
@@ -184,12 +167,6 @@ function SusDataTable({ currDateRange, rowClicked }) {
         label: "URL",
         title: "URL",
         choices: urlChoices,
-      },
-      {
-        key: "subCategory",
-        label: "Subcategory",
-        title: "Subcategory",
-        choices: subCategoryChoices,
       },
       {
         key: 'type',
