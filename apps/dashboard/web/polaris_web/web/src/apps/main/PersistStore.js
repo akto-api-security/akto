@@ -37,7 +37,17 @@ let persistStore = (set) => ({
     setSubCategoryFromSourceConfigMap: (subCategoryFromSourceConfigMap) => set({ subCategoryFromSourceConfigMap }),
     setActive: (selected) => set({ active: selected }),
     setCollectionsMap: (collectionsMap) => set({ collectionsMap }),
-    setAllCollections: (allCollections) => set({ allCollections }),
+    setAllCollections: (allCollections) => {
+        const optimizedCollections = allCollections.map(({ id, displayName, urlsCount, deactivated, type, automated }) => ({
+            id,
+            displayName,
+            urlsCount,
+            deactivated, 
+            type,
+            automated
+        }));
+        set({ allCollections: optimizedCollections });
+    },
     setHostNameMap: (hostNameMap) => set({ hostNameMap }),
     setLastFetchedInfo: (lastFetchedInfo) => set({ lastFetchedInfo }),
     setLastFetchedResp: (lastFetchedResp) => set({ lastFetchedResp }),
