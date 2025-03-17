@@ -187,7 +187,7 @@ public class StartTestAction extends UserAction {
     private List<String> selectedTestRunResultHexIds;
 
     private int getPeriodInSeconds(boolean recurringDaily, boolean recurringWeekly, boolean recurringMonthly) {
-        if(this.recurringDaily){
+        if(recurringDaily){
             return Constants.ONE_DAY_TIMESTAMP;
         } else if(recurringWeekly){
             return 7 * Constants.ONE_DAY_TIMESTAMP;
