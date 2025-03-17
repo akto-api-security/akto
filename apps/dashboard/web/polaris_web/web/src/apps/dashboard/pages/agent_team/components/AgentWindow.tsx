@@ -30,6 +30,13 @@ function AgentWindow({ agent, onClose, open }: AgentWindowProps) {
                         <FindVulnerabilitiesAgent agentId={agent.id} finalCTAShow={finalCTAShow} setFinalCTAShow={setFinalCTAShow}/>
                     </VerticalStack>
                 )
+            case 'FIND_APIS_FROM_SOURCE_CODE':
+                return (
+                    <VerticalStack gap={"4"}>
+                        {(currentProcessId === null || currentProcessId.length === 0) ? <RepositoryInitializer agentType={agent.id}/> : null}
+                        <FindVulnerabilitiesAgent agentId={agent.id} finalCTAShow={finalCTAShow} setFinalCTAShow={setFinalCTAShow}/>
+                    </VerticalStack>
+                )
             case 'FIND_SENSITIVE_DATA_TYPES':
                 return (
                     <VerticalStack gap={"4"}>
@@ -45,6 +52,8 @@ function AgentWindow({ agent, onClose, open }: AgentWindowProps) {
     function AgentFinalCTA() {
         switch (agent?.id) {
             case 'FIND_VULNERABILITIES_FROM_SOURCE_CODE':
+                return (<></>)
+            case 'FIND_APIS_FROM_SOURCE_CODE':
                 return (<></>)
             case 'FIND_SENSITIVE_DATA_TYPES':
                 return (<SensitiveDataTypeCTA show={finalCTAShow} setShow={setFinalCTAShow}/>)

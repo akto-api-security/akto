@@ -91,6 +91,13 @@ export const PromptComposer = ({ onSend, agentId }: PromptComposerProps) => {
 
     // when selected choices are provided by the user, accepted case should be returned to the agent
     // agent if gets user-input, with the accepted state, it should take that into account
+    console.log("on Resume", {
+      processId: currentProcessId,
+      subProcessId: currentSubprocess,
+      attemptId: currentAttempt,
+      state: filteredUserInput !== null ? State.USER_PROVIDED_SOLUTION : State.ACCEPTED.toString(),
+      data: { selectedOptions: structuredOutputFormat(filteredUserInput, agentId , currentSubprocess || "") }
+    })
 
     await api.updateAgentSubprocess({
       processId: currentProcessId,
