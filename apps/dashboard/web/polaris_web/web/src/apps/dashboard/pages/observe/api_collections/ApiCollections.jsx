@@ -558,6 +558,7 @@ function ApiCollections() {
             return (
                 <ResourceItem
                     id={id}
+                    key={id}
                     media={media}
                     shortcutActions={shortcutActions}
                     persistActions
