@@ -27,6 +27,8 @@ interface AgentsStore {
     setCurrentSubprocess: (subprocess: string) => void;
     currentAttempt: number 
     setCurrentAttempt: (subprocess: number) => void;
+    PRstate: string;
+    setPRState: (state: string) => void;
     resetStore: () => void;
 }
 
@@ -56,6 +58,8 @@ export const useAgentsStore = create<AgentsStore>()(
                 setCurrentProcessId: (currentProcessId: string) => set({ currentProcessId: currentProcessId }),
                 currentAttempt: 0,
                 setCurrentAttempt: (attempt: number) => set({ currentAttempt: attempt }),
+                PRstate: "-1",
+                setPRState: (state: string) => set({ PRstate: state }),
 
                 resetStore: () => set({
                     attemptedInBlockedState: false,
@@ -64,6 +68,7 @@ export const useAgentsStore = create<AgentsStore>()(
                     currentSubprocess: '0',
                     currentProcessId: "",
                     currentAttempt: 0,
+                    PRstate: "-1",
                 }),
             }),
             { name: "agentsStore", storage: createJSONStorage(() => localStorage) }
