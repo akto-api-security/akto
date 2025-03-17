@@ -16,13 +16,15 @@ import RunTestSuites from "./RunTestSuites";
 import RunTestConfiguration from "./RunTestConfiguration";
 import createTestName from "./Utils"
 
-function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOutside, closeRunTest, selectedResourcesForPrimaryAction, useLocalSubCategoryData, preActivator, testIdConfig, activeFromTesting, setActiveFromTesting, showEditableSettings, setShowEditableSettings, parentAdvanceSettingsConfig, testRunType }) {
+function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOutside, closeRunTest, selectedResourcesForPrimaryAction, useLocalSubCategoryData, preActivator, testIdConfig, activeFromTesting, setActiveFromTesting, showEditableSettings, setShowEditableSettings, parentAdvanceSettingsConfig, testRunType, shouldDisable }) {
 
     const initialState = {
         categories: [],
         tests: {},
         selectedCategory: "BOLA",
         recurringDaily: false,
+        recurringWeekly: false,
+        recurringMonthly: false,
         continuousTesting: false,
         overriddenTestAppUrl: "",
         hasOverriddenTestAppUrl: false,
@@ -224,6 +226,8 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                     sendSlackAlert: testIdConfig?.sendSlackAlert,
                     sendMsTeamsAlert: testIdConfig?.sendMsTeamsAlert,
                     recurringDaily: testIdConfig?.periodInSeconds === 86400,
+                    recurringMonthly: testIdConfig?.periodInSeconds === (86400 * 30), // 30 days
+                    recurringWeekly: testIdConfig?.periodInSeconds === (86400 * 7),  // one week
                     continuousTesting: testIdConfig?.periodInSeconds === -1
                 }));
         }
@@ -430,7 +434,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
 
     const testRunTimeOptions = [...runTimeMinutes, ...runTimeHours]
 
-    const runTypeOptions = [{ label: "Daily", value: "Daily" }, { label: "Continuously", value: "Continuously" }, { label: "Once", value: "Once" }]
+    const runTypeOptions = [{ label: "Daily", value: "Daily" }, {label: 'Weekly',value: 'Weekly'}, {label: 'Monthly', value: 'weekly'}, { label: "Continuously", value: "Continuously" }, { label: "Once", value: "Once" }]
 
     const maxRequests = hours.reduce((abc, x) => {
         if (x < 11) {
@@ -446,7 +450,12 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         if (testRun.hourlyLabel === "Now") {
             if (testRun.recurringDaily) {
                 return <div data-testid="schedule_run_button">Run daily at this time</div>
-            } else if (testRun.continuousTesting) {
+            } else if (testRun.recurringWeekly) { 
+                return <div data-testid="schedule_run_button">Run weekly at this time</div>
+            } else if (testRun.recurringMonthly) {
+                return <div data-testid="schedule_run_button">Run monthly at this time</div>
+            }
+            else if (testRun.continuousTesting) {
                 return <div data-testid="schedule_run_button">Run continuous testing</div>
             } else {
                 return <div data-testid="schedule_run_button">Run once {func.prettifyFutureEpoch(testRun.startTimestamp)}</div>
@@ -454,8 +463,11 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         } else {
             if (testRun.recurringDaily) {
                 return <div data-testid="schedule_run_button">Run daily at {testRun.hourlyLabel}</div>
-
-            } else {
+            } else if (testRun.recurringWeekly) { 
+                return <div data-testid="schedule_run_button">Run weekly at {testRun.hourlyLabel}</div>
+            } else if (testRun.recurringMonthly) {
+                return <div data-testid="schedule_run_button">Run monthly at {testRun.hourlyLabel}</div>
+            }else {
                 return <div data-testid="schedule_run_button">Run once at {func.prettifyFutureEpoch(testRun.startTimestamp)}</div>
             }
         }
@@ -487,7 +499,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
     }
 
     async function handleRun() {
-        const { startTimestamp, recurringDaily, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, cleanUpTestingResources } = testRun
+        const { startTimestamp, recurringDaily, recurringMonthly, recurringWeekly,  testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, cleanUpTestingResources } = testRun
         const collectionId = parseInt(apiCollectionId)
 
         const tests = testRun.tests
@@ -528,9 +540,9 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         }
 
         if (filtered || selectedResourcesForPrimaryAction?.length > 0) {
-            await observeApi.scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, "TESTING_UI", testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, finalAdvancedConditions, cleanUpTestingResources)
+            await observeApi.scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, recurringWeekly, recurringMonthly, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, "TESTING_UI", testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, finalAdvancedConditions, cleanUpTestingResources)
         } else {
-            await observeApi.scheduleTestForCollection(collectionId, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, finalAdvancedConditions, cleanUpTestingResources)
+            await observeApi.scheduleTestForCollection(collectionId, startTimestamp, recurringDaily, recurringWeekly, recurringMonthly, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, finalAdvancedConditions, cleanUpTestingResources)
         }
 
         setActive(false)
@@ -667,7 +679,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
             <Modal.Section>
                 <>
                     <RunTestConfiguration
-                        timeFieldsDisabled={showEditableSettings || activeFromTesting}
+                        timeFieldsDisabled={shouldDisable}
                         testRun={testRun}
                         setTestRun={setTestRun}
                         runTypeOptions={runTypeOptions}
@@ -841,7 +853,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                                     </div>
                                 </div>
                                 <RunTestConfiguration
-                                    timeFieldsDisabled={showEditableSettings || activeFromTesting}
+                                    timeFieldsDisabled={shouldDisable}
                                     testRun={testRun}
                                     setTestRun={setTestRun}
                                     runTypeOptions={runTypeOptions}
@@ -871,7 +883,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                                 checkRemoveAll={checkRemoveAll} handleModifyConfig={handleModifyConfig} /> :
                                 <>
                                     <RunTestConfiguration
-                                        timeFieldsDisabled={showEditableSettings || activeFromTesting}
+                                        timeFieldsDisabled={shouldDisable}
                                         testRun={testRun}
                                         setTestRun={setTestRun}
                                         runTypeOptions={runTypeOptions}

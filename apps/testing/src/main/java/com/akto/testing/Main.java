@@ -882,7 +882,7 @@ public class Main {
         String testType = "ONE_TIME";
         if(testingRun.getPeriodInSeconds()>0)
         {
-            testType = "SCHEDULED DAILY";
+            testType = "SCHEDULED";
         }
         if (testingRunResultSummary.getMetadata() != null) {
             testType = "CI_CD";

@@ -67,6 +67,8 @@ public class StartTestAction extends UserAction {
     private int testRunTime;
     private int maxConcurrentRequests;
     boolean recurringDaily;
+    boolean recurringWeekly;
+    boolean recurringMonthly;
     private List<TestingRun> testingRuns;
     private AuthMechanism authMechanism;
     private int endTimestamp;
@@ -183,6 +185,18 @@ public class StartTestAction extends UserAction {
     private List<TestConfigsAdvancedSettings> testConfigsAdvancedSettings;
 
     private List<String> selectedTestRunResultHexIds;
+
+    private int getPeriodInSeconds(boolean recurringDaily, boolean recurringWeekly, boolean recurringMonthly) {
+        if(recurringDaily){
+            return Constants.ONE_DAY_TIMESTAMP;
+        } else if(recurringWeekly){
+            return 7 * Constants.ONE_DAY_TIMESTAMP;
+        } else if(recurringMonthly){
+            return Constants.ONE_MONTH_TIMESTAMP;
+        } else {
+            return 0;
+        }
+    }
     public String startTest() {
 
         if (this.startTimestamp != 0 && this.startTimestamp + 86400 < Context.now()) {
@@ -206,7 +220,7 @@ public class StartTestAction extends UserAction {
         }
         if (localTestingRun == null) {
             try {
-                localTestingRun = createTestingRun(scheduleTimestamp, this.recurringDaily ? 86400 : 0);
+                localTestingRun = createTestingRun(scheduleTimestamp, getPeriodInSeconds(recurringDaily, recurringWeekly, recurringMonthly));
                 // pass boolean from ui, which will tell if testing is coniinuous on new endpoints
                 if (this.continuousTesting) {
                     localTestingRun.setPeriodInSeconds(-1);
@@ -1276,14 +1290,20 @@ public class StartTestAction extends UserAction {
                                         editableTestingRunConfig.getSendMsTeamsAlert()));
                     }
 
-                    int periodInSeconds = 0;
+                    int periodInSeconds = getPeriodInSeconds(editableTestingRunConfig.getRecurringDaily(), editableTestingRunConfig.getRecurringWeekly(), editableTestingRunConfig.getRecurringMonthly());
                     if (editableTestingRunConfig.getContinuousTesting()) {
                         periodInSeconds = -1;
-                    } else if (editableTestingRunConfig.getRecurringDaily()) {
-                        periodInSeconds = 86400;
                     }
-                    if (existingTestingRun.getPeriodInSeconds() != periodInSeconds) {
+                    if (existingTestingRun.getPeriodInSeconds() != periodInSeconds && periodInSeconds != 0) {
                         updates.add(Updates.set(TestingRun.PERIOD_IN_SECONDS, periodInSeconds));
+                    }
+                    if(editableTestingRunConfig.getScheduleTimestamp() > 0){
+                        updates.add(
+                            Updates.combine(
+                                Updates.set(TestingRun.SCHEDULE_TIMESTAMP, editableTestingRunConfig.getScheduleTimestamp()),
+                                Updates.set(TestingRun.STATE, State.SCHEDULED)
+                            )
+                        );
                     }
                 
                     if (!updates.isEmpty()) {
@@ -1766,4 +1786,14 @@ public class StartTestAction extends UserAction {
     public void setSendMsTeamsAlert(boolean sendMsTeamsAlert) {
         this.sendMsTeamsAlert = sendMsTeamsAlert;
     }
+
+    public void setRecurringWeekly(boolean recurringWeekly) {
+        this.recurringWeekly = recurringWeekly;
+    }
+
+    
+    public void setRecurringMonthly(boolean recurringMonthly) {
+        this.recurringMonthly = recurringMonthly;
+    }
+
 }
