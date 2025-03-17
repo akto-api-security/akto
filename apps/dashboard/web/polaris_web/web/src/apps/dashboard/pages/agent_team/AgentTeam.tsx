@@ -85,15 +85,15 @@ function AgentTeam() {
                 title={
                     <TitleWithInfo
                         tooltipContent={"These are AI agents that can be used to provide insights"}
-                        titleText={"Members"}
+                        titleText={"AI Agents"}
                         // TODO: implement docsUrl functionality
                         docsUrl={"https://docs.akto.io"}
                     />
                 }
-                secondaryActions={[
-                    // TODO: implement Knowledge base functionality
-                    <Button id={"Knowledge-base"} onClick={() => {}}>Knowledge base</Button>
-                ]}
+                // secondaryActions={[
+                //     // TODO: implement Knowledge base functionality
+                //     <Button id={"Knowledge-base"} onClick={() => {}}>Knowledge base</Button>
+                // ]}
             />
             <AgentWindow agent={currentAgent} onClose={closeAction} open={showAgentWindow} />
         </>
