@@ -13,21 +13,18 @@ import com.akto.dto.test_editor.ExecuteAlgoObj;
 import com.akto.dto.test_editor.ExecutorNode;
 import com.akto.dto.test_editor.ExecutorSingleOperationResp;
 import com.akto.dto.test_editor.ExecutorSingleRequest;
-import com.akto.dto.testing.AuthMechanism;
 
 public class ExecutorAlgorithm {
 
     private RawApi sampleRawApi;
     private Map<String, Object> varMap;
-    private AuthMechanism authMechanism;
     private List<CustomAuthType> customAuthTypes;
     private Executor executor = new Executor();
 
-    public ExecutorAlgorithm(RawApi sampleRawApi, Map<String, Object> varMap, AuthMechanism authMechanism,
+    public ExecutorAlgorithm(RawApi sampleRawApi, Map<String, Object> varMap,
         List<CustomAuthType> customAuthTypes) {
         this.sampleRawApi = sampleRawApi;
         this.varMap = varMap;
-        this.authMechanism = authMechanism;
         this.customAuthTypes = customAuthTypes;
     }
 
@@ -111,7 +108,7 @@ public class ExecutorAlgorithm {
                     valIndex = (valIndex + 1)%valList.size();
                 }
             }
-            ExecutorSingleOperationResp resp = executor.invokeOperation(executorNode.getOperationType(), key, val, rawApis.get(rawApiIndex), varMap, authMechanism, customAuthTypes, apiInfoKey);
+            ExecutorSingleOperationResp resp = executor.invokeOperation(executorNode.getOperationType(), key, val, rawApis.get(rawApiIndex), varMap, customAuthTypes, apiInfoKey);
             if (!resp.getSuccess()) {
                 return new ExecutorSingleRequest(false, resp.getErrMsg(), null, false);
             }

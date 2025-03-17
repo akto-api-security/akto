@@ -11,7 +11,6 @@ import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.URLMethods;
-import com.akto.store.AuthMechanismStore;
 import com.akto.store.SampleMessageStore;
 import com.akto.store.TestingUtil;
 import org.apache.commons.lang3.StringUtils;
@@ -68,8 +67,7 @@ public class TestExecutorTest extends MongoBasedTest {
         Set<Integer> apiCollectionSet = new HashSet<>();
         apiCollectionSet.add(0);
         messageStore.fetchSampleMessages(apiCollectionSet);
-        AuthMechanismStore authMechanismStore = AuthMechanismStore.create(null);
-        TestingUtil testingUtil = new TestingUtil(authMechanismStore.getAuthMechanism(), messageStore, new ArrayList<>(), "", new ArrayList<>());
+        TestingUtil testingUtil = new TestingUtil(messageStore, new ArrayList<>(), "", new ArrayList<>());
 
         OriginalHttpRequest request = TestExecutor.findOriginalHttpRequest(apiInfoKey, testingUtil.getSampleMessages(),
                 messageStore);

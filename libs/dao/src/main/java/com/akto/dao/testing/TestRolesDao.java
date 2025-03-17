@@ -64,50 +64,7 @@ public class TestRolesDao extends AccountsContextDao<TestRoles> {
 
     public AuthMechanism fetchAttackerToken(int apiCollectionId, RawApi rawApi) {
         TestRoles testRoles = TestRolesDao.instance.findOne(TestRoles.NAME, "ATTACKER_TOKEN_ALL");
-        if (testRoles != null && testRoles.getAuthWithCondList().size() > 0) {
-            List<AuthWithCond> authWithCondList = testRoles.getAuthWithCondList();
-            AuthWithCond firstAuth = authWithCondList.get(0);
-            AuthMechanism defaultAuthMechanism = firstAuth.getAuthMechanism();
-            if(firstAuth.getRecordedLoginFlowInput()!=null){
-                defaultAuthMechanism.setRecordedLoginFlowInput(firstAuth.getRecordedLoginFlowInput());
-            }
-            if (rawApi == null) {
-                return defaultAuthMechanism;
-            } else {
-                try {
-                    Map<String, List<String>> reqHeaders = rawApi.getRequest().getHeaders();
-                    for (AuthWithCond authWithCond: authWithCondList)  {
-                        Map<String, String> headerKVPairs = authWithCond.getHeaderKVPairs();
-                        if (headerKVPairs == null) continue;
-
-                        boolean allHeadersMatched = true;
-                        for(String hKey: headerKVPairs.keySet()) {
-                            String hVal = authWithCond.getHeaderKVPairs().get(hKey);
-                            if (reqHeaders.containsKey(hKey.toLowerCase())) {
-                                if (!reqHeaders.get(hKey.toLowerCase()).contains(hVal)) {
-                                    allHeadersMatched = false;
-                                    break;
-                                }
-                            }
-                        }
-
-                        if (allHeadersMatched) {
-                            defaultAuthMechanism = authWithCond.getAuthMechanism();
-                            if(authWithCond.getRecordedLoginFlowInput()!=null){
-                                defaultAuthMechanism.setRecordedLoginFlowInput(authWithCond.getRecordedLoginFlowInput());
-                            }
-                            return defaultAuthMechanism;
-                        }
-                    }
-                } catch (Exception e) {
-                    return defaultAuthMechanism;
-                }
-            }
-
-            return defaultAuthMechanism;
-        }
-
-        return null;
+        return testRoles.findMatchinAuthMechanism(rawApi).getFirst();
     }
 
     public BasicDBObject fetchAttackerTokenDoc(int apiCollectionId) {

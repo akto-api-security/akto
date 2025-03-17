@@ -5,7 +5,6 @@ import com.akto.util.TokenPayloadModifier;
 public class LoginRequestAuthParam extends AuthParam {
 
     private Location where;
-
     private String key;
     private String value;
     private Boolean showHeader;
@@ -17,6 +16,11 @@ public class LoginRequestAuthParam extends AuthParam {
         this.value = value;
         this.where = where;
         this.showHeader = showHeader;
+    }
+
+    @Override
+    protected AuthParam copy() {
+        return new LoginRequestAuthParam(where, key, value, showHeader);
     }
 
     @Override

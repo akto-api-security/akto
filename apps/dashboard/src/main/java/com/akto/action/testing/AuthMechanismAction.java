@@ -100,9 +100,8 @@ public class AuthMechanismAction extends UserAction {
 
         AuthMechanism authMechanism = new AuthMechanism(authParams, requestData, type, null);
 
-        TestExecutor testExecutor = new TestExecutor();
         try {
-            LoginFlowResponse loginFlowResponse = testExecutor.executeLoginFlow(authMechanism, null, null);
+            LoginFlowResponse loginFlowResponse = TestExecutor.triggerLoginFlow(authMechanism, null, null, 1);
             responses = loginFlowResponse.getResponses();
             if (!loginFlowResponse.getSuccess()) {
                 throw new Exception(loginFlowResponse.getError());
@@ -124,10 +123,9 @@ public class AuthMechanismAction extends UserAction {
 
         AuthMechanism authMechanism = new AuthMechanism(authParams, requestData, type, null);
 
-        TestExecutor testExecutor = new TestExecutor();
         try {
             LoginFlowParams loginFlowParams = new LoginFlowParams(getSUser().getId(), true, nodeId);
-            LoginFlowResponse loginFlowResponse = testExecutor.executeLoginFlow(authMechanism, loginFlowParams, null);
+            LoginFlowResponse loginFlowResponse = TestExecutor.triggerLoginFlow(authMechanism, loginFlowParams, null, 1);
             responses = loginFlowResponse.getResponses();
             if (!loginFlowResponse.getSuccess()) {
                 throw new Exception(loginFlowResponse.getError());

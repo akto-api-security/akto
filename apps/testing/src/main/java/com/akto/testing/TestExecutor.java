@@ -39,7 +39,6 @@ import com.akto.dto.type.URLMethods.Method;
 import com.akto.github.GithubUtils;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-import com.akto.store.AuthMechanismStore;
 import com.akto.store.SampleMessageStore;
 import com.akto.store.TestingUtil;
 import com.akto.test_editor.execution.Build;
@@ -203,7 +202,6 @@ public class TestExecutor {
 
         List<RawApi> rawApis = sampleMessageStore.findSampleMessages(1);
         RawApi randomRawApi = !rawApis.isEmpty() ? rawApis.get(0) : null;
-        AuthMechanismStore authMechanismStore = AuthMechanismStore.create(randomRawApi);
 
         if (apiInfoKeyList == null || apiInfoKeyList.isEmpty()) return;
         loggerMaker.infoAndAddToDb("APIs found: " + apiInfoKeyList.size(), LogDb.TESTING);
@@ -213,7 +211,6 @@ public class TestExecutor {
             Updates.set(TestingRunResultSummary.TOTAL_APIS, apiInfoKeyList.size()));
 
         List<TestRoles> testRoles = sampleMessageStore.fetchTestRoles();
-        AuthMechanism authMechanism = authMechanismStore.getAuthMechanism();
 
         //Updating the subcategory list if its individual run
         List<String> testingRunSubCategories;
@@ -226,30 +223,24 @@ public class TestExecutor {
         Map<String, TestConfig> testConfigMap = YamlTemplateDao.instance.fetchTestConfigMap(false, true, 0, 10_000, Filters.in("_id", testingRunSubCategories));
 
         List<CustomAuthType> customAuthTypes = CustomAuthTypeDao.instance.findAll(CustomAuthType.ACTIVE,true);
-        TestingUtil testingUtil = new TestingUtil(authMechanism, sampleMessageStore, testRoles, testingRun.getUserEmail(), customAuthTypes);
+        TestingUtil testingUtil = new TestingUtil(sampleMessageStore, testRoles, testingRun.getUserEmail(), customAuthTypes);
 
         logger.info("For account: " + accountId + " fetched test yamls and auth types");
 
         try {
             logger.info("For account: " + accountId + " initiating login flow");
-            LoginFlowResponse loginFlowResponse = triggerLoginFlow(authMechanism, 3);
-            if (!loginFlowResponse.getSuccess()) {
-                loggerMaker.errorAndAddToDb("login flow failed", LogDb.TESTING);
-                throw new Exception("login flow failed");
-            }
+            // LoginFlowResponse loginFlowResponse = triggerLoginFlow(authMechanism, 3);
+            // if (!loginFlowResponse.getSuccess()) {
+            //     loggerMaker.errorAndAddToDb("login flow failed", LogDb.TESTING);
+            //     throw new Exception("login flow failed");
+            // }
+            Executor.modifyAuthTokenInRawApi(TestRolesDao.instance.findOne(TestRoles.NAME, "ATTACKER_TOKEN_ALL"), randomRawApi);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e.getMessage(), LogDb.TESTING);
             return;
         }
 
         Map<ApiInfo.ApiInfoKey, List<String>> sampleDataMapForStatusCodeAnalyser = new HashMap<>();
-        Set<ApiInfo.ApiInfoKey> apiInfoKeySet = new HashSet<>(apiInfoKeyList);
-        Map<ApiInfo.ApiInfoKey, List<String>> sampleMessages = sampleMessageStore.getSampleDataMap();
-        for (ApiInfo.ApiInfoKey apiInfoKey: sampleMessages.keySet()) {
-            if (apiInfoKeySet.contains(apiInfoKey)) {
-                sampleDataMapForStatusCodeAnalyser.put(apiInfoKey, sampleMessages.get(apiInfoKey));
-            }
-        }
 
         int currentTime = Context.now();
         Map<String, String> hostAndContentType = new HashMap<>();
@@ -268,17 +259,6 @@ public class TestExecutor {
         } catch (Exception e){
             loggerMaker.errorAndAddToDb("Error while running HostValidator " + e.getMessage(), LogDb.TESTING);
         }
-        try {
-            currentTime = Context.now();
-            loggerMaker.infoAndAddToDb("Starting StatusCodeAnalyser at: " + currentTime, LogDb.TESTING);
-            StatusCodeAnalyser.run(sampleDataMapForStatusCodeAnalyser, sampleMessageStore , authMechanismStore, testingRun.getTestingRunConfig(), hostAndContentType);
-            loggerMaker.infoAndAddToDb("Completing StatusCodeAnalyser in: " + (Context.now() -  currentTime) + " at: " + Context.now(), LogDb.TESTING);
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("Error while running status code analyser " + e.getMessage(), LogDb.TESTING);
-        }
-
-        loggerMaker.infoAndAddToDb("StatusCodeAnalyser result = " + StatusCodeAnalyser.result, LogDb.TESTING);
-        loggerMaker.infoAndAddToDb("StatusCodeAnalyser defaultPayloadsMap = " + StatusCodeAnalyser.defaultPayloadsMap, LogDb.TESTING);
 
         ConcurrentHashMap<String, String> subCategoryEndpointMap = new ConcurrentHashMap<>();
         Map<ApiInfoKey, String> apiInfoKeyToHostMap = new HashMap<>();
@@ -571,7 +551,7 @@ public class TestExecutor {
         return null;
     }
 
-    private LoginFlowResponse triggerLoginFlow(AuthMechanism authMechanism, int retries) {
+    public static LoginFlowResponse triggerLoginFlow(AuthMechanism authMechanism, LoginFlowParams loginFlowParams, String roleName, int retries) {
         LoginFlowResponse loginFlowResponse = null;
         for (int i=0; i<retries; i++) {
             try {
@@ -588,7 +568,7 @@ public class TestExecutor {
         return loginFlowResponse;
     }
 
-    public static LoginFlowResponse executeLoginFlow(AuthMechanism authMechanism, LoginFlowParams loginFlowParams, String roleName) throws Exception {
+    private static LoginFlowResponse executeLoginFlow(AuthMechanism authMechanism, LoginFlowParams loginFlowParams, String roleName) throws Exception {
 
         if (authMechanism.getType() == null) {
             loggerMaker.infoAndAddToDb("auth type value is null", LogDb.TESTING);
@@ -744,12 +724,6 @@ public class TestExecutor {
     public void trim(List<TestingRunResult> testingRunResults) {
         for (TestingRunResult testingRunResult: testingRunResults) {
             trim(testingRunResult);
-        }
-    }
-
-    private synchronized void checkAndUpdateAuthMechanism(int timeNow, AuthMechanism authMechanism){
-        if(expiryTimeOfAuthToken != -1 && expiryTimeOfAuthToken <= timeNow){
-            triggerLoginFlow(authMechanism, 3);
         }
     }
 
@@ -1003,7 +977,7 @@ public class TestExecutor {
         com.akto.test_editor.execution.Executor executor = new Executor();
         executor.overrideTestUrl(rawApi, testingRunConfig);
         YamlTestTemplate yamlTestTemplate = new YamlTestTemplate(apiInfoKey,filterNode, validatorNode, executorNode,
-                rawApi, varMap, auth, testingUtil.getAuthMechanism(), testExecutionLogId, testingRunConfig, customAuthTypes, testConfig.getStrategy());
+                rawApi, varMap, auth, testExecutionLogId, testingRunConfig, customAuthTypes, testConfig.getStrategy());
         YamlTestResult testResults = yamlTestTemplate.run(debug, testLogs);
         if (testResults == null || testResults.getTestResults().isEmpty()) {
             List<GenericTestResult> res = new ArrayList<>();

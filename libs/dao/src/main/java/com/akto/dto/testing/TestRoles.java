@@ -1,12 +1,15 @@
 package com.akto.dto.testing;
 
 import com.akto.dao.testing.EndpointLogicalGroupDao;
+import com.akto.dto.RawApi;
 import com.akto.dto.testing.sources.AuthWithCond;
+import com.akto.util.Pair;
 import com.mongodb.client.model.Filters;
 import org.bson.codecs.pojo.annotations.BsonIgnore;
 import org.bson.types.ObjectId;
 
 import java.util.List;
+import java.util.Map;
 
 import static com.akto.util.Constants.ID;
 
@@ -134,5 +137,54 @@ public class TestRoles {
             }
         }
         return null;
+    }
+
+    public Pair<AuthMechanism, Integer> findMatchinAuthMechanism(RawApi rawApi) {
+        if (this.getAuthWithCondList().size() > 0) {
+            int index = 0;
+            List<AuthWithCond> authWithCondList = this.getAuthWithCondList();
+            AuthWithCond firstAuth = authWithCondList.get(0);
+            AuthMechanism defaultAuthMechanism = firstAuth.getAuthMechanism();
+            if(firstAuth.getRecordedLoginFlowInput()!=null){
+                defaultAuthMechanism.setRecordedLoginFlowInput(firstAuth.getRecordedLoginFlowInput());
+            }
+            if (rawApi == null) {
+                return new Pair<>(defaultAuthMechanism, 0);
+            } else {
+                try {
+                    Map<String, List<String>> reqHeaders = rawApi.getRequest().getHeaders();
+                    for (AuthWithCond authWithCond: authWithCondList)  {
+                        Map<String, String> headerKVPairs = authWithCond.getHeaderKVPairs();
+                        if (headerKVPairs == null) continue;
+
+                        boolean allHeadersMatched = true;
+                        for(String hKey: headerKVPairs.keySet()) {
+                            String hVal = authWithCond.getHeaderKVPairs().get(hKey);
+                            if (reqHeaders.containsKey(hKey.toLowerCase())) {
+                                if (!reqHeaders.get(hKey.toLowerCase()).contains(hVal)) {
+                                    allHeadersMatched = false;
+                                    break;
+                                }
+                            }
+                        }
+
+                        if (allHeadersMatched) {
+                            defaultAuthMechanism = authWithCond.getAuthMechanism();
+                            if(authWithCond.getRecordedLoginFlowInput()!=null){
+                                defaultAuthMechanism.setRecordedLoginFlowInput(authWithCond.getRecordedLoginFlowInput());
+                            }
+                            return new Pair<>(defaultAuthMechanism, index);
+                        }
+                        index++;
+                    }
+                } catch (Exception e) {
+                    return new Pair<>(defaultAuthMechanism, 0);
+                }
+            }
+
+            return new Pair<>(defaultAuthMechanism, 0);
+        }
+
+        return null;        
     }
 }

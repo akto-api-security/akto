@@ -1,48 +1,52 @@
 package com.akto.store;
 
+import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 
 import com.akto.dao.context.Context;
+import com.akto.dto.testing.AuthParam;
 import com.akto.util.Pair;
 
 public class TestRolesCache {
-    private static final ConcurrentHashMap<String, Pair<String, Integer>> tokensMap = new ConcurrentHashMap<>();
+    private static final ConcurrentHashMap<String, Pair<List<AuthParam>, Integer>> mapRoleToTokensAndFetchEpoch = new ConcurrentHashMap<>();
     private static final int DEFAULT_EXPIRY_TIME = 30 * 60; // 30 minutes
-    private static final ConcurrentHashMap<String, Integer> tokenExpiryMap = new ConcurrentHashMap<>();
+    private static final ConcurrentHashMap<String, Integer> mapRoleToExpiryEpoch = new ConcurrentHashMap<>();
 
     // in case of multiple headers, parse this token string, storing the token as json string
 
-    public static void putToken(String roleName, String token, int fetchTime) {
-        tokensMap.put(roleName, new Pair<>(token, fetchTime));
+    public static void putToken(String roleKey, List<AuthParam> tokens, int fetchTime) {
+        mapRoleToTokensAndFetchEpoch.put(roleKey, new Pair<List<AuthParam>,Integer>(tokens, fetchTime));
     }
 
-    public static void addTokenExpiry(String roleName, int expiryTime) {
-        tokenExpiryMap.put(roleName, expiryTime);
+    public static void addTokenExpiry(String roleKey, int expiryTime) {
+        mapRoleToExpiryEpoch.put(roleKey, expiryTime);        
     }
 
-    public static String getTokenForRole(String roleName, int updatedTs) {
-        if(tokensMap.isEmpty()){
+    public static List<AuthParam> getTokenForRole(String roleKey, int updatedTs) {
+        if(mapRoleToTokensAndFetchEpoch.isEmpty()){
             return null;
         }
-        Pair<String, Integer> tokenPair = tokensMap.get(roleName);
+        Pair<List<AuthParam>, Integer> tokenPair = mapRoleToTokensAndFetchEpoch.get(roleKey);
         if (tokenPair == null) {
             return null;
         }
         if(tokenPair.getSecond() < updatedTs) {
-            tokensMap.remove(roleName);
+            mapRoleToTokensAndFetchEpoch.remove(roleKey);
             return null;
         }
-        int expiryTime = tokenExpiryMap.getOrDefault(roleName, 0);
+        int expiryTime = mapRoleToExpiryEpoch.getOrDefault(roleKey, 0);
         if(expiryTime != 0){
             if(expiryTime < Context.now()){
-                tokensMap.remove(roleName);
+                mapRoleToTokensAndFetchEpoch.remove(roleKey);
                 return null;
             }
         }
+
         if (Context.now() - tokenPair.getSecond() > DEFAULT_EXPIRY_TIME) {
-            tokensMap.remove(roleName);
+            mapRoleToTokensAndFetchEpoch.remove(roleKey);
             return null;
         }
+
         return tokenPair.getFirst();
     }
 

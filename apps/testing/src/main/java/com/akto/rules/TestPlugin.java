@@ -15,7 +15,6 @@ import com.akto.store.SampleMessageStore;
 import com.akto.store.TestingUtil;
 import com.akto.test_editor.filter.Filter;
 import com.akto.test_editor.filter.data_operands_impl.ValidationResult;
-import com.akto.testing.StatusCodeAnalyser;
 import com.akto.types.CappedSet;
 import com.akto.util.JSONUtils;
 import com.fasterxml.jackson.core.JsonFactory;
@@ -324,11 +323,10 @@ public abstract class TestPlugin {
 
         OriginalHttpResponse response = testRawApi.getResponse();
         String body = response == null ? null : response.getBody();
-        boolean isDefaultPayload = StatusCodeAnalyser.isDefaultPayload(body);
         ValidationResult validateResult = validate(validatorNode,rawApi,testRawApi, apiInfoKey,"validator", varMap, logId);
 
         // loggerMaker.infoAndAddToDb(logId + " isDefaultPayload = " + isDefaultPayload + "; validateResult = " + validateResult, LogDb.TESTING);
-        return !isDefaultPayload && validateResult.getIsValid();
+        return validateResult.getIsValid();
     }
 
     private static ValidationResult validate(FilterNode node, RawApi rawApi, RawApi testRawApi, ApiInfoKey apiInfoKey, String context, Map<String, Object> varMap, String logId) {

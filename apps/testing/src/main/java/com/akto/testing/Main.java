@@ -374,7 +374,7 @@ public class Main {
     }
 
     public static void main(String[] args) throws InterruptedException {
-        String mongoURI = System.getenv("AKTO_MONGO_CONN");
+        String mongoURI = "mongodb://localhost:27017/admini";//System.getenv("AKTO_MONGO_CONN");
         ReadPreference readPreference = ReadPreference.primary();
         WriteConcern writeConcern = WriteConcern.W1;
         DaoInit.init(new ConnectionString(mongoURI), readPreference, writeConcern);

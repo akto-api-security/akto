@@ -27,9 +27,9 @@ import com.akto.dto.test_editor.ExecutorNode;
 import com.akto.dto.test_editor.ExecutorSingleRequest;
 import com.akto.dto.test_editor.FilterNode;
 import com.akto.dto.test_editor.TestConfig;
-import com.akto.dto.testing.AuthMechanism;
 import com.akto.dto.testing.GenericTestResult;
 import com.akto.dto.testing.TestResult;
+import com.akto.dto.testing.TestRoles;
 import com.akto.dto.testing.TestingRunConfig;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.WorkflowTestResult;
@@ -103,14 +103,13 @@ public class YamlNodeExecutor extends NodeExecutor {
             }
         }
 
-        AuthMechanism authMechanism = yamlNodeDetails.getAuthMechanism();
         List<CustomAuthType> customAuthTypes = yamlNodeDetails.getCustomAuthTypes();
 
         ExecutionListBuilder executionListBuilder = new ExecutionListBuilder();
         List<ExecutorNode> executorNodes = new ArrayList<>();
         boolean followRedirect = executionListBuilder.buildExecuteOrder(executorNode, executorNodes);
 
-        ExecutorAlgorithm executorAlgorithm = new ExecutorAlgorithm(sampleRawApi, varMap, authMechanism, customAuthTypes);
+        ExecutorAlgorithm executorAlgorithm = new ExecutorAlgorithm(sampleRawApi, varMap, customAuthTypes);
         Map<Integer, ExecuteAlgoObj> algoMap = new HashMap<>();
         ExecutorSingleRequest singleReq = executorAlgorithm.execute(executorNodes, 0, algoMap, rawApis, false, 0, yamlNodeDetails.getApiInfoKey());
 
@@ -311,12 +310,11 @@ public class YamlNodeExecutor extends NodeExecutor {
         json.put("responseHeaders", gson.toJson(m2));
         json.put("statusCode", Integer.toString(rawApi.getResponse().getStatusCode()));
         
-        AuthMechanism authMechanism = yamlNodeDetails.getAuthMechanism();
         Map<ApiInfo.ApiInfoKey, List<String>> sampleDataMap = new HashMap<>();
         sampleDataMap.put(yamlNodeDetails.getApiInfoKey(), Collections.singletonList(json.toString()));
         SampleMessageStore messageStore = SampleMessageStore.create(sampleDataMap);
         List<CustomAuthType> customAuthTypes = yamlNodeDetails.getCustomAuthTypes();
-        TestingUtil testingUtil = new TestingUtil(authMechanism, messageStore, null, null, customAuthTypes);
+        TestingUtil testingUtil = new TestingUtil(messageStore, null, null, customAuthTypes);
         TestExecutor executor = new TestExecutor();
         ApiInfoKey infoKey = yamlNodeDetails.getApiInfoKey();
         List<String> samples = testingUtil.getSampleMessages().get(infoKey);

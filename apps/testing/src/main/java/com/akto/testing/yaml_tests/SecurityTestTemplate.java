@@ -28,7 +28,6 @@ public abstract class SecurityTestTemplate {
     RawApi rawApi;
     Map<String, Object> varMap;
     Auth auth;
-    AuthMechanism authMechanism;
     String logId;
 
     TestingRunConfig testingRunConfig;
@@ -36,7 +35,7 @@ public abstract class SecurityTestTemplate {
 
     Memory memory;
 
-    public SecurityTestTemplate(ApiInfo.ApiInfoKey apiInfoKey, FilterNode filterNode, FilterNode validatorNode, ExecutorNode executorNode ,RawApi rawApi, Map<String, Object> varMap, Auth auth, AuthMechanism authMechanism, String logId, TestingRunConfig testingRunConfig, Strategy strategy) {
+    public SecurityTestTemplate(ApiInfo.ApiInfoKey apiInfoKey, FilterNode filterNode, FilterNode validatorNode, ExecutorNode executorNode ,RawApi rawApi, Map<String, Object> varMap, Auth auth, String logId, TestingRunConfig testingRunConfig, Strategy strategy) {
         this.apiInfoKey = apiInfoKey;
         this.filterNode = filterNode;
         this.validatorNode = validatorNode;
@@ -44,7 +43,6 @@ public abstract class SecurityTestTemplate {
         this.rawApi = rawApi;
         this.varMap = varMap;
         this.auth = auth;
-        this.authMechanism = authMechanism;
         this.logId = logId;
         this.testingRunConfig = testingRunConfig;
         this.strategy = strategy;
@@ -163,14 +161,6 @@ public abstract class SecurityTestTemplate {
 
     public void setAuth(Auth auth) {
         this.auth = auth;
-    }
-
-    public AuthMechanism getAuthMechanism() {
-        return authMechanism;
-    }
-
-    public void setAuthMechanism(AuthMechanism authMechanism) {
-        this.authMechanism = authMechanism;
     }
 
     public String getLogId() {

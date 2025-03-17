@@ -36,6 +36,14 @@ public class AuthMechanism {
         this.apiCollectionIds = apiCollectionIds;
     }
 
+    public AuthMechanism copy() {
+        List<AuthParam> newAuthParams = new ArrayList<>();
+        for (AuthParam authParam : authParams) {
+            newAuthParams.add(authParam.copy());
+        }
+        return new AuthMechanism(newAuthParams, new ArrayList<>(requestData), type, apiCollectionIds == null? null :new ArrayList<>(apiCollectionIds));
+    }
+
     public boolean addAuthToRequest(OriginalHttpRequest request) {
         for (AuthParam authParamPair : authParams) {
             boolean result = authParamPair.addAuthTokens(request);

@@ -6,6 +6,7 @@ import java.util.ArrayList;
 
 public abstract class AuthParam {
 
+    protected abstract AuthParam copy();
     public abstract boolean addAuthTokens(OriginalHttpRequest request);
     public abstract boolean removeAuthTokens(OriginalHttpRequest request);
 
@@ -21,4 +22,5 @@ public abstract class AuthParam {
         HEADER,
         BODY
     }
+
 }

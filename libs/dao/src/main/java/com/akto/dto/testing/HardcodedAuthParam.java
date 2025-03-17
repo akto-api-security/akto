@@ -20,6 +20,11 @@ public class HardcodedAuthParam extends AuthParam {
     }
 
     @Override
+    protected AuthParam copy() {
+        return new HardcodedAuthParam(where, key, value, showHeader);
+    }
+        
+    @Override
     public boolean addAuthTokens(OriginalHttpRequest request) {
         if (this.key == null) return false;
         return TokenPayloadModifier.tokenPayloadModifier(request, this.key, this.value, this.where);
@@ -67,4 +72,5 @@ public class HardcodedAuthParam extends AuthParam {
     public void setShowHeader(Boolean showHeader) {
         this.showHeader = showHeader;
     }
+
 }

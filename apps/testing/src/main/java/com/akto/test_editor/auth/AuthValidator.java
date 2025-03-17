@@ -5,8 +5,6 @@ import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.RawApi;
 import com.akto.dto.test_editor.Auth;
 import com.akto.dto.test_editor.ExecutionResult;
-import com.akto.dto.testing.AuthMechanism;
-import com.akto.dto.testing.AuthParam;
 import com.akto.dto.testing.TestingRunConfig;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.test_editor.execution.Operations;
@@ -20,13 +18,13 @@ import java.util.Map;
 
 public class AuthValidator {
     
-    public static boolean validate(Auth auth, RawApi rawApi, AuthMechanism authMechanism, List<CustomAuthType> customAuthTypes) {
+    public static boolean validate(Auth auth, RawApi rawApi, List<CustomAuthType> customAuthTypes) {
 
         if (auth == null) {
             return true;
         }
 
-        List<String> headerKeys = getHeaders(auth, authMechanism, customAuthTypes);
+        List<String> headerKeys = getHeaders(auth, customAuthTypes);
 
         auth.setHeaders(headerKeys);
 
@@ -48,22 +46,14 @@ public class AuthValidator {
         return false;
     }
 
-    public static List<String> getHeaders(Auth auth, AuthMechanism authMechanism, List<CustomAuthType> customAuthTypes) {
+    public static List<String> getHeaders(Auth auth, List<CustomAuthType> customAuthTypes) {
 
         if (auth != null && auth.getHeaders() != null && auth.getHeaders().size() > 0) {
             return auth.getHeaders();
         }
 
         List<String> headerKeys = new ArrayList<>();
-
-        if (authMechanism != null && authMechanism.getAuthParams() != null && authMechanism.getAuthParams().size() > 0) {
-            for (AuthParam authParam: authMechanism.getAuthParams()) {
-                String key = authParam.getKey();
-                if (key == null) continue;
-                headerKeys.add(key.toLowerCase());
-            }
-        }
-
+        headerKeys.add("authorization");
         if (customAuthTypes != null) {
             for(CustomAuthType customAuthType: customAuthTypes) {
                 headerKeys.addAll(customAuthType.getHeaderKeys());

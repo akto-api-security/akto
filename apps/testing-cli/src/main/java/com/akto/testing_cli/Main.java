@@ -301,7 +301,7 @@ public class Main {
             }
         }
 
-        TestingUtil testingUtil = new TestingUtil(authMechanism, messageStore, null, null, customAuthTypes);
+        TestingUtil testingUtil = new TestingUtil(messageStore, null, null, customAuthTypes);
 
         List<TestingRunResult> testingRunResults = new ArrayList<>();
         TestExecutor testExecutor = new TestExecutor();

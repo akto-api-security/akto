@@ -9,7 +9,6 @@ import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.TestConfigYamlParser;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.test_editor.info.InfoParser;
-import com.akto.dao.testing.TestRolesDao;
 import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dto.AccountSettings;
 import com.akto.dto.ApiInfo;
@@ -21,7 +20,6 @@ import com.akto.dto.test_editor.TestLibrary;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
-import com.akto.dto.testing.AuthMechanism;
 import com.akto.dto.testing.GenericTestResult;
 import com.akto.dto.testing.MultiExecTestResult;
 import com.akto.dto.testing.TestResult;
@@ -293,7 +291,6 @@ public class SaveTestEditorAction extends UserAction {
                 apiInfoKey.getString(ApiInfo.ApiInfoKey.URL),
                 URLMethods.Method.valueOf(apiInfoKey.getString(ApiInfo.ApiInfoKey.METHOD)));
 
-        AuthMechanism authMechanism = TestRolesDao.instance.fetchAttackerToken(0, null);
         Map<ApiInfo.ApiInfoKey, List<String>> sampleDataMap = new HashMap<>();
         Map<ApiInfo.ApiInfoKey, List<String>> newSampleDataMap = new HashMap<>();
         
@@ -317,7 +314,7 @@ public class SaveTestEditorAction extends UserAction {
 
         SampleMessageStore messageStore = SampleMessageStore.create(sampleDataMap);
         List<CustomAuthType> customAuthTypes = CustomAuthTypeDao.instance.findAll(CustomAuthType.ACTIVE,true);
-        TestingUtil testingUtil = new TestingUtil(authMechanism, messageStore, null, null, customAuthTypes);
+        TestingUtil testingUtil = new TestingUtil(messageStore, null, null, customAuthTypes);
         List<TestingRunResult.TestLog> testLogs = new ArrayList<>();
         int lastSampleIndex = sampleDataList.get(0).getSamples().size() - 1;
         

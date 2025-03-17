@@ -14,7 +14,6 @@ import com.akto.test_editor.Utils;
 import com.akto.test_editor.auth.AuthValidator;
 import com.akto.test_editor.execution.Executor;
 import com.akto.test_editor.filter.data_operands_impl.ValidationResult;
-import com.akto.testing.StatusCodeAnalyser;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -28,21 +27,20 @@ public class YamlTestTemplate extends SecurityTestTemplate {
     private final List<CustomAuthType> customAuthTypes;
     public YamlTestTemplate(ApiInfo.ApiInfoKey apiInfoKey, FilterNode filterNode, FilterNode validatorNode,
                             ExecutorNode executorNode, RawApi rawApi, Map<String, Object> varMap, Auth auth,
-                            AuthMechanism authMechanism, String logId, TestingRunConfig testingRunConfig,
+                            String logId, TestingRunConfig testingRunConfig,
                             List<CustomAuthType> customAuthTypes, Strategy strategy) {
-        super(apiInfoKey, filterNode, validatorNode, executorNode ,rawApi, varMap, auth, authMechanism, logId, testingRunConfig, strategy);
+        super(apiInfoKey, filterNode, validatorNode, executorNode ,rawApi, varMap, auth, logId, testingRunConfig, strategy);
         this.customAuthTypes = customAuthTypes;
     }
 
     @Override
     public Set<String> requireConfig(){
         Set<String> requiredConfigsList = new HashSet<>();
+        Map<String,Boolean> currentRolesMap = RequiredConfigs.getCurrentConfigsMap();
 
-        if(this.authMechanism == null || this.authMechanism.getAuthParams() == null || this.authMechanism.getAuthParams().isEmpty()){
+        if (!currentRolesMap.containsKey("ATTACKER_TOKEN_ALL")) {
             requiredConfigsList.add("ATTACKER_TOKEN_ALL");
         }
-
-        Map<String,Boolean> currentRolesMap = RequiredConfigs.getCurrentConfigsMap();
 
         // traverse in filternodes.getValues(), looks for valid key, if key valid, check for that role
         List<FilterNode> childNodes = filterNode.getChildNodes();
@@ -92,14 +90,14 @@ public class YamlTestTemplate extends SecurityTestTemplate {
     @Override
     public ValidationResult filter() {
         // loggerMaker.infoAndAddToDb("filter started" + logId, LogDb.TESTING);
-        List<String> authHeaders = AuthValidator.getHeaders(this.auth, this.authMechanism, this.customAuthTypes);
+        List<String> authHeaders = AuthValidator.getHeaders(this.auth, this.customAuthTypes);
         // loggerMaker.infoAndAddToDb("found authHeaders " + authHeaders + " " + logId, LogDb.TESTING);
         if (authHeaders != null && authHeaders.size() > 0) {
             this.varMap.put("auth_headers", authHeaders);
         }
         if (this.auth != null && this.auth.getAuthenticated() != null) {
             // loggerMaker.infoAndAddToDb("validating auth, authenticated value is " + this.auth.getAuthenticated() + " " + logId, LogDb.TESTING);
-            boolean validAuthHeaders = AuthValidator.validate(this.auth, this.rawApi, this.authMechanism, this.customAuthTypes);
+            boolean validAuthHeaders = AuthValidator.validate(this.auth, this.rawApi, this.customAuthTypes);
             if (!validAuthHeaders) {
                 ValidationResult validationResult = new ValidationResult(false, "No valid auth headers");
                 // loggerMaker.infoAndAddToDb("invalid auth, skipping filter " + logId, LogDb.TESTING);
@@ -119,7 +117,7 @@ public class YamlTestTemplate extends SecurityTestTemplate {
             ExecutionResult res = AuthValidator.checkAuth(this.auth, this.rawApi.copy(), this.testingRunConfig, this.customAuthTypes, debug, testLogs);
             if(res.getSuccess()) {
                 OriginalHttpResponse resp = res.getResponse();
-                int statusCode = StatusCodeAnalyser.getStatusCode(resp.getBody(), resp.getStatusCode());
+                int statusCode = resp.getStatusCode();
                 if (statusCode >= 200 && statusCode < 300) {
                     // loggerMaker.infoAndAddToDb("noAuth check failed, skipping execution " + logId, LogDb.TESTING);
                     return false;
@@ -133,7 +131,7 @@ public class YamlTestTemplate extends SecurityTestTemplate {
     public YamlTestResult executor(boolean debug, List<TestingRunResult.TestLog> testLogs) {
         // loggerMaker.infoAndAddToDb("executor started" + logId, LogDb.TESTING);
         YamlTestResult results = new Executor().execute(this.executorNode, this.rawApi, this.varMap, this.logId,
-                this.authMechanism, this.validatorNode, this.apiInfoKey, this.testingRunConfig, this.customAuthTypes,
+                this.validatorNode, this.apiInfoKey, this.testingRunConfig, this.customAuthTypes,
                 debug, testLogs, memory);
         // loggerMaker.infoAndAddToDb("execution result size " + results.size() +  " " + logId, LogDb.TESTING);
         return results;
