@@ -33,7 +33,7 @@ export const FindVulnerabilitiesAgent = (props) => {
         }
     }
 
-    const getAllSubProcesses = async (processId: string) => {
+    const getAllSubProcesses = async (processId: string, shouldSetState: boolean) => {
        // polling for all subprocesses;
         const response = await api.getAllSubProcesses({
             processId: processId
@@ -42,7 +42,7 @@ export const FindVulnerabilitiesAgent = (props) => {
         
         setSubprocesses(subprocesses);
         
-        if(subprocesses.length > 0) { 
+        if(subprocesses.length > 0 && shouldSetState){ 
             // if page-reload, this will be called to fill the data required in the localstorage
             let newestSubprocess = subprocesses[0]
             subprocesses.forEach((subprocess) => {
@@ -53,7 +53,7 @@ export const FindVulnerabilitiesAgent = (props) => {
             setCurrentSubprocess(newestSubprocess.subProcessId)
             setCurrentAttempt(newestSubprocess.attemptId)
         }
-        if(subprocesses.length === 0) {
+        if(subprocesses.length === 0 && shouldSetState) {
             // create first subprocess of the agent run here
             const response = await api.updateAgentSubprocess({
                 processId: processId,
@@ -75,7 +75,7 @@ export const FindVulnerabilitiesAgent = (props) => {
             setCurrentSubprocess("0");
             intervalRef.current = setInterval(getAllAgentRuns, 2000);
         } else {
-            getAllSubProcesses(currentAgentRun.processId);
+            getAllSubProcesses(currentAgentRun.processId, true);
         }
     
         return () => {
@@ -86,17 +86,24 @@ export const FindVulnerabilitiesAgent = (props) => {
         };
     }, [currentAgentRun]);
 
+    const triggerCallForSubProcesses = async () => {
+        // call for all subprocesses triggered on new subprocess creation
+        getAllSubProcesses(currentAgentRun?.processId || "", false);
+    }
+
     return (
         <Scrollable className="h-full">
             <VerticalStack gap="2">
                 {subprocesses.length > 0 && subprocesses.map((subprocess, index) => (
                     <Subprocess 
-                    key={subprocess.subProcessId}
-                    agentId={agentId} 
-                    processId={currentAgentRun?.processId || ""} 
-                    subProcessFromProp={subprocesses[index]} 
-                    finalCTAShow={finalCTAShow}
-                    setFinalCTAShow={setFinalCTAShow} />
+                        key={subprocess.subProcessId}
+                        agentId={agentId} 
+                        processId={currentAgentRun?.processId || ""} 
+                        subProcessFromProp={subprocesses[index]} 
+                        finalCTAShow={finalCTAShow}
+                        setFinalCTAShow={setFinalCTAShow} 
+                        triggerCallForSubProcesses={triggerCallForSubProcesses}
+                    />
                 ))}
             </VerticalStack>
         </Scrollable>

@@ -35,9 +35,13 @@ function OutputSelector({onHandleSelect, processOutput} : OutputSelectorProps) {
     const allowMultiple = processOutput?.selectionType === "multiple"
     const initialValue = !allowMultiple ?
         getMessageFromObj(processOutput?.outputOptions[0], "textValue") :
-        processOutput?.outputOptions.map((option: any) => (option.value !== undefined ? option.value : option));
+        processOutput?.outputOptions.map((option: any) => (option.textValue !== undefined ? {
+            label: option?.textValue,
+            value: option?.value !== undefined ? option?.value : JSON.stringify(option)
+        } : option));
     const [filteredChoices, setFilteredChoices] = useState(initialValue);
     const handleSelected = (selectedChoices: any) => { 
+        console.log("selectedChoices", selectedChoices);
         setFilteredChoices(selectedChoices);
     }
 
@@ -59,13 +63,13 @@ function OutputSelector({onHandleSelect, processOutput} : OutputSelectorProps) {
                         // TODO: optionally take this function for transformation.
                         return {
                             label: option.textValue!==undefined ? option?.textValue : option,
-                            value: option.value!==undefined ? option.value : option,
+                            value: option?.value!==undefined ? option?.value : JSON.stringify(option),
                         }
                     })}
                     placeHolder={"Edit choice(s)"}
                     setSelected={(selectedChoices: any) => handleSelected(selectedChoices)}
-                    preSelected={filteredChoices}
-                    value={processOutput?.selectedType === 'multiple' ?`${filteredChoices.length} choice${filteredChoices.length===1 ? "" : "s"} selected` : filteredChoices}
+                    preSelected={initialValue}
+                    value={allowMultiple ?`${filteredChoices.length} choice${filteredChoices.length===1 ? "" : "s"} selected` : filteredChoices}
                 /> : <TextField labelHidden={true} label="" autoComplete="off" value={filteredChoices as string} onChange={(val:string) => setFilteredChoices(val)}/>}
             </HorizontalStack>
 

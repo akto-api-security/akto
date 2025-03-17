@@ -11,6 +11,7 @@ import SensitiveDataTypeCTA from './finalctas/SensitiveDataTypeCTA';
 import ApiGroupAgentInitializer from './ApiGroupAgentInitializer';
 import { useAgentsStore } from '../agents.store';
 import AgentGroupCTA from './finalctas/AgentGroupCTA';
+import APISRequiredCTA from './finalctas/APISRequiredCTA';
 
 interface AgentWindowProps {
     agent: Agent | null;
@@ -21,7 +22,7 @@ interface AgentWindowProps {
 function AgentWindow({ agent, onClose, open }: AgentWindowProps) {
 
     const [finalCTAShow, setFinalCTAShow] = useState(false)
-    const { currentProcessId } = useAgentsStore()
+    const { currentProcessId , PRstate} = useAgentsStore()
 
     const renderAgentWindow = () => {
         switch (agent?.id) {
@@ -56,7 +57,7 @@ function AgentWindow({ agent, onClose, open }: AgentWindowProps) {
     function AgentFinalCTA() {
         switch (agent?.id) {
             case 'FIND_VULNERABILITIES_FROM_SOURCE_CODE':
-                return (<></>)
+                return (PRstate === "4" ? <APISRequiredCTA /> : <></>)
             case 'FIND_SENSITIVE_DATA_TYPES':
                 return (<SensitiveDataTypeCTA show={finalCTAShow} setShow={setFinalCTAShow}/>)
             case 'GROUP_APIS':
