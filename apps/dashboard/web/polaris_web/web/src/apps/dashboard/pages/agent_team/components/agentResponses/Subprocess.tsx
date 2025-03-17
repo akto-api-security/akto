@@ -31,7 +31,7 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, finalCTASho
         setPRState: state.setPRState
     }));  // Only subscribe to necessary store values
 
-    const { setFilteredUserInput, setOutputOptions } = intermediateStore(state => ({ setFilteredUserInput: state.setFilteredUserInput })); 
+    const { setFilteredUserInput, setOutputOptions } = intermediateStore(state => ({ setFilteredUserInput: state.setFilteredUserInput, setOutputOptions: state.setOutputOptions })); 
 
     // Memoized function to create new subprocess
     const createNewSubprocess = useCallback(async (newSubIdNumber: number) => {
@@ -123,6 +123,10 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, finalCTASho
         };
 
         const interval = setInterval(fetchSubprocess, 2000);
+        /*
+        We do not want to refresh current subprocess, 
+        if we're already at final CTA.
+        */
         if (finalCTAShow) clearInterval(interval);
         return () => clearInterval(interval);
     }, [currentSubprocess, finalCTAShow, processId, currentAttempt, subProcessFromProp, createNewSubprocess]);
