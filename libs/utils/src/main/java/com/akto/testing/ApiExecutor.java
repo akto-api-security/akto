@@ -269,7 +269,7 @@ public class ApiExecutor {
         }
 
         boolean executeScript = testingRunConfig != null;
-        ApiExecutorUtil.calculateHashAndAddAuth(request, executeScript);
+        String tempPayload = ApiExecutorUtil.calculateHashAndAddAuth(request, executeScript);
 
         String url = prepareUrl(request, testingRunConfig);
 
@@ -333,6 +333,8 @@ public class ApiExecutor {
         if (url.contains("login_submit")) {
             loggerMaker.infoAndAddToDb("Response Payload " + response.getBody(), LogDb.TESTING);
         }
+
+        request.setBody(tempPayload);
         return response;
     }
     public static OriginalHttpResponse sendRequest(OriginalHttpRequest request, boolean followRedirects, TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs) throws Exception {
@@ -444,7 +446,6 @@ public class ApiExecutor {
             payloadConditions.getOrDefault(TestEditorEnums.TerminalExecutorDataOperands.DELETE_BODY_PARAM.name(), emptyList)
         );
     }
-
 
     private static OriginalHttpResponse sendWithRequestBody(OriginalHttpRequest request, Request.Builder builder, boolean followRedirects, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck, boolean nonTestingContext, String requestProtocol) throws Exception {
         Map<String,List<String>> headers = request.getHeaders();
