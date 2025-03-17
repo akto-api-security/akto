@@ -36,12 +36,19 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
                     selected={(runType) => {
                         let recurringDaily = false;
                         let continuousTesting = false;
+                        let recurringMonthly = false;
+                        let recurringWeekly = false;
 
                         if (runType === 'Continuously') {
                             continuousTesting = true;
                         } else if (runType === 'Daily') {
                             recurringDaily = true;
-                        } else if (runType === 'Once') {
+                        } else if (runType === 'Weekly') {
+                            recurringWeekly = true;
+                        } else if (runType === 'Monthly') {
+                            recurringMonthly = true;
+                        } 
+                        else if (runType === 'Once') {
                             // Always ensure we have a date when switching to Once
                             dispatch({
                                 type: "update",
@@ -54,7 +61,9 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
                             ...prev,
                             recurringDaily,
                             continuousTesting,
-                            runTypeLabel: runType
+                            runTypeLabel: runType,
+                            recurringWeekly,
+                            recurringMonthly
                         }));
                     }} />
                 {testRun.runTypeLabel === "Once" && (
