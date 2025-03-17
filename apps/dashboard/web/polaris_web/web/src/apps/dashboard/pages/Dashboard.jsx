@@ -114,6 +114,17 @@ function Dashboard() {
                 }
             }
         }
+
+        Object.keys(sessionStorage).forEach((key) => {
+            if (key === "undefined" || key === "persistedStore") {
+                sessionStorage.removeItem(key);
+            }
+        });
+        Object.keys(localStorage).forEach((key) => {
+            if (key === "undefined") {
+                localStorage.removeItem(key);
+            }
+        });
     }, [])
 
     useEffect(() => {
