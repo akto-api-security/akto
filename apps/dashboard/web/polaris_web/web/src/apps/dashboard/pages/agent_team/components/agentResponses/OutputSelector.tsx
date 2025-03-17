@@ -56,6 +56,7 @@ function OutputSelector({onHandleSelect, processOutput} : OutputSelectorProps) {
                 {processOutput?.outputOptions.length > 1 ? <DropdownSearch
                     allowMultiple={allowMultiple}
                     optionsList={processOutput?.outputOptions.map((option: any) => {
+                        // TODO: optionally take this function for transformation.
                         return {
                             label: option.textValue!==undefined ? option?.textValue : option,
                             value: option.value!==undefined ? option.value : option,

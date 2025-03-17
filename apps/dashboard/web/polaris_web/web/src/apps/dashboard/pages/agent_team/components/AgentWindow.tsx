@@ -10,6 +10,7 @@ import FlyLayout from '../../../components/layouts/FlyLayout';
 import SensitiveDataTypeCTA from './finalctas/SensitiveDataTypeCTA';
 import ApiGroupAgentInitializer from './ApiGroupAgentInitializer';
 import { useAgentsStore } from '../agents.store';
+import AgentGroupCTA from './finalctas/AgentGroupCTA';
 
 interface AgentWindowProps {
     agent: Agent | null;
@@ -59,7 +60,7 @@ function AgentWindow({ agent, onClose, open }: AgentWindowProps) {
             case 'FIND_SENSITIVE_DATA_TYPES':
                 return (<SensitiveDataTypeCTA show={finalCTAShow} setShow={setFinalCTAShow}/>)
             case 'GROUP_APIS':
-                return (<></>)
+                return (<AgentGroupCTA show={finalCTAShow} setShow={setFinalCTAShow}/>)
             case 'FIND_FALSE_POSITIVE':
                 return (<></>)
             default:

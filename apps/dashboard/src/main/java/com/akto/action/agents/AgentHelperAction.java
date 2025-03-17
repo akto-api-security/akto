@@ -8,14 +8,17 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
+import com.akto.action.ApiCollectionsAction;
 import com.akto.action.CustomDataTypeAction;
 import com.akto.action.UserAction;
 import com.akto.action.CustomDataTypeAction.ConditionFromUser;
 import com.akto.dao.SampleDataDao;
 import com.akto.dao.context.Context;
+import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.data_types.Predicate.Type;
 import com.akto.dto.traffic.SampleData;
 import com.akto.util.enums.GlobalEnums.Severity;
+import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Sorts;
 import com.opensymphony.xwork2.Action;
@@ -86,6 +89,43 @@ public class AgentHelperAction extends UserAction {
                 }
             }
         }, 0 , TimeUnit.SECONDS);
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    List<BasicDBObject> apiGroupList;
+    
+    public List<BasicDBObject> getApiGroupList() {
+        return apiGroupList;
+    }
+
+    public void setApiGroupList(List<BasicDBObject> apiGroupList) {
+        this.apiGroupList = apiGroupList;
+    }
+
+    public String createAPIGroups() {
+
+        int accountId = Context.accountId.get();
+        Map<String, Object> session = getSession();
+
+        executorService.schedule(new Runnable() {
+            public void run() {
+                try {
+                    Context.accountId.set(accountId);
+
+                    for(BasicDBObject apiGroupObject: apiGroupList){
+                        String apiGroupName = apiGroupObject.getString("apiGroupName");
+                        List<ApiInfoKey> apiList = (List<ApiInfoKey>) apiGroupObject.get("apiList");
+
+                        ApiCollectionsAction apiCollectionsAction = new ApiCollectionsAction();
+                        apiCollectionsAction.setCollectionName(apiGroupName);
+                        apiCollectionsAction.setApiList(apiList);
+                        apiCollectionsAction.addApisToCustomCollection();
+                    }
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+        }, 0, TimeUnit.SECONDS);
         return Action.SUCCESS.toUpperCase();
     }
 
