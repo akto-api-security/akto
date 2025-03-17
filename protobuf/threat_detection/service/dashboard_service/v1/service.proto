@@ -160,6 +160,7 @@ message ThreatActorFilterRequest {
 message ThreatActorFilterResponse {
   repeated string sub_categories = 1;
   repeated string countries = 2;
+  repeated string actor_id = 3;
 }
 
 message ThreatCategoryWiseCountResponse {

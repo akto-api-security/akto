@@ -117,8 +117,11 @@ function ThreatActorTable({ data, currDateRange, handleRowClick }) {
     let total = 0;
     let ret = [];
     try {
-      const res = await api.fetchThreatActors(skip, sort, filters.latestAttack || [], filters.country || [], startTimestamp, endTimestamp);
+      const res = await api.fetchThreatActors(skip, sort, filters.latestAttack || [], filters.country || [], startTimestamp, endTimestamp, filters.actorId || []);
       total = res.total;
+      if (res?.actors?.length === 0) {
+        return { value: [], total: 0 };
+      }
       const allEndpoints = res?.actors?.map(x => x.latestApiEndpoint);
 
       const sensitiveDataResponse = await api.fetchSensitiveParamsForEndpoints(allEndpoints);
@@ -209,8 +212,18 @@ function ThreatActorTable({ data, currDateRange, handleRowClick }) {
       label: x,
       value: x
     }));
-
+    const actorIdChoices = res?.actorId.map(x => ({
+      label: x,
+      value: x
+    }));
     filters = [
+      {
+        key: 'actorId',
+        label: 'Actor Id',
+        type: 'select',
+        choices: actorIdChoices,
+        multiple: true
+      },
       {
         key: 'latestAttack',
         label: 'Latest attack sub-category',

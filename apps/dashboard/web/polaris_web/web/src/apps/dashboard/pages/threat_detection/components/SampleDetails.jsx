@@ -1,4 +1,4 @@
-import { Badge, Box, Button, Divider, HorizontalStack, Modal, Text, VerticalStack } from "@shopify/polaris";
+import { Badge, Box, Button, Divider, HorizontalStack, Modal, Text, Tooltip, VerticalStack } from "@shopify/polaris";
 import FlyLayout from "../../../components/layouts/FlyLayout";
 import SampleDataList from "../../../components/shared/SampleDataList";
 import LayoutWithTabs from "../../../components/layouts/LayoutWithTabs";
@@ -115,28 +115,38 @@ function SampleDetails(props) {
 
     function TitleComponent () {
         return(
-            <Box padding={"4"} paddingBlockStart={"0"}>
+            <Box padding={"4"} paddingBlockStart={"0"} maxWidth="100%">
                 <HorizontalStack wrap={false} align="space-between" gap={"6"}>
-                    <VerticalStack gap={"2"}>
-                        <HorizontalStack gap={"2"}>
-                            <Button onClick={() => openTest(moreInfoData?.templateId)} removeUnderline plain monochrome>
-                                <Box maxWidth="180px">
-                                    <TooltipText tooltip={moreInfoData?.templateId} text={moreInfoData?.templateId} textProps={{variant: 'headingMd'}}  />
-                                </Box>
-                            </Button> 
-                            <div className={`badge-wrapper-${severity}`}>
-                                <Badge size="small">{func.toSentenceCase(severity)}</Badge>
-                            </div>
-                        </HorizontalStack>
-                        <HorizontalStack gap={"1"} wrap={false}>
-                            <Text color="subdued" variant="bodySm">{moreInfoData.url}</Text>
-                            <Box width="1px" borderColor="border-subdued" borderInlineStartWidth="1" minHeight='16px'/>
-                            <Text color="subdued" variant="bodySm">{currentTemplateObj?.category?.name || "-"}</Text>
-                        </HorizontalStack>
-                    </VerticalStack>
-                    <HorizontalStack gap={"2"}>
+                    <Box maxWidth="50%">
+                        <VerticalStack gap={"2"}>
+                            <HorizontalStack gap={"2"} align="start">
+                                <Button onClick={() => openTest(moreInfoData?.templateId)} removeUnderline plain monochrome>
+                                    <Box maxWidth="180px">
+                                        <TooltipText tooltip={moreInfoData?.templateId} text={moreInfoData?.templateId} textProps={{variant: 'headingMd'}}  />
+                                    </Box>
+                                </Button> 
+                                <div className={`badge-wrapper-${severity}`}>
+                                    <Badge size="small">{func.toSentenceCase(severity)}</Badge>
+                                </div>
+                            </HorizontalStack>
+                            <HorizontalStack gap={"1"} wrap={false}>
+                                <Tooltip content={moreInfoData?.url}>
+                                    <Text color="subdued" variant="bodySm" truncate>{moreInfoData?.url}</Text>
+                                </Tooltip>
+                                {
+                                    currentTemplateObj?.category?.name && (
+                                        <>
+                                            <Box width="1px" borderColor="border-subdued" borderInlineStartWidth="1" minHeight='16px'/>
+                                            <Text color="subdued" variant="bodySm">{currentTemplateObj?.category?.name || "-"}</Text>
+                                        </>
+                                    )
+                                }
+                            </HorizontalStack>
+                        </VerticalStack>
+                    </Box>
+                    <HorizontalStack gap={"2"} wrap={false}>
                         <Modal
-                            activator={<Button size="slim" onClick={() => setShowModal(!showModal)}>Block IPs</Button>}
+                            activator={<Button destructive size="slim" onClick={() => setShowModal(!showModal)}>Block IPs</Button>}
                             open={showModal}
                             onClose={() => setShowModal(false)}
                             primaryAction={{content: 'Save', onAction: () => setShowModal(false)}}
