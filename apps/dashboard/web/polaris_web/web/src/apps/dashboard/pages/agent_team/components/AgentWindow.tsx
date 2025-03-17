@@ -74,12 +74,12 @@ function AgentWindow({ agent, onClose, open }: AgentWindowProps) {
                 <Scrollable className="h-full">
                     <div className="pt-2 flex flex-col gap-2">
                         <Box paddingBlockEnd={"8"}>
-                        {renderAgentWindow()}
-                        <AgentFinalCTA />
+                                {renderAgentWindow()}
+                                <AgentFinalCTA />
                         </Box>
-                    </div>
-                </Scrollable>
-            </div>
+                            </div>
+                        </Scrollable>
+                </div>
             <PromptComposer agentId ={agent?.id} onSend={console.log} />
         </div>
     </div >]
@@ -90,7 +90,7 @@ function AgentWindow({ agent, onClose, open }: AgentWindowProps) {
             setShow={() => { }}
             isHandleClose={true}
             handleClose={onClose}
-            title={"Member Details"}
+            title={"Agent Details"}
             components={components}
         />
     )

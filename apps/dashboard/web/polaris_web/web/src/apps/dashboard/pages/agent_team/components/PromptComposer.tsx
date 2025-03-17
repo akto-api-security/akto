@@ -46,7 +46,7 @@ export const PromptComposer = ({ onSend, agentId }: PromptComposerProps) => {
     extensions: [
       StarterKit,
       Placeholder.configure({
-        placeholder: 'Message member...',
+        placeholder: 'Message agent...',
         showOnlyWhenEditable: false,
       }),
       ListItem,
