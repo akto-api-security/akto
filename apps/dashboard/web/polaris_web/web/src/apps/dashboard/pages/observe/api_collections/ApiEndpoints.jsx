@@ -158,7 +158,7 @@ function ApiEndpoints(props) {
     const setCollectionsMap = PersistStore(state => state.setCollectionsMap)
     const setAllCollections = PersistStore(state => state.setAllCollections)
 
-    const [ pageTitle, setPageTitle] = useState(collectionsMap[apiCollectionId])
+    const [ pageTitle, setPageTitle] = useState(collectionsMap[apiCollectionId] !== undefined ? collectionsMap[apiCollectionId] : "")
     const [apiEndpoints, setApiEndpoints] = useState([])
     const [apiInfoList, setApiInfoList] = useState([])
     const [unusedEndpoints, setUnusedEndpoints] = useState([])
@@ -385,6 +385,12 @@ function ApiEndpoints(props) {
         }
         fetchData()
     }, [apiCollectionId, endpointListFromConditions])
+
+    useEffect(() => {
+        if (pageTitle !== collectionsMap[apiCollectionId]) { 
+            setPageTitle(collectionsMap[apiCollectionId])
+        }
+    }, [collectionsMap[apiCollectionId]])
 
     const resourceName = {
         singular: 'endpoint',
@@ -638,6 +644,7 @@ function ApiEndpoints(props) {
     }
     const collectionsObj = (allCollections && allCollections.length > 0) ? allCollections.filter(x => Number(x.id) === Number(apiCollectionId))[0] : {}
     const isApiGroup = collectionsObj?.type === 'API_GROUP'
+    const isHostnameCollection = hostNameMap[collectionsObj?.id] !== null && hostNameMap[collectionsObj?.id] !== undefined 
 
     const secondaryActionsComponent = (
         <HorizontalStack gap="2">
@@ -666,7 +673,7 @@ function ApiEndpoints(props) {
                                     </div> :
                                     null
                             }
-                            { !isApiGroup && !(hostNameMap.hasOwnProperty(collectionsObj?.id)) ?
+                            { !isApiGroup && !(isHostnameCollection) ?
                                 <UploadFile
                                 fileFormat=".har"
                                 fileChanged={file => handleFileChange(file)}

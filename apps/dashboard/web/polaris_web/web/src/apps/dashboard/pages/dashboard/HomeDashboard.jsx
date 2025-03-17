@@ -384,7 +384,7 @@ function HomeDashboard() {
     }
 
     function getCollectionsWithCoverage() {
-        const validCollections = allCollections.filter(collection => hostNameMap.hasOwnProperty(collection.id) && !collection.deactivated);
+        const validCollections = allCollections.filter(collection => (hostNameMap[collection.id] && hostNameMap[collection.id] !== undefined)  && !collection.deactivated);
 
         const sortedCollections = validCollections.sort((a, b) => b?.startTs - a?.startTs);
 
