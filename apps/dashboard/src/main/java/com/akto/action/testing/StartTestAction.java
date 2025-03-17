@@ -220,7 +220,7 @@ public class StartTestAction extends UserAction {
         }
         if (localTestingRun == null) {
             try {
-                localTestingRun = createTestingRun(scheduleTimestamp, this.recurringDaily ? 86400 : 0);
+                localTestingRun = createTestingRun(scheduleTimestamp, getPeriodInSeconds(recurringDaily, recurringWeekly, recurringMonthly));
                 // pass boolean from ui, which will tell if testing is coniinuous on new endpoints
                 if (this.continuousTesting) {
                     localTestingRun.setPeriodInSeconds(-1);
@@ -1290,15 +1290,11 @@ public class StartTestAction extends UserAction {
                                         editableTestingRunConfig.getSendMsTeamsAlert()));
                     }
 
-                    int periodInSeconds = 0;
+                    int periodInSeconds = getPeriodInSeconds(editableTestingRunConfig.getRecurringDaily(), editableTestingRunConfig.getRecurringWeekly(), editableTestingRunConfig.getRecurringMonthly());
                     if (editableTestingRunConfig.getContinuousTesting()) {
                         periodInSeconds = -1;
-                    } else if (editableTestingRunConfig.getRecurringDaily()) {
-                        periodInSeconds = 86400;
-                    }else if(editableTestingRunConfig.getPeriodInSeconds() > 0){
-                        periodInSeconds = editableTestingRunConfig.getPeriodInSeconds();
                     }
-                    if (existingTestingRun.getPeriodInSeconds() != periodInSeconds) {
+                    if (existingTestingRun.getPeriodInSeconds() != periodInSeconds && periodInSeconds != 0) {
                         updates.add(Updates.set(TestingRun.PERIOD_IN_SECONDS, periodInSeconds));
                     }
                     if(editableTestingRunConfig.getScheduleTimestamp() > 0){

@@ -1181,7 +1181,8 @@ getMissingConfigs(testResults){
       recurringDaily: testRun.recurringDaily,
       continuousTesting: testRun.continuousTesting,
       scheduleTimestamp: testRun.startTimestamp,
-      periodInSeconds: testRun.recurringWeekly ? 7 * 86400 :  testRun.recurringMonthly ? 30 * 86400 : 0, 
+      recurringWeekly: testRun.recurringWeekly,
+      recurringMonthly: testRun.recurringMonthly
     }
   }
 }
