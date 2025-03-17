@@ -279,7 +279,7 @@ const transform = {
       obj['run_time_epoch'] = Math.max(data.scheduleTimestamp, (cicd ? testingRunResultSummary.endTimestamp : data.endTimestamp))
       obj['scheduleTimestamp'] = data.scheduleTimestamp
       obj['pickedUpTimestamp'] = data.pickedUpTimestamp
-      obj['run_time'] = getRuntime(data.scheduleTimestamp , (cicd ? testingRunResultSummary.endTimestamp : data.endTimestamp), state)
+      obj['run_time'] = getRuntime(data.scheduleTimestamp , (cicd ? testingRunResultSummary.endTimestamp : getStatus(state) === "SCHEDULED" ? data.scheduledTimestamp:  data.endTimestamp), state)
       obj['severity'] = func.getSeverity(testingRunResultSummary.countIssues)
       obj['total_severity'] = getTotalSeverity(testingRunResultSummary.countIssues);
       obj['severityStatus'] = func.getSeverityStatus(testingRunResultSummary.countIssues)
@@ -1180,6 +1180,8 @@ getMissingConfigs(testResults){
       sendMsTeamsAlert:testRun.sendMsTeamsAlert,
       recurringDaily: testRun.recurringDaily,
       continuousTesting: testRun.continuousTesting,
+      scheduleTimestamp: testRun.startTimestamp,
+      periodInSeconds: testRun.recurringWeekly ? 7 * 86400 :  testRun.recurringMonthly ? 30 * 86400 : 0, 
     }
   }
 }

@@ -9,7 +9,8 @@ public class EditableTestingRunConfig extends TestingRunConfig {
     private boolean recurringDaily;
     private boolean continuousTesting;
     private boolean sendMsTeamsAlert;
-
+    private int periodInSeconds;
+    private int scheduleTimestamp;
     public EditableTestingRunConfig() {
 
     }
@@ -68,6 +69,22 @@ public class EditableTestingRunConfig extends TestingRunConfig {
 
     public void setSendMsTeamsAlert(boolean sendMsTeamsAlert) {
         this.sendMsTeamsAlert = sendMsTeamsAlert;
+    }
+
+    public int getPeriodInSeconds() {
+        return periodInSeconds;
+    }
+
+    public void setPeriodInSeconds(int periodInSeconds) {
+        this.periodInSeconds = periodInSeconds;
+    }
+
+    public int getScheduleTimestamp() {
+        return scheduleTimestamp;
+    }
+
+    public void setScheduleTimestamp(int scheduleTimestamp) {
+        this.scheduleTimestamp = scheduleTimestamp;
     }
 }
 

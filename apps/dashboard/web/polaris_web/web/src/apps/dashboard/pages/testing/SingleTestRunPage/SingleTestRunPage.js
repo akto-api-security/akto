@@ -571,6 +571,7 @@ function SingleTestRunPage() {
         useLocalSubCategoryData={useLocalSubCategoryData} 
         testRunType={testingRunResultSummariesObj?.testingRunType} 
         disabled={window.USER_ROLE === "GUEST"}
+        shouldDisable={selectedTestRun.type === "CI_CD" || selectedTestRun.type === "RECURRING"}
       />
       <GithubServerTable
         key={"table"}

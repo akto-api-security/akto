@@ -1295,9 +1295,19 @@ public class StartTestAction extends UserAction {
                         periodInSeconds = -1;
                     } else if (editableTestingRunConfig.getRecurringDaily()) {
                         periodInSeconds = 86400;
+                    }else if(editableTestingRunConfig.getPeriodInSeconds() > 0){
+                        periodInSeconds = editableTestingRunConfig.getPeriodInSeconds();
                     }
                     if (existingTestingRun.getPeriodInSeconds() != periodInSeconds) {
                         updates.add(Updates.set(TestingRun.PERIOD_IN_SECONDS, periodInSeconds));
+                    }
+                    if(editableTestingRunConfig.getScheduleTimestamp() > 0){
+                        updates.add(
+                            Updates.combine(
+                                Updates.set(TestingRun.SCHEDULE_TIMESTAMP, editableTestingRunConfig.getScheduleTimestamp()),
+                                Updates.set(TestingRun.STATE, State.SCHEDULED)
+                            )
+                        );
                     }
                 
                     if (!updates.isEmpty()) {

@@ -31,6 +31,7 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
             <HorizontalGrid gap={"4"} columns={"3"}>
                 <Dropdown
                     label="Run Type"
+                    disabled={timeFieldsDisabled}
                     menuItems={runTypeOptions}
                     initial={testRun.runTypeLabel}
                     selected={(runType) => {

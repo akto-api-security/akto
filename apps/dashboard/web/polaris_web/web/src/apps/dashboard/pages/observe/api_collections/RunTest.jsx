@@ -16,7 +16,7 @@ import RunTestSuites from "./RunTestSuites";
 import RunTestConfiguration from "./RunTestConfiguration";
 import createTestName from "./Utils"
 
-function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOutside, closeRunTest, selectedResourcesForPrimaryAction, useLocalSubCategoryData, preActivator, testIdConfig, activeFromTesting, setActiveFromTesting, showEditableSettings, setShowEditableSettings, parentAdvanceSettingsConfig, testRunType }) {
+function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOutside, closeRunTest, selectedResourcesForPrimaryAction, useLocalSubCategoryData, preActivator, testIdConfig, activeFromTesting, setActiveFromTesting, showEditableSettings, setShowEditableSettings, parentAdvanceSettingsConfig, testRunType, shouldDisable }) {
 
     const initialState = {
         categories: [],
@@ -679,7 +679,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
             <Modal.Section>
                 <>
                     <RunTestConfiguration
-                        timeFieldsDisabled={showEditableSettings || activeFromTesting}
+                        timeFieldsDisabled={shouldDisable}
                         testRun={testRun}
                         setTestRun={setTestRun}
                         runTypeOptions={runTypeOptions}
@@ -853,7 +853,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                                     </div>
                                 </div>
                                 <RunTestConfiguration
-                                    timeFieldsDisabled={showEditableSettings || activeFromTesting}
+                                    timeFieldsDisabled={shouldDisable}
                                     testRun={testRun}
                                     setTestRun={setTestRun}
                                     runTypeOptions={runTypeOptions}
@@ -883,7 +883,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                                 checkRemoveAll={checkRemoveAll} handleModifyConfig={handleModifyConfig} /> :
                                 <>
                                     <RunTestConfiguration
-                                        timeFieldsDisabled={showEditableSettings || activeFromTesting}
+                                        timeFieldsDisabled={shouldDisable}
                                         testRun={testRun}
                                         setTestRun={setTestRun}
                                         runTypeOptions={runTypeOptions}
