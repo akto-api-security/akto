@@ -33,6 +33,7 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
   String refId;
   List<String> latestAttack;
   List<String> country;
+  List<String> actorId;
   int startTs;
   int endTs;
   private final CloseableHttpClient httpClient;
@@ -85,6 +86,7 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
               msg -> {
                 this.country = msg.getCountriesList();
                 this.latestAttack = msg.getSubCategoriesList();
+                this.actorId = msg.getActorIdList();
               });
     } catch (Exception e) {
       e.printStackTrace();
@@ -105,6 +107,9 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
     }
     if(this.country != null && !this.country.isEmpty()){
       filter.put("country", this.country);
+    }
+    if(this.actorId != null && !this.actorId.isEmpty()){
+      filter.put("actors", this.actorId);
     }
     Map<String, Object> body =
         new HashMap<String, Object>() {
@@ -281,4 +286,11 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
     this.endTs = endTs;
   }
   
+  public List<String> getActorId() {
+    return actorId;
+  }
+
+  public void setActorId(List<String> actorId) {
+    this.actorId = actorId;
+  }
 }
