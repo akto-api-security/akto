@@ -29,15 +29,15 @@ public class ApiExecutorUtil {
     private static Map<Integer, Integer> lastFetchedMap = new HashMap<>();
     private static Map<Integer, TestScript> testScriptMap = new HashMap<>();
 
-    public static void calculateHashAndAddAuth(OriginalHttpRequest originalHttpRequest, boolean executeScript) {
+    public static String calculateHashAndAddAuth(OriginalHttpRequest originalHttpRequest, boolean executeScript) {
         if (!executeScript) {
-            return;
+            return originalHttpRequest.getBody();
         }
         try {
             int accountId = Context.accountId.get();
             FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccessSaas(accountId, "TEST_PRE_SCRIPT");
             if (!featureAccess.getIsGranted()) {
-                return;
+                return originalHttpRequest.getBody();
             }
 
             String script;
@@ -52,7 +52,7 @@ public class ApiExecutorUtil {
             if (testScript != null && testScript.getJavascript() != null) {
                 script = testScript.getJavascript();
             } else {
-                return;
+                return originalHttpRequest.getBody();
             }
             loggerMaker.infoAndAddToDb("Starting calculateHashAndAddAuth");
 
@@ -72,6 +72,7 @@ public class ApiExecutorUtil {
             String url = (String) sctx.getAttribute("url");
             String payload = (String) sctx.getAttribute("payload");
             String queryParams = (String) sctx.getAttribute("queryParams");
+            String parsedPayloadTemp = (String) sctx.getAttribute("parsedPayloadTemp");
 
             Map<String, List<String>> hs = new HashMap<>();
             for (String key: headers.keySet()) {
@@ -93,10 +94,15 @@ public class ApiExecutorUtil {
             originalHttpRequest.setHeaders(hs);
             originalHttpRequest.setQueryParams(queryParams);
 
+            if (parsedPayloadTemp != null) {
+                return parsedPayloadTemp;
+            }
+            return payload;
+
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("error in calculateHashAndAddAuth " + e.getMessage() + " url " + originalHttpRequest.getUrl());
             e.printStackTrace();
-            return;
+            return originalHttpRequest.getBody();
         }
     }
 
