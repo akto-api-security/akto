@@ -30,6 +30,8 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
   List<Integer> apiCollectionIds;
   long total;
   Map<String, Integer> sort;
+  List<String> severity;
+  List<String> subCategory;
   int startTimestamp, endTimestamp;
   List<String> types;
 
@@ -51,6 +53,14 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
     Map<String, Object> filter = new HashMap<>();
     if (this.ips != null && !this.ips.isEmpty()) {
       filter.put("ips", this.ips);
+    }
+
+    if (this.severity != null && !this.severity.isEmpty()) {
+      filter.put("severity", this.severity);
+    }
+
+    if (this.subCategory != null && !this.subCategory.isEmpty()) {
+      filter.put("subCategory", this.subCategory);
     }
 
     if (this.urls != null && !this.urls.isEmpty()) {
@@ -105,7 +115,8 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
                             smr.getCountry(),
                             smr.getDetectedAt(),
                             smr.getType(),
-                            smr.getRefId()))
+                            smr.getRefId(),
+                            smr.getSubCategory()))
                     .collect(Collectors.toList());
                 this.total = m.getTotal();
               });
@@ -131,6 +142,7 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
               msg -> {
                 this.ips = msg.getActorsList();
                 this.urls = msg.getUrlsList();
+                this.subCategory = msg.getSubCategoryList();
               });
     } catch (Exception e) {
       e.printStackTrace();
@@ -230,5 +242,21 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
 
   public List<String> getTypes() {
     return types;
+  }
+
+  public List<String> getSeverity() {
+    return severity;
+  }
+
+  public void setSeverity(List<String> severity) {
+    this.severity = severity;
+  }
+
+  public List<String> getSubCategory() {
+    return subCategory;
+  }
+
+  public void setSubCategory(List<String> subCategory) {
+    this.subCategory = subCategory;
   }
 }

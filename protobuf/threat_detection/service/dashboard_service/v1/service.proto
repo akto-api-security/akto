@@ -42,6 +42,7 @@ message ListMaliciousRequestsRequest {
       repeated string ips = 3;
       optional TimeRangeFilter detected_at_time_range = 4;
       repeated string types = 5;
+      repeated string sub_category = 6;
     }
 
     // The number of alerts to return
@@ -56,6 +57,7 @@ message FetchAlertFiltersRequest {}
 message FetchAlertFiltersResponse {
   repeated string actors = 1;
   repeated string urls = 2;
+  repeated string sub_category = 3;
 }
 
 message ListThreatActorsRequest {
@@ -63,15 +65,26 @@ message ListThreatActorsRequest {
     repeated string actors = 1;
     repeated string latest_ips = 2;
     optional TimeRangeFilter detected_at_time_range = 3;
+    repeated string latest_attack = 4;
+    repeated string country = 5;
   }
 
   optional uint32 skip = 1;
   uint32 limit = 2;
   map<string, int32> sort = 3;
   Filter filter = 4;
+  uint32 start_ts = 5;
+  uint32 end_ts = 6;
 }
 
 message ListThreatActorResponse {
+  message ActivityData {
+    string url = 1;
+    string sub_category = 2;
+    uint64 detected_at = 3;
+    string severity = 4;
+    string method = 5;
+  }
   message ThreatActor {
     string id = 1;
     string latest_api_ip = 2;
@@ -79,6 +92,8 @@ message ListThreatActorResponse {
     string latest_api_method = 4;
     uint64 discovered_at = 5;
     string country = 6;
+    repeated ActivityData activity_data = 7;
+    string latest_subcategory = 8;
   }
   repeated ThreatActor actors = 1;
   uint64 total = 2;
@@ -135,6 +150,16 @@ message ThreatActorByCountryResponse {
 }
 
 message ThreatCategoryWiseCountRequest {
+  uint32 start_ts = 1;
+  uint32 end_ts = 2;
+}
+
+message ThreatActorFilterRequest {
+}
+
+message ThreatActorFilterResponse {
+  repeated string sub_categories = 1;
+  repeated string countries = 2;
 }
 
 message ThreatCategoryWiseCountResponse {
@@ -145,4 +170,52 @@ message ThreatCategoryWiseCountResponse {
   }
 
   repeated SubCategoryCount  category_wise_counts = 1;
+}
+
+message ThreatSeverityWiseCountRequest {
+  uint32 start_ts = 1;
+  uint32 end_ts = 2;
+}
+
+message ThreatSeverityWiseCountResponse {
+  message SeverityCount {
+    string severity = 1;
+    uint32 count = 2;
+  }
+
+  repeated SeverityCount  category_wise_counts = 1;
+}
+
+message DailyActorsCountRequest {
+  uint32 start_ts = 1;
+  uint32 end_ts = 2;
+}
+
+message DailyActorsCountResponse {
+  message ActorsCount {
+    uint32 ts = 1;
+    uint32 total_actors = 2;
+    uint32 critical_actors = 3;
+  }
+
+  repeated ActorsCount actors_counts = 1;
+}
+
+message ThreatActivityTimelineRequest {
+  uint32 start_ts = 1;
+  uint32 end_ts = 2;
+}
+
+message ThreatActivityTimelineResponse {
+  message SubCategoryData {
+    string sub_category = 1;
+    int32 activity_count = 2;
+  }
+
+  message ActivityTimeline {
+    uint32 ts = 1;
+    repeated SubCategoryData sub_category_wise_data = 2;
+  }
+
+  repeated ActivityTimeline threat_activity_timeline = 1;
 }

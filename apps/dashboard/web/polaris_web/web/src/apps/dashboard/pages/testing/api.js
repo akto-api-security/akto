@@ -68,13 +68,22 @@ export default {
         })
         return resp        
     },
-    async rerunTest(testingRunHexId){
+    async rerunTest(testingRunHexId, selectedTestRunForRerun, testingRunResultSummaryHexId ){
+        if (selectedTestRunForRerun === []) {
+            const resp = await request({
+                url: '/api/startTest',
+                method: 'post',
+                data: { testingRunHexId }
+            })
+            return resp        
+        }
+        let selectedTestRunResultHexIds = selectedTestRunForRerun
         const resp = await request({
             url: '/api/startTest',
             method: 'post',
-            data: { testingRunHexId }
+            data: { testingRunHexId, testingRunResultSummaryHexId,  selectedTestRunResultHexIds}
         })
-        return resp        
+        return resp
     },
     fetchAffectedEndpoints (issueId) {
         return request({
@@ -520,6 +529,34 @@ export default {
             url: '/api/handleRefreshTableCount',
             method: 'post',
             data: {testingRunResultSummaryHexId}
+        })
+    },
+    createNewTestSuite(testSuiteName,subCategoryList) {
+        return request({
+            url: '/api/createTestSuite',
+            method: 'post',
+            data: {testSuiteName,subCategoryList}
+        })
+    },
+    fetchAllTestSuites() {
+        return request({
+            url: '/api/fetchAllTestSuites',
+            method: 'post',
+            data: {}
+        })
+    },
+    modifyTestSuite(testSuiteHexId, testSuiteName, subCategoryList) {
+        return request({
+            url: '/api/modifyTestSuite',
+            method: 'post',
+            data: {testSuiteHexId, testSuiteName, subCategoryList}
+        })
+    },
+    deleteTestSuite(testSuiteHexId) {
+        return request({
+            url: '/api/deleteTestSuite',
+            method: 'post',
+            data: {testSuiteHexId}
         })
     }
 }

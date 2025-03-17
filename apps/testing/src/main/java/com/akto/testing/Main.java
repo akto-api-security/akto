@@ -39,6 +39,7 @@ import com.akto.task.Cluster;
 import com.akto.test_editor.execution.Executor;
 import com.akto.testing.kafka_utils.ConsumerUtil;
 import com.akto.testing.kafka_utils.Producer;
+import com.akto.testing.kafka_utils.TestingConfigurations;
 import com.akto.util.AccountTask;
 import com.akto.util.Constants;
 import com.akto.util.DashboardMode;
@@ -332,6 +333,46 @@ public class Main {
 
     private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
 
+    //returns true if test is not supposed to run
+    private static boolean handleRerunTestingRunResult(TestingRunResultSummary originalSummary) {
+        TestingConfigurations config = TestingConfigurations.getInstance();
+        config.setRerunTestingRunResultSummary(null);
+
+        if (originalSummary == null || originalSummary.getOriginalTestingRunResultSummaryId() == null) {
+            config.setTestingRunResultList(null);
+            return false;
+        }
+
+        ObjectId summaryId = originalSummary.getOriginalTestingRunResultSummaryId();
+        List<TestingRunResult> testingRunResultList = TestingRunResultDao.instance.findAll(
+                Filters.and(
+                        Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, summaryId),
+                        Filters.eq(TestingRunResult.RERUN, true)
+                ),
+                Projections.include(
+                        TestingRunResult.TEST_RUN_ID,
+                        TestingRunResult.API_INFO_KEY,
+                        TestingRunResult.TEST_SUB_TYPE,
+                        TestingRunResult.VULNERABLE,
+                        TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID
+                )
+        );
+
+        if (testingRunResultList == null) {
+            TestingRunResultSummariesDao.instance.deleteAll(Filters.eq(TestingRunResultSummariesDao.ID, originalSummary.getId()));
+            loggerMaker.infoAndAddToDb("Deleting TRRS for rerun case, no testing run result found, TRRS_ID: " + originalSummary.getId().toHexString());
+            return true;
+        }
+
+        //Updating start time stamp as current time stamp in case of rerun
+        TestingRunResultSummariesDao.instance.updateOneNoUpsert(Filters.eq(TestingRunResultSummary.ID, summaryId),
+                Updates.set(TestingRunResultSummary.START_TIMESTAMP, Context.now()));
+
+        config.setRerunTestingRunResultSummary(originalSummary);
+        config.setTestingRunResultList(testingRunResultList);
+        return false;
+    }
+
     public static void main(String[] args) throws InterruptedException {
         String mongoURI = System.getenv("AKTO_MONGO_CONN");
         ReadPreference readPreference = ReadPreference.primary();
@@ -389,27 +430,31 @@ public class Main {
 
                 String testingRunId = currentTestInfo.getString("testingRunId");
                 String testingRunSummaryId = currentTestInfo.getString("summaryId");
-                TestingRun testingRun = TestingRunDao.instance.findOne(Filters.eq(Constants.ID, new ObjectId(testingRunId)));
-                TestingRunConfig baseConfig = TestingRunConfigDao.instance.findOne(Constants.ID, testingRun.getTestIdConfig());
-                testingRun.setTestingRunConfig(baseConfig);
+                //check if currently running testrun is part of rerun
                 ObjectId summaryId = new ObjectId(testingRunSummaryId);
-                testingProducer.initProducer(testingRun, summaryId, featureAccess.fetchSyncLimit(), true);
-                int maxRunTime = testingRun.getTestRunTime() <= 0 ? 30*60 : testingRun.getTestRunTime();
-                testingConsumer.init(maxRunTime);
+                TestingRunResultSummary rerunTestingRunResultSummary = TestingRunResultSummariesDao.instance.findOne(TestingRunResultSummary.ORIGINAL_TESTING_RUN_SUMMARY_ID, summaryId);
+                //fill testingRunResult in TestingConfigurations
+                if(!handleRerunTestingRunResult(rerunTestingRunResultSummary)) {
+                    TestingRun testingRun = TestingRunDao.instance.findOne(Filters.eq(Constants.ID, new ObjectId(testingRunId)));
+                    TestingRunConfig baseConfig = TestingRunConfigDao.instance.findOne(Constants.ID, testingRun.getTestIdConfig());
+                    testingRun.setTestingRunConfig(baseConfig);
+                    testingProducer.initProducer(testingRun, summaryId, featureAccess.fetchSyncLimit(), true);
+                    int maxRunTime = testingRun.getTestRunTime() <= 0 ? 30*60 : testingRun.getTestRunTime();
+                    testingConsumer.init(maxRunTime);
 
-                // mark the test completed here
-                testCompletion.markTestAsCompleteAndRunFunctions(testingRun, summaryId);
+                    // mark the test completed here
+                    testCompletion.markTestAsCompleteAndRunFunctions(testingRun, summaryId);
 
-                if (StringUtils.hasLength(AKTO_SLACK_WEBHOOK) && !isTestingRunForDemoCollection(testingRun)) {
-                    try {
-                        CustomTextAlert customTextAlert = new CustomTextAlert("Test completed for accountId=" + accountId + " testingRun=" + testingRun.getHexId() + " summaryId=" + summaryId.toHexString() + " : @Arjun you are up now. Make your time worth it. :)");
-                        SLACK_INSTANCE.send(AKTO_SLACK_WEBHOOK, customTextAlert.toJson());  
-                    } catch (Exception e) {
-                        logger.error("Error sending slack alert for completion of test", e);
+                    if (StringUtils.hasLength(AKTO_SLACK_WEBHOOK) && !isTestingRunForDemoCollection(testingRun)) {
+                        try {
+                            CustomTextAlert customTextAlert = new CustomTextAlert("Test completed for accountId=" + accountId + " testingRun=" + testingRun.getHexId() + " summaryId=" + summaryId.toHexString() + " : @Arjun you are up now. Make your time worth it. :)");
+                            SLACK_INSTANCE.send(AKTO_SLACK_WEBHOOK, customTextAlert.toJson());
+                        } catch (Exception e) {
+                            logger.error("Error sending slack alert for completion of test", e);
+                        }
                     }
-                    
                 }
-                
+
                 deleteScheduler.execute(() -> {
                     Context.accountId.set(accountId);
                     try {
@@ -464,19 +509,26 @@ public class Main {
                 if(accountSettings != null){
                     defaultTime =  accountSettings.getTimeForScheduledSummaries();
                 }
+                TestingConfigurations config = TestingConfigurations.getInstance();
                 TestingRunResultSummary trrs = findPendingTestingRunResultSummary(defaultTime);
                 boolean isSummaryRunning = trrs != null && trrs.getState().equals(State.RUNNING);
+                boolean isTestingRunResultRerunCase = trrs != null && trrs.getOriginalTestingRunResultSummaryId() != null;
                 TestingRun testingRun;
                 ObjectId summaryId = null;
                 if (trrs == null) {
                     testingRun = findPendingTestingRun(defaultTime);
                 } else {
-                    summaryId = trrs.getId();
-                    loggerMaker.infoAndAddToDb("Found trrs " + trrs.getHexId() +  " for account: " + accountId);
+                    // For rerun case, use the original summary ID to maintain connection to original test
+                    summaryId = isTestingRunResultRerunCase ? trrs.getOriginalTestingRunResultSummaryId() : trrs.getId();
+                    loggerMaker.infoAndAddToDb("Found trrs " + trrs.getHexId() + (isTestingRunResultRerunCase ? " (rerun case) " : " ") + "for account: " + accountId);
                     testingRun = TestingRunDao.instance.findOne("_id", trrs.getTestingRunId());
                 }
 
                 if (testingRun == null) {
+                    return;
+                }
+
+                if (handleRerunTestingRunResult(trrs)) {
                     return;
                 }
 
@@ -492,16 +544,24 @@ public class Main {
                         loggerMaker.infoAndAddToDb("Stopping TRRS: " + trrs.getId());
 
                         // get count issues here
-                        Map<String,Integer> finalCountMap = Utils.finalCountIssuesMap(trrs.getId());
-                        loggerMaker.infoAndAddToDb("Final count map calculated is " + finalCountMap.toString());
-                        TestingRunResultSummariesDao.instance.updateOneNoUpsert(
-                                Filters.eq(Constants.ID, trrs.getId()),
-                                Updates.combine(
-                                    Updates.set(TestingRunResultSummary.STATE, State.STOPPED),
-                                    Updates.set(TestingRunResultSummary.COUNT_ISSUES, finalCountMap)
-                                )
-                        );
-                        loggerMaker.infoAndAddToDb("Stopped TRRS: " + trrs.getId());
+                        if (isTestingRunResultRerunCase) {
+                            // For TRR-rerun case, delete the rerun summary and clean up configurations
+                            TestingRunResultSummariesDao.instance.deleteAll(Filters.eq(TestingRunResultSummariesDao.ID, trrs.getId()));
+                            config.setTestingRunResultList(null);
+                            config.setRerunTestingRunResultSummary(null);
+                            loggerMaker.infoAndAddToDb("Deleted for TestingRunResult rerun case for stopped testrun TRRS: " + trrs.getId());
+                        } else {
+                            Map<String,Integer> finalCountMap = Utils.finalCountIssuesMap(trrs.getId());
+                            loggerMaker.infoAndAddToDb("Final count map calculated is " + finalCountMap.toString());
+                            TestingRunResultSummariesDao.instance.updateOneNoUpsert(
+                                    Filters.eq(Constants.ID, trrs.getId()),
+                                    Updates.combine(
+                                            Updates.set(TestingRunResultSummary.STATE, State.STOPPED),
+                                            Updates.set(TestingRunResultSummary.COUNT_ISSUES, finalCountMap)
+                                    )
+                            );
+                            loggerMaker.infoAndAddToDb("Stopped TRRS: " + trrs.getId());
+                        }
                     }
                     return;
                 }
@@ -518,9 +578,17 @@ public class Main {
                             Filters.eq(Constants.ID, testingRun.getId()),
                             Updates.set(TestingRun.STATE, TestingRun.State.FAILED));
 
-                    TestingRunResultSummariesDao.instance.getMCollection().withWriteConcern(writeConcern).findOneAndUpdate(
-                            Filters.eq(Constants.ID, summaryId),
-                            Updates.set(TestingRun.STATE, TestingRun.State.FAILED));
+                    if (isTestingRunResultRerunCase) {
+                        // For TRR-rerun case, delete the rerun summary and clean up configurations
+                        TestingRunResultSummariesDao.instance.deleteAll(Filters.eq(TestingRunResultSummariesDao.ID, trrs.getId()));
+                        config.setTestingRunResultList(null);
+                        config.setRerunTestingRunResultSummary(null);
+                        loggerMaker.infoAndAddToDb("Deleted for TestingRunResult rerun case for failed testrun TRRS: " + trrs.getId());
+                    } else {
+                        TestingRunResultSummariesDao.instance.getMCollection().withWriteConcern(writeConcern).findOneAndUpdate(
+                                Filters.eq(Constants.ID, summaryId),
+                                Updates.set(TestingRun.STATE, TestingRun.State.FAILED));
+                    }
                     return;
                 }
 
@@ -567,19 +635,50 @@ public class Main {
                                 Filters.eq(TestingRunResultSummary.TESTING_RUN_ID, testingRun.getId()),
                                 Filters.eq(TestingRunResultSummary.STATE, State.FAILED)
                             );
-                            List<TestingRunResult> testingRunResults = Utils.fetchLatestTestingRunResult(Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, testingRunResultSummary.getId()));
+
+                            // For rerun case, we need to check the original test results
+                            List<TestingRunResult> testingRunResults;
+                            if (isTestingRunResultRerunCase) {
+                                testingRunResults = Utils.fetchLatestTestingRunResult(
+                                    Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, testingRunResultSummary.getOriginalTestingRunResultSummaryId())
+                                );
+                            } else {
+                                testingRunResults = Utils.fetchLatestTestingRunResult(
+                                    Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, testingRunResultSummary.getId())
+                                );
+                            }
+
                             if (testingRunResults != null && !testingRunResults.isEmpty()) {
                                 TestingRunResult testingRunResult = testingRunResults.get(0);
                                 if (Context.now() - testingRunResult.getEndTimestamp() < LAST_TEST_RUN_EXECUTION_DELTA) {
                                     loggerMaker.infoAndAddToDb("Skipping test run as it was executed recently, TRR_ID:"
-                                            + testingRunResult.getHexId() + ", TRRS_ID:" + testingRunResultSummary.getHexId() + " TR_ID:" + testingRun.getHexId(), LogDb.TESTING);
+                                            + testingRunResult.getHexId() + ", TRRS_ID:" + testingRunResultSummary.getHexId() 
+                                            + (isTestingRunResultRerunCase ? " (rerun case) " : " ")
+                                            + " TR_ID:" + testingRun.getHexId(), LogDb.TESTING);
                                     return;
                                 } else {
                                     loggerMaker.infoAndAddToDb("Test run was executed long ago, TRR_ID:"
-                                            + testingRunResult.getHexId() + ", TRRS_ID:" + testingRunResultSummary.getHexId() + " TR_ID:" + testingRun.getHexId(), LogDb.TESTING);
+                                            + testingRunResult.getHexId() + ", TRRS_ID:" + testingRunResultSummary.getHexId() 
+                                            + (isTestingRunResultRerunCase ? " (rerun case) " : " ")
+                                            + " TR_ID:" + testingRun.getHexId(), LogDb.TESTING);
+
+                                    Map<String,Integer> finalCountMap = Utils.finalCountIssuesMap(isTestingRunResultRerunCase?
+                                            testingRunResultSummary.getOriginalTestingRunResultSummaryId(): testingRunResultSummary.getId());
+                                    if (isTestingRunResultRerunCase) {
+                                        //If stuck for a long time, delete the rerun test summary and update issue count for original summary
+                                        TestingRunResultSummariesDao.instance.updateOneNoUpsert(
+                                                Filters.eq(TestingRunResultSummary.ID, testingRunResultSummary.getOriginalTestingRunResultSummaryId()),
+                                                Updates.set(TestingRunResultSummary.COUNT_ISSUES, finalCountMap)
+                                        );
+
+                                        TestingRunResultSummariesDao.instance.deleteAll(Filters.eq(TestingRunResultSummariesDao.ID, testingRunResultSummary.getId()));
+                                        config.setTestingRunResultList(null);
+                                        config.setRerunTestingRunResultSummary(null);
+                                        loggerMaker.infoAndAddToDb("Deleted for TestingRunResult rerun case for failed testrun TRRS: " + testingRunResultSummary.getId());
+                                        return;
+                                    }
 
                                     int countFailedSummaries = (int) TestingRunResultSummariesDao.instance.count(filterCountFailed);
-                                    Map<String,Integer> finalCountMap = Utils.finalCountIssuesMap(testingRunResultSummary.getId());
                                     loggerMaker.infoAndAddToDb("Final count map calculated is " + finalCountMap.toString());
                                     Bson updateForSummary = Updates.combine(
                                         Updates.set(TestingRunResultSummary.STATE, State.FAILED),
@@ -607,11 +706,27 @@ public class Main {
                                         return;
                                     }
 
-                                    TestingRunResultSummary runResultSummary = TestingRunResultSummariesDao.instance.findOne(Filters.eq(TestingRunResultSummary.ID, testingRunResultSummary.getId()));
+                                    TestingRunResultSummary runResultSummary = TestingRunResultSummariesDao.instance.findOne(
+                                        Filters.eq(TestingRunResultSummary.ID, testingRunResultSummary.getId())
+                                    );
                                     GithubUtils.publishGithubComments(runResultSummary);
                                 }
                             } else {
-                                loggerMaker.infoAndAddToDb("No executions made for this test, will need to restart it, TRRS_ID:" + testingRunResultSummary.getHexId() + " TR_ID:" + testingRun.getHexId(), LogDb.TESTING);
+                                loggerMaker.infoAndAddToDb("No executions made for this test, will need to restart it, TRRS_ID:" 
+                                    + testingRunResultSummary.getHexId() 
+                                    + (isTestingRunResultRerunCase ? " (rerun case) " : " ")
+                                    + " TR_ID:" + testingRun.getHexId(), LogDb.TESTING);
+
+                                //won't reach here for testing run result rerun case, as there will be a minimum of 1 TRR
+                                //for safety delete run result.
+                                if (isTestingRunResultRerunCase) {
+                                    TestingRunResultSummariesDao.instance.deleteAll(Filters.eq(TestingRunResultSummariesDao.ID, testingRunResultSummary.getId()));
+                                    config.setTestingRunResultList(null);
+                                    config.setRerunTestingRunResultSummary(null);
+                                    loggerMaker.infoAndAddToDb("Deleted for TestingRunResult rerun case for failed testrun TRRS: " + testingRunResultSummary.getId());
+                                    return;
+                                }
+
                                 int countFailedSummaries = (int) TestingRunResultSummariesDao.instance.count(filterCountFailed);
                                 Bson updateForSummary = Updates.set(TestingRunResultSummary.STATE, State.FAILED);
 
@@ -683,7 +798,7 @@ public class Main {
                         // init producer and the consumer here
                         // producer for testing is currently calls init functions from test-executor
                         if(Constants.IS_NEW_TESTING_ENABLED){
-                            testingProducer.initProducer(testingRun, summaryId, syncLimit, false);  
+                            testingProducer.initProducer(testingRun, summaryId, syncLimit, false);
                             testingConsumer.init(maxRunTime);  
                         }else{
                             TestExecutor testExecutor = new TestExecutor();

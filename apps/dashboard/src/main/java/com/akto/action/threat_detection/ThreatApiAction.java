@@ -6,8 +6,12 @@ import com.akto.dto.test_editor.Category;
 import com.akto.dto.test_editor.Info;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.type.URLMethods;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.DailyActorsCountResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListThreatApiResponse;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatActivityTimelineResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatCategoryWiseCountResponse;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatSeverityWiseCountResponse;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.DailyActorsCountResponse.ActorsCount;
 import com.akto.proto.utils.ProtoMessageUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.HashMap;
@@ -28,11 +32,14 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
 
   List<DashboardThreatApi> apis;
   List<ThreatCategoryCount> categoryCounts;
+  List<DailyActorsCount> actorsCounts;
+  List<ThreatActivityTimeline> threatActivityTimelines;
   int skip;
   static final int LIMIT = 50;
   long total;
   Map<String, Integer> sort;
-  int startTimestamp, endTimestamp;
+  int startTs;
+  int endTs;
 
   private final CloseableHttpClient httpClient;
 
@@ -76,12 +83,22 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
   }
 
   public String fetchThreatCategoryCount() {
-    HttpGet get = new HttpGet(
+    HttpPost post = new HttpPost(
         String.format("%s/api/dashboard/get_subcategory_wise_count", this.getBackendUrl()));
-    get.addHeader("Authorization", "Bearer " + this.getApiToken());
-    get.addHeader("Content-Type", "application/json");
+    post.addHeader("Authorization", "Bearer " + this.getApiToken());
+    post.addHeader("Content-Type", "application/json");
 
-    try (CloseableHttpResponse resp = this.httpClient.execute(get)) {
+    Map<String, Object> body = new HashMap<String, Object>() {
+      {
+        put("start_ts", startTs);
+        put("end_ts", endTs);
+      }
+    };
+    String msg = objectMapper.valueToTree(body).toString();
+    StringEntity requestEntity = new StringEntity(msg, ContentType.APPLICATION_JSON);
+    post.setEntity(requestEntity);
+
+    try (CloseableHttpResponse resp = this.httpClient.execute(post)) {
       String responseBody = EntityUtils.toString(resp.getEntity());
 
       ProtoMessageUtils.<ThreatCategoryWiseCountResponse>toProtoMessage(
@@ -96,6 +113,126 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
                               ? categoryDisplayNames.get(smr.getCategory())
                               : smr.getCategory();
                           return new ThreatCategoryCount(displayName, smr.getSubCategory(), smr.getCount());
+                        })
+                    .collect(Collectors.toList());
+              });
+    } catch (Exception e) {
+      e.printStackTrace();
+      return ERROR.toUpperCase();
+    }
+
+    return SUCCESS.toUpperCase();
+  }
+
+  public String fetchCountBySeverity() {
+    HttpPost post = new HttpPost(
+        String.format("%s/api/dashboard/get_severity_wise_count", this.getBackendUrl()));
+
+    post.addHeader("Authorization", "Bearer " + this.getApiToken());
+    post.addHeader("Content-Type", "application/json");
+
+    Map<String, Object> body = new HashMap<String, Object>() {
+      {
+        put("start_ts", startTs);
+        put("end_ts", endTs);
+      }
+    };
+    String msg = objectMapper.valueToTree(body).toString();
+    StringEntity requestEntity = new StringEntity(msg, ContentType.APPLICATION_JSON);
+    post.setEntity(requestEntity);
+
+    try (CloseableHttpResponse resp = this.httpClient.execute(post)) {
+      String responseBody = EntityUtils.toString(resp.getEntity());
+
+      ProtoMessageUtils.<ThreatSeverityWiseCountResponse>toProtoMessage(
+        ThreatSeverityWiseCountResponse.class, responseBody)
+          .ifPresent(
+              m -> {
+                this.categoryCounts = m.getCategoryWiseCountsList().stream()
+                    .map(
+                        smr -> {
+                          return new ThreatCategoryCount("", smr.getSeverity(), smr.getCount());
+                        })
+                    .collect(Collectors.toList());
+              });
+    } catch (Exception e) {
+      e.printStackTrace();
+      return ERROR.toUpperCase();
+    }
+
+    return SUCCESS.toUpperCase();
+  }
+
+  public String getDailyThreatActorsCount() {
+    HttpPost post = new HttpPost(String.format("%s/api/dashboard/get_daily_actor_count", this.getBackendUrl()));
+    post.addHeader("Authorization", "Bearer " + this.getApiToken());
+    post.addHeader("Content-Type", "application/json");
+
+    Map<String, Object> body = new HashMap<String, Object>() {
+      {
+        put("start_ts", startTs);
+        put("end_ts", endTs);
+      }
+    };
+    String msg = objectMapper.valueToTree(body).toString();
+
+    StringEntity requestEntity = new StringEntity(msg, ContentType.APPLICATION_JSON);
+    post.setEntity(requestEntity);
+
+    try (CloseableHttpResponse resp = this.httpClient.execute(post)) {
+      String responseBody = EntityUtils.toString(resp.getEntity());
+
+      ProtoMessageUtils.<DailyActorsCountResponse>toProtoMessage(
+        DailyActorsCountResponse.class, responseBody)
+          .ifPresent(
+              m -> {
+                this.actorsCounts = m.getActorsCountsList().stream()
+                    .map(
+                        smr -> {
+                          return new DailyActorsCount(smr.getTs(), smr.getTotalActors(), smr.getCriticalActors());
+                        })
+                    .collect(Collectors.toList());
+              });
+    } catch (Exception e) {
+      e.printStackTrace();
+      return ERROR.toUpperCase();
+    }
+
+    return SUCCESS.toUpperCase();
+  }
+
+  public String getThreatActivityTimeline() {
+    HttpPost post = new HttpPost(String.format("%s/api/dashboard/get_threat_activity_timeline", this.getBackendUrl()));
+    post.addHeader("Authorization", "Bearer " + this.getApiToken());
+    post.addHeader("Content-Type", "application/json");
+
+    Map<String, Object> body = new HashMap<String, Object>() {
+      {
+        put("start_ts", startTs);
+        put("end_ts", endTs);
+      }
+    };
+    String msg = objectMapper.valueToTree(body).toString();
+
+    StringEntity requestEntity = new StringEntity(msg, ContentType.APPLICATION_JSON);
+    post.setEntity(requestEntity);
+
+    try (CloseableHttpResponse resp = this.httpClient.execute(post)) {
+      String responseBody = EntityUtils.toString(resp.getEntity());
+
+      ProtoMessageUtils.<ThreatActivityTimelineResponse>toProtoMessage(
+        ThreatActivityTimelineResponse.class, responseBody)
+          .ifPresent(
+              m -> {
+                this.threatActivityTimelines = m.getThreatActivityTimelineList().stream()
+                    .map(
+                        smr -> {
+                          //System.out.print(smr);
+                          
+                          return new ThreatActivityTimeline(smr.getTs(),
+                          smr.getSubCategoryWiseDataList().stream()
+                          .map(subData -> new SubCategoryWiseData(subData.getSubCategory(), subData.getActivityCount()))
+                          .collect(Collectors.toList()));
                         })
                     .collect(Collectors.toList());
               });
@@ -194,4 +331,37 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
   public void setCategoryCounts(List<ThreatCategoryCount> categoryCounts) {
     this.categoryCounts = categoryCounts;
   }
+
+  public List<DailyActorsCount> getActorsCounts() {
+    return actorsCounts;
+  }
+
+  public void setActorsCounts(List<DailyActorsCount> actorsCounts) {
+    this.actorsCounts = actorsCounts;
+  }
+
+  public int getStartTs() {
+    return startTs;
+  }
+
+  public void setStartTs(int startTs) {
+    this.startTs = startTs;
+  }
+
+  public int getEndTs() {
+    return endTs;
+  }
+
+  public void setEndTs(int endTs) {
+    this.endTs = endTs;
+  }
+
+  public List<ThreatActivityTimeline> getThreatActivityTimelines() {
+    return threatActivityTimelines;
+  }
+
+  public void setThreatActivityTimelines(List<ThreatActivityTimeline> threatActivityTimelines) {
+    this.threatActivityTimelines = threatActivityTimelines;
+  }
+
 }

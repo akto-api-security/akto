@@ -645,7 +645,8 @@ public class InitializerListener implements ServletContextListener {
                 boolean hasNotChangedCondition = currTypes.containsKey(piiKey) &&
                         (currTypes.get(piiKey).equals(piiType) && dt.getBoolean(PIISource.ACTIVE, true)) &&
                         (existingCDT != null && existingCDT.getDataTypePriority() != null)
-                        && (existingCDT.getCategoriesList() != null && !existingCDT.getCategoriesList().isEmpty());
+                        && (existingCDT.getCategoriesList() != null && !existingCDT.getCategoriesList().isEmpty())
+                        && existingCDT.systemFieldsCompare(newCDT);
 
                 boolean userHasChangedCondition = false;
                 if(existingCDT != null && existingCDT.getUserModifiedTimestamp() > 0){

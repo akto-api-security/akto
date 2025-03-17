@@ -47,6 +47,7 @@ import LocalStore from "../../../../main/LocalStorageStore";
 import { produce } from "immer"
 import GithubServerTable from "../../../components/tables/GithubServerTable";
 import RunTest from '../../observe/api_collections/RunTest';
+import TableStore from '../../../components/tables/TableStore'
 let sortOptions = [
   { label: 'Severity', value: 'severity asc', directionLabel: 'Highest severity', sortKey: 'total_severity', columnIndex: 3 },
   { label: 'Severity', value: 'severity desc', directionLabel: 'Lowest severity', sortKey: 'total_severity', columnIndex: 3 },
@@ -402,12 +403,16 @@ function SingleTestRunPage() {
 
   }, []);
 
-  const promotedBulkActions = (selectedDataHexIds) => {
+  const promotedBulkActions = () => {
+    let totalSelectedItemsSet = new Set(TableStore.getState().selectedItems.flat())
+
     return [
       {
-        content: `Export ${selectedDataHexIds.length} record${selectedDataHexIds.length == 1 ? '' : 's'}`,
+        content: `Rerun ${totalSelectedItemsSet.size} test${totalSelectedItemsSet.size === 1 ? '' : 's'}`,
         onAction: () => {
-          func.downloadAsCSV((testRunResultsText[selectedTab]).filter((data) => { return selectedDataHexIds.includes(data.id) }), selectedTestRun)
+        if (totalSelectedItemsSet.size > 0) {
+          transform.rerunTest(selectedTestRun.id, null, false, [...totalSelectedItemsSet], selectedTestRun.testingRunResultSummaryHexId)
+        }
         },
       },
     ]
@@ -577,17 +582,18 @@ function SingleTestRunPage() {
         filters={filterOptions}
         disambiguateLabel={disambiguateLabel}
         headers={tableHeaders}
-        selectable={false}
+        selectable={true}
         promotedBulkActions={promotedBulkActions}
         loading={loading}
         getStatus={func.getTestResultStatus}
         mode={IndexFiltersMode.Default}
         headings={tableHeaders}
         useNewRow={true}
+        isMultipleItemsSelected={true}
         condensedHeight={true}
         useModifiedData={true}
         modifyData={(data, filters) => modifyData(data, filters)}
-        notHighlightOnselected={true}
+        notHighlightOnselected={false}
         selected={selected}
         tableTabs={tableTabs}
         onSelect={handleSelectedTab}
