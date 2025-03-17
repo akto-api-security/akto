@@ -8,6 +8,21 @@ const STEPS_PER_AGENT_ID = {
     "FIND_FALSE_POSITIVE": 1,
 }
 
+const checkForSourceCodeApis = async()=> {
+    // make and api call to check the source code apis of this directory
+    // chosen directory => {get from output of step "1"}
+    return false
+}
+
+export const preRequisitesMap = {
+    "FIND_VULNERABILITIES_FROM_SOURCE_CODE": {
+        4: {
+            "text": "Please provide the list of apis for finding vulnerabilities",
+            "action": () => checkForSourceCodeApis()
+        },
+    }
+}
+
 export function structuredOutputFormat (output: any, agentType: string | undefined, subProcessId: string): any {
     console.log("output", output)
     switch (agentType) {
