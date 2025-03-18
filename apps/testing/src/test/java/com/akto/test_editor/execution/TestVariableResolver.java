@@ -54,7 +54,7 @@ public class TestVariableResolver {
         varMap.put("wordList_specialCharacters", Arrays.asList(".", "$", "/"));
         String key = "${changed_body_value}${specialCharacters}${randomVar}";
 
-        List<String> result = VariableResolver.resolveWordListVar(key, varMap);
+        List<Object> result = VariableResolver.resolveWordListVar(key, varMap);
         assertEquals(Arrays.asList("${changed_body_value}.${randomVar}", "${changed_body_value}$${randomVar}", "${changed_body_value}/${randomVar}"), result);
 
 
