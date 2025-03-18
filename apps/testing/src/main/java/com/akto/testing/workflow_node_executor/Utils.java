@@ -307,6 +307,9 @@ public class Utils {
         for (AuthParam param : authMechanism.getAuthParams()) {
             try {
                 String value = executeCode(param.getValue(), valuesMap, false);
+                if (Context.accountId.get() == 1728622642) {
+                    loggerMaker.infoAndAddToDb("evaluating param key and existing value " + param + " " + param.getValue() + " new value " + value, LogDb.TESTING);
+                }
                 if (!param.getValue().equals(value) && value == null) {
                     return new LoginFlowResponse(responses, "auth param not found at specified path " + 
                     param.getValue(), false);
@@ -355,6 +358,9 @@ public class Utils {
                 }
 
                 param.setValue(value);
+                if (Context.accountId.get() == 1728622642) {
+                    loggerMaker.infoAndAddToDb("setting param key and value " + param + " " + value, LogDb.TESTING);
+                }
             } catch(Exception e) {
                 return new LoginFlowResponse(responses, "error resolving auth param " + param.getValue(), false);
             }
