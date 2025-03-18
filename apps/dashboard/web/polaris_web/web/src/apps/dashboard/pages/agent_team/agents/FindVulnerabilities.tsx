@@ -67,7 +67,7 @@ export const FindVulnerabilitiesAgent = (props) => {
         }
 
     }
-    const intervalRef = useRef<number | null>(null);
+    const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
     useEffect(() => {
         if (!currentAgentRun || currentAgentRun?.state !== State.RUNNING) {

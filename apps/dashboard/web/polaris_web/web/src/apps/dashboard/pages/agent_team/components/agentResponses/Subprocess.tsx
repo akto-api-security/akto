@@ -6,7 +6,7 @@ import api from "../../api";
 import { useAgentsStore } from "../../agents.store";
 import STEPS_PER_AGENT_ID, { preRequisitesMap } from "../../constants";
 import { VerticalStack, Text } from "@shopify/polaris";
-import OutputSelector, { getMessageFromObj } from "./OutputSelector";
+import OutputSelector from "./OutputSelector";
 import { intermediateStore } from "../../intermediate.store";
 
 interface SubProcessProps {
@@ -113,9 +113,11 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, finalCTASho
                 triggerCallForSubProcesses();
             }
 
-            if (newSubProcess.state === State.USER_PROVIDED_SOLUTION) {
-                setAgentState("idle");
-            }
+            // TODO: implement the same.
+            // Removed from Prompt composer as well.
+            // if (newSubProcess.state === State.USER_PROVIDED_SOLUTION) {
+            //     setAgentState("idle");
+            // }
 
             if (JSON.stringify(newSubProcess) !== JSON.stringify(subprocess)) {
                 setSubprocess(newSubProcess);

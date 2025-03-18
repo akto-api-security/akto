@@ -35,13 +35,9 @@ function OutputSelector({onHandleSelect, processOutput} : OutputSelectorProps) {
     const allowMultiple = processOutput?.selectionType === "multiple"
     const initialValue = !allowMultiple ?
         getMessageFromObj(processOutput?.outputOptions[0], "textValue") :
-        processOutput?.outputOptions.map((option: any) => (option.textValue !== undefined ? {
-            label: option?.textValue,
-            value: option?.value !== undefined ? option?.value : JSON.stringify(option)
-        } : option));
+        processOutput?.outputOptions.map((option: any) => (option.value !== undefined ? option.value : JSON.stringify(option)));
     const [filteredChoices, setFilteredChoices] = useState(initialValue);
     const handleSelected = (selectedChoices: any) => { 
-        console.log("selectedChoices", selectedChoices);
         setFilteredChoices(selectedChoices);
     }
 
@@ -68,7 +64,7 @@ function OutputSelector({onHandleSelect, processOutput} : OutputSelectorProps) {
                     })}
                     placeHolder={"Edit choice(s)"}
                     setSelected={(selectedChoices: any) => handleSelected(selectedChoices)}
-                    preSelected={initialValue}
+                    preSelected={filteredChoices}
                     value={allowMultiple ?`${filteredChoices.length} choice${filteredChoices.length===1 ? "" : "s"} selected` : filteredChoices}
                 /> : <TextField labelHidden={true} label="" autoComplete="off" value={filteredChoices as string} onChange={(val:string) => setFilteredChoices(val)}/>}
             </HorizontalStack>

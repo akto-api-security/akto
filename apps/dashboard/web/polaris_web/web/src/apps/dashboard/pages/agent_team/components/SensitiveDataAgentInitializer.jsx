@@ -1,9 +1,8 @@
-import { Box, VerticalStack, Text, Button } from "@shopify/polaris";
 import React, { useState } from "react";
-import DropdownSearch from "../../../components/shared/DropdownSearch";
 import PersistStore from "../../../../main/PersistStore";
 import agentApi from '../api'
 import func from "../../../../../util/func";
+import DropDownAgentInitializer from "./DropDownAgentInitializer";
 
 function SensitiveDataAgentInitializer(props) {
 
@@ -33,36 +32,14 @@ function SensitiveDataAgentInitializer(props) {
         func.setToast(true, false, "Agent run scheduled")
     }
 
-    function StartButton() {
-        return <Button onClick={() => startAgent(selectedCollections)} >
-            Let's start!!
-        </Button>
-    }
-
-    function CollectionSelector() {
-        return (
-            <Box as='div' paddingBlockStart={"5"}>
-                <VerticalStack gap={"4"}>
-                    <Text as='span' variant='bodyMd'>
-                        Hey! Let's select API collections to run the sensitive data type scanner on.
-                    </Text>
-                    <Box width='350px' paddingInlineStart={"2"}>
-                        <DropdownSearch
-                            placeholder={"Select collections"}
-                            allowMultiple
-                            optionsList={optionsList}
-                            setSelected={setSelectedCollections}
-                            preSelected={selectedCollections}
-                            value={`${selectedCollections.length} collections selected`}
-                        />
-                    </Box>
-                    <StartButton />
-                </VerticalStack>
-            </Box>
-        )
-    }
-
-    return <CollectionSelector />
+    return <DropDownAgentInitializer
+        optionsList={optionsList}
+        data={selectedCollections}
+        setData={setSelectedCollections}
+        startAgent={startAgent}
+        agentText={"Hey! Let's select API collections to run the sensitive data type scanner on."}
+        agentProperty={"collection"}
+    />
 }
 
 export default SensitiveDataAgentInitializer;

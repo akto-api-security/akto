@@ -2,8 +2,8 @@ import { useEffect, useState } from "react"
 import func from "../../../../../util/func"
 import testingApi from "../../../pages/testing/api"
 import testingTransform from "../../../pages/testing/transform"
-import { Box, Button, Text, VerticalStack } from "@shopify/polaris"
-import DropdownSearch from "../../../components/shared/DropdownSearch"
+import DropDownAgentInitializer from "./DropDownAgentInitializer"
+import agentApi from "../api"
 
 function TestFalsePositiveInitializer(props) {
     const { agentType } = props
@@ -75,37 +75,14 @@ function TestFalsePositiveInitializer(props) {
         func.setToast(true, false, "Agent run scheduled")
     }
 
-    function StartButton() {
-        return <Button onClick={() => startAgent(testingRuns)} >
-            Let's start!!
-        </Button>
-    }
-
-
-    function TestSelector() {
-        return (
-            <Box as='div' paddingBlockStart={"5"}>
-                <VerticalStack gap={"4"}>
-                    <Text as='span' variant='bodyMd'>
-                        Hey! Let's select Test runs to run the test false positive finder on.
-                    </Text>
-                    <Box width='350px' paddingInlineStart={"2"}>
-                        <DropdownSearch
-                            placeholder={"Select testing runs"}
-                            allowMultiple
-                            optionsList={optionsList}
-                            setSelected={setTestingRuns}
-                            preSelected={testingRuns}
-                            value={`${testingRuns.length} tests selected`}
-                        />
-                    </Box>
-                    <StartButton />
-                </VerticalStack>
-            </Box>
-        )
-    }
-
-    return <TestSelector />
+    return <DropDownAgentInitializer
+        optionsList={optionsList}
+        data={testingRuns}
+        setData={setTestingRuns}
+        startAgent={startAgent}
+        agentText={"Hey! Let's select Test runs to run the test false positive finder on."}
+        agentProperty={"testing run"}
+    />
 }
 
 export default TestFalsePositiveInitializer

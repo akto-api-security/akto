@@ -13,6 +13,7 @@ import { useAgentsStore } from '../agents.store';
 import AgentGroupCTA from './finalctas/AgentGroupCTA';
 import APISRequiredCTA from './finalctas/APISRequiredCTA';
 import TestFalsePositiveInitializer from './TestFalsePositiveInitializer';
+import TestFalsePositiveAgentCTA from './finalctas/TestFalsePositiveAgentCTA';
 
 interface AgentWindowProps {
     agent: Agent | null;
@@ -67,7 +68,7 @@ function AgentWindow({ agent, onClose, open }: AgentWindowProps) {
             case 'GROUP_APIS':
                 return (<AgentGroupCTA show={finalCTAShow} setShow={setFinalCTAShow}/>)
             case 'FIND_FALSE_POSITIVE':
-                return (<></>)
+                return (<TestFalsePositiveAgentCTA show={finalCTAShow} setShow={setFinalCTAShow} />)
             default:
                 return (<></>)
         }
