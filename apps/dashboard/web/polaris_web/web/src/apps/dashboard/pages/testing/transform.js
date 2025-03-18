@@ -1102,7 +1102,7 @@ getHeaders: (tab)=> {
       case "no_vulnerability_found":
           return headers.filter((header) => header.title !== "Severity")
 
-      case "skipped":
+      case "not_applicable":
           return headers.filter((header) => header.title !== "CWE tags").map((header) => {
               if (header.title === "Severity") {
                   // Modify the object as needed
