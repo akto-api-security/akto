@@ -19,7 +19,7 @@ export const BlockedState = ({ onResume, onDiscard }: BlockedStateProps) => {
         onResume();
     }
 
-    const isPaused = true;
+    const isPaused = agentState === 'paused';
     const isThinking = agentState === 'thinking';
 
     const show = isPaused || isThinking;
