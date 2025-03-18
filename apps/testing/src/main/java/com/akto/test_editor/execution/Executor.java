@@ -595,7 +595,13 @@ public class Executor {
                 List<AuthParam> authParamList = authMechanismForRole.getAuthParams();
                 if (!authParamList.isEmpty()) {
                     ExecutorSingleOperationResp ret = null;
+                    if (Context.accountId.get() == 1728622642) {
+                        loggerMaker.infoAndAddToDb("logging rawapi headers " + rawApi.getRequest().getHeaders());
+                    }
                     for (AuthParam authParam1: authParamList) {
+                        if (Context.accountId.get() == 1728622642) {
+                            loggerMaker.infoAndAddToDb("logging authParam1 " + authParam1);
+                        }
                         if(authParam1.authTokenPresent(rawApi.getRequest())){
                             authParam1.addAuthTokens(rawApi.getRequest());
                             ret = new ExecutorSingleOperationResp(true, "");
@@ -603,7 +609,9 @@ public class Executor {
                             ret = new ExecutorSingleOperationResp(true, "key not present " + authParam1.getKey().toLowerCase());
                         }
                     }
-
+                    if (Context.accountId.get() == 1728622642) {
+                        loggerMaker.infoAndAddToDb("logging rawapi headers post modification " + rawApi.getRequest().getHeaders());
+                    }
                     return ret;
                 }
             }

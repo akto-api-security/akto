@@ -292,6 +292,9 @@ public class Utils {
             }
             // respString.put("body", json.get("response").get("body").toString());
             responses.add(respString.toString());
+            if(Context.accountId.get() == 1728622642){
+                loggerMaker.infoAndAddToDb("response from node " + node.getId() + " " + respString.toString(), LogDb.TESTING);
+            }
             
             if (nodeResult.getErrors().size() > 0) {
                 return new LoginFlowResponse(responses, "Failed to process node " + node.getId(), false);
@@ -307,6 +310,9 @@ public class Utils {
         for (AuthParam param : authMechanism.getAuthParams()) {
             try {
                 String value = executeCode(param.getValue(), valuesMap, false);
+                if (Context.accountId.get() == 1728622642) {
+                    loggerMaker.infoAndAddToDb("evaluating param key and existing value " + param + " " + param.getValue() + " new value " + value, LogDb.TESTING);
+                }
                 if (!param.getValue().equals(value) && value == null) {
                     return new LoginFlowResponse(responses, "auth param not found at specified path " + 
                     param.getValue(), false);
@@ -341,6 +347,9 @@ public class Utils {
                     // check if this cookie with max-age or expiry time
                     try {
                         Map<String,String> cookieMap = parseCookie(Arrays.asList(value));
+                        if(Context.accountId.get() == 1728622642){
+                            loggerMaker.infoAndAddToDb("cookieMap: " + cookieMap.toString(), LogDb.TESTING);
+                        }
                         int expiryTsEpoch = CookieExpireFilter.getMaxAgeFromCookie(cookieMap);
                         if(expiryTsEpoch > 0){
                             int newExpiryTime = Context.now() + expiryTsEpoch;
@@ -355,6 +364,9 @@ public class Utils {
                 }
 
                 param.setValue(value);
+                if (Context.accountId.get() == 1728622642) {
+                    loggerMaker.infoAndAddToDb("setting param key and value " + param + " " + value, LogDb.TESTING);
+                }
             } catch(Exception e) {
                 return new LoginFlowResponse(responses, "error resolving auth param " + param.getValue(), false);
             }
