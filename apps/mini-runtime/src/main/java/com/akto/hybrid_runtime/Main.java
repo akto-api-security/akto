@@ -17,6 +17,7 @@ import com.akto.kafka.Kafka;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.metrics.AllMetrics;
+import com.akto.monitor.MemoryMonitor;
 import com.akto.sql.SampleDataAltDb;
 import com.akto.hybrid_parsers.HttpCallParser;
 import com.akto.data_actor.DataActor;
@@ -149,6 +150,9 @@ public class Main {
         // DictionaryFilter.readDictionaryBinary();
         return topicName;
     }
+
+    private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
+
 
     // REFERENCE: https://www.oreilly.com/library/view/kafka-the-definitive/9781491936153/ch04.html (But how do we Exit?)
     public static void main(String[] args) {
@@ -308,7 +312,7 @@ public class Main {
 
         long lastSyncOffset = 0;
 
-        Map<Integer, Integer> logSentMap = new HashMap<>();
+        executorService.scheduleAtFixedRate(new MemoryMonitor.MemoryMonitorTask(), 0, 10, TimeUnit.SECONDS);
 
         try {
             main.consumer.subscribe(Arrays.asList(topicName, "har_"+topicName));
