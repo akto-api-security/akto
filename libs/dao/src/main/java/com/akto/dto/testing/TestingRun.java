@@ -37,6 +37,9 @@ public class TestingRun {
     public static final String NAME = "name";
     private String name;
 
+    public static final String MINI_TESTING_SERVICE_NAME = "miniTestingServiceName";
+    private String miniTestingServiceName;
+
     public enum TestingRunType{
         ONE_TIME, RECURRING, CI_CD, CONTINUOUS_TESTING
     }
@@ -61,7 +64,7 @@ public class TestingRun {
         this.triggeredBy = triggeredBy;
         this.sendSlackAlert = sendSlackAlert;
     }
-    public TestingRun(int scheduleTimestamp, String userEmail, TestingEndpoints testingEndpoints, int testIdConfig, State state, int periodInSeconds, String name, int testRunTime, int maxConcurrentRequests, boolean sendSlackAlert) {
+    public TestingRun(int scheduleTimestamp, String userEmail, TestingEndpoints testingEndpoints, int testIdConfig, State state, int periodInSeconds, String name, int testRunTime, int maxConcurrentRequests, boolean sendSlackAlert, String miniTestingServiceName) {
         this.scheduleTimestamp = scheduleTimestamp;
         this.testRunTime = testRunTime;
         this.maxConcurrentRequests = maxConcurrentRequests;
@@ -74,6 +77,7 @@ public class TestingRun {
         this.periodInSeconds = periodInSeconds;
         this.name = name;
         this.sendSlackAlert = sendSlackAlert;
+        this.miniTestingServiceName = miniTestingServiceName;
     }
 
     public TestingRunConfig getTestingRunConfig() {
@@ -207,6 +211,14 @@ public class TestingRun {
 
     public void setSendSlackAlert(boolean sendSlackAlert) {
         this.sendSlackAlert = sendSlackAlert;
+    }
+
+    public String getMiniTestingServiceName() {
+        return miniTestingServiceName;
+    }
+
+    public void setMiniTestingServiceName(String miniTestingServiceName) {
+        this.miniTestingServiceName = miniTestingServiceName;
     }
 
     @Override
