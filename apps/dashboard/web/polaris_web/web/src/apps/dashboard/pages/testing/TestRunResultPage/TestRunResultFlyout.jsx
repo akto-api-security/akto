@@ -237,17 +237,23 @@ function TestRunResultFlyout(props) {
     const ValuesTab = {
         id: 'values',
         content: "Values",
-        component: (dataExpired && !selectedTestRunResult?.vulnerable && 
-            !(selectedTestRunResult?.testResults?.[0]?.originalMessage || selectedTestRunResult?.testResults?.[0]?.message) )
+        component: (dataExpired && !selectedTestRunResult?.vulnerable)
             ? dataExpiredComponent :
-            (func.showTestSampleData(selectedTestRunResult) && selectedTestRunResult.testResults &&
+            (selectedTestRunResult.testResults &&
         <Box paddingBlockStart={3} paddingInlineEnd={4} paddingInlineStart={4}><SampleDataList
             key="Sample values"
             heading={"Attempt"}
             minHeight={"30vh"}
             vertical={true}
             sampleData={selectedTestRunResult?.testResults.map((result) => {
-                return {originalMessage: result.originalMessage, message:result.message, highlightPaths:[]}
+                if (result.errors && result.errors.length > 0) {
+                    let errorList = result.errors.join(", ");
+                    return { errorList: errorList }
+                }
+                if (result.originalMessage || result.message) {
+                    return { originalMessage: result.originalMessage, message: result.message, highlightPaths: [] }
+                }
+                return { errorList: "No data found" }
             })}
             isNewDiff={true}
             vulnerable={selectedTestRunResult?.vulnerable}
@@ -373,7 +379,7 @@ function TestRunResultFlyout(props) {
     const errorTab = {
         id: "error",
         content: "Attempt",
-        component:  ( selectedTestRunResult.errors && selectedTestRunResult.errors.length > 0 ) && <Box padding={"4"}>
+        component:  (selectedTestRunResult.errors && selectedTestRunResult.errors.length > 0 ) && <Box padding={"4"}>
             {
             selectedTestRunResult?.errors?.map((error, i) => {
                 if (error) {
@@ -382,7 +388,6 @@ function TestRunResultFlyout(props) {
                     }
                     return (
                         <SampleData key={i} data={data} language="yaml" minHeight="450px" wordWrap={false}/>
-                        // <p className="p-class" key={i}>{error}</p>
                       )
                 }
             })
@@ -390,7 +395,7 @@ function TestRunResultFlyout(props) {
         </Box>
     }
 
-    const attemptTab =  ( selectedTestRunResult.errors && selectedTestRunResult.errors.length > 0 ) ? errorTab : ValuesTab
+    const attemptTab = !selectedTestRunResult.testResults ? errorTab : ValuesTab
 
     const tabsComponent = (
         <LayoutWithTabs
