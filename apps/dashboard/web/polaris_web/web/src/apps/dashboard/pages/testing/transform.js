@@ -305,6 +305,10 @@ const transform = {
         return obj
       }
     },
+    processData: (testingRuns, latestTestingRunResultSummaries, cicd) => {
+      let testRuns = transform.prepareTestRuns(testingRuns, latestTestingRunResultSummaries, cicd, true);
+      return testRuns;
+    },
     prepareTestRuns : (testingRuns, latestTestingRunResultSummaries, cicd, prettified) => {
       let testRuns = []
       testingRuns.forEach((data)=>{

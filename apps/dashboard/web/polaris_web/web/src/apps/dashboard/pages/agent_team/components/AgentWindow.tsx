@@ -12,6 +12,7 @@ import ApiGroupAgentInitializer from './ApiGroupAgentInitializer';
 import { useAgentsStore } from '../agents.store';
 import AgentGroupCTA from './finalctas/AgentGroupCTA';
 import APISRequiredCTA from './finalctas/APISRequiredCTA';
+import TestFalsePositiveInitializer from './TestFalsePositiveInitializer';
 
 interface AgentWindowProps {
     agent: Agent | null;
@@ -41,14 +42,17 @@ function AgentWindow({ agent, onClose, open }: AgentWindowProps) {
                     </VerticalStack>
                 )
             case 'GROUP_APIS':
-                return(
+                return (
                     <VerticalStack gap={"4"}>
-                        {(currentProcessId === null || currentProcessId.length === 0) ? <ApiGroupAgentInitializer agentType={agent.id}/> : <></> }
-                        <FindVulnerabilitiesAgent agentId={agent.id} finalCTAShow={finalCTAShow} setFinalCTAShow={setFinalCTAShow}/>
+                        {(currentProcessId === null || currentProcessId.length === 0) ? <ApiGroupAgentInitializer agentType={agent.id} /> : <></>}
+                        <FindVulnerabilitiesAgent agentId={agent.id} finalCTAShow={finalCTAShow} setFinalCTAShow={setFinalCTAShow} />
                     </VerticalStack>
                 )
             case 'FIND_FALSE_POSITIVE':
-                return (<></>)
+                return (<VerticalStack gap={"4"}>
+                    {(currentProcessId === null || currentProcessId.length === 0) ? <TestFalsePositiveInitializer agentType={agent.id} /> : <></>}
+                    <FindVulnerabilitiesAgent agentId={agent.id} finalCTAShow={finalCTAShow} setFinalCTAShow={setFinalCTAShow} />
+                </VerticalStack>)
             default:
                 return (<></>)
         }
