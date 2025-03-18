@@ -49,26 +49,23 @@ function AgentTeam() {
 
     }, []);
 
-    const [newCol, setNewCol] = useState(0)
-
     const closeAction = () => {
         setCurrentAgent(null)
-        setNewCol(0)
         setShowAgentWindow(false)
     }
 
     const onButtonClick = (agent: Agent | null ) => {
-        setNewCol(1)
         setCurrentAgent(agent)
         setShowAgentWindow(true)
     }
 
     const agents = (
-        <GridRows CardComponent={AgentRowCard} columns="3"
+        <GridRows 
+            CardComponent={AgentRowCard} 
+            columns="3"
             items={Agents}
             onButtonClick={onButtonClick}
             cardType="AGENT"
-            changedColumns={newCol}
         />
     )
 
