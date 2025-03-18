@@ -468,7 +468,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
             } else if (testRun.recurringMonthly) {
                 return <div data-testid="schedule_run_button">Run monthly on every {new Date(testRun.startTimestamp * 1000).getDate()} at {testRun.hourlyLabel}</div>
             }else {
-                return <div data-testid="schedule_run_button">Run once at {func.prettifyFutureEpoch(testRun.startTimestamp)}</div>
+                return <div data-testid="schedule_run_button">Run once on {new Date(testRun.startTimestamp * 1000).getDate()} at {testRun.hourlyLabel}</div>
             }
         }
     }
