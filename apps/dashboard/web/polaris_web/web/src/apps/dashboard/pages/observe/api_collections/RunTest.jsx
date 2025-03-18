@@ -406,11 +406,11 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
     const hours = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
 
     const amTimes = hours.map(hour => {
-        let hourStr = hour + (hour == 12 ? " noon" : " am")
+        let hourStr = hour + (hour === 12 ? " noon" : " am")
         return { label: hourStr, value: hour.toString() }
     })
     const pmTimes = hours.map(hour => {
-        let hourStr = hour + (hour == 12 ? " midnight" : " pm")
+        let hourStr = hour + (hour === 12 ? " midnight" : " pm")
         return { label: hourStr, value: `${hour + 12}` }
     })
 
@@ -434,7 +434,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
 
     const testRunTimeOptions = [...runTimeMinutes, ...runTimeHours]
 
-    const runTypeOptions = [{ label: "Daily", value: "Daily" }, {label: 'Weekly',value: 'Weekly'}, {label: 'Monthly', value: 'weekly'}, { label: "Continuously", value: "Continuously" }, { label: "Once", value: "Once" }]
+    const runTypeOptions = [{ label: "Daily", value: "Daily" }, {label: 'Weekly',value: 'Weekly'}, {label: 'Monthly', value: 'Monthly'}, { label: "Continuously", value: "Continuously" }, { label: "Once", value: "Once" }]
 
     const maxRequests = hours.reduce((abc, x) => {
         if (x < 11) {
@@ -464,9 +464,9 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
             if (testRun.recurringDaily) {
                 return <div data-testid="schedule_run_button">Run daily at {testRun.hourlyLabel}</div>
             } else if (testRun.recurringWeekly) { 
-                return <div data-testid="schedule_run_button">Run weekly at {testRun.hourlyLabel}</div>
+                return <div data-testid="schedule_run_button">Run weekly on every {func.getDayOfWeek(testRun.startTimestamp)} at {testRun.hourlyLabel}</div>
             } else if (testRun.recurringMonthly) {
-                return <div data-testid="schedule_run_button">Run monthly at {testRun.hourlyLabel}</div>
+                return <div data-testid="schedule_run_button">Run monthly on every {new Date(testRun.startTimestamp * 1000).getDate()} at {testRun.hourlyLabel}</div>
             }else {
                 return <div data-testid="schedule_run_button">Run once at {func.prettifyFutureEpoch(testRun.startTimestamp)}</div>
             }
