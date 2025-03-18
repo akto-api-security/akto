@@ -292,6 +292,9 @@ public class Utils {
             }
             // respString.put("body", json.get("response").get("body").toString());
             responses.add(respString.toString());
+            if(Context.accountId.get() == 1728622642){
+                loggerMaker.infoAndAddToDb("response from node " + node.getId() + " " + respString.toString(), LogDb.TESTING);
+            }
             
             if (nodeResult.getErrors().size() > 0) {
                 return new LoginFlowResponse(responses, "Failed to process node " + node.getId(), false);
@@ -344,6 +347,9 @@ public class Utils {
                     // check if this cookie with max-age or expiry time
                     try {
                         Map<String,String> cookieMap = parseCookie(Arrays.asList(value));
+                        if(Context.accountId.get() == 1728622642){
+                            loggerMaker.infoAndAddToDb("cookieMap: " + cookieMap.toString(), LogDb.TESTING);
+                        }
                         int expiryTsEpoch = CookieExpireFilter.getMaxAgeFromCookie(cookieMap);
                         if(expiryTsEpoch > 0){
                             int newExpiryTime = Context.now() + expiryTsEpoch;
