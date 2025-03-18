@@ -362,6 +362,15 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
         return processPipelineForEndpoint(pipeline);
     }
 
+    public List<ApiInfo.ApiInfoKey> fetchSensitiveEndpoints(int apiCollectionId, int skip, int limit) {
+        Bson filter = filterForSensitiveParamsExcludingUserMarkedSensitive(apiCollectionId,
+                null, null, null);
+        List<Bson> pipeline = getPipelineForEndpoints(filter);
+        pipeline.add(Aggregates.limit(limit));
+        pipeline.add(Aggregates.skip(skip));
+        return processPipelineForEndpoint(pipeline);
+    }
+
     private List<Bson> getPipelineForEndpoints(Bson matchCriteria) {
         List<Bson> pipeline = new ArrayList<>();
         BasicDBObject groupedId =

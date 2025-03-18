@@ -26,7 +26,11 @@ import com.akto.dao.TrafficInfoDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.demo.VulnerableRequestForTemplateDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
+import com.akto.dto.testing.CustomTestingEndpoints;
+import com.akto.dto.testing.SensitiveDataEndpoints;
 import com.akto.dto.testing.TestingEndpoints;
+import com.akto.dto.testing.custom_groups.AllAPIsGroup;
+import com.akto.dto.testing.custom_groups.UnauthenticatedEndpoint;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.util.Constants;
 import com.mongodb.BasicDBObject;
@@ -141,6 +145,22 @@ public class ApiCollectionUsers {
     }
 
     public static void computeCollectionsForCollectionId(List<TestingEndpoints> conditions, int apiCollectionId) {
+
+        if(UnauthenticatedEndpoint.UNAUTHENTICATED_GROUP_ID == apiCollectionId){
+            UnauthenticatedEndpoint.updateCollections();
+            return;
+        }
+
+        if(SensitiveDataEndpoints.API_GROUP_ID == apiCollectionId){
+            SensitiveDataEndpoints.updateCollections();
+            return;
+        }
+
+        if(AllAPIsGroup.ALL_APIS_GROUP_ID == apiCollectionId){
+            AllAPIsGroup.updateCollections();
+            return;
+        }
+
         addToCollectionsForCollectionId(conditions, apiCollectionId);
         removeFromCollectionsForCollectionId(conditions, apiCollectionId);
         updateApiCollection(conditions, apiCollectionId);
@@ -220,6 +240,11 @@ public class ApiCollectionUsers {
             logger.info("updated " + c + " " + collection.getCollName() + " in account id: " + accountId);
         }
         logger.info("Total time taken : " + (Context.now() - time) + " for " + collection.getCollName() + " in account id: " + accountId);
+    }
+
+    public static void reset(int apiCollectionId) {
+        CustomTestingEndpoints ep = new CustomTestingEndpoints(new ArrayList<>());
+        removeFromCollectionsForCollectionId(Collections.singletonList(ep), apiCollectionId);
     }
 
 }

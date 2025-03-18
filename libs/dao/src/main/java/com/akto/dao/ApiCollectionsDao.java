@@ -2,11 +2,11 @@ package com.akto.dao;
 
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiCollection;
-import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
+import com.akto.dto.CodeAnalysisCollection;
+import com.akto.dto.testing.CollectionWiseTestingEndpoints;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.util.Constants;
-import com.akto.dto.type.SingleTypeInfo;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.MongoDatabase;
@@ -101,8 +101,20 @@ public class ApiCollectionsDao extends AccountsContextDao<ApiCollection> {
         return ApiCollectionsDao.instance.findAll(Filters.eq(ApiCollection._TYPE, ApiCollection.Type.API_GROUP.toString()));
     }
 
+    public List<ApiCollection> fetchNonApiGroupsIds() {
+        return ApiCollectionsDao.instance.findAll(
+                nonApiGroupFilter(),
+                Projections.include(ApiCollection.ID));
+    }
+
+    public Bson nonApiGroupFilter() {
+        return Filters.or(
+                Filters.exists(ApiCollection._TYPE, false),
+                Filters.ne(ApiCollection._TYPE, ApiCollection.Type.API_GROUP.toString()));
+    }
+
     public ApiCollection findByName(String name) {
-        List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(new BasicDBObject());
+        List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(nonApiGroupFilter());
         for (ApiCollection apiCollection: apiCollections) {
             if (apiCollection.getDisplayName() == null) continue;
             if (apiCollection.getDisplayName().equalsIgnoreCase(name)) {
@@ -159,6 +171,22 @@ public class ApiCollectionsDao extends AccountsContextDao<ApiCollection> {
             }
         }
 
+        Map<String, Integer> codeAnalysisUrlsCountMap = CodeAnalysisApiInfoDao.instance.getUrlsCount();
+        if (codeAnalysisUrlsCountMap.isEmpty()) return countMap;
+
+        Map<String, Integer> idToCollectionNameMap = CodeAnalysisCollectionDao.instance.findIdToCollectionNameMap();
+        for (String codeAnalysisId: codeAnalysisUrlsCountMap.keySet()) {
+            int count = codeAnalysisUrlsCountMap.getOrDefault(codeAnalysisId, 0);
+            Integer apiCollectionId = idToCollectionNameMap.get(codeAnalysisId);
+            if (apiCollectionId == null) continue;
+
+            int currentCount = countMap.getOrDefault(apiCollectionId, 0);
+            currentCount += count;
+
+            countMap.put(apiCollectionId, currentCount);
+        }
+
+
         return countMap;
     }
 
@@ -180,8 +208,11 @@ public class ApiCollectionsDao extends AccountsContextDao<ApiCollection> {
 
         pipeline.add(Aggregates.project(projections));
         pipeline.add(Aggregates.group(groupedId, Accumulators.min("startTs", "$timestamp"), Accumulators.sum("changesCount", 1)));
-        pipeline.add(Aggregates.skip(skip));
-        pipeline.add(Aggregates.limit(limit));
+        if(limit != -1){
+            pipeline.add(Aggregates.skip(skip));
+            pipeline.add(Aggregates.limit(limit));
+        }
+        
         pipeline.add(Aggregates.sort(Sorts.descending("startTs")));
 
         MongoCursor<BasicDBObject> endpointsCursor = SingleTypeInfoDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
@@ -194,9 +225,11 @@ public class ApiCollectionsDao extends AccountsContextDao<ApiCollection> {
         return endpoints;
     }
 
+    public static final int STIS_LIMIT = 10_000;
+
     public static List<SingleTypeInfo> fetchHostSTI(int apiCollectionId, int skip) {
         Bson filterQ = SingleTypeInfoDao.filterForHostHeader(apiCollectionId, true);
-        return SingleTypeInfoDao.instance.findAll(filterQ, skip,10_000, null);
+        return SingleTypeInfoDao.instance.findAll(filterQ, skip, STIS_LIMIT, null);
     }
 
     public static List<BasicDBObject> fetchEndpointsInCollectionUsingHost(int apiCollectionId, int skip, int limit, int deltaPeriodValue) {
@@ -210,7 +243,17 @@ public class ApiCollectionsDao extends AccountsContextDao<ApiCollection> {
         if (apiCollection.getHostName() == null || apiCollection.getHostName().length() == 0 ) {
             return fetchEndpointsInCollection(apiCollectionId, skip, limit, deltaPeriodValue);
         } else {
-            List<SingleTypeInfo> allUrlsInCollection = fetchHostSTI(apiCollectionId, skip);
+            List<SingleTypeInfo> allUrlsInCollection = new ArrayList<>();
+            int localSkip = 0;
+            while(true){
+                List<SingleTypeInfo> stis = fetchHostSTI(apiCollectionId, localSkip);
+                allUrlsInCollection.addAll(stis);
+                if(stis.size() < STIS_LIMIT){
+                    break;
+                }
+
+                localSkip += STIS_LIMIT;
+            }
 
             List<BasicDBObject> endpoints = new ArrayList<>();
             for(SingleTypeInfo singleTypeInfo: allUrlsInCollection) {

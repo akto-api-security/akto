@@ -38,7 +38,7 @@ public abstract class TestingEndpoints {
 
 
     public enum Type {
-        CUSTOM, COLLECTION_WISE, WORKFLOW, LOGICAL_GROUP, METHOD, ALL, REGEX, RISK_SCORE
+        CUSTOM, COLLECTION_WISE, WORKFLOW, LOGICAL_GROUP, METHOD, ALL, REGEX, RISK_SCORE, SENSITIVE_DATA, UNAUTHENTICATED
     }
 
     public Type getType() {
@@ -76,6 +76,8 @@ public abstract class TestingEndpoints {
                 case METHOD:
                     condition = new MethodCondition(operator, Method.valueOf(data.getString("method")));
                     break;
+                case REGEX:
+                    condition = new RegexTestingEndpoints(operator, data.getString("regex"));
                 default:
                     break;
             }
@@ -128,4 +130,6 @@ public abstract class TestingEndpoints {
                 return false;
         }
     }
+
+    
 }

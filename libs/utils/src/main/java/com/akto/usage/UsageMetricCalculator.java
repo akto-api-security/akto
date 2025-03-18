@@ -1,8 +1,10 @@
 package com.akto.usage;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -23,9 +25,12 @@ import com.akto.dto.usage.MetricTypes;
 import com.akto.dto.usage.UsageMetric;
 import com.akto.dto.usage.metadata.ActiveAccounts;
 import com.akto.log.LoggerMaker;
+import com.akto.util.Constants;
 import com.akto.util.enums.GlobalEnums.YamlTemplateSource;
 import com.google.gson.Gson;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Projections;
+
 import org.bson.conversions.Bson;
 
 public class UsageMetricCalculator {
@@ -43,24 +48,30 @@ public class UsageMetricCalculator {
         return demos;
     }
 
-    private static int lastDeactivatedFetched = 0;
+    /*
+     * to handle multiple accounts using static maps.
+     */
+    private static Map<Integer, Integer> lastDeactivatedFetchedMap = new HashMap<>();
     private static final int REFRESH_INTERVAL = 60 * 2; // 2 minutes.
-    private static Set<Integer> deactivatedCollections = new HashSet<>();
+    private static Map<Integer, Set<Integer>> deactivatedCollectionsMap = new HashMap<>();
 
     public static Set<Integer> getDeactivated() {
 
-        if ((lastDeactivatedFetched + REFRESH_INTERVAL) >= Context.now()) {
-            return deactivatedCollections;
+        int accountId = Context.accountId.get();
+        if (lastDeactivatedFetchedMap.containsKey(accountId)
+                && (lastDeactivatedFetchedMap.get(accountId) + REFRESH_INTERVAL) >= Context.now()
+                && deactivatedCollectionsMap.containsKey(accountId)) {
+            return deactivatedCollectionsMap.get(accountId);
         }
 
-        deactivatedCollections = getDeactivatedLatest();
-        lastDeactivatedFetched = Context.now();
-        return deactivatedCollections;
+        deactivatedCollectionsMap.put(accountId, getDeactivatedLatest());
+        lastDeactivatedFetchedMap.put(accountId, Context.now());
+        return deactivatedCollectionsMap.get(accountId);
     }
 
     public static Set<Integer> getDeactivatedLatest(){
         List<ApiCollection> deactivated = ApiCollectionsDao.instance
-                .findAll(Filters.eq(ApiCollection._DEACTIVATED, true));
+                .findAll(Filters.eq(ApiCollection._DEACTIVATED, true), Projections.include(Constants.ID));
         Set<Integer> deactivatedIds = new HashSet<>(
                 deactivated.stream().map(apiCollection -> apiCollection.getId()).collect(Collectors.toList()));
 

@@ -32,7 +32,7 @@ public class KafkaUtils {
     
     private final static ObjectMapper mapper = new ObjectMapper();
     private static final Gson gson = new Gson();
-    private static final LoggerMaker loggerMaker = new LoggerMaker(KafkaUtils.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(KafkaUtils.class, LogDb.DB_ABS);
     private static final Logger logger = LoggerFactory.getLogger(KafkaUtils.class);
     private Consumer<String, String> consumer;
     private static Kafka kafkaProducer;
@@ -81,7 +81,7 @@ public class KafkaUtils {
                 } catch (InterruptedException e) {
                     e.printStackTrace();
                 } catch (Error e){
-                    loggerMaker.errorAndAddToDb("Error in add shut down hook: "+ e.getMessage(), LogDb.DASHBOARD);
+                    loggerMaker.errorAndAddToDb("Error in add shut down hook: "+ e.toString());
                 }
             }
         });
@@ -89,7 +89,7 @@ public class KafkaUtils {
 
         try {
             this.consumer.subscribe(Arrays.asList(topicName));
-            loggerMaker.infoAndAddToDb("Kafka Consumer subscribed", LogDb.DASHBOARD);
+            loggerMaker.infoAndAddToDb("Kafka Consumer subscribed");
             while (true) {
                 ConsumerRecords<String, String> records = this.consumer.poll(Duration.ofMillis(10000));
                 try {
@@ -107,7 +107,7 @@ public class KafkaUtils {
 
                         parseAndTriggerWrites(r.value());
                     } catch (Exception e) {
-                        loggerMaker.errorAndAddToDb(e, "Error in parseAndTriggerWrites " + e, LogDb.DASHBOARD);
+                        loggerMaker.errorAndAddToDb(e, "Error in parseAndTriggerWrites " + e);
                         continue;
                     }
                 }
@@ -116,13 +116,12 @@ public class KafkaUtils {
           // nothing to catch. This exception is called from the shutdown hook.
         } catch (Exception e) {
             exceptionOnCommitSync.set(true);
-            loggerMaker.errorAndAddToDb("Exception in init kafka consumer  " + e.getMessage(),LogDb.DASHBOARD);
+            loggerMaker.errorAndAddToDb("Exception in init kafka consumer  " + e.toString());
             e.printStackTrace();
             System.exit(0);
         } finally {
             this.consumer.close();
         }
-
     }
 
     public void initKafkaProducer() {
@@ -186,6 +185,11 @@ public class KafkaUtils {
                 dbAction.bulkWriteTestingRunIssues();
                 break;
 
+            case "bulkWriteSuspectSampleData":
+                dbAction.setWritesForSuspectSampleData(bulkWrites);
+                dbAction.bulkWriteSuspectSampleData();
+                break;
+
             default:
                 break;
         }
@@ -219,13 +223,42 @@ public class KafkaUtils {
     }
 
     public void insertData(List<BulkUpdates> writes, String triggerMethod, int accountId) {
-        String topicName = System.getenv("AKTO_KAFKA_TOPIC_NAME");
-        BasicDBObject obj = new BasicDBObject();
-        obj.put("triggerMethod", triggerMethod);
-        String payloadStr = gson.toJson(writes);
-        obj.put("payload", payloadStr);
-        obj.put("accountId", accountId);
-        kafkaProducer.send(obj.toString(), topicName);
+        insertDataCore(writes, triggerMethod, accountId, "AKTO_KAFKA_TOPIC_NAME", null, "kafka insertData");
+    }
+
+    public void insertDataSecondary(Object writes, String triggerMethod, int accountId) {
+        insertDataCore(writes, triggerMethod, accountId, "AKTO_KAFKA_TOPIC_NAME_SECONDARY", "akto.secondary.trafficdata", "kafka insertDataSecondary");
+    }
+
+    /*
+     * By default, traffic Metrics and traffic Info are sent to the same kafka topic.
+     * In case of high load, we send them to a different topic
+     * and add a separate consumer for the topic.
+     */
+    public void insertDataTraffic(List<BulkUpdates> writes, String triggerMethod, int accountId) {
+        insertDataCore(writes, triggerMethod, accountId, "AKTO_KAFKA_TOPIC_NAME_TRAFFIC", "akto.trafficdata", "kafka insertDataTraffic");
+    }
+
+    public void insertDataCore(Object writes, String triggerMethod, int accountId, String topicEnvVar, String defaultTopic, String errorContext) {
+        try {
+            // Retrieve topic name from environment variable or use default if specified
+            String topicName = System.getenv(topicEnvVar);
+            if (topicName == null) {
+                if (defaultTopic != null) {
+                    topicName = defaultTopic;
+                } else {
+                    throw new Exception(topicEnvVar + " is null and no default topic provided");
+                }
+            }
+            String payloadStr = gson.toJson(writes);
+            BasicDBObject obj = new BasicDBObject();
+            obj.put("triggerMethod", triggerMethod);
+            obj.put("payload", payloadStr);
+            obj.put("accountId", accountId);
+            kafkaProducer.send(obj.toString(), topicName);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in " + errorContext + " " + e.toString());
+        }
     }
 
 }
