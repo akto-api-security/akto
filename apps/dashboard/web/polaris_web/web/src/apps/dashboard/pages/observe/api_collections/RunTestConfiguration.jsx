@@ -5,11 +5,15 @@ import SingleDate from "../../../components/layouts/SingleDate";
 import func from "@/util/func"
 
 const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes, testRunTimeOptions, testRolesArr, maxConcurrentRequestsOptions, slackIntegrated, generateLabelForSlackIntegration,getLabel, timeFieldsDisabled, teamsTestingWebhookIntegrated, generateLabelForTeamsIntegration}) => {
-
     const reducer = (state, action) => {
         switch (action.type) {
           case "update":
             let scheduledEpoch = new Date(action.obj['selectedDate']).getTime() / 1000;
+            let hourlyLabel = testRun.hourlyLabel;
+            if(hourlyLabel !== "Now"){
+                const val = hourlyTimes.filter((item) => item.label === hourlyLabel)[0].value;
+                scheduledEpoch += parseInt(val) * 60 * 60;  
+            }
             const timeNow = new Date().getTime() / 1000;
             if(Math.abs(timeNow - scheduledEpoch) < 86400){
                 scheduledEpoch = func.timeNow()
@@ -24,8 +28,8 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
         }
     };
     const initialState = {data: new Date()};
+    const startDayToday = func.getStartOfTodayEpoch()
     const [state, dispatch] = useReducer(reducer, initialState);
-
     return (
         <VerticalStack gap={"4"}>
             <HorizontalGrid gap={"4"} columns={"3"}>
@@ -49,15 +53,6 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
                         } else if (runType === 'Monthly') {
                             recurringMonthly = true;
                         } 
-                        else if (runType === 'Once') {
-                            // Always ensure we have a date when switching to Once
-                            dispatch({
-                                type: "update",
-                                key: "data",
-                                obj: { selectedDate: state.data || new Date() }
-                            });
-                        }
-                        
                         setTestRun(prev => ({
                             ...prev,
                             recurringDaily,
@@ -67,27 +62,31 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
                             recurringMonthly
                         }));
                     }} />
-                {testRun.runTypeLabel === "Once" && (
-                    <div style={{ width: "100%" }}>
-                        <SingleDate 
-                            dispatch={dispatch}
-                            data={state.data}
-                            dataKey="selectedDate"
-                            preferredPosition="above"
-                            disableDatesBefore={new Date(new Date().setDate(new Date().getDate() - 1))}
-                            label="Select date"
-                            allowRange={false}
-                            readOnly={true}
-                        />
-                    </div>
-                )}
+                <div style={{ width: "100%" }}>
+                    <SingleDate 
+                        dispatch={dispatch}
+                        data={state.data}
+                        dataKey="selectedDate"
+                        preferredPosition="above"
+                        disableDatesBefore={new Date(new Date().setDate(new Date().getDate() - 1))}
+                        label="Select date"
+                        allowRange={false}
+                        readOnly={true}
+                    />
+                </div>
                 <Dropdown
                     label="Select Time:"
                     disabled={testRun.continuousTesting === true || timeFieldsDisabled}
-                    menuItems={hourlyTimes}
+                    menuItems={hourlyTimes.filter((item) => {
+                        if(func.isSameDateAsToday(state.data)){
+                            return  item.label === "Now" || func.timeNow() <= (startDayToday + parseInt(item.value) * 60 * 60)
+                        }else{
+                            return item.label !== "Now"
+                        }
+                    })}
                     initial={testRun.hourlyLabel}
                     selected={(hour) => {
-                        let scheduledEpoch = new Date(state.data).getTime() / 1000;
+                        let scheduledEpoch = new Date().getTime() / 1000;
                         if (hour !== "Now"){
                             scheduledEpoch += parseInt(hour) * 60 * 60;
                         }else{
