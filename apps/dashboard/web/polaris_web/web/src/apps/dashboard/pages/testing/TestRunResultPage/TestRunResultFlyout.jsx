@@ -239,18 +239,21 @@ function TestRunResultFlyout(props) {
         content: "Values",
         component: (dataExpired && !selectedTestRunResult?.vulnerable)
             ? dataExpiredComponent :
-            (func.showTestSampleData(selectedTestRunResult) && selectedTestRunResult.testResults &&
+            (selectedTestRunResult.testResults &&
         <Box paddingBlockStart={3} paddingInlineEnd={4} paddingInlineStart={4}><SampleDataList
             key="Sample values"
             heading={"Attempt"}
             minHeight={"30vh"}
             vertical={true}
             sampleData={selectedTestRunResult?.testResults.map((result) => {
-                if(result.errors && result.errors.length > 0){
+                if (result.errors && result.errors.length > 0) {
                     let errorList = result.errors.join(", ");
                     return { errorList: errorList }
                 }
-                return {originalMessage: result.originalMessage, message:result.message, highlightPaths:[]}
+                if (result.originalMessage || result.message) {
+                    return { originalMessage: result.originalMessage, message: result.message, highlightPaths: [] }
+                }
+                return { errorList: "No data found" }
             })}
             isNewDiff={true}
             vulnerable={selectedTestRunResult?.vulnerable}
@@ -373,10 +376,31 @@ function TestRunResultFlyout(props) {
         component: (<MarkdownViewer markdown={remediationText}></MarkdownViewer>)
     }
 
+    const errorTab = {
+        id: "error",
+        content: "Attempt",
+        component:  (selectedTestRunResult.errors && selectedTestRunResult.errors.length > 0 ) && <Box padding={"4"}>
+            {
+            selectedTestRunResult?.errors?.map((error, i) => {
+                if (error) {
+                    let data = {
+                        original : error
+                    }
+                    return (
+                        <SampleData key={i} data={data} language="yaml" minHeight="450px" wordWrap={false}/>
+                      )
+                }
+            })
+          }
+        </Box>
+    }
+
+    const attemptTab = !selectedTestRunResult.testResults ? errorTab : ValuesTab
+
     const tabsComponent = (
         <LayoutWithTabs
             key={issueDetails?.id}
-            tabs={issueDetails?.id ? [overviewTab,timelineTab,ValuesTab, remediationTab]: [ValuesTab]}
+            tabs={issueDetails?.id ? [overviewTab,timelineTab,ValuesTab, remediationTab]: [attemptTab]}
             currTab = {() => {}}
         />
     )
