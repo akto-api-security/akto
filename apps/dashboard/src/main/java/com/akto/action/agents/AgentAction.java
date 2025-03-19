@@ -5,10 +5,6 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
-
 import org.bson.conversions.Bson;
 
 import com.akto.action.UserAction;
@@ -38,8 +34,6 @@ public class AgentAction extends UserAction {
         agentRuns = AgentRunDao.instance.findAll(filter);
         return Action.SUCCESS.toUpperCase();
     }
-
-    private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
 
     public String createAgentRun() {
 
@@ -76,25 +70,6 @@ public class AgentAction extends UserAction {
                 Context.now(), 0, 0, State.SCHEDULED);
         AgentRunDao.instance.insertOne(agentRun);
 
-        // TODO: Use health check for dashboard to trigger the agent module.
-        int accountId = Context.accountId.get();
-        executorService.schedule( new Runnable() {
-            public void run() {
-                Context.accountId.set(accountId);
-                try {
-                    AgentRunDao.instance.updateOne(
-                        Filters.eq(AgentRun.PROCESS_ID, processId),
-                        Updates.combine(
-                            Updates.setOnInsert(AgentRun.START_TIMESTAMP, Context.now()),
-                            Updates.set(AgentRun._STATE, State.RUNNING)
-                        )
-                    );
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
-            }
-        }, 5 , TimeUnit.SECONDS);
-
         return Action.SUCCESS.toUpperCase();
     }
 
@@ -103,16 +78,37 @@ public class AgentAction extends UserAction {
         try {
             updatedState = State.valueOf(state);
         } catch (Exception e) {
+            addActionError("Invalid state");
+            return Action.ERROR.toUpperCase();
+        }
+        Bson processIdFilter = Filters.eq(AgentRun.PROCESS_ID, processId);
+
+        agentRun = AgentRunDao.instance.findOne(processIdFilter);
+
+        if (agentRun == null) {
+            addActionError("No process found");
+            return Action.ERROR.toUpperCase();
         }
 
         if (updatedState != null) {
             List<Bson> updates = new ArrayList<>();
             updates.add(Updates.set(AgentRun._STATE, updatedState));
-            if (updatedState.equals(State.COMPLETED)) {
-                updates.add(Updates.set(AgentRun.END_TIMESTAMP, Context.now()));
+            switch (updatedState) {
+                case COMPLETED:
+                    if (!State.COMPLETED.equals(agentRun.getState())) {
+                        updates.add(Updates.set(AgentRun.END_TIMESTAMP, Context.now()));
+                    }
+                    break;
+                case RUNNING:
+                    if (!State.RUNNING.equals(agentRun.getState())) {
+                        updates.add(Updates.set(AgentRun.START_TIMESTAMP, Context.now()));
+                    }
+                    break;
+                default:
+                    break;
             }
-            AgentRunDao.instance.updateOne(
-                    Filters.eq(AgentRun.PROCESS_ID, processId),
+            agentRun = AgentRunDao.instance.updateOneNoUpsert(
+                    processIdFilter,
                     Updates.combine(updates));
         }
         return Action.SUCCESS.toUpperCase();
@@ -241,6 +237,10 @@ public class AgentAction extends UserAction {
             // TODO: handle more state conditions
         }else {
             updates.add(Updates.setOnInsert(AgentSubProcessSingleAttempt._STATE, State.SCHEDULED));
+        }
+
+        if (subProcessHeading != null) {
+            updates.add(Updates.set(AgentSubProcessSingleAttempt.SUB_PROCESS_HEADING, subProcessHeading));
         }
 
         /*

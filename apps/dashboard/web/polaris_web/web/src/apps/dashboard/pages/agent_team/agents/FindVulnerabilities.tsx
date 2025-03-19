@@ -58,7 +58,8 @@ export const FindVulnerabilitiesAgent = (props) => {
             const response = await api.updateAgentSubprocess({
                 processId: processId,
                 subProcessId: "1",
-                attemptId: 1
+                attemptId: 1,
+                subProcessHeading: "Subprocess scheduled"
             });
             setCurrentSubprocess("1");
             setCurrentAttempt(1);
@@ -67,7 +68,7 @@ export const FindVulnerabilitiesAgent = (props) => {
         }
 
     }
-    const intervalRef = useRef<NodeJS.Timeout | null>(null);
+    const intervalRef = useRef<number | null>(null);
 
     useEffect(() => {
         if (!currentAgentRun || currentAgentRun?.state !== State.RUNNING) {

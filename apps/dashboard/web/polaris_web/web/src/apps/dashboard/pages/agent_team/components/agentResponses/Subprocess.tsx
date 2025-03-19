@@ -48,7 +48,8 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, finalCTASho
         const newRes = await api.updateAgentSubprocess({
             processId,
             subProcessId: newSubId,
-            attemptId: 1
+            attemptId: 1,
+            subProcessHeading: "Subprocess scheduled"
         });
         setCurrentSubprocess(newSubId);
         setCurrentAttempt(1);
@@ -99,7 +100,8 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, finalCTASho
                 const tempRes = await api.updateAgentSubprocess({
                     processId,
                     subProcessId: currentSubprocess,
-                    attemptId: currentAttempt + 1
+                    attemptId: currentAttempt + 1,
+                    subProcessHeading: "Subprocess scheduled"
                 });
                 setSubprocess(tempRes.subprocess as AgentSubprocess);
                 setCurrentAttempt(currentAttempt + 1);

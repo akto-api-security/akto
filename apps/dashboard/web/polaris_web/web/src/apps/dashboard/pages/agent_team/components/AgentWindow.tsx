@@ -86,7 +86,8 @@ function AgentWindow({ agent, onClose, open }: AgentWindowProps) {
                         </Box>
                             </div>
                         </Scrollable>
-                </div>
+            </div>
+            <br/><br/><br/>
             <PromptComposer agentId ={agent?.id} onSend={console.log} />
         </div>
     </div >]
