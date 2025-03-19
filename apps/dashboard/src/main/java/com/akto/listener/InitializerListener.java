@@ -614,6 +614,7 @@ public class InitializerListener implements ServletContextListener {
                 continue;
             }
             BasicDBObject fileObj = BasicDBObject.parse(fileContent);
+            String [] list = fileContent.split("\n");
             BasicDBList dataTypes = (BasicDBList) (fileObj.get("types"));
             Bson findQ = Filters.eq("_id", id);
 

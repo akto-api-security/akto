@@ -1,11 +1,9 @@
 package com.akto.dao.test_editor;
-
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
-
 import com.akto.dao.test_editor.auth.Parser;
 import com.akto.dao.test_editor.filter.ConfigParser;
 import com.akto.dao.test_editor.info.InfoParser;
@@ -17,7 +15,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 
 public class TestConfigYamlParser {
-
     public TestConfigYamlParser() { }
 
     public static TestConfig parseTemplate(String content) throws Exception {
@@ -98,10 +95,45 @@ public class TestConfigYamlParser {
         }
 
         Map<String, List<String>> wordListMap = new HashMap<>();
+        Map<String, Object> wordListTempMap = new HashMap<>();
         try {
             if (config.containsKey("wordLists")) {
-                wordListMap = (Map) config.get("wordLists");
+                wordListTempMap = (Map) config.get("wordLists");
             }
+
+            for(String wordListName: wordListTempMap.keySet()) {
+                Object valueObj = wordListTempMap.get(wordListName);
+
+                if (valueObj instanceof List) {
+                    wordListMap.put(wordListName, (List<String>) valueObj);
+                } else if (valueObj instanceof String) {
+                    String valueStr = valueObj.toString();
+                    if (valueStr.startsWith("http") && valueStr.endsWith("txt")) {
+
+                        List<String> parsedLines = new ArrayList<>();
+                        try {
+                            String [] list = null;
+                            // download file
+                            // parse file as List<String>
+                            // parsedLines = ...
+
+                            if(list!=null && list.length > 0){ 
+                                parsedLines = Arrays.asList(list);
+                            }
+
+                        } catch (Exception e) {
+                            System.out.println("unable to download or parse file: " + valueStr);
+                            e.printStackTrace();
+                        }
+
+                        wordListMap.put(wordListName, parsedLines);
+
+                    } else {
+                        wordListMap.put(wordListName, Arrays.asList(valueStr));
+                    }
+                }
+            }
+
         } catch (Exception e) {
             return new TestConfig(id, info, null, null, null, null, null, null, attributes);
         }
@@ -171,5 +203,4 @@ public class TestConfigYamlParser {
 
         return config.get(field);
     }
-
 }

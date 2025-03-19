@@ -1,18 +1,21 @@
 package com.akto.runtime.utils;
-
 import java.util.HashMap;
+import org.apache.commons.io.FileUtils;
+import com.akto.log.LoggerMaker;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.attribute.FileTime;
+import com.akto.dao.context.Context;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.StringJoiner;
 import java.util.regex.Pattern;
-
 import org.apache.commons.lang3.math.NumberUtils;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import com.akto.dto.HttpRequestParams;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.OriginalHttpRequest;
@@ -30,7 +33,8 @@ import static com.akto.util.HttpRequestResponseUtils.GRPC_CONTENT_TYPE;
 
 public class Utils {
     private static final Logger logger = LoggerFactory.getLogger(Utils.class);
-
+    private static final int THREE_HOURS = 3*60*60;
+    private static final int CONNECTION_TIMEOUT = 10 * 1000;
     private static int debugPrintCounter = 500;
     public static void printL(Object o) {
         if (debugPrintCounter > 0) {
@@ -231,6 +235,39 @@ public class Utils {
 
         return originalHttpResponseParams;
     }
+
+
+    private static String fetchPayloadsFile(String fileURLFromTemplate, String fileName){
+        String fileUrl = fileURLFromTemplate;
+        String id = fileName;
+        String tempFileUrl = "temp_" + id;
+        try {
+            if (fileUrl.startsWith("http")) {
+                if (downloadFileCheck(tempFileUrl)) {
+                    FileUtils.copyURLToFile(new URL(fileUrl), new File(tempFileUrl), CONNECTION_TIMEOUT, CONNECTION_TIMEOUT);
+                }
+                fileUrl = tempFileUrl;
+            }
+            return FileUtils.readFileToString(new File(fileUrl), StandardCharsets.UTF_8);
+        } catch (Exception e){
+            e.printStackTrace();
+            loggerMaker.errorAndAddToDb(e, String.format("failed to fetch PII file %s from github, trying locally", piiSource.getFileUrl()), LogDb.DASHBOARD);
+            return loadPIIFileFromResources(piiSource.getFileUrl());
+        }
+    }
+
+    private static boolean downloadFileCheck(String filePath){
+        try {
+            FileTime fileTime = Files.getLastModifiedTime(new File(filePath).toPath());
+            if(fileTime.toMillis()/1000l >= (Context.now()-THREE_HOURS)){
+                return false;
+            }
+        } catch (Exception e){
+            return true;
+        }
+        return true;
+    }
+
 
 
 }
