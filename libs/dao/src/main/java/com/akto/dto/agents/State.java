@@ -12,8 +12,6 @@ public enum State {
     SCHEDULED, // agent/subprocess scheduled
     FAILED, // agent/subprocess failed
     DISCARDED, // subprocess discarded by user and solution provided by user
-    // creates new subprocess with state USER_PROVIDED_SOLUTION, attempt+1 and preserves agent solution here.
-    USER_PROVIDED_SOLUTION, // subprocess discarded by user and solution provided by user
     RE_ATTEMPT, // subprocess discarded by user and attempted again with more information 
     // => creates a new subprocess with attemptId+1
     // => preserves agent solution here.

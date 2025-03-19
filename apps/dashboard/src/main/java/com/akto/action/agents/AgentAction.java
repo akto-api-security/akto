@@ -230,7 +230,6 @@ public class AgentAction extends UserAction {
             if (State.COMPLETED.equals(subProcess.getState())
                     && (State.ACCEPTED.equals(updatedState) ||
                             State.DISCARDED.equals(updatedState) ||
-                            State.USER_PROVIDED_SOLUTION.equals(updatedState) ||
                             State.RE_ATTEMPT.equals(updatedState))) {
                 updates.add(Updates.set(AgentSubProcessSingleAttempt._STATE, updatedState));
 

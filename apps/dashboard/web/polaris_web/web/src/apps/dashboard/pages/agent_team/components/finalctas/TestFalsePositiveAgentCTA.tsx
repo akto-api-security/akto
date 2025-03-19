@@ -17,12 +17,18 @@ function TestFalsePositiveAgentCTA(props: { show: any; setShow: any; }) {
         })
 
         let issueIdArray = filteredData.map((x: { issueId: any; }) => x.issueId)
+        let compactIssueIdArray =[
+            ...new Map(issueIdArray.map((item: any) => [JSON.stringify(item), item])).values()
+        ];
+
+        console.log(issueIdArray, compactIssueIdArray)
+
         let testingRunResultHexIdsMap = filteredData.reduce((y: { [x: string]: any; }, x: { value: string ; severity: string; }) => {
             y[x.value] = x.severity
             return y
         }, {})
 
-        await issueApi.bulkUpdateIssueStatus(issueIdArray, "IGNORED", "False positive", { testingRunResultHexIdsMap: testingRunResultHexIdsMap })
+        await issueApi.bulkUpdateIssueStatus(compactIssueIdArray, "IGNORED", "False positive", testingRunResultHexIdsMap)
         func.setToast(true, false, "Tests were marked as false positive")
         setShow(false)
     }

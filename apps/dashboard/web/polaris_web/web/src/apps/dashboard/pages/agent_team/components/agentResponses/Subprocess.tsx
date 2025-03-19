@@ -113,12 +113,6 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, finalCTASho
                 triggerCallForSubProcesses();
             }
 
-            // TODO: implement the same.
-            // Removed from Prompt composer as well.
-            // if (newSubProcess.state === State.USER_PROVIDED_SOLUTION) {
-            //     setAgentState("idle");
-            // }
-
             if (JSON.stringify(newSubProcess) !== JSON.stringify(subprocess)) {
                 setSubprocess(newSubProcess);
             }
