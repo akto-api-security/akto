@@ -4,21 +4,20 @@ import { AgentRun, AgentSubprocess, State } from '../types';
 import { Subprocess } from '../components/agentResponses/Subprocess';
 import { useAgentsStore } from '../agents.store';
 import api from '../api';
+import SpinnerCentered from '../../../components/progress/SpinnerCentered';
 
-export const FindVulnerabilitiesAgent = (props) => {
-
-    const {agentId, finalCTAShow, setFinalCTAShow} = props
+export const FindVulnerabilitiesAgent = () => {
 
     const [currentAgentRun, setCurrentAgentRun] = useState<AgentRun | null>(null);
     const [subprocesses, setSubprocesses] = useState<AgentSubprocess[]>([]);
 
     // ?? Where exactly is agent steps being used.
     // I didn't find any use case, we can remove it.
-    const { setCurrentAttempt, setCurrentSubprocess, setCurrentProcessId, resetStore} = useAgentsStore();
+    const { currentProcessId, currentAgent, setCurrentAttempt, setCurrentSubprocess, setCurrentProcessId, resetStore, finalCTAShow, setFinalCTAShow} = useAgentsStore();
 
     const getAllAgentRuns = async () => {
         try {
-            const response = (await api.getAllAgentRuns(agentId));
+            const response = (await api.getAllAgentRuns(currentAgent?.id));
             const agentRuns = response.agentRuns as AgentRun[];
             setCurrentAgentRun(agentRuns[0]);
             if (agentRuns.length > 0 && agentRuns[0]?.processId) {
@@ -85,7 +84,7 @@ export const FindVulnerabilitiesAgent = (props) => {
                 intervalRef.current = null;
             }
         };
-    }, [currentAgentRun]);
+    }, [currentAgentRun, currentAgent]);
 
     const triggerCallForSubProcesses = async () => {
         // call for all subprocesses triggered on new subprocess creation
@@ -95,14 +94,14 @@ export const FindVulnerabilitiesAgent = (props) => {
     return (
         <Scrollable className="h-full">
             <VerticalStack gap="2">
-                {subprocesses.length > 0 && subprocesses.map((subprocess, index) => (
-                    <Subprocess 
+                {((currentProcessId?.length || 0) > 0 && subprocesses.length == 0) ? <SpinnerCentered /> : subprocesses.map((subprocess, index) => (
+                    <Subprocess
                         key={subprocess.subProcessId}
-                        agentId={agentId} 
-                        processId={currentAgentRun?.processId || ""} 
-                        subProcessFromProp={subprocesses[index]} 
+                        agentId={currentAgent?.id || ""}
+                        processId={currentAgentRun?.processId || ""}
+                        subProcessFromProp={subprocesses[index]}
                         finalCTAShow={finalCTAShow}
-                        setFinalCTAShow={setFinalCTAShow} 
+                        setFinalCTAShow={setFinalCTAShow}
                         triggerCallForSubProcesses={triggerCallForSubProcesses}
                     />
                 ))}

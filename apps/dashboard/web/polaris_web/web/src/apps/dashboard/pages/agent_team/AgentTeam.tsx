@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { useAgentsStore } from './agents.store';
 import { Agent } from './types';
 import AgentWindow from './components/AgentWindow';
-import { Button } from '@shopify/polaris';
 import PageWithMultipleCards from '../../components/layouts/PageWithMultipleCards';
 import GridRows from '../../components/shared/GridRows';
 import AgentRowCard from './AgentRowCard';
@@ -16,7 +15,7 @@ const AGENT_IMAGES = ["/public/agents/secret-agent-1.svg",
 ]
 
 function AgentTeam() {
-    const { setAvailableModels, currentAgent, setCurrentAgent } = useAgentsStore();
+    const { setAvailableModels, setCurrentAgent } = useAgentsStore();
 
     const [Agents, setAgents] = useState([])
 
@@ -95,7 +94,7 @@ function AgentTeam() {
                 //     <Button id={"Knowledge-base"} onClick={() => {}}>Knowledge base</Button>
                 // ]}
             />
-            <AgentWindow agent={currentAgent} onClose={closeAction} open={showAgentWindow} />
+            <AgentWindow onClose={closeAction} open={showAgentWindow} />
         </>
     )
 }

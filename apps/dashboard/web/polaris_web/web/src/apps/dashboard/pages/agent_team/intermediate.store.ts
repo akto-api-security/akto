@@ -6,6 +6,7 @@ interface AgentsStore {
     setFilteredUserInput: (filteredUserInput: any) => void;
     outputOptions: any | null;
     setOutputOptions: (outputOptions: any) => void;
+    resetStore: () => void;
 
 }
 
@@ -15,9 +16,15 @@ export const intermediateStore = create<AgentsStore>()(
         persist(
             (set, get) => ({
                 filteredUserInput: null,
-                setFilteredUserInput:  (filteredUserInput: any) => set({ filteredUserInput: filteredUserInput }),
+                setFilteredUserInput: (filteredUserInput: any) => set({ filteredUserInput: filteredUserInput }),
                 outputOptions: null,
-                setOutputOptions:  (outputOptions: any) => set({ outputOptions: outputOptions }),
+                setOutputOptions: (outputOptions: any) => set({ outputOptions: outputOptions }),
+
+                resetStore: () => set({
+                    filteredUserInput: null,
+                    outputOptions: null
+                }),
+
             }),
             { name: "intermediateStore", storage: createJSONStorage(() => sessionStorage) }
         )

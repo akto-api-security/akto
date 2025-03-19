@@ -151,7 +151,9 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, finalCTASho
                     <motion.div animate={expanded ? "open" : "closed"} variants={{ open: { height: "auto", opacity: 1 }, closed: { height: 0, opacity: 0 } }} transition={{ duration: 0.2 }} className="overflow-hidden">
                         <div className="bg-[#F6F6F7] ml-2.5 pt-0 space-y-1 border-l border-[#D2D5D8]">
                             <AnimatePresence initial={false}>
-                                {subprocess?.logs?.map((log, index) => (
+                                {subprocess?.logs?.sort((a,b) => {
+                                    return a.eventTimestamp > b.eventTimestamp ? 1 : -1
+                                }).map((log, index) => (
                                     <motion.p key={`${index}-${log.log}`} initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }} className="text-xs text-[var(--text-subdued)] ml-3! p-0.5 hover:bg-[var(--background-selected)]">
                                         {log.log}
                                     </motion.p>
