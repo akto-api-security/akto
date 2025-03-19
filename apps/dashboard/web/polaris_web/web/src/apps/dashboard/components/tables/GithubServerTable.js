@@ -333,6 +333,22 @@ function GithubServerTable(props) {
           selectItems([])
           TableStore.getState().setSelectedItems([])
         }else{
+        //todo: handle
+          if (data) {
+            if (toggleType) {
+              let allItemsSet = new Set()
+              for (let row of data) {
+                  if (row?.id instanceof Array) {
+                    row?.id.forEach(item => allItemsSet.add(item));
+                  }
+              }
+              selectItems([...allItemsSet])
+              TableStore.getState().setSelectedItems([...allItemsSet])
+            } else {
+              selectItems([])
+              TableStore.getState().setSelectedItems([])
+            }
+          }
         }
       }
     }
@@ -410,7 +426,7 @@ function GithubServerTable(props) {
                 sortOptions={props.sortOptions}
                 sortSelected={sortSelected}
                 queryValue={queryValue}
-                queryPlaceholder={`Searching in ${transform.formatNumberWithCommas(total)} ${total == 1 ? props.resourceName.singular : props.resourceName.plural}`}
+                queryPlaceholder={`Search in ${transform.formatNumberWithCommas(total)} ${total == 1 ? props.resourceName.singular : props.resourceName.plural}`}
                 onQueryChange={handleFiltersQueryChange}
                 onQueryClear={handleFiltersQueryClear}
                 {...(props.hideQueryField ? { hideQueryField: props.hideQueryField } : {})}

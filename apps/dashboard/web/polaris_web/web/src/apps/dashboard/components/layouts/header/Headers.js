@@ -11,7 +11,6 @@ import SemiCircleProgress from '../../shared/SemiCircleProgress';
 import { usePolling } from '../../../../main/PollingProvider';
 import { debounce } from 'lodash';
 import LocalStore from '../../../../main/LocalStorageStore';
-import homeFunctions from '../../../../dashboard/pages/home/module';
 
 function ContentWithIcon({icon,text, isAvatar= false}) {
     return(
@@ -35,14 +34,11 @@ export default function Header() {
 
     const username = Store((state) => state.username)
     const storeAccessToken = PersistStore(state => state.storeAccessToken)
-    const accounts = Store(state => state.accounts)
-    const activeAccount = Store(state => state.activeAccount)
     const resetAll = PersistStore(state => state.resetAll)
     const resetStore = LocalStore(state => state.resetStore)
 
     const allRoutes = Store((state) => state.allRoutes)
     const allCollections = PersistStore((state) => state.allCollections)
-    const setAllCollections = PersistStore(state => state.setAllCollections)
     var searchItemsArr = useMemo(() => func.getSearchItemsArr(allRoutes, allCollections), [])
     const [filteredItemsArr, setFilteredItemsArr] = useState(searchItemsArr)
     const toggleIsUserMenuOpen = useCallback(
@@ -67,15 +63,8 @@ export default function Header() {
     }
 
     const debouncedSearch = debounce(async (searchQuery) => {
-
-        let apiCollections = []
-        if (allCollections.length === 0 && searchItemsArr.length === 0) {
-            apiCollections = await homeFunctions.getAllCollections()
-            setAllCollections(apiCollections)
-        }
-
         if (searchItemsArr.length === 0) {
-            searchItemsArr = func.getSearchItemsArr(allRoutes, apiCollections)
+            searchItemsArr = func.getSearchItemsArr(allRoutes, allCollections)
         }
 
         if(searchQuery.length === 0){
@@ -85,20 +74,6 @@ export default function Header() {
             setFilteredItemsArr(resultArr)
         }
     }, 500);
-
-    const accountsItems = Object.keys(accounts).map(accountId => {
-        return {
-            id: accountId,
-            content: (<div style={{ color: accountId === activeAccount.toString() ? "var(--akto-primary)" :  "var(--p-text)"  }}>{accounts[accountId]}</div>),
-            onAction: async () => {
-                await api.goToAccount(accountId)
-                func.setToast(true, false, `Switched to account ${accounts[accountId]}`)
-                resetAll();
-                resetStore();
-                window.location.href = '/dashboard/observe/inventory'
-            }
-        }
-    })
 
     function createNewAccount() {
         api.saveToAccount(newAccount).then(resp => {
@@ -126,9 +101,6 @@ export default function Header() {
     const userMenuMarkup = (
         <TopBar.UserMenu
             actions={[
-                {
-                    items: accountsItems
-                },
                 {
                     items: [
                         (window.IS_SAAS !== "true" && (window?.DASHBOARD_MODE === 'LOCAL_DEPLOY' || window?.DASHBOARD_MODE === "ON_PREM")) ? {} :
@@ -209,13 +181,13 @@ export default function Header() {
 
 
     const secondaryMenuMarkup = (
-        <HorizontalStack gap="200">
+        <HorizontalStack gap="1">
             {(Object.keys(currentTestsObj).length > 0 && currentTestsObj?.testRunsArr?.length !== 0 && currentTestsObj?.totalTestsCompleted > 0) ? 
-            <HorizontalStack gap="100">
+            <HorizontalStack gap="1">
                 <Button plain monochrome onClick={() => {handleTestingNavigate()}}>
                  <SemiCircleProgress key={"progress"} progress={Math.min(progress, 100)} size={60} height={55} width={75}/>
                 </Button>
-                <VerticalStack gap="100">
+                <VerticalStack gap="1">
                     <Text fontWeight="medium">Test run status</Text>
                     <Text color="subdued" variant="bodySm">{`${currentTestsObj.totalTestsQueued} tests queued`}</Text>
                 </VerticalStack>

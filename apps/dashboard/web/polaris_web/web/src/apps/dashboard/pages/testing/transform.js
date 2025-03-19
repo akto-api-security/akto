@@ -18,7 +18,7 @@ import PersistStore from "../../../main/PersistStore";
 import observeFunc from "../observe/transform";
 import TooltipText from "../../components/shared/TooltipText";
 import TestingStore from "./testingStore";
-
+import IssuesCheckbox from "../issues/IssuesPage/IssuesCheckbox";
 import { CellType } from "@/apps/dashboard/components/tables/rows/GithubRow";
 import LocalStore from "../../../main/LocalStorageStore";
 
@@ -279,7 +279,7 @@ const transform = {
       obj['run_time_epoch'] = Math.max(data.scheduleTimestamp, (cicd ? testingRunResultSummary.endTimestamp : data.endTimestamp))
       obj['scheduleTimestamp'] = data.scheduleTimestamp
       obj['pickedUpTimestamp'] = data.pickedUpTimestamp
-      obj['run_time'] = getRuntime(data.scheduleTimestamp , (cicd ? testingRunResultSummary.endTimestamp : data.endTimestamp), state)
+      obj['run_time'] = getRuntime(data.scheduleTimestamp , (cicd ? testingRunResultSummary.endTimestamp : getStatus(state) === "SCHEDULED" ? data.scheduledTimestamp:  data.endTimestamp), state)
       obj['severity'] = func.getSeverity(testingRunResultSummary.countIssues)
       obj['total_severity'] = getTotalSeverity(testingRunResultSummary.countIssues);
       obj['severityStatus'] = func.getSeverityStatus(testingRunResultSummary.countIssues)
@@ -804,26 +804,32 @@ getUrlComp(url){
   )
 },
 
-getCollapsibleRow(urls, severity){
-  const borderStyle = '4px solid ' + func.getHexColorForSeverity(severity?.toUpperCase());
-  return(
-    <tr style={{background: "#FAFBFB", borderLeft: borderStyle, padding: '0px !important', borderTop: '1px solid #dde0e4'}}>
-      <td colSpan={7} style={{padding: '0px !important'}}>
+getCollapsibleRow(urls, severity) {
+    const borderStyle = '4px solid ' + func.getHexColorForSeverity(severity?.toUpperCase());
+    return(
+      <tr style={{background: "#FAFBFB", borderLeft: borderStyle, padding: '0px !important', borderTop: '1px solid #dde0e4'}}>
+        <td colSpan={8} style={{padding: '0px !important', width: '100%'}}>
           {urls.map((ele,index)=>{
             const borderStyle = index < (urls.length - 1) ? {borderBlockEndWidth : 1} : {}
-            return( 
-              <Box padding={"2"} paddingInlineEnd={"4"} paddingInlineStart={"4"} key={index}
+            return(
+              <Box padding={"2"} paddingInlineStart={"4"} key={index}
                   borderColor="border-subdued" {...borderStyle}
+                  width="100%"
               >
-                <Link monochrome onClick={() => history.navigate(ele.nextUrl)} removeUnderline >
-                  {this.getUrlComp(ele.url)}
-                </Link>
+                <HorizontalStack gap="2" align="start" blockAlign="center">
+                  <IssuesCheckbox
+                    id={ele.testRunResultsId}
+                  />
+                  <Link monochrome onClick={() => history.navigate(ele.nextUrl)} removeUnderline >
+                    {transform.getUrlComp(ele.url)}
+                  </Link>
+                </HorizontalStack>
               </Box>
             )
           })}
-      </td>
-    </tr>
-  )
+        </td>
+      </tr>
+    )
 },
 
 getTestErrorType(message){
@@ -861,7 +867,7 @@ getPrettifiedTestRunResults(testRunResults){
             })}
           </HorizontalStack>
         )
-      }else{
+      } else{
         error_message = errorsObject[errorType]
       }
     }
@@ -869,7 +875,7 @@ getPrettifiedTestRunResults(testRunResults){
     if(testRunResultsObj.hasOwnProperty(key)){
       let endTimestamp = Math.max(test.endTimestamp, testRunResultsObj[key].endTimestamp)
       let urls = testRunResultsObj[key].urls
-      urls.push({url: test.url, nextUrl: test.nextUrl})
+      urls.push({url: test.url, nextUrl: test.nextUrl, testRunResultsId: test.id})
       let obj = {
         ...test,
         urls: urls,
@@ -881,7 +887,7 @@ getPrettifiedTestRunResults(testRunResults){
       delete obj["errorsList"]
       testRunResultsObj[key] = obj
     }else{
-      let urls = [{url: test.url, nextUrl: test.nextUrl}]
+      let urls = [{url: test.url, nextUrl: test.nextUrl, testRunResultsId: test.id}]
       let obj={
         ...test,
         urls:urls,
@@ -916,6 +922,14 @@ getPrettifiedTestRunResults(testRunResults){
     }
     prettifiedResults.push(prettifiedObj)
   })
+  for (let prettifiedObj of prettifiedResults){
+    let testingRunResultsIds = []
+    for (let url of prettifiedObj.urls) {
+      testingRunResultsIds.push(url.testRunResultsId)
+    }
+    prettifiedObj["id"] = testingRunResultsIds
+    
+  }
   return prettifiedResults
 },
 getTestingRunResultUrl(testingResult){
@@ -1019,8 +1033,8 @@ stopTest(hexId){
   });
 },
 
-rerunTest(hexId, refreshSummaries, shouldRefresh){
-  api.rerunTest(hexId).then((resp) => {
+rerunTest(hexId, refreshSummaries, shouldRefresh, selectedTestRunForRerun, testingRunResultSummaryHexId){
+  api.rerunTest(hexId, selectedTestRunForRerun, testingRunResultSummaryHexId).then((resp) => {
     window.location.reload()
     func.setToast(true, false, "Test re-run initiated")
     if(shouldRefresh){
@@ -1170,6 +1184,9 @@ getMissingConfigs(testResults){
       sendMsTeamsAlert:testRun.sendMsTeamsAlert,
       recurringDaily: testRun.recurringDaily,
       continuousTesting: testRun.continuousTesting,
+      scheduleTimestamp: testRun.startTimestamp,
+      recurringWeekly: testRun.recurringWeekly,
+      recurringMonthly: testRun.recurringMonthly
     }
   }
 }

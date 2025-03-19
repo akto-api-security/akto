@@ -1888,6 +1888,37 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
   },
   isDemoAccount(){
     return window.ACTIVE_ACCOUNT === 1669322524
+  },
+  isSameDateAsToday (givenDate) {
+      const today = new Date();
+      return (
+          givenDate.getUTCFullYear() === today.getUTCFullYear() &&
+          givenDate.getUTCMonth() === today.getUTCMonth() &&
+          givenDate.getDate() === today.getDate()
+      );
+  },
+  getStartOfTodayEpoch() {
+    const now = new Date();
+    return Math.floor(new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime() / 1000);
+  },
+  getDayOfWeek(time){
+    const temp = new Date(time * 1000);
+    switch(temp.getDay()){
+      case 1:
+        return "Monday"
+      case 2:
+        return "Tuesday"
+      case 3:
+        return "Wednesday"
+      case 4: 
+        return "Thursday"
+      case 5:
+        return "Friday"
+      case 6: 
+        return "Saturday"
+      default:
+        return "Sunday"
+    }
   }
 
 }

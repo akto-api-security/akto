@@ -74,6 +74,7 @@ function ApiGroupModal(props){
                             }
                         })
                     }
+                    value={apiGroupName}
                     setSelected={setApiGroupName}
                 />
             </Box>

@@ -41,12 +41,18 @@ function Dashboard() {
     const sendEventOnLogin = LocalStore(state => state.sendEventOnLogin)
     const setSendEventOnLogin = LocalStore(state => state.setSendEventOnLogin)
     const fetchAllCollections = async () => {
-        let apiCollections = await homeFunctions.getAllCollections()
+        let apiCollections = []
+        if(allCollections && allCollections.length > 0){
+            apiCollections = allCollections
+        }else{
+            apiCollections = await homeFunctions.getAllCollections()
+            setAllCollections(apiCollections)
+        }
+        apiCollections = apiCollections.filter((x) => x?.deactivated !== true)
         const allCollectionsMap = func.mapCollectionIdToName(apiCollections)
         const allHostNameMap = func.mapCollectionIdToHostName(apiCollections)
         setHostNameMap(allHostNameMap)
         setCollectionsMap(allCollectionsMap)
-        setAllCollections(apiCollections)
     }
     const trafficAlerts = PersistStore(state => state.trafficAlerts)
     const setTrafficAlerts = PersistStore(state => state.setTrafficAlerts)
@@ -113,6 +119,17 @@ function Dashboard() {
                 }
             }
         }
+
+        Object.keys(sessionStorage).forEach((key) => {
+            if (key === "undefined" || key === "persistedStore") {
+                sessionStorage.removeItem(key);
+            }
+        });
+        Object.keys(localStorage).forEach((key) => {
+            if (key === "undefined") {
+                localStorage.removeItem(key);
+            }
+        });
     }, [])
 
     useEffect(() => {
