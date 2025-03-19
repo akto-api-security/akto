@@ -1259,17 +1259,30 @@ getDeprecatedEndpoints(apiInfoList, unusedEndpoints, apiCollectionId) {
           : dateRange.title;
   return dateStr
  },
-
- getSearchItemsArr(allRoutes,allCollections){
-  let combinedArr = []
+ getInitialPathByContent(allRoutes, content) {
+    console.log(allRoutes)
+    const route = allRoutes.find(obj => obj.content === content);
+    console.log(route)
+    return route ? route.path : ""; 
+  },
+ getCollectionsSearchItems(allRoutes, allCollections) {
+  const searchItems = []
 
   const activatedColections = allCollections.filter((item) => item.deactivated === false)
-
-  let initialStr = "/dashboard/observe/inventory/"
-
+  const initialPath = "/dashboard/observe/inventory/"
+  //const initialPath = this.getInitialPathByContent(allRoutes, "ApiCollections")
   activatedColections.forEach((item)=> {
-    combinedArr.push({content: item.displayName, url: initialStr + item.id, type:'collection'})
+    searchItems.push({content: item.displayName, url: initialPath + item.id, type:'collection'})
   })
+  return searchItems
+ },
+ getSearchItemsArr(allRoutes,allCollections, subCategoryMap){
+  let combinedArr = []
+
+  const collectionsSearchItems = this.getCollectionsSearchItems(allRoutes, allCollections)
+  combinedArr.push(...collectionsSearchItems)
+
+  console.log(combinedArr)
 
   return combinedArr
  },

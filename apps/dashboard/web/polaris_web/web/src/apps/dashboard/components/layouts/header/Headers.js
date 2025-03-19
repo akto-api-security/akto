@@ -39,7 +39,8 @@ export default function Header() {
 
     const allRoutes = Store((state) => state.allRoutes)
     const allCollections = PersistStore((state) => state.allCollections)
-    var searchItemsArr = useMemo(() => func.getSearchItemsArr(allRoutes, allCollections), [])
+    const subCategoryMap = LocalStore(state => state.subCategoryMap)
+    var searchItemsArr = useMemo(() => func.getSearchItemsArr(allRoutes, allCollections, subCategoryMap), [])
     const [filteredItemsArr, setFilteredItemsArr] = useState(searchItemsArr)
     const toggleIsUserMenuOpen = useCallback(
         () => setIsUserMenuOpen((isUserMenuOpen) => !isUserMenuOpen),
