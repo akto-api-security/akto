@@ -359,6 +359,43 @@ export default function LeftNav() {
                                 ],
                             }
                             : {},
+                            {
+                                label: (
+                                    <Text variant="bodyMd" fontWeight="medium">
+                                        Team
+                                    </Text>
+                                ),
+                                icon: StarFilledMinor,
+                                onClick: () => {
+                                    handleSelect("agent_team_members");
+                                    navigate("/dashboard/agent-team/members");
+                                    setActive("normal");
+                                },
+                                selected: leftNavSelected.includes("agent_team"),
+                                url: "#",
+                                key: "8",
+                                subNavigationItems: [
+                                    {
+                                        label: "Members",
+                                        onClick: () => {
+                                            navigate("/dashboard/agent-team/members");
+                                            handleSelect("agent_team_members");
+                                            setActive("active");
+                                        },
+                                        selected: leftNavSelected === "agent_team_members",
+                                    },
+                                    {
+                                        label: "Hired Members",
+                                        onClick: () => {
+                                            navigate("/dashboard/agent-team/hired-members");
+                                            handleSelect("agent_team_hired_members");
+                                            setActive("active");
+                                        },
+                                        selected:
+                                            leftNavSelected === "agent_team_hired_members",
+                                    }
+                                ],
+                            }
                     ].filter(item => item.label !== null)}
                 />
             </Navigation>
