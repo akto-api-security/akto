@@ -300,122 +300,67 @@ export default function LeftNav() {
                             subNavigationItems: reportsSubNavigationItems,
                             key: "6",
                         },
-                        ...(window?.STIGG_FEATURE_WISE_ALLOWED?.THREAT_DETECTION?.isGranted ? [{
-                            label: (
-                                <Text variant="bodyMd" fontWeight="medium">
-                                    API Protection
-                                </Text>
-                            ),
-                            icon: DiamondAlertMinor,
-                            onClick: () => {
-                                handleSelect("dashboard_threat_actor");
-                                navigate("/dashboard/protection/threat-actor");
-                                setActive("normal");
-                            },
-                            selected: leftNavSelected.includes("_threat"),
-                            url: "#",
-                            key: "7",
-                            subNavigationItems: [
-                                {
-                                    label: "Threat Actors",
-                                    onClick: () => {
-                                        navigate("/dashboard/protection/threat-actor");
-                                        handleSelect("dashboard_threat_actor");
-                                        setActive("active");
-                                    },
-                                    selected: leftNavSelected === "dashboard_threat_actor",
+                        window?.STIGG_FEATURE_WISE_ALLOWED?.THREAT_DETECTION?.isGranted ?
+                             {
+                                label: (
+                                    <Text variant="bodyMd" fontWeight="medium">
+                                        API Protection
+                                    </Text>
+                                ),
+                                icon: DiamondAlertMinor,
+                                onClick: () => {
+                                    handleSelect("dashboard_threat_actor");
+                                    navigate("/dashboard/protection/threat-actor");
+                                    setActive("normal");
                                 },
-                                {
-                                    label: "Threat Activity",
-                                    onClick: () => {
-                                        navigate("/dashboard/protection/threat-activity");
-                                        handleSelect("dashboard_threat_activity");
-                                        setActive("active");
+                                selected: leftNavSelected.includes("_threat"),
+                                url: "#",
+                                key: "7",
+                                subNavigationItems: [
+                                    {
+                                        label: "Threat Actors",
+                                        onClick: () => {
+                                            navigate("/dashboard/protection/threat-actor");
+                                            handleSelect("dashboard_threat_actor");
+                                            setActive("active");
+                                        },
+                                        selected: leftNavSelected === "dashboard_threat_actor",
                                     },
-                                    selected:
-                                        leftNavSelected === "dashboard_threat_activity",
-                                },
-                                {
-                                    label: "APIs Under Threat",
-                                    onClick: () => {
-                                        navigate("/dashboard/protection/threat-api");
-                                        handleSelect("dashboard_threat_api");
-                                        setActive("active");
+                                    {
+                                        label: "Threat Activity",
+                                        onClick: () => {
+                                            navigate("/dashboard/protection/threat-activity");
+                                            handleSelect("dashboard_threat_activity");
+                                            setActive("active");
+                                        },
+                                        selected:
+                                            leftNavSelected === "dashboard_threat_activity",
                                     },
-                                    selected:
-                                        leftNavSelected === "dashboard_threat_api",
-                                },
-                                {
-                                    label: "Threat Policy",
-                                    onClick: () => {
-                                        navigate("/dashboard/protection/threat-policy");
-                                        handleSelect("dashboard_threat_policy");
-                                        setActive("active");
+                                    {
+                                        label: "APIs Under Threat",
+                                        onClick: () => {
+                                            navigate("/dashboard/protection/threat-api");
+                                            handleSelect("dashboard_threat_api");
+                                            setActive("active");
+                                        },
+                                        selected:
+                                            leftNavSelected === "dashboard_threat_api",
                                     },
-                                    selected:
-                                        leftNavSelected === "dashboard_threat_policy",
-                                },
-                            ],
-                        }] : []),
-                        {
-                            label: (
-                                <Text variant="bodyMd" fontWeight="medium">
-                                    AI Agents
-                                </Text>
-                            ),
-                            icon: StarFilledMinor,
-                            onClick: () => {
-                                handleSelect("agent_team_members");
-                                navigate("/dashboard/agent-team/members");
-                                setActive("normal");
-                            },
-                            selected: leftNavSelected.includes("agent_team"),
-                            url: "#",
-                            key: "8",
-                            // subNavigationItems: [
-                            //     {
-                            //         label: "Members",
-                            //         onClick: () => {
-                            //             navigate("/dashboard/agent-team/members");
-                            //             handleSelect("agent_team_members");
-                            //             setActive("active");
-                            //         },
-                            //         selected: leftNavSelected === "agent_team_members",
-                            //     },
-                            //     {
-                            //         label: "Hired Members",
-                            //         onClick: () => {
-                            //             navigate("/dashboard/agent-team/hired-members");
-                            //             handleSelect("agent_team_hired_members");
-                            //             setActive("active");
-                            //         },
-                            //         selected:
-                            //             leftNavSelected === "agent_team_hired_members",
-                            //     }
-                            // ],
-                        }
-                    ]}
+                                    {
+                                        label: "Threat Policy",
+                                        onClick: () => {
+                                            navigate("/dashboard/protection/threat-policy");
+                                            handleSelect("dashboard_threat_policy");
+                                            setActive("active");
+                                        },
+                                        selected:
+                                            leftNavSelected === "dashboard_threat_policy",
+                                    },
+                                ],
+                            }
+                            : {},
+                    ].filter(item => item.label !== null)}
                 />
-                {/* Settings navigation section commented out
-                <Navigation.Section
-                    items={[
-                        {
-                            label: (
-                                <Text variant="bodyMd" fontWeight="medium">
-                                    Settings
-                                </Text>
-                            ),
-                            icon: SettingsFilledMinor,
-                            onClick: () => {
-                                navigate("/dashboard/settings/about");
-                                setActive("normal");
-                            },
-                            selected: currPathString === "settings",
-                            key: "7",
-                        },
-                    ]}
-                />
-                */}
             </Navigation>
         </div>
     );
