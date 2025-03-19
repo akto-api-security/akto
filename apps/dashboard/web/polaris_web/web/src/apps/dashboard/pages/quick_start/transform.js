@@ -26,7 +26,7 @@ const apigeeObj = {
     icon: '/public/apigee.svg',
     label: "Apigee",
     text: "Apigee setup is recommended if you are using Google's Apigee API Management platform to design, secure, and scale your APIs.",
-    docsUrl: 'https://docs.akto.io/traffic-connector',
+    docsUrl: 'https://docs.akto.io/traffic-connector/gcp-services/connect-akto-with-apigee',
     key: "Apigee",
     component: <AddOnComponenet/>
 }
@@ -44,7 +44,7 @@ const gitlabObj = {
     icon: '/public/gitlab.svg',
     label: "GitLab",
     text: "We recommend setting up GitLab if you want to connect and retrieve APIs directly from your source code hosted on GitLab.",
-    docsUrl: 'https://docs.akto.io/traffic-connector',
+    docsUrl: 'https://docs.akto.io/traffic-connector/source-code/gitlab',
     key: "GitLab",
     component: <AddOnComponenet/>
 }
@@ -62,7 +62,7 @@ const azureObj = {
     icon: '/public/azure.svg',
     label: "Azure API Gateway",
     text: "Azure API Gateway setup is recommended if you are using Azure's API Management service to manage, secure, and analyze your APIs.",
-    docsUrl: 'https://docs.akto.io/traffic-connector',
+    docsUrl: 'https://docs.akto.io/traffic-connector/api-gateways/connect-akto-with-azure-api-management',
     key: "Azure",
     component: <AddOnComponenet/>
 }
@@ -71,7 +71,7 @@ const cloudflareObj = {
     icon: '/public/cloudflare.svg',
     label: "Cloudflare",
     text: "You should use Cloudflare as a traffic connector if you are leveraging Cloudflare's CDN and security features to manage and optimize your API traffic.",
-    docsUrl: 'https://docs.akto.io/traffic-connector',
+    docsUrl: 'https://docs.akto.io/traffic-connector/api-gateways/connect-akto-with-cloudflare',
     key: "Cloudflare",
     component: <AddOnComponenet/>
 }
@@ -80,7 +80,7 @@ const f5Obj = {
     icon: '/public/f5.svg',
     label: "F5",
     text: "F5 setup is recommended if you are using F5's BIG-IP as an API gateway or load balancer to manage and control your API traffic.",
-    docsUrl: 'https://docs.akto.io/traffic-connector',
+    docsUrl: 'https://docs.akto.io/traffic-connector/api-gateways/connect-akto-with-f5',
     key: "F5",
     component: <AddOnComponenet/>
 }
@@ -98,7 +98,7 @@ const haproxyObj = {
     icon: '/public/haproxy.svg',
     label: "HA Proxy",
     text: "HA Proxy should be used as a traffic connector if you are leveraging HA Proxy for load balancing, high availability, and proxying HTTP and TCP-based applications.",
-    docsUrl: 'https://docs.akto.io/traffic-connector',
+    docsUrl: 'https://docs.akto.io/traffic-connector/api-gateways/connect-akto-with-haproxy',
     key: "HAproxy",
     component: <AddOnComponenet/>
 }
@@ -116,7 +116,7 @@ const kongmeshObj = {
     icon: '/public/kongmesh.svg',
     label: "Kong Mesh",
     text: "Use this set-up if you are utilizing Kong's service mesh capabilities to manage and secure your microservices and APIs.",
-    docsUrl: 'https://docs.akto.io/traffic-connector',
+    docsUrl: 'https://docs.akto.io/traffic-connector/api-gateways/connect-akto-with-kong-mesh',
     key: "Kong Mesh",
     component: <AddOnComponenet/>
 }
@@ -125,7 +125,7 @@ const layer7Obj = {
     icon: '/public/layer7.svg',
     label: "Layer 7",
     text: "Layer7 is recommended if you are using CA Technologies' Layer7 API Management for securing and managing your APIs.",
-    docsUrl: 'https://docs.akto.io/traffic-connector',
+    docsUrl: 'https://docs.akto.io/traffic-connector/api-gateways/connect-akto-with-layer7-api-gateway',
     key: "Layer 7",
     component: <AddOnComponenet/>
 }
@@ -143,7 +143,7 @@ const openshiftObj = {
     icon: '/public/openshift.svg',
     label: "OpenShift",
     text: "OpenShift should be used as a traffic connector if you are deploying and managing containerized applications using OpenShift.",
-    docsUrl: 'https://docs.akto.io/traffic-connector',
+    docsUrl: 'https://docs.akto.io/getting-started/quick-start-with-akto-self-hosted/openshift-deploy',
     key: "OpenShift",
     component: <AddOnComponenet/>
 }
@@ -152,7 +152,7 @@ const threescaleObj = {
     icon: '/public/threescale.svg',
     label: "3Scale",
     text: "This setup is recommended if your APIs are managed by 3scale.",
-    docsUrl: 'https://docs.akto.io/traffic-connector',
+    docsUrl: 'https://docs.akto.io/traffic-connector/api-gateways/connect-akto-with-3scale',
     key: "3Scale",
     component: <AddOnComponenet/>
 }
@@ -371,7 +371,7 @@ const citrixObj = {
     icon: '/public/citrix.svg',
     label: "Citrix",
     text: "Citrix setup is recommended if you are using ADC (NetScaler) to manage, secure, and optimize your API traffic.",
-    docsUrl: 'https://docs.akto.io/traffic-connector/api-gateways/mulesoft-flex',
+    docsUrl: 'https://docs.akto.io/traffic-connector/api-gateways/connect-akto-with-citrix',
     component: <AddOnComponenet/>,
     key: "citrix",
 }

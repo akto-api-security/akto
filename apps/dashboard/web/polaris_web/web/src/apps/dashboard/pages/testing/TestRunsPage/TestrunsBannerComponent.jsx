@@ -55,7 +55,7 @@ function TestrunsBannerComponent({isInventory,onButtonClick}) {
         )
 
     const subCategoryMap = LocalStore.getState().subCategoryMap;
-    let defaultCount = Math.max(Object.keys(subCategoryMap).length,850);
+    let defaultCount = Math.max(Object.keys(subCategoryMap).length,1000);
     defaultCount = Math.floor(defaultCount / 50) * 50
     return (
         <BannerLayout

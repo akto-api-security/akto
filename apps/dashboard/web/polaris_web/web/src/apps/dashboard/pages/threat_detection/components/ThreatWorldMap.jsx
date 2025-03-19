@@ -3,7 +3,7 @@ import Highcharts from "highcharts/highmaps";
 import Exporting from "highcharts/modules/exporting";
 import ExportData from "highcharts/modules/export-data";
 import FullScreen from "highcharts/modules/full-screen";
-
+import InfoCard from "../../dashboard/new_components/InfoCard";
 // Initialize modules
 Exporting(Highcharts);
 ExportData(Highcharts);
@@ -23,7 +23,7 @@ function ThreatWorldMap({ data, style, loading }) {
         },
 
         title: {
-          text: "Threat Actor Map",
+          text: undefined,
         },
 
         credits: {
@@ -107,7 +107,11 @@ function ThreatWorldMap({ data, style, loading }) {
     fetchMapData();
   }, [data]);
 
-  return <div id="threat-world-map-container" style={style}></div>;
+  return <InfoCard
+    title={"Threat Actor Map"}
+    titleToolTip={"Threat Actor Map"}
+    component={<div id="threat-world-map-container" style={style}></div>}
+  />;
 }
 
 export default ThreatWorldMap;

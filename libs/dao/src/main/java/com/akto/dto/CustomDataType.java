@@ -274,7 +274,20 @@ public class CustomDataType {
         this.userModifiedTimestamp = userModifiedTimestamp;
     }
 
-   
-    
-    
+    public boolean systemFieldsCompare(Object obj){
+        if (this == obj) {
+            return true;
+        }
+        if (obj == null || getClass() != obj.getClass()) {
+            return false;
+        }
+
+        CustomDataType that = (CustomDataType) obj;
+
+        return sensitiveAlways == that.sensitiveAlways &&
+                (keyConditions != null ? keyConditions.equals(that.keyConditions) : that.keyConditions == null) &&
+                (valueConditions != null ? valueConditions.equals(that.valueConditions) : that.valueConditions == null)
+                &&
+                (operator != null ? operator.equals(that.operator) : that.operator == null);
+    }    
 }

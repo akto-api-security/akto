@@ -33,6 +33,7 @@ function HomeDashboard() {
     const [testSummaryInfo, setTestSummaryInfo] = useState([])
 
     const allCollections = PersistStore(state => state.allCollections)
+    const hostNameMap = PersistStore(state => state.hostNameMap)
     const coverageMap = PersistStore(state => state.coverageMap)
     const [authMap, setAuthMap] = useState({})
     const [apiTypesData, setApiTypesData] = useState([{ "data": [], "color": "#D6BBFB" }])
@@ -383,9 +384,9 @@ function HomeDashboard() {
     }
 
     function getCollectionsWithCoverage() {
-        const validCollections = allCollections.filter(collection => collection.hostName !== null && collection.hostName !== undefined && !collection.deactivated);
+        const validCollections = allCollections.filter(collection => (hostNameMap[collection.id] && hostNameMap[collection.id] !== undefined)  && !collection.deactivated);
 
-        const sortedCollections = validCollections.sort((a, b) => b.startTs - a.startTs);
+        const sortedCollections = validCollections.sort((a, b) => b?.startTs - a?.startTs);
 
         const result = sortedCollections.slice(0, 10).map(collection => {
             const apisTested = coverageMap[collection.id] || 0;

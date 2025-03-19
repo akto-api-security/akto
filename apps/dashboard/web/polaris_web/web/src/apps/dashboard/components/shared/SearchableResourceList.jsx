@@ -3,6 +3,10 @@ import {SearchMinor} from "@shopify/polaris-icons"
 import React, { useEffect, useState } from 'react'
 
 function SearchableResourceList({ resourceName, items, renderItem, loading, isFilterControlEnabale, selectable, onSelectedItemsChange, alreadySelectedItems }) {
+  /*
+    While implementing renderItem, make sure the ResourceItem has a key prop passed to it to avoid rendering issues.
+  */
+  
   const [value, setValue] = useState('')
   const [selectedItems, setSelectedItems] = useState(alreadySelectedItems || [])
   const [resourceItems, setResourceItems] = useState(items)

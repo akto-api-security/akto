@@ -4,6 +4,7 @@ import com.akto.dto.type.URLMethods;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchMaliciousEventsResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListThreatActorResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatActorByCountryResponse;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatActorFilterResponse;
 import com.akto.proto.utils.ProtoMessageUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.HashMap;
@@ -30,7 +31,10 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
   Map<String, Integer> sort;
   int startTimestamp, endTimestamp;
   String refId;
-
+  List<String> latestAttack;
+  List<String> country;
+  int startTs;
+  int endTs;
   private final CloseableHttpClient httpClient;
 
   private final ObjectMapper objectMapper = new ObjectMapper();
@@ -67,18 +71,50 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
     return SUCCESS.toUpperCase();
   }
 
+  public String fetchThreatActorFilters() {
+    HttpGet get = new HttpGet(String.format("%s/api/dashboard/fetch_filters_for_threat_actors", this.getBackendUrl()));
+    get.addHeader("Authorization", "Bearer " + this.getApiToken());
+    get.addHeader("Content-Type", "application/json");
+
+    try (CloseableHttpResponse resp = this.httpClient.execute(get)) {
+      String responseBody = EntityUtils.toString(resp.getEntity());
+
+      ProtoMessageUtils.<ThreatActorFilterResponse>toProtoMessage(
+          ThreatActorFilterResponse.class, responseBody)
+          .ifPresent(
+              msg -> {
+                this.country = msg.getCountriesList();
+                this.latestAttack = msg.getSubCategoriesList();
+              });
+    } catch (Exception e) {
+      e.printStackTrace();
+      return ERROR.toUpperCase();
+    }
+    return SUCCESS.toUpperCase();
+  }
+
   public String fetchThreatActors() {
     HttpPost post =
         new HttpPost(String.format("%s/api/dashboard/list_threat_actors", this.getBackendUrl()));
     post.addHeader("Authorization", "Bearer " + this.getApiToken());
     post.addHeader("Content-Type", "application/json");
+    Map<String, Object> filter = new HashMap<>();
 
+    if(this.latestAttack != null && !this.latestAttack.isEmpty()){
+      filter.put("latestAttack", this.latestAttack);
+    }
+    if(this.country != null && !this.country.isEmpty()){
+      filter.put("country", this.country);
+    }
     Map<String, Object> body =
         new HashMap<String, Object>() {
           {
             put("skip", skip);
             put("limit", LIMIT);
             put("sort", sort);
+            put("filter", filter);
+            put("start_ts", startTs);
+            put("end_ts", endTs);
           }
         };
     String msg = objectMapper.valueToTree(body).toString();
@@ -103,7 +139,11 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
                                     smr.getLatestApiIp(),
                                     URLMethods.Method.fromString(smr.getLatestApiMethod()),
                                     smr.getDiscoveredAt(),
-                                    smr.getCountry()))
+                                    smr.getCountry(),
+                                    smr.getLatestSubcategory(),
+                                    smr.getActivityDataList().stream()
+                                    .map(subData -> new ActivityData(subData.getUrl(), subData.getSeverity(), subData.getSubCategory(), subData.getDetectedAt(), subData.getMethod()))
+                                    .collect(Collectors.toList())))
                         .collect(Collectors.toList());
 
                 this.total = m.getTotal();
@@ -165,6 +205,14 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
     this.skip = skip;
   }
 
+  public List<String> getLatestAttack() {
+    return latestAttack;
+  }
+
+  public void setLatestAttack(List<String> latestAttack) {
+    this.latestAttack = latestAttack;
+  }
+
   public static int getLimit() {
     return LIMIT;
   }
@@ -208,4 +256,29 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
   public void setRefId(String refId) {
     this.refId = refId;
   }
+
+  public List<String> getCountry() {
+    return country;
+  }
+  
+  public void setCountry(List<String> country) {
+    this.country = country;
+  }
+
+  public int getStartTs() {
+    return startTs;
+  }
+
+  public void setStartTs(int startTs) {
+    this.startTs = startTs;
+  }
+
+  public int getEndTs() {
+    return endTs;
+  }
+
+  public void setEndTs(int endTs) {
+    this.endTs = endTs;
+  }
+  
 }

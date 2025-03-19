@@ -20,6 +20,7 @@ public class MaliciousEventModel {
   private String subCategory;
   private String type;
   private String refId;
+  private String severity;
 
   public enum EventType {
     SINGLE,
@@ -42,6 +43,9 @@ public class MaliciousEventModel {
     this.eventType = builder.eventType;
     this.category = builder.category;
     this.subCategory = builder.subCategory;
+    this.severity = builder.severity;
+    this.type = builder.type;
+    this.refId = builder.refId;
   }
 
   public static class Builder {
@@ -58,6 +62,8 @@ public class MaliciousEventModel {
     private String category;
     private String subCategory;
     private String refId;
+    private String type;
+    private String severity;
 
     public Builder setFilterId(String filterId) {
       this.filterId = filterId;
@@ -121,6 +127,16 @@ public class MaliciousEventModel {
 
     public Builder setRefId(String refId) {
       this.refId = refId;
+      return this;
+    }
+
+    public Builder setSeverity(String severity) {
+      this.severity = severity;
+      return this;
+    }
+
+    public Builder setType(String type) {
+      this.type = type;
       return this;
     }
 
@@ -253,6 +269,14 @@ public class MaliciousEventModel {
 
   public void setRefId(String refId) {
     this.refId = refId;
+  }
+
+  public String getSeverity() {
+    return severity;
+  }
+  
+  public void setSeverity(String severity) {
+    this.severity = severity;
   }
 
 }

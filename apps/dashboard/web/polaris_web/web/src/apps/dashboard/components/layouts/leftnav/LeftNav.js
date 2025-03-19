@@ -1,6 +1,5 @@
-import {Navigation, Text} from "@shopify/polaris";
+import {Box, Navigation, Text} from "@shopify/polaris";
 import {
-    SettingsFilledMinor,
     AppsFilledMajor,
     InventoryFilledMajor,
     MarketingFilledMinor,
@@ -13,8 +12,12 @@ import {useLocation, useNavigate} from "react-router-dom";
 
 import "./LeftNav.css";
 import PersistStore from "../../../../main/PersistStore";
+import LocalStore from "../../../../main/LocalStorageStore";
+import Store from "../../../store";
+import api from "../../../../signup/api";
 import {useState} from "react";
 import func from "@/util/func";
+import Dropdown from "../Dropdown";
 
 export default function LeftNav() {
     const navigate = useNavigate();
@@ -25,10 +28,27 @@ export default function LeftNav() {
 
     const active = PersistStore((state) => state.active);
     const setActive = PersistStore((state) => state.setActive);
+    const accounts = Store(state => state.accounts) || {};
+    const activeAccount = Store(state => state.activeAccount);
+    const resetAll = PersistStore(state => state.resetAll);
+    const resetStore = LocalStore(state => state.resetStore);
 
     const handleSelect = (selectedId) => {
         setLeftNavSelected(selectedId);
     };
+
+    const handleAccountChange = async (selected) => {
+        await api.goToAccount(selected);
+        func.setToast(true, false, `Switched to account ${accounts[selected]}`);
+        resetAll();
+        resetStore();
+        window.location.href = '/dashboard/observe/inventory';
+    };
+
+    const accountOptions = Object.keys(accounts).map(accountId => ({
+        label: accounts[accountId],
+        value: accountId
+    }));
 
     let reportsSubNavigationItems = [
         {
@@ -59,6 +79,19 @@ export default function LeftNav() {
             <Navigation location="/">
                 <Navigation.Section
                     items={[
+                        {
+                            label: (!func.checkLocal()) ? (
+                                <Box paddingBlockEnd={"2"}>
+                                    <Dropdown
+                                        id={`select-account`}
+                                        menuItems={accountOptions}
+                                        initial={() => accounts[activeAccount]}
+                                        selected={(type) => handleAccountChange(type)}
+                                    />
+                                </Box>
+
+                            ) : null
+                        },
                         {
                             label: (
                                 <Text variant="bodyMd" fontWeight="medium">
@@ -192,6 +225,15 @@ export default function LeftNav() {
                                     },
                                     selected: leftNavSelected === "dashboard_testing_user_config",
                                 },
+                                {
+                                    label:"Test Suite",
+                                    onClick:()=>{
+                                        navigate("/dashboard/testing/test-suite");
+                                        handleSelect("dashboard_testing_test_suite");
+                                        setActive("active");
+                                    },
+                                    selected: leftNavSelected === "dashboard_testing_test_suite",
+                                }
                             ],
                             key: "4",
                         },
@@ -317,62 +359,7 @@ export default function LeftNav() {
                                 ],
                             }
                             : {},
-                            {
-                                label: (
-                                    <Text variant="bodyMd" fontWeight="medium">
-                                        Team
-                                    </Text>
-                                ),
-                                icon: StarFilledMinor,
-                                onClick: () => {
-                                    handleSelect("agent_team_members");
-                                    navigate("/dashboard/agent-team/members");
-                                    setActive("normal");
-                                },
-                                selected: leftNavSelected.includes("agent_team"),
-                                url: "#",
-                                key: "8",
-                                subNavigationItems: [
-                                    {
-                                        label: "Members",
-                                        onClick: () => {
-                                            navigate("/dashboard/agent-team/members");
-                                            handleSelect("agent_team_members");
-                                            setActive("active");
-                                        },
-                                        selected: leftNavSelected === "agent_team_members",
-                                    },
-                                    {
-                                        label: "Hired Members",
-                                        onClick: () => {
-                                            navigate("/dashboard/agent-team/hired-members");
-                                            handleSelect("agent_team_hired_members");
-                                            setActive("active");
-                                        },
-                                        selected:
-                                            leftNavSelected === "agent_team_hired_members",
-                                    }
-                                ],
-                            }
-                    ]}
-                />
-                <Navigation.Section
-                    items={[
-                        {
-                            label: (
-                                <Text variant="bodyMd" fontWeight="medium">
-                                    Settings
-                                </Text>
-                            ),
-                            icon: SettingsFilledMinor,
-                            onClick: () => {
-                                navigate("/dashboard/settings/about");
-                                setActive("normal");
-                            },
-                            selected: currPathString === "settings",
-                            key: "7",
-                        },
-                    ]}
+                    ].filter(item => item.label !== null)}
                 />
             </Navigation>
         </div>
