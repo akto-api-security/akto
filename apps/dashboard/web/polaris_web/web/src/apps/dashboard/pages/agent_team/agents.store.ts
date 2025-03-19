@@ -29,6 +29,8 @@ interface AgentsStore {
     setCurrentAttempt: (subprocess: number) => void;
     PRstate: string;
     setPRState: (state: string) => void;
+    finalCTAShow: boolean;
+    setFinalCTAShow: (state: boolean) => void;
     resetStore: () => void;
 }
 
@@ -60,15 +62,20 @@ export const useAgentsStore = create<AgentsStore>()(
                 setCurrentAttempt: (attempt: number) => set({ currentAttempt: attempt }),
                 PRstate: "-1",
                 setPRState: (state: string) => set({ PRstate: state }),
+                finalCTAShow: false,
+                setFinalCTAShow: (state: boolean) => set({ finalCTAShow: state }),
+            
 
                 resetStore: () => set({
+                    currentPrompt: { html: "", markdown: "" },
                     attemptedInBlockedState: false,
                     agentState: "idle",
                     selectedRepository: null,
-                    currentSubprocess: '0',
+                    currentSubprocess: "0",
                     currentProcessId: "",
                     currentAttempt: 0,
                     PRstate: "-1",
+                    finalCTAShow: false
                 }),
             }),
             { name: "agentsStore", storage: createJSONStorage(() => localStorage) }

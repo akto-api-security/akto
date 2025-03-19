@@ -3,12 +3,12 @@ import { intermediateStore } from "../../intermediate.store";
 import func from "../../../../../../util/func";
 import { Modal, Text, VerticalStack } from "@shopify/polaris";
 import issueApi from "../../../../pages/issues/api"
+import { useAgentsStore } from "../../agents.store";
 
-function TestFalsePositiveAgentCTA(props: { show: any; setShow: any; }) {
+function TestFalsePositiveAgentCTA() {
+    const { finalCTAShow, setFinalCTAShow } = useAgentsStore()
 
-    const { show, setShow } = props
-
-    const { filteredUserInput, outputOptions } = intermediateStore();
+    const { filteredUserInput, outputOptions, resetStore } = intermediateStore();
 
     async function saveFunction() {
 
@@ -17,20 +17,21 @@ function TestFalsePositiveAgentCTA(props: { show: any; setShow: any; }) {
         })
 
         let issueIdArray = filteredData.map((x: { issueId: any; }) => x.issueId)
-        let compactIssueIdArray =[
+        let compactIssueIdArray = [
             ...new Map(issueIdArray.map((item: any) => [JSON.stringify(item), item])).values()
         ];
 
         console.log(issueIdArray, compactIssueIdArray)
 
-        let testingRunResultHexIdsMap = filteredData.reduce((y: { [x: string]: any; }, x: { value: string ; severity: string; }) => {
+        let testingRunResultHexIdsMap = filteredData.reduce((y: { [x: string]: any; }, x: { value: string; severity: string; }) => {
             y[x.value] = x.severity
             return y
         }, {})
 
         await issueApi.bulkUpdateIssueStatus(compactIssueIdArray, "IGNORED", "False positive", testingRunResultHexIdsMap)
         func.setToast(true, false, "Tests were marked as false positive")
-        setShow(false)
+        setFinalCTAShow(false)
+        resetStore()
     }
 
     return (
@@ -39,8 +40,8 @@ function TestFalsePositiveAgentCTA(props: { show: any; setShow: any; }) {
             primaryAction={{
                 content: 'Mark as ignored',
                 onAction: () => saveFunction()
-            }} open={show}
-            onClose={() => setShow(false)}
+            }} open={finalCTAShow}
+            onClose={() => setFinalCTAShow(false)}
         >
             <Modal.Section>
                 <VerticalStack gap={"4"}>

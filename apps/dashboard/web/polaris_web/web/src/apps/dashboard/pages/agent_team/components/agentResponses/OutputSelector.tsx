@@ -24,10 +24,17 @@ function OutputSelector({onHandleSelect, processOutput} : OutputSelectorProps) {
     const getStringMessage = (type: string, options: any[]) => {
         let maxOutputOptions = type === "multiple" ? 3 : 1;
         let messageString = "";
-        options.slice(0, maxOutputOptions).forEach((option: any) => {
-            messageString += getMessageFromObj(option, "textValue") + " ";
+        options.slice(0, maxOutputOptions).forEach((option: any, index: any) => {
+            messageString += getMessageFromObj(option, "textValue")
+            if ((index + 1) < maxOutputOptions) {
+                messageString += ",";
+            }
+            messageString += " ";
         })
-        if (maxOutputOptions < options.length && type === "multiple") {
+
+        if (maxOutputOptions + 1 == options.length && type === "multiple") {
+            messageString += "and " + options[options.length - 1]
+        } else if (maxOutputOptions < options.length && type === "multiple") {
             messageString += "and " + (options.length - maxOutputOptions) + " more...";
         }
         return messageString;
@@ -39,7 +46,7 @@ function OutputSelector({onHandleSelect, processOutput} : OutputSelectorProps) {
     const allowMultiple = processOutput?.selectionType === "multiple"
     const initialValue = !allowMultiple ?
         getMessageFromObj(processOutput?.outputOptions[0], "textValue") :
-        processOutput?.outputOptions.map((option: any) => (option.value !== undefined ? option.value : JSON.stringify(option)));
+        processOutput?.outputOptions.map((option: any) => (option.value !== undefined ? option.value : option));
     const [filteredChoices, setFilteredChoices] = useState(initialValue);
     const handleSelected = (selectedChoices: any) => { 
         setFilteredChoices(selectedChoices);
@@ -53,7 +60,7 @@ function OutputSelector({onHandleSelect, processOutput} : OutputSelectorProps) {
         <VerticalStack gap={"3"}>
             <VerticalStack gap={"1"}>
                 <Text variant="bodyMd" as="span">{messageString}</Text>
-                <Text variant="bodySm" color="subdued" as="span">{getStringMessage(processOutput?.selectionType, processOutput?.outputOptions)}</Text>
+                <Text variant="headingMd" color="subdued" as="span">{getStringMessage(processOutput?.selectionType, processOutput?.outputOptions)}</Text>
             </VerticalStack>
             {
                 noOptionsReturned ? <></> :
@@ -64,7 +71,7 @@ function OutputSelector({onHandleSelect, processOutput} : OutputSelectorProps) {
                                 // TODO: optionally take this function for transformation.
                                 return {
                                     label: option.textValue !== undefined ? option?.textValue : option,
-                                    value: option?.value !== undefined ? option?.value : JSON.stringify(option),
+                                    value: option?.value !== undefined ? option?.value : option,
                                 }
                             })}
                             placeHolder={"Edit choice(s)"}
