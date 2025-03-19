@@ -8,8 +8,12 @@ import RepositoryInitializer from './RepositoryInitializer';
 import SensitiveDataAgentInitializer from './SensitiveDataAgentInitializer';
 import FlyLayout from '../../../components/layouts/FlyLayout';
 import SensitiveDataTypeCTA from './finalctas/SensitiveDataTypeCTA';
+import ApiGroupAgentInitializer from './ApiGroupAgentInitializer';
 import { useAgentsStore } from '../agents.store';
+import AgentGroupCTA from './finalctas/AgentGroupCTA';
 import APISRequiredCTA from './finalctas/APISRequiredCTA';
+import TestFalsePositiveInitializer from './TestFalsePositiveInitializer';
+import TestFalsePositiveAgentCTA from './finalctas/TestFalsePositiveAgentCTA';
 
 interface AgentWindowProps {
     agent: Agent | null;
@@ -27,17 +31,29 @@ function AgentWindow({ agent, onClose, open }: AgentWindowProps) {
             case 'FIND_VULNERABILITIES_FROM_SOURCE_CODE':
                 return (
                     <VerticalStack gap={"4"}>
-                        {(currentProcessId === null || currentProcessId.length === 0) ? <RepositoryInitializer agentType={agent.id}/> : null}
+                        {(currentProcessId === null || currentProcessId.length === 0) ? <RepositoryInitializer agentType={agent.id}/> : <></>}
                         <FindVulnerabilitiesAgent agentId={agent.id} finalCTAShow={finalCTAShow} setFinalCTAShow={setFinalCTAShow}/>
                     </VerticalStack>
                 )
             case 'FIND_SENSITIVE_DATA_TYPES':
                 return (
                     <VerticalStack gap={"4"}>
-                        <SensitiveDataAgentInitializer agentType={agent.id}/>
+                        {(currentProcessId === null || currentProcessId.length === 0) ? <SensitiveDataAgentInitializer agentType={agent.id}/> : <></> }
                         <FindVulnerabilitiesAgent agentId={agent.id} finalCTAShow={finalCTAShow} setFinalCTAShow={setFinalCTAShow}/>
                     </VerticalStack>
                 )
+            case 'GROUP_APIS':
+                return (
+                    <VerticalStack gap={"4"}>
+                        {(currentProcessId === null || currentProcessId.length === 0) ? <ApiGroupAgentInitializer agentType={agent.id} /> : <></>}
+                        <FindVulnerabilitiesAgent agentId={agent.id} finalCTAShow={finalCTAShow} setFinalCTAShow={setFinalCTAShow} />
+                    </VerticalStack>
+                )
+            case 'FIND_FALSE_POSITIVE':
+                return (<VerticalStack gap={"4"}>
+                    {(currentProcessId === null || currentProcessId.length === 0) ? <TestFalsePositiveInitializer agentType={agent.id} /> : <></>}
+                    <FindVulnerabilitiesAgent agentId={agent.id} finalCTAShow={finalCTAShow} setFinalCTAShow={setFinalCTAShow} />
+                </VerticalStack>)
             default:
                 return (<></>)
         }
@@ -49,6 +65,10 @@ function AgentWindow({ agent, onClose, open }: AgentWindowProps) {
                 return (PRstate === "4" ? <APISRequiredCTA /> : <></>)
             case 'FIND_SENSITIVE_DATA_TYPES':
                 return (<SensitiveDataTypeCTA show={finalCTAShow} setShow={setFinalCTAShow}/>)
+            case 'GROUP_APIS':
+                return (<AgentGroupCTA show={finalCTAShow} setShow={setFinalCTAShow}/>)
+            case 'FIND_FALSE_POSITIVE':
+                return (<TestFalsePositiveAgentCTA show={finalCTAShow} setShow={setFinalCTAShow} />)
             default:
                 return (<></>)
         }
@@ -61,12 +81,13 @@ function AgentWindow({ agent, onClose, open }: AgentWindowProps) {
                 <Scrollable className="h-full">
                     <div className="pt-2 flex flex-col gap-2">
                         <Box paddingBlockEnd={"8"}>
-                        {renderAgentWindow()}
-                        <AgentFinalCTA />
+                                {renderAgentWindow()}
+                                <AgentFinalCTA />
                         </Box>
-                    </div>
-                </Scrollable>
+                            </div>
+                        </Scrollable>
             </div>
+            <br/><br/><br/>
             <PromptComposer agentId ={agent?.id} onSend={console.log} />
         </div>
     </div >]
@@ -77,7 +98,7 @@ function AgentWindow({ agent, onClose, open }: AgentWindowProps) {
             setShow={() => { }}
             isHandleClose={true}
             handleClose={onClose}
-            title={"Member Details"}
+            title={"Agent Details"}
             components={components}
         />
     )

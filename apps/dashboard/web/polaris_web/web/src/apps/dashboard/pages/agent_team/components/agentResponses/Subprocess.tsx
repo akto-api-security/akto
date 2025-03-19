@@ -6,7 +6,7 @@ import api from "../../api";
 import { useAgentsStore } from "../../agents.store";
 import STEPS_PER_AGENT_ID, { preRequisitesMap } from "../../constants";
 import { VerticalStack, Text } from "@shopify/polaris";
-import OutputSelector, { getMessageFromObj } from "./OutputSelector";
+import OutputSelector from "./OutputSelector";
 import { intermediateStore } from "../../intermediate.store";
 
 interface SubProcessProps {
@@ -31,7 +31,7 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, finalCTASho
         setPRState: state.setPRState
     }));  // Only subscribe to necessary store values
 
-    const { setFilteredUserInput } = intermediateStore(state => ({ setFilteredUserInput: state.setFilteredUserInput })); 
+    const { setFilteredUserInput, setOutputOptions } = intermediateStore(state => ({ setFilteredUserInput: state.setFilteredUserInput, setOutputOptions: state.setOutputOptions })); 
 
     // Memoized function to create new subprocess
     const createNewSubprocess = useCallback(async (newSubIdNumber: number) => {
@@ -48,7 +48,8 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, finalCTASho
         const newRes = await api.updateAgentSubprocess({
             processId,
             subProcessId: newSubId,
-            attemptId: 1
+            attemptId: 1,
+            subProcessHeading: "Subprocess scheduled"
         });
         setCurrentSubprocess(newSubId);
         setCurrentAttempt(1);
@@ -99,7 +100,8 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, finalCTASho
                 const tempRes = await api.updateAgentSubprocess({
                     processId,
                     subProcessId: currentSubprocess,
-                    attemptId: currentAttempt + 1
+                    attemptId: currentAttempt + 1,
+                    subProcessHeading: "Subprocess scheduled"
                 });
                 setSubprocess(tempRes.subprocess as AgentSubprocess);
                 setCurrentAttempt(currentAttempt + 1);
@@ -113,24 +115,25 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, finalCTASho
                 triggerCallForSubProcesses();
             }
 
-            if (newSubProcess.state === State.USER_PROVIDED_SOLUTION) {
-                setAgentState("idle");
-            }
-
             if (JSON.stringify(newSubProcess) !== JSON.stringify(subprocess)) {
                 setSubprocess(newSubProcess);
             }
         };
 
         const interval = setInterval(fetchSubprocess, 2000);
+        /*
+        We do not want to refresh current subprocess, 
+        if we're already at final CTA.
+        */
         if (finalCTAShow) clearInterval(interval);
         return () => clearInterval(interval);
     }, [currentSubprocess, finalCTAShow, processId, currentAttempt, subProcessFromProp, createNewSubprocess]);
 
     if (!subprocess) return null;
 
-    const handleSelect = (selectedChoices: any) => {
+    const handleSelect = (selectedChoices: any, outputOptions: any) => {
         console.log(selectedChoices);
+        setOutputOptions(outputOptions);
         setFilteredUserInput(selectedChoices);
     }
 

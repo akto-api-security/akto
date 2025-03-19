@@ -8503,7 +8503,9 @@
             <interceptor-ref name="usageInterceptor">
                 <param name="featureLabel">AI_AGENTS</param>
             </interceptor-ref>
-            <result name="SUCCESS"  type="json"></result>
+            <result name="SUCCESS" type="json">
+                <param name="enumAsBean">true</param>
+            </result>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
                 <param name="ignoreHierarchy">false</param>
@@ -8531,7 +8533,9 @@
             <interceptor-ref name="usageInterceptor">
                 <param name="featureLabel">AI_AGENTS</param>
             </interceptor-ref>
-            <result name="SUCCESS"  type="json"></result>
+            <result name="SUCCESS" type="json">
+                <param name="enumAsBean">true</param>
+            </result>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
                 <param name="ignoreHierarchy">false</param>

@@ -3,17 +3,16 @@ package com.akto.dto.agents;
 public enum Agent {
 
     FIND_VULNERABILITIES_FROM_SOURCE_CODE("Matt", "Vulnerability scanner",
-            "An intelligent member that analyzes your source code for security vulnerabilities by examining authentication mechanisms, API endpoints, and data flow patterns"),
+            "Your code's guardian that identifies security weaknesses and shields against potential attacks"),
     FIND_APIS_FROM_SOURCE_CODE("Lisa", "Source code analyser",
-            "An intelligent member that analyzes your source code for API endpoints and data flow patterns"),
+            "An intelligent agent that analyzes your source code for API endpoints and data flow patterns"),
     FIND_SENSITIVE_DATA_TYPES("Damon", "Sensitive data type scanner",
-            "An intelligent member that analyzes your APIs for sensitive data types"),
-    CREATE_TEST_TEMPLATES("Edward", "Test template creator",
-            "An intelligent member that creates test templates specific to your APIs"),
+            "The privacy sentinel that spots exposed personal information in your API ecosystem"),
+//     CREATE_TEST_TEMPLATES("Edward", "Test template creator", "Your testing companion that builds customized templates tailored to your API architecture"),
     GROUP_APIS("Suzy", "API grouping tool",
-            "An intelligent member that groups your APIs based on their probable services"),
+            "The organization wizard that clusters your APIs into logical service groups and relationships"),
     FIND_FALSE_POSITIVE("Lizzie", "Test false positive finder",
-            "An intelligent member that finds false positives in your test results");
+            "Error detective that hunts down misleading test failures to improve quality assurance efficiency");
 
     private final String agentEnglishName;
 

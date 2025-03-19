@@ -4,7 +4,7 @@ import agentApi from '../api'
 import func from "../../../../../util/func";
 import DropDownAgentInitializer from "./DropDownAgentInitializer";
 
-function SensitiveDataAgentInitializer(props) {
+function ApiGroupAgentInitializer(props) {
 
     const { agentType } = props
 
@@ -37,9 +37,10 @@ function SensitiveDataAgentInitializer(props) {
         data={selectedCollections}
         setData={setSelectedCollections}
         startAgent={startAgent}
-        agentText={"Hey! Let's select API collections to run the sensitive data type scanner on."}
+        agentText={"Hey! Let's select API collections to run the API grouping agent on."}
         agentProperty={"collection"}
     />
 }
 
-export default SensitiveDataAgentInitializer;
+
+export default ApiGroupAgentInitializer
