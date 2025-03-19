@@ -4,6 +4,7 @@ import { AgentRun, AgentSubprocess, State } from '../types';
 import { Subprocess } from '../components/agentResponses/Subprocess';
 import { useAgentsStore } from '../agents.store';
 import api from '../api';
+import { useAgentsStateStore } from '../agents.state.store';
 
 export const FindVulnerabilitiesAgent = (props) => {
 
@@ -15,14 +16,17 @@ export const FindVulnerabilitiesAgent = (props) => {
     // ?? Where exactly is agent steps being used.
     // I didn't find any use case, we can remove it.
     const { setCurrentAttempt, setCurrentSubprocess, setCurrentProcessId, resetStore} = useAgentsStore();
+    const {setCurrentSubprocessAttempt,setCurrentAgentProcessId,setCurrentAgentSubprocess} = useAgentsStateStore();
 
     const getAllAgentRuns = async () => {
         try {
             const response = (await api.getAllAgentRuns(agentId));
+            console.log("agent",agentId,response)
             const agentRuns = response.agentRuns as AgentRun[];
             setCurrentAgentRun(agentRuns[0]);
             if (agentRuns.length > 0 && agentRuns[0]?.processId) {
                 setCurrentProcessId(agentRuns[0]?.processId)
+                setCurrentAgentProcessId(agentId, agentRuns[0]?.processId)
             } else {
                 // TODO: handle cases here, because the above API only gets "RUNNING" Agents.
                 // setCurrentProcessId("")
@@ -52,6 +56,8 @@ export const FindVulnerabilitiesAgent = (props) => {
             });
             setCurrentSubprocess(newestSubprocess.subProcessId)
             setCurrentAttempt(newestSubprocess.attemptId)
+            setCurrentAgentSubprocess(agentId, newestSubprocess.subProcessId)
+            setCurrentSubprocessAttempt(agentId,newestSubprocess.attemptId)
         }
         if(subprocesses.length === 0) {
             // create first subprocess of the agent run here
@@ -62,8 +68,11 @@ export const FindVulnerabilitiesAgent = (props) => {
             });
             setCurrentSubprocess("1");
             setCurrentAttempt(1);
+            setCurrentAgentSubprocess(agentId, "1")
+            setCurrentSubprocessAttempt(agentId, 1)
             const subprocess = response.subprocess as AgentSubprocess;
             setSubprocesses([...subprocesses, subprocess]);
+
         }
 
     }
@@ -73,8 +82,12 @@ export const FindVulnerabilitiesAgent = (props) => {
         if (!currentAgentRun || currentAgentRun?.state !== State.RUNNING) {
             setCurrentAttempt(0);
             setCurrentSubprocess("0");
+            setCurrentSubprocessAttempt(agentId, 0);
+            setCurrentAgentSubprocess(agentId, "0");
             intervalRef.current = setInterval(getAllAgentRuns, 2000);
+            
         } else {
+            console.log("subprocess",currentAgentRun)
             getAllSubProcesses(currentAgentRun.processId);
         }
     
@@ -87,18 +100,18 @@ export const FindVulnerabilitiesAgent = (props) => {
     }, [currentAgentRun]);
 
     return (
-        <Scrollable className="h-full">
-            <VerticalStack gap="2">
-                {subprocesses.length > 0 && subprocesses.map((subprocess, index) => (
-                    <Subprocess 
+
+        <VerticalStack gap="2">
+            {subprocesses.length > 0 && subprocesses.map((subprocess, index) => (
+                <Subprocess
                     key={subprocess.subProcessId}
-                    agentId={agentId} 
-                    processId={currentAgentRun?.processId || ""} 
-                    subProcessFromProp={subprocesses[index]} 
+                    agentId={agentId}
+                    processId={currentAgentRun?.processId || ""}
+                    subProcessFromProp={subprocesses[index]}
                     finalCTAShow={finalCTAShow}
                     setFinalCTAShow={setFinalCTAShow} />
-                ))}
-            </VerticalStack>
-        </Scrollable>
+            ))}
+        </VerticalStack>
+
     )
 }

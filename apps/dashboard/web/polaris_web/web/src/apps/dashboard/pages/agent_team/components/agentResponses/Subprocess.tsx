@@ -8,12 +8,15 @@ import STEPS_PER_AGENT_ID from "../../constants";
 import { VerticalStack, Text } from "@shopify/polaris";
 import OutputSelector, { getMessageFromObj } from "./OutputSelector";
 import { intermediateStore } from "../../intermediate.store";
+import {useAgentsStateStore} from "../../agents.state.store"
 
 export const Subprocess = ({agentId, processId, subProcessFromProp, finalCTAShow, setFinalCTAShow}: {agentId: string, processId:string, subProcessFromProp: AgentSubprocess, finalCTAShow: boolean, setFinalCTAShow: (show: boolean) => void}) => {
     const [subprocess, setSubprocess] = useState<AgentSubprocess | null>(subProcessFromProp);
     const [expanded, setExpanded] = useState(true);
 
     const {setCurrentAttempt, setCurrentSubprocess, currentSubprocess, currentAttempt, setAgentState } = useAgentsStore();
+
+    const {setCurrentAgentState, setCurrentSubprocessAttempt, setCurrentAgentSubprocess} = useAgentsStateStore();
     const  { setFilteredUserInput, setOutputOptions } = intermediateStore();
 
 
@@ -29,11 +32,13 @@ export const Subprocess = ({agentId, processId, subProcessFromProp, finalCTAShow
         setCurrentSubprocess(newSubId);
         setCurrentAttempt(1);
         setAgentState('thinking');
+        setCurrentAgentState(agentId, 'thinking');
+        setCurrentSubprocessAttempt(agentId, 1);
+        setCurrentAgentSubprocess(agentId, newSubId);
         return subProcess;
     }
 
     const handleSelect = (selectedChoices: any, outputOptions: any) => {
-        console.log(selectedChoices);
         setOutputOptions(outputOptions);
         setFilteredUserInput(selectedChoices);
     }
@@ -53,6 +58,7 @@ export const Subprocess = ({agentId, processId, subProcessFromProp, finalCTAShow
 
             if(subProcess !== null && subProcess.state === State.RUNNING) {
                 setAgentState("thinking")
+                setCurrentAgentState(agentId, "thinking")
             }
 
             /* handle new subprocess creation from here
@@ -68,6 +74,7 @@ export const Subprocess = ({agentId, processId, subProcessFromProp, finalCTAShow
                         await api.updateAgentRun({ processId: processId, state: "COMPLETED" })
                     } else {
                         setAgentState("idle")
+                        setCurrentAgentState(agentId, "idle")
                     }
                 } else {
                     // create new subprocess without retry attempt now
@@ -82,6 +89,7 @@ export const Subprocess = ({agentId, processId, subProcessFromProp, finalCTAShow
             */ 
             if(subProcess !== null && subProcess.state === State.COMPLETED) {
                 setAgentState("paused")
+                setCurrentAgentState(agentId, "paused")
                 const allowMultiple = subProcess.processOutput?.selectionType === "multiple"
                 const initialValue = !allowMultiple ?
                     getMessageFromObj(subProcess.processOutput?.outputOptions[0], "textValue") :
@@ -103,6 +111,8 @@ export const Subprocess = ({agentId, processId, subProcessFromProp, finalCTAShow
                 setSubprocess(subProcess);
                 setCurrentAttempt(currentAttempt + 1);
                 setAgentState("thinking")
+                setCurrentAgentState(agentId, "thinking")
+                setCurrentSubprocessAttempt(agentId, currentAttempt + 1);
             }
 
             if(subProcess !== null && subProcess.state === State.AGENT_ACKNOWLEDGED) {
@@ -117,9 +127,11 @@ export const Subprocess = ({agentId, processId, subProcessFromProp, finalCTAShow
                     // waiting for agent to acknowledge the solution that user provided.
                     // setFilteredUserInput(null); 
                     setAgentState("idle")
+                    setCurrentAgentState(agentId, "idle")
                 }
             }else{
                 setAgentState("idle")
+                setCurrentAgentState(agentId, "idle")
             }
 
         }
@@ -167,7 +179,7 @@ export const Subprocess = ({agentId, processId, subProcessFromProp, finalCTAShow
                     transition={{ duration: 0.2 }}
                     className="overflow-hidden"
                 >
-                    <div className="bg-[#F6F6F7] ml-2.5 pt-0 space-y-1 border-l border-[#D2D5D8]">
+                    <div className="bg-[#F6F6F7] h-[45vh] overflow-auto ml-2.5 pt-0 space-y-1 border-l border-[#D2D5D8]">
                         <AnimatePresence initial={false}>
                             {subprocess?.logs?.map((log, index) => (
                                 <motion.p 

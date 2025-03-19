@@ -6,14 +6,19 @@ and we need a react element
 */
 import { Avatar, Box, Button, Card, HorizontalGrid, HorizontalStack, Text, VerticalStack } from "@shopify/polaris";
 import React from "react";
+import {useAgentsStateStore} from "./agents.state.store";
+import "./agentRowCard.css"
+
+import transform from "./transform";
 
 function AgentRowCard(props) {
 
   const { cardObj, onButtonClick } = props
+  
+  const { getCurrentAgentState} = useAgentsStateStore();
 
-  return <Card>
-
-    <Button onClick={() => onButtonClick(cardObj)} plain monochrome removeUnderline>
+  return<Card background={transform.getAgentStatusColor(cardObj.id,getCurrentAgentState)}>
+    <div style={{cursor:"pointer"}} onClick={() => onButtonClick(cardObj)} >
       <HorizontalStack gap="3" align="start" wrap={false} blockAlign="start">
         <div style={{ alignSelf: 'start' }}>
           <Box>
@@ -21,12 +26,14 @@ function AgentRowCard(props) {
           </Box>
         </div>
         <VerticalStack gap="1" align="start" inlineAlign="start">
-          <Text variant="headingSm">{cardObj.name}</Text>
+          <HorizontalStack gap={2} align="start" wrap={false} blockAlign="start">
+          <Text variant="headingSm">{cardObj.name}</Text> 
+          {transform.getStatusBadge(cardObj.id,getCurrentAgentState)}
+          </HorizontalStack>
           <Text variant="bodyMd" color="subdued" alignment="start">{cardObj.description}</Text>
         </VerticalStack>
       </HorizontalStack>
-    </Button>
-
+    </div>
   </Card>
 }
 

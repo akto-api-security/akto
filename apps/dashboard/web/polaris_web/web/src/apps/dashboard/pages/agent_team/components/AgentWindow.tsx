@@ -3,13 +3,15 @@ import { PromptComposer } from './PromptComposer';
 import { Agent } from '../types';
 import { AgentHeader } from './AgentHeader';
 import { FindVulnerabilitiesAgent } from '../agents/FindVulnerabilities';
-import { Box, Scrollable, VerticalStack } from '@shopify/polaris';
+import { Box, Divider, Scrollable, Text, VerticalStack } from '@shopify/polaris';
 import RepositoryInitializer from './RepositoryInitializer';
 import SensitiveDataAgentInitializer from './SensitiveDataAgentInitializer';
 import FlyLayout from '../../../components/layouts/FlyLayout';
 import SensitiveDataTypeCTA from './finalctas/SensitiveDataTypeCTA';
 import ApiGroupAgentInitializer from './ApiGroupAgentInitializer';
 import { useAgentsStore } from '../agents.store';
+import LayoutWithTabs from '../../../components/layouts/LayoutWithTabs';
+
 
 interface AgentWindowProps {
     agent: Agent | null;
@@ -67,22 +69,45 @@ function AgentWindow({ agent, onClose, open }: AgentWindowProps) {
         }
     }
 
-    const components = [<div>
-        <AgentHeader agent={agent} />
-        <div className="h-[calc(100vh-172px)] flex flex-col overflow-y-auto px-4 pb-5">
-            <div className="flex-1 min-h-0">
-                <Scrollable className="h-full">
-                    <div className="pt-2 flex flex-col gap-2">
-                        <Box paddingBlockEnd={"8"}>
-                                {renderAgentWindow()}
-                                <AgentFinalCTA />
-                        </Box>
-                            </div>
-                        </Scrollable>
-                </div>
-            <PromptComposer agentId ={agent?.id} onSend={console.log} />
-        </div>
-    </div >]
+    const titleComp = (
+        <VerticalStack gap={"5"}>
+            <Text variant="headingMd" as="p">
+                {"Agent Details"}
+            </Text>
+            <AgentHeader agent={agent} />
+        </VerticalStack>
+        
+    )
+
+    const chatTab = {
+        id: 'chat',
+        content: 'Chat',
+        component:<div className="h-[calc(100vh-172px)] flex flex-col px-4 pb-5">
+        <div className="flex-1 min-h-0">
+                <div className="pt-2 flex flex-col gap-2">
+                    <Box paddingBlockEnd={"8"}>
+                            {renderAgentWindow()}
+                            <AgentFinalCTA />
+                    </Box>
+                        </div>
+            </div>
+            <br/><br/><br/>
+        <PromptComposer agentId ={agent?.id} onSend={console.log} />
+    </div>
+    }
+    const activityTab = {
+        id: 'activity',
+        content: 'Activity',
+        component: <div>Activity</div>
+    }
+
+    const components = [
+        <LayoutWithTabs
+            key="tabs"
+            tabs={[chatTab, activityTab]}
+            currTab={() => { }}
+            disabledTabs={[]}
+        />,<Box paddingBlockEnd={"4"}></Box>]
 
     return (
         <FlyLayout
@@ -90,8 +115,11 @@ function AgentWindow({ agent, onClose, open }: AgentWindowProps) {
             setShow={() => { }}
             isHandleClose={true}
             handleClose={onClose}
-            title={"Agent Details"}
+            // title={"Agent Details"}
+            titleComp={titleComp}
             components={components}
+            newComp={true}
+            variant={"agentFootterVariant"}
         />
     )
 }
