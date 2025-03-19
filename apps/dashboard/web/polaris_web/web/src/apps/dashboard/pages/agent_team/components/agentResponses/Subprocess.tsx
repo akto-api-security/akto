@@ -91,8 +91,18 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, finalCTASho
 
             if (newSubProcess.state === State.COMPLETED) {
                 setAgentState("paused");
+                const allowMultiple = subprocess?.processOutput?.selectionType === "multiple"
+
+                const initialValue = !allowMultiple ?
+        getMessageFromObj(subprocess?.processOutput?.outputOptions[0], "textValue") :
+        subprocess?.processOutput?.outputOptions.map((option: any) => (option.textValue !== undefined ? {
+            label: option?.textValue,
+            value: option?.value !== undefined ? option?.value : JSON.stringify(option)
+        } : option));
+
+            console.log("initialValue", initialValue)
                 // add default filtered input here if needed
-                // setFilteredUserInput(getMessageFromObj(newSubProcess.processOutput?.outputOptions[0], "textValue"));
+                setFilteredUserInput(initialValue);
             }
 
             if (newSubProcess.state === State.RE_ATTEMPT) {
