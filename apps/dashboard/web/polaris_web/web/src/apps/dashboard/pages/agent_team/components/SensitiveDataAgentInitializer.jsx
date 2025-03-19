@@ -1,37 +1,24 @@
-import { Box, VerticalStack, Text, Button } from "@shopify/polaris";
 import React, { useState } from "react";
-import DropdownSearch from "../../../components/shared/DropdownSearch";
 import PersistStore from "../../../../main/PersistStore";
 import agentApi from '../api'
 import func from "../../../../../util/func";
+import DropDownAgentInitializer from "./DropDownAgentInitializer";
 
 function SensitiveDataAgentInitializer(props) {
 
     const { agentType } = props
 
-    const [selectedCollection, setSelectedCollection] = useState(-1);
+    const [selectedCollections, setSelectedCollections] = useState([]);
     const allCollections = PersistStore(state => state.allCollections)
+    const optionsList = allCollections.filter(x => !x.deactivated).map((x) => {
+        return {
+            label: x.displayName,
+            value: x.id,
+        }
+    })
 
-    function CollectionDropDown() {
-        return (<DropdownSearch
-            placeholder="Select collections"
-            optionsList={
-                allCollections.filter(x => !x.deactivated).map((x) => {
-                    return {
-                        label: x.displayName,
-                        value: x.id,
-                    }
-                })
-            }
-            setSelected={(x) => {
-                setSelectedCollection(x);
-            }}
-            value={selectedCollection !== -1 ? allCollections.filter(x => x.id === selectedCollection)[0].displayName : "Select collections"}
-        />)
-    }
-
-    async function startSensitiveDataAgent(collectionId) {
-        if (collectionId === -1) {
+    async function startAgent(collectionIds) {
+        if (collectionIds.length === 0) {
             func.setToast(true, true, "Please select collections to run the agent")
             return
         }
@@ -39,35 +26,20 @@ function SensitiveDataAgentInitializer(props) {
         await agentApi.createAgentRun({
             agent: agentType,
             data: {
-                apiCollectionIds: [collectionId]
+                apiCollectionIds: collectionIds
             }
         })
         func.setToast(true, false, "Agent run scheduled")
     }
 
-    function StartButton() {
-        return <Button onClick={() => startSensitiveDataAgent(selectedCollection)} >
-            Let's start!!
-        </Button>
-    }
-
-    function CollectionSelector() {
-        return (
-            <Box as='div' paddingBlockStart={"5"}>
-                <VerticalStack gap={"4"}>
-                    <Text as='span' variant='bodyMd'>
-                        Hey! Let's select an API collection to run the sensitive data type scanner on.
-                    </Text>
-                    <Box width='350px' paddingInlineStart={"2"}>
-                        <CollectionDropDown />
-                    </Box>
-                    <StartButton />
-                </VerticalStack>
-            </Box>
-        )
-    }
-
-    return <CollectionSelector />
+    return <DropDownAgentInitializer
+        optionsList={optionsList}
+        data={selectedCollections}
+        setData={setSelectedCollections}
+        startAgent={startAgent}
+        agentText={"Hey! Let's select API collections to run the sensitive data type scanner on."}
+        agentProperty={"collection"}
+    />
 }
 
 export default SensitiveDataAgentInitializer;

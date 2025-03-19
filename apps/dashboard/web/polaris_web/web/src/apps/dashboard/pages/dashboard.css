@@ -101,6 +101,7 @@
    --color-patch: #50e3c2 ;
    --color-disabled: #ebebeb ;
    --color-options: #0d5aa7 ;
+   --color-success-new: #008060;
    --white: #ffffff;
    --borderShadow-box-shadow: #AEB4B9;
    --inset-box-shadow: 0px 1px 0px 0px #898F94 inset;
@@ -120,6 +121,7 @@
     --p-color-text-primary: var(--akto-primary) !important;
     --p-color-text-success: var(--akto-primary) !important;
     --p-color-text-primary-hover: var(--akto-primary) !important;
+    --p-color-text-success-new: var(--color-success-new) !important;
     
     --p-color-icon-primary: var(--akto-primary) !important;
     --p-color-bg-interactive-selected: #F6F6F7 !important;

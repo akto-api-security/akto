@@ -15,6 +15,7 @@ public class DashboardMaliciousEvent {
   private long timestamp;
   private String type;
   private String refId;
+  private String subCategory;
 
   public DashboardMaliciousEvent() {}
 
@@ -29,7 +30,8 @@ public class DashboardMaliciousEvent {
       String country,
       long timestamp,
       String type,
-      String refId) {
+      String refId,
+      String subCategory) {
     this.id = id;
     this.actor = actor;
     this.filter_id = filter;
@@ -41,6 +43,7 @@ public class DashboardMaliciousEvent {
     this.timestamp = timestamp;
     this.type = type;
     this.refId = refId;
+    this.subCategory = subCategory;
   }
 
   public String getId() {
@@ -129,6 +132,14 @@ public class DashboardMaliciousEvent {
 
   public void setRefId(String refId) {
     this.refId = refId;
+  }
+
+  public String getSubCategory() {
+    return subCategory;
+  }
+
+  public void setSubCategory(String subCategory) {
+    this.subCategory = subCategory;
   }
 
 }

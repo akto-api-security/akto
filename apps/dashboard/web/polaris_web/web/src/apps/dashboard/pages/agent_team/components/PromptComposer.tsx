@@ -24,12 +24,11 @@ import { structuredOutputFormat } from '../constants';
 
 interface PromptComposerProps {
   onSend: (prompt: PromptPayload) => void;
-  agentId: string | undefined;
 }
 
-export const PromptComposer = ({ onSend, agentId }: PromptComposerProps) => {
+export const PromptComposer = ({ onSend }: PromptComposerProps) => {
   const [isFocused, setIsFocused] = useState(false);
-  const { currentProcessId, currentSubprocess, currentAttempt } = useAgentsStore();
+  const { currentProcessId, currentSubprocess, currentAttempt, currentAgent } = useAgentsStore();
   const { filteredUserInput } = intermediateStore();
   const {
     currentPrompt,
@@ -46,7 +45,7 @@ export const PromptComposer = ({ onSend, agentId }: PromptComposerProps) => {
     extensions: [
       StarterKit,
       Placeholder.configure({
-        placeholder: 'Message member...',
+        placeholder: 'Message agent...',
         showOnlyWhenEditable: false,
       }),
       ListItem,
@@ -91,20 +90,17 @@ export const PromptComposer = ({ onSend, agentId }: PromptComposerProps) => {
 
     // when selected choices are provided by the user, accepted case should be returned to the agent
     // agent if gets user-input, with the accepted state, it should take that into account
-    console.log("on Resume", {
-      processId: currentProcessId,
-      subProcessId: currentSubprocess,
-      attemptId: currentAttempt,
-      state: filteredUserInput !== null ? State.USER_PROVIDED_SOLUTION : State.ACCEPTED.toString(),
-      data: { selectedOptions: structuredOutputFormat(filteredUserInput, agentId , currentSubprocess || "") }
-    })
+    // Does not make sense ^, since irrespective of weather the user selects or takes all,
+    // The res will always be similar, i.e. the result could be the complete array or a sub-array,
+    // but they would behave the same.
+    // Using a single state till better use case.
 
     await api.updateAgentSubprocess({
       processId: currentProcessId,
       subProcessId: currentSubprocess,
       attemptId: currentAttempt,
-      state: filteredUserInput !== null ? State.USER_PROVIDED_SOLUTION : State.ACCEPTED.toString(),
-      data: { selectedOptions: structuredOutputFormat(filteredUserInput, agentId , currentSubprocess || "") }
+      state: State.ACCEPTED.toString(),
+      data: { selectedOptions: structuredOutputFormat(filteredUserInput, currentAgent?.id , currentSubprocess || "") }
     });
     func.setToast(true, false, "Member solution accepted")
   }
@@ -114,8 +110,8 @@ export const PromptComposer = ({ onSend, agentId }: PromptComposerProps) => {
       processId: currentProcessId,
       subProcessId: currentSubprocess,
       attemptId: currentAttempt,
-      state: filteredUserInput !== null ? State.USER_PROVIDED_SOLUTION : State.DISCARDED.toString(),
-      data: { selectedOptions: structuredOutputFormat(filteredUserInput, agentId , currentSubprocess || "") }
+      state: State.DISCARDED.toString(),
+      data: { selectedOptions: structuredOutputFormat(filteredUserInput, currentAgent?.id , currentSubprocess || "") }
     });
     func.setToast(true, false, "Member solution discarded")
   }

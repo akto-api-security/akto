@@ -44,6 +44,8 @@ public class AggregateSampleMaliciousEventModel {
     private String orig;
     private long requestTime;
     private String refId;
+    private String severity;
+    private String type;
 
     public Builder setFilterId(String filterId) {
       this.filterId = filterId;
@@ -93,7 +95,12 @@ public class AggregateSampleMaliciousEventModel {
     public Builder setRefId(String refId) {
       this.refId = refId;
       return this;
-    }  
+    }
+
+    public Builder setSeverity(String severity) {
+      this.severity = severity;
+      return this;
+    }
 
     public AggregateSampleMaliciousEventModel build() {
       return new AggregateSampleMaliciousEventModel(this);

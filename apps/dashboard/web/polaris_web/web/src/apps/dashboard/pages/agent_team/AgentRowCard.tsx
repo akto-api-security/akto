@@ -20,9 +20,9 @@ function AgentRowCard(props) {
             <Avatar customer size="medium" name={cardObj.id} source={cardObj.image} shape='square' />
           </Box>
         </div>
-        <VerticalStack gap="2" align="start" inlineAlign="start">
+        <VerticalStack gap="1" align="start" inlineAlign="start">
           <Text variant="headingSm">{cardObj.name}</Text>
-          <Text variant="bodySm" color="subdued" alignment="start">{cardObj.description}</Text>
+          <Text variant="bodyMd" color="subdued" alignment="start">{cardObj.description}</Text>
         </VerticalStack>
       </HorizontalStack>
     </Button>

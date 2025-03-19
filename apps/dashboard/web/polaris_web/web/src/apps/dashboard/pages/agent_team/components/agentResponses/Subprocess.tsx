@@ -6,7 +6,7 @@ import api from "../../api";
 import { useAgentsStore } from "../../agents.store";
 import STEPS_PER_AGENT_ID, { preRequisitesMap } from "../../constants";
 import { VerticalStack, Text } from "@shopify/polaris";
-import OutputSelector, { getMessageFromObj } from "./OutputSelector";
+import OutputSelector from "./OutputSelector";
 import { intermediateStore } from "../../intermediate.store";
 
 interface SubProcessProps {
@@ -31,7 +31,7 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, finalCTASho
         setPRState: state.setPRState
     }));  // Only subscribe to necessary store values
 
-    const { setFilteredUserInput } = intermediateStore(state => ({ setFilteredUserInput: state.setFilteredUserInput })); 
+    const { setFilteredUserInput, setOutputOptions } = intermediateStore(state => ({ setFilteredUserInput: state.setFilteredUserInput, setOutputOptions: state.setOutputOptions })); 
 
     // Memoized function to create new subprocess
     const createNewSubprocess = useCallback(async (newSubIdNumber: number) => {
@@ -48,7 +48,8 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, finalCTASho
         const newRes = await api.updateAgentSubprocess({
             processId,
             subProcessId: newSubId,
-            attemptId: 1
+            attemptId: 1,
+            subProcessHeading: "Subprocess scheduled"
         });
         setCurrentSubprocess(newSubId);
         setCurrentAttempt(1);
@@ -109,7 +110,8 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, finalCTASho
                 const tempRes = await api.updateAgentSubprocess({
                     processId,
                     subProcessId: currentSubprocess,
-                    attemptId: currentAttempt + 1
+                    attemptId: currentAttempt + 1,
+                    subProcessHeading: "Subprocess scheduled"
                 });
                 setSubprocess(tempRes.subprocess as AgentSubprocess);
                 setCurrentAttempt(currentAttempt + 1);
@@ -123,24 +125,25 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, finalCTASho
                 triggerCallForSubProcesses();
             }
 
-            if (newSubProcess.state === State.USER_PROVIDED_SOLUTION) {
-                setAgentState("idle");
-            }
-
             if (JSON.stringify(newSubProcess) !== JSON.stringify(subprocess)) {
                 setSubprocess(newSubProcess);
             }
         };
 
         const interval = setInterval(fetchSubprocess, 2000);
+        /*
+        We do not want to refresh current subprocess, 
+        if we're already at final CTA.
+        */
         if (finalCTAShow) clearInterval(interval);
         return () => clearInterval(interval);
     }, [currentSubprocess, finalCTAShow, processId, currentAttempt, subProcessFromProp, createNewSubprocess]);
 
     if (!subprocess) return null;
 
-    const handleSelect = (selectedChoices: any) => {
+    const handleSelect = (selectedChoices: any, outputOptions: any) => {
         console.log(selectedChoices);
+        setOutputOptions(outputOptions);
         setFilteredUserInput(selectedChoices);
     }
 
@@ -158,7 +161,9 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, finalCTASho
                     <motion.div animate={expanded ? "open" : "closed"} variants={{ open: { height: "auto", opacity: 1 }, closed: { height: 0, opacity: 0 } }} transition={{ duration: 0.2 }} className="overflow-hidden">
                         <div className="bg-[#F6F6F7] ml-2.5 pt-0 space-y-1 border-l border-[#D2D5D8]">
                             <AnimatePresence initial={false}>
-                                {subprocess?.logs?.map((log, index) => (
+                                {subprocess?.logs?.sort((a,b) => {
+                                    return a.eventTimestamp > b.eventTimestamp ? 1 : -1
+                                }).map((log, index) => (
                                     <motion.p key={`${index}-${log.log}`} initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }} className="text-xs text-[var(--text-subdued)] ml-3! p-0.5 hover:bg-[var(--background-selected)]">
                                         {log.log}
                                     </motion.p>

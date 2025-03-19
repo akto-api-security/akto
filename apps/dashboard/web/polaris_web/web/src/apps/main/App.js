@@ -84,6 +84,7 @@ import AuditLogs from "../dashboard/pages/settings/audit_logs/AuditLogs";
 import ThreatApiPage from "../dashboard/pages/threat_detection/ThreatApiPage";
 import ThreatActorPage from "../dashboard/pages/threat_detection/ThreatActorPage";
 import ThreatPolicyPage from "../dashboard/pages/threat_detection/ThreatPolicyPage";
+import TestSuite from "../dashboard/pages/testing/testSuite/TestSuite";
 import TestsTablePage from "../dashboard/pages/test_editor/tests_table/TestsTablePage";
 import Splunk from "../dashboard/pages/settings/integrations/Splunk";
 import F5Waf from "../dashboard/pages/settings/integrations/F5Waf";
@@ -137,6 +138,10 @@ const router = createBrowserRouter([
                             {
                                 path: "dependency",
                                 element: <DependencyTable/>
+                            },
+                            {
+                              path:"test-suite",
+                              element:<TestSuite/>
                             }
                         ]
                     },
