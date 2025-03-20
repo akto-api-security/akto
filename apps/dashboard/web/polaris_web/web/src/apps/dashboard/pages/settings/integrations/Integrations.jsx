@@ -230,12 +230,12 @@ function Integrations() {
         }
         return automationItems;
       case 'waf':
-        if (func.isDemoAccount()) {
+        if (func.checkLocal()) {
           return wafItems;
         }
         return emptyItem;
       case 'splunk':
-        if (func.isDemoAccount()) {
+        if (func.checkLocal()) {
           return siemItems;
         }
         return emptyItem;

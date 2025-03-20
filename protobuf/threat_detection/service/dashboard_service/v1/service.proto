@@ -160,6 +160,7 @@ message ThreatActorFilterRequest {
 message ThreatActorFilterResponse {
   repeated string sub_categories = 1;
   repeated string countries = 2;
+  repeated string actor_id = 3;
 }
 
 message ThreatCategoryWiseCountResponse {
@@ -218,4 +219,22 @@ message ThreatActivityTimelineResponse {
   }
 
   repeated ActivityTimeline threat_activity_timeline = 1;
+}
+
+message SplunkIntegrationRequest {
+  string splunk_url = 1;
+  string splunk_token = 2;
+}
+
+message SplunkIntegrationRespone {
+
+}
+
+message ModifyThreatActorStatusRequest {
+  string ip = 1;
+  string status = 2;
+  uint64 updated_ts = 3;
+}
+
+message ModifyThreatActorStatusResponse {  
 }
