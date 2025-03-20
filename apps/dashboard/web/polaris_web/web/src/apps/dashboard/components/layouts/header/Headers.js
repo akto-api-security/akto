@@ -64,10 +64,6 @@ export default function Header() {
     }
 
     const debouncedSearch = debounce(async (searchQuery) => {
-        if (searchItemsArr.length === 0) {
-            searchItemsArr = func.getSearchItemsArr(allRoutes, allCollections, subCategoryMap)
-        }
-
         if(searchQuery.length === 0){
             setFilteredItemsArr(searchItemsArr)
         }else{

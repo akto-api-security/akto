@@ -31,7 +31,8 @@ function UpdateConnections(props) {
     const onButtonClick = (cardObj) => {
         setNewCol(2)
         setCurrentCardObj(cardObj)
-        func.updateQueryParams(searchParams, setSearchParams, connectorSearchParamKey, cardObj.key)
+        const connector = cardObj.key?.toLowerCase() ?? "";
+        func.updateQueryParams(searchParams, setSearchParams, connectorSearchParamKey, connector)
     }
 
     useEffect(()=>{

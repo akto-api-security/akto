@@ -13,6 +13,7 @@ import { tokens } from "@shopify/polaris-tokens"
 import PersistStore from '../apps/main/PersistStore';
 
 import { circle_cancel, circle_tick_minor } from "@/apps/dashboard/components/icons";
+import quickStartFunc from '../apps/dashboard/pages/quick_start/transform';
 
 const iconsUsedMap = {
   CalendarMinor,ClockMinor,CircleAlertMajor,DynamicSourceMinor, LockMinor, KeyMajor, ProfileMinor, PasskeyMinor,
@@ -1289,12 +1290,28 @@ getDeprecatedEndpoints(apiInfoList, unusedEndpoints, apiCollectionId) {
 
   return searchItems
  },
+ getConnectorSearchItems(allRoutes) {
+  const searchItems = []
+
+  const connectorCategories = quickStartFunc.getConnectorsListCategorized()
+  const initialPath = "/dashboard/quick-start"
+
+  for (const categoryArr of Object.values(connectorCategories)) {
+      for (const connector of categoryArr) {
+        const connectorKey = connector.key?.toLowerCase() ?? "";
+        searchItems.push({content: connector.label, url: `${initialPath}?connector=${connectorKey}`, type:'connector'})
+      }
+  }
+
+  return searchItems
+ },
  getSearchItemsArr(allRoutes,allCollections, subCategoryMap){
   let combinedArr = []
 
   const collectionsSearchItems = this.getCollectionsSearchItems(allRoutes, allCollections)
   const testSearchItems = this.getTestSearchItems(allRoutes, subCategoryMap)
-  combinedArr.push(...collectionsSearchItems, ...testSearchItems)
+  const connectorSearchItems = this.getConnectorSearchItems(allRoutes)
+  combinedArr.push(...collectionsSearchItems, ...testSearchItems, ...connectorSearchItems)
 
   return combinedArr
  },
@@ -1918,7 +1935,7 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
     const iconsMap = {
       "collection": DynamicSourceMajor,
       "test": FileMinor,
-      "connection": AffiliateMajor,
+      "connector": AffiliateMajor,
       "page": PageMajor,
     };
   
