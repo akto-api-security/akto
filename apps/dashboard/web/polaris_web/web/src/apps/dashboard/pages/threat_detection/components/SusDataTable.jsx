@@ -6,7 +6,7 @@ import GetPrettifyEndpoint from "../../observe/GetPrettifyEndpoint";
 import PersistStore from "../../../../main/PersistStore";
 import func from "../../../../../util/func";
 import { Badge } from "@shopify/polaris";
-
+import dayjs from "dayjs";
 const resourceName = {
   singular: "sample",
   plural: "samples",
@@ -14,12 +14,17 @@ const resourceName = {
 
 const headers = [
   {
-    text: "Endpoint",
-    value: "endpointComp",
-    title: "Endpoint",
+    text: "Severity",
+    value: "severityComp",
+    title: "Severity",
   },
   {
-    text: "Actor",
+    text: "Api Endpoint",
+    value: "endpointComp",
+    title: "Api Endpoint",
+  },
+  {
+    text: "Threat Actor",
     value: "actorComp",
     title: "Actor",
     filterKey: 'actor'
@@ -28,11 +33,6 @@ const headers = [
     text: "Filter",
     value: "filterId",
     title: "Attack type",
-  },
-  {
-    text: "Severity",
-    value: "severityComp",
-    title: "Severity",
   },
   {
     text: "Collection",
@@ -48,16 +48,6 @@ const headers = [
     type: CellType.TEXT,
     sortActive: true,
   },
-  {
-    text: "Source IP",
-    title: "Source IP",
-    value: "sourceIPComponent",
-  },
-  {
-    text: "Type",
-    title: "Type",
-    value: "type",
-  }
 ];
 
 const sortOptions = [
@@ -90,6 +80,7 @@ function SusDataTable({ currDateRange, rowClicked }) {
   const collectionsMap = PersistStore((state) => state.collectionsMap);
   const threatFiltersMap = PersistStore((state) => state.threatFiltersMap);
 
+
   async function fetchData(
     sortKey,
     sortOrder,
@@ -103,8 +94,7 @@ function SusDataTable({ currDateRange, rowClicked }) {
     let sourceIpsFilter = [],
       apiCollectionIdsFilter = [],
       matchingUrlFilter = [],
-      typeFilter = []
-      ;
+      typeFilter = [];
     if (filters?.actor) {
       sourceIpsFilter = filters?.actor;
     }
@@ -128,6 +118,7 @@ function SusDataTable({ currDateRange, rowClicked }) {
       startTimestamp,
       endTimestamp
     );
+//    setSubCategoryChoices(distinctSubCategories);
     let total = res.total;
     let ret = res?.maliciousEvents.map((x) => {
       const severity = threatFiltersMap[x?.filterId]?.severity || "HIGH"
@@ -136,10 +127,10 @@ function SusDataTable({ currDateRange, rowClicked }) {
         id: x.id,
         actorComp: x?.actor,
         endpointComp: (
-          <GetPrettifyEndpoint method={x.method} url={x.url} isNew={false} />
+          <GetPrettifyEndpoint maxWidth="300px" method={x.method} url={x.url} isNew={false} />
         ),
         apiCollectionName: collectionsMap[x.apiCollectionId] || "-",
-        discoveredTs: func.prettifyEpoch(x.timestamp),
+        discoveredTs: dayjs(x.timestamp*1000).format("DD-MM-YYYY HH:mm:ss"),
         sourceIPComponent: x?.ip || "-",
         type: x?.type || "-",
         severityComp: (<div className={`badge-wrapper-${severity}`}>
@@ -162,6 +153,7 @@ function SusDataTable({ currDateRange, rowClicked }) {
     let ipChoices = res?.ips.map((x) => {
       return { label: x, value: x };
     });
+
 
     filters = [
       {

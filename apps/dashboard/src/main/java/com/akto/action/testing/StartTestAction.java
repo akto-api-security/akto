@@ -67,6 +67,8 @@ public class StartTestAction extends UserAction {
     private int testRunTime;
     private int maxConcurrentRequests;
     boolean recurringDaily;
+    boolean recurringWeekly;
+    boolean recurringMonthly;
     private List<TestingRun> testingRuns;
     private AuthMechanism authMechanism;
     private int endTimestamp;
@@ -182,6 +184,19 @@ public class StartTestAction extends UserAction {
     private List<String> selectedTests;
     private List<TestConfigsAdvancedSettings> testConfigsAdvancedSettings;
 
+    private List<String> selectedTestRunResultHexIds;
+
+    private int getPeriodInSeconds(boolean recurringDaily, boolean recurringWeekly, boolean recurringMonthly) {
+        if(recurringDaily){
+            return Constants.ONE_DAY_TIMESTAMP;
+        } else if(recurringWeekly){
+            return 7 * Constants.ONE_DAY_TIMESTAMP;
+        } else if(recurringMonthly){
+            return Constants.ONE_MONTH_TIMESTAMP;
+        } else {
+            return 0;
+        }
+    }
     public String startTest() {
 
         if (this.startTimestamp != 0 && this.startTimestamp + 86400 < Context.now()) {
@@ -205,7 +220,7 @@ public class StartTestAction extends UserAction {
         }
         if (localTestingRun == null) {
             try {
-                localTestingRun = createTestingRun(scheduleTimestamp, this.recurringDaily ? 86400 : 0);
+                localTestingRun = createTestingRun(scheduleTimestamp, getPeriodInSeconds(recurringDaily, recurringWeekly, recurringMonthly));
                 // pass boolean from ui, which will tell if testing is coniinuous on new endpoints
                 if (this.continuousTesting) {
                     localTestingRun.setPeriodInSeconds(-1);
@@ -226,11 +241,35 @@ public class StartTestAction extends UserAction {
             this.testIdConfig = 0;
         } else {
             if(this.metadata == null || this.metadata.isEmpty()){
-                TestingRunDao.instance.updateOne(
-                    Filters.eq(Constants.ID, localTestingRun.getId()),
-                    Updates.combine(
-                            Updates.set(TestingRun.STATE, TestingRun.State.SCHEDULED),
-                            Updates.set(TestingRun.SCHEDULE_TIMESTAMP, scheduleTimestamp)));
+                if (selectedTestRunResultHexIds == null || selectedTestRunResultHexIds.isEmpty()) {
+                    TestingRunDao.instance.updateOne(
+                            Filters.eq(Constants.ID, localTestingRun.getId()),
+                            Updates.combine(
+                                    Updates.set(TestingRun.STATE, TestingRun.State.SCHEDULED),
+                                    Updates.set(TestingRun.SCHEDULE_TIMESTAMP, scheduleTimestamp)));
+
+                } else {
+
+                    if (this.testingRunResultSummaryHexId != null) {
+                        List<ObjectId> testingRunResultIds = new ArrayList<>();
+                        for (String testingRunResultHexId : selectedTestRunResultHexIds) {
+                            testingRunResultIds.add(new ObjectId(testingRunResultHexId));
+                        }
+
+                        TestingRunResultDao.instance.updateManyNoUpsert(Filters.in(TestingRunResultDao.ID, testingRunResultIds),
+                                Updates.set(TestingRunResult.RERUN,true));
+
+                        TestingRunResultSummary summary = new TestingRunResultSummary(Context.now(), 0, new HashMap<>(),
+                                0, localTestingRun.getId(), localTestingRun.getId().toHexString(), 0, localTestingRun.getTestIdConfig(),0 );
+                        summary.setState(TestingRun.State.SCHEDULED);
+                        summary.setOriginalTestingRunResultSummaryId(new ObjectId(testingRunResultSummaryHexId));
+                        loggerMaker.infoAndAddToDb("Rerun test triggered at " + Context.now(), LogDb.DASHBOARD);
+
+                        InsertOneResult result = TestingRunResultSummariesDao.instance.insertOne(summary);
+                        this.testingRunResultSummaryHexId = result.getInsertedId().asObjectId().getValue().toHexString();
+                    }
+                }
+
             } else {
                 // CI-CD test.
                 /*
@@ -704,6 +743,14 @@ public class StartTestAction extends UserAction {
 
     public long getIssueslistCount() {
         return issueslistCount;
+    }
+
+    public List<String> getSelectedTestRunResultHexIds() {
+        return selectedTestRunResultHexIds;
+    }
+
+    public void setSelectedTestRunResultHexIds(List<String> selectedTestRunResultHexIds) {
+        this.selectedTestRunResultHexIds = selectedTestRunResultHexIds;
     }
 
     public enum QueryMode {
@@ -1243,14 +1290,20 @@ public class StartTestAction extends UserAction {
                                         editableTestingRunConfig.getSendMsTeamsAlert()));
                     }
 
-                    int periodInSeconds = 0;
+                    int periodInSeconds = getPeriodInSeconds(editableTestingRunConfig.getRecurringDaily(), editableTestingRunConfig.getRecurringWeekly(), editableTestingRunConfig.getRecurringMonthly());
                     if (editableTestingRunConfig.getContinuousTesting()) {
                         periodInSeconds = -1;
-                    } else if (editableTestingRunConfig.getRecurringDaily()) {
-                        periodInSeconds = 86400;
                     }
-                    if (existingTestingRun.getPeriodInSeconds() != periodInSeconds) {
+                    if (existingTestingRun.getPeriodInSeconds() != periodInSeconds && periodInSeconds != 0) {
                         updates.add(Updates.set(TestingRun.PERIOD_IN_SECONDS, periodInSeconds));
+                    }
+                    if(editableTestingRunConfig.getScheduleTimestamp() > 0){
+                        updates.add(
+                            Updates.combine(
+                                Updates.set(TestingRun.SCHEDULE_TIMESTAMP, editableTestingRunConfig.getScheduleTimestamp()),
+                                Updates.set(TestingRun.STATE, State.SCHEDULED)
+                            )
+                        );
                     }
                 
                     if (!updates.isEmpty()) {
@@ -1733,4 +1786,14 @@ public class StartTestAction extends UserAction {
     public void setSendMsTeamsAlert(boolean sendMsTeamsAlert) {
         this.sendMsTeamsAlert = sendMsTeamsAlert;
     }
+
+    public void setRecurringWeekly(boolean recurringWeekly) {
+        this.recurringWeekly = recurringWeekly;
+    }
+
+    
+    public void setRecurringMonthly(boolean recurringMonthly) {
+        this.recurringMonthly = recurringMonthly;
+    }
+
 }

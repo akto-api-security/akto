@@ -39,13 +39,17 @@ const threatDetectionRequests = {
             data: {}
         })
     },
-    fetchThreatActors(skip, sort) {
+    fetchThreatActors(skip, sort, latestAttack, country, startTs, endTs) {
         return request({
             url: '/api/fetchThreatActors',
             method: 'post',
             data: {
                 skip: skip,
-                sort: sort
+                sort: sort,
+                latestAttack: latestAttack,
+                country: country,
+                startTs: startTs,
+                endTs: endTs
             }
         })
     },
@@ -66,11 +70,11 @@ const threatDetectionRequests = {
             data: {}
         })
     },
-    fetchThreatCategoryCount() {
+    fetchThreatCategoryCount(startTs, endTs) {
         return request({
             url: '/api/fetchThreatCategoryCount',
-            method: 'get',
-            data: {}
+            method: 'post',
+            data: {startTs, endTs}
         })
     },
     fetchMaliciousRequest(refId){
@@ -79,7 +83,50 @@ const threatDetectionRequests = {
             method: 'post',
             data: {refId}
         })
+    },
+    fetchCountBySeverity(startTs, endTs) {
+        return request({
+            url: '/api/fetchCountBySeverity',
+            method: 'post',
+            data: {startTs, endTs}
+        })
+    },
+    getThreatActivityTimeline(startTs, endTs) {
+        return request({
+            url: '/api/getThreatActivityTimeline',
+            method: 'post',
+            data: {startTs, endTs}
+        })
+    },
+    getDailyThreatActorsCount(startTs, endTs) {
+        return request({
+            url: '/api/getDailyThreatActorsCount',
+            method: 'post',
+            data: {startTs, endTs}
+        })
+    },
+    fetchSensitiveParamsForEndpoints (urls) {
+        return request({
+            url: '/api/fetchSensitiveParamsForEndpoints',
+            method: 'post',
+            data: {urls}
+        }).then((resp) => {
+            return resp
+        })
+    },
+    getAccessTypes(urls) {
+        return request({
+            url: '/api/getAccessTypes',
+            method: 'post',
+            data: {urls}
+        })
+    },
+    fetchThreatActorFilters() {
+        return request({
+            url: '/api/fetchFiltersForThreatActors',
+            method: 'post',
+            data: {}
+        })
     }
 }
-
 export default threatDetectionRequests

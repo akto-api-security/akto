@@ -7,9 +7,11 @@ public class EditableTestingRunConfig extends TestingRunConfig {
     private int testRunTime;
     private boolean sendSlackAlert;
     private boolean recurringDaily;
+    private boolean recurringWeekly;
+    private boolean recurringMonthly;
     private boolean continuousTesting;
     private boolean sendMsTeamsAlert;
-
+    private int scheduleTimestamp;
     public EditableTestingRunConfig() {
 
     }
@@ -46,6 +48,22 @@ public class EditableTestingRunConfig extends TestingRunConfig {
         this.sendSlackAlert = sendSlackAlert;
     }
 
+    public boolean getRecurringWeekly() {
+        return recurringWeekly;
+    }
+
+    public void setRecurringWeekly(boolean recurringWeekly) {
+        this.recurringWeekly = recurringWeekly;
+    }
+
+    public boolean getRecurringMonthly() {
+        return recurringMonthly;
+    }
+
+    public void setRecurringMonthly(boolean recurringMonthly) {
+        this.recurringMonthly = recurringMonthly;
+    }
+
     public boolean getRecurringDaily() {
         return recurringDaily;
     }
@@ -68,6 +86,14 @@ public class EditableTestingRunConfig extends TestingRunConfig {
 
     public void setSendMsTeamsAlert(boolean sendMsTeamsAlert) {
         this.sendMsTeamsAlert = sendMsTeamsAlert;
+    }
+
+    public int getScheduleTimestamp() {
+        return scheduleTimestamp;
+    }
+
+    public void setScheduleTimestamp(int scheduleTimestamp) {
+        this.scheduleTimestamp = scheduleTimestamp;
     }
 }
 

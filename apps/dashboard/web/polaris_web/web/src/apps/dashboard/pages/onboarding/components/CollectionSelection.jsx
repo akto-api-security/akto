@@ -16,7 +16,11 @@ function CollectionSelection() {
     const [dummyCollections, setDummyCollections] = useState([])
 
     const checkCollections = (apiCollections) => {
-        const localCopy = apiCollections.filter((x) => x.displayName.toLowerCase() !== "default")
+        const allowedCollections = ['juice_shop_demo', 'vulnerable_apis']
+        
+        const localCopy = apiCollections.filter((x) => 
+            allowedCollections.includes(x.displayName.toLowerCase())
+        )
         setDummyCollections(localCopy)
         if(localCopy.length > 0){
             if(!collection){

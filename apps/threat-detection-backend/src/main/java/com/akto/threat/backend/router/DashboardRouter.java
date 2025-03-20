@@ -1,5 +1,6 @@
 package com.akto.threat.backend.router;
 
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.DailyActorsCountRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchAlertFiltersRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchMaliciousEventsRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListMaliciousRequestsRequest;
@@ -7,8 +8,11 @@ import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.Li
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListThreatApiRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ModifyThreatActorStatusRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.SplunkIntegrationRequest;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatActivityTimelineRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatActorByCountryRequest;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatActorFilterRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatCategoryWiseCountRequest;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatSeverityWiseCountRequest;
 import com.akto.proto.utils.ProtoMessageUtils;
 import com.akto.threat.backend.service.MaliciousEventService;
 import com.akto.threat.backend.service.ThreatActorService;
@@ -126,12 +130,60 @@ public class DashboardRouter implements ARouter {
             });
 
         router
-            .get("/get_subcategory_wise_count")
+            .get("/fetch_filters_for_threat_actors")
             .blockingHandler(ctx -> {
+                ProtoMessageUtils.toString(
+                    dsService.fetchThreatActorFilters(
+                        ctx.get("accountId"),
+                        ThreatActorFilterRequest.newBuilder().build()
+                    )
+                ).ifPresent(s -> ctx.response().setStatusCode(200).end(s));
+            });
+
+        router
+        .post("/get_subcategory_wise_count")
+            .blockingHandler(ctx -> {
+                RequestBody reqBody = ctx.body();
+                ThreatCategoryWiseCountRequest req = ProtoMessageUtils.<
+                    ThreatCategoryWiseCountRequest
+                >toProtoMessage(
+                    ThreatCategoryWiseCountRequest.class,
+                    reqBody.asString()
+                ).orElse(null);
+
+                if (req == null) {
+                    ctx.response().setStatusCode(400).end("Invalid request");
+                    return;
+                }
+
                 ProtoMessageUtils.toString(
                     threatApiService.getSubCategoryWiseCount(
                         ctx.get("accountId"),
-                        ThreatCategoryWiseCountRequest.newBuilder().build()
+                        req
+                    )
+                ).ifPresent(s -> ctx.response().setStatusCode(200).end(s));
+            });
+
+            router
+            .post("/get_severity_wise_count")
+            .blockingHandler(ctx -> {
+                RequestBody reqBody = ctx.body();
+                ThreatSeverityWiseCountRequest req = ProtoMessageUtils.<
+                    ThreatSeverityWiseCountRequest
+                >toProtoMessage(
+                    ThreatSeverityWiseCountRequest.class,
+                    reqBody.asString()
+                ).orElse(null);
+
+                if (req == null) {
+                    ctx.response().setStatusCode(400).end("Invalid request");
+                    return;
+                }
+
+                ProtoMessageUtils.toString(
+                    threatApiService.getSeverityWiseCount(
+                        ctx.get("accountId"),
+                        req
                     )
                 ).ifPresent(s -> ctx.response().setStatusCode(200).end(s));
             });
@@ -204,6 +256,56 @@ public class DashboardRouter implements ARouter {
                     threatActorService.modifyThreatActorStatus(
                         ctx.get("accountId"),
                         req
+                    )
+                ).ifPresent(s -> ctx.response().setStatusCode(200).end(s));
+            });
+
+        router
+            .post("/get_daily_actor_count")
+            .blockingHandler(ctx -> {
+                RequestBody reqBody = ctx.body();
+                DailyActorsCountRequest req = ProtoMessageUtils.<
+                DailyActorsCountRequest
+                >toProtoMessage(
+                    DailyActorsCountRequest.class,
+                    reqBody.asString()
+                ).orElse(null);
+
+                if (req == null) {
+                    ctx.response().setStatusCode(400).end("Invalid request");
+                    return;
+                }
+
+                ProtoMessageUtils.toString(
+                    threatActorService.getDailyActorCounts(
+                        ctx.get("accountId"),
+                        req.getStartTs(),
+                        req.getEndTs()
+                    )
+                ).ifPresent(s -> ctx.response().setStatusCode(200).end(s));
+            });
+        
+        router
+            .post("/get_threat_activity_timeline")
+            .blockingHandler(ctx -> {
+                RequestBody reqBody = ctx.body();
+                ThreatActivityTimelineRequest req = ProtoMessageUtils.<
+                ThreatActivityTimelineRequest
+                >toProtoMessage(
+                    ThreatActivityTimelineRequest.class,
+                    reqBody.asString()
+                ).orElse(null);
+
+                if (req == null) {
+                    ctx.response().setStatusCode(400).end("Invalid request");
+                    return;
+                }
+
+                ProtoMessageUtils.toString(
+                    threatActorService.getThreatActivityTimeline(
+                        ctx.get("accountId"),
+                        req.getStartTs(),
+                        req.getEndTs()
                     )
                 ).ifPresent(s -> ctx.response().setStatusCode(200).end(s));
             });
