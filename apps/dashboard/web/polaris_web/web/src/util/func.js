@@ -1912,7 +1912,7 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
       })} ${timeStr}`;
   },
   isDemoAccount(){
-    return window.ACTIVE_ACCOUNT === 1669322524
+     return window.ACTIVE_ACCOUNT === 1669322524
   },
   getSearchItemIcon(itemType) {
     const iconsMap = {
@@ -1923,8 +1923,16 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
     };
   
     return iconsMap[itemType] || PageMajor;
+  },
+  updateQueryParams(searchParams, setSearchParams, key, value) {
+    const newSearchParams = new URLSearchParams(searchParams);
+    if (value === "") {
+        newSearchParams.delete(key)
+    } else {
+        newSearchParams.set(key, value);
+    }
+    setSearchParams(newSearchParams);
   }
-
 }
 
 export default func

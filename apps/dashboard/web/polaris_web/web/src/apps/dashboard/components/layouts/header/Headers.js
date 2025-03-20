@@ -145,8 +145,9 @@ export default function Header() {
     const searchItems = filteredItemsArr.slice(0,20).map((item) => {
         const icon = func.getSearchItemIcon(item.type)
         return {
-            value: item.content,
-            content: <ContentWithIcon text={item.content} icon={icon} />,
+            icon: icon,
+            content: item.content,
+            truncate: true,
             onAction: () => handleNavigateSearch(item.url),
         }
     })

@@ -6,8 +6,12 @@ import GridRows from '../../../components/shared/GridRows';
 import QuickStartStore from '../quickStartStore';
 import TitleWithInfo from '@/apps/dashboard/components/shared/TitleWithInfo';
 import FlyLayout from '../../../components/layouts/FlyLayout';
+import { useSearchParams } from 'react-router-dom';
+import func from "@/util/func"
 
 function UpdateConnections(props) {
+
+    const [searchParams, setSearchParams] = useSearchParams();
 
     const { myConnections } = props; 
     const obj = quickStartFunc.getConnectorsListCategorized()
@@ -16,17 +20,33 @@ function UpdateConnections(props) {
     const currentCardObj = QuickStartStore(state => state.currentConnector)
     const setCurrentCardObj = QuickStartStore(state => state.setCurrentConnector)
 
+    const connectorSearchParamKey = "connector"
+
     const closeAction = () => {
         setCurrentCardObj(null)
         setNewCol(0)
+        func.updateQueryParams(searchParams, setSearchParams, connectorSearchParamKey,"")
     }
 
     const onButtonClick = (cardObj) => {
         setNewCol(2)
         setCurrentCardObj(cardObj)
+        func.updateQueryParams(searchParams, setSearchParams, connectorSearchParamKey, cardObj.key)
     }
 
     useEffect(()=>{
+        const connectorKey = decodeURIComponent(decodeURIComponent(searchParams.get("connector") || ""))
+        if (connectorKey.length !== 0) {
+            for (const categoryArr of Object.values(obj)) {
+                for (const connectorCardObj of categoryArr) {
+                    const connectorCardObjKey = connectorCardObj.key?.toLowerCase() ?? "";
+                    if (connectorCardObjKey === connectorKey) {
+                        setCurrentCardObj(connectorCardObj);
+                        return; 
+                    }
+                }
+            }
+        } 
         setCurrentCardObj(null)
     },[])
 
