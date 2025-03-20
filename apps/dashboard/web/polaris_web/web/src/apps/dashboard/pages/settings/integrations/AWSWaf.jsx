@@ -29,7 +29,7 @@ function AWSWaf() {
                 />
                 <TextField value={region} onChange={setRegion} label="Region" placeholder="Region"/>
                 <TextField value={ruleSetId} onChange={setRuleSetId} label="Waf Rule Set Id" placeholder="Rule-Set=Id"/>
-                <TextField value={ruleSetName} onChange={setRuleSetName} label="Waf Rule Name" placeholder="Waf-Rule-Name"/>
+                <TextField value={ruleSetName} onChange={setRuleSetName} label="Waf Rule Set Name" placeholder="Waf-Rule-Set-Name"/>
             </VerticalStack>
           </LegacyCard.Section> 
         </LegacyCard>
