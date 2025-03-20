@@ -231,14 +231,14 @@ function Integrations() {
         return automationItems;
       case 'waf':
         if (func.checkLocal()) {
-          return wafItems;
+          return emptyItem;
         }
-        return emptyItem;
+        return wafItems;
       case 'splunk':
         if (func.checkLocal()) {
-          return siemItems;
+          return emptyItem;
         }
-        return emptyItem;
+        return siemItems;
       default:
         let allItems = [...trafficItems, ...aiItems]
         if (!func.checkLocal()){
