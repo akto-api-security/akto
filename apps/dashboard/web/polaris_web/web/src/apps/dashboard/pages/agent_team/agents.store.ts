@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { Model, Agent, PromptContent, AgentState, AgentRun } from "./types";
+import { Model, Agent, PromptContent, AgentState } from "./types";
 import { devtools, persist, createJSONStorage } from "zustand/middleware";
 
 // Define the blocking states
