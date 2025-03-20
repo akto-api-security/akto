@@ -1,7 +1,7 @@
 import {
-  CalendarMinor,ClockMinor,CircleAlertMajor,DynamicSourceMinor, LockMinor, KeyMajor, ProfileMinor, PasskeyMinor,
+  CalendarMinor,ClockMinor,CircleAlertMajor,DynamicSourceMinor,DynamicSourceMajor, LockMinor, KeyMajor, ProfileMinor, PasskeyMinor,
   EmailMajor, CreditCardMajor, IdentityCardMajor, LocationsMinor,PhoneMajor, FileMinor, ImageMajor, BankMajor, HashtagMinor, 
-  ReceiptMajor, MobileMajor, CalendarTimeMinor, LocationMajor,  IdentityCardFilledMajor, CalendarMajor
+  ReceiptMajor, MobileMajor, CalendarTimeMinor, LocationMajor,  IdentityCardFilledMajor, CalendarMajor, PageMajor, AffiliateMajor
 } from '@shopify/polaris-icons';
 import { saveAs } from 'file-saver'
 import inventoryApi from "../apps/dashboard/pages/observe/api"
@@ -1913,6 +1913,16 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
   },
   isDemoAccount(){
     return window.ACTIVE_ACCOUNT === 1669322524
+  },
+  getSearchItemIcon(itemType) {
+    const iconsMap = {
+      "collection": DynamicSourceMajor,
+      "test": FileMinor,
+      "connection": AffiliateMajor,
+      "page": PageMajor,
+    };
+  
+    return iconsMap[itemType] || PageMajor;
   }
 
 }

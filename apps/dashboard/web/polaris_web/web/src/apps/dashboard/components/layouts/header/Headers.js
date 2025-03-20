@@ -40,7 +40,7 @@ export default function Header() {
     const allRoutes = Store((state) => state.allRoutes)
     const allCollections = PersistStore((state) => state.allCollections)
     const subCategoryMap = LocalStore(state => state.subCategoryMap)
-    var searchItemsArr = useMemo(() => func.getSearchItemsArr(allRoutes, allCollections, subCategoryMap), [])
+    var searchItemsArr = useMemo(() => func.getSearchItemsArr(allRoutes, allCollections, subCategoryMap), [allRoutes, allCollections, subCategoryMap])
     const [filteredItemsArr, setFilteredItemsArr] = useState(searchItemsArr)
     const toggleIsUserMenuOpen = useCallback(
         () => setIsUserMenuOpen((isUserMenuOpen) => !isUserMenuOpen),
@@ -65,7 +65,7 @@ export default function Header() {
 
     const debouncedSearch = debounce(async (searchQuery) => {
         if (searchItemsArr.length === 0) {
-            searchItemsArr = func.getSearchItemsArr(allRoutes, allCollections)
+            searchItemsArr = func.getSearchItemsArr(allRoutes, allCollections, subCategoryMap)
         }
 
         if(searchQuery.length === 0){
@@ -143,7 +143,7 @@ export default function Header() {
     }
 
     const searchItems = filteredItemsArr.slice(0,20).map((item) => {
-        const icon = item.type === 'page' ? PageMajor : DynamicSourceMajor;
+        const icon = func.getSearchItemIcon(item.type)
         return {
             value: item.content,
             content: <ContentWithIcon text={item.content} icon={icon} />,
