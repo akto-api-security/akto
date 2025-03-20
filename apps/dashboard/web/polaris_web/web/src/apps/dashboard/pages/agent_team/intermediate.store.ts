@@ -6,7 +6,7 @@ interface AgentsStore {
     setFilteredUserInput: (filteredUserInput: any) => void;
     outputOptions: any | null;
     setOutputOptions: (outputOptions: any) => void;
-    resetStore: () => void;
+    resetIntermediateStore: () => void;
 
 }
 
@@ -20,7 +20,7 @@ export const intermediateStore = create<AgentsStore>()(
                 outputOptions: null,
                 setOutputOptions: (outputOptions: any) => set({ outputOptions: outputOptions }),
 
-                resetStore: () => set({
+                resetIntermediateStore: () => set({
                     filteredUserInput: null,
                     outputOptions: null
                 }),

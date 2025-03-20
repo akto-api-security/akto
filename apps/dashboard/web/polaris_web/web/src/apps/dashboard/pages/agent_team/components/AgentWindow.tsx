@@ -4,7 +4,7 @@ import { AgentHeader } from './AgentHeader';
 import { Box, Scrollable } from '@shopify/polaris';
 import FlyLayout from '../../../components/layouts/FlyLayout';
 import AgentWindowCore from './AgentWindowCore';
-import AgentFinalCTA from './AgentFinalCTA';
+import AgentFinalCTA from './finalctas/AgentFinalCTA';
 
 interface AgentWindowProps {
     onClose: () => void;
@@ -34,6 +34,7 @@ function AgentWindow({ onClose, open }: AgentWindowProps) {
                                 </div>
                             </Scrollable>
                         </div>
+                        <br/>
                         <PromptComposer onSend={console.log} />
                     </div>
                 </div >
