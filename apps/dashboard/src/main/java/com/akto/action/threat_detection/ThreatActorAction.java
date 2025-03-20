@@ -212,7 +212,7 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
 
     public String modifyThreatActorStatus() {
         Wafv2Client wafClient = null;
-        int accId = 1000000;//Context.accountId.get();
+        int accId = Context.accountId.get();
         Bson filters = Filters.and(
             Filters.eq("_id", accId+ "_" + "AWS_WAF"),
             Filters.eq("accountId", accId)
