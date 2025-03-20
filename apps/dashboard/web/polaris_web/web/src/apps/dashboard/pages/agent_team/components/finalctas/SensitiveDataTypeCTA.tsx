@@ -7,23 +7,28 @@ import { useAgentsStore } from "../../agents.store";
 
 function SensitiveDataTypeCTA() {
     const { finalCTAShow, setFinalCTAShow } = useAgentsStore()
-    const { filteredUserInput, resetStore } = intermediateStore();
+    const { filteredUserInput, resetIntermediateStore } = intermediateStore();
 
     async function saveFunction() {
         await api.createSensitiveResponseDataTypes({ dataTypeKeys: filteredUserInput })
         func.setToast(true, false, "Sensitive data types are being created")
         setFinalCTAShow(false)
-        resetStore()
+        resetIntermediateStore()
     }
 
-    return (filteredUserInput?.length == 0 ? <></> :
+    async function closeFunction(){
+        setFinalCTAShow(false)
+        resetIntermediateStore()
+    }
+
+    return (filteredUserInput?.length || 0 == 0 ? <></> :
         <Modal
             title={"Save sensitive data types"}
             primaryAction={{
                 content: 'Save',
                 onAction: () => saveFunction()
             }} open={finalCTAShow}
-            onClose={() => setFinalCTAShow(false)}
+            onClose={() => closeFunction()}
         >
             <Modal.Section>
                 <VerticalStack gap={"4"}>

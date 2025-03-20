@@ -8,7 +8,7 @@ import { useAgentsStore } from "../../agents.store";
 function TestFalsePositiveAgentCTA() {
     const { finalCTAShow, setFinalCTAShow } = useAgentsStore()
 
-    const { filteredUserInput, outputOptions, resetStore } = intermediateStore();
+    const { filteredUserInput, outputOptions, resetIntermediateStore } = intermediateStore();
 
     async function saveFunction() {
 
@@ -31,17 +31,22 @@ function TestFalsePositiveAgentCTA() {
         await issueApi.bulkUpdateIssueStatus(compactIssueIdArray, "IGNORED", "False positive", testingRunResultHexIdsMap)
         func.setToast(true, false, "Tests were marked as false positive")
         setFinalCTAShow(false)
-        resetStore()
+        resetIntermediateStore()
     }
 
-    return (
+    async function closeFunction(){
+        setFinalCTAShow(false)
+        resetIntermediateStore()
+    }
+
+    return (filteredUserInput?.length || 0 == 0 ? <></> :
         <Modal
             title={"Ignore testing run results"}
             primaryAction={{
                 content: 'Mark as ignored',
                 onAction: () => saveFunction()
             }} open={finalCTAShow}
-            onClose={() => setFinalCTAShow(false)}
+            onClose={() => closeFunction()}
         >
             <Modal.Section>
                 <VerticalStack gap={"4"}>

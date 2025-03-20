@@ -1,5 +1,4 @@
 import React from 'react';
-import { Agent } from '../types';
 import SensitiveDataTypeCTA from './finalctas/SensitiveDataTypeCTA';
 import { useAgentsStore } from '../agents.store';
 import AgentGroupCTA from './finalctas/AgentGroupCTA';

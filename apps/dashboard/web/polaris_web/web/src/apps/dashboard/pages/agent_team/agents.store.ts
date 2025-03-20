@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { Model, Agent, PromptContent, AgentState } from "./types";
+import { Model, Agent, PromptContent, AgentState, AgentRun } from "./types";
 import { devtools, persist, createJSONStorage } from "zustand/middleware";
 
 // Define the blocking states
@@ -19,8 +19,6 @@ interface AgentsStore {
     setAttemptedInBlockedState: (attempted: boolean) => void;
     agentState: AgentState;
     setAgentState: (state: AgentState) => void;
-    selectedRepository: string | null;
-    setSelectedRepository: (repo: string) => void;
     currentProcessId: string | null;
     setCurrentProcessId: (currentProcessId: string) => void;
     currentSubprocess: string | null;
@@ -52,8 +50,6 @@ export const useAgentsStore = create<AgentsStore>()(
                     set({ attemptedInBlockedState: attempted }),
                 agentState: "idle",
                 setAgentState: (state: AgentState) => set({ agentState: state }),
-                selectedRepository: null,
-                setSelectedRepository: (repo: string) => set({ selectedRepository: repo }),
                 currentSubprocess: '0',
                 setCurrentSubprocess: (subprocess: string) => set({ currentSubprocess: subprocess }),
                 currentProcessId:"",
@@ -70,7 +66,6 @@ export const useAgentsStore = create<AgentsStore>()(
                     currentPrompt: { html: "", markdown: "" },
                     attemptedInBlockedState: false,
                     agentState: "idle",
-                    selectedRepository: null,
                     currentSubprocess: "0",
                     currentProcessId: "",
                     currentAttempt: 0,

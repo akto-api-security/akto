@@ -68,8 +68,6 @@ export const BlockedState = ({ onResume, onDiscard }: BlockedStateProps) => {
                                     <button
                                         onClick={handleDiscard}
                                         id="discard-button"
-                                        // Disabled because we do not have a disabled flow currently.
-                                        disabled
                                     >
                                         Discard
                                     </button>

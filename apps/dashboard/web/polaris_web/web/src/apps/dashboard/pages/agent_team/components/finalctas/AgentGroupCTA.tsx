@@ -9,7 +9,7 @@ function AgentGroupCTA() {
 
     const { finalCTAShow, setFinalCTAShow } = useAgentsStore()
 
-    const { filteredUserInput, outputOptions, resetStore } = intermediateStore();
+    const { filteredUserInput, outputOptions, resetIntermediateStore } = intermediateStore();
 
     async function saveFunction() {
         let filteredCollections = outputOptions.outputOptions.filter(x => {
@@ -22,17 +22,22 @@ function AgentGroupCTA() {
         }
         func.setToast(true, false, "API groups are being created")
         setFinalCTAShow(false)
-        resetStore()
+        resetIntermediateStore()
     }
 
-    return (filteredUserInput?.length == 0 ? <></> :
+    async function closeFunction(){
+        setFinalCTAShow(false)
+        resetIntermediateStore()
+    }
+
+    return (filteredUserInput?.length || 0 == 0 ? <></> :
         <Modal
             title={"Save API groups"}
             primaryAction={{
                 content: 'Save',
                 onAction: () => saveFunction()
             }} open={finalCTAShow}
-            onClose={() => setFinalCTAShow(false)}
+            onClose={() => closeFunction()}
         >
             <Modal.Section>
                 <VerticalStack gap={"4"}>
