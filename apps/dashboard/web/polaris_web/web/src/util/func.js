@@ -1276,13 +1276,25 @@ getDeprecatedEndpoints(apiInfoList, unusedEndpoints, apiCollectionId) {
   })
   return searchItems
  },
+ getTestSearchItems(allRoutes, allTests) {
+  const searchItems = []
+
+  // filter active tests
+  const activeTests = Object.values(allTests).filter((item) => item.inactive === false)
+
+  const initialPath = "/dashboard/test-editor/"
+  activeTests.forEach(item => {
+    searchItems.push({content: item.testName, url: initialPath + item.name, type:'test'})
+  });
+
+  return searchItems
+ },
  getSearchItemsArr(allRoutes,allCollections, subCategoryMap){
   let combinedArr = []
 
   const collectionsSearchItems = this.getCollectionsSearchItems(allRoutes, allCollections)
-  combinedArr.push(...collectionsSearchItems)
-
-  console.log(combinedArr)
+  const testSearchItems = this.getTestSearchItems(allRoutes, subCategoryMap)
+  combinedArr.push(...collectionsSearchItems, ...testSearchItems)
 
   return combinedArr
  },
