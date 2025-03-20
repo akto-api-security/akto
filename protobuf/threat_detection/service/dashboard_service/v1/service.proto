@@ -155,3 +155,12 @@ message SplunkIntegrationRequest {
 message SplunkIntegrationRespone {
 
 }
+
+message ModifyThreatActorStatusRequest {
+  string ip = 1;
+  string status = 2;
+  uint64 updated_ts = 3;
+}
+
+message ModifyThreatActorStatusResponse {  
+}

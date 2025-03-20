@@ -7,5 +7,7 @@ public class MongoDBCollection {
         "aggregate_sample_malicious_requests";
     public static final String SPLUNK_INTEGRATION_CONFIG =
         "splunk_integration_config";
+    public static final String ACTOR_INFO =
+        "actor_info";
   }
 }

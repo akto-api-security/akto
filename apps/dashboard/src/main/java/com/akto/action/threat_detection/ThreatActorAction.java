@@ -3,6 +3,7 @@ package com.akto.action.threat_detection;
 import com.akto.dao.ConfigsDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.Config;
+import com.akto.dto.Config.AwsWafConfig;
 import com.akto.dto.type.URLMethods;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -51,6 +52,8 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
   String refId;
   String splunkUrl;
   String splunkToken;
+  String actorIp;
+  String status;
 
   private final CloseableHttpClient httpClient;
 
@@ -207,11 +210,11 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
         return getResponse;
     }
 
-    public String blockThreatActor(String ipAddress) {
+    public String modifyThreatActorStatus() {
         Wafv2Client wafClient = null;
-        int accId = Context.accountId.get();
+        int accId = 1000000;//Context.accountId.get();
         Bson filters = Filters.and(
-            Filters.eq("_id", "AWS_WAF"),
+            Filters.eq("_id", accId+ "_" + "AWS_WAF"),
             Filters.eq("accountId", accId)
         );
         Config.AwsWafConfig awsWafConfig = (Config.AwsWafConfig) ConfigsDao.instance.findOne(filters);
@@ -226,7 +229,6 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
         }
 
         try {
-            // Fetch existing IP set
             GetIpSetRequest getRequest = GetIpSetRequest.builder()
                     .name(awsWafConfig.getRuleSetName())
                     .scope(SCOPE)
@@ -244,32 +246,93 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
             
             List<String> ipAddresses = new ArrayList<>(getResponse.ipSet().addresses());
 
-            // Check if the IP is already blocked
-            String ipWithCidr = ipAddress + "/32";
-            if (!ipAddresses.contains(ipWithCidr)) {
-                ipAddresses.add(ipWithCidr);
-
-                // Update IP Set with new blocked IP
-                UpdateIpSetRequest updateRequest = UpdateIpSetRequest.builder()
-                        .name(awsWafConfig.getRuleSetName())
-                        .scope(SCOPE)
-                        .id(awsWafConfig.getRuleSetId())
-                        .addresses(ipAddresses)
-                        .lockToken(getResponse.lockToken())
-                        .build();
-
-                wafClient.updateIPSet(updateRequest);
-                loggerMaker.infoAndAddToDb("Blocked Threat Actor: " + ipAddress);
-                return SUCCESS.toUpperCase();
+            String ipWithCidr = actorIp + "/32";
+            boolean resp;
+            if (status.equalsIgnoreCase("blocked")) {
+              resp = blockActorIp(ipAddresses, ipWithCidr, wafClient, awsWafConfig, getResponse);
             } else {
-                loggerMaker.infoAndAddToDb("Threat Actor " + ipAddress + " is already blocked.");
-                return SUCCESS.toUpperCase();
+              resp = unblockActorIp(ipAddresses, ipWithCidr, wafClient, awsWafConfig, getResponse);
             }
+
+            if (resp) {
+
+              HttpPost post =
+                new HttpPost(String.format("%s/api/dashboard/modifyThreatActorStatus", this.getBackendUrl()));
+                  post.addHeader("Authorization", "Bearer " + this.getApiToken());
+                  post.addHeader("Content-Type", "application/json");
+
+                  Map<String, Object> body =
+                      new HashMap<String, Object>() {
+                        {
+                          put("updated_ts", Context.now());
+                          put("ip", ipWithCidr);
+                          put("status", status);
+                        }
+                      };
+                  String msg = objectMapper.valueToTree(body).toString();
+
+                  StringEntity requestEntity = new StringEntity(msg, ContentType.APPLICATION_JSON);
+                  post.setEntity(requestEntity);
+
+                  try (CloseableHttpResponse response = this.httpClient.execute(post)) {
+                      loggerMaker.infoAndAddToDb("updated threat actor status");
+                  } catch (Exception e) {
+                    e.printStackTrace();
+                    return ERROR.toUpperCase();
+                  }
+
+
+              return SUCCESS.toUpperCase();
+            }
+            return SUCCESS.toUpperCase();
+            
         } catch (Wafv2Exception e) {
-            loggerMaker.infoAndAddToDb("Error updating AWS WAF IP Set: " + e.getMessage());
+            loggerMaker.infoAndAddToDb("Error modiftying threat actor status: " + e.getMessage());
             return ERROR.toUpperCase();
         }
     }
+
+    public boolean blockActorIp(List<String> ipAddresses, String ipWithCidr, Wafv2Client wafClient, AwsWafConfig awsWafConfig, GetIpSetResponse getResponse) {
+        if (!ipAddresses.contains(ipWithCidr)) {
+            ipAddresses.add(ipWithCidr);
+
+            UpdateIpSetRequest updateRequest = UpdateIpSetRequest.builder()
+                    .name(awsWafConfig.getRuleSetName())
+                    .scope(SCOPE)
+                    .id(awsWafConfig.getRuleSetId())
+                    .addresses(ipAddresses) 
+                    .lockToken(getResponse.lockToken())
+                    .build();
+
+            wafClient.updateIPSet(updateRequest);
+            loggerMaker.infoAndAddToDb("Blocked Threat Actor: " + actorIp);
+            return true;
+        } else {
+            loggerMaker.infoAndAddToDb("Threat Actor " + actorIp + " is already blocked.");
+            return false;
+        }
+    }
+
+    public boolean unblockActorIp(List<String> ipAddresses, String ipWithCidr, Wafv2Client wafClient, AwsWafConfig awsWafConfig, GetIpSetResponse getResponse) {
+      if (ipAddresses.contains(ipWithCidr)) {
+          ipAddresses.remove(ipWithCidr);
+
+          UpdateIpSetRequest updateRequest = UpdateIpSetRequest.builder()
+                  .name(awsWafConfig.getRuleSetName())
+                  .scope(SCOPE)
+                  .id(awsWafConfig.getRuleSetId())
+                  .addresses(ipAddresses) 
+                  .lockToken(getResponse.lockToken())
+                  .build();
+
+          wafClient.updateIPSet(updateRequest);
+          loggerMaker.infoAndAddToDb("Unblocked Threat Actor: " + actorIp);
+          return true;
+      } else {
+          loggerMaker.infoAndAddToDb("Threat Actor " + actorIp + " is currently active");
+          return false;
+      }
+  }
 
     public String sendIntegrationDataToThreatBackend() {
       HttpPost post =
@@ -379,6 +442,22 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
 
   public void setSplunkToken(String splunkToken) {
     this.splunkToken = splunkToken;
+  }
+
+  public String getActorIp() {
+    return actorIp;
+  }
+
+  public void setActorIp(String actorIp) {
+    this.actorIp = actorIp;
+  }
+
+  public String getStatus() {
+    return status;
+  }
+
+  public void setStatus(String status) {
+    this.status = status;
   }
 
 }

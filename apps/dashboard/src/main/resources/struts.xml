@@ -7660,8 +7660,8 @@
             </result>
         </action>
 
-        <action name="api/blockThreatActor"
-            class="com.akto.action.threat_detection.ThreatActorAction" method="blockThreatActor">
+        <action name="api/modifyThreatActorStatus"
+            class="com.akto.action.threat_detection.ThreatActorAction" method="modifyThreatActorStatus">
             <interceptor-ref name="json" />
             <interceptor-ref name="defaultStack" />
             <result name="FORBIDDEN" type="json">
