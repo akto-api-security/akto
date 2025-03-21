@@ -138,20 +138,13 @@ export default function Header() {
         handleSearchChange('')
     }
 
-    const searchItems = filteredItemsArr.slice(0,20).map((item) => {
-        const icon = func.getSearchItemIcon(item.type)
-        return {
-            icon: icon,
-            content: item.content,
-            truncate: true,
-            onAction: () => handleNavigateSearch(item.url),
-        }
-    })
+
+    const searchResultSections = func.getSearchResults(filteredItemsArr, handleNavigateSearch)
 
     const searchResultsMarkup = (
-        <Scrollable style={{maxHeight: '300px'}} shadow>
+        <Scrollable style={{maxHeight: '500px'}} shadow>
         <ActionList
-            items={searchItems}
+            sections={searchResultSections}
         />
         </Scrollable>
     );

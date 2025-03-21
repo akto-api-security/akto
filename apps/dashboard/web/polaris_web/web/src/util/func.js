@@ -1299,7 +1299,11 @@ getDeprecatedEndpoints(apiInfoList, unusedEndpoints, apiCollectionId) {
   for (const categoryArr of Object.values(connectorCategories)) {
       for (const connector of categoryArr) {
         const connectorKey = connector.key?.toLowerCase() ?? "";
-        searchItems.push({content: connector.label, url: `${initialPath}?connector=${connectorKey}`, type:'connector'})
+        searchItems.push({
+          content: connector.label, 
+          url: `${initialPath}?connector=${connectorKey}`, 
+          type:'connector'
+        })
       }
   }
 
@@ -1314,6 +1318,69 @@ getDeprecatedEndpoints(apiInfoList, unusedEndpoints, apiCollectionId) {
   combinedArr.push(...collectionsSearchItems, ...testSearchItems, ...connectorSearchItems)
 
   return combinedArr
+ },
+ createSearchResultFromItem(item, handleNavigateSearch) {
+  const icon = this.getSearchItemIcon(item.type)
+  return {
+      icon: icon,
+      content: item.content,
+      variant: 'menu',
+      truncate: true,
+      onAction: () => handleNavigateSearch(item.url),
+  }
+ },
+ getSearchResults(filteredItemsArr, handleNavigateSearch) {
+  const SECTION_ITEMS_MAX_COUNT = 10
+  const searchResultSections = []
+
+  //collections
+  const filteredCollections = filteredItemsArr.filter(item => item.type === 'collection')
+  const filteredCollectionResults = filteredCollections.slice(0,SECTION_ITEMS_MAX_COUNT).map(item => this.createSearchResultFromItem(item, handleNavigateSearch))
+  const collectionsPath = `/dashboard/observe/inventory`
+  if (filteredCollections.length > SECTION_ITEMS_MAX_COUNT) {
+    const item = {
+      content: `+${filteredCollections.length - SECTION_ITEMS_MAX_COUNT} more`, 
+      url: collectionsPath, 
+      type:'collection'
+    }
+    const result = this.createSearchResultFromItem(item, handleNavigateSearch)
+    filteredCollectionResults.push(result)
+  }
+
+  searchResultSections.push({
+    title: "Collections",
+    items: filteredCollectionResults
+  })
+
+  //tests
+  const filteredTests = filteredItemsArr.filter(item => item.type === 'test')
+  const filteredTestResults = filteredTests.slice(0,SECTION_ITEMS_MAX_COUNT).map(item => this.createSearchResultFromItem(item, handleNavigateSearch))
+  const testsPath = "/dashboard/test-editor"
+  if (filteredTests.length > SECTION_ITEMS_MAX_COUNT) {
+    const item = {
+      content: `+${filteredTests.length - SECTION_ITEMS_MAX_COUNT} more`, 
+      url: testsPath, 
+      type:'test'
+    }
+    const result = this.createSearchResultFromItem(item, handleNavigateSearch)
+    filteredTestResults.push(result)
+  }
+  
+  searchResultSections.push({
+    title: "Tests",
+    items: filteredTestResults
+  })
+
+  //connectors
+  const filteredConnectors = filteredItemsArr.filter(item => item.type === 'connector')
+  const filteredConnectorResults = filteredConnectors.map(item => this.createSearchResultFromItem(item, handleNavigateSearch))
+
+  searchResultSections.push({
+    title: "Connectors",
+    items: filteredConnectorResults
+  })
+
+  return searchResultSections
  },
  getComplianceIcon: (complianceName) => {
   return "/public/"+complianceName.toUpperCase()+".svg";
