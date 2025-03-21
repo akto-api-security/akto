@@ -1,7 +1,7 @@
 import {
-  CalendarMinor,ClockMinor,CircleAlertMajor,DynamicSourceMinor, LockMinor, KeyMajor, ProfileMinor, PasskeyMinor,
+  CalendarMinor,ClockMinor,CircleAlertMajor,DynamicSourceMinor,DynamicSourceMajor, LockMinor, KeyMajor, ProfileMinor, PasskeyMinor,
   EmailMajor, CreditCardMajor, IdentityCardMajor, LocationsMinor,PhoneMajor, FileMinor, ImageMajor, BankMajor, HashtagMinor, 
-  ReceiptMajor, MobileMajor, CalendarTimeMinor, LocationMajor,  IdentityCardFilledMajor, CalendarMajor
+  ReceiptMajor, MobileMajor, CalendarTimeMinor, LocationMajor,  IdentityCardFilledMajor, CalendarMajor, PageMajor, AffiliateMajor
 } from '@shopify/polaris-icons';
 import { saveAs } from 'file-saver'
 import inventoryApi from "../apps/dashboard/pages/observe/api"
@@ -13,6 +13,7 @@ import { tokens } from "@shopify/polaris-tokens"
 import PersistStore from '../apps/main/PersistStore';
 
 import { circle_cancel, circle_tick_minor } from "@/apps/dashboard/components/icons";
+import quickStartFunc from '../apps/dashboard/pages/quick_start/transform';
 
 const iconsUsedMap = {
   CalendarMinor,ClockMinor,CircleAlertMajor,DynamicSourceMinor, LockMinor, KeyMajor, ProfileMinor, PasskeyMinor,
@@ -1259,20 +1260,148 @@ getDeprecatedEndpoints(apiInfoList, unusedEndpoints, apiCollectionId) {
           : dateRange.title;
   return dateStr
  },
-
- getSearchItemsArr(allRoutes,allCollections){
-  let combinedArr = []
+ getInitialPathByContent(allRoutes, content) {
+    console.log(allRoutes)
+    const route = allRoutes.find(obj => obj.content === content);
+    console.log(route)
+    return route ? route.path : ""; 
+  },
+ getCollectionsSearchItems(allRoutes, allCollections) {
+  const searchItems = []
 
   const activatedColections = allCollections.filter((item) => item.deactivated === false)
-
-  let initialStr = "/dashboard/observe/inventory/"
-
+  const initialPath = "/dashboard/observe/inventory/"
+  //const initialPath = this.getInitialPathByContent(allRoutes, "ApiCollections")
   activatedColections.forEach((item)=> {
-    combinedArr.push({content: item.displayName, url: initialStr + item.id, type:'collection'})
+    searchItems.push({content: item.displayName, url: initialPath + item.id, type:'collection'})
   })
+  return searchItems
+ },
+ getTestSearchItems(allRoutes, allTests) {
+  const searchItems = []
+
+  // filter active tests
+  const activeTests = Object.values(allTests).filter((item) => item.inactive === false)
+
+  const initialPath = "/dashboard/test-editor/"
+  activeTests.forEach(item => {
+    searchItems.push({content: item.testName, url: initialPath + item.name, type:'test'})
+  });
+
+  return searchItems
+ },
+ getConnectorSearchItems(allRoutes) {
+  const searchItems = []
+
+  const connectorCategories = quickStartFunc.getConnectorsListCategorized()
+  const initialPath = "/dashboard/quick-start"
+
+  for (const categoryArr of Object.values(connectorCategories)) {
+      for (const connector of categoryArr) {
+        const connectorKey = connector.key?.toLowerCase() ?? "";
+        searchItems.push({
+          content: connector.label, 
+          url: `${initialPath}?connector=${connectorKey}`, 
+          type:'connector'
+        })
+      }
+  }
+
+  return searchItems
+ },
+ getSearchItemsArr(allRoutes,allCollections, subCategoryMap){
+  let combinedArr = []
+
+  const collectionsSearchItems = this.getCollectionsSearchItems(allRoutes, allCollections)
+  const testSearchItems = this.getTestSearchItems(allRoutes, subCategoryMap)
+  const connectorSearchItems = this.getConnectorSearchItems(allRoutes)
+  combinedArr.push(...collectionsSearchItems, ...testSearchItems, ...connectorSearchItems)
 
   return combinedArr
  },
+ createSearchResultFromItem(item, handleNavigateSearch) {
+  const icon = this.getSearchItemIcon(item.type)
+  return {
+      icon: icon,
+      content: item.content,
+      variant: 'menu',
+      truncate: true,
+      onAction: () => handleNavigateSearch(item.url),
+  }
+ },
+ getSearchResults(filteredItemsArr, handleNavigateSearch) {
+  const SECTION_ITEMS_MAX_COUNT = 10
+  const searchResultSections = []
+
+  //collections
+  const filteredCollections = filteredItemsArr.filter(item => item.type === 'collection')
+  const filteredCollectionResults = filteredCollections.slice(0,SECTION_ITEMS_MAX_COUNT).map(item => this.createSearchResultFromItem(item, handleNavigateSearch))
+  const collectionsPath = `/dashboard/observe/inventory`
+  if (filteredCollections.length > SECTION_ITEMS_MAX_COUNT) {
+    const item = {
+      content: `+${filteredCollections.length - SECTION_ITEMS_MAX_COUNT} more`, 
+      url: collectionsPath, 
+      type:'collection'
+    }
+    const result = this.createSearchResultFromItem(item, handleNavigateSearch)
+    filteredCollectionResults.push(result)
+  }
+
+  searchResultSections.push({
+    title: "Collections",
+    items: filteredCollectionResults
+  })
+
+  //tests
+  const filteredTests = filteredItemsArr.filter(item => item.type === 'test')
+  const filteredTestResults = filteredTests.slice(0,SECTION_ITEMS_MAX_COUNT).map(item => this.createSearchResultFromItem(item, handleNavigateSearch))
+  const testsPath = "/dashboard/test-editor"
+  if (filteredTests.length > SECTION_ITEMS_MAX_COUNT) {
+    const item = {
+      content: `+${filteredTests.length - SECTION_ITEMS_MAX_COUNT} more`, 
+      url: testsPath, 
+      type:'test'
+    }
+    const result = this.createSearchResultFromItem(item, handleNavigateSearch)
+    filteredTestResults.push(result)
+  }
+  
+  searchResultSections.push({
+    title: "Tests",
+    items: filteredTestResults
+  })
+
+  //connectors
+  const filteredConnectors = filteredItemsArr.filter(item => item.type === 'connector')
+  const filteredConnectorResults = filteredConnectors.map(item => this.createSearchResultFromItem(item, handleNavigateSearch))
+
+  searchResultSections.push({
+    title: "Connectors",
+    items: filteredConnectorResults
+  })
+
+  return searchResultSections
+ },
+ getSearchItemIcon(itemType) {
+  const iconsMap = {
+    "collection": DynamicSourceMajor,
+    "test": FileMinor,
+    "connector": AffiliateMajor,
+    "page": PageMajor,
+  };
+
+  return iconsMap[itemType] || PageMajor;
+},
+updateQueryParams(searchParams, setSearchParams, key, value) {
+  const newSearchParams = new URLSearchParams(searchParams);
+  if (value === "") {
+      newSearchParams.delete(key)
+  } else {
+      newSearchParams.set(key, value);
+  }
+  setSearchParams(newSearchParams);
+  return window.ACTIVE_ACCOUNT === 1669322524
+},
  getComplianceIcon: (complianceName) => {
   return "/public/"+complianceName.toUpperCase()+".svg";
 },
@@ -1887,7 +2016,7 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
       })} ${timeStr}`;
   },
   isDemoAccount(){
-    return window.ACTIVE_ACCOUNT === 1669322524
+     return window.ACTIVE_ACCOUNT === 1669322524
   },
   isSameDateAsToday (givenDate) {
       const today = new Date();
@@ -1920,7 +2049,6 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
         return "Sunday"
     }
   }
-
 }
 
 export default func
