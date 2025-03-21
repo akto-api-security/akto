@@ -22,14 +22,14 @@ function FlyLayout(props) {
                     { loading ? <div style={{position: "absolute", right: "25vw" , top: "50vh"}}><Spinner size="large" /></div>:
                     <VerticalStack gap={"5"}>
                         <Box padding={"4"} paddingBlockEnd={"0"} >
-                            <HorizontalStack align="space-between">
+                            <div style={{display: "flex", justifyContent: "space-between", alignItems:"start"}}>
                                 {titleComp ? titleComp : 
                                     <Text variant="headingMd">
                                         {title}
                                     </Text>
                                 }
                                 <Button icon={CancelMajor} onClick={() => { handleExit()}} plain></Button>
-                            </HorizontalStack>
+                            </div>
                         </Box>
                         <Scrollable style={{ height: scrollableHeight, scrollbarWidth:"none"}} >
                         <Box paddingBlockEnd={"20"}>

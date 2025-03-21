@@ -39,6 +39,15 @@ public class AgentAction extends UserAction {
         return Action.SUCCESS.toUpperCase();
     }
 
+    public String getAllAgentRunsObject(){
+        if(StringUtils.isNullOrEmpty(this.agent)){
+            addActionError("Invalid agent");
+            return Action.ERROR.toUpperCase();
+        }
+        agentRuns = AgentRunDao.instance.findAll(Filters.eq("agent", agent));
+        return Action.SUCCESS.toUpperCase();
+    }
+
     private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
 
     public String createAgentRun() {

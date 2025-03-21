@@ -11,6 +11,7 @@ import SensitiveDataTypeCTA from './finalctas/SensitiveDataTypeCTA';
 import ApiGroupAgentInitializer from './ApiGroupAgentInitializer';
 import { useAgentsStore } from '../agents.store';
 import LayoutWithTabs from '../../../components/layouts/LayoutWithTabs';
+import ActivityTable from './ActivityTable';
 
 
 interface AgentWindowProps {
@@ -98,7 +99,7 @@ function AgentWindow({ agent, onClose, open }: AgentWindowProps) {
     const activityTab = {
         id: 'activity',
         content: 'Activity',
-        component: <div>Activity</div>
+        component: <ActivityTable agentId={agent?.id}/>
     }
 
     const components = [

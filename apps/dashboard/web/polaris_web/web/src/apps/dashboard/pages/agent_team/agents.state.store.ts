@@ -30,6 +30,7 @@ interface AgentsStateStore {
     getCurrentSubprocessAttempt: (agentId: string) => number;
 
     resetAllAgents: () => void;
+    resetAgentState: (agentId: string) => void;
 }
 
 export const useAgentsStateStore = create<AgentsStateStore>()(
@@ -90,6 +91,13 @@ export const useAgentsStateStore = create<AgentsStateStore>()(
 
 
                 resetAllAgents: () => set({ agentsStore: {} }),
+                resetAgentState: (agentId) =>
+                    set((state) => ({
+                        agentsStore: {
+                            ...state.agentsStore,
+                            [agentId]: defaultAgentData(),
+                        },
+                    })),
             }),
             { name: "allAgentsStore", storage: createJSONStorage(() => localStorage) }
         )

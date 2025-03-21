@@ -52,6 +52,18 @@ const transform = {
             return "stopped";
         }
         else return "idle";
+    },
+    getTargetNames:(agentId)=>{
+        if(["FIND_VULNERABILITIES_FROM_SOURCE_CODE","FIND_APIS_FROM_SOURCE_CODE"].includes(agentId)){
+            return "Repository";
+        }
+        else if (["FIND_SENSITIVE_DATA_TYPES","GROUP_APIS"].includes(agentId)){
+            return "Collection";
+        }
+        else if(["FIND_FALSE_POSITIVE"].includes(agentId)){
+            return "Test name"
+        }
+        else return "Target name";
     }
 
 }
