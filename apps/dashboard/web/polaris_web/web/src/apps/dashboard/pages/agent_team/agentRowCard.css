@@ -1,0 +1,4 @@
+.agentStatusColor:not(:hover){
+    background-color: inherit !important;
+
+}

@@ -62,6 +62,13 @@ const api = {
             data: data 
         })
     },
+    getAllAgentRunsObject: async (agent) => {
+        return await request({
+            url: '/api/getAllAgentRunsObject',
+            method: 'post',
+            data: {agent} 
+        })
+    },
 }
 
 export default api;

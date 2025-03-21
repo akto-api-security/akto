@@ -8,6 +8,7 @@ import STEPS_PER_AGENT_ID, { preRequisitesMap } from "../../constants";
 import { VerticalStack, Text, HorizontalStack, Button } from "@shopify/polaris";
 import OutputSelector from "./OutputSelector";
 import { intermediateStore } from "../../intermediate.store";
+import {useAgentsStateStore} from "../../agents.state.store"
 import func from "../../../../../../util/func";
 
 interface SubProcessProps {
@@ -34,6 +35,7 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, triggerCall
     }));  // Only subscribe to necessary store values
 
     const { setFilteredUserInput, setOutputOptions } = intermediateStore(state => ({ setFilteredUserInput: state.setFilteredUserInput, setOutputOptions: state.setOutputOptions })); 
+    const {setCurrentAgentState, setCurrentSubprocessAttempt, setCurrentAgentSubprocess} = useAgentsStateStore();
 
     // Memoized function to create new subprocess
     const createNewSubprocess = useCallback(async (newSubIdNumber: number) => {
@@ -56,6 +58,9 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, triggerCall
         setCurrentSubprocess(newSubId);
         setCurrentAttempt(1);
         setAgentState("thinking");
+        setCurrentAgentState(agentId, "thinking");
+        setCurrentSubprocessAttempt(agentId, 1);
+        setCurrentAgentSubprocess(agentId, newSubId);
         return newRes.subprocess as AgentSubprocess;
     }, [processId, setCurrentSubprocess, setCurrentAttempt, setAgentState]);
 
@@ -74,7 +79,10 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, triggerCall
 
             if (!newSubProcess) return;
 
-            if (newSubProcess.state === State.RUNNING) setAgentState("thinking");
+            if (newSubProcess.state === State.RUNNING)  {
+                setAgentState("thinking")
+                setCurrentAgentState(agentId, "thinking")
+            }
 
             if (newSubProcess.state === State.ACCEPTED) {
                 const newSubIdNumber = Number(currentSubprocess) + 1;
@@ -83,7 +91,8 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, triggerCall
                         setFinalCTAShow(true);
                         await api.updateAgentRun({ processId, state: "COMPLETED" });
                     } else {
-                        setAgentState("idle");
+                        setAgentState("idle")
+                        setCurrentAgentState(agentId, "idle")
                     }
                 } else {
                     const newSub = await createNewSubprocess(newSubIdNumber);
@@ -94,12 +103,14 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, triggerCall
 
             if (newSubProcess.state === State.COMPLETED) {
                 setAgentState("paused");
+                setCurrentAgentState(agentId, "paused");
                 // add default filtered input here if needed
                 // setFilteredUserInput(getMessageFromObj(newSubProcess.processOutput?.outputOptions[0], "textValue"));
             }
 
             if (newSubProcess.state === State.DISCARDED) {
                 setAgentState("idle");
+                setCurrentAgentState(agentId, "idle");
             }  
 
             if (newSubProcess.state === State.AGENT_ACKNOWLEDGED) {
@@ -176,7 +187,7 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, triggerCall
 
                 <AnimatePresence>
                     <motion.div animate={expanded ? "open" : "closed"} variants={{ open: { height: "auto", opacity: 1 }, closed: { height: 0, opacity: 0 } }} transition={{ duration: 0.2 }} className="overflow-hidden">
-                        <div className="bg-[#F6F6F7] ml-2.5 pt-0 space-y-1 border-l border-[#D2D5D8]">
+                        <div className="bg-[#F6F6F7]  h-[45vh] overflow-auto ml-2.5 pt-0 space-y-1 border-l border-[#D2D5D8]">
                             <AnimatePresence initial={false}>
                                 {subprocess?.logs?.sort((a,b) => {
                                     return a.eventTimestamp > b.eventTimestamp ? 1 : -1

@@ -7,7 +7,7 @@ import OrderedList from '@tiptap/extension-ordered-list';
 import BulletList from '@tiptap/extension-bullet-list';
 import './composer.styles.css';
 
-import { Button, Tooltip } from '@shopify/polaris';
+import { Box, Button, Tooltip } from '@shopify/polaris';
 
 import { SendMajor } from '@shopify/polaris-icons';
 
@@ -118,8 +118,10 @@ export const PromptComposer = ({ onSend }: PromptComposerProps) => {
   }
 
   return (
+    <div style={{ position: "fixed", bottom: "0", opacity: "1",right:"16px", background: "white", zIndex: 10, width:"50vw" }}>
+      <Box borderColor="border-subdued" borderInlineStartWidth='1' padding={"4"} >
     <div className={`flex flex-col gap-4 border border-1 border-[var(--borderShadow-box-shadow)] py-2 px-4 rounded-sm relative z-[500] bg-white ${isFocused ? 'ring ring-violet-200' : ''}`}>
-      <BlockedState onResume={onResume} onDiscard={onDiscard} />
+      <BlockedState  onResume={onResume} onDiscard={onDiscard} />
       <div className="flex flex-col gap-2 justify-start">
         <div className="w-full" onClick={() => isInBlockedState && setAttemptedInBlockedState(true)}>
           {/* <Button 
@@ -150,6 +152,8 @@ export const PromptComposer = ({ onSend }: PromptComposerProps) => {
           </div>
         </Tooltip>
       </div>
+    </div>
+    </Box>
     </div>
   );
 };
