@@ -11,7 +11,7 @@ import DropdownSearch from '../../../components/shared/DropdownSearch'
 import agentApi from '../api'
 
 function RepositoryInitializer({agentType}: {agentType: string}) {
-    const { setSelectedRepository } = useAgentsStore()
+    // const { setSelectedRepository } = useAgentsStore();
     const [reposList, setReposList] = useState<RepoPayload[]>([])
     const [selectedConnection, setSelectedConnection] = React.useState<string>('')
     const [selectedRepo, setSelectedRepo] = React.useState<string>('')
@@ -52,7 +52,7 @@ function RepositoryInitializer({agentType}: {agentType: string}) {
     const handleClickRepo = async (repo: string, project: string, localString: string | null) => {
         setSelectedProject(project);
         setSelectedRepo(repo);  
-        setSelectedRepository(repo + "/" + project);
+        // setSelectedRepository(repo + "/" + project);
         await agentApi.createAgentRun({
             agent: agentType,
             data: {
