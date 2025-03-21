@@ -156,7 +156,7 @@ function TestsTablePage() {
                 }
                 
             } else { 
-                metaDataObj = await transform.getAllSubcategoriesData(true, "testEditor")
+                metaDataObj = await transform.getAllSubcategoriesData(false, "testEditor")
             }
             if (!metaDataObj?.subCategories?.length) return;
 
