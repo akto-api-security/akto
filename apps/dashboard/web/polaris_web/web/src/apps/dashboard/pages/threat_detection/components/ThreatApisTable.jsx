@@ -5,6 +5,8 @@ import { CellType } from "../../../components/tables/rows/GithubRow";
 import GetPrettifyEndpoint from "../../observe/GetPrettifyEndpoint";
 import func from "../../../../../util/func";
 import PersistStore from "../../../../main/PersistStore";
+import dayjs from "dayjs";
+import { Text } from "@shopify/polaris";
 
 const resourceName = {
   singular: "api",
@@ -18,14 +20,14 @@ const headers = [
     title: "Endpoint",
   },
   {
-    text: "Malicious Actors",
+    text: "Threat Actors",
     value: "actorsCount",
-    title: "Malicious Actors",
+    title: "Threat Actors",
   },
   {
-    text: "Malicious Requests",
+    text: "Threat Requests",
     value: "requestsCount",
-    title: "Malicious Requests",
+    title: "Threat Requests",
   },
   {
     text: "Discovered",
@@ -80,8 +82,8 @@ function ThreatApiTable({ currDateRange, rowClicked }) {
         ...x,
         id: `${x.method}-${x.api}`,
         actorsCount: x.actorsCount,
-        requestsCount: x.requestsCount,
-        discoveredAt: func.prettifyEpoch(x.discoveredAt),
+        requestsCount: (<Text color="critical">{x.requestsCount}</Text>),
+        discoveredAt: dayjs(x.discoveredAt).format("DD-MM-YYYY HH:mm:ss"),
         api: (
           <GetPrettifyEndpoint method={x.method} url={x.api} isNew={false} />
         ),
