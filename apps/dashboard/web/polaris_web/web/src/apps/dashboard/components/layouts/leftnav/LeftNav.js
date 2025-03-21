@@ -300,8 +300,7 @@ export default function LeftNav() {
                             subNavigationItems: reportsSubNavigationItems,
                             key: "6",
                         },
-                        window?.STIGG_FEATURE_WISE_ALLOWED?.THREAT_DETECTION?.isGranted ?
-                             {
+                        ...(window?.STIGG_FEATURE_WISE_ALLOWED?.THREAT_DETECTION?.isGranted ? [{
                                 label: (
                                     <Text variant="bodyMd" fontWeight="medium">
                                         API Protection
@@ -357,47 +356,24 @@ export default function LeftNav() {
                                             leftNavSelected === "dashboard_threat_policy",
                                     },
                                 ],
-                            }
-                            : {},
-                            {
-                                label: (
-                                    <Text variant="bodyMd" fontWeight="medium">
-                                        Team
-                                    </Text>
-                                ),
-                                icon: StarFilledMinor,
-                                onClick: () => {
-                                    handleSelect("agent_team_members");
-                                    navigate("/dashboard/agent-team/members");
-                                    setActive("normal");
-                                },
-                                selected: leftNavSelected.includes("agent_team"),
-                                url: "#",
-                                key: "8",
-                                subNavigationItems: [
-                                    {
-                                        label: "Members",
-                                        onClick: () => {
-                                            navigate("/dashboard/agent-team/members");
-                                            handleSelect("agent_team_members");
-                                            setActive("active");
-                                        },
-                                        selected: leftNavSelected === "agent_team_members",
-                                    },
-                                    // TODO: hired members state.
-                                    // {
-                                    //     label: "Hired Members",
-                                    //     onClick: () => {
-                                    //         navigate("/dashboard/agent-team/hired-members");
-                                    //         handleSelect("agent_team_hired_members");
-                                    //         setActive("active");
-                                    //     },
-                                    //     selected:
-                                    //         leftNavSelected === "agent_team_hired_members",
-                                    // }
-                                ],
-                            }
-                    ].filter(item => item.label !== null)}
+                            }] : []),
+                        {
+                            label: (
+                                <Text variant="bodyMd" fontWeight="medium">
+                                    AI Agents
+                                </Text>
+                            ),
+                            icon: StarFilledMinor,
+                            onClick: () => {
+                                handleSelect("agent_team_members");
+                                navigate("/dashboard/agent-team/members");
+                                setActive("normal");
+                            },
+                            selected: leftNavSelected.includes("agent_team"),
+                            url: "#",
+                            key: "8",
+                        }
+                    ]}
                 />
             </Navigation>
         </div>
