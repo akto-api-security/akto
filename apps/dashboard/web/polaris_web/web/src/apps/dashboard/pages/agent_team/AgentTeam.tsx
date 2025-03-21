@@ -83,7 +83,6 @@ function AgentTeam() {
                     attemptId: agent.currentSubprocessAttempt,
                 });
                 let subProcess = response.subprocess as AgentSubprocess;
-
                 setCurrentAgentState(key, transform.getStateToAgentState(subProcess.state));
             })
             

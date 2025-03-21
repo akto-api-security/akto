@@ -19,6 +19,11 @@ interface TableData {
     details: string;
 }
 
+const sortOptions = [
+    { label: 'Start time', value: 'start_time asc', directionLabel: 'Highest', sortKey: 'start_time', columnIndex: 1 },
+    { label: 'Start time', value: 'start_time desc', directionLabel: 'Lowest', sortKey: 'start_time', columnIndex: 1 },
+];
+
 function ActivityTable({ agentId }) {
 
     const [data, setData] = useState<TableData[]>([]);
@@ -54,54 +59,43 @@ function ActivityTable({ agentId }) {
         singular: 'agent activity',
         plural: 'agent activities',
     };
-    
+
     const { setCurrentProcessId, resetStore } = useAgentsStore();
     const { setCurrentAgentProcessId, resetAgentState } = useAgentsStateStore();
 
 
-    const getAllSubProcesses = async (processId: string) => {
-        const response = await api.getAllSubProcesses({
-            processId: processId
-        });
-        const subprocesses = (response.subProcesses as AgentSubprocess[]).sort(
-            (a, b) => b.createdTimestamp - a.createdTimestamp
-        );
-        return subprocesses;
-    }
-
     const getDetails = async (runData: AgentRun) => {
         let details = "";
-    
+
         if (runData.state === State.SCHEDULED) {
             details = "Agent is scheduled";
         } else if ([State.RUNNING, State.COMPLETED].includes(runData.state)) {
-            const subprocesses = await getAllSubProcesses(runData.processId);
-            let lastSubprocess = subprocesses.find(subprocess => subprocess.state === "ACCEPTED");
-    
-            details = `${lastSubprocess?.subProcessHeading ?? ""} ${
-                lastSubprocess?.userInput?.length > 0
+            const subprocesses = await transform.getAllSubProcesses(runData.processId);
+            // extracting subProcessHeading and subProcess.processOutput, if it exists for running and completed state of agentRun
+            let lastSubprocess = subprocesses.find(subprocess => ["ACCEPTED"].includes(subprocess.state));
+
+            details = `${lastSubprocess?.subProcessHeading ?? ""} ${lastSubprocess?.userInput?.length > 0
                     ? lastSubprocess?.userInput
                     : lastSubprocess?.processOutput?.outputMessage ?? ""
-            }`;
-    
+                }`;
+
         } else if (runData.state === State.FAILED) {
-            const subprocesses = await getAllSubProcesses(runData.processId);
+            const subprocesses = await transform.getAllSubProcesses(runData.processId);
             let lastSubprocess = subprocesses.find(subprocess => subprocess.state === State.FAILED);
-    
+
             details = `Agent failed ${lastSubprocess?.processOutput?.outputMessage ?? ""}`;
         }
-    
+
         return details;
     };
-    
+
 
     const getTargetNames = (runData: AgentRun) => {
         if (!runData?.agentInitDocument) {
             return "-";
         }
-        const targetNames = Object.values(runData.agentInitDocument)
-        .flat() 
-        .filter(Boolean); 
+        const targetNames = Object.values(runData.agentInitDocument).flat().filter(Boolean);
+        
         return <ShowListInBadge
             itemsArr={[...targetNames]}
             maxItems={1}
@@ -134,16 +128,20 @@ function ActivityTable({ agentId }) {
         if (agentRuns.length === 0) return;
         const fetchedData: TableData[] = await Promise.all(
             agentRuns.map(async (runData) => {
-                console.log(runData);
+                const duration = (runData.endTimestamp === 0)
+                    ? func.prettifyEpoch(runData.startTimestamp)
+                    : func.prettifyEpochDuration(runData.endTimestamp - runData.startTimestamp);
+                
                 return {
-                    start_time: func.prettifyEpoch(runData.startTimestamp),
+                    start_time: new Date(runData.startTimestamp * 1000).toUTCString(),
                     targetName: getTargetNames(runData),
                     action: func.capitalizeFirstLetter(runData.state.toLowerCase()),
-                    duration: func.prettifyEpoch(runData.endTimestamp - runData.startTimestamp),
+                    duration: duration,
                     details: await getDetails(runData),
                 } as TableData;
             })
         );
+        
         setData(fetchedData);
     }
 
@@ -166,6 +164,7 @@ function ActivityTable({ agentId }) {
             hideQueryField={true}
             hidePagination={true}
             showFooter={false}
+            sortOptions={sortOptions}
         />
     )
 

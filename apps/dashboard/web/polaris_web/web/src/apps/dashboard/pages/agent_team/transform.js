@@ -3,6 +3,7 @@ import {
     PauseCircleMajor, StopMajor, StatusActiveMajor
   } from '@shopify/polaris-icons';
 import { State } from './types';
+import api from './api';
   
 
 const transform = {
@@ -64,6 +65,15 @@ const transform = {
             return "Test name"
         }
         else return "Target name";
+    },
+    getAllSubProcesses: async (processId) => {
+        const response = await api.getAllSubProcesses({
+            processId: processId
+        });
+        const subprocesses = (response.subProcesses).sort(
+            (a, b) => b.createdTimestamp - a.createdTimestamp
+        );
+        return subprocesses;
     }
 
 }

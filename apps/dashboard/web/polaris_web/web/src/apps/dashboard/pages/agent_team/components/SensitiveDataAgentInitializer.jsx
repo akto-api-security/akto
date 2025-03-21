@@ -9,7 +9,7 @@ function SensitiveDataAgentInitializer(props) {
 
     const { agentType } = props
 
-    const [selectedCollections, setSelectedCollections] = useState([]);
+    const [selectedCollections, setSelectedCollections] = useState(["1111111111"]);
     const allCollections = PersistStore(state => state.allCollections)
     const optionsList = allCollections.filter(x => !x.deactivated).map((x) => {
         return {

@@ -5,17 +5,21 @@ import { motion, AnimatePresence } from 'motion/react';
 import { isBlockingState, useAgentsStore } from '../agents.store';
 
 import './BlockedState.css';
+import { useAgentsStateStore } from '../agents.state.store';
 
 interface BlockedStateProps {
     onResume: () => void;
     onDiscard: () => void;
+    agentId: string | undefined;
 }
 
-export const BlockedState = ({ onResume, onDiscard }: BlockedStateProps) => {
+export const BlockedState = ({ onResume, onDiscard, agentId }: BlockedStateProps) => {
     const { agentState, setAttemptedInBlockedState, attemptedInBlockedState, setAgentState } = useAgentsStore();
+    const {setCurrentAgentState} = useAgentsStateStore()
 
     const handleResume = () => {
         setAgentState('idle');
+        if (agentId) setCurrentAgentState(agentId, 'idle');
         onResume();
     }
 
@@ -26,6 +30,7 @@ export const BlockedState = ({ onResume, onDiscard }: BlockedStateProps) => {
 
     const handleDiscard = () => {
         setAgentState('idle');
+        if (agentId) setCurrentAgentState(agentId, 'idle');
         onDiscard();
     }
 

@@ -117,7 +117,7 @@ export const PromptComposer = ({ onSend, agentId }: PromptComposerProps) => {
     <div style={{ position: "fixed", bottom: "0", opacity: "1",right:"16px", background: "white", zIndex: 10, width:"50vw" }}>
       <Box borderColor="border-subdued" borderInlineStartWidth='1' padding={"4"} >
     <div className={`flex flex-col gap-4 border border-1 border-[var(--borderShadow-box-shadow)] py-2 px-4 rounded-sm relative z-[500] bg-white ${isFocused ? 'ring ring-violet-200' : ''}`}>
-      <BlockedState onResume={onResume} onDiscard={onDiscard} />
+      <BlockedState agentId={agentId} onResume={onResume} onDiscard={onDiscard} />
       <div className="flex flex-col gap-2 justify-start">
         <div className="w-full" onClick={() => isInBlockedState && setAttemptedInBlockedState(true)}>
           {/* <Button 
