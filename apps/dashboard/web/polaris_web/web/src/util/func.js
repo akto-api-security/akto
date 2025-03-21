@@ -1260,18 +1260,11 @@ getDeprecatedEndpoints(apiInfoList, unusedEndpoints, apiCollectionId) {
           : dateRange.title;
   return dateStr
  },
- getInitialPathByContent(allRoutes, content) {
-    console.log(allRoutes)
-    const route = allRoutes.find(obj => obj.content === content);
-    console.log(route)
-    return route ? route.path : ""; 
-  },
  getCollectionsSearchItems(allRoutes, allCollections) {
   const searchItems = []
 
   const activatedColections = allCollections.filter((item) => item.deactivated === false)
   const initialPath = "/dashboard/observe/inventory/"
-  //const initialPath = this.getInitialPathByContent(allRoutes, "ApiCollections")
   activatedColections.forEach((item)=> {
     searchItems.push({content: item.displayName, url: initialPath + item.id, type:'collection'})
   })
@@ -1373,7 +1366,18 @@ getDeprecatedEndpoints(apiInfoList, unusedEndpoints, apiCollectionId) {
 
   //connectors
   const filteredConnectors = filteredItemsArr.filter(item => item.type === 'connector')
-  const filteredConnectorResults = filteredConnectors.map(item => this.createSearchResultFromItem(item, handleNavigateSearch))
+  const filteredConnectorResults = filteredConnectors.slice(0,SECTION_ITEMS_MAX_COUNT).map(item => this.createSearchResultFromItem(item, handleNavigateSearch))
+  const connectorsPath = "/dashboard/quick-start"
+
+  if (filteredConnectors.length > SECTION_ITEMS_MAX_COUNT) {
+    const item = {
+      content: `+${filteredConnectors.length - SECTION_ITEMS_MAX_COUNT} more`, 
+      url: connectorsPath, 
+      type:'connector'
+    }
+    const result = this.createSearchResultFromItem(item, handleNavigateSearch)
+    filteredConnectorResults.push(result)
+  }
 
   searchResultSections.push({
     title: "Connectors",

@@ -20,19 +20,17 @@ function UpdateConnections(props) {
     const currentCardObj = QuickStartStore(state => state.currentConnector)
     const setCurrentCardObj = QuickStartStore(state => state.setCurrentConnector)
 
-    const connectorSearchParamKey = "connector"
-
     const closeAction = () => {
         setCurrentCardObj(null)
         setNewCol(0)
-        func.updateQueryParams(searchParams, setSearchParams, connectorSearchParamKey,"")
+        func.updateQueryParams(searchParams, setSearchParams, "connector","")
     }
 
     const onButtonClick = (cardObj) => {
         setNewCol(2)
         setCurrentCardObj(cardObj)
         const connector = cardObj.key?.toLowerCase() ?? "";
-        func.updateQueryParams(searchParams, setSearchParams, connectorSearchParamKey, connector)
+        func.updateQueryParams(searchParams, setSearchParams, "connector", connector)
     }
 
     useEffect(()=>{
