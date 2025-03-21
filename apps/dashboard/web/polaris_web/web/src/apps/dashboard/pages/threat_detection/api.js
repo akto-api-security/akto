@@ -39,7 +39,7 @@ const threatDetectionRequests = {
             data: {}
         })
     },
-    fetchThreatActors(skip, sort, latestAttack, country, startTs, endTs) {
+    fetchThreatActors(skip, sort, latestAttack, country, startTs, endTs, actorId) {
         return request({
             url: '/api/fetchThreatActors',
             method: 'post',
@@ -49,7 +49,8 @@ const threatDetectionRequests = {
                 latestAttack: latestAttack,
                 country: country,
                 startTs: startTs,
-                endTs: endTs
+                endTs: endTs,
+                actorId: actorId
             }
         })
     },
@@ -126,6 +127,13 @@ const threatDetectionRequests = {
             url: '/api/fetchFiltersForThreatActors',
             method: 'post',
             data: {}
+        })
+    },
+    modifyThreatActorStatus(actorIp, status) {
+        return request({
+            url: '/api/modifyThreatActorStatus',
+            method: 'post',
+            data: {actorIp, status}
         })
     }
 }

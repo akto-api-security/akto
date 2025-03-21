@@ -140,7 +140,11 @@ public class MaliciousEventService {
         MaliciousEventService.<String>findDistinctFields(
             coll, "country", String.class, Filters.empty());
 
-    return ThreatActorFilterResponse.newBuilder().addAllSubCategories(latestAttack).addAllCountries(countries).build();
+    Set<String> actorIds =
+        MaliciousEventService.<String>findDistinctFields(
+            coll, "actor", String.class, Filters.empty());
+
+    return ThreatActorFilterResponse.newBuilder().addAllSubCategories(latestAttack).addAllCountries(countries).addAllActorId(actorIds).build();
   }
 
   public FetchAlertFiltersResponse fetchAlertFilters(

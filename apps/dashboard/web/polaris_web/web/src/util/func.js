@@ -1382,6 +1382,26 @@ getDeprecatedEndpoints(apiInfoList, unusedEndpoints, apiCollectionId) {
 
   return searchResultSections
  },
+ getSearchItemIcon(itemType) {
+  const iconsMap = {
+    "collection": DynamicSourceMajor,
+    "test": FileMinor,
+    "connector": AffiliateMajor,
+    "page": PageMajor,
+  };
+
+  return iconsMap[itemType] || PageMajor;
+},
+updateQueryParams(searchParams, setSearchParams, key, value) {
+  const newSearchParams = new URLSearchParams(searchParams);
+  if (value === "") {
+      newSearchParams.delete(key)
+  } else {
+      newSearchParams.set(key, value);
+  }
+  setSearchParams(newSearchParams);
+  return window.ACTIVE_ACCOUNT === 1669322524
+},
  getComplianceIcon: (complianceName) => {
   return "/public/"+complianceName.toUpperCase()+".svg";
 },
@@ -1998,24 +2018,36 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
   isDemoAccount(){
      return window.ACTIVE_ACCOUNT === 1669322524
   },
-  getSearchItemIcon(itemType) {
-    const iconsMap = {
-      "collection": DynamicSourceMajor,
-      "test": FileMinor,
-      "connector": AffiliateMajor,
-      "page": PageMajor,
-    };
-  
-    return iconsMap[itemType] || PageMajor;
+  isSameDateAsToday (givenDate) {
+      const today = new Date();
+      return (
+          givenDate.getUTCFullYear() === today.getUTCFullYear() &&
+          givenDate.getUTCMonth() === today.getUTCMonth() &&
+          givenDate.getDate() === today.getDate()
+      );
   },
-  updateQueryParams(searchParams, setSearchParams, key, value) {
-    const newSearchParams = new URLSearchParams(searchParams);
-    if (value === "") {
-        newSearchParams.delete(key)
-    } else {
-        newSearchParams.set(key, value);
+  getStartOfTodayEpoch() {
+    const now = new Date();
+    return Math.floor(new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime() / 1000);
+  },
+  getDayOfWeek(time){
+    const temp = new Date(time * 1000);
+    switch(temp.getDay()){
+      case 1:
+        return "Monday"
+      case 2:
+        return "Tuesday"
+      case 3:
+        return "Wednesday"
+      case 4: 
+        return "Thursday"
+      case 5:
+        return "Friday"
+      case 6: 
+        return "Saturday"
+      default:
+        return "Sunday"
     }
-    setSearchParams(newSearchParams);
   }
 }
 
