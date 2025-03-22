@@ -29,7 +29,7 @@ interface PromptComposerProps {
 export const PromptComposer = ({ onSend }: PromptComposerProps) => {
   const [isFocused, setIsFocused] = useState(false);
   const { currentProcessId, currentSubprocess, currentAttempt, currentAgent } = useAgentsStore();
-  const { filteredUserInput, resetIntermediateStore } = intermediateStore();
+  const { filteredUserInput, outputOptions, resetIntermediateStore } = intermediateStore();
   const {
     currentPrompt,
     setCurrentPrompt,
@@ -90,12 +90,30 @@ export const PromptComposer = ({ onSend }: PromptComposerProps) => {
 
     // when selected choices are provided by the user, accepted case should be returned to the agent
 
+
+    let userInput = filteredUserInput
+
+    let allowMultiple = true
+    if (outputOptions?.selectionType !== "multiple") {
+      allowMultiple = false
+      userInput = outputOptions?.outputOptions?.filter((ele) => {
+        if (typeof ele === "string") {
+          return ele === filteredUserInput;
+        } else if (ele && typeof ele === "object" && "textValue" in ele) {
+          return ele.textValue === filteredUserInput;
+        }
+        return false; // Default case: no match
+      });
+    }
+
+    console.log("userInput", userInput)
+
     await api.updateAgentSubprocess({
       processId: currentProcessId,
       subProcessId: currentSubprocess,
       attemptId: currentAttempt,
       state: State.ACCEPTED.toString(),
-      data: { selectedOptions: structuredOutputFormat(filteredUserInput, currentAgent?.id , currentSubprocess || "") }
+      data: { selectedOptions: structuredOutputFormat(userInput && userInput.length > 0 ? allowMultiple ? userInput : userInput[0]: null, currentAgent?.id , currentSubprocess || "") }
     });
     if(filteredUserInput?.length == 0){
       resetIntermediateStore()
@@ -104,12 +122,27 @@ export const PromptComposer = ({ onSend }: PromptComposerProps) => {
   }
 
   async function onDiscard() {
+    let userInput = filteredUserInput
+
+    let allowMultiple = true
+    if (outputOptions?.selectionType !== "multiple") {
+      allowMultiple = false
+      userInput = outputOptions?.outputOptions?.filter((ele) => {
+        if (typeof ele === "string") {
+          return ele === filteredUserInput;
+        } else if (ele && typeof ele === "object" && "textValue" in ele) {
+          return ele.textValue === filteredUserInput;
+        }
+        return false; // Default case: no match
+      });
+    }
+
     await api.updateAgentSubprocess({
       processId: currentProcessId,
       subProcessId: currentSubprocess,
       attemptId: currentAttempt,
       state: State.DISCARDED.toString(),
-      data: { selectedOptions: structuredOutputFormat(filteredUserInput, currentAgent?.id , currentSubprocess || "") }
+      data: { selectedOptions: structuredOutputFormat(userInput && userInput.length > 0 ? allowMultiple ? userInput : userInput[0]: null, currentAgent?.id , currentSubprocess || "") }
     });
     if(filteredUserInput?.length == 0){
       resetIntermediateStore()

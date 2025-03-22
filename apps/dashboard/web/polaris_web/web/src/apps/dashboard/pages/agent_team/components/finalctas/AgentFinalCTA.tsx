@@ -7,6 +7,7 @@ import func from '../../../../../../util/func';
 import issueApi from "../../../../pages/issues/api"
 import api from "./api";
 import apiCollectionApi from "../../../../pages/observe/api"
+import SourceCodeAnalyserCTA from "./SourceCodeAnalyserCTA"
 
 function AgentFinalCTA() {
     const { PRstate, currentAgent } = useAgentsStore()
@@ -62,6 +63,8 @@ function AgentFinalCTA() {
                     modalTitle={`Save sensitive data type${filteredUserInput?.length == 1 ? "" : "s"}`}
                     actionText={'Save'}
                     contentString={`Do you want to add the ${filteredUserInput?.length} selected sensitive data type${filteredUserInput?.length == 1 ? "" : "s"} to Akto ?`} />
+            case 'FIND_APIS_FROM_SOURCE_CODE':
+                return (<SourceCodeAnalyserCTA />)
             case 'GROUP_APIS':
                 return <AgentCoreCTA
                     onSave={() => apiGroupSave()}

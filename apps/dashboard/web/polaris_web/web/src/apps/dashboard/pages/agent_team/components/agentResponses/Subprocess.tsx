@@ -6,7 +6,7 @@ import api from "../../api";
 import { useAgentsStore } from "../../agents.store";
 import STEPS_PER_AGENT_ID, { preRequisitesMap } from "../../constants";
 import { VerticalStack, Text, HorizontalStack, Button } from "@shopify/polaris";
-import OutputSelector from "./OutputSelector";
+import OutputSelector, { getMessageFromObj } from "./OutputSelector";
 import { intermediateStore } from "../../intermediate.store";
 import func from "../../../../../../util/func";
 import SelectedChoices from "./SelectedChoices";
@@ -101,13 +101,22 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, triggerCall
 
             if (newSubProcess.state === State.COMPLETED) {
                 setAgentState("paused");
+                const allowMultiple = newSubProcess?.processOutput?.selectionType === "multiple"
+                const initialValue = !allowMultiple ?
+        getMessageFromObj(newSubProcess?.processOutput?.outputOptions[0], "textValue") :
+        newSubProcess?.processOutput?.outputOptions.map((option: any) => (option.textValue !== undefined ? {
+            label: option?.textValue,
+            value: option?.value !== undefined ? option?.value : JSON.stringify(option)
+        } : option));
+
                 // add default filtered input here if needed
-                // setFilteredUserInput(getMessageFromObj(newSubProcess.processOutput?.outputOptions[0], "textValue"));
+                setFilteredUserInput(initialValue);
+                setOutputOptions(newSubProcess?.processOutput);
             }
 
             if (newSubProcess.state === State.DISCARDED) {
                 setAgentState("idle");
-            }  
+            }
 
             if (newSubProcess.state === State.AGENT_ACKNOWLEDGED) {
                 const newSub = await createNewSubprocess(Number(currentSubprocess) + 1);

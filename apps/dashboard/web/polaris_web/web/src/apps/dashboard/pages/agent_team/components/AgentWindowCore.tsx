@@ -20,6 +20,13 @@ function AgentWindowCore() {
                         <FindVulnerabilitiesAgent/>
                     </VerticalStack>
                 )
+            case 'FIND_APIS_FROM_SOURCE_CODE':
+                return (
+                    <VerticalStack gap={"4"}>
+                        {(currentProcessId === null || currentProcessId.length === 0) ? <RepositoryInitializer agentType={currentAgent.id} /> : <></>}
+                        <FindVulnerabilitiesAgent/>
+                    </VerticalStack>
+                )
             case 'FIND_SENSITIVE_DATA_TYPES':
                 return (
                     <VerticalStack gap={"4"}>
