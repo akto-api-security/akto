@@ -301,6 +301,29 @@ public class AgentAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    public String getAllAgentRunningDetails(){
+        try {
+            if (this.processId == null) {
+                return ERROR.toUpperCase();
+            }
+
+            AgentRun agentRun = AgentRunDao.instance.findOne(Filters.eq(AgentRun.PROCESS_ID, this.processId));
+            response = new BasicDBObject();
+            if(agentRun != null){
+                List<AgentSubProcessSingleAttempt> subprocesses = AgentSubProcessSingleAttemptDao.instance.findAll(Filters.eq(AgentSubProcessSingleAttempt.PROCESS_ID, agentRun.getProcessId()));
+                response.put("type", "initForReboot");
+                response.put("data", agentRun);
+                response.put("allSubProcesses", subprocesses);
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ERROR.toUpperCase();
+        }
+
+        return SUCCESS.toUpperCase();
+    }
+
     String type;
     public void setType(String type) {
         this.type = type;
