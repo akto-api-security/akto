@@ -59,8 +59,8 @@ export function structuredOutputFormat (output: any, agentType: string | undefin
                     }else{
                         return output
                     }
-            default:
-                return output
+                default:
+                    return output
             }
         default:
             return output

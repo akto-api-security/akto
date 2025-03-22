@@ -6,7 +6,7 @@ import api from "../../api";
 import { useAgentsStore } from "../../agents.store";
 import STEPS_PER_AGENT_ID, { preRequisitesMap } from "../../constants";
 import { VerticalStack, Text } from "@shopify/polaris";
-import OutputSelector from "./OutputSelector";
+import OutputSelector, { getMessageFromObj } from "./OutputSelector";
 import { intermediateStore } from "../../intermediate.store";
 
 interface SubProcessProps {
@@ -92,11 +92,11 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, finalCTASho
 
             if (newSubProcess.state === State.COMPLETED) {
                 setAgentState("paused");
-                const allowMultiple = subprocess?.processOutput?.selectionType === "multiple"
+                const allowMultiple = newSubProcess?.processOutput?.selectionType === "multiple"
 
                 const initialValue = !allowMultiple ?
-        getMessageFromObj(subprocess?.processOutput?.outputOptions[0], "textValue") :
-        subprocess?.processOutput?.outputOptions.map((option: any) => (option.textValue !== undefined ? {
+        getMessageFromObj(newSubProcess?.processOutput?.outputOptions[0], "textValue") :
+        newSubProcess?.processOutput?.outputOptions.map((option: any) => (option.textValue !== undefined ? {
             label: option?.textValue,
             value: option?.value !== undefined ? option?.value : JSON.stringify(option)
         } : option));
@@ -104,6 +104,7 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, finalCTASho
             console.log("initialValue", initialValue)
                 // add default filtered input here if needed
                 setFilteredUserInput(initialValue);
+                setOutputOptions(newSubProcess?.processOutput);
             }
 
             if (newSubProcess.state === State.RE_ATTEMPT) {

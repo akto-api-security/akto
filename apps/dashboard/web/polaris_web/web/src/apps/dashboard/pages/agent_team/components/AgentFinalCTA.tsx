@@ -5,6 +5,7 @@ import { useAgentsStore } from '../agents.store';
 import AgentGroupCTA from './finalctas/AgentGroupCTA';
 import APISRequiredCTA from './finalctas/APISRequiredCTA';
 import TestFalsePositiveAgentCTA from './finalctas/TestFalsePositiveAgentCTA';
+import SourceCodeAnalyserCTA from './finalctas/SourceCodeAnalyserCTA';
 
 function AgentFinalCTA() {
 
@@ -13,6 +14,8 @@ function AgentFinalCTA() {
         switch (currentAgent?.id) {
             case 'FIND_VULNERABILITIES_FROM_SOURCE_CODE':
                 return (PRstate === "4" ? <APISRequiredCTA /> : <></>)
+            case 'FIND_APIS_FROM_SOURCE_CODE':
+                return (<SourceCodeAnalyserCTA />)
             case 'FIND_SENSITIVE_DATA_TYPES':
                 return (<SensitiveDataTypeCTA />)
             case 'GROUP_APIS':
