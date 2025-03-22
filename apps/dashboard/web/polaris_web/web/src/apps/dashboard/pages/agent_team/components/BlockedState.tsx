@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useAgentsStore } from '../agents.store';
 
 import './BlockedState.css';
+import { useAgentsStateStore } from '../agents.state.store';
 
 interface BlockedStateProps {
     onResume: () => void;
@@ -12,10 +13,12 @@ interface BlockedStateProps {
 }
 
 export const BlockedState = ({ onResume, onDiscard }: BlockedStateProps) => {
-    const { agentState, setAttemptedInBlockedState, attemptedInBlockedState, setAgentState } = useAgentsStore();
+    const { agentState, setAttemptedInBlockedState, attemptedInBlockedState, setAgentState, currentAgent } = useAgentsStore();
+    const {setCurrentAgentState} = useAgentsStateStore()
 
     const handleResume = () => {
         setAgentState('idle');
+        if (currentAgent?.id) setCurrentAgentState(currentAgent?.id, 'idle');
         onResume();
     }
 
@@ -27,6 +30,7 @@ export const BlockedState = ({ onResume, onDiscard }: BlockedStateProps) => {
 
     const handleDiscard = () => {
         setAgentState('idle');
+        if (currentAgent?.id) setCurrentAgentState(currentAgent?.id, 'idle');
         onDiscard();
     }
 
@@ -54,7 +58,7 @@ export const BlockedState = ({ onResume, onDiscard }: BlockedStateProps) => {
                             }
                         }
                     }}
-                    className="absolute min-h-[38px] -top-[38px] py-2 px-3 w-[90%] left-1/2 -translate-x-1/2 bg-[var(--agent-grey-background)] border border-[var(--borderShadow-box-shadow)] rounded-t-sm flex justify-between items-center z-[100]"
+                    className="absolute min-h-[38px] -top-[38px] py-2 px-3 w-[95%] left-1/2 -translate-x-1/2 bg-[var(--agent-grey-background)] border border-[var(--borderShadow-box-shadow)] rounded-t-sm flex justify-between items-center z-[100]"
                 >
                     {
                         isPaused && (

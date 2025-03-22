@@ -4,6 +4,7 @@ import { AgentRun, AgentSubprocess, State } from '../types';
 import { Subprocess } from '../components/agentResponses/Subprocess';
 import { useAgentsStore } from '../agents.store';
 import api from '../api';
+import { useAgentsStateStore } from '../agents.state.store';
 import SpinnerCentered from '../../../components/progress/SpinnerCentered';
 import { intermediateStore } from '../intermediate.store';
 
@@ -15,6 +16,8 @@ export const FindVulnerabilitiesAgent = () => {
     const { currentProcessId, currentAgent, setCurrentAttempt, setCurrentSubprocess, setCurrentProcessId, resetStore, agentState, setAgentState} = useAgentsStore();
     const { resetIntermediateStore } = intermediateStore(state => ({ resetIntermediateStore: state.resetIntermediateStore })); 
 
+    const {setCurrentSubprocessAttempt,setCurrentAgentProcessId,setCurrentAgentSubprocess, resetAgentState} = useAgentsStateStore();
+
     const getAllAgentRuns = async () => {
         try {
             const response = (await api.getAllAgentRuns(currentAgent?.id));
@@ -22,11 +25,13 @@ export const FindVulnerabilitiesAgent = () => {
             setCurrentAgentRun(agentRuns[0]);
             if (agentRuns.length > 0 && agentRuns[0]?.processId) {
                 setCurrentProcessId(agentRuns[0]?.processId)
+                if(agentRuns[0]?.agent){
+                    setCurrentAgentProcessId(agentRuns[0]?.agent, agentRuns[0]?.processId)
+                }
             } else {
                 // TODO: handle cases here, because the above API only gets "RUNNING" Agents.
                 // setCurrentProcessId("")
                 resetStore();
-                resetIntermediateStore();
             }
         } catch(error) {
             resetStore();
@@ -69,6 +74,8 @@ export const FindVulnerabilitiesAgent = () => {
             });
             setCurrentSubprocess(newestSubprocess.subProcessId)
             setCurrentAttempt(newestSubprocess.attemptId)
+            if(currentAgentRun?.agent)setCurrentAgentSubprocess(currentAgentRun?.agent, newestSubprocess.subProcessId)
+            if(currentAgentRun?.agent)setCurrentSubprocessAttempt(currentAgentRun?.agent,newestSubprocess.attemptId)
         }
         if(subprocesses.length === 0 && shouldSetState) {
             // create first subprocess of the agent run here
@@ -80,8 +87,11 @@ export const FindVulnerabilitiesAgent = () => {
             });
             setCurrentSubprocess("1");
             setCurrentAttempt(1);
+            if(currentAgentRun?.agent)setCurrentAgentSubprocess(currentAgentRun?.agent, "1")
+                if(currentAgentRun?.agent)setCurrentSubprocessAttempt(currentAgentRun?.agent, 1)
             const subprocess = response.subprocess as AgentSubprocess;
             setSubprocesses([...subprocesses, subprocess]);
+
         }
 
     }
@@ -92,7 +102,10 @@ export const FindVulnerabilitiesAgent = () => {
         if (!currentAgentRun || currentAgentRun?.state !== State.RUNNING) {
             setCurrentAttempt(0);
             setCurrentSubprocess("0");
+            if(currentAgentRun?.agent)setCurrentSubprocessAttempt(currentAgentRun?.agent, 0);
+            if(currentAgentRun?.agent)setCurrentAgentSubprocess(currentAgentRun?.agent, "0");
             intervalRef.current = setInterval(getAllAgentRuns, 2000);
+            
         } else {
             getAllSubProcesses(currentAgentRun.processId, true);
             healthCheckIntervalRef.current = setInterval(fetchAgentModuleHealth, 2000)
@@ -118,15 +131,14 @@ export const FindVulnerabilitiesAgent = () => {
     return (
         <Scrollable className="h-full">
             <VerticalStack gap="2">
-                {((currentProcessId?.length || 0) > 0 && subprocesses.length == 0) ? <SpinnerCentered /> : subprocesses.map((subprocess, index) => (
-                    <Subprocess
-                        key={subprocess.subProcessId}
+                {subprocesses.length > 0 && subprocesses.map((subprocess, index) => (
+                    <Subprocess 
+                    key={subprocess.subProcessId}
                         agentId={currentAgent?.id || ""}
                         processId={currentAgentRun?.processId || ""}
                         subProcessFromProp={subprocesses[index]}
                         setCurrentAgentRun={setCurrentAgentRun}
-                        triggerCallForSubProcesses={triggerCallForSubProcesses}
-                    />
+                        triggerCallForSubProcesses={triggerCallForSubProcesses}/>
                 ))}
             </VerticalStack>
         </Scrollable>

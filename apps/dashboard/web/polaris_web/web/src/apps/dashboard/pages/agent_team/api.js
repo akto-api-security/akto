@@ -62,7 +62,13 @@ const api = {
             data: data 
         })
     },
-
+    getAllAgentRunsObject: async (agent) => {
+        return await request({
+            url: '/api/getAllAgentRunsObject',
+            method: 'post',
+            data: {agent} 
+        })
+    },
     checkAgentRunModule: async (data) => {
         return await request({
             url: '/api/checkAgentRunModule',
