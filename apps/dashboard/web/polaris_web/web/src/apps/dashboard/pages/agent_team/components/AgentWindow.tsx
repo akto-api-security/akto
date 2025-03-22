@@ -60,7 +60,7 @@ function AgentWindow({ onClose, open }: AgentWindowProps) {
             tabs={[chatTab, activityTab]}
             currTab={() => { }}
             disabledTabs={[]}
-        />,<Box paddingBlockEnd={"4"}></Box>]
+        />]
 
     return (
         <FlyLayout

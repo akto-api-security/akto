@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {  AgentRun, AgentSubprocess, State } from "../../types";
 import { CaretDownMinor } from "@shopify/polaris-icons";
@@ -6,7 +6,7 @@ import api from "../../api";
 import { useAgentsStore } from "../../agents.store";
 import STEPS_PER_AGENT_ID, { preRequisitesMap } from "../../constants";
 import { VerticalStack, Text, HorizontalStack, Button } from "@shopify/polaris";
-import OutputSelector, { getMessageFromObj } from "./OutputSelector";
+import OutputSelector from "./OutputSelector";
 import { intermediateStore } from "../../intermediate.store";
 import {useAgentsStateStore} from "../../agents.state.store"
 import func from "../../../../../../util/func";
@@ -114,6 +114,7 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, triggerCall
             if (newSubProcess.state === State.DISCARDED) {
                 setAgentState("idle");
                 setCurrentAgentState(agentId, "idle");
+            }
 
             if (newSubProcess.state === State.AGENT_ACKNOWLEDGED) {
                 const newSub = await createNewSubprocess(Number(currentSubprocess) + 1);
@@ -202,7 +203,7 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, triggerCall
 
                 <AnimatePresence>
                     <motion.div animate={expanded ? "open" : "closed"} variants={{ open: { height: "auto", opacity: 1 }, closed: { height: 0, opacity: 0 } }} transition={{ duration: 0.2 }} className="overflow-hidden">
-                        <div className="bg-[#F6F6F7]  h-[45vh] overflow-auto ml-2.5 pt-0 space-y-1 border-l border-[#D2D5D8]">
+                        <div className="bg-[#F6F6F7]  max-h-[45vh] overflow-auto ml-2.5 pt-0 space-y-1 border-l border-[#D2D5D8]">
                             <AnimatePresence initial={false}>
                                 {subprocess?.logs?.sort((a,b) => {
                                     return a.eventTimestamp > b.eventTimestamp ? 1 : -1

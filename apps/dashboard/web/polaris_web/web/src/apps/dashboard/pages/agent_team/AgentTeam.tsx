@@ -52,12 +52,16 @@ function AgentTeam() {
 
     }, []);
 
+    const [newCol, setNewCol] = useState(0)
+
     const closeAction = () => {
         setCurrentAgent(null)
+        setNewCol(0)
         setShowAgentWindow(false)
     }
 
     const onButtonClick = (agent: Agent | null ) => {
+        setNewCol(1)
         setCurrentAgent(agent)
         setShowAgentWindow(true)
     }
@@ -69,6 +73,7 @@ function AgentTeam() {
             items={Agents}
             onButtonClick={onButtonClick}
             cardType="AGENT"
+            changedColumns={newCol}
         />
     )
 

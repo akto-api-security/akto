@@ -131,7 +131,8 @@ export const FindVulnerabilitiesAgent = () => {
     return (
         <Scrollable className="h-full">
             <VerticalStack gap="2">
-                {subprocesses.length > 0 && subprocesses.map((subprocess, index) => (
+            {((currentProcessId?.length || 0) > 0 && subprocesses.length == 0) ? <SpinnerCentered /> : 
+            subprocesses.map((subprocess, index) => (
                     <Subprocess 
                     key={subprocess.subProcessId}
                         agentId={currentAgent?.id || ""}

@@ -65,7 +65,7 @@ public class AgentHelperAction extends UserAction {
                 try {
                     Context.accountId.set(accountId);
                     for(String datatype: dataTypeKeys){
-                        String formattedDataType = datatype.substring(0, 24);
+                        String formattedDataType = datatype.substring(0, Math.min(24, datatype.length()));
                         Map<String, Object> valueMap = new HashMap<>();
                         valueMap.put("value", datatype);
                         ConditionFromUser conditionFromUser = new ConditionFromUser(Type.EQUALS_TO, valueMap);
