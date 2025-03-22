@@ -101,17 +101,6 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, triggerCall
 
             if (newSubProcess.state === State.COMPLETED) {
                 setAgentState("paused");
-                const allowMultiple = newSubProcess?.processOutput?.selectionType === "multiple"
-                const initialValue = !allowMultiple ?
-        getMessageFromObj(newSubProcess?.processOutput?.outputOptions[0], "textValue") :
-        newSubProcess?.processOutput?.outputOptions.map((option: any) => (option.textValue !== undefined ? {
-            label: option?.textValue,
-            value: option?.value !== undefined ? option?.value : JSON.stringify(option)
-        } : option));
-
-                // add default filtered input here if needed
-                setFilteredUserInput(initialValue);
-                setOutputOptions(newSubProcess?.processOutput);
             }
 
             if (newSubProcess.state === State.DISCARDED) {

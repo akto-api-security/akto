@@ -10,7 +10,6 @@ interface OutputSelectorProps {
 }
 
 export const getMessageFromObj = (obj: any, key:string) => {
-    console.log("obj", obj, "key", key)
     if(typeof obj === "string"){
         return obj;
     }else{
