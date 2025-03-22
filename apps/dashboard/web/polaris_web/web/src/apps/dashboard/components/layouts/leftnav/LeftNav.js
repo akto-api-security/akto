@@ -357,7 +357,7 @@ export default function LeftNav() {
                                     },
                                 ],
                             }] : []),
-                        {
+                            ...(window?.STIGG_FEATURE_WISE_ALLOWED?.AI_AGENTS?.isGranted ? [{
                             label: (
                                 <Text variant="bodyMd" fontWeight="medium">
                                     AI Agents
@@ -372,7 +372,7 @@ export default function LeftNav() {
                             selected: leftNavSelected.includes("agent_team"),
                             url: "#",
                             key: "8",
-                        }
+                        }] : []),
                     ]}
                 />
             </Navigation>

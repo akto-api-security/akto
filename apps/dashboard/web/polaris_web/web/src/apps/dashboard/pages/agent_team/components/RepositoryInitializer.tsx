@@ -59,6 +59,7 @@ function RepositoryInitializer({agentType}: {agentType: string}) {
                 projectDir: func.checkLocal() ? localString : repo + "/" + project
             }
         })
+        func.setToast(true, false, "Starting agent")
     }   
     
     const connectionOptions: RepoType[] = [
