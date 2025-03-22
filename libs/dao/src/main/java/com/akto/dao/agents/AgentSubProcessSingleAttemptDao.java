@@ -25,6 +25,10 @@ public class AgentSubProcessSingleAttemptDao extends AccountsContextDao<AgentSub
         return Filters.and(filters);
     }
 
+    public Bson getFiltersForAgentSubProcess(AgentSubProcessSingleAttempt subProcess){
+        return getFiltersForAgentSubProcess(subProcess.getProcessId(), subProcess.getSubProcessId(), subProcess.getAttemptId());
+    }
+
 
     @Override
     public String getCollName() {

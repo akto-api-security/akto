@@ -1,7 +1,7 @@
 
 const STEPS_PER_AGENT_ID = {
     "FIND_VULNERABILITIES_FROM_SOURCE_CODE": 5,
-    "FIND_APIS_FROM_SOURCE_CODE": 2,
+    "FIND_APIS_FROM_SOURCE_CODE": 4,
     "FIND_SENSITIVE_DATA_TYPES": 1,
     "CREATE_TEST_TEMPLATES": 1,
     "GROUP_APIS": 1,
@@ -24,9 +24,9 @@ export const preRequisitesMap = {
 }
 
 export function structuredOutputFormat (output: any, agentType: string | undefined, subProcessId: string): any {
-    console.log("output", output)
     switch (agentType) {
         case "FIND_VULNERABILITIES_FROM_SOURCE_CODE":
+        case "FIND_APIS_FROM_SOURCE_CODE":
             switch (subProcessId) {
                 case "1":
                     return {
@@ -41,8 +41,8 @@ export function structuredOutputFormat (output: any, agentType: string | undefin
                     }else{
                         return output
                     }
-            default:
-                return output
+                default:
+                    return output
             }
         default:
             return output

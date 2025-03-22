@@ -13,7 +13,8 @@ import transform from './transform';
 const AGENT_IMAGES = ["/public/agents/secret-agent-1.svg",
     "/public/agents/secret-agent-2.svg",
     "/public/agents/secret-agent-3.svg",
-    "/public/agents/secret-agent-4.svg"
+    "/public/agents/secret-agent-4.svg",
+    "/public/agents/secret-agent-5.svg"
 ]
 
 function AgentTeam() {
@@ -40,9 +41,9 @@ function AgentTeam() {
         api.getAgentModels().then((res: { models: any; }) => {
             if(res && res.models){
                 let models = res.models.map((x: { _name: string; modelName: string; }) =>{
-                    return { 
-                        id: x._name, 
-                        name: x.modelName 
+                    return {
+                        id: x._name,
+                        name: x.modelName
                     }
                 })
                 setAvailableModels(models);

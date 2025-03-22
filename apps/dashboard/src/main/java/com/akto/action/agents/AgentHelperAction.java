@@ -59,13 +59,13 @@ public class AgentHelperAction extends UserAction {
 
         int accountId = Context.accountId.get();
         Map<String, Object> session = getSession();
-        
-        final String NAME_PREFIX = "DATA_TYPE_";
+
         executorService.schedule( new Runnable() {
             public void run() {
                 try {
                     Context.accountId.set(accountId);
                     for(String datatype: dataTypeKeys){
+                        String formattedDataType = datatype.substring(0, 24);
                         Map<String, Object> valueMap = new HashMap<>();
                         valueMap.put("value", datatype);
                         ConditionFromUser conditionFromUser = new ConditionFromUser(Type.EQUALS_TO, valueMap);
@@ -74,7 +74,7 @@ public class AgentHelperAction extends UserAction {
                         customDataTypeAction.setKeyOperator("OR");
                         customDataTypeAction.setValueOperator("OR");
                         customDataTypeAction.setOperator("OR");
-                        customDataTypeAction.setName(NAME_PREFIX+datatype);
+                        customDataTypeAction.setName(formattedDataType);
                         customDataTypeAction.setRedacted(false);
                         customDataTypeAction.setSensitiveAlways(false);
                         customDataTypeAction.setSensitivePosition(Arrays.asList("RESPONSE_PAYLOAD", "RESPONSE_HEADER"));

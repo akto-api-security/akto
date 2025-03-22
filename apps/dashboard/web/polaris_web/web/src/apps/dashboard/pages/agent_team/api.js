@@ -69,6 +69,13 @@ const api = {
             data: {agent} 
         })
     },
+    checkAgentRunModule: async (data) => {
+        return await request({
+            url: '/api/checkAgentRunModule',
+            method: 'post',
+            data: data 
+        })
+    },
 }
 
 export default api;

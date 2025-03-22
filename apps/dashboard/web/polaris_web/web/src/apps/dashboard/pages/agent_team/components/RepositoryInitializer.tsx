@@ -3,7 +3,6 @@ import React, { useState } from 'react'
 import SSOTextfield from '../../../../signup/components/SSOTextfield'
 import { RepoPayload, RepoType } from '../types'
 import api from '../../quick_start/api' 
-import { useAgentsStore } from '../agents.store'
 import func from "../../../../../util/func"
 import GridRows from '../../../components/shared/GridRows'
 import SelectRepoComp from './agentResponses/SelectRepoComp'
@@ -11,7 +10,6 @@ import DropdownSearch from '../../../components/shared/DropdownSearch'
 import agentApi from '../api'
 
 function RepositoryInitializer({agentType}: {agentType: string}) {
-    // const { setSelectedRepository } = useAgentsStore();
     const [reposList, setReposList] = useState<RepoPayload[]>([])
     const [selectedConnection, setSelectedConnection] = React.useState<string>('')
     const [selectedRepo, setSelectedRepo] = React.useState<string>('')
@@ -52,13 +50,13 @@ function RepositoryInitializer({agentType}: {agentType: string}) {
     const handleClickRepo = async (repo: string, project: string, localString: string | null) => {
         setSelectedProject(project);
         setSelectedRepo(repo);  
-        // setSelectedRepository(repo + "/" + project);
         await agentApi.createAgentRun({
             agent: agentType,
             data: {
                 projectDir: func.checkLocal() ? localString : repo + "/" + project
             }
         })
+        func.setToast(true, false, "Starting agent")
     }   
     
     const connectionOptions: RepoType[] = [
@@ -101,7 +99,7 @@ function RepositoryInitializer({agentType}: {agentType: string}) {
                                     autoComplete="off" 
                                     placeholder="Enter your repository URL" 
                                     value={temp} 
-                                    // focused={true}
+                                    focused={true}
                                     onChange={(x:string) => setTemp(x)} 
                                     connectedRight={<Button onClick={() => handleClickRepo("", "", temp)}>Start</Button>} 
                                 /> : null}
