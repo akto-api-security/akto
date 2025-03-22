@@ -7,7 +7,7 @@ import func from '../../../../../../util/func';
 import issueApi from "../../../../pages/issues/api"
 import api from "./api";
 import apiCollectionApi from "../../../../pages/observe/api"
-import SourceCodeAnalyserCTA from './SourceCodeAnalyserCTA';
+import SourceCodeAnalyserCTA from "./SourceCodeAnalyserCTA"
 
 function AgentFinalCTA() {
     const { PRstate, currentAgent } = useAgentsStore()
