@@ -12,7 +12,7 @@ export const FindVulnerabilitiesAgent = () => {
     const [currentAgentRun, setCurrentAgentRun] = useState<AgentRun | null>(null);
     const [subprocesses, setSubprocesses] = useState<AgentSubprocess[]>([]);
 
-    const { currentProcessId, currentAgent, setCurrentAttempt, setCurrentSubprocess, setCurrentProcessId, resetStore} = useAgentsStore();
+    const { currentProcessId, currentAgent, setCurrentAttempt, setCurrentSubprocess, setCurrentProcessId, resetStore, agentState, setAgentState} = useAgentsStore();
     const { resetIntermediateStore } = intermediateStore(state => ({ resetIntermediateStore: state.resetIntermediateStore })); 
 
     const getAllAgentRuns = async () => {
@@ -31,6 +31,22 @@ export const FindVulnerabilitiesAgent = () => {
         } catch(error) {
             resetStore();
             resetIntermediateStore();
+        }
+    }
+
+    const fetchAgentModuleHealth = async () => {
+        try {
+            const response = await api.checkAgentRunModule({ processId: currentAgentRun?.processId });
+            const agentRunningOnModule = response?.agentRunningOnModule;
+            if (!agentRunningOnModule) {
+                if (agentState === "thinking") {
+                    setAgentState("error")
+                }
+            }
+        } catch (error) {
+            if (agentState === "thinking") {
+                setAgentState("error")
+            }
         }
     }
 
@@ -70,6 +86,7 @@ export const FindVulnerabilitiesAgent = () => {
 
     }
     const intervalRef = useRef<number | null>(null);
+    const healthCheckIntervalRef = useRef<number | null>(null);
 
     useEffect(() => {
         if (!currentAgentRun || currentAgentRun?.state !== State.RUNNING) {
@@ -78,12 +95,17 @@ export const FindVulnerabilitiesAgent = () => {
             intervalRef.current = setInterval(getAllAgentRuns, 2000);
         } else {
             getAllSubProcesses(currentAgentRun.processId, true);
+            healthCheckIntervalRef.current = setInterval(fetchAgentModuleHealth, 2000)
         }
     
         return () => {
             if (intervalRef.current) {
                 clearInterval(intervalRef.current);
                 intervalRef.current = null;
+            }
+            if (healthCheckIntervalRef.current) {
+                clearInterval(healthCheckIntervalRef.current);
+                healthCheckIntervalRef.current = null;
             }
         };
     }, [currentAgentRun, currentAgent]);

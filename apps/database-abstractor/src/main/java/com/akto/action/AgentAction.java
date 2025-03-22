@@ -13,7 +13,6 @@ import com.akto.dao.context.Context;
 import com.akto.dto.agents.AgentLog;
 import com.akto.dto.agents.AgentRun;
 import com.akto.dto.agents.AgentSubProcessSingleAttempt;
-import com.akto.dto.agents.HealthCheck;
 import com.akto.dto.agents.State;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Sorts;
@@ -33,30 +32,12 @@ public class AgentAction extends ActionSupport {
             addActionError("InstanceId is empty");
             return Action.ERROR.toUpperCase();
         }
-
-        Bson instanceFilter = Filters.eq(HealthCheck.INSTANCE_ID, instanceId);
-
-        List<Bson> updates = new ArrayList<>();
-
         if (version == null || version.isEmpty()) {
             addActionError("Agent Version is missing");
             return Action.ERROR.toUpperCase();
         }
 
-        updates.add(Updates.set(HealthCheck.LAST_HEALTH_CHECK_TIMESTAMP, Context.now()));
-        updates.add(Updates.set(HealthCheck._VERSION, version));
-        updates.add(Updates.set(HealthCheck.PROCESS_ID, processId));
-
-        /*
-         * This operation has upsert: true.
-         */
-        AgentHealthCheckDao.instance.updateOne(instanceFilter, Updates.combine(updates));
-
-        Bson timeoutFilter = Filters.lt(HealthCheck.LAST_HEALTH_CHECK_TIMESTAMP,
-                Context.now() - HealthCheck.HEALTH_CHECK_TIMEOUT);
-
-        AgentHealthCheckDao.instance.deleteAll(timeoutFilter);
-
+        AgentHealthCheckDao.instance.saveHealth(instanceId, version, processId);
         return Action.SUCCESS.toUpperCase();
     }
 

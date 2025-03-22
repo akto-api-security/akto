@@ -7,6 +7,8 @@ public class HealthCheck {
      */
     String instanceId;
     public static final String INSTANCE_ID = "instanceId";
+    // Instance name -> make random english names using word conjunction
+    // String instanceName;
     int lastHealthCheckTimestamp;
     public static final String LAST_HEALTH_CHECK_TIMESTAMP = "lastHealthCheckTimestamp";
     /*
@@ -22,7 +24,9 @@ public class HealthCheck {
     String processId;
     public static final String PROCESS_ID = "processId";
 
-    final public static int HEALTH_CHECK_TIMEOUT = 5 * 60 * 60;
+    // Health check is sent every 2 seconds.
+    // So taking 1/10 calls as health alive.
+    final public static int HEALTH_CHECK_TIMEOUT = 20;
 
     public HealthCheck(String instanceId, int lastHealthCheckTimestamp, String version) {
         this.instanceId = instanceId;
