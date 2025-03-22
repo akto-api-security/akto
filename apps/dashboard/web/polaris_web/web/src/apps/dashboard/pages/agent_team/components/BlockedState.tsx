@@ -1,8 +1,8 @@
-import { Button, Icon, Text } from '@shopify/polaris';
-import { PauseMajor } from '@shopify/polaris-icons';
+import { Icon, Text } from '@shopify/polaris';
+import { PauseMajor, StopMajor } from '@shopify/polaris-icons';
 import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { isBlockingState, useAgentsStore } from '../agents.store';
+import { useAgentsStore } from '../agents.store';
 
 import './BlockedState.css';
 
@@ -21,8 +21,9 @@ export const BlockedState = ({ onResume, onDiscard }: BlockedStateProps) => {
 
     const isPaused = agentState === 'paused';
     const isThinking = agentState === 'thinking';
+    const isError = agentState === 'error';
 
-    const show = isPaused || isThinking;
+    const show = isPaused || isThinking || isError;
 
     const handleDiscard = () => {
         setAgentState('idle');
@@ -88,6 +89,19 @@ export const BlockedState = ({ onResume, onDiscard }: BlockedStateProps) => {
                                     Thinking
                                     <span className="inline-block animate-[ellipsis_1s_steps(4,end)_infinite]">...</span>
                                 </Text>
+                            </>
+                        )
+                    }
+                    {
+                        isError && (
+                            <>
+                                <div className="flex items-center">
+                                    <Icon source={StopMajor} color="critical" />
+                                    <Text as="span" variant="bodySm" color="subdued">
+                                    Agent has stopped unexpectedly. Waiting for the Agent to come back online
+                                    <span className="inline-block animate-[ellipsis_1s_steps(4,end)_infinite]">...</span>
+                                    </Text>
+                                </div>
                             </>
                         )
                     }
