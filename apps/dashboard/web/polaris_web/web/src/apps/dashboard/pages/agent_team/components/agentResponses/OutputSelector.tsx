@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react'
 import { HorizontalStack, Text, TextField, VerticalStack } from "@shopify/polaris"
 import DropdownSearch from "../../../../components/shared/DropdownSearch"
+import AgentOutput from './AgentOutput';
+import { useAgentsStore } from '../../agents.store';
 
 interface OutputSelectorProps {
   onHandleSelect: (selectedChoice: any, outputOptions: any) => void;
@@ -20,9 +22,16 @@ export const getMessageFromObj = (obj: any, key:string) => {
 
 function OutputSelector({onHandleSelect, processOutput} : OutputSelectorProps) {
 
+    const { currentAgent } = useAgentsStore();
+
     const noOptionsReturned = processOutput?.outputOptions.length == 0
 
     const getStringMessage = (type: string, options: any[]) => {
+
+        if(currentAgent?.id=="GROUP_APIS"){
+            return ""
+        }
+
         let maxOutputOptions = type === "multiple" ? 3 : 1;
         let messageString = "";
         options.slice(0, maxOutputOptions).forEach((option: any, index: any) => {
@@ -42,7 +51,7 @@ function OutputSelector({onHandleSelect, processOutput} : OutputSelectorProps) {
     }
     const auxMessage = noOptionsReturned ? "\n No options were returned \n" : "\n We are moving forward with the following option(s):\n"; 
 
-    const messageString = processOutput?.outputMessage  + auxMessage;
+    const messageString = processOutput?.outputMessage;
 
     const allowMultiple = processOutput?.selectionType === "multiple"
     const initialValue = !allowMultiple ?
@@ -63,6 +72,9 @@ function OutputSelector({onHandleSelect, processOutput} : OutputSelectorProps) {
                 <Text variant="bodyMd" as="span">{messageString}</Text>
                 <Text variant="headingMd" color="subdued" as="span">{getStringMessage(processOutput?.selectionType, processOutput?.outputOptions)}</Text>
             </VerticalStack>
+            <AgentOutput/>
+            <HorizontalStack gap={"3"}>
+            <Text variant="bodyMd" as="span">{auxMessage}</Text>
             {
                 noOptionsReturned ? <></> :
                     <HorizontalStack gap={"2"}>
@@ -83,6 +95,7 @@ function OutputSelector({onHandleSelect, processOutput} : OutputSelectorProps) {
                         /> : <TextField labelHidden={true} label="" autoComplete="off" value={filteredChoices as string} onChange={(val: string) => setFilteredChoices(val)} />}
                     </HorizontalStack>
             }
+            </HorizontalStack>
         </VerticalStack>
     )
 }

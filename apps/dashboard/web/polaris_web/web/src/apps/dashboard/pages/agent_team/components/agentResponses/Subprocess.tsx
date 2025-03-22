@@ -5,24 +5,26 @@ import { CaretDownMinor } from "@shopify/polaris-icons";
 import api from "../../api";
 import { useAgentsStore } from "../../agents.store";
 import STEPS_PER_AGENT_ID, { preRequisitesMap } from "../../constants";
-import { VerticalStack, Text } from "@shopify/polaris";
+import { VerticalStack, Text, HorizontalStack, Button } from "@shopify/polaris";
 import OutputSelector, { getMessageFromObj } from "./OutputSelector";
 import { intermediateStore } from "../../intermediate.store";
+import func from "../../../../../../util/func";
 
 interface SubProcessProps {
     agentId: string, 
     processId:string, 
     subProcessFromProp: AgentSubprocess, 
-    finalCTAShow: boolean, 
-    setFinalCTAShow: (show: boolean) => void,
+    setCurrentAgentRun: (agentRun: AgentRun|null) => void,
     triggerCallForSubProcesses: ()=> void ,
 }
 
-export const Subprocess = ({ agentId, processId, subProcessFromProp, finalCTAShow, setFinalCTAShow, triggerCallForSubProcesses }: SubProcessProps) => {
+export const Subprocess = ({ agentId, processId, subProcessFromProp, triggerCallForSubProcesses, setCurrentAgentRun }: SubProcessProps) => {
     const [subprocess, setSubprocess] = useState<AgentSubprocess | null>(subProcessFromProp);
     const [expanded, setExpanded] = useState(true);
 
-    const { setCurrentAttempt, setCurrentSubprocess, currentSubprocess, currentAttempt, setAgentState, setPRState } = useAgentsStore(state => ({
+    const { finalCTAShow, setFinalCTAShow, setCurrentAttempt, setCurrentSubprocess, currentSubprocess, currentAttempt, setAgentState, setPRState } = useAgentsStore(state => ({
+        finalCTAShow: state.finalCTAShow,
+        setFinalCTAShow: state.setFinalCTAShow,
         setCurrentAttempt: state.setCurrentAttempt,
         setCurrentSubprocess: state.setCurrentSubprocess,
         currentSubprocess: state.currentSubprocess,
@@ -93,7 +95,6 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, finalCTASho
             if (newSubProcess.state === State.COMPLETED) {
                 setAgentState("paused");
                 const allowMultiple = newSubProcess?.processOutput?.selectionType === "multiple"
-
                 const initialValue = !allowMultiple ?
         getMessageFromObj(newSubProcess?.processOutput?.outputOptions[0], "textValue") :
         newSubProcess?.processOutput?.outputOptions.map((option: any) => (option.textValue !== undefined ? {
@@ -101,22 +102,13 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, finalCTASho
             value: option?.value !== undefined ? option?.value : JSON.stringify(option)
         } : option));
 
-            console.log("initialValue", initialValue)
                 // add default filtered input here if needed
                 setFilteredUserInput(initialValue);
                 setOutputOptions(newSubProcess?.processOutput);
             }
 
-            if (newSubProcess.state === State.RE_ATTEMPT) {
-                const tempRes = await api.updateAgentSubprocess({
-                    processId,
-                    subProcessId: currentSubprocess,
-                    attemptId: currentAttempt + 1,
-                    subProcessHeading: "Subprocess scheduled"
-                });
-                setSubprocess(tempRes.subprocess as AgentSubprocess);
-                setCurrentAttempt(currentAttempt + 1);
-                setAgentState("thinking");
+            if (newSubProcess.state === State.DISCARDED) {
+                setAgentState("idle");
             }
 
             if (newSubProcess.state === State.AGENT_ACKNOWLEDGED) {
@@ -148,6 +140,39 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, finalCTASho
         setFilteredUserInput(selectedChoices);
     }
 
+    async function reRunTask() {
+        const tempRes = await api.updateAgentSubprocess({
+            processId,
+            subProcessId: currentSubprocess,
+            attemptId: currentAttempt + 1,
+            subProcessHeading: "Subprocess scheduled"
+        });
+        setSubprocess(tempRes.subprocess as AgentSubprocess);
+        setCurrentAttempt(currentAttempt + 1);
+        setAgentState("thinking");
+        func.setToast(true, false, "Task submitted for re-run")
+    }
+
+    async function startAgentAgain() {
+        let res = await api.updateAgentRun({ processId, state: "DISCARDED" });
+        func.setToast(true, false, "Agent is being submitted for re-run")
+        setAgentState("idle");
+        setTimeout(async () => {
+            const previousAgentRun = res.agentRun
+            let data = await api.createAgentRun({
+                agent: previousAgentRun.agent,
+                data: previousAgentRun.agentInitDocument
+            })
+            if(data.agentRun){
+                setCurrentAgentRun(data?.agentRun)
+                func.setToast(true, false, "Agent submitted for re-run")
+            } else {
+                setCurrentAgentRun(null)
+                func.setToast(true, true, "Unable to create agent run")
+            }
+        }, 5000)
+    }
+
     return useMemo(() => (
         <VerticalStack gap="4">
             <div className={`rounded-lg overflow-hidden border border-[#C9CCCF] bg-[#F6F6F7] p-2 flex flex-col ${expanded ? "gap-1" : "gap-0"}`}>
@@ -155,7 +180,7 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, finalCTASho
                     <motion.div animate={{ rotate: expanded ? 0 : 270 }} transition={{ duration: 0.2 }}>
                         <CaretDownMinor height={20} width={20} />
                     </motion.div>
-                    <span className="text-sm text-[var(--text-default)]">{subprocess.subProcessHeading}</span>
+                    <Text as={"dd"}>{`${subprocess.subProcessHeading} ${currentAttempt > 1 ? `(Attempt ${currentAttempt})` : ""} `}</Text>
                 </button>
 
                 <AnimatePresence>
@@ -184,7 +209,17 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, finalCTASho
             }
 
             {subprocess.state === State.DISCARDED && subprocess.userInput &&
-                <Text variant="bodyMd" as="span">{subprocess.userInput?.inputMessage}</Text>
+                <VerticalStack gap={"2"}>
+                    <Text as={"dd"}>This task has been discarded by you, would you like to:</Text>
+                    <HorizontalStack gap={"2"}>
+                        <Button size={"slim"} onClick={() => reRunTask()}>
+                            Re-run task
+                        </Button>
+                        <Button monochrome plain onClick={()=> startAgentAgain()}>
+                            Start again
+                        </Button>
+                    </HorizontalStack>
+                </VerticalStack>
             }
         </VerticalStack>
     ), [subprocess, expanded]);  // Only re-render if these values change

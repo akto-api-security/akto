@@ -384,16 +384,17 @@ export default function LeftNav() {
                                         },
                                         selected: leftNavSelected === "agent_team_members",
                                     },
-                                    {
-                                        label: "Hired Members",
-                                        onClick: () => {
-                                            navigate("/dashboard/agent-team/hired-members");
-                                            handleSelect("agent_team_hired_members");
-                                            setActive("active");
-                                        },
-                                        selected:
-                                            leftNavSelected === "agent_team_hired_members",
-                                    }
+                                    // TODO: hired members state.
+                                    // {
+                                    //     label: "Hired Members",
+                                    //     onClick: () => {
+                                    //         navigate("/dashboard/agent-team/hired-members");
+                                    //         handleSelect("agent_team_hired_members");
+                                    //         setActive("active");
+                                    //     },
+                                    //     selected:
+                                    //         leftNavSelected === "agent_team_hired_members",
+                                    // }
                                 ],
                             }
                     ].filter(item => item.label !== null)}

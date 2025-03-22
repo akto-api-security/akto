@@ -5,15 +5,15 @@ import { Subprocess } from '../components/agentResponses/Subprocess';
 import { useAgentsStore } from '../agents.store';
 import api from '../api';
 import SpinnerCentered from '../../../components/progress/SpinnerCentered';
+import { intermediateStore } from '../intermediate.store';
 
 export const FindVulnerabilitiesAgent = () => {
 
     const [currentAgentRun, setCurrentAgentRun] = useState<AgentRun | null>(null);
     const [subprocesses, setSubprocesses] = useState<AgentSubprocess[]>([]);
 
-    // ?? Where exactly is agent steps being used.
-    // I didn't find any use case, we can remove it.
-    const { currentProcessId, currentAgent, setCurrentAttempt, setCurrentSubprocess, setCurrentProcessId, resetStore, finalCTAShow, setFinalCTAShow} = useAgentsStore();
+    const { currentProcessId, currentAgent, setCurrentAttempt, setCurrentSubprocess, setCurrentProcessId, resetStore} = useAgentsStore();
+    const { resetIntermediateStore } = intermediateStore(state => ({ resetIntermediateStore: state.resetIntermediateStore })); 
 
     const getAllAgentRuns = async () => {
         try {
@@ -26,9 +26,11 @@ export const FindVulnerabilitiesAgent = () => {
                 // TODO: handle cases here, because the above API only gets "RUNNING" Agents.
                 // setCurrentProcessId("")
                 resetStore();
+                resetIntermediateStore();
             }
         } catch(error) {
             resetStore();
+            resetIntermediateStore();
         }
     }
 
@@ -100,8 +102,7 @@ export const FindVulnerabilitiesAgent = () => {
                         agentId={currentAgent?.id || ""}
                         processId={currentAgentRun?.processId || ""}
                         subProcessFromProp={subprocesses[index]}
-                        finalCTAShow={finalCTAShow}
-                        setFinalCTAShow={setFinalCTAShow}
+                        setCurrentAgentRun={setCurrentAgentRun}
                         triggerCallForSubProcesses={triggerCallForSubProcesses}
                     />
                 ))}

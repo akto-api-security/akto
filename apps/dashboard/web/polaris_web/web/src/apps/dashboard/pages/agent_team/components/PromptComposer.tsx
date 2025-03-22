@@ -29,8 +29,7 @@ interface PromptComposerProps {
 export const PromptComposer = ({ onSend }: PromptComposerProps) => {
   const [isFocused, setIsFocused] = useState(false);
   const { currentProcessId, currentSubprocess, currentAttempt, currentAgent } = useAgentsStore();
-  const { filteredUserInput, outputOptions } = intermediateStore();
-  console.log("filteredUserInput",filteredUserInput)
+  const { filteredUserInput, outputOptions, resetIntermediateStore } = intermediateStore();
   const {
     currentPrompt,
     setCurrentPrompt,
@@ -90,11 +89,6 @@ export const PromptComposer = ({ onSend }: PromptComposerProps) => {
   async function onResume() {
 
     // when selected choices are provided by the user, accepted case should be returned to the agent
-    // agent if gets user-input, with the accepted state, it should take that into account
-    // Does not make sense ^, since irrespective of weather the user selects or takes all,
-    // The res will always be similar, i.e. the result could be the complete array or a sub-array,
-    // but they would behave the same.
-    // Using a single state till better use case.
 
 
     let userInput = filteredUserInput
@@ -110,7 +104,7 @@ export const PromptComposer = ({ onSend }: PromptComposerProps) => {
         }
         return false; // Default case: no match
       });
-    } 
+    }
 
     console.log("userInput", userInput)
 
@@ -121,17 +115,38 @@ export const PromptComposer = ({ onSend }: PromptComposerProps) => {
       state: State.ACCEPTED.toString(),
       data: { selectedOptions: structuredOutputFormat(userInput && userInput.length > 0 ? allowMultiple ? userInput : userInput[0]: null, currentAgent?.id , currentSubprocess || "") }
     });
+    if(filteredUserInput?.length == 0){
+      resetIntermediateStore()
+    }
     func.setToast(true, false, "Member solution accepted")
   }
 
   async function onDiscard() {
+    let userInput = filteredUserInput
+
+    let allowMultiple = true
+    if (outputOptions?.selectionType !== "multiple") {
+      allowMultiple = false
+      userInput = outputOptions?.outputOptions?.filter((ele) => {
+        if (typeof ele === "string") {
+          return ele === filteredUserInput;
+        } else if (ele && typeof ele === "object" && "textValue" in ele) {
+          return ele.textValue === filteredUserInput;
+        }
+        return false; // Default case: no match
+      });
+    }
+
     await api.updateAgentSubprocess({
       processId: currentProcessId,
       subProcessId: currentSubprocess,
       attemptId: currentAttempt,
       state: State.DISCARDED.toString(),
-      data: { selectedOptions: structuredOutputFormat(filteredUserInput, currentAgent?.id , currentSubprocess || "") }
+      data: { selectedOptions: structuredOutputFormat(userInput && userInput.length > 0 ? allowMultiple ? userInput : userInput[0]: null, currentAgent?.id , currentSubprocess || "") }
     });
+    if(filteredUserInput?.length == 0){
+      resetIntermediateStore()
+    }
     func.setToast(true, false, "Member solution discarded")
   }
 
