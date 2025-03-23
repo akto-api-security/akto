@@ -10,7 +10,6 @@ interface OutputSelectorProps {
 }
 
 export const getMessageFromObj = (obj: any, key:string) => {
-    console.log("obj", obj, "key", key)
     if(typeof obj === "string"){
         return obj;
     }else{
@@ -78,7 +77,7 @@ function OutputSelector({onHandleSelect, processOutput} : OutputSelectorProps) {
             {
                 noOptionsReturned ? <></> :
                     <HorizontalStack gap={"2"}>
-                        {processOutput?.outputOptions.length > 1 ? <DropdownSearch
+                        {processOutput?.outputOptions.length > 0 ? <DropdownSearch
                             key = "dropdown-search"
                             allowMultiple={allowMultiple}
                             optionsList={processOutput?.outputOptions.map((option: any) => {

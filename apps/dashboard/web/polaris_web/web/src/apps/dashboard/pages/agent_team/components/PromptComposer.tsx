@@ -86,11 +86,7 @@ export const PromptComposer = ({ onSend }: PromptComposerProps) => {
     onSend(prompt);
   }
   
-  async function onResume() {
-
-    // when selected choices are provided by the user, accepted case should be returned to the agent
-
-
+  async function saveOutput(state: string, message: string){
     let userInput = filteredUserInput
 
     let allowMultiple = true
@@ -105,49 +101,25 @@ export const PromptComposer = ({ onSend }: PromptComposerProps) => {
         return false; // Default case: no match
       });
     }
-
-    console.log("userInput", userInput)
-
     await api.updateAgentSubprocess({
       processId: currentProcessId,
       subProcessId: currentSubprocess,
       attemptId: currentAttempt,
-      state: State.ACCEPTED.toString(),
+      state: state,
       data: { selectedOptions: structuredOutputFormat(userInput && userInput.length > 0 ? allowMultiple ? userInput : userInput[0]: null, currentAgent?.id , currentSubprocess || "") }
     });
     if(filteredUserInput?.length == 0){
       resetIntermediateStore()
     }
-    func.setToast(true, false, "Member solution accepted")
+    func.setToast(true, false, message)
+  }
+
+  async function onResume() {
+    await saveOutput(State.ACCEPTED.toString(), "Member solution accepted")
   }
 
   async function onDiscard() {
-    let userInput = filteredUserInput
-
-    let allowMultiple = true
-    if (outputOptions?.selectionType !== "multiple") {
-      allowMultiple = false
-      userInput = outputOptions?.outputOptions?.filter((ele) => {
-        if (typeof ele === "string") {
-          return ele === filteredUserInput;
-        } else if (ele && typeof ele === "object" && "textValue" in ele) {
-          return ele.textValue === filteredUserInput;
-        }
-        return false; // Default case: no match
-      });
-    }
-
-    await api.updateAgentSubprocess({
-      processId: currentProcessId,
-      subProcessId: currentSubprocess,
-      attemptId: currentAttempt,
-      state: State.DISCARDED.toString(),
-      data: { selectedOptions: structuredOutputFormat(userInput && userInput.length > 0 ? allowMultiple ? userInput : userInput[0]: null, currentAgent?.id , currentSubprocess || "") }
-    });
-    if(filteredUserInput?.length == 0){
-      resetIntermediateStore()
-    }
-    func.setToast(true, false, "Member solution discarded")
+    await saveOutput(State.DISCARDED.toString(), "Member solution discarded")
   }
 
   return (

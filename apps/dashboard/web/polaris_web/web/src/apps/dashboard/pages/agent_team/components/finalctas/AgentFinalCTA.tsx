@@ -7,7 +7,7 @@ import func from '../../../../../../util/func';
 import issueApi from "../../../../pages/issues/api"
 import api from "./api";
 import apiCollectionApi from "../../../../pages/observe/api"
-import SourceCodeAnalyserCTA from './SourceCodeAnalyserCTA';
+import SourceCodeAnalyserCTA from "./SourceCodeAnalyserCTA"
 
 function AgentFinalCTA() {
     const { PRstate, currentAgent } = useAgentsStore()
@@ -39,10 +39,16 @@ function AgentFinalCTA() {
         let filteredCollections = outputOptions.outputOptions.filter(x => {
             return filteredUserInput.includes(x.value)
         })
+        let interval = 1000;
         for (let index in filteredCollections) {
             let collectionName = filteredCollections[index].value
             let apis = filteredCollections[index].apis
-            await apiCollectionApi.addApisToCustomCollection(apis, collectionName)
+            // this because they take up the same timestamp
+            // and since the timestamp is _id, it gives an error.
+            setTimeout(async () => {
+                await apiCollectionApi.addApisToCustomCollection(apis, collectionName)
+            }, interval)
+            interval += 1000
         }
         func.setToast(true, false, "API groups are being created")
     }
