@@ -23,7 +23,7 @@ interface AgentsStore {
     setCurrentProcessId: (currentProcessId: string) => void;
     currentSubprocess: string | null;
     setCurrentSubprocess: (subprocess: string) => void;
-    currentAttempt: number 
+    currentAttempt: number
     setCurrentAttempt: (subprocess: number) => void;
     PRstate: string;
     setPRState: (state: string) => void;

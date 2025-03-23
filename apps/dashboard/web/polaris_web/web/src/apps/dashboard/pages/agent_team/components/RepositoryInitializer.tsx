@@ -56,6 +56,7 @@ function RepositoryInitializer({agentType}: {agentType: string}) {
                 projectDir: func.checkLocal() ? localString : repo + "/" + project
             }
         })
+        func.setToast(true, false, "Starting agent")
     }   
     
     const connectionOptions: RepoType[] = [
@@ -98,7 +99,7 @@ function RepositoryInitializer({agentType}: {agentType: string}) {
                                     autoComplete="off" 
                                     placeholder="Enter your repository URL" 
                                     value={temp} 
-                                    // focused={true}
+                                    focused={true}
                                     onChange={(x:string) => setTemp(x)} 
                                     connectedRight={<Button onClick={() => handleClickRepo("", "", temp)}>Start</Button>} 
                                 /> : null}

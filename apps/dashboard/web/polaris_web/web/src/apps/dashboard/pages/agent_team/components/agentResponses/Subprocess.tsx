@@ -6,9 +6,10 @@ import api from "../../api";
 import { useAgentsStore } from "../../agents.store";
 import STEPS_PER_AGENT_ID, { preRequisitesMap } from "../../constants";
 import { VerticalStack, Text, HorizontalStack, Button } from "@shopify/polaris";
-import OutputSelector from "./OutputSelector";
+import OutputSelector, { getMessageFromObj } from "./OutputSelector";
 import { intermediateStore } from "../../intermediate.store";
 import func from "../../../../../../util/func";
+import SelectedChoices from "./SelectedChoices";
 
 interface SubProcessProps {
     agentId: string, 
@@ -22,7 +23,8 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, triggerCall
     const [subprocess, setSubprocess] = useState<AgentSubprocess | null>(subProcessFromProp);
     const [expanded, setExpanded] = useState(true);
 
-    const { finalCTAShow, setFinalCTAShow, setCurrentAttempt, setCurrentSubprocess, currentSubprocess, currentAttempt, setAgentState, setPRState } = useAgentsStore(state => ({
+    const { finalCTAShow, setFinalCTAShow, setCurrentAttempt, 
+        setCurrentSubprocess, currentSubprocess, currentAttempt, setAgentState, setPRState, agentState } = useAgentsStore(state => ({
         finalCTAShow: state.finalCTAShow,
         setFinalCTAShow: state.setFinalCTAShow,
         setCurrentAttempt: state.setCurrentAttempt,
@@ -30,7 +32,8 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, triggerCall
         currentSubprocess: state.currentSubprocess,
         currentAttempt: state.currentAttempt,
         setAgentState: state.setAgentState,
-        setPRState: state.setPRState
+        setPRState: state.setPRState,
+        agentState: state.agentState
     }));  // Only subscribe to necessary store values
 
     const { setFilteredUserInput, setOutputOptions, setPreviousUserInput } = intermediateStore(state => ({ setFilteredUserInput: state.setFilteredUserInput, setOutputOptions: state.setOutputOptions, setPreviousUserInput: state.setPreviousUserInput })); 
@@ -74,7 +77,11 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, triggerCall
 
             if (!newSubProcess) return;
 
-            if (newSubProcess.state === State.RUNNING) setAgentState("thinking");
+            if (newSubProcess.state === State.RUNNING) {
+                if (agentState !== "error") {
+                    setAgentState("thinking");
+                }
+            }
 
             if (newSubProcess.state === State.ACCEPTED) {
                 const newSubIdNumber = Number(currentSubprocess) + 1;
@@ -94,13 +101,11 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, triggerCall
 
             if (newSubProcess.state === State.COMPLETED) {
                 setAgentState("paused");
-                // add default filtered input here if needed
-                // setFilteredUserInput(getMessageFromObj(newSubProcess.processOutput?.outputOptions[0], "textValue"));
             }
 
             if (newSubProcess.state === State.DISCARDED) {
                 setAgentState("idle");
-            }  
+            }
 
             if (newSubProcess.state === State.AGENT_ACKNOWLEDGED) {
                 setPreviousUserInput(newSubProcess.userInput);
@@ -109,6 +114,14 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, triggerCall
                
                 setSubprocess(newSub);
                 triggerCallForSubProcesses();
+            }
+
+            if (newSubProcess.state === State.FAILED) {
+                await reRunTask();
+            }
+
+            if (newSubProcess.state === State.SCHEDULED) {
+                setAgentState("idle");
             }
 
             if (JSON.stringify(newSubProcess) !== JSON.stringify(subprocess)) {
@@ -141,7 +154,6 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, triggerCall
         });
         setSubprocess(tempRes.subprocess as AgentSubprocess);
         setCurrentAttempt(currentAttempt + 1);
-        setAgentState("thinking");
         func.setToast(true, false, "Task submitted for re-run")
     }
 
@@ -163,6 +175,12 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, triggerCall
                 func.setToast(true, true, "Unable to create agent run")
             }
         }, 5000)
+    }
+
+    async function stopAgent() {
+        await api.updateAgentRun({ processId, state: "STOPPED" });
+        func.setToast(true, false, "Agent has been stopped")
+        setAgentState("idle");
     }
 
     return useMemo(() => (
@@ -197,7 +215,15 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, triggerCall
             }
 
             {subprocess.state === State.ACCEPTED && subprocess.processOutput &&
-                <Text variant="bodyMd" as="span">{subprocess.processOutput?.outputMessage}</Text>
+                <VerticalStack gap={"2"}>
+                    <Text variant="bodyMd" as="span">{subprocess.processOutput?.outputMessage}</Text>
+                    {/* TODO: Selected choices dialog, handle edge cases. */}
+                    {/* <SelectedChoices userInput={subprocess.userInput}/> */}
+                </VerticalStack>
+            }
+
+            {subprocess.state === State.FAILED &&
+                <Text variant="bodyMd" as="span">Task failed. Attempting to re-run task.</Text>
             }
 
             {subprocess.state === State.DISCARDED && subprocess.userInput &&
@@ -207,8 +233,11 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, triggerCall
                         <Button size={"slim"} onClick={() => reRunTask()}>
                             Re-run task
                         </Button>
-                        <Button monochrome plain onClick={()=> startAgentAgain()}>
+                        <Button plain onClick={()=> startAgentAgain()}>
                             Start again
+                        </Button>
+                        <Button plain onClick={()=> stopAgent()} destructive>
+                            Stop agent
                         </Button>
                     </HorizontalStack>
                 </VerticalStack>
