@@ -33,7 +33,7 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, triggerCall
         setPRState: state.setPRState
     }));  // Only subscribe to necessary store values
 
-    const { setFilteredUserInput, setOutputOptions } = intermediateStore(state => ({ setFilteredUserInput: state.setFilteredUserInput, setOutputOptions: state.setOutputOptions })); 
+    const { setFilteredUserInput, setOutputOptions, setPreviousUserInput } = intermediateStore(state => ({ setFilteredUserInput: state.setFilteredUserInput, setOutputOptions: state.setOutputOptions, setPreviousUserInput: state.setPreviousUserInput })); 
 
     // Memoized function to create new subprocess
     const createNewSubprocess = useCallback(async (newSubIdNumber: number) => {
@@ -41,8 +41,8 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, triggerCall
         // check for pre-requisites first
         const shouldCreateSubProcess = preRequisitesMap[agentId]?.[newSubIdNumber]?.action ? await preRequisitesMap[agentId][newSubIdNumber].action() : true;
         if (!shouldCreateSubProcess) {
-            setFinalCTAShow(false);
-            setPRState("4");
+            setFinalCTAShow(true);
+            setPRState("2");
             return null;
         }
 
@@ -103,8 +103,10 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, triggerCall
             }  
 
             if (newSubProcess.state === State.AGENT_ACKNOWLEDGED) {
+                setPreviousUserInput(newSubProcess.userInput);
                 const newSub = await createNewSubprocess(Number(currentSubprocess) + 1);
                 setFilteredUserInput(null);
+               
                 setSubprocess(newSub);
                 triggerCallForSubProcesses();
             }
@@ -126,8 +128,7 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, triggerCall
     if (!subprocess) return null;
 
     const handleSelect = (selectedChoices: any, outputOptions: any) => {
-        console.log(selectedChoices);
-        setOutputOptions(outputOptions);
+        setOutputOptions(outputOptions); 
         setFilteredUserInput(selectedChoices);
     }
 

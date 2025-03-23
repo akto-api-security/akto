@@ -61,7 +61,7 @@ const api = {
             method: 'post',
             data: data 
         })
-    },
+    }
 }
 
 export default api;

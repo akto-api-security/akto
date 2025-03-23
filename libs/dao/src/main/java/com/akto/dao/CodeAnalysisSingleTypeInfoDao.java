@@ -8,6 +8,7 @@ import java.util.Map;
 import org.bson.conversions.Bson;
 
 import com.akto.dto.ApiInfo;
+import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
 import com.mongodb.BasicDBObject;
@@ -35,7 +36,7 @@ public class CodeAnalysisSingleTypeInfoDao extends AccountsContextDaoWithRbac<Si
          * Since singleTypeInfo is the implemented class for this and SingleTypeInfoDao.
          * reusing the filters here.
          */
-        List<Bson> pipeline = SingleTypeInfoDao.instance.createPipelineForFetchRequestParams(apiInfoKeys);
+        List<Bson> pipeline = SingleTypeInfoDao.instance.createPipelineForFetchParams(apiInfoKeys, true, true);
 
         MongoCursor<BasicDBObject> stiCursor = instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
         while (stiCursor.hasNext()) {
@@ -54,7 +55,31 @@ public class CodeAnalysisSingleTypeInfoDao extends AccountsContextDaoWithRbac<Si
             result.put(apiInfoKey, params);
         }
         return result;
-    }    
+    } 
+    
+    public Map<ApiInfoKey, BasicDBObject> getReqResSchemaForApis(List<ApiInfoKey> apiInfoKeys) {
+        Map<ApiInfoKey, BasicDBObject> result = new HashMap<>();
+        if (apiInfoKeys == null || apiInfoKeys.isEmpty()) return result;
+        List<Bson> pipeline = SingleTypeInfoDao.instance.createPipelineForFetchParams(apiInfoKeys, false, false);
+        MongoCursor<BasicDBObject> stiCursor = instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
+        while (stiCursor.hasNext()) {
+            BasicDBObject next = stiCursor.next();
+            BasicDBObject id = (BasicDBObject) next.get("_id");
+            int responseCode = id.getInt("responseCode");
+            ApiInfoKey apiInfoKey = new ApiInfoKey(id.getInt("apiCollectionId"), id.getString("url"), URLMethods.Method.fromString(id.getString("method")));
+            Object paramsObj = next.get("params");
+            String schema = paramsObj.toString();
+            BasicDBObject schemaObj = result.getOrDefault(apiInfoKey, new BasicDBObject());
+
+            if(responseCode > -1){
+                schemaObj.put("responseSchema", schema);
+            }else{
+                schemaObj.put("requestSchema", schema);
+            }
+            result.put(apiInfoKey, schemaObj);
+        }
+        return result;
+    }
 
     @Override
     public String getFilterKeyString() {

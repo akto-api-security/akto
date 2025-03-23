@@ -1,5 +1,6 @@
 package com.akto.action.agents;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -8,18 +9,32 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
+import org.bson.conversions.Bson;
+import org.bson.types.ObjectId;
+
 import com.akto.action.ApiCollectionsAction;
 import com.akto.action.CustomDataTypeAction;
 import com.akto.action.UserAction;
 import com.akto.action.CustomDataTypeAction.ConditionFromUser;
+import com.akto.dao.CodeAnalysisApiInfoDao;
+import com.akto.dao.CodeAnalysisCollectionDao;
+import com.akto.dao.CodeAnalysisSingleTypeInfoDao;
 import com.akto.dao.SampleDataDao;
 import com.akto.dao.context.Context;
+import com.akto.dto.CodeAnalysisApiInfo;
+import com.akto.dto.CodeAnalysisCollection;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.data_types.Predicate.Type;
 import com.akto.dto.traffic.SampleData;
+import com.akto.dto.type.URLMethods;
+import com.akto.util.Constants;
 import com.akto.util.enums.GlobalEnums.Severity;
 import com.mongodb.BasicDBObject;
+import com.mongodb.client.MongoCursor;
+import com.mongodb.client.model.Accumulators;
+import com.mongodb.client.model.Aggregates;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Sorts;
 import com.opensymphony.xwork2.Action;
 
@@ -105,7 +120,6 @@ public class AgentHelperAction extends UserAction {
     public String createAPIGroups() {
 
         int accountId = Context.accountId.get();
-        Map<String, Object> session = getSession();
 
         // TODO: subprocessId , attemptID, processId -> apiGroupList
 
@@ -129,6 +143,71 @@ public class AgentHelperAction extends UserAction {
             }
         }, 0, TimeUnit.SECONDS);
         return Action.SUCCESS.toUpperCase();
+    }
+
+    String chosenBackendDirectory;
+    List<BasicDBObject> codeAnalysisCollectionIdList;
+
+    public String getSourceCodeCollectionsForDirectories(){
+
+        List<Bson> pipeLine = new ArrayList<>();
+        String regexPattern = "^" + this.chosenBackendDirectory + ".*";
+        pipeLine.add(Aggregates.match(Filters.regex("location.filePath", regexPattern)));
+        pipeLine.add(
+            Aggregates.group("$_id.codeAnalysisCollectionId", Accumulators.sum("count", 1))
+        );
+
+        this.codeAnalysisCollectionIdList = new ArrayList<>();
+        Map<ObjectId, Integer> countMap = new HashMap<>();
+        MongoCursor<BasicDBObject> cursor = CodeAnalysisApiInfoDao.instance.getMCollection().aggregate(pipeLine, BasicDBObject.class).cursor();
+        while(cursor.hasNext()) {
+            try {
+                BasicDBObject basicDBObject = cursor.next();
+                ObjectId id = basicDBObject.getObjectId("_id");
+                int count = basicDBObject.getInt("count");
+                countMap.put(id, count);
+            } catch (Exception e) {
+                e.printStackTrace();
+                return Action.ERROR.toUpperCase();
+            }
+        }
+
+        if(!countMap.isEmpty()){
+            List<CodeAnalysisCollection> collections = CodeAnalysisCollectionDao.instance.findAll(Filters.in(Constants.ID, countMap.keySet()), Projections.include("name"));
+            for(CodeAnalysisCollection codeAnalysisCollection: collections){
+               BasicDBObject basicDBObject = new BasicDBObject();
+                basicDBObject.put("id", codeAnalysisCollection.getId());
+                basicDBObject.put("name", codeAnalysisCollection.getName());
+                basicDBObject.put("count", countMap.get(codeAnalysisCollection.getId()));
+                this.codeAnalysisCollectionIdList.add(basicDBObject);
+            }
+        }
+
+        return SUCCESS.toUpperCase();
+    }
+
+    List<String> chosenCodeAnalysisCollectionIds;
+    List<Map<ApiInfoKey, BasicDBObject>> apiInfoKeysWithSchema;
+
+    public String getApisForChosenCollectionForSourceCode(){
+        this.apiInfoKeysWithSchema = new ArrayList<>();
+        for(String hexId: chosenCodeAnalysisCollectionIds){
+            ObjectId objectId = new ObjectId(hexId);
+            CodeAnalysisCollection codeAnalysisCollection = CodeAnalysisCollectionDao.instance.findOne(Filters.eq(Constants.ID, objectId));
+            List<CodeAnalysisApiInfo> apiInfos = CodeAnalysisApiInfoDao.instance.findAll(Filters.eq("codeAnalysisCollectionId", objectId), Projections.include("id"));
+            List<ApiInfoKey> apiInfoKeys = new ArrayList<>();
+            for(CodeAnalysisApiInfo apiInfo: apiInfos){
+                ApiInfoKey apiInfoKey = new ApiInfoKey(
+                    codeAnalysisCollection.getApiCollectionId(),
+                    apiInfo.getId().getEndpoint(),
+                    URLMethods.Method.fromString(apiInfo.getId().getMethod())
+                );  
+                apiInfoKeys.add(apiInfoKey); 
+            }
+            Map<ApiInfoKey, BasicDBObject> schemaMap = CodeAnalysisSingleTypeInfoDao.instance.getReqResSchemaForApis(apiInfoKeys);
+            apiInfoKeysWithSchema.add(schemaMap);
+        }
+        return SUCCESS.toUpperCase();
     }
 
     public List<String> getDataTypeKeys() {
@@ -169,5 +248,21 @@ public class AgentHelperAction extends UserAction {
 
     public void setSample(SampleData sample) {
         this.sample = sample;
+    }
+
+    public List<BasicDBObject> getCodeAnalysisCollectionIdList() {
+        return codeAnalysisCollectionIdList;
+    }
+
+    public void setChosenBackendDirectory(String chosenBackendDirectory) {
+        this.chosenBackendDirectory = chosenBackendDirectory;
+    }
+
+    public void setChosenCodeAnalysisCollectionIds(List<String> chosenCodeAnalysisCollectionIds) {
+        this.chosenCodeAnalysisCollectionIds = chosenCodeAnalysisCollectionIds;
+    }
+
+    public List<Map<ApiInfoKey, BasicDBObject>> getApiInfoKeysWithSchema() {
+        return apiInfoKeysWithSchema;
     }
 }

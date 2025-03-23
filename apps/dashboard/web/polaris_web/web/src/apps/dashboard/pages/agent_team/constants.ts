@@ -1,3 +1,5 @@
+import api from "./components/finalctas/api"
+import { intermediateStore } from "./intermediate.store";
 
 const STEPS_PER_AGENT_ID = {
     "FIND_VULNERABILITIES_FROM_SOURCE_CODE": 5,
@@ -9,22 +11,38 @@ const STEPS_PER_AGENT_ID = {
 }
 
 const checkForSourceCodeApis = async()=> {
-    // make and api call to check the source code apis of this directory
-    // chosen directory => {get from output of step "1"}
-    return false
+    const chosenBackendDirectory = intermediateStore.getState().previousUserInput?.selectedOptions?.chosenBackendDirectory;
+    await api.getSourceCodeCollectionsForDirectories({
+        "chosenBackendDirectory": chosenBackendDirectory || ""
+    }).then((res) => {
+        intermediateStore.getState().setSourceCodeCollections(res)
+    })
+    return true
 }
 
 export const preRequisitesMap = {
     "FIND_VULNERABILITIES_FROM_SOURCE_CODE": {
-        4: {
+        2: {
             "text": "Please provide the list of apis for finding vulnerabilities",
             "action": () => checkForSourceCodeApis()
         },
     }
 }
 
+function toJson(input: string):any {
+    const result = {};
+    
+    input.split(',').forEach(pair => {
+      const [key, value] = pair.split(':').map(str => str.trim());
+      if (key && value) {
+        result[key.toLowerCase()] = value;
+      }
+    });
+  
+    return result;
+}
+
 export function structuredOutputFormat (output: any, agentType: string | undefined, subProcessId: string): any {
-    console.log("output", output)
     switch (agentType) {
         case "FIND_VULNERABILITIES_FROM_SOURCE_CODE":
             switch (subProcessId) {
@@ -34,13 +52,42 @@ export function structuredOutputFormat (output: any, agentType: string | undefin
                     }
                 case "2":
                     if(typeof output === "string") {
-                        const jsonStr = `{${output}}`;
-                        const obj = JSON.parse(jsonStr);
-                        console.log("obj", obj)
-                        return obj
+                        let obj = {}
+                        try {
+                            obj = JSON.parse(output);
+                            return obj
+                        } catch (error) {
+                            const jsonStr = `{${output}}`;
+                            obj = JSON.parse(jsonStr);
+                            return obj
+                        }finally {
+                            return toJson(output)  
+                        }
                     }else{
                         return output
                     }
+                case "3":{
+                    let respArr= output.map((item: any) => {
+                        let splitArr = item.split(" - ")
+                        return {
+                            "type": splitArr[1],
+                            "file_path": splitArr[splitArr.length - 1]
+                        }
+                    })
+                    const obj = {
+                        authMethods: respArr
+                    }
+                    return obj
+                }
+                case "4": {
+                    const outputOptions = intermediateStore.getState().outputOptions?.outputOptions !== undefined ? intermediateStore.getState().outputOptions?.outputOptions : intermediateStore.getState().outputOptions;
+                    let valueSelectedSet = new Set(output);
+                    let selectedOptions = outputOptions.filter((x: any) => valueSelectedSet.has(x?.value));
+                    const obj = {
+                        authMechanisms: selectedOptions
+                    }
+                    return obj
+                }
             default:
                 return output
             }
