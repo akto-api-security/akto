@@ -21,6 +21,24 @@ const iconsUsedMap = {
   ReceiptMajor, MobileMajor, CalendarTimeMinor,LocationMajor, IdentityCardFilledMajor, CalendarMajor
 }
 
+const searchResultSections = {
+  collections: {
+    type: "collection",
+    title: "Collections",
+    icon: DynamicSourceMajor
+  },
+  tests: {
+    type: "test",
+    title: "Tests",
+    icon: FileMinor
+  },
+  connectors: {
+    type: "connector",
+    title: "Connectors",
+    icon: AffiliateMajor
+  },
+}
+
 const func = {
   setToast (isActive, isError, message) {
     Store.getState().setToastConfig({
@@ -1260,30 +1278,52 @@ getDeprecatedEndpoints(apiInfoList, unusedEndpoints, apiCollectionId) {
           : dateRange.title;
   return dateStr
  },
- getCollectionsSearchItems(allRoutes, allCollections) {
+ createSearchResult(section, content, url) {
+  return {
+    content: content,
+    url: url, 
+    type: section.type,
+    icon: section.icon,
+    variant: 'menu',
+    truncate: true,
+  }
+ },
+ getCollectionsSearchItems(allCollections) {
   const searchItems = []
 
-  const activatedColections = allCollections.filter((item) => item.deactivated === false)
+  const activatedColections = allCollections.filter((collection) => collection.deactivated === false)
   const initialPath = "/dashboard/observe/inventory/"
-  activatedColections.forEach((item)=> {
-    searchItems.push({content: item.displayName, url: initialPath + item.id, type:'collection'})
+  activatedColections.forEach((collection)=> {
+    const collectionUrl = initialPath + collection.id
+    const searchResult = this.createSearchResult(
+      searchResultSections.collections,
+      collection.displayName, 
+      collectionUrl
+    )
+    searchItems.push(searchResult)
   })
   return searchItems
  },
- getTestSearchItems(allRoutes, allTests) {
+ getTestSearchItems(allTests) {
   const searchItems = []
 
   // filter active tests
-  const activeTests = Object.values(allTests).filter((item) => item.inactive === false)
+  const activeTests = Object.values(allTests).filter((test) => test.inactive === false)
 
   const initialPath = "/dashboard/test-editor/"
-  activeTests.forEach(item => {
-    searchItems.push({content: item.testName, url: initialPath + item.name, type:'test'})
+  activeTests.forEach(test => {
+    const testUrl = initialPath + test.name
+    const searchResult = this.createSearchResult(
+      searchResultSections.tests,
+      test.name, 
+      testUrl,
+    )
+    searchItems.push(searchResult)
   });
 
   return searchItems
  },
- getConnectorSearchItems(allRoutes) {
+ getConnectorSearchItems() {
   const searchItems = []
 
   const connectorCategories = quickStartFunc.getConnectorsListCategorized()
@@ -1292,110 +1332,68 @@ getDeprecatedEndpoints(apiInfoList, unusedEndpoints, apiCollectionId) {
   for (const categoryArr of Object.values(connectorCategories)) {
       for (const connector of categoryArr) {
         const connectorKey = connector.key?.toLowerCase() ?? "";
-        searchItems.push({
-          content: connector.label, 
-          url: `${initialPath}?connector=${connectorKey}`, 
-          type:'connector'
-        })
+        const connectorUrl = `${initialPath}?connector=${connectorKey}`
+        const searchResult = this.createSearchResult(
+          searchResultSections.connectors,
+          connector.label, 
+          connectorUrl,
+        )
+      searchItems.push(searchResult)
       }
   }
 
   return searchItems
  },
- getSearchItemsArr(allRoutes,allCollections, subCategoryMap){
+ getSearchItemsArr(allCollections, subCategoryMap){
   let combinedArr = []
 
-  const collectionsSearchItems = this.getCollectionsSearchItems(allRoutes, allCollections)
-  const testSearchItems = this.getTestSearchItems(allRoutes, subCategoryMap)
-  const connectorSearchItems = this.getConnectorSearchItems(allRoutes)
+  const collectionsSearchItems = this.getCollectionsSearchItems(allCollections)
+  const testSearchItems = this.getTestSearchItems(subCategoryMap)
+  const connectorSearchItems = this.getConnectorSearchItems()
   combinedArr.push(...collectionsSearchItems, ...testSearchItems, ...connectorSearchItems)
 
   return combinedArr
  },
- createSearchResultFromItem(item, handleNavigateSearch) {
-  const icon = this.getSearchItemIcon(item.type)
-  return {
-      icon: icon,
-      content: item.content,
-      variant: 'menu',
-      truncate: true,
-      onAction: () => handleNavigateSearch(item.url),
-  }
- },
- getSearchResults(filteredItemsArr, handleNavigateSearch) {
-  const SECTION_ITEMS_MAX_COUNT = 10
-  const searchResultSections = []
+ createSearchResultsSection(section, filteredItemsArr, sectionOverflowUrl, handleNavigateSearch) {
+    const SECTION_ITEMS_MAX_COUNT = 10
+    const filteredSectionItems = filteredItemsArr.filter(sectionItem => sectionItem.type === section.type)
+    const filteredSectionResults = filteredSectionItems
+      .slice(0, SECTION_ITEMS_MAX_COUNT)
+      .map(({ url, ...sectionItem }) => ({ ...sectionItem, onAction: () => handleNavigateSearch(url) }));
+    
+    if (filteredSectionItems.length > SECTION_ITEMS_MAX_COUNT) {
+      const { url, ...moreResult } = this.createSearchResult(
+        searchResultSections.collections,
+        `+${filteredSectionItems.length - SECTION_ITEMS_MAX_COUNT} more`,
+        sectionOverflowUrl
+      );
 
-  //collections
-  const filteredCollections = filteredItemsArr.filter(item => item.type === 'collection')
-  const filteredCollectionResults = filteredCollections.slice(0,SECTION_ITEMS_MAX_COUNT).map(item => this.createSearchResultFromItem(item, handleNavigateSearch))
-  const collectionsPath = `/dashboard/observe/inventory`
-  if (filteredCollections.length > SECTION_ITEMS_MAX_COUNT) {
-    const item = {
-      content: `+${filteredCollections.length - SECTION_ITEMS_MAX_COUNT} more`, 
-      url: collectionsPath, 
-      type:'collection'
+      moreResult.onAction = () => handleNavigateSearch(sectionOverflowUrl);
+      moreResult.icon = ''
+      filteredSectionResults.push(moreResult)
     }
-    const result = this.createSearchResultFromItem(item, handleNavigateSearch)
-    filteredCollectionResults.push(result)
-  }
 
-  searchResultSections.push({
-    title: "Collections",
-    items: filteredCollectionResults
-  })
-
-  //tests
-  const filteredTests = filteredItemsArr.filter(item => item.type === 'test')
-  const filteredTestResults = filteredTests.slice(0,SECTION_ITEMS_MAX_COUNT).map(item => this.createSearchResultFromItem(item, handleNavigateSearch))
-  const testsPath = "/dashboard/test-editor"
-  if (filteredTests.length > SECTION_ITEMS_MAX_COUNT) {
-    const item = {
-      content: `+${filteredTests.length - SECTION_ITEMS_MAX_COUNT} more`, 
-      url: testsPath, 
-      type:'test'
+    if (filteredSectionResults.length === 0) return null
+    else {
+      return { title: section.title, items: filteredSectionResults }
     }
-    const result = this.createSearchResultFromItem(item, handleNavigateSearch)
-    filteredTestResults.push(result)
-  }
-  
-  searchResultSections.push({
-    title: "Tests",
-    items: filteredTestResults
-  })
-
-  //connectors
-  const filteredConnectors = filteredItemsArr.filter(item => item.type === 'connector')
-  const filteredConnectorResults = filteredConnectors.slice(0,SECTION_ITEMS_MAX_COUNT).map(item => this.createSearchResultFromItem(item, handleNavigateSearch))
-  const connectorsPath = "/dashboard/quick-start"
-
-  if (filteredConnectors.length > SECTION_ITEMS_MAX_COUNT) {
-    const item = {
-      content: `+${filteredConnectors.length - SECTION_ITEMS_MAX_COUNT} more`, 
-      url: connectorsPath, 
-      type:'connector'
-    }
-    const result = this.createSearchResultFromItem(item, handleNavigateSearch)
-    filteredConnectorResults.push(result)
-  }
-
-  searchResultSections.push({
-    title: "Connectors",
-    items: filteredConnectorResults
-  })
-
-  return searchResultSections
- },
- getSearchItemIcon(itemType) {
-  const iconsMap = {
-    "collection": DynamicSourceMajor,
-    "test": FileMinor,
-    "connector": AffiliateMajor,
-    "page": PageMajor,
-  };
-
-  return iconsMap[itemType] || PageMajor;
 },
+ getSearchResults(filteredItemsArr, handleNavigateSearch) {
+
+  const collectionsPath = "/dashboard/observe/inventory/"
+  const testsPath = "/dashboard/test-editor"
+  const connectorsPath = "/dashboard/quick-start"
+  const collectionsSection = this.createSearchResultsSection(searchResultSections.collections, filteredItemsArr, collectionsPath, handleNavigateSearch)
+  const testsSection = this.createSearchResultsSection(searchResultSections.tests, filteredItemsArr, testsPath, handleNavigateSearch)
+  const connectorsSection = this.createSearchResultsSection(searchResultSections.connectors, filteredItemsArr, connectorsPath, handleNavigateSearch)
+
+
+
+  const allSections = [ collectionsSection, testsSection, connectorsSection ].filter(section => section !== null)
+
+  return allSections
+ },
+
 updateQueryParams(searchParams, setSearchParams, key, value) {
   const newSearchParams = new URLSearchParams(searchParams);
   if (value === "") {

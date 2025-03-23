@@ -37,10 +37,10 @@ export default function Header() {
     const resetAll = PersistStore(state => state.resetAll)
     const resetStore = LocalStore(state => state.resetStore)
 
-    const allRoutes = Store((state) => state.allRoutes)
+    //const allRoutes = Store((state) => state.allRoutes)
     const allCollections = PersistStore((state) => state.allCollections)
     const subCategoryMap = LocalStore(state => state.subCategoryMap)
-    var searchItemsArr = useMemo(() => func.getSearchItemsArr(allRoutes, allCollections, subCategoryMap), [allRoutes, allCollections, subCategoryMap])
+    const searchItemsArr = useMemo(() => func.getSearchItemsArr(allCollections, subCategoryMap), [allCollections, subCategoryMap])
     const [filteredItemsArr, setFilteredItemsArr] = useState(searchItemsArr)
     const toggleIsUserMenuOpen = useCallback(
         () => setIsUserMenuOpen((isUserMenuOpen) => !isUserMenuOpen),
@@ -139,7 +139,7 @@ export default function Header() {
     }
 
 
-    const searchResultSections = func.getSearchResults(filteredItemsArr, handleNavigateSearch)
+    const searchResultSections = useMemo(() =>func.getSearchResults(filteredItemsArr, handleNavigateSearch), [filteredItemsArr])
 
     const searchResultsMarkup = (
         <Scrollable style={{maxHeight: '500px'}} shadow>
