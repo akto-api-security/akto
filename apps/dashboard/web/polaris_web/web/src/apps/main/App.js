@@ -235,10 +235,6 @@ const router = createBrowserRouter([
                             {
                                 path: "members",
                                 element: <AgentTeam/>
-                            },
-                            {
-                                path: "hired-members",
-                                element: <AgentTeam/>
                             }
                         ]
                     },
