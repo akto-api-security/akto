@@ -230,15 +230,15 @@ function Integrations() {
         }
         return automationItems;
       case 'waf':
-        if (func.isDemoAccount()) {
-          return wafItems;
+        if (func.checkLocal()) {
+          return emptyItem;
         }
-        return emptyItem;
+        return wafItems;
       case 'splunk':
-        if (func.isDemoAccount()) {
-          return siemItems;
+        if (func.checkLocal()) {
+          return emptyItem;
         }
-        return emptyItem;
+        return siemItems;
       default:
         let allItems = [...trafficItems, ...aiItems]
         if (!func.checkLocal()){

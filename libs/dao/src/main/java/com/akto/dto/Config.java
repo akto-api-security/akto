@@ -4,9 +4,10 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
 
+import org.bson.codecs.pojo.annotations.BsonDiscriminator;
+
 import com.akto.dao.ConfigsDao;
 import com.mongodb.client.model.Filters;
-import org.bson.codecs.pojo.annotations.BsonDiscriminator;
 
 @BsonDiscriminator
 public abstract class Config {
@@ -33,7 +34,7 @@ public abstract class Config {
     public String id;
 
     public enum ConfigType {
-        SLACK, GOOGLE, WEBPUSH, PASSWORD, SALESFORCE, SENDGRID, AUTH0, GITHUB, STIGG, MIXPANEL, SLACK_ALERT, OKTA, AZURE, HYBRID_SAAS, SLACK_ALERT_USAGE, GOOGLE_SAML;
+        SLACK, GOOGLE, WEBPUSH, PASSWORD, SALESFORCE, SENDGRID, AUTH0, GITHUB, STIGG, MIXPANEL, SLACK_ALERT, OKTA, AZURE, HYBRID_SAAS, SLACK_ALERT_USAGE, GOOGLE_SAML, AWS_WAF, SPLUNK_SIEM;
     }
 
     public ConfigType configType;
@@ -684,6 +685,123 @@ public abstract class Config {
         public void setPublicKey(String publicKey) {
             this.publicKey = publicKey;
         }
+    }
+
+    @BsonDiscriminator
+    public static class AwsWafConfig extends Config {
+        private String awsAccessKey;
+        private String awsSecretKey;
+        private String region;
+        private String ruleSetId;
+        private String ruleSetName;
+        private int accountId;
+
+        public static final String CONFIG_ID = ConfigType.AWS_WAF.name();
+
+        public AwsWafConfig() {
+            this.configType = ConfigType.AWS_WAF;
+            this.id = CONFIG_ID;
+        }
+
+        public AwsWafConfig(String awsAccessKey, String awsSecretKey, String region, String ruleSetId,
+                String ruleSetName, int accountId) {
+            this.awsAccessKey = awsAccessKey;
+            this.awsSecretKey = awsSecretKey;
+            this.region = region;
+            this.ruleSetId = ruleSetId;
+            this.ruleSetName = ruleSetName;
+            this.accountId = accountId;
+            this.id = accountId + "_" + CONFIG_ID;
+        }
+
+        public String getAwsAccessKey() {
+            return awsAccessKey;
+        }
+
+        public void setAwsAccessKey(String awsAccessKey) {
+            this.awsAccessKey = awsAccessKey;
+        }
+
+        public String getAwsSecretKey() {
+            return awsSecretKey;
+        }
+
+        public void setAwsSecretKey(String awsSecretKey) {
+            this.awsSecretKey = awsSecretKey;
+        }
+
+        public String getRegion() {
+            return region;
+        }
+
+        public void setRegion(String region) {
+            this.region = region;
+        }
+
+        public String getRuleSetId() {
+            return ruleSetId;
+        }
+
+        public void setRuleSetId(String ruleSetId) {
+            this.ruleSetId = ruleSetId;
+        }
+
+        public String getRuleSetName() {
+            return ruleSetName;
+        }
+
+        public void setRuleSetName(String ruleSetName) {
+            this.ruleSetName = ruleSetName;
+        }
+
+        public static String getConfigId() {
+            return CONFIG_ID;
+        }
+
+        public int getAccountId() {
+            return accountId;
+        }
+
+        public void setAccountId(int accountId) {
+            this.accountId = accountId;
+        }
+       
+    }
+
+    @BsonDiscriminator
+    public static class SplunkSiemConfig extends Config {
+        private String splunkUrl;
+        private String splunkToken;
+
+        public static final String CONFIG_ID = ConfigType.SPLUNK_SIEM.name();
+
+        public SplunkSiemConfig() {
+            this.configType = ConfigType.SPLUNK_SIEM;
+            this.id = CONFIG_ID;
+        }
+
+        public SplunkSiemConfig(String splunkUrl, String splunkToken, int accountId) {
+            this.splunkUrl = splunkUrl;
+            this.splunkToken = splunkToken;
+            this.id = accountId + "_" + CONFIG_ID;
+        }
+
+        public String getSplunkUrl() {
+            return splunkUrl;
+        }
+
+        public void setSplunkUrl(String splunkUrl) {
+            this.splunkUrl = splunkUrl;
+        }
+
+        public String getSplunkToken() {
+            return splunkToken;
+        }
+
+        public void setSplunkToken(String splunkToken) {
+            this.splunkToken = splunkToken;
+        }
+       
     }
 
     public static boolean isConfigSSOType(ConfigType configType){
