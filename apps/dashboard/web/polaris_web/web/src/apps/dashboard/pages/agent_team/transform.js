@@ -74,7 +74,11 @@ const transform = {
             (a, b) => b.createdTimestamp - a.createdTimestamp
         );
         return subprocesses;
-    }
+    },
+    updateAgentState: (state,agentId="",setAgentState,setCurrentAgentState) => {
+        setAgentState(state)
+        if(agentId !== "")setCurrentAgentState(agentId,state)
+    },
 
 }
 

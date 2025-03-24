@@ -11,6 +11,7 @@ import { intermediateStore } from "../../intermediate.store";
 import {useAgentsStateStore} from "../../agents.state.store"
 import func from "../../../../../../util/func";
 import SelectedChoices from "./SelectedChoices";
+import transform from "../../transform";
 
 interface SubProcessProps {
     agentId: string, 
@@ -60,8 +61,7 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, triggerCall
         });
         setCurrentSubprocess(newSubId);
         setCurrentAttempt(1);
-        setAgentState("thinking");
-        setCurrentAgentState(agentId, "thinking");
+        transform.updateAgentState("thinking", agentId??"", setAgentState, setCurrentAgentState);
         setCurrentSubprocessAttempt(agentId, 1);
         setCurrentAgentSubprocess(agentId, newSubId);
         return newRes.subprocess as AgentSubprocess;
@@ -84,8 +84,7 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, triggerCall
 
             if (newSubProcess.state === State.RUNNING) {
                 if (agentState !== "error") {
-                    setAgentState("thinking");
-                    setCurrentAgentState(agentId, "thinking")
+                    transform.updateAgentState("thinking", agentId??"", setAgentState, setCurrentAgentState);
                 }
             }
 
@@ -96,8 +95,7 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, triggerCall
                         setFinalCTAShow(true);
                         await api.updateAgentRun({ processId, state: "COMPLETED" });
                     } else {
-                        setAgentState("idle")
-                        setCurrentAgentState(agentId, "idle")
+                        transform.updateAgentState("idle", agentId??"", setAgentState, setCurrentAgentState);
                     }
                 } else {
                     const newSub = await createNewSubprocess(newSubIdNumber);
@@ -107,13 +105,11 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, triggerCall
             }
 
             if (newSubProcess.state === State.COMPLETED) {
-                setAgentState("paused");
-                setCurrentAgentState(agentId, "paused");
+                transform.updateAgentState("paused", agentId??"", setAgentState, setCurrentAgentState);
             }
 
             if (newSubProcess.state === State.DISCARDED) {
-                setAgentState("idle");
-                setCurrentAgentState(agentId, "idle");
+                transform.updateAgentState("idle", agentId??"", setAgentState, setCurrentAgentState);
             }
 
             if (newSubProcess.state === State.AGENT_ACKNOWLEDGED) {
@@ -128,7 +124,7 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, triggerCall
             }
 
             if (newSubProcess.state === State.SCHEDULED) {
-                setAgentState("idle");
+                transform.updateAgentState("idle", agentId??"", setAgentState, setCurrentAgentState);
             }
 
             if (JSON.stringify(newSubProcess) !== JSON.stringify(subprocess)) {
@@ -168,7 +164,7 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, triggerCall
     async function startAgentAgain() {
         let res = await api.updateAgentRun({ processId, state: "DISCARDED" });
         func.setToast(true, false, "Agent is being submitted for re-run")
-        setAgentState("idle");
+        transform.updateAgentState("idle", agentId??"", setAgentState, setCurrentAgentState);
         setTimeout(async () => {
             const previousAgentRun = res.agentRun
             let data = await api.createAgentRun({
@@ -188,7 +184,7 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, triggerCall
     async function stopAgent() {
         await api.updateAgentRun({ processId, state: "STOPPED" });
         func.setToast(true, false, "Agent has been stopped")
-        setAgentState("idle");
+        transform.updateAgentState("idle", agentId??"", setAgentState, setCurrentAgentState);
     }
 
     return useMemo(() => (

@@ -6,6 +6,7 @@ import { useAgentsStore } from '../agents.store';
 
 import './BlockedState.css';
 import { useAgentsStateStore } from '../agents.state.store';
+import transform from '../transform';
 
 interface BlockedStateProps {
     onResume: () => void;
@@ -17,8 +18,7 @@ export const BlockedState = ({ onResume, onDiscard }: BlockedStateProps) => {
     const {setCurrentAgentState} = useAgentsStateStore()
 
     const handleResume = () => {
-        setAgentState('idle');
-        if (currentAgent?.id) setCurrentAgentState(currentAgent?.id, 'idle');
+        transform.updateAgentState("idle", currentAgent?.id??"", setAgentState, setCurrentAgentState);
         onResume();
     }
 
@@ -29,8 +29,7 @@ export const BlockedState = ({ onResume, onDiscard }: BlockedStateProps) => {
     const show = isPaused || isThinking || isError;
 
     const handleDiscard = () => {
-        setAgentState('idle');
-        if (currentAgent?.id) setCurrentAgentState(currentAgent?.id, 'idle');
+        transform.updateAgentState("idle", currentAgent?.id??"", setAgentState, setCurrentAgentState);
         onDiscard();
     }
 
