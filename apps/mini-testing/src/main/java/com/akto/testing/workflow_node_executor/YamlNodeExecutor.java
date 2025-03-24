@@ -259,7 +259,7 @@ public class YamlNodeExecutor extends NodeExecutor {
         String testSubCategory = yamlNodeDetails.getTestId();
         List<YamlTemplate> yamlTemplates = new ArrayList<>();
         for (int i = 0; i < 10; i++) {
-            yamlTemplates.addAll(dataActor.fetchYamlTemplates(false, i*50));
+            yamlTemplates.addAll(dataActor.fetchYamlTemplates(true, i*50));
         }
         Map<String, TestConfig> testConfigMap = YamlTemplateDao.instance.fetchTestConfigMap(false, false, yamlTemplates);
         TestConfig testConfig = testConfigMap.get(testSubCategory);
