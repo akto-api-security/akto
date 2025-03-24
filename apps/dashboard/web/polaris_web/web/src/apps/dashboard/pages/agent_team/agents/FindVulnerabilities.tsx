@@ -7,6 +7,7 @@ import api from '../api';
 import { useAgentsStateStore } from '../agents.state.store';
 import SpinnerCentered from '../../../components/progress/SpinnerCentered';
 import { intermediateStore } from '../intermediate.store';
+import transform from '../transform';
 
 export const FindVulnerabilitiesAgent = () => {
 
@@ -16,7 +17,7 @@ export const FindVulnerabilitiesAgent = () => {
     const { currentProcessId, currentAgent, setCurrentAttempt, setCurrentSubprocess, setCurrentProcessId, resetStore, agentState, setAgentState} = useAgentsStore();
     const { resetIntermediateStore } = intermediateStore(state => ({ resetIntermediateStore: state.resetIntermediateStore })); 
 
-    const {setCurrentSubprocessAttempt,setCurrentAgentProcessId,setCurrentAgentSubprocess, resetAgentState} = useAgentsStateStore();
+    const {setCurrentSubprocessAttempt,setCurrentAgentProcessId,setCurrentAgentSubprocess, resetAgentState, setCurrentAgentState} = useAgentsStateStore();
 
     const getAllAgentRuns = async () => {
         try {
@@ -48,12 +49,12 @@ export const FindVulnerabilitiesAgent = () => {
             const agentRunningOnModule = response?.agentRunningOnModule;
             if (!agentRunningOnModule) {
                 if (agentState === "thinking") {
-                    setAgentState("error")
+                    transform.updateAgentState("error", currentAgent?.id??"", setAgentState, setCurrentAgentState);
                 }
             }
         } catch (error) {
             if (agentState === "thinking") {
-                setAgentState("error")
+                transform.updateAgentState("error", currentAgent?.id??"", setAgentState, setCurrentAgentState);
             }
         }
     }
