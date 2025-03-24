@@ -189,7 +189,13 @@ public class AgentHelperAction extends UserAction {
     List<BasicDBObject> apiInfoKeysWithSchema;
 
     public String getApisForChosenCollectionForSourceCode(){
-        this.apiInfoKeysWithSchema = new ArrayList<>();
+        this.apiInfoKeysWithSchema = new 
+        ArrayList<>();
+
+        if (chosenCodeAnalysisCollectionIds == null || chosenCodeAnalysisCollectionIds.isEmpty()) {
+            return Action.SUCCESS.toUpperCase();
+        }
+
         for(String hexId: chosenCodeAnalysisCollectionIds){
             ObjectId objectId = new ObjectId(hexId);
             CodeAnalysisCollection codeAnalysisCollection = CodeAnalysisCollectionDao.instance.findOne(Filters.eq(Constants.ID, objectId));
@@ -203,7 +209,7 @@ public class AgentHelperAction extends UserAction {
                 this.apiInfoKeysWithSchema.add(schema);
             });
         }
-        return SUCCESS.toUpperCase();
+        return Action.SUCCESS.toUpperCase();
     }
 
     public List<String> getDataTypeKeys() {
