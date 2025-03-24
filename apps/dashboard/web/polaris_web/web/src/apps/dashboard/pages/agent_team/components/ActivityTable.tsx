@@ -18,11 +18,12 @@ interface TableData {
     action: string;
     duration: string;
     details: string;
+    createdTimeStamp: number|string;
 }
 
 const sortOptions = [
-    { label: 'Start time', value: 'start_time asc', directionLabel: 'Highest', sortKey: 'start_time', columnIndex: 1 },
-    { label: 'Start time', value: 'start_time desc', directionLabel: 'Lowest', sortKey: 'start_time', columnIndex: 1 },
+    { label: 'Start time', value: 'start_time asc', directionLabel: 'Highest', sortKey: 'createdTimeStamp', columnIndex: 1 },
+    { label: 'Start time', value: 'start_time desc', directionLabel: 'Lowest', sortKey: 'createdTimeStamp', columnIndex: 1 },
 ];
 
 function ActivityTable({ agentId }) {
@@ -129,7 +130,10 @@ function ActivityTable({ agentId }) {
             resetStore();
             resetAgentState(agentId);
         }
-        if (agentRuns.length === 0) return;
+        if (agentRuns.length === 0) {
+            setData([]);
+            return;
+        }
         const fetchedData: TableData[] = await Promise.all(
             agentRuns.map(async (runData) => {
                 const duration = (runData.endTimestamp === 0)
@@ -142,6 +146,7 @@ function ActivityTable({ agentId }) {
                     action: func.capitalizeFirstLetter(runData.state.toLowerCase()),
                     duration: duration,
                     details: await getDetails(runData),
+                    createdTimeStamp: runData.startTimestamp,
                 } as TableData;
             })
         );
@@ -152,6 +157,10 @@ function ActivityTable({ agentId }) {
 
 
     useEffect(() => {
+        if(!agentId || agentId.trim() === "") {
+            setData([]);
+            return;
+        }
         fetchTable();
 
     }, [agentId]);

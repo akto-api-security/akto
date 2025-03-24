@@ -32,9 +32,12 @@ export const FindVulnerabilitiesAgent = () => {
                 // TODO: handle cases here, because the above API only gets "RUNNING" Agents.
                 // setCurrentProcessId("")
                 resetStore();
+                if(currentAgent?.id)resetAgentState(currentAgent?.id);
+                setSubprocesses([]);
             }
         } catch(error) {
             resetStore();
+            if(currentAgent?.id)resetAgentState(currentAgent?.id);
             resetIntermediateStore();
         }
     }
@@ -99,7 +102,7 @@ export const FindVulnerabilitiesAgent = () => {
     const healthCheckIntervalRef = useRef<number | null>(null);
 
     useEffect(() => {
-        if (!currentAgentRun || currentAgentRun?.state !== State.RUNNING) {
+        if (!currentAgentRun || currentAgentRun?.state !== State.RUNNING || currentAgentRun?.agent !== currentAgent?.id) {
             setCurrentAttempt(0);
             setCurrentSubprocess("0");
             if(currentAgentRun?.agent)setCurrentSubprocessAttempt(currentAgentRun?.agent, 0);

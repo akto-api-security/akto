@@ -82,14 +82,14 @@ function AgentTeam() {
             Object.entries(agentsStore).forEach(async ([key,agent]) => {
                 if(!agent.currentAgentSubprocess || agent.currentAgentSubprocess === "0" || !agent.currentAgentProcessId ) return;
                 // TODO: creating Infinite loop of `no process found toast`, if process is not found
-                console.log(agent)
+                // console.log(agent)
                 const response = await api.getSubProcess({
                     processId: agent.currentAgentProcessId,
                     subProcessId: agent.currentAgentSubprocess,
                     attemptId: agent.currentSubprocessAttempt,
                 });
                 let subProcess = response.subprocess as AgentSubprocess;
-                console.log(response)
+                // console.log(response)
                 setCurrentAgentState(key, transform.getStateToAgentState(subProcess.state));
             })
             
