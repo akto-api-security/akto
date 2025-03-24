@@ -9,6 +9,7 @@ import "../styles.css"
 import PersistStore from '../../main/PersistStore'
 import { usePolling } from '../../main/PollingProvider'
 import SignUpPageLayout from './SignUpPageLayout'
+import LocalStore from '../../main/LocalStorageStore'
 
 function SignUp() {
 
@@ -39,6 +40,7 @@ function SignUp() {
   const githubAuthUrl = window.GITHUB_AUTH_URL
   const oktaAuthUrl = window.OKTA_AUTH_URL
   const resetAll = PersistStore(state => state.resetAll)
+  const resetStore = LocalStore(state => state.resetStore)
   const { clearPollingInterval } = usePolling();
 
   const githubAuthObj = {
@@ -67,6 +69,7 @@ function SignUp() {
 
   useEffect(() => {
     resetAll()
+    resetStore()
     clearPollingInterval()
     let copySsoList = []
     switch (activeSSO?.toLowerCase()) {

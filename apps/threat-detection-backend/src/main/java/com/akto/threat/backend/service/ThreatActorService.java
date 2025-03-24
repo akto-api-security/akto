@@ -5,27 +5,29 @@ import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.Fe
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchMaliciousEventsResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListThreatActorResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListThreatActorsRequest;
-import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatActivityTimelineRequest;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ModifyThreatActorStatusRequest;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ModifyThreatActorStatusResponse;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.SplunkIntegrationRequest;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.SplunkIntegrationRespone;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatActivityTimelineResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatActorByCountryRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatActorByCountryResponse;
-import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchMaliciousEventsResponse.MaliciousPayloadsResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListThreatActorResponse.ActivityData;
-import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatActivityTimelineResponse.ActivityTimeline;
 import com.akto.threat.backend.constants.MongoDBCollection;
+import com.akto.threat.backend.db.ActorInfoModel;
+import com.akto.threat.backend.db.SplunkIntegrationModel;
 import com.mongodb.client.FindIterable;
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Updates;
 import com.mongodb.client.model.Sorts;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
 
 import org.bson.Document;
 import org.bson.conversions.Bson;
@@ -367,4 +369,70 @@ public class ThreatActorService {
 
     return ThreatActorByCountryResponse.newBuilder().addAllCountries(actorsByCountryCount).build();
   }
+
+  public SplunkIntegrationRespone addSplunkIntegration(
+      String accountId, SplunkIntegrationRequest req) {
+
+        int accId = Integer.parseInt(accountId);
+        MongoCollection<SplunkIntegrationModel> coll =
+            this.mongoClient
+                .getDatabase(accountId)
+                .getCollection(MongoDBCollection.ThreatDetection.SPLUNK_INTEGRATION_CONFIG, SplunkIntegrationModel.class);
+
+        Bson filters = Filters.eq("accountId", accId);
+        long cnt = coll.countDocuments(filters);
+        if (cnt > 0) {
+            Bson updates = Updates.combine(
+                Updates.set("splunkUrl", req.getSplunkUrl()),
+                Updates.set("splunkToken", req.getSplunkToken())
+            );
+            this.mongoClient
+            .getDatabase(accountId + "")
+            .getCollection(MongoDBCollection.ThreatDetection.SPLUNK_INTEGRATION_CONFIG, Document.class)
+            .updateOne(filters, updates);
+        } else {
+            SplunkIntegrationModel splunkIntegrationModel = SplunkIntegrationModel.newBuilder().setAccountId(accId).setSplunkToken(req.getSplunkToken()).setSplunkUrl(req.getSplunkUrl()).build();
+            this.mongoClient
+            .getDatabase(accountId + "")
+            .getCollection(MongoDBCollection.ThreatDetection.SPLUNK_INTEGRATION_CONFIG, SplunkIntegrationModel.class)
+            .insertOne(splunkIntegrationModel);
+        }
+        
+        return SplunkIntegrationRespone.newBuilder().build();
+        
+
+    }
+
+    public ModifyThreatActorStatusResponse modifyThreatActorStatus(
+      String accountId, ModifyThreatActorStatusRequest request) {
+
+        MongoCollection<ActorInfoModel> coll =
+            this.mongoClient
+                .getDatabase(accountId)
+                .getCollection(MongoDBCollection.ThreatDetection.ACTOR_INFO, ActorInfoModel.class);
+        String actorIp = request.getIp();
+
+        Bson filters = Filters.eq("ip", actorIp);
+        long cnt = coll.countDocuments(filters);
+        if (cnt > 0) {
+            Bson updates = Updates.combine(
+                Updates.set("updatedTs", request.getUpdatedTs()),
+                Updates.set("status", request.getStatus())
+            );
+            this.mongoClient
+            .getDatabase(accountId + "")
+            .getCollection(MongoDBCollection.ThreatDetection.ACTOR_INFO, Document.class)
+            .updateOne(filters, updates);
+        } else {
+            ActorInfoModel actorInfoModel = ActorInfoModel.newBuilder().setIp(actorIp).
+              setStatus(request.getStatus()).setUpdatedTs(request.getUpdatedTs()).build();
+            this.mongoClient
+              .getDatabase(accountId + "")
+              .getCollection(MongoDBCollection.ThreatDetection.ACTOR_INFO, ActorInfoModel.class)
+              .insertOne(actorInfoModel);
+        }
+
+
+        return ModifyThreatActorStatusResponse.newBuilder().build();
+      }
 }

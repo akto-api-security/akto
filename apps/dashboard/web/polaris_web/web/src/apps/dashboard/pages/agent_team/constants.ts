@@ -2,8 +2,8 @@ import api from "./components/finalctas/api"
 import { intermediateStore } from "./intermediate.store";
 
 const STEPS_PER_AGENT_ID = {
-    "FIND_VULNERABILITIES_FROM_SOURCE_CODE": 6,
-    "FIND_APIS_FROM_SOURCE_CODE": 2,
+    "FIND_VULNERABILITIES_FROM_SOURCE_CODE": 5,
+    "FIND_APIS_FROM_SOURCE_CODE": 4,
     "FIND_SENSITIVE_DATA_TYPES": 1,
     "CREATE_TEST_TEMPLATES": 1,
     "GROUP_APIS": 1,
@@ -97,6 +97,24 @@ export function structuredOutputFormat (output: any, agentType: string | undefin
                 }
             default:
                 return output
+            }
+        case "FIND_APIS_FROM_SOURCE_CODE":
+            switch (subProcessId) {
+                case "1":
+                    return {
+                        "chosenBackendDirectory": output
+                    }
+                case "2":
+                    if(typeof output === "string") {
+                        const jsonStr = `{${output}}`;
+                        const obj = JSON.parse(jsonStr);
+                        console.log("obj", obj)
+                        return obj
+                    }else{
+                        return output
+                    }
+                default:
+                    return output
             }
         default:
             return output

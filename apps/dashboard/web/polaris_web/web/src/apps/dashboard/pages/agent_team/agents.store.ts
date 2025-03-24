@@ -18,12 +18,12 @@ interface AgentsStore {
     attemptedInBlockedState: boolean;
     setAttemptedInBlockedState: (attempted: boolean) => void;
     agentState: AgentState;
-    setAgentState: (state: AgentState) => void;
+    setAgentState: (state: AgentState | ((prev: AgentState) => AgentState)) => void;
     currentProcessId: string | null;
     setCurrentProcessId: (currentProcessId: string) => void;
     currentSubprocess: string | null;
     setCurrentSubprocess: (subprocess: string) => void;
-    currentAttempt: number 
+    currentAttempt: number
     setCurrentAttempt: (subprocess: number) => void;
     PRstate: string;
     setPRState: (state: string) => void;
@@ -51,7 +51,13 @@ export const useAgentsStore = create<AgentsStore>()(
                 setAttemptedInBlockedState: (attempted: boolean) =>
                     set({ attemptedInBlockedState: attempted }),
                 agentState: "idle",
-                setAgentState: (state: AgentState) => set({ agentState: state }),
+                setAgentState: (stateOrUpdater) => {
+                    const prev = get().agentState;
+                    const nextState = typeof stateOrUpdater === "function"
+                      ? (stateOrUpdater as (prev: AgentState) => AgentState)(prev)
+                      : stateOrUpdater;
+                    set({ agentState: nextState });
+                  },                
                 currentSubprocess: '0',
                 setCurrentSubprocess: (subprocess: string) => set({ currentSubprocess: subprocess }),
                 currentProcessId:"",

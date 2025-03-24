@@ -8,6 +8,7 @@ import java.util.UUID;
 import org.bson.conversions.Bson;
 
 import com.akto.action.UserAction;
+import com.akto.dao.agents.AgentHealthCheckDao;
 import com.akto.dao.agents.AgentRunDao;
 import com.akto.dao.agents.AgentSubProcessSingleAttemptDao;
 import com.akto.dao.context.Context;
@@ -287,6 +288,7 @@ public class AgentAction extends UserAction {
                     // get subprocess data of the latest one only, i am assuming that if chosen retry attempt, the data of later will get cleaned up from mongo, the new one would be inserted
                     AgentSubProcessSingleAttempt subprocess = AgentSubProcessSingleAttemptDao.instance.findLatestOne(Filters.eq(AgentSubProcessSingleAttempt.PROCESS_ID, agentRunRunning.getProcessId()));
                     response.put("data", subprocess);
+                    response.put("agentData", agentRunRunning);
                 }
 
                 // else case is nothing is running or scheduled, hence empty object is sufficient for 
@@ -296,6 +298,29 @@ public class AgentAction extends UserAction {
             return ERROR.toUpperCase();
         }
         
+        return SUCCESS.toUpperCase();
+    }
+
+    public String getAllAgentRunningDetails(){
+        try {
+            if (this.processId == null) {
+                return ERROR.toUpperCase();
+            }
+
+            AgentRun agentRun = AgentRunDao.instance.findOne(Filters.eq(AgentRun.PROCESS_ID, this.processId));
+            response = new BasicDBObject();
+            if(agentRun != null){
+                List<AgentSubProcessSingleAttempt> subprocesses = AgentSubProcessSingleAttemptDao.instance.findAll(Filters.eq(AgentSubProcessSingleAttempt.PROCESS_ID, agentRun.getProcessId()));
+                response.put("type", "initForReboot");
+                response.put("data", agentRun);
+                response.put("allSubProcesses", subprocesses);
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ERROR.toUpperCase();
+        }
+
         return SUCCESS.toUpperCase();
     }
 
@@ -310,7 +335,7 @@ public class AgentAction extends UserAction {
         this.logs = logs;
     }
 
-    public String receiveDataFromAgent(){
+    public String receiveDataFromAgent() {
         response = new BasicDBObject();
         Bson filter = Filters.and(
             Filters.eq(AgentSubProcessSingleAttempt.PROCESS_ID, this.processId),
@@ -319,7 +344,7 @@ public class AgentAction extends UserAction {
         );
         switch (type) {
             case "logs":
-                AgentSubProcessSingleAttemptDao.instance.updateOne(
+                AgentSubProcessSingleAttemptDao.instance.updateOneNoUpsert(
                     filter,
                     Updates.addEachToSet(AgentSubProcessSingleAttempt._LOGS, this.logs)
                 );
@@ -336,7 +361,7 @@ public class AgentAction extends UserAction {
                     );
                 }
                 try {
-                    AgentSubProcessSingleAttemptDao.instance.updateOne(
+                    AgentSubProcessSingleAttemptDao.instance.updateOneNoUpsert(
                         filter,
                         update
                     );
@@ -346,7 +371,7 @@ public class AgentAction extends UserAction {
                 }
                 break;
             case "subProcessHeading":
-                AgentSubProcessSingleAttemptDao.instance.updateOne(
+                AgentSubProcessSingleAttemptDao.instance.updateOneNoUpsert(
                     filter,
                     Updates.set(AgentSubProcessSingleAttempt.SUB_PROCESS_HEADING, subProcessHeading)
                 );
@@ -363,6 +388,37 @@ public class AgentAction extends UserAction {
         }
         response.put("success", "200 ok");
         return SUCCESS.toUpperCase();
+    }
+
+    String instanceId;
+    String version;
+
+    public String agentHealth() {
+
+        if (instanceId == null || instanceId.isEmpty()) {
+            addActionError("InstanceId is empty");
+            return Action.ERROR.toUpperCase();
+        }
+
+        if (version == null || version.isEmpty()) {
+            addActionError("Agent Version is missing");
+            return Action.ERROR.toUpperCase();
+        }
+
+        AgentHealthCheckDao.instance.saveHealth(instanceId, version, processId);
+
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    boolean agentRunningOnModule;
+
+    public String checkAgentRunModule() {
+        if (processId == null || processId.isEmpty()) {
+            addActionError("Process Id is empty");
+            return Action.ERROR.toUpperCase();
+        }
+        agentRunningOnModule = AgentHealthCheckDao.instance.isProcessRunningSomewhere(processId);
+        return Action.SUCCESS.toUpperCase();
     }
 
     public List<AgentRun> getAgentRuns() {
@@ -462,6 +518,30 @@ public class AgentAction extends UserAction {
     
     public BasicDBObject getResponse() {
         return response;
+    }
+
+    public String getInstanceId() {
+        return instanceId;
+    }
+
+    public void setInstanceId(String instanceId) {
+        this.instanceId = instanceId;
+    }
+
+    public String getVersion() {
+        return version;
+    }
+
+    public void setVersion(String version) {
+        this.version = version;
+    }
+    
+    public boolean getAgentRunningOnModule() {
+        return agentRunningOnModule;
+    }
+
+    public void setAgentRunningOnModule(boolean agentRunningOnModule) {
+        this.agentRunningOnModule = agentRunningOnModule;
     }
 
 }

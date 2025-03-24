@@ -14,12 +14,9 @@ export const ThreatSummary = ({ startTimestamp, endTimestamp }) => {
 
     const fetchThreatActorsCount = async () => {
         const response = await api.getDailyThreatActorsCount(startTimestamp, endTimestamp);
-        console.log({ response });
         const actorsCountByDay =  response.actorsCounts;
-        console.log({ actorsCountByDay });
         const criticalActors = actorsCountByDay.map(item => item.criticalActors);
         const activeActors = actorsCountByDay.map(item => item.totalActors);
-        console.log({ criticalActors, activeActors });
         observeFunc.setIssuesState(criticalActors, setCriticalActors, setCriticalActorsDelta, true);
         observeFunc.setIssuesState(activeActors, setActiveActors, setTotalActorsDelta, true);
     }
@@ -34,14 +31,14 @@ export const ThreatSummary = ({ startTimestamp, endTimestamp }) => {
             data: observeFunc.formatNumberWithCommas(criticalActors[criticalActors.length - 1]),
             variant: 'heading2xl',
             color: 'critical',
-            byLineComponent: observeFunc.generateByLineComponent(criticalActorsDelta, func.timeDifference(startTimestamp, endTimestamp)),
+            // byLineComponent: observeFunc.generateByLineComponent(criticalActorsDelta, func.timeDifference(startTimestamp, endTimestamp)),
             smoothChartComponent: (<SmoothAreaChart tickPositions={criticalActors} />)
         },
         {
             title: 'Active Actors',
             data: observeFunc.formatNumberWithCommas(activeActors[activeActors.length - 1]),
             variant: 'heading2xl',
-            byLineComponent: observeFunc.generateByLineComponent(totalActorsDelta, func.timeDifference(startTimestamp, endTimestamp)),
+            // byLineComponent: observeFunc.generateByLineComponent(totalActorsDelta, func.timeDifference(startTimestamp, endTimestamp)),
             smoothChartComponent: (<SmoothAreaChart tickPositions={activeActors} />)
         }
     ]
