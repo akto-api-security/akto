@@ -1,6 +1,6 @@
 import { TopBar, Icon, Text, ActionList, Modal, TextField, HorizontalStack, Box, Avatar, VerticalStack, Button, Scrollable } from '@shopify/polaris';
 import { NotificationMajor, CustomerPlusMajor, LogOutMinor, NoteMinor, ResourcesMajor, UpdateInventoryMajor, PageMajor, DynamicSourceMajor, PhoneMajor, ChatMajor, SettingsMajor } from '@shopify/polaris-icons';
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Store from '../../../store';
 import PersistStore from '../../../../main/PersistStore';
@@ -37,11 +37,57 @@ export default function Header() {
     const resetAll = PersistStore(state => state.resetAll)
     const resetStore = LocalStore(state => state.resetStore)
 
+    /* Search bar */
     //const allRoutes = Store((state) => state.allRoutes)
     const allCollections = PersistStore((state) => state.allCollections)
     const subCategoryMap = LocalStore(state => state.subCategoryMap)
     const searchItemsArr = useMemo(() => func.getSearchItemsArr(allCollections, subCategoryMap), [allCollections, subCategoryMap])
-    const [filteredItemsArr, setFilteredItemsArr] = useState(searchItemsArr)
+    const [filteredItemsArr, setFilteredItemsArr] = useState(searchItemsArr);
+    
+    useEffect(() => {
+        setFilteredItemsArr(searchItemsArr);
+    }, [searchItemsArr]);
+
+    const debouncedSearch = useMemo(() => debounce(async (searchQuery) => {    
+        if (searchQuery.length === 0) {
+            setFilteredItemsArr(searchItemsArr);
+        } else {
+            const resultArr = searchItemsArr.filter((x) => x.content.toLowerCase().includes(searchQuery));
+            setFilteredItemsArr(resultArr);
+        }
+    }, 500), [searchItemsArr]); 
+
+    const handleSearchChange = useCallback((value) => {
+        setSearchValue(value);
+        debouncedSearch(value.toLowerCase());
+    }, [debouncedSearch]);
+
+    const handleNavigateSearch = (url) => {
+        navigate(url)
+        handleSearchChange('')
+    }
+
+    const searchResultSections = useMemo(() =>func.getSearchResults(filteredItemsArr, handleNavigateSearch), [filteredItemsArr])
+
+    const searchResultsMarkup = (
+        <Scrollable style={{maxHeight: '500px'}} shadow>
+        <ActionList
+            sections={searchResultSections}
+        />
+        </Scrollable>
+    );
+
+    const searchFieldMarkup = (
+        <TopBar.SearchField
+            placeholder="Search collections, tests, and connectors"
+            showFocusBorder
+            onChange={handleSearchChange}
+            value={searchValue}
+        />
+    );
+    /* Search bar */
+
+
     const toggleIsUserMenuOpen = useCallback(
         () => setIsUserMenuOpen((isUserMenuOpen) => !isUserMenuOpen),
         [],
@@ -63,14 +109,6 @@ export default function Header() {
         })
     }
 
-    const debouncedSearch = debounce(async (searchQuery) => {
-        if(searchQuery.length === 0){
-            setFilteredItemsArr(searchItemsArr)
-        }else{
-            const resultArr = searchItemsArr.filter((x) => x.content.toLowerCase().includes(searchQuery))
-            setFilteredItemsArr(resultArr)
-        }
-    }, 500);
 
     function createNewAccount() {
         api.saveToAccount(newAccount).then(resp => {
@@ -125,36 +163,6 @@ export default function Header() {
             initials={func.initials(username)}
             open={isUserMenuOpen}
             onToggle={toggleIsUserMenuOpen}
-        />
-    );
-
-    const handleSearchChange = useCallback((value) => {
-        setSearchValue(value);
-        debouncedSearch(value.toLowerCase())
-    }, []);
-
-    const handleNavigateSearch = (url) => {
-        navigate(url)
-        handleSearchChange('')
-    }
-
-
-    const searchResultSections = useMemo(() =>func.getSearchResults(filteredItemsArr, handleNavigateSearch), [filteredItemsArr])
-
-    const searchResultsMarkup = (
-        <Scrollable style={{maxHeight: '500px'}} shadow>
-        <ActionList
-            sections={searchResultSections}
-        />
-        </Scrollable>
-    );
-
-    const searchFieldMarkup = (
-        <TopBar.SearchField
-            placeholder="Search collections, tests, and connectors"
-            showFocusBorder
-            onChange={handleSearchChange}
-            value={searchValue}
         />
     );
 
