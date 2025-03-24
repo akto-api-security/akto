@@ -106,10 +106,17 @@ export function structuredOutputFormat (output: any, agentType: string | undefin
                     }
                 case "2":
                     if(typeof output === "string") {
-                        const jsonStr = `{${output}}`;
-                        const obj = JSON.parse(jsonStr);
-                        console.log("obj", obj)
-                        return obj
+                        let obj = {}
+                        try {
+                            obj = JSON.parse(output);
+                            return obj
+                        } catch (error) {
+                            const jsonStr = `{${output}}`;
+                            obj = JSON.parse(jsonStr);
+                            return obj
+                        }finally {
+                            return toJson(output)  
+                        }
                     }else{
                         return output
                     }

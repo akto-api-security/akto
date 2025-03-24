@@ -55,7 +55,7 @@ function OutputSelector({onHandleSelect, processOutput} : OutputSelectorProps) {
     const allowMultiple = processOutput?.selectionType === "multiple"
     const initialValue = noOptionsReturned ? "" : (!allowMultiple ?
         getMessageFromObj(processOutput?.outputOptions[0], "textValue") :
-        processOutput?.outputOptions.map((option: any) => (option.value !== undefined ? option.value : option)))
+        processOutput?.outputOptions.map((option: any) => (option?.value !== undefined ? option?.value : (option?.textValue !== undefined ? option?.textValue : option))))
 
     const [filteredChoices, setFilteredChoices] = useState(initialValue);
     const handleSelected = (selectedChoices: any) => { 
@@ -85,7 +85,7 @@ function OutputSelector({onHandleSelect, processOutput} : OutputSelectorProps) {
                                 // TODO: optionally take this function for transformation.
                                 return {
                                     label: option?.textValue !== undefined ? option?.textValue : option,
-                                    value: option?.value !== undefined ? option?.value : option,
+                                    value: option?.value !== undefined ? option?.value : (option?.textValue !== undefined ? option?.textValue : option),
                                 }
                             })}
                             placeHolder={"Edit choice(s)"}

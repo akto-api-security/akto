@@ -259,7 +259,7 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, triggerCall
                 <VerticalStack gap={"2"}>
                     <Text variant="bodyMd" as="span">{subprocess.processOutput?.outputMessage}</Text>
                     {/* TODO: Selected choices dialog, handle edge cases. */}
-                    {/* <SelectedChoices userInput={subprocess.userInput}/> */}
+                    <SelectedChoices userInput={subprocess.userInput}/>
                 </VerticalStack>
             }
 
