@@ -53,9 +53,10 @@ function OutputSelector({onHandleSelect, processOutput} : OutputSelectorProps) {
     const messageString = processOutput?.outputMessage;
 
     const allowMultiple = processOutput?.selectionType === "multiple"
-    const initialValue = !allowMultiple ?
+    const initialValue = noOptionsReturned ? "" : (!allowMultiple ?
         getMessageFromObj(processOutput?.outputOptions[0], "textValue") :
-        processOutput?.outputOptions.map((option: any) => (option.value !== undefined ? option.value : option));
+        processOutput?.outputOptions.map((option: any) => (option.value !== undefined ? option.value : option)))
+
     const [filteredChoices, setFilteredChoices] = useState(initialValue);
     const handleSelected = (selectedChoices: any) => { 
         setFilteredChoices(selectedChoices);
