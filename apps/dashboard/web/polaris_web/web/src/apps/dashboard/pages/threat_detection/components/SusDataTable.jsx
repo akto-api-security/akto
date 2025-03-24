@@ -30,6 +30,11 @@ const headers = [
     filterKey: 'actor'
   },
   {
+    text: "Subcategory",
+    value: "subCategory",
+    title: "Subcategory",
+  },
+  {
     text: "Filter",
     value: "filterId",
     title: "Attack type",
@@ -69,7 +74,7 @@ const sortOptions = [
 
 let filters = [];
 
-function SusDataTable({ currDateRange, rowClicked }) {
+function SusDataTable({ currDateRange, rowClicked, externalFilter }) {
   const getTimeEpoch = (key) => {
     return Math.floor(Date.parse(currDateRange.period[key]) / 1000);
   };
@@ -94,7 +99,8 @@ function SusDataTable({ currDateRange, rowClicked }) {
     let sourceIpsFilter = [],
       apiCollectionIdsFilter = [],
       matchingUrlFilter = [],
-      typeFilter = [];
+      typeFilter = [],
+      subCategoryFilter = [];
     if (filters?.actor) {
       sourceIpsFilter = filters?.actor;
     }
@@ -107,6 +113,9 @@ function SusDataTable({ currDateRange, rowClicked }) {
     if(filters?.type){
       typeFilter = filters?.type
     }
+    if(filters?.subCategory){
+      subCategoryFilter = filters?.subCategory
+    }
     const sort = { [sortKey]: sortOrder };
     const res = await api.fetchSuspectSampleData(
       skip,
@@ -116,7 +125,8 @@ function SusDataTable({ currDateRange, rowClicked }) {
       typeFilter,
       sort,
       startTimestamp,
-      endTimestamp
+      endTimestamp,
+      subCategoryFilter,
     );
 //    setSubCategoryChoices(distinctSubCategories);
     let total = res.total;
@@ -133,6 +143,7 @@ function SusDataTable({ currDateRange, rowClicked }) {
         discoveredTs: dayjs(x.timestamp*1000).format("DD-MM-YYYY HH:mm:ss"),
         sourceIPComponent: x?.ip || "-",
         type: x?.type || "-",
+        subCategory: x?.subCategory || "-",
         severityComp: (<div className={`badge-wrapper-${severity}`}>
                           <Badge size="small">{func.toSentenceCase(severity)}</Badge>
                       </div>
@@ -151,6 +162,9 @@ function SusDataTable({ currDateRange, rowClicked }) {
         return { label: url, value: x };
       });
     let ipChoices = res?.ips.map((x) => {
+      return { label: x, value: x };
+    });
+    let subCategoryChoices = res?.subCategory.map((x) => {
       return { label: x, value: x };
     });
 
@@ -176,6 +190,12 @@ function SusDataTable({ currDateRange, rowClicked }) {
           {label: 'Rule based', value: 'Rule-Based'},
           {label: 'Anomaly', value: 'Anomaly'},
         ],
+      },
+      {
+        key: 'subCategory',
+        label: "Subcategory",
+        title: "Subcategory",
+        choices: subCategoryChoices,
       }
     ];
   }
@@ -213,6 +233,7 @@ function SusDataTable({ currDateRange, rowClicked }) {
       headings={headers}
       useNewRow={true}
       condensedHeight={true}
+      externalFilter={externalFilter}
     />
   );
 }
