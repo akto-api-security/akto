@@ -62,12 +62,12 @@ export default function Header() {
         debouncedSearch(value.toLowerCase());
     }, [debouncedSearch]);
 
-    const handleNavigateSearch = (url) => {
-        navigate(url)
-        handleSearchChange('')
-    }
+    const handleNavigateSearch = useCallback((url) => {
+            navigate(url);
+            handleSearchChange('');  
+    }, [navigate, handleSearchChange]);
 
-    const searchResultSections = useMemo(() =>func.getSearchResults(filteredItemsArr, handleNavigateSearch), [filteredItemsArr])
+    const searchResultSections = useMemo(() => func.getSearchResults(filteredItemsArr, handleNavigateSearch), [filteredItemsArr, handleNavigateSearch])
 
     const searchResultsMarkup = (
         <Scrollable style={{maxHeight: '500px'}} shadow>

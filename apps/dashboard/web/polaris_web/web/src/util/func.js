@@ -25,17 +25,20 @@ const searchResultSections = {
   collections: {
     type: "collection",
     title: "Collections",
-    icon: DynamicSourceMajor
+    icon: DynamicSourceMajor,
+    sectionPath: "/dashboard/observe/inventory/"
   },
   tests: {
     type: "test",
     title: "Tests",
-    icon: FileMinor
+    icon: FileMinor,
+    sectionPath: "/dashboard/test-editor/"
   },
   connectors: {
     type: "connector",
     title: "Connectors",
-    icon: AffiliateMajor
+    icon: AffiliateMajor,
+    sectionPath: "/dashboard/quick-start"
   },
 }
 
@@ -1292,9 +1295,8 @@ getDeprecatedEndpoints(apiInfoList, unusedEndpoints, apiCollectionId) {
   const searchItems = []
 
   const activatedColections = allCollections.filter((collection) => collection.deactivated === false)
-  const initialPath = "/dashboard/observe/inventory/"
   activatedColections.forEach((collection)=> {
-    const collectionUrl = initialPath + collection.id
+    const collectionUrl = searchResultSections.collections.sectionPath + collection.id
     const searchResult = this.createSearchResult(
       searchResultSections.collections,
       collection.displayName, 
@@ -1310,9 +1312,8 @@ getDeprecatedEndpoints(apiInfoList, unusedEndpoints, apiCollectionId) {
   // filter active tests
   const activeTests = Object.values(allTests).filter((test) => test.inactive === false)
 
-  const initialPath = "/dashboard/test-editor/"
   activeTests.forEach(test => {
-    const testUrl = initialPath + test.name
+    const testUrl = searchResultSections.tests.sectionPath + test.name
     const searchResult = this.createSearchResult(
       searchResultSections.tests,
       test.name, 
@@ -1321,18 +1322,19 @@ getDeprecatedEndpoints(apiInfoList, unusedEndpoints, apiCollectionId) {
     searchItems.push(searchResult)
   });
 
+  console.log(searchItems)
+
   return searchItems
  },
  getConnectorSearchItems() {
   const searchItems = []
 
   const connectorCategories = quickStartFunc.getConnectorsListCategorized()
-  const initialPath = "/dashboard/quick-start"
 
   for (const categoryArr of Object.values(connectorCategories)) {
       for (const connector of categoryArr) {
         const connectorKey = connector.key?.toLowerCase() ?? "";
-        const connectorUrl = `${initialPath}?connector=${connectorKey}`
+        const connectorUrl = `${searchResultSections.connectors.sectionPath}?connector=${connectorKey}`
         const searchResult = this.createSearchResult(
           searchResultSections.connectors,
           connector.label, 
@@ -1354,7 +1356,7 @@ getDeprecatedEndpoints(apiInfoList, unusedEndpoints, apiCollectionId) {
 
   return combinedArr
  },
- createSearchResultsSection(section, filteredItemsArr, sectionOverflowUrl, handleNavigateSearch) {
+ createSearchResultsSection(section, filteredItemsArr, handleNavigateSearch) {
     const SECTION_ITEMS_MAX_COUNT = 10
     const filteredSectionItems = filteredItemsArr.filter(sectionItem => sectionItem.type === section.type)
     const filteredSectionResults = filteredSectionItems
@@ -1365,10 +1367,10 @@ getDeprecatedEndpoints(apiInfoList, unusedEndpoints, apiCollectionId) {
       const { url, ...moreResult } = this.createSearchResult(
         searchResultSections.collections,
         `+${filteredSectionItems.length - SECTION_ITEMS_MAX_COUNT} more`,
-        sectionOverflowUrl
+        section.sectionPath
       );
 
-      moreResult.onAction = () => handleNavigateSearch(sectionOverflowUrl);
+      moreResult.onAction = () => handleNavigateSearch(section.sectionPath);
       moreResult.icon = ''
       filteredSectionResults.push(moreResult)
     }
@@ -1379,15 +1381,9 @@ getDeprecatedEndpoints(apiInfoList, unusedEndpoints, apiCollectionId) {
     }
 },
  getSearchResults(filteredItemsArr, handleNavigateSearch) {
-
-  const collectionsPath = "/dashboard/observe/inventory/"
-  const testsPath = "/dashboard/test-editor"
-  const connectorsPath = "/dashboard/quick-start"
-  const collectionsSection = this.createSearchResultsSection(searchResultSections.collections, filteredItemsArr, collectionsPath, handleNavigateSearch)
-  const testsSection = this.createSearchResultsSection(searchResultSections.tests, filteredItemsArr, testsPath, handleNavigateSearch)
-  const connectorsSection = this.createSearchResultsSection(searchResultSections.connectors, filteredItemsArr, connectorsPath, handleNavigateSearch)
-
-
+  const collectionsSection = this.createSearchResultsSection(searchResultSections.collections, filteredItemsArr, handleNavigateSearch)
+  const testsSection = this.createSearchResultsSection(searchResultSections.tests, filteredItemsArr, handleNavigateSearch)
+  const connectorsSection = this.createSearchResultsSection(searchResultSections.connectors, filteredItemsArr, handleNavigateSearch)
 
   const allSections = [ collectionsSection, testsSection, connectorsSection ].filter(section => section !== null)
 
