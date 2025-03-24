@@ -1322,8 +1322,6 @@ getDeprecatedEndpoints(apiInfoList, unusedEndpoints, apiCollectionId) {
     searchItems.push(searchResult)
   });
 
-  console.log(searchItems)
-
   return searchItems
  },
  getConnectorSearchItems() {
@@ -1398,7 +1396,6 @@ updateQueryParams(searchParams, setSearchParams, key, value) {
       newSearchParams.set(key, value);
   }
   setSearchParams(newSearchParams);
-  return window.ACTIVE_ACCOUNT === 1669322524
 },
  getComplianceIcon: (complianceName) => {
   return "/public/"+complianceName.toUpperCase()+".svg";
