@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Scrollable, VerticalStack } from '@shopify/polaris';
-import { AgentRun, AgentSubprocess, State } from '../types';
+import { AgentRun, AgentState, AgentSubprocess, State } from '../types';
 import { Subprocess } from '../components/agentResponses/Subprocess';
 import { useAgentsStore } from '../agents.store';
 import api from '../api';
@@ -48,14 +48,14 @@ export const FindVulnerabilitiesAgent = () => {
             const response = await api.checkAgentRunModule({ processId: currentAgentRun?.processId });
             const agentRunningOnModule = response?.agentRunningOnModule;
             if (!agentRunningOnModule) {
-                if (agentState === "thinking") {
-                    transform.updateAgentState("error", currentAgent?.id??"", setAgentState, setCurrentAgentState);
-                }
+                    transform.updateAgentState((prev: AgentState) => {
+                        return prev === "thinking" ? "error" : prev
+                    }, currentAgent?.id??"", setAgentState, setCurrentAgentState);
             }
         } catch (error) {
-            if (agentState === "thinking") {
-                transform.updateAgentState("error", currentAgent?.id??"", setAgentState, setCurrentAgentState);
-            }
+            transform.updateAgentState((prev: AgentState) => {
+                return prev === "thinking" ? "error" : prev
+            }, currentAgent?.id??"", setAgentState, setCurrentAgentState);
         }
     }
 
@@ -64,15 +64,52 @@ export const FindVulnerabilitiesAgent = () => {
         const response = await api.getAllSubProcesses({
             processId: processId
         });
-        const subprocesses = response.subProcesses as AgentSubprocess[];
+        let subprocesses = response.subProcesses as AgentSubprocess[];
         
+        let subProcessesLatestAttempts : AgentSubprocess[] = []
+
+        subprocesses.sort((a,b) => {
+            let spa = Number(a.subProcessId)
+            let spb = Number(b.subProcessId)
+            let ata = a.attemptId
+            let atb = b.attemptId
+            if(spa < spb){
+                return -1;
+            } else if(spa > spb){
+                return 1;
+            } else {
+                if(ata < atb){
+                    return -1
+                } else {
+                    return 1
+                }
+            }
+        })
+
+        let currentSubprocessId = 0;
+        let currentAttemptId = 0;
+
+        for(let temp of subprocesses){
+            let tempSubProcessId = Number(temp.subProcessId)
+            let tempAttemptId = temp.attemptId
+            if (currentSubprocessId === tempSubProcessId &&
+                tempAttemptId > currentAttemptId) {
+                subProcessesLatestAttempts.pop()
+            }
+            currentSubprocessId = tempSubProcessId
+            currentAttemptId = tempAttemptId
+            subProcessesLatestAttempts.push(temp)
+        }
+        subprocesses = subProcessesLatestAttempts
         setSubprocesses(subprocesses);
         
         if(subprocesses.length > 0 && shouldSetState){ 
             // if page-reload, this will be called to fill the data required in the localstorage
             let newestSubprocess = subprocesses[0]
             subprocesses.forEach((subprocess) => {
-                if(subprocess.createdTimestamp > newestSubprocess.createdTimestamp){
+                if ((Number(subprocess.subProcessId) > Number(newestSubprocess.subProcessId))
+                    || (Number(subprocess.subProcessId) === Number(newestSubprocess.subProcessId)
+                        && subprocess.attemptId > newestSubprocess.attemptId)) {
                     newestSubprocess = subprocess
                 }
             });

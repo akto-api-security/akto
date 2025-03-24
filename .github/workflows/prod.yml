@@ -117,7 +117,7 @@ jobs:
           ECR_REPOSITORY: akto-api-security
           IMAGE_TAG_1: local
           IMAGE_TAG_2: ${{ github.event.inputs.release_version }}_local
-          IMAGE_TAG_THREAT: threat_local
+          IMAGE_TAG_THREAT: threat_latest_image
         run: |
           docker buildx create --use
           # Build a docker container and push it to DockerHub

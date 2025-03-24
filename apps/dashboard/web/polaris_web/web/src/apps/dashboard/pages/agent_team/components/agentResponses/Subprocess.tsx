@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import {  AgentRun, AgentSubprocess, State } from "../../types";
+import {  AgentRun, AgentState, AgentSubprocess, State } from "../../types";
 import { CaretDownMinor } from "@shopify/polaris-icons";
 import api from "../../api";
 import { useAgentsStore } from "../../agents.store";
@@ -83,9 +83,9 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, triggerCall
             if (!newSubProcess) return;
 
             if (newSubProcess.state === State.RUNNING) {
-                if (agentState !== "error") {
-                    transform.updateAgentState("thinking", agentId??"", setAgentState, setCurrentAgentState);
-                }
+                    transform.updateAgentState((prev: AgentState) => {
+                        return prev !== "error" ? "thinking" : prev
+                    }, agentId??"", setAgentState, setCurrentAgentState);
             }
 
             if (newSubProcess.state === State.ACCEPTED) {
