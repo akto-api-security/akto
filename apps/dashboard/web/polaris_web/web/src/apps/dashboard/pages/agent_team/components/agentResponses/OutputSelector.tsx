@@ -23,7 +23,7 @@ function OutputSelector({onHandleSelect, processOutput} : OutputSelectorProps) {
 
     const { currentAgent } = useAgentsStore();
 
-    const noOptionsReturned = processOutput?.outputOptions.length == 0
+    const noOptionsReturned = processOutput?.outputOptions.length === 0
 
     const getStringMessage = (type: string, options: any[]) => {
 
@@ -41,7 +41,7 @@ function OutputSelector({onHandleSelect, processOutput} : OutputSelectorProps) {
             messageString += " ";
         })
 
-        if (maxOutputOptions + 1 == options.length && type === "multiple") {
+        if (maxOutputOptions + 1 === options.length && type === "multiple") {
             messageString += "and " + options[options.length - 1]
         } else if (maxOutputOptions < options.length && type === "multiple") {
             messageString += "and " + (options.length - maxOutputOptions) + " more...";
@@ -53,9 +53,10 @@ function OutputSelector({onHandleSelect, processOutput} : OutputSelectorProps) {
     const messageString = processOutput?.outputMessage;
 
     const allowMultiple = processOutput?.selectionType === "multiple"
-    const initialValue = !allowMultiple ?
+    const initialValue = noOptionsReturned ? "" : (!allowMultiple ?
         getMessageFromObj(processOutput?.outputOptions[0], "textValue") :
-        processOutput?.outputOptions.map((option: any) => (option.value !== undefined ? option.value : option));
+        processOutput?.outputOptions.map((option: any) => (option?.value !== undefined ? option?.value : (option?.textValue !== undefined ? option?.textValue : option))))
+
     const [filteredChoices, setFilteredChoices] = useState(initialValue);
     const handleSelected = (selectedChoices: any) => { 
         setFilteredChoices(selectedChoices);
@@ -83,8 +84,8 @@ function OutputSelector({onHandleSelect, processOutput} : OutputSelectorProps) {
                             optionsList={processOutput?.outputOptions.map((option: any) => {
                                 // TODO: optionally take this function for transformation.
                                 return {
-                                    label: option.textValue !== undefined ? option?.textValue : option,
-                                    value: option?.value !== undefined ? option?.value : option,
+                                    label: option?.textValue !== undefined ? option?.textValue : option,
+                                    value: option?.value !== undefined ? option?.value : (option?.textValue !== undefined ? option?.textValue : option),
                                 }
                             })}
                             placeHolder={"Edit choice(s)"}

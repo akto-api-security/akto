@@ -1,12 +1,12 @@
 import React from 'react';
 import { useAgentsStore } from '../../agents.store';
-import APISRequiredCTA from './APISRequiredCTA';
 import { intermediateStore } from '../../intermediate.store';
 import AgentCoreCTA from './AgentCoreCTA';
 import func from '../../../../../../util/func';
 import issueApi from "../../../../pages/issues/api"
 import api from "./api";
 import apiCollectionApi from "../../../../pages/observe/api"
+import APISRequiredCTA from './APISRequiredCTA';
 import SourceCodeAnalyserCTA from "./SourceCodeAnalyserCTA"
 
 function AgentFinalCTA() {
@@ -56,27 +56,30 @@ function AgentFinalCTA() {
     return (() => {
         switch (currentAgent?.id) {
             case 'FIND_VULNERABILITIES_FROM_SOURCE_CODE':
-                return (PRstate === "4" ? <APISRequiredCTA /> : <></>)
+                return (PRstate === "2" && <APISRequiredCTA />)
             case 'FIND_SENSITIVE_DATA_TYPES':
                 return <AgentCoreCTA
                     onSave={() => sensitiveDataTypeSave()}
-                    modalTitle={`Save sensitive data type${filteredUserInput?.length == 1 ? "" : "s"}`}
+                    modalTitle={`Save sensitive data type${filteredUserInput?.length === 1 ? "" : "s"}`}
                     actionText={'Save'}
-                    contentString={`Do you want to add the ${filteredUserInput?.length} selected sensitive data type${filteredUserInput?.length == 1 ? "" : "s"} to Akto ?`} />
+                    contentString={`Do you want to add the ${filteredUserInput?.length} selected sensitive data type${filteredUserInput?.length === 1 ? "" : "s"} to Akto ?`} 
+                />
             case 'FIND_APIS_FROM_SOURCE_CODE':
                 return (<SourceCodeAnalyserCTA />)
             case 'GROUP_APIS':
                 return <AgentCoreCTA
                     onSave={() => apiGroupSave()}
-                    modalTitle={`Save API group${filteredUserInput?.length == 1 ? "" : "s"}`}
+                    modalTitle={`Save API group${filteredUserInput?.length === 1 ? "" : "s"}`}
                     actionText={'Save'}
-                    contentString={`Do you want to add the ${filteredUserInput?.length} selected API group${filteredUserInput?.length == 1 ? "" : "s"} to Akto ?`} />
+                    contentString={`Do you want to add the ${filteredUserInput?.length} selected API group${filteredUserInput?.length === 1 ? "" : "s"} to Akto ?`} 
+                    />
             case 'FIND_FALSE_POSITIVE':
                 return <AgentCoreCTA
                     onSave={() => falsePositiveSave()}
-                    modalTitle={`Ignore testing run result${filteredUserInput?.length == 1 ? "" : "s"}`}
+                    modalTitle={`Ignore testing run result${filteredUserInput?.length === 1 ? "" : "s"}`}
                     actionText={'Mark as ignored'}
-                    contentString={`Do you want to mark the ${filteredUserInput?.length} selected testing result${filteredUserInput?.length == 1 ? "" : "s"} as false positive?`} />
+                    contentString={`Do you want to mark the ${filteredUserInput?.length} selected testing result${filteredUserInput?.length === 1 ? "" : "s"} as false positive?`} 
+                    />
             default:
                 return (<></>)
         }

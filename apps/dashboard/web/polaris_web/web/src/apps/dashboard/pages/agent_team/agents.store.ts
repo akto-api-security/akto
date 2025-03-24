@@ -29,6 +29,8 @@ interface AgentsStore {
     setPRState: (state: string) => void;
     finalCTAShow: boolean;
     setFinalCTAShow: (state: boolean) => void;
+    chosenBackendDirectory: string;
+    setChosenBackendDirectory: (directory: string) => void;
     resetStore: () => void;
 }
 
@@ -66,8 +68,8 @@ export const useAgentsStore = create<AgentsStore>()(
                 setPRState: (state: string) => set({ PRstate: state }),
                 finalCTAShow: false,
                 setFinalCTAShow: (state: boolean) => set({ finalCTAShow: state }),
-            
-
+                chosenBackendDirectory: "",
+                setChosenBackendDirectory: (directory: string) => set({ chosenBackendDirectory: directory }),
                 resetStore: () => set({
                     currentPrompt: { html: "", markdown: "" },
                     attemptedInBlockedState: false,
@@ -76,7 +78,8 @@ export const useAgentsStore = create<AgentsStore>()(
                     currentProcessId: "",
                     currentAttempt: 0,
                     PRstate: "-1",
-                    finalCTAShow: false
+                    finalCTAShow: false,
+                    chosenBackendDirectory: "",
                 }),
             }),
             { name: "agentsStore", storage: createJSONStorage(() => localStorage) }

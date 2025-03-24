@@ -7,7 +7,12 @@ interface AgentsStore {
     outputOptions: any | null;
     setOutputOptions: (outputOptions: any) => void;
     resetIntermediateStore: () => void;
-
+    previousUserInput: any | null;
+    setPreviousUserInput: (previousUserInput: any) => void;
+    sourceCodeCollections: any[];
+    setSourceCodeCollections: (sourceCodeCollections: any[]) => void;
+    userSelectedCollections: string[];
+    setUserSelectedCollections: (userSelectedCollections: string[]) => void;
 }
 
 // Zustand Store with Middleware
@@ -19,7 +24,12 @@ export const intermediateStore = create<AgentsStore>()(
                 setFilteredUserInput: (filteredUserInput: any) => set({ filteredUserInput: filteredUserInput }),
                 outputOptions: null,
                 setOutputOptions: (outputOptions: any) => set({ outputOptions: outputOptions }),
-
+                previousUserInput: null,
+                setPreviousUserInput: (previousUserInput: any) => set({ previousUserInput: previousUserInput }),
+                sourceCodeCollections: [],
+                setSourceCodeCollections: (sourceCodeCollections: any[]) => set({ sourceCodeCollections: sourceCodeCollections }),
+                userSelectedCollections: [],
+                setUserSelectedCollections: (userSelectedCollections: string[]) => set({ userSelectedCollections: userSelectedCollections }),
                 resetIntermediateStore: () => set({
                     filteredUserInput: null,
                     outputOptions: null

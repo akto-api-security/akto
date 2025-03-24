@@ -6,8 +6,93 @@ import func from "../../../../../util/func"
 import DropdownSearch from '../../../components/shared/DropdownSearch'
 import agentApi from '../api'
 
-function RepositoryInitializer({ agentType }: { agentType: string }) {
+function RepoSelector({ handleClickRepo, selectedRepo, selectedProject, selectedConnection }) {
     const [reposList, setReposList] = useState<RepoPayload[]>([])
+    const [newRepoName, setNewRepoName] = React.useState<string>('');
+    const [newProjectName, setNewProjectName] = React.useState<string>('');
+
+    const handleAddRepository = async () => {
+        if (newRepoName && newProjectName) {
+            // Add the new repository to the list
+            const newRepo: RepoPayload = {
+                repo: newRepoName,
+                project: newProjectName,
+                lastRun: 0,  // Default value for new repo
+                scheduleTime: 0  // Default value for new repo
+            };
+            setReposList(prev => [...prev, newRepo]);
+
+            // Trigger the analysis for the new repository
+            await handleClickRepo(newRepoName, newProjectName, null);
+
+            // Clear the input fields
+            setNewRepoName('');
+            setNewProjectName('');
+        }
+    };
+
+    return (
+        <Box as='div' paddingBlockStart={"5"}>
+            <VerticalStack gap={"4"}>
+                {/* New repository input section */}
+                <VerticalStack gap={"2"}>
+                    <Text variant="bodyMd" as='span'>
+                        Add a new repository:
+                    </Text>
+                    <HorizontalStack gap={"2"} align="start">
+                        <Box width='200px'>
+                            <TextField
+                                label="Repository Name"
+                                autoComplete="off"
+                                value={newRepoName}
+                                onChange={(value) => setNewRepoName(value)}
+                                placeholder="Enter repository name"
+                            />
+                        </Box>
+                        <Box width='200px'>
+                            <TextField
+                                label="Project Name"
+                                autoComplete="off"
+                                value={newProjectName}
+                                onChange={(value) => setNewProjectName(value)}
+                                placeholder="Enter project name"
+                            />
+                        </Box>
+                        <Button
+                            onClick={handleAddRepository}
+                            disabled={!newRepoName || !newProjectName}
+                            primary
+                        >
+                            Add Repository
+                        </Button>
+                    </HorizontalStack>
+                </VerticalStack>
+
+                {/* Recently added section */}
+                {/* <VerticalStack gap={"2"}>
+                    <Text variant="bodySm" as='span' color='subdued'>Recently added:</Text>
+                    <GridRows
+                        items={reposList.slice(0, 5).map((x) => {
+                            return {
+                                ...x,
+                                icon: getIcon(selectedConnection)
+                            }
+                        })}
+                        CardComponent={SelectRepoComp}
+                        horizontalGap={"3"}
+                        verticalGap={"3"}
+                        columns={3}
+                        onButtonClick={(repo: string, project: string) => {
+                            handleClickRepo(repo, project, null)
+                        }}
+                    />
+                </VerticalStack> */}
+            </VerticalStack>
+        </Box>
+    )
+}
+
+function RepositoryInitializer({ agentType }: { agentType: string }) {
     const [selectedConnection, setSelectedConnection] = React.useState<string>('')
     const [selectedRepo, setSelectedRepo] = React.useState<string>('')
     const [selectedProject, setSelectedProject] = React.useState<string>('')
@@ -114,119 +199,13 @@ function RepositoryInitializer({ agentType }: { agentType: string }) {
         )
     }
 
-    function RepoSelector() {
-        const [newRepoName, setNewRepoName] = React.useState<string>('');
-        const [newProjectName, setNewProjectName] = React.useState<string>('');
-
-        const handleAddRepository = async () => {
-            if (newRepoName && newProjectName) {
-                // Add the new repository to the list
-                const newRepo: RepoPayload = {
-                    repo: newRepoName,
-                    project: newProjectName,
-                    lastRun: 0,  // Default value for new repo
-                    scheduleTime: 0  // Default value for new repo
-                };
-                setReposList(prev => [...prev, newRepo]);
-
-                // Trigger the analysis for the new repository
-                await handleClickRepo(newRepoName, newProjectName, null);
-
-                // Clear the input fields
-                setNewRepoName('');
-                setNewProjectName('');
-            }
-        };
-
-        return (
-            <Box as='div' paddingBlockStart={"5"}>
-                <VerticalStack gap={"4"}>
-                    {/* New repository input section */}
-                    <VerticalStack gap={"2"}>
-                        <Text variant="bodyMd" as='span'>
-                            Add a new repository:
-                        </Text>
-                        <HorizontalStack gap={"2"} align="start">
-                            <Box width='200px'>
-                                <TextField
-                                    label="Repository Name"
-                                    autoComplete="off"
-                                    value={newRepoName}
-                                    onChange={(value) => setNewRepoName(value)}
-                                    placeholder="Enter repository name"
-                                />
-                            </Box>
-                            <Box width='200px'>
-                                <TextField
-                                    label="Project Name"
-                                    autoComplete="off"
-                                    value={newProjectName}
-                                    onChange={(value) => setNewProjectName(value)}
-                                    placeholder="Enter project name"
-                                />
-                            </Box>
-                            <Button
-                                onClick={handleAddRepository}
-                                disabled={!newRepoName || !newProjectName}
-                                primary
-                            >
-                                Add Repository
-                            </Button>
-                        </HorizontalStack>
-                    </VerticalStack>
-
-                    {/* Recently added section */}
-                    {/* <VerticalStack gap={"2"}>
-                        <Text variant="bodySm" as='span' color='subdued'>Recently added:</Text>
-                        <GridRows
-                            items={reposList.slice(0, 5).map((x) => {
-                                return {
-                                    ...x,
-                                    icon: getIcon(selectedConnection)
-                                }
-                            })}
-                            CardComponent={SelectRepoComp}
-                            horizontalGap={"3"}
-                            verticalGap={"3"}
-                            columns={3}
-                            onButtonClick={(repo: string, project: string) => {
-                                handleClickRepo(repo, project, null)
-                            }}
-                        />
-                    </VerticalStack> */}
-                    
-                    {reposList.length > 0 ? <div>
-                        <Text as='span' variant='bodyMd'>
-                            Hey! I see you've connected your {func.toSentenceCase(selectedConnection)} account. Found {reposList.length} repositories which one would you like me to analyze?
-                        </Text>
-
-                        {/* Existing repository selector */}
-                        <Box width='350px' paddingInlineStart={"2"}>
-                            <DropdownSearch
-                                placeholder="Select a repository"
-                                optionsList={
-                                    reposList.map((x) => {
-                                        return {
-                                            label: x.project + " / " + x.repo,
-                                            value: x.repo + "/" + x.project,
-                                        }
-                                    })
-                                }
-                                setSelected={(x: string) => {
-                                    handleClickRepo(x.split("/")[0], x.split("/")[1], null)
-                                }}
-                                value={selectedRepo.length > 0 ? selectedRepo + "/" + selectedProject : ""}
-                            />
-                        </Box>
-
-                    </div> : null
-                    }
-                </VerticalStack>
-            </Box>
-        )
-    }
     return (
-        selectedConnection.length === 0 ? <RepoInitializer /> : <RepoSelector />
+        selectedConnection.length === 0 ? <RepoInitializer /> : <RepoSelector 
+            handleClickRepo={handleClickRepo}
+            selectedRepo={selectedRepo}
+            selectedProject={selectedProject}
+            selectedConnection={selectedConnection}
+        />
     )
 }
 

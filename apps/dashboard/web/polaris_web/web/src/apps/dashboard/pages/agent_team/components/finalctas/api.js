@@ -7,6 +7,15 @@ const api = {
             data: data 
         })
     },
+
+    getSourceCodeCollectionsForDirectories: async (data) => {
+        return await request({
+            url: '/api/getSourceCodeCollectionsForDirectories',
+            method: 'post',
+            data: data 
+        })
+    }
+    
 }
 
 export default api;

@@ -371,11 +371,18 @@ public class AgentAction extends UserAction {
                 }
                 break;
             case "subProcessHeading":
-            AgentSubProcessSingleAttemptDao.instance.updateOneNoUpsert(
-                filter,
-                Updates.set(AgentSubProcessSingleAttempt.SUB_PROCESS_HEADING, subProcessHeading)
-            );
-            break;
+                AgentSubProcessSingleAttemptDao.instance.updateOneNoUpsert(
+                    filter,
+                    Updates.set(AgentSubProcessSingleAttempt.SUB_PROCESS_HEADING, subProcessHeading)
+                );
+                break;
+            case "batchedData":
+                List<Object> batchedList = (List<Object>) this.data.get("outputOptions");
+                AgentSubProcessSingleAttemptDao.instance.updateOne(
+                    filter,
+                    Updates.addEachToSet(AgentSubProcessSingleAttempt.PROCESS_OUTPUT + ".outputOptions", batchedList)
+                );
+                break;
             default:
                 break;
         }

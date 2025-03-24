@@ -4,11 +4,12 @@ import {  AgentRun, AgentState, AgentSubprocess, State } from "../../types";
 import { CaretDownMinor } from "@shopify/polaris-icons";
 import api from "../../api";
 import { useAgentsStore } from "../../agents.store";
-import STEPS_PER_AGENT_ID, { preRequisitesMap } from "../../constants";
+import STEPS_PER_AGENT_ID, { outputKeys, preRequisitesMap } from "../../constants";
 import { VerticalStack, Text, HorizontalStack, Button } from "@shopify/polaris";
 import OutputSelector, { getMessageFromObj } from "./OutputSelector";
 import { intermediateStore } from "../../intermediate.store";
 import func from "../../../../../../util/func";
+import BatchedOutput from "./BatchedOutput";
 import SelectedChoices from "./SelectedChoices";
 
 interface SubProcessProps {
@@ -36,7 +37,7 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, triggerCall
         agentState: state.agentState
     }));  // Only subscribe to necessary store values
 
-    const { setFilteredUserInput, setOutputOptions } = intermediateStore(state => ({ setFilteredUserInput: state.setFilteredUserInput, setOutputOptions: state.setOutputOptions })); 
+    const { setFilteredUserInput, setOutputOptions, setPreviousUserInput } = intermediateStore(state => ({ setFilteredUserInput: state.setFilteredUserInput, setOutputOptions: state.setOutputOptions, setPreviousUserInput: state.setPreviousUserInput })); 
 
     // Memoized function to create new subprocess
     const createNewSubprocess = useCallback(async (newSubIdNumber: number) => {
@@ -44,8 +45,8 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, triggerCall
         // check for pre-requisites first
         const shouldCreateSubProcess = preRequisitesMap[agentId]?.[newSubIdNumber]?.action ? await preRequisitesMap[agentId][newSubIdNumber].action() : true;
         if (!shouldCreateSubProcess) {
-            setFinalCTAShow(false);
-            setPRState("4");
+            setFinalCTAShow(true);
+            setPRState("2");
             return null;
         }
 
@@ -108,8 +109,10 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, triggerCall
             }
 
             if (newSubProcess.state === State.AGENT_ACKNOWLEDGED) {
+                setPreviousUserInput(newSubProcess.userInput);
                 const newSub = await createNewSubprocess(Number(currentSubprocess) + 1);
                 setFilteredUserInput(null);
+               
                 setSubprocess(newSub);
                 triggerCallForSubProcesses();
             }
@@ -136,11 +139,45 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, triggerCall
         return () => clearInterval(interval);
     }, [currentSubprocess, finalCTAShow, processId, currentAttempt, subProcessFromProp, createNewSubprocess]);
 
+    const groupedOutput = useMemo(() => {
+        const rawData = subprocess?.processOutput?.selectionType === "batch" ? subprocess?.processOutput?.outputOptions : [];
+        if(rawData.length === 0) return {};
+        let finalMap = {};
+        rawData.forEach((data: any) => {
+            const {id, output} = data;
+            const {apiCollectionId, url, method} = id;
+            if(!finalMap[apiCollectionId]){
+                finalMap[data.collectionId] = [
+                    {
+                        output: output,
+                        url: url,
+                        method: method
+                    }
+                ]
+            }else{
+                if(finalMap[apiCollectionId].filter((item: any) => item.url === url && item.method === method).length === 0){ // new entry and hence add it to the list
+                    finalMap[apiCollectionId].push({
+                        output: output,
+                        url: url,
+                        method: method
+                    })
+                }else{ // update the output value
+                    finalMap[apiCollectionId].forEach((item: any) => {
+                        if(item.url === url && item.method === method && !func.deepComparison(item.output, output)){
+                            item.output = output;
+                        }
+                    })
+
+                }
+            }
+        })
+        return finalMap;
+    }, [subprocess?.processOutput?.outputOptions]);
+
     if (!subprocess) return null;
 
     const handleSelect = (selectedChoices: any, outputOptions: any) => {
-        console.log(selectedChoices);
-        setOutputOptions(outputOptions);
+        setOutputOptions(outputOptions); 
         setFilteredUserInput(selectedChoices);
     }
 
@@ -208,7 +245,12 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, triggerCall
                     </motion.div>
                 </AnimatePresence>
             </div>
-
+            {subprocess.processOutput?.selectionType === 'batch' ?<BatchedOutput 
+                data={groupedOutput} 
+                buttonText="Analyzing APIs for the collection: " 
+                isCollectionBased={true}
+                keysArr={outputKeys[agentId]}
+            /> : null}
             {subprocess.state === State.COMPLETED && subprocess.processOutput &&
                 <OutputSelector processOutput={subprocess.processOutput} onHandleSelect={handleSelect} />
             }
@@ -217,7 +259,7 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, triggerCall
                 <VerticalStack gap={"2"}>
                     <Text variant="bodyMd" as="span">{subprocess.processOutput?.outputMessage}</Text>
                     {/* TODO: Selected choices dialog, handle edge cases. */}
-                    {/* <SelectedChoices userInput={subprocess.userInput}/> */}
+                    <SelectedChoices userInput={subprocess.userInput}/>
                 </VerticalStack>
             }
 
