@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Box, Text } from '@shopify/polaris';
+import { Box, EmptySearchResult, Text } from '@shopify/polaris';
 import GithubSimpleTable from "../../../components/tables/GithubSimpleTable";
 import api from '../api';
 import { useAgentsStore } from '../agents.store';
@@ -165,6 +165,12 @@ function ActivityTable({ agentId }) {
 
     }, [agentId]);
 
+    const emptyStateMarkup = (
+        <EmptySearchResult
+          title={'No agent activity found'}
+          withIllustration
+        />
+      );
 
     const table = (
         <GithubSimpleTable
@@ -178,6 +184,7 @@ function ActivityTable({ agentId }) {
             hidePagination={true}
             showFooter={false}
             sortOptions={sortOptions}
+            emptyStateMarkup={emptyStateMarkup}
         />
     )
 
