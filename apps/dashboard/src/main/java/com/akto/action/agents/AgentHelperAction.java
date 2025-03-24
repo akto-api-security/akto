@@ -26,7 +26,6 @@ import com.akto.dto.CodeAnalysisCollection;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.data_types.Predicate.Type;
 import com.akto.dto.traffic.SampleData;
-import com.akto.dto.type.URLMethods;
 import com.akto.util.Constants;
 import com.akto.util.enums.GlobalEnums.Severity;
 import com.mongodb.BasicDBObject;
@@ -187,25 +186,22 @@ public class AgentHelperAction extends UserAction {
     }
 
     List<String> chosenCodeAnalysisCollectionIds;
-    List<Map<ApiInfoKey, BasicDBObject>> apiInfoKeysWithSchema;
+    List<BasicDBObject> apiInfoKeysWithSchema;
 
     public String getApisForChosenCollectionForSourceCode(){
         this.apiInfoKeysWithSchema = new ArrayList<>();
         for(String hexId: chosenCodeAnalysisCollectionIds){
             ObjectId objectId = new ObjectId(hexId);
             CodeAnalysisCollection codeAnalysisCollection = CodeAnalysisCollectionDao.instance.findOne(Filters.eq(Constants.ID, objectId));
-            List<CodeAnalysisApiInfo> apiInfos = CodeAnalysisApiInfoDao.instance.findAll(Filters.eq("codeAnalysisCollectionId", objectId), Projections.include("id"));
-            List<ApiInfoKey> apiInfoKeys = new ArrayList<>();
-            for(CodeAnalysisApiInfo apiInfo: apiInfos){
-                ApiInfoKey apiInfoKey = new ApiInfoKey(
-                    codeAnalysisCollection.getApiCollectionId(),
-                    apiInfo.getId().getEndpoint(),
-                    URLMethods.Method.fromString(apiInfo.getId().getMethod())
-                );  
-                apiInfoKeys.add(apiInfoKey); 
-            }
-            Map<ApiInfoKey, BasicDBObject> schemaMap = CodeAnalysisSingleTypeInfoDao.instance.getReqResSchemaForApis(apiInfoKeys);
-            apiInfoKeysWithSchema.add(schemaMap);
+            List<CodeAnalysisApiInfo> apiInfos = CodeAnalysisApiInfoDao.instance.findAll(Filters.eq("codeAnalysisCollectionId", objectId), Projections.include("id", "location"));
+            Map<ApiInfoKey, BasicDBObject> schemaMap = CodeAnalysisSingleTypeInfoDao.instance.getReqResSchemaForApis(apiInfos, codeAnalysisCollection.getApiCollectionId());
+            schemaMap.keySet().forEach(apiInfoKey -> {
+                BasicDBObject schema = schemaMap.get(apiInfoKey);
+                schema.put("apiCollectionId", apiInfoKey.getApiCollectionId());
+                schema.put("url", apiInfoKey.getUrl());
+                schema.put("method", apiInfoKey.getMethod().name());
+                this.apiInfoKeysWithSchema.add(schema);
+            });
         }
         return SUCCESS.toUpperCase();
     }
@@ -262,7 +258,7 @@ public class AgentHelperAction extends UserAction {
         this.chosenCodeAnalysisCollectionIds = chosenCodeAnalysisCollectionIds;
     }
 
-    public List<Map<ApiInfoKey, BasicDBObject>> getApiInfoKeysWithSchema() {
+    public List<BasicDBObject> getApiInfoKeysWithSchema() {
         return apiInfoKeysWithSchema;
     }
 }

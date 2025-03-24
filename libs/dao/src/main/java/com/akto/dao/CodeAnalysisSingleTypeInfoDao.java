@@ -9,6 +9,7 @@ import org.bson.conversions.Bson;
 
 import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
+import com.akto.dto.CodeAnalysisApiInfo;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
 import com.mongodb.BasicDBObject;
@@ -57,8 +58,22 @@ public class CodeAnalysisSingleTypeInfoDao extends AccountsContextDaoWithRbac<Si
         return result;
     } 
     
-    public Map<ApiInfoKey, BasicDBObject> getReqResSchemaForApis(List<ApiInfoKey> apiInfoKeys) {
+    public Map<ApiInfoKey, BasicDBObject> getReqResSchemaForApis(List<CodeAnalysisApiInfo> apiInfos, int apiCollectionId) {
         Map<ApiInfoKey, BasicDBObject> result = new HashMap<>();
+        List<ApiInfoKey> apiInfoKeys = new ArrayList<>();
+        for(CodeAnalysisApiInfo apiInfo: apiInfos){
+            ApiInfoKey apiInfoKey = new ApiInfoKey(
+                apiCollectionId,
+                apiInfo.getId().getEndpoint(),
+                URLMethods.Method.fromString(apiInfo.getId().getMethod())
+            );  
+            BasicDBObject obj = new BasicDBObject();
+            obj.put("filePath", apiInfo.getLocation().getFilePath());
+            obj.put("lineNumber", apiInfo.getLocation().getLineNo());
+            result.put(apiInfoKey, obj);
+            apiInfoKeys.add(apiInfoKey); 
+        }
+       
         if (apiInfoKeys == null || apiInfoKeys.isEmpty()) return result;
         List<Bson> pipeline = SingleTypeInfoDao.instance.createPipelineForFetchParams(apiInfoKeys, false, false);
         MongoCursor<BasicDBObject> stiCursor = instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
@@ -69,7 +84,7 @@ public class CodeAnalysisSingleTypeInfoDao extends AccountsContextDaoWithRbac<Si
             ApiInfoKey apiInfoKey = new ApiInfoKey(id.getInt("apiCollectionId"), id.getString("url"), URLMethods.Method.fromString(id.getString("method")));
             Object paramsObj = next.get("params");
             String schema = paramsObj.toString();
-            BasicDBObject schemaObj = result.getOrDefault(apiInfoKey, new BasicDBObject());
+            BasicDBObject schemaObj = result.get(apiInfoKey);
 
             if(responseCode > -1){
                 schemaObj.put("responseSchema", schema);

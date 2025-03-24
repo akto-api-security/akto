@@ -2,7 +2,7 @@ import api from "./components/finalctas/api"
 import { intermediateStore } from "./intermediate.store";
 
 const STEPS_PER_AGENT_ID = {
-    "FIND_VULNERABILITIES_FROM_SOURCE_CODE": 5,
+    "FIND_VULNERABILITIES_FROM_SOURCE_CODE": 6,
     "FIND_APIS_FROM_SOURCE_CODE": 2,
     "FIND_SENSITIVE_DATA_TYPES": 1,
     "CREATE_TEST_TEMPLATES": 1,
@@ -22,12 +22,19 @@ const checkForSourceCodeApis = async()=> {
 
 export const preRequisitesMap = {
     "FIND_VULNERABILITIES_FROM_SOURCE_CODE": {
-        2: {
+        6: {
             "text": "Please provide the list of apis for finding vulnerabilities",
             "action": () => checkForSourceCodeApis()
         },
     }
 }
+
+const vulnerableKeys = ["IS_AUTHENTICATED", "DDOS", "BOLA", "INPUT_VALIDATION"];
+
+export const outputKeys = {
+    "FIND_VULNERABILITIES_FROM_SOURCE_CODE": vulnerableKeys
+}
+
 
 function toJson(input: string):any {
     const result = {};

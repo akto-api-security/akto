@@ -4,11 +4,12 @@ import {  AgentRun, AgentSubprocess, State } from "../../types";
 import { CaretDownMinor } from "@shopify/polaris-icons";
 import api from "../../api";
 import { useAgentsStore } from "../../agents.store";
-import STEPS_PER_AGENT_ID, { preRequisitesMap } from "../../constants";
+import STEPS_PER_AGENT_ID, { outputKeys, preRequisitesMap } from "../../constants";
 import { VerticalStack, Text, HorizontalStack, Button } from "@shopify/polaris";
 import OutputSelector from "./OutputSelector";
 import { intermediateStore } from "../../intermediate.store";
 import func from "../../../../../../util/func";
+import BatchedOutput from "./BatchedOutput";
 
 interface SubProcessProps {
     agentId: string, 
@@ -125,6 +126,41 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, triggerCall
         return () => clearInterval(interval);
     }, [currentSubprocess, finalCTAShow, processId, currentAttempt, subProcessFromProp, createNewSubprocess]);
 
+    const groupedOutput = useMemo(() => {
+        const rawData = subprocess?.processOutput?.selectionType === "batch" ? subprocess?.processOutput?.outputOptions : [];
+        if(rawData.length === 0) return {};
+        let finalMap = {};
+        rawData.forEach((data: any) => {
+            const {id, output} = data;
+            const {apiCollectionId, url, method} = id;
+            if(!finalMap[apiCollectionId]){
+                finalMap[data.collectionId] = [
+                    {
+                        output: output,
+                        url: url,
+                        method: method
+                    }
+                ]
+            }else{
+                if(finalMap[apiCollectionId].filter((item: any) => item.url === url && item.method === method).length === 0){ // new entry and hence add it to the list
+                    finalMap[apiCollectionId].push({
+                        output: output,
+                        url: url,
+                        method: method
+                    })
+                }else{ // update the output value
+                    finalMap[apiCollectionId].forEach((item: any) => {
+                        if(item.url === url && item.method === method && !func.deepComparison(item.output, output)){
+                            item.output = output;
+                        }
+                    })
+
+                }
+            }
+        })
+        return finalMap;
+    }, [subprocess?.processOutput?.outputOptions]);
+
     if (!subprocess) return null;
 
     const handleSelect = (selectedChoices: any, outputOptions: any) => {
@@ -191,7 +227,12 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, triggerCall
                     </motion.div>
                 </AnimatePresence>
             </div>
-
+            {subprocess.processOutput?.selectionType === 'batch' ?<BatchedOutput 
+                data={groupedOutput} 
+                buttonText="Analyzing APIs for the collection: " 
+                isCollectionBased={true}
+                keysArr={outputKeys[agentId]}
+            /> : null}
             {subprocess.state === State.COMPLETED && subprocess.processOutput &&
                 <OutputSelector processOutput={subprocess.processOutput} onHandleSelect={handleSelect} />
             }
