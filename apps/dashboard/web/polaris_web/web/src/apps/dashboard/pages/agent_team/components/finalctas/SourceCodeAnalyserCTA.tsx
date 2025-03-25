@@ -8,6 +8,7 @@ import apiCollectionApi from "../../../../pages/observe/api"
 function SourceCodeAnalyserCTA() {
     const { finalCTAShow, setFinalCTAShow } = useAgentsStore()
 
+    //outputOptions is processOutput
     const { filteredUserInput, outputOptions, agentInitDocument } = intermediateStore();
 
     function getApiCollectionName() {
@@ -21,7 +22,12 @@ function SourceCodeAnalyserCTA() {
     async function saveApis() {
         let apiCollectionName = getApiCollectionName()
         let projectDir = apiCollectionName
-        let codeAnalysisApisList = filteredUserInput
+        let codeAnalysisApisList: any[] = []
+        outputOptions?.outputOptions?.forEach((element: any) => {
+            if (filteredUserInput.includes(element.textValue)) {
+                codeAnalysisApisList.push(element?.valueObj)
+            }
+        })
 
         await apiCollectionApi.syncExtractedAPIs(apiCollectionName, projectDir, codeAnalysisApisList)
         func.setToast(true, false, `All the api's are now saved in ${apiCollectionName} collection`)
@@ -31,19 +37,19 @@ function SourceCodeAnalyserCTA() {
        <Modal
             title={`Save all extracted apis`}
             open={finalCTAShow}
-            onClose={() => setFinalCTAShow(true)}
+            onClose={() => setFinalCTAShow(false)}
             primaryAction={{
                 content: 'Save apis',
-                onAction: () => {saveApis} /* setCurrentAgent as source code agent here */
+                onAction: () => {saveApis()} /* setCurrentAgent as source code agent here */
             }}
             secondaryActions={[{
                 content: 'Cancel',
-                onAction: () => setFinalCTAShow(true)
+                onAction: () => setFinalCTAShow(false)
             }]}
         >
             <Modal.Section>
                 <p>
-                    Save all ${filteredUserInput.length} apis with schema into "${getApiCollectionName()}" collection
+                    Save all { filteredUserInput ? filteredUserInput.length : ""} apis with schema into "{getApiCollectionName()}" collection
                 </p>
             </Modal.Section>
         </Modal>
