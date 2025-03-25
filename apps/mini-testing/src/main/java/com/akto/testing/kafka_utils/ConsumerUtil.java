@@ -30,6 +30,7 @@ import com.akto.dto.test_editor.TestConfig;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.TestResult.TestError;
 import com.akto.dto.testing.info.SingleTestPayload;
+import com.akto.log.LoggerMaker;
 import com.akto.sql.SampleDataAltDb;
 // import com.akto.notifications.slack.CustomTextAlert;
 // import com.akto.testing.Main;
@@ -52,7 +53,8 @@ public class ConsumerUtil {
     }
     private static Consumer<String, String> consumer = Constants.IS_NEW_TESTING_ENABLED ? new KafkaConsumer<>(properties) : null; 
     private static final Logger logger = LoggerFactory.getLogger(ConsumerUtil.class);
-    public static ExecutorService executor = Executors.newFixedThreadPool(100);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(ConsumerUtil.class);
+    public static ExecutorService executor = Executors.newFixedThreadPool(150);
 
     public static SingleTestPayload parseTestMessage(String message) {
         JSONObject jsonObject = JSON.parseObject(message);
@@ -76,6 +78,7 @@ public class ConsumerUtil {
         ApiInfoKey apiInfoKey = singleTestPayload.getApiInfoKey();
 
         List<String> messagesList = instance.getTestingUtil().getSampleMessages().get(apiInfoKey);
+        int timeNow = Context.now();
         if(messagesList == null || messagesList.isEmpty()){}
         else{
             String sample = messagesList.get(messagesList.size() - 1);
@@ -91,6 +94,7 @@ public class ConsumerUtil {
             logger.info("Running test for: " + apiInfoKey + " with subcategory: " + subCategory);
             TestingRunResult runResult = executor.runTestNew(apiInfoKey, singleTestPayload.getTestingRunId(), instance.getTestingUtil(), singleTestPayload.getTestingRunResultSummaryId(),testConfig , instance.getTestingRunConfig(), instance.isDebug(), singleTestPayload.getTestLogs(), sample);
             executor.insertResultsAndMakeIssues(Collections.singletonList(runResult), singleTestPayload.getTestingRunResultSummaryId());
+            loggerMaker.insertImportantTestingLog("Test completed for: " + apiInfoKey + " with subcategory: " + subCategory + " in " + (Context.now() - timeNow) + " seconds"); 
         }
     }
 
@@ -135,7 +139,7 @@ public class ConsumerUtil {
             ParallelConsumerOptions<String, String> options = ParallelConsumerOptions.<String, String>builder()
                 .consumer(consumer)
                 .ordering(ParallelConsumerOptions.ProcessingOrder.UNORDERED) // Use unordered for parallelism
-                .maxConcurrency(100) // Number of threads for parallel processing
+                .maxConcurrency(150) // Number of threads for parallel processing
                 .commitMode(ParallelConsumerOptions.CommitMode.PERIODIC_CONSUMER_SYNC) // Commit offsets synchronously
                 .batchSize(1) // Number of records to process in each poll
                 .maxFailureHistory(3)
@@ -166,14 +170,14 @@ public class ConsumerUtil {
                         try {
                             future.get(5, TimeUnit.MINUTES); 
                         } catch (InterruptedException e) {
-                            logger.error("Task timed out");
+                            loggerMaker.insertImportantTestingLog("Test is timed out");
                             future.cancel(true);
                             if(!executor.isShutdown()){
                                 createTimedOutResultFromMessage(message);
                             }
                             
                         } catch(TimeoutException e){
-                            logger.error("Task timed out");
+                            loggerMaker.insertImportantTestingLog("Test is timed out");
                             future.cancel(true);
                             createTimedOutResultFromMessage(message);
                         } catch (Exception e) {
