@@ -25,6 +25,7 @@ message ListMaliciousRequestsResponse {
       string sub_category = 13;
       string type = 14;
       string ref_id = 15;
+      string severity = 16;
     }
     repeated MaliciousEvent malicious_events = 1;
     uint64 total = 2;
@@ -131,6 +132,8 @@ message ListThreatApiResponse {
     uint64 discovered_at = 3;
     uint32 actors_count = 4;
     uint32 requests_count = 5;
+    string severity = 6;
+    string sub_category = 7;
   }
 
   repeated ThreatApi apis = 1;
