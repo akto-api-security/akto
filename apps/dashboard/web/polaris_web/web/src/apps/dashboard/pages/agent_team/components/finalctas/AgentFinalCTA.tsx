@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useAgentsStore } from '../../agents.store';
 import { intermediateStore } from '../../intermediate.store';
 import AgentCoreCTA from './AgentCoreCTA';
@@ -56,7 +56,7 @@ function AgentFinalCTA() {
     return (() => {
         switch (currentAgent?.id) {
             case 'FIND_VULNERABILITIES_FROM_SOURCE_CODE':
-                return (PRstate === "2" && <APISRequiredCTA />)
+                return (PRstate === "1" && <APISRequiredCTA />)
             case 'FIND_SENSITIVE_DATA_TYPES':
                 return <AgentCoreCTA
                     onSave={() => sensitiveDataTypeSave()}

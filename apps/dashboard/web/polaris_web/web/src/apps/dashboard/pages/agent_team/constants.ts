@@ -11,18 +11,17 @@ const STEPS_PER_AGENT_ID = {
 }
 
 const checkForSourceCodeApis = async()=> {
-    const chosenBackendDirectory = intermediateStore.getState().previousUserInput?.selectedOptions?.chosenBackendDirectory;
+    const chosenBackendDirectory = intermediateStore.getState().filteredUserInput;
     await api.getSourceCodeCollectionsForDirectories({
         "chosenBackendDirectory": chosenBackendDirectory || ""
     }).then((res) => {
         intermediateStore.getState().setSourceCodeCollections(res)
     })
-    return true
 }
 
 export const preRequisitesMap = {
     "FIND_VULNERABILITIES_FROM_SOURCE_CODE": {
-        6: {
+        1: {
             "text": "Please provide the list of apis for finding vulnerabilities",
             "action": () => checkForSourceCodeApis()
         },

@@ -1,4 +1,4 @@
-import { Icon, Text } from '@shopify/polaris';
+import { Button, HorizontalStack, Icon, Text } from '@shopify/polaris';
 import { PauseMajor, StopMajor } from '@shopify/polaris-icons';
 import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -12,7 +12,7 @@ interface BlockedStateProps {
 }
 
 export const BlockedState = ({ onResume, onDiscard }: BlockedStateProps) => {
-    const { agentState, setAttemptedInBlockedState, attemptedInBlockedState, setAgentState } = useAgentsStore();
+    const { agentState, setAttemptedInBlockedState, attemptedInBlockedState, setAgentState, PRstate } = useAgentsStore();
 
     const handleResume = () => {
         setAgentState('idle');
@@ -65,21 +65,10 @@ export const BlockedState = ({ onResume, onDiscard }: BlockedStateProps) => {
                                         Paused (Member is waiting for your response)
                                     </Text>
                                 </div>
-                                <div className="flex items-center gap-2">
-                                    <button
-                                        onClick={handleDiscard}
-                                        id="discard-button"
-                                    >
-                                        Discard
-                                    </button>
-                                    <button
-                                        onClick={handleResume}
-                                        id="approve-button"
-                                        className="hover:bg-[var(--akto-primary)/80] cursor-pointer"
-                                    >
-                                        Approve
-                                    </button>
-                                </div>
+                                <HorizontalStack gap="2">
+                                    <Button size="micro" onClick={handleDiscard}>Discard</Button>
+                                    <Button disabled={PRstate !== "-1"} size="micro" primary onClick={handleResume}>Resume</Button>
+                                </HorizontalStack>
                             </>
                     )}
                     {

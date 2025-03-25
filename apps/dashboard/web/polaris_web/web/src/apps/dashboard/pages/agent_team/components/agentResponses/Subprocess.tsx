@@ -6,7 +6,7 @@ import api from "../../api";
 import { useAgentsStore } from "../../agents.store";
 import STEPS_PER_AGENT_ID, { outputKeys, preRequisitesMap } from "../../constants";
 import { VerticalStack, Text, HorizontalStack, Button } from "@shopify/polaris";
-import OutputSelector, { getMessageFromObj } from "./OutputSelector";
+import OutputSelector from "./OutputSelector";
 import { intermediateStore } from "../../intermediate.store";
 import func from "../../../../../../util/func";
 import BatchedOutput from "./BatchedOutput";
@@ -25,7 +25,7 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, triggerCall
     const [expanded, setExpanded] = useState(true);
 
     const { finalCTAShow, setFinalCTAShow, setCurrentAttempt, 
-        setCurrentSubprocess, currentSubprocess, currentAttempt, setAgentState, setPRState, agentState } = useAgentsStore(state => ({
+        setCurrentSubprocess, currentSubprocess, currentAttempt, setAgentState, setPRState, PRstate } = useAgentsStore(state => ({
         finalCTAShow: state.finalCTAShow,
         setFinalCTAShow: state.setFinalCTAShow,
         setCurrentAttempt: state.setCurrentAttempt,
@@ -34,22 +34,13 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, triggerCall
         currentAttempt: state.currentAttempt,
         setAgentState: state.setAgentState,
         setPRState: state.setPRState,
-        agentState: state.agentState
+        PRstate: state.PRstate
     }));  // Only subscribe to necessary store values
 
-    const { setFilteredUserInput, setOutputOptions, setPreviousUserInput } = intermediateStore(state => ({ setFilteredUserInput: state.setFilteredUserInput, setOutputOptions: state.setOutputOptions, setPreviousUserInput: state.setPreviousUserInput })); 
+    const { setFilteredUserInput, setOutputOptions } = intermediateStore(state => ({ setFilteredUserInput: state.setFilteredUserInput, setOutputOptions: state.setOutputOptions })); 
 
     // Memoized function to create new subprocess
     const createNewSubprocess = useCallback(async (newSubIdNumber: number) => {
-
-        // check for pre-requisites first
-        const shouldCreateSubProcess = preRequisitesMap[agentId]?.[newSubIdNumber]?.action ? await preRequisitesMap[agentId][newSubIdNumber].action() : true;
-        if (!shouldCreateSubProcess) {
-            setFinalCTAShow(true);
-            setPRState("2");
-            return null;
-        }
-
         const newSubId = newSubIdNumber.toString();
         const newRes = await api.updateAgentSubprocess({
             processId,
@@ -101,6 +92,16 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, triggerCall
             }
 
             if (newSubProcess.state === State.COMPLETED) {
+                if(preRequisitesMap[agentId] && preRequisitesMap[agentId][currentSubprocess]){
+                    if(preRequisitesMap[agentId][currentSubprocess].action){
+                        await preRequisitesMap[agentId][currentSubprocess].action();
+                        if(PRstate === "-1"){
+                            setFinalCTAShow(true);
+                            setPRState("1");
+                        }
+                        
+                    }
+                }
                 setAgentState("paused");
             }
 
@@ -109,7 +110,6 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, triggerCall
             }
 
             if (newSubProcess.state === State.AGENT_ACKNOWLEDGED) {
-                setPreviousUserInput(newSubProcess.userInput);
                 const newSub = await createNewSubprocess(Number(currentSubprocess) + 1);
                 setFilteredUserInput(null);
                
@@ -179,6 +179,10 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, triggerCall
     const handleSelect = (selectedChoices: any, outputOptions: any) => {
         setOutputOptions(outputOptions); 
         setFilteredUserInput(selectedChoices);
+        console.log("Selected choices: ", selectedChoices, PRstate);
+        if(PRstate !== "-1"){
+            setFinalCTAShow(true);
+        }
     }
 
     async function reRunTask() {

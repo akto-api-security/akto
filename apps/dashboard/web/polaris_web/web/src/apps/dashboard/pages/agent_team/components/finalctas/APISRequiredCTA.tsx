@@ -1,14 +1,15 @@
 import { Modal, Text } from '@shopify/polaris'
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useAgentsStore } from '../../agents.store'
 import { intermediateStore } from '../../intermediate.store'
 import SearchableResourceList from '../../../../components/shared/SearchableResourceList'
 import { usersCollectionRenderItem } from '../../../settings/rbac/utils'
+import { preRequisitesMap } from '../../constants'
 
 function APISRequiredCTA() {
 
-    const {setFinalCTAShow} = useAgentsStore()
-    const { sourceCodeCollections, setUserSelectedCollections } = intermediateStore();
+    const {setFinalCTAShow, setPRState, PRstate, finalCTAShow} = useAgentsStore()
+    const { sourceCodeCollections, setUserSelectedCollections, filteredUserInput } = intermediateStore();
     const [ show, setShow] = useState<boolean>(true);
     const [selectedApisCount, setSelectedApisCount] = useState<number>(0);
 
@@ -17,7 +18,11 @@ function APISRequiredCTA() {
 
     const handleAction = () => {
         if(!showCollections){
-           // go to source code agent
+            setPRState("-1")
+        }else{
+            if(selectedApisCount !== 0){
+                setPRState('-1')
+            }
         }
         setShow(false); 
         setFinalCTAShow(false);
@@ -34,6 +39,14 @@ function APISRequiredCTA() {
         setSelectedApisCount(apisCount);
         setUserSelectedCollections(selectedIds)
     }
+
+    useEffect(() => {
+        if(finalCTAShow && PRstate !== "-1"){
+            setShow(true)
+            preRequisitesMap["FIND_VULNERABILITIES_FROM_SOURCE_CODE"][1].action()   
+        } 
+        
+    },[filteredUserInput, finalCTAShow, PRstate])
 
     const component = showCollections ? (
         <SearchableResourceList
@@ -56,7 +69,8 @@ function APISRequiredCTA() {
             onClose={() => setShow(false)}
             primaryAction={{
                 content: actionContent,
-                onAction: () => handleAction() /* setCurrentAgent as source code agent here */
+                onAction: () => handleAction(), /* setCurrentAgent as source code agent here */
+                disabled: (showCollections && selectedApisCount === 0)
             }}
             secondaryActions={[{
                 content: 'Cancel',
