@@ -1581,6 +1581,7 @@ public class APICatalogSync {
         if (accountLevelRedact || apiCollectionLevelRedact) {
             try {
                 long start = System.currentTimeMillis();
+                // call in batches of 100
                 SampleDataAltDb.bulkInsert(unfilteredSamples);
                 AllMetrics.instance.setPostgreSampleDataInsertedCount(unfilteredSamples.size());
                 AllMetrics.instance.setPostgreSampleDataInsertLatency(System.currentTimeMillis() - start);
