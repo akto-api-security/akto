@@ -195,6 +195,7 @@ public class LoggerMaker  {
     public void insertImportantTestingLog(String info) {
         String accountId = Context.accountId.get() != null ? Context.accountId.get().toString() : "NA";
         String infoMessage = "acc: " + accountId + ", " + info;
+        logger.info(infoMessage);
         insert(infoMessage, "info", LogDb.TESTING);
     }
 
