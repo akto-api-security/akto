@@ -93,10 +93,6 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, triggerCall
                     } else {
                         setAgentState("idle");
                     }
-                } else {
-                    const newSub = await createNewSubprocess(newSubIdNumber);
-                    setSubprocess(newSub);
-                    triggerCallForSubProcesses();
                 }
             }
 

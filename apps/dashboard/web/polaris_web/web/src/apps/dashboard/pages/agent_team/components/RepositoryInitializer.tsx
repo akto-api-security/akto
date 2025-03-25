@@ -58,14 +58,14 @@ function RepoSelector({ handleClickRepo, selectedRepo, selectedProject, selected
                                 placeholder="Enter project name"
                             />
                         </Box>
-                        <Button
+                    </HorizontalStack>
+                    <Button
                             onClick={handleAddRepository}
                             disabled={!newRepoName || !newProjectName}
                             primary
                         >
                             Add Repository
                         </Button>
-                    </HorizontalStack>
                 </VerticalStack>
 
                 {/* Recently added section */}
