@@ -12,7 +12,6 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Executors;
@@ -184,10 +183,19 @@ public class LoggerMaker  {
         String infoMessage = "acc: " + accountId + ", " + info;
         logger.info(infoMessage);
         try{
+            if(db.equals(LogDb.TESTING)){
+                return;
+            }
             insert(infoMessage, "info",db);
         } catch (Exception e){
 
         }
+    }
+
+    public void insertImportantTestingLog(String info) {
+        String accountId = Context.accountId.get() != null ? Context.accountId.get().toString() : "NA";
+        String infoMessage = "acc: " + accountId + ", " + info;
+        insert(infoMessage, "info", LogDb.TESTING);
     }
 
     public void errorAndAddToDb(String err) {
