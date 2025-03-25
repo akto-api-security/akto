@@ -11,6 +11,8 @@ interface AgentsStore {
     setSourceCodeCollections: (sourceCodeCollections: any[]) => void;
     userSelectedCollections: string[];
     setUserSelectedCollections: (userSelectedCollections: string[]) => void;
+    agentInitDocument: Record<string, any>| null;
+    setAgentInitDocument: (agentInitDocument: Record<string, any>) => void;
 }
 
 // Zustand Store with Middleware
@@ -18,6 +20,8 @@ export const intermediateStore = create<AgentsStore>()(
     devtools(
         persist(
             (set, get) => ({
+                agentInitDocument: null,
+                setAgentInitDocument: (agentInitDocument: Record<string, any>) => set({ agentInitDocument: agentInitDocument }),
                 filteredUserInput: null,
                 setFilteredUserInput: (filteredUserInput: any) => set({ filteredUserInput: filteredUserInput }),
                 outputOptions: null,
