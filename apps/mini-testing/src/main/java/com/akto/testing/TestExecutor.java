@@ -292,7 +292,7 @@ public class TestExecutor {
                 throw new RuntimeException(e);
             }
             if(!shouldInitOnly && Constants.IS_NEW_TESTING_ENABLED){
-                loggerMaker.infoAndAddToDb("Finished inserting records in kafka, Total records: " + totalRecords.get(), LogDb.TESTING);
+                loggerMaker.insertImportantTestingLog("Finished inserting records in kafka, Total records: " + totalRecords.get());
                 dbObject.put("PRODUCER_RUNNING", false);
                 dbObject.put("CONSUMER_RUNNING", true);
                 writeJsonContentInFile(Constants.TESTING_STATE_FOLDER_PATH, Constants.TESTING_STATE_FILE_NAME, dbObject);
