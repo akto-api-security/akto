@@ -4,9 +4,11 @@ public class TestEditorEnums {
     
     public enum DataOperands {
         CONTAINS_EITHER,
+        CONTAINS_EITHER_CIDR,
         CONTAINS_ALL,
         NOT_CONTAINS,
         NOT_CONTAINS_EITHER,
+        NOT_CONTAINS_CIDR,
         REGEX,
         EQ,
         EQ_OBJ,

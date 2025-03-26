@@ -52,6 +52,8 @@ public final class FilterAction {
     public final Map<String, DataOperandsImpl> filters = new HashMap<String, DataOperandsImpl>() {{
         put("contains_all", new ContainsAllFilter());
         put("contains_either", new ContainsEitherFilter());
+        put("contains_either_cidr", new ContainsEitherIpFilter());
+        put("not_contains_cidr", new NotContainsIpFilter());
         put("not_contains", new NotContainsFilter());
         put("regex", new RegexFilter());
         put("eq", new EqFilter());
@@ -155,11 +157,6 @@ public final class FilterAction {
                 return;
             case "response_code":
                 extractResponseCode(filterActionRequest, varMap);
-                return;
-            case "source_ip":
-                extractSourceIp(filterActionRequest, varMap);
-            case "destination_ip":
-                extractDestinationIp(filterActionRequest, varMap);
                 return;
             default:
                 return;
@@ -278,22 +275,6 @@ public final class FilterAction {
         return new DataOperandsFilterResponse(res.getIsValid(), null, null, null, res.getValidationReason());
     }
 
-    public void extractSourceIp(FilterActionRequest filterActionRequest, Map<String, Object> varMap) {
-        RawApi rawApi = filterActionRequest.fetchRawApiBasedOnContext();
-        if (rawApi == null) {
-            return;
-        }
-        if (rawApi.getRequest() == null) {
-            return;
-        }
-        String sourceIp = rawApi.getRequest().getSourceIp(); 
-        List<String> querySet = (List<String>) filterActionRequest.getQuerySet();
-        if (varMap.containsKey(querySet.get(0)) && varMap.get(querySet.get(0)) != null) {
-            return;
-        }
-        varMap.put(querySet.get(0), sourceIp);
-    }
-
     public DataOperandsFilterResponse applyFilterOnDestinationIps(FilterActionRequest filterActionRequest) {
 
         RawApi rawApi = filterActionRequest.fetchRawApiBasedOnContext();
@@ -309,23 +290,6 @@ public final class FilterAction {
         ValidationResult res = invokeFilter(dataOperandFilterRequest);
         return new DataOperandsFilterResponse(res.getIsValid(), null, null, null, res.getValidationReason());
     }
-
-    public void extractDestinationIp(FilterActionRequest filterActionRequest, Map<String, Object> varMap) {
-        RawApi rawApi = filterActionRequest.fetchRawApiBasedOnContext();
-        if (rawApi == null) {
-            return;
-        }
-        if (rawApi.getRequest() == null) {
-            return;
-        }
-        String destinationIp = rawApi.getRequest().getDestinationIp(); 
-        List<String> querySet = (List<String>) filterActionRequest.getQuerySet();
-        if (varMap.containsKey(querySet.get(0)) && varMap.get(querySet.get(0)) != null) {
-            return;
-        }
-        varMap.put(querySet.get(0), destinationIp);
-    }
-
 
     public DataOperandsFilterResponse applyFilterOnRequestPayload(FilterActionRequest filterActionRequest) {
 
