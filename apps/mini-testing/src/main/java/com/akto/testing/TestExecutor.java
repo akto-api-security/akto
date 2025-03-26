@@ -37,6 +37,7 @@ import com.akto.test_editor.execution.Build;
 import com.akto.test_editor.execution.Executor;
 import com.akto.test_editor.execution.VariableResolver;
 import com.akto.testing.yaml_tests.YamlTestTemplate;
+import com.akto.testing_db_layer_client.ClientLayer;
 import com.akto.testing_issues.TestingIssuesHandler;
 import com.akto.util.JSONUtils;
 import com.akto.util.enums.GlobalEnums.Severity;
@@ -73,6 +74,8 @@ public class TestExecutor {
     public static final String REQUEST_HOUR = "requestHour";
     public static final String COUNT = "count";
     public static final int ALLOWED_REQUEST_PER_HOUR = 100;
+    private static final ClientLayer clientLayer = new ClientLayer();
+
     public void init(TestingRun testingRun, ObjectId summaryId) {
         if (testingRun.getTestIdConfig() != 1) {
             apiWiseInit(testingRun, summaryId, false, new ArrayList<>());
@@ -651,7 +654,8 @@ public class TestExecutor {
         }
 
         try {
-            messages.addAll(SampleDataAltDb.findSamplesByApiInfoKey(apiInfoKey));
+            List<String> samples = clientLayer.fetchSamples(apiInfoKey);
+            messages.addAll(samples);
         } catch (Exception e) {
             // TODO Auto-generated catch block
             //e.printStackTrace();
@@ -672,7 +676,7 @@ public class TestExecutor {
             long start = System.currentTimeMillis();
             String msg = null;
             try {
-                msg = SampleDataAltDb.findLatestSampleByApiInfoKey(apiInfoKey);
+                msg = clientLayer.fetchLatestSample(apiInfoKey);
             } catch (Exception e) {
             }
             if (msg != null) {
