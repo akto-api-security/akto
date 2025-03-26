@@ -89,9 +89,6 @@ public class MergeLogicLocal {
                 Map<String, List<String>> updates = new HashMap<>();
                 List<SampleDataAlt> data = new ArrayList<>();
                 try {
-                    if (apiCollectionId == -86954494) {
-                        loggerMaker.infoAndAddToDb("hi there");
-                    }
                     data = clientLayer.fetchSampleData(apiCollectionId, skip);
                     if (data == null) {
                         loggerMaker.infoAndAddToDb(String.format("didn't find any sample data for collection", apiCollectionId));
