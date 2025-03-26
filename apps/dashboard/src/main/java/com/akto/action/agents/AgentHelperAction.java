@@ -172,7 +172,7 @@ public class AgentHelperAction extends UserAction {
         }
 
         if(!countMap.isEmpty()){
-            List<CodeAnalysisCollection> collections = CodeAnalysisCollectionDao.instance.findAll(Filters.in(Constants.ID, countMap.keySet()), Projections.include("name"));
+            List<CodeAnalysisCollection> collections = CodeAnalysisCollectionDao.instance.findAll(Filters.in(Constants.ID, countMap.keySet()), Projections.include("name", "apiCollectionId"));
             for(CodeAnalysisCollection codeAnalysisCollection: collections){
                BasicDBObject basicDBObject = new BasicDBObject();
                 basicDBObject.put("id", codeAnalysisCollection.getId().toHexString());

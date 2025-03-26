@@ -347,7 +347,7 @@ public class AgentAction extends UserAction {
                 if(this.logs == null || this.logs.isEmpty()){
                     return SUCCESS.toUpperCase();
                 }
-            }else if(type.equals("stateChange") || type.equals("batchedData")){
+            }else if(type.equals("batchedData")){
                 if(this.data.isEmpty()){
                     return SUCCESS.toUpperCase();
                 }else{

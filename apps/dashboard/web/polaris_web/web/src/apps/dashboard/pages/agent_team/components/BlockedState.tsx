@@ -67,7 +67,7 @@ export const BlockedState = ({ onResume, onDiscard }: BlockedStateProps) => {
                                 </div>
                                 <HorizontalStack gap="2">
                                     <Button size="micro" onClick={handleDiscard}>Discard</Button>
-                                    <Button disabled={PRstate !== "-1"} size="micro" primary onClick={handleResume}>Resume</Button>
+                                    <Button disabled={PRstate !== "-1"} size="micro" primary onClick={handleResume}>Accept</Button>
                                 </HorizontalStack>
                             </>
                     )}

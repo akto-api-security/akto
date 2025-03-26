@@ -35,6 +35,20 @@ function BatchedOutput({data, buttonText, isCollectionBased, keysArr}: {data: an
     return useMemo(() => {
         return (
             <VerticalStack gap={"4"}>
+                <HorizontalStack gap={"2"} wrap={false}>
+                    <HorizontalStack gap="1" wrap={false}>
+                        <Icon source={ClockMinor} color="subdued"/>
+                        <Text as={"dt"}>Pending</Text>
+                    </HorizontalStack>
+                    <HorizontalStack gap="1" wrap={false}>
+                        <Icon source={CircleAlertMajor} color="critical"/>
+                        <Text as={"dt"}>Vulnerable</Text>
+                    </HorizontalStack>
+                    <HorizontalStack gap="1" wrap={false}>
+                        <Icon source={circle_tick_minor} color="base"/>
+                        <Text as={"dt"}>Not Vulnerable</Text>
+                    </HorizontalStack>
+                </HorizontalStack>
                 {Object.keys(data).map((collectionID, index) => {
                     return (
                         <VerticalStack key={index} gap={"2"} >
@@ -61,14 +75,14 @@ function BatchedOutput({data, buttonText, isCollectionBased, keysArr}: {data: an
                                                         animate={{ opacity: 1 }}
                                                         exit={{ opacity: 0 }}
                                                         transition={{ duration: 0.6 }}
-                                                        className='flex gap-2 w-full'
+                                                        className='flex gap-2 w-full wrap:nowrap'
                                                     >
                                                         <motion.p initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }} className="text-xs text-[var(--text-subdued)] ml-3! p-0.5 hover:bg-[var(--background-selected)]">
                                                             {item?.method} - {item?.url}
                                                         </motion.p>
                                                         <HorizontalStack gap={"2"}>
                                                             {keysArr.map((key) => (
-                                                            <div key={key} className="flex text-xs">
+                                                            <div key={key} className="flex text-xs wrap:nowrap">
                                                                 {key}
                                                                 <motion.span
                                                                     initial={{ scale: 0, opacity: 0 }}
