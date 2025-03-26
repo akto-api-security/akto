@@ -11,25 +11,24 @@ const STEPS_PER_AGENT_ID = {
 }
 
 const checkForSourceCodeApis = async()=> {
-    const chosenBackendDirectory = intermediateStore.getState().previousUserInput?.selectedOptions?.chosenBackendDirectory;
+    const chosenBackendDirectory = intermediateStore.getState().filteredUserInput;
     await api.getSourceCodeCollectionsForDirectories({
         "chosenBackendDirectory": chosenBackendDirectory || ""
     }).then((res) => {
         intermediateStore.getState().setSourceCodeCollections(res)
     })
-    return true
 }
 
 export const preRequisitesMap = {
     "FIND_VULNERABILITIES_FROM_SOURCE_CODE": {
-        6: {
+        1: {
             "text": "Please provide the list of apis for finding vulnerabilities",
             "action": () => checkForSourceCodeApis()
         },
     }
 }
 
-const vulnerableKeys = ["IS_AUTHENTICATED", "DDOS", "BOLA", "INPUT_VALIDATION"];
+const vulnerableKeys = ["IS_UNAUTHENTICATED", "DDOS", "BOLA", "INPUT_VALIDATION"];
 
 export const outputKeys = {
     "FIND_VULNERABILITIES_FROM_SOURCE_CODE": vulnerableKeys
@@ -55,7 +54,8 @@ export function structuredOutputFormat (output: any, agentType: string | undefin
             switch (subProcessId) {
                 case "1":
                     return {
-                        "chosenBackendDirectory": output
+                        "chosenBackendDirectory": output,
+                        "chosenApiCollections": intermediateStore.getState().userSelectedCollections,
                     }
                 case "2":
                     if(typeof output === "string") {

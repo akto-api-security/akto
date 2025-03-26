@@ -172,12 +172,13 @@ public class AgentHelperAction extends UserAction {
         }
 
         if(!countMap.isEmpty()){
-            List<CodeAnalysisCollection> collections = CodeAnalysisCollectionDao.instance.findAll(Filters.in(Constants.ID, countMap.keySet()), Projections.include("name"));
+            List<CodeAnalysisCollection> collections = CodeAnalysisCollectionDao.instance.findAll(Filters.in(Constants.ID, countMap.keySet()), Projections.include("name", "apiCollectionId"));
             for(CodeAnalysisCollection codeAnalysisCollection: collections){
                BasicDBObject basicDBObject = new BasicDBObject();
-                basicDBObject.put("id", codeAnalysisCollection.getId());
+                basicDBObject.put("id", codeAnalysisCollection.getId().toHexString());
                 basicDBObject.put("name", codeAnalysisCollection.getName());
                 basicDBObject.put("count", countMap.get(codeAnalysisCollection.getId()));
+                basicDBObject.put("apiCollectionId", codeAnalysisCollection.getApiCollectionId());
                 this.codeAnalysisCollectionIdList.add(basicDBObject);
             }
         }
@@ -189,8 +190,7 @@ public class AgentHelperAction extends UserAction {
     List<BasicDBObject> apiInfoKeysWithSchema;
 
     public String getApisForChosenCollectionForSourceCode(){
-        this.apiInfoKeysWithSchema = new 
-        ArrayList<>();
+        this.apiInfoKeysWithSchema = new ArrayList<>();
 
         if (chosenCodeAnalysisCollectionIds == null || chosenCodeAnalysisCollectionIds.isEmpty()) {
             return Action.SUCCESS.toUpperCase();
@@ -199,7 +199,7 @@ public class AgentHelperAction extends UserAction {
         for(String hexId: chosenCodeAnalysisCollectionIds){
             ObjectId objectId = new ObjectId(hexId);
             CodeAnalysisCollection codeAnalysisCollection = CodeAnalysisCollectionDao.instance.findOne(Filters.eq(Constants.ID, objectId));
-            List<CodeAnalysisApiInfo> apiInfos = CodeAnalysisApiInfoDao.instance.findAll(Filters.eq("codeAnalysisCollectionId", objectId), Projections.include("id", "location"));
+            List<CodeAnalysisApiInfo> apiInfos = CodeAnalysisApiInfoDao.instance.findAll(Filters.eq("_id.codeAnalysisCollectionId", objectId), Projections.include("id", "location"));
             Map<ApiInfoKey, BasicDBObject> schemaMap = CodeAnalysisSingleTypeInfoDao.instance.getReqResSchemaForApis(apiInfos, codeAnalysisCollection.getApiCollectionId());
             schemaMap.keySet().forEach(apiInfoKey -> {
                 BasicDBObject schema = schemaMap.get(apiInfoKey);

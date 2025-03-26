@@ -342,6 +342,23 @@ public class AgentAction extends UserAction {
             Filters.eq(AgentSubProcessSingleAttempt.SUB_PROCESS_ID, this.subProcessId),
             Filters.eq(AgentSubProcessSingleAttempt.ATTEMPT_ID, this.attemptId)
         );
+        if(!StringUtils.isNullOrEmpty(type)){
+            if(type.equals("logs")){
+                if(this.logs == null || this.logs.isEmpty()){
+                    return SUCCESS.toUpperCase();
+                }
+            }else if(type.equals("batchedData")){
+                if(this.data.isEmpty()){
+                    return SUCCESS.toUpperCase();
+                }else{
+                    List<Object> outputOptions = (List<Object>) this.data.get("outputOptions");
+                    if(outputOptions == null || outputOptions.isEmpty()){
+                        return SUCCESS.toUpperCase();
+                    }
+                }
+            }
+        }
+            
         switch (type) {
             case "logs":
                 AgentSubProcessSingleAttemptDao.instance.updateOneNoUpsert(
@@ -378,10 +395,16 @@ public class AgentAction extends UserAction {
                 break;
             case "batchedData":
                 List<Object> batchedList = (List<Object>) this.data.get("outputOptions");
+                update = Updates.set(
+                    AgentSubProcessSingleAttempt.PROCESS_OUTPUT + ".selectionType",
+                    "batched"
+                );
                 AgentSubProcessSingleAttemptDao.instance.updateOne(
                     filter,
-                    Updates.addEachToSet(AgentSubProcessSingleAttempt.PROCESS_OUTPUT + ".outputOptions", batchedList)
-                );
+                    Updates.combine(
+                        update,
+                        Updates.addEachToSet(AgentSubProcessSingleAttempt.PROCESS_OUTPUT + ".outputOptions", batchedList)
+                    ));
                 break;
             default:
                 break;
