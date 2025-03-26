@@ -1316,7 +1316,7 @@ getDeprecatedEndpoints(apiInfoList, unusedEndpoints, apiCollectionId) {
     const testUrl = searchResultSections.tests.sectionPath + test.name
     const searchResult = this.createSearchResult(
       searchResultSections.tests,
-      test.name, 
+      test.testName, 
       testUrl,
     )
     searchItems.push(searchResult)
