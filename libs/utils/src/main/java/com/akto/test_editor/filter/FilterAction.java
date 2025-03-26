@@ -115,6 +115,10 @@ public final class FilterAction {
                 return applyFilterOnQueryParams(filterActionRequest);
             case "response_code":
                 return applyFilterOnResponseCode(filterActionRequest);
+            case "source_ip":
+                return applyFilterOnSourceIps(filterActionRequest);
+            case "destination_ip":
+                return applyFilterOnDestinationIps(filterActionRequest);
             default:
                 return new DataOperandsFilterResponse(false, null, null, null);
 
@@ -151,6 +155,11 @@ public final class FilterAction {
                 return;
             case "response_code":
                 extractResponseCode(filterActionRequest, varMap);
+                return;
+            case "source_ip":
+                extractSourceIp(filterActionRequest, varMap);
+            case "destination_ip":
+                extractDestinationIp(filterActionRequest, varMap);
                 return;
             default:
                 return;
@@ -252,6 +261,71 @@ public final class FilterAction {
         }
         varMap.put(querySet.get(0), respCode);
     }
+
+    public DataOperandsFilterResponse applyFilterOnSourceIps(FilterActionRequest filterActionRequest) {
+
+        RawApi rawApi = filterActionRequest.fetchRawApiBasedOnContext();
+        if (rawApi == null) {
+            return new DataOperandsFilterResponse(false, null, null, null);
+        }
+        if (rawApi.getRequest() == null) {
+            return new DataOperandsFilterResponse(false, null, null, null);
+        }
+
+        String sourceIp = rawApi.getRequest().getSourceIp();
+        DataOperandFilterRequest dataOperandFilterRequest = new DataOperandFilterRequest(sourceIp, filterActionRequest.getQuerySet(), filterActionRequest.getOperand());
+        ValidationResult res = invokeFilter(dataOperandFilterRequest);
+        return new DataOperandsFilterResponse(res.getIsValid(), null, null, null, res.getValidationReason());
+    }
+
+    public void extractSourceIp(FilterActionRequest filterActionRequest, Map<String, Object> varMap) {
+        RawApi rawApi = filterActionRequest.fetchRawApiBasedOnContext();
+        if (rawApi == null) {
+            return;
+        }
+        if (rawApi.getRequest() == null) {
+            return;
+        }
+        String sourceIp = rawApi.getRequest().getSourceIp(); 
+        List<String> querySet = (List<String>) filterActionRequest.getQuerySet();
+        if (varMap.containsKey(querySet.get(0)) && varMap.get(querySet.get(0)) != null) {
+            return;
+        }
+        varMap.put(querySet.get(0), sourceIp);
+    }
+
+    public DataOperandsFilterResponse applyFilterOnDestinationIps(FilterActionRequest filterActionRequest) {
+
+        RawApi rawApi = filterActionRequest.fetchRawApiBasedOnContext();
+        if (rawApi == null) {
+            return new DataOperandsFilterResponse(false, null, null, null);
+        }
+        if (rawApi.getRequest() == null) {
+            return new DataOperandsFilterResponse(false, null, null, null);
+        }
+
+        String destinationIp = rawApi.getRequest().getDestinationIp();
+        DataOperandFilterRequest dataOperandFilterRequest = new DataOperandFilterRequest(destinationIp, filterActionRequest.getQuerySet(), filterActionRequest.getOperand());
+        ValidationResult res = invokeFilter(dataOperandFilterRequest);
+        return new DataOperandsFilterResponse(res.getIsValid(), null, null, null, res.getValidationReason());
+    }
+
+    public void extractDestinationIp(FilterActionRequest filterActionRequest, Map<String, Object> varMap) {
+        RawApi rawApi = filterActionRequest.fetchRawApiBasedOnContext();
+        if (rawApi == null) {
+            return;
+        }
+        if (rawApi.getRequest() == null) {
+            return;
+        }
+        String destinationIp = rawApi.getRequest().getDestinationIp(); 
+        List<String> querySet = (List<String>) filterActionRequest.getQuerySet();
+        if (varMap.containsKey(querySet.get(0)) && varMap.get(querySet.get(0)) != null) {
+            return;
+        }
+        varMap.put(querySet.get(0), destinationIp);
+    }
+
 
     public DataOperandsFilterResponse applyFilterOnRequestPayload(FilterActionRequest filterActionRequest) {
 

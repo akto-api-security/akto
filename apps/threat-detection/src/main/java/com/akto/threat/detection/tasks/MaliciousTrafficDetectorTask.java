@@ -287,7 +287,7 @@ public class MaliciousTrafficDetectorTask implements Task {
             .setDetectedAt(responseParam.getTime())
             .setCategory(apiFilter.getInfo().getCategory().getName())
             .setSubCategory(apiFilter.getInfo().getSubCategory())
-            .setSeverity(apiFilter.getInfo().getSeverity())
+            .setSeverity("HIGH")
             .setType("Rule-Based")
             .build();
     MaliciousEventKafkaEnvelope envelope =
@@ -366,6 +366,7 @@ public class MaliciousTrafficDetectorTask implements Task {
     origObj.put("requestPayload", httpResponseParamProto.getRequestPayload());
     origObj.put("responsePayload", httpResponseParamProto.getResponsePayload());
     origObj.put("ip", httpResponseParamProto.getIp());
+    origObj.put("destIp", httpResponseParamProto.getDestIp());
     origObj.put("source", sourceStr);
     origObj.put("type", httpResponseParamProto.getType());
     origObj.put("akto_vxlan_id", httpResponseParamProto.getAktoVxlanId());

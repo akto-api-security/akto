@@ -38,7 +38,10 @@ public class TestEditorEnums {
         REQUEST_PAYLOAD,
         RESPONSE_HEADERS,
         RESPONSE_PAYLOAD,
-        RESPONSE_CODE
+        RESPONSE_CODE,
+        SOURCE_IP,
+        DESTINATION_IP,
+        COUNTRY_CODE
     }
 
     public enum PredicateOperator {
