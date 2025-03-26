@@ -443,11 +443,11 @@ export default {
             data: {}
         })
     },
-    downloadReportPDF(reportId, organizationName, reportDate, reportUrl, firstPollRequest) {
+    downloadReportPDF(reportId, organizationName, reportDate, reportUrl, username, firstPollRequest) {
         return request({
             url: '/api/downloadReportPDF',
             method: 'post',
-            data: {reportId, organizationName, reportDate, reportUrl, firstPollRequest}
+            data: {reportId, organizationName, reportDate, reportUrl, username, firstPollRequest}
         })
     },
     fetchScript() {
