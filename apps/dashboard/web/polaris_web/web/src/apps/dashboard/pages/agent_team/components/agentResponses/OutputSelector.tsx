@@ -92,6 +92,7 @@ function OutputSelector({onHandleSelect, processOutput} : OutputSelectorProps) {
                             setSelected={(selectedChoices: any) => handleSelected(selectedChoices)}
                             preSelected={filteredChoices}
                             value={allowMultiple ? `${filteredChoices.length} choice${filteredChoices.length === 1 ? "" : "s"} selected` : filteredChoices}
+                            sliceMaxVal={80}
                         /> : <TextField labelHidden={true} label="" autoComplete="off" value={filteredChoices as string} onChange={(val: string) => setFilteredChoices(val)} />}
                     </HorizontalStack>
             }

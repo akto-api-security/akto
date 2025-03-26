@@ -84,10 +84,6 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, triggerCall
                     } else {
                         setAgentState("idle");
                     }
-                } else {
-                    const newSub = await createNewSubprocess(newSubIdNumber);
-                    setSubprocess(newSub);
-                    triggerCallForSubProcesses();
                 }
             }
 
@@ -140,14 +136,14 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, triggerCall
     }, [currentSubprocess, finalCTAShow, processId, currentAttempt, subProcessFromProp, createNewSubprocess]);
 
     const groupedOutput = useMemo(() => {
-        const rawData = subprocess?.processOutput?.selectionType === "batch" ? subprocess?.processOutput?.outputOptions : [];
+        const rawData = subprocess?.processOutput?.selectionType === "batched" ? subprocess?.processOutput?.outputOptions : [];
         if(rawData.length === 0) return {};
         let finalMap = {};
         rawData.forEach((data: any) => {
             const {id, output} = data;
             const {apiCollectionId, url, method} = id;
             if(!finalMap[apiCollectionId]){
-                finalMap[data.collectionId] = [
+                finalMap[apiCollectionId] = [
                     {
                         output: output,
                         url: url,
@@ -179,7 +175,6 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, triggerCall
     const handleSelect = (selectedChoices: any, outputOptions: any) => {
         setOutputOptions(outputOptions); 
         setFilteredUserInput(selectedChoices);
-        console.log("Selected choices: ", selectedChoices, PRstate);
         if(PRstate !== "-1"){
             setFinalCTAShow(true);
         }
@@ -249,7 +244,7 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, triggerCall
                     </motion.div>
                 </AnimatePresence>
             </div>
-            {subprocess.processOutput?.selectionType === 'batch' ?<BatchedOutput 
+            {subprocess.processOutput?.selectionType === 'batched' ?<BatchedOutput 
                 data={groupedOutput} 
                 buttonText="Analyzing APIs for the collection: " 
                 isCollectionBased={true}

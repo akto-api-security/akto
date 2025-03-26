@@ -15,17 +15,19 @@ function APISRequiredCTA() {
 
     const showCollections = sourceCodeCollections.length > 0
     const actionContent = showCollections ? `${selectedApisCount} APIs selected` : "Get APIs"
-
     const handleAction = () => {
-        if(!showCollections){
-            setPRState("-1")
-        }else{
-            if(selectedApisCount !== 0){
-                setPRState('-1')
-            }
-        }
         setShow(false); 
         setFinalCTAShow(false);
+        setTimeout(() => {
+            if(!showCollections){
+                setPRState("-1")
+            }else{
+                if(selectedApisCount !== 0){
+                    setPRState('-1')
+                }
+            }
+        },10)
+        
     }
 
     const handleSelection = (selectedIds: string[]) => {

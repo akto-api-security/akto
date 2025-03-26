@@ -6,7 +6,7 @@ import { intermediateStore } from '../../intermediate.store';
 import {circle_tick_minor } from  "../../../../../dashboard/components/icons";
 
 function BatchedOutput({data, buttonText, isCollectionBased, keysArr}: {data: any, buttonText: string, isCollectionBased: boolean, keysArr: string[]}) {
-    const [expanded, setExpanded] = React.useState(false);
+    const [expanded, setExpanded] = React.useState(true);
     const codeAnalysisCollections = intermediateStore(state => state.sourceCodeCollections);
     const collectionsMap = codeAnalysisCollections.reduce((acc, item) => {
         acc[item?.apiCollectionId] = item.name;
@@ -42,7 +42,7 @@ function BatchedOutput({data, buttonText, isCollectionBased, keysArr}: {data: an
                                 <motion.div animate={{ rotate: expanded ? 0 : 270 }} transition={{ duration: 0.2 }}>
                                     <CaretDownMinor height={20} width={20} />
                                 </motion.div>
-                                <Text as={"dd"}>{buttonText + isCollectionBased ? collectionsMap[collectionID] : ""}</Text>
+                                <Text as={"dd"}>{`${buttonText} ${collectionsMap[collectionID]}`}</Text>
                             </button>
                             <AnimatePresence>
                                 <motion.div

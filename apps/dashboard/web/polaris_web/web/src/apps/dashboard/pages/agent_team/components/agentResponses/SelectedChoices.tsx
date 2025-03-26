@@ -23,8 +23,6 @@ function SelectedChoices(props) {
             }
         }
 
-        console.log("userInput", userInput, options)
-
         return <Text as={"dd"}>{data}</Text>
     }
     return <></>
