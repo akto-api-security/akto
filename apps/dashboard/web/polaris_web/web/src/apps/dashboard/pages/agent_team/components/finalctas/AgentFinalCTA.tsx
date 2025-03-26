@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { useAgentsStore } from '../../agents.store';
 import { intermediateStore } from '../../intermediate.store';
 import AgentCoreCTA from './AgentCoreCTA';
@@ -10,7 +10,7 @@ import APISRequiredCTA from './APISRequiredCTA';
 import SourceCodeAnalyserCTA from "./SourceCodeAnalyserCTA"
 
 function AgentFinalCTA() {
-    const { PRstate, currentAgent } = useAgentsStore()
+    const { PRstate, currentAgent, currentProcessId} = useAgentsStore()
     const { filteredUserInput, outputOptions } = intermediateStore();
 
     async function falsePositiveSave() {
@@ -53,10 +53,48 @@ function AgentFinalCTA() {
         func.setToast(true, false, "API groups are being created")
     }
 
+    const atLeastOneVuln = (obj: any) => {
+        if(obj === undefined || obj === null) {
+            return false
+        }
+        return Object.values(obj).some((x: any) => x === true)
+    }
+
+    const handleSaveVuln = async () => {
+        const filteredData = outputOptions.outputOptions.filter(x => {
+            return filteredUserInput.includes(x.value)
+        })
+
+        const totalApisScanned = outputOptions.outputOptions.length;
+        const agentProcessId = currentProcessId;
+        let finalVuln : any[] = [];
+        filteredData.forEach((data: any) => {
+            let vulnObj = {} as any;
+            const id = data?.id;
+            vulnObj["id"] = id;
+            vulnObj["output"] = data?.output;
+            if(atLeastOneVuln(data?.output)) {
+                finalVuln.push(vulnObj);
+            }
+        })
+        await api.saveVulnerabilities({
+            agentProcessId: agentProcessId, 
+            vulnerabilities: finalVuln, 
+            totalApisScanned: totalApisScanned
+        })      
+    }
+
     return (() => {
         switch (currentAgent?.id) {
             case 'FIND_VULNERABILITIES_FROM_SOURCE_CODE':
-                return (PRstate === "1" && <APISRequiredCTA />)
+                return (PRstate === "1" ? <APISRequiredCTA />: 
+                    <AgentCoreCTA
+                        onSave={() => handleSaveVuln()}
+                        modalTitle={`Save vulnerabilities`}
+                        actionText={'Save'}
+                        contentString={`Saving the shown vulnerabilities to the database`} 
+                    />
+                )
             case 'FIND_SENSITIVE_DATA_TYPES':
                 return <AgentCoreCTA
                     onSave={() => sensitiveDataTypeSave()}
