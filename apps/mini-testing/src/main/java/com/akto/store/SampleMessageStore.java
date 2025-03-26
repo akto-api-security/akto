@@ -13,6 +13,7 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.metrics.AllMetrics;
 import com.akto.sql.SampleDataAltDb;
+import com.akto.testing_db_layer_client.ClientLayer;
 
 import java.util.*;
 
@@ -23,6 +24,7 @@ public class SampleMessageStore {
     private Map<ApiInfo.ApiInfoKey, List<String>> sampleDataMap = new HashMap<>();
     private Map<String, SingleTypeInfo> singleTypeInfos = new HashMap<>();
     private static final DataActor dataActor = DataActorFactory.fetchInstance();
+    private static final ClientLayer clientLayer = new ClientLayer();
     
     private SampleMessageStore() {}
 
@@ -74,8 +76,10 @@ public class SampleMessageStore {
             long start = System.currentTimeMillis();
             List<String> samples = new ArrayList<>();
             try {
-                samples = SampleDataAltDb.findSamplesByApiInfoKey(apiInfoKey);
+                samples = clientLayer.fetchSamples(apiInfoKey);
             } catch (Exception e) {
+                e.printStackTrace();
+                System.out.println("error in fetchAllOriginalMessages " + e.getMessage());
             }
             if (samples == null) {
                 samples = new ArrayList<>();
