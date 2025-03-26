@@ -11,7 +11,7 @@ function SelectedChoices(props) {
         let data = "Selected option(s): "
 
         if (Array.isArray(options)) {
-            data += options.filter((i, x) => i < 3).join(", ")
+            data += options.filter((x, i) => i < 3).join(", ")
         } else if (typeof options === "object") {
             let j = 0;
             for (let i in options) {
@@ -22,8 +22,6 @@ function SelectedChoices(props) {
                 data += i + "-> " + options[i] + ","
             }
         }
-
-        console.log("userInput", userInput, options)
 
         return <Text as={"dd"}>{data}</Text>
     }
