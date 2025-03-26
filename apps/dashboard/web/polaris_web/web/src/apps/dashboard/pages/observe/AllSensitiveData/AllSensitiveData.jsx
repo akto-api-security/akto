@@ -215,7 +215,7 @@ function AllSensitiveData() {
         const dataTypesVsApisCount = results[2].status === 'fulfilled' ? results[2].value : {};
 
         let dataTypesArr = [...(dataTypesRes?.dataTypes?.aktoDataTypes || []) , ...(dataTypesRes?.dataTypes?.customDataTypes || [])]
-        const reqResCountMap = subTypeCountRes?.response?.subTypeCountMap || {REQUEST: {}, RESPONSE: {}}
+        const reqResCountMap = subTypeCountRes?.subTypeCountMap || {REQUEST: {}, RESPONSE: {}}
         let subtypeToNameMap = {}
 
         let totalSensitive = 0;
