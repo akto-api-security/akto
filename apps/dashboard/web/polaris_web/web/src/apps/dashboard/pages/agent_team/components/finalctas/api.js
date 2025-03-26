@@ -14,8 +14,15 @@ const api = {
             method: 'post',
             data: data 
         })
+    },
+
+    saveVulnerabilities: async (data) => {
+        return await request({
+            url: '/api/saveVulnerabilities',
+            method: 'post',
+            data: data 
+        })
     }
-    
 }
 
 export default api;

@@ -21,11 +21,14 @@ import com.akto.dao.CodeAnalysisCollectionDao;
 import com.akto.dao.CodeAnalysisSingleTypeInfoDao;
 import com.akto.dao.SampleDataDao;
 import com.akto.dao.context.Context;
+import com.akto.dao.testing_run_findings.SourceCodeVulnerabilitiesDao;
 import com.akto.dto.CodeAnalysisApiInfo;
 import com.akto.dto.CodeAnalysisCollection;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.data_types.Predicate.Type;
+import com.akto.dto.test_run_findings.SourceCodeVulnerabilities;
 import com.akto.dto.traffic.SampleData;
+import com.akto.dto.type.URLMethods.Method;
 import com.akto.util.Constants;
 import com.akto.util.enums.GlobalEnums.Severity;
 import com.mongodb.BasicDBObject;
@@ -212,6 +215,41 @@ public class AgentHelperAction extends UserAction {
         return Action.SUCCESS.toUpperCase();
     }
 
+    List<BasicDBObject> vulnerabilities;
+    int totalApisScanned;
+    String agentProcessId;
+
+    public String saveVulnerabilities(){
+        if(vulnerabilities == null || vulnerabilities.isEmpty()){
+            return Action.SUCCESS.toUpperCase();
+        }else{
+            Map<String, BasicDBObject> vulnerabilitiesMap = new HashMap<>();
+            for(BasicDBObject dbObject: vulnerabilities){
+                Map<?,?> id = (Map) dbObject.get("id");
+                ApiInfoKey apiInfoKey = new ApiInfoKey(
+                    Integer.parseInt(id.get("apiCollectionId").toString()),
+                    id.get("url").toString(),
+                    Method.valueOf(id.get("method").toString())
+                );
+                Map<String,String> output = (Map) dbObject.get("output");
+                BasicDBObject finalObj = new BasicDBObject();
+                output.keySet().forEach(key -> {
+                    finalObj.put(key.toString(), output.get(key));
+                });
+                vulnerabilitiesMap.put(apiInfoKey.toString(), finalObj);
+            }
+
+            SourceCodeVulnerabilities sourceCodeVulnerabilities = new SourceCodeVulnerabilities(
+                agentProcessId,
+                totalApisScanned,
+                vulnerabilitiesMap
+            );
+
+            SourceCodeVulnerabilitiesDao.instance.insertOne(sourceCodeVulnerabilities);
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
     public List<String> getDataTypeKeys() {
         return dataTypeKeys;
     }
@@ -266,5 +304,17 @@ public class AgentHelperAction extends UserAction {
 
     public List<BasicDBObject> getApiInfoKeysWithSchema() {
         return apiInfoKeysWithSchema;
+    }
+
+    public void setVulnerabilities(List<BasicDBObject> vulnerabilities) {
+        this.vulnerabilities = vulnerabilities;
+    }
+
+    public void setAgentProcessId(String agentProcessId) {
+        this.agentProcessId = agentProcessId;
+    }
+
+    public void setTotalApisScanned(int totalApisScanned) {
+        this.totalApisScanned = totalApisScanned;
     }
 }
