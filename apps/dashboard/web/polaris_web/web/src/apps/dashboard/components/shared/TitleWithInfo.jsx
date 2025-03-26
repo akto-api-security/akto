@@ -1,7 +1,9 @@
 import { Avatar, Box, HorizontalStack, Link, Popover, Text, Tooltip } from '@shopify/polaris'
 import React, { useState } from 'react'
 
-function TitleWithInfo({titleComp, textProps, titleText, tooltipContent, docsUrl}) {
+function TitleWithInfo(props) {
+
+    const { titleComp, textProps, titleText, tooltipContent, docsUrl } = props
     
     const content = docsUrl ?
 

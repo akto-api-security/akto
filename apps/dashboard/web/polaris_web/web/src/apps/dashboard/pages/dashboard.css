@@ -103,6 +103,14 @@
    --color-options: #0d5aa7 ;
    --color-success-new: #008060;
    --white: #ffffff;
+   --borderShadow-box-shadow: #AEB4B9;
+   --inset-box-shadow: 0px 1px 0px 0px #898F94 inset;
+   --agent-grey-background: #F6F6F7;
+
+   --text-default: #202223;
+   --text-subdued: #6D7175;
+
+   --background-selected: #EDEEEF;
 
     --p-color-bg-primary: var(--akto-primary) !important;
     --p-color-bg-primary-hover: #5400CB !important;

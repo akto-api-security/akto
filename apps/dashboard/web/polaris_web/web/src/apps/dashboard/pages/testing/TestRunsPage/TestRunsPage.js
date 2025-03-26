@@ -154,13 +154,6 @@ const [subCategoryInfo, setSubCategoryInfo] = useState({})
 const [collapsible, setCollapsible] = useState(true)
 const [hasUserInitiatedTestRuns, setHasUserInitiatedTestRuns] = useState(false)
 
-
-
-function processData(testingRuns, latestTestingRunResultSummaries, cicd){
-  let testRuns = transform.prepareTestRuns(testingRuns, latestTestingRunResultSummaries, cicd, true);
-  return testRuns;
-}
-
   async function fetchTableData(sortKey, sortOrder, skip, limit, filters, filterOperators, queryValue) {
     setLoading(true);
     let ret = [];
@@ -173,7 +166,7 @@ function processData(testingRuns, latestTestingRunResultSummaries, cicd){
         await api.fetchTestingDetails(
           startTimestamp, endTimestamp, sortKey, sortOrder, skip, limit, filters, "CI_CD",queryValue
         ).then(({ testingRuns, testingRunsCount, latestTestingRunResultSummaries }) => {
-          ret = processData(testingRuns, latestTestingRunResultSummaries, true);
+          ret = transform.processData(testingRuns, latestTestingRunResultSummaries, true);
           total = testingRunsCount;
         });
         break;
@@ -181,7 +174,7 @@ function processData(testingRuns, latestTestingRunResultSummaries, cicd){
         await api.fetchTestingDetails(
           startTimestamp, endTimestamp, sortKey, sortOrder, skip, limit, filters, "RECURRING",queryValue
         ).then(({ testingRuns, testingRunsCount, latestTestingRunResultSummaries }) => {
-          ret = processData(testingRuns, latestTestingRunResultSummaries);
+          ret = transform.processData(testingRuns, latestTestingRunResultSummaries);
           total = testingRunsCount;
         });
         break;
@@ -189,7 +182,7 @@ function processData(testingRuns, latestTestingRunResultSummaries, cicd){
         await api.fetchTestingDetails(
           startTimestamp, endTimestamp, sortKey, sortOrder, skip, limit, filters, "ONE_TIME",queryValue
         ).then(({ testingRuns, testingRunsCount, latestTestingRunResultSummaries }) => {
-          ret = processData(testingRuns, latestTestingRunResultSummaries);
+          ret = transform.processData(testingRuns, latestTestingRunResultSummaries);
           total = testingRunsCount;
         });
         break;
@@ -197,7 +190,7 @@ function processData(testingRuns, latestTestingRunResultSummaries, cicd){
         await api.fetchTestingDetails(
           startTimestamp, endTimestamp, sortKey, sortOrder, skip, limit, filters, "CONTINUOUS_TESTING",queryValue
         ).then(({ testingRuns, testingRunsCount, latestTestingRunResultSummaries }) => {
-          ret = processData(testingRuns, latestTestingRunResultSummaries);
+          ret = transform.processData(testingRuns, latestTestingRunResultSummaries);
           total = testingRunsCount;
         });
         break;
@@ -205,7 +198,7 @@ function processData(testingRuns, latestTestingRunResultSummaries, cicd){
         await api.fetchTestingDetails(
           startTimestamp, endTimestamp, sortKey, sortOrder, skip, limit, filters, null,queryValue
         ).then(({ testingRuns, testingRunsCount, latestTestingRunResultSummaries }) => {
-          ret = processData(testingRuns, latestTestingRunResultSummaries);
+          ret = transform.processData(testingRuns, latestTestingRunResultSummaries);
           total = testingRunsCount;
         });
         break;

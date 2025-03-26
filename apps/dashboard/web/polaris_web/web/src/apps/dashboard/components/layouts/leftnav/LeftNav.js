@@ -5,6 +5,7 @@ import {
     MarketingFilledMinor,
     ReportFilledMinor,
     DiamondAlertMinor,
+    StarFilledMinor,
     FinancesMinor,
 } from "@shopify/polaris-icons";
 import {useLocation, useNavigate} from "react-router-dom";
@@ -299,8 +300,7 @@ export default function LeftNav() {
                             subNavigationItems: reportsSubNavigationItems,
                             key: "6",
                         },
-                        window?.STIGG_FEATURE_WISE_ALLOWED?.THREAT_DETECTION?.isGranted ?
-                             {
+                        ...(window?.STIGG_FEATURE_WISE_ALLOWED?.THREAT_DETECTION?.isGranted ? [{
                                 label: (
                                     <Text variant="bodyMd" fontWeight="medium">
                                         API Protection
@@ -356,9 +356,24 @@ export default function LeftNav() {
                                             leftNavSelected === "dashboard_threat_policy",
                                     },
                                 ],
-                            }
-                            : {},
-                    ].filter(item => item.label !== null)}
+                            }] : []),
+                            ...(window?.STIGG_FEATURE_WISE_ALLOWED?.AI_AGENTS?.isGranted ? [{
+                            label: (
+                                <Text variant="bodyMd" fontWeight="medium">
+                                    AI Agents
+                                </Text>
+                            ),
+                            icon: StarFilledMinor,
+                            onClick: () => {
+                                handleSelect("agent_team_members");
+                                navigate("/dashboard/agent-team/members");
+                                setActive("normal");
+                            },
+                            selected: leftNavSelected.includes("agent_team"),
+                            url: "#",
+                            key: "8",
+                        }] : []),
+                    ]}
                 />
             </Navigation>
         </div>
