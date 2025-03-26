@@ -1,4 +1,4 @@
-import { Icon, Text } from '@shopify/polaris';
+import { Button, HorizontalStack, Icon, Text } from '@shopify/polaris';
 import { PauseMajor, StopMajor } from '@shopify/polaris-icons';
 import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -14,7 +14,7 @@ interface BlockedStateProps {
 }
 
 export const BlockedState = ({ onResume, onDiscard }: BlockedStateProps) => {
-    const { agentState, setAttemptedInBlockedState, attemptedInBlockedState, setAgentState, currentAgent } = useAgentsStore();
+    const { agentState, setAttemptedInBlockedState, attemptedInBlockedState, setAgentState, currentAgent, PRstate } = useAgentsStore();
     const {setCurrentAgentState} = useAgentsStateStore()
 
     const handleResume = () => {
@@ -57,7 +57,7 @@ export const BlockedState = ({ onResume, onDiscard }: BlockedStateProps) => {
                             }
                         }
                     }}
-                    className="absolute min-h-[38px] -top-[38px] py-2 px-3 w-[95%] left-1/2 -translate-x-1/2 bg-[var(--agent-grey-background)] border border-[var(--borderShadow-box-shadow)] rounded-t-sm flex justify-between items-center z-[100]"
+                    className="absolute min-h-[40px] -top-[40px] py-2 px-3 w-[90%] left-1/2 -translate-x-1/2 bg-[var(--agent-grey-background)] border border-[var(--borderShadow-box-shadow)] rounded-t-sm flex justify-between items-center z-[100]"
                 >
                     {
                         isPaused && (
@@ -68,21 +68,10 @@ export const BlockedState = ({ onResume, onDiscard }: BlockedStateProps) => {
                                         Paused (Member is waiting for your response)
                                     </Text>
                                 </div>
-                                <div className="flex items-center gap-2">
-                                    <button
-                                        onClick={handleDiscard}
-                                        id="discard-button"
-                                    >
-                                        Discard
-                                    </button>
-                                    <button
-                                        onClick={handleResume}
-                                        id="approve-button"
-                                        className="hover:bg-[var(--akto-primary)/80] cursor-pointer"
-                                    >
-                                        Approve
-                                    </button>
-                                </div>
+                                <HorizontalStack gap="2">
+                                    <Button size="micro" onClick={handleDiscard}>Discard</Button>
+                                    <Button disabled={PRstate !== "-1"} size="micro" primary onClick={handleResume}>Approve</Button>
+                                </HorizontalStack>
                             </>
                     )}
                     {

@@ -15,7 +15,11 @@ export const FindVulnerabilitiesAgent = () => {
     const [subprocesses, setSubprocesses] = useState<AgentSubprocess[]>([]);
 
     const { currentProcessId, currentAgent, setCurrentAttempt, setCurrentSubprocess, setCurrentProcessId, resetStore, agentState, setAgentState} = useAgentsStore();
-    const { resetIntermediateStore } = intermediateStore(state => ({ resetIntermediateStore: state.resetIntermediateStore })); 
+    const { resetIntermediateStore, setAgentInitDocument } = intermediateStore(state => ({ resetIntermediateStore: state.resetIntermediateStore,  setAgentInitDocument: state.setAgentInitDocument })); 
+
+    useEffect(()=>{
+        setAgentInitDocument(currentAgentRun?.agentInitDocument || {})
+    },[currentAgentRun])
 
     const {setCurrentSubprocessAttempt,setCurrentAgentProcessId,setCurrentAgentSubprocess, resetAgentState, setCurrentAgentState} = useAgentsStateStore();
 

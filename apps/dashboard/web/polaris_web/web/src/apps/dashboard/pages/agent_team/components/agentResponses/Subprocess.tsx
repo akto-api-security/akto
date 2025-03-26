@@ -4,12 +4,13 @@ import {  AgentRun, AgentState, AgentSubprocess, State } from "../../types";
 import { CaretDownMinor } from "@shopify/polaris-icons";
 import api from "../../api";
 import { useAgentsStore } from "../../agents.store";
-import STEPS_PER_AGENT_ID, { preRequisitesMap } from "../../constants";
+import STEPS_PER_AGENT_ID, { outputKeys, preRequisitesMap } from "../../constants";
 import { VerticalStack, Text, HorizontalStack, Button } from "@shopify/polaris";
 import OutputSelector from "./OutputSelector";
 import { intermediateStore } from "../../intermediate.store";
 import {useAgentsStateStore} from "../../agents.state.store"
 import func from "../../../../../../util/func";
+import BatchedOutput from "./BatchedOutput";
 import SelectedChoices from "./SelectedChoices";
 import transform from "../../transform";
 
@@ -26,7 +27,7 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, triggerCall
     const [expanded, setExpanded] = useState(true);
 
     const { finalCTAShow, setFinalCTAShow, setCurrentAttempt, 
-        setCurrentSubprocess, currentSubprocess, currentAttempt, setAgentState, setPRState, agentState } = useAgentsStore(state => ({
+        setCurrentSubprocess, currentSubprocess, currentAttempt, setAgentState, setPRState, PRstate } = useAgentsStore(state => ({
         finalCTAShow: state.finalCTAShow,
         setFinalCTAShow: state.setFinalCTAShow,
         setCurrentAttempt: state.setCurrentAttempt,
@@ -35,7 +36,7 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, triggerCall
         currentAttempt: state.currentAttempt,
         setAgentState: state.setAgentState,
         setPRState: state.setPRState,
-        agentState: state.agentState
+        PRstate: state.PRstate
     }));  // Only subscribe to necessary store values
 
     const { setFilteredUserInput, setOutputOptions } = intermediateStore(state => ({ setFilteredUserInput: state.setFilteredUserInput, setOutputOptions: state.setOutputOptions })); 
@@ -43,15 +44,6 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, triggerCall
 
     // Memoized function to create new subprocess
     const createNewSubprocess = useCallback(async (newSubIdNumber: number) => {
-
-        // check for pre-requisites first
-        const shouldCreateSubProcess = preRequisitesMap[agentId]?.[newSubIdNumber]?.action ? await preRequisitesMap[agentId][newSubIdNumber].action() : true;
-        if (!shouldCreateSubProcess) {
-            setFinalCTAShow(false);
-            setPRState("4");
-            return null;
-        }
-
         const newSubId = newSubIdNumber.toString();
         const newRes = await api.updateAgentSubprocess({
             processId,
@@ -97,15 +89,21 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, triggerCall
                     } else {
                         transform.updateAgentState("idle", agentId??"", setAgentState, setCurrentAgentState);
                     }
-                } else {
-                    const newSub = await createNewSubprocess(newSubIdNumber);
-                    setSubprocess(newSub);
-                    triggerCallForSubProcesses();
                 }
             }
 
             if (newSubProcess.state === State.COMPLETED) {
                 transform.updateAgentState("paused", agentId??"", setAgentState, setCurrentAgentState);
+                if(preRequisitesMap[agentId] && preRequisitesMap[agentId][currentSubprocess]){
+                    if(preRequisitesMap[agentId][currentSubprocess].action){
+                        await preRequisitesMap[agentId][currentSubprocess].action();
+                        if(PRstate === "-1"){
+                            setFinalCTAShow(true);
+                            setPRState("1");
+                        }
+                        
+                    }
+                }
             }
 
             if (newSubProcess.state === State.DISCARDED) {
@@ -115,6 +113,7 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, triggerCall
             if (newSubProcess.state === State.AGENT_ACKNOWLEDGED) {
                 const newSub = await createNewSubprocess(Number(currentSubprocess) + 1);
                 setFilteredUserInput(null);
+               
                 setSubprocess(newSub);
                 triggerCallForSubProcesses();
             }
@@ -141,12 +140,49 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, triggerCall
         return () => clearInterval(interval);
     }, [currentSubprocess, finalCTAShow, processId, currentAttempt, subProcessFromProp, createNewSubprocess]);
 
+    const groupedOutput = useMemo(() => {
+        const rawData = subprocess?.processOutput?.selectionType === "batched" ? subprocess?.processOutput?.outputOptions : [];
+        if(rawData.length === 0) return {};
+        let finalMap = {};
+        rawData.forEach((data: any) => {
+            const {id, output} = data;
+            const {apiCollectionId, url, method} = id;
+            if(!finalMap[apiCollectionId]){
+                finalMap[apiCollectionId] = [
+                    {
+                        output: output,
+                        url: url,
+                        method: method
+                    }
+                ]
+            }else{
+                if(finalMap[apiCollectionId].filter((item: any) => item.url === url && item.method === method).length === 0){ // new entry and hence add it to the list
+                    finalMap[apiCollectionId].push({
+                        output: output,
+                        url: url,
+                        method: method
+                    })
+                }else{ // update the output value
+                    finalMap[apiCollectionId].forEach((item: any) => {
+                        if(item.url === url && item.method === method && !func.deepComparison(item.output, output)){
+                            item.output = output;
+                        }
+                    })
+
+                }
+            }
+        })
+        return finalMap;
+    }, [subprocess?.processOutput?.outputOptions]);
+
     if (!subprocess) return null;
 
     const handleSelect = (selectedChoices: any, outputOptions: any) => {
-        console.log(selectedChoices);
-        setOutputOptions(outputOptions);
+        setOutputOptions(outputOptions); 
         setFilteredUserInput(selectedChoices);
+        if(PRstate !== "-1"){
+            setFinalCTAShow(true);
+        }
     }
 
     async function reRunTask() {
@@ -213,7 +249,12 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, triggerCall
                     </motion.div>
                 </AnimatePresence>
             </div>
-
+            {subprocess.processOutput?.selectionType === 'batched' ?<BatchedOutput 
+                data={groupedOutput} 
+                buttonText="Analyzing APIs for the collection: " 
+                isCollectionBased={true}
+                keysArr={outputKeys[agentId]}
+            /> : null}
             {subprocess.state === State.COMPLETED && subprocess.processOutput &&
                 <OutputSelector processOutput={subprocess.processOutput} onHandleSelect={handleSelect} />
             }
@@ -222,7 +263,7 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, triggerCall
                 <VerticalStack gap={"2"}>
                     <Text variant="bodyMd" as="span">{subprocess.processOutput?.outputMessage}</Text>
                     {/* TODO: Selected choices dialog, handle edge cases. */}
-                    {/* <SelectedChoices userInput={subprocess.userInput}/> */}
+                    <SelectedChoices userInput={subprocess.userInput}/>
                 </VerticalStack>
             }
 

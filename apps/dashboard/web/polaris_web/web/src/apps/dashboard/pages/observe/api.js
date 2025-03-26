@@ -23,7 +23,7 @@ export default {
                 searchString:queryValue
             }
         })
-        return resp.response.data
+        return resp?.data
     },
     fetchRecentParams(startTimestamp, endTimestamp){
         return request({
@@ -664,6 +664,15 @@ export default {
             method: 'post',
             data: {
                 apiList, collectionName
+            }
+        })
+    },
+    async syncExtractedAPIs(apiCollectionName, projectDir, codeAnalysisApisList) {
+        return await request({
+            url: '/api/syncExtractedAPIs',
+            method: 'post',
+            data: {
+                apiCollectionName, projectDir, codeAnalysisApisList
             }
         })
     },
