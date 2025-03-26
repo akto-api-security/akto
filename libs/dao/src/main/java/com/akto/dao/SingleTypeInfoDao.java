@@ -21,6 +21,7 @@ import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.*;
 
 import org.bson.conversions.Bson;
+import org.checkerframework.checker.units.qual.s;
 
 public class SingleTypeInfoDao extends AccountsContextDaoWithRbac<SingleTypeInfo> {
 
@@ -580,17 +581,21 @@ public class SingleTypeInfoDao extends AccountsContextDaoWithRbac<SingleTypeInfo
     public static final int LARGE_LIMIT = 10_000;
     public static final String _COUNT = "count";
 
-    public List<Bson> createPipelineForFetchRequestParams(List<ApiInfo.ApiInfoKey> apiInfoKeys){
+    public List<Bson> createPipelineForFetchParams(List<ApiInfo.ApiInfoKey> apiInfoKeys, boolean isRequest, boolean shouldApplyResponseCodeFilter){
         List<Bson> pipeline = new ArrayList<>();
 
         List<Bson> filters = new ArrayList<>();
+        Bson responseCodeFilter = Filters.gte(SingleTypeInfo._RESPONSE_CODE, -1);
+        if(shouldApplyResponseCodeFilter){
+            responseCodeFilter = isRequest ? Filters.eq(SingleTypeInfo._RESPONSE_CODE, -1) : Filters.gt(SingleTypeInfo._RESPONSE_CODE, -1);
+        } 
         for (ApiInfo.ApiInfoKey apiInfoKey: apiInfoKeys) {
             filters.add(
                     Filters.and(
                             Filters.eq(SingleTypeInfo._API_COLLECTION_ID, apiInfoKey.getApiCollectionId()),
                             Filters.eq(SingleTypeInfo._URL, apiInfoKey.getUrl()),
                             Filters.eq(SingleTypeInfo._METHOD, apiInfoKey.getMethod().name()),
-                            Filters.eq(SingleTypeInfo._RESPONSE_CODE, -1),
+                            responseCodeFilter,
                             Filters.eq(SingleTypeInfo._IS_HEADER, false)
                     )
             );
@@ -606,18 +611,21 @@ public class SingleTypeInfoDao extends AccountsContextDaoWithRbac<SingleTypeInfo
         } catch(Exception e){
         }
 
-        BasicDBObject groupedId = new BasicDBObject("apiCollectionId", "$apiCollectionId")
-                        .append("url", "$url")
-                        .append("method", "$method");
+        BasicDBObject groupedId = new BasicDBObject(SingleTypeInfo._API_COLLECTION_ID, "$" + SingleTypeInfo._API_COLLECTION_ID)
+                        .append(SingleTypeInfo._URL, "$" + SingleTypeInfo._URL)
+                        .append(SingleTypeInfo._METHOD, "$" + SingleTypeInfo._METHOD);
 
 
         Bson projections = Projections.fields(
-                Projections.include( "apiCollectionId", "url", "method", "param")
+                Projections.include( SingleTypeInfo._API_COLLECTION_ID, SingleTypeInfo._URL, SingleTypeInfo._METHOD, SingleTypeInfo._PARAM, SingleTypeInfo._RESPONSE_CODE)
         );
 
         pipeline.add(Aggregates.project(projections));
-
+        if(!shouldApplyResponseCodeFilter){
+            groupedId.append(SingleTypeInfo._RESPONSE_CODE, "$" + SingleTypeInfo._RESPONSE_CODE);
+        }
         pipeline.add(Aggregates.group(groupedId,Accumulators.addToSet("params", "$param")));
+        
         return pipeline;
 
     }
@@ -626,7 +634,7 @@ public class SingleTypeInfoDao extends AccountsContextDaoWithRbac<SingleTypeInfo
         Map<ApiInfo.ApiInfoKey, List<String>> result = new HashMap<>();
         if (apiInfoKeys == null || apiInfoKeys.isEmpty()) return result;
 
-        List<Bson> pipeline = createPipelineForFetchRequestParams(apiInfoKeys);
+        List<Bson> pipeline = createPipelineForFetchParams(apiInfoKeys, true, true);
 
         MongoCursor<BasicDBObject> stiCursor = instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
         while (stiCursor.hasNext()) {

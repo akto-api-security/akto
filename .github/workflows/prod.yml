@@ -6,6 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       release_version:
+        description: 'Release version for the deployment'
         required: true
       skipTests:
         description: 'Do you want to skip unit tests?'
