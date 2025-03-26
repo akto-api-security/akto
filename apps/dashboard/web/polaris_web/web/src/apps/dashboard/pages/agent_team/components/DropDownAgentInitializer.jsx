@@ -18,7 +18,6 @@ function DataSelector(props) {
                         optionsList={optionsList}
                         setSelected={setData}
                         preSelected={data}
-                        value={`${data.length} ${agentProperty}${data.length == 1 ? '' : 's'} selected`}
                     />
                 </Box>
                 <StartButton startAgent={startAgent} data={data} />
