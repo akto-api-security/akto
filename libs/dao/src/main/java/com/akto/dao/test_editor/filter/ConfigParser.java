@@ -250,18 +250,18 @@ public class ConfigParser {
         }
         
         // 11. CIDR operands can only be applied to IP properties.
-        if (curNode.getOperand().equals(DataOperands.CONTAINS_EITHER_CIDR.toString())
-                || curNode.getOperand().equals(DataOperands.NOT_CONTAINS_CIDR.toString())) {
+        if (isIpOperand(curNode.getOperand())) {
             
-            if (!concernedProperty.equals(TermOperands.DESTINATION_IP.toString())
-                    || !concernedProperty.equals(TermOperands.SOURCE_IP.toString())) {
+            if (!isIpProperty(concernedProperty)) {
                 configParserValidationResult.setIsValid(false);
                 configParserValidationResult.setErrMsg("IP CIDR rules can only be applied to source_ip and destination_ip");
+                return configParserValidationResult;
             }
 
             if (!isListOfValidIPv4CIDR(values)) {
                 configParserValidationResult.setIsValid(false);
                 configParserValidationResult.setErrMsg("Values must be a list of valid IPv4 CIDR notations");
+                return configParserValidationResult;
             }
         
         }
@@ -287,6 +287,17 @@ public class ConfigParser {
         }
 
         return true;
+    }
+
+    
+    private Boolean isIpOperand(String operand) {
+        return DataOperands.CONTAINS_EITHER_CIDR.toString().equals(operand)
+                || DataOperands.NOT_CONTAINS_CIDR.toString().equals(operand);
+    }
+
+    private Boolean isIpProperty(String concernedProperty) {
+        return TermOperands.SOURCE_IP.toString().equals(concernedProperty)
+                || TermOperands.DESTINATION_IP.toString().equals(concernedProperty);
     }
 
     public Boolean isListOfValidIPv4CIDR(Object value) {
