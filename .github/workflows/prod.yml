@@ -61,7 +61,7 @@ jobs:
           IMAGE_TAG: latest
           IMAGE_TAG1: testruntime
           IMAGE_TAG2: local
-          IMAGE_TAG3: 1.42.11_local
+          IMAGE_TAG3: 1.42.12_local
         run: |
           docker buildx create --use
           # Build a docker container and push it to DockerHub 
