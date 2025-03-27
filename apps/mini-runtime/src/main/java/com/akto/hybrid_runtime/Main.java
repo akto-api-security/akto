@@ -21,6 +21,7 @@ import com.akto.sql.SampleDataAltDb;
 import com.akto.hybrid_parsers.HttpCallParser;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
+import com.akto.testing_db_layer_client.ClientLayer;
 import com.akto.util.DashboardMode;
 import com.akto.util.filter.DictionaryFilter;
 import com.google.gson.Gson;
@@ -43,6 +44,7 @@ public class Main {
     private static final LoggerMaker loggerMaker = new LoggerMaker(Main.class, LogDb.RUNTIME);
 
     public static final DataActor dataActor = DataActorFactory.fetchInstance();
+    private static final ClientLayer clientLayer = new ClientLayer();
 
     // this sync threshold time is used for deleting sample data
     public static final int sync_threshold_time = 120;
@@ -210,22 +212,6 @@ public class Main {
         HttpCallParser.init();
         loggerMaker.infoAndAddToDb("All metrics initialized", LogDb.RUNTIME);
 
-
-        if (checkPg) {
-            try {
-                com.akto.sql.Main.createSampleDataTable();
-                SampleDataAltDb.createIndex();
-            } catch(Exception e){
-                logger.error("Unable to connect to postgres sql db", e);
-            }
-
-            try {
-                CleanPostgres.cleanPostgresCron();
-            } catch(Exception e){
-                logger.error("Unable to clean postgres", e);
-            }
-        }
-
         dataActor.modifyHybridSaasSetting(RuntimeMode.isHybridDeployment());
 
         APIConfig apiConfig = dataActor.fetchApiConfig(configName);
@@ -285,11 +271,11 @@ public class Main {
                     }
                 }
 
-
                 if (checkPg) {
-                    AllMetrics.instance.setTotalSampleDataCount(SampleDataAltDb.totalNumberOfRecords());
-                    loggerMaker.infoAndAddToDb("Total number of records in postgres: " + SampleDataAltDb.totalNumberOfRecords(), LogDb.RUNTIME);
-                    long dbSizeInMb = SampleDataAltDb.getDbSizeInMb();
+                    int records = clientLayer.fetchTotalRecords();
+                    AllMetrics.instance.setTotalSampleDataCount(records);
+                    loggerMaker.infoAndAddToDb("Total number of records in postgres: " + records, LogDb.RUNTIME);
+                    long dbSizeInMb = clientLayer.fetchTotalSize();
                     AllMetrics.instance.setPgDataSizeInMb(dbSizeInMb);
                     loggerMaker.infoAndAddToDb("Postgres size: " + dbSizeInMb + " MB", LogDb.RUNTIME);
                 }

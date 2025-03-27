@@ -23,24 +23,6 @@ public class CleanPostgres {
         } catch (Exception e) {
         }
 
-        scheduler.scheduleAtFixedRate(new Runnable() {
-            public void run() {
-                long start = System.currentTimeMillis();
-                cleanPostgresJob();
-                AllMetrics.instance.setStaleSampleDataCleanupJobLatency(System.currentTimeMillis() - start);
-            }
-        }, 0, time, TimeUnit.MINUTES);
-    }
-
-    private static void cleanPostgresJob() {
-
-        try {
-            int deleteCount = SampleDataAltDb.deleteOld();
-            AllMetrics.instance.setStaleSampleDataDeletedCount(deleteCount);
-        } catch (Exception ex) {
-            loggerMaker.errorAndAddToDb(ex,
-                    String.format("Failed to delete from postgres %s", ex.getMessage()));
-        }
     }
 
 }
