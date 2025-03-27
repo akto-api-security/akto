@@ -70,7 +70,7 @@ export default function Header() {
     const searchResultSections = useMemo(() => func.getSearchResults(filteredItemsArr, handleNavigateSearch), [filteredItemsArr, handleNavigateSearch])
 
     const searchResultsMarkup = (
-        <Scrollable style={{maxHeight: '500px'}} shadow>
+        <Scrollable key={searchValue} style={{maxHeight: '500px'}} shadow>
         <ActionList
             sections={searchResultSections}
         />

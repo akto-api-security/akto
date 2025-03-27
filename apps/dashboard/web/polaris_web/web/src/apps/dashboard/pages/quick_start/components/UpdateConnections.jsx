@@ -21,33 +21,31 @@ function UpdateConnections(props) {
     const setCurrentCardObj = QuickStartStore(state => state.setCurrentConnector)
 
     const closeAction = () => {
-        setCurrentCardObj(null)
-        setNewCol(0)
         func.updateQueryParams(searchParams, setSearchParams, "connector","")
     }
 
     const onButtonClick = (cardObj) => {
-        setNewCol(2)
-        setCurrentCardObj(cardObj)
         const connector = cardObj.key?.toLowerCase() ?? "";
-        func.updateQueryParams(searchParams, setSearchParams, "connector", connector)
+        func.updateQueryParams(searchParams, setSearchParams, "connector", encodeURIComponent(connector))
     }
 
     useEffect(()=>{
-        const connectorKey = decodeURIComponent(decodeURIComponent(searchParams.get("connector") || ""))
+        const connectorKey = decodeURIComponent(searchParams.get("connector") || "")
         if (connectorKey.length !== 0) {
             for (const categoryArr of Object.values(obj)) {
                 for (const connectorCardObj of categoryArr) {
                     const connectorCardObjKey = connectorCardObj.key?.toLowerCase() ?? "";
                     if (connectorCardObjKey === connectorKey) {
+                        setNewCol(2)
                         setCurrentCardObj(connectorCardObj);
                         return; 
                     }
                 }
             }
         } 
+        setNewCol(0)
         setCurrentCardObj(null)
-    },[])
+    },[searchParams])
 
     const components = [
         currentCardObj ? <HorizontalStack gap="1">
