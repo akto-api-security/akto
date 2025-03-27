@@ -124,9 +124,9 @@ public class MaliciousTrafficDetectorTask implements Task {
 
   private Map<String, FilterConfig> getFilters() {
     int now = (int) (System.currentTimeMillis() / 1000);
-    if (now - filterLastUpdatedAt < filterUpdateIntervalSec) {
-      return apiFilters;
-    }
+    // if (now - filterLastUpdatedAt < filterUpdateIntervalSec) {
+    //   return apiFilters;
+    // }
 
     List<YamlTemplate> templates = dataActor.fetchFilterYamlTemplates();
     apiFilters = FilterYamlTemplateDao.fetchFilterConfig(false, templates, false);

@@ -127,7 +127,10 @@ public class FlushMessagesToDB {
                   sendEventToSplunk(event, accountId);
               });
             });
-
+        
+        if (bulkUpdates.isEmpty()){
+          break;
+        }
 
         this.mClient
             .getDatabase(accountId + "")
@@ -138,6 +141,11 @@ public class FlushMessagesToDB {
       case MongoDBCollection.ThreatDetection.MALICIOUS_EVENTS:
         MaliciousEventModel event =
             mapper.readValue(payload, new TypeReference<MaliciousEventModel>() {});
+        
+        if (event == null){
+          break;
+        }
+        
         this.mClient
             .getDatabase(accountId + "")
             .getCollection(eventType, MaliciousEventModel.class)

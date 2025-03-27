@@ -73,8 +73,7 @@ public class MaliciousEventService {
             .setLatestApiCollectionId(evt.getLatestApiCollectionId())
             .setEventType(maliciousEventType)
             .setLatestApiIp(evt.getLatestApiIp())
-            .setCountry(
-                this.ipLookupClient.getCountryISOCodeGivenIp(evt.getLatestApiIp()).orElse(""))
+            .setCountry("IN")
             .setCategory(evt.getCategory())
             .setSubCategory(evt.getSubCategory())
             .setRefId(refId)

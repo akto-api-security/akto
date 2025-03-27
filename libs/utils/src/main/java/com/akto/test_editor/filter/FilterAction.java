@@ -262,10 +262,7 @@ public final class FilterAction {
     public DataOperandsFilterResponse applyFilterOnSourceIps(FilterActionRequest filterActionRequest) {
 
         RawApi rawApi = filterActionRequest.fetchRawApiBasedOnContext();
-        if (rawApi == null) {
-            return new DataOperandsFilterResponse(false, null, null, null);
-        }
-        if (rawApi.getRequest() == null) {
+        if (rawApi == null || rawApi.getRequest() == null) {
             return new DataOperandsFilterResponse(false, null, null, null);
         }
 
@@ -278,10 +275,7 @@ public final class FilterAction {
     public DataOperandsFilterResponse applyFilterOnDestinationIps(FilterActionRequest filterActionRequest) {
 
         RawApi rawApi = filterActionRequest.fetchRawApiBasedOnContext();
-        if (rawApi == null) {
-            return new DataOperandsFilterResponse(false, null, null, null);
-        }
-        if (rawApi.getRequest() == null) {
+        if (rawApi == null || rawApi.getRequest() == null) {
             return new DataOperandsFilterResponse(false, null, null, null);
         }
 

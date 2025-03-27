@@ -62,8 +62,7 @@ public class Main {
             .setValueSerializer(Serializer.STRING)
             .build();
 
-    IPLookupClient ipLookupClient = new IPLookupClient(getMaxmindFile());
-
+    IPLookupClient ipLookupClient = null; 
     new FlushMessagesToDB(internalKafkaConfig, threatProtectionMongo).run();
 
     MaliciousEventService maliciousEventService =
