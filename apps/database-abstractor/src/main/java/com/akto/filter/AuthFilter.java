@@ -23,11 +23,11 @@ public class AuthFilter implements Filter {
     public void doFilter(ServletRequest servletRequest, ServletResponse servletResponse, FilterChain chain) throws IOException, ServletException {
         HttpServletRequest httpServletRequest= (HttpServletRequest) servletRequest;
         HttpServletResponse httpServletResponse = (HttpServletResponse) servletResponse;
-        //String accessTokenFromRequest = httpServletRequest.getHeader("authorization");
+        String accessTokenFromRequest = httpServletRequest.getHeader("authorization");
 
         try {
-            // Jws<Claims> claims = JwtAuthenticator.authenticate(accessTokenFromRequest);
-            Context.accountId.set(1000000);
+            Jws<Claims> claims = JwtAuthenticator.authenticate(accessTokenFromRequest);
+            Context.accountId.set((int) claims.getBody().get("accountId"));
         } catch (Exception e) {
             System.out.println(e.getMessage());
             httpServletResponse.sendError(401);

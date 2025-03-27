@@ -404,6 +404,10 @@ public class InventoryAction extends UserAction {
     private List<String> urls;
     public String fetchSensitiveParamsForEndpoints() {
 
+        if (urls.isEmpty()){
+            return Action.SUCCESS.toUpperCase();
+        }
+
         int batchSize = 500;
         List<SingleTypeInfo> list = new ArrayList<>();
         for (int i = 0; i < urls.size(); i += batchSize) {
