@@ -4,7 +4,7 @@ import {  AgentRun, AgentState, AgentSubprocess, State } from "../../types";
 import { CaretDownMinor } from "@shopify/polaris-icons";
 import api from "../../api";
 import { useAgentsStore } from "../../agents.store";
-import STEPS_PER_AGENT_ID, { outputKeys, preRequisitesMap } from "../../constants";
+import STEPS_PER_AGENT_ID, { outputKeys, preRequisitesMap, showSummaryOutput } from "../../constants";
 import { VerticalStack, Text, HorizontalStack, Button } from "@shopify/polaris";
 import OutputSelector from "./OutputSelector";
 import { intermediateStore } from "../../intermediate.store";
@@ -135,8 +135,9 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, triggerCall
         return () => clearInterval(interval);
     }, [currentSubprocess, finalCTAShow, processId, currentAttempt, subProcessFromProp, createNewSubprocess]);
 
+    const showSummary = STEPS_PER_AGENT_ID[agentId] === parseInt(subprocess?.subProcessId || '0') && showSummaryOutput[agentId];
     const groupedOutput = useMemo(() => {
-        const rawData = subprocess?.processOutput?.selectionType === "batched" ? subprocess?.processOutput?.outputOptions : [];
+        const rawData = showSummary ? subprocess?.processOutput?.outputOptions : [];
         if(rawData.length === 0) return {};
         let finalMap = {};
         rawData.forEach((data: any) => {
@@ -244,7 +245,7 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, triggerCall
                     </motion.div>
                 </AnimatePresence>
             </div>
-            {subprocess.processOutput?.selectionType === 'batched' ?<BatchedOutput 
+            {showSummary ?<BatchedOutput 
                 data={groupedOutput} 
                 buttonText="Analyzing APIs for the collection: " 
                 isCollectionBased={true}
