@@ -33,6 +33,7 @@ public class InitializerListener implements ServletContextListener {
             logger.error("Error creating index" + e.getMessage());
         }
 
+        // todo: add metrics on all the postgres operations
         try {
             CleanPostgres.cleanPostgresCron();
         } catch(Exception e){
