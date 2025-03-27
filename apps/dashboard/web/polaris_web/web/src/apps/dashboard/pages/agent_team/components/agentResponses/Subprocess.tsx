@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {  AgentRun, AgentState, AgentSubprocess, State } from "../../types";
 import { CaretDownMinor } from "@shopify/polaris-icons";
@@ -8,9 +8,11 @@ import STEPS_PER_AGENT_ID, { outputKeys, preRequisitesMap, showSummaryOutput } f
 import { VerticalStack, Text, HorizontalStack, Button } from "@shopify/polaris";
 import OutputSelector from "./OutputSelector";
 import { intermediateStore } from "../../intermediate.store";
+import {useAgentsStateStore} from "../../agents.state.store"
 import func from "../../../../../../util/func";
 import BatchedOutput from "./BatchedOutput";
 import SelectedChoices from "./SelectedChoices";
+import transform from "../../transform";
 
 interface SubProcessProps {
     agentId: string, 
@@ -38,6 +40,7 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, triggerCall
     }));  // Only subscribe to necessary store values
 
     const { setFilteredUserInput, setOutputOptions } = intermediateStore(state => ({ setFilteredUserInput: state.setFilteredUserInput, setOutputOptions: state.setOutputOptions })); 
+    const {setCurrentAgentState, setCurrentSubprocessAttempt, setCurrentAgentSubprocess} = useAgentsStateStore();
 
     // Memoized function to create new subprocess
     const createNewSubprocess = useCallback(async (newSubIdNumber: number) => {
@@ -50,7 +53,9 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, triggerCall
         });
         setCurrentSubprocess(newSubId);
         setCurrentAttempt(1);
-        setAgentState("thinking");
+        transform.updateAgentState("thinking", agentId??"", setAgentState, setCurrentAgentState);
+        setCurrentSubprocessAttempt(agentId, 1);
+        setCurrentAgentSubprocess(agentId, newSubId);
         return newRes.subprocess as AgentSubprocess;
     }, [processId, setCurrentSubprocess, setCurrentAttempt, setAgentState]);
 
@@ -70,9 +75,9 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, triggerCall
             if (!newSubProcess) return;
 
             if (newSubProcess.state === State.RUNNING) {
-                setAgentState((prev: AgentState) => {
-                    return prev !== "error" ? "thinking" : prev
-                });
+                    transform.updateAgentState((prev: AgentState) => {
+                        return prev !== "error" ? "thinking" : prev
+                    }, agentId??"", setAgentState, setCurrentAgentState);
             }
 
             if (newSubProcess.state === State.ACCEPTED) {
@@ -82,12 +87,13 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, triggerCall
                         setFinalCTAShow(true);
                         await api.updateAgentRun({ processId, state: "COMPLETED" });
                     } else {
-                        setAgentState("idle");
+                        transform.updateAgentState("idle", agentId??"", setAgentState, setCurrentAgentState);
                     }
                 }
             }
 
             if (newSubProcess.state === State.COMPLETED) {
+                transform.updateAgentState("paused", agentId??"", setAgentState, setCurrentAgentState);
                 if(preRequisitesMap[agentId] && preRequisitesMap[agentId][currentSubprocess]){
                     if(preRequisitesMap[agentId][currentSubprocess].action){
                         await preRequisitesMap[agentId][currentSubprocess].action();
@@ -98,11 +104,10 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, triggerCall
                         
                     }
                 }
-                setAgentState("paused");
             }
 
             if (newSubProcess.state === State.DISCARDED) {
-                setAgentState("idle");
+                transform.updateAgentState("idle", agentId??"", setAgentState, setCurrentAgentState);
             }
 
             if (newSubProcess.state === State.AGENT_ACKNOWLEDGED) {
@@ -118,7 +123,7 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, triggerCall
             }
 
             if (newSubProcess.state === State.SCHEDULED) {
-                setAgentState("idle");
+                transform.updateAgentState("idle", agentId??"", setAgentState, setCurrentAgentState);
             }
 
             if (JSON.stringify(newSubProcess) !== JSON.stringify(subprocess)) {
@@ -196,7 +201,7 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, triggerCall
     async function startAgentAgain() {
         let res = await api.updateAgentRun({ processId, state: "DISCARDED" });
         func.setToast(true, false, "Agent is being submitted for re-run")
-        setAgentState("idle");
+        transform.updateAgentState("idle", agentId??"", setAgentState, setCurrentAgentState);
         setTimeout(async () => {
             const previousAgentRun = res.agentRun
             let data = await api.createAgentRun({
@@ -216,7 +221,7 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, triggerCall
     async function stopAgent() {
         await api.updateAgentRun({ processId, state: "STOPPED" });
         func.setToast(true, false, "Agent has been stopped")
-        setAgentState("idle");
+        transform.updateAgentState("idle", agentId??"", setAgentState, setCurrentAgentState);
     }
 
     return useMemo(() => (
@@ -231,7 +236,7 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, triggerCall
 
                 <AnimatePresence>
                     <motion.div animate={expanded ? "open" : "closed"} variants={{ open: { height: "auto", opacity: 1 }, closed: { height: 0, opacity: 0 } }} transition={{ duration: 0.2 }} className="overflow-hidden">
-                        <div className="bg-[#F6F6F7] ml-2.5 pt-0 space-y-1 border-l border-[#D2D5D8]">
+                        <div className="bg-[#F6F6F7]  max-h-[45vh] overflow-auto ml-2.5 pt-0 space-y-1 border-l border-[#D2D5D8]">
                             <AnimatePresence initial={false}>
                                 {subprocess?.logs?.sort((a,b) => {
                                     return a.eventTimestamp > b.eventTimestamp ? 1 : -1

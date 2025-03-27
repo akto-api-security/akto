@@ -472,6 +472,7 @@ function GithubServerTable(props) {
                 sortDirection={activeColumnSort.sortDirection}
                 onSort={handleSort}
                 lastColumnSticky={props?.lastColumnSticky || false}
+                {...(props?.emptyStateMarkup ? {emptyState:props?.emptyStateMarkup} : {})}
               >
                 {rowMarkup}
               </IndexTable>

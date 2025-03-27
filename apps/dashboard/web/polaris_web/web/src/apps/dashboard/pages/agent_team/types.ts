@@ -34,7 +34,7 @@ export type PromptPayload = {
     prompt: PromptContent;
 }
 
-export type AgentState = 'paused' | 'idle' | 'thinking' | 'error';
+export type AgentState = 'paused' | 'idle' | 'thinking' | 'error' | 'stopped' | 'completed';
 
 export enum State {
     STOPPED = 'STOPPED',
