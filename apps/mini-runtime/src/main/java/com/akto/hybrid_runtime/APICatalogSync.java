@@ -33,6 +33,7 @@ import com.akto.sql.SampleDataAltDb;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
 import com.akto.hybrid_runtime.policies.AktoPolicyNew;
+import com.akto.testing_db_layer_client.ClientLayer;
 import com.akto.types.CappedSet;
 import com.akto.util.filter.DictionaryFilter;
 import com.akto.utils.RedactSampleData;
@@ -72,6 +73,7 @@ public class APICatalogSync {
 
     private static DataActor dataActor = DataActorFactory.fetchInstance();
     public static Set<MergedUrls> mergedUrls;
+    private static final ClientLayer clientLayer = new ClientLayer();
 
     public APICatalogSync(String userIdentifier,int thresh, boolean fetchAllSTI) {
         this(userIdentifier, thresh, fetchAllSTI, true);
@@ -1464,6 +1466,7 @@ public class APICatalogSync {
 
         long start = System.currentTimeMillis();
         if (writesForParams.size() >0) {
+
             do {
 
                 List<Object> slicedWrites = writesForParams.subList(from, Math.min(from + batch, writesForParams.size()));
@@ -1581,7 +1584,17 @@ public class APICatalogSync {
         if (accountLevelRedact || apiCollectionLevelRedact) {
             try {
                 long start = System.currentTimeMillis();
-                SampleDataAltDb.bulkInsert(unfilteredSamples);
+                List<SampleDataAlt> samplesBatch = new ArrayList<>();
+                for (int i = 0; i < unfilteredSamples.size(); i++) {
+                    samplesBatch.add(unfilteredSamples.get(i));
+                    if ((i % 100) == 0) {
+                        clientLayer.bulkInsertSamples(samplesBatch);
+                        samplesBatch = new ArrayList<>();
+                    }
+                }
+                if (!samplesBatch.isEmpty()) {
+                    clientLayer.bulkInsertSamples(samplesBatch);
+                }
                 AllMetrics.instance.setPostgreSampleDataInsertedCount(unfilteredSamples.size());
                 AllMetrics.instance.setPostgreSampleDataInsertLatency(System.currentTimeMillis() - start);
 

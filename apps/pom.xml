@@ -13,6 +13,9 @@
     <groupId>com.akto.apps</groupId>
     <artifactId>apps</artifactId>
     <packaging>pom</packaging>
+    <modules>
+        <module>testing-db-layer</module>
+    </modules>
 
     <profiles>
         <profile>
