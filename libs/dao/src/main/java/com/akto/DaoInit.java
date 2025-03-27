@@ -9,6 +9,7 @@ import com.akto.dao.testing.TestingRunDao;
 import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dao.testing.TestingRunResultSummariesDao;
 import com.akto.dao.testing.VulnerableTestingRunResultDao;
+import com.akto.dao.testing_run_findings.SourceCodeVulnerabilitiesDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dao.traffic_metrics.TrafficAlertsDao;
 import com.akto.dao.traffic_metrics.RuntimeMetricsDao;
@@ -87,6 +88,8 @@ import org.slf4j.LoggerFactory;
 import static com.akto.dao.MCollection.clients;
 import static org.bson.codecs.configuration.CodecRegistries.fromProviders;
 import static org.bson.codecs.configuration.CodecRegistries.fromRegistries;
+
+import javax.xml.transform.Source;
 
 public class DaoInit {
 
@@ -421,6 +424,7 @@ public class DaoInit {
         CustomRoleDao.instance.createIndicesIfAbsent();
         TestingInstanceHeartBeatDao.instance.createIndexIfAbsent();
         PupeteerLogsDao.instance.createIndicesIfAbsent();
+        SourceCodeVulnerabilitiesDao.instance.createIndicesIfAbsent();
     }
 
 }
