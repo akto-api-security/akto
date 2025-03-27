@@ -31,13 +31,14 @@ const convertToGraphData = (severityMap) => {
     return dataArr
 }
 
-const ChartComponent = ({ subCategoryCount, severityCountMap }) => {
+const ChartComponent = ({ subCategoryCount, severityCountMap, onSubCategoryClick }) => {
     return (
       <VerticalStack gap={4} columns={2}>
         <HorizontalGrid gap={4} columns={2}>
           <TopThreatTypeChart
             key={"top-threat-types"}
             data={subCategoryCount}
+            onSubCategoryClick={onSubCategoryClick}
           />
           <InfoCard
                 title={"Threats by severity"}
@@ -78,7 +79,7 @@ function ThreatDetectionPage() {
     const [showNewTab, setShowNewTab] = useState(false)
     const [subCategoryCount, setSubCategoryCount] = useState([]);
     const [severityCountMap, setSeverityCountMap] = useState([]);
-
+    const [externalFilter, setExternalFilter] = useState(null);
     const threatFiltersMap = PersistStore((state) => state.threatFiltersMap);
 
     const startTimestamp = parseInt(currDateRange.period.since.getTime()/1000)
@@ -146,11 +147,20 @@ function ThreatDetectionPage() {
         fetchCountBySeverity();
       }, [startTimestamp, endTimestamp]);
 
+      const onSubCategoryClick = (eventPoint ) => {
+        setExternalFilter({key: "subCategory", value: [eventPoint.subCategory]});
+      }
+
     const components = [
-        <ChartComponent subCategoryCount={subCategoryCount} severityCountMap={severityCountMap} />,
+        <ChartComponent
+            subCategoryCount={subCategoryCount}
+            severityCountMap={severityCountMap}
+            onSubCategoryClick={onSubCategoryClick}
+        />,
         <SusDataTable key={"sus-data-table"}
             currDateRange={currDateRange}
             rowClicked={rowClicked} 
+            externalFilter={externalFilter}
         />,
         !showNewTab ? <NormalSampleDetails
             title={"Attacker payload"}
