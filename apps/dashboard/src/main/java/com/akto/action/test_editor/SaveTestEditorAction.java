@@ -8,7 +8,7 @@ import com.akto.dao.CustomAuthTypeDao;
 import com.akto.dao.SampleDataDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.TestConfigYamlParser;
-import com.akto.dao.test_editor.TestingRunPlayGroundDao;
+import com.akto.dao.test_editor.TestingRunPlaygroundDao;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.test_editor.info.InfoParser;
 import com.akto.dao.testing.TestRolesDao;
@@ -298,7 +298,7 @@ public class SaveTestEditorAction extends UserAction {
                     Updates.set(TestingRunPlayground.API_INFO_KEY, apiInfoKey),
                     Updates.set(TestingRunPlayground.CREATED_AT, new Date()));
 
-            TestingRunPlayground result = TestingRunPlayGroundDao.instance.getMCollection().findOneAndUpdate(
+            TestingRunPlayground result = TestingRunPlaygroundDao.instance.getMCollection().findOneAndUpdate(
                     Filters.empty(),
                     updates,
                     new FindOneAndUpdateOptions().upsert(true).returnDocument(ReturnDocument.AFTER));
@@ -364,7 +364,7 @@ public class SaveTestEditorAction extends UserAction {
         }
         if (testingRunResult == null) {
             testingRunResult = new TestingRunResult(
-        g            new ObjectId(), infoKey, testConfig.getInfo().getCategory().getName(), testConfig.getInfo().getSubCategory() ,Collections.singletonList(new TestResult(null, sampleDataList.get(0).getSamples().get(lastSampleIndex),
+                    new ObjectId(), infoKey, testConfig.getInfo().getCategory().getName(), testConfig.getInfo().getSubCategory() ,Collections.singletonList(new TestResult(null, sampleDataList.get(0).getSamples().get(lastSampleIndex),
                     Collections.singletonList("failed to execute test"),
                     0, false, TestResult.Confidence.HIGH, null)),
                     false,null,0,Context.now(),
@@ -406,7 +406,7 @@ public class SaveTestEditorAction extends UserAction {
 
         ObjectId testRunId = new ObjectId(testingRunPlaygroundHexId);
 
-        TestingRunPlayground testingRunPlayGround = (TestingRunPlayGroundDao.instance.findOne(Filters.eq(Constants.ID, testRunId)));
+        TestingRunPlayground testingRunPlayGround = (TestingRunPlaygroundDao.instance.findOne(Filters.eq(Constants.ID, testRunId)));
         if (testingRunPlayGround == null) {
             addActionError("testingRunPlayGround not found");
             return ERROR.toUpperCase();
