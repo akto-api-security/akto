@@ -1,7 +1,7 @@
 import { Box, Button, Divider, Frame, HorizontalStack, LegacyTabs, Modal, Text, Tooltip} from "@shopify/polaris"
 import {ChevronUpMinor } from "@shopify/polaris-icons"
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import DropdownSearch from "../../../components/shared/DropdownSearch";
 import api from "../../testing/api"
 import testEditorRequests from "../api";
@@ -221,6 +221,8 @@ const SampleApi = () => {
         toggleSelectApiActive()
     }
 
+    const intervalRef = useRef(null);
+
     const runTest = async()=>{
         setLoading(true)
         const apiKeyInfo = {
@@ -230,11 +232,46 @@ const SampleApi = () => {
 
         try {
             let resp = await testEditorRequests.runTestForTemplate(currentContent,apiKeyInfo,sampleDataList)
-            setTestResult(resp)
+            console.log(resp);
+            if(resp?.testingRunPlaygroundHexId.trim() != ""){
+                let maxAttempts = 100; // Maximum number of polling attempts
+                let pollInterval = 2000; // Poll every 2 seconds
+                let attempts = 0;
+
+
+                intervalRef.current= setInterval(async () => {
+                    if (attempts >= maxAttempts) {
+                        clearInterval(intervalRef.current);
+                        intervalRef.current = null;
+                        setToastConfig({ isActive: true, isError: true, message: "Error while running the test" });
+                        return;
+                    }
+                    try {
+                        const result = await testEditorRequests.fetchTestingRunPlaygroundStatus(resp?.testingRunPlayGroundHexId);
+                        if (result === "COMPLETED") {
+                            clearInterval(intervalRef.current);
+                            intervalRef.current = null
+                            setTestResult(result?.testingRunPlaygroundStatus);
+                        }
+                    } catch (err) {
+                        console.error("Error fetching updateResult:", err);
+                    }
+                    attempts++;
+                }, pollInterval);
+            }
+            else setTestResult(resp)
         } catch (err){
         }
         setLoading(false)
     }
+
+    useEffect(() => {
+        return () => {
+            if (intervalRef.current) {
+                clearInterval(intervalRef.current);
+            }
+        };
+    }, []);
 
     const showResults = () => {
         setShowTestResult(!showTestResult);

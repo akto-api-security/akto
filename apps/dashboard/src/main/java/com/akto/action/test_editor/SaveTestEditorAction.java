@@ -3,14 +3,17 @@ package com.akto.action.test_editor;
 import com.akto.action.UserAction;
 import com.akto.action.testing_issues.IssuesAction;
 import com.akto.dao.AccountSettingsDao;
+import com.akto.dao.AccountsDao;
 import com.akto.dao.CustomAuthTypeDao;
 import com.akto.dao.SampleDataDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.TestConfigYamlParser;
+import com.akto.dao.test_editor.TestingRunPlayGroundDao;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.test_editor.info.InfoParser;
 import com.akto.dao.testing.TestRolesDao;
 import com.akto.dao.testing.TestingRunResultDao;
+import com.akto.dto.Account;
 import com.akto.dto.AccountSettings;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.CustomAuthType;
@@ -18,6 +21,7 @@ import com.akto.dto.test_editor.Category;
 import com.akto.dto.test_editor.Info;
 import com.akto.dto.test_editor.TestConfig;
 import com.akto.dto.test_editor.TestLibrary;
+import com.akto.dto.test_editor.TestingRunPlayground;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
@@ -27,6 +31,7 @@ import com.akto.dto.testing.MultiExecTestResult;
 import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.TestingRunConfig;
 import com.akto.dto.testing.TestingRunResult;
+import com.akto.dto.testing.TestingRun.State;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.URLMethods;
 import com.akto.listener.InitializerListener;
@@ -41,14 +46,18 @@ import com.akto.testing.Utils;
 import com.akto.util.Constants;
 import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.Severity;
+import com.akto.util.enums.GlobalEnums.YamlTemplateSource;
 import com.akto.utils.GithubSync;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.FindOneAndUpdateOptions;
 import com.mongodb.client.model.Projections;
+import com.mongodb.client.model.ReturnDocument;
 import com.mongodb.client.model.Updates;
+import com.mongodb.client.result.InsertOneResult;
 
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
@@ -86,6 +95,8 @@ public class SaveTestEditorAction extends UserAction {
     private boolean inactive;
     private String repositoryUrl;
     private HashMap<String, Integer> testCountMap;
+    private String testingRunPlaygroundHexId;
+    private State testingRunPlaygroundStatus;
 
     public String fetchTestingRunResultFromTestingRun() {
         if (testingRunHexId == null) {
@@ -277,6 +288,30 @@ public class SaveTestEditorAction extends UserAction {
             return ERROR.toUpperCase();
         }
 
+        Account account = AccountsDao.instance.findOne(Filters.eq(Constants.ID, Context.accountId.get()));
+        boolean a = true;
+        if (a) {
+            Bson updates = Updates.combine(
+                    Updates.set(TestingRunPlayground.TEST_TEMPLATE, content),
+                    Updates.set(TestingRunPlayground.STATE, State.SCHEDULED),
+                    Updates.set(TestingRunPlayground.SAMPLES, sampleDataList.get(0).getSamples()),// give latest only
+                    Updates.set(TestingRunPlayground.API_INFO_KEY, apiInfoKey),
+                    Updates.set(TestingRunPlayground.CREATED_AT, new Date()));
+
+            TestingRunPlayground result = TestingRunPlayGroundDao.instance.getMCollection().findOneAndUpdate(
+                    Filters.empty(),
+                    updates,
+                    new FindOneAndUpdateOptions().upsert(true).returnDocument(ReturnDocument.AFTER));
+
+            if (result != null) {
+                testingRunPlaygroundHexId = result.getId().toHexString();
+                return SUCCESS.toUpperCase();
+            } else {
+                addActionError("Failed to create TestingRunPlayground");
+                return ERROR.toUpperCase();
+            }
+        }
+
         try {
             if (!TestConfig.DYNAMIC_SEVERITY.equals(testConfig.getInfo().getSeverity())) {
                 GlobalEnums.Severity.valueOf(testConfig.getInfo().getSeverity());
@@ -312,7 +347,7 @@ public class SaveTestEditorAction extends UserAction {
         if (wordListsMap == null) {
             wordListsMap = new HashMap<String, List<String>>();
         }
-        
+
         wordListsMap = VariableResolver.resolveWordList(wordListsMap, infoKey, newSampleDataMap);
 
         SampleMessageStore messageStore = SampleMessageStore.create(sampleDataMap);
@@ -329,7 +364,7 @@ public class SaveTestEditorAction extends UserAction {
         }
         if (testingRunResult == null) {
             testingRunResult = new TestingRunResult(
-                    new ObjectId(), infoKey, testConfig.getInfo().getCategory().getName(), testConfig.getInfo().getSubCategory() ,Collections.singletonList(new TestResult(null, sampleDataList.get(0).getSamples().get(lastSampleIndex),
+        g            new ObjectId(), infoKey, testConfig.getInfo().getCategory().getName(), testConfig.getInfo().getSubCategory() ,Collections.singletonList(new TestResult(null, sampleDataList.get(0).getSamples().get(lastSampleIndex),
                     Collections.singletonList("failed to execute test"),
                     0, false, TestResult.Confidence.HIGH, null)),
                     false,null,0,Context.now(),
@@ -360,6 +395,23 @@ public class SaveTestEditorAction extends UserAction {
 
         this.testingRunResult.setTestResults(runResults);
 
+        return SUCCESS.toUpperCase();
+    }
+
+    public String fetchTestingRunPlaygroundStatus(){
+        if (testingRunPlaygroundHexId == null) {
+            addActionError("testingRunPlayGroundHexId is invalid");
+            return ERROR.toUpperCase();
+        }
+
+        ObjectId testRunId = new ObjectId(testingRunPlaygroundHexId);
+
+        TestingRunPlayground testingRunPlayGround = (TestingRunPlayGroundDao.instance.findOne(Filters.eq(Constants.ID, testRunId)));
+        if (testingRunPlayGround == null) {
+            addActionError("testingRunPlayGround not found");
+            return ERROR.toUpperCase();
+        }
+        this.testingRunPlaygroundStatus = testingRunPlayGround.getState();
         return SUCCESS.toUpperCase();
     }
 
@@ -631,6 +683,22 @@ public class SaveTestEditorAction extends UserAction {
 
     public void setTestCountMap(HashMap<String, Integer> testCountMap) {
         this.testCountMap = testCountMap;
+    }
+
+    public void setTestingRunPlaygroundHexId(String testingRunPlayGroundHexId) {
+        this.testingRunPlaygroundHexId = testingRunPlayGroundHexId;
+    }
+
+    public State getTestingRunPlaygroundStatus() {
+        return testingRunPlaygroundStatus;
+    }
+
+    public void setTestingRunPlaygroundStatus(State testingRunPlaygroundStatus) {
+        this.testingRunPlaygroundStatus = testingRunPlaygroundStatus;
+    }
+
+    public String getTestingRunPlaygroundHexId() {
+        return testingRunPlaygroundHexId;
     }
 
 }

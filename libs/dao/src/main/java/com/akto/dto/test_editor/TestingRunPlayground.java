@@ -1,0 +1,116 @@
+package com.akto.dto.test_editor;
+
+import java.util.Date;
+import java.util.List;
+
+import org.bson.codecs.pojo.annotations.BsonIgnore;
+import org.bson.types.ObjectId;
+
+import com.akto.dto.testing.TestingRunResult;
+import com.akto.dto.testing.TestingRun.State;
+import com.mongodb.BasicDBObject;
+
+public class TestingRunPlayground {
+
+    public static final String ID = "id";
+
+    public static final String TEST_TEMPLATE = "testTemplate";
+
+    public static final String STATE = "state";
+
+    public static final String SAMPLES = "samples";
+
+    public static final String API_INFO_KEY = "apiInfoKey";
+
+    public static final String CREATED_AT = "createdAt";
+
+    private ObjectId id;
+
+    private String testTemplate;
+
+    private State state;
+
+    private List<String> samples;
+
+    private BasicDBObject apiInfoKey;
+
+    private Date createdAt;
+
+    private TestingRunResult testingRunResult;
+
+    @BsonIgnore
+    private String hexId;
+
+
+    public TestingRunPlayground(String testTemplate, State state, List<String> samples, BasicDBObject apiInfoKey, Date createdAt) {
+        this.testTemplate = testTemplate;
+        this.state = state;
+        this.samples = samples;
+        this.apiInfoKey = apiInfoKey;
+        this.createdAt = createdAt;
+    }
+
+    public TestingRunPlayground(){
+
+    }
+
+    public Date getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(Date createdAt) {
+        this.createdAt = createdAt;
+    }
+
+    public BasicDBObject getApiInfoKey() {
+        return apiInfoKey;
+    }
+
+    public void setApiInfoKey(BasicDBObject apiInfoKey) {
+        this.apiInfoKey = apiInfoKey;
+    }
+
+    public ObjectId getId() {
+        return id;
+    }
+
+    public void setId(ObjectId id) {
+        this.id = id;
+    }
+
+    public List<String> getSamples() {
+        return samples;
+    }
+
+    public void setSamples(List<String> samples) {
+        this.samples = samples;
+    }
+
+    public State getState() {
+        return state;
+    }
+
+    public void setState(State state) {
+        this.state = state;
+    }
+
+    public String getTestTemplate() {
+        return testTemplate;
+    }
+
+    public void setTestTemplate(String testTemplate) {
+        this.testTemplate = testTemplate;
+    } 
+
+    public String getHexId() {
+        return this.id.toHexString();
+    }
+
+    public TestingRunResult getTestingRunResult() {
+        return testingRunResult;
+    }
+
+    public void setTestingRunResult(TestingRunResult testingRunResult) {
+        this.testingRunResult = testingRunResult;
+    }
+}
