@@ -100,7 +100,7 @@ function ThreatDetectionPage() {
             const sameRow = currentRefId === data?.refId
             if (!sameRow) {
                 let rowData = [];
-                await threatDetectionRequests.fetchMaliciousRequest(data?.refId).then((res) => {
+                await threatDetectionRequests.fetchMaliciousRequest(data?.refId, data?.eventType).then((res) => {
                     rowData = [...res.maliciousPayloadsResponses]
                 }) 
                 setRowDataList(rowData)

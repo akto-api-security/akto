@@ -60,6 +60,7 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
   String splunkToken;
   String actorIp;
   String status;
+  String eventType;
 
   private final CloseableHttpClient httpClient;
 
@@ -199,6 +200,7 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
         new HashMap<String, Object>() {
           {
             put("ref_id", refId);
+            put("event_type", eventType);
           }
         };
     String msg = objectMapper.valueToTree(body).toString();
@@ -545,4 +547,13 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
   public void setActorId(List<String> actorId) {
     this.actorId = actorId;
   }
+
+  public String getEventType() {
+    return eventType;
+  }
+
+  public void setEventType(String eventType) {
+    this.eventType = eventType;
+  }
+
 }

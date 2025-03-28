@@ -21,6 +21,8 @@ public class OriginalHttpRequest {
     private String queryParams;
     private String method;
     private String body;
+    private String sourceIp;
+    private String destinationIp;
     private Map<String, List<String>> headers;
 
     public OriginalHttpRequest() { }
@@ -35,6 +37,18 @@ public class OriginalHttpRequest {
         this.type = type;
     }
 
+
+    public OriginalHttpRequest(String url, String queryParams, String method, String body, String sourceIp, String destinationIp, Map<String, List<String>> headers, String type) {
+        this.url = url;
+        this.queryParams = queryParams;
+        this.method = method;
+        this.body = body;
+        this.sourceIp = sourceIp;
+        this.destinationIp = destinationIp;
+        this.headers = headers;
+        this.type = type;
+    }
+
     public OriginalHttpRequest copy() {
         Map<String, List<String>> headersCopy = new HashMap<>();
         for(Map.Entry<String, List<String>> headerKV: this.headers.entrySet()) {
@@ -43,7 +57,7 @@ public class OriginalHttpRequest {
             headersCopy.put(headerKV.getKey(), headerValues);
         }
         return new OriginalHttpRequest(
-                this.url, this.queryParams, this.method, this.body, headersCopy, this.type
+                this.url, this.queryParams, this.method, this.body, this.sourceIp, this.destinationIp, headersCopy, this.type
         );
     }
 
@@ -79,6 +93,8 @@ public class OriginalHttpRequest {
 
         String requestPayload = (String) json.get("requestPayload");
         this.body = requestPayload.trim();
+        this.sourceIp = (String) json.get("ip");
+        this.destinationIp = (String) json.get("destIp");
 
         this.headers = buildHeadersMap(json, "requestHeaders");
     }
@@ -97,6 +113,9 @@ public class OriginalHttpRequest {
 
         String requestPayload = responseParam.getRequestParams().getPayload();
         this.body = requestPayload.trim();
+
+        this.sourceIp = responseParam.getSourceIP();
+        this.destinationIp = responseParam.getDestIP();
 
         this.headers = responseParam.getRequestParams().getHeaders();
     }
@@ -127,6 +146,8 @@ public class OriginalHttpRequest {
         this.method = reqObj.getString("method");
         this.body = reqObj.getString("body");
         this.type = reqObj.getString("type");
+        this.sourceIp = reqObj.getString("ip");
+        this.destinationIp = reqObj.getString("destIp");
 
     }
 
@@ -373,6 +394,22 @@ public class OriginalHttpRequest {
         this.type = type;
     }
 
+    public String getSourceIp() {
+        return this.sourceIp;
+    }
+
+    public void setSourceIp(String sourceIp) {
+        this.sourceIp = sourceIp;
+    }
+    
+    public String getDestinationIp() {
+        return this.destinationIp;
+    }
+
+    public void setDestinationIp(String destinationIp) {
+        this.destinationIp = destinationIp;
+    }
+
     public boolean setMethodAndQP(String line) {
         String[] tokens = line.split(" ");
         if (tokens.length != 3) {
@@ -418,6 +455,8 @@ public class OriginalHttpRequest {
                 ", method='" + method + '\'' +
                 ", body='" + body + '\'' +
                 ", headers=" + headers +
+                ", sourceIp=" + sourceIp +
+                ", destinationIp=" + destinationIp +
                 '}';
     }
 }

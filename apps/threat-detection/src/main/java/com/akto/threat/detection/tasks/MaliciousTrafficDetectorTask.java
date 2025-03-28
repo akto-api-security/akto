@@ -366,6 +366,7 @@ public class MaliciousTrafficDetectorTask implements Task {
     origObj.put("requestPayload", httpResponseParamProto.getRequestPayload());
     origObj.put("responsePayload", httpResponseParamProto.getResponsePayload());
     origObj.put("ip", httpResponseParamProto.getIp());
+    origObj.put("destIp", httpResponseParamProto.getDestIp());
     origObj.put("source", sourceStr);
     origObj.put("type", httpResponseParamProto.getType());
     origObj.put("akto_vxlan_id", httpResponseParamProto.getAktoVxlanId());

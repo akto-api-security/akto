@@ -256,14 +256,14 @@ public class RawApi {
         result.put("method", this.request.getMethod());
         result.put("requestPayload",this.request.getBody());
         result.put("responsePayload",this.response.getBody());
-        result.put("ip", "");
+        result.put("ip", this.request.getSourceIp());
         result.put("time",time+"");
         result.put("statusCode", this.response.getStatusCode()+"");
         result.put("type",type);
         result.put("status", "");
         result.put("contentType",contentType);
         result.put("source", source);
-        result.put("destIp", "");
+        result.put("destIp", this.request.getDestinationIp());
 
         this.originalMessage = om.writeValueAsString(result);
     }

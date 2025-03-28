@@ -236,6 +236,7 @@ public class MaliciousEventService {
                 .setApiCollectionId(evt.getLatestApiCollectionId())
                 .setType(evt.getType())
                 .setRefId(evt.getRefId())
+                .setEventTypeVal(evt.getEventType().toString())
                 .build());
       }
       return ListMaliciousRequestsResponse.newBuilder()
