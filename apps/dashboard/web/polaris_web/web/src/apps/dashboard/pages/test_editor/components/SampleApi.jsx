@@ -239,7 +239,7 @@ const SampleApi = () => {
                 let attempts = 0;
 
 
-                intervalRef.current= setInterval(async () => {
+                intervalRef.current = setInterval(async () => {
                     if (attempts >= maxAttempts) {
                         clearInterval(intervalRef.current);
                         intervalRef.current = null;
@@ -247,11 +247,11 @@ const SampleApi = () => {
                         return;
                     }
                     try {
-                        const result = await testEditorRequests.fetchTestingRunPlaygroundStatus(resp?.testingRunPlayGroundHexId);
-                        if (result === "COMPLETED") {
+                        const result = await testEditorRequests.fetchTestingRunPlaygroundStatus(resp?.testingRunPlaygroundHexId);
+                        if (result?.testingRunPlaygroundStatus === "COMPLETED") {
                             clearInterval(intervalRef.current);
                             intervalRef.current = null
-                            setTestResult(result?.testingRunPlaygroundStatus);
+                            setTestResult(result);
                         }
                     } catch (err) {
                         console.error("Error fetching updateResult:", err);

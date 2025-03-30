@@ -296,7 +296,8 @@ public class SaveTestEditorAction extends UserAction {
                     Updates.set(TestingRunPlayground.STATE, State.SCHEDULED),
                     Updates.set(TestingRunPlayground.SAMPLES, sampleDataList.get(0).getSamples()),// give latest only
                     Updates.set(TestingRunPlayground.API_INFO_KEY, apiInfoKey),
-                    Updates.set(TestingRunPlayground.CREATED_AT, new Date()));
+                    Updates.set(TestingRunPlayground.CREATED_AT, new Date()),
+                    Updates.set("testingRunResult", new TestingRunResult()));
 
             TestingRunPlayground result = TestingRunPlaygroundDao.instance.getMCollection().findOneAndUpdate(
                     Filters.empty(),
@@ -371,11 +372,75 @@ public class SaveTestEditorAction extends UserAction {
                     Context.now(), new ObjectId(), null, testLogs
             );
         }
+        generateTestingRunResultAndIssue(testConfig, infoKey, testingRunResult);
+
+        return SUCCESS.toUpperCase();
+    }
+
+    public String fetchTestingRunPlaygroundStatus() {
+        if (testingRunPlaygroundHexId == null) {
+            addActionError("testingRunPlayGroundHexId is invalid");
+            return ERROR.toUpperCase();
+        }
+
+        ObjectId testRunId = new ObjectId(testingRunPlaygroundHexId);
+
+        TestingRunPlayground testingRunPlayGround = (TestingRunPlaygroundDao.instance.findOne(Filters.eq(Constants.ID, testRunId)));
+
+        if (testingRunPlayGround == null) {
+            addActionError("testingRunPlayGround not found");
+            return ERROR.toUpperCase();
+        }
+        this.testingRunPlaygroundStatus = testingRunPlayGround.getState();
+
+        if (testingRunPlayGround.getState() == State.COMPLETED) {
+
+            TestingRunResult testingRunResult = testingRunPlayGround.getTestingRunResult();
+
+            BasicDBObject apiInfoKey = testingRunPlayGround.getApiInfoKey();
+            if (apiInfoKey == null) {
+                addActionError("apiInfoKey is null");
+                return ERROR.toUpperCase();
+            }
+
+            ApiInfo.ApiInfoKey infoKey = new ApiInfo.ApiInfoKey(apiInfoKey.getInt(ApiInfo.ApiInfoKey.API_COLLECTION_ID),
+            apiInfoKey.getString(ApiInfo.ApiInfoKey.URL),
+            URLMethods.Method.valueOf(apiInfoKey.getString(ApiInfo.ApiInfoKey.METHOD)));
+
+            TestConfig testConfig;
+            try {
+                testConfig = TestConfigYamlParser.parseTemplate(testingRunPlayGround.getTestTemplate());
+            } catch (Exception e) {
+                e.printStackTrace();
+                addActionError(e.getMessage());
+                return ERROR.toUpperCase();
+            }
+
+            List<String> samples = testingRunPlayGround.getSamples();
+            int lastSampleIndex = samples.size()-1;
+            List<TestingRunResult.TestLog> testLogs = new ArrayList<>();
+
+            if (testingRunResult == null) {
+                testingRunResult = new TestingRunResult(
+                        new ObjectId(), infoKey, testConfig.getInfo().getCategory().getName(), testConfig.getInfo().getSubCategory() ,Collections.singletonList(new TestResult(null, samples.get(lastSampleIndex),
+                        Collections.singletonList("failed to execute test"),
+                        0, false, TestResult.Confidence.HIGH, null)),
+                        false,null,0,Context.now(),
+                        Context.now(), new ObjectId(), null, testLogs
+                );
+            }
+            
+            generateTestingRunResultAndIssue(testConfig, infoKey, testingRunResult);
+        }
+        return SUCCESS.toUpperCase();
+    }
+
+    public void generateTestingRunResultAndIssue(TestConfig testConfig, ApiInfo.ApiInfoKey infoKey, TestingRunResult testingRunResult) {
         testingRunResult.setId(new ObjectId());
         if (testingRunResult.isVulnerable()) {
             TestingIssuesId issuesId = new TestingIssuesId(infoKey, GlobalEnums.TestErrorSource.TEST_EDITOR, testConfig.getId(), null);
             Severity severity = TestExecutor.getSeverityFromTestingRunResult(testingRunResult);
-            testingRunIssues = new TestingRunIssues(issuesId, severity, GlobalEnums.TestRunIssueStatus.OPEN, Context.now(), Context.now(),null, null, Context.now());
+            this.testingRunIssues = new TestingRunIssues(issuesId, severity, GlobalEnums.TestRunIssueStatus.OPEN, Context.now(), Context.now(),null, null, Context.now());
         }
         BasicDBObject infoObj = IssuesAction.createSubcategoriesInfoObj(testConfig);
         subCategoryMap = new HashMap<>();
@@ -394,25 +459,6 @@ public class SaveTestEditorAction extends UserAction {
         }
 
         this.testingRunResult.setTestResults(runResults);
-
-        return SUCCESS.toUpperCase();
-    }
-
-    public String fetchTestingRunPlaygroundStatus(){
-        if (testingRunPlaygroundHexId == null) {
-            addActionError("testingRunPlayGroundHexId is invalid");
-            return ERROR.toUpperCase();
-        }
-
-        ObjectId testRunId = new ObjectId(testingRunPlaygroundHexId);
-
-        TestingRunPlayground testingRunPlayGround = (TestingRunPlaygroundDao.instance.findOne(Filters.eq(Constants.ID, testRunId)));
-        if (testingRunPlayGround == null) {
-            addActionError("testingRunPlayGround not found");
-            return ERROR.toUpperCase();
-        }
-        this.testingRunPlaygroundStatus = testingRunPlayGround.getState();
-        return SUCCESS.toUpperCase();
     }
 
     public static void showFile(File file, List<String> files) {
