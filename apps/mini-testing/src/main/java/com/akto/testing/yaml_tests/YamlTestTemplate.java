@@ -15,8 +15,6 @@ import com.akto.testing.StatusCodeAnalyser;
 
 import java.util.List;
 import java.util.Map;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 public class YamlTestTemplate extends SecurityTestTemplate {
 
@@ -59,14 +57,8 @@ public class YamlTestTemplate extends SecurityTestTemplate {
             ExecutionResult res = AuthValidator.checkAuth(this.auth, this.rawApi.copy(), this.testingRunConfig, this.customAuthTypes, debug, testLogs);
             if(res.getSuccess()) {
                 OriginalHttpResponse resp = res.getResponse();
-                String respBody = resp.getBody();
-                if (respBody.contains("unauthorized") || respBody.contains("Unauthorized") || respBody.contains("UNAUTHORIZED")) {
-                    return true;
-                }
-                String regex = "(?i)\"error\"";
-                Pattern pattern = Pattern.compile(regex);
-                Matcher matcher = pattern.matcher(respBody);
-                if (matcher.find()) {
+                String respBody = resp.getBody().toLowerCase();
+                if (respBody.contains("unauthorized") || respBody.contains("unauthorised") || respBody.contains("\"error\"")) {
                     return true;
                 }
 
