@@ -2320,6 +2320,7 @@ public class DbAction extends ActionSupport {
         try {
             testingRunPlayground = DbLayer.getCurrentTestingRunDetailsFromEditor(this.timestamp);
         } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in getCurrentTestingRunDetailsFromEditor " + e.toString());
             return Action.ERROR.toUpperCase();
         }
         return Action.SUCCESS.toUpperCase();
