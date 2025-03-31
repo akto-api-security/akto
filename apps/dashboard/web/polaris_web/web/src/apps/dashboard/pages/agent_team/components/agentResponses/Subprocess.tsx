@@ -138,7 +138,7 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, triggerCall
     const showSummary = STEPS_PER_AGENT_ID[agentId] === parseInt(subprocess?.subProcessId || '0') && showSummaryOutput[agentId];
     const groupedOutput = useMemo(() => {
         const rawData = showSummary ? subprocess?.processOutput?.outputOptions : [];
-        if(rawData.length === 0) return {};
+        if(rawData === null || rawData === undefined) return {};
         let finalMap = {};
         rawData.forEach((data: any) => {
             const {id, output} = data;
@@ -230,7 +230,7 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, triggerCall
                 </button>
 
                 <AnimatePresence>
-                    <motion.div animate={expanded ? "open" : "closed"} variants={{ open: { height: "auto", opacity: 1 }, closed: { height: 0, opacity: 0 } }} transition={{ duration: 0.2 }} className="overflow-hidden">
+                    <motion.div animate={subprocess.state === "RUNNING" ? "open" : "closed"} variants={{ open: { height: "auto", opacity: 1 }, closed: { height: 0, opacity: 0 } }} transition={{ duration: 0.2 }} className="overflow-hidden">
                         <div className="bg-[#F6F6F7] ml-2.5 pt-0 space-y-1 border-l border-[#D2D5D8]">
                             <AnimatePresence initial={false}>
                                 {subprocess?.logs?.sort((a,b) => {
@@ -245,7 +245,7 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, triggerCall
                     </motion.div>
                 </AnimatePresence>
             </div>
-            {showSummary ?<BatchedOutput 
+            {showSummary && Object.keys(groupedOutput).length > 0 ?<BatchedOutput 
                 data={groupedOutput} 
                 buttonText="Analyzing APIs for the collection: " 
                 isCollectionBased={true}

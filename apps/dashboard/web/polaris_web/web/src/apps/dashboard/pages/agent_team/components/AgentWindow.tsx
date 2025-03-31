@@ -35,6 +35,7 @@ function AgentWindow({ onClose, open }: AgentWindowProps) {
                             </Scrollable>
                         </div>
                         <br/>
+                        <div style={{height: '24px'}} />
                         <PromptComposer onSend={console.log} />
                     </div>
                 </div >

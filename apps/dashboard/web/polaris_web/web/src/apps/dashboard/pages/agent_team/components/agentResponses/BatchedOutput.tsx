@@ -56,7 +56,9 @@ function BatchedOutput({data, buttonText, isCollectionBased, keysArr}: {data: an
                                 <motion.div animate={{ rotate: expanded ? 0 : 270 }} transition={{ duration: 0.2 }}>
                                     <CaretDownMinor height={20} width={20} />
                                 </motion.div>
-                                <Text as={"dd"}>{`${buttonText} ${collectionsMap[collectionID]}`}</Text>
+                                <Text as={"dd"}>{`${buttonText}`}</Text>
+                                <Text as={"dd"}>{" "}</Text>
+                                <Text as={"dd"} variant="headingMd">{collectionsMap[collectionID]}</Text>
                             </button>
                             <AnimatePresence>
                                 <motion.div
