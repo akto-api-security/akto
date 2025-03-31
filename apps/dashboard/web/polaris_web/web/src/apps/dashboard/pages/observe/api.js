@@ -840,10 +840,26 @@ export default {
         return request({
             url: '/api/resetDataTypeRetro',
             method: 'post',
-            data: {
-                name: name,
-            }
+            data: { name }
         })
+    },
+
+    async getEndpointDescription(apiCollectionId, url, method) {
+        const resp = await request({
+            url: '/api/getEndpointDescription',
+            method: 'post',
+            data: { apiCollectionId, url, method }
+        })
+        return resp
+    },
+
+    async saveEndpointDescription(apiCollectionId, url, method, description) {
+        const resp = await request({
+            url: '/api/saveEndpointDescription',
+            method: 'post',
+            data: { apiCollectionId, url, method, description }
+        })
+        return resp
     },
 
     async checkIfDependencyGraphAvailable(apiCollectionId, url, method) {
