@@ -393,7 +393,33 @@ public class AdminSettingsAction extends UserAction {
     public String accountPermission;
     public String modifiedValueForAccount;
 
+    static int maxValueLength = 60;
+
     public String modifyAccountSettings () {
+
+        if (modifiedValueForAccount == null || modifiedValueForAccount.isEmpty()) {
+            addActionError("Value cannot be null or empty");
+            return ERROR.toUpperCase();
+        }
+
+        if (modifiedValueForAccount.length() > maxValueLength) {
+            addActionError("Value cannot be greater than " + maxValueLength + " characters");
+            return ERROR.toUpperCase();
+        }
+
+        for (char c : this.modifiedValueForAccount.toCharArray()) {
+            boolean alphabets = (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z');
+            boolean numbers = c >= '0' && c <= '9';
+            boolean specialChars = c == '-' || c == '.' || c == '_' || c == '/' || c == '+';
+            boolean spaces = c == ' ';
+
+            if (!(alphabets || numbers || specialChars || spaces)) {
+                addActionError("Value names can only be alphanumeric and contain '-','.','_','/' and '_'");
+                return ERROR.toUpperCase();
+
+            }
+        }
+
         if(accountPermission.equals("name") || accountPermission.equals("timezone")){
             if(Context.accountId.get() != null && Context.accountId.get() != 0){
                 AccountsDao.instance.updateOne(
