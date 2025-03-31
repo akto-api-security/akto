@@ -1,5 +1,5 @@
 import LayoutWithTabs from "../../../components/layouts/LayoutWithTabs"
-import { Box, Button, Popover, Modal, Tooltip, VerticalStack } from "@shopify/polaris"
+import { Box, Button, Popover, Modal, Tooltip, VerticalStack, HorizontalStack, Text, TextField } from "@shopify/polaris"
 import FlyLayout from "../../../components/layouts/FlyLayout";
 import GithubCell from "../../../components/tables/cells/GithubCell";
 import SampleDataList from "../../../components/shared/SampleDataList";
@@ -35,6 +35,8 @@ function ApiDetails(props) {
     const [showMoreActions, setShowMoreActions] = useState(false)
     const setSelectedSampleApi = PersistStore(state => state.setSelectedSampleApi)
     const [disabledTabs, setDisabledTabs] = useState([])
+    const [description, setDescription] = useState("")
+    const [showDescriptionModal, setShowDescriptionModal] = useState(false)
 
     const [useLocalSubCategoryData, setUseLocalSubCategoryData] = useState(false)
 
@@ -62,6 +64,7 @@ function ApiDetails(props) {
                     setDisabledTabs([])
                 }
             })
+            fetchEndpointDescription(apiCollectionId, endpoint, method)
             let commonMessages = []
             await api.fetchSampleData(endpoint, apiCollectionId, method).then((res) => {
                 api.fetchSensitiveSampleData(endpoint, apiCollectionId, method).then(async (resp) => {
@@ -119,6 +122,38 @@ function ApiDetails(props) {
             })
         }
     }
+
+    const fetchEndpointDescription = async (apiCollectionId, url, method) => {
+        try {
+            const resp = await api.getEndpointDescription(apiCollectionId, url, method);
+            if (resp?.error) {
+                console.error("Failed to fetch endpoint description:", resp.error);
+                return;
+            }
+            if (resp?.description) {
+                setDescription(resp.description);
+            } else {
+                setDescription("");
+            }
+        } catch (error) {
+            console.error("Failed to fetch endpoint description:", error);
+            setDescription("");
+        }
+    };
+
+    const handleSaveDescription = () => {
+        const { apiCollectionId, endpoint, method } = apiDetail;
+        setShowDescriptionModal(false);
+        
+        api.saveEndpointDescription(apiCollectionId, endpoint, method, description)
+            .then(() => {
+                func.setToast(true, false, "Description saved successfully");
+            })
+            .catch((err) => {
+                console.error("Failed to save description:", err);
+                func.setToast(true, true, "Failed to save description. Please try again.");
+            });
+    };
 
     const runTests = async (testsList) => {
         setIsGptScreenActive(false)
@@ -245,15 +280,31 @@ function ApiDetails(props) {
 
     const headingComp = (
         <div style={{ display: "flex", justifyContent: "space-between" }} key="heading">
-            <div style={{ display: "flex", gap: '8px' }}>
-                <GithubCell
-                    width="32vw"
-                    data={newData}
-                    headers={headers}
-                    getStatus={statusFunc}
-                    isBadgeClickable={true}
-                    badgeClicked={badgeClicked}
-                />
+            <div style={{ display: "flex", flexDirection: "column"}}>
+                <div style={{ display: "flex", gap: '8px' }}>
+                    <GithubCell
+                        width="32vw"
+                        data={newData}
+                        headers={headers}
+                        getStatus={statusFunc}
+                        isBadgeClickable={true}
+                        badgeClicked={badgeClicked}
+                    />
+                </div>
+                <HorizontalStack gap={2} align="start" blockAlign="start">
+                    {!description && (
+                        <Button plain onClick={() => setShowDescriptionModal(true)} textAlign="left">
+                            Add description
+                        </Button>
+                    )}
+                    {description && (
+                        <Button plain onClick={() => setShowDescriptionModal(true)} textAlign="left">
+                            <Text as="span" variant="bodyMd" color="subdued" alignment="start">
+                                {description}
+                            </Text>
+                        </Button>
+                    )}
+                </HorizontalStack>
             </div>
             <div style={{ display: "flex", gap: '8px' }}>
                 <RunTest
@@ -294,8 +345,7 @@ function ApiDetails(props) {
     )
 
     const components = [
-        headingComp
-        ,
+        headingComp,
         <LayoutWithTabs
             key="tabs"
             tabs={[ValuesTab, SchemaTab, DependencyTab]}
@@ -313,6 +363,34 @@ function ApiDetails(props) {
                 components={components}
                 loading={loading}
             />
+            <Modal
+                open={showDescriptionModal}
+                onClose={() => setShowDescriptionModal(false)}
+                title="API Endpoint Description"
+                primaryAction={{
+                    content: 'Save',
+                    onAction: handleSaveDescription
+                }}
+                secondaryActions={[
+                    {
+                        content: 'Cancel',
+                        onAction: () => setShowDescriptionModal(false)
+                    }
+                ]}
+            >
+                <Modal.Section>
+                    <TextField
+                        label="Description"
+                        value={description}
+                        onChange={setDescription}
+                        multiline={4}
+                        autoComplete="off"
+                        maxLength={64}
+                        placeholder="Add a brief description for this endpoint"
+                        helpText={`${description.length}/64 characters`}
+                    />
+                </Modal.Section>
+            </Modal>
             <Modal large open={isGptScreenActive} onClose={() => setIsGptScreenActive(false)} title="Akto GPT">
                 <Modal.Section flush>
                     <AktoGptLayout prompts={prompts} closeModal={() => setIsGptScreenActive(false)} runCustomTests={(tests) => runTests(tests)} />
