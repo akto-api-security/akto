@@ -109,7 +109,7 @@ const convertDataIntoTableFormat = (endpoint, apiCollectionMap) => {
     let temp = {}
     const key = func.findLastParamField(endpoint.param)
     // const value = endpoint?.values?.elements?.length > 0 ? endpoint.values.elements[0] : ""
-    const id = endpoint.method + " " + endpoint.url
+    const id = endpoint.method + " " + endpoint.url + endpoint.param
     temp['id'] = id
     temp['endpoint'] = id;
     temp['url'] = endpoint.url
