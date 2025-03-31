@@ -47,7 +47,6 @@ import io.confluent.parallelconsumer.ParallelStreamProcessor;
 public class ConsumerUtil {
 
     static Properties properties = com.akto.runtime.utils.Utils.configProperties(Constants.LOCAL_KAFKA_BROKER_URL, Constants.AKTO_KAFKA_GROUP_ID_CONFIG, Constants.AKTO_KAFKA_MAX_POLL_RECORDS_CONFIG);
-    private static final DataActor dataActor = DataActorFactory.fetchInstance();
     static{
         properties.put(ConsumerConfig.MAX_POLL_INTERVAL_MS_CONFIG, 10000); 
     }
@@ -102,6 +101,8 @@ public class ConsumerUtil {
         SingleTestPayload singleTestPayload = parseTestMessage(message);
         Context.accountId.set(singleTestPayload.getAccountId());
 
+        TestExecutor testExecutor = new TestExecutor();
+
         String subCategory = singleTestPayload.getSubcategory();
         TestConfig testConfig = TestingConfigurations.getInstance().getTestConfigMap().get(subCategory);
 
@@ -109,9 +110,7 @@ public class ConsumerUtil {
         String testSubType = testConfig.getInfo().getSubCategory();
 
         TestingRunResult runResult = Utils.generateFailedRunResultForMessage(singleTestPayload.getTestingRunId(), singleTestPayload.getApiInfoKey(), testSuperType, testSubType, singleTestPayload.getTestingRunResultSummaryId(), new ArrayList<>(),  TestError.TEST_TIMED_OUT.getMessage());
-        TestExecutor.trim(runResult);
-        dataActor.updateTestResultsCountInTestSummary(singleTestPayload.getTestingRunResultSummaryId().toHexString(), 1);
-        dataActor.insertTestingRunResults(runResult);
+        testExecutor.insertResultsAndMakeIssues(Collections.singletonList(runResult), singleTestPayload.getTestingRunResultSummaryId());
     }
     
     public void init(int maxRunTimeInSeconds) {
