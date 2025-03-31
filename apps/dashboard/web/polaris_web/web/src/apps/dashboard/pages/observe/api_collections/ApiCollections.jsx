@@ -1,5 +1,5 @@
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
-import { Text, Button, IndexFiltersMode, Box, Badge, Popover, ActionList, ResourceItem, Avatar,  HorizontalStack, Icon, TextField, Tooltip} from "@shopify/polaris"
+import { Text, Button, IndexFiltersMode, Box, Badge, Popover, ActionList, ResourceItem, Avatar,  HorizontalStack, Icon, TextField, Tooltip, Modal, VerticalStack} from "@shopify/polaris"
 import { HideMinor, ViewMinor,FileMinor, FileFilledMinor } from '@shopify/polaris-icons';
 import api from "../api"
 import dashboardApi from "../../dashboard/api"
@@ -135,7 +135,16 @@ const headers = [
         value: 'discovered',
         isText: CellType.TEXT,
         sortActive: true,
-    }
+    },
+    {
+        title: "Description",
+        text: "Description",
+        value: "descriptionComp",
+        filterKey: "description",
+        textValue: 'description',
+        showFilter: true,
+        boxWidth: '200px'
+    },
 ];
 
 const tempSortOptions = [
@@ -168,7 +177,17 @@ function convertToCollectionData(c) {
         ...c,
         detected: func.prettifyEpoch(c.startTs),
         icon: CircleTickMajor,
-        nextUrl: "/dashboard/observe/inventory/"+ c.id
+        nextUrl: "/dashboard/observe/inventory/"+ c.id,
+        descriptionComp: (
+            <Box maxWidth="20vw">
+                <TooltipText 
+                    tooltip={c.description || '-'} 
+                    text={c.description || '-'} 
+                    textProps={{fontWeight: 'regular'}}
+                />
+            </Box>
+        ),
+        description: c.description || '-'
     }    
 }
 
@@ -189,6 +208,16 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
             detectedTimestamp: c.urlsCount === 0 ? 0 : (trafficInfoMap[c.id] || 0),
             riskScore: c.urlsCount === 0 ? 0 : (riskScoreMap[c.id] ? riskScoreMap[c.id] : 0),
             discovered: func.prettifyEpoch(c.startTs || 0),
+            description: c.description || '-',
+            descriptionComp: (
+                <Box maxWidth="20vw">
+                    <TooltipText 
+                        tooltip={c.description || '-'} 
+                        text={c.description || '-'} 
+                        textProps={{fontWeight: 'regular'}}
+                    />
+                </Box>
+            )
         }
     })
 
@@ -218,6 +247,11 @@ function ApiCollections() {
     const [moreActions, setMoreActions] = useState(false);
     const [textFieldActive, setTextFieldActive] = useState(false);
     const [customEnv,setCustomEnv] = useState('')
+    const [showDescriptionModal, setShowDescriptionModal] = useState(false);
+    const [descriptionText, setDescriptionText] = useState('');
+    const [selectedCollectionForDescription, setSelectedCollectionForDescription] = useState(null);
+    const [descriptionCharCount, setDescriptionCharCount] = useState(0);
+    const MAX_DESCRIPTION_LENGTH = 64;
 
     // const dummyData = dummyJson;
 
@@ -494,51 +528,129 @@ function ApiCollections() {
         }
     }
 
-
-
-    const promotedBulkActions = (selectedResourcesArr) => {
-        let selectedResources;
-        if(treeView){
-            selectedResources = selectedResourcesArr.flat();
-        }else{
-            selectedResources = selectedResourcesArr
+    const handleDescriptionChange = (value) => {
+        if (value.length <= MAX_DESCRIPTION_LENGTH) {
+            setDescriptionText(value);
+            setDescriptionCharCount(value.length);
         }
+    };
+
+    const handleAddDescription = async () => {
+        try {
+            if (!selectedCollectionForDescription) {
+                throw new Error('No collection selected');
+            }
+
+            await collectionApi.updateCollectionDescription(selectedCollectionForDescription, descriptionText);
+            
+            // Update collections in PersistStore first
+            const updatedCollections = allCollections.map(collection => {
+                if (collection.id === selectedCollectionForDescription) {
+                    return {
+                        ...collection,
+                        description: descriptionText
+                    };
+                }
+                return collection;
+            });
+            setAllCollections(updatedCollections);
+            
+            // Update display data
+            const updatedData = {};
+            Object.keys(data).forEach(key => {
+                updatedData[key] = data[key].map(item => {
+                    if (item.id === selectedCollectionForDescription) {
+                        return {
+                            ...item,
+                            description: descriptionText,
+                            descriptionComp: (
+                                <Box maxWidth="20vw">
+                                    <TooltipText 
+                                        tooltip={descriptionText} 
+                                        text={descriptionText} 
+                                        textProps={{fontWeight: 'regular'}}
+                                    />
+                                </Box>
+                            )
+                        };
+                    }
+                    return item;
+                });
+            });
+            setData(updatedData);
+            
+            func.setToast(true, false, 'Description added successfully');
+            setShowDescriptionModal(false);
+            setDescriptionText('');
+            setSelectedCollectionForDescription(null);
+            setDescriptionCharCount(0);
+        } catch (error) {
+            console.error('Error updating description:', error);
+            func.setToast(true, true, error.message || 'Failed to add description');
+        }
+    };
+
+    const handleDescriptionModalClose = () => {
+        setShowDescriptionModal(false);
+        setDescriptionText('');
+        setSelectedCollectionForDescription(null);
+    };
+
+    const promotedBulkActions = (selectedResources) => {
+        let selectedResourcesList = treeView ? selectedResources.flat() : selectedResources;
         let actions = [
             {
                 content: 'Export as CSV',
-                onAction: () => exportCsv(selectedResources)
+                onAction: () => exportCsv(selectedResourcesList)
+            },
+            {
+                content: 'Add description',
+                onAction: () => {
+                    if (selectedResourcesList.length === 1) {
+                        // Get the collection data from the current view
+                        const selectedCollection = data[selectedTab].find(item => item.id === selectedResourcesList[0]);
+                        if (selectedCollection) {
+                            setSelectedCollectionForDescription(selectedCollection.id);
+                            setDescriptionText(selectedCollection.description !== '-' ? selectedCollection.description : '');
+                            setDescriptionCharCount(selectedCollection.description !== '-' ? selectedCollection.description.length : 0);
+                            setShowDescriptionModal(true);
+                        }
+                    } else {
+                        func.setToast(true, true, 'Please select only one collection to add description');
+                    }
+                }
             }
         ];
 
         const deactivated = allCollections.filter(x => { return x.deactivated }).map(x => x.id);
         const activated = allCollections.filter(x => { return !x.deactivated }).map(x => x.id);
         const apiGrous = allCollections.filter(x => { return x?.type === 'API_GROUP' }).map(x => x?.id)
-        if (selectedResources.every(v => { return activated.includes(v) })) {
+        if (selectedResourcesList.every(v => { return activated.includes(v) })) {
             actions.push(
                 {
-                    content: `Deactivate collection${func.addPlurality(selectedResources.length)}`,
+                    content: `Deactivate collection${func.addPlurality(selectedResourcesList.length)}`,
                     onAction: () => {
                         const message = "Deactivating a collection will stop traffic ingestion and testing for this collection. Please sync the usage data via Settings > billing after deactivating a collection to reflect your updated usage. Are you sure, you want to deactivate this collection ?"
-                        func.showConfirmationModal(message, "Deactivate collection", () => handleCollectionsAction(selectedResources, collectionApi.deactivateCollections, "deactivated") )
+                        func.showConfirmationModal(message, "Deactivate collection", () => handleCollectionsAction(selectedResourcesList, collectionApi.deactivateCollections, "deactivated") )
                     }
                 }
             )
-        } else if (selectedResources.every(v => { return deactivated.includes(v) })) {
+        } else if (selectedResourcesList.every(v => { return deactivated.includes(v) })) {
             actions.push(
                 {
-                    content: `Reactivate collection${func.addPlurality(selectedResources.length)}`,
+                    content: `Reactivate collection${func.addPlurality(selectedResourcesList.length)}`,
                     onAction: () =>  {
                         const message = "Please sync the usage data via Settings > billing after reactivating a collection to resume data ingestion and testing."
-                        func.showConfirmationModal(message, "Activate collection", () => handleCollectionsAction(selectedResources, collectionApi.activateCollections, "activated"))
+                        func.showConfirmationModal(message, "Activate collection", () => handleCollectionsAction(selectedResourcesList, collectionApi.activateCollections, "activated"))
                     }
                 }
             )
         }
-        if (selectedResources.every(v => { return !apiGrous.includes(v) })) {
+        if (selectedResourcesList.every(v => { return !apiGrous.includes(v) })) {
             actions.push(
                 {
-                    content: `Remove collection${func.addPlurality(selectedResources.length)}`,
-                    onAction: () => handleCollectionsAction(selectedResources, api.deleteMultipleCollections, "deleted")
+                    content: `Remove collection${func.addPlurality(selectedResourcesList.length)}`,
+                    onAction: () => handleCollectionsAction(selectedResourcesList, api.deleteMultipleCollections, "deleted")
                 }
             )
         }
@@ -575,7 +687,7 @@ function ApiCollections() {
 
         const shareCollectionHandler = () => {
             if (selectedItems.length > 0) {
-                handleShareCollectionsAction(selectedResources, selectedItems, api.updateUserCollections);
+                handleShareCollectionsAction(selectedResourcesList, selectedItems, api.updateUserCollections);
                 return true
             } else {
                 func.setToast(true, true, "No member is selected!");
@@ -590,7 +702,7 @@ function ApiCollections() {
         const shareComponentChildrens = (
             <Box>
                 <Box padding={5} background="bg-subdued-hover">
-                    <Text fontWeight="medium">{`${selectedResources.length} collection${func.addPlurality(selectedResources.length)} selected`}</Text>
+                    <Text fontWeight="medium">{`${selectedResourcesList.length} collection${func.addPlurality(selectedResourcesList.length)} selected`}</Text>
                 </Box>
                     <SearchableResourceList
                         resourceName={'user'}
@@ -636,7 +748,7 @@ function ApiCollections() {
                             <Tooltip content="Save your Custom env type" dismissOnMouseOut>
                                 <Button onClick={() => {
                                     resetResourcesSelected();
-                                    updateEnvType(selectedResources, customEnv);
+                                    updateEnvType(selectedResourcesList, customEnv);
                                     setTextFieldActive(false);
                                 }} plain icon={FileFilledMinor}/>
                             </Tooltip>
@@ -645,9 +757,9 @@ function ApiCollections() {
                         :<ActionList
                         actionRole="menuitem"
                         items={[
-                            {content: 'Staging', onAction: () => updateEnvType(selectedResources, "STAGING")},
-                            {content: 'Production', onAction: () => updateEnvType(selectedResources, "PRODUCTION")},
-                            {content: 'Reset', onAction: () => updateEnvType(selectedResources, null)},
+                            {content: 'Staging', onAction: () => updateEnvType(selectedResourcesList, "STAGING")},
+                            {content: 'Production', onAction: () => updateEnvType(selectedResourcesList, "PRODUCTION")},
+                            {content: 'Reset', onAction: () => updateEnvType(selectedResourcesList, null)},
                             {content: 'Add Custom', onAction: () => setTextFieldActive(!textFieldActive)}
                         ]}
                     
@@ -798,7 +910,41 @@ function ApiCollections() {
         />
     )
 
-    const components = loading ? [<SpinnerCentered key={"loading"}/>]: [<SummaryCardInfo summaryItems={summaryItems} key="summary"/>, (!hasUsageEndpoints ? <CollectionsPageBanner key="page-banner" /> : null) ,modalComponent, tableComponent]
+    const descriptionModal = (
+        <Modal
+            open={showDescriptionModal}
+            onClose={handleDescriptionModalClose}
+            title="Add Collection Description"
+            primaryAction={{
+                content: 'Save',
+                onAction: handleAddDescription,
+                disabled: descriptionText.trim().length === 0
+            }}
+            secondaryActions={[
+                {
+                    content: 'Cancel',
+                    onAction: handleDescriptionModalClose
+                }
+            ]}
+        >
+            <Modal.Section>
+                <VerticalStack gap="4">
+                    <TextField
+                        label="Description"
+                        value={descriptionText}
+                        onChange={handleDescriptionChange}
+                        multiline={3}
+                        maxLength={MAX_DESCRIPTION_LENGTH}
+                        autoComplete="off"
+                        placeholder="Enter collection description..."
+                        helpText={`${descriptionCharCount}/${MAX_DESCRIPTION_LENGTH} characters`}
+                    />
+                </VerticalStack>
+            </Modal.Section>
+        </Modal>
+    );
+
+    const components = loading ? [<SpinnerCentered key={"loading"}/>]: [<SummaryCardInfo summaryItems={summaryItems} key="summary"/>, (!hasUsageEndpoints ? <CollectionsPageBanner key="page-banner" /> : null) ,modalComponent, descriptionModal, tableComponent]
 
     return(
         <PageWithMultipleCards
