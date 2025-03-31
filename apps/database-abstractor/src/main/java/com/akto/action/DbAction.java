@@ -13,6 +13,7 @@ import com.akto.dto.bulk_updates.UpdatePayload;
 import com.akto.dto.filter.MergedUrls;
 import com.akto.dto.runtime_filters.RuntimeFilter;
 import com.akto.dto.settings.DataControlSettings;
+import com.akto.dto.test_editor.TestingRunPlayground;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
@@ -205,6 +206,8 @@ public class DbAction extends ActionSupport {
     List<YamlTemplate> yamlTemplates;
     SingleTypeInfo sti;
     int scheduleTs;
+    int timestamp;
+    TestingRunPlayground testingRunPlayground;
 
     private static final Gson gson = new Gson();
     ObjectMapper objectMapper = new ObjectMapper();
@@ -1735,6 +1738,15 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
+    public String getCurrentTestingRunDetailsFromEditor(){
+        try {
+            testingRunPlayground = DbLayer.getCurrentTestingRunDetailsFromEditor(this.timestamp);
+        } catch (Exception e) {
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
     public List<CustomDataTypeMapper> getCustomDataTypes() {
         return customDataTypes;
     }
@@ -2659,6 +2671,22 @@ public class DbAction extends ActionSupport {
 
     public void setOperator(String operator) {
         this.operator = operator;
+    }
+
+    public int getTimestamp() {
+        return timestamp;
+    }
+
+    public void setTimestamp(int timestamp) {
+        this.timestamp = timestamp;
+    }
+
+    public TestingRunPlayground getTestingRunPlayground() {
+        return testingRunPlayground;
+    }
+
+    public void setTestingRunPlayground(TestingRunPlayground testingRunPlayground) {
+        this.testingRunPlayground = testingRunPlayground;
     }
 
 }
