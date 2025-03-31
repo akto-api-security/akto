@@ -225,7 +225,6 @@ public class DbAction extends ActionSupport {
     List<YamlTemplate> yamlTemplates;
     SingleTypeInfo sti;
     int scheduleTs;
-    int timestamp;
     TestingRunPlayground testingRunPlayground;
 
     private static final Gson gson = new Gson();
@@ -2318,7 +2317,7 @@ public class DbAction extends ActionSupport {
 
     public String getCurrentTestingRunDetailsFromEditor(){
         try {
-            testingRunPlayground = DbLayer.getCurrentTestingRunDetailsFromEditor(this.timestamp);
+            testingRunPlayground = DbLayer.getCurrentTestingRunDetailsFromEditor(this.ts);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in getCurrentTestingRunDetailsFromEditor " + e.toString());
             return Action.ERROR.toUpperCase();
@@ -3367,14 +3366,6 @@ public class DbAction extends ActionSupport {
 
     public void setOperator(String operator) {
         this.operator = operator;
-    }
-
-    public int getTimestamp() {
-        return timestamp;
-    }
-
-    public void setTimestamp(int timestamp) {
-        this.timestamp = timestamp;
     }
 
     public TestingRunPlayground getTestingRunPlayground() {

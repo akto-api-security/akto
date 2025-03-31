@@ -3618,15 +3618,15 @@ public class ClientActor extends DataActor {
 
     public TestingRunPlayground getCurrentTestingRunDetailsFromEditor(int timestamp){
         BasicDBObject obj = new BasicDBObject();
-        obj.put("timestamp", timestamp);
+        obj.put("ts", timestamp);
 
         Map<String, List<String>> headers = buildHeaders();
-        OriginalHttpRequest request = new OriginalHttpRequest(url + "/findLatestEditorTest", "", "POST",  obj.toString(), headers, "");
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchEditorTest", "", "POST",  obj.toString(), headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
             String responsePayload = response.getBody();
             if (response.getStatusCode() != 200 || responsePayload == null) {
-                loggerMaker.errorAndAddToDb("non 2xx response in findLatestEditorTest", LoggerMaker.LogDb.TESTING);
+                loggerMaker.errorAndAddToDb("non 2xx response in fetchEditorTest", LoggerMaker.LogDb.TESTING);
                 return null;
             }
             BasicDBObject payloadObj;
@@ -3635,10 +3635,10 @@ public class ClientActor extends DataActor {
                 BasicDBObject testingRunPlaygroundObj = (BasicDBObject) payloadObj.get("testingRunPlayground");
                 return objectMapper.readValue(testingRunPlaygroundObj.toJson(), TestingRunPlayground.class);
             } catch (Exception e) {
-                loggerMaker.errorAndAddToDb("error extracting response in findLatestEditorTest" + e, LoggerMaker.LogDb.RUNTIME);
+                loggerMaker.errorAndAddToDb("error extracting response in fetchEditorTest" + e, LoggerMaker.LogDb.TESTING);
             }
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("error in findLatestEditorTest" + e, LoggerMaker.LogDb.RUNTIME);
+            loggerMaker.errorAndAddToDb("error in fetchEditorTest" + e, LoggerMaker.LogDb.TESTING);
         }
         return null;
     }

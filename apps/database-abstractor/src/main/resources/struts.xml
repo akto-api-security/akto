@@ -1448,7 +1448,7 @@
             </result>
         </action>
 
-        <action name="api/findLatestEditorTest" class="com.akto.action.DbAction" method="getCurrentTestingRunDetailsFromEditor">
+        <action name="api/fetchEditorTest" class="com.akto.action.DbAction" method="getCurrentTestingRunDetailsFromEditor">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS" type="json"/>
