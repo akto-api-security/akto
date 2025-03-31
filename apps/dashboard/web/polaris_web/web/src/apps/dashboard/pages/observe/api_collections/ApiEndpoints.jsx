@@ -975,6 +975,13 @@ function ApiEndpoints(props) {
       }
 
     const handleSaveDescription = () => {
+        // Check for special characters
+        const specialChars = /[!@#$%^&*()\-_=+\[\]{}\\|;:'",.<>/?~]/;
+        if (specialChars.test(description)) {
+            func.setToast(true, true, "Description contains special characters that are not allowed.");
+            return;
+        }
+        
         setShowDescriptionModal(false);
         api.saveCollectionDescription(apiCollectionId, description)
             .then(() => {
@@ -1057,7 +1064,11 @@ function ApiEndpoints(props) {
                                 <TextField
                                     label="Description"
                                     value={description}
-                                    onChange={setDescription}
+                                    onChange={(value) => {
+                                        // Remove all special characters from the input
+                                        const filteredValue = value.replace(/[!@#$%^&*()\-_=+\[\]{}\\|;:'",.<>/?~]/g, '');
+                                        setDescription(filteredValue);
+                                    }}
                                     multiline={4}
                                     autoComplete="off"
                                     maxLength={64}
