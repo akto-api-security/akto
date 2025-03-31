@@ -1,5 +1,6 @@
 package com.akto.action;
 
+import com.akto.action.observe.Utils;
 import com.akto.dao.*;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
@@ -397,27 +398,11 @@ public class AdminSettingsAction extends UserAction {
 
     public String modifyAccountSettings () {
 
-        if (modifiedValueForAccount == null || modifiedValueForAccount.isEmpty()) {
-            addActionError("Value cannot be null or empty");
+        StringBuilder error = new StringBuilder();
+        boolean sanitized = Utils.isInputSanitized(modifiedValueForAccount, error, maxValueLength);
+        if (!sanitized) {
+            addActionError(error.toString());
             return ERROR.toUpperCase();
-        }
-
-        if (modifiedValueForAccount.length() > maxValueLength) {
-            addActionError("Value cannot be greater than " + maxValueLength + " characters");
-            return ERROR.toUpperCase();
-        }
-
-        for (char c : this.modifiedValueForAccount.toCharArray()) {
-            boolean alphabets = (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z');
-            boolean numbers = c >= '0' && c <= '9';
-            boolean specialChars = c == '-' || c == '.' || c == '_' || c == '/' || c == '+';
-            boolean spaces = c == ' ';
-
-            if (!(alphabets || numbers || specialChars || spaces)) {
-                addActionError("Value names can only be alphanumeric and contain '-','.','_','/' and '_'");
-                return ERROR.toUpperCase();
-
-            }
         }
 
         if(accountPermission.equals("name") || accountPermission.equals("timezone")){
