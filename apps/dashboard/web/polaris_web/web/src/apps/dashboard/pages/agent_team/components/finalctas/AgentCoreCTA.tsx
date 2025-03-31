@@ -2,6 +2,7 @@ import React from "react";
 import { useAgentsStore } from "../../agents.store";
 import { intermediateStore } from "../../intermediate.store";
 import { Modal, Text, VerticalStack } from "@shopify/polaris";
+import func from "../../../../../../util/func";
 
 interface AgentCoreCTAProps {
     onSave: () => void;
@@ -20,6 +21,7 @@ function AgentCoreCTA({ onSave, modalTitle, actionText, contentString }: AgentCo
         onSave()
         setFinalCTAShow(false)
         resetIntermediateStore()
+        func.setToast(true, false, "Vulnerabilities for the collection: juice-shop has been stored successfully")
     }
 
     async function closeFunction() {
@@ -27,7 +29,7 @@ function AgentCoreCTA({ onSave, modalTitle, actionText, contentString }: AgentCo
         resetIntermediateStore()
     }
 
-    return (!filteredUserInput || (filteredUserInput?.length == 0) ? <></> :
+    return (!filteredUserInput || (filteredUserInput?.length === 0) ? <></> :
         <Modal
             title={modalTitle}
             primaryAction={{
