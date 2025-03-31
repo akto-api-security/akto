@@ -867,10 +867,10 @@ public class InventoryAction extends UserAction {
     public String fetchChanges() {
         response = new BasicDBObject();
 
-        long totalParams = getTotalParams(SingleTypeInfo.URL.getName().toLowerCase());
+        long totalParams = getTotalParams(SingleTypeInfo._URL);
         loggerMaker.infoAndAddToDb("Total params: " + totalParams, LogDb.DASHBOARD);
 
-        List<SingleTypeInfo> singleTypeInfos = getMongoResults(SingleTypeInfo.URL.getName().toLowerCase());
+        List<SingleTypeInfo> singleTypeInfos = getMongoResults(SingleTypeInfo._URL);
         loggerMaker.infoAndAddToDb("STI count: " + singleTypeInfos.size(), LogDb.DASHBOARD);
 
         response.put("data", new BasicDBObject("endpoints", singleTypeInfos ).append("total", totalParams));
