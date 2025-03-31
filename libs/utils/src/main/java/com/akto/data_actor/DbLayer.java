@@ -28,6 +28,7 @@ import com.akto.dao.billing.TokensDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.monitoring.FilterYamlTemplateDao;
 import com.akto.dao.runtime_filters.AdvancedTrafficFiltersDao;
+import com.akto.dao.test_editor.TestingRunPlaygroundDao;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing.AccessMatrixTaskInfosDao;
 import com.akto.dao.testing.AccessMatrixUrlToRolesDao;
@@ -52,6 +53,7 @@ import com.akto.dto.billing.Organization;
 import com.akto.dto.billing.Tokens;
 import com.akto.dto.dependency_flow.Node;
 import com.akto.dto.runtime_filters.RuntimeFilter;
+import com.akto.dto.test_editor.TestingRunPlayground;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
@@ -1144,6 +1146,15 @@ public class DbLayer {
     
     public static TestingRunResultSummary findLatestTestingRunResultSummary(Bson filter){
         return TestingRunResultSummariesDao.instance.findLatestOne(filter);
+    }
+
+    public static TestingRunPlayground getCurrentTestingRunDetailsFromEditor(int timestamp){
+        return TestingRunPlaygroundDao.instance.findOne(
+                Filters.and(
+                        Filters.gte(TestingRunPlayground.CREATED_AT, timestamp),
+                        Filters.eq(TestingRunPlayground.STATE, State.SCHEDULED)
+                )
+        );
     }
 
 }
