@@ -243,7 +243,7 @@ function SensitiveDataExposure() {
         filterOperators['subType']="OR"
         let ret = []
         let total = 0; 
-        await api.fetchChanges(sortKey, sortOrder, skip, limit, filters, filterOperators, startTimestamp, endTimestamp, true,isRequest).then((res)=> {
+        await api.fetchChanges(sortKey, sortOrder, skip, limit, filters, filterOperators, startTimestamp, endTimestamp, true,isRequest, queryValue).then((res)=> {
             res.endpoints.forEach((endpoint) => {
                 const dataObj = convertDataIntoTableFormat(endpoint, apiCollectionMap)
                 ret.push(dataObj);
@@ -287,7 +287,7 @@ const primaryActions = (
                 loading={loading}
                 fetchData={fetchData}
                 filters={filters}
-                hideQueryField={true}
+                hideQueryField={false}
                 getStatus={func.getTestResultStatus}
                 useNewRow={true}
                 condensedHeight={true}
