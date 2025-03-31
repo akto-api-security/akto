@@ -828,17 +828,17 @@ public class InventoryAction extends UserAction {
         return regexPattern;
     }
 
-    private Bson getSearchFilters(){
+    private Bson getSearchFilters(String searchKey){
         String regexPattern = getRegexPattern();
-        if(regexPattern.isEmpty() || regexPattern.length() == 0){
+        if(regexPattern == null || regexPattern.isEmpty()){
             return Filters.empty();
         }
-        Bson filter = Filters.regex(SingleTypeInfo._PARAM, regexPattern, "i");
+        Bson filter = Filters.regex(searchKey, regexPattern, "i");
         return filter;
     }
 
     private String searchString;
-    private List<SingleTypeInfo> getMongoResults() {
+    private List<SingleTypeInfo> getMongoResults(String searchKey) {
 
         List<String> sortFields = new ArrayList<>();
         sortFields.add(sortKey);
@@ -856,21 +856,21 @@ public class InventoryAction extends UserAction {
 
         int pageLimit = Math.min(limit == 0 ? 50 : limit, 200);
 
-        List<SingleTypeInfo> list = SingleTypeInfoDao.instance.findAll(Filters.and(prepareFilters("STI"), getSearchFilters()), skip,pageLimit, sort);
+        List<SingleTypeInfo> list = SingleTypeInfoDao.instance.findAll(Filters.and(prepareFilters("STI"), getSearchFilters(searchKey)), skip,pageLimit, sort);
         return list;        
     }
 
-    private long getTotalParams() {
-        return SingleTypeInfoDao.instance.getMCollection().countDocuments(Filters.and(prepareFilters("STI"), getSearchFilters()));
+    private long getTotalParams(String searchKey) {
+        return SingleTypeInfoDao.instance.getMCollection().countDocuments(Filters.and(prepareFilters("STI"), getSearchFilters(searchKey)));
     }
 
     public String fetchChanges() {
         response = new BasicDBObject();
 
-        long totalParams = getTotalParams();
+        long totalParams = getTotalParams(SingleTypeInfo._URL);
         loggerMaker.infoAndAddToDb("Total params: " + totalParams, LogDb.DASHBOARD);
 
-        List<SingleTypeInfo> singleTypeInfos = getMongoResults();
+        List<SingleTypeInfo> singleTypeInfos = getMongoResults(SingleTypeInfo._URL);
         loggerMaker.infoAndAddToDb("STI count: " + singleTypeInfos.size(), LogDb.DASHBOARD);
 
         response.put("data", new BasicDBObject("endpoints", singleTypeInfos ).append("total", totalParams));
