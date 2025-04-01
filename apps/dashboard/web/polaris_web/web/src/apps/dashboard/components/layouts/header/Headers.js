@@ -36,7 +36,7 @@ export default function Header() {
     const username = Store((state) => state.username)
     const resetAll = PersistStore(state => state.resetAll)
     const resetStore = LocalStore(state => state.resetStore)
-    const { resetSession } = SessionStore(state => state.resetStore)
+    const resetSession  = SessionStore(state => state.resetStore)
 
     /* Search bar */
     //const allRoutes = Store((state) => state.allRoutes)
