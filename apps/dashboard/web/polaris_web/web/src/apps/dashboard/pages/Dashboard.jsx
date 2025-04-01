@@ -104,7 +104,7 @@ function Dashboard() {
         if (!subCategoryMap || (Object.keys(subCategoryMap).length === 0)) {
             fetchMetadata();
         }
-        if(!threatFiltersMap && func.isDemoAccount()){
+        if(!threatFiltersMap && window?.STIGG_FEATURE_WISE_ALLOWED?.THREAT_DETECTION?.isGranted){
             fetchFilterYamlTemplates()
         }
         if(window.Beamer){

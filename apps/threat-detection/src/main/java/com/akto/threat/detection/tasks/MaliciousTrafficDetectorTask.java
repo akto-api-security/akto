@@ -284,6 +284,7 @@ public class MaliciousTrafficDetectorTask implements Task {
             .setLatestApiIp(maliciousReq.getIp())
             .setLatestApiPayload(maliciousReq.getPayload())
             .setLatestApiMethod(maliciousReq.getMethod())
+            .setLatestApiEndpoint(maliciousReq.getUrl())
             .setDetectedAt(responseParam.getTime())
             .setCategory(apiFilter.getInfo().getCategory().getName())
             .setSubCategory(apiFilter.getInfo().getSubCategory())
