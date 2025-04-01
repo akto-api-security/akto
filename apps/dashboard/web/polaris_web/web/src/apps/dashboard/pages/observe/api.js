@@ -667,6 +667,15 @@ export default {
             }
         })
     },
+    async syncExtractedAPIs(apiCollectionName, projectDir, codeAnalysisApisList) {
+        return await request({
+            url: '/api/syncExtractedAPIs',
+            method: 'post',
+            data: {
+                apiCollectionName, projectDir, codeAnalysisApisList
+            }
+        })
+    },
     async removeApisFromCustomCollection(apiList, collectionName) {
         return await request({
             url: '/api/removeApisFromCustomCollection',

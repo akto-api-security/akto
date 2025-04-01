@@ -1,5 +1,6 @@
 package com.akto.action;
 
+import com.akto.action.observe.Utils;
 import com.akto.dao.*;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
@@ -393,7 +394,17 @@ public class AdminSettingsAction extends UserAction {
     public String accountPermission;
     public String modifiedValueForAccount;
 
+    static int maxValueLength = 60;
+
     public String modifyAccountSettings () {
+
+        StringBuilder error = new StringBuilder();
+        boolean sanitized = Utils.isInputSanitized(modifiedValueForAccount, error, maxValueLength);
+        if (!sanitized) {
+            addActionError(error.toString());
+            return ERROR.toUpperCase();
+        }
+
         if(accountPermission.equals("name") || accountPermission.equals("timezone")){
             if(Context.accountId.get() != null && Context.accountId.get() != 0){
                 AccountsDao.instance.updateOne(

@@ -280,7 +280,7 @@ const learnMoreObject = {
     },
     dashboard_test_library_tests:{
         title:"Tests",
-        description:"View and manage your security test library, browse available tests, and run them against your APIs.",
+        description:"View and manage your security test library, browse available tests and run them against your APIs.",
         docsLink:[{
             content:"What is Dynamic Severity",
             value:"https://docs.akto.io/test-editor/concepts/dynamic-severity"
@@ -671,6 +671,19 @@ const learnMoreObject = {
                 value: "https://www.youtube.com/watch?v=4BIBra9J0Ek"
             }
         ]
+    },
+    // TODO: update docs links
+    dashboard_agent_team_members: {
+        docsLink: [
+            {
+                content: "Using agents",
+                value: "https://docs.akto.io/"
+            },
+            {
+                content: "Discover agents",
+                value: "https://docs.akto.io/"
+            }
+        ],
     }
 }
 

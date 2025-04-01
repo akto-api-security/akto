@@ -1,4 +1,4 @@
-import { Autocomplete, Avatar, Checkbox, HorizontalStack, Icon, Link, Text, TextContainer } from '@shopify/polaris';
+import { Autocomplete, Avatar, Icon, Link, TextContainer } from '@shopify/polaris';
 import { SearchMinor, ChevronDownMinor } from '@shopify/polaris-icons';
 import React, { useState, useCallback, useEffect } from 'react';
 import func from "@/util/func";
@@ -14,18 +14,16 @@ function DropdownSearch(props) {
     const [options, setOptions] = useState(deselectedOptions);
     const [loading, setLoading] = useState(false);
     const [checked,setChecked] = useState(false)
-
-
     useEffect(() => {
-        if(value!=undefined){
+        if(value!==undefined){
             setInputValue((prev) => {
-                if(prev == value){
+                if(prev === value){
                     return prev;
                 }
                 return value;
             });
         }
-        if(preSelected!=undefined){
+        if(preSelected!==undefined){
             setSelectedOptions((prev) => {
                 if(func.deepComparison(prev,preSelected)){
                     return prev;
@@ -100,7 +98,7 @@ function DropdownSearch(props) {
                         option[searchKey].match(filterRegex)
                     ).slice(0, defaultSliceValue);
 
-                    const title = deselectedOptions.length != defaultSliceValue && resultOptions.length >= defaultSliceValue
+                    const title = deselectedOptions.length !== defaultSliceValue && resultOptions.length >= defaultSliceValue
                         ? `Showing ${resultOptions.length} result${func.addPlurality(resultOptions.length)} only. (type more to refine results)`
                         : "Showing all results";
 

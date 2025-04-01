@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import FlyLayout from '../../../components/layouts/FlyLayout'
 import func from '@/util/func'
 import transform from '../transform'
@@ -234,33 +234,36 @@ function TestRunResultFlyout(props) {
     const dataStoreTime = 2 * 30 * 24 * 60 * 60;
     const dataExpired = func.timeNow() - (selectedTestRunResult?.endTimestamp || func.timeNow()) > dataStoreTime
 
-    const ValuesTab = {
-        id: 'values',
-        content: "Values",
-        component: (dataExpired && !selectedTestRunResult?.vulnerable)
-            ? dataExpiredComponent :
-            (selectedTestRunResult.testResults &&
-        <Box paddingBlockStart={3} paddingInlineEnd={4} paddingInlineStart={4}><SampleDataList
-            key="Sample values"
-            heading={"Attempt"}
-            minHeight={"30vh"}
-            vertical={true}
-            sampleData={selectedTestRunResult?.testResults.map((result) => {
-                if (result.errors && result.errors.length > 0) {
-                    let errorList = result.errors.join(", ");
-                    return { errorList: errorList }
-                }
-                if (result.originalMessage || result.message) {
-                    return { originalMessage: result.originalMessage, message: result.message, highlightPaths: [] }
-                }
-                return { errorList: "No data found" }
-            })}
-            isNewDiff={true}
-            vulnerable={selectedTestRunResult?.vulnerable}
-            isVulnerable={selectedTestRunResult.vulnerable}
-        />
-        </Box>)
-    }
+    const ValuesTab = typeof selectedTestRunResult === "object" ? useMemo(() => {
+        return {
+            id: 'values',
+            content: "Values",
+            component: (dataExpired && !selectedTestRunResult?.vulnerable)
+                ? dataExpiredComponent :
+                (selectedTestRunResult.testResults &&
+                    <Box paddingBlockStart={3} paddingInlineEnd={4} paddingInlineStart={4}><SampleDataList
+                        key="Sample values"
+                        heading={"Attempt"}
+                        minHeight={"30vh"}
+                        vertical={true}
+                        sampleData={selectedTestRunResult?.testResults.map((result) => {
+                            if (result.errors && result.errors.length > 0) {
+                                let errorList = result.errors.join(", ");
+                                return { errorList: errorList }
+                            }
+                            if (result.originalMessage || result.message) {
+                                return { originalMessage: result.originalMessage, message: result.message, highlightPaths: [] }
+                            }
+                            return { errorList: "No data found" }
+                        })}
+                        isNewDiff={true}
+                        vulnerable={selectedTestRunResult?.vulnerable}
+                        isVulnerable={selectedTestRunResult.vulnerable}
+                    />
+                    </Box>)
+        }
+    }, [JSON.stringify(selectedTestRunResult)]) : <></>
+
     const moreInfoComponent = (
         infoStateFlyout.length > 0 ?
         <VerticalStack gap={"5"}>
