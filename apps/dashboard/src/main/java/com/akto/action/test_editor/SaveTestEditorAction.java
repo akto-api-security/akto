@@ -289,15 +289,15 @@ public class SaveTestEditorAction extends UserAction {
         }
 
         Account account = AccountsDao.instance.findOne(Filters.eq(Constants.ID, Context.accountId.get()));
-        boolean a = true;
-        if (a) {
+
+        if (account.getHybridTestingEnabled()) {
             Bson updates = Updates.combine(
                     Updates.set(TestingRunPlayground.TEST_TEMPLATE, content),
                     Updates.set(TestingRunPlayground.STATE, State.SCHEDULED),
-                    Updates.set(TestingRunPlayground.SAMPLES, sampleDataList.get(0).getSamples()),// give latest only
+                    Updates.set(TestingRunPlayground.SAMPLES, sampleDataList.get(0).getSamples()),
                     Updates.set(TestingRunPlayground.API_INFO_KEY, apiInfoKey),
-                    Updates.set(TestingRunPlayground.CREATED_AT, new Date()),
-                    Updates.set("testingRunResult", new TestingRunResult()));
+                    Updates.set(TestingRunPlayground.CREATED_AT, Context.now()),
+                    Updates.set(TestingRunPlayground.TESTING_RUN_RESULT, new TestingRunResult()));
 
             TestingRunPlayground result = TestingRunPlaygroundDao.instance.getMCollection().findOneAndUpdate(
                     Filters.empty(),
@@ -305,7 +305,7 @@ public class SaveTestEditorAction extends UserAction {
                     new FindOneAndUpdateOptions().upsert(true).returnDocument(ReturnDocument.AFTER));
 
             if (result != null) {
-                testingRunPlaygroundHexId = result.getId().toHexString();
+                testingRunPlaygroundHexId = result.getHexId();
                 return SUCCESS.toUpperCase();
             } else {
                 addActionError("Failed to create TestingRunPlayground");

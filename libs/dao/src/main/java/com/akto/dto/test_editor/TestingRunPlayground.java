@@ -24,6 +24,8 @@ public class TestingRunPlayground {
 
     public static final String CREATED_AT = "createdAt";
 
+    public static final String TESTING_RUN_RESULT = "testingRunResult";
+
     private ObjectId id;
 
     private String testTemplate;
@@ -34,7 +36,7 @@ public class TestingRunPlayground {
 
     private BasicDBObject apiInfoKey;
 
-    private Date createdAt;
+    private int createdAt;
 
     private TestingRunResult testingRunResult;
 
@@ -42,7 +44,7 @@ public class TestingRunPlayground {
     private String hexId;
 
 
-    public TestingRunPlayground(String testTemplate, State state, List<String> samples, BasicDBObject apiInfoKey, Date createdAt) {
+    public TestingRunPlayground(String testTemplate, State state, List<String> samples, BasicDBObject apiInfoKey, int createdAt) {
         this.testTemplate = testTemplate;
         this.state = state;
         this.samples = samples;
@@ -54,11 +56,11 @@ public class TestingRunPlayground {
 
     }
 
-    public Date getCreatedAt() {
+    public int getCreatedAt() {
         return createdAt;
     }
 
-    public void setCreatedAt(Date createdAt) {
+    public void setCreatedAt(int createdAt) {
         this.createdAt = createdAt;
     }
 
