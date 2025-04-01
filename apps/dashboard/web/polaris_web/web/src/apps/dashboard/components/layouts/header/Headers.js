@@ -11,6 +11,7 @@ import SemiCircleProgress from '../../shared/SemiCircleProgress';
 import { usePolling } from '../../../../main/PollingProvider';
 import { debounce } from 'lodash';
 import LocalStore from '../../../../main/LocalStorageStore';
+import SessionStore from '../../../../main/SessionStore';
 
 function ContentWithIcon({icon,text, isAvatar= false}) {
     return(
@@ -33,9 +34,9 @@ export default function Header() {
     const navigate = useNavigate()
 
     const username = Store((state) => state.username)
-    const storeAccessToken = PersistStore(state => state.storeAccessToken)
     const resetAll = PersistStore(state => state.resetAll)
     const resetStore = LocalStore(state => state.resetStore)
+    const { resetSession } = SessionStore(state => state.resetStore)
 
     /* Search bar */
     //const allRoutes = Store((state) => state.allRoutes)
@@ -98,7 +99,7 @@ export default function Header() {
         api.logout().then(res => {
             resetAll();
             resetStore() ;
-            storeAccessToken(null)
+            resetSession();
             if(res.logoutUrl){
                 window.location.href = res.logoutUrl
             } else {

@@ -59,19 +59,10 @@ const initialState = {
     trafficAlerts: [],
     sendEventOnLogin: false,
     tableSelectedTab: {},
-    threatFiltersMap: null,
 };
 
 let persistStore = (set, get) => ({
     ...initialState,
-    accessToken: null,
-    storeAccessToken: (accessToken) => {
-        try {
-            set({ accessToken });
-        } catch (error) {
-            console.error("Error setting accessToken:", error);
-        }
-    },
     setQuickstartTasksCompleted: (quickstartTasksCompleted) => {
         try {
             set({ quickstartTasksCompleted });
@@ -202,13 +193,6 @@ let persistStore = (set, get) => ({
             console.error("Error setting tableSelectedTab:", error);
         }
     },
-    setThreatFiltersMap: (threatFiltersMap) => {
-        try {
-            set({ threatFiltersMap });
-        } catch (error) {
-            console.error("Error setting threatFiltersMap:", error);
-        }
-    },
     resetAll: () => {
         try {
             set(initialState);
@@ -235,8 +219,7 @@ persistStore = persist(persistStore, {
         tableInitialState: state.tableInitialState,
         trafficAlerts: state.trafficAlerts,
         sendEventOnLogin: state.sendEventOnLogin,
-        tableSelectedTab: state.tableSelectedTab,
-        threatFiltersMap: state.threatFiltersMap,
+        tableSelectedTab: state.tableSelectedTab
     }) 
 });
 
