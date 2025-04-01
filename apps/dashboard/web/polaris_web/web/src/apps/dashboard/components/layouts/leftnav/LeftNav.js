@@ -38,10 +38,10 @@ export default function LeftNav() {
     };
 
     const handleAccountChange = async (selected) => {
-        await api.goToAccount(selected);
-        func.setToast(true, false, `Switched to account ${accounts[selected]}`);
         resetAll();
         resetStore();
+        await api.goToAccount(selected);
+        func.setToast(true, false, `Switched to account ${accounts[selected]}`);
         window.location.href = '/dashboard/observe/inventory';
     };
 

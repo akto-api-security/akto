@@ -284,6 +284,7 @@ public class MaliciousTrafficDetectorTask implements Task {
             .setLatestApiIp(maliciousReq.getIp())
             .setLatestApiPayload(maliciousReq.getPayload())
             .setLatestApiMethod(maliciousReq.getMethod())
+            .setLatestApiEndpoint(maliciousReq.getUrl())
             .setDetectedAt(responseParam.getTime())
             .setCategory(apiFilter.getInfo().getCategory().getName())
             .setSubCategory(apiFilter.getInfo().getSubCategory())
@@ -366,6 +367,7 @@ public class MaliciousTrafficDetectorTask implements Task {
     origObj.put("requestPayload", httpResponseParamProto.getRequestPayload());
     origObj.put("responsePayload", httpResponseParamProto.getResponsePayload());
     origObj.put("ip", httpResponseParamProto.getIp());
+    origObj.put("destIp", httpResponseParamProto.getDestIp());
     origObj.put("source", sourceStr);
     origObj.put("type", httpResponseParamProto.getType());
     origObj.put("akto_vxlan_id", httpResponseParamProto.getAktoVxlanId());
