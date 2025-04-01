@@ -5,6 +5,7 @@ import com.akto.kafka.KafkaConfig;
 import com.akto.kafka.KafkaConsumerConfig;
 import com.akto.kafka.KafkaProducerConfig;
 import com.akto.kafka.Serializer;
+import com.akto.threat.detection.client.IPLookupClient;
 import com.akto.threat.detection.constants.KafkaTopic;
 import com.akto.threat.detection.session_factory.SessionFactoryUtils;
 import com.akto.threat.detection.tasks.CleanupTask;
@@ -13,6 +14,12 @@ import com.akto.threat.detection.tasks.MaliciousTrafficDetectorTask;
 import com.akto.threat.detection.tasks.SendMaliciousEventsToBackend;
 import com.mongodb.ConnectionString;
 import io.lettuce.core.RedisClient;
+
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import org.apache.commons.io.IOUtils;
+
 import org.flywaydb.core.Flyway;
 import org.hibernate.SessionFactory;
 
@@ -20,7 +27,7 @@ public class Main {
 
   private static final String CONSUMER_GROUP_ID = "akto.threat_detection";
 
-  public static void main(String[] args) {
+  public static void main(String[] args) throws Exception {
     runMigrations();
 
     SessionFactory sessionFactory = SessionFactoryUtils.createFactory();
@@ -58,8 +65,9 @@ public class Main {
             .build();
 
     RedisClient localRedis = createLocalRedisClient();
+    IPLookupClient ipLookupClient = new IPLookupClient(getMaxmindFile());
 
-    new MaliciousTrafficDetectorTask(trafficKafka, internalKafka, localRedis).run();
+    new MaliciousTrafficDetectorTask(trafficKafka, internalKafka, localRedis, ipLookupClient).run();
     new FlushSampleDataTask(
             sessionFactory, internalKafka, KafkaTopic.ThreatDetection.MALICIOUS_EVENTS)
         .run();
@@ -85,5 +93,18 @@ public class Main {
             .load();
 
     flyway.migrate();
+  }
+
+
+  private static File getMaxmindFile() throws IOException {
+    File maxmindTmpFile = File.createTempFile("tmp-geo-country", ".mmdb");
+    maxmindTmpFile.deleteOnExit();
+
+    try (FileOutputStream fos = new FileOutputStream(maxmindTmpFile)) {
+      IOUtils.copy(
+          Main.class.getClassLoader().getResourceAsStream("maxmind/Geo-Country.mmdb"), fos);
+    }
+
+    return maxmindTmpFile;
   }
 }
