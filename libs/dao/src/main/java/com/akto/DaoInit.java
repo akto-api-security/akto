@@ -220,6 +220,7 @@ public class DaoInit {
         ClassModel<TrafficMetricsAlert> trafficMetricsAlertClassModel = ClassModel.builder(TrafficMetricsAlert.class).enableDiscriminator(true).build();
         ClassModel<JiraIntegration> jiraintegrationClassModel = ClassModel.builder(JiraIntegration.class).enableDiscriminator(true).build();
         ClassModel<MethodCondition> methodConditionClassModel = ClassModel.builder(MethodCondition.class).enableDiscriminator(true).build();
+        
         ClassModel<RegexTestingEndpoints> regexTestingEndpointsClassModel = ClassModel.builder(RegexTestingEndpoints.class).enableDiscriminator(true).build();
         ClassModel<DependencyNode> dependencyNodeClassModel = ClassModel.builder(DependencyNode.class).enableDiscriminator(true).build();
         ClassModel<ParamInfo> paramInfoClassModel = ClassModel.builder(ParamInfo.class).enableDiscriminator(true).build();
