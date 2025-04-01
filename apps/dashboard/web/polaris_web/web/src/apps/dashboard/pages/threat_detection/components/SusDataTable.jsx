@@ -7,6 +7,7 @@ import PersistStore from "../../../../main/PersistStore";
 import func from "../../../../../util/func";
 import { Badge } from "@shopify/polaris";
 import dayjs from "dayjs";
+import SessionStore from "../../../../main/SessionStore";
 const resourceName = {
   singular: "sample",
   plural: "samples",
@@ -78,7 +79,7 @@ function SusDataTable({ currDateRange, rowClicked }) {
 
   const [loading, setLoading] = useState(true);
   const collectionsMap = PersistStore((state) => state.collectionsMap);
-  const threatFiltersMap = PersistStore((state) => state.threatFiltersMap);
+  const threatFiltersMap = SessionStore((state) => state.threatFiltersMap);
 
 
   async function fetchData(
