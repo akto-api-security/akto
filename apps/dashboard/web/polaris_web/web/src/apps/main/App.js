@@ -53,7 +53,7 @@ import ApiChanges from "../dashboard/pages/observe/api_collections/ApiChanges";
 
 import Store from "../dashboard/store";
 import {generateSearchData} from "@/util/searchItems"
-import {useEffect} from "react";
+import {useEffect, useMemo} from "react";
 import CICD from "../dashboard/pages/settings/integrations/CICD";
 import ErrorComponent from "../dashboard/components/shared/ErrorComponent";
 import OktaIntegration from "../dashboard/pages/settings/integrations/OktaIntegration";
@@ -480,13 +480,13 @@ function App() {
         document.body.appendChild(script)
     }, [])
 
-    return (
+    return useMemo(() => {return (
         <PollingProvider>
             <TableContextProvider>
                 <RouterProvider router={router}/>
             </TableContextProvider>
         </PollingProvider>
-    );
+    )}, [router]) ;
 }
 
 export default App;
