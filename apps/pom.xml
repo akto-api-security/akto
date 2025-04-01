@@ -148,5 +148,16 @@
                 <module>threat-detection-backend</module>
             </modules>
         </profile>
+        <profile>
+            <id>testing-job</id>
+            <activation>
+                <file>
+                    <exists>testing-job/pom.xml</exists>
+                </file>
+            </activation>
+            <modules>
+                <module>testing-job</module>
+            </modules>
+        </profile>
     </profiles>
 </project>
