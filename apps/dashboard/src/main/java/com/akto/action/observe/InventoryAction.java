@@ -404,7 +404,7 @@ public class InventoryAction extends UserAction {
     private List<String> urls;
     public String fetchSensitiveParamsForEndpoints() {
 
-        if (urls.isEmpty()){
+        if (urls == null || urls.isEmpty()){
             return Action.SUCCESS.toUpperCase();
         }
 
