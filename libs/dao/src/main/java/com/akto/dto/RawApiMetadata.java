@@ -1,6 +1,5 @@
 package com.akto.dto;
 
-
 public class RawApiMetadata {
     private String countryCode;
 
@@ -18,5 +17,4 @@ public class RawApiMetadata {
     public void setCountryCode(String countryCode) {
         this.countryCode = countryCode;
     }
-   
 }

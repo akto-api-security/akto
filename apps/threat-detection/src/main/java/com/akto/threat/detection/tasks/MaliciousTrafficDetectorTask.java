@@ -27,15 +27,14 @@ import com.akto.rules.TestPlugin;
 import com.akto.test_editor.execution.VariableResolver;
 import com.akto.test_editor.filter.data_operands_impl.ValidationResult;
 import com.akto.threat.detection.actor.SourceIPActorGenerator;
-import com.akto.threat.detection.client.IPLookupClient;
 import com.akto.threat.detection.cache.RedisBackedCounterCache;
 import com.akto.threat.detection.constants.KafkaTopic;
 import com.akto.threat.detection.kafka.KafkaProtoProducer;
 import com.akto.threat.detection.smart_event_detector.window_based.WindowBasedThresholdNotifier;
 import com.akto.util.HttpRequestResponseUtils;
-import com.alibaba.fastjson2.JSONObject;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mongodb.BasicDBObject;
+import com.akto.RawApiMetadataFactory;
 
 import io.lettuce.core.RedisClient;
 import java.time.Duration;
@@ -55,6 +54,7 @@ public class MaliciousTrafficDetectorTask implements Task {
   private final KafkaConfig kafkaConfig;
   private final HttpCallParser httpCallParser;
   private final WindowBasedThresholdNotifier windowBasedThresholdNotifier;
+  private final RawApiMetadataFactory rawApiFactory;
 
   private Map<String, FilterConfig> apiFilters;
   private int filterLastUpdatedAt = 0;
@@ -65,11 +65,10 @@ public class MaliciousTrafficDetectorTask implements Task {
   private static final DataActor dataActor = DataActorFactory.fetchInstance();
 
   private static final ObjectMapper objectMapper = new ObjectMapper();
-  private final IPLookupClient ipLookupClient;
   
 
   public MaliciousTrafficDetectorTask(
-      KafkaConfig trafficConfig, KafkaConfig internalConfig, RedisClient redisClient, IPLookupClient ipLookupClient) {
+      KafkaConfig trafficConfig, KafkaConfig internalConfig, RedisClient redisClient) throws Exception {
     this.kafkaConfig = trafficConfig;
 
     Properties properties = new Properties();
@@ -96,7 +95,7 @@ public class MaliciousTrafficDetectorTask implements Task {
             new WindowBasedThresholdNotifier.Config(100, 10 * 60));
 
     this.internalKafka = new KafkaProtoProducer(internalConfig);
-    this.ipLookupClient = ipLookupClient;
+    this.rawApiFactory = new RawApiMetadataFactory();
   }
 
   public void run() {
@@ -179,8 +178,8 @@ public class MaliciousTrafficDetectorTask implements Task {
 
     String message = responseParam.getOrig();
     RawApi rawApi = RawApi.buildFromMessageNew(responseParam);
-    String countryCode = this.ipLookupClient.getCountryISOCodeGivenIp(rawApi.getRequest().getSourceIp()).orElse("");
-    rawApi.setRawApiMetdata(new RawApiMetadata(countryCode));
+    RawApiMetadata metadata = this.rawApiFactory.buildFromHttp(rawApi.getRequest(), rawApi.getResponse());
+    rawApi.setRawApiMetdata(metadata);
 
     int apiCollectionId = httpCallParser.createApiCollectionId(responseParam);
     responseParam.requestParams.setApiCollectionId(apiCollectionId);
