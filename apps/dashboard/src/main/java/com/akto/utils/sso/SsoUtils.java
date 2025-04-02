@@ -71,6 +71,23 @@ public class SsoUtils {
         }
     }
 
+    public static HttpServletRequest getWrappedRequest(HttpServletRequest servletRequest, ConfigType configType, SAMLConfig samlConfig) {
+        String requestUri = servletRequest.getRequestURL().toString();
+        String savedRequestUri = samlConfig.getAcsUrl();
+
+        if(requestUri.equals(savedRequestUri)){
+            return servletRequest;
+        }
+        String tempRequestUri = requestUri.substring(7);
+        String tempSavedRequestUri = savedRequestUri.substring(8);
+
+        if(tempRequestUri.equals(tempSavedRequestUri)){
+            return new CustomHttpsWrapper(servletRequest);
+        }else{
+            return servletRequest;
+        }
+    }
+
     public static SAMLConfig findSAMLConfig(ConfigType configType, int accountId){
         String idString = String.valueOf(accountId);
         SAMLConfig config = (SAMLConfig) SSOConfigsDao.instance.findOne(

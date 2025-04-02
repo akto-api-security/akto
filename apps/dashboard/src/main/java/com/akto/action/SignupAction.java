@@ -655,6 +655,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
     public String registerViaAzure() throws Exception{
         Auth auth;
         try {
+            SAMLConfig samlConfig = null;
             String relayState = servletRequest.getParameter("RelayState");
             logger.info("RelayState received in registerViaAzure: " + relayState);
             if (relayState == null || relayState.isEmpty()) {
@@ -666,18 +667,22 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
 
             if (StringUtils.isNumeric(relayState)) {
                 resolvedAccountId = Integer.parseInt(relayState);
+                samlConfig = SSOConfigsDao.getSAMLConfigByAccountId(resolvedAccountId);
             } else {
-                resolvedAccountId = SsoUtils.getAccountIdFromOrgName(relayState);
-                if (resolvedAccountId == null) {
-                    loggerMaker.errorAndAddToDb("Invalid RelayState: No matching accountId for orgName: " + relayState);
-                    servletResponse.sendRedirect("/login");
-                    return ERROR.toUpperCase();
-                }
+                samlConfig = SSOConfigsDao.instance.getSSOConfigByDomain(relayState);
             }
 
+            if (samlConfig == null) {
+                loggerMaker.errorAndAddToDb("Invalid RelayState: No matching samlConfig for orgName: " + relayState);
+                servletResponse.sendRedirect("/login");
+                return ERROR.toUpperCase();
+            }
+
+            resolvedAccountId = Integer.valueOf(samlConfig.getId());
+
             setAccountId(resolvedAccountId);
-            Saml2Settings settings = CustomSamlSettings.getSamlSettings(ConfigType.AZURE, this.accountId);
-            HttpServletRequest wrappedRequest = SsoUtils.getWrappedRequest(servletRequest,ConfigType.AZURE, this.accountId);
+            Saml2Settings settings = CustomSamlSettings.buildSamlSettingsMap(samlConfig);
+            HttpServletRequest wrappedRequest = SsoUtils.getWrappedRequest(servletRequest,ConfigType.AZURE, samlConfig);
             logger.info("Before sending request to Azure Idp");
             auth = new Auth(settings, wrappedRequest, servletResponse);
             auth.processResponse();
