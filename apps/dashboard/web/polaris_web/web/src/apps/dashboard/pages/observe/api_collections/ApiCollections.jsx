@@ -306,7 +306,7 @@ function ApiCollections() {
             envTypeObj[c.id] = c.envType
         })
         setEnvTypeMap(envTypeObj)
-        setAllCollections(apiCollectionsResp.apiCollections.filter(x => x?.deactivated !== true) || [])
+        setAllCollections(apiCollectionsResp.apiCollections || [])
 
         const shouldCallHeavyApis = (func.timeNow() - lastFetchedInfo.lastRiskScoreInfo) >= (5 * 60)
         // const shouldCallHeavyApis = false;
