@@ -4,10 +4,13 @@ import com.akto.RuntimeMode;
 import com.akto.billing.UsageMetricUtils;
 import com.akto.crons.GetRunningTestsStatus;
 import com.akto.dao.context.Context;
+import com.akto.dao.test_editor.TestConfigYamlParser;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.*;
 import com.akto.dto.billing.Organization;
+import com.akto.dto.test_editor.TestConfig;
+import com.akto.dto.test_editor.TestingRunPlayground;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.*;
 import com.akto.dto.testing.TestingEndpoints.Operator;
@@ -25,6 +28,9 @@ import com.akto.notifications.slack.APITestStatusAlert;
 import com.akto.notifications.slack.NewIssuesModel;
 import com.akto.notifications.slack.SlackAlerts;
 import com.akto.notifications.slack.SlackSender;
+import com.akto.store.AuthMechanismStore;
+import com.akto.store.SampleMessageStore;
+import com.akto.store.TestingUtil;
 import com.akto.util.DashboardMode;
 import com.akto.util.EmailAccountName;
 import com.akto.util.enums.GlobalEnums;
@@ -70,6 +76,41 @@ public class Main {
                 rateLimitMap.put(new GlobalApiRateLimit(globalRateLimit), globalRateLimit);
             }
         }, 0, 1, TimeUnit.MINUTES);
+    }
+
+    public static void checkForPlaygroundTest(){
+        scheduler.scheduleAtFixedRate(new Runnable() {
+            private final int timestamp = Context.now()-5*60;
+            public void run() {
+                TestExecutor executor = new TestExecutor();
+                TestingRunPlayground testingRunPlayground =  null; // fetch from Db
+                TestConfig testConfig = null; 
+                try {
+                    testConfig = TestConfigYamlParser.parseTemplate(testingRunPlayground.getTestTemplate());
+                } catch (Exception e) {
+                    return ;
+                }
+                ApiInfo.ApiInfoKey infoKey = testingRunPlayground.getApiInfoKey();
+
+                List<String> sampleData = testingRunPlayground.getSamples(); // get sample data from DB
+
+                List<TestingRunResult.TestLog> testLogs = new ArrayList<>();
+                Map<ApiInfo.ApiInfoKey, List<String>> sampleDataMap = new HashMap<>();
+                sampleDataMap.put(infoKey, sampleData); // get sample list from DB
+                SampleMessageStore messageStore = SampleMessageStore.create(sampleDataMap);
+
+                AuthMechanismStore authMechanismStore = AuthMechanismStore.create();
+                AuthMechanism authMechanism = authMechanismStore.getAuthMechanism();
+                
+                List<CustomAuthType> customAuthTypes = dataActor.fetchCustomAuthTypes();
+                
+                TestingUtil testingUtil = new TestingUtil(authMechanism, messageStore, null, null, customAuthTypes);
+                TestingRunResult testingRunResult = executor.runTestNew(infoKey, null, testingUtil, null, testConfig, null, true, testLogs);
+                testingRunPlayground.setTestingRunResult(testingRunResult);
+                // upate testingRunPlayground in DB
+            }
+        }, 0, 2, TimeUnit.SECONDS);
+
     }
 
     public static Set<Integer> extractApiCollectionIds(List<ApiInfo.ApiInfoKey> apiInfoKeyList) {
@@ -147,6 +188,7 @@ public class Main {
         AccountSettings accountSettings = dataActor.fetchAccountSettings();
         dataActor.modifyHybridTestingSetting(RuntimeMode.isHybridDeployment());
         setupRateLimitWatcher(accountSettings);
+        checkForPlaygroundTest();
 
         if (!SKIP_SSRF_CHECK) {
             Setup setup = dataActor.fetchSetup();

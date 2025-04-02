@@ -13,6 +13,7 @@ public class TestingRunPlayground {
     public static final String SAMPLES = "samples";
     public static final String API_INFO_KEY = "apiInfoKey";
     public static final String CREATED_AT = "createdAt";
+    public static final String TESTING_RUN_RESULT = "testingRunResult";
 
     private ObjectId id;
     private String testTemplate;
