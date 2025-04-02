@@ -81,4 +81,16 @@ public class SsoUtils {
         );
         return config;
     }
+
+    public static Integer getAccountIdFromOrgName(String orgName) {
+        try {
+            SAMLConfig config = SSOConfigsDao.instance.findOne(
+                    Filters.eq(SAMLConfig.ORGANIZATION_DOMAIN, orgName)
+            );
+            return Integer.valueOf(config.getId());
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
 }

@@ -655,13 +655,27 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
     public String registerViaAzure() throws Exception{
         Auth auth;
         try {
-            String tempAccountId = servletRequest.getParameter("RelayState");
-            logger.info("Account id found in registerViaAzure: " + tempAccountId);
-            if(tempAccountId == null || tempAccountId.isEmpty()){
-                loggerMaker.errorAndAddToDb("Account id not found");
+            String relayState = servletRequest.getParameter("RelayState");
+            logger.info("RelayState received in registerViaAzure: " + relayState);
+            if (relayState == null || relayState.isEmpty()) {
+                loggerMaker.errorAndAddToDb("RelayState not found");
                 return ERROR.toUpperCase();
             }
-            setAccountId(Integer.parseInt(tempAccountId));
+
+            Integer resolvedAccountId = null;
+
+            if (StringUtils.isNumeric(relayState)) {
+                resolvedAccountId = Integer.parseInt(relayState);
+            } else {
+                resolvedAccountId = SsoUtils.getAccountIdFromOrgName(relayState);
+                if (resolvedAccountId == null) {
+                    loggerMaker.errorAndAddToDb("Invalid RelayState: No matching accountId for orgName: " + relayState);
+                    servletResponse.sendRedirect("/login");
+                    return ERROR.toUpperCase();
+                }
+            }
+
+            setAccountId(resolvedAccountId);
             Saml2Settings settings = CustomSamlSettings.getSamlSettings(ConfigType.AZURE, this.accountId);
             HttpServletRequest wrappedRequest = SsoUtils.getWrappedRequest(servletRequest,ConfigType.AZURE, this.accountId);
             logger.info("Before sending request to Azure Idp");
