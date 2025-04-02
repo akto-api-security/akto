@@ -9,6 +9,8 @@ import java.util.UUID;
 import javax.sql.DataSource;
 
 import org.postgresql.ds.PGSimpleDataSource;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.akto.dao.context.Context;
 import com.akto.dto.sql.SampleDataAlt;
@@ -24,6 +26,8 @@ public class Main {
     final static String password = 
     System.getenv("POSTGRES_PASSWORD");
     // "example";
+    
+    private static final Logger logger = LoggerFactory.getLogger(Main.class);
 
     public static void main(String args[]) {
 
@@ -90,8 +94,12 @@ public class Main {
                 lastPing = now;
                 getConnection();
                 postgresConnected = true;
+                logger.info("established postgres connection ");
             }
+            logger.info("reusing existing postgres connection ");
         } catch (Exception e) {
+            e.printStackTrace();
+            logger.error("error establishing postgres connection " + e.getMessage());
         }
         return postgresConnected;
     }
