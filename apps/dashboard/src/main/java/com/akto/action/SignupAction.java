@@ -678,11 +678,18 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                 return ERROR.toUpperCase();
             }
 
-            resolvedAccountId = Integer.valueOf(samlConfig.getId());
+            try {
+                resolvedAccountId = Integer.valueOf(samlConfig.getId());
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("Error while parsing account ID: " + e.getMessage());
+                servletResponse.sendRedirect("/login");
+                return ERROR.toUpperCase();
+            }
 
             setAccountId(resolvedAccountId);
+            CustomSamlSettings.getInstance(ConfigType.AZURE, this.accountId).setSamlConfig(samlConfig);
             Saml2Settings settings = CustomSamlSettings.buildSamlSettingsMap(samlConfig);
-            HttpServletRequest wrappedRequest = SsoUtils.getWrappedRequest(servletRequest,ConfigType.AZURE, samlConfig);
+            HttpServletRequest wrappedRequest = SsoUtils.getWrappedRequest(servletRequest,ConfigType.AZURE, this.accountId);
             logger.info("Before sending request to Azure Idp");
             auth = new Auth(settings, wrappedRequest, servletResponse);
             auth.processResponse();

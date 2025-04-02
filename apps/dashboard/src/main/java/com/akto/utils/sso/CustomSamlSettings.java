@@ -16,13 +16,20 @@ public class CustomSamlSettings {
 
     public static CustomSamlSettings getInstance(ConfigType configType, int accountId) {
         CustomSamlSettings instance = instances.getOrDefault(configType, new CustomSamlSettings());
-        SAMLConfig samlConfig = SsoUtils.findSAMLConfig(configType, accountId);
-        instance.samlConfig = samlConfig;
+        if(instance.samlConfig == null) {
+            SAMLConfig samlConfig = SsoUtils.findSAMLConfig(configType, accountId);;
+            instance.samlConfig = samlConfig;
+        }
+
         return instance;
     }
 
     public SAMLConfig getSamlConfig() {
         return samlConfig;
+    }
+
+    public void setSamlConfig(SAMLConfig samlConfig) {
+        this.samlConfig = samlConfig;
     }
 
     public static Saml2Settings buildSamlSettingsMap (SAMLConfig samlConfig){
