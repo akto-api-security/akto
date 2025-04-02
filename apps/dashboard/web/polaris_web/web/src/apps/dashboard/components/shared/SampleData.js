@@ -9,6 +9,7 @@ import keywords from "../../pages/test_editor/components/editor_config/keywords"
 import authTypesApi from "@/apps/dashboard/pages/settings/auth_types/api";
 
 function highlightPaths(highlightPathMap, ref){
+  console.log("highlightPathMap: ", highlightPathMap)
   highlightPathMap && Object.keys(highlightPathMap).forEach((key) => {
       if (highlightPathMap[key].highlight) {
         let path = key.split("#");
