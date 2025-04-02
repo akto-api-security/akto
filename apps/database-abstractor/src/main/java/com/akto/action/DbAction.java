@@ -1747,7 +1747,7 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
-    public String setTestingRunStateAndResult(){
+    public String updateTestingRunPlaygroundStateAndResult(){
         try {
             DbLayer.updateTestingRunPlayground(this.testingRunPlayground);
         } catch (Exception e) {
