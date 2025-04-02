@@ -8,6 +8,7 @@ import com.akto.dto.ApiInfo;
 import com.akto.dto.HttpRequestParams;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.RawApi;
+import com.akto.dto.RawApiMetadata;
 import com.akto.dto.api_protection_parse_layer.AggregationRules;
 import com.akto.dto.api_protection_parse_layer.Rule;
 import com.akto.dto.monitoring.FilterConfig;
@@ -31,9 +32,9 @@ import com.akto.threat.detection.constants.KafkaTopic;
 import com.akto.threat.detection.kafka.KafkaProtoProducer;
 import com.akto.threat.detection.smart_event_detector.window_based.WindowBasedThresholdNotifier;
 import com.akto.util.HttpRequestResponseUtils;
-import com.alibaba.fastjson2.JSONObject;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mongodb.BasicDBObject;
+import com.akto.RawApiMetadataFactory;
 
 import io.lettuce.core.RedisClient;
 import java.time.Duration;
@@ -53,6 +54,7 @@ public class MaliciousTrafficDetectorTask implements Task {
   private final KafkaConfig kafkaConfig;
   private final HttpCallParser httpCallParser;
   private final WindowBasedThresholdNotifier windowBasedThresholdNotifier;
+  private final RawApiMetadataFactory rawApiFactory;
 
   private Map<String, FilterConfig> apiFilters;
   private int filterLastUpdatedAt = 0;
@@ -63,9 +65,10 @@ public class MaliciousTrafficDetectorTask implements Task {
   private static final DataActor dataActor = DataActorFactory.fetchInstance();
 
   private static final ObjectMapper objectMapper = new ObjectMapper();
+  
 
   public MaliciousTrafficDetectorTask(
-      KafkaConfig trafficConfig, KafkaConfig internalConfig, RedisClient redisClient) {
+      KafkaConfig trafficConfig, KafkaConfig internalConfig, RedisClient redisClient) throws Exception {
     this.kafkaConfig = trafficConfig;
 
     Properties properties = new Properties();
@@ -92,6 +95,7 @@ public class MaliciousTrafficDetectorTask implements Task {
             new WindowBasedThresholdNotifier.Config(100, 10 * 60));
 
     this.internalKafka = new KafkaProtoProducer(internalConfig);
+    this.rawApiFactory = new RawApiMetadataFactory();
   }
 
   public void run() {
@@ -174,6 +178,9 @@ public class MaliciousTrafficDetectorTask implements Task {
 
     String message = responseParam.getOrig();
     RawApi rawApi = RawApi.buildFromMessageNew(responseParam);
+    RawApiMetadata metadata = this.rawApiFactory.buildFromHttp(rawApi.getRequest(), rawApi.getResponse());
+    rawApi.setRawApiMetdata(metadata);
+
     int apiCollectionId = httpCallParser.createApiCollectionId(responseParam);
     responseParam.requestParams.setApiCollectionId(apiCollectionId);
     String url = responseParam.getRequestParams().getURL();

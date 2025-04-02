@@ -13,6 +13,8 @@ import com.akto.threat.detection.tasks.MaliciousTrafficDetectorTask;
 import com.akto.threat.detection.tasks.SendMaliciousEventsToBackend;
 import com.mongodb.ConnectionString;
 import io.lettuce.core.RedisClient;
+
+
 import org.flywaydb.core.Flyway;
 import org.hibernate.SessionFactory;
 
@@ -20,7 +22,7 @@ public class Main {
 
   private static final String CONSUMER_GROUP_ID = "akto.threat_detection";
 
-  public static void main(String[] args) {
+  public static void main(String[] args) throws Exception {
     runMigrations();
 
     SessionFactory sessionFactory = SessionFactoryUtils.createFactory();
@@ -86,4 +88,5 @@ public class Main {
 
     flyway.migrate();
   }
+
 }
