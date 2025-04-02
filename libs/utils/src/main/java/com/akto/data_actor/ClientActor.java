@@ -3555,16 +3555,16 @@ public class ClientActor extends DataActor {
         Map<String, List<String>> headers = buildHeaders();
         BasicDBObject obj = new BasicDBObject();
         obj.put("testingRunPlayground", testingRunPlayground);
-        OriginalHttpRequest request = new OriginalHttpRequest(url + "/setTestingRunStateAndResult", "", "POST",  obj.toString(), headers, "");
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/updateTestingRunPlaygroundStateAndResult", "", "POST",  obj.toString(), headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
             String responsePayload = response.getBody();
             if (response.getStatusCode() != 200 || responsePayload == null) {
-                loggerMaker.errorAndAddToDb("non 2xx response in setTestingRunStateAndResult", LoggerMaker.LogDb.TESTING);
+                loggerMaker.errorAndAddToDb("non 2xx response in updateTestingRunPlaygroundStateAndResult", LoggerMaker.LogDb.TESTING);
                 return;
             }
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("error in setTestingRunStateAndResult" + e, LoggerMaker.LogDb.RUNTIME);
+            loggerMaker.errorAndAddToDb("error in updateTestingRunPlaygroundStateAndResult" + e, LoggerMaker.LogDb.RUNTIME);
             return;
         }
     }

@@ -1234,7 +1234,7 @@
             </result>
         </action>
 
-        <action name="api/setTestingRunStateAndResult" class="com.akto.action.DbAction" method="setTestingRunStateAndResult">
+        <action name="api/updateTestingRunPlaygroundStateAndResult" class="com.akto.action.DbAction" method="updateTestingRunPlaygroundStateAndResult">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS" type="json"/>
