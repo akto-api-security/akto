@@ -17,19 +17,14 @@ import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.SingleTypeInfo.SubType;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-import com.mongodb.BasicDBObject;
-import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.UpdateOneModel;
 import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
 import com.mongodb.client.model.WriteModel;
 
 import org.bson.conversions.Bson;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public class PayloadAnalyzer {
-    private static final Logger logger = LoggerFactory.getLogger(PayloadAnalyzer.class);
     private static final LoggerMaker loggerMaker = new LoggerMaker(PayloadAnalyzer.class);
     private static EndpointInfo endpointInfo = null;
 
@@ -54,7 +49,7 @@ public class PayloadAnalyzer {
                 Context.accountId.set(accountId);
                 EndpointInfo temp = endpointInfo;
                 endpointInfo = new EndpointInfo(new HashMap<>());
-                logger.info("gathering updates");
+                loggerMaker.info("gathering updates");
                 ArrayList<WriteModel<SingleTypeInfo>> bulkUpdates = new ArrayList<>();
 
                 for(Map<String, RequestTemplate> methodToTemplate: temp.getAllEndpoints().values()) {
@@ -85,11 +80,11 @@ public class PayloadAnalyzer {
                         loggerMaker.errorAndAddToDb(e.toString(), LogDb.RUNTIME);
                     }
                 }
-                logger.info("updates completed");
+                loggerMaker.info("updates completed");
             }
             
         }, 5, 10, TimeUnit.SECONDS); 
 
-        logger.info("update service scheduled");
+        loggerMaker.info("update service scheduled");
     }
 }
