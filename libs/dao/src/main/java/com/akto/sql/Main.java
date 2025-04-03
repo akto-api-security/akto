@@ -9,6 +9,8 @@ import java.util.UUID;
 import javax.sql.DataSource;
 
 import org.postgresql.ds.PGSimpleDataSource;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.akto.dao.context.Context;
 import com.akto.dto.sql.SampleDataAlt;
@@ -24,6 +26,8 @@ public class Main {
     final static String password = 
     System.getenv("POSTGRES_PASSWORD");
     // "example";
+    
+    private static final Logger logger = LoggerFactory.getLogger(Main.class);
 
     public static void main(String args[]) {
 
@@ -84,14 +88,18 @@ public class Main {
     private static boolean postgresConnected = false;
 
     public static boolean isPostgresConnected() {
+        int now = Context.now();
         try {
-            int now = Context.now();
             if ((lastPing + PING_INTERVAL) <= now) {
                 lastPing = now;
                 getConnection();
                 postgresConnected = true;
+                logger.info("established postgres connection lastPing: " + lastPing + " now: " + now );
             }
+            logger.info("reusing existing postgres connection isConnected: " + postgresConnected + " lastPing: " + lastPing + " now: " + now );
         } catch (Exception e) {
+            e.printStackTrace();
+            logger.error("error establishing postgres connection now: " + now + " error: " + e.getMessage());
         }
         return postgresConnected;
     }
@@ -112,6 +120,7 @@ public class Main {
         final String url = connectionUri;
         final PGSimpleDataSource dataSource = new PGSimpleDataSource();
         if (connectionUri == null || user == null || password == null) {
+            logger.info("createDataSource values: " + connectionUri + " user: " + user + " password: " + password );
             return dataSource;
         }
         dataSource.setUrl(url);
@@ -125,7 +134,7 @@ public class Main {
         return ds.getConnection();
     }
 
-    public static void createSampleDataTable() {
+    public static void createSampleDataTable() throws Exception {
         DataSource ds = createDataSource();
 
         try {
@@ -146,7 +155,8 @@ public class Main {
 
         } catch (Exception e) {
             e.printStackTrace();
-            System.err.println(e.getClass().getName() + ": " + e.getMessage());
+            System.err.println("create table operation failed " +  e.getClass().getName() + ": " + e.getMessage());
+            throw e;
         }
     }
 
