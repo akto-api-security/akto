@@ -623,7 +623,6 @@ public class TestExecutor {
             SingleTestPayload singleTestPayload = new SingleTestPayload(
                 testingRun.getId(), summaryId, apiInfoKey, testSubType, testLogs, accountId
             );
-            totalRecords.incrementAndGet();
             if(Constants.KAFKA_DEBUG_MODE){
                 logger.info("Inserting record for apiInfoKey: " + apiInfoKey.toString() + " subcategory: " + testSubType);
             }
