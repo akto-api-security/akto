@@ -143,7 +143,7 @@ public class ConsumerUtil {
             ParallelConsumerOptions<String, String> options = ParallelConsumerOptions.<String, String>builder()
                 .consumer(consumer)
                 .ordering(ParallelConsumerOptions.ProcessingOrder.UNORDERED) // Use unordered for parallelism
-                .maxConcurrency(100) // Number of threads for parallel processing
+                .maxConcurrency(instance.getMaxConcurrentRequest()) // Number of threads for parallel processing
                 .commitMode(ParallelConsumerOptions.CommitMode.PERIODIC_CONSUMER_SYNC) // Commit offsets synchronously
                 .batchSize(1) // Number of records to process in each poll
                 .maxFailureHistory(3)
