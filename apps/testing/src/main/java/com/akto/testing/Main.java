@@ -374,6 +374,12 @@ public class Main {
     }
 
     public static void main(String[] args) throws InterruptedException {
+        if ("true".equalsIgnoreCase(System.getenv("TESTING_JOB_MODE"))) {
+            SubmitTestingJob submitTestingJob = new SubmitTestingJob();
+            submitTestingJob.submitTestingJob();
+            System.exit(0);
+        }    
+
         String mongoURI = System.getenv("AKTO_MONGO_CONN");
         ReadPreference readPreference = ReadPreference.primary();
         WriteConcern writeConcern = WriteConcern.W1;

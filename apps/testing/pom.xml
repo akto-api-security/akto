@@ -13,9 +13,14 @@
     <groupId>com.akto.apps.testing</groupId>
     <artifactId>testing</artifactId>
     <packaging>jar</packaging>
-
-
+    
     <dependencies>
+        <dependency>
+            <groupId>com.google.cloud</groupId>
+            <artifactId>google-cloud-batch</artifactId>
+            <version>0.60.0</version>
+        </dependency>
+        
         <dependency>
             <groupId>com.akto.libs.dao</groupId>
             <artifactId>dao</artifactId>
@@ -33,6 +38,7 @@
             <version>${project.version}</version>
             <scope>test</scope>
         </dependency>
+    
     </dependencies>
 
     <build>
