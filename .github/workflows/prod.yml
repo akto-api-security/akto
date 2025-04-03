@@ -8,7 +8,20 @@ on:
   workflow_dispatch:
     inputs:
       release_version:
+        description: 'Release version for the deployment'
         required: true
+      mini-runtime:
+        type: boolean
+        default: true
+        description: Mini-Runtime
+      mini-testing:
+        type: boolean
+        default: true
+        description: Mini-Testing
+      testing-db-layer:
+        type: boolean
+        default: true
+        description: Testing-Db-Layer
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
@@ -31,7 +44,58 @@ jobs:
           node-version: '17'
 
       - name: mvn package command
-        run: mvn package -DskipTests
+        run: mvn package
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{secrets.AWS_ACCESS_KEY_ID}}
+          aws-secret-access-key: ${{secrets.AWS_SECRET_ACCESS_KEY}}
+          aws-region: ap-south-1
+
+      - name: Configure AWS Credentials for ECR
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{secrets.AWS_ACCESS_KEY_ID}}
+          aws-secret-access-key: ${{secrets.AWS_SECRET_ACCESS_KEY}}
+          aws-region: us-east-1
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+        with:
+          mask-password: 'true'
+          registry-type: public
+
+      - name: Build, tag, and push docker image to Amazon ECR
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: akto-api-security
+          REGISTRY_ALIAS: p7q3h0z2
+          IMAGE_TAG: latest
+          IMAGE_TAG1: testruntime
+          IMAGE_TAG2: local
+          IMAGE_TAG3: ${{ github.event.inputs.release_version }}_local
+        run: |
+          docker buildx create --use
+          # Build a docker container and push it to DockerHub 
+          cd apps/mini-runtime
+          if [[ "${{ github.event.inputs.mini-runtime }}" == "true" ]]; then
+            cd ../mini-runtime
+            docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-api-security-mini-runtime:$IMAGE_TAG -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-api-security-mini-runtime:$IMAGE_TAG1 -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-api-security-mini-runtime:$IMAGE_TAG2 -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-api-security-mini-runtime:$IMAGE_TAG3 . --push
+            echo "::set-output name=image::$ECR_REGISTRY/akto-api-security-mini-runtime:$IMAGE_TAG"
+          fi
+
+          if [[ "${{ github.event.inputs.mini-testing }}" == "true" ]]; then
+            cd ../mini-testing
+            docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-api-security-mini-testing:$IMAGE_TAG -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-api-security-mini-testing:$IMAGE_TAG1 -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-api-security-mini-testing:$IMAGE_TAG2 -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-api-security-mini-testing:$IMAGE_TAG3 . --push
+            echo "::set-output name=image::$ECR_REGISTRY/akto-api-security-mini-testing:$IMAGE_TAG3"
+          fi
+
+          if [[ "${{ github.event.inputs.testing-db-layer }}" == "true" ]]; then
+            cd ../testing-db-layer
+            docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-api-security-testing-db-layer:$IMAGE_TAG -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-api-security-testing-db-layer:$IMAGE_TAG1 -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-api-security-testing-db-layer:$IMAGE_TAG2 -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-api-security-testing-db-layer:$IMAGE_TAG3 . --push
+            echo "::set-output name=image::$ECR_REGISTRY/akto-api-security-testing-db-layer:$IMAGE_TAG3"
+          fi
 
       - name: DockerHub login
         env:
@@ -44,13 +108,26 @@ jobs:
         env:
           ECR_REGISTRY: aktosecurity
           ECR_REPOSITORY: akto-api-security
-          IMAGE_TAG: temp-latest
-          IMAGE_TAG1: temp-testruntime
-          IMAGE_TAG2: temp-local
-          IMAGE_TAG3: latest-improved-testing-performance
+          IMAGE_TAG: latest
+          IMAGE_TAG1: testruntime
+          IMAGE_TAG2: local
+          IMAGE_TAG3: ${{ github.event.inputs.release_version }}_local
         run: |
           echo $IMAGE_TAG >> $GITHUB_STEP_SUMMARY
           docker buildx create --use
           # Build a docker container and push it to DockerHub 
-          cd apps/mini-testing
-          docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/mini-testing:$IMAGE_TAG -t $ECR_REGISTRY/mini-testing:$IMAGE_TAG1 -t $ECR_REGISTRY/mini-testing:$IMAGE_TAG2 -t $ECR_REGISTRY/mini-testing:$IMAGE_TAG3 . --push
+          cd apps/mini-runtime
+          if [[ "${{ github.event.inputs.mini-runtime }}" == "true" ]]; then
+            cd ../mini-runtime
+            docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/mini-runtime:$IMAGE_TAG -t $ECR_REGISTRY/mini-runtime:$IMAGE_TAG1 -t $ECR_REGISTRY/mini-runtime:$IMAGE_TAG2 -t $ECR_REGISTRY/mini-runtime:$IMAGE_TAG3 . --push
+          fi
+
+          if [[ "${{ github.event.inputs.mini-testing }}" == "true" ]]; then
+            cd ../mini-testing
+            docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/mini-testing:$IMAGE_TAG -t $ECR_REGISTRY/mini-testing:$IMAGE_TAG1 -t $ECR_REGISTRY/mini-testing:$IMAGE_TAG2 -t $ECR_REGISTRY/mini-testing:$IMAGE_TAG3 . --push
+          fi
+
+          if [[ "${{ github.event.inputs.testing-db-layer }}" == "true" ]]; then
+            cd ../testing-db-layer
+            docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/testing-db-layer:$IMAGE_TAG -t $ECR_REGISTRY/testing-db-layer:$IMAGE_TAG1 -t $ECR_REGISTRY/testing-db-layer:$IMAGE_TAG2 -t $ECR_REGISTRY/testing-db-layer:$IMAGE_TAG3 . --push
+          fi
