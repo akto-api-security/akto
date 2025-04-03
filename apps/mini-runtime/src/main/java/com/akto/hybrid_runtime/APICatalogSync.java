@@ -26,6 +26,7 @@ import com.akto.dto.type.SingleTypeInfo.SubType;
 import com.akto.dto.type.SingleTypeInfo.SuperType;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.dto.usage.MetricTypes;
+import com.akto.hybrid_runtime.filter_updates.FilterUpdates;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.metrics.AllMetrics;
@@ -1618,6 +1619,16 @@ public class APICatalogSync {
 
             SingleTypeInfo dbInfo = dbInfoMap.get(key);
             SingleTypeInfo deltaInfo = deltaInfoMap.get(key);
+
+            try {
+                boolean isEligible = FilterUpdates.isEligibleForUpdate(deltaInfo.getApiCollectionId(), deltaInfo.getUrl(), deltaInfo.getMethod(), deltaInfo.getParam());
+                if (!isEligible) {
+                    continue;
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+                loggerMaker.errorAndAddToDb("error evaluating if sti param is eligible for update " + e.getMessage());
+            }
 
             if (deltaInfo.getParam().equalsIgnoreCase("host")) {
                 if (dbInfo == null) {
