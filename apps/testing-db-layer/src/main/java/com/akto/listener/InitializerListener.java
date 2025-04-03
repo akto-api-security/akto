@@ -13,15 +13,16 @@ public class InitializerListener implements ServletContextListener {
 //    private final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
     private static final Logger logger = LoggerFactory.getLogger(InitializerListener.class);
     int MAX_RETRIES = 10;
-    int SLEEP_DURATION = 1000;
+    int SLEEP_DURATION = 2000;
 
     @Override
     public void contextInitialized(javax.servlet.ServletContextEvent sce) {
 
-        for (int i = 0; i < MAX_RETRIES; i++) {
+        for (int i = 1; i <= MAX_RETRIES; i++) {
             try {
                 logger.info("initiate create sample data table operation");
                 com.akto.sql.Main.createSampleDataTable();
+                break;
             } catch(Exception e){
                 e.printStackTrace();
                 logger.error("Error creating sample data table" + e.getMessage());
@@ -34,10 +35,11 @@ public class InitializerListener implements ServletContextListener {
             }
         }
 
-        for (int i = 0; i < MAX_RETRIES; i++) {
+        for (int i = 1; i <= MAX_RETRIES; i++) {
             try {
                 logger.info("initiate create index operation");
                 SampleDataAltDb.createIndex();
+                break;
             } catch(Exception e){
                 e.printStackTrace();
                 logger.error("Error creating index" + e.getMessage());
