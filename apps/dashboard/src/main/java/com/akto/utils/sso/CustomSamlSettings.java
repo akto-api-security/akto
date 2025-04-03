@@ -16,8 +16,11 @@ public class CustomSamlSettings {
 
     public static CustomSamlSettings getInstance(ConfigType configType, int accountId) {
         CustomSamlSettings instance = instances.getOrDefault(configType, new CustomSamlSettings());
-        SAMLConfig samlConfig = SsoUtils.findSAMLConfig(configType, accountId);
-        instance.samlConfig = samlConfig;
+        if(instance.samlConfig == null) {
+            SAMLConfig samlConfig = SsoUtils.findSAMLConfig(configType, accountId);;
+            instance.samlConfig = samlConfig;
+        }
+
         return instance;
     }
 
@@ -25,7 +28,11 @@ public class CustomSamlSettings {
         return samlConfig;
     }
 
-    private static Saml2Settings buildSamlSettingsMap (SAMLConfig samlConfig){
+    public void setSamlConfig(SAMLConfig samlConfig) {
+        this.samlConfig = samlConfig;
+    }
+
+    public static Saml2Settings buildSamlSettingsMap (SAMLConfig samlConfig){
         Map<String, Object> samlData = new HashMap<>();
         samlData.put("onelogin.saml2.sp.entityid", samlConfig.getApplicationIdentifier());
         samlData.put("onelogin.saml2.idp.single_sign_on_service.url", samlConfig.getLoginUrl());

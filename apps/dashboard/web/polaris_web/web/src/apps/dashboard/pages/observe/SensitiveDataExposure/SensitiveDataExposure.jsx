@@ -169,6 +169,8 @@ function SensitiveDataExposure() {
         }
     ]
 
+    const filtersMap = PersistStore(state => state.filtersMap)
+
     const handleCreateCollection = async(collectionName) => {
         const filterOperators = {
             "endpoint": "OR",
@@ -182,7 +184,21 @@ function SensitiveDataExposure() {
         setLoading(true)
         const apiInfosSet = new Set()
         let apisList = []
-        await api.fetchChanges('timestamp', -1, 0, 100000, [], filterOperators, startTimestamp, endTimestamp, true, false).then((res) => {
+        let filters = {
+            "subType": [subType],
+            "apiCollectionId": [],
+            "location": [],
+            "collectionIds": []
+        }
+        Object.values(filtersMap)?.forEach(({ filters: filterArray }) => {
+            filterArray?.forEach(({ key, value }) => {
+                if (filters.hasOwnProperty(key)) {
+                    filters[key] = [...new Set([...filters[key], ...value])]
+                }
+            })
+        })
+        filters['subType'] = [subType]
+        await api.fetchChanges('timestamp', -1, 0, 100000, filters, filterOperators, startTimestamp, endTimestamp, true, false).then((res) => {
             
             res.endpoints.forEach(x => {
                 let stringId = x.apiCollectionId + "####" + x.method + "###" + x.url
