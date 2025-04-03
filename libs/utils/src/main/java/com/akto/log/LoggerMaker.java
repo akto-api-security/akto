@@ -36,6 +36,7 @@ public class LoggerMaker  {
     private static final DataActor dataActor = DataActorFactory.fetchInstance();
 
     protected static final Logger internalLogger = LoggerFactory.getLogger(LoggerMaker.class);
+    private static final boolean shouldNotSendTestingLogs = System.getenv("BLOCK_LOGS") != null && System.getenv("BLOCK_LOGS").equals("true");
 
     static {
         scheduler.scheduleAtFixedRate(new Runnable() {
@@ -183,6 +184,9 @@ public class LoggerMaker  {
         String infoMessage = "acc: " + accountId + ", " + info;
         logger.info(infoMessage);
         try{
+            if(db == LogDb.TESTING && shouldNotSendTestingLogs){
+                return;
+            }   
             insert(infoMessage, "info",db);
         } catch (Exception e){
 
