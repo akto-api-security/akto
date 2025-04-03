@@ -3,14 +3,19 @@ package com.akto.testing.kafka_utils;
 import java.util.Collections;
 import java.util.List;
 import java.util.Properties;
+import java.util.Set;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.kafka.clients.admin.DeleteTopicsResult;
 import org.apache.kafka.clients.admin.ListTopicsResult;
 import org.apache.kafka.clients.admin.NewTopic;
+import org.apache.kafka.clients.admin.TopicDescription;
 import org.bson.types.ObjectId;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.akto.dto.billing.SyncLimit;
 import com.akto.dto.testing.TestingRun;
@@ -21,11 +26,13 @@ import com.akto.util.Constants;
 
 public class Producer {
 
+    private static final Logger logger = LoggerFactory.getLogger(Producer.class);
+
     public static final Kafka producer = Constants.IS_NEW_TESTING_ENABLED ?  new Kafka(Constants.LOCAL_KAFKA_BROKER_URL, Constants.LINGER_MS_KAFKA, 100, Constants.MAX_REQUEST_TIMEOUT) : null;
-    public static Void pushMessagesToKafka(List<SingleTestPayload> messages){
+    public static Void pushMessagesToKafka(List<SingleTestPayload> messages, AtomicInteger totalRecords){
         for(SingleTestPayload singleTestPayload: messages){
             String messageString = singleTestPayload.toString();
-            producer.send(messageString, Constants.TEST_RESULTS_TOPIC_NAME);
+            producer.send(messageString, Constants.TEST_RESULTS_TOPIC_NAME, totalRecords);
         }
         return null;
     }
@@ -33,26 +40,36 @@ public class Producer {
     private static void deleteTopic(String bootstrapServers, String topicName) 
             throws ExecutionException, InterruptedException {
 
-        // 1) Build properties for AdminClient
         Properties adminProps = new Properties();
         adminProps.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
-
-        // 2) Create AdminClient
         try (AdminClient adminClient = AdminClient.create(adminProps)) {
-            
-            // 3) Check if topic exists
             ListTopicsResult listTopicsResult = adminClient.listTopics();
             if (!listTopicsResult.names().get().contains(topicName)) {
-                System.out.println("Topic \"" + topicName + "\" does not exist.");
+                logger.info("Topic \"" + topicName + "\" does not exist.");
                 return;
             }
-            
-            // 4) Delete the topic
             DeleteTopicsResult deleteTopicsResult = adminClient.deleteTopics(Collections.singletonList(topicName));
-            deleteTopicsResult.all().get(); // Wait for deletion to complete
+            deleteTopicsResult.all().get();
+            logger.info("Topic \"" + topicName + "\" deletion initiated.");
 
-            System.out.println("Topic \"" + topicName + "\" has been deleted successfully.");
-            Thread.sleep(3000); 
+            int retries = 0;
+            int maxRetries = 8;
+            int baseBackoff = 500;
+
+            while (retries < maxRetries) {
+                Thread.sleep((long) (baseBackoff * Math.pow(2, retries)));
+                retries++;
+
+                Set<String> topics = adminClient.listTopics().names().get();
+                if (!topics.contains(topicName)) {
+                    logger.info("Confirmed topic \"" + topicName + "\" is deleted on retry attempt: " + retries);
+                    return;
+                }
+
+                logger.info("Waiting for topic \"" + topicName + "\" to be fully deleted... retry attempt: " + retries);
+            }
+
+            throw new RuntimeException("Topic deletion not confirmed after retries.");
         }
     }
 
@@ -62,14 +79,33 @@ public class Producer {
         adminProps.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
 
         try (AdminClient adminClient = AdminClient.create(adminProps)) {
-            ListTopicsResult listTopicsResult = adminClient.listTopics();
-            if (!listTopicsResult.names().get().contains(topicName)) {
-                System.out.println("Topic \"" + topicName + "\" does not exist.");
-                return;
-            }
-            NewTopic newTopic = new NewTopic(topicName, 1, (short) 1);  // Partitions = 1, Replicas = 1
+            NewTopic newTopic = new NewTopic(topicName, 1, (short) 1); 
             adminClient.createTopics(Collections.singletonList(newTopic)).all().get();
-            System.out.println("Topic \"" + topicName + "\" created successfully.");
+            logger.info("Topic \"" + topicName + "\" creation initiated.");
+
+            int retries = 0;
+            int maxRetries = 8;
+            int baseBackoff = 500; // ms
+
+            while (retries < maxRetries) {
+                Thread.sleep((long) (baseBackoff * Math.pow(2, retries)));
+                retries++;
+
+                try {
+                    TopicDescription description = adminClient.describeTopics(Collections.singletonList(topicName)).all().get().get(topicName);
+                    boolean allHaveLeaders = description.partitions().stream().allMatch(p -> p.leader() != null);
+                    if (allHaveLeaders) {
+                        logger.info("Confirmed topic \"" + topicName + "\" has leader assigned on retry attempt: " + retries);
+                        return;
+                    }
+                } catch (Exception e) {
+                    logger.warn("Retry {}: Topic metadata not ready yet - {}", retries, e.getMessage());
+                }
+
+                logger.info("Waiting for topic \"" + topicName + "\" to be fully created with leader on retry attempt: " + retries);
+            }
+
+            throw new RuntimeException("Topic creation not confirmed after retries.");
         }
     }
 
