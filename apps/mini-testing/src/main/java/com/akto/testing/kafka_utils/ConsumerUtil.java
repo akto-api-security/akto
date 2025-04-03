@@ -10,10 +10,10 @@ import java.util.Properties;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.kafka.clients.consumer.*;
 import org.bson.types.ObjectId;
@@ -22,8 +22,6 @@ import org.slf4j.LoggerFactory;
 
 import com.akto.crons.GetRunningTestsStatus;
 import com.akto.dao.context.Context;
-import com.akto.data_actor.DataActor;
-import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.test_editor.TestConfig;
@@ -32,8 +30,6 @@ import com.akto.dto.testing.TestResult.TestError;
 import com.akto.dto.testing.info.SingleTestPayload;
 import com.akto.log.LoggerMaker;
 import com.akto.sql.SampleDataAltDb;
-// import com.akto.notifications.slack.CustomTextAlert;
-// import com.akto.testing.Main;
 import com.akto.testing.TestExecutor;
 import com.akto.testing.Utils;
 import com.akto.util.Constants;
@@ -54,6 +50,7 @@ public class ConsumerUtil {
     private static final Logger logger = LoggerFactory.getLogger(ConsumerUtil.class);
     private static final LoggerMaker loggerMaker = new LoggerMaker(ConsumerUtil.class);
     public static ExecutorService executor = Executors.newFixedThreadPool(150);
+    private static final int maxRunTimeForTests = 5 * 60;
 
     public static SingleTestPayload parseTestMessage(String message) {
         JSONObject jsonObject = JSON.parseObject(message);
@@ -121,8 +118,6 @@ public class ConsumerUtil {
         final ObjectId summaryObjectId = new ObjectId(summaryIdForTest);
         final int startTime = Context.now();
         AtomicBoolean firstRecordRead = new AtomicBoolean(false);
-        AtomicInteger maxRetries = new AtomicInteger(0);
-        AtomicInteger countVal = new AtomicInteger(0);
 
         boolean isConsumerRunning = false;
         if(currentTestInfo != null){
@@ -138,7 +133,7 @@ public class ConsumerUtil {
             ParallelConsumerOptions<String, String> options = ParallelConsumerOptions.<String, String>builder()
                 .consumer(consumer)
                 .ordering(ParallelConsumerOptions.ProcessingOrder.UNORDERED) // Use unordered for parallelism
-                .maxConcurrency(150) // Number of threads for parallel processing
+                .maxConcurrency(instance.getMaxConcurrentRequest()) // Number of threads for parallel processing
                 .commitMode(ParallelConsumerOptions.CommitMode.PERIODIC_CONSUMER_SYNC) // Commit offsets synchronously
                 .batchSize(1) // Number of records to process in each poll
                 .maxFailureHistory(3)
@@ -146,15 +141,6 @@ public class ConsumerUtil {
 
             parallelConsumer = ParallelStreamProcessor.createEosStreamProcessor(options);
             parallelConsumer.subscribe(Arrays.asList(topicName)); 
-            // if (StringUtils.hasLength(Main.AKTO_SLACK_WEBHOOK) ) {
-            //     try {
-            //         CustomTextAlert customTextAlert = new CustomTextAlert("Tests being picked for execution" + currentTestInfo.getInt("accountId") + " summaryId=" + summaryIdForTest);
-            //         Main.SLACK_INSTANCE.send(Main.AKTO_SLACK_WEBHOOK, customTextAlert.toJson());
-            //     } catch (Exception e) {
-            //         logger.error("Error sending slack alert for completion of test", e);
-            //     }
-                
-            // }
         }
 
         try {
@@ -167,18 +153,17 @@ public class ConsumerUtil {
                         Future<?> future = executor.submit(() -> runTestFromMessage(message));
                         firstRecordRead.set(true);
                         try {
-                            future.get(5, TimeUnit.MINUTES); 
+                            future.get(maxRunTimeForTests, TimeUnit.SECONDS); 
                         } catch (InterruptedException e) {
-                            loggerMaker.insertImportantTestingLog("Test is timed out");
-                            future.cancel(true);
-                            if(!executor.isShutdown()){
-                                createTimedOutResultFromMessage(message);
-                            }
-                            
-                        } catch(TimeoutException e){
-                            loggerMaker.insertImportantTestingLog("Test is timed out");
+                            logger.error("Task timed out");
                             future.cancel(true);
                             createTimedOutResultFromMessage(message);
+                        } catch(TimeoutException e){
+                            logger.error("Task timed out");
+                            future.cancel(true);
+                            createTimedOutResultFromMessage(message);
+                        } catch(RejectedExecutionException e){
+                            future.cancel(true);
                         } catch (Exception e) {
                             logger.error("Error in task execution: " + message, e);
                         }
@@ -190,10 +175,6 @@ public class ConsumerUtil {
             });
 
             while (parallelConsumer != null) {
-                if(countVal.get() % 100 == 0){
-                    countVal.set(0);
-                    logger.info("Total work remaining now is: " + parallelConsumer.workRemaining());
-                }
                 if(!GetRunningTestsStatus.getRunningTests().isTestRunning(summaryObjectId)){
                     logger.info("Tests have been marked stopped.");
                     executor.shutdownNow();
@@ -204,14 +185,10 @@ public class ConsumerUtil {
                     executor.shutdownNow();
                     break;
                 }else if(firstRecordRead.get() && parallelConsumer.workRemaining() == 0){
-                    if(maxRetries.get() < 3){
-                        maxRetries.incrementAndGet();
-                    }else{
-                        logger.info("Records are empty now, thus executing final tests");
-                        executor.shutdown();
-                        executor.awaitTermination(maxRunTimeInSeconds, TimeUnit.SECONDS);
-                        break;
-                    }
+                    logger.info("Records are empty now, thus executing final tests");
+                    executor.shutdown();
+                    executor.awaitTermination(180 + maxRunTimeForTests, TimeUnit.SECONDS);
+                    break;
                 }
                 Thread.sleep(100);
             }

@@ -6,6 +6,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Properties;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class Kafka {
     private static final Logger logger = LoggerFactory.getLogger(Kafka.class);
@@ -28,6 +29,13 @@ public class Kafka {
         } catch (Exception e) {
             e.printStackTrace();
         }
+    }
+
+    public void send (String message, String topic, AtomicInteger counter){
+        if(!this.producerReady) return;
+        ProducerRecord<String, String> record = new ProducerRecord<>(topic, message);
+        producer.send(record, new DemoProducerCallback());
+        counter.incrementAndGet();
     }
 
     public void send(String message,String topic) {
