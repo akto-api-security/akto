@@ -39,7 +39,7 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.sql.SampleDataAltDb;
 import com.akto.test_editor.filter.Filter;
 import com.akto.test_editor.filter.data_operands_impl.ValidationResult;
-import com.akto.usage.UsageMetricCalculator;
+import com.akto.testing_db_layer_client.ClientLayer;
 import com.akto.util.JSONUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mongodb.BasicDBList;
@@ -55,6 +55,8 @@ import static com.akto.test_editor.execution.Operations.modifyCookie;
 public class Utils {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(Utils.class);
+    private static final ClientLayer clientLayer = new ClientLayer();
+    private static final boolean shouldCallClientLayerForSampleData = System.getenv("TESTING_DB_LAYER_SERVICE_URL") != null && !System.getenv("TESTING_DB_LAYER_SERVICE_URL").isEmpty();
 
     public static void populateValuesMap(Map<String, Object> valuesMap, String payloadStr, String nodeId, Map<String,
             List<String>> headers, boolean isRequest, String queryParams) {
@@ -547,9 +549,11 @@ public class Utils {
         List<GenericTestResult> testResults = new ArrayList<>();
         String failMessage = errorMessage;
         String msg = null;
-        try {
-            msg = SampleDataAltDb.findLatestSampleByApiInfoKey(apiInfoKey) ;
-        } catch (Exception e) {
+        if(shouldCallClientLayerForSampleData){
+            try {
+                msg = clientLayer.fetchLatestSample(apiInfoKey);
+            } catch (Exception e) {
+            }   
         }
         
         if(!StringUtils.hasLength(failMessage) && (messages == null || messages.isEmpty()) && msg == null){
