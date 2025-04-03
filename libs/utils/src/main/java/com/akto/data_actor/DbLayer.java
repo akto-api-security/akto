@@ -1050,4 +1050,8 @@ public class DbLayer {
         return DependencyNodeDao.instance.findAll(delFilterQ);
     }
 
+    public static TestingRunResultSummary findLatestTestingRunResultSummary(Bson filter){
+        return TestingRunResultSummariesDao.instance.findLatestOne(filter);
+    }
+
 }
