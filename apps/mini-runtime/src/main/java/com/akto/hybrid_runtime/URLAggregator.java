@@ -12,7 +12,7 @@ import com.akto.log.LoggerMaker;
 
 public class URLAggregator {
 
-    private static final LoggerMaker loggerMaker = new LoggerMaker(Main.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(URLAggregator.class);
 
     ConcurrentMap<URLStatic, Set<HttpResponseParams>> urls;
 
