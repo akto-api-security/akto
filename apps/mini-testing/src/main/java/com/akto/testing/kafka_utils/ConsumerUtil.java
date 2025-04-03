@@ -185,9 +185,10 @@ public class ConsumerUtil {
                     executor.shutdownNow();
                     break;
                 }else if(firstRecordRead.get() && parallelConsumer.workRemaining() == 0){
+                    int remainingTime = Math.max(0,maxRunTimeInSeconds - (Context.now() - startTime));
                     logger.info("Records are empty now, thus executing final tests");
                     executor.shutdown();
-                    executor.awaitTermination(180 + maxRunTimeForTests, TimeUnit.SECONDS);
+                    executor.awaitTermination(remainingTime, TimeUnit.SECONDS);
                     break;
                 }
                 Thread.sleep(100);
