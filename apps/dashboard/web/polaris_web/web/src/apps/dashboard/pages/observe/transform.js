@@ -233,7 +233,11 @@ const transform = {
                         "value": "x-akto-decode",
                         "wholeRow": true,
                         "className": "akto-decoded",
+                        "highlight": true,
                     },
+                    "responseCode": -1,
+                    "header": 'x-akto-decode',
+                    "param": "x-akto-decode",
                 })
             }
             paths.push({message:c, highlightPaths:highlightPaths}); 
