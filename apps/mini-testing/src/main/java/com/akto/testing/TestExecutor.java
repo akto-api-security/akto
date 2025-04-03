@@ -29,7 +29,6 @@ import com.akto.dto.type.URLMethods.Method;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.metrics.AllMetrics;
-import com.akto.sql.SampleDataAltDb;
 import com.akto.store.AuthMechanismStore;
 import com.akto.store.SampleMessageStore;
 import com.akto.store.TestingUtil;
@@ -70,11 +69,11 @@ public class TestExecutor {
 
     private static final DataActor dataActor = DataActorFactory.fetchInstance();
 
-    private static Map<String, Map<String, Integer>> requestRestrictionMap = new ConcurrentHashMap<>();
     public static final String REQUEST_HOUR = "requestHour";
     public static final String COUNT = "count";
     public static final int ALLOWED_REQUEST_PER_HOUR = 100;
     private static final ClientLayer clientLayer = new ClientLayer();
+    private static final boolean shouldCallClientLayerForSampleData = System.getenv("TESTING_DB_LAYER_SERVICE_URL") != null && !System.getenv("TESTING_DB_LAYER_SERVICE_URL").isEmpty();
 
     public void init(TestingRun testingRun, ObjectId summaryId) {
         if (testingRun.getTestIdConfig() != 1) {
@@ -654,8 +653,11 @@ public class TestExecutor {
         }
 
         try {
-            List<String> samples = clientLayer.fetchSamples(apiInfoKey);
-            messages.addAll(samples);
+            if(shouldCallClientLayerForSampleData){
+                List<String> samples = clientLayer.fetchSamples(apiInfoKey);
+                messages.addAll(samples);
+            }
+            
         } catch (Exception e) {
             // TODO Auto-generated catch block
             //e.printStackTrace();
@@ -672,20 +674,24 @@ public class TestExecutor {
         }
 
         String message = messages.get(messages.size() - 1);
-        try {
-            long start = System.currentTimeMillis();
-            String msg = null;
+        if(shouldCallClientLayerForSampleData){
             try {
-                msg = clientLayer.fetchLatestSample(apiInfoKey);
+                long start = System.currentTimeMillis();
+                String msg = null;
+                
+                try {
+                    msg = clientLayer.fetchLatestSample(apiInfoKey);
+                } catch (Exception e) {
+                }
+                if (msg != null) {
+                    message = msg;
+                }
+                AllMetrics.instance.setSampleDataFetchLatency(System.currentTimeMillis() - start);
             } catch (Exception e) {
+                e.printStackTrace();
             }
-            if (msg != null) {
-                message = msg;
-            }
-            AllMetrics.instance.setSampleDataFetchLatency(System.currentTimeMillis() - start);
-        } catch (Exception e) {
-            e.printStackTrace();
         }
+        
         RawApi rawApi = RawApi.buildFromMessage(message);
         int startTime = Context.now();
 
