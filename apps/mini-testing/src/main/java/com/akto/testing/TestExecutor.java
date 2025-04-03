@@ -77,11 +77,11 @@ public class TestExecutor {
 
     private static final DataActor dataActor = DataActorFactory.fetchInstance();
 
-    private static Map<String, Map<String, Integer>> requestRestrictionMap = new ConcurrentHashMap<>();
     public static final String REQUEST_HOUR = "requestHour";
     public static final String COUNT = "count";
     public static final int ALLOWED_REQUEST_PER_HOUR = 100;
     private static final ClientLayer clientLayer = new ClientLayer();
+    private static final boolean shouldCallClientLayerForSampleData = System.getenv("TESTING_DB_LAYER_SERVICE_URL") != null && !System.getenv("TESTING_DB_LAYER_SERVICE_URL").isEmpty();
     public void init(TestingRun testingRun, ObjectId summaryId, SyncLimit syncLimit, boolean shouldInitOnly) {
         if (testingRun.getTestIdConfig() != 1) {
             apiWiseInit(testingRun, summaryId, false, new ArrayList<>(), syncLimit, shouldInitOnly);
@@ -211,28 +211,6 @@ public class TestExecutor {
         // Todo: Aryan? [entire for-loop] 
         ConcurrentHashMap<String, String> subCategoryEndpointMap = new ConcurrentHashMap<>();
         Map<ApiInfoKey, String> apiInfoKeyToHostMap = new HashMap<>();
-        String hostName;
-
-        // this commented in main-testing
-
-        // for (String testSubCategory: testingRun.getTestingRunConfig().getTestSubCategoryList()) {
-        //     TestConfig testConfig = testConfigMap.get(testSubCategory);
-        //     if (testConfig == null || testConfig.getStrategy() == null || testConfig.getStrategy().getRunOnce() == null) {
-        //         continue;
-        //     }
-        //     for (ApiInfo.ApiInfoKey apiInfoKey: apiInfoKeyList) {
-        //         try {
-        //             hostName = findHost(apiInfoKey, testingUtil.getSampleMessages(), testingUtil.getSampleMessageStore());
-        //             if (hostName == null) {
-        //                 continue;
-        //             }
-        //             apiInfoKeyToHostMap.put(apiInfoKey, hostName);
-        //             subCategoryEndpointMap.put(apiInfoKey.getApiCollectionId() + "_" + testSubCategory, hostName);
-        //         } catch (URISyntaxException e) {
-        //             loggerMaker.errorAndAddToDb("Error while finding host: " + e, LogDb.TESTING);
-        //         }
-        //     }
-        // }
 
         // init the singleton class here
         TestingConfigurations.getInstance().init(testingUtil, testingRun.getTestingRunConfig(), debug, testConfigMap, testingRun.getMaxConcurrentRequests());
@@ -697,19 +675,22 @@ public class TestExecutor {
 
         String testSuperType = testConfig.getInfo().getCategory().getName();
         String testSubType = testConfig.getInfo().getSubCategory();
-        try {
-            long start = System.currentTimeMillis();
-            String msg = null;
+        if(shouldCallClientLayerForSampleData){
             try {
-                msg = clientLayer.fetchLatestSample(apiInfoKey);
+                long start = System.currentTimeMillis();
+                String msg = null;
+                
+                try {
+                    msg = clientLayer.fetchLatestSample(apiInfoKey);
+                } catch (Exception e) {
+                }
+                if (msg != null) {
+                    message = msg;
+                }
+                AllMetrics.instance.setSampleDataFetchLatency(System.currentTimeMillis() - start);
             } catch (Exception e) {
+                e.printStackTrace();
             }
-            if (msg != null) {
-                message = msg;
-            }
-            AllMetrics.instance.setSampleDataFetchLatency(System.currentTimeMillis() - start);
-        } catch (Exception e) {
-            e.printStackTrace();
         }
         RawApi rawApi = RawApi.buildFromMessage(message);
         int startTime = Context.now();

@@ -136,6 +136,19 @@ public class DbLayerAction extends ActionSupport {
         return SUCCESS.toUpperCase();
     }
 
+    public String createSampleDataTable() {
+        try {
+            logger.info("initiating createSampleDataTable call");
+            com.akto.sql.Main.createSampleDataTable();
+            SampleDataAltDb.createIndex();
+        } catch(Exception e){
+            e.printStackTrace();
+            logger.error("error in createSampleDataTable " + e.getMessage());
+            return ERROR.toUpperCase();
+        }
+        return SUCCESS.toUpperCase();
+    }
+
     public List<String> getSamples() {
         return samples;
     }
