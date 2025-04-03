@@ -80,8 +80,8 @@ import com.google.gson.Gson;
 public class ClientActor extends DataActor {
 
     private static final int batchWriteLimit = 8;
-    private static final String url = buildDbAbstractorUrl();
     private static final LoggerMaker loggerMaker = new LoggerMaker(ClientActor.class);
+    private static final String url = buildDbAbstractorUrl();
     private static final int maxConcurrentBatchWrites = 150;
     private static final Gson gson = new Gson();
     private static final CodecRegistry codecRegistry = DaoInit.createCodecRegistry();
@@ -96,7 +96,7 @@ public class ClientActor extends DataActor {
         if (checkAccount()) {
             dbAbsHost = System.getenv("DATABASE_ABSTRACTOR_SERVICE_URL");
         }
-        System.out.println("dbHost value " + dbAbsHost);
+        loggerMaker.debug("dbHost value " + dbAbsHost);
         if (dbAbsHost.endsWith("/")) {
             dbAbsHost = dbAbsHost.substring(0, dbAbsHost.length() - 1);
         }
@@ -3065,10 +3065,10 @@ public class ClientActor extends DataActor {
             String decodedPayload = new String(decodedBytes);
             BasicDBObject basicDBObject = BasicDBObject.parse(decodedPayload);
             int accId = (int) basicDBObject.getInt("accountId");
-            System.out.println("checkaccount accountId log " + accId);
+            loggerMaker.debug("checkaccount accountId log " + accId);
             return accId == 1000000;
         } catch (Exception e) {
-            System.out.println("checkaccount error" + e.getStackTrace());
+            loggerMaker.error("checkaccount error" + e.getStackTrace());
         }
         return false;
     }

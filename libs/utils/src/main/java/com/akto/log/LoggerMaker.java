@@ -21,9 +21,14 @@ import java.util.concurrent.TimeUnit;
 import org.bson.conversions.Bson;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.simple.SimpleLogger;
 import com.slack.api.Slack;
 
-public class LoggerMaker  {
+public class LoggerMaker {
+    
+    static {
+        System.setProperty(SimpleLogger.DEFAULT_LOG_LEVEL_KEY, System.getenv().getOrDefault("AKTO_LOG_LEVEL", "WARN"));
+    }
 
     public static final int LOG_SAVE_INTERVAL = 60*60; // 1 hour
 
@@ -94,7 +99,6 @@ public class LoggerMaker  {
         }
 
     }
-
 
     @Deprecated
     public LoggerMaker(Class<?> c) {
@@ -276,5 +280,21 @@ public class LoggerMaker  {
                 break;
         }
         return logs;
+    }
+
+    public void info(String msg){
+        logger.info(msg);
+    }
+
+    public void error(String msg){
+        logger.error(msg);
+    }
+
+    public void error(String msg, Throwable t){
+        logger.error(msg, t);
+    }
+
+    public void debug(String msg){
+        logger.error(msg);
     }
 }
