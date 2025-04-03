@@ -256,6 +256,13 @@ public class TestExecutor {
             int tempRunTime = 10 * 60;
             if(!Constants.IS_NEW_TESTING_ENABLED){
                 tempRunTime = testingRun.getTestRunTime() <= 0 ? 30*60 : testingRun.getTestRunTime();
+            }else{
+                try {
+                    Producer.createTopic(Constants.LOCAL_KAFKA_BROKER_URL, Constants.TEST_RESULTS_TOPIC_NAME);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    logger.error("Error in creating topic", e.getMessage());
+                }
             }
 
             final int maxRunTime = tempRunTime;
@@ -643,7 +650,7 @@ public class TestExecutor {
                 logger.info("Inserting record for apiInfoKey: " + apiInfoKey.toString() + " subcategory: " + testSubType);
             }
             try {
-                Producer.pushMessagesToKafka(Arrays.asList(singleTestPayload));
+                Producer.pushMessagesToKafka(Arrays.asList(singleTestPayload), totalRecords);
             } catch (Exception e) {
                 e.printStackTrace();
                 return null;
