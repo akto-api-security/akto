@@ -16,6 +16,7 @@ import com.akto.dto.User;
 import com.akto.dto.ApiToken.Utility;
 import com.akto.dto.RBAC;
 import com.akto.dto.CollectionConditions.TestConfigsAdvancedSettings;
+import com.akto.dto.RBAC.Role;
 import com.akto.dto.test_editor.Info;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
@@ -318,8 +319,18 @@ public class StartTestAction extends UserAction {
                 int accountId = Context.accountId.get();
                 User user = AccountAction.addUserToExistingAccount("arjun@akto.io", accountId);
                 if (user != null) {
-                    RBACDao.instance.insertOne(
-                            new RBAC(user.getId(), RBAC.Role.DEVELOPER.getName(), accountId));
+                    
+                    RBACDao.instance.updateOneNoUpsert(
+                        Filters.and(
+                            Filters.eq(RBAC.USER_ID, user.getId()),
+                            Filters.eq(RBAC.ACCOUNT_ID, accountId)
+                        ),
+                        Updates.combine(
+                            Updates.set(RBAC.USER_ID, user.getId()),
+                            Updates.set(RBAC.ACCOUNT_ID, accountId),
+                            Updates.set(RBAC.ROLE, Role.DEVELOPER)
+                        )
+                    );
                 }
             }
         } catch (Exception e) {
