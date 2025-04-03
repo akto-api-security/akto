@@ -134,7 +134,7 @@ public class Main {
         return ds.getConnection();
     }
 
-    public static void createSampleDataTable() {
+    public static void createSampleDataTable() throws Exception {
         DataSource ds = createDataSource();
 
         try {
@@ -155,7 +155,8 @@ public class Main {
 
         } catch (Exception e) {
             e.printStackTrace();
-            System.err.println(e.getClass().getName() + ": " + e.getMessage());
+            System.err.println("create table operation failed " +  e.getClass().getName() + ": " + e.getMessage());
+            throw e;
         }
     }
 
