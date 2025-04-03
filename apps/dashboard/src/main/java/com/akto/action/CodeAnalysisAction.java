@@ -48,6 +48,7 @@ public class CodeAnalysisAction extends UserAction {
 
     private String projectDir;
     private String apiCollectionName;
+    private int apiCollectionId;
     private List<CodeAnalysisApi> codeAnalysisApisList;
     private CodeAnalysisRepo.SourceCodeType sourceCodeType;
     public static final int MAX_BATCH_SIZE = 100;
@@ -129,6 +130,7 @@ public class CodeAnalysisAction extends UserAction {
             apiCollection = new ApiCollection(Context.now(), apiCollectionName, Context.now(), new HashSet<>(), null, 0, false, false);
             ApiCollectionsDao.instance.insertOne(apiCollection);
         }
+        this.apiCollectionId = apiCollection.getId();
 
         /*
          * In some cases it is not possible to determine the type of template url from source code
@@ -475,5 +477,13 @@ public class CodeAnalysisAction extends UserAction {
 
     public void setSourceCodeType(CodeAnalysisRepo.SourceCodeType sourceCodeType) {
         this.sourceCodeType = sourceCodeType;
+    }
+
+    public int getApiCollectionId() {
+        return apiCollectionId;
+    }
+
+    public void setApiCollectionId(int apiCollectionId) {
+        this.apiCollectionId = apiCollectionId;
     }
 }

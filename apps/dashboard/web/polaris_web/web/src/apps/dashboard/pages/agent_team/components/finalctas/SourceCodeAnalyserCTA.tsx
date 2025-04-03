@@ -29,8 +29,12 @@ function SourceCodeAnalyserCTA() {
             }
         })
 
-        await apiCollectionApi.syncExtractedAPIs(apiCollectionName, projectDir, codeAnalysisApisList)
+        const response:any = await apiCollectionApi.syncExtractedAPIs(apiCollectionName, projectDir, codeAnalysisApisList)
         func.setToast(true, false, `All the api's are now saved in ${apiCollectionName} collection`)
+        setFinalCTAShow(false)
+        if (response?.apiCollectionId) {
+            window.open(`/dashboard/observe/inventory/${response?.apiCollectionId}`, "_blank");
+        }
     }
 
     return (
