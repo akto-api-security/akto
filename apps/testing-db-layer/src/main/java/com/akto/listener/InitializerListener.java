@@ -27,8 +27,10 @@ public class InitializerListener implements ServletContextListener {
                 e.printStackTrace();
                 logger.error("Error creating sample data table" + e.getMessage());
                 try {
-                    logger.info("sleeping during create table operation " + SLEEP_DURATION * i + "retry attempt " + i);
-                    Thread.sleep(SLEEP_DURATION * i);
+                    logger.info("sleeping during create table operation " + SLEEP_DURATION * i + " retry attempt " + i);
+                    if (i < MAX_RETRIES) {
+                        Thread.sleep(SLEEP_DURATION * i);
+                    }
                 } catch (Exception ex) {
                     logger.error("error initiating sleep operation for create table operation " + ex.getMessage());
                 }
@@ -44,8 +46,10 @@ public class InitializerListener implements ServletContextListener {
                 e.printStackTrace();
                 logger.error("Error creating index" + e.getMessage());
                 try {
-                    logger.info("sleeping during create index operation " + SLEEP_DURATION * i + "retry attempt " + i);
-                    Thread.sleep(SLEEP_DURATION * i);
+                    logger.info("sleeping during create index operation " + SLEEP_DURATION * i + " retry attempt " + i);
+                    if (i < MAX_RETRIES) {
+                        Thread.sleep(SLEEP_DURATION * i);
+                    }
                 } catch (Exception ex) {
                     logger.error("error initiating sleep operation for create index operation " + ex.getMessage());
                 }
