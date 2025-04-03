@@ -209,7 +209,7 @@ public class ConsumerUtil {
                 }else if(firstRecordRead.get() && parallelConsumer.workRemaining() == 0){
                     logger.info("Records are empty now, thus executing final tests");
                     executor.shutdown();
-                    executor.awaitTermination(180 + maxRunTimeInSeconds, TimeUnit.SECONDS);
+                    executor.awaitTermination(180 + maxRunTimeForTests, TimeUnit.SECONDS);
                     break;
                 }
                 Thread.sleep(100);
