@@ -37,6 +37,60 @@ public class Producer {
         return null;
     }
 
+    private static void deleteTopicWithRetries(String bootstrapServers, String topicName) {
+        int retries = 0;
+        int maxRetries = 5;
+        int baseBackoff = 500; 
+    
+        while (retries < maxRetries) {
+            try {
+                deleteTopic(bootstrapServers, topicName);
+                return; 
+            } catch (Exception e) {
+                retries++;
+                long backoff = (long) (baseBackoff * Math.pow(2, retries));
+                logger.info("Attempt {} to delete topic '{}' failed: {}. Retrying in {}ms...", retries, topicName, e.getMessage(), backoff);
+    
+                try {
+                    Thread.sleep(backoff);
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    throw new RuntimeException("Interrupted while waiting to retry topic deletion", ie);
+                }
+            }
+        }
+    
+        throw new RuntimeException("Failed to delete topic '" + topicName + "' after " + maxRetries + " retries.");
+    }
+
+    public static void createTopicWithRetries(String bootstrapServers, String topicName) {
+        int retries = 0;
+        int maxRetries = 5;
+        int baseBackoff = 500;
+    
+        while (retries < maxRetries) {
+            try {
+                createTopic(bootstrapServers, topicName);
+                return; // success
+            } catch (Exception e) {
+                retries++;
+                long backoff = (long) (baseBackoff * Math.pow(2, retries));
+                logger.warn("Attempt {} to create topic '{}' failed: {}. Retrying in {}ms...", retries, topicName, e.getMessage(), backoff);
+    
+                try {
+                    Thread.sleep(backoff);
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    throw new RuntimeException("Interrupted while retrying topic creation", ie);
+                }
+            }
+        }
+    
+        throw new RuntimeException("Failed to create topic '" + topicName + "' after " + maxRetries + " retries.");
+    }
+    
+    
+
     private static void deleteTopic(String bootstrapServers, String topicName) 
             throws ExecutionException, InterruptedException {
 
@@ -49,8 +103,8 @@ public class Producer {
                 return;
             }
             DeleteTopicsResult deleteTopicsResult = adminClient.deleteTopics(Collections.singletonList(topicName));
-            deleteTopicsResult.all().get();
             logger.info("Topic \"" + topicName + "\" deletion initiated.");
+            deleteTopicsResult.all().get();
 
             int retries = 0;
             int maxRetries = 8;
@@ -80,8 +134,8 @@ public class Producer {
 
         try (AdminClient adminClient = AdminClient.create(adminProps)) {
             NewTopic newTopic = new NewTopic(topicName, 1, (short) 1); 
-            adminClient.createTopics(Collections.singletonList(newTopic)).all().get();
             logger.info("Topic \"" + topicName + "\" creation initiated.");
+            adminClient.createTopics(Collections.singletonList(newTopic)).all().get();
 
             int retries = 0;
             int maxRetries = 8;
@@ -113,8 +167,8 @@ public class Producer {
         TestExecutor executor = new TestExecutor();
         if(!doInitOnly){
             try {
-                deleteTopic(Constants.LOCAL_KAFKA_BROKER_URL, Constants.TEST_RESULTS_TOPIC_NAME);
-            } catch (ExecutionException | InterruptedException e) {
+                deleteTopicWithRetries(Constants.LOCAL_KAFKA_BROKER_URL, Constants.TEST_RESULTS_TOPIC_NAME);
+            } catch (Exception e) {
                 e.printStackTrace();
             }
         }

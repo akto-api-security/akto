@@ -333,7 +333,7 @@ public class TestExecutor {
             final int maxRunTime = tempRunTime;
             if(Constants.IS_NEW_TESTING_ENABLED){
                 try {
-                    Producer.createTopic(Constants.LOCAL_KAFKA_BROKER_URL, Constants.TEST_RESULTS_TOPIC_NAME);
+                    Producer.createTopicWithRetries(Constants.LOCAL_KAFKA_BROKER_URL, Constants.TEST_RESULTS_TOPIC_NAME);
                 } catch (Exception e) {
                     e.printStackTrace();
                     logger.error("Error in creating topic", e.getMessage());
