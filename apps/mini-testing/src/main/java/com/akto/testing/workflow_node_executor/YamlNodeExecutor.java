@@ -1,16 +1,14 @@
 package com.akto.testing.workflow_node_executor;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import com.akto.dto.type.SingleTypeInfo;
 import com.akto.testing.Main;
 import com.akto.dto.*;
-import com.akto.dto.type.URLMethods;
+import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.test_editor.execution.Memory;
 import org.json.JSONObject;
 
@@ -22,7 +20,6 @@ import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.api_workflow.Node;
 import com.akto.dto.test_editor.ConfigParserResult;
 import com.akto.dto.test_editor.ExecuteAlgoObj;
-import com.akto.dto.test_editor.ExecutionOrderResp;
 import com.akto.dto.test_editor.ExecutionResult;
 import com.akto.dto.test_editor.ExecutorNode;
 import com.akto.dto.test_editor.ExecutorSingleRequest;
@@ -36,6 +33,7 @@ import com.akto.dto.testing.TestingRunConfig;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.WorkflowTestResult;
 import com.akto.dto.testing.YamlNodeDetails;
+import com.akto.sql.SampleDataAltDb;
 import com.akto.dto.testing.WorkflowTestResult.NodeResult;
 import com.akto.store.SampleMessageStore;
 import com.akto.store.TestingUtil;
@@ -312,7 +310,21 @@ public class YamlNodeExecutor extends NodeExecutor {
         List<CustomAuthType> customAuthTypes = yamlNodeDetails.getCustomAuthTypes();
         TestingUtil testingUtil = new TestingUtil(authMechanism, messageStore, null, null, customAuthTypes);
         TestExecutor executor = new TestExecutor();
-        TestingRunResult testingRunResult = executor.runTestNew(yamlNodeDetails.getApiInfoKey(), null, testingUtil, null, testConfig, null, debug, testLogs);
+        ApiInfoKey infoKey = yamlNodeDetails.getApiInfoKey();
+        List<String> samples = testingUtil.getSampleMessages().get(infoKey);
+        TestingRunResult testingRunResult = com.akto.testing.Utils.generateFailedRunResultForMessage(null, infoKey, testConfig.getInfo().getCategory().getName(), testConfig.getInfo().getSubCategory(), null,samples , null);
+        if(testingRunResult == null){
+            String message = samples.get(samples.size() - 1);
+            String msg = null;
+            try {
+                msg = SampleDataAltDb.findLatestSampleByApiInfoKey(infoKey);
+            } catch (Exception e) {
+            }
+            if (msg != null) {
+                message = msg;
+            }
+            testingRunResult = executor.runTestNew(infoKey, null, testingUtil, null, testConfig, null, debug, testLogs, message);
+        }
 
         List<String> errors = new ArrayList<>();
         List<String> messages = new ArrayList<>();
