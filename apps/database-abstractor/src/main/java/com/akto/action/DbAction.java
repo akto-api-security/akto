@@ -1303,19 +1303,20 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
+    private void updateTestingRunApisList(TestingRun testingRun) {
+        if(testingRun != null){
+            if(testingRun.getTestingEndpoints() instanceof CollectionWiseTestingEndpoints){
+                CollectionWiseTestingEndpoints ts = (CollectionWiseTestingEndpoints) testingRun.getTestingEndpoints();
+                CustomTestingEndpoints endpoints = new CustomTestingEndpoints(ts.returnApis());
+                testingRun.setTestingEndpoints(endpoints);
+            }
+        }
+    }
+
     public String findPendingTestingRun() {
         try {
             testingRun = DbLayer.findPendingTestingRun(delta);
-            if (testingRun != null) {
-                /*
-                * There is a db call involved for collectionWiseTestingEndpoints, thus this hack. 
-                */
-                if(testingRun.getTestingEndpoints() instanceof CollectionWiseTestingEndpoints){
-                    CollectionWiseTestingEndpoints ts = (CollectionWiseTestingEndpoints) testingRun.getTestingEndpoints();
-                    CustomTestingEndpoints endpoints = new CustomTestingEndpoints(ts.returnApis());
-                    testingRun.setTestingEndpoints(endpoints);
-                }
-            }
+            updateTestingRunApisList(testingRun);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in findPendingTestingRun " + e.toString());
             return Action.ERROR.toUpperCase();
@@ -1349,6 +1350,7 @@ public class DbAction extends ActionSupport {
     public String findTestingRun() {
         try {
             testingRun = DbLayer.findTestingRun(testingRunId);
+            updateTestingRunApisList(testingRun);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in findTestingRun " + e.toString());
             return Action.ERROR.toUpperCase();
