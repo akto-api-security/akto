@@ -55,8 +55,6 @@ import static com.akto.testing.Utils.writeJsonContentInFile;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.types.ObjectId;
 import org.json.JSONObject;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -70,7 +68,6 @@ import com.akto.testing.workflow_node_executor.Utils;
 public class TestExecutor {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(TestExecutor.class, LogDb.TESTING);
-    private static final Logger logger = LoggerFactory.getLogger(TestExecutor.class);
 
     public static long acceptableSizeInBytes = 5_000_000;
     private static final Gson gson = new Gson();
@@ -239,7 +236,7 @@ public class TestExecutor {
                     Producer.createTopicWithRetries(Constants.LOCAL_KAFKA_BROKER_URL, Constants.TEST_RESULTS_TOPIC_NAME);
                 } catch (Exception e) {
                     e.printStackTrace();
-                    logger.error("Error in creating topic", e.getMessage());
+                    loggerMaker.error("Error in creating topic", e);
                 }
             }
 
@@ -492,7 +489,7 @@ public class TestExecutor {
                 if(GetRunningTestsStatus.getRunningTests().isTestRunning(summaryId)){
                     insertRecordInKafka(accountId, testSubCategory, apiInfoKey, messages, summaryId, syncLimit, apiInfoKeyToHostMap, subCategoryEndpointMap, testConfigMap, testLogs, testingRun, isApiInfoTested, new AtomicInteger(0));
                 }else{
-                    logger.info("Test stopped for id: " + testingRun.getHexId());
+                    loggerMaker.info("Test stopped for id: " + testingRun.getHexId());
                     break;
                 }
             }
@@ -500,7 +497,7 @@ public class TestExecutor {
             loggerMaker.errorAndAddToDb(e, "error while running tests: " + e);
         }
         if(isApiInfoTested.get()){
-            logger.info("Api: " + apiInfoKey.toString() + " has been successfully tested");
+            loggerMaker.info("Api: " + apiInfoKey.toString() + " has been successfully tested");
             dataActor.updateLastTestedField(apiInfoKey.getApiCollectionId(), apiInfoKey.getUrl(), apiInfoKey.getMethod().toString());
         }
         latch.countDown();
@@ -624,7 +621,7 @@ public class TestExecutor {
                 testingRun.getId(), summaryId, apiInfoKey, testSubType, testLogs, accountId
             );
             if(Constants.KAFKA_DEBUG_MODE){
-                logger.info("Inserting record for apiInfoKey: " + apiInfoKey.toString() + " subcategory: " + testSubType);
+                loggerMaker.info("Inserting record for apiInfoKey: " + apiInfoKey.toString() + " subcategory: " + testSubType);
             }
             try {
                 Producer.pushMessagesToKafka(Arrays.asList(singleTestPayload), totalRecords);

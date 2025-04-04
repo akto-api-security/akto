@@ -2,7 +2,6 @@ package com.akto.testing;
 
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.TestEditorEnums;
-import com.akto.dao.testing.config.TestScriptsDao;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.OriginalHttpRequest;
@@ -24,8 +23,6 @@ import okhttp3.*;
 import okio.BufferedSink;
 
 import org.apache.commons.lang3.StringUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -42,7 +39,6 @@ import jdk.nashorn.api.scripting.ScriptObjectMirror;
 
 public class ApiExecutor {
     private static final LoggerMaker loggerMaker = new LoggerMaker(ApiExecutor.class);
-    private static final Logger logger = LoggerFactory.getLogger(ApiExecutor.class);
 
     // Load only first 1 MiB of response body into memory.
     private static final int MAX_RESPONSE_SIZE = 1024*1024;
@@ -62,7 +58,7 @@ public class ApiExecutor {
                     if (!(request.url().toString().contains("insertRuntimeLog") || request.url().toString().contains("insertTestingLog"))) {
                         loggerMaker.infoAndAddToDb("Rate limit hit, sleeping", LogDb.TESTING);
                     }else {
-                        System.out.println("Rate limit hit, sleeping");
+                       loggerMaker.info("Rate limit hit, sleeping");
                     }
                 }
                 rateLimitHit = false;
@@ -73,7 +69,7 @@ public class ApiExecutor {
                     if (!(request.url().toString().contains("insertRuntimeLog") || request.url().toString().contains("insertTestingLog"))) {
                         loggerMaker.infoAndAddToDb("waiting for rate limit availability", LogDb.TESTING);
                     }else{
-                        System.out.println("waiting for rate limit availability");
+                        loggerMaker.info("waiting for rate limit availability");
                     }
                 }
             }
@@ -116,7 +112,7 @@ public class ApiExecutor {
                 if (!(request.url().toString().contains("insertRuntimeLog") || request.url().toString().contains("insertTestingLog"))) {
                     loggerMaker.errorAndAddToDb("Error while parsing response body: " + e, LogDb.TESTING);
                 } else {
-                    System.out.println("Error while parsing response body: " + e);
+                    loggerMaker.error("Error while parsing response body: " + e);
                 }
                 body = "{}";
             }
@@ -129,7 +125,7 @@ public class ApiExecutor {
             if (!(request.url().toString().contains("insertRuntimeLog") || request.url().toString().contains("insertTestingLog"))) {
                 loggerMaker.errorAndAddToDb("Error while executing request " + request.url() + " " + response.protocol() +" : " + e, LogDb.TESTING);
             } else {
-                System.out.println("Error while executing request " + request.url() + ": " + e);
+                loggerMaker.error("Error while executing request " + request.url() + ": " + e);
             }
             throw new Exception("Api Call failed");
         } finally {
@@ -343,12 +339,14 @@ public class ApiExecutor {
                 }
                 break;
             } catch (Exception e) {
-                logger.error("Error in sending request for api : {} , will retry after {} seconds : {}", request.getUrl(),
+                String message = String.format("Error in sending request for api : %s , will retry after %d seconds : %s", request.getUrl(),
                         limit, e.toString());
+                loggerMaker.error(message);
                 try {
                     Thread.sleep(1000 * limit);
                 } catch (Exception f) {
-                    logger.error("Error in exponential backoff at limit {} : {}", limit, f.toString());
+                    String backoffMessage = String.format("Error in exponential backoff at limit %d  : %s", limit, f.toString());
+                    loggerMaker.error(backoffMessage);
                 }
             }
         }

@@ -39,8 +39,6 @@ import com.mongodb.client.model.*;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 import org.json.JSONObject;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import static com.akto.testing.Utils.readJsonContentFromFile;
 
@@ -51,8 +49,6 @@ import java.util.concurrent.TimeUnit;
 
 public class Main {
     private static final LoggerMaker loggerMaker = new LoggerMaker(Main.class);
-
-    private static final Logger logger = LoggerFactory.getLogger(Main.class);
 
     private static final DataActor dataActor = DataActorFactory.fetchInstance();
 
@@ -121,7 +117,7 @@ public class Main {
                 return null;
             }   
         } catch (Exception e) {
-            logger.error("Error in reading the testing state file: " + e.getMessage());
+            loggerMaker.error("Error in reading the testing state file: " + e.getMessage());
             return null;
         }
     }
@@ -166,9 +162,9 @@ public class Main {
             testingRun.setTestingRunConfig(configFromTrrs);
         }
         if(testingRun.getTestingRunConfig() != null){
-            logger.info(testingRun.getTestingRunConfig().toString());
+            loggerMaker.info(testingRun.getTestingRunConfig().toString());
         }else{
-            logger.info("Testing run config is null.");
+            loggerMaker.info("Testing run config is null.");
         }
     }
 
@@ -209,7 +205,7 @@ public class Main {
 
         if(Constants.IS_NEW_TESTING_ENABLED){
             boolean val = Utils.createFolder(Constants.TESTING_STATE_FOLDER_PATH);
-            logger.info("Testing info folder status: " + val);
+            loggerMaker.info("Testing info folder status: " + val);
         }
 
         schedulerAccessMatrix.scheduleAtFixedRate(new Runnable() {
@@ -269,7 +265,7 @@ public class Main {
                 //         CustomTextAlert customTextAlert = new CustomTextAlert("Test completed for accountId=" + accountId + " testingRun=" + testingRun.getHexId() + " summaryId=" + summaryId.toHexString() + " : @Arjun you are up now. Make your time worth it. :)");
                 //         SLACK_INSTANCE.send(AKTO_SLACK_WEBHOOK, customTextAlert.toJson());
                 //     } catch (Exception e) {
-                //         logger.error("Error sending slack alert for completion of test", e);
+                //         loggerMaker.error("Error sending slack alert for completion of test", e);
                 //     }
                     
                 // }
@@ -284,7 +280,7 @@ public class Main {
                 //     }
                 // });
             } catch (Exception e) {
-                logger.error("Error in running failed tests from file.", e);
+                loggerMaker.error("Error in running failed tests from file.", e);
             }
         }
 
