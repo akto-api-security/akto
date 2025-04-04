@@ -84,6 +84,8 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
 
     const [openConfigurations, openConfigurationsToggle] = useState(false);
 
+    const [testSuiteIds, setTestSuiteIds] = useState([])
+
     useEffect(() => {
         if (preActivator) {
             setParentActivator(true);
@@ -541,9 +543,9 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         }
 
         if (filtered || selectedResourcesForPrimaryAction?.length > 0) {
-            await observeApi.scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, recurringWeekly, recurringMonthly, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, "TESTING_UI", testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, finalAdvancedConditions, cleanUpTestingResources)
+            await observeApi.scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, recurringWeekly, recurringMonthly, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, "TESTING_UI", testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, finalAdvancedConditions, cleanUpTestingResources, testSuiteIds)
         } else {
-            await observeApi.scheduleTestForCollection(collectionId, startTimestamp, recurringDaily, recurringWeekly, recurringMonthly, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, finalAdvancedConditions, cleanUpTestingResources)
+            await observeApi.scheduleTestForCollection(collectionId, startTimestamp, recurringDaily, recurringWeekly, recurringMonthly, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, finalAdvancedConditions, cleanUpTestingResources, testSuiteIds)
         }
 
         setActive(false)
@@ -881,7 +883,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                                 apiCollectionName={apiCollectionName}
                                 setTestMode={setTestMode}
                                 activeFromTesting={activeFromTesting}
-                                checkRemoveAll={checkRemoveAll} handleModifyConfig={handleModifyConfig} /> :
+                                checkRemoveAll={checkRemoveAll} handleModifyConfig={handleModifyConfig} setTestSuiteIds={setTestSuiteIds} /> :
                                 <>
                                     <RunTestConfiguration
                                         timeFieldsDisabled={shouldDisable}
