@@ -143,7 +143,7 @@ public class DbLayer {
     }
     public static void bulkWriteSingleTypeInfo(List<WriteModel<SingleTypeInfo>> writesForSingleTypeInfo) {
         BulkWriteResult res = SingleTypeInfoDao.instance.getMCollection().bulkWrite(writesForSingleTypeInfo);
-        System.out.println("bulk write result: del:" + res.getDeletedCount() + " ins:" + res.getInsertedCount() + " match:" + res.getMatchedCount() + " modify:" +res.getModifiedCount());
+        loggerMaker.debug("bulk write result: del:" + res.getDeletedCount() + " ins:" + res.getInsertedCount() + " match:" + res.getMatchedCount() + " modify:" +res.getModifiedCount());
     }
 
     public static void bulkWriteSampleData(List<WriteModel<SampleData>> writesForSampleData) {
@@ -240,11 +240,11 @@ public class DbLayer {
                 try {
                     sti.setStrId(sti.getId().toHexString());
                 } catch (Exception e) {
-                    System.out.println("error" + e);
+                    loggerMaker.error("error" + e);
                 }
             }
         } catch (Exception e) {
-            System.out.println("error" + e);
+            loggerMaker.error("error" + e);
         }
         return stis;
     }
