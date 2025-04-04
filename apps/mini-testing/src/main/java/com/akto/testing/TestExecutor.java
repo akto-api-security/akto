@@ -124,8 +124,24 @@ public class TestExecutor {
         int maxConcurrentRequests = testingRun.getMaxConcurrentRequests() > 0 ? Math.min( testingRun.getMaxConcurrentRequests(), 100) : 10;
         TestingEndpoints testingEndpoints = testingRun.getTestingEndpoints();
 
+        List<String> testSuiteIds = testingRun.getTestingRunConfig().getTestSuiteIds();
+        Set<String> testSubCategoryList = new HashSet<>();
+        for(String testSuiteId : testSuiteIds) {
+            List<String> testSuiteTestSubCategoryList;
+            if (testSuiteId != null) {
+                testSuiteTestSubCategoryList = dataActor.findTestSubCategoriesByTestSuiteId(testSuiteId);
+            } else {
+                testSuiteTestSubCategoryList = new ArrayList<>();
+            }
+
+            if (testSuiteTestSubCategoryList != null && !testSuiteTestSubCategoryList.isEmpty()) {
+                testSubCategoryList.addAll(testSuiteTestSubCategoryList);
+            } else {
+                testSubCategoryList.addAll(testingRun.getTestingRunConfig().getTestSubCategoryList());
+            }
+        }
         if (testingRun.getTestingRunConfig() != null) {
-            dataActor.updateTestInitiatedCountInTestSummary(summaryId.toHexString(), testingRun.getTestingRunConfig().getTestSubCategoryList().size());
+            dataActor.updateTestInitiatedCountInTestSummary(summaryId.toHexString(), testSubCategoryList.size());
         }
 
         SampleMessageStore sampleMessageStore = SampleMessageStore.create();
@@ -195,7 +211,8 @@ public class TestExecutor {
         ConcurrentHashMap<String, String> subCategoryEndpointMap = new ConcurrentHashMap<>();
         Map<ApiInfoKey, String> apiInfoKeyToHostMap = new HashMap<>();
         String hostName;
-        for (String testSubCategory: testingRun.getTestingRunConfig().getTestSubCategoryList()) {
+
+        for (String testSubCategory: testSubCategoryList) {
             TestConfig testConfig = testConfigMap.get(testSubCategory);
             if (testConfig == null) {
                 continue;
@@ -203,7 +220,7 @@ public class TestExecutor {
             Map<String, Object> wordListsMap = (Map) testConfig.getWordlists();
             //VariableResolver.resolveWordList(wordListsMap, testingUtil.getSampleMessageStore().getSampleDataMap(), ap);
         }
-        for (String testSubCategory: testingRun.getTestingRunConfig().getTestSubCategoryList()) {
+        for (String testSubCategory: testSubCategoryList) {
             TestConfig testConfig = testConfigMap.get(testSubCategory);
             if (testConfig == null || testConfig.getStrategy() == null || testConfig.getStrategy().getRunOnce() == null) {
                 continue;
@@ -571,10 +588,30 @@ public class TestExecutor {
                                                ConcurrentHashMap<String, String> subCategoryEndpointMap, Map<ApiInfoKey, String> apiInfoKeyToHostMap,
                                                boolean debug, List<TestingRunResult.TestLog> testLogs, int startTime, int timeToKill) {
 
-        List<String> testSubCategories = testingRunConfig == null ? new ArrayList<>() : testingRunConfig.getTestSubCategoryList();
+        List<String> testSuiteIds;
+        if(testingRunConfig == null) {
+            testSuiteIds = new ArrayList<>();
+        } else {
+            testSuiteIds = testingRunConfig.getTestSuiteIds();
+        }
+        Set<String> testSubCategoryList = new HashSet<>();
+        for(String testSuiteId : testSuiteIds) {
+            List<String> testSuiteTestSubCategoryList;
+            if (testSuiteId != null) {
+                testSuiteTestSubCategoryList = dataActor.findTestSubCategoriesByTestSuiteId(testSuiteId);
+            } else {
+                testSuiteTestSubCategoryList = new ArrayList<>();
+            }
+
+            if (testSuiteTestSubCategoryList != null && !testSuiteTestSubCategoryList.isEmpty()) {
+                testSubCategoryList.addAll(testSuiteTestSubCategoryList);
+            } else {
+                testSubCategoryList.addAll(testingRunConfig.getTestSubCategoryList());
+            }
+        }
 
         int countSuccessfulTests = 0;
-        for (String testSubCategory: testSubCategories) {
+        for (String testSubCategory: testSubCategoryList) {
             if(GetRunningTestsStatus.getRunningTests().isTestRunning(testRunResultSummaryId)){
                 if (Context.now() - startTime > timeToKill) {
                     loggerMaker.infoAndAddToDb("Timed out in " + (Context.now()-startTime) + "seconds");

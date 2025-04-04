@@ -556,4 +556,9 @@ public class DbActor extends DataActor {
         return DbLayer.findDependencyNodes(apiCollectionId, url, method, reqMethod);
     }
 
+    @Override
+    public List<String> findTestSubCategoriesByTestSuiteId(String testSuiteId) {
+        return DbLayer.findTestSubCategoriesByTestSuiteId(testSuiteId);
+    }
+
 }

@@ -14,10 +14,12 @@ import com.akto.bulk_update_util.ApiInfoBulkUpdate;
 import com.akto.dao.*;
 import com.akto.dao.filter.MergedUrlsDao;
 import com.akto.dao.settings.DataControlSettingsDao;
+import com.akto.dao.testing.config.TestSuiteDao;
 import com.akto.dependency_analyser.DependencyAnalyserUtils;
 import com.akto.dto.*;
 import com.akto.dto.filter.MergedUrls;
 import com.akto.dto.settings.DataControlSettings;
+import com.akto.dto.testing.config.TestSuites;
 import com.mongodb.client.model.*;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
@@ -1048,6 +1050,15 @@ public class DbLayer {
         // TODO: Handle cases where the delete API does not have the delete method
         Bson delFilterQ = Filters.and(filterQ, Filters.eq(DependencyNode.METHOD_REQ, reqMethod));
         return DependencyNodeDao.instance.findAll(delFilterQ);
+    }
+
+    public static List<String> findTestSubCategoriesByTestSuiteId(String testSuiteId) {
+        TestSuites testSuite = TestSuiteDao.instance.findOne(Filters.eq(ID, new ObjectId(testSuiteId)));
+        if(testSuite == null) {
+            return new ArrayList<>();
+        }
+
+        return testSuite.getSubCategoryList();
     }
 
 }
