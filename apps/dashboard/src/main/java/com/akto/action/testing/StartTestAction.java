@@ -85,6 +85,7 @@ public class StartTestAction extends UserAction {
     private String searchString;
     private boolean continuousTesting;
     private int testingRunConfigId;
+    private List<String> testSuiteIds;
 
     private Map<String,Long> allTestsCountMap = new HashMap<>();
     private Map<String,Integer> issuesSummaryInfoMap = new HashMap<>();
@@ -173,6 +174,8 @@ public class StartTestAction extends UserAction {
             if(this.testConfigsAdvancedSettings != null && !this.testConfigsAdvancedSettings.isEmpty()){
                 testingRunConfig.setConfigsAdvancedSettings(this.testConfigsAdvancedSettings);
             }
+            List<String> testSuiteIdsObj = new ArrayList<>(testSuiteIds);
+            testingRunConfig.setTestSuiteIds(testSuiteIdsObj);
             this.testIdConfig = testingRunConfig.getId();
             TestingRunConfigDao.instance.insertOne(testingRunConfig);
         }
@@ -290,6 +293,9 @@ public class StartTestAction extends UserAction {
             if (this.overriddenTestAppUrl != null || this.selectedTests != null) {
                 int id = UUID.randomUUID().hashCode() & 0xfffffff;
                 TestingRunConfig testingRunConfig = new TestingRunConfig(id, null, this.selectedTests, null, this.overriddenTestAppUrl, this.testRoleId);
+
+                List<String> testSuiteIdsObj = new ArrayList<>(testSuiteIds);
+                testingRunConfig.setTestSuiteIds(testSuiteIdsObj);
                 this.testIdConfig = testingRunConfig.getId();
                 TestingRunConfigDao.instance.insertOne(testingRunConfig);
             } 
@@ -1807,4 +1813,7 @@ public class StartTestAction extends UserAction {
         this.recurringMonthly = recurringMonthly;
     }
 
+    public void setTestSuiteIds(List<String> testSuiteIds) {
+        this.testSuiteIds = testSuiteIds;
+    }
 }
