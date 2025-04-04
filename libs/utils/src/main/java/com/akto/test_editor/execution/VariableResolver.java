@@ -387,6 +387,103 @@ public class VariableResolver {
         return finalValue.isEmpty() ? null : String.join( " ", finalValue);
     }
 
+    public static String resolveAuthContextForPayload(Object resolveObj, String payload, String headerKey) {
+
+        String origExpression = null;
+        if (!(resolveObj instanceof String)) {
+            if (resolveObj instanceof Map) {
+                Map<String, Object> resolveMap = (Map) resolveObj;
+                if (resolveMap.size() != 1) return null;
+
+                origExpression = resolveMap.keySet().iterator().next();
+                
+            } else {
+                return null;
+            }
+
+        } else {
+            origExpression = resolveObj.toString();
+        }
+        
+        String expression = origExpression;
+        expression = expression.substring(2, expression.length());
+        expression = expression.substring(0, expression.length() - 1);
+
+        String authContextConstant = "auth_context.";
+        String secondParam = expression.substring(authContextConstant.length());// params[1];
+
+        BasicDBObject payloadObj = new BasicDBObject();
+        if (payload != null && payload.startsWith("[")) {
+            payload = "{\"json\": "+payload+"}";
+        }
+        try {
+            payloadObj = BasicDBObject.parse(payload);
+        } catch (Exception e) {
+        }
+
+        if (!payloadObj.containsKey(headerKey)) {
+            return null;
+        }
+
+        String headerVal = payloadObj.getString(headerKey);
+
+        String[] splitValue = headerVal.toString().split(" ");
+        String modifiedHeaderVal = null;
+
+        List<String> finalValue = new ArrayList<>();
+
+        for (String val: splitValue) {
+            if (!KeyTypes.isJWT(val)) {
+                finalValue.add(val);
+                continue;
+            }
+            if (secondParam.equalsIgnoreCase("none_algo_token")) {
+                NoneAlgoJWTModifier noneAlgoJWTModifier = new NoneAlgoJWTModifier("none");
+                try {
+                    modifiedHeaderVal = noneAlgoJWTModifier.jwtModify("", val);
+                } catch(Exception e) {
+                    return null;
+                }
+            } else if (secondParam.equalsIgnoreCase("invalid_signature_token")) {
+                InvalidSignatureJWTModifier invalidSigModified = new InvalidSignatureJWTModifier();
+                modifiedHeaderVal = invalidSigModified.jwtModify("", val);
+            } else if (secondParam.equalsIgnoreCase("jku_added_token")) {
+                AddJkuJWTModifier addJkuJWTModifier = new AddJkuJWTModifier();
+                try {
+                    modifiedHeaderVal = addJkuJWTModifier.jwtModify("", val);
+                } catch(Exception e) {
+                    return null;
+                }
+            } else if (secondParam.equalsIgnoreCase("modify_jwt")) {
+                try {
+                    Map<String, Object> kvPairMap = (Map) ((Map)resolveObj).get(origExpression);
+                    String kvKey = kvPairMap.keySet().iterator().next();
+                    JwtKvModifier jwtKvModifier = new JwtKvModifier(kvKey, kvPairMap.get(kvKey).toString());
+                    modifiedHeaderVal = jwtKvModifier.jwtModify("", val);
+                } catch (Exception e) {
+                    return null;
+                }
+            } else if (secondParam.equalsIgnoreCase("jwk_added_token")) {
+                AddJWKModifier addJWKModifier = new AddJWKModifier();
+                try {
+                    modifiedHeaderVal = addJWKModifier.jwtModify("", val);
+                } catch(Exception e) {
+                    return null;
+                }
+            } else if (secondParam.equalsIgnoreCase("kid_added_token")) {
+                AddKidParamModifier addKidParamModifier = new AddKidParamModifier();
+                try {
+                    modifiedHeaderVal = addKidParamModifier.jwtModify("", val);
+                } catch(Exception e) {
+                    return null;
+                }
+            } 
+            finalValue.add(modifiedHeaderVal);
+        }
+
+        return finalValue.isEmpty() ? null : String.join( " ", finalValue);
+    }
+
     public static Boolean isWordListVariable(Object key, Map<String, Object> varMap) {
         if (key == null) {
             return false;
