@@ -8,7 +8,6 @@ import java.util.regex.Pattern;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
 import com.akto.dao.monitoring.FilterYamlTemplateDao;
-import com.akto.dao.runtime_filters.AdvancedTrafficFiltersDao;
 import com.akto.dto.*;
 import com.akto.dto.billing.SyncLimit;
 import com.akto.dto.bulk_updates.BulkUpdates;
@@ -29,7 +28,6 @@ import com.akto.dto.usage.MetricTypes;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.metrics.AllMetrics;
-import com.akto.sql.SampleDataAltDb;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
 import com.akto.hybrid_runtime.policies.AktoPolicyNew;
@@ -48,8 +46,6 @@ import org.apache.commons.lang3.math.NumberUtils;
 import org.bson.conversions.Bson;
 import org.bson.json.JsonParseException;
 import org.bson.types.ObjectId;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import static com.akto.dto.type.KeyTypes.patternToSubType;
 
@@ -60,7 +56,6 @@ public class APICatalogSync {
 
     public int thresh;
     public String userIdentifier;
-    private static final Logger logger = LoggerFactory.getLogger(APICatalogSync.class);
     private static final LoggerMaker loggerMaker = new LoggerMaker(APICatalogSync.class, LogDb.RUNTIME);
     public Map<Integer, APICatalog> dbState;
     public Map<Integer, APICatalog> delta;
@@ -207,7 +202,7 @@ public class APICatalogSync {
         } 
 
         URLAggregator aggregator = new URLAggregator(origAggregator.urls);
-        logger.info("aggregator: " + (System.currentTimeMillis() - start));
+        loggerMaker.info("aggregator: " + (System.currentTimeMillis() - start));
         origAggregator.urls = new ConcurrentHashMap<>();
 
         Set<Map.Entry<URLStatic, Set<HttpResponseParams>>> entries = aggregator.urls.entrySet();
@@ -225,20 +220,20 @@ public class APICatalogSync {
 
         start = System.currentTimeMillis();
         processKnownStaticURLs(aggregator, deltaCatalog, dbCatalog);
-        logger.info("processKnownStaticURLs: " +  (System.currentTimeMillis() - start));
+        loggerMaker.info("processKnownStaticURLs: " +  (System.currentTimeMillis() - start));
 
         start = System.currentTimeMillis();
         Map<URLStatic, RequestTemplate> pendingRequests = createRequestTemplates(aggregator);
-        logger.info("pendingRequests: " + (System.currentTimeMillis() - start));
+        loggerMaker.info("pendingRequests: " + (System.currentTimeMillis() - start));
 
         start = System.currentTimeMillis();
         tryWithKnownURLTemplates(pendingRequests, deltaCatalog, dbCatalog, apiCollectionId );
-        logger.info("tryWithKnownURLTemplates: " + (System.currentTimeMillis() - start));
+        loggerMaker.info("tryWithKnownURLTemplates: " + (System.currentTimeMillis() - start));
 
         if (!mergeAsyncOutside) {
             start = System.currentTimeMillis();
             tryMergingWithKnownStrictURLs(pendingRequests, dbCatalog, deltaCatalog);
-            logger.info("tryMergingWithKnownStrictURLs: " + (System.currentTimeMillis() - start));
+            loggerMaker.info("tryMergingWithKnownStrictURLs: " + (System.currentTimeMillis() - start));
         } else {
             if (DataControlFetcher.discardNewApi()) {
                 pendingRequests.clear();
@@ -277,7 +272,7 @@ public class APICatalogSync {
             }
         }
 
-        logger.info("processTime: " + RequestTemplate.insertTime + " " + RequestTemplate.processTime + " " + RequestTemplate.deleteTime);
+        loggerMaker.info("processTime: " + RequestTemplate.insertTime + " " + RequestTemplate.processTime + " " + RequestTemplate.deleteTime);
 
     }
 
@@ -1266,7 +1261,7 @@ public class APICatalogSync {
             keyTypes = new KeyTypes(new HashMap<>(), false);
 
             if (param.getParam() == null) {
-                logger.info("null value - " + param.composeKey());
+                loggerMaker.info("null value - " + param.composeKey());
             }
 
             keyTypesMap.put(param.getParam(), keyTypes);
@@ -1757,11 +1752,11 @@ public class APICatalogSync {
 
     public void printNewURLsInDelta(APICatalog deltaCatalog) {
         for(URLStatic s: deltaCatalog.getStrictURLToMethods().keySet()) {
-            logger.info(s.getUrl());
+            loggerMaker.info(s.getUrl());
         }
 
         for(URLTemplate s: deltaCatalog.getTemplateURLToMethods().keySet()) {
-            logger.info(s.getTemplateString());
+            loggerMaker.info(s.getTemplateString());
         }
     }
 

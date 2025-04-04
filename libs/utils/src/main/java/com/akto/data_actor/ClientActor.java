@@ -80,8 +80,8 @@ import com.google.gson.Gson;
 public class ClientActor extends DataActor {
 
     private static final int batchWriteLimit = 8;
-    private static final String url = buildDbAbstractorUrl();
     private static final LoggerMaker loggerMaker = new LoggerMaker(ClientActor.class);
+    private static final String url = buildDbAbstractorUrl();
     private static final int maxConcurrentBatchWrites = 150;
     private static final Gson gson = new Gson();
     private static final CodecRegistry codecRegistry = DaoInit.createCodecRegistry();
@@ -96,7 +96,7 @@ public class ClientActor extends DataActor {
         if (checkAccount()) {
             dbAbsHost = System.getenv("DATABASE_ABSTRACTOR_SERVICE_URL");
         }
-        System.out.println("dbHost value " + dbAbsHost);
+        loggerMaker.info("dbHost value " + dbAbsHost);
         if (dbAbsHost.endsWith("/")) {
             dbAbsHost = dbAbsHost.substring(0, dbAbsHost.length() - 1);
         }
@@ -590,7 +590,6 @@ public class ClientActor extends DataActor {
     //                 BasicDBObject kConditions = (BasicDBObject) obj2.get("keyConditions");
     //                 BasicDBList predicates = (BasicDBList) kConditions.get("predicates");
     //                 RegexPredicate regexPredicate = objectMapper.readValue(((BasicDBObject) predicates.get(0)).toJson(), RegexPredicate.class);
-    //                 System.out.println("hi");
     //                 //customDataTypes.add(objectMapper.readValue(obj2.toJson(), CustomDataType.class));
     //             }
     //         } catch(Exception e) {
@@ -868,7 +867,7 @@ public class ClientActor extends DataActor {
         obj.put("apiInfoList", writesForApiInfo);
 
         String objString = gson.toJson(obj);
-        System.out.println("api info batch" + objString);
+        loggerMaker.debug("api info batch" + objString);
 
         Map<String, List<String>> headers = buildHeaders();
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/bulkWriteApiInfo", "", "POST", objString, headers, "");
@@ -1143,11 +1142,11 @@ public class ClientActor extends DataActor {
             OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
             String responsePayload = response.getBody();
             if (response.getStatusCode() != 200 || responsePayload == null) {
-                System.out.println("non 2xx response in insertRuntimeLog");
+                loggerMaker.info("non 2xx response in insertRuntimeLog");
                 return;
             }
         } catch (Exception e) {
-            System.out.println("error in insertRuntimeLog" + e);
+            loggerMaker.error("error in insertRuntimeLog" + e);
             return;
         }
     }
@@ -1954,7 +1953,7 @@ public class ClientActor extends DataActor {
         BasicDBObject obj = new BasicDBObject();
         obj.put("testingRunResult", testingRunResult);
         String objString = gson.toJson(obj);
-        System.out.println(objString);
+        loggerMaker.debug(objString);
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/insertTestingRunResults", "", "POST", objString, headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
@@ -3017,11 +3016,11 @@ public class ClientActor extends DataActor {
             OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
             String responsePayload = response.getBody();
             if (response.getStatusCode() != 200 || responsePayload == null) {
-                System.out.println("non 2xx response in insertTestingLog");
+                loggerMaker.info("non 2xx response in insertTestingLog");
                 return;
             }
         } catch (Exception e) {
-            System.out.println("error in insertTestingLog" + e);
+            loggerMaker.error("error in insertTestingLog" + e);
             return;
         }
     }
@@ -3065,10 +3064,10 @@ public class ClientActor extends DataActor {
             String decodedPayload = new String(decodedBytes);
             BasicDBObject basicDBObject = BasicDBObject.parse(decodedPayload);
             int accId = (int) basicDBObject.getInt("accountId");
-            System.out.println("checkaccount accountId log " + accId);
+            loggerMaker.info("checkaccount accountId log " + accId);
             return accId == 1000000;
         } catch (Exception e) {
-            System.out.println("checkaccount error" + e.getStackTrace());
+            loggerMaker.error("checkaccount error" + e.getStackTrace());
         }
         return false;
     }
