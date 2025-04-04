@@ -583,4 +583,8 @@ public class DbActor extends DataActor {
         return DbLayer.findLatestTestingRunResultSummary(filter);
     }
 
+    @Override
+    public List<String> findTestSubCategoriesByTestSuiteId(String testSuiteId) {
+        return DbLayer.findTestSubCategoriesByTestSuiteId(testSuiteId);
+    }
 }

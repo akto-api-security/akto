@@ -2313,6 +2313,18 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
+    String testSuiteId;
+    List<String> testSuiteTestSubCategories;
+    public String findTestSubCategoriesByTestSuiteId() {
+        try {
+            testSuiteTestSubCategories = DbLayer.findTestSubCategoriesByTestSuiteId(testSuiteId);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in fetchTestSubCategoriesByTestSuiteId " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
     public List<CustomDataTypeMapper> getCustomDataTypes() {
         return customDataTypes;
     }
@@ -3356,4 +3368,11 @@ public class DbAction extends ActionSupport {
         this.operator = operator;
     }
 
+    public void setTestSuiteId(String testSuiteId) {
+        this.testSuiteId = testSuiteId;
+    }
+
+    public List<String> getTestSuiteTestSubCategories() {
+        return testSuiteTestSubCategories;
+    }
 }
