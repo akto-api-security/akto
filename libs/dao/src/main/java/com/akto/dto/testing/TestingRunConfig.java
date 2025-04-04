@@ -26,6 +26,8 @@ public class TestingRunConfig {
     private List<TestConfigsAdvancedSettings> configsAdvancedSettings;
     private boolean cleanUp;
 
+    private List<String> testSuiteIds;
+
     public TestingRunConfig() {}
 
     public TestingRunConfig(int id, Map<Integer, List<ApiInfo.ApiInfoKey>> collectionWiseApiInfoKey,
@@ -137,4 +139,11 @@ public class TestingRunConfig {
         this.cleanUp = cleanUp;
     }
 
+    public List<String> getTestSuiteIds() {
+        return testSuiteIds;
+    }
+
+    public void setTestSuiteIds(List<String> testSuiteIds) {
+        this.testSuiteIds = testSuiteIds;
+    }
 }

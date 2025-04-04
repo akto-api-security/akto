@@ -20,7 +20,7 @@ const owaspTop10List = {
     "Unsafe Consumption of APIs": ["COMMAND_INJECTION", "INJ", "CRLF", "SSTI", "LFI", "XSS", "INJECT"]
 }
 
-function RunTestSuites({ testRun, setTestRun, apiCollectionName, checkRemoveAll, handleRemoveAll, handleModifyConfig, activeFromTesting }) {
+function RunTestSuites({ testRun, setTestRun, apiCollectionName, checkRemoveAll, handleRemoveAll, handleModifyConfig, activeFromTesting, setTestSuiteIds }) {
 
     const [data, setData] = useState({ owaspTop10List: {}, testingMethods:{}, custom : {}, severity: {} });
 
@@ -67,7 +67,7 @@ function RunTestSuites({ testRun, setTestRun, apiCollectionName, checkRemoveAll,
         // Fetch Custom Test Suite
         const fetchedTestSuite = await testingApi.fetchAllTestSuites();
         const fetchedData = fetchedTestSuite.map((testSuiteItem) => {
-            return { name: testSuiteItem.name, tests: testSuiteItem.subCategoryList }
+            return { name: testSuiteItem.name, tests: testSuiteItem.subCategoryList, id: testSuiteItem.hexId }
 
         });
         setData(prev => {
@@ -120,6 +120,20 @@ function RunTestSuites({ testRun, setTestRun, apiCollectionName, checkRemoveAll,
                 testName: updatedTestName
             };
         });
+
+        setTestSuiteIds((prev) => {
+            if (!data.id) {
+              return prev;
+            }
+          
+            if (!prev.includes(data.id) && checkedSelected(data) === false) {
+              return [...prev, data.id]
+            } else if (checkedSelected(data) === true || checkedSelected(data) === "indeterminate") {
+              return prev.filter((id) => id !== data.id)
+            }
+          
+            return prev
+          })          
     }
 
     function countTestSuitesTests(data) {
