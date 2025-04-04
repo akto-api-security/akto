@@ -46,7 +46,6 @@ public class Main {
         //     System.err.println(e.getClass().getName() + ": " + e.getMessage());
         //     System.exit(0);
         // }
-        // System.out.println("Opened database successfully");
 
         // createSampleDataTable();
         try {
@@ -62,7 +61,6 @@ public class Main {
         // List<String> ids = SampleDataAltDb.iterateAndGetIds(limit, skip);
         // while (ids != null && !ids.isEmpty()) {
 
-        //     System.out.println(ids);
         //     skip += limit;
         //     ids = SampleDataAltDb.iterateAndGetIds(limit, skip);
         // }
