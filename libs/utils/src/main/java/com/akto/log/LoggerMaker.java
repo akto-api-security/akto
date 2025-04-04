@@ -28,6 +28,7 @@ public class LoggerMaker {
     
     static {
         System.setProperty(SimpleLogger.DEFAULT_LOG_LEVEL_KEY, System.getenv().getOrDefault("AKTO_LOG_LEVEL", "WARN"));
+        System.out.printf("AKTO_LOG_LEVEL is set to: %s \n", System.getProperty(SimpleLogger.DEFAULT_LOG_LEVEL_KEY));
     }
 
     public static final int LOG_SAVE_INTERVAL = 60*60; // 1 hour
