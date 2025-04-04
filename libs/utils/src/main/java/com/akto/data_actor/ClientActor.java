@@ -96,7 +96,7 @@ public class ClientActor extends DataActor {
         if (checkAccount()) {
             dbAbsHost = System.getenv("DATABASE_ABSTRACTOR_SERVICE_URL");
         }
-        loggerMaker.debug("dbHost value " + dbAbsHost);
+        loggerMaker.info("dbHost value " + dbAbsHost);
         if (dbAbsHost.endsWith("/")) {
             dbAbsHost = dbAbsHost.substring(0, dbAbsHost.length() - 1);
         }
@@ -3064,7 +3064,7 @@ public class ClientActor extends DataActor {
             String decodedPayload = new String(decodedBytes);
             BasicDBObject basicDBObject = BasicDBObject.parse(decodedPayload);
             int accId = (int) basicDBObject.getInt("accountId");
-            loggerMaker.debug("checkaccount accountId log " + accId);
+            loggerMaker.info("checkaccount accountId log " + accId);
             return accId == 1000000;
         } catch (Exception e) {
             loggerMaker.error("checkaccount error" + e.getStackTrace());
