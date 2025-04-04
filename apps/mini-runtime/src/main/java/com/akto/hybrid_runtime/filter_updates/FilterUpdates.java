@@ -17,11 +17,11 @@ public class FilterUpdates {
 
     private static List<BloomFilter<CharSequence>> filters = new ArrayList<BloomFilter<CharSequence>>() {
         {
-            add(BloomFilter.create(Funnels.stringFunnel(Charsets.UTF_8), 1_000_000, 0.001));
-            add(BloomFilter.create(Funnels.stringFunnel(Charsets.UTF_8), 1_000_000, 0.001));
-            add(BloomFilter.create(Funnels.stringFunnel(Charsets.UTF_8), 1_000_000, 0.001));
-            add(BloomFilter.create(Funnels.stringFunnel(Charsets.UTF_8), 1_000_000, 0.001));
-            add(BloomFilter.create(Funnels.stringFunnel(Charsets.UTF_8), 1_000_000, 0.001));
+            add(BloomFilter.create(Funnels.stringFunnel(Charsets.UTF_8), 5_000_000, 0.001));
+            add(BloomFilter.create(Funnels.stringFunnel(Charsets.UTF_8), 5_000_000, 0.001));
+            add(BloomFilter.create(Funnels.stringFunnel(Charsets.UTF_8), 5_000_000, 0.001));
+            add(BloomFilter.create(Funnels.stringFunnel(Charsets.UTF_8), 5_000_000, 0.001));
+            add(BloomFilter.create(Funnels.stringFunnel(Charsets.UTF_8), 5_000_000, 0.001));
         }
     };
 
@@ -40,13 +40,13 @@ public class FilterUpdates {
         }
     }
 
-    public static boolean isEligibleForUpdate(int apiCollectionId, String url, String method, String param) {
+    public static boolean isEligibleForUpdate(int apiCollectionId, String url, String method, String param, int responseCode, String operation) {
         BloomFilter<CharSequence> filter;
         int checkIdx;
         boolean found = false;
         // assigns correct filter. Creates a new filter if filter at that index is not present
         assignFilterForOperation();
-        String key = buildKey(apiCollectionId, url, method, param);
+        String key = buildKey(apiCollectionId, url, method, param, responseCode, operation);
         for (int i = 0; i < TOTAL_FILTERS; i++) {
             checkIdx = (filterId + i) % TOTAL_FILTERS;
             filter = filters.get(checkIdx);
@@ -64,8 +64,8 @@ public class FilterUpdates {
         filters.get(filterId).put(key);
     }
 
-    public static String buildKey(int apiCollectionId, String url, String method, String param) {
-        return apiCollectionId + "$" + url + "$" + method + "$" + param;
+    public static String buildKey(int apiCollectionId, String url, String method, String param, int responseCode, String operation) {
+        return apiCollectionId + "$" + url + "$" + method + "$" + param +  "$" + responseCode + "$" + operation;
     }
 
 }

@@ -1620,16 +1620,6 @@ public class APICatalogSync {
             SingleTypeInfo dbInfo = dbInfoMap.get(key);
             SingleTypeInfo deltaInfo = deltaInfoMap.get(key);
 
-            try {
-                boolean isEligible = FilterUpdates.isEligibleForUpdate(deltaInfo.getApiCollectionId(), deltaInfo.getUrl(), deltaInfo.getMethod(), deltaInfo.getParam());
-                if (!isEligible) {
-                    continue;
-                }
-            } catch (Exception e) {
-                e.printStackTrace();
-                loggerMaker.errorAndAddToDb("error evaluating if sti param is eligible for update " + e.getMessage());
-            }
-
             if (deltaInfo.getParam().equalsIgnoreCase("host")) {
                 if (dbInfo == null) {
                     AllMetrics.instance.setCyborgNewApiCount(1);
@@ -1691,6 +1681,15 @@ public class APICatalogSync {
                 bulkUpdatesForSampleData.add(new BulkUpdates(SensitiveSampleDataDao.getFiltersMap(deltaInfo), sampleDataUpdates));
             }
 
+            try {
+                boolean isEligible = FilterUpdates.isEligibleForUpdate(deltaInfo.getApiCollectionId(), deltaInfo.getUrl(), deltaInfo.getMethod(), deltaInfo.getParam(), deltaInfo.getResponseCode(), "update");
+                if (!isEligible) {
+                    continue;
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+                loggerMaker.errorAndAddToDb("error evaluating if sti param is eligible for update " + e.getMessage());
+            }
 
             bulkUpdates.add(new BulkUpdates(SingleTypeInfoDao.createFiltersMap(deltaInfo), updates));
         }
@@ -1700,7 +1699,18 @@ public class APICatalogSync {
             UpdatePayload updatePayload = new UpdatePayload(null, null, "delete");
             updates.add(updatePayload.toString());
             currentDelta.getStrictURLToMethods().remove(new URLStatic(deleted.getUrl(), Method.fromString(deleted.getMethod())));
-            bulkUpdates.add(new BulkUpdates(SingleTypeInfoDao.createFiltersMap(deleted), updates));
+
+            boolean isEligible = true;
+            try {
+                isEligible = FilterUpdates.isEligibleForUpdate(deleted.getApiCollectionId(), deleted.getUrl(), deleted.getMethod(), deleted.getParam(), deleted.getResponseCode(), "delete");
+            } catch (Exception e) {
+                e.printStackTrace();
+                loggerMaker.errorAndAddToDb("error evaluating if sti param is eligible for delete update " + e.getMessage());
+            }
+
+            if (isEligible) {
+                bulkUpdates.add(new BulkUpdates(SingleTypeInfoDao.createFiltersMap(deleted), updates));
+            }
 
             ArrayList<String> sampleDataUpdates = new ArrayList<>();
             updatePayload = new UpdatePayload(null, null, "delete");
