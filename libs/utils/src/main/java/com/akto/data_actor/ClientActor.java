@@ -1299,6 +1299,28 @@ public class ClientActor extends DataActor {
         }
     }
 
+    private void fillTestingEndpointsType(String type, Document testingRun) {
+        switch (type) {
+            case "CUSTOM":
+                ((Document) testingRun.get("testingEndpoints")).put("_t", "com.akto.dto.testing.CustomTestingEndpoints");
+                break;
+            case "COLLECTION_WISE":
+                ((Document) testingRun.get("testingEndpoints")).put("_t", "com.akto.dto.testing.CollectionWiseTestingEndpoints");
+                break;
+            case "WORKFLOW":
+                ((Document) testingRun.get("testingEndpoints")).put("_t", "com.akto.dto.testing.WorkflowTestingEndpoints");
+                break;
+            case "ALL":
+                ((Document) testingRun.get("testingEndpoints")).put("_t", "com.akto.dto.testing.AllTestingEndpoints");
+                break;
+            case "LOGICAL_GROUP":
+                ((Document) testingRun.get("testingEndpoints")).put("_t", "com.akto.dto.testing.LogicalGroupTestingEndpoint");
+                break;
+            default:
+                break;
+        }
+    }
+
     public TestingRun findPendingTestingRun(int delta) {
         Map<String, List<String>> headers = buildHeaders();
         BasicDBObject obj = new BasicDBObject();
@@ -1316,25 +1338,7 @@ public class ClientActor extends DataActor {
                 Document testingRun = (Document) doc.get("testingRun");
                 Codec<TestingRun> apiInfoKeyCodec = codecRegistry.get(TestingRun.class);
                 String type = ((Document) testingRun.get("testingEndpoints")).getString("type");
-                switch (type) {
-                    case "CUSTOM":
-                        ((Document) testingRun.get("testingEndpoints")).put("_t", "com.akto.dto.testing.CustomTestingEndpoints");
-                        break;
-                    case "COLLECTION_WISE":
-                        ((Document) testingRun.get("testingEndpoints")).put("_t", "com.akto.dto.testing.CollectionWiseTestingEndpoints");
-                        break;
-                    case "WORKFLOW":
-                        ((Document) testingRun.get("testingEndpoints")).put("_t", "com.akto.dto.testing.WorkflowTestingEndpoints");
-                        break;
-                    case "ALL":
-                        ((Document) testingRun.get("testingEndpoints")).put("_t", "com.akto.dto.testing.AllTestingEndpoints");
-                        break;
-                    case "LOGICAL_GROUP":
-                        ((Document) testingRun.get("testingEndpoints")).put("_t", "com.akto.dto.testing.LogicalGroupTestingEndpoint");
-                        break;
-                    default:
-                        break;
-                }
+                fillTestingEndpointsType(type, testingRun);
                 String hexId = testingRun.getString("hexId");
                 testingRun.put("id", hexId);
                 TestingRun res = decode(apiInfoKeyCodec, testingRun);
@@ -1437,19 +1441,7 @@ public class ClientActor extends DataActor {
                 Document testingRun = (Document) doc.get("testingRun");
                 Codec<TestingRun> apiInfoKeyCodec = codecRegistry.get(TestingRun.class);
                 String type = ((Document) testingRun.get("testingEndpoints")).getString("type");
-                switch (type) {
-                    case "CUSTOM":
-                        ((Document) testingRun.get("testingEndpoints")).put("_t", "com.akto.dto.testing.CustomTestingEndpoints");
-                        break;
-                    case "COLLECTION_WISE":
-                        ((Document) testingRun.get("testingEndpoints")).put("_t", "com.akto.dto.testing.CollectionWiseTestingEndpoints");
-                        break;
-                    case "WORKFLOW":
-                        ((Document) testingRun.get("testingEndpoints")).put("_t", "com.akto.dto.testing.WorkflowTestingEndpoints");
-                        break;
-                    default:
-                        break;
-                }
+                fillTestingEndpointsType(type, testingRun);
                 String hexId = testingRun.getString("hexId");
                 testingRun.put("id", hexId);
                 TestingRun res = decode(apiInfoKeyCodec, testingRun);
