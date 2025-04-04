@@ -25,6 +25,7 @@ import com.akto.dto.type.SingleTypeInfo.SubType;
 import com.akto.dto.type.SingleTypeInfo.SuperType;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.dto.usage.MetricTypes;
+import com.akto.hybrid_runtime.filter_updates.FilterUpdates;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.metrics.AllMetrics;
@@ -1675,6 +1676,15 @@ public class APICatalogSync {
                 bulkUpdatesForSampleData.add(new BulkUpdates(SensitiveSampleDataDao.getFiltersMap(deltaInfo), sampleDataUpdates));
             }
 
+            try {
+                boolean isEligible = FilterUpdates.isEligibleForUpdate(deltaInfo.getApiCollectionId(), deltaInfo.getUrl(), deltaInfo.getMethod(), deltaInfo.getParam(), deltaInfo.getResponseCode(), "update");
+                if (!isEligible) {
+                    continue;
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+                loggerMaker.errorAndAddToDb("error evaluating if sti param is eligible for update " + e.getMessage());
+            }
 
             bulkUpdates.add(new BulkUpdates(SingleTypeInfoDao.createFiltersMap(deltaInfo), updates));
         }
@@ -1684,7 +1694,18 @@ public class APICatalogSync {
             UpdatePayload updatePayload = new UpdatePayload(null, null, "delete");
             updates.add(updatePayload.toString());
             currentDelta.getStrictURLToMethods().remove(new URLStatic(deleted.getUrl(), Method.fromString(deleted.getMethod())));
-            bulkUpdates.add(new BulkUpdates(SingleTypeInfoDao.createFiltersMap(deleted), updates));
+
+            boolean isEligible = true;
+            try {
+                isEligible = FilterUpdates.isEligibleForUpdate(deleted.getApiCollectionId(), deleted.getUrl(), deleted.getMethod(), deleted.getParam(), deleted.getResponseCode(), "delete");
+            } catch (Exception e) {
+                e.printStackTrace();
+                loggerMaker.errorAndAddToDb("error evaluating if sti param is eligible for delete update " + e.getMessage());
+            }
+
+            if (isEligible) {
+                bulkUpdates.add(new BulkUpdates(SingleTypeInfoDao.createFiltersMap(deleted), updates));
+            }
 
             ArrayList<String> sampleDataUpdates = new ArrayList<>();
             updatePayload = new UpdatePayload(null, null, "delete");
