@@ -62,8 +62,12 @@ public class TestRolesDao extends AccountsContextDao<TestRoles> {
         return role;
     }
 
+    public TestRoles findAttackerRole() {
+        return TestRolesDao.instance.findOne(TestRoles.NAME, "ATTACKER_TOKEN_ALL");
+    }
+
     public AuthMechanism fetchAttackerToken(int apiCollectionId, RawApi rawApi) {
-        TestRoles testRoles = TestRolesDao.instance.findOne(TestRoles.NAME, "ATTACKER_TOKEN_ALL");
+        TestRoles testRoles = findAttackerRole();
         if (testRoles != null && testRoles.getAuthWithCondList().size() > 0) {
             List<AuthWithCond> authWithCondList = testRoles.getAuthWithCondList();
             AuthWithCond firstAuth = authWithCondList.get(0);
@@ -111,27 +115,6 @@ public class TestRolesDao extends AccountsContextDao<TestRoles> {
     }
 
     public BasicDBObject fetchAttackerTokenDoc(int apiCollectionId) {
-        MongoCursor<BasicDBObject> cursor = MCollection.getMCollection(getDBName(), getCollName(), BasicDBObject.class).find(new BasicDBObject(TestRoles.NAME, "ATTACKER_TOKEN_ALL")).cursor();
-        if(cursor.hasNext()) {
-            BasicDBObject testRole = cursor.next();
-            Object authWithCondList = testRole.get(TestRoles.AUTH_WITH_COND_LIST);
-            if (authWithCondList instanceof BasicDBList) {
-                BasicDBList list = (BasicDBList) authWithCondList;
-                if (list.size() > 0) {
-                    Object authWithCond = list.get(0);
-                    if (authWithCond instanceof BasicDBObject) {
-                        BasicDBObject authWithCondObj = (BasicDBObject) authWithCond;
-                        Object auth = authWithCondObj.get("authMechanism");
-                        if (auth instanceof BasicDBObject) {
-                            return (BasicDBObject) auth;
-                        }
-                    }
-                }
-            }
-        }
-
-
-        //AuthMechanismsDao.instance.findOneDocument(new BasicDBObject());
-        return null;
+        throw new IllegalStateException("Not implemented");
     }
 }

@@ -201,10 +201,6 @@ public class TestExecutor {
         SampleMessageStore sampleMessageStore = SampleMessageStore.create();
         sampleMessageStore.fetchSampleMessages(Main.extractApiCollectionIds(apiInfoKeyList));
 
-        List<RawApi> rawApis = sampleMessageStore.findSampleMessages(1);
-        RawApi randomRawApi = !rawApis.isEmpty() ? rawApis.get(0) : null;
-        AuthMechanismStore authMechanismStore = AuthMechanismStore.create(randomRawApi);
-
         if (apiInfoKeyList == null || apiInfoKeyList.isEmpty()) return;
         loggerMaker.infoAndAddToDb("APIs found: " + apiInfoKeyList.size(), LogDb.TESTING);
 
@@ -213,7 +209,7 @@ public class TestExecutor {
             Updates.set(TestingRunResultSummary.TOTAL_APIS, apiInfoKeyList.size()));
 
         List<TestRoles> testRoles = sampleMessageStore.fetchTestRoles();
-        AuthMechanism authMechanism = authMechanismStore.getAuthMechanism();
+        TestRoles attackerTestRole = TestRolesDao.instance.findAttackerRole();
 
         //Updating the subcategory list if its individual run
         List<String> testingRunSubCategories;
@@ -226,21 +222,10 @@ public class TestExecutor {
         Map<String, TestConfig> testConfigMap = YamlTemplateDao.instance.fetchTestConfigMap(false, true, 0, 10_000, Filters.in("_id", testingRunSubCategories));
 
         List<CustomAuthType> customAuthTypes = CustomAuthTypeDao.instance.findAll(CustomAuthType.ACTIVE,true);
-        TestingUtil testingUtil = new TestingUtil(authMechanism, sampleMessageStore, testRoles, testingRun.getUserEmail(), customAuthTypes);
+        TestingUtil testingUtil = new TestingUtil(sampleMessageStore, testRoles, testingRun.getUserEmail(), customAuthTypes);
 
         logger.info("For account: " + accountId + " fetched test yamls and auth types");
 
-        try {
-            logger.info("For account: " + accountId + " initiating login flow");
-            LoginFlowResponse loginFlowResponse = triggerLoginFlow(authMechanism, 3);
-            if (!loginFlowResponse.getSuccess()) {
-                loggerMaker.errorAndAddToDb("login flow failed", LogDb.TESTING);
-                throw new Exception("login flow failed");
-            }
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e.getMessage(), LogDb.TESTING);
-            return;
-        }
 
         Map<ApiInfo.ApiInfoKey, List<String>> sampleDataMapForStatusCodeAnalyser = new HashMap<>();
         Set<ApiInfo.ApiInfoKey> apiInfoKeySet = new HashSet<>(apiInfoKeyList);
@@ -271,7 +256,7 @@ public class TestExecutor {
         try {
             currentTime = Context.now();
             loggerMaker.infoAndAddToDb("Starting StatusCodeAnalyser at: " + currentTime, LogDb.TESTING);
-            StatusCodeAnalyser.run(sampleDataMapForStatusCodeAnalyser, sampleMessageStore , authMechanismStore, testingRun.getTestingRunConfig(), hostAndContentType);
+            StatusCodeAnalyser.run(sampleDataMapForStatusCodeAnalyser, sampleMessageStore , attackerTestRole.findMatchingAuthMechanism(null), testingRun.getTestingRunConfig(), hostAndContentType);
             loggerMaker.infoAndAddToDb("Completing StatusCodeAnalyser in: " + (Context.now() -  currentTime) + " at: " + Context.now(), LogDb.TESTING);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error while running status code analyser " + e.getMessage(), LogDb.TESTING);
@@ -809,7 +794,7 @@ public class TestExecutor {
     Set<Integer> deactivatedCollections = UsageMetricCalculator.getDeactivated();
     Set<Integer> demoCollections = UsageMetricCalculator.getDemos();
 
-    private Map<ApiInfoKey, List<ApiInfoKey>> cleanUpTestArtifacts(List<TestingRunResult> testingRunResults, ApiInfoKey apiInfoKey, TestingUtil testingUtil, TestingRunConfig testingRunConfig) {
+    private Map<ApiInfoKey, List<ApiInfoKey>> cleanUpTestArtifacts(List<TestingRunResult> testingRunResults, ApiInfoKey apiInfoKey, SampleMessageStore sampleMessageStore, TestingRunConfig testingRunConfig) {
 
         Map<ApiInfoKey, List<ApiInfoKey>> cleanedUpRequests = new HashMap<>();
 
@@ -843,7 +828,7 @@ public class TestExecutor {
                                         Map<String, Set<Object>> valuesMap = Build.getValuesMap(rawApiToBeReplayed.getResponse());
 
                                         ApiInfoKey cleanUpApiInfoKey = new ApiInfoKey(Integer.valueOf(node.getApiCollectionIdReq()), node.getUrlReq(), Method.valueOf(node.getMethodReq()));
-                                        List<String> samples = testingUtil.getSampleMessages().get(cleanUpApiInfoKey);
+                                        List<String> samples = sampleMessageStore.getSampleDataMap().get(cleanUpApiInfoKey);
                                         if (samples == null || samples.isEmpty()) {
                                             continue;
                                         } else {
@@ -871,14 +856,12 @@ public class TestExecutor {
                                             }
 
                                             if (testingRunConfig != null && StringUtils.isNotBlank(testingRunConfig.getTestRoleId())) {
-                                                TestRoles role = TestRolesDao.instance.findOne(Filters.eq("_id", new ObjectId(testingRunConfig.getTestRoleId())));
+                                                TestRoles role = Executor.fetchOrFindTestRole(testingRunConfig.getTestRoleId(), true);
                                                 if (role != null) {
                                                     EndpointLogicalGroup endpointLogicalGroup = role.fetchEndpointLogicalGroup();
                                                     if (endpointLogicalGroup != null && endpointLogicalGroup.getTestingEndpoints() != null  && endpointLogicalGroup.getTestingEndpoints().containsApi(apiInfoKey)) {
-                                                        if (role.getDefaultAuthMechanism() != null) {
-                                                            loggerMaker.infoAndAddToDb("attempting to override auth ", LogDb.TESTING);
-                                                            Executor.modifyAuthTokenInRawApi(role, nextApi);
-                                                        } else {
+                                                        loggerMaker.infoAndAddToDb("attempting to override auth ", LogDb.TESTING);
+                                                        if (Executor.modifyAuthTokenInRawApi(role, nextApi) == null) {
                                                             loggerMaker.infoAndAddToDb("Default auth mechanism absent", LogDb.TESTING);
                                                         }
                                                     } else {
@@ -958,12 +941,25 @@ public class TestExecutor {
     }
 
     public TestingRunResult runTestNew(ApiInfo.ApiInfoKey apiInfoKey, ObjectId testRunId, TestingUtil testingUtil,
-                                       ObjectId testRunResultSummaryId, TestConfig testConfig, TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs, String message) {
+        ObjectId testRunResultSummaryId, TestConfig testConfig, TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs, String message) {
+            RawApi rawApi = RawApi.buildFromMessage(message, true);
+            TestRoles attackerTestRole = Executor.fetchOrFindTestRole("ATTACKER_TOKEN_ALL", false);
+            AuthMechanism attackerAuthMechanism = null;
+            if (attackerTestRole == null) {
+                loggerMaker.infoAndAddToDb("ATTACKER_TOKEN_ALL test role not found", LogDb.TESTING);
+            } else {
+                attackerAuthMechanism = attackerTestRole.findMatchingAuthMechanism(rawApi);
+            }
+            return runTestNew(apiInfoKey, testRunId, testingUtil.getSampleMessageStore(), attackerAuthMechanism, testingUtil.getCustomAuthTypes(), testRunResultSummaryId, testConfig, testingRunConfig, debug, testLogs, rawApi);
+    }
+
+    public TestingRunResult runTestNew(ApiInfo.ApiInfoKey apiInfoKey, ObjectId testRunId, SampleMessageStore sampleMessageStore, AuthMechanism attackerAuthMechanism, List<CustomAuthType> customAuthTypes,
+                                       ObjectId testRunResultSummaryId, TestConfig testConfig, TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs, RawApi rawApi) {
+
 
         String testSuperType = testConfig.getInfo().getCategory().getName();
         String testSubType = testConfig.getInfo().getSubCategory();
 
-        RawApi rawApi = RawApi.buildFromMessage(message, true);
         int startTime = Context.now();
 
         try {
@@ -989,20 +985,19 @@ public class TestExecutor {
             varMap.put("wordList_" + key, wordListsMap.get(key));
         }
 
-        VariableResolver.resolveWordList(varMap, testingUtil.getSampleMessages(), apiInfoKey);
+        VariableResolver.resolveWordList(varMap, sampleMessageStore.getSampleDataMap(), apiInfoKey);
 
         String testExecutionLogId = UUID.randomUUID().toString();
         
         loggerMaker.infoAndAddToDb("triggering test run for apiInfoKey " + apiInfoKey + "test " + 
             testSubType + "logId" + testExecutionLogId, LogDb.TESTING);
 
-        List<CustomAuthType> customAuthTypes = testingUtil.getCustomAuthTypes();
         // TestingUtil -> authMechanism
         // TestingConfig -> auth
         com.akto.test_editor.execution.Executor executor = new Executor();
         executor.overrideTestUrl(rawApi, testingRunConfig);
         YamlTestTemplate yamlTestTemplate = new YamlTestTemplate(apiInfoKey,filterNode, validatorNode, executorNode,
-                rawApi, varMap, auth, testingUtil.getAuthMechanism(), testExecutionLogId, testingRunConfig, customAuthTypes, testConfig.getStrategy());
+                rawApi, varMap, auth, attackerAuthMechanism, testExecutionLogId, testingRunConfig, customAuthTypes, testConfig.getStrategy());
         YamlTestResult testResults = yamlTestTemplate.run(debug, testLogs);
         if (testResults == null || testResults.getTestResults().isEmpty()) {
             List<GenericTestResult> res = new ArrayList<>();
@@ -1039,7 +1034,7 @@ public class TestExecutor {
 
         if (testingRunConfig!=null && testingRunConfig.getCleanUp()) {
             try {
-                cleanUpTestArtifacts(Collections.singletonList(ret), apiInfoKey, testingUtil, testingRunConfig);
+                cleanUpTestArtifacts(Collections.singletonList(ret), apiInfoKey, sampleMessageStore, testingRunConfig);
             } catch(Exception e){
                 loggerMaker.errorAndAddToDb("Error while cleaning up test artifacts: " + e.getMessage(), LogDb.TESTING);
             }

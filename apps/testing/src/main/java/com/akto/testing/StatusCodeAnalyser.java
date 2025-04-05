@@ -41,7 +41,7 @@ public class StatusCodeAnalyser {
         }
     }
 
-    public static void run(Map<ApiInfo.ApiInfoKey, List<String>> sampleDataMap, SampleMessageStore sampleMessageStore, AuthMechanismStore authMechanismStore, TestingRunConfig testingRunConfig, Map<String, String> hostAndContentType) {
+    public static void run(Map<ApiInfo.ApiInfoKey, List<String>> sampleDataMap, SampleMessageStore sampleMessageStore, AuthMechanism authMechanism, TestingRunConfig testingRunConfig, Map<String, String> hostAndContentType) {
         defaultPayloadsMap = new HashMap<>();
         result = new ArrayList<>();
         if (sampleDataMap == null) {
@@ -53,7 +53,7 @@ public class StatusCodeAnalyser {
         calculateDefaultPayloads(sampleMessageStore, sampleDataMap, testingRunConfig, hostAndContentType);
 
         loggerMaker.infoAndAddToDb("started fill result", LogDb.TESTING);
-        fillResult(sampleMessageStore, sampleDataMap, authMechanismStore, testingRunConfig);
+        fillResult(sampleMessageStore, sampleDataMap, authMechanism, testingRunConfig);
     }
 
     public static Map<String, String> findAllHosts(SampleMessageStore sampleMessageStore, Map<ApiInfo.ApiInfoKey, List<String>> sampleDataMap){
@@ -126,10 +126,9 @@ public class StatusCodeAnalyser {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(StatusCodeAnalyser.class);
     public static int MAX_COUNT = 30;
-    public static void fillResult(SampleMessageStore sampleMessageStore, Map<ApiInfo.ApiInfoKey, List<String>> sampleDataMap, AuthMechanismStore authMechanismStore, TestingRunConfig testingRunConfig) {
+    public static void fillResult(SampleMessageStore sampleMessageStore, Map<ApiInfo.ApiInfoKey, List<String>> sampleDataMap, AuthMechanism authMechanism, TestingRunConfig testingRunConfig) {
         loggerMaker.infoAndAddToDb("Running status analyser", LogDb.TESTING);
 
-        AuthMechanism authMechanism = authMechanismStore.getAuthMechanism();
         if (authMechanism == null) {
             loggerMaker.errorAndAddToDb("No auth mechanism", LogDb.TESTING);
             return;

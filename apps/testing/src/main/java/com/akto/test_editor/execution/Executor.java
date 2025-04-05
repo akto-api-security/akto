@@ -115,13 +115,11 @@ public class Executor {
             if (role != null) {
                 EndpointLogicalGroup endpointLogicalGroup = role.fetchEndpointLogicalGroup();
                 if (endpointLogicalGroup != null && endpointLogicalGroup.getTestingEndpoints() != null  && endpointLogicalGroup.getTestingEndpoints().containsApi(apiInfoKey)) {
-                    if (role.getDefaultAuthMechanism() != null) {
-                        synchronized(role) {
-                            loggerMaker.infoAndAddToDb("attempting to override auth " + logId, LogDb.TESTING);
-                            modifyAuthTokenInRawApi(role, sampleRawApi);
+                    synchronized(role) {
+                        loggerMaker.infoAndAddToDb("attempting to override auth " + logId, LogDb.TESTING);
+                        if (modifyAuthTokenInRawApi(role, sampleRawApi) == null) {
+                            loggerMaker.infoAndAddToDb("Default auth mechanism absent: " + logId, LogDb.TESTING);
                         }
-                    } else {
-                        loggerMaker.infoAndAddToDb("Default auth mechanism absent: " + logId, LogDb.TESTING);
                     }
                 } else {
                     loggerMaker.infoAndAddToDb("Endpoint didn't satisfy endpoint condition for testRole" + logId, LogDb.TESTING);
@@ -507,84 +505,23 @@ public class Executor {
 
             if (allSatisfied) {
                 AuthMechanism authMechanismForRole = authWithCond.getAuthMechanism();
-
-                if (authWithCond.getRecordedLoginFlowInput() != null) {
-                    // handle json recording
-                    RecordedLoginFlowInput recordedLoginFlowInput = authWithCond.getRecordedLoginFlowInput();
-                    Map<String, Object> valuesMap = new HashMap<>();
-
-                    String token = null;
-                    boolean isRoleFromCache = false;
-                    // if(TestRolesCache.getTokenForRole(testRole.getName() + "_" + Context.accountId.get(), testRole.getLastUpdatedTs()) != null){
-                    //     loggerMaker.infoAndAddToDb("got login response from cache " + testRole.getName(), LogDb.TESTING);
-                    //     isRoleFromCache = true;
-                    //     token = TestRolesCache.getTokenForRole(testRole.getName() + "_" + Context.accountId.get(), testRole.getLastUpdatedTs());
-                    // }else{
-                        
-                    // }
-                    loggerMaker.infoAndAddToDb("trying to fetch token for role " + testRole.getName(), LogDb.TESTING);
-                    token = com.akto.testing.workflow_node_executor.Utils.fetchToken(testRole.getName(), recordedLoginFlowInput, 5);
-                    if (token == null) {
-                        return new ExecutorSingleOperationResp(false, "Failed to replace roles_access_context: ");
-                    } else {
-                        loggerMaker.infoAndAddToDb("flattened here: " + token);
-                        if(!isRoleFromCache){
-                            TestRolesCache.putToken(testRole.getName() + "_" + Context.accountId.get(), token, Context.now());
+                
+                if (AuthMechanismTypes.LOGIN_REQUEST.toString().equalsIgnoreCase(authMechanismForRole.getType())) {
+                    try {
+                        LoginFlowResponse loginFlowResponse= new LoginFlowResponse();
+                        String roleKey = testRole.getName() + "_" + Context.accountId.get();
+                        loggerMaker.infoAndAddToDb("trying to fetch token of step builder type for role " + testRole.getName(), LogDb.TESTING);
+                        loginFlowResponse = TestExecutor.executeLoginFlow(authMechanismForRole, null, testRole.getName());
+                        if (!loginFlowResponse.getSuccess())
+                            throw new Exception(loginFlowResponse.getError());
+                        else{
+                            String responseString = loginFlowResponse.toString();
+                            TestRolesCache.putToken(roleKey, responseString, Context.now());
                         }
-                        BasicDBObject flattened = JSONUtils.flattenWithDots(BasicDBObject.parse(token));
-
-                        for (String param: flattened.keySet()) {
-                            String key = "x1.response.body." + param;
-                            valuesMap.put(key, flattened.get(param));
-                            loggerMaker.infoAndAddToDb("kv pair: " + key + " " + flattened.get(param));
-                        }	
-
-                    }
-
-                    for (AuthParam param : authMechanismForRole.getAuthParams()) {
-                        try {
-                            String value = com.akto.testing.workflow_node_executor.Utils.executeCode(param.getValue(), valuesMap);
-                            if (!param.getValue().equals(value) && value == null) {
-                                return new ExecutorSingleOperationResp(false, "auth param not found at specified path");
-                            }
-                            param.setValue(value);
-                        } catch(Exception e) {
-                            return new ExecutorSingleOperationResp(false, "auth param not found at specified path" + e.getMessage());
-                        }
-                    }
-
-                    authMechanismForRole.setType(LoginFlowEnums.AuthMechanismTypes.HARDCODED.name());
-                    /*
-                     * We set the recorded login flow null
-                     * so that we calculate the tokens only once
-                     * and use them every time.
-                     */
-                    authWithCond.setRecordedLoginFlowInput(null);
-                } else {
-                    if (AuthMechanismTypes.LOGIN_REQUEST.toString().equalsIgnoreCase(authMechanismForRole.getType())) {
-                        try {
-                            LoginFlowResponse loginFlowResponse= new LoginFlowResponse();
-                            String roleKey = testRole.getName() + "_" + Context.accountId.get();
-                            if(TestRolesCache.getTokenForRole(roleKey, testRole.getLastUpdatedTs()) == null){
-                                loggerMaker.infoAndAddToDb("trying to fetch token of step builder type for role " + testRole.getName(), LogDb.TESTING);
-                                loginFlowResponse = TestExecutor.executeLoginFlow(authMechanismForRole, null, testRole.getName());
-                                if (!loginFlowResponse.getSuccess())
-                                    throw new Exception(loginFlowResponse.getError());
-                                else{
-                                    String responseString = loginFlowResponse.toString();
-                                    TestRolesCache.putToken(roleKey, responseString, Context.now());
-                                }
-                            }else{
-                                loggerMaker.infoAndAddToDb("got login response from cache " + testRole.getName(), LogDb.TESTING);
-                                String responseString = TestRolesCache.getTokenForRole(roleKey, testRole.getLastUpdatedTs());
-                                loginFlowResponse = LoginFlowResponse.getLoginFlowResponse(responseString);
-                            }
-                            
-    
-                            authMechanismForRole.setType(LoginFlowEnums.AuthMechanismTypes.HARDCODED.name());
-                        } catch (Exception e) {
-                            return new ExecutorSingleOperationResp(false, "Failed to replace roles_access_context: " + e.getMessage());
-                        }
+                        authMechanismForRole.setType(LoginFlowEnums.AuthMechanismTypes.HARDCODED.name());
+                        authMechanismForRole.setRecordedLoginFlowInput(null);
+                    } catch (Exception e) {
+                        return new ExecutorSingleOperationResp(false, "Failed to replace roles_access_context: " + e.getMessage());
                     }
                 }
          
@@ -620,7 +557,7 @@ public class Executor {
         }
     }
 
-    private synchronized static TestRoles fetchOrFindTestRole(String name, boolean isId) {
+    public synchronized static TestRoles fetchOrFindTestRole(String name, boolean isId) {
         if (roleCache == null) {
             roleCache = new ConcurrentHashMap<>();
         }
