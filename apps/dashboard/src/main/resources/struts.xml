@@ -2240,7 +2240,7 @@
             </result>
         </action>
 
-        <action name="api/deleteApisBasedOnHeader" class="com.akto.action.InternalAction" method="deleteApisBasedOnHeader">
+        <action name="api/deleteApisWithoutHost" class="com.akto.action.InternalAction" method="deleteApisWithoutHost">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="FORBIDDEN" type="json">
