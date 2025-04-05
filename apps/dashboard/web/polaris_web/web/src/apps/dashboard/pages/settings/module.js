@@ -81,6 +81,12 @@ const urlOptionsList = [
       {value: 'otf', label: '.otf'},
     ],
   },
+  {
+    title: 'Content-type header',
+    options: [
+      { value: 'CONTENT-TYPE html', label: 'text/html'}
+    ]
+  },
 ]
 
 const settingFunctions = {

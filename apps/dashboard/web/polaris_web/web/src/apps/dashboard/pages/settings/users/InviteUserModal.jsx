@@ -1,22 +1,13 @@
 import { Modal, Text, TextField } from "@shopify/polaris"
-import { useState, useRef, useCallback } from "react"
+import { useState, useRef } from "react"
 import func from "@/util/func"
 import Store from "../../../store"
 import settingRequests from "../api"
-import Dropdown from "../../../components/layouts/Dropdown"
 
-const InviteUserModal = ({ inviteUser, setInviteUser, toggleInviteUserModal, roleHierarchy, rolesOptions}) => {
+const InviteUserModal = ({ inviteUser, setInviteUser, toggleInviteUserModal }) => {
     const setToastConfig = Store(state => state.setToastConfig)
     const ref = useRef(null)
     const [inviteEmail, setInviteEmail] = useState()
-    const [inviteRole, setInviteRole] = useState('MEMBER')
-
-    const handleRoleSelectChange = useCallback(
-        (value) => {
-            setInviteRole(value)
-        },
-        [],
-    );
 
     const handleSendInvitation = async () => {
         setInviteUser(previousState => ({
@@ -29,8 +20,7 @@ const InviteUserModal = ({ inviteUser, setInviteUser, toggleInviteUserModal, rol
         const spec = {
             inviteeName: "there",
             inviteeEmail: inviteEmail,
-            websiteHostName: window.location.origin,
-            inviteeRole: inviteRole,
+            websiteHostName: window.location.origin
         }
 
         const inviteUsersResponse = await settingRequests.inviteUsers(spec)
@@ -49,19 +39,12 @@ const InviteUserModal = ({ inviteUser, setInviteUser, toggleInviteUserModal, rol
         })
 
         setInviteEmail("")
-        setInviteRole("GUEST")
     }
 
     const handleCopyInvitation = () => {
         func.copyToClipboard(inviteUser.inviteLink, ref, "Invitation link copied to clipboard")
     }
 
-    const filteredRoleOptions = rolesOptions[0].items.map((c) => {
-        return{
-            label: c?.content,
-            value: c?.role,
-        }
-    }).filter((c) => roleHierarchy.includes(c.value))
     if (inviteUser.state !== "success") {
         return (
             <Modal
@@ -92,12 +75,6 @@ const InviteUserModal = ({ inviteUser, setInviteUser, toggleInviteUserModal, rol
                     <Text variant="bodyMd" color="subdued">
                         We'll use this address if we need to contact you about your account.
                     </Text>
-
-                    <Dropdown
-                        id={"inviteRoleSelection"}
-                        selected={handleRoleSelectChange}
-                        menuItems={filteredRoleOptions} 
-                        initial={inviteRole} />
 
                 </Modal.Section>
             </Modal>

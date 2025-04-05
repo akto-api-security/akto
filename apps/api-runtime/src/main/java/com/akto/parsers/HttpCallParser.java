@@ -8,23 +8,33 @@ import com.akto.dao.context.Context;
 import com.akto.dao.traffic_metrics.TrafficMetricsDao;
 import com.akto.dependency.DependencyAnalyser;
 import com.akto.dto.*;
+import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.billing.SyncLimit;
+import com.akto.dto.monitoring.FilterConfig;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.settings.DefaultPayload;
 import com.akto.dto.traffic_metrics.TrafficMetrics;
+import com.akto.dto.type.URLMethods.Method;
 import com.akto.dto.usage.MetricTypes;
 import com.akto.graphql.GraphQLUtils;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-import com.akto.runtime.parser.SampleParser;
 import com.akto.runtime.APICatalogSync;
 import com.akto.runtime.Main;
+import com.akto.runtime.RuntimeUtil;
 import com.akto.runtime.URLAggregator;
+import com.akto.runtime.parser.SampleParser;
+import com.akto.runtime.utils.Utils;
+import com.akto.test_editor.execution.VariableResolver;
+import com.akto.test_editor.filter.data_operands_impl.ValidationResult;
 import com.akto.usage.UsageMetricCalculator;
+import com.akto.util.JSONUtils;
 import com.akto.util.http_util.CoreHTTPClient;
 import com.akto.util.Constants;
 import com.akto.util.DbMode;
+import com.akto.util.HttpRequestResponseUtils;
+import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.*;
 import okhttp3.*;
@@ -33,6 +43,7 @@ import org.bson.conversions.Bson;
 
 import java.io.IOException;
 import java.util.*;
+import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -41,6 +52,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static com.akto.runtime.RuntimeUtil.matchesDefaultPayload;
+import static com.akto.testing.Utils.validateFilter;
 
 public class HttpCallParser {
     private final int sync_threshold_count;
@@ -158,13 +170,64 @@ public class HttpCallParser {
 
     int numberOfSyncs = 0;
 
+    private List<HttpResponseParams> applyAdvancedFilters(List<HttpResponseParams> responseParams){
+        Map<String,FilterConfig> filterMap = apiCatalogSync.advancedFilterMap;
+        
+        if (filterMap != null && !filterMap.isEmpty()) {
+            List<HttpResponseParams> filteredParams = new ArrayList<>();
+            for (HttpResponseParams responseParam : responseParams) {
+                for (Entry<String, FilterConfig> apiFilterEntry : filterMap.entrySet()) {
+                    try {
+                        FilterConfig apiFilter = apiFilterEntry.getValue();
+                        String message = responseParam.getOrig();
+                        RawApi rawApi = RawApi.buildFromMessage(message);
+                        int apiCollectionId = createApiCollectionId(responseParam);
+                        responseParam.requestParams.setApiCollectionId(apiCollectionId);
+                        String url = responseParam.getRequestParams().getURL();
+                        Method method = Method.valueOf(responseParam.getRequestParams().getMethod());
+                        ApiInfoKey apiInfoKey = new ApiInfoKey(apiCollectionId, url, method);
+                        Map<String, Object> varMap = apiFilter.resolveVarMap();
+                        VariableResolver.resolveWordList(varMap, new HashMap<ApiInfoKey, List<String>>() {
+                            {
+                                put(apiInfoKey, Arrays.asList(message));
+                            }
+                        }, apiInfoKey);
+                        String filterExecutionLogId = UUID.randomUUID().toString();
+                        ValidationResult res = validateFilter(apiFilter.getFilter().getNode(), rawApi,
+                                apiInfoKey, varMap, filterExecutionLogId);
+                        if (res.getIsValid()) {
+                            // TODO apply execution
+                            
+                            filteredParams.add(responseParam);
+                            break;
+                        }
+                    } catch (Exception e) {
+                        loggerMaker.errorAndAddToDb(e, String.format("Error in httpCallFilter %s", e.toString()));
+                        return responseParams;
+                    }
+                }
+            }
+            return filteredParams;
+        }
+        return responseParams;
+    }
+
     public void syncFunction(List<HttpResponseParams> responseParams, boolean syncImmediately, boolean fetchAllSTI, AccountSettings accountSettings)  {
         // USE ONLY filteredResponseParams and not responseParams
         List<HttpResponseParams> filteredResponseParams = responseParams;
         if (accountSettings != null && accountSettings.getDefaultPayloads() != null) {
             filteredResponseParams = filterDefaultPayloads(filteredResponseParams, accountSettings.getDefaultPayloads());
         }
-        filteredResponseParams = filterHttpResponseParams(filteredResponseParams, accountSettings);
+        List<String> redundantList = new ArrayList<>();
+        if(accountSettings !=null && !accountSettings.getAllowRedundantEndpointsList().isEmpty()){
+            redundantList = accountSettings.getAllowRedundantEndpointsList();
+        }
+        Pattern regexPattern = Utils.createRegexPatternFromList(redundantList);
+        filteredResponseParams = filterHttpResponseParams(filteredResponseParams, redundantList, regexPattern);
+
+        // add advanced filters
+        filteredResponseParams = applyAdvancedFilters(filteredResponseParams);
+
         boolean isHarOrPcap = aggregate(filteredResponseParams, aggregatorMap);
 
         for (int apiCollectionId: aggregatorMap.keySet()) {
@@ -330,14 +393,9 @@ public class HttpCallParser {
         trafficMetrics.inc(value);
     }
 
-    public boolean isRedundantEndpoint(String url, List<String> discardedUrlList){
-        StringJoiner joiner = new StringJoiner("|", ".*\\.(", ")(\\?.*)?");
-        for (String extension : discardedUrlList) {
-            joiner.add(extension);
-        }
-        String regex = joiner.toString();
+    public static final String CONTENT_TYPE = "CONTENT-TYPE";
 
-        Pattern pattern = Pattern.compile(regex);
+    public boolean isRedundantEndpoint(String url, Pattern pattern){
         Matcher matcher = pattern.matcher(url);
         return matcher.matches();
     }
@@ -350,7 +408,77 @@ public class HttpCallParser {
         return res;
     }
 
-    public List<HttpResponseParams> filterHttpResponseParams(List<HttpResponseParams> httpResponseParamsList, AccountSettings accountSettings) {
+    public int createApiCollectionId(HttpResponseParams httpResponseParam){
+        int apiCollectionId;
+        String hostName = getHeaderValue(httpResponseParam.getRequestParams().getHeaders(), "host");
+
+        if (hostName != null && !hostNameToIdMap.containsKey(hostName) && RuntimeUtil.hasSpecialCharacters(hostName)) {
+            hostName = "Special_Char_Host";
+        }
+
+        int vxlanId = httpResponseParam.requestParams.getApiCollectionId();
+
+        if (useHostCondition(hostName, httpResponseParam.getSource())) {
+            hostName = hostName.toLowerCase();
+            hostName = hostName.trim();
+
+            String key = hostName;
+
+            if (hostNameToIdMap.containsKey(key)) {
+                apiCollectionId = hostNameToIdMap.get(key);
+
+            } else {
+                int id = hostName.hashCode();
+                try {
+
+                    apiCollectionId = createCollectionBasedOnHostName(id, hostName);
+
+                    hostNameToIdMap.put(key, apiCollectionId);
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb("Failed to create collection for host : " + hostName, LogDb.RUNTIME);
+                    createCollectionSimple(vxlanId);
+                    hostNameToIdMap.put("null " + vxlanId, vxlanId);
+                    apiCollectionId = httpResponseParam.requestParams.getApiCollectionId();
+                }
+            }
+
+        } else {
+            String key = "null" + " " + vxlanId;
+            if (!hostNameToIdMap.containsKey(key)) {
+                createCollectionSimple(vxlanId);
+                hostNameToIdMap.put(key, vxlanId);
+            }
+
+            apiCollectionId = vxlanId;
+        }
+        return apiCollectionId;
+    }
+
+
+
+    private boolean isBlankResponseBodyForGET(String method, String contentType, String matchContentType,
+            String responseBody) {
+        boolean res = true;
+        if (contentType == null || contentType.length() == 0)
+            return false;
+        res &= contentType.contains(matchContentType);
+        res &= "GET".equals(method.toUpperCase());
+
+        /*
+         * To be sure that the content type
+         * header matches the actual payload.
+         * 
+         * We will need to add more type validation as needed.
+         */
+        if (matchContentType.contains("html")) {
+            res &= responseBody.startsWith("<") && responseBody.endsWith(">");
+        } else {
+            res &= false;
+        }
+        return res;
+    }
+
+    public List<HttpResponseParams> filterHttpResponseParams(List<HttpResponseParams> httpResponseParamsList, List<String> redundantUrlsList, Pattern pattern) {
         List<HttpResponseParams> filteredResponseParams = new ArrayList<>();
         int originalSize = httpResponseParamsList.size();
         for (HttpResponseParams httpResponseParam: httpResponseParamsList) {
@@ -371,8 +499,8 @@ public class HttpCallParser {
             if (ignoreAktoFlag != null) continue;
 
             // check for garbage points here
-            if(accountSettings != null && accountSettings.getAllowRedundantEndpointsList() != null){
-                if(isRedundantEndpoint(httpResponseParam.getRequestParams().getURL(), accountSettings.getAllowRedundantEndpointsList())){
+            if(redundantUrlsList != null && !redundantUrlsList.isEmpty()){
+                if(isRedundantEndpoint(httpResponseParam.getRequestParams().getURL(), pattern)){
                     continue;
                 }
                 List<String> contentTypeList = (List<String>) httpResponseParam.getRequestParams().getHeaders().getOrDefault("content-type", new ArrayList<>());
@@ -383,59 +511,33 @@ public class HttpCallParser {
                 if(isInvalidContentType(contentType)){
                     continue;
                 }
-            }
 
-            Map<String, List<String>> reqHeaders = httpResponseParam.getRequestParams().getHeaders();
-            String hostName = getHeaderValue(reqHeaders, "host");
-
-            if (StringUtils.isEmpty(hostName)) {
-                hostName = getHeaderValue(reqHeaders, "authority");
-                if (StringUtils.isEmpty(hostName)) {
-                    hostName = getHeaderValue(reqHeaders, ":authority");
-                }
-
-                if (!StringUtils.isEmpty(hostName)) {
-                    reqHeaders.put("host", Collections.singletonList(hostName));
-                }
-            }
-
-            int vxlanId = httpResponseParam.requestParams.getApiCollectionId();
-            int apiCollectionId ;
-
-            if (useHostCondition(hostName, httpResponseParam.getSource())) {
-                hostName = hostName.toLowerCase();
-                hostName = hostName.trim();
-
-                String key = hostName;
-
-                if (hostNameToIdMap.containsKey(key)) {
-                    apiCollectionId = hostNameToIdMap.get(key);
-
-                } else {
-                    int id = hostName.hashCode();
-                    try {
-
-                        apiCollectionId = createCollectionBasedOnHostName(id, hostName);
-
-                        hostNameToIdMap.put(key, apiCollectionId);
-                    } catch (Exception e) {
-                        loggerMaker.errorAndAddToDb("Failed to create collection for host : " + hostName, LogDb.RUNTIME);
-                        createCollectionSimple(vxlanId);
-                        hostNameToIdMap.put("null " + vxlanId, vxlanId);
-                        apiCollectionId = httpResponseParam.requestParams.getApiCollectionId();
+                try {
+                    List<String> responseContentTypeList = (List<String>) httpResponseParam.getHeaders().getOrDefault("content-type", new ArrayList<>());
+                    String allContentTypes = responseContentTypeList.toString();
+                    String method = httpResponseParam.getRequestParams().getMethod();
+                    String responseBody = httpResponseParam.getPayload();
+                    boolean ignore = false;
+                    for (String extension : redundantUrlsList) {
+                        if(extension.startsWith(CONTENT_TYPE)){
+                            String matchContentType = extension.split(" ")[1];
+                            if(isBlankResponseBodyForGET(method, allContentTypes, matchContentType, responseBody)){
+                                ignore = true;
+                                break;
+                            }
+                        }
                     }
+                    if(ignore){
+                        continue;
+                    }
+    
+                } catch(Exception e){
+                    loggerMaker.errorAndAddToDb(e, "Error while ignoring content-type redundant samples " + e.toString(), LogDb.RUNTIME);
                 }
 
-            } else {
-                String key = "null" + " " + vxlanId;
-                if (!hostNameToIdMap.containsKey(key)) {
-                    createCollectionSimple(vxlanId);
-                    hostNameToIdMap.put(key, vxlanId);
-                }
-
-                apiCollectionId = vxlanId;
             }
-
+            int apiCollectionId = createApiCollectionId(httpResponseParam);
+            
             httpResponseParam.requestParams.setApiCollectionId(apiCollectionId);
 
             List<HttpResponseParams> responseParamsList = GraphQLUtils.getUtils().parseGraphqlResponseParam(httpResponseParam);

@@ -12,8 +12,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.mongodb.client.model.*;
 import org.bson.conversions.Bson;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.HttpRequestParams;
 
@@ -231,37 +229,7 @@ public class RelationshipSync {
 
     public static void extractAllValuesFromPayload(JsonNode node, List<String> params, Map<String, Set<String>> values) {
         // TODO: null values remove
-        if (node == null) return;
-        if (node.isValueNode()) {
-            String textValue = node.asText();
-            if (textValue != null) {
-                String param = String.join("",params);
-                if (param.startsWith("#")) {
-                    param = param.substring(1);
-                }
-                if (!values.containsKey(param)) {
-                    values.put(param, new HashSet<>());
-                }
-                values.get(param).add(textValue);
-            }
-        } else if (node.isArray()) {
-            ArrayNode arrayNode = (ArrayNode) node;
-            for(int i = 0; i < arrayNode.size(); i++) {
-                JsonNode arrayElement = arrayNode.get(i);
-                params.add("#$");
-                extractAllValuesFromPayload(arrayElement, params, values);
-                params.remove(params.size()-1);
-            }
-        } else {
-            Iterator<String> fieldNames = node.fieldNames();
-            while(fieldNames.hasNext()) {
-                String fieldName = fieldNames.next();
-                params.add("#"+fieldName);
-                JsonNode fieldValue = node.get(fieldName);
-                extractAllValuesFromPayload(fieldValue, params,values);
-                params.remove(params.size()-1);
-            }
-        }
+        com.akto.runtime.RuntimeUtil.extractAllValuesFromPayload(node,params,values);
 
     }
 

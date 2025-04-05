@@ -18,7 +18,6 @@ import com.akto.dependency_analyser.DependencyAnalyserUtils;
 import com.akto.dto.*;
 import com.akto.dto.filter.MergedUrls;
 import com.akto.dto.settings.DataControlSettings;
-import com.mongodb.BasicDBList;
 import com.mongodb.client.model.*;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
@@ -26,7 +25,6 @@ import org.bson.types.ObjectId;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.billing.TokensDao;
 import com.akto.dao.context.Context;
-import com.akto.dao.monitoring.FilterYamlTemplateDao;
 import com.akto.dao.runtime_filters.AdvancedTrafficFiltersDao;
 import com.akto.dao.test_editor.TestingRunPlaygroundDao;
 import com.akto.dao.test_editor.YamlTemplateDao;
@@ -39,14 +37,12 @@ import com.akto.dao.testing.TestingRunConfigDao;
 import com.akto.dao.testing.TestingRunDao;
 import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dao.testing.TestingRunResultSummariesDao;
-import com.akto.dao.testing.VulnerableTestingRunResultDao;
 import com.akto.dao.testing.WorkflowTestResultsDao;
 import com.akto.dao.testing.WorkflowTestsDao;
 import com.akto.dao.testing.config.TestCollectionPropertiesDao;
 import com.akto.dao.testing.config.TestScriptsDao;
 import com.akto.dao.testing.sources.TestSourceConfigsDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
-import com.akto.dao.traffic_metrics.RuntimeMetricsDao;
 import com.akto.dao.traffic_metrics.TrafficMetricsDao;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.billing.Organization;
@@ -73,9 +69,7 @@ import com.akto.dto.testing.TestingRun.State;
 import com.akto.dto.testing.config.TestScript;
 import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.dto.traffic.SampleData;
-import com.akto.dto.traffic.SuspectSampleData;
 import com.akto.dto.traffic.TrafficInfo;
-import com.akto.dto.traffic_metrics.RuntimeMetrics;
 import com.akto.dto.traffic_metrics.TrafficMetrics;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
@@ -363,7 +357,7 @@ public class DbLayer {
                 Updates.combine(
                         Updates.set(ApiCollection.VXLAN_ID, vxlanId),
                         Updates.setOnInsert("startTs", Context.now()),
-                        Updates.setOnInsert("urls", new HashSet<>())
+                        Updates.set("urls", new HashSet<>())
                 ),
                 updateOptions
         );
@@ -379,7 +373,7 @@ public class DbLayer {
                         Updates.set(ApiCollection.VXLAN_ID, vxlanId),
                         Updates.setOnInsert("startTs", Context.now()),
                         Updates.setOnInsert("urls", new HashSet<>()),
-                        Updates.setOnInsert("userSetEnvType", vpcId)
+                        Updates.set("userSetEnvType", vpcId)
                 ),
                 updateOptions
         );
@@ -408,7 +402,7 @@ public class DbLayer {
             Updates.setOnInsert("_id", id),
             Updates.setOnInsert("startTs", Context.now()),
             Updates.setOnInsert("urls", new HashSet<>()),
-            Updates.setOnInsert("userSetEnvType", vpcId)
+            Updates.set("userSetEnvType", vpcId)
         );
 
         ApiCollectionsDao.instance.getMCollection().findOneAndUpdate(Filters.eq(ApiCollection.HOST_NAME, host), updates, updateOptions);
@@ -424,10 +418,6 @@ public class DbLayer {
 
     public static void insertTestingLog(Log log) {
         LogsDao.instance.insertOne(log);
-    }
-
-    public static void insertProtectionLog(Log log) {
-        ProtectionLogsDao.instance.insertOne(log);
     }
 
     public static void modifyHybridSaasSetting(boolean isHybridSaas) {
@@ -454,9 +444,6 @@ public class DbLayer {
 
     public static TestingRunResultSummary createTRRSummaryIfAbsent(String testingRunHexId, int start) {
         ObjectId testingRunId = new ObjectId(testingRunHexId);
-        
-        // since the extra field is not used in mini-testing explicitly, we can just update the summary here
-        // it is only used in dashboard for querying data from new collection
 
         return TestingRunResultSummariesDao.instance.getMCollection().findOneAndUpdate(
                 Filters.and(
@@ -465,8 +452,7 @@ public class DbLayer {
                 ),
                 Updates.combine(
                         Updates.set(TestingRunResultSummary.STATE, TestingRun.State.RUNNING),
-                        Updates.setOnInsert(TestingRunResultSummary.START_TIMESTAMP, start),
-                        Updates.set(TestingRunResultSummary.IS_NEW_TESTING_RUN_RESULT_SUMMARY, true)
+                        Updates.setOnInsert(TestingRunResultSummary.START_TIMESTAMP, start)
                 ),
                 new FindOneAndUpdateOptions().upsert(true).returnDocument(ReturnDocument.AFTER)
         );
@@ -549,30 +535,9 @@ public class DbLayer {
         return TestingRunResultSummariesDao.instance.fetchLatestTestingRunResultSummaries(Collections.singletonList(testingRunObjId));
     }
 
-    private static List<TestingRunResult> fetchLatestTestingRunResultFromComparison(Bson filter){
-        List<TestingRunResult> resultsFromNonVulCollection = TestingRunResultDao.instance.fetchLatestTestingRunResult(filter, 1);
-        List<TestingRunResult> resultsFromVulCollection = VulnerableTestingRunResultDao.instance.fetchLatestTestingRunResult(filter, 1);
-
-        if(resultsFromVulCollection != null && !resultsFromVulCollection.isEmpty()){
-            if(resultsFromNonVulCollection != null && !resultsFromNonVulCollection.isEmpty()){
-                TestingRunResult tr1 = resultsFromVulCollection.get(0);
-                TestingRunResult tr2 = resultsFromNonVulCollection.get(0);
-                if(tr1.getEndTimestamp() >= tr2.getEndTimestamp()){
-                    return resultsFromVulCollection;
-                }else{
-                    return resultsFromVulCollection;
-                }
-            }else{
-                return resultsFromVulCollection;
-            }
-        }
-
-        return resultsFromNonVulCollection;
-    }
-
     public static List<TestingRunResult> fetchLatestTestingRunResult(String testingRunResultSummaryId) {
         ObjectId summaryObjectId = new ObjectId(testingRunResultSummaryId);
-        return fetchLatestTestingRunResultFromComparison(Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, summaryObjectId));
+        return TestingRunResultDao.instance.fetchLatestTestingRunResult(Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, summaryObjectId), 1);
     }
 
     public static TestingRunResultSummary fetchTestingRunResultSummary(String testingRunResultSummaryId) {
@@ -592,7 +557,6 @@ public class DbLayer {
     }
 
     public static void insertTestingRunResultSummary(TestingRunResultSummary trrs) {
-        trrs.setNewTestingSummary(true);
         TestingRunResultSummariesDao.instance.insertOne(trrs);
     }
 
@@ -632,7 +596,7 @@ public class DbLayer {
     }
 
     public static List<ApiCollection> fetchAllApiCollectionsMeta() {
-        List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(ApiCollectionsDao.instance.nonApiGroupFilter(), Projections.exclude("urls", "conditions"));
+        List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(new BasicDBObject(), Projections.exclude("urls", "conditions"));
         return apiCollections;
     }
 
@@ -689,10 +653,6 @@ public class DbLayer {
 
     public static void insertTestingRunResults(TestingRunResult testingRunResult) {
         TestingRunResultDao.instance.insertOne(testingRunResult);
-        // from now store vulnerable results in separate collection also
-        if(testingRunResult.isVulnerable()){
-            VulnerableTestingRunResultDao.instance.insertOne(testingRunResult);
-        }
     }
 
     public static void updateTotalApiCountInTestSummary(String summaryId, int totalApiCount) {
@@ -713,23 +673,17 @@ public class DbLayer {
             ObjectId summaryObjectId = new ObjectId(summaryId);
             FindOneAndUpdateOptions options = new FindOneAndUpdateOptions();
             options.returnDocument(ReturnDocument.AFTER);
-            Bson finalUpdate =  Updates.combine(Updates.set(TestingRunResultSummary.END_TIMESTAMP, Context.now()),
-                                        Updates.set(TestingRunResultSummary.STATE, State.COMPLETED),
-                                    Updates.set(TestingRunResultSummary.COUNT_ISSUES, totalCountIssues)
-            );
             Bson updateIncrement = Updates.combine(
-                Updates.inc("countIssues.CRITICAL", totalCountIssues.getOrDefault("CRITICAL", 0)),
                 Updates.inc("countIssues.HIGH", totalCountIssues.getOrDefault("HIGH", 0)),
                 Updates.inc("countIssues.MEDIUM", totalCountIssues.getOrDefault("MEDIUM", 0)),
                 Updates.inc("countIssues.LOW", totalCountIssues.getOrDefault("LOW", 0))
             );
-            if(!((operator == null || operator.isEmpty()))){
-                finalUpdate = updateIncrement;
-            }
             return TestingRunResultSummariesDao.instance.getMCollection().findOneAndUpdate(
                     Filters.eq(Constants.ID, summaryObjectId),
-                    finalUpdate, options
-                );
+                    Updates.combine(
+                            Updates.set(TestingRunResultSummary.END_TIMESTAMP, Context.now()),
+                            Updates.set(TestingRunResultSummary.STATE, State.COMPLETED),
+                            updateIncrement),options);
         }
     }
 
@@ -759,7 +713,7 @@ public class DbLayer {
     }
 
     public static List<Integer> fetchDeactivatedCollections() {
-        return new ArrayList<>(UsageMetricCalculator.getDeactivated());
+        return new ArrayList<>(UsageMetricCalculator.getDeactivatedLatest());
     }
 
     public static void updateUsage(MetricTypes metricType, int deltaUsage){
@@ -770,16 +724,7 @@ public class DbLayer {
 
     public static List<TestingRunResult> fetchLatestTestingRunResultBySummaryId(String summaryId, int limit, int skip) {
         ObjectId summaryObjectId = new ObjectId(summaryId);
-        if(VulnerableTestingRunResultDao.instance.isStoredInVulnerableCollection(summaryObjectId)){
-            return VulnerableTestingRunResultDao.instance
-                    .fetchLatestTestingRunResult(
-                        Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, summaryObjectId),
-                        limit,
-                        skip,
-                        Projections.exclude("testResults.originalMessage", "testResults.nodeResultMap")
-                    );
-        }else{
-            return TestingRunResultDao.instance
+        return TestingRunResultDao.instance
                     .fetchLatestTestingRunResult(
                             Filters.and(
                                     Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, summaryObjectId),
@@ -787,8 +732,6 @@ public class DbLayer {
                             limit,
                             skip,
                             Projections.exclude("testResults.originalMessage", "testResults.nodeResultMap"));
-        }
-        
     }
 
     public static List<TestRoles> fetchTestRoles() {
@@ -993,50 +936,10 @@ public class DbLayer {
         return SingleTypeInfoDao.fetchLatestEndpointsForTesting(startTimestamp, endTimestamp, apiCollectionId);
     }
 
-    public static void insertRuntimeMetricsData(BasicDBList metricsData) {
-
-        ArrayList<WriteModel<RuntimeMetrics>> bulkUpdates = new ArrayList<>();
-        RuntimeMetrics runtimeMetrics;
-        for (Object metrics: metricsData) {
-            try {
-                Map<String, Object> obj = (Map) metrics;
-                String name = (String) obj.get("metric_id");
-                String instanceId = (String) obj.get("instance_id");
-                Long tsVal = (Long) obj.get("timestamp");
-                int ts = tsVal.intValue();
-                Double val = (Double) obj.get("val");
-                if (name == null || name.length() == 0) {
-                    continue;
-                }
-                runtimeMetrics = new RuntimeMetrics(name, ts, instanceId, val);
-                bulkUpdates.add(new InsertOneModel<>(runtimeMetrics));
-            } catch (Exception e) {
-                loggerMaker.errorAndAddToDb(e, "error writing bulk update " + e.getMessage());
-            }
-        }
-
-        if (bulkUpdates.size() > 0) {
-            loggerMaker.infoAndAddToDb("insertRuntimeMetricsData bulk write size " + metricsData.size());
-            RuntimeMetricsDao.bulkInsertMetrics(bulkUpdates);
-        }
-    }
-
-    public static void bulkWriteSuspectSampleData(List<WriteModel<SuspectSampleData>> writesForSingleTypeInfo) {
-        SuspectSampleDataDao.instance.getMCollection().bulkWrite(writesForSingleTypeInfo);
-    }
-
-    public static List<YamlTemplate> fetchFilterYamlTemplates() {
-        return FilterYamlTemplateDao.instance.findAll(Filters.empty());
-    }
-
     public static List<YamlTemplate> fetchActiveFilterTemplates(){
         return AdvancedTrafficFiltersDao.instance.findAll(
             Filters.ne(YamlTemplate.INACTIVE, false)
         );
-    }
-
-    public static Set<MergedUrls> fetchMergedUrls() {
-        return MergedUrlsDao.instance.getMergedUrls();
     }
 
     public static List<TestingRunResultSummary> fetchStatusOfTests() {
@@ -1051,7 +954,11 @@ public class DbLayer {
         return currentRunningTests;
     }
 
-    private static final int ENDPOINT_LIMIT = 50;
+    public static Set<MergedUrls> fetchMergedUrls() {
+        return MergedUrlsDao.instance.getMergedUrls();
+    }
+
+    public static final int ENDPOINT_LIMIT = 50;
 
     public static List<BasicDBObject> fetchEndpointsInCollectionUsingHost(int apiCollectionId, int skip, int deltaPeriodValue) {
         ApiCollection apiCollection = ApiCollectionsDao.instance.getMeta(apiCollectionId);
@@ -1122,7 +1029,7 @@ public class DbLayer {
         return SampleDataDao.instance.findAll(Filters.or(filters));
     }
 
-    final static int NODE_LIMIT = 100;
+    public final static int NODE_LIMIT = 100;
 
     public static List<Node> fetchNodesForCollectionIds(List<Integer> apiCollectionsIds, boolean removeZeroLevel, int skip) {
         return DependencyFlowNodesDao.instance.findNodesForCollectionIds(apiCollectionsIds, removeZeroLevel, skip,
@@ -1132,6 +1039,7 @@ public class DbLayer {
     public static long countTestingRunResultSummaries(Bson filter){
         return TestingRunResultSummariesDao.instance.count(filter);
     }
+
 
     public static TestScript fetchTestScript(){
         return TestScriptsDao.instance.fetchTestScript();

@@ -3,16 +3,19 @@ package com.akto.dto.testing;
 import com.akto.dto.testing.info.TestInfo;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 public class TestResult extends GenericTestResult {
 
+    public static final String _MESSAGE = "message";
     private String message;
     public static final String _ERRORS = "errors";
     private List<String> errors;
     public static final String TEST_RESULTS_ERRORS = TestingRunResult.TEST_RESULTS + "." + TestResult._ERRORS;
 
     public static final String ERRORS = "errors";
+    public static final String ORIGINAL_MESSAGE = "originalMessage";
     private String originalMessage;
     private double percentageMatch;
     private TestInfo testInfo;
@@ -108,6 +111,15 @@ public class TestResult extends GenericTestResult {
     }
 
     public String getOriginalMessage() {
+        /*
+         Not storing original messages for passive tests,
+         as original and attempt are same for passive tests.
+
+         For any other test, there will always be original message.
+         */
+        if(originalMessage == null || originalMessage.isEmpty()){
+            return message;
+        }
         return originalMessage;
     }
 
@@ -137,5 +149,10 @@ public class TestResult extends GenericTestResult {
 
     public void setRequiresConfig(boolean requiresConfig) {
         this.requiresConfig = requiresConfig;
+    }
+
+    @Override
+    public List<String> getResponses() {
+        return Collections.singletonList(message);
     }
 }

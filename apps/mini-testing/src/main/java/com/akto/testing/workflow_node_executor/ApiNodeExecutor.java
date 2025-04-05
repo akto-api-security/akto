@@ -20,7 +20,8 @@ import com.akto.test_editor.execution.Memory;
 import com.akto.testing.ApiExecutor;
 import com.akto.testing.Main;
 import com.akto.testing.Utils;
-import com.akto.utils.RedactSampleData;
+
+import static com.akto.runtime.utils.Utils.convertOriginalReqRespToString;
 
 public class ApiNodeExecutor extends NodeExecutor {
     
@@ -94,7 +95,7 @@ public class ApiNodeExecutor extends NodeExecutor {
 
         String message = null;
         try {
-            message = RedactSampleData.convertOriginalReqRespToString(request, response);
+            message = convertOriginalReqRespToString(request, response);
         } catch (Exception e) {
             ;
         }

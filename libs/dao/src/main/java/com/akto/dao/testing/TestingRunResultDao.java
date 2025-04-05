@@ -71,7 +71,7 @@ public class TestingRunResultDao extends AccountsContextDao<TestingRunResult> {
     }
 
     public List<TestingRunResult> fetchLatestTestingRunResult(Bson filters, int limit, int skip, Bson projections) {
-        MongoCursor<TestingRunResult> cursor = this.getMCollection().find(filters)
+        MongoCursor<TestingRunResult> cursor = instance.getMCollection().find(filters)
                 .projection(projections)
                 .sort(Sorts.descending("_id"))
                 .skip(skip)

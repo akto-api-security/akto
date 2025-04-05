@@ -29,7 +29,6 @@ import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
 import com.akto.dto.usage.MetricTypes;
-import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 
 import java.util.List;
@@ -236,22 +235,14 @@ public abstract class DataActor {
     public abstract DataControlSettings fetchDataControlSettings(String prevResult, String prevCommand);
 
     public abstract void bulkWriteDependencyNodes(List<DependencyNode> dependencyNodeList);
-    
     public abstract List<ApiInfo.ApiInfoKey> fetchLatestEndpointsForTesting(int startTimestamp, int endTimestamp, int apiCollectionId);
 
-    public abstract void insertRuntimeMetricsData(BasicDBList metricsData);
-
-    public abstract void bulkWriteSuspectSampleData(List<Object> writesForSuspectSampleData);
-
-    public abstract List<YamlTemplate> fetchFilterYamlTemplates();
-
-    public abstract void insertProtectionLog(Log log);
-    
     public abstract List<YamlTemplate> fetchActiveAdvancedFilters();
 
+    public abstract List<TestingRunResultSummary> fetchStatusOfTests();
+    
     public abstract Set<MergedUrls> fetchMergedUrls();
 
-    public abstract List<TestingRunResultSummary> fetchStatusOfTests();
     public abstract void createCollectionSimpleForVpc(int vxlanId, String vpcId);
 
     public abstract void createCollectionForHostAndVpc(String host, int colId, String vpcId);

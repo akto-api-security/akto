@@ -326,15 +326,6 @@ const transform = {
         }
         return finalArr
     },
-
-    convertSampleDataToSensitiveSampleData(samples, sensitiveInfo) {
-        let sensitiveSampleData = {}
-        samples.forEach(x => {
-            sensitiveSampleData[x] = sensitiveInfo
-        })
-        return { sensitiveSampleData: sensitiveSampleData };
-    },
-
     getColor(key){
         switch(key.toUpperCase()){
             case "HIGH" : return "critical";
@@ -374,17 +365,6 @@ const transform = {
         )
     },
 
-    getIssuesListText(severityInfo){
-        let val = "-"
-        if(Object.keys(severityInfo).length > 0){
-            val = ""
-            Object.keys(severityInfo).map((key) => {
-                val += (key + ": " + severityInfo[key] + " ")
-            })
-        } 
-        return val
-    },
-
     prettifySubtypes(sensitiveTags, deactivated){
         return(
             <Box maxWidth="200px">
@@ -402,7 +382,7 @@ const transform = {
         )
     },
 
-    prettifyCollectionsData(newData, isLoading){
+    prettifyCollectionsData(newData){
         const prettifyData = newData.map((c)=>{
             let calcCoverage = '0%';
             if(c.endpoints > 0){
@@ -412,7 +392,6 @@ const transform = {
                     calcCoverage =  Math.ceil((c.testedEndpoints * 100)/c.endpoints) + '%'
                 }
             }
-            const loadingComp = <Text color="subdued" variant="bodyMd">...</Text>
             return{
                 ...c,
                 id: c.id,
@@ -420,17 +399,15 @@ const transform = {
                 displayName: c.displayName,
                 displayNameComp: c.displayNameComp,
                 endpoints: c.endpoints,
-                riskScoreComp: isLoading ? loadingComp : <Badge key={c?.id} status={this.getStatus(c.riskScore)} size="small">{c.riskScore}</Badge>,
-                coverage: isLoading ? '...' : calcCoverage,
-                issuesArr: isLoading ? loadingComp : this.getIssuesList(c.severityInfo),
-                issuesArrVal: this.getIssuesListText(c.severityInfo),
-                sensitiveSubTypes: isLoading ? loadingComp : this.prettifySubtypes(c.sensitiveInRespTypes, c.deactivated),
-                lastTraffic: isLoading ? '...' : c.detected,
+                riskScoreComp: <Badge key={c?.id} status={this.getStatus(c.riskScore)} size="small">{c.riskScore}</Badge>,
+                coverage: calcCoverage,
+                issuesArr: this.getIssuesList(c.severityInfo),
+                sensitiveSubTypes: this.prettifySubtypes(c.sensitiveInRespTypes, c.deactivated),
+                lastTraffic: c.detected,
                 riskScore: c.riskScore,
                 deactivatedRiskScore: c.deactivated ? (c.riskScore - 10 ) : c.riskScore,
                 activatedRiskScore: -1 * (c.deactivated ? c.riskScore : (c.riskScore - 10 )),
-                envTypeComp: isLoading ? loadingComp : c.envType ? <Badge size="small" status="info">{func.toSentenceCase(c.envType)}</Badge> : null,
-                sensitiveSubTypesVal: c?.sensitiveInRespTypes.join(" ") ||  "-"
+                envTypeComp: c.envType ? <Badge size="small" status="info">{func.toSentenceCase(c.envType)}</Badge> : null
             }
         })
 

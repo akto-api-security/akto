@@ -5,7 +5,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Collections;
 
-import com.akto.dto.ApiInfo;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.api_workflow.Node;
@@ -18,9 +17,8 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.test_editor.execution.Memory;
 import com.akto.testing.ApiExecutor;
-import com.akto.testing.Main;
 import com.akto.testing.Utils;
-import com.akto.utils.RedactSampleData;
+import static com.akto.runtime.utils.Utils.convertOriginalReqRespToString;
 
 public class ApiNodeExecutor extends NodeExecutor {
     
@@ -73,7 +71,7 @@ public class ApiNodeExecutor extends NodeExecutor {
                     Thread.sleep(sleep);
                 }
 
-                response = ApiExecutor.sendRequest(request, followRedirects, null, debug, testLogs, Main.SKIP_SSRF_CHECK);
+                response = ApiExecutor.sendRequest(request, followRedirects, null, debug, testLogs, com.akto.test_editor.Utils.SKIP_SSRF_CHECK);
 
                 int statusCode = response.getStatusCode();
 
@@ -94,7 +92,7 @@ public class ApiNodeExecutor extends NodeExecutor {
 
         String message = null;
         try {
-            message = RedactSampleData.convertOriginalReqRespToString(request, response);
+            message = convertOriginalReqRespToString(request, response);
         } catch (Exception e) {
             ;
         }

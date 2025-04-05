@@ -506,7 +506,7 @@ public class Utils {
 
 
     public static String replaceVariables(String payload, Map<String, Object> valuesMap, boolean escapeString) throws Exception {
-        String regex = "\\$\\{(x\\d+\\.[\\w\\-\\[\\].]+|AKTO\\.changes_info\\..*?)\\}"; 
+        String regex = "\\$\\{((x|step)\\d+\\.[\\w\\-\\[\\].]+|AKTO\\.changes_info\\..*?)\\}"; 
         Pattern p = Pattern.compile(regex);
 
         // replace with values

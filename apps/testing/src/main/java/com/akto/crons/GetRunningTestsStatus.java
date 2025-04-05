@@ -34,7 +34,7 @@ public class GetRunningTestsStatus {
     public void getStatusOfRunningTests(){
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run(){
-                AccountTask.instance.executeTaskForNonHybridAccounts(new Consumer<Account>() {
+                AccountTask.instance.executeTask(new Consumer<Account>() {
                     @Override
                     public void accept(Account t) {
                         try {

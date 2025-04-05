@@ -4,6 +4,7 @@ import com.akto.action.UserAction;
 import com.akto.action.testing.StartTestAction;
 import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.ConfigsDao;
+import com.akto.dao.RBACDao;
 import com.akto.dao.UsersDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.AccountSettings;
@@ -43,6 +44,14 @@ public class GithubSsoAction extends UserAction {
             return ERROR.toUpperCase();
         }
 
+        User user = getSUser();
+        if (user == null) return ERROR.toUpperCase();
+        boolean isAdmin = RBACDao.instance.isAdmin(user.getId(), Context.accountId.get());
+        if (!isAdmin) {
+            addActionError("Only admin can delete SSO");
+            return ERROR.toUpperCase();
+        }
+
         DeleteResult result = ConfigsDao.instance.deleteAll(Filters.eq("_id", "GITHUB-ankush"));
 
         if (result.getDeletedCount() > 0) {
@@ -68,6 +77,13 @@ public class GithubSsoAction extends UserAction {
             return ERROR.toUpperCase();
         }
 
+        User user = getSUser();
+        boolean isAdmin = RBACDao.instance.isAdmin(user.getId(), Context.accountId.get());
+        if (!isAdmin) {
+            addActionError("Only admin can delete github app credentials");
+            return ERROR.toUpperCase();
+        }
+
         AccountSettingsDao.instance.updateOne(generateFilter(), Updates.combine(
                 Updates.unset(AccountSettings.GITHUB_APP_ID),
                 Updates.unset(AccountSettings.GITHUB_APP_SECRET_KEY)));
@@ -81,6 +97,12 @@ public class GithubSsoAction extends UserAction {
             return ERROR.toUpperCase();
         }
 
+        User user = getSUser();
+        boolean isAdmin = RBACDao.instance.isAdmin(user.getId(), Context.accountId.get());
+        if (!isAdmin) {
+            addActionError("Only admin can delete github app credentials");
+            return ERROR.toUpperCase();
+        }
         githubAppSecretKey = githubAppSecretKey.replace("-----BEGIN RSA PRIVATE KEY-----","");
         githubAppSecretKey = githubAppSecretKey.replace("-----END RSA PRIVATE KEY-----","");
         githubAppSecretKey = githubAppSecretKey.replace("\n","");
@@ -108,6 +130,14 @@ public class GithubSsoAction extends UserAction {
 
         if(!DashboardMode.isOnPremDeployment()){
             addActionError("This feature is only available in on-prem deployment");
+            return ERROR.toUpperCase();
+        }
+
+        User user = getSUser();
+        if (user == null) return ERROR.toUpperCase();
+        boolean isAdmin = RBACDao.instance.isAdmin(user.getId(), Context.accountId.get());
+        if (!isAdmin) {
+            addActionError("Only admin can add SSO");
             return ERROR.toUpperCase();
         }
 

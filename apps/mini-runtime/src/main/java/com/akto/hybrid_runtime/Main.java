@@ -204,19 +204,27 @@ public class Main {
             }
         }, 5, 5, TimeUnit.MINUTES);
 
-        try {
-            com.akto.sql.Main.createSampleDataTable();
-            SampleDataAltDb.createIndex();
-        } catch(Exception e){
-            logger.error("Unable to connect to postgres sql db", e);
-        }
+        final boolean checkPg = aSettings != null && aSettings.isRedactPayload();
 
-        try {
-            CleanPostgres.cleanPostgresCron();
-        } catch(Exception e){
-            logger.error("Unable to clean postgres", e);
-        }
+        AllMetrics.instance.init(LogDb.RUNTIME, checkPg);
+        HttpCallParser.init();
+        loggerMaker.infoAndAddToDb("All metrics initialized", LogDb.RUNTIME);
 
+
+        if (checkPg) {
+            try {
+                com.akto.sql.Main.createSampleDataTable();
+                SampleDataAltDb.createIndex();
+            } catch(Exception e){
+                logger.error("Unable to connect to postgres sql db", e);
+            }
+
+            try {
+                CleanPostgres.cleanPostgresCron();
+            } catch(Exception e){
+                logger.error("Unable to clean postgres", e);
+            }
+        }
 
         dataActor.modifyHybridSaasSetting(RuntimeMode.isHybridDeployment());
 
@@ -278,11 +286,13 @@ public class Main {
                 }
 
 
-                AllMetrics.instance.setTotalSampleDataCount(SampleDataAltDb.totalNumberOfRecords());
-                loggerMaker.infoAndAddToDb("Total number of records in postgres: " + SampleDataAltDb.totalNumberOfRecords(), LogDb.RUNTIME);
-                long dbSizeInMb = SampleDataAltDb.getDbSizeInMb();
-                AllMetrics.instance.setPgDataSizeInMb(dbSizeInMb);
-                loggerMaker.infoAndAddToDb("Postgres size: " + dbSizeInMb + " MB", LogDb.RUNTIME);
+                if (checkPg) {
+                    AllMetrics.instance.setTotalSampleDataCount(SampleDataAltDb.totalNumberOfRecords());
+                    loggerMaker.infoAndAddToDb("Total number of records in postgres: " + SampleDataAltDb.totalNumberOfRecords(), LogDb.RUNTIME);
+                    long dbSizeInMb = SampleDataAltDb.getDbSizeInMb();
+                    AllMetrics.instance.setPgDataSizeInMb(dbSizeInMb);
+                    loggerMaker.infoAndAddToDb("Postgres size: " + dbSizeInMb + " MB", LogDb.RUNTIME);
+                }
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb(e, "Failed to get total number of records from postgres");
             }
@@ -373,17 +383,6 @@ public class Main {
 
                     if (!isDashboardInstance && accountInfo.estimatedCount> 20_000_000) {
                         loggerMaker.infoAndAddToDb("STI count is greater than 20M, skipping", LogDb.RUNTIME);
-                        continue;
-                    }
-
-                    if (UsageMetricUtils.checkActiveEndpointOverage(accountIdInt)) {
-                        int now = Context.now();
-                        int lastSent = logSentMap.getOrDefault(accountIdInt, 0);
-                        if (now - lastSent > LoggerMaker.LOG_SAVE_INTERVAL) {
-                            logSentMap.put(accountIdInt, now);
-                            loggerMaker.infoAndAddToDb("Active endpoint overage detected for account " + accountIdInt
-                                    + ". Ingestion stopped " + now, LogDb.RUNTIME);
-                        }
                         continue;
                     }
 
@@ -523,9 +522,6 @@ public class Main {
 
         Account account = dataActor.fetchActiveAccount();
         Context.accountId.set(account.getId());
-
-        AllMetrics.instance.init();
-        loggerMaker.infoAndAddToDb("All metrics initialized", LogDb.RUNTIME);
 
         Setup setup = dataActor.fetchSetup();
 

@@ -346,11 +346,16 @@ public class OriginalHttpRequest {
     }
 
     public String getPath(){
-        String path = URI.create(this.url).getPath();
-        if (path == null || path.isEmpty()) {
-            return "/";
+        try {
+            String path = URI.create(this.url).getPath();
+            if (path == null || path.isEmpty()) {
+                return "/";
+            }
+            return path;
+        } catch (Exception e) {
+            String strippedUrl = this.url.replaceAll("^(https?://[^/]+)", "");
+            return strippedUrl.isEmpty() ? "/" : strippedUrl;
         }
-        return path;
     }
 
     @Override

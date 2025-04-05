@@ -31,14 +31,12 @@ import com.akto.dto.testing.WorkflowTest;
 import com.akto.dto.testing.WorkflowTestResult;
 import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.dto.traffic.SampleData;
-import com.akto.dto.traffic.SuspectSampleData;
 import com.akto.dto.traffic.TrafficInfo;
 import com.akto.dto.traffic_metrics.TrafficMetrics;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.dto.usage.MetricTypes;
-import com.mongodb.BasicDBList;
 import com.akto.util.Constants;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
@@ -487,10 +485,6 @@ public class DbActor extends DataActor {
         DbLayer.insertTestingLog(log);
     }
 
-    public void insertProtectionLog(Log log) {
-        DbLayer.insertProtectionLog(log);
-    }
-
     public void bulkWriteDependencyNodes(List<DependencyNode> dependencyNodeList) {
         DbLayer.bulkWriteDependencyNodes(dependencyNodeList);
     }
@@ -499,33 +493,16 @@ public class DbActor extends DataActor {
         return DbLayer.fetchLatestEndpointsForTesting(startTimestamp, endTimestamp, apiCollectionId);
     }
 
-    public void insertRuntimeMetricsData(BasicDBList metricsData) {
-        DbLayer.insertRuntimeMetricsData(metricsData);
-    }
-
-    public void bulkWriteSuspectSampleData(List<Object> writesForSuspectSampleData) {
-        ArrayList<WriteModel<SuspectSampleData>> writes = new ArrayList<>();
-        for (Object obj: writesForSuspectSampleData) {
-            WriteModel<SuspectSampleData> write = (WriteModel<SuspectSampleData>)obj;
-            writes.add(write);
-        }
-        DbLayer.bulkWriteSuspectSampleData(writes);
-    }
-
-    public List<YamlTemplate> fetchFilterYamlTemplates() {
-        return DbLayer.fetchFilterYamlTemplates();
-    }
-    
     public List<YamlTemplate> fetchActiveAdvancedFilters(){
         return DbLayer.fetchActiveFilterTemplates();
     }
 
-    public Set<MergedUrls> fetchMergedUrls() {
-        return DbLayer.fetchMergedUrls();
-    }
-
     public List<TestingRunResultSummary> fetchStatusOfTests() {
         return DbLayer.fetchStatusOfTests();
+    }
+    
+    public Set<MergedUrls> fetchMergedUrls() {
+        return DbLayer.fetchMergedUrls();
     }
 
     public void createCollectionSimpleForVpc(int vxlanId, String vpcId) {

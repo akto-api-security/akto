@@ -14,7 +14,6 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import com.akto.RuntimeMode;
-import com.akto.dao.SetupDao;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.usage.UsageMetricInfoDao;
@@ -239,11 +238,8 @@ public class UsageMetricUtils {
         try {
             /*
              * runtime mode check for hybrid mini-runtime deployments.
-             * Setup Dao check for database-abstractor
              */
-            if (!(DashboardMode.isMetered() ||
-                    RuntimeMode.isHybridDeployment() ||
-                    SetupDao.instance.isMetered())) {
+            if (!DashboardMode.isMetered() && !RuntimeMode.isHybridDeployment()) {
                 return featureAccess;
             }
             Organization organization = OrganizationsDao.instance.findOneByAccountId(accountId);
@@ -259,11 +255,8 @@ public class UsageMetricUtils {
         try {
             /*
              * runtime mode check for hybrid mini-runtime deployments.
-             * Setup Dao check for database-abstractor
              */
-            if (!(DashboardMode.isMetered() ||
-                    RuntimeMode.isHybridDeployment() ||
-                    SetupDao.instance.isMetered())) {
+            if (!DashboardMode.isMetered() && !RuntimeMode.isHybridDeployment()) {
                 return featureAccess;
             }
             if (organization == null) {

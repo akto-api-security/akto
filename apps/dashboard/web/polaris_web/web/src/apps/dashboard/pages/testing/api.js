@@ -398,12 +398,6 @@ export default {
             method: 'post',
             data: {}
         })
-    },
-    downloadReportPDF(reportId, organizationName, reportDate, reportUrl) {
-        return request({
-            url: '/api/downloadReportPDF',
-            method: 'post',
-            data: {reportId, organizationName, reportDate, reportUrl}
-        })
-    },
+    }
+
 }

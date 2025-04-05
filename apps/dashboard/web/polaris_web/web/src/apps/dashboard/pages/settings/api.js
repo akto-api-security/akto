@@ -9,7 +9,7 @@ const settingRequests = {
                 inviteeName: apiSpec.inviteeName,
                 inviteeEmail: apiSpec.inviteeEmail,
                 websiteHostName: apiSpec.websiteHostName,
-                inviteeRole: apiSpec.inviteeRole,
+
             }
         })
     },
@@ -29,13 +29,12 @@ const settingRequests = {
             }
         })
     },
-    makeAdmin(email, roleVal) {
+    makeAdmin(email) {
         return request({
             url: '/api/makeAdmin',
             method: 'post',
             data: {
-                email: email,
-                userRole: roleVal
+                email: email
             }
         })
     },
@@ -423,15 +422,6 @@ const settingRequests = {
             }
         });
     },
-    getRoleHierarchy(userRole){
-        return request({
-            url: '/api/getRoleHierarchy',
-            method: 'post',
-            data: {
-                userRole
-            }
-        });
-    }
 }
 
 export default settingRequests

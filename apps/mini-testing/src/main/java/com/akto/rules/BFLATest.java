@@ -79,6 +79,9 @@ public class BFLATest {
                     AuthMechanism authMechanismForRole = authWithCond.getAuthMechanism();
                     if (authMechanismForRole.getType().equalsIgnoreCase(LoginFlowEnums.AuthMechanismTypes.LOGIN_REQUEST.name())) {
                         LoginFlowResponse loginFlowResponse = TestExecutor.executeLoginFlow(authMechanismForRole, null);
+                        if (authWithCond.getRecordedLoginFlowInput() != null) {
+                            authMechanismForRole.setRecordedLoginFlowInput(authWithCond.getRecordedLoginFlowInput());
+                        }
                         if (!loginFlowResponse.getSuccess()) throw new Exception(loginFlowResponse.getError());
 
                         authMechanismForRole.setType(LoginFlowEnums.AuthMechanismTypes.HARDCODED.name());

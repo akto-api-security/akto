@@ -46,20 +46,16 @@ function SingleRequest(){
 
     useEffect(() => {
         async function fetchData(){
-            let sensitiveData =[]
             await api.loadSensitiveParameters(apiCollectionId, url, method, subType).then((res) => {
                 setEndpointData(transform.prepareEndpointData(collectionsMap, res));
-                sensitiveData = res.data.endpoints;
             })
             await api.fetchSensitiveSampleData(url, apiCollectionId, method).then(async(res) => {
                 if(res.sensitiveSampleData && Object.keys(res.sensitiveSampleData).length > 0){
                     setSampleData(transform.prepareSampleData(res, subType))
                 }else{
                     await api.fetchSampleData(url, apiCollectionId, method).then((resp) => {
-                        let sampleData = resp.sampleDataList.map(x => x.samples)
-                        sampleData = sampleData.flat()
-                        let newResp = transform.convertSampleDataToSensitiveSampleData(sampleData, sensitiveData)
-                        setSampleData(transform.prepareSampleData(newResp, subType))
+                        const commonMessages = transform.getCommonSamples(resp.sampleDataList[0].samples,resp)
+                        setSampleData(commonMessages)
                     })
                 }
             })

@@ -1,5 +1,5 @@
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
-import { Text, Button, IndexFiltersMode, Box, Badge, Popover, ActionList} from "@shopify/polaris"
+import { Text, Button, IndexFiltersMode, Box, Badge, Popover, ActionList, Link, Tooltip } from "@shopify/polaris"
 import api from "../api"
 import { useEffect,useState, useRef } from "react"
 import func from "@/util/func"
@@ -18,7 +18,6 @@ import CollectionsPageBanner from "./component/CollectionsPageBanner"
 import useTable from "@/apps/dashboard/components/tables/TableContext"
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo"
 import HeadingWithTooltip from "../../../components/shared/HeadingWithTooltip"
-import { saveAs } from 'file-saver'
 
 const headers = [
     {
@@ -26,7 +25,6 @@ const headers = [
         text: "API collection name",
         value: "displayNameComp",
         filterKey:"displayName",
-        textValue: 'displayName',
         showFilter:true
     },
     {
@@ -39,8 +37,6 @@ const headers = [
     {
         title: <HeadingWithTooltip content={<Text variant="bodySm">Risk score of collection is maximum risk score of the endpoints inside this collection</Text>} title="Risk score" />,
         value: 'riskScoreComp',
-        textValue: 'riskScore',
-        text: 'Risk Score',
         sortActive: true
     },
     {   
@@ -54,14 +50,12 @@ const headers = [
         title: 'Issues', 
         text: 'Issues', 
         value: 'issuesArr',
-        textValue: 'issuesArrVal',
         tooltipContent: (<Text variant="bodySm">Severity and count of issues present in the collection</Text>)
     },
     {   
         title: 'Sensitive data' , 
         text: 'Sensitive data' , 
         value: 'sensitiveSubTypes',
-        textValue: 'sensitiveSubTypesVal',
         tooltipContent: (<Text variant="bodySm">Types of data type present in response of endpoint inside the collection</Text>)
     },
     {
@@ -70,7 +64,6 @@ const headers = [
         value: 'envTypeComp',
         filterKey: "envType",
         showFilter: true,
-        textValue: 'envType',
         tooltipContent: (<Text variant="bodySm">Environment type for an API collection, Staging or Production </Text>)
     },
     {   
@@ -90,8 +83,6 @@ const headers = [
 ]
 
 const sortOptions = [
-    { label: 'Name', value: 'displayName asc', directionLabel: 'A-Z', sortKey: 'displayName' },
-    { label: 'Name', value: 'displayName desc', directionLabel: 'Z-A', sortKey: 'displayName' },
     { label: 'Activity', value: 'deactivatedScore asc', directionLabel: 'Active', sortKey: 'deactivatedRiskScore' },
     { label: 'Activity', value: 'deactivatedScore desc', directionLabel: 'Inactive', sortKey: 'activatedRiskScore' },
     { label: 'Risk Score', value: 'score asc', directionLabel: 'High risk', sortKey: 'riskScore', columnIndex: 3 },
@@ -100,8 +91,8 @@ const sortOptions = [
     { label: 'Discovered', value: 'discovered desc', directionLabel: 'Oldest first', sortKey: 'startTs' , columnIndex: 9},
     { label: 'Endpoints', value: 'endpoints asc', directionLabel: 'More', sortKey: 'endpoints', columnIndex: 2 },
     { label: 'Endpoints', value: 'endpoints desc', directionLabel: 'Less', sortKey: 'endpoints' , columnIndex: 2},
-    { label: 'Last traffic seen', value: 'detected asc', directionLabel: 'Recent first', sortKey: 'detectedTimestamp', columnIndex: 8 },
-    { label: 'Last traffic seen', value: 'detected desc', directionLabel: 'Oldest first', sortKey: 'detectedTimestamp' , columnIndex: 8},
+    { label: 'Last traffic seen', value: 'detected asc', directionLabel: 'Recent first', sortKey: 'detected', columnIndex: 8 },
+    { label: 'Last traffic seen', value: 'detected desc', directionLabel: 'Oldest first', sortKey: 'detected' , columnIndex: 8},
   ];        
 
 
@@ -120,7 +111,7 @@ function convertToCollectionData(c) {
     }    
 }
 
-const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, coverageMap, trafficInfoMap, riskScoreMap, isLoading) => {
+const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, coverageMap, trafficInfoMap, riskScoreMap) => {
 
     const newData = collectionsArr.map((c) => {
         if(c.deactivated){
@@ -140,7 +131,7 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
         }
     })
 
-    const prettifyData = transform.prettifyCollectionsData(newData, isLoading)
+    const prettifyData = transform.prettifyCollectionsData(newData)
     return { prettify: prettifyData, normal: newData }
 }
 
@@ -186,27 +177,18 @@ function ApiCollections() {
 
     const setCoverageMap = PersistStore(state => state.setCoverageMap)
 
-    const lastFetchedInfo = PersistStore.getState().lastFetchedInfo
-    const lastFetchedResp = PersistStore.getState().lastFetchedResp
-    const lastFetchedSeverityResp = PersistStore.getState().lastFetchedSeverityResp
-    const lastFetchedSensitiveResp = PersistStore.getState().lastFetchedSensitiveResp
-    const setLastFetchedInfo = PersistStore.getState().setLastFetchedInfo
-    const setLastFetchedResp = PersistStore.getState().setLastFetchedResp
-    const setLastFetchedSeverityResp = PersistStore.getState().setLastFetchedSeverityResp
-    const setLastFetchedSensitiveResp = PersistStore.getState().setLastFetchedSensitiveResp
-
-    // as riskScore cron runs every 5 min, we will cache the data and refresh in 5 mins
-    // similarly call sensitive and severityInfo
-
     async function fetchData() {
-
-        // first api call to get only collections name and collection id
         setLoading(true)
         let apiCollectionsResp = await api.getAllCollectionsBasic();
         setLoading(false)
         let tmp = (apiCollectionsResp.apiCollections || []).map(convertToCollectionData)
+        let envTypeObj = {}
+        tmp.forEach((c) => {
+            envTypeObj[c.id] = c.envType
+        })
+        setEnvTypeMap(envTypeObj)
         let dataObj = {}
-        dataObj = convertToNewData(tmp, {}, {}, {}, {}, {}, true);
+        dataObj = convertToNewData(tmp, {}, {}, {}, {}, {});
         let res = {}
         res.all = dataObj.prettify
         res.hostname = dataObj.prettify.filter((c) => c.hostName !== null && c.hostName !== undefined)
@@ -214,22 +196,12 @@ function ApiCollections() {
         res.custom = res.all.filter(x => !res.hostname.includes(x) && !res.groups.includes(x));
         setData(res);
 
-        const shouldCallHeavyApis = (func.timeNow() - lastFetchedInfo.lastRiskScoreInfo) >= (5 * 60)
-
-        // fire all the other apis in parallel
-
         let apiPromises = [
             api.getAllCollections(),
             api.getCoverageInfoForCollections(),
             api.getLastTrafficSeen(),
             api.getUserEndpoints(),
         ];
-        if(shouldCallHeavyApis){
-            apiPromises = [
-                ...apiPromises,
-                ...[api.getRiskScoreInfo(), api.getSensitiveInfoForCollections(), api.getSeverityInfoForCollections()]
-            ]
-        }
         
         let results = await Promise.allSettled(apiPromises);
 
@@ -237,52 +209,22 @@ function ApiCollections() {
         let coverageInfo = results[1].status === 'fulfilled' ? results[1].value : {};
         let trafficInfo = results[2].status === 'fulfilled' ? results[2].value : {};
         let hasUserEndpoints = results[3].status === 'fulfilled' ? results[3].value : true;
-
-        let riskScoreObj = lastFetchedResp
-        let sensitiveInfo = lastFetchedSensitiveResp
-        let severityObj = lastFetchedSeverityResp
-
-        if(shouldCallHeavyApis){
-            if(results[4]?.status === "fulfilled"){
-                const res = results[4].value
-                riskScoreObj = {
-                    criticalUrls: res.criticalEndpointsCount,
-                    riskScoreMap: res.riskScoreOfCollectionsMap
-                } 
-            }
-
-            if(results[5]?.status === "fulfilled"){
-                const res = results[5].value
-                sensitiveInfo ={ 
-                    sensitiveUrls: res.sensitiveUrlsInResponse,
-                    sensitiveInfoMap: res.sensitiveSubtypesInCollection
-                }
-            }
-
-            if(results[6]?.status === "fulfilled"){
-                const res = results[6].value
-                severityObj = res
-            }
-
-            // update the store which has the cached response
-            setLastFetchedInfo({lastRiskScoreInfo: func.timeNow(), lastSensitiveInfo: func.timeNow()})
-            setLastFetchedResp(riskScoreObj)
-            setLastFetchedSeverityResp(severityObj)
-            setLastFetchedSensitiveResp(sensitiveInfo)
-
-        }
-
         setHasUsageEndpoints(hasUserEndpoints)
         setCoverageMap(coverageInfo)
 
         tmp = (apiCollectionsResp.apiCollections || []).map(convertToCollectionData)
-        let envTypeObj = {}
+        envTypeObj = {}
         tmp.forEach((c) => {
             envTypeObj[c.id] = c.envType
         })
         setEnvTypeMap(envTypeObj)
 
-        dataObj = convertToNewData(tmp, sensitiveInfo.sensitiveInfoMap, severityObj, coverageInfo, trafficInfo, riskScoreObj?.riskScoreMap, false);
+        const issuesObj = await transform.fetchRiskScoreInfo();
+        const severityObj = issuesObj.severityObj;
+        const riskScoreObj = issuesObj.riskScoreObj;
+        const sensitiveInfo = await transform.fetchSensitiveInfo();
+
+        dataObj = convertToNewData(tmp, sensitiveInfo.sensitiveInfoMap, severityObj, coverageInfo, trafficInfo, riskScoreObj?.riskScoreMap);
 
         const summary = transform.getSummaryData(dataObj.normal)
         summary.totalCriticalEndpoints = riskScoreObj.criticalUrls;
@@ -320,31 +262,11 @@ function ApiCollections() {
         func.setToast(true, false, `${collectionIdList.length} API collection${func.addPlurality(collectionIdList.length)} ${toastContent} successfully`)
     }
 
-    const exportCsv = () =>{
-        const csvFileName = definedTableTabs[selected] + " Collections.csv"
-        if (!loading) {
-            let headerTextToValueMap = Object.fromEntries(headers.map(x => [x.text, x.isText === CellType.TEXT ? x.value : x.textValue]).filter(x => x[0]?.length > 0));
-            let csv = Object.keys(headerTextToValueMap).join(",") + "\r\n"
-            data[selectedTab].forEach(i => {
-                csv += Object.values(headerTextToValueMap).map(h => (i[h] || "-")).join(",") + "\r\n"
-            })
-            let blob = new Blob([csv], {
-                type: "application/csvcharset=UTF-8"
-            });
-            saveAs(blob, csvFileName) ;
-            func.setToast(true, false,"CSV exported successfully")
-        }
-    }
-
     const promotedBulkActions = (selectedResources) => {
         let actions = [
             {
                 content: `Remove collection${func.addPlurality(selectedResources.length)}`,
                 onAction: () => handleCollectionsAction(selectedResources, api.deleteMultipleCollections, "deleted")
-            },
-            {
-                content: 'Export as CSV',
-                onAction: () => exportCsv()
             }
         ];
 
@@ -481,7 +403,6 @@ function ApiCollections() {
             tableTabs={tableTabs}
             onSelect={handleSelectedTab}
             selected={selected}
-            csvFileName={"Inventory"}
         />
     )
 

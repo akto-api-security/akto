@@ -1,22 +1,16 @@
 package com.akto;
 
-import com.akto.dao.context.Context;
 import com.akto.dto.HttpRequestParams;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.graphql.GraphQLUtils;
-import com.akto.util.grpc.ProtoBufUtils;
 import com.akto.har.HAR;
 import com.akto.util.HttpRequestResponseUtils;
 import com.google.gson.Gson;
 import org.apache.commons.lang3.math.NumberUtils;
 import org.junit.Assert;
 import org.junit.Test;
-import org.mortbay.util.ajax.JSON;
 
-import java.io.IOException;
-import java.util.Base64;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 

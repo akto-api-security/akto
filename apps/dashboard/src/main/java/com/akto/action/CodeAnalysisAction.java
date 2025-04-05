@@ -13,18 +13,25 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
-import com.akto.dao.*;
-import com.akto.dto.*;
-import com.akto.dto.type.SingleTypeInfo;
-import org.bson.conversions.Bson;
 import org.bson.types.Code;
 import org.bson.types.ObjectId;
 import org.checkerframework.checker.units.qual.s;
 import org.json.JSONObject;
 
 import com.akto.action.observe.Utils;
+import com.akto.dao.ApiCollectionsDao;
+import com.akto.dao.CodeAnalysisApiInfoDao;
+import com.akto.dao.CodeAnalysisCollectionDao;
+import com.akto.dao.RBACDao;
+import com.akto.dao.UsersDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.YamlTemplateDao;
+import com.akto.dto.ApiCollection;
+import com.akto.dto.CodeAnalysisApi;
+import com.akto.dto.CodeAnalysisApiInfo;
+import com.akto.dto.CodeAnalysisApiLocation;
+import com.akto.dto.CodeAnalysisCollection;
+import com.akto.dto.RBAC;
 import com.akto.dto.RBAC.Role;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.type.SingleTypeInfo.SuperType;
@@ -41,14 +48,12 @@ import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
 import com.mongodb.client.model.WriteModel;
 
-import static com.akto.util.HttpRequestResponseUtils.generateSTIsFromPayload;
-
 public class CodeAnalysisAction extends UserAction {
 
     private String projectDir;
     private String apiCollectionName;
     private List<CodeAnalysisApi> codeAnalysisApisList;
-    private CodeAnalysisRepo.SourceCodeType sourceCodeType;
+
     public static final int MAX_BATCH_SIZE = 100;
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(CodeAnalysisAction.class);
@@ -57,7 +62,7 @@ public class CodeAnalysisAction extends UserAction {
     public void sendMixpanelEvent() {
         try {
             int accountId = Context.accountId.get();
-            DashboardMode dashboardMode = DashboardMode.getDashboardMode();
+            DashboardMode dashboardMode = DashboardMode.getDashboardMode();        
             RBAC record = RBACDao.instance.findOne(RBAC.ACCOUNT_ID, accountId, RBAC.ROLE, Role.ADMIN);
             if (record == null) {
                 return;
@@ -88,7 +93,7 @@ public class CodeAnalysisAction extends UserAction {
                         }
                     }
                 }
-            }
+            } 
             props.put("codeAnalysisApiCount", codeAnalysisApiCount);
             props.put("fileExtensions", fileExtensions);
 
@@ -98,7 +103,7 @@ public class CodeAnalysisAction extends UserAction {
             loggerMaker.errorAndAddToDb("Error sending CODE_ANALYSIS_SYNC mixpanel event: " + e.getMessage(), LogDb.DASHBOARD);
         }
     }
-
+    
     public String syncExtractedAPIs() {
         loggerMaker.infoAndAddToDb("Syncing code analysis endpoints for collection: " + apiCollectionName, LogDb.DASHBOARD);
 
@@ -133,7 +138,7 @@ public class CodeAnalysisAction extends UserAction {
         /*
          * In some cases it is not possible to determine the type of template url from source code
          * In such cases, we can use the information from traffic endpoints to match the traffic and source code endpoints
-         *
+         * 
          * Eg:
          * Source code endpoints:
          * GET /books/STRING -> GET /books/AKTO_TEMPLATE_STR -> GET /books/INTEGER
@@ -183,7 +188,7 @@ public class CodeAnalysisAction extends UserAction {
 
             trafficApiEndpointAktoTemplateStrToOriginalMap.put(trafficApiEndpointAktoTemplateStr, trafficApiEndpoint);
         }
-
+        
         Map<String, CodeAnalysisApi> tempCodeAnalysisApisMap = new HashMap<>(codeAnalysisApisMap);
         for (Map.Entry<String, CodeAnalysisApi> codeAnalysisApiEntry: codeAnalysisApisMap.entrySet()) {
             String codeAnalysisApiKey = codeAnalysisApiEntry.getKey();
@@ -199,11 +204,11 @@ public class CodeAnalysisAction extends UserAction {
             }
 
             if(codeAnalysisApiEndpointAktoTemplateStr.contains("AKTO_TEMPLATE_STR") && trafficApiEndpointAktoTemplateStrToOriginalMap.containsKey(codeAnalysisApiEndpointAktoTemplateStr)) {
-                CodeAnalysisApi newCodeAnalysisApi = new CodeAnalysisApi(
-                        codeAnalysisApi.getMethod(),
-                        trafficApiEndpointAktoTemplateStrToOriginalMap.get(codeAnalysisApiEndpointAktoTemplateStr),
-                        codeAnalysisApi.getLocation(), codeAnalysisApi.getRequestBody(), codeAnalysisApi.getResponseBody());
-
+               CodeAnalysisApi newCodeAnalysisApi = new CodeAnalysisApi(
+                    codeAnalysisApi.getMethod(), 
+                    trafficApiEndpointAktoTemplateStrToOriginalMap.get(codeAnalysisApiEndpointAktoTemplateStr), 
+                    codeAnalysisApi.getLocation());
+                
                 tempCodeAnalysisApisMap.remove(codeAnalysisApiKey);
                 tempCodeAnalysisApisMap.put(newCodeAnalysisApi.generateCodeAnalysisApisMapKey(), newCodeAnalysisApi);
             }
@@ -224,7 +229,7 @@ public class CodeAnalysisAction extends UserAction {
                 for(Map.Entry<String, CodeAnalysisApi> codeAnalysisApiEntry: tempCodeAnalysisApisMap.entrySet()) {
                     CodeAnalysisApi codeAnalysisApi = codeAnalysisApiEntry.getValue();
                     String codeAnalysisApiEndpoint = codeAnalysisApi.getEndpoint();
-
+                   
                     String trafficApiMethod = "", trafficApiEndpoint = "";
                     try {
                         String[] trafficApiKeyParts = trafficApiKey.split(" ");
@@ -237,10 +242,10 @@ public class CodeAnalysisAction extends UserAction {
 
                     if (codeAnalysisApiEndpoint.equals(trafficApiEndpoint)) {
                         CodeAnalysisApi newCodeAnalysisApi = new CodeAnalysisApi(
-                                trafficApiMethod,
-                                trafficApiEndpoint,
-                                codeAnalysisApi.getLocation(), codeAnalysisApi.getRequestBody(), codeAnalysisApi.getResponseBody());
-
+                            trafficApiMethod, 
+                            trafficApiEndpoint, 
+                            codeAnalysisApi.getLocation());
+                        
                         tempCodeAnalysisApisMap.put(newCodeAnalysisApi.generateCodeAnalysisApisMapKey(), newCodeAnalysisApi);
                         break;
                     }
@@ -256,13 +261,12 @@ public class CodeAnalysisAction extends UserAction {
             codeAnalysisCollectionId = new ObjectId();
 
             CodeAnalysisCollection codeAnalysisCollection = CodeAnalysisCollectionDao.instance.updateOne(
-                    Filters.eq("codeAnalysisCollectionName", apiCollectionName),
-                    Updates.combine(
-                            Updates.setOnInsert(CodeAnalysisCollection.ID, codeAnalysisCollectionId),
-                            Updates.setOnInsert(CodeAnalysisCollection.NAME, apiCollectionName),
-                            Updates.set(CodeAnalysisCollection.PROJECT_DIR, projectDir),
-                            Updates.setOnInsert(CodeAnalysisCollection.API_COLLECTION_ID, apiCollection.getId())
-                    )
+                Filters.eq("codeAnalysisCollectionName", apiCollectionName),
+                Updates.combine(
+                        Updates.setOnInsert(CodeAnalysisCollection.ID, codeAnalysisCollectionId),
+                        Updates.setOnInsert(CodeAnalysisCollection.NAME, apiCollectionName),
+                        Updates.set(CodeAnalysisCollection.PROJECT_DIR, projectDir)
+                )
             );
 
             // Set code analysis collection id if existing collection is updated
@@ -274,53 +278,24 @@ public class CodeAnalysisAction extends UserAction {
             addActionError("Error syncing code analysis collection: " + apiCollectionName);
             return ERROR.toUpperCase();
         }
-
-        int now = Context.now();
-
+       
         if (codeAnalysisCollectionId != null) {
             List<WriteModel<CodeAnalysisApiInfo>> bulkUpdates = new ArrayList<>();
-            List<WriteModel<SingleTypeInfo>> bulkUpdatesSTI = new ArrayList<>();
 
             for(Map.Entry<String, CodeAnalysisApi> codeAnalysisApiEntry: codeAnalysisApisMap.entrySet()) {
-                CodeAnalysisApi codeAnalysisApi = codeAnalysisApiEntry.getValue();
-                CodeAnalysisApiInfo.CodeAnalysisApiInfoKey codeAnalysisApiInfoKey = new CodeAnalysisApiInfo.CodeAnalysisApiInfoKey(codeAnalysisCollectionId, codeAnalysisApi.getMethod(), codeAnalysisApi.getEndpoint());
+                    CodeAnalysisApi codeAnalysisApi = codeAnalysisApiEntry.getValue();
+                    CodeAnalysisApiInfo.CodeAnalysisApiInfoKey codeAnalysisApiInfoKey = new CodeAnalysisApiInfo.CodeAnalysisApiInfoKey(codeAnalysisCollectionId, codeAnalysisApi.getMethod(), codeAnalysisApi.getEndpoint());
 
-                bulkUpdates.add(
+                    bulkUpdates.add(
                         new UpdateOneModel<>(
-                                Filters.eq(CodeAnalysisApiInfo.ID, codeAnalysisApiInfoKey),
-                                Updates.combine(
-                                        Updates.setOnInsert(CodeAnalysisApiInfo.ID, codeAnalysisApiInfoKey),
-                                        Updates.set(CodeAnalysisApiInfo.LOCATION, codeAnalysisApi.getLocation()),
-                                        Updates.setOnInsert(CodeAnalysisApiInfo.DISCOVERED_TS, now),
-                                        Updates.set(CodeAnalysisApiInfo.LAST_SEEN_TS, now)
-                                ),
-                                new UpdateOptions().upsert(true)
+                            Filters.eq(CodeAnalysisApiInfo.ID, codeAnalysisApiInfoKey),
+                            Updates.combine(
+                                Updates.setOnInsert(CodeAnalysisApiInfo.ID, codeAnalysisApiInfoKey),
+                                Updates.set(CodeAnalysisApiInfo.LOCATION, codeAnalysisApi.getLocation())
+                            ),
+                            new UpdateOptions().upsert(true)
                         )
-                );
-
-                String requestBody = codeAnalysisApi.getRequestBody();
-                String responseBody = codeAnalysisApi.getResponseBody();
-
-                List<SingleTypeInfo> singleTypeInfos = new ArrayList<>();
-                singleTypeInfos.addAll(generateSTIsFromPayload(apiCollection.getId(), codeAnalysisApi.getEndpoint(), codeAnalysisApi.getMethod(), requestBody, -1));
-                singleTypeInfos.addAll(generateSTIsFromPayload(apiCollection.getId(), codeAnalysisApi.getEndpoint(), codeAnalysisApi.getMethod(), responseBody, 200));
-
-                Bson update = Updates.combine(Updates.max(SingleTypeInfo.LAST_SEEN, now), Updates.setOnInsert("timestamp", now));
-
-                for (SingleTypeInfo singleTypeInfo: singleTypeInfos) {
-                    bulkUpdatesSTI.add(
-                            new UpdateOneModel<>(
-                                    SingleTypeInfoDao.createFilters(singleTypeInfo),
-                                    update,
-                                    new UpdateOptions().upsert(true)
-                            )
                     );
-                }
-
-            }
-
-            if (!bulkUpdatesSTI.isEmpty()) {
-                CodeAnalysisSingleTypeInfoDao.instance.getMCollection().bulkWrite(bulkUpdatesSTI);
             }
 
             if (bulkUpdates.size() > 0) {
@@ -345,91 +320,10 @@ public class CodeAnalysisAction extends UserAction {
                 sendMixpanelEvent();
             }
         }, 0, TimeUnit.SECONDS);
-
+        
 
         return SUCCESS.toUpperCase();
     }
-
-    public String addCodeAnalysisRepo() {
-        if (codeAnalysisRepos == null || codeAnalysisRepos.isEmpty()) {
-            addActionError("Can't add empty repo");
-            return ERROR.toUpperCase();
-        }
-        List<WriteModel<CodeAnalysisRepo>> updates = new ArrayList<>();
-        for (CodeAnalysisRepo c: codeAnalysisRepos) {
-            updates.add(new UpdateOneModel<>(
-                    Filters.and(
-                            Filters.eq(CodeAnalysisRepo.REPO_NAME, c.getRepoName()),
-                            Filters.eq(CodeAnalysisRepo.PROJECT_NAME, c.getProjectName()),
-                            Filters.eq(CodeAnalysisRepo.SOURCE_CODE_TYPE, c.getSourceCodeType())
-                    ),
-                    Updates.combine(
-                            Updates.setOnInsert(CodeAnalysisRepo.LAST_RUN, 0),
-                            Updates.setOnInsert(CodeAnalysisRepo.SCHEDULE_TIME, Context.now())
-                    ),
-                    new UpdateOptions().upsert(true)
-            ));
-        }
-
-        CodeAnalysisRepoDao.instance.getMCollection().bulkWrite(updates);
-        return SUCCESS.toUpperCase();
-    }
-
-    public String runCodeAnalysisRepo() {
-        if (codeAnalysisRepos == null || codeAnalysisRepos.isEmpty()) {
-            addActionError("Can't run empty repo");
-            return ERROR.toUpperCase();
-        }
-        List<WriteModel<CodeAnalysisRepo>> updates = new ArrayList<>();
-        for (CodeAnalysisRepo c: codeAnalysisRepos) {
-            updates.add(new UpdateOneModel<>(
-                    Filters.and(
-                            Filters.eq(CodeAnalysisRepo.REPO_NAME, c.getRepoName()),
-                            Filters.eq(CodeAnalysisRepo.PROJECT_NAME, c.getProjectName())
-                    ),
-                    Updates.set(CodeAnalysisRepo.SCHEDULE_TIME, Context.now()),
-                    new UpdateOptions().upsert(false)
-            ));
-        }
-
-        CodeAnalysisRepoDao.instance.getMCollection().bulkWrite(updates);
-        return SUCCESS.toUpperCase();
-    }
-
-    CodeAnalysisRepo codeAnalysisRepo;
-    public String deleteCodeAnalysisRepo() {
-        if (codeAnalysisRepo == null) {
-            addActionError("Can't delete null repo");
-            return ERROR.toUpperCase();
-        }
-        CodeAnalysisRepoDao.instance.deleteAll(
-                Filters.and(
-                        Filters.eq(CodeAnalysisRepo.REPO_NAME, codeAnalysisRepo.getRepoName()),
-                        Filters.eq(CodeAnalysisRepo.PROJECT_NAME, codeAnalysisRepo.getProjectName())
-                )
-        );
-        return SUCCESS.toUpperCase();
-    }
-
-    List<CodeAnalysisRepo> codeAnalysisRepos;
-    public String fetchCodeAnalysisRepos() {
-        if (sourceCodeType == null) {
-            sourceCodeType = CodeAnalysisRepo.SourceCodeType.BITBUCKET;
-        }
-        Bson filters;
-        if (sourceCodeType == CodeAnalysisRepo.SourceCodeType.BITBUCKET) {
-            filters = Filters.or(
-                    Filters.eq(CodeAnalysisRepo.SOURCE_CODE_TYPE, sourceCodeType),
-                    Filters.exists(CodeAnalysisRepo.SOURCE_CODE_TYPE, false)
-
-            );
-        } else {
-            filters = Filters.eq(CodeAnalysisRepo.SOURCE_CODE_TYPE, sourceCodeType);
-        }
-        codeAnalysisRepos = CodeAnalysisRepoDao.instance.findAll(filters);
-        return SUCCESS.toUpperCase();
-    }
-
 
     public String getProjectDir() {
         return projectDir;
@@ -453,25 +347,5 @@ public class CodeAnalysisAction extends UserAction {
 
     public void setCodeAnalysisApisList(List<CodeAnalysisApi> codeAnalysisApisList) {
         this.codeAnalysisApisList = codeAnalysisApisList;
-    }
-
-    public void setCodeAnalysisRepo(CodeAnalysisRepo codeAnalysisRepo) {
-        this.codeAnalysisRepo = codeAnalysisRepo;
-    }
-
-    public List<CodeAnalysisRepo> getCodeAnalysisRepos() {
-        return codeAnalysisRepos;
-    }
-
-    public void setCodeAnalysisRepos(List<CodeAnalysisRepo> codeAnalysisRepos) {
-        this.codeAnalysisRepos = codeAnalysisRepos;
-    }
-
-    public CodeAnalysisRepo.SourceCodeType getSourceCodeType() {
-        return sourceCodeType;
-    }
-
-    public void setSourceCodeType(CodeAnalysisRepo.SourceCodeType sourceCodeType) {
-        this.sourceCodeType = sourceCodeType;
     }
 }

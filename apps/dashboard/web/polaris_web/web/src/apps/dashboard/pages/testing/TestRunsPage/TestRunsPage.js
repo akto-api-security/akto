@@ -252,7 +252,8 @@ function processData(testingRuns, latestTestingRunResultSummaries, cicd){
     api.getUserTestRuns().then((resp)=> {
       setHasUserInitiatedTestRuns(resp)
     })
-    setLoading(false)    
+    setLoading(false)
+    
   }
 
   useEffect(()=>{

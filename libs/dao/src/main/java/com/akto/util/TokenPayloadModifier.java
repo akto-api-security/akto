@@ -8,7 +8,6 @@ import java.util.Map;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.testing.AuthParam;
 
-import okhttp3.Cookie;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
