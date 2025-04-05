@@ -489,64 +489,55 @@ public class Executor {
     }
 
     public synchronized static ExecutorSingleOperationResp modifyAuthTokenInRawApi(TestRoles testRole, RawApi rawApi) {
-        Map<String, List<String>> rawHeaders = rawApi.fetchReqHeaders();
-        for(AuthWithCond authWithCond: testRole.getAuthWithCondList()) {
+        AuthMechanism authMechanismForRole = testRole.findMatchingAuthMechanism(rawApi);
 
-            boolean allSatisfied = true;
-            for(String headerKey: authWithCond.getHeaderKVPairs().keySet()) {
-                String headerVal = authWithCond.getHeaderKVPairs().get(headerKey);
-
-                List<String> rawHeaderValue = rawHeaders.getOrDefault(headerKey.toLowerCase(), new ArrayList<>());
-                if (!rawHeaderValue.contains(headerVal)) {
-                    allSatisfied = false;
-                    break;
+        if (authMechanismForRole == null) {
+            return null;
+        }
+        
+        List<AuthParam> authParamList = authMechanismForRole.getAuthParams();
+        
+        if (authParamList.isEmpty()) {
+            return null;
+        }
+        
+        if (AuthMechanismTypes.LOGIN_REQUEST.toString().equalsIgnoreCase(authMechanismForRole.getType())) {
+            try {
+                LoginFlowResponse loginFlowResponse= new LoginFlowResponse();
+                String roleKey = testRole.getName() + "_" + Context.accountId.get();
+                loggerMaker.infoAndAddToDb("trying to fetch token of step builder type for role " + testRole.getName(), LogDb.TESTING);
+                loginFlowResponse = TestExecutor.executeLoginFlow(authMechanismForRole, null, testRole.getName());
+                if (!loginFlowResponse.getSuccess())
+                    throw new Exception(loginFlowResponse.getError());
+                else{
+                    String responseString = loginFlowResponse.toString();
+                    TestRolesCache.putToken(roleKey, responseString, Context.now());
                 }
-            }
-
-            if (allSatisfied) {
-                AuthMechanism authMechanismForRole = authWithCond.getAuthMechanism();
-                
-                if (AuthMechanismTypes.LOGIN_REQUEST.toString().equalsIgnoreCase(authMechanismForRole.getType())) {
-                    try {
-                        LoginFlowResponse loginFlowResponse= new LoginFlowResponse();
-                        String roleKey = testRole.getName() + "_" + Context.accountId.get();
-                        loggerMaker.infoAndAddToDb("trying to fetch token of step builder type for role " + testRole.getName(), LogDb.TESTING);
-                        loginFlowResponse = TestExecutor.executeLoginFlow(authMechanismForRole, null, testRole.getName());
-                        if (!loginFlowResponse.getSuccess())
-                            throw new Exception(loginFlowResponse.getError());
-                        else{
-                            String responseString = loginFlowResponse.toString();
-                            TestRolesCache.putToken(roleKey, responseString, Context.now());
-                        }
-                        authMechanismForRole.setType(LoginFlowEnums.AuthMechanismTypes.HARDCODED.name());
-                        authMechanismForRole.setRecordedLoginFlowInput(null);
-                    } catch (Exception e) {
-                        return new ExecutorSingleOperationResp(false, "Failed to replace roles_access_context: " + e.getMessage());
-                    }
-                }
-         
-                if (!authMechanismForRole.getType().equalsIgnoreCase(AuthMechanismTypes.HARDCODED.toString())) {
-                    return new ExecutorSingleOperationResp(false, "Auth type is not HARDCODED");
-                }
-
-                List<AuthParam> authParamList = authMechanismForRole.getAuthParams();
-                if (!authParamList.isEmpty()) {
-                    ExecutorSingleOperationResp ret = null;
-                    for (AuthParam authParam1: authParamList) {
-                        if(authParam1.authTokenPresent(rawApi.getRequest())){
-                            authParam1.addAuthTokens(rawApi.getRequest());
-                            ret = new ExecutorSingleOperationResp(true, "");
-                        } else {
-                            ret = new ExecutorSingleOperationResp(true, "key not present " + authParam1.getKey().toLowerCase());
-                        }
-                    }
-
-                    return ret;
-                }
+                authMechanismForRole.setType(LoginFlowEnums.AuthMechanismTypes.HARDCODED.name());
+                authMechanismForRole.setRecordedLoginFlowInput(null);
+            } catch (Exception e) {
+                return new ExecutorSingleOperationResp(false, "Failed to replace roles_access_context: " + e.getMessage());
             }
         }
+    
+        if (!authMechanismForRole.getType().equalsIgnoreCase(AuthMechanismTypes.HARDCODED.toString())) {
+            return new ExecutorSingleOperationResp(false, "Auth type is not HARDCODED");
+        }
 
-        return null;
+        ExecutorSingleOperationResp ret = null;
+        String messageKeysPresent = "";
+        String messageKeysAbsent = "";
+        for (AuthParam authParam1: authParamList) {
+            if(authParam1.authTokenPresent(rawApi.getRequest())){
+                authParam1.addAuthTokens(rawApi.getRequest());
+                messageKeysPresent += authParam1.getKey()+", ";
+            } else {
+                messageKeysAbsent += authParam1.getKey()+", ";
+            }
+        }
+        ret = new ExecutorSingleOperationResp(true, "keys present=[" + messageKeysPresent +"], absent=["+ messageKeysAbsent + "]");
+
+        return ret;
     }
 
     private static ConcurrentHashMap<String, TestRoles> roleCache = new ConcurrentHashMap<>();

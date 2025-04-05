@@ -48,31 +48,57 @@ public class TestRoles {
         return this.endpointLogicalGroup;
     }
 
+    public AuthMechanism findDefaultAuthMechanism() {
+        try {
+            for(AuthWithCond authWithCond: this.getAuthWithCondList()) {
+                if (authWithCond.getHeaderKVPairs().isEmpty()) {
+                    AuthMechanism ret = authWithCond.getAuthMechanism();
+                    if(authWithCond.getRecordedLoginFlowInput()!=null){
+                        ret.setRecordedLoginFlowInput(authWithCond.getRecordedLoginFlowInput());
+                    }
+
+                    return ret;
+                }
+            }
+        } catch (Exception e) {
+            return null;
+        }
+
+        return null;
+    }
+
     public AuthMechanism findMatchingAuthMechanism(RawApi rawApi) {
+        if (rawApi == null) {
+            return findDefaultAuthMechanism();
+        }
 
         for(AuthWithCond authWithCond: this.getAuthWithCondList()) {
 
-            boolean allSatisfied = true;
+            try {
+                boolean allSatisfied = true;
 
-            if (rawApi == null && authWithCond.getHeaderKVPairs().isEmpty()) {
-                return authWithCond.getAuthMechanism();
-            }
-
-            for(String headerKey: authWithCond.getHeaderKVPairs().keySet()) {
-                String headerVal = authWithCond.getHeaderKVPairs().get(headerKey);
-                List<String> rawHeaderValue = rawApi.getRequest().getHeaders().getOrDefault(headerKey.toLowerCase(), new ArrayList<>());
-                if (!rawHeaderValue.contains(headerVal)) {
-                    allSatisfied = false;
-                    break;
+                for(String headerKey: authWithCond.getHeaderKVPairs().keySet()) {
+                    String headerVal = authWithCond.getHeaderKVPairs().get(headerKey);
+                    List<String> rawHeaderValue = rawApi.getRequest().getHeaders().getOrDefault(headerKey.toLowerCase(), new ArrayList<>());
+                    if (!rawHeaderValue.contains(headerVal)) {
+                        allSatisfied = false;
+                        break;
+                    }
                 }
-            }
 
-            if (allSatisfied) {
-                return authWithCond.getAuthMechanism();
+                if (allSatisfied) {
+                    AuthMechanism ret = authWithCond.getAuthMechanism();
+                    if(authWithCond.getRecordedLoginFlowInput()!=null){
+                        ret.setRecordedLoginFlowInput(authWithCond.getRecordedLoginFlowInput());
+                    }
+                    return ret;
+                }
+            } catch (Exception e) {
+                // Handle exception if needed
             }
         }
         
-        return null;
+        return findDefaultAuthMechanism();
     }
 
     public ObjectId getId() {
