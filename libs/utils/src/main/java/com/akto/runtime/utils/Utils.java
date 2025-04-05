@@ -1,10 +1,6 @@
 package com.akto.runtime.utils;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Properties;
-import java.util.StringJoiner;
+import java.util.*;
 import java.util.regex.Pattern;
 
 import org.apache.commons.lang3.math.NumberUtils;
@@ -146,6 +142,44 @@ public class Utils {
     }
 
     private static int GRPC_DEBUG_COUNTER = 50;
+
+    private static final Set<String> DEBUG_HOSTS_SET = initializeDebugHostsSet();
+    private static final Set<String> DEBUG_URLS_SET = initializeDebugUrlsSet();
+
+    private static Set<String> initializeDebugHostsSet() {
+        String debugHosts = System.getenv("DEBUG_HOSTS");
+        if (debugHosts == null || debugHosts.isEmpty()) {
+            return new HashSet<>();
+        }
+        return new HashSet<>(Arrays.asList(debugHosts.split(",")));
+    }
+
+    public static String printDebugHostLog(HttpResponseParams httpResponseParams) {
+        if (DEBUG_HOSTS_SET.isEmpty()) return null;
+        if (httpResponseParams == null || httpResponseParams.requestParams == null || httpResponseParams.requestParams.getHeaders() == null) {
+            return null;
+        }
+        Map<String, List<String>> headers = httpResponseParams.getRequestParams().getHeaders();
+        List<String> hosts = headers.get("host");
+        if (hosts == null || hosts.isEmpty()) return null;
+        String host = hosts.get(0);
+
+        return DEBUG_HOSTS_SET.contains(host) ? host : null;
+    }
+
+    private static Set<String> initializeDebugUrlsSet() {
+        String debugUrls = System.getenv("DEBUG_URLS");
+        if (debugUrls == null || debugUrls.isEmpty()) {
+            return new HashSet<>();
+        }
+        return new HashSet<>(Arrays.asList(debugUrls.split(",")));
+    }
+
+    public static boolean printDebugUrlLog(String url) {
+        if (DEBUG_URLS_SET.isEmpty()) return false;
+        return DEBUG_HOSTS_SET.contains(url);
+    }
+
 
     public static HttpResponseParams parseKafkaMessage(String message) throws Exception {
 

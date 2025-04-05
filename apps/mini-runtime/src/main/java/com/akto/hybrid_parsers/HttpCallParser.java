@@ -1,7 +1,5 @@
 package com.akto.hybrid_parsers;
 
-import com.akto.dao.ApiCollectionsDao;
-import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.traffic_metrics.TrafficMetricsDao;
 import com.akto.hybrid_dependency.DependencyAnalyser;
@@ -20,6 +18,7 @@ import com.akto.hybrid_runtime.APICatalogSync;
 import com.akto.hybrid_runtime.Main;
 import com.akto.hybrid_runtime.URLAggregator;
 import com.akto.runtime.RuntimeUtil;
+import com.akto.runtime.utils.Utils;
 import com.akto.util.JSONUtils;
 import com.akto.util.Constants;
 import com.akto.util.HttpRequestResponseUtils;
@@ -29,7 +28,6 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.*;
 import okhttp3.*;
 import org.apache.commons.lang3.math.NumberUtils;
-import org.bson.conversions.Bson;
 import com.alibaba.fastjson2.*;
 
 import java.io.IOException;
@@ -546,6 +544,12 @@ public class HttpCallParser {
         boolean ret = false;
         Set<String> urlSet= new HashSet<>();
         for (HttpResponseParams responseParams: responses) {
+            String debugHost = Utils.printDebugHostLog(responseParams);
+            if (debugHost != null) {
+                HttpRequestParams requestParams = responseParams.getRequestParams();
+                loggerMaker.infoAndAddToDb("Found host: " + debugHost + " for url: " + requestParams.getMethod() + " " + requestParams.getURL());
+            }
+
             if (responseParams.getSource() == HttpResponseParams.Source.HAR || responseParams.getSource() == HttpResponseParams.Source.PCAP) {
                 ret = true;
             }
