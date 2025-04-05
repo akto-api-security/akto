@@ -24,6 +24,7 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.rules.BFLATest;
 import com.akto.store.SampleMessageStore;
 import com.akto.store.TestingUtil;
+import com.akto.test_editor.execution.Executor;
 import com.akto.util.Constants;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
@@ -94,7 +95,11 @@ public class AccessMatrixAnalyzer {
             sampleMessageStore.fetchSampleMessages(apiCollectionIds);
             String roleFromTask = task.getEndpointLogicalGroupName().substring(0, task.getEndpointLogicalGroupName().length()-EndpointLogicalGroup.GROUP_NAME_SUFFIX.length());
             loggerMaker.infoAndAddToDb("Role found: " + roleFromTask, LogDb.TESTING);
-            List<TestRoles> testRoles = TestRolesDao.instance.findAll(TestRoles.NAME, roleFromTask);
+            List<TestRoles> testRoles = new ArrayList<>();
+            TestRoles testRoleForTask = Executor.fetchOrFindTestRole(roleFromTask, false);
+            if (testRoleForTask != null) {
+                testRoles.add(testRoleForTask);
+            }
 
             List<CustomAuthType> customAuthTypes = CustomAuthTypeDao.instance.findAll(CustomAuthType.ACTIVE,true);
             TestingUtil testingUtil = new TestingUtil(sampleMessageStore, testRoles,"", customAuthTypes);
