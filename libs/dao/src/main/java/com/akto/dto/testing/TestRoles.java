@@ -77,6 +77,10 @@ public class TestRoles {
             try {
                 boolean allSatisfied = true;
 
+                if (authWithCond.getHeaderKVPairs().isEmpty()) {
+                    continue;
+                }
+
                 for(String headerKey: authWithCond.getHeaderKVPairs().keySet()) {
                     String headerVal = authWithCond.getHeaderKVPairs().get(headerKey);
                     List<String> rawHeaderValue = rawApi.getRequest().getHeaders().getOrDefault(headerKey.toLowerCase(), new ArrayList<>());
