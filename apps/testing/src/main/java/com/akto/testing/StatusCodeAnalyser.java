@@ -7,7 +7,6 @@ import com.akto.dto.testing.TestingRunConfig;
 import com.akto.dto.type.URLMethods;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-import com.akto.store.AuthMechanismStore;
 import com.akto.rules.TestPlugin;
 import com.akto.store.SampleMessageStore;
 import com.fasterxml.jackson.core.JsonFactory;

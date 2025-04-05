@@ -39,7 +39,6 @@ import com.akto.dto.type.URLMethods.Method;
 import com.akto.github.GithubUtils;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-import com.akto.store.AuthMechanismStore;
 import com.akto.store.SampleMessageStore;
 import com.akto.store.TestingUtil;
 import com.akto.test_editor.execution.Build;

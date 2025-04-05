@@ -11,7 +11,6 @@ import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.URLMethods;
-import com.akto.store.AuthMechanismStore;
 import com.akto.store.SampleMessageStore;
 import com.akto.store.TestingUtil;
 import org.apache.commons.lang3.StringUtils;
