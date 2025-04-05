@@ -5,6 +5,7 @@ import com.akto.dao.RBACDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.testing.EndpointLogicalGroupDao;
 import com.akto.dao.testing.TestRolesDao;
+import com.akto.dao.testing.TestingRunConfigDao;
 import com.akto.dao.testing.config.TestCollectionPropertiesDao;
 import com.akto.dto.RBAC;
 import com.akto.dto.User;
@@ -76,6 +77,7 @@ public class TestRolesAction extends UserAction {
                     break;
                 }
             }
+            item.setTestCountForRole(TestingRunConfigDao.instance.count(Filters.eq(TestingRunConfig.TEST_ROLE_ID, item.getHexId())));
         });
         return SUCCESS.toUpperCase();
     }
