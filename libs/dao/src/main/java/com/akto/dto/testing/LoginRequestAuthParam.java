@@ -36,6 +36,7 @@ public class LoginRequestAuthParam extends AuthParam {
         return Utils.isRequestKeyPresent(this.key, request, where);
     }
 
+    @Override
     public Location getWhere() {
         return where;
     }
@@ -44,6 +45,7 @@ public class LoginRequestAuthParam extends AuthParam {
         this.where = where;
     }
 
+    @Override
     public String getKey() {
         return key;
     }
@@ -52,6 +54,7 @@ public class LoginRequestAuthParam extends AuthParam {
         this.key = key;
     }
 
+    @Override
     public String getValue() {
         return value;
     }
@@ -60,6 +63,7 @@ public class LoginRequestAuthParam extends AuthParam {
         this.value = value;
     }
 
+    @Override
     public Boolean getShowHeader() {
         return showHeader;
     }

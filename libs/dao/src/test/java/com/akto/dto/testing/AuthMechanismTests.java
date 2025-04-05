@@ -15,7 +15,7 @@ public class AuthMechanismTests {
         AuthMechanism authMechanism = new AuthMechanism();
         authMechanism.setAuthParams(Collections.singletonList(new HardcodedAuthParam(AuthParam.Location.HEADER, key, value, true)));
 
-        authMechanism.addAuthToRequest(request);
+        authMechanism.addAuthToRequest(request, false);
         List<String> modifiedHeader = request.getHeaders().get(finalKey);
         assertEquals(modifiedHeader, modifiedValue);
 

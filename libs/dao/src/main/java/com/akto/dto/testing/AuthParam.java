@@ -13,6 +13,10 @@ public abstract class AuthParam {
 
     public abstract String getKey();
 
+    public abstract Boolean getShowHeader();
+
+    public abstract Location getWhere();
+
     public abstract void setValue(String value);
 
     public enum Location {

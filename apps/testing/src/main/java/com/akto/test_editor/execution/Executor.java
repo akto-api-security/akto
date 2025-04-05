@@ -281,26 +281,6 @@ public class Executor {
         return val;
     }
 
-    private void overrideAuth(RawApi rawApi, AuthMechanism authMechanism) {
-        List<AuthParam> authParams = authMechanism.getAuthParams();
-        if (authParams == null || authParams.isEmpty()) {
-            return;
-        }
-        AuthParam authParam = authParams.get(0);
-        String authHeader = authParam.getKey();
-        String authVal = authParam.getValue();
-        Map<String, List<String>> headersMap= rawApi.fetchReqHeaders();
-        for (Map.Entry<String, List<String>> headerKeyVal : headersMap.entrySet()) {
-            if (headerKeyVal.getKey().equalsIgnoreCase(authHeader)) {
-                headerKeyVal.setValue(Collections.singletonList(authVal));
-                rawApi.modifyReqHeaders(headersMap);
-                loggerMaker.infoAndAddToDb("overriding auth header " + authHeader, LogDb.TESTING);
-                return;
-            }
-        }
-        loggerMaker.infoAndAddToDb("auth header not found " + authHeader, LogDb.TESTING);
-    }
-
     public WorkflowTest buildWorkflowGraph(ExecutorNode reqNodes, RawApi rawApi, AuthMechanism authMechanism,
         List<CustomAuthType> customAuthTypes, ApiInfo.ApiInfoKey apiInfoKey, Map<String, Object> varMap, FilterNode validatorNode) {
 
@@ -501,30 +481,22 @@ public class Executor {
             return null;
         }
         
-        if (AuthMechanismTypes.LOGIN_REQUEST.toString().equalsIgnoreCase(authMechanismForRole.getType())) {
+        boolean eligibleForCachedToken = AuthMechanismTypes.LOGIN_REQUEST.toString().equalsIgnoreCase(authMechanismForRole.getType());
+        boolean shouldCalculateNewToken = eligibleForCachedToken && authMechanismForRole.isCacheExpired();
+
+        if (shouldCalculateNewToken) {
             try {
                 LoginFlowResponse loginFlowResponse= new LoginFlowResponse();
-                String roleKey = testRole.getName() + "_" + Context.accountId.get();
                 loggerMaker.infoAndAddToDb("trying to fetch token of step builder type for role " + testRole.getName(), LogDb.TESTING);
                 loginFlowResponse = TestExecutor.executeLoginFlow(authMechanismForRole, null, testRole.getName());
                 if (!loginFlowResponse.getSuccess())
                     throw new Exception(loginFlowResponse.getError());
-                else{
-                    String responseString = loginFlowResponse.toString();
-                    TestRolesCache.putToken(roleKey, responseString, Context.now());
-                }
-                authMechanismForRole.setType(LoginFlowEnums.AuthMechanismTypes.HARDCODED.name());
-                authMechanismForRole.setRecordedLoginFlowInput(null);
             } catch (Exception e) {
                 return new ExecutorSingleOperationResp(false, "Failed to replace roles_access_context: " + e.getMessage());
             }
         }
     
-        if (!authMechanismForRole.getType().equalsIgnoreCase(AuthMechanismTypes.HARDCODED.toString())) {
-            return new ExecutorSingleOperationResp(false, "Auth type is not HARDCODED");
-        }
-
-        ExecutorSingleOperationResp ret = authMechanismForRole.addAuthToRequest(rawApi.getRequest());;
+        ExecutorSingleOperationResp ret = authMechanismForRole.addAuthToRequest(rawApi.getRequest(), eligibleForCachedToken);
 
         return ret;
     }
