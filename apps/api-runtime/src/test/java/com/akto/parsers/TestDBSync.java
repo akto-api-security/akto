@@ -17,11 +17,7 @@ import com.akto.dto.billing.SyncLimit;
 import com.akto.dto.*;
 import com.akto.dto.runtime_filters.RuntimeFilter;
 import com.akto.dto.traffic.SampleData;
-import com.akto.dto.type.AccountDataTypesInfo;
-import com.akto.dto.type.CollectionReplaceDetails;
-import com.akto.dto.type.RequestTemplate;
-import com.akto.dto.type.SingleTypeInfo;
-import com.akto.dto.type.URLTemplate;
+import com.akto.dto.type.*;
 import com.akto.dto.HttpResponseParams.Source;
 import com.akto.runtime.APICatalogSync;
 import com.akto.runtime.Main;
@@ -101,19 +97,12 @@ public class TestDBSync extends MongoBasedTest {
         APICatalogSync.mergeUrlsAndSave(123, true, false, sync.existingAPIsInDb, false);
         sync.buildFromDB(false, true);
 
-        assertEquals(0, sync.getDbState(123).getStrictURLToMethods().size());
-        assertEquals(1, sync.getDbState(123).getTemplateURLToMethods().size());
 
-        Map.Entry<URLTemplate, RequestTemplate> entry = sync.getDbState(123).getTemplateURLToMethods().entrySet().iterator().next();
+        Map<String, Integer> staticAndTemplateUrlsCount = fetchStaticAndTemplateUrlsCount(123);
+        assertEquals(0, (int) staticAndTemplateUrlsCount.get(STATIC_URLS));
+        assertEquals(1,  (int) staticAndTemplateUrlsCount.get(TEMPLATE_URLS));
 
-        assertEquals(url+"INTEGER", entry.getKey().getTemplateString());
-        RequestTemplate reqTemplate = entry.getValue();
-
-        assertEquals(2, reqTemplate.getParameters().size());
-        
-        RequestTemplate respTemplate = reqTemplate.getResponseTemplates().get(resp.getStatusCode());
-        assertEquals(3, respTemplate.getParameters().size());
-    }    
+    }
 
 //    @Test
     public void testImmediateSync() {
@@ -204,7 +193,33 @@ public class TestDBSync extends MongoBasedTest {
         responseParams.get(0).setSource(Source.HAR);
         parser.syncFunction(responseParams, false, true, null);
 
-    }  
+    }
+
+    static String STATIC_URLS = "staticUrls";
+    static String TEMPLATE_URLS = "templateUrls";
+
+    public static Map<String, Integer> fetchStaticAndTemplateUrlsCount(int apiCollectionId) {
+        List<SingleTypeInfo> singleTypeInfos = SingleTypeInfoDao.instance.findAll(Filters.eq(SingleTypeInfo._API_COLLECTION_ID, apiCollectionId));
+        Set<String> staticUrls = new HashSet<>();
+        Set<String> templateUrls = new HashSet<>();
+        for (SingleTypeInfo singleTypeInfo: singleTypeInfos) {
+            String url = singleTypeInfo.getUrl();
+            String method = singleTypeInfo.getMethod();
+
+            if (APICatalog.isTemplateUrl(url)) {
+                URLTemplate urlTemplate = APICatalogSync.createUrlTemplate(url, URLMethods.Method.fromString(method));
+                templateUrls.add(urlTemplate.getTemplateString() + " " + method);
+            } else {
+                staticUrls.add(url + " " + method);
+            }
+        }
+
+        Map<String, Integer> count = new HashMap<>();
+        count.put(STATIC_URLS, staticUrls.size());
+        count.put(TEMPLATE_URLS, templateUrls.size());
+
+        return count;
+    }
 
     @Test
     public void testInvalidMergeParameterizedURL() {
@@ -219,8 +234,9 @@ public class TestDBSync extends MongoBasedTest {
         sync.syncWithDB(false, true, SyncLimit.noLimit);
 
 
-        assertEquals(30, sync.getDbState(123).getStrictURLToMethods().size());
-        assertEquals(0, sync.getDbState(123).getTemplateURLToMethods().size());
+        Map<String, Integer> staticAndTemplateUrlsCount = fetchStaticAndTemplateUrlsCount(123);
+        assertEquals(30, (int) staticAndTemplateUrlsCount.get(STATIC_URLS));
+        assertEquals(0,  (int) staticAndTemplateUrlsCount.get(TEMPLATE_URLS));
 
         HttpResponseParams resp2 = TestDump2.createSampleParams("user1", "/payment/history");
         ArrayList<String> newHeader = new ArrayList<>();
@@ -234,9 +250,10 @@ public class TestDBSync extends MongoBasedTest {
         APICatalogSync.mergeUrlsAndSave(123, true, false, sync.existingAPIsInDb, false);
         sync.buildFromDB(false, true);
 
-        assertEquals(1, sync.getDbState(123).getStrictURLToMethods().size());
-        assertEquals(1, sync.getDbState(123).getTemplateURLToMethods().size());
 
+        staticAndTemplateUrlsCount = fetchStaticAndTemplateUrlsCount(123);
+        assertEquals(1, (int)staticAndTemplateUrlsCount.get(STATIC_URLS));
+        assertEquals(1,  (int) staticAndTemplateUrlsCount.get(TEMPLATE_URLS));
 
     }
 

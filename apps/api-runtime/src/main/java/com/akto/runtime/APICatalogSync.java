@@ -7,6 +7,7 @@ import java.util.regex.Pattern;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
 import com.akto.dao.filter.MergedUrlsDao;
+import com.akto.data_actor.DbLayer;
 import com.akto.dto.*;
 import com.akto.dto.billing.SyncLimit;
 import com.akto.dto.dependency_flow.DependencyFlow;
@@ -1584,30 +1585,30 @@ public class APICatalogSync {
         }
 
         loggerMaker.infoAndAddToDb("Fetching STIs: " + fetchAllSTI, LogDb.RUNTIME);
-        List<SingleTypeInfo> allParams;
+        List<SingleTypeInfo> allParams = new ArrayList<>();
+
+        // when fetchAllSTI = true, then we need to minimise memory, we do that by keeping 1 STI per API
         if (fetchAllSTI) {
-            Bson filterForHostHeader = SingleTypeInfoDao.filterForHostHeader(-1,false);
-            Bson filterQ = Filters.and(filterForHostHeader, Filters.regex(SingleTypeInfo._URL, "STRING|INTEGER"));
-            allParams = SingleTypeInfoDao.instance.findAll(filterQ, Projections.exclude(SingleTypeInfo._VALUES));
-            allParams.addAll(SingleTypeInfoDao.instance.findAll(new BasicDBObject(), Projections.exclude(SingleTypeInfo._VALUES)));
-
-            int dependencyFlowLimit = 1_000;
-            if (mergingCalled && allParams.size() < dependencyFlowLimit) {
-                loggerMaker.infoAndAddToDb("ALl params less than " + dependencyFlowLimit +", running dependency flow", LogDb.RUNTIME);
-                try {
-                    DependencyFlow dependencyFlow = new DependencyFlow();
-                    dependencyFlow.run(null);
-                    dependencyFlow.syncWithDb();
-                    loggerMaker.infoAndAddToDb("Finished running dependency flow", LogDb.RUNTIME);
-                } catch (Exception e) {
-                    loggerMaker.errorAndAddToDb(e, "Error while running dependency flow in runtime: " + e.getMessage(), LogDb.RUNTIME);
-                }
-            }
-
-        } else {
-            List<Integer> apiCollectionIds = ApiCollectionsDao.instance.fetchNonTrafficApiCollectionsIds();
-            allParams = SingleTypeInfoDao.instance.fetchStiOfCollections(apiCollectionIds);
+            allParams = DbLayer.fetchStiBasedOnHostHeaders();
         }
+
+        List<Integer> nonHostsApiCollectionIds = ApiCollectionsDao.instance.fetchNonTrafficApiCollectionsIds();
+        List<SingleTypeInfo> nonHostsSTI = SingleTypeInfoDao.instance.fetchStiOfCollections(nonHostsApiCollectionIds);
+        if (fetchAllSTI) {
+            // for collections without hosts, we need to get all STIs of such collections and make sure only unique ones are kept
+            Set<String> seen = new HashSet<>();
+            for (SingleTypeInfo singleTypeInfo: nonHostsSTI) {
+                String nonHostUrl = singleTypeInfo.getUrl();
+                String nonHostMethod = singleTypeInfo.getMethod();
+                String key = nonHostMethod + " " + nonHostUrl;
+                if (seen.contains(key)) continue;
+                seen.add(key);
+                allParams.add(singleTypeInfo);
+            }
+        } else {
+            allParams.addAll(nonHostsSTI);
+        }
+
         loggerMaker.infoAndAddToDb("Fetched STIs count: " + allParams.size(), LogDb.RUNTIME);
         this.dbState.clear();
         loggerMaker.infoAndAddToDb("Starting building dbState", LogDb.RUNTIME);
