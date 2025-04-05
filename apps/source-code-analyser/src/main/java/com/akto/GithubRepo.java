@@ -34,7 +34,7 @@ public class GithubRepo extends SourceCodeAnalyserRepo{
 
     @Override
     public BasicDBObject getCodeAnalysisBody(String path) {
-        if (path == null || StringUtils.isEmpty(GITHUB_ACCESS_TOKEN)) {
+        if (path == null) {
             return null;
         }
 
@@ -43,6 +43,7 @@ public class GithubRepo extends SourceCodeAnalyserRepo{
         requestBody.put("orgName",this.getRepoToBeAnalysed().getProjectName());
         requestBody.put("repoName",this.getRepoToBeAnalysed().getRepoName());
         requestBody.put("is_github",true);
+        requestBody.put("is_aktogpt",false);
         return requestBody;
     }
 
