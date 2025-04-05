@@ -209,7 +209,7 @@ public class TestExecutor {
             Updates.set(TestingRunResultSummary.TOTAL_APIS, apiInfoKeyList.size()));
 
         List<TestRoles> testRoles = sampleMessageStore.fetchTestRoles();
-        TestRoles attackerTestRole = TestRolesDao.instance.findAttackerRole();
+        TestRoles attackerTestRole = Executor.fetchOrFindAttackerRole();
 
         //Updating the subcategory list if its individual run
         List<String> testingRunSubCategories;
@@ -943,7 +943,7 @@ public class TestExecutor {
     public TestingRunResult runTestNew(ApiInfo.ApiInfoKey apiInfoKey, ObjectId testRunId, TestingUtil testingUtil,
         ObjectId testRunResultSummaryId, TestConfig testConfig, TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs, String message) {
             RawApi rawApi = RawApi.buildFromMessage(message, true);
-            TestRoles attackerTestRole = Executor.fetchOrFindTestRole("ATTACKER_TOKEN_ALL", false);
+            TestRoles attackerTestRole = Executor.fetchOrFindAttackerRole();
             AuthMechanism attackerAuthMechanism = null;
             if (attackerTestRole == null) {
                 loggerMaker.infoAndAddToDb("ATTACKER_TOKEN_ALL test role not found", LogDb.TESTING);

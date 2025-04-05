@@ -62,7 +62,7 @@ public class TestRolesDao extends AccountsContextDao<TestRoles> {
         return role;
     }
 
-    public TestRoles findAttackerRole() {
+    private TestRoles findAttackerRole() {
         return TestRolesDao.instance.findOne(TestRoles.NAME, "ATTACKER_TOKEN_ALL");
     }
 

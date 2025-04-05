@@ -557,6 +557,10 @@ public class Executor {
         }
     }
 
+    public static TestRoles fetchOrFindAttackerRole() {
+        return fetchOrFindTestRole("ATTACKER_TOKEN_ALL", false);
+    }
+
     public synchronized static TestRoles fetchOrFindTestRole(String name, boolean isId) {
         if (roleCache == null) {
             roleCache = new ConcurrentHashMap<>();
