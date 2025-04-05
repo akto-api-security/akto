@@ -2,6 +2,7 @@ package com.akto.dto.testing;
 
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.RecordedLoginFlowInput;
+import com.akto.dto.test_editor.ExecutorSingleOperationResp;
 
 import org.bson.codecs.pojo.annotations.BsonIgnore;
 import org.bson.types.ObjectId;
@@ -36,12 +37,22 @@ public class AuthMechanism {
         this.apiCollectionIds = apiCollectionIds;
     }
 
-    public boolean addAuthToRequest(OriginalHttpRequest request) {
-        for (AuthParam authParamPair : authParams) {
-            boolean result = authParamPair.addAuthTokens(request);
-            if (!result) return false;
+    public ExecutorSingleOperationResp addAuthToRequest(OriginalHttpRequest request) {
+        String messageKeysPresent = "";
+        String messageKeysAbsent = "";
+        boolean modifiedAtLeastOne = false;
+        for (AuthParam authParam1: authParams) {
+            if(authParam1.authTokenPresent(request)){
+                authParam1.addAuthTokens(request);
+                messageKeysPresent += authParam1.getKey()+", ";
+                modifiedAtLeastOne = true;
+            } else {
+                messageKeysAbsent += authParam1.getKey()+", ";
+            }
         }
-        return true;
+
+        return new ExecutorSingleOperationResp(modifiedAtLeastOne, "keys present=[" + messageKeysPresent +"], absent=["+ messageKeysAbsent + "]");
+
     }
 
     public boolean removeAuthFromRequest(OriginalHttpRequest request) {

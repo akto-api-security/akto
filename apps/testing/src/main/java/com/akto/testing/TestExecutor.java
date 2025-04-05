@@ -730,12 +730,6 @@ public class TestExecutor {
         }
     }
 
-    private synchronized void checkAndUpdateAuthMechanism(int timeNow, AuthMechanism authMechanism){
-        if(expiryTimeOfAuthToken != -1 && expiryTimeOfAuthToken <= timeNow){
-            triggerLoginFlow(authMechanism, 3);
-        }
-    }
-
     public void insertResultsAndMakeIssues(List<TestingRunResult> testingRunResults, ObjectId testRunResultSummaryId) {
         int resultSize = testingRunResults.size();
         if (resultSize > 0) {

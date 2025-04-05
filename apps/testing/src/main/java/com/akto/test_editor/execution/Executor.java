@@ -524,18 +524,7 @@ public class Executor {
             return new ExecutorSingleOperationResp(false, "Auth type is not HARDCODED");
         }
 
-        ExecutorSingleOperationResp ret = null;
-        String messageKeysPresent = "";
-        String messageKeysAbsent = "";
-        for (AuthParam authParam1: authParamList) {
-            if(authParam1.authTokenPresent(rawApi.getRequest())){
-                authParam1.addAuthTokens(rawApi.getRequest());
-                messageKeysPresent += authParam1.getKey()+", ";
-            } else {
-                messageKeysAbsent += authParam1.getKey()+", ";
-            }
-        }
-        ret = new ExecutorSingleOperationResp(true, "keys present=[" + messageKeysPresent +"], absent=["+ messageKeysAbsent + "]");
+        ExecutorSingleOperationResp ret = authMechanismForRole.addAuthToRequest(rawApi.getRequest());;
 
         return ret;
     }
@@ -693,13 +682,12 @@ public class Executor {
                         return new ExecutorSingleOperationResp(false, "auth headers missing");
                     }
 
-                    for (AuthParam authParam: authMechanism.getAuthParams()) {
-                        authVal = authParam.getValue();
-                        ExecutorSingleOperationResp result = new ExecutorSingleOperationResp(true, "");
-                        boolean ret = authParam.addAuthTokens(rawApi.getRequest());
-                        result.setSuccess(ret);
-                        modifiedAtLeastOne = modifiedAtLeastOne || result.getSuccess();
+                    ExecutorSingleOperationResp opResponse = modifyAuthTokenInRawApi(Executor.fetchOrFindAttackerRole(), rawApi);
+                    if (opResponse == null) {
+                        return new ExecutorSingleOperationResp(false, "auth headers missing");
                     }
+                    
+                    modifiedAtLeastOne = modifiedAtLeastOne || opResponse.getSuccess();
                 }
 
                 // once all the replacement has been done.. .remove all the auth keys that were not impacted by the change by comparing it with initial request

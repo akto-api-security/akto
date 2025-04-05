@@ -2,11 +2,9 @@ package com.akto.dto.testing;
 
 import com.akto.dto.OriginalHttpRequest;
 
-import java.util.ArrayList;
-
 public abstract class AuthParam {
 
-    public abstract boolean addAuthTokens(OriginalHttpRequest request);
+    abstract boolean addAuthTokens(OriginalHttpRequest request);
     public abstract boolean removeAuthTokens(OriginalHttpRequest request);
 
     public abstract boolean authTokenPresent(OriginalHttpRequest request);

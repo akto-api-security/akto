@@ -25,28 +25,6 @@ public class AuthMechanismTests {
         assertNull(modifiedHeader);
     }
 
-    private void validateBodyAuthOperations(OriginalHttpRequest request, String key, String modifiedValue, String removeExpectedValue, Boolean modified, Boolean hardcoded) {
-        String value = "Value";
-        AuthMechanism authMechanism = new AuthMechanism();
-        if (hardcoded) {
-            authMechanism.setAuthParams(Collections.singletonList(new HardcodedAuthParam(AuthParam.Location.BODY, key, value, false)));
-        } else {
-            authMechanism.setAuthParams(Collections.singletonList(new LoginRequestAuthParam(AuthParam.Location.BODY, key, value, false)));
-        }
-
-        boolean result = authMechanism.addAuthToRequest(request);
-        assertEquals(result, modified);
-        
-        String body = request.getBody();
-        assertEquals(request.getBody(), modifiedValue);
-
-        result = authMechanism.removeAuthFromRequest(request);
-        assertEquals(result, modified);
-        if (modifiedValue == null) return;
-
-        body = request.getBody();
-        assertEquals(body, removeExpectedValue);
-    }
 
     @Test
     public void testAddAuthToRequestHardcoded() {
