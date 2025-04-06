@@ -61,6 +61,9 @@ public class TestRolesDao extends AccountsContextDao<TestRoles> {
 
     public AuthMechanism fetchAttackerToken(RawApi rawApi) {
         TestRoles testRoles = findAttackerRole();
+        if (testRoles == null) {
+            return null;
+        }
         return testRoles.findMatchingAuthMechanism(rawApi);
     }
 
