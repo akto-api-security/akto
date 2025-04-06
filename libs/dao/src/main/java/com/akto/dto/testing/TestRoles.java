@@ -184,11 +184,4 @@ public class TestRoles {
     public void setApiCollectionIds(List<Integer> apiCollectionIds) {
         this.apiCollectionIds = apiCollectionIds;
     }
-
-    private AuthWithCond getAuthMechanism(RawApi rawApi) {
-        for (AuthWithCond authWithCond : this.authWithCondList) {
-
-        }
-        return null;
-    }
 }
