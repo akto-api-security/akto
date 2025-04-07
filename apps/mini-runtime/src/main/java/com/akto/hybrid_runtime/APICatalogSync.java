@@ -1681,17 +1681,21 @@ public class APICatalogSync {
                 bulkUpdatesForSampleData.add(new BulkUpdates(SensitiveSampleDataDao.getFiltersMap(deltaInfo), sampleDataUpdates));
             }
 
+            boolean isEligible = true;
             try {
-                boolean isEligible = FilterUpdates.isEligibleForUpdate(deltaInfo.getApiCollectionId(), deltaInfo.getUrl(), deltaInfo.getMethod(), deltaInfo.getParam(), deltaInfo.getResponseCode(), "update");
+                isEligible = FilterUpdates.isEligibleForUpdate(deltaInfo.getApiCollectionId(), deltaInfo.getUrl(), deltaInfo.getMethod(), deltaInfo.getParam(), deltaInfo.getResponseCode(), "update");
                 if (!isEligible) {
-                    continue;
+                    loggerMaker.infoAndAddToDb("param already found " + deltaInfo.getParam() + " " + deltaInfo.getUrl());
                 }
             } catch (Exception e) {
                 e.printStackTrace();
                 loggerMaker.errorAndAddToDb("error evaluating if sti param is eligible for update " + e.getMessage());
             }
 
-            bulkUpdates.add(new BulkUpdates(SingleTypeInfoDao.createFiltersMap(deltaInfo), updates));
+            if (isEligible) {
+                bulkUpdates.add(new BulkUpdates(SingleTypeInfoDao.createFiltersMap(deltaInfo), updates));
+            }
+
         }
 
         for(SingleTypeInfo deleted: currentDelta.getDeletedInfo()) {
@@ -1703,6 +1707,9 @@ public class APICatalogSync {
             boolean isEligible = true;
             try {
                 isEligible = FilterUpdates.isEligibleForUpdate(deleted.getApiCollectionId(), deleted.getUrl(), deleted.getMethod(), deleted.getParam(), deleted.getResponseCode(), "delete");
+                if (!isEligible) {
+                    loggerMaker.infoAndAddToDb("param already found for delete update " + deleted.getParam() + " " + deleted.getUrl());
+                }
             } catch (Exception e) {
                 e.printStackTrace();
                 loggerMaker.errorAndAddToDb("error evaluating if sti param is eligible for delete update " + e.getMessage());
