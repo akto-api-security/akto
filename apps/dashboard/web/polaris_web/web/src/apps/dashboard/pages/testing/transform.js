@@ -1206,7 +1206,7 @@ getMissingConfigs(testResults){
       };
     });
   },
-  prepareEditableConfigObject(testRun,settings,hexId){
+  prepareEditableConfigObject(testRun,settings,hexId,testSuiteIds){
     const tests = testRun.tests;
     const selectedTests = []
         Object.keys(tests).forEach(category => {
@@ -1229,7 +1229,8 @@ getMissingConfigs(testResults){
       continuousTesting: testRun.continuousTesting,
       scheduleTimestamp: testRun?.hourlyLabel === 'Now' && ((testRun.startTimestamp - func.getStartOfTodayEpoch()) < 86400) ? 0 : testRun.startTimestamp,
       recurringWeekly: testRun.recurringWeekly,
-      recurringMonthly: testRun.recurringMonthly
+      recurringMonthly: testRun.recurringMonthly,
+      testSuiteIds:testSuiteIds,
     }
   }
 }
