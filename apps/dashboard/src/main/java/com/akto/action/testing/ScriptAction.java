@@ -40,11 +40,7 @@ public class ScriptAction extends UserAction {
 
     public String addScript() {
 
-        if (!DashboardMode.isSaasDeployment()) {
-            return Action.ERROR.toUpperCase();
-        }
-
-        if (!aktoUser()) {
+        if (DashboardMode.isSaasDeployment() && !aktoUser()) {
             return Action.ERROR.toUpperCase();
         }
 
@@ -72,11 +68,7 @@ public class ScriptAction extends UserAction {
     
     public String updateScript() {
 
-        if (!DashboardMode.isSaasDeployment()) {
-            return Action.ERROR.toUpperCase();
-        }
-
-        if (!aktoUser()) {
+        if (DashboardMode.isSaasDeployment() && !aktoUser()) {
             return Action.ERROR.toUpperCase();
         }
         

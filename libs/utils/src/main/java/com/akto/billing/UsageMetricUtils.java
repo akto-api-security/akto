@@ -260,7 +260,7 @@ public class UsageMetricUtils {
             }
             HashMap<String, FeatureAccess> featureWiseAllowed = organization.getFeatureWiseAllowed();
             if (featureWiseAllowed == null || featureWiseAllowed.isEmpty()) {
-                return featureAccess;
+                return DashboardMode.isOnPremDeployment() ? FeatureAccess.fullAccess : FeatureAccess.noAccess;
             }
             featureAccess = featureWiseAllowed.getOrDefault(featureLabel, FeatureAccess.noAccess);
         } catch (Exception e) {
