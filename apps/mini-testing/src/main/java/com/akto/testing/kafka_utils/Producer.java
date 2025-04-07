@@ -21,6 +21,7 @@ import com.akto.dto.testing.info.SingleTestPayload;
 import com.akto.kafka.Kafka;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.test_editor.execution.Executor;
 import com.akto.testing.TestExecutor;
 import com.akto.util.Constants;
 
@@ -169,6 +170,7 @@ public class Producer {
                 e.printStackTrace();
             }
         }
+        Executor.clearRoleCache();
         executor.init(testingRun, summaryId, syncLimit, doInitOnly);
     }
 }
