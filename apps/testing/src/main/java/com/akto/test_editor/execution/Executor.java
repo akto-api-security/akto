@@ -488,6 +488,12 @@ public class Executor {
         }
     }    
 
+    public static void clearRoleCache() {
+        if (Executor.roleCache != null) {
+            roleCache.clear();
+        }
+    }
+
     public ExecutorSingleOperationResp runOperation(String operationType, RawApi rawApi, Object key, Object value, Map<String, Object> varMap, AuthMechanism authMechanism, List<CustomAuthType> customAuthTypes, ApiInfo.ApiInfoKey apiInfoKey) {
         switch (operationType.toLowerCase()) {
             case "send_ssrf_req":
