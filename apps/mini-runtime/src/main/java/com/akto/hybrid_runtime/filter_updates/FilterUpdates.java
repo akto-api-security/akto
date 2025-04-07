@@ -28,7 +28,7 @@ public class FilterUpdates {
     private static synchronized void assignFilterForOperation() {
         int now = Context.now();
         if ((lastUpdateTs + FILTER_UPDATE_DURATION) < now) {
-            BloomFilter<CharSequence> newFilter = BloomFilter.create(Funnels.stringFunnel(Charsets.UTF_8), 1_000_000,
+            BloomFilter<CharSequence> newFilter = BloomFilter.create(Funnels.stringFunnel(Charsets.UTF_8), 5_000_000,
                     0.001);
             lastUpdateTs = now;
             filterId = (filterId + 1) % TOTAL_FILTERS;
