@@ -34,49 +34,6 @@ import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo";
   }
 */
 
-let headers = [
-  {
-    text:"Test name",
-    title: 'Test run name',
-    value:"testName",
-    itemOrder:1,
-  },
-  {
-    text: "Number of tests",
-    title: "Number of tests",
-    value: "number_of_tests",
-    itemOrder: 3,
-    type: CellType.TEXT,
-    tooltipContent: (<Text variant="bodySm">Count of attempted testing run results</Text>)
-  },
-  {
-    text:"Severity",
-    value: 'severity',
-    title: 'Issues',
-    filterKey:"severityStatus",
-    itemOrder:2,
-    tooltipContent: (<Text variant="bodySm">Severity and count of issues per test run</Text>)
-  },
-  {
-    text: 'Run time',
-    value: 'run_time',
-    title: 'Status',
-    itemOrder: 3,
-    type: CellType.TEXT,
-    sortActive: true
-  },
-  {
-    text: 'Total Apis',
-    title: 'Total Endpoints',
-    value: 'total_apis',
-    type: CellType.TEXT
-  },
-  {
-    title: '',
-    type: CellType.ACTION,
-  }
-]
-
 const sortOptions = [
   { label: 'Run time', value: 'scheduleTimestamp asc', directionLabel: 'Newest run', sortKey: 'scheduleTimestamp', columnIndex: 4 },
   { label: 'Run time', value: 'scheduleTimestamp desc', directionLabel: 'Oldest run', sortKey: 'scheduleTimestamp', columnIndex: 4 }
@@ -107,6 +64,51 @@ let filters = [
 ]
 
 function TestRunsPage() {
+
+  const [headers, setHeaders] = useState(
+    [
+      {
+        text:"Test name",
+        title: 'Test run name',
+        value:"testName",
+        itemOrder:1,
+      },
+      {
+        text: "Number of tests",
+        title: "Number of tests",
+        value: "number_of_tests",
+        itemOrder: 3,
+        type: CellType.TEXT,
+        tooltipContent: (<Text variant="bodySm">Count of attempted testing run results</Text>)
+      },
+      {
+        text:"Severity",
+        value: 'severity',
+        title: 'Issues',
+        filterKey:"severityStatus",
+        itemOrder:2,
+        tooltipContent: (<Text variant="bodySm">Severity and count of issues per test run</Text>)
+      },
+      {
+        text: 'Run time',
+        value: 'run_time',
+        title: 'Status',
+        itemOrder: 3,
+        type: CellType.TEXT,
+        sortActive: true
+      },
+      {
+        text: 'Total Apis',
+        title: 'Total Endpoints',
+        value: 'total_apis',
+        type: CellType.TEXT
+      },
+      {
+        title: '',
+        type: CellType.ACTION,
+      }
+    ]
+  )
 
   const apiCollectionMap = PersistStore(state => state.collectionsMap)
 
@@ -148,6 +150,33 @@ const [selected, setSelected] = useState(initialTabIdx)
 
 const tableCountObj = func.getTabsCount(definedTableTabs, {}, initialCount)
 const tableTabs = func.getTableTabsContent(definedTableTabs, tableCountObj, setCurrentTab, currentTab, tabsInfo)
+
+useEffect(() => {
+  const scanFrequencyHeader = {
+    text: 'Scan frequency',
+    title: 'Scan frequency',
+    value: 'scan_frequency',
+    type: CellType.TEXT,
+  }
+
+  if (currentTab === 'scheduled') {
+    setHeaders((prevHeaders) => {
+      const alreadyExists = prevHeaders.some(
+        (header) => header.value === 'scan_frequency'
+      )
+      if (alreadyExists) return prevHeaders
+
+      const insertPosition = Math.max(prevHeaders.length - 2, 0)
+      const newHeaders = [...prevHeaders]
+      newHeaders.splice(insertPosition, 0, scanFrequencyHeader)
+      return newHeaders
+    })
+  } else {
+    setHeaders((prevHeaders) =>
+      prevHeaders.filter((header) => header.value !== 'scan_frequency')
+    )
+  }
+}, [currentTab])
 
 const [severityMap, setSeverityMap] = useState({})
 const [subCategoryInfo, setSubCategoryInfo] = useState({})

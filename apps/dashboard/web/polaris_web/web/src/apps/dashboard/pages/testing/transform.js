@@ -167,6 +167,23 @@ function getCveLink(item) {
   return `https://nvd.nist.gov/vuln/detail/${item}`
 }
 
+function getScanFrequency(periodInSeconds) {
+  if (periodInSeconds === -1) {
+    return "Continuous"
+  }
+  else if (periodInSeconds === 0) {
+    return "Once"
+  } else if (periodInSeconds <= 86400) {
+    return "Daily"
+  } else if (periodInSeconds <= 604800) {
+    return "Weekly"
+  } else if (periodInSeconds <= 2678400) {
+    return "Monthly"
+  } else {
+    return "-"
+  }
+}
+
 const transform = {
 
   tagList: (list, linkType) => {
@@ -292,6 +309,7 @@ const transform = {
       obj['metadata'] = func.flattenObject(testingRunResultSummary?.metadata)
       obj['apiCollectionId'] = apiCollectionId
       obj['userEmail'] = data.userEmail
+      obj['scan_frequency'] = getScanFrequency(data.periodInSeconds)
       obj['total_apis'] = testingRunResultSummary.totalApis
       if(prettified){
         
