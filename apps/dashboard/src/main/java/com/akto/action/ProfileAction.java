@@ -2,19 +2,12 @@ package com.akto.action;
 
 
 import com.akto.billing.UsageMetricUtils;
-import com.akto.dao.AccountSettingsDao;
-import com.akto.dao.AccountsDao;
-import com.akto.dao.JiraIntegrationDao;
-import com.akto.dao.RBACDao;
-import com.akto.dao.UsersDao;
+import com.akto.dao.*;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
-import com.akto.dto.Account;
-import com.akto.dto.AccountSettings;
-import com.akto.dto.RBAC;
-import com.akto.dto.User;
-import com.akto.dto.UserAccountEntry;
+import com.akto.dto.*;
 import com.akto.dto.ApiToken.Utility;
+import com.akto.dto.azure_boards_integration.AzureBoardsIntegration;
 import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.jira_integration.JiraIntegration;
@@ -30,11 +23,7 @@ import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
-import com.mongodb.client.model.Updates;
 
-import io.micrometer.core.instrument.util.StringUtils;
-import org.apache.commons.codec.digest.HmacAlgorithms;
-import org.apache.commons.codec.digest.HmacUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -44,7 +33,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 import static com.mongodb.client.model.Filters.in;
 
@@ -135,6 +123,15 @@ public class ProfileAction extends UserAction {
         } catch (Exception e) {
         }
 
+        boolean azureBoardsIntegrated = false;
+        try {
+            AzureBoardsIntegration azureBoardsIntegration = AzureBoardsIntegrationDao.instance.findOne(new BasicDBObject());
+            if (azureBoardsIntegration != null) {
+                azureBoardsIntegrated = true;
+            }
+        } catch (Exception e) {
+        }
+
         InitializerListener.insertStateInAccountSettings(accountSettings);
 
         Organization organization = OrganizationsDao.instance.findOne(
@@ -163,6 +160,7 @@ public class ProfileAction extends UserAction {
                 .append("accountName", accountName)
                 .append("aktoUIMode", userFromDB.getAktoUIMode().name())
                 .append("jiraIntegrated", jiraIntegrated)
+                .append("azureBoardsIntegrated", azureBoardsIntegrated)
                 .append("userRole", userRole.toString().toUpperCase())
                 .append("currentTimeZone", timeZone)
                 .append("organizationName", orgName);

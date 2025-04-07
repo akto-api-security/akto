@@ -30,6 +30,7 @@ import CriticalUnsecuredAPIsOverTimeGraph from "./CriticalUnsecuredAPIsOverTimeG
 import settingFunctions from "../../settings/module.js";
 import JiraTicketCreationModal from "../../../components/shared/JiraTicketCreationModal.jsx";
 import testingApi from "../../testing/api.js"
+import AzureBoardsWorkItemCreationModal from "../../../components/shared/AzureBoardsWorkItemCreationModal.jsx";
 
 const sortOptions = [
     { label: 'Severity', value: 'severity asc', directionLabel: 'Highest', sortKey: 'severity', columnIndex: 2 },
@@ -170,6 +171,11 @@ function CompliancePage() {
     const [complianceView, setComplianceView] = useState('SOC 2');
     const [filteredTestIds, setFilteredTestIds] = useState([]);
 
+    const [boardsModalActive, setBoardsModalActive] = useState(false)
+    const [projectToWorkItemsMap, setProjectToWorkItemsMap] = useState({})
+    const [projectId, setProjectId] = useState('')
+    const [workItemType, setWorkItemType] = useState('')
+
 
     const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[5])
 
@@ -271,6 +277,19 @@ function CompliancePage() {
         })
     }
 
+    const handleSaveBulkAzureWorkItemsAction = () => {
+            setToast(true, false, "Please wait while we create your Azure Boards Work Item.")
+            setBoardsModalActive(false)
+            api.bulkCreateAzureWorkItems(selectedIssuesItems, projectId, workItemType, window.location.origin).then((res) => {
+                if(res?.errorMessage) {
+                    setToast(true, false, res?.errorMessage)
+                } else {
+                    setToast(true, false, `${selectedIssuesItems.length} Azure Boards Work Item${selectedIssuesItems.length === 1 ? "" : "s"} created.`)
+                }
+                resetResourcesSelected()
+            })
+    }
+
     let promotedBulkActions = (selectedResources) => {
         let items
         if(selectedResources.length > 0 && typeof selectedResources[0][0] === 'string') {
@@ -309,6 +328,23 @@ function CompliancePage() {
                 setJiraModalActive(true)
             })
         }
+
+        function createAzureBoardWorkItemBulk() {
+            setSelectedIssuesItems(items)
+            settingFunctions.fetchAzureBoardsIntegration().then((azureBoardsIntegration) => {
+                if(azureBoardsIntegration.projectToWorkItemsMap != null && Object.keys(azureBoardsIntegration.projectToWorkItemsMap).length > 0){
+                    setProjectToWorkItemsMap(azureBoardsIntegration.projectToWorkItemsMap)
+                    if(Object.keys(azureBoardsIntegration.projectToWorkItemsMap).length > 0){
+                        setProjectId(Object.keys(azureBoardsIntegration.projectToWorkItemsMap)[0])
+                        setWorkItemType(Object.values(azureBoardsIntegration.projectToWorkItemsMap)[0]?.[0])
+                    }
+                }else{
+                    setProjectId(azureBoardsIntegration?.projectId)
+                    setWorkItemType(azureBoardsIntegration?.workItemType)
+                }
+                setBoardsModalActive(true)
+            })
+        }
         
         let issues = [{
             content: 'False positive',
@@ -329,6 +365,11 @@ function CompliancePage() {
         {
             content: 'Create jira ticket',
             onAction: () => { createJiraTicketBulk() }
+        },
+        {
+            content: 'Create azure work item',
+            onAction: () => { createAzureBoardWorkItemBulk() },
+            disabled: (window.AZURE_BOARDS_INTEGRATED === 'false')
         }]
         
         let reopen =  [{
@@ -618,6 +659,27 @@ function CompliancePage() {
             secondaryActions={<DateRangeFilter initialDispatch={currDateRange} dispatch={(dateObj) => dispatchCurrDateRange({ type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias })} />}
         />
             {(resultId !== null && resultId.length > 0) ? <TestRunResultPage /> : null}
+            <JiraTicketCreationModal
+                modalActive={jiraModalActive}
+                setModalActive={setJiraModalActive}
+                handleSaveAction={handleSaveJiraAction}
+                jiraProjectMaps={jiraProjectMaps}
+                setProjId={setProjId}
+                setIssueType={setIssueType}
+                projId={projId}
+                issueType={issueType}
+            />
+
+            <AzureBoardsWorkItemCreationModal
+                modalActive={boardsModalActive}
+                setModalActive={setBoardsModalActive}
+                handleSaveAction={handleSaveBulkAzureWorkItemsAction}
+                projectToWorkItemsMap={projectToWorkItemsMap}
+                setProjectId={setProjectId}
+                setWorkItemType={setWorkItemType}
+                projectId={projectId}
+                workItemType={workItemType}
+            />
         </>
     )
 }

@@ -940,7 +940,7 @@ getTestingRunResultUrl(testingResult){
   return methodObj.method + " " + truncatedUrl
   
 },
-getRowInfo(severity, apiInfo,jiraIssueUrl, sensitiveData, isIgnored){
+getRowInfo(severity, apiInfo,jiraIssueUrl, sensitiveData, isIgnored, azureBoardsWorkItemUrl){
   let auth_type = apiInfo["allAuthTypesFound"].join(", ")
   let access_type = null
   let access_types = apiInfo["apiAccessTypes"]
@@ -972,6 +972,22 @@ getRowInfo(severity, apiInfo,jiraIssueUrl, sensitiveData, isIgnored){
             </Link>
           </HorizontalStack>
         </Tag>
+    </Box>
+  ) : null
+
+      
+  const azureBoardsComp = azureBoardsWorkItemUrl?.length > 0 ? (
+    <Box>
+      <Tag>
+        <HorizontalStack gap={1}>
+          <Avatar size="extraSmall" shape='round' source="/public/azure-boards.svg" />
+          <Link url={azureBoardsWorkItemUrl}>
+            <Text>
+              {azureBoardsWorkItemUrl?.split("/")?.[azureBoardsWorkItemUrl?.split("/")?.length - 1]}
+            </Text>
+          </Link>
+        </HorizontalStack>
+      </Tag>
     </Box>
   ) : null
 
@@ -1020,6 +1036,11 @@ getRowInfo(severity, apiInfo,jiraIssueUrl, sensitiveData, isIgnored){
       title: "Jira",
       value: jiraComponent,
       tooltipContent:"Jira ticket number attached to the testing run issue"
+    },
+    {
+      title: "Azure Boards",
+      value: azureBoardsComp,
+      tooltipContent: "Azure boards work item number attached to the testing run issue"
     }
   ]
   return rowItems
