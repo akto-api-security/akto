@@ -18,8 +18,12 @@ public class SSOConfigsDao extends CommonContextDao<SAMLConfig> {
         }
 
         String domain = companyKeyArr[1];
+        return getSSOConfigByDomain(domain);
+    }
+
+    public SAMLConfig getSSOConfigByDomain(String domain) {
         SAMLConfig config = SSOConfigsDao.instance.findOne(
-            Filters.eq(SAMLConfig.ORGANIZATION_DOMAIN, domain)
+                Filters.eq(SAMLConfig.ORGANIZATION_DOMAIN, domain)
         );
         return config;
     }

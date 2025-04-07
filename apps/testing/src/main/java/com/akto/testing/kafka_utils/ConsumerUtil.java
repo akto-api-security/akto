@@ -61,6 +61,8 @@ public class ConsumerUtil {
     private static final Logger logger = LoggerFactory.getLogger(ConsumerUtil.class);
     public static ExecutorService executor = Executors.newFixedThreadPool(100);
 
+    private final int maxRunTimeForTests = 5 * 60;
+
     public void initializeConsumer() {
         String mongoURI = System.getenv("AKTO_MONGO_CONN");
         ReadPreference readPreference = ReadPreference.secondary();
@@ -143,7 +145,7 @@ public class ConsumerUtil {
             ParallelConsumerOptions<String, String> options = ParallelConsumerOptions.<String, String>builder()
                 .consumer(consumer)
                 .ordering(ParallelConsumerOptions.ProcessingOrder.UNORDERED) // Use unordered for parallelism
-                .maxConcurrency(100) // Number of threads for parallel processing
+                .maxConcurrency(instance.getMaxConcurrentRequest()) // Number of threads for parallel processing
                 .commitMode(ParallelConsumerOptions.CommitMode.PERIODIC_CONSUMER_SYNC) // Commit offsets synchronously
                 .batchSize(1) // Number of records to process in each poll
                 .maxFailureHistory(3)
@@ -172,19 +174,16 @@ public class ConsumerUtil {
                         Future<?> future = executor.submit(() -> runTestFromMessage(message));
                         firstRecordRead.set(true);
                         try {
-                            future.get(5, TimeUnit.MINUTES); 
-                        } catch (InterruptedException e) {
-                            logger.error("Task timed out");
+                            future.get(maxRunTimeForTests, TimeUnit.SECONDS); 
+                        } catch (InterruptedException | TimeoutException f) {
+                            logger.error("Task timed out: "+  message);
                             future.cancel(true);
                             createTimedOutResultFromMessage(message);
-                        } catch(TimeoutException e){
-                            logger.error("Task timed out");
-                            future.cancel(true);
-                            createTimedOutResultFromMessage(message);
-                        } catch(RejectedExecutionException e){
+                        }catch(RejectedExecutionException e){
                             future.cancel(true);
                         } 
                         catch (Exception e) {
+                            future.cancel(true);
                             logger.error("Error in task execution: " + message, e);
                         }
                     }
@@ -205,9 +204,11 @@ public class ConsumerUtil {
                     executor.shutdownNow();
                     break;
                 }else if(firstRecordRead.get() && parallelConsumer.workRemaining() == 0){
+                    int timeConsumed = Context.now() - startTime;
+                    int timeLeft = maxRunTimeInSeconds - timeConsumed;
                     logger.info("Records are empty now, thus executing final tests");
                     executor.shutdown();
-                    executor.awaitTermination(maxRunTimeInSeconds, TimeUnit.SECONDS);
+                    executor.awaitTermination(Math.abs(timeLeft), TimeUnit.SECONDS);
                     break;
                 }
                 Thread.sleep(100);

@@ -333,10 +333,10 @@ public class TestExecutor {
             final int maxRunTime = tempRunTime;
             if(Constants.IS_NEW_TESTING_ENABLED){
                 try {
-                    Producer.createTopic(Constants.LOCAL_KAFKA_BROKER_URL, Constants.TEST_RESULTS_TOPIC_NAME);
-                    Thread.sleep(2000);
+                    Producer.createTopicWithRetries(Constants.LOCAL_KAFKA_BROKER_URL, Constants.TEST_RESULTS_TOPIC_NAME);
                 } catch (Exception e) {
-                    // e.printStackTrace();
+                    e.printStackTrace();
+                    logger.error("Error in creating topic", e.getMessage());
                 }
             }
 
@@ -462,8 +462,7 @@ public class TestExecutor {
             }
             
             try {
-                totalRecords.getAndIncrement();
-                Producer.pushMessagesToKafka(Arrays.asList(singleTestPayload));
+                Producer.pushMessagesToKafka(Arrays.asList(singleTestPayload), totalRecords);
             } catch (Exception e) {
                 e.printStackTrace();
                 return null;
