@@ -70,6 +70,7 @@ public class ExecutorAlgorithm {
         int rawApiIndex = 0;
         int keyIndex = 0;
         int valIndex = 0;
+        boolean allowAllCombinations = true;
         int numberOfOperations = Math.max(rawApis.size(), calcNumberOfOperations(keyList, valList));
         
         if (expandRawApis) {
@@ -117,7 +118,11 @@ public class ExecutorAlgorithm {
             }
             rawApiIndex++;
             if (keyList.size() > 1) {
-                keyIndex = (keyIndex + 1)%keyList.size();
+                if (valList.size() > 0 && allowAllCombinations) {
+                    keyIndex = i/valList.size();
+                } else {
+                    keyIndex = (keyIndex + 1)%keyList.size();
+                }
             }
 
         }
@@ -139,7 +144,7 @@ public class ExecutorAlgorithm {
             return valList.size();
         }
 
-        return keyList.size();
+        return keyList.size() * valList.size();
 
     }
 
