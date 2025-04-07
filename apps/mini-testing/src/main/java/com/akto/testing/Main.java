@@ -248,8 +248,6 @@ public class Main {
                 Organization organization = dataActor.fetchOrganization(accountId);
                 FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccess(organization, MetricTypes.TEST_RUNS);   
                 SyncLimit syncLimit = featureAccess.fetchSyncLimit();
-                Executor.clearRoleCache();
-
                 String testingRunSummaryId = currentTestInfo.getString("summaryId");
                 TestingRun testingRun = dataActor.findTestingRun(testingRunSummaryId);
                 TestingRunConfig baseConfig = dataActor.findTestingRunConfig(testingRun.getTestIdConfig());
@@ -442,6 +440,7 @@ public class Main {
                 Organization organization = dataActor.fetchOrganization(accountId);
                 FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccess(organization, MetricTypes.TEST_RUNS);   
                 SyncLimit syncLimit = featureAccess.fetchSyncLimit();
+                Executor.clearRoleCache();
 
                 if(!maxRetriesReached){
                     if(Constants.IS_NEW_TESTING_ENABLED){
