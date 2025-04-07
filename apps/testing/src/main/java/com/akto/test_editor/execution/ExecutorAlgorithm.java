@@ -21,6 +21,7 @@ public class ExecutorAlgorithm {
     private Map<String, Object> varMap;
     private AuthMechanism authMechanism;
     private List<CustomAuthType> customAuthTypes;
+    private boolean allowAllCombinations;
     private Executor executor = new Executor();
 
     public ExecutorAlgorithm(RawApi sampleRawApi, Map<String, Object> varMap, AuthMechanism authMechanism,
@@ -29,6 +30,16 @@ public class ExecutorAlgorithm {
         this.varMap = varMap;
         this.authMechanism = authMechanism;
         this.customAuthTypes = customAuthTypes;
+        this.allowAllCombinations = false;
+    }
+
+    public ExecutorAlgorithm(RawApi sampleRawApi, Map<String, Object> varMap, AuthMechanism authMechanism,
+        List<CustomAuthType> customAuthTypes, boolean allowAllCombinations) {
+        this.sampleRawApi = sampleRawApi;
+        this.varMap = varMap;
+        this.authMechanism = authMechanism;
+        this.customAuthTypes = customAuthTypes;
+        this.allowAllCombinations = allowAllCombinations;
     }
 
     public ExecutorAlgorithm(){
@@ -70,7 +81,6 @@ public class ExecutorAlgorithm {
         int rawApiIndex = 0;
         int keyIndex = 0;
         int valIndex = 0;
-        boolean allowAllCombinations = true;
         int numberOfOperations = Math.max(rawApis.size(), calcNumberOfOperations(keyList, valList));
         
         if (expandRawApis) {
@@ -118,7 +128,7 @@ public class ExecutorAlgorithm {
             }
             rawApiIndex++;
             if (keyList.size() > 1) {
-                if (valList.size() > 0 && allowAllCombinations) {
+                if (valList.size() > 0 && this.allowAllCombinations) {
                     keyIndex = i/valList.size();
                 } else {
                     keyIndex = (keyIndex + 1)%keyList.size();
@@ -144,8 +154,10 @@ public class ExecutorAlgorithm {
             return valList.size();
         }
 
-        return keyList.size() * valList.size();
-
+        if (this.allowAllCombinations) {
+            return keyList.size() * valList.size();
+        }
+        return keyList.size();
     }
 
 
