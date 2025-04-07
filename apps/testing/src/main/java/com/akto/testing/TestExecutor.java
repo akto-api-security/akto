@@ -17,6 +17,7 @@ import com.akto.dao.testing.TestingRunResultSummariesDao;
 import com.akto.dao.testing.VulnerableTestingRunResultDao;
 import com.akto.dao.testing.WorkflowTestResultsDao;
 import com.akto.dao.testing.WorkflowTestsDao;
+import com.akto.dao.testing.config.TestSuiteDao;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.CustomAuthType;
@@ -51,6 +52,7 @@ import com.akto.dto.testing.TestRoles;
 import com.akto.dto.testing.TestingEndpoints;
 import com.akto.dto.testing.TestingRun;
 import com.akto.dto.testing.TestingRun.State;
+import com.akto.dto.testing.config.TestSuites;
 import com.akto.dto.testing.TestingRunConfig;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.TestingRunResultSummary;
@@ -248,10 +250,21 @@ public class TestExecutor {
 
         //Updating the subcategory list if its individual run
         List<String> testingRunSubCategories;
-        if (testingSubCategorySet.isEmpty()) {
-            testingRunSubCategories = testingRun.getTestingRunConfig().getTestSubCategoryList();
-        } else {
+        if (!testingSubCategorySet.isEmpty()) {
             testingRunSubCategories = new ArrayList<>(testingSubCategorySet);
+        } else {
+
+            List<String> testSuiteIds = testingRun.getTestingRunConfig().getTestSuiteIds();
+
+            if (testSuiteIds == null || testSuiteIds.isEmpty() || StringUtils.isEmpty(testSuiteIds.get(0))) {
+                testingRunSubCategories = testingRun.getTestingRunConfig().getTestSubCategoryList();
+            } else {
+
+                ObjectId testSuiteId = new ObjectId(testSuiteIds.get(0));
+                TestSuites testSuite = TestSuiteDao.instance.findOne(Filters.eq(Constants.ID, testSuiteId));
+
+                testingRunSubCategories = (testSuite != null) ? testSuite.getSubCategoryList() : new ArrayList<>();
+            }
         }
 
         Map<String, TestConfig> testConfigMap = YamlTemplateDao.instance.fetchTestConfigMap(false, true, 0, 10_000, Filters.in("_id", testingRunSubCategories));
