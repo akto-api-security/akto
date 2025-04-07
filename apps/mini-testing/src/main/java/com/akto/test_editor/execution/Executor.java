@@ -105,7 +105,7 @@ public class Executor {
             return yamlTestResult;
         }
         if (testingRunConfig != null && StringUtils.isNotBlank(testingRunConfig.getTestRoleId())) {
-            TestRoles role = dataActor.fetchTestRolesforId(testingRunConfig.getTestRoleId());
+            TestRoles role = Executor.fetchOrFindTestRole(testingRunConfig.getTestRoleId(), true);
             if (role != null) {
                 EndpointLogicalGroup endpointLogicalGroup = role.getEndpointLogicalGroup();
                 if (endpointLogicalGroup == null) {
@@ -506,6 +506,12 @@ public class Executor {
             TestRoles testRole = dataActor.fetchTestRolesforId(name);
             roleCache.put(name, testRole);
             return roleCache.get(name);
+        }
+    }
+
+    public static void clearRoleCache() {
+        if (Executor.roleCache != null) {
+            roleCache.clear();
         }
     }
 
