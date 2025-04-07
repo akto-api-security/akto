@@ -19,6 +19,7 @@ import org.slf4j.LoggerFactory;
 
 import com.akto.dto.billing.SyncLimit;
 import com.akto.dto.testing.TestingRun;
+import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.info.SingleTestPayload;
 import com.akto.kafka.Kafka;
 import com.akto.testing.TestExecutor;
@@ -29,6 +30,7 @@ public class Producer {
     private static final Logger logger = LoggerFactory.getLogger(Producer.class);
 
     public static final Kafka producer = Constants.IS_NEW_TESTING_ENABLED ?  new Kafka(Constants.LOCAL_KAFKA_BROKER_URL, Constants.LINGER_MS_KAFKA, 100, Constants.MAX_REQUEST_TIMEOUT) : null;
+    public static final Kafka producerForInsertion = new Kafka(Constants.LOCAL_KAFKA_BROKER_URL, 1000, 100);
     public static Void pushMessagesToKafka(List<SingleTestPayload> messages, AtomicInteger totalRecords){
         for(SingleTestPayload singleTestPayload: messages){
             String messageString = singleTestPayload.toString();
@@ -173,5 +175,11 @@ public class Producer {
             }
         }
         executor.init(testingRun, summaryId, syncLimit, doInitOnly);
+    }
+
+    public static Void insertTestingResultMessage(TestingRunResult result){
+        String messageString = result.toCompleteString();
+        producerForInsertion.send(messageString, Constants.TEST_RESULTS_FOR_INSERTION_TOPIC_NAME);
+        return null;
     }
 }

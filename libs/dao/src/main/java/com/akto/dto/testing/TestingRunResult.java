@@ -3,10 +3,13 @@ package com.akto.dto.testing;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.util.ColorConstants;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
+import com.mongodb.client.model.Updates;
 
 import org.bson.codecs.pojo.annotations.BsonIgnore;
+import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
 import java.util.ArrayList;
@@ -58,6 +61,7 @@ public class TestingRunResult implements Comparable<TestingRunResult> {
 
     public static final String WORKFLOW_TEST = "workflowTest";
     private WorkflowTest workflowTest;
+    private final static ObjectMapper mapper = new ObjectMapper();
 
     @BsonIgnore
     private List<TestLog> testLogs = new ArrayList<>();
@@ -282,6 +286,37 @@ public class TestingRunResult implements Comparable<TestingRunResult> {
          (vulnerable ? ColorConstants.CYAN + " Severity : " + severity : "") + 
          "\n" + ColorConstants.RESET;
     }
+
+    public String toCompleteString(){
+        try {
+            return mapper.writeValueAsString(this);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return "";
+        }
+        
+    }
+
+    public static Bson buildFullUpdate(TestingRunResult runResult) {
+        return Updates.combine(
+            Updates.set(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, runResult.getTestRunResultSummaryId()),
+            Updates.set(TestingRunResult.API_INFO_KEY, runResult.getApiInfoKey()),
+            Updates.set(TestingRunResult.TEST_SUB_TYPE, runResult.getTestSubType()),
+            Updates.set(TestingRunResult.CONFIDENCE_PERCENTAGE, runResult.getConfidencePercentage()),
+            Updates.set(TestingRunResult.TEST_RESULTS, runResult.getTestResults()),
+            Updates.set(TestingRunResult.TEST_RUN_ID, runResult.getTestRunId()),
+            Updates.set(TestingRunResult.TEST_SUPER_TYPE, runResult.getTestSuperType()),
+            Updates.set(TestingRunResult.RERUN, runResult.isRerun()),
+            Updates.set(TestingRunResult.VULNERABLE, runResult.isVulnerable()),
+            Updates.set(TestingRunResult.SINGLE_TYPE_INFOS, runResult.getSingleTypeInfos()),
+            Updates.set(TestingRunResult.START_TIMESTAMP, runResult.getStartTimestamp()),
+            Updates.set(TestingRunResult.END_TIMESTAMP, runResult.getEndTimestamp()),
+            Updates.set(TestingRunResult.IS_IGNORED_RESULT, runResult.isIgnoredResult()),
+            Updates.set(TestingRunResult.ERRORS_LIST, runResult.getErrorsList()),
+            Updates.set(TestingRunResult.WORKFLOW_TEST, runResult.getWorkflowTest())
+        );
+}
+
 
     public String toOutputString(String severity){
         StringBuilder bld = new StringBuilder();

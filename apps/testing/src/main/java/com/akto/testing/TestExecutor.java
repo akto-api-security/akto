@@ -49,7 +49,6 @@ import com.akto.test_editor.filter.data_operands_impl.ValidationResult;
 import com.akto.testing.kafka_utils.TestingConfigurations;
 import com.akto.testing.kafka_utils.Producer;
 import com.akto.testing.yaml_tests.YamlTestTemplate;
-import com.akto.testing_issues.TestingIssuesHandler;
 import com.akto.usage.UsageMetricCalculator;
 import com.akto.util.Constants;
 import com.akto.util.JSONUtils;
@@ -282,27 +281,6 @@ public class TestExecutor {
 
         ConcurrentHashMap<String, String> subCategoryEndpointMap = new ConcurrentHashMap<>();
         Map<ApiInfoKey, String> apiInfoKeyToHostMap = new HashMap<>();
-        // for (String testSubCategory: testingRunSubCategories) {
-        //     TestConfig testConfig = testConfigMap.get(testSubCategory);
-        //     if (testConfig == null || testConfig.getStrategy() == null || testConfig.getStrategy().getRunOnce() == null) {
-        //         continue;
-        //     }
-        //     for (ApiInfo.ApiInfoKey apiInfoKey: apiInfoKeyList) {
-        //         try {
-        //             hostName = findHost(apiInfoKey, testingUtil.getSampleMessages(), testingUtil.getSampleMessageStore());
-        //             if (hostName == null) {
-        //                 continue;
-        //             }
-        //             if(hostsToApiCollectionMap.get(hostName) == null) {
-        //                 hostsToApiCollectionMap.put(hostName, apiInfoKey.getApiCollectionId());
-        //             }
-        //             apiInfoKeyToHostMap.put(apiInfoKey, hostName);
-        //             subCategoryEndpointMap.put(apiInfoKey.getApiCollectionId() + "_" + testSubCategory, hostName);
-        //         } catch (URISyntaxException e) {
-        //             loggerMaker.errorAndAddToDb("Error while finding host: " + e, LogDb.TESTING);
-        //         }
-        //     }
-        // }
 
         // init the singleton class here
         TestingConfigurations.getInstance().init(testingUtil, testingRun.getTestingRunConfig(), debug, testConfigMap, testingRun.getMaxConcurrentRequests());
@@ -754,56 +732,50 @@ public class TestExecutor {
 
     public void insertResultsAndMakeIssues(List<TestingRunResult> testingRunResults, ObjectId testRunResultSummaryId) {
         int resultSize = testingRunResults.size();
-        if (resultSize > 0) {
-            loggerMaker.infoAndAddToDb("testingRunResults size: " + resultSize, LogDb.TESTING);
-            trim(testingRunResults);
-            TestingRunResult originalTestingRunResultForRerun = TestingConfigurations.getInstance().getTestingRunResultForApiKeyInfo(testingRunResults.get(0).getApiInfoKey(), testingRunResults.get(0).getTestSubType());
-            if (originalTestingRunResultForRerun != null) {
-                loggerMaker.infoAndAddToDb("Deleting original testingRunResults for rerun after replaced with run TRR_ID: " + originalTestingRunResultForRerun.getHexId());
-                TestingRunResultDao.instance.deleteAll(Filters.eq(TestingRunResultDao.ID, originalTestingRunResultForRerun.getId()));
-                /*
-                * delete from vulnerableTestResults as well.
-                * assuming if original was vulnerable, entry will be in VulnerableTestingRunResultDao
-                * for API_INFO_KEY, TEST_RUN_RESULT_SUMMARY_ID, TEST_SUB_TYPE, VulnerableTestingRunResultDao will have
-                * single entry
-                * */
-                if (originalTestingRunResultForRerun.isVulnerable()) {
-                    Bson filters = Filters.and(
-                            Filters.eq(TestingRunResult.API_INFO_KEY, originalTestingRunResultForRerun.getApiInfoKey()),
-                            Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, originalTestingRunResultForRerun.getTestRunResultSummaryId()),
-                            Filters.eq(TestingRunResult.TEST_SUB_TYPE, originalTestingRunResultForRerun.getTestSubType())
-                    );
-                    loggerMaker.infoAndAddToDb("Deleting from vulnerableTestingRunResults if present for rerun after replaced with run TRR_ID: " + originalTestingRunResultForRerun.getHexId());
-                    VulnerableTestingRunResultDao.instance.deleteAll(filters);
+        try {
+            if (resultSize > 0) {
+                loggerMaker.infoAndAddToDb("testingRunResults size: " + resultSize, LogDb.TESTING);
+                trim(testingRunResults);
+                TestingRunResult originalTestingRunResultForRerun = TestingConfigurations.getInstance().getTestingRunResultForApiKeyInfo(testingRunResults.get(0).getApiInfoKey(), testingRunResults.get(0).getTestSubType());
+                if (originalTestingRunResultForRerun != null) {
+                    loggerMaker.infoAndAddToDb("Deleting original testingRunResults for rerun after replaced with run TRR_ID: " + originalTestingRunResultForRerun.getHexId());
+                    TestingRunResultDao.instance.deleteAll(Filters.eq(TestingRunResultDao.ID, originalTestingRunResultForRerun.getId()));
+                    /*
+                    * delete from vulnerableTestResults as well.
+                    * assuming if original was vulnerable, entry will be in VulnerableTestingRunResultDao
+                    * for API_INFO_KEY, TEST_RUN_RESULT_SUMMARY_ID, TEST_SUB_TYPE, VulnerableTestingRunResultDao will have
+                    * single entry
+                    * */
+                    if (originalTestingRunResultForRerun.isVulnerable()) {
+                        Bson filters = Filters.and(
+                                Filters.eq(TestingRunResult.API_INFO_KEY, originalTestingRunResultForRerun.getApiInfoKey()),
+                                Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, originalTestingRunResultForRerun.getTestRunResultSummaryId()),
+                                Filters.eq(TestingRunResult.TEST_SUB_TYPE, originalTestingRunResultForRerun.getTestSubType())
+                        );
+                        loggerMaker.infoAndAddToDb("Deleting from vulnerableTestingRunResults if present for rerun after replaced with run TRR_ID: " + originalTestingRunResultForRerun.getHexId());
+                        VulnerableTestingRunResultDao.instance.deleteAll(filters);
+                    }
                 }
-            }
-            TestingRunResultDao.instance.insertMany(testingRunResults);
-            loggerMaker.infoAndAddToDb("Inserted testing results", LogDb.TESTING);
-
-            // insert vulnerable testing run results here
-            List<TestingRunResult> vulTestResults = new ArrayList<>();
-            for(TestingRunResult runResult: testingRunResults){
-                if(runResult != null && runResult.isVulnerable()){
-                    vulTestResults.add(runResult);
+                
+                for(TestingRunResult testingRunResult: testingRunResults){
+                    logger.info("Sending TRR to kafka: " + testingRunResult.getApiInfoKey().toString() + " : " + testingRunResult.getTestSubType());
+                    Producer.insertTestingResultMessage(testingRunResult);
                 }
+    
+                TestingRunResultSummariesDao.instance.getMCollection().withWriteConcern(WriteConcern.W1).findOneAndUpdate(
+                    Filters.eq(Constants.ID, testRunResultSummaryId),
+                    Updates.inc(TestingRunResultSummary.TEST_RESULTS_COUNT, resultSize)
+                );
+    
+                loggerMaker.infoAndAddToDb("Updated count in summary", LogDb.TESTING);
+    
+                // removed the issues creation from here, moved to the consumer
             }
-
-            if(!vulTestResults.isEmpty()){
-                loggerMaker.infoAndAddToDb("Inserted vul testing results.", LogDb.TESTING);
-                VulnerableTestingRunResultDao.instance.insertMany(vulTestResults);
-            }
-
-            TestingRunResultSummariesDao.instance.getMCollection().withWriteConcern(WriteConcern.W1).findOneAndUpdate(
-                Filters.eq(Constants.ID, testRunResultSummaryId),
-                Updates.inc(TestingRunResultSummary.TEST_RESULTS_COUNT, resultSize)
-            );
-
-            loggerMaker.infoAndAddToDb("Updated count in summary", LogDb.TESTING);
-
-            TestingIssuesHandler handler = new TestingIssuesHandler();
-            boolean triggeredByTestEditor = false;
-            handler.handleIssuesCreationFromTestingRunResults(testingRunResults, triggeredByTestEditor);
+        } catch (Exception e) {
+            e.printStackTrace();
+            loggerMaker.errorAndAddToDb("Error while inserting results in kafka: " + e.getMessage(), LogDb.TESTING);
         }
+        
     }
 
     Set<Integer> deactivatedCollections = UsageMetricCalculator.getDeactivated();
@@ -963,89 +935,96 @@ public class TestExecutor {
         String testSuperType = testConfig.getInfo().getCategory().getName();
         String testSubType = testConfig.getInfo().getSubCategory();
 
-        RawApi rawApi = RawApi.buildFromMessage(message, true);
-        int startTime = Context.now();
-
         try {
-            boolean isGraphQlPayload = filterGraphQlPayload(rawApi, apiInfoKey);
-            if (isGraphQlPayload) testLogs.add(new TestingRunResult.TestLog(TestingRunResult.TestLogType.INFO, "GraphQL payload found"));
+            RawApi rawApi = RawApi.buildFromMessage(message, true);
+            int startTime = Context.now();
+
+            try {
+                boolean isGraphQlPayload = filterGraphQlPayload(rawApi, apiInfoKey);
+                if (isGraphQlPayload) testLogs.add(new TestingRunResult.TestLog(TestingRunResult.TestLogType.INFO, "GraphQL payload found"));
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e, "Exception in filterGraphQlPayload: " + e.getMessage());
+                testLogs.add(new TestingRunResult.TestLog(TestingRunResult.TestLogType.ERROR, e.getMessage()));
+            }
+
+            FilterNode filterNode = testConfig.getApiSelectionFilters().getNode();
+            FilterNode validatorNode = null;
+            if (testConfig.getValidation() != null) {
+                validatorNode = testConfig.getValidation().getNode();
+            }
+            ExecutorNode executorNode = testConfig.getExecute().getNode();
+            Auth auth = testConfig.getAuth();
+            Map<String, List<String>> wordListsMap = testConfig.getWordlists();
+            Map<String, Object> varMap = new HashMap<>();
+            String severity = testConfig.getInfo().getSeverity();
+
+            for (String key: wordListsMap.keySet()) {
+                varMap.put("wordList_" + key, wordListsMap.get(key));
+            }
+
+            VariableResolver.resolveWordList(varMap, testingUtil.getSampleMessages(), apiInfoKey);
+
+            String testExecutionLogId = UUID.randomUUID().toString();
+            
+            loggerMaker.infoAndAddToDb("triggering test run for apiInfoKey " + apiInfoKey + "test " + 
+                testSubType + "logId" + testExecutionLogId, LogDb.TESTING);
+
+            List<CustomAuthType> customAuthTypes = testingUtil.getCustomAuthTypes();
+            // TestingUtil -> authMechanism
+            // TestingConfig -> auth
+            com.akto.test_editor.execution.Executor executor = new Executor();
+            executor.overrideTestUrl(rawApi, testingRunConfig);
+            YamlTestTemplate yamlTestTemplate = new YamlTestTemplate(apiInfoKey,filterNode, validatorNode, executorNode,
+                    rawApi, varMap, auth, testingUtil.getAuthMechanism(), testExecutionLogId, testingRunConfig, customAuthTypes, testConfig.getStrategy());
+            YamlTestResult testResults = yamlTestTemplate.run(debug, testLogs);
+            if (testResults == null || testResults.getTestResults().isEmpty()) {
+                List<GenericTestResult> res = new ArrayList<>();
+                res.add(new TestResult(null, rawApi.getOriginalMessage(), Collections.singletonList(TestError.SOMETHING_WENT_WRONG.getMessage()), 0, false, TestResult.Confidence.HIGH, null));
+                testResults.setTestResults(res);
+            }
+            int endTime = Context.now();
+
+            boolean vulnerable = false;
+            for (GenericTestResult testResult: testResults.getTestResults()) {
+                if (testResult == null) continue;
+                vulnerable = vulnerable || testResult.isVulnerable();
+                try {
+                    testResult.setConfidence(Confidence.valueOf(severity));
+                } catch (Exception e){
+                    testResult.setConfidence(Confidence.HIGH);
+                }
+                // dynamic severity for tests
+                Confidence overConfidence = getConfidenceForTests(testConfig, yamlTestTemplate);
+                if (overConfidence != null) {
+                    testResult.setConfidence(overConfidence);
+                }
+            }
+
+            List<SingleTypeInfo> singleTypeInfos = new ArrayList<>();
+
+            int confidencePercentage = 100;
+
+
+            TestingRunResult ret = new TestingRunResult(
+                testRunId, apiInfoKey, testSuperType, testSubType ,testResults.getTestResults(),
+                vulnerable,singleTypeInfos,confidencePercentage,startTime,
+                endTime, testRunResultSummaryId, testResults.getWorkflowTest(), testLogs);  
+
+            if (testingRunConfig!=null && testingRunConfig.getCleanUp()) {
+                try {
+                    cleanUpTestArtifacts(Collections.singletonList(ret), apiInfoKey, testingUtil, testingRunConfig);
+                } catch(Exception e){
+                    loggerMaker.errorAndAddToDb("Error while cleaning up test artifacts: " + e.getMessage(), LogDb.TESTING);
+                }
+            }
+
+            return ret;
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "Exception in filterGraphQlPayload: " + e.getMessage());
-            testLogs.add(new TestingRunResult.TestLog(TestingRunResult.TestLogType.ERROR, e.getMessage()));
+            e.printStackTrace();
+            loggerMaker.errorAndAddToDb("Error in executing test in runTestNew : " + e.getMessage(), LogDb.TESTING);
+            return Utils.generateFailedRunResultForMessage(testRunId, apiInfoKey, testSuperType, testSubType, testRunResultSummaryId, Arrays.asList(message), "Error occurred while executing test.");
         }
-
-        FilterNode filterNode = testConfig.getApiSelectionFilters().getNode();
-        FilterNode validatorNode = null;
-        if (testConfig.getValidation() != null) {
-            validatorNode = testConfig.getValidation().getNode();
-        }
-        ExecutorNode executorNode = testConfig.getExecute().getNode();
-        Auth auth = testConfig.getAuth();
-        Map<String, List<String>> wordListsMap = testConfig.getWordlists();
-        Map<String, Object> varMap = new HashMap<>();
-        String severity = testConfig.getInfo().getSeverity();
-
-        for (String key: wordListsMap.keySet()) {
-            varMap.put("wordList_" + key, wordListsMap.get(key));
-        }
-
-        VariableResolver.resolveWordList(varMap, testingUtil.getSampleMessages(), apiInfoKey);
-
-        String testExecutionLogId = UUID.randomUUID().toString();
         
-        loggerMaker.infoAndAddToDb("triggering test run for apiInfoKey " + apiInfoKey + "test " + 
-            testSubType + "logId" + testExecutionLogId, LogDb.TESTING);
-
-        List<CustomAuthType> customAuthTypes = testingUtil.getCustomAuthTypes();
-        // TestingUtil -> authMechanism
-        // TestingConfig -> auth
-        com.akto.test_editor.execution.Executor executor = new Executor();
-        executor.overrideTestUrl(rawApi, testingRunConfig);
-        YamlTestTemplate yamlTestTemplate = new YamlTestTemplate(apiInfoKey,filterNode, validatorNode, executorNode,
-                rawApi, varMap, auth, testingUtil.getAuthMechanism(), testExecutionLogId, testingRunConfig, customAuthTypes, testConfig.getStrategy());
-        YamlTestResult testResults = yamlTestTemplate.run(debug, testLogs);
-        if (testResults == null || testResults.getTestResults().isEmpty()) {
-            List<GenericTestResult> res = new ArrayList<>();
-            res.add(new TestResult(null, rawApi.getOriginalMessage(), Collections.singletonList(TestError.SOMETHING_WENT_WRONG.getMessage()), 0, false, TestResult.Confidence.HIGH, null));
-            testResults.setTestResults(res);
-        }
-        int endTime = Context.now();
-
-        boolean vulnerable = false;
-        for (GenericTestResult testResult: testResults.getTestResults()) {
-            if (testResult == null) continue;
-            vulnerable = vulnerable || testResult.isVulnerable();
-            try {
-                testResult.setConfidence(Confidence.valueOf(severity));
-            } catch (Exception e){
-                testResult.setConfidence(Confidence.HIGH);
-            }
-            // dynamic severity for tests
-            Confidence overConfidence = getConfidenceForTests(testConfig, yamlTestTemplate);
-            if (overConfidence != null) {
-                testResult.setConfidence(overConfidence);
-            }
-        }
-
-        List<SingleTypeInfo> singleTypeInfos = new ArrayList<>();
-
-        int confidencePercentage = 100;
-
-
-        TestingRunResult ret = new TestingRunResult(
-            testRunId, apiInfoKey, testSuperType, testSubType ,testResults.getTestResults(),
-            vulnerable,singleTypeInfos,confidencePercentage,startTime,
-            endTime, testRunResultSummaryId, testResults.getWorkflowTest(), testLogs);  
-
-        if (testingRunConfig!=null && testingRunConfig.getCleanUp()) {
-            try {
-                cleanUpTestArtifacts(Collections.singletonList(ret), apiInfoKey, testingUtil, testingRunConfig);
-            } catch(Exception e){
-                loggerMaker.errorAndAddToDb("Error while cleaning up test artifacts: " + e.getMessage(), LogDb.TESTING);
-            }
-        }
-
-        return ret;
     }
 
     public Confidence getConfidenceForTests(TestConfig testConfig, YamlTestTemplate template) {

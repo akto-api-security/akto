@@ -410,7 +410,7 @@ public class Main {
         ConsumerUtil testingConsumer = new ConsumerUtil();
         TestCompletion testCompletion = new TestCompletion();
         if(Constants.IS_NEW_TESTING_ENABLED){
-            testingConsumer.initializeConsumer();
+            ConsumerUtil.initializeConsumer();
         }
 
         // read from files here and then see if we want to init the Producer and run the consumer
