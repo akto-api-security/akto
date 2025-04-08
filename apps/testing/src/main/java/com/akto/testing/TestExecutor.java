@@ -63,6 +63,7 @@ import com.mongodb.client.model.*;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
+import org.checkerframework.checker.units.qual.t;
 import org.json.JSONObject;
 import org.mortbay.util.ajax.JSON;
 import org.slf4j.Logger;
@@ -289,6 +290,7 @@ public class TestExecutor {
             int maxThreads = Math.min(testingRunSubCategories.size(), 500);
             AtomicInteger totalRecordsInsertedInKafka = new AtomicInteger(0);
             AtomicInteger skippedRecordsForKafka = new AtomicInteger(0);
+            AtomicInteger throttleNumber = new AtomicInteger(0);
             if(maxThreads == 0){
                 loggerMaker.infoAndAddToDb("Subcategories list are empty");
                 return;
@@ -327,7 +329,7 @@ public class TestExecutor {
                             insertRecordInKafka(accountId, testSubCategory,
                                     apiInfoKey, messages, summaryId, syncLimit, apiInfoKeyToHostMap, subCategoryEndpointMap,
                                     testConfigMap, testLogs, testingRun, new AtomicBoolean(false),
-                                    totalRecordsInsertedInKafka, skippedRecordsForKafka);
+                                    totalRecordsInsertedInKafka, skippedRecordsForKafka, throttleNumber);
                         }
                     }
                 }
@@ -377,7 +379,7 @@ public class TestExecutor {
                     if(GetRunningTestsStatus.getRunningTests().isTestRunning(summaryId, true)){
                         insertRecordInKafka(accountId, testSubCategory, apiInfoKey, messages, summaryId, syncLimit,
                                 apiInfoKeyToHostMap, subCategoryEndpointMap, testConfigMap, testLogs, testingRun,
-                                isApiInfoTested, new AtomicInteger(), new AtomicInteger());
+                                isApiInfoTested, new AtomicInteger(), new AtomicInteger(), new AtomicInteger());
                     }else{
                         logger.info("Test stopped for id: " + testingRun.getHexId());
                         break;
@@ -397,7 +399,7 @@ public class TestExecutor {
             List<String> messages, ObjectId summaryId, SyncLimit syncLimit, Map<ApiInfoKey, String> apiInfoKeyToHostMap,
             ConcurrentHashMap<String, String> subCategoryEndpointMap, Map<String, TestConfig> testConfigMap,
             List<TestingRunResult.TestLog> testLogs, TestingRun testingRun, AtomicBoolean isApiInfoTested, 
-            AtomicInteger totalRecords,  AtomicInteger skippedRecords) {
+            AtomicInteger totalRecords,  AtomicInteger skippedRecords, AtomicInteger throttleNumber) {
         Context.accountId.set(accountId);
         TestConfig testConfig = testConfigMap.get(testSubCategory);
                     
@@ -440,7 +442,7 @@ public class TestExecutor {
             }
             
             try {
-                Producer.pushMessagesToKafka(Arrays.asList(singleTestPayload), totalRecords);
+                Producer.pushMessagesToKafka(Arrays.asList(singleTestPayload), totalRecords, throttleNumber);
             } catch (Exception e) {
                 e.printStackTrace();
                 return null;

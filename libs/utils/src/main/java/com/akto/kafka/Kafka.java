@@ -55,12 +55,8 @@ public class Kafka {
     this(brokerIP, lingerMS, batchSize, Serializer.STRING, Serializer.STRING);
   }
 
-  public Kafka(String brokerIP, int lingerMS, int batchSize, int maxRequestTimeout) {
-    this(brokerIP, lingerMS, batchSize, Serializer.STRING, Serializer.STRING, maxRequestTimeout, 3);
-  }
-
-  public void send (String message, String topic, AtomicInteger counter){
-    sendWithCounter(message, topic, counter);
+  public Kafka(String brokerIP, int lingerMS, int batchSize, int maxRequestTimeout, int retriesConfig) {
+    this(brokerIP, lingerMS, batchSize, Serializer.STRING, Serializer.STRING, maxRequestTimeout, retriesConfig);
   }
 
   public void sendWithCounter(String message, String topic, AtomicInteger counter) {

@@ -13,12 +13,12 @@ import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.bson.conversions.Bson;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dao.testing.VulnerableTestingRunResultDao;
 import com.akto.dto.testing.TestingRunResult;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.testing_issues.TestingIssuesHandler;
 import com.akto.util.Constants;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -40,8 +40,8 @@ public class InsertResultsConsumer {
         properties.put(ConsumerConfig.MAX_POLL_INTERVAL_MS_CONFIG, 1000); 
     }
     private static Consumer<String, String> consumer = new KafkaConsumer<>(properties);
-    private static final Logger logger = LoggerFactory.getLogger(InsertResultsConsumer.class);
     private final static ObjectMapper mapper = new ObjectMapper();
+    private static final LoggerMaker loggerMaker = new LoggerMaker(InsertResultsConsumer.class);
     
     private boolean insertResultsAndMakeIssuesInBatch(List<TestingRunResult> runResults) {
         // this is the batched run results, by default it is 100
@@ -75,43 +75,71 @@ public class InsertResultsConsumer {
         }
     }
 
+    private void insertResultsWithRetries(List<TestingRunResult> runResults) {
+        int retryCount = 3;
+        boolean success = true;
+        while (retryCount > 0) {
+            try {
+                int subListSize = (int) Math.pow(10, retryCount - 1);
+                int total = (runResults.size() + subListSize - 1) / subListSize ;
+                for (int i = 0; i < total; i++) {
+                    int start = i * subListSize;
+                    int end = Math.min(start + subListSize, runResults.size());
+                    List<TestingRunResult> subList = runResults.subList(start, end);
+                    boolean val = insertResultsAndMakeIssuesInBatch(subList);
+                    success = success && val;
+                }
+                if(success) return;
+            } catch (Exception e) {
+                e.printStackTrace();
+                retryCount--;
+                loggerMaker.errorAndAddToDb("Error inserting results, retrying... " + e.getMessage(), LogDb.TESTING);
+            }
+        }
+    }
+
     public void run() {
         consumer.subscribe(Collections.singletonList(Constants.TEST_RESULTS_FOR_INSERTION_TOPIC_NAME));
         List<TestingRunResult> runResults = new ArrayList<>();
         AtomicInteger totalRecords = new AtomicInteger(0);
         try {
             while (true) {
-                ConsumerRecords<String, String> records = consumer.poll(Duration.ofMillis(1000));
-                if (records.isEmpty()) {
-                    continue;
-                }
-                for (ConsumerRecord<String,String> record : records) {
-                    String message = record.value();
-                    Object object = mapper.readValue(message, Object.class);
-                    TestingRunResult runResult = mapper.convertValue(object, TestingRunResult.class);
-                    if (runResult == null) {
+                try {
+                    ConsumerRecords<String, String> records = consumer.poll(Duration.ofMillis(1000));
+                    if (records.isEmpty() && totalRecords.get() > 0) {
+                        insertResultsWithRetries(runResults);
+                        totalRecords.set(0);
+                        runResults.clear();
                         continue;
                     }
-                    runResults.add(runResult);
-                    totalRecords.incrementAndGet();
-                }
-                if(totalRecords.get() >= 100){
-                    boolean inserted = insertResultsAndMakeIssuesInBatch(runResults);
-                    if(inserted){
-                        runResults.clear();
-                        try {
-                            consumer.commitSync();
-                        } catch (Exception e) {
-                            throw e;
+                    for (ConsumerRecord<String,String> record : records) {
+                        String message = record.value();
+                        Object object = mapper.readValue(message, Object.class);
+                        TestingRunResult runResult = mapper.convertValue(object, TestingRunResult.class);
+                        if (runResult == null) {
+                            continue;
                         }
+                        runResults.add(runResult);
+                        totalRecords.incrementAndGet();
                     }
+                    if(totalRecords.get() >= 100){
+                        insertResultsWithRetries(runResults);
+                        runResults.clear();
+                        consumer.commitSync();
+                        totalRecords.set(0);
+                    }   
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    loggerMaker.errorAndAddToDb("Error in consumer: " + e.getMessage(), LogDb.TESTING);
                 }
             }
         } catch (Exception e) {
             e.printStackTrace();
-            logger.error("Error in consumer: " + e.getMessage());
-        }finally {
-            consumer.close();
+            consumer.wakeup();
         }
+    }
+
+    public static void close() {
+        consumer.close();
     }
 }

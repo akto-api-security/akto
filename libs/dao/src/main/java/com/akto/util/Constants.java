@@ -39,7 +39,7 @@ public class Constants {
     public static final int LINGER_MS_KAFKA = StringUtils.hasLength(System.getenv("LINGER_MS_KAFKA")) ?  Integer.parseInt(System.getenv("LINGER_MS_KAFKA")) : 15000;
     public static final String UNDERSCORE = "_";
 
-    public static final String TEST_RESULTS_FOR_INSERTION_TOPIC_NAME ="akto.insertion.messages";
+    public static final String TEST_RESULTS_FOR_INSERTION_TOPIC_NAME ="akto.test_results.messages";
     public static final String AKTO_KAFKA_INSERTION_GROUP_ID_CONFIG =  "insertion-group";
 
     public final static String _AKTO = "AKTO";

@@ -18,6 +18,7 @@ import com.akto.dto.billing.Organization;
 import com.akto.dto.billing.SyncLimit;
 import com.akto.dto.testing.TestingRun;
 import com.akto.dto.usage.MetricTypes;
+import com.akto.testing.kafka_utils.InsertResultsConsumer;
 import com.akto.usage.UsageMetricHandler;
 import com.mongodb.WriteConcern;
 import com.mongodb.client.model.Filters;
@@ -57,6 +58,8 @@ public class TestCompletion {
         if(summaryId != null && testingRun.getTestIdConfig() != 1){
             TestExecutor.updateTestSummary(summaryId);
         }
+
+        InsertResultsConsumer.close();
 
         int accountId = Context.accountId.get();
 
