@@ -34,6 +34,7 @@ import com.akto.threat.detection.smart_event_detector.window_based.WindowBasedTh
 import com.akto.util.HttpRequestResponseUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mongodb.BasicDBObject;
+import com.akto.IPLookupClient;
 import com.akto.RawApiMetadataFactory;
 
 import io.lettuce.core.RedisClient;
@@ -95,7 +96,7 @@ public class MaliciousTrafficDetectorTask implements Task {
             new WindowBasedThresholdNotifier.Config(100, 10 * 60));
 
     this.internalKafka = new KafkaProtoProducer(internalConfig);
-    this.rawApiFactory = new RawApiMetadataFactory();
+    this.rawApiFactory = new RawApiMetadataFactory(new IPLookupClient());
   }
 
   public void run() {

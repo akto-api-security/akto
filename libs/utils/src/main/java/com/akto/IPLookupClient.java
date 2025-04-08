@@ -1,6 +1,5 @@
 package com.akto;
 
-import com.akto.dto.RawApiMetadata;
 import com.maxmind.db.CHMCache;
 import com.maxmind.geoip2.DatabaseReader;
 import com.maxmind.geoip2.model.CountryResponse;

@@ -8,8 +8,8 @@ import com.akto.dto.OriginalHttpResponse;
 public class RawApiMetadataFactory {
     private IPLookupClient ipLookupClient;
 
-    public RawApiMetadataFactory() throws Exception{
-        this.ipLookupClient = new IPLookupClient();
+    public RawApiMetadataFactory(IPLookupClient ipLookupClient) throws Exception{
+        this.ipLookupClient = ipLookupClient;
     }
     
     public RawApiMetadata buildFromHttp(OriginalHttpRequest request, OriginalHttpResponse response) {
