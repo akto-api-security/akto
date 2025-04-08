@@ -58,6 +58,7 @@ public class TestConfigYamlParser {
             return testConfig;
         }
 
+        String depth = (String) config.get("testing_depth");
         InfoParser infoParser = new InfoParser();
         Info info = infoParser.parse(infoMap);
         if (info == null) {
@@ -160,6 +161,7 @@ public class TestConfigYamlParser {
 
         testConfig = new TestConfig(id, info, auth, filters, wordListMap, executeOperations, validations, strategy, attributes);
         testConfig.setDynamicSeverityList(dynamicSeverityList);
+        testConfig.setTestingDepth(depth);
         return testConfig;
     }
 

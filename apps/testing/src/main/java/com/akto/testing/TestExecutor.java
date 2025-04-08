@@ -1003,6 +1003,7 @@ public class TestExecutor {
         executor.overrideTestUrl(rawApi, testingRunConfig);
         YamlTestTemplate yamlTestTemplate = new YamlTestTemplate(apiInfoKey,filterNode, validatorNode, executorNode,
                 rawApi, varMap, auth, testingUtil.getAuthMechanism(), testExecutionLogId, testingRunConfig, customAuthTypes, testConfig.getStrategy());
+        yamlTestTemplate.setTestingDepth(testConfig.getTestingDepth());
         YamlTestResult testResults = yamlTestTemplate.run(debug, testLogs);
         if (testResults == null || testResults.getTestResults().isEmpty()) {
             List<GenericTestResult> res = new ArrayList<>();

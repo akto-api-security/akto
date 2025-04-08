@@ -134,7 +134,7 @@ public class YamlTestTemplate extends SecurityTestTemplate {
         // loggerMaker.infoAndAddToDb("executor started" + logId, LogDb.TESTING);
         YamlTestResult results = new Executor().execute(this.executorNode, this.rawApi, this.varMap, this.logId,
                 this.authMechanism, this.validatorNode, this.apiInfoKey, this.testingRunConfig, this.customAuthTypes,
-                debug, testLogs, memory);
+                debug, testLogs, memory, this.getTestingDepth());
         // loggerMaker.infoAndAddToDb("execution result size " + results.size() +  " " + logId, LogDb.TESTING);
         return results;
     }

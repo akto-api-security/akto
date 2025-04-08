@@ -33,6 +33,7 @@ public abstract class SecurityTestTemplate {
 
     TestingRunConfig testingRunConfig;
     Strategy strategy;
+    private String testingDepth;
 
     Memory memory;
 
@@ -181,4 +182,11 @@ public abstract class SecurityTestTemplate {
         this.logId = logId;
     }
 
+    public String getTestingDepth() {
+        return testingDepth;
+    }
+
+    public void setTestingDepth(String testingDepth) {
+        this.testingDepth = testingDepth;
+    }
 }

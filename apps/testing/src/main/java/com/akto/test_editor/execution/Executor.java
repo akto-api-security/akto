@@ -57,7 +57,7 @@ public class Executor {
     public YamlTestResult execute(ExecutorNode node, RawApi rawApi, Map<String, Object> varMap, String logId,
                                   AuthMechanism authMechanism, FilterNode validatorNode, ApiInfo.ApiInfoKey apiInfoKey, TestingRunConfig testingRunConfig,
                                   List<CustomAuthType> customAuthTypes, boolean debug, List<TestingRunResult.TestLog> testLogs,
-                                  Memory memory) {
+                                  Memory memory, String testingDepth) {
         List<GenericTestResult> result = new ArrayList<>();
 
         ExecutionListBuilder executionListBuilder = new ExecutionListBuilder();
@@ -135,6 +135,8 @@ public class Executor {
 
         boolean requestSent = false;
 
+        boolean allowAllCombinations = "deep".equalsIgnoreCase(testingDepth);
+
         String executionType = node.getChildNodes().get(0).getValues().toString();
         if (executionType.equals("multiple") || executionType.equals("graph")) {
             if (executionType.equals("graph")) {
@@ -166,7 +168,7 @@ public class Executor {
 
         List<RawApi> testRawApis = new ArrayList<>();
         testRawApis.add(sampleRawApi.copy());
-        ExecutorAlgorithm executorAlgorithm = new ExecutorAlgorithm(sampleRawApi, varMap, authMechanism, customAuthTypes);
+        ExecutorAlgorithm executorAlgorithm = new ExecutorAlgorithm(sampleRawApi, varMap, authMechanism, customAuthTypes, allowAllCombinations);
         Map<Integer, ExecuteAlgoObj> algoMap = new HashMap<>();
         ExecutorSingleRequest singleReq = executorAlgorithm.execute(executorNodes, 0, algoMap, testRawApis, false, 0, apiInfoKey);
         
