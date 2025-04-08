@@ -67,6 +67,8 @@ import com.akto.dto.CollectionConditions.ConditionsType;
 import com.akto.dto.CollectionConditions.MethodCondition;
 import com.akto.dto.CollectionConditions.TestConfigsAdvancedSettings;
 import com.akto.dto.DependencyNode.ParamInfo;
+import com.akto.dto.agents.Model;
+import com.akto.dto.agents.ModelType;
 import com.akto.dto.agents.State;
 import com.akto.dto.auth.APIAuth;
 import com.akto.dto.billing.Organization;
@@ -88,8 +90,6 @@ import org.slf4j.LoggerFactory;
 import static com.akto.dao.MCollection.clients;
 import static org.bson.codecs.configuration.CodecRegistries.fromProviders;
 import static org.bson.codecs.configuration.CodecRegistries.fromRegistries;
-
-import javax.xml.transform.Source;
 
 public class DaoInit {
 
@@ -280,6 +280,7 @@ public class DaoInit {
         ClassModel<ConditionsType> configSettingsConditionTypeClassModel = ClassModel.builder(ConditionsType.class).enableDiscriminator(true).build();
         ClassModel<CustomRole> roleClassModel = ClassModel.builder(CustomRole.class).enableDiscriminator(true).build();
         ClassModel<TestingInstanceHeartBeat> testingInstanceHeartBeat = ClassModel.builder(TestingInstanceHeartBeat.class).enableDiscriminator(true).build();
+        ClassModel<Model> agentModel = ClassModel.builder(Model.class).enableDiscriminator(true).build();
 
         CodecRegistry pojoCodecRegistry = fromProviders(PojoCodecProvider.builder().register(
                 configClassModel, signupInfoClassModel, apiAuthClassModel, attempResultModel, urlTemplateModel,
@@ -310,7 +311,8 @@ public class DaoInit {
                         nodeClassModel, connectionClassModel, edgeClassModel, replaceDetailClassModel, modifyHostDetailClassModel, fileUploadClassModel
                 ,fileUploadLogClassModel, codeAnalysisCollectionClassModel, codeAnalysisApiLocationClassModel, codeAnalysisApiInfoClassModel, codeAnalysisApiInfoKeyClassModel,
                 riskScoreTestingEndpointsClassModel, OrganizationFlagsClassModel, sensitiveDataEndpointsClassModel, unauthenticatedEndpointsClassModel, allApisGroupClassModel,
-                eventsExampleClassModel, remediationClassModel, complianceInfoModel, complianceMappingModel, RuntimeMetricsClassModel, codeAnalysisRepoModel, codeAnalysisApiModel, historicalDataClassModel, configSettingClassModel, configSettingsConditionTypeClassModel, roleClassModel, testingInstanceHeartBeat).automatic(true).build());
+                eventsExampleClassModel, remediationClassModel, complianceInfoModel, complianceMappingModel, RuntimeMetricsClassModel, codeAnalysisRepoModel, codeAnalysisApiModel, historicalDataClassModel, configSettingClassModel, configSettingsConditionTypeClassModel, roleClassModel, testingInstanceHeartBeat,
+                agentModel).automatic(true).build());
 
         final CodecRegistry customEnumCodecs = CodecRegistries.fromCodecs(
                 new EnumCodec<>(Conditions.Operator.class),
@@ -356,7 +358,8 @@ public class DaoInit {
                 new EnumCodec<>(TrafficAlerts.ALERT_TYPE.class),
                 new EnumCodec<>(ApiInfo.ApiType.class),
                 new EnumCodec<>(CodeAnalysisRepo.SourceCodeType.class),
-                new EnumCodec<>(State.class)
+                new EnumCodec<>(State.class),
+                new EnumCodec<>(ModelType.class)
         );
 
         return fromRegistries(MongoClientSettings.getDefaultCodecRegistry(), pojoCodecRegistry,

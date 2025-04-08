@@ -122,6 +122,12 @@ function Integrations() {
       source: '/public/splunk.svg'
     }
 
+    let agentConfigObj ={
+      id: 'agents',
+      name:'Agents',
+      source: '/public/wand.svg'
+    }
+
     let awsWafObj ={
       id: 'aws_waf',
       name:'AWS WAF',
@@ -194,7 +200,7 @@ function Integrations() {
     const trafficItems = [burpSuiteObj, postmanObj];
     const reportingItems = [githubAppObj];
     const cicdItems = [jenkinsObj, azuredevopsObj, gitlabObj, githubactionsObj, ciCdObj];
-    const aiItems = [aktoGptObj];
+    const aiItems = [aktoGptObj, agentConfigObj];
     const alertsItems = [slackObj, webhooksObj, teamsWebhooksObj];
     const automationItems = [aktoApiObj, ciCdObj, jiraObj];
     const wafItems = [awsWafObj, f5WafObj];
@@ -242,7 +248,7 @@ function Integrations() {
       default:
         let allItems = [...trafficItems, ...aiItems]
         if (!func.checkLocal()){
-          allItems = [...allItems, ...alertsItems, ...automationItems, ...ssoItems,  ...cicdItems]
+          allItems = [...allItems, ...alertsItems, ...automationItems, ...ssoItems,  ...cicdItems, ...wafItems, ...siemItems]
         }
         if(func.checkOnPrem()){
           allItems = [...allItems, ...reportingItems]

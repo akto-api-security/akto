@@ -16,6 +16,7 @@ function TestFalsePositiveInitializer(props) {
 
     const [allTestingRuns, setAllTestingRuns] = useState([])
     const [testingRuns, setTestingRuns] = useState([])
+    const {selectedModel} = useAgentsStore(state => state)
 
     const optionsList = allTestingRuns.map((x) => {
         return {
@@ -70,7 +71,8 @@ function TestFalsePositiveInitializer(props) {
             agent: agentType,
             data: {
                 testingRunSummaries: testingRuns
-            }
+            },
+            modelName: selectedModel.id
         })
         func.setToast(true, false, "Agent run scheduled")
     }
