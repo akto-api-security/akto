@@ -260,7 +260,7 @@ public class UsageMetricUtils {
             }
             HashMap<String, FeatureAccess> featureWiseAllowed = organization.getFeatureWiseAllowed();
             if (featureWiseAllowed == null || featureWiseAllowed.isEmpty()) {
-                return DashboardMode.isOnPremDeployment() ? FeatureAccess.fullAccess : FeatureAccess.noAccess;
+                return DashboardMode.isOnPremDeployment() ? FeatureAccess.fullAccess : FeatureAccess.noAccess; // case of on-prem customers without internet access
             }
             featureAccess = featureWiseAllowed.getOrDefault(featureLabel, FeatureAccess.noAccess);
         } catch (Exception e) {

@@ -315,24 +315,24 @@ public class StartTestAction extends UserAction {
         }
 
         try {
-            if (DashboardMode.isSaasDeployment() && !com.akto.testing.Utils.isTestingRunForDemoCollection(localTestingRun)) {
-                int accountId = Context.accountId.get();
-                User user = AccountAction.addUserToExistingAccount("arjun@akto.io", accountId);
-                if (user != null) {
+            // if (DashboardMode.isSaasDeployment() && !com.akto.testing.Utils.isTestingRunForDemoCollection(localTestingRun)) {
+            //     int accountId = Context.accountId.get();
+            //     User user = AccountAction.addUserToExistingAccount("arjun@akto.io", accountId);
+            //     if (user != null) {
                     
-                    RBACDao.instance.updateOneNoUpsert(
-                        Filters.and(
-                            Filters.eq(RBAC.USER_ID, user.getId()),
-                            Filters.eq(RBAC.ACCOUNT_ID, accountId)
-                        ),
-                        Updates.combine(
-                            Updates.set(RBAC.USER_ID, user.getId()),
-                            Updates.set(RBAC.ACCOUNT_ID, accountId),
-                            Updates.set(RBAC.ROLE, Role.DEVELOPER)
-                        )
-                    );
-                }
-            }
+            //         RBACDao.instance.updateOneNoUpsert(
+            //             Filters.and(
+            //                 Filters.eq(RBAC.USER_ID, user.getId()),
+            //                 Filters.eq(RBAC.ACCOUNT_ID, accountId)
+            //             ),
+            //             Updates.combine(
+            //                 Updates.set(RBAC.USER_ID, user.getId()),
+            //                 Updates.set(RBAC.ACCOUNT_ID, accountId),
+            //                 Updates.set(RBAC.ROLE, Role.DEVELOPER)
+            //             )
+            //         );
+            //     }
+            // }
         } catch (Exception e) {
             e.printStackTrace();
             loggerMaker.errorAndAddToDb(e, "error in adding user startTest " + e.getMessage());

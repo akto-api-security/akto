@@ -202,7 +202,7 @@ public class HttpRequestResponseUtils {
         if(!StringUtils.isEmpty(rawRequest)){
             rawRequest = rawRequest.trim();
             String decodedString = rawRequest;
-            if(rawRequest.startsWith("ey", 0)){
+            if(rawRequest.startsWith("ey", 0)){ // since jwt starts with ey as base64 encoded string of '{' is needed to be proper json
                 try {
                     String[] jwtParts = rawRequest.split("\\.");
                     if(jwtParts.length == 3) {
