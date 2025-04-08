@@ -48,6 +48,8 @@ import okhttp3.Request;
 import okhttp3.RequestBody;
 import okhttp3.Response;
 
+import static com.akto.utils.Utils.createRequestFile;
+
 public class JiraIntegrationAction extends UserAction {
 
     private String baseUrl;
@@ -292,25 +294,10 @@ public class JiraIntegrationAction extends UserAction {
             String url = jiraIntegration.getBaseUrl() + CREATE_ISSUE_ENDPOINT + "/" + issueId + ATTACH_FILE_ENDPOINT;
             String authHeader = Base64.getEncoder().encodeToString((jiraIntegration.getUserEmail() + ":" + jiraIntegration.getApiToken()).getBytes());
 
-            origCurl = ExportSampleDataAction.getCurl(origReq);
-            testCurl = ExportSampleDataAction.getCurl(testReq);
-            HttpResponseParams origObj = HttpCallParser.parseKafkaMessage(origReq);
-            BasicDBObject respObj = BasicDBObject.parse(testReq);
-            BasicDBObject respPayloaObj = BasicDBObject.parse(respObj.getString("response"));
-            String resp = respPayloaObj.getString("body");
-
-            File tmpOutputFile = File.createTempFile("output", ".txt");
-
-            FileUtils.writeStringToFile(new File(tmpOutputFile.getPath()), "Original Curl ----- \n\n", (String) null);
-            FileUtils.writeStringToFile(new File(tmpOutputFile.getPath()), origCurl + "\n\n", (String) null, true);
-            FileUtils.writeStringToFile(new File(tmpOutputFile.getPath()), "Original Api Response ----- \n\n", (String) null, true);
-            FileUtils.writeStringToFile(new File(tmpOutputFile.getPath()), origObj.getPayload() + "\n\n", (String) null, true);
-
-            FileUtils.writeStringToFile(new File(tmpOutputFile.getPath()), "Test Curl ----- \n\n", (String) null, true);
-            FileUtils.writeStringToFile(new File(tmpOutputFile.getPath()), testCurl + "\n\n", (String) null, true);
-            FileUtils.writeStringToFile(new File(tmpOutputFile.getPath()), "Test Api Response ----- \n\n", (String) null, true);
-            FileUtils.writeStringToFile(new File(tmpOutputFile.getPath()), resp + "\n\n", (String) null, true);
-
+            File tmpOutputFile = createRequestFile(origReq, testReq);
+            if(tmpOutputFile == null) {
+                return Action.ERROR.toUpperCase();
+            }
 
             MediaType mType = MediaType.parse("application/octet-stream");
             RequestBody requestBody = new MultipartBody.Builder().setType(MultipartBody.FORM)

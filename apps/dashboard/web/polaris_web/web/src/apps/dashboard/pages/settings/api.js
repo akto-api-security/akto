@@ -541,6 +541,13 @@ const settingRequests = {
             method: 'post',
             data: {organization, projectList, personalAuthToken}
         })
+    },
+    removeAzureBoardsIntegration() {
+        return request({
+            url: '/api/removeAzureBoardsIntegration',
+            method: 'post',
+            data: {}
+        })
     }
 }
 

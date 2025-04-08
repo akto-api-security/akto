@@ -9186,6 +9186,9 @@
                 <param name="featureLabel">INTEGRATIONS</param>
                 <param name="accessType">READ</param>
             </interceptor-ref>
+            <interceptor-ref name="usageInterceptor">
+                <param name="featureLabel">AZURE_BOARD_INTEGRATION</param>
+            </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -9239,6 +9242,9 @@
                 <param name="accessType">READ_WRITE</param>
                 <param name="actionDescription">User created an Azure Board Work Item</param>
             </interceptor-ref>
+            <interceptor-ref name="usageInterceptor">
+                <param name="featureLabel">AZURE_BOARD_INTEGRATION</param>
+            </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -9261,6 +9267,9 @@
                 <param name="accessType">READ_WRITE</param>
                 <param name="actionDescription">User created few Azure Board Work Items</param>
             </interceptor-ref>
+            <interceptor-ref name="usageInterceptor">
+                <param name="featureLabel">AZURE_BOARD_INTEGRATION</param>
+            </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -9272,6 +9281,37 @@
                 <param name="statusCode">422</param>
                 <param name="ignoreHierarchy">false</param>
                 <param name="includeProperties">^actionErrors.*, ^responses.*</param>
+            </result>
+        </action>
+
+
+        <action name="api/removeAzureBoardsIntegration" class="com.akto.action.AzureBoardsIntegrationAction" method="removeAzureBoardsIntegration" >
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">INTEGRATIONS</param>
+                <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User removed Azure Boards integration</param>
+            </interceptor-ref>
+
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <interceptor-ref name="usageInterceptor">
+                <param name="featureLabel">AZURE_BOARD_INTEGRATION</param>
+            </interceptor-ref>
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*, ^responses.*</param>
+            </result>
+            <result name="UNAUTHORIZED" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
             </result>
         </action>
     </package>

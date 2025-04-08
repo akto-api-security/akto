@@ -6,6 +6,7 @@ import java.util.Map;
 public class AzureBoardsIntegration {
 
     private String organization;
+    public static final String PERSONAL_AUTH_TOKEN = "personalAuthToken";
     private String personalAuthToken;
     private int createdTs;
     private int updatedTs;

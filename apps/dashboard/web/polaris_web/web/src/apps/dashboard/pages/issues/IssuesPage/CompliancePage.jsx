@@ -30,7 +30,6 @@ import CriticalUnsecuredAPIsOverTimeGraph from "./CriticalUnsecuredAPIsOverTimeG
 import settingFunctions from "../../settings/module.js";
 import JiraTicketCreationModal from "../../../components/shared/JiraTicketCreationModal.jsx";
 import testingApi from "../../testing/api.js"
-import AzureBoardsWorkItemCreationModal from "../../../components/shared/AzureBoardsWorkItemCreationModal.jsx";
 
 const sortOptions = [
     { label: 'Severity', value: 'severity asc', directionLabel: 'Highest', sortKey: 'severity', columnIndex: 2 },
@@ -670,15 +669,16 @@ function CompliancePage() {
                 issueType={issueType}
             />
 
-            <AzureBoardsWorkItemCreationModal
+            <JiraTicketCreationModal
                 modalActive={boardsModalActive}
                 setModalActive={setBoardsModalActive}
                 handleSaveAction={handleSaveBulkAzureWorkItemsAction}
-                projectToWorkItemsMap={projectToWorkItemsMap}
-                setProjectId={setProjectId}
-                setWorkItemType={setWorkItemType}
-                projectId={projectId}
-                workItemType={workItemType}
+                jiraProjectMaps={projectToWorkItemsMap}
+                setProjId={setProjectId}
+                setIssueType={setWorkItemType}
+                projId={projectId}
+                issueType={workItemType}
+                isAzureModal={true}
             />
         </>
     )

@@ -5,7 +5,6 @@ import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
-import com.akto.dto.HttpResponseParams;
 import com.akto.dto.azure_boards_integration.AzureBoardsIntegration;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
@@ -15,7 +14,6 @@ import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.TestingRunResult;
-import com.akto.parsers.HttpCallParser;
 import com.akto.testing.ApiExecutor;
 import com.akto.util.Constants;
 import com.mongodb.BasicDBList;
@@ -25,7 +23,6 @@ import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
 import com.opensymphony.xwork2.Action;
-import org.apache.commons.io.FileUtils;
 import org.bson.conversions.Bson;
 import com.akto.dto.azure_boards_integration.AzureBoardsIntegration.AzureBoardsOperations;
 
@@ -36,6 +33,8 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.*;
+
+import static com.akto.utils.Utils.createRequestFile;
 
 public class AzureBoardsIntegrationAction extends UserAction {
 
@@ -50,16 +49,22 @@ public class AzureBoardsIntegrationAction extends UserAction {
 
 
     public String fetchAzureBoardsIntegration() {
-        azureBoardsIntegration = AzureBoardsIntegrationDao.instance.findOne(new BasicDBObject());
-
-        if(azureBoardsIntegration != null) {
-            azureBoardsIntegration.setPersonalAuthToken("****************************");
-        }
+        azureBoardsIntegration = AzureBoardsIntegrationDao.instance.findOne(new BasicDBObject(), Projections.exclude(AzureBoardsIntegration.PERSONAL_AUTH_TOKEN));
 
         return Action.SUCCESS.toUpperCase();
     }
 
     public String addAzureBoardsIntegration() {
+        if(organization == null || organization.isEmpty()) {
+            addActionError("Please enter a valid organization.");
+            return Action.ERROR.toUpperCase();
+        }
+
+        if(projectList == null || projectList.isEmpty()) {
+            addActionError("Please enter valid project names.");
+            return Action.ERROR.toUpperCase();
+        }
+
         Bson combineUpdates = Updates.combine(
                 Updates.set("organization", organization),
                 Updates.set("projectList", projectList),
@@ -69,10 +74,15 @@ public class AzureBoardsIntegrationAction extends UserAction {
 
         String basicAuth = ":" + personalAuthToken;
         String base64PersonalAuthToken = Base64.getEncoder().encodeToString(basicAuth.getBytes());
-        if(!personalAuthToken.contains("****")) {
+        if(personalAuthToken != null && !personalAuthToken.isEmpty()) {
             Bson personalAuthTokenUpdate = Updates.set("personalAuthToken", base64PersonalAuthToken);
             combineUpdates = Updates.combine(combineUpdates, personalAuthTokenUpdate);
         } else {
+            AzureBoardsIntegration boardsIntegration = AzureBoardsIntegrationDao.instance.findOne(new BasicDBObject());
+            if(boardsIntegration == null || boardsIntegration.getPersonalAuthToken() == null || boardsIntegration.getPersonalAuthToken().isEmpty()) {
+                addActionError("Please enter a valid personal auth token.");
+                return Action.ERROR.toUpperCase();
+            }
             base64PersonalAuthToken = AzureBoardsIntegrationDao.instance.findOne(new BasicDBObject()).getPersonalAuthToken();
         }
 
@@ -275,35 +285,6 @@ public class AzureBoardsIntegrationAction extends UserAction {
         return null;
     }
 
-    public File createRequestFile(String originalMessage, String message) {
-        try {
-            String origCurl = ExportSampleDataAction.getCurl(originalMessage);
-            String testCurl = ExportSampleDataAction.getCurl(message);
-
-            HttpResponseParams origObj = HttpCallParser.parseKafkaMessage(originalMessage);
-            BasicDBObject testRespObj = BasicDBObject.parse(message);
-            BasicDBObject testPayloadObj = BasicDBObject.parse(testRespObj.getString("response"));
-            String testResp = testPayloadObj.getString("body");
-
-            File tmpOutputFile = File.createTempFile("output", ".txt");
-
-            FileUtils.writeStringToFile(tmpOutputFile, "Original Curl ----- \n\n", (String) null);
-            FileUtils.writeStringToFile(tmpOutputFile, origCurl + "\n\n", (String) null, true);
-            FileUtils.writeStringToFile(tmpOutputFile, "Original Api Response ----- \n\n", (String) null, true);
-            FileUtils.writeStringToFile(tmpOutputFile, origObj.getPayload() + "\n\n", (String) null, true);
-
-            FileUtils.writeStringToFile(tmpOutputFile, "Test Curl ----- \n\n", (String) null, true);
-            FileUtils.writeStringToFile(tmpOutputFile, testCurl + "\n\n", (String) null, true);
-            FileUtils.writeStringToFile(tmpOutputFile, "Test Api Response ----- \n\n", (String) null, true);
-            FileUtils.writeStringToFile(tmpOutputFile, testResp + "\n\n", (String) null, true);
-
-            return tmpOutputFile;
-        } catch (Exception e) {
-            e.printStackTrace();
-            return null;
-        }
-    }
-
     private String getEndpointPath(String fullUrl) {
         String endpointPath;
 
@@ -357,6 +338,11 @@ public class AzureBoardsIntegrationAction extends UserAction {
         return Action.SUCCESS.toUpperCase();
     }
 
+    public String removeAzureBoardsIntegration() {
+        AzureBoardsIntegrationDao.instance.deleteAll(new BasicDBObject());
+        return Action.SUCCESS.toUpperCase();
+    }
+
     public String getOrganization() {
         return organization;
     }
@@ -371,10 +357,6 @@ public class AzureBoardsIntegrationAction extends UserAction {
 
     public void setProjectList(List<String> projectList) {
         this.projectList = projectList;
-    }
-
-    public String getPersonalAuthToken() {
-        return personalAuthToken;
     }
 
     public void setPersonalAuthToken(String personalAuthToken) {

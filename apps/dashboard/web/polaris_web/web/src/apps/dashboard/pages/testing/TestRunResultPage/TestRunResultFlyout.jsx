@@ -18,7 +18,6 @@ import observeFunc from "../../observe/transform.js"
 import settingFunctions from '../../settings/module.js'
 import JiraTicketCreationModal from '../../../components/shared/JiraTicketCreationModal.jsx'
 import MarkdownViewer from '../../../components/shared/MarkdownViewer.jsx'
-import AzureBoardsWorkItemCreationModal from '../../../components/shared/AzureBoardsWorkItemCreationModal.jsx'
 
 function TestRunResultFlyout(props) {
 
@@ -255,17 +254,18 @@ function TestRunResultFlyout(props) {
                                 issueType={issueType}
                                 issueId={issueDetails.id}
                             />
-                            <AzureBoardsWorkItemCreationModal
+                            <JiraTicketCreationModal
                                 activator={<Button id={"create-azure-boards-ticket-button"} primary onClick={handleAzureBoardClick} disabled={azureBoardsWorkItemUrl !== "" || window.AZURE_BOARDS_INTEGRATED !== "true"}>Create Work Item</Button>}
                                 modalActive={boardsModalActive}
                                 setModalActive={setBoardsModalActive}
                                 handleSaveAction={handleAzureBoardWorkitemCreation}
-                                projectToWorkItemsMap={projectToWorkItemsMap}
-                                projectId={projectId}
-                                setProjectId={setProjectId}
-                                workItemType={workItemType}
-                                setWorkItemType={setWorkItemType}
+                                jiraProjectMaps={projectToWorkItemsMap}
+                                projId={projectId}
+                                setProjId={setProjectId}
+                                issueType={workItemType}
+                                setIssueType={setWorkItemType}
                                 issueId={issueDetails.id}
+                                isAzureModal={true}
                             />
                         </HorizontalStack>
                     }

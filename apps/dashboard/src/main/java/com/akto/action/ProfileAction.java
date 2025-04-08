@@ -125,8 +125,8 @@ public class ProfileAction extends UserAction {
 
         boolean azureBoardsIntegrated = false;
         try {
-            AzureBoardsIntegration azureBoardsIntegration = AzureBoardsIntegrationDao.instance.findOne(new BasicDBObject());
-            if (azureBoardsIntegration != null) {
+            long documentCount = AzureBoardsIntegrationDao.instance.estimatedDocumentCount();
+            if (documentCount > 0) {
                 azureBoardsIntegrated = true;
             }
         } catch (Exception e) {

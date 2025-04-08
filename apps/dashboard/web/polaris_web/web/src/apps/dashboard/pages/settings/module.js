@@ -273,6 +273,13 @@ const settingFunctions = {
       })
       return trafficData
     },
+    removeAzureBoardsIntegration: async function() {
+      let trafficData = {}
+      await settingRequests.removeAzureBoardsIntegration().then((resp)=>{
+        trafficData = resp
+      })
+      return trafficData
+    },
     getSetupOptions: function(){
       return setupOptions;
     },

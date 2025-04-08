@@ -10,13 +10,14 @@ const AzureBoards = () => {
     const [organization, setOrganization] = useState('')
     const [projectIds, setProjectIds] = useState('')
     const [personalAuthToken, setPersonalAuthToken] = useState('')
-    const [collapsibleOpen, setCollapsibleOpen] = useState(false)
+    const [isRemoveable, setIsRemoveable] = useState(false)
 
     async function fetchAzureBoardsInteg() {
         let azureBoardsInteg = await settingFunctions.fetchAzureBoardsIntegration()
         setOrganization(azureBoardsInteg != null ? azureBoardsInteg.organization : '')
         setProjectIds(azureBoardsInteg != null ? azureBoardsInteg.projectList?.join(',') : '')
-        setPersonalAuthToken(azureBoardsInteg != null ? azureBoardsInteg.personalAuthToken : '')
+        setPersonalAuthToken(azureBoardsInteg != null ? null : '')
+        setIsRemoveable(azureBoardsInteg != null ? true : false)
     }
 
     useEffect(() => {
@@ -28,10 +29,20 @@ const AzureBoards = () => {
         func.setToast(true, false, "Successfully added Azure Boards Integration")
         fetchAzureBoardsInteg()
     }
+
+    async function removeAzureBoardsIntegration() {
+        await settingFunctions.removeAzureBoardsIntegration()
+        func.setToast(true, false, "Successfully removed Azure Boards Integration")
+        setOrganization('')
+        setProjectIds('')
+        setPersonalAuthToken('')
+        setIsRemoveable(false)
+    }
     
     const AzureBoardsCard = (
         <LegacyCard
             primaryFooterAction={{content: 'Save', onAction: addAzureBoardsIntegration }}
+            secondaryFooterActions={[{content: 'Remove', onAction: removeAzureBoardsIntegration, disabled: !isRemoveable}]}
         >
           <LegacyCard.Section>
             <Text variant="headingMd">Integrate Azure Boards</Text>
@@ -40,7 +51,7 @@ const AzureBoards = () => {
           <LegacyCard.Section>
                 <VerticalStack gap={"2"}>
                     <TextField label="Organization" value={organization} helpText="Specify the organization name" placeholder='Organization name' requiredIndicator onChange={setOrganization} />
-                    <PasswordTextField label="Personal Auth Token" helpText="Specify the personal auth token created for your project" field={personalAuthToken} onFunc={true} setField={setPersonalAuthToken} />
+                    {personalAuthToken === null ? <></> : <PasswordTextField label="Personal Auth Token" helpText="Specify the personal auth token created for your project" field={personalAuthToken} onFunc={true} setField={setPersonalAuthToken} />}
                     <TextField label="Projects" helpText="Specify the projects names in comma separated string" value={projectIds} placeholder='Project Names' requiredIndicator onChange={setProjectIds} />
                 </VerticalStack>
           </LegacyCard.Section> 
