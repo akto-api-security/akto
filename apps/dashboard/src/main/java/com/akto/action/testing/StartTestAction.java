@@ -1247,31 +1247,10 @@ public class StartTestAction extends UserAction {
 
                 if(editableTestingRunConfig.getTestSuiteIds() != null && !editableTestingRunConfig.getTestSuiteIds().equals(existingTestingRunConfig.getTestSuiteIds())){
                     updates.add(Updates.set(TestingRunConfig.TEST_SUITE_IDS, editableTestingRunConfig.getTestSuiteIds()));
-                }
-                
-                if (editableTestingRunConfig.getTestSubCategoryList() != null) {
-                    if(editableTestingRunConfig.getTestSuiteIds() != null && editableTestingRunConfig.getTestSuiteIds().size() > 0){
-                        // fetch testList from testSuite, remove duplicates and then update it
-                        ObjectId objectId = new ObjectId(editableTestingRunConfig.getTestSuiteIds().get(0));
-                        TestSuites testSuite = TestSuiteDao.instance.findOne(Filters.eq(Constants.ID, objectId));
-                        if(testSuite == null){
-                            addActionError("testRun Edit Failed test suite not found for ID: " + editableTestingRunConfig.getTestSuiteIds().get(0));
-                            return Action.ERROR.toUpperCase();
-                        }
-                        Set<String> subCategorySet = new HashSet<>(testSuite.getSubCategoryList());
-                        for(String s : editableTestingRunConfig.getTestSubCategoryList()){
-                            if(!subCategorySet.contains(s)){
-                                testSuite.getSubCategoryList().add(s);
-                            }
-                        }
-                        TestSuiteDao.instance.updateOne(
-                            Filters.eq(Constants.ID, objectId),
-                            Updates.set(TestSuites.FIELD_SUB_CATEGORY_LIST, testSuite.getSubCategoryList())
-                        );
-                        updates.add(Updates.set(TestingRunConfig.TEST_SUBCATEGORY_LIST, new ArrayList<String>()));
-                        
-                    }
-                    else if(!editableTestingRunConfig.getTestSubCategoryList().equals(existingTestingRunConfig.getTestSubCategoryList())) updates.add(Updates.set(TestingRunConfig.TEST_SUBCATEGORY_LIST, editableTestingRunConfig.getTestSubCategoryList()));
+                }   
+
+                if (editableTestingRunConfig.getTestSubCategoryList() != null && !editableTestingRunConfig.getTestSubCategoryList().equals(existingTestingRunConfig.getTestSubCategoryList())) {
+                    updates.add(Updates.set(TestingRunConfig.TEST_SUBCATEGORY_LIST, editableTestingRunConfig.getTestSubCategoryList()));
                 }
                 
                 if (editableTestingRunConfig.getTestRoleId() != null && !editableTestingRunConfig.getTestRoleId().equals(existingTestingRunConfig.getTestRoleId())) {

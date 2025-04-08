@@ -1163,19 +1163,23 @@ getMissingConfigs(testResults){
       };
     });
   },
-  prepareEditableConfigObject(testRun,settings,hexId,testSuiteIds){
+  prepareEditableConfigObject(testRun,settings,hexId,testSuiteIds=[],testMode,selectedGeneratedSuiteTests){
     const tests = testRun.tests;
-    const selectedTests = []
-        Object.keys(tests).forEach(category => {
-            tests[category].forEach(test => {
-                if (test.selected) selectedTests.push(test.value)
-            })
+    let selectedTests = []
+    if (testMode) {
+      Object.keys(tests).forEach(category => {
+        tests[category].forEach(test => {
+          if (test.selected) selectedTests.push(test.value)
         })
-
+      })
+    }
+    else {
+      selectedTests = [...selectedGeneratedSuiteTests];
+    }
     return {
       configsAdvancedSettings:settings,
       testRoleId: testRun.testRoleId,
-      testSubCategoryList: selectedTests,
+      testSubCategoryList: testSuiteIds?.length == 0? selectedTests : [],
       overriddenTestAppUrl: testRun.hasOverriddenTestAppUrl ? testRun.overriddenTestAppUrl : "",
       maxConcurrentRequests: testRun.maxConcurrentRequests,
       testingRunHexId: hexId,
@@ -1187,7 +1191,7 @@ getMissingConfigs(testResults){
       scheduleTimestamp: testRun.startTimestamp,
       recurringWeekly: testRun.recurringWeekly,
       recurringMonthly: testRun.recurringMonthly,
-      testSuiteIds:testSuiteIds,
+      testSuiteIds:testMode? [] : testSuiteIds,
     }
   }
 }

@@ -97,7 +97,7 @@ function RunTestSuites({ testRun, setTestRun, apiCollectionName, activeFromTesti
     function handleTestSuiteSelection(data) {
         if (!data.id) {
             let testName = apiCollectionName + "_" + func.joinWordsWithUnderscores(data.name)
-            setTestNameSuiteModal(testName)
+            if(!activeFromTesting)setTestNameSuiteModal(testName)
             setSelectedGeneratedSuiteTests([...data?.tests])
             setTestSuiteIds([])
             return;
@@ -109,7 +109,7 @@ function RunTestSuites({ testRun, setTestRun, apiCollectionName, activeFromTesti
             }
         })
         let testName = apiCollectionName + "_" + data.name;
-        setTestNameSuiteModal(testName)
+        if(!activeFromTesting)setTestNameSuiteModal(testName)
         setSelectedGeneratedSuiteTests([])
     }
 
@@ -174,7 +174,7 @@ function RunTestSuites({ testRun, setTestRun, apiCollectionName, activeFromTesti
                                 plain
                                 destructive
                                 onClick={handleRemoveAll}
-                                disabled={testSuiteIds?.length===0}><div data-testid="remove_all_tests">Clear selection</div></Button></div>
+                                disabled={testSuiteIds?.length===0 && selectedGeneratedSuiteTests.length === 0}><div data-testid="remove_all_tests">Clear selection</div></Button></div>
                     </div>
                     {
                         Object.values(data).map((key) => {
