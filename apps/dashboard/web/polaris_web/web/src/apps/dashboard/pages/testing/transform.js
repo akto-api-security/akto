@@ -993,7 +993,7 @@ getRowInfo(severity, apiInfo,jiraIssueUrl, sensitiveData, isIgnored, azureBoards
     </Box>
   ) : null
 
-      
+
   const azureBoardsComp = azureBoardsWorkItemUrl?.length > 0 ? (
     <Box>
       <Tag>
@@ -1202,7 +1202,7 @@ getMissingConfigs(testResults){
       };
     });
   },
-  prepareEditableConfigObject(testRun,settings,hexId,testSuiteIds){
+  prepareEditableConfigObject(testRun,settings,hexId,testSuiteIds=[],testMode,selectedGeneratedSuiteTests){
     const tests = testRun.tests;
     const selectedTests = []
     Object.keys(tests).forEach(category => {
@@ -1214,7 +1214,7 @@ getMissingConfigs(testResults){
     return {
       configsAdvancedSettings:settings,
       testRoleId: testRun.testRoleId,
-      testSubCategoryList: selectedTests,
+      testSubCategoryList: testSuiteIds?.length == 0? selectedTests : [],
       overriddenTestAppUrl: testRun.hasOverriddenTestAppUrl ? testRun.overriddenTestAppUrl : "",
       maxConcurrentRequests: testRun.maxConcurrentRequests,
       testingRunHexId: hexId,
@@ -1226,7 +1226,7 @@ getMissingConfigs(testResults){
       scheduleTimestamp: testRun?.hourlyLabel === 'Now' && ((testRun.startTimestamp - func.getStartOfTodayEpoch()) < 86400) ? 0 : testRun.startTimestamp,
       recurringWeekly: testRun.recurringWeekly,
       recurringMonthly: testRun.recurringMonthly,
-      testSuiteIds:testSuiteIds,
+      testSuiteIds:testMode? [] : testSuiteIds,
     }
   }
 }
