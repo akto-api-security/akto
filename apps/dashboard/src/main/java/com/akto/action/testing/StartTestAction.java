@@ -1257,7 +1257,7 @@ public class StartTestAction extends UserAction {
                 }
 
                 if(editableTestingRunConfig.getTestSuiteIds() != null && !editableTestingRunConfig.getTestSuiteIds().equals(existingTestingRunConfig.getTestSuiteIds())){
-                    updates.add(Updates.set("testSuiteIds", editableTestingRunConfig.getTestSuiteIds()));
+                    updates.add(Updates.set(TestingRunConfig.TEST_SUITE_IDS, editableTestingRunConfig.getTestSuiteIds()));
                 }
                 
                 if (editableTestingRunConfig.getTestSubCategoryList() != null) {

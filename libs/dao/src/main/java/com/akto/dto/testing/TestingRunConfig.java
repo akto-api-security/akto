@@ -27,6 +27,7 @@ public class TestingRunConfig {
     private boolean cleanUp;
 
     private List<String> testSuiteIds;
+    public static final String TEST_SUITE_IDS = "testSuiteIds";
 
     public TestingRunConfig() {}
 
