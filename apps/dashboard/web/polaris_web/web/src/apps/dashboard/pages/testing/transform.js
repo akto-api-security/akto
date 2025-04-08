@@ -108,6 +108,10 @@ function getTotalSeverityTestRunResult(severity) {
 }
 
 function getRuntime(scheduleTimestamp, endTimestamp, state) {
+  scheduleTimestamp = func.convertEpochToTimezoneEpoch(scheduleTimestamp)
+  if(endTimestamp) {
+    endTimestamp = func.convertEpochToTimezoneEpoch(endTimestamp)
+  }
   let status = getStatus(state);
   if (status === 'RUNNING') {
     return <div data-testid="test_run_status">Currently running</div>;
