@@ -24,6 +24,16 @@
     background-color: rgba(255, 0, 0, 0.1);
 }
 
+.akto-decoded{
+    border-left: 4px solid var(--akto-primary);
+    border-top: 1px solid var(--akto-primary);
+    border-bottom: 1px solid var(--akto-primary);
+    margin-left: -62px;
+    width: 100vw !important;
+    border-radius: 2px;
+    background-color: rgba(224, 134, 247, 0.226);
+}
+
 .updated-content{
     color: #916A00 !important;
     font-weight: 600 !important;
