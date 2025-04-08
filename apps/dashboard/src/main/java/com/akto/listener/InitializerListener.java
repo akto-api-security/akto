@@ -3130,6 +3130,33 @@ public class InitializerListener implements ServletContextListener {
         }
     }
 
+    private static void cleanupRbacEntriesForDeveloperRole(BackwardCompatibility backwardCompatibility){
+        if(backwardCompatibility.getCleanupRbacEntries() == 0){
+            int count = (int) RBACDao.instance.count(
+                Filters.and(
+                    Filters.eq(RBAC.ROLE, Role.DEVELOPER.name()),
+                    Filters.eq(RBAC.USER_ID, 1696481097)
+                )
+            );
+            if(count > 1){
+                RBACDao.instance.deleteAll(
+                    Filters.and(
+                        Filters.eq(RBAC.ROLE, Role.DEVELOPER.name()),
+                        Filters.eq(RBAC.USER_ID, 1696481097)
+                    )
+                );
+                RBACDao.instance.insertOne(
+                    new RBAC(1696481097, Role.DEVELOPER.name(), Context.accountId.get())
+                );
+            }
+
+            BackwardCompatibilityDao.instance.updateOne(
+                Filters.eq("_id", backwardCompatibility.getId()),
+                Updates.set(BackwardCompatibility.CLEANUP_RBAC_ENTRIES, Context.now())
+            );
+        }
+    }
+
     public static void setBackwardCompatibilities(BackwardCompatibility backwardCompatibility){
         if (DashboardMode.isMetered()) {
             initializeOrganizationAccountBelongsTo(backwardCompatibility);
@@ -3139,6 +3166,7 @@ public class InitializerListener implements ServletContextListener {
         updateCustomDataTypeOperator(backwardCompatibility);
         markSummariesAsVulnerable(backwardCompatibility);
         dropLastCronRunInfoField(backwardCompatibility);
+        cleanupRbacEntriesForDeveloperRole(backwardCompatibility);
         fetchIntegratedConnections(backwardCompatibility);
         dropFilterSampleDataCollection(backwardCompatibility);
         dropApiDependencies(backwardCompatibility);
