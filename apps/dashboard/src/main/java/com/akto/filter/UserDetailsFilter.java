@@ -8,30 +8,34 @@ import com.akto.dao.UsersDao;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiToken;
+import com.akto.dto.ApiToken.Utility;
 import com.akto.dto.SignupUserInfo;
 import com.akto.dto.User;
-import com.akto.dto.ApiToken.Utility;
 import com.akto.dto.billing.Organization;
 import com.akto.listener.InitializerListener;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.DashboardMode;
 import com.akto.utils.JWT;
 import com.akto.utils.Token;
 import com.mongodb.BasicDBObject;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jws;
-import org.apache.commons.lang3.StringUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import javax.servlet.*;
-import javax.servlet.http.Cookie;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-import javax.servlet.http.HttpSession;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import javax.servlet.Filter;
+import javax.servlet.FilterChain;
+import javax.servlet.FilterConfig;
+import javax.servlet.ServletException;
+import javax.servlet.ServletRequest;
+import javax.servlet.ServletResponse;
+import javax.servlet.http.Cookie;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import javax.servlet.http.HttpSession;
+import org.apache.commons.lang3.StringUtils;
 
 // This is the first filter which will hit for every request to server
 // First checks if the access token is valid or not (from header)
@@ -40,7 +44,7 @@ import java.util.Objects;
 // Using the username from the access token it sets the user details in session to be used by other filters/action
 public class UserDetailsFilter implements Filter {
 
-    private static final Logger logger = LoggerFactory.getLogger(UserDetailsFilter.class);
+    private static final LoggerMaker logger = new LoggerMaker(UserDetailsFilter.class, LogDb.DASHBOARD);
     public static final String LOGIN_URI = "/login";
     public static final String API_URI = "/api";
 

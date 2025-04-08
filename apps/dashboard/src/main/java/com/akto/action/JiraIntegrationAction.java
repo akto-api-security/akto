@@ -70,7 +70,7 @@ public class JiraIntegrationAction extends UserAction {
     private final String CREATE_ISSUE_ENDPOINT = "/rest/api/3/issue";
     private final String CREATE_ISSUE_ENDPOINT_BULK = "/rest/api/3/issue/bulk";
     private final String ATTACH_FILE_ENDPOINT = "/attachments";
-    private static final LoggerMaker loggerMaker = new LoggerMaker(ApiExecutor.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(ApiExecutor.class, LogDb.DASHBOARD);
     private static final OkHttpClient client = CoreHTTPClient.client.newBuilder()
             .connectTimeout(60, TimeUnit.SECONDS)
             .readTimeout(60, TimeUnit.SECONDS)

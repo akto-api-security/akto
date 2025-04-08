@@ -5,21 +5,19 @@ import com.akto.dao.context.Context;
 import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Aggregates;
-import com.mongodb.client.model.EstimatedDocumentCountOptions;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
-
 import java.util.ArrayList;
 import java.util.List;
-
 import org.bson.Document;
 import org.bson.conversions.Bson;
 
 public class ParamStateAction extends UserAction {
 
-    private static final LoggerMaker loggerMaker = new LoggerMaker(ParamStateAction.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(ParamStateAction.class, LogDb.DASHBOARD);
     @Override
     public String execute() {
         return SUCCESS.toUpperCase();

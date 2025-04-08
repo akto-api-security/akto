@@ -19,7 +19,7 @@ import java.util.stream.Collectors;
 
 public class Utils {
 
-    private static final LoggerMaker loggerMaker = new LoggerMaker(Utils.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(Utils.class, LogDb.DASHBOARD);
     public static CloudType getCloudType() {
         if (System.getenv("AWS_REGION") != null) {
             return CloudType.AWS;

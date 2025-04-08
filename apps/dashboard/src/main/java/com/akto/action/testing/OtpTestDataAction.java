@@ -4,16 +4,15 @@ import com.akto.action.UserAction;
 import com.akto.dao.OtpTestDataDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.testing.OtpTestData;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 import org.bson.conversions.Bson;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 public class OtpTestDataAction extends UserAction {
+
+    private static final LoggerMaker logger = new LoggerMaker(OtpTestDataAction.class, LogDb.DASHBOARD);;
 
     private String regex;
 
@@ -23,7 +22,6 @@ public class OtpTestDataAction extends UserAction {
 
     private String otp;
 
-    private static final Logger logger = LoggerFactory.getLogger(OtpTestDataAction.class);
 
     public String saveOtpData() {
 

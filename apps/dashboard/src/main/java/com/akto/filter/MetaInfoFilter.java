@@ -1,16 +1,17 @@
 package com.akto.filter;
 
-import com.akto.action.ProfileAction;
-import com.akto.dto.User;
-import com.mongodb.BasicDBObject;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import javax.servlet.*;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
+import java.io.IOException;
+import javax.servlet.Filter;
+import javax.servlet.FilterChain;
+import javax.servlet.FilterConfig;
+import javax.servlet.ServletException;
+import javax.servlet.ServletRequest;
+import javax.servlet.ServletResponse;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
-import java.io.IOException;
 
 public class MetaInfoFilter implements Filter {
     @Override
@@ -18,7 +19,7 @@ public class MetaInfoFilter implements Filter {
 
     }
 
-    private static final Logger logger = LoggerFactory.getLogger(MetaInfoFilter.class);
+    private static final LoggerMaker logger = new LoggerMaker(MetaInfoFilter.class, LogDb.DASHBOARD);
 
     @Override
     public void doFilter(ServletRequest servletRequest, ServletResponse servletResponse, FilterChain filterChain) throws IOException, ServletException {

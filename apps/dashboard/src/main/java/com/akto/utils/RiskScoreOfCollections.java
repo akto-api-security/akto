@@ -41,7 +41,7 @@ import com.mongodb.client.model.WriteModel;
 
 import static com.akto.utils.Utils.calculateRiskValueForSeverity;
 public class RiskScoreOfCollections {
-    private static final LoggerMaker loggerMaker = new LoggerMaker(RiskScoreOfCollections.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(RiskScoreOfCollections.class, LogDb.DASHBOARD);;
 
     private Map<ApiInfoKey, Float> getSeverityScoreMap(List<TestingRunIssues> issues){
         // Method to calculate severity Score for the apiInfo on the basis of HIGH, LOW, MEDIUM

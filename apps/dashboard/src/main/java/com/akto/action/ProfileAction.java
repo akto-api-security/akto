@@ -1,6 +1,8 @@
 package com.akto.action;
 
 
+import static com.mongodb.client.model.Filters.in;
+
 import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.AccountsDao;
@@ -11,47 +13,36 @@ import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.Account;
 import com.akto.dto.AccountSettings;
+import com.akto.dto.ApiToken.Utility;
 import com.akto.dto.RBAC;
 import com.akto.dto.User;
 import com.akto.dto.UserAccountEntry;
-import com.akto.dto.ApiToken.Utility;
 import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.jira_integration.JiraIntegration;
 import com.akto.listener.InitializerListener;
 import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.Constants;
+import com.akto.util.DashboardMode;
 import com.akto.util.EmailAccountName;
 import com.akto.utils.Intercom;
-import com.akto.util.DashboardMode;
 import com.akto.utils.billing.OrganizationUtils;
 import com.akto.utils.cloud.Utils;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
-import com.mongodb.client.model.Updates;
-
-import io.micrometer.core.instrument.util.StringUtils;
-import org.apache.commons.codec.digest.HmacAlgorithms;
-import org.apache.commons.codec.digest.HmacUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-
-import static com.mongodb.client.model.Filters.in;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 
 public class ProfileAction extends UserAction {
 
-    private static final LoggerMaker loggerMaker = new LoggerMaker(ProfileAction.class);
-    private static final Logger logger = LoggerFactory.getLogger(ProfileAction.class);
+    private static final LoggerMaker logger = new LoggerMaker(ProfileAction.class, LogDb.DASHBOARD);
 
 
     private int accountId;
@@ -174,7 +165,7 @@ public class ProfileAction extends UserAction {
         // only external API calls have non-null "utility"
         if (DashboardMode.isMetered() &&  utility == null) {
             if(organization == null){
-                loggerMaker.infoAndAddToDb("Org not found for user: " + username + " acc: " + sessionAccId + ", creating it now!", LoggerMaker.LogDb.DASHBOARD);
+                logger.infoAndAddToDb("Org not found for user: " + username + " acc: " + sessionAccId + ", creating it now!", LoggerMaker.LogDb.DASHBOARD);
                 InitializerListener.createOrg(sessionAccId);
                 organization = OrganizationsDao.instance.findOne(
                         Filters.in(Organization.ACCOUNTS, sessionAccId)
@@ -201,7 +192,7 @@ public class ProfileAction extends UserAction {
 
                 isOverage = OrganizationUtils.isOverage(featureWiseAllowed);
             } catch (Exception e) {
-                loggerMaker.errorAndAddToDb(e,"Customer not found in stigg. User: " + username + " org: " + organizationId + " acc: " + accountIdInt, LoggerMaker.LogDb.DASHBOARD);
+                logger.errorAndAddToDb(e,"Customer not found in stigg. User: " + username + " org: " + organizationId + " acc: " + accountIdInt, LoggerMaker.LogDb.DASHBOARD);
             }
 
             userDetails.append("organizationId", organizationId);
