@@ -4,11 +4,11 @@ import static org.bson.codecs.configuration.CodecRegistries.fromProviders;
 import static org.bson.codecs.configuration.CodecRegistries.fromRegistries;
 
 import com.akto.DaoInit;
+import com.akto.IPLookupClient;
 import com.akto.kafka.KafkaConfig;
 import com.akto.kafka.KafkaConsumerConfig;
 import com.akto.kafka.KafkaProducerConfig;
 import com.akto.kafka.Serializer;
-import com.akto.threat.backend.client.IPLookupClient;
 import com.akto.threat.backend.service.MaliciousEventService;
 import com.akto.threat.backend.service.ThreatActorService;
 import com.akto.threat.backend.service.ThreatApiService;
@@ -19,10 +19,6 @@ import com.mongodb.ReadPreference;
 import com.mongodb.WriteConcern;
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoClients;
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import org.apache.commons.io.IOUtils;
 import org.bson.codecs.configuration.CodecRegistry;
 import org.bson.codecs.pojo.PojoCodecProvider;
 
@@ -62,7 +58,7 @@ public class Main {
             .setValueSerializer(Serializer.STRING)
             .build();
 
-    IPLookupClient ipLookupClient = new IPLookupClient(getMaxmindFile());
+    IPLookupClient ipLookupClient = new IPLookupClient();
 
     new FlushMessagesToDB(internalKafkaConfig, threatProtectionMongo).run();
 
@@ -75,15 +71,4 @@ public class Main {
     new BackendVerticle(maliciousEventService, threatActorService, threatApiService).start();
   }
 
-  private static File getMaxmindFile() throws IOException {
-    File maxmindTmpFile = File.createTempFile("tmp-geo-country", ".mmdb");
-    maxmindTmpFile.deleteOnExit();
-
-    try (FileOutputStream fos = new FileOutputStream(maxmindTmpFile)) {
-      IOUtils.copy(
-          Main.class.getClassLoader().getResourceAsStream("maxmind/Geo-Country.mmdb"), fos);
-    }
-
-    return maxmindTmpFile;
-  }
 }

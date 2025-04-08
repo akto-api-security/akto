@@ -295,6 +295,10 @@ public final class FilterAction {
         }
 
         String countryCode = rawApi.getRawApiMetadata().getCountryCode();
+        if (countryCode.isEmpty()){
+            return new DataOperandsFilterResponse(false, null, null, null);
+        }
+
         DataOperandFilterRequest dataOperandFilterRequest = new DataOperandFilterRequest(countryCode, filterActionRequest.getQuerySet(), filterActionRequest.getOperand());
         ValidationResult res = invokeFilter(dataOperandFilterRequest);
         return new DataOperandsFilterResponse(res.getIsValid(), null, null, null, res.getValidationReason());

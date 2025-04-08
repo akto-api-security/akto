@@ -13,8 +13,6 @@ import com.akto.threat.detection.tasks.MaliciousTrafficDetectorTask;
 import com.akto.threat.detection.tasks.SendMaliciousEventsToBackend;
 import com.mongodb.ConnectionString;
 import io.lettuce.core.RedisClient;
-
-
 import org.flywaydb.core.Flyway;
 import org.hibernate.SessionFactory;
 

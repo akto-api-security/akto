@@ -49,9 +49,9 @@ jobs:
           wget -O Geo-Country.mmdb https://raw.githubusercontent.com/akto-api-security/tests-library/refs/heads/master/resources/Geo-Country.mmdb
       
       - name: Create maxmind directory
-        run: mkdir -p ./apps/threat-detection/src/main/resources/maxmind
+        run: mkdir -p ./libs/utils/src/main/resources/maxmind
       - name: Download Maxmind Country database
-        working-directory: ./apps/threat-detection/src/main/resources/maxmind
+        working-directory: ./libs/utils/src/main/resources/maxmind
         run: |
           wget -O Geo-Country.mmdb https://raw.githubusercontent.com/akto-api-security/tests-library/refs/heads/master/resources/Geo-Country.mmdb
 

@@ -22,7 +22,7 @@ public class IPLookupClient {
     try {
       InetAddress ipAddr = InetAddress.getByName(ip);
       CountryResponse resp = db.country(ipAddr);
-      return Optional.of(resp.getCountry().getIsoCode());
+      return Optional.of(resp.getCountry().getName());
     } catch (Exception e) {
       return Optional.empty();
     }
