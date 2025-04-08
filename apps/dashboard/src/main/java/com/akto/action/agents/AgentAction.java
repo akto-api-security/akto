@@ -9,6 +9,7 @@ import org.bson.conversions.Bson;
 
 import com.akto.action.UserAction;
 import com.akto.dao.agents.AgentHealthCheckDao;
+import com.akto.dao.agents.AgentModelDao;
 import com.akto.dao.agents.AgentRunDao;
 import com.akto.dao.agents.AgentSubProcessSingleAttemptDao;
 import com.akto.dao.context.Context;
@@ -26,6 +27,8 @@ public class AgentAction extends UserAction {
     String agent;
 
     List<AgentRun> agentRuns;
+
+    String modelName;
 
     public String getAllAgentRuns() {
         Bson filter = Filters.eq(AgentRun._STATE, State.RUNNING);
@@ -67,8 +70,18 @@ public class AgentAction extends UserAction {
 
         String processId = UUID.randomUUID().toString();
 
+        Model model = null;
+        if (modelName != null && !modelName.isEmpty()) {
+            model = AgentModelDao.instance.findOne(Filters.eq(Model._NAME, modelName));
+        }
+
+        if (model == null) {
+            addActionError("Model not found");
+            return Action.ERROR.toUpperCase();
+        }
+
         agentRun = new AgentRun(processId, data, agentModule,
-                Context.now(), 0, 0, State.SCHEDULED);
+                Context.now(), 0, 0, State.SCHEDULED, model);
         AgentRunDao.instance.insertOne(agentRun);
 
         return Action.SUCCESS.toUpperCase();
@@ -131,10 +144,11 @@ public class AgentAction extends UserAction {
         return Action.SUCCESS.toUpperCase();
     }
 
-    Model[] models;
+    List<Model> models;
 
     public String getAgentModels() {
-        models = Model.values();
+        // Do not send the api key etc params, once saved.
+        models = AgentModelDao.instance.findAll(Filters.empty(), Projections.exclude(Model._PARAMS));
         return Action.SUCCESS.toUpperCase();
     }
 
@@ -531,11 +545,11 @@ public class AgentAction extends UserAction {
         this.subProcesses = subProcesses;
     }
 
-    public Model[] getModels() {
+    public List<Model> getModels() {
         return models;
     }
 
-    public void setModels(Model[] models) {
+    public void setModels(List<Model> models) {
         this.models = models;
     }
     
@@ -565,6 +579,14 @@ public class AgentAction extends UserAction {
 
     public void setAgentRunningOnModule(boolean agentRunningOnModule) {
         this.agentRunningOnModule = agentRunningOnModule;
+    }
+
+    public String getModelName() {
+        return modelName;
+    }
+
+    public void setModelName(String modelName) {
+        this.modelName = modelName;
     }
 
 }

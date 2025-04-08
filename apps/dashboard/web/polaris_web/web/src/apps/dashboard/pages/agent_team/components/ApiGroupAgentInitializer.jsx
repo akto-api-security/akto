@@ -3,10 +3,12 @@ import PersistStore from "../../../../main/PersistStore";
 import agentApi from '../api'
 import func from "../../../../../util/func";
 import DropDownAgentInitializer from "./DropDownAgentInitializer";
+import { useAgentsStore } from "../agents.store";
 
 function ApiGroupAgentInitializer(props) {
 
     const { agentType } = props
+    const {selectedModel} = useAgentsStore(state => state)
 
     const [selectedCollections, setSelectedCollections] = useState([]);
     const allCollections = PersistStore(state => state.allCollections)
@@ -26,8 +28,9 @@ function ApiGroupAgentInitializer(props) {
         await agentApi.createAgentRun({
             agent: agentType,
             data: {
-                apiCollectionIds: collectionIds
-            }
+                apiCollectionIds: collectionIds,
+            },
+            modelName: selectedModel.id
         })
         func.setToast(true, false, "Agent run scheduled")
     }

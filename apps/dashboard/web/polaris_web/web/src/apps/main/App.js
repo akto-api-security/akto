@@ -89,6 +89,7 @@ import TestsTablePage from "../dashboard/pages/test_editor/tests_table/TestsTabl
 import Splunk from "../dashboard/pages/settings/integrations/Splunk";
 import F5Waf from "../dashboard/pages/settings/integrations/F5Waf";
 import AWSWaf from "../dashboard/pages/settings/integrations/AWSWaf";
+import AgentConfig from "../dashboard/pages/settings/integrations/AgentConfig";
 
 // if you add a component in a new path, please verify the search implementation in function -> 'getSearchItemsArr' in func.js
 
@@ -291,6 +292,10 @@ const router = createBrowserRouter([
                     {
                         path: "integrations/aws_waf",
                         element: <AWSWaf/>,
+                    },
+                    {
+                        path: "integrations/agents",
+                        element: <AgentConfig/>,
                     },
                     {
                         path: "integrations/jira",
