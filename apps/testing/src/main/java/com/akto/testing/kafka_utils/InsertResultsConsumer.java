@@ -77,23 +77,28 @@ public class InsertResultsConsumer {
 
     private void insertResultsWithRetries(List<TestingRunResult> runResults) {
         int retryCount = 3;
-        boolean success = true;
+        List<TestingRunResult> resultsToBeInserted = new ArrayList<>();
         while (retryCount > 0) {
-            try {
-                int subListSize = (int) Math.pow(10, retryCount - 1);
-                int total = (runResults.size() + subListSize - 1) / subListSize ;
-                for (int i = 0; i < total; i++) {
-                    int start = i * subListSize;
-                    int end = Math.min(start + subListSize, runResults.size());
-                    List<TestingRunResult> subList = runResults.subList(start, end);
-                    boolean val = insertResultsAndMakeIssuesInBatch(subList);
-                    success = success && val;
+            int subListSize = (int) Math.pow(10, retryCount - 1);
+            int total = (runResults.size() + subListSize - 1) / subListSize ;
+            for (int i = 0; i < total; i++) {
+                int start = i * subListSize;
+                int end = Math.min(start + subListSize, runResults.size());
+                List<TestingRunResult> subList = runResults.subList(start, end);
+                boolean val = insertResultsAndMakeIssuesInBatch(subList);
+                if(!val){
+                    resultsToBeInserted.addAll(subList);
+                }else{
+                    return;
                 }
-                if(success) return;
-            } catch (Exception e) {
-                e.printStackTrace();
+            }
+            if(resultsToBeInserted.size() > 0){
+                loggerMaker.errorAndAddToDb("Error inserting results, retrying... " + resultsToBeInserted.size() + " results failed to insert", LogDb.TESTING);
+                runResults = new ArrayList<>(resultsToBeInserted);
+                resultsToBeInserted.clear();
                 retryCount--;
-                loggerMaker.errorAndAddToDb("Error inserting results, retrying... " + e.getMessage(), LogDb.TESTING);
+            } else {
+                return ;
             }
         }
     }
@@ -101,14 +106,12 @@ public class InsertResultsConsumer {
     public void run() {
         consumer.subscribe(Collections.singletonList(Constants.TEST_RESULTS_FOR_INSERTION_TOPIC_NAME));
         List<TestingRunResult> runResults = new ArrayList<>();
-        AtomicInteger totalRecords = new AtomicInteger(0);
         try {
             while (true) {
                 try {
                     ConsumerRecords<String, String> records = consumer.poll(Duration.ofMillis(1000));
-                    if (records.isEmpty() && totalRecords.get() > 0) {
+                    if (records.isEmpty() && runResults.size() > 0) {
                         insertResultsWithRetries(runResults);
-                        totalRecords.set(0);
                         runResults.clear();
                         continue;
                     }
@@ -120,13 +123,11 @@ public class InsertResultsConsumer {
                             continue;
                         }
                         runResults.add(runResult);
-                        totalRecords.incrementAndGet();
                     }
-                    if(totalRecords.get() >= 100){
+                    if(runResults.size() >= 100){
                         insertResultsWithRetries(runResults);
                         runResults.clear();
                         consumer.commitSync();
-                        totalRecords.set(0);
                     }   
                 } catch (Exception e) {
                     e.printStackTrace();
