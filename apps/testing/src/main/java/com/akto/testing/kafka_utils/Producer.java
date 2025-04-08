@@ -34,6 +34,14 @@ public class Producer {
     public static Void pushMessagesToKafka(List<SingleTestPayload> messages, AtomicInteger totalRecords){
         for(SingleTestPayload singleTestPayload: messages){
             String messageString = singleTestPayload.toString();
+            try {
+                while (totalRecords.get() > 500) {
+                    Thread.sleep(200);
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+            totalRecords.incrementAndGet();
             producer.send(messageString, Constants.TEST_RESULTS_TOPIC_NAME, totalRecords);
         }
         return null;
