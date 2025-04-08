@@ -734,7 +734,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                 primaryAction={{
                     content: activeFromTesting ? "Save" : scheduleString(),
                     onAction: activeFromTesting ? handleModifyConfig : handleRun,
-                    disabled: (testMode && activeFromTesting && (testSuiteIds.length !== 0 || selectedGeneratedSuiteTests.length != 0)) || (countAllSelectedTests() === 0 && testSuiteIds.length === 0 && selectedGeneratedSuiteTests === 0 ) || !testRun.authMechanismPresent
+                    disabled: (testMode && activeFromTesting && (testSuiteIds.length !== 0 || selectedGeneratedSuiteTests.length != 0)) || (countAllSelectedTests() === 0 && testSuiteIds.length === 0 && selectedGeneratedSuiteTests.length === 0 ) || !testRun.authMechanismPresent
                 }}
                 secondaryActions={[
                     countAllSelectedTests() && testMode ? {
