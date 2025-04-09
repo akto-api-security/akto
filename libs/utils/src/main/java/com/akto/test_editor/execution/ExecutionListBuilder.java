@@ -60,9 +60,8 @@ public class ExecutionListBuilder {
                 this.allowAllCombinations = allCombinations;
             } catch (Exception e) {
             }
+            return true;
         }
-
-
 
         if (node.getOperationType().equalsIgnoreCase(TestEditorEnums.ExecutorParentOperands.TYPE.toString()) || 
             node.getOperationType().equalsIgnoreCase(TestEditorEnums.ExecutorOperandTypes.Validate.toString()) || 
