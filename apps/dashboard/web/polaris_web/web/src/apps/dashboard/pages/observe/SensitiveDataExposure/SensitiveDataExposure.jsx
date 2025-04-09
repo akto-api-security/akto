@@ -244,7 +244,7 @@ function SensitiveDataExposure() {
             case "apiCollectionId": 
             return func.convertToDisambiguateLabelObj(value, apiCollectionMap, 2)
             case "isRequest":
-                return value[0] ? "In request" : "In response"
+                return func.convertToDisambiguateLabelObj(value, null, 2)
             default:
                 return value;
         }
