@@ -23,6 +23,10 @@ public class TestResult extends GenericTestResult {
     public static final String REQUIRES_CONFIG = "requiresConfig";
     private boolean requiresConfig;
 
+    public static final String  API_CALL_FAILED_ERROR_STRING = "Error executing test request: Api Call failed";
+    public static final String  API_CALL_FAILED_ERROR_STRING_UNREACHABLE = "Error executing test request: Host unreachable previously";
+
+
     /*
      * This field is being used as severity.
      * Thus keeping this in sync with "enum severity".
@@ -53,7 +57,8 @@ public class TestResult extends GenericTestResult {
         SKIPPING_EXECUTION_BECAUSE_FILTERS("Request API failed to satisfy api_selection_filters block, skipping execution", true),
         DEACTIVATED_ENDPOINT("This is a deactivated endpoint", true),
         USAGE_EXCEEDED("You have exceeded the limit of this feature, skipping execution", true),
-        ROLE_NOT_FOUND("config doesn't exist, skipping execution", false);
+        ROLE_NOT_FOUND("config doesn't exist, skipping execution", false),
+        TEST_TIMED_OUT("Test took too long for execution, exited out", true);
         private final String message;
         private final boolean skipTest;
 

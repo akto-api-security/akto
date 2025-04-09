@@ -1,4 +1,3 @@
-
 package com.akto.testing;
 
 import com.akto.crons.GetRunningTestsStatus;
@@ -15,6 +14,7 @@ import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.RawApi;
 import com.akto.dto.api_workflow.Graph;
+import com.akto.dto.billing.SyncLimit;
 import com.akto.dto.dependency_flow.KVPair;
 import com.akto.dto.dependency_flow.ReplaceDetail;
 import com.akto.dto.test_editor.*;
@@ -29,7 +29,6 @@ import com.akto.dto.type.URLMethods.Method;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.metrics.AllMetrics;
-import com.akto.sql.SampleDataAltDb;
 import com.akto.store.AuthMechanismStore;
 import com.akto.store.SampleMessageStore;
 import com.akto.store.TestingUtil;
@@ -37,8 +36,10 @@ import com.akto.test_editor.execution.Build;
 import com.akto.test_editor.execution.Executor;
 import com.akto.test_editor.execution.VariableResolver;
 import com.akto.testing.yaml_tests.YamlTestTemplate;
+import com.akto.testing_db_layer_client.ClientLayer;
 import com.akto.testing_issues.TestingIssuesHandler;
 import com.akto.util.JSONUtils;
+import com.akto.util.Constants;
 import com.akto.util.enums.GlobalEnums.Severity;
 import com.akto.util.enums.LoginFlowEnums;
 import com.alibaba.fastjson2.JSON;
@@ -46,36 +47,41 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
 import static com.akto.test_editor.execution.Build.modifyRequest;
+import com.akto.testing.kafka_utils.TestingConfigurations;
+import com.akto.testing.kafka_utils.Producer;
+import com.akto.dto.testing.info.SingleTestPayload;
+import static com.akto.testing.Utils.writeJsonContentInFile;
 
 import org.apache.commons.lang3.StringUtils;
 import org.bson.types.ObjectId;
 import org.json.JSONObject;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+
 import com.akto.testing.workflow_node_executor.Utils;
 
 public class TestExecutor {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(TestExecutor.class, LogDb.TESTING);
-    private static final Logger logger = LoggerFactory.getLogger(TestExecutor.class);
 
     public static long acceptableSizeInBytes = 5_000_000;
     private static final Gson gson = new Gson();
 
     private static final DataActor dataActor = DataActorFactory.fetchInstance();
 
-    private static Map<String, Map<String, Integer>> requestRestrictionMap = new ConcurrentHashMap<>();
     public static final String REQUEST_HOUR = "requestHour";
     public static final String COUNT = "count";
     public static final int ALLOWED_REQUEST_PER_HOUR = 100;
-    public void init(TestingRun testingRun, ObjectId summaryId) {
+    private static final ClientLayer clientLayer = new ClientLayer();
+    private static final boolean shouldCallClientLayerForSampleData = System.getenv("TESTING_DB_LAYER_SERVICE_URL") != null && !System.getenv("TESTING_DB_LAYER_SERVICE_URL").isEmpty();
+    public void init(TestingRun testingRun, ObjectId summaryId, SyncLimit syncLimit, boolean shouldInitOnly) {
         if (testingRun.getTestIdConfig() != 1) {
-            apiWiseInit(testingRun, summaryId, false, new ArrayList<>());
+            apiWiseInit(testingRun, summaryId, false, new ArrayList<>(), syncLimit, shouldInitOnly);
         } else {
             workflowInit(testingRun, summaryId, false, new ArrayList<>());
         }
@@ -118,10 +124,20 @@ public class TestExecutor {
         dataActor.updateIssueCountInTestSummary(summaryId.toHexString(), totalCountIssues);
     }
 
-    public void apiWiseInit(TestingRun testingRun, ObjectId summaryId, boolean debug, List<TestingRunResult.TestLog> testLogs) {
+    public void apiWiseInit(TestingRun testingRun, ObjectId summaryId, boolean debug, List<TestingRunResult.TestLog> testLogs, SyncLimit syncLimit, boolean shouldInitOnly) {
+        // write producer running here as producer has been initiated now
         int accountId = Context.accountId.get();
-        int now = Context.now();
-        int maxConcurrentRequests = testingRun.getMaxConcurrentRequests() > 0 ? Math.min( testingRun.getMaxConcurrentRequests(), 100) : 10;
+
+        BasicDBObject dbObject = new BasicDBObject();
+        if(!shouldInitOnly && Constants.IS_NEW_TESTING_ENABLED){
+            dbObject.put("PRODUCER_RUNNING", true);
+            dbObject.put("CONSUMER_RUNNING", false);
+            dbObject.put("accountId", accountId);
+            dbObject.put("summaryId", summaryId.toHexString());
+            dbObject.put("testingRunId", testingRun.getId().toHexString()); 
+            writeJsonContentInFile(Constants.TESTING_STATE_FOLDER_PATH, Constants.TESTING_STATE_FILE_NAME, dbObject);
+        }
+
         TestingEndpoints testingEndpoints = testingRun.getTestingEndpoints();
 
         if (testingRun.getTestingRunConfig() != null) {
@@ -138,7 +154,8 @@ public class TestExecutor {
 
         List<TestRoles> testRoles = sampleMessageStore.fetchTestRoles();
         AuthMechanism authMechanism = authMechanismStore.getAuthMechanism();
-
+        List<String> testingRunSubCategories = testingRun.getTestingRunConfig().getTestSubCategoryList();
+        
         List<YamlTemplate> yamlTemplates = new ArrayList<>();
         final int TEST_LIMIT = 50;
         for (int i = 0; i < 100; i++) {
@@ -197,92 +214,83 @@ public class TestExecutor {
         loggerMaker.infoAndAddToDb("StatusCodeAnalyser defaultPayloadsMap = " + StatusCodeAnalyser.defaultPayloadsMap, LogDb.TESTING);
 
         dataActor.updateTotalApiCountInTestSummary(summaryId.toHexString(), apiInfoKeyList.size());
-        CountDownLatch latch = new CountDownLatch(apiInfoKeyList.size());
-        ExecutorService threadPool = Executors.newFixedThreadPool(maxConcurrentRequests);
-        List<Future<Void>> futureTestingRunResults = new ArrayList<>();
-        Map<String, Integer> hostsToApiCollectionMap = new HashMap<>();
 
+        // Todo: Aryan? [entire for-loop] 
         ConcurrentHashMap<String, String> subCategoryEndpointMap = new ConcurrentHashMap<>();
         Map<ApiInfoKey, String> apiInfoKeyToHostMap = new HashMap<>();
-        String hostName;
-        for (String testSubCategory: testingRun.getTestingRunConfig().getTestSubCategoryList()) {
-            TestConfig testConfig = testConfigMap.get(testSubCategory);
-            if (testConfig == null) {
-                continue;
+
+        // init the singleton class here
+        TestingConfigurations.getInstance().init(testingUtil, testingRun.getTestingRunConfig(), debug, testConfigMap, testingRun.getMaxConcurrentRequests());
+
+        if(!shouldInitOnly){
+            int maxThreads = Math.min(testingRunSubCategories.size(), 1000);
+            if(maxThreads == 0){
+                loggerMaker.infoAndAddToDb("Subcategories list are empty");
+                return;
             }
-            Map<String, Object> wordListsMap = (Map) testConfig.getWordlists();
-            //VariableResolver.resolveWordList(wordListsMap, testingUtil.getSampleMessageStore().getSampleDataMap(), ap);
-        }
-        for (String testSubCategory: testingRun.getTestingRunConfig().getTestSubCategoryList()) {
-            TestConfig testConfig = testConfigMap.get(testSubCategory);
-            if (testConfig == null || testConfig.getStrategy() == null || testConfig.getStrategy().getRunOnce() == null) {
-                continue;
+
+            if(!Constants.IS_NEW_TESTING_ENABLED){
+                maxThreads = Math.min(100, Math.max(10, testingRun.getMaxConcurrentRequests()));
             }
-            for (ApiInfo.ApiInfoKey apiInfoKey: apiInfoKeyList) {
+
+            List<Future<Void>> testingRecords = new ArrayList<>();
+            ExecutorService threadPool = Executors.newFixedThreadPool(maxThreads);
+
+            // create count down latch to know when inserting kafka records are completed.
+            CountDownLatch latch = new CountDownLatch(apiInfoKeyList.size());
+            int tempRunTime = 10 * 60;
+            if(!Constants.IS_NEW_TESTING_ENABLED){
+                tempRunTime = testingRun.getTestRunTime() <= 0 ? 30*60 : testingRun.getTestRunTime();
+            }else{
                 try {
-                    OriginalHttpRequest request = TestExecutor.findOriginalHttpRequest(apiInfoKey, testingUtil.getSampleMessages(), testingUtil.getSampleMessageStore());
-                    hostName = TestExecutor.findHostFromOriginalHttpRequest(request);    
-                    if (hostName == null) {
-                        continue;
+                    Producer.createTopicWithRetries(Constants.LOCAL_KAFKA_BROKER_URL, Constants.TEST_RESULTS_TOPIC_NAME);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    loggerMaker.error("Error in creating topic", e);
+                }
+            }
+
+            final int maxRunTime = tempRunTime;
+            AtomicInteger totalRecords = new AtomicInteger(0);
+            for (ApiInfo.ApiInfoKey apiInfoKey: apiInfoKeyList) {
+                List<String> messages = testingUtil.getSampleMessages().get(apiInfoKey);
+                if(Constants.IS_NEW_TESTING_ENABLED){
+                    for (String testSubCategory: testingRunSubCategories) {
+                        insertRecordInKafka(accountId, testSubCategory, apiInfoKey, messages, summaryId, syncLimit, apiInfoKeyToHostMap, subCategoryEndpointMap, testConfigMap, testLogs, testingRun, new AtomicBoolean(false), totalRecords);
                     }
-                    apiInfoKeyToHostMap.put(apiInfoKey, hostName);
-                    subCategoryEndpointMap.put(apiInfoKey.getApiCollectionId() + "_" + testSubCategory, hostName);
-                } catch (URISyntaxException e) {
-                    loggerMaker.errorAndAddToDb("Error while finding host: " + e, LogDb.TESTING);
+                }
+                else{
+                    Future<Void> future = threadPool.submit(() -> startWithLatch(testingRunSubCategories, accountId, apiInfoKey, messages, summaryId, syncLimit, apiInfoKeyToHostMap, subCategoryEndpointMap, testConfigMap, testLogs, testingRun, latch));
+                    testingRecords.add(future);
                 }
             }
-        }
-
-        final int maxRunTime = testingRun.getTestRunTime() <= 0 ? 30*60 : testingRun.getTestRunTime(); // if nothing specified wait for 30 minutes
-
-        for (ApiInfo.ApiInfoKey apiInfoKey: apiInfoKeyList) {
+            
             try {
-                OriginalHttpRequest request = TestExecutor.findOriginalHttpRequest(apiInfoKey, testingUtil.getSampleMessages(), testingUtil.getSampleMessageStore());
-                hostName = TestExecutor.findHostFromOriginalHttpRequest(request);
-                if (hostName != null && hostsToApiCollectionMap.get(hostName) == null) {
-                    hostsToApiCollectionMap.put(hostName, apiInfoKey.getApiCollectionId());
+                if(!Constants.IS_NEW_TESTING_ENABLED){
+                    int waitTs = Context.now();
+                    while(latch.getCount() > 0 && GetRunningTestsStatus.getRunningTests().isTestRunning(summaryId) 
+                        && (Context.now() - waitTs < maxRunTime)) {
+                            loggerMaker.infoAndAddToDb("waiting for tests to finish", LogDb.TESTING);
+                            Thread.sleep(10000);
+                    }
+    
+                    for (Future<Void> future : testingRecords) {
+                        future.cancel(!Constants.IS_NEW_TESTING_ENABLED);
+                    }
+                    loggerMaker.infoAndAddToDb("Canceled all running future tasks due to timeout.", LogDb.TESTING);
                 }
-            } catch (URISyntaxException e) {
-                loggerMaker.errorAndAddToDb("Error while finding host: " + e, LogDb.TESTING);
-            }
-            try {
-                 Future<Void> future = threadPool.submit(
-                         () -> startWithLatch(apiInfoKey,
-                                 testingRun.getTestIdConfig(),
-                                 testingRun.getId(),testingRun.getTestingRunConfig(), testingUtil, summaryId,
-                                 accountId, latch, now, maxRunTime, testConfigMap, testingRun, subCategoryEndpointMap, apiInfoKeyToHostMap, debug, testLogs));
-                 futureTestingRunResults.add(future);
+                
+
             } catch (Exception e) {
-                loggerMaker.errorAndAddToDb("Error in API " + apiInfoKey + " : " + e.getMessage(), LogDb.TESTING);
+                throw new RuntimeException(e);
+            }
+            if(!shouldInitOnly && Constants.IS_NEW_TESTING_ENABLED){
+                loggerMaker.insertImportantTestingLog("Finished inserting records in kafka, Total records: " + totalRecords.get());
+                dbObject.put("PRODUCER_RUNNING", false);
+                dbObject.put("CONSUMER_RUNNING", true);
+                writeJsonContentInFile(Constants.TESTING_STATE_FOLDER_PATH, Constants.TESTING_STATE_FILE_NAME, dbObject);
             }
         }
-
-        loggerMaker.infoAndAddToDb("hostsToApiCollectionMap : " + hostsToApiCollectionMap.keySet(), LogDb.TESTING);
-        loggerMaker.infoAndAddToDb("Waiting...", LogDb.TESTING);
-
-        try {
-            //boolean awaitResult = latch.await(maxRunTime, TimeUnit.SECONDS);
-            int waitTs = Context.now();
-            while(latch.getCount() > 0 && GetRunningTestsStatus.getRunningTests().isTestRunning(summaryId) 
-                && (Context.now() - waitTs < maxRunTime)) {
-                    loggerMaker.infoAndAddToDb("waiting for tests to finish", LogDb.TESTING);
-                    Thread.sleep(10000);
-            }
-            loggerMaker.infoAndAddToDb("test is completed", LogDb.TESTING);
-            //awaitResult = latch.getCount() > 0 && GetRunningTestsStatus.getRunningTests().isTestRunning(summaryId);
-            //loggerMaker.infoAndAddToDb("Await result: " + awaitResult, LogDb.TESTING);
-
-            for (Future<Void> future : futureTestingRunResults) {
-                future.cancel(true);
-            }
-            loggerMaker.infoAndAddToDb("Canceled all running future tasks due to timeout.", LogDb.TESTING);
-
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
-
-        loggerMaker.infoAndAddToDb("Finished testing", LogDb.TESTING);
-
     }
 
     public static void updateTestSummary(ObjectId summaryId){
@@ -500,18 +508,29 @@ public class TestExecutor {
     }
 
     public Void startWithLatch(
-            ApiInfo.ApiInfoKey apiInfoKey, int testIdConfig, ObjectId testRunId, TestingRunConfig testingRunConfig,
-            TestingUtil testingUtil, ObjectId testRunResultSummaryId, int accountId, CountDownLatch latch, int startTime,
-            int maxRunTime, Map<String, TestConfig> testConfigMap, TestingRun testingRun,
-            ConcurrentHashMap<String, String> subCategoryEndpointMap, Map<ApiInfoKey, String> apiInfoKeyToHostMap,
-            boolean debug, List<TestingRunResult.TestLog> testLogs) {
+        List<String> testingRunSubCategories,int accountId,ApiInfo.ApiInfoKey apiInfoKey,
+        List<String> messages, ObjectId summaryId, SyncLimit syncLimit, Map<ApiInfoKey, String> apiInfoKeyToHostMap,
+        ConcurrentHashMap<String, String> subCategoryEndpointMap, Map<String, TestConfig> testConfigMap,
+        List<TestingRunResult.TestLog> testLogs, TestingRun testingRun, CountDownLatch latch) {
 
         Context.accountId.set(accountId);
         loggerMaker.infoAndAddToDb("Starting test for " + apiInfoKey, LogDb.TESTING);   
+        AtomicBoolean isApiInfoTested = new AtomicBoolean(false);
         try {
-            startTestNew(apiInfoKey, testRunId, testingRunConfig, testingUtil, testRunResultSummaryId, testConfigMap, subCategoryEndpointMap, apiInfoKeyToHostMap, debug, testLogs, startTime, maxRunTime);
+            for (String testSubCategory: testingRunSubCategories) {
+                if(GetRunningTestsStatus.getRunningTests().isTestRunning(summaryId)){
+                    insertRecordInKafka(accountId, testSubCategory, apiInfoKey, messages, summaryId, syncLimit, apiInfoKeyToHostMap, subCategoryEndpointMap, testConfigMap, testLogs, testingRun, isApiInfoTested, new AtomicInteger(0));
+                }else{
+                    loggerMaker.info("Test stopped for id: " + testingRun.getHexId());
+                    break;
+                }
+            }
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "error while running tests: " + e);
+        }
+        if(isApiInfoTested.get()){
+            loggerMaker.info("Api: " + apiInfoKey.toString() + " has been successfully tested");
+            dataActor.updateLastTestedField(apiInfoKey.getApiCollectionId(), apiInfoKey.getUrl(), apiInfoKey.getMethod().toString());
         }
         latch.countDown();
         loggerMaker.infoAndAddToDb("DONE FINAL: " + latch.getCount(), LogDb.TESTING);
@@ -595,55 +614,70 @@ public class TestExecutor {
             } catch (Exception e){
                 loggerMaker.errorAndAddToDb(e, "Unable to create issues", LogDb.TESTING);
             }
-            testingRunResults.clear();
         }
     }
 
-    public void startTestNew(ApiInfo.ApiInfoKey apiInfoKey, ObjectId testRunId,
-                                               TestingRunConfig testingRunConfig, TestingUtil testingUtil,
-                                               ObjectId testRunResultSummaryId, Map<String, TestConfig> testConfigMap,
-                                               ConcurrentHashMap<String, String> subCategoryEndpointMap, Map<ApiInfoKey, String> apiInfoKeyToHostMap,
-                                               boolean debug, List<TestingRunResult.TestLog> testLogs, int startTime, int timeToKill) {
+    private Void insertRecordInKafka(int accountId, String testSubCategory, ApiInfo.ApiInfoKey apiInfoKey,
+            List<String> messages, ObjectId summaryId, SyncLimit syncLimit, Map<ApiInfoKey, String> apiInfoKeyToHostMap,
+            ConcurrentHashMap<String, String> subCategoryEndpointMap, Map<String, TestConfig> testConfigMap,
+            List<TestingRunResult.TestLog> testLogs, TestingRun testingRun, AtomicBoolean isApiInfoTested, AtomicInteger totalRecords) {
+        Context.accountId.set(accountId);
+        TestConfig testConfig = testConfigMap.get(testSubCategory);
 
-        List<String> testSubCategories = testingRunConfig == null ? new ArrayList<>() : testingRunConfig.getTestSubCategoryList();
-
-        int countSuccessfulTests = 0;
-        for (String testSubCategory: testSubCategories) {
-            if(GetRunningTestsStatus.getRunningTests().isTestRunning(testRunResultSummaryId)){
-                if (Context.now() - startTime > timeToKill) {
-                    loggerMaker.infoAndAddToDb("Timed out in " + (Context.now()-startTime) + "seconds");
-                    return;
-                }
-                List<TestingRunResult> testingRunResults = new ArrayList<>();
-
-                TestConfig testConfig = testConfigMap.get(testSubCategory);
-                
-                if (testConfig == null) continue;
-                TestingRunResult testingRunResult = null;
-                if (!applyRunOnceCheck(apiInfoKey, testConfig, subCategoryEndpointMap, apiInfoKeyToHostMap, testSubCategory)) {
-                    continue;
-                }
-                try {
-                    testingRunResult = runTestNew(apiInfoKey,testRunId,testingUtil,testRunResultSummaryId, testConfig, testingRunConfig, debug, testLogs);
-                } catch (Exception e) {
-                    loggerMaker.errorAndAddToDb("Error while running tests for " + testSubCategory +  ": " + e.getMessage(), LogDb.TESTING);
-                    e.printStackTrace();
-                }
-                if (testingRunResult != null) {
-                    testingRunResults.add(testingRunResult);
-                    countSuccessfulTests++;
-                }
-
-                insertResultsAndMakeIssues(testingRunResults, testRunResultSummaryId);
-            }else{
-                logger.info("Test stopped for id: " + testRunId.toString());
-                break;
+        if (testConfig == null) {
+            if(Constants.KAFKA_DEBUG_MODE){
+                loggerMaker.infoAndAddToDb("Found testing config null: " + apiInfoKey.toString() + " : " + testSubCategory);
             }
-        }
-        if(countSuccessfulTests > 0){
-            dataActor.updateLastTestedField(apiInfoKey.getApiCollectionId(), apiInfoKey.getUrl(), apiInfoKey.getMethod().toString());
+            return null;
         }
 
+        if (!applyRunOnceCheck(apiInfoKey, testConfig, subCategoryEndpointMap, apiInfoKeyToHostMap, testSubCategory)) {
+            return null;
+        }
+
+        String testSuperType = testConfig.getInfo().getCategory().getName();
+        String testSubType = testConfig.getInfo().getSubCategory();
+
+
+        String failMessage = null;
+        TestingRunResult testingRunResult = com.akto.testing.Utils.generateFailedRunResultForMessage(testingRun.getId(), apiInfoKey, testSuperType, testSubType, summaryId, messages, failMessage); 
+        if(testingRunResult != null){
+            if(Constants.KAFKA_DEBUG_MODE){
+                loggerMaker.infoAndAddToDb("Skipping test from producers because: " + failMessage + " apiinfo: " + apiInfoKey.toString(), LogDb.TESTING);
+            }
+            
+        }else if (Constants.IS_NEW_TESTING_ENABLED){
+            // push data to kafka here and inside that call run test new function
+            // create an object of TestMessage
+            SingleTestPayload singleTestPayload = new SingleTestPayload(
+                testingRun.getId(), summaryId, apiInfoKey, testSubType, testLogs, accountId
+            );
+            if(Constants.KAFKA_DEBUG_MODE){
+                loggerMaker.info("Inserting record for apiInfoKey: " + apiInfoKey.toString() + " subcategory: " + testSubType);
+            }
+            try {
+                Producer.pushMessagesToKafka(Arrays.asList(singleTestPayload), totalRecords);
+            } catch (Exception e) {
+                e.printStackTrace();
+                return null;
+            }
+
+        }else{
+            if(GetRunningTestsStatus.getRunningTests().isTestRunning(summaryId)){
+                TestingConfigurations instance = TestingConfigurations.getInstance();
+                String sampleMessage = messages.get(messages.size() - 1);
+                testingRunResult = runTestNew(apiInfoKey, summaryId, instance.getTestingUtil(), summaryId, testConfig, instance.getTestingRunConfig(), instance.isDebug(), testLogs, sampleMessage);
+                if (testingRunResult != null) {
+                    List<String> errorList = testingRunResult.getErrorsList();
+                    if (errorList == null || !errorList.contains(TestResult.API_CALL_FAILED_ERROR_STRING)) {
+                        isApiInfoTested.set(true);
+                    }
+                }
+                insertResultsAndMakeIssues(Collections.singletonList(testingRunResult), summaryId);
+            }
+
+        }
+        return null;
     }
 
     public boolean applyRunOnceCheck(ApiInfoKey apiInfoKey, TestConfig testConfig, ConcurrentHashMap<String, String> subCategoryEndpointMap, Map<ApiInfoKey, String> apiInfoKeyToHostMap, String testSubCategory) {
@@ -664,57 +698,27 @@ public class TestExecutor {
     //Set<Integer> deactivatedCollections = UsageMetricCalculator.getDeactivated();
 
     public TestingRunResult runTestNew(ApiInfo.ApiInfoKey apiInfoKey, ObjectId testRunId, TestingUtil testingUtil,
-                                       ObjectId testRunResultSummaryId, TestConfig testConfig, TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs) {
+                                       ObjectId testRunResultSummaryId, TestConfig testConfig, TestingRunConfig testingRunConfig, 
+                                       boolean debug, List<TestingRunResult.TestLog> testLogs, String message) {
 
         String testSuperType = testConfig.getInfo().getCategory().getName();
         String testSubType = testConfig.getInfo().getSubCategory();
-
-        // if (deactivatedCollections.contains(apiInfoKey.getApiCollectionId())) {
-        //     List<GenericTestResult> testResults = new ArrayList<>();
-        //     testResults.add(new TestResult(null, null, Collections.singletonList(TestError.DEACTIVATED_ENDPOINT.getMessage()),0, false, Confidence.HIGH, null));
-        //     return new TestingRunResult(
-        //         testRunId, apiInfoKey, testSuperType, testSubType ,testResults,
-        //         false,new ArrayList<>(),100,Context.now(),
-        //         Context.now(), testRunResultSummaryId, null, Collections.singletonList(new TestingRunResult.TestLog(TestingRunResult.TestLogType.INFO, "Deactivated endpoint"))
-        //     );
-        // }
-
-        List<String> messages = testingUtil.getSampleMessages().get(apiInfoKey);
-        if (messages == null) {
-            messages = new ArrayList<String>();
-        }
-
-        try {
-            messages.addAll(SampleDataAltDb.findSamplesByApiInfoKey(apiInfoKey));
-        } catch (Exception e) {
-            // TODO Auto-generated catch block
-            //e.printStackTrace();
-        }
-
-        if (messages == null || messages.isEmpty()){
-            List<GenericTestResult> testResults = new ArrayList<>();
-            testResults.add(new TestResult(null, null, Collections.singletonList(TestError.NO_PATH.getMessage()),0, false, Confidence.HIGH, null));
-            return new TestingRunResult(
-                testRunId, apiInfoKey, testSuperType, testSubType ,testResults,
-                false,new ArrayList<>(),100,Context.now(),
-                Context.now(), testRunResultSummaryId, null, Collections.singletonList(new TestingRunResult.TestLog(TestingRunResult.TestLogType.INFO, "No samples messages found"))
-            );
-        }
-
-        String message = messages.get(messages.size() - 1);
-        try {
-            long start = System.currentTimeMillis();
-            String msg = null;
+        if(shouldCallClientLayerForSampleData){
             try {
-                msg = SampleDataAltDb.findLatestSampleByApiInfoKey(apiInfoKey);
+                long start = System.currentTimeMillis();
+                String msg = null;
+                
+                try {
+                    msg = clientLayer.fetchLatestSample(apiInfoKey);
+                } catch (Exception e) {
+                }
+                if (msg != null) {
+                    message = msg;
+                }
+                AllMetrics.instance.setSampleDataFetchLatency(System.currentTimeMillis() - start);
             } catch (Exception e) {
+                e.printStackTrace();
             }
-            if (msg != null) {
-                message = msg;
-            }
-            AllMetrics.instance.setSampleDataFetchLatency(System.currentTimeMillis() - start);
-        } catch (Exception e) {
-            e.printStackTrace();
         }
         RawApi rawApi = RawApi.buildFromMessage(message);
         int startTime = Context.now();

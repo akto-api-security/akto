@@ -50,6 +50,8 @@ public final class FilterAction {
         put("not_contains", new NotContainsFilter());
         put("regex", new RegexFilter());
         put("eq", new EqFilter());
+        put("eq_obj", new EqFilterObj());
+        put("neq_obj", new NeqFilterObj());
         put("neq", new NeqFilter());
         put("gt", new GreaterThanFilter());
         put("gte", new GreaterThanEqFilter());
