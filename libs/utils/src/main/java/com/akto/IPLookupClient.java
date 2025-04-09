@@ -1,6 +1,6 @@
 package com.akto;
 
-import com.maxmind.db.CHMCache;
+import com.akto.util.LRUCache;
 import com.maxmind.geoip2.DatabaseReader;
 import com.maxmind.geoip2.model.CountryResponse;
 import java.io.File;
@@ -15,7 +15,7 @@ public class IPLookupClient {
 
   public IPLookupClient() throws IOException {
     File dbFile = this.getMaxmindFile();
-    this.db = new DatabaseReader.Builder(dbFile).withCache(new CHMCache()).build();
+    this.db = new DatabaseReader.Builder(dbFile).withCache(new LRUCache(2048)).build();
   }
 
   public Optional<String> getCountryISOCodeGivenIp(String ip) {

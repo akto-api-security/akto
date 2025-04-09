@@ -4,7 +4,6 @@ import static org.bson.codecs.configuration.CodecRegistries.fromProviders;
 import static org.bson.codecs.configuration.CodecRegistries.fromRegistries;
 
 import com.akto.DaoInit;
-import com.akto.IPLookupClient;
 import com.akto.kafka.KafkaConfig;
 import com.akto.kafka.KafkaConsumerConfig;
 import com.akto.kafka.KafkaProducerConfig;
@@ -58,12 +57,11 @@ public class Main {
             .setValueSerializer(Serializer.STRING)
             .build();
 
-    IPLookupClient ipLookupClient = new IPLookupClient();
 
     new FlushMessagesToDB(internalKafkaConfig, threatProtectionMongo).run();
 
     MaliciousEventService maliciousEventService =
-        new MaliciousEventService(internalKafkaConfig, threatProtectionMongo, ipLookupClient);
+        new MaliciousEventService(internalKafkaConfig, threatProtectionMongo);
 
     ThreatActorService threatActorService = new ThreatActorService(threatProtectionMongo);
     ThreatApiService threatApiService = new ThreatApiService(threatProtectionMongo);
