@@ -18,7 +18,7 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 
 public class RiskScoreTestingEndpointsUtils {
-    private static final LoggerMaker loggerMaker = new LoggerMaker(RiskScoreTestingEndpointsUtils.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(RiskScoreTestingEndpointsUtils.class, LogDb.DASHBOARD);;
 
     private Map<RiskScoreTestingEndpoints.RiskScoreGroupType, List<ApiInfo>> removeApisFromRiskScoreGroupMap = new HashMap<RiskScoreTestingEndpoints.RiskScoreGroupType, List<ApiInfo>>() {{
         put(RiskScoreTestingEndpoints.RiskScoreGroupType.LOW, new ArrayList<>());

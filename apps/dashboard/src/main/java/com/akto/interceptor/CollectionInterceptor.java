@@ -14,7 +14,7 @@ import com.opensymphony.xwork2.interceptor.AbstractInterceptor;
 
 public class CollectionInterceptor extends AbstractInterceptor {
 
-    private static final LoggerMaker loggerMaker = new LoggerMaker(UsageInterceptor.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(UsageInterceptor.class, LogDb.DASHBOARD);
 
     boolean checkDeactivated(int apiCollectionId) {
         Set<Integer> deactivatedCollections = UsageMetricCalculator.getDeactivated();

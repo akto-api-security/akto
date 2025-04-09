@@ -35,7 +35,7 @@ public class Lambda implements ServerlessFunction {
 
     }
 
-    private static final LoggerMaker loggerMaker = new LoggerMaker(ServerlessFunction.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(ServerlessFunction.class, LogDb.DASHBOARD);
 
     private static final AWSLambda awsLambda = AWSLambdaClientBuilder.standard().build();
 

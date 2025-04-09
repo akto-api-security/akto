@@ -48,9 +48,10 @@ import static com.mongodb.client.model.Filters.eq;
 
 public class AccountAction extends UserAction {
 
+    private static final LoggerMaker loggerMaker = new LoggerMaker(AccountAction.class, LogDb.DASHBOARD);;
+
     private String newAccountName;
     private int newAccountId;
-private static final LoggerMaker loggerMaker = new LoggerMaker(AccountAction.class);
 
     public static final int MAX_NUM_OF_LAMBDAS_TO_FETCH = 50;
     private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();

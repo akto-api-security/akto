@@ -1,13 +1,28 @@
 package com.akto.rules;
 
+import static com.akto.runtime.APICatalogSync.trimAndSplit;
+import static com.akto.runtime.utils.Utils.convertOriginalReqRespToString;
+
 import com.akto.dao.SingleTypeInfoDao;
-import com.akto.dto.*;
+import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
+import com.akto.dto.OriginalHttpRequest;
+import com.akto.dto.OriginalHttpResponse;
+import com.akto.dto.RawApi;
+import com.akto.dto.SampleRequestReplayResponse;
 import com.akto.dto.test_editor.DataOperandsFilterResponse;
 import com.akto.dto.test_editor.FilterNode;
-import com.akto.dto.testing.*;
+import com.akto.dto.testing.EndpointLogicalGroup;
+import com.akto.dto.testing.TestResult;
+import com.akto.dto.testing.TestRoles;
+import com.akto.dto.testing.TestingEndpoints;
+import com.akto.dto.testing.TestingRunConfig;
 import com.akto.dto.testing.info.TestInfo;
-import com.akto.dto.type.*;
+import com.akto.dto.type.APICatalog;
+import com.akto.dto.type.RequestTemplate;
+import com.akto.dto.type.SingleTypeInfo;
+import com.akto.dto.type.URLMethods;
+import com.akto.dto.type.URLTemplate;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.runtime.APICatalogSync;
@@ -19,31 +34,27 @@ import com.akto.testing.StatusCodeAnalyser;
 import com.akto.types.CappedSet;
 import com.akto.util.JSONUtils;
 import com.fasterxml.jackson.core.JsonFactory;
-import com.fasterxml.jackson.core.JsonParser;
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
-
-import org.bson.conversions.Bson;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
-import static com.akto.runtime.APICatalogSync.trimAndSplit;
-import static com.akto.runtime.utils.Utils.convertOriginalReqRespToString;
+import org.bson.conversions.Bson;
 
 
 public abstract class TestPlugin {
     static ObjectMapper mapper = new ObjectMapper();
     static JsonFactory factory = mapper.getFactory();
     static final LoggerMaker loggerMaker = new LoggerMaker(TestPlugin.class, LogDb.TESTING);
-
-    private static final Logger logger = LoggerFactory.getLogger(TestPlugin.class);
     private static final Gson gson = new Gson();
 
     public abstract Result  start(ApiInfoKey apiInfoKey, TestingUtil testingUtil, TestingRunConfig testingRunConfig);
@@ -127,7 +138,7 @@ public abstract class TestPlugin {
             message = convertOriginalReqRespToString(request, response);
         } catch (Exception e) {
             // TODO:
-            logger.error("Error while converting OriginalHttpRequest to string", e);
+            loggerMaker.error("Error while converting OriginalHttpRequest to string", e);
             message = convertOriginalReqRespToString(new OriginalHttpRequest(), new OriginalHttpResponse());
             errors.add(TestResult.TestError.FAILED_TO_CONVERT_TEST_REQUEST_TO_STRING.getMessage());
         }

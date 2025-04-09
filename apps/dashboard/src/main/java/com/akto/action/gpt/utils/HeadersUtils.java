@@ -1,15 +1,14 @@
 package com.akto.action.gpt.utils;
 
 import com.akto.dto.OriginalHttpRequest;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.google.gson.Gson;
-import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.tuple.Pair;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.tuple.Pair;
 
 public class HeadersUtils {
 
@@ -17,7 +16,7 @@ public class HeadersUtils {
     public static final String ACCESS_TOKEN = "%ACCESS_TOKEN%";
     public static final String COOKIE = "%COOKIE%";
 
-    private static final Logger logger = LoggerFactory.getLogger(HeadersUtils.class);
+    private static final LoggerMaker logger = new LoggerMaker(HeadersUtils.class, LogDb.DASHBOARD);;
 
     private static final Gson gson = new Gson();
     public static Pair<String, List<Pair<String, String>>> minifyHeaders(String sampleData){

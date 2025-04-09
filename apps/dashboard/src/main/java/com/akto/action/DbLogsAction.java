@@ -7,8 +7,12 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 
 public class DbLogsAction extends UserAction {
-    
+
+    private static final LoggerMaker loggerMaker = new LoggerMaker(DbLogsAction.class, LogDb.DASHBOARD);;
+
+    private List<Log> logs;
     private int startTime;
+
     public int getStartTime() {
         return startTime;
     }
@@ -32,8 +36,6 @@ public class DbLogsAction extends UserAction {
     public void setLogDb(LogDb logDb) {
         this.logDb = logDb;
     }
-    private List<Log> logs;
-    private static final LoggerMaker loggerMaker = new LoggerMaker(DbLogsAction.class);
 
     public String fetchLogsFromDb() {
         if(logDb==null){
