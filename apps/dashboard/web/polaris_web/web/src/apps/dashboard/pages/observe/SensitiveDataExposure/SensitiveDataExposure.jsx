@@ -244,6 +244,7 @@ function SensitiveDataExposure() {
             case "apiCollectionId": 
             return func.convertToDisambiguateLabelObj(value, apiCollectionMap, 2)
             case "isRequest":
+                console.log(func.convertToDisambiguateLabelObj(value, null, 2))
                 return value[0] ? "In request" : "In response"
             default:
                 return value;
@@ -252,6 +253,7 @@ function SensitiveDataExposure() {
 
     filters = func.getCollectionFilters(filters)
     async function fetchData(sortKey, sortOrder, skip, limit, filters, filterOperators, queryValue){
+        console.log(filters)
         setLoading(true);
         let isRequest = (filters && filters['isRequest'] !== undefined && filters['isRequest'][0]) || initialValForResponseFilter;
         delete filters['isRequest']
