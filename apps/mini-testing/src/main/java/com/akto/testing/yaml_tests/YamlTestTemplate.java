@@ -57,6 +57,11 @@ public class YamlTestTemplate extends SecurityTestTemplate {
             ExecutionResult res = AuthValidator.checkAuth(this.auth, this.rawApi.copy(), this.testingRunConfig, this.customAuthTypes, debug, testLogs);
             if(res.getSuccess()) {
                 OriginalHttpResponse resp = res.getResponse();
+                String respBody = resp.getBody().toLowerCase();
+                if (respBody.contains("unauthorized") || respBody.contains("unauthorised") || respBody.contains("\"error\"")) {
+                    return true;
+                }
+
                 int statusCode = StatusCodeAnalyser.getStatusCode(resp.getBody(), resp.getStatusCode());
                 if (statusCode >= 200 && statusCode < 300) {
                     loggerMaker.infoAndAddToDb("noAuth check failed, skipping execution " + logId);

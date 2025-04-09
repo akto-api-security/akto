@@ -14,6 +14,7 @@ import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.RawApi;
 import com.akto.dto.RecordedLoginFlowInput;
 import com.akto.dto.testing.*;
+import com.akto.dto.testing.AuthParam.Location;
 import com.akto.dto.testing.sources.AuthWithCond;
 import com.akto.testing.*;
 import com.akto.util.enums.LoginFlowEnums;
@@ -134,8 +135,8 @@ public class Executor {
                 apiInfoKeys.add(apiInfoKey);
                 memory = new Memory(apiInfoKeys, new HashMap<>());
             }
-            workflowTest = buildWorkflowGraph(reqNodes, rawApi, authMechanism, customAuthTypes, apiInfoKey, varMap, validatorNode);
-            result.add(triggerMultiExecution(workflowTest, reqNodes, rawApi, authMechanism, customAuthTypes, apiInfoKey, varMap, validatorNode, debug, testLogs, memory));
+            workflowTest = buildWorkflowGraph(reqNodes, sampleRawApi, authMechanism, customAuthTypes, apiInfoKey, varMap, validatorNode);
+            result.add(triggerMultiExecution(workflowTest, reqNodes, sampleRawApi, authMechanism, customAuthTypes, apiInfoKey, varMap, validatorNode, debug, testLogs, memory));
             yamlTestResult = new YamlTestResult(result, workflowTest);
             
             return yamlTestResult;
@@ -695,6 +696,7 @@ public class Executor {
                 RawApi copy = rawApi.copy();
                 authHeaders = (List<String>) varMap.get("auth_headers");
                 String authHeader;
+                Location authLocation = Location.HEADER;
                 if (authHeaders == null) {
                     return new ExecutorSingleOperationResp(false, "auth headers missing from var map");
                 }
@@ -703,6 +705,13 @@ public class Executor {
                         return new ExecutorSingleOperationResp(false, "auth headers missing");
                     }
                     authHeader = authMechanism.getAuthParams().get(0).getKey();
+                    for (AuthParam authParam: authMechanism.getAuthParams()){
+                        if (authParam.authTokenPresent(rawApi.getRequest())) {
+                            authHeader = authParam.getKey(); // x-id-token
+                            authLocation = authParam.getWhere();
+                            break;
+                        }
+                    }
                 } else {
                     authHeader = authHeaders.get(0);
                 }
@@ -717,7 +726,10 @@ public class Executor {
 
                 if (VariableResolver.isAuthContext(key)) {
                     // resolve context for auth mechanism keys
-                    authVal = VariableResolver.resolveAuthContext(key, rawApi.getRequest().getHeaders(), authHeader);
+                    authVal = null;
+                    if (authLocation.equals(Location.HEADER)) {
+                        authVal = VariableResolver.resolveAuthContext(key, rawApi.getRequest().getHeaders(), authHeader);
+                    }
                     if (authVal != null) {
                         ExecutorSingleOperationResp authMechanismContextResult = Operations.modifyHeader(rawApi, authHeader, authVal);
                         modifiedAtLeastOne = modifiedAtLeastOne || authMechanismContextResult.getSuccess();
@@ -736,7 +748,8 @@ public class Executor {
                         // resolve context for custom auth body params
                         List<String> customAuthPayloadKeys = customAuthType.getPayloadKeys();
                         for (String customAuthPayloadKey: customAuthPayloadKeys) {
-                            authVal = VariableResolver.resolveAuthContext(key.toString(), rawApi.getRequest().getHeaders(), customAuthPayloadKey);
+                            authVal = VariableResolver.resolveAuthContextForPayload(key, rawApi.getRequest().getBody(), authHeader);
+                            //authVal = VariableResolver.resolveAuthContext(key.toString(), rawApi.getRequest().getHeaders(), customAuthPayloadKey);
                             if (authVal == null) continue;
                             ExecutorSingleOperationResp customAuthContextResult = Operations.modifyBodyParam(rawApi, customAuthPayloadKey, authVal);
                             modifiedAtLeastOne = modifiedAtLeastOne || customAuthContextResult.getSuccess();

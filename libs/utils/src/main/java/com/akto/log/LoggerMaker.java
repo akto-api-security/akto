@@ -12,7 +12,6 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Executors;
@@ -22,9 +21,15 @@ import java.util.concurrent.TimeUnit;
 import org.bson.conversions.Bson;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.simple.SimpleLogger;
 import com.slack.api.Slack;
 
-public class LoggerMaker  {
+public class LoggerMaker {
+    
+    static {
+        System.setProperty(SimpleLogger.DEFAULT_LOG_LEVEL_KEY, System.getenv().getOrDefault("AKTO_LOG_LEVEL", "WARN"));
+        System.out.printf("AKTO_LOG_LEVEL is set to: %s \n", System.getProperty(SimpleLogger.DEFAULT_LOG_LEVEL_KEY));
+    }
 
     public static final int LOG_SAVE_INTERVAL = 60*60; // 1 hour
 
@@ -37,6 +42,7 @@ public class LoggerMaker  {
     private static final DataActor dataActor = DataActorFactory.fetchInstance();
 
     protected static final Logger internalLogger = LoggerFactory.getLogger(LoggerMaker.class);
+    private static final boolean shouldNotSendTestingLogs = System.getenv("BLOCK_LOGS") != null && System.getenv("BLOCK_LOGS").equals("true");
 
     static {
         scheduler.scheduleAtFixedRate(new Runnable() {
@@ -95,7 +101,6 @@ public class LoggerMaker  {
         }
 
     }
-
 
     @Deprecated
     public LoggerMaker(Class<?> c) {
@@ -184,10 +189,20 @@ public class LoggerMaker  {
         String infoMessage = "acc: " + accountId + ", " + info;
         logger.info(infoMessage);
         try{
+            if(db == LogDb.TESTING && shouldNotSendTestingLogs){
+                return;
+            }   
             insert(infoMessage, "info",db);
         } catch (Exception e){
 
         }
+    }
+
+    public void insertImportantTestingLog(String info) {
+        String accountId = Context.accountId.get() != null ? Context.accountId.get().toString() : "NA";
+        String infoMessage = "acc: " + accountId + ", " + info;
+        logger.info(infoMessage);
+        insert(infoMessage, "info", LogDb.TESTING);
     }
 
     public void errorAndAddToDb(String err) {
@@ -270,5 +285,21 @@ public class LoggerMaker  {
                 break;
         }
         return logs;
+    }
+
+    public void info(String msg){
+        logger.info(msg);
+    }
+
+    public void error(String msg){
+        logger.error(msg);
+    }
+
+    public void error(String msg, Throwable t){
+        logger.error(msg, t);
+    }
+
+    public void debug(String msg){
+        logger.error(msg);
     }
 }
