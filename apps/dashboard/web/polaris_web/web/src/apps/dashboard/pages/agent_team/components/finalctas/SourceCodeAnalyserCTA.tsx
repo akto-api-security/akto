@@ -31,6 +31,7 @@ function SourceCodeAnalyserCTA() {
 
         await apiCollectionApi.syncExtractedAPIs(apiCollectionName, projectDir, codeAnalysisApisList)
         func.setToast(true, false, `All the api's are now saved in ${apiCollectionName} collection`)
+        setFinalCTAShow(false)
     }
 
     return (
