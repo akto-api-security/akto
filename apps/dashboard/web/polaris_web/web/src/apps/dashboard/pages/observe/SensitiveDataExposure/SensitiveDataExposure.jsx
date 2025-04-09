@@ -242,7 +242,6 @@ function SensitiveDataExposure() {
         let total = 0;
 
         const fetchPromises = [];
-        console.log(isRequestValues);
         // if (!isRequestValues.length || isRequestValues.includes('request')) {
             await api.fetchChanges(sortKey, sortOrder, skip, limit, filters, filterOperators, startTimestamp, endTimestamp, true, isRequestValues, queryValue).then((res)=>{
                 res.endpoints.forEach((endpoint) => {
