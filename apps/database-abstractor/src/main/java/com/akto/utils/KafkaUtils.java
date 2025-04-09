@@ -1,22 +1,5 @@
 package com.akto.utils;
 
-import java.time.Duration;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
-import java.util.Properties;
-import java.util.concurrent.atomic.AtomicBoolean;
-
-import org.apache.kafka.clients.consumer.Consumer;
-import org.apache.kafka.clients.consumer.ConsumerConfig;
-import org.apache.kafka.clients.consumer.ConsumerRecord;
-import org.apache.kafka.clients.consumer.ConsumerRecords;
-import org.apache.kafka.clients.consumer.KafkaConsumer;
-import org.apache.kafka.common.errors.WakeupException;
-import org.apache.kafka.common.serialization.StringDeserializer;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import com.akto.action.DbAction;
 import com.akto.dao.context.Context;
 import com.akto.dto.bulk_updates.BulkUpdates;
@@ -27,13 +10,25 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
+import java.time.Duration;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+import java.util.Properties;
+import java.util.concurrent.atomic.AtomicBoolean;
+import org.apache.kafka.clients.consumer.Consumer;
+import org.apache.kafka.clients.consumer.ConsumerConfig;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.apache.kafka.clients.consumer.ConsumerRecords;
+import org.apache.kafka.clients.consumer.KafkaConsumer;
+import org.apache.kafka.common.errors.WakeupException;
+import org.apache.kafka.common.serialization.StringDeserializer;
 
 public class KafkaUtils {
     
     private final static ObjectMapper mapper = new ObjectMapper();
     private static final Gson gson = new Gson();
     private static final LoggerMaker loggerMaker = new LoggerMaker(KafkaUtils.class, LogDb.DB_ABS);
-    private static final Logger logger = LoggerFactory.getLogger(KafkaUtils.class);
     private Consumer<String, String> consumer;
     private static Kafka kafkaProducer;
     long lastSyncOffset = 0;
@@ -102,7 +97,7 @@ public class KafkaUtils {
                     try {                         
                         lastSyncOffset++;
                         if (lastSyncOffset % 100 == 0) {
-                            logger.info("Committing offset at position: " + lastSyncOffset);
+                            loggerMaker.info("Committing offset at position: {}", lastSyncOffset);
                         }
 
                         parseAndTriggerWrites(r.value());
@@ -116,7 +111,7 @@ public class KafkaUtils {
           // nothing to catch. This exception is called from the shutdown hook.
         } catch (Exception e) {
             exceptionOnCommitSync.set(true);
-            loggerMaker.errorAndAddToDb("Exception in init kafka consumer  " + e.toString());
+            loggerMaker.errorAndAddToDb("Exception in init kafka consumer  " + e);
             e.printStackTrace();
             System.exit(0);
         } finally {
@@ -129,7 +124,7 @@ public class KafkaUtils {
         int batchSize = Integer.parseInt(System.getenv("AKTO_KAFKA_PRODUCER_BATCH_SIZE"));
         int kafkaLingerMS = Integer.parseInt(System.getenv("AKTO_KAFKA_PRODUCER_LINGER_MS"));
         kafkaProducer = new Kafka(kafkaBrokerUrl, kafkaLingerMS, batchSize);
-        logger.info("Kafka Producer Init " + Context.now());
+        loggerMaker.info("Kafka Producer Init {}", Context.now());
     }
 
 
