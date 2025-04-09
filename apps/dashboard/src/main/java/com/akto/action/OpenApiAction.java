@@ -56,7 +56,7 @@ import java.util.stream.IntStream;
 
 public class OpenApiAction extends UserAction implements ServletResponseAware {
 
-    private static final LoggerMaker loggerMaker = new LoggerMaker(OpenApiAction.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(OpenApiAction.class, LogDb.DASHBOARD);
 
     private final boolean skipKafka = DashboardMode.isLocalDeployment();
 

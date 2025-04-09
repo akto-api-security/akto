@@ -7,28 +7,38 @@ import com.akto.dao.testing.EndpointLogicalGroupDao;
 import com.akto.dao.testing.TestRolesDao;
 import com.akto.dao.testing.config.TestCollectionPropertiesDao;
 import com.akto.dto.RBAC;
-import com.akto.dto.User;
-import com.akto.dto.testing.config.TestCollectionProperty;
 import com.akto.dto.RecordedLoginFlowInput;
+import com.akto.dto.User;
 import com.akto.dto.data_types.Conditions;
 import com.akto.dto.data_types.Conditions.Operator;
 import com.akto.dto.data_types.Predicate;
 import com.akto.dto.data_types.Predicate.Type;
-import com.akto.dto.testing.*;
+import com.akto.dto.testing.AuthMechanism;
+import com.akto.dto.testing.AuthParam;
+import com.akto.dto.testing.AuthParamData;
+import com.akto.dto.testing.EndpointLogicalGroup;
+import com.akto.dto.testing.HardcodedAuthParam;
+import com.akto.dto.testing.LoginRequestAuthParam;
+import com.akto.dto.testing.RequestData;
+import com.akto.dto.testing.TestRoles;
+import com.akto.dto.testing.config.TestCollectionProperty;
 import com.akto.dto.testing.sources.AuthWithCond;
 import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.Constants;
 import com.akto.util.enums.LoginFlowEnums;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 import com.mongodb.client.result.DeleteResult;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 import org.bson.conversions.Bson;
 
-import java.util.*;
-
 public class TestRolesAction extends UserAction {
-    private static final LoggerMaker loggerMaker = new LoggerMaker(TestRolesAction.class);
+
+    private static final LoggerMaker loggerMaker = new LoggerMaker(TestRolesAction.class, LogDb.DASHBOARD);;
 
     private List<TestRoles> testRoles;
     private TestRoles selectedRole;

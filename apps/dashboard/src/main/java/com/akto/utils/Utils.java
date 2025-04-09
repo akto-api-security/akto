@@ -55,7 +55,7 @@ import static com.akto.dto.RawApi.convertHeaders;
 
 public class Utils {
 
-    private static final LoggerMaker loggerMaker = new LoggerMaker(Utils.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(Utils.class, LogDb.DASHBOARD);;
     private final static ObjectMapper mapper = new ObjectMapper();
 
     public static Map<String, String> getAuthMap(JsonNode auth, Map<String, String> variableMap) {

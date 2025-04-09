@@ -1,38 +1,38 @@
 package com.akto.action;
 
-import com.akto.DaoInit;
-import com.akto.action.test_editor.SaveTestEditorAction;
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.SampleDataDao;
 import com.akto.dao.context.Context;
-import com.akto.dto.*;
-import com.akto.dto.traffic.Key;
+import com.akto.dto.ApiCollection;
+import com.akto.dto.HttpRequestParams;
+import com.akto.dto.HttpResponseParams;
+import com.akto.dto.OriginalHttpRequest;
+import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.traffic.SampleData;
-import com.akto.dto.type.URLMethods;
 import com.akto.listener.InitializerListener;
 import com.akto.listener.RuntimeListener;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.parsers.HttpCallParser;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
-import com.mongodb.ConnectionString;
-import com.mongodb.client.model.Filters;
-import com.sun.jndi.toolkit.url.Uri;
-import org.jetbrains.annotations.Nullable;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 
 public class ExportSampleDataAction extends UserAction {
-    private final static ObjectMapper mapper = new ObjectMapper();
-    private static final Logger logger = LoggerFactory.getLogger(ExportSampleDataAction.class);
+    private static final LoggerMaker logger = new LoggerMaker(ExportSampleDataAction.class, LogDb.DASHBOARD);;
+    private static final ObjectMapper mapper = new ObjectMapper();
     private static final JsonFactory factory = mapper.getFactory();
     @Override
     public String execute() {

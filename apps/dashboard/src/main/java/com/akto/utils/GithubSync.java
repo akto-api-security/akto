@@ -17,7 +17,7 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.http_util.CoreHTTPClient;
 
 public class GithubSync {
-    private static final LoggerMaker loggerMaker = new LoggerMaker(GithubSync.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(GithubSync.class, LogDb.DASHBOARD);;
     private static final OkHttpClient client = CoreHTTPClient.client.newBuilder().build();
 
     public GithubFile syncFile(String repo, String filePath, String latestSha, Map<String, String> githubFileShaMap) {
