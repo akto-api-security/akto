@@ -150,25 +150,6 @@ function SensitiveDataExposure() {
     const apiCollectionMap = PersistStore(state => state.collectionsMap)
     const [modal, setModal] = useState(false)
 
-    const [searchParams] = useSearchParams();
-    const filterParams = searchParams.get('filters')
-    let initialFilterValues = []
-    if(filterParams && filterParams !== undefined && filterParams.split('isRequest').length > 1){
-        let isRequestVal = filterParams.split("isRequest__")[1].split('&')[0]
-        if(isRequestVal.length > 0){
-            initialFilterValues = isRequestVal.split(',')
-        }
-    }
-
-    const appliedFilters = [
-        {
-            key: 'isRequest',
-            label: 'API call',
-            value: initialFilterValues,
-            onRemove: () => {}
-        }
-    ]
-
     const filtersMap = PersistStore(state => state.filtersMap)
 
     const handleCreateCollection = async(collectionName) => {
@@ -303,7 +284,7 @@ const primaryActions = (
                 key={startTimestamp + endTimestamp}
                 headers={headers}
                 resourceName={resourceName} 
-                appliedFilters={appliedFilters}
+                appliedFilters={[]}
                 sortOptions={sortOptions}
                 disambiguateLabel={disambiguateLabel}
                 loading={loading}
