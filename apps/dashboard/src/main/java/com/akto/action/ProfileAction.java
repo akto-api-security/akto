@@ -4,11 +4,7 @@ package com.akto.action;
 import static com.mongodb.client.model.Filters.in;
 
 import com.akto.billing.UsageMetricUtils;
-import com.akto.dao.AccountSettingsDao;
-import com.akto.dao.AccountsDao;
-import com.akto.dao.JiraIntegrationDao;
-import com.akto.dao.RBACDao;
-import com.akto.dao.UsersDao;
+import com.akto.dao.*;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.Account;
@@ -33,12 +29,13 @@ import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
+
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
 
 public class ProfileAction extends UserAction {
 
@@ -126,6 +123,15 @@ public class ProfileAction extends UserAction {
         } catch (Exception e) {
         }
 
+        boolean azureBoardsIntegrated = false;
+        try {
+            long documentCount = AzureBoardsIntegrationDao.instance.estimatedDocumentCount();
+            if (documentCount > 0) {
+                azureBoardsIntegrated = true;
+            }
+        } catch (Exception e) {
+        }
+
         InitializerListener.insertStateInAccountSettings(accountSettings);
 
         Organization organization = OrganizationsDao.instance.findOne(
@@ -154,6 +160,7 @@ public class ProfileAction extends UserAction {
                 .append("accountName", accountName)
                 .append("aktoUIMode", userFromDB.getAktoUIMode().name())
                 .append("jiraIntegrated", jiraIntegrated)
+                .append("azureBoardsIntegrated", azureBoardsIntegrated)
                 .append("userRole", userRole.toString().toUpperCase())
                 .append("currentTimeZone", timeZone)
                 .append("organizationName", orgName);

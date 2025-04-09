@@ -63,6 +63,7 @@ function TestRunResultPage(props) {
   const subCategoryFromSourceConfigMap = PersistStore(state => state.subCategoryFromSourceConfigMap);
   const [issueDetails, setIssueDetails] = useState({});
   const [jiraIssueUrl, setJiraIssueUrl] = useState({});
+  const [azureBoardsWorkItemUrl, setAzureBoardsWorkItemUrl] = useState({});
   const subCategoryMap = LocalStore(state => state.subCategoryMap);
   const params = useParams();
   const hexId = params.hexId;
@@ -207,8 +208,10 @@ function TestRunResultPage(props) {
         runIssuesArr = resp1['similarlyAffectedIssues'];
       })
       let jiraIssueCopy = runIssues.jiraIssueUrl || "";
+      let azureBoardsWorkItemUrlCopy = runIssues.azureBoardsWorkItemUrl || "";
       const moreInfoSections = transform.getInfoSectionsHeaders()
       setJiraIssueUrl(jiraIssueCopy)
+      setAzureBoardsWorkItemUrl(azureBoardsWorkItemUrlCopy)
       setInfoState(transform.fillMoreInformation(subCategoryMap[runIssues?.id?.testSubCategory],moreInfoSections, runIssuesArr, jiraIssueCopy, onClickButton))
       setRemediation(subCategoryMap[runIssues?.id?.testSubCategory]?.remediation)
       // setJiraIssueUrl(jiraIssueUrl)
@@ -240,6 +243,7 @@ function TestRunResultPage(props) {
       setShowDetails={setShowDetails}
       showDetails={showDetails}
       isIssuePage={location.pathname.includes("issues")}
+      azureBoardsWorkItemUrl={azureBoardsWorkItemUrl}
     />
     </>
     :
