@@ -307,4 +307,8 @@ public class LoggerMaker  {
     public void debug(String message, Object... vars) {
         logger.debug(message, vars);
     }
+
+    public void warn(String message, Object... vars) {
+        logger.warn(message, vars);
+    }
 }

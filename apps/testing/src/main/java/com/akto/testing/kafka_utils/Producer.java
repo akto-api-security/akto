@@ -1,5 +1,7 @@
 package com.akto.testing.kafka_utils;
 
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import java.util.Collections;
 import java.util.List;
 import java.util.Properties;
@@ -26,7 +28,7 @@ import com.akto.util.Constants;
 
 public class Producer {
 
-    private static final Logger logger = LoggerFactory.getLogger(Producer.class);
+    private static final LoggerMaker logger = new LoggerMaker(Producer.class, LogDb.TESTING);
 
     public static final Kafka producer = Constants.IS_NEW_TESTING_ENABLED ?  new Kafka(Constants.LOCAL_KAFKA_BROKER_URL, Constants.LINGER_MS_KAFKA, 100, Constants.MAX_REQUEST_TIMEOUT) : null;
     public static Void pushMessagesToKafka(List<SingleTestPayload> messages, AtomicInteger totalRecords){

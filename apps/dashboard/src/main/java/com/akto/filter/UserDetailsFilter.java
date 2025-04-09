@@ -212,14 +212,12 @@ public class UserDetailsFilter implements Filter {
                         return ;
                     }
                 }else{
-                    logger.info("Logout object not found");
+                    //logger.info("Logout object not found");
                 }
             } catch (Exception ignored) {
                 redirectIfNotLoginURI(filterChain, httpServletRequest, httpServletResponse);
                 return ;
             }
-
-
         }
 
         session.setAttribute(AccessTokenAction.ACCESS_TOKEN_HEADER_NAME, accessToken);
@@ -288,7 +286,7 @@ public class UserDetailsFilter implements Filter {
                 if (accountId > 0) {
                     if(user.getAccounts().containsKey(accountIdStr)) {
                         Context.accountId.set(accountId);
-                        logger.info("choosing account: " + accountIdStr);
+                        //logger.info("choosing account: " + accountIdStr);
                     } else {
 
                         accountIdStr = user.findAnyAccountId();
