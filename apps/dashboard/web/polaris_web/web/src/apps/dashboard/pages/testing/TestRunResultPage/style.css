@@ -2,7 +2,7 @@
     white-space: pre;
 }
 
-#create-jira-ticket-button {
+#create-jira-ticket-button, #create-azure-boards-ticket-button {
     text-wrap: nowrap;
 }
 

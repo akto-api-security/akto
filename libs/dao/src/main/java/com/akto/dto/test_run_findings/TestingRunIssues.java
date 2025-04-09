@@ -25,6 +25,8 @@ public class TestingRunIssues {
     public static final String IGNORE_REASON = "ignoreReason";
     private String ignoreReason;
     private String jiraIssueUrl;
+    public static final String AZURE_BOARDS_WORK_ITEM_URL = "azureBoardsWorkItemUrl";
+    private String azureBoardsWorkItemUrl;
     public static final String LAST_UPDATED = "lastUpdated";
     private int lastUpdated;
     public static final String UNREAD = "unread";
@@ -164,5 +166,13 @@ public class TestingRunIssues {
 
     public void setUnread(boolean unread) {
         this.unread = unread;
+    }
+
+    public String getAzureBoardsWorkItemUrl() {
+        return azureBoardsWorkItemUrl;
+    }
+
+    public void setAzureBoardsWorkItemUrl(String azureBoardsWorkItemUrl) {
+        this.azureBoardsWorkItemUrl = azureBoardsWorkItemUrl;
     }
 }
