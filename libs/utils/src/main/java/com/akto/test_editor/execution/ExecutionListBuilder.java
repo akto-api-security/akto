@@ -16,6 +16,7 @@ public class ExecutionListBuilder {
     
     private static final LoggerMaker loggerMaker = new LoggerMaker(ExecutionListBuilder.class);
 
+    private boolean allowAllCombinations;
     public ExecutionOrderResp parseExecuteOperations(ExecutorNode node, List<ExecutorNode> executeOrder) {
 
         String error = null;
@@ -51,6 +52,17 @@ public class ExecutionListBuilder {
             }
             return redirect;
         }
+
+        if(node.getOperationType().equalsIgnoreCase(TestEditorEnums.TerminalExecutorDataOperands.FOR_EACH_COMBINATION.toString())) {
+            boolean allCombinations = false;
+            try {
+                allCombinations = Boolean.valueOf(node.getValues().toString());
+                this.allowAllCombinations = allCombinations;
+            } catch (Exception e) {
+            }
+        }
+
+
 
         if (node.getOperationType().equalsIgnoreCase(TestEditorEnums.ExecutorParentOperands.TYPE.toString()) || 
             node.getOperationType().equalsIgnoreCase(TestEditorEnums.ExecutorOperandTypes.Validate.toString()) || 
@@ -131,4 +143,11 @@ public class ExecutionListBuilder {
         return new ModifyExecutionOrderResp(updatedExecutionFlow, null);
     }
 
+    public boolean isAllowAllCombinations() {
+        return allowAllCombinations;
+    }
+
+    public void setAllowAllCombinations(boolean allowAllCombinations) {
+        this.allowAllCombinations = allowAllCombinations;
+    }
 }

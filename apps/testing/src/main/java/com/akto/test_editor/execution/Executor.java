@@ -57,7 +57,7 @@ public class Executor {
     public YamlTestResult execute(ExecutorNode node, RawApi rawApi, Map<String, Object> varMap, String logId,
                                   AuthMechanism authMechanism, FilterNode validatorNode, ApiInfo.ApiInfoKey apiInfoKey, TestingRunConfig testingRunConfig,
                                   List<CustomAuthType> customAuthTypes, boolean debug, List<TestingRunResult.TestLog> testLogs,
-                                  Memory memory, String testingDepth) {
+                                  Memory memory) {
         List<GenericTestResult> result = new ArrayList<>();
 
         ExecutionListBuilder executionListBuilder = new ExecutionListBuilder();
@@ -135,7 +135,7 @@ public class Executor {
 
         boolean requestSent = false;
 
-        boolean allowAllCombinations = "deep".equalsIgnoreCase(testingDepth);
+        boolean allowAllCombinations = executionListBuilder.isAllowAllCombinations();
 
         String executionType = node.getChildNodes().get(0).getValues().toString();
         if (executionType.equals("multiple") || executionType.equals("graph")) {

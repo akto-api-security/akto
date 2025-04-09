@@ -33,7 +33,6 @@ public class TestConfig {
 
     public static final String SETTINGS = "attributes";
     private TemplateSettings attributes;
-    private String testingDepth;
 
     public TestConfig(String id, Info info, Auth auth, ConfigParserResult apiSelectionFilters, Map<String, List<String>> wordlists, ExecutorConfigParserResult execute, 
         ConfigParserResult validation, Strategy strategy, TemplateSettings attributes) {
@@ -187,13 +186,5 @@ public class TestConfig {
 
     public void setAttributes(TemplateSettings attributes) {
         this.attributes = attributes;
-    }
-
-    public String getTestingDepth() {
-        return testingDepth;
-    }
-
-    public void setTestingDepth(String testingDepth) {
-        this.testingDepth = testingDepth;
     }
 }
