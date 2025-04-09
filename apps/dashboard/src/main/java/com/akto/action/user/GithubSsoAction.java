@@ -1,5 +1,7 @@
 package com.akto.action.user;
 
+import static com.akto.dao.AccountSettingsDao.generateFilter;
+
 import com.akto.action.UserAction;
 import com.akto.action.testing.StartTestAction;
 import com.akto.dao.AccountSettingsDao;
@@ -9,30 +11,28 @@ import com.akto.dao.context.Context;
 import com.akto.dto.AccountSettings;
 import com.akto.dto.Config;
 import com.akto.dto.User;
-import com.akto.utils.sso.SsoUtils;
 import com.akto.github.GithubUtils;
 import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.DashboardMode;
 import com.akto.util.http_util.CoreHTTPClient;
+import com.akto.utils.sso.SsoUtils;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 import com.mongodb.client.result.DeleteResult;
-
+import java.util.ArrayList;
 import okhttp3.OkHttpClient;
-
 import org.apache.commons.lang3.StringUtils;
 import org.kohsuke.github.GitHub;
 import org.kohsuke.github.GitHubBuilder;
 import org.kohsuke.github.connector.GitHubConnector;
 import org.kohsuke.github.extras.okhttp3.OkHttpGitHubConnector;
 
-import java.util.ArrayList;
-
-import static com.akto.dao.AccountSettingsDao.generateFilter;
-
 public class GithubSsoAction extends UserAction {
-    private static final LoggerMaker loggerMaker = new LoggerMaker(StartTestAction.class);
+
+    private static final LoggerMaker logger = new LoggerMaker(StartTestAction.class, LogDb.DASHBOARD);;
+
     private static final OkHttpClient client = CoreHTTPClient.client.newBuilder().build();
     private static final GitHubConnector connector = new OkHttpGitHubConnector(client);
 

@@ -22,6 +22,9 @@ import com.mongodb.client.result.InsertOneResult;
 import org.bson.conversions.Bson;
 
 public class WorkflowTestAction extends UserAction {
+
+    private static final LoggerMaker logger = new LoggerMaker(WorkflowTestAction.class, LogDb.DASHBOARD);;
+
     int apiCollectionId;
     private List<String> nodes;
     private List<String> edges;
@@ -34,7 +37,6 @@ public class WorkflowTestAction extends UserAction {
     int logFetchStartTime;
     int logFetchEndTime;
 
-    private static final LoggerMaker loggerMaker = new LoggerMaker(WorkflowTestAction.class);
 
     public String fetchWorkflowTests() {
         workflowTests = WorkflowTestsDao.instance.findAll(new BasicDBObject());
@@ -84,9 +86,9 @@ public class WorkflowTestAction extends UserAction {
             Updates.set("edges", edges),
             Updates.set("mapNodeIdToWorkflowNodeDetails", mapNodeIdToWorkflowNodeDetails)
         );
-        
+
         updateWorkflowTest(id, updates);
-        
+
         return SUCCESS.toUpperCase();
     }
 
@@ -97,7 +99,7 @@ public class WorkflowTestAction extends UserAction {
         }
 
         updateWorkflowTest(id, Updates.set("state", state));
-        
+
         return SUCCESS.toUpperCase();
     }
 
@@ -106,7 +108,7 @@ public class WorkflowTestAction extends UserAction {
         if (workflowTest == null) {
             return ERROR.toUpperCase();
         }
-        
+
         ObjectMapper objectMapper = new ObjectMapper();
         try {
             str = objectMapper.writeValueAsString(workflowTest);
@@ -197,7 +199,7 @@ public class WorkflowTestAction extends UserAction {
 
     public String fetchTestingLogs() {
 
-        testingLogs = loggerMaker.fetchLogRecords(logFetchStartTime, logFetchEndTime, LogDb.TESTING);
+        testingLogs = logger.fetchLogRecords(logFetchStartTime, logFetchEndTime, LogDb.TESTING);
         return SUCCESS.toUpperCase();
     }
 
@@ -231,7 +233,7 @@ public class WorkflowTestAction extends UserAction {
 
     public void setMapNodeIdToWorkflowNodeDetails(Map<String,WorkflowNodeDetails> mapNodeIdToWorkflowNodeDetails) {
         this.mapNodeIdToWorkflowNodeDetails = mapNodeIdToWorkflowNodeDetails;
-    }    
+    }
 
     public WorkflowTest.State getState() {
         return this.state;

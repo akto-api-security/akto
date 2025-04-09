@@ -24,13 +24,10 @@ import com.amazonaws.services.cloudformation.AmazonCloudFormationAsyncClientBuil
 import com.amazonaws.services.cloudformation.AmazonCloudFormationClientBuilder;
 import com.amazonaws.services.cloudformation.model.*;
 import org.apache.commons.lang3.StringUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public class AwsStack implements com.akto.utils.cloud.stack.Stack {
 
-    private static final Logger logger = LoggerFactory.getLogger(AwsStack.class);
-    private static final LoggerMaker loggerMaker = new LoggerMaker(AwsStack.class);
+    private static final LoggerMaker logger = new LoggerMaker(AwsStack.class, LogDb.DASHBOARD);
     private static final Set<String> ACCEPTABLE_STACK_STATUSES = new HashSet<String>(
             Arrays.asList(StackStatus.CREATE_IN_PROGRESS.toString(), StackStatus.CREATE_COMPLETE.toString()));
     private static final int STACK_CREATION_TIMEOUT_MINS = 20;
@@ -69,10 +66,10 @@ public class AwsStack implements com.akto.utils.cloud.stack.Stack {
             }
             Future<CreateStackResult> future = CLOUD_FORMATION_ASYNC.createStackAsync(createRequest);
             CreateStackResult createStackResult = future.get();
-            loggerMaker.infoAndAddToDb("Stack Id: " + createStackResult.getStackId(), LogDb.DASHBOARD);
+            logger.infoAndAddToDb("Stack Id: " + createStackResult.getStackId(), LogDb.DASHBOARD);
             return createStackResult.getStackId();
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, e.toString(), LogDb.DASHBOARD);
+            logger.errorAndAddToDb(e, e.toString(), LogDb.DASHBOARD);
             throw e;
         }
     }
@@ -103,7 +100,7 @@ public class AwsStack implements com.akto.utils.cloud.stack.Stack {
             String stackStatus = stack.getStackStatus();
 
             if (!ACCEPTABLE_STACK_STATUSES.contains(stackStatus)) {
-                loggerMaker.infoAndAddToDb("Actual stack status: " + stackStatus, LogDb.DASHBOARD);
+                logger.infoAndAddToDb("Actual stack status: " + stackStatus, LogDb.DASHBOARD);
                 return new StackState(StackStatus.CREATION_FAILED.toString(), 0);
             }
             return new StackState(stackStatus, stack.getCreationTime().getTime());
@@ -132,7 +129,7 @@ public class AwsStack implements com.akto.utils.cloud.stack.Stack {
             logger.info(String.valueOf(resources));
             return resources.get(0).getPhysicalResourceId();
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, String.format("Failed to fetch physical id of resource with logical id %s : %s", logicalId, e.toString()), LogDb.DASHBOARD);
+            logger.errorAndAddToDb(e, String.format("Failed to fetch physical id of resource with logical id %s : %s", logicalId, e.toString()), LogDb.DASHBOARD);
             return "";
         }
     }

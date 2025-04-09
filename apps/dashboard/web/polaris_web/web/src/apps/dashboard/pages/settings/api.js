@@ -526,6 +526,29 @@ const settingRequests = {
             data: {}
         })
     },
+
+    fetchAzureBoardsIntegration() {
+        return request({
+            url: '/api/fetchAzureBoardsIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    addAzureBoardsIntegration(organization, projectList, personalAuthToken) {
+        return request({
+            url: '/api/addAzureBoardsIntegration',
+            method: 'post',
+            data: {organization, projectList, personalAuthToken}
+        })
+    },
+    removeAzureBoardsIntegration() {
+        return request({
+            url: '/api/removeAzureBoardsIntegration',
+            method: 'post',
+            data: {}
+        })
+    }
 }
 
 export default settingRequests

@@ -1,6 +1,9 @@
 
 package com.akto.testing;
 
+import static com.akto.test_editor.execution.Build.modifyRequest;
+import static com.akto.testing.Utils.writeJsonContentInFile;
+
 import com.akto.crons.GetRunningTestsStatus;
 import com.akto.dao.ActivitiesDao;
 import com.akto.dao.ApiInfoDao;
@@ -16,9 +19,6 @@ import com.akto.dao.testing.WorkflowTestResultsDao;
 import com.akto.dao.testing.WorkflowTestsDao;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
-import com.akto.dto.billing.SyncLimit;
-import com.akto.dto.dependency_flow.KVPair;
-import com.akto.dto.dependency_flow.ReplaceDetail;
 import com.akto.dto.CustomAuthType;
 import com.akto.dto.DependencyNode;
 import com.akto.dto.DependencyNode.ParamInfo;
@@ -26,11 +26,39 @@ import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.RawApi;
 import com.akto.dto.api_workflow.Graph;
-import com.akto.dto.test_editor.*;
-import com.akto.dto.testing.*;
+import com.akto.dto.billing.SyncLimit;
+import com.akto.dto.dependency_flow.KVPair;
+import com.akto.dto.dependency_flow.ReplaceDetail;
+import com.akto.dto.test_editor.Auth;
+import com.akto.dto.test_editor.ExecutorNode;
+import com.akto.dto.test_editor.FilterNode;
+import com.akto.dto.test_editor.SeverityParserResult;
+import com.akto.dto.test_editor.TestConfig;
+import com.akto.dto.testing.AuthMechanism;
+import com.akto.dto.testing.EndpointLogicalGroup;
+import com.akto.dto.testing.GenericTestResult;
+import com.akto.dto.testing.GraphExecutorRequest;
+import com.akto.dto.testing.GraphExecutorResult;
+import com.akto.dto.testing.LoginFlowParams;
+import com.akto.dto.testing.LoginFlowResponse;
+import com.akto.dto.testing.LoginWorkflowGraphEdge;
+import com.akto.dto.testing.MultiExecTestResult;
+import com.akto.dto.testing.RequestData;
+import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.TestResult.Confidence;
 import com.akto.dto.testing.TestResult.TestError;
+import com.akto.dto.testing.TestRoles;
+import com.akto.dto.testing.TestingEndpoints;
+import com.akto.dto.testing.TestingRun;
 import com.akto.dto.testing.TestingRun.State;
+import com.akto.dto.testing.TestingRunConfig;
+import com.akto.dto.testing.TestingRunResult;
+import com.akto.dto.testing.TestingRunResultSummary;
+import com.akto.dto.testing.WorkflowNodeDetails;
+import com.akto.dto.testing.WorkflowTest;
+import com.akto.dto.testing.WorkflowTestingEndpoints;
+import com.akto.dto.testing.WorkflowUpdatedSampleData;
+import com.akto.dto.testing.YamlTestResult;
 import com.akto.dto.testing.info.SingleTestPayload;
 import com.akto.dto.type.RequestTemplate;
 import com.akto.dto.type.SingleTypeInfo;
@@ -45,8 +73,8 @@ import com.akto.test_editor.execution.Build;
 import com.akto.test_editor.execution.Executor;
 import com.akto.test_editor.execution.VariableResolver;
 import com.akto.test_editor.filter.data_operands_impl.ValidationResult;
-import com.akto.testing.kafka_utils.TestingConfigurations;
 import com.akto.testing.kafka_utils.Producer;
+import com.akto.testing.kafka_utils.TestingConfigurations;
 import com.akto.testing.yaml_tests.YamlTestTemplate;
 import com.akto.testing_issues.TestingIssuesHandler;
 import com.akto.usage.UsageMetricCalculator;
@@ -58,30 +86,38 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
 import com.mongodb.WriteConcern;
-import com.mongodb.client.model.*;
-
+import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.FindOneAndUpdateOptions;
+import com.mongodb.client.model.ReturnDocument;
+import com.mongodb.client.model.Updates;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 import org.json.JSONObject;
 import org.mortbay.util.ajax.JSON;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import static com.akto.test_editor.execution.Build.modifyRequest;
-import static com.akto.testing.Utils.writeJsonContentInFile;
-
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.util.*;
-import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
 
 public class TestExecutor {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(TestExecutor.class, LogDb.TESTING);
-    private static final Logger logger = LoggerFactory.getLogger(TestExecutor.class);
 
     public static long acceptableSizeInBytes = 5_000_000;
     private static final Gson gson = new Gson();
@@ -223,7 +259,7 @@ public class TestExecutor {
         List<CustomAuthType> customAuthTypes = CustomAuthTypeDao.instance.findAll(CustomAuthType.ACTIVE,true);
         TestingUtil testingUtil = new TestingUtil(sampleMessageStore, testRoles, testingRun.getUserEmail(), customAuthTypes);
 
-        logger.info("For account: " + accountId + " fetched test yamls and auth types");
+        loggerMaker.info("For account: " + accountId + " fetched test yamls and auth types");
 
 
         Map<ApiInfo.ApiInfoKey, List<String>> sampleDataMapForStatusCodeAnalyser = new HashMap<>();
@@ -320,7 +356,7 @@ public class TestExecutor {
                     Producer.createTopicWithRetries(Constants.LOCAL_KAFKA_BROKER_URL, Constants.TEST_RESULTS_TOPIC_NAME);
                 } catch (Exception e) {
                     e.printStackTrace();
-                    logger.error("Error in creating topic", e.getMessage());
+                    loggerMaker.error("Error in creating topic", e.getMessage());
                 }
             }
 
@@ -385,13 +421,13 @@ public class TestExecutor {
                                 apiInfoKeyToHostMap, subCategoryEndpointMap, testConfigMap, testLogs, testingRun,
                                 isApiInfoTested, new AtomicInteger(), new AtomicInteger());
                     }else{
-                        logger.info("Test stopped for id: " + testingRun.getHexId());
+                        loggerMaker.info("Test stopped for id: " + testingRun.getHexId());
                         break;
                     }
                 }
             }
             if(isApiInfoTested.get()){
-                logger.info("Api: " + apiInfoKey.toString() + " has been successfully tested");
+                loggerMaker.info("Api: " + apiInfoKey.toString() + " has been successfully tested");
                 ApiInfoDao.instance.updateLastTestedField(apiInfoKey);
             }
             latch.countDown();
@@ -442,7 +478,7 @@ public class TestExecutor {
                 testingRun.getId(), summaryId, apiInfoKey, testSubType, testLogs, accountId
             );
             if(Constants.KAFKA_DEBUG_MODE){
-                logger.info("Inserting record for apiInfoKey: " + apiInfoKey.toString() + " subcategory: " + testSubType);
+                loggerMaker.info("Inserting record for apiInfoKey: " + apiInfoKey.toString() + " subcategory: " + testSubType);
             }
             
             try {
@@ -558,7 +594,7 @@ public class TestExecutor {
         LoginFlowResponse loginFlowResponse = null;
         for (int i=0; i<retries; i++) {
             try {
-                logger.info("retry attempt: " + i + " for login flow");
+                loggerMaker.info("retry attempt: " + i + " for login flow");
                 loginFlowResponse = executeLoginFlow(authMechanism, null, null);
                 if (loginFlowResponse.getSuccess()) {
                     loggerMaker.infoAndAddToDb("login flow success", LogDb.TESTING);
