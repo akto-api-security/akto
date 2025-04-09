@@ -259,7 +259,27 @@ const settingFunctions = {
       })
       return trafficData
     },
-
+    fetchAzureBoardsIntegration: async function(){
+      let azureBoardsInteg = {}
+      await settingRequests.fetchAzureBoardsIntegration().then((resp)=>{
+        azureBoardsInteg = resp.azureBoardsIntegration
+      })
+      return azureBoardsInteg
+    },
+    addAzureBoardsIntegration: async function(organization, projectList, personalAuthToken) {
+      let trafficData = {}
+      await settingRequests.addAzureBoardsIntegration(organization, projectList, personalAuthToken).then((resp)=>{
+        trafficData = resp
+      })
+      return trafficData
+    },
+    removeAzureBoardsIntegration: async function() {
+      let trafficData = {}
+      await settingRequests.removeAzureBoardsIntegration().then((resp)=>{
+        trafficData = resp
+      })
+      return trafficData
+    },
     getSetupOptions: function(){
       return setupOptions;
     },

@@ -30,7 +30,7 @@ import java.util.concurrent.Future;
 
 public class InfraMetricsAction implements Action,ServletResponseAware, ServletRequestAware  {
 
-    private static final LoggerMaker loggerMaker = new LoggerMaker(InfraMetricsAction.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(InfraMetricsAction.class, LogDb.DASHBOARD);;
 
     @Override
     public String execute() throws Exception {

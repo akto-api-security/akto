@@ -1,9 +1,17 @@
 package com.akto.testing;
 
+import static com.akto.testing.Utils.isTestingRunForDemoCollection;
+import static com.akto.testing.Utils.readJsonContentFromFile;
+
 import com.akto.DaoInit;
 import com.akto.billing.UsageMetricUtils;
 import com.akto.crons.GetRunningTestsStatus;
-import com.akto.dao.*;
+import com.akto.dao.AccountSettingsDao;
+import com.akto.dao.ApiCollectionsDao;
+import com.akto.dao.MCollection;
+import com.akto.dao.SetupDao;
+import com.akto.dao.SingleTypeInfoDao;
+import com.akto.dao.TestingInstanceHeartBeatDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.testing.TestingRunConfigDao;
 import com.akto.dao.testing.TestingRunDao;
@@ -11,13 +19,23 @@ import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dao.testing.TestingRunResultSummariesDao;
 import com.akto.dao.testing.VulnerableTestingRunResultDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
+import com.akto.dto.Account;
+import com.akto.dto.AccountSettings;
+import com.akto.dto.ApiCollection;
+import com.akto.dto.ApiInfo;
+import com.akto.dto.Setup;
 import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.billing.SyncLimit;
 import com.akto.dto.test_run_findings.TestingRunIssues;
-import com.akto.dto.*;
-import com.akto.dto.testing.*;
+import com.akto.dto.testing.CollectionWiseTestingEndpoints;
+import com.akto.dto.testing.CustomTestingEndpoints;
+import com.akto.dto.testing.TestingEndpoints;
 import com.akto.dto.testing.TestingEndpoints.Operator;
+import com.akto.dto.testing.TestingRun;
 import com.akto.dto.testing.TestingRun.State;
+import com.akto.dto.testing.TestingRunConfig;
+import com.akto.dto.testing.TestingRunResult;
+import com.akto.dto.testing.TestingRunResultSummary;
 import com.akto.dto.testing.rate_limit.ApiRateLimit;
 import com.akto.dto.testing.rate_limit.GlobalApiRateLimit;
 import com.akto.dto.testing.rate_limit.RateLimitHandler;
@@ -52,32 +70,37 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import com.mongodb.ReadPreference;
 import com.mongodb.WriteConcern;
-import com.mongodb.client.model.*;
+import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.FindOneAndUpdateOptions;
+import com.mongodb.client.model.Projections;
+import com.mongodb.client.model.ReturnDocument;
+import com.mongodb.client.model.Sorts;
+import com.mongodb.client.model.UpdateOptions;
+import com.mongodb.client.model.Updates;
 import com.mongodb.client.result.DeleteResult;
 import com.slack.api.Slack;
-
-import org.bson.Document;
-import org.bson.conversions.Bson;
-import org.bson.types.ObjectId;
-import org.json.JSONObject;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.util.StringUtils;
-
-import static com.akto.testing.Utils.isTestingRunForDemoCollection;
-import static com.akto.testing.Utils.readJsonContentFromFile;
-
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
+import org.bson.Document;
+import org.bson.conversions.Bson;
+import org.bson.types.ObjectId;
+import org.json.JSONObject;
+import org.springframework.util.StringUtils;
 
 public class Main {
     private static final LoggerMaker loggerMaker = new LoggerMaker(Main.class, LogDb.TESTING);
-
-    private static final Logger logger = LoggerFactory.getLogger(Main.class);
-
     private static final String testingInstanceId = UUID.randomUUID().toString();
 
     public static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
@@ -260,9 +283,9 @@ public class Main {
             testingRun.setTestingRunConfig(configFromTrrs);
         }
         if(testingRun.getTestingRunConfig() != null){
-            logger.info(testingRun.getTestingRunConfig().toString());
+            loggerMaker.info(testingRun.getTestingRunConfig().toString());
         }else{
-            logger.info("Testing run config is null.");
+            loggerMaker.info("Testing run config is null.");
         }
     }
 
@@ -295,7 +318,7 @@ public class Main {
                 return null;
             }   
         } catch (Exception e) {
-            logger.error("Error in reading the testing state file: " + e.getMessage());
+            loggerMaker.error("Error in reading the testing state file: " + e.getMessage());
             return null;
         }
     }
@@ -450,7 +473,7 @@ public class Main {
                             CustomTextAlert customTextAlert = new CustomTextAlert("Test completed for accountId=" + accountId + " testingRun=" + testingRun.getHexId() + " summaryId=" + summaryId.toHexString() + " : @Arjun you are up now. Make your time worth it. :)");
                             SLACK_INSTANCE.send(AKTO_SLACK_WEBHOOK, customTextAlert.toJson());
                         } catch (Exception e) {
-                            logger.error("Error sending slack alert for completion of test", e);
+                            loggerMaker.error("Error sending slack alert for completion of test", e);
                         }
                     }
                 }
@@ -465,7 +488,7 @@ public class Main {
                     }
                 });
             } catch (Exception e) {
-                logger.error("Error in running failed tests from file.", e);
+                loggerMaker.error("Error in running failed tests from file.", e);
             }
         }
 
@@ -491,7 +514,7 @@ public class Main {
         // create /testing-info folder in the memory from here
         if(Constants.IS_NEW_TESTING_ENABLED){
             boolean val = Utils.createFolder(Constants.TESTING_STATE_FOLDER_PATH);
-            logger.info("Testing info folder status: " + val);
+            loggerMaker.info("Testing info folder status: " + val);
         }
 
         SingleTypeInfo.init();
@@ -815,7 +838,7 @@ public class Main {
                         CustomTextAlert customTextAlert = new CustomTextAlert("Test completed for accountId=" + accountId + " testingRun=" + testingRun.getHexId() + " summaryId=" + summaryId.toHexString() + " : @Arjun you are up now. Make your time worth it. :)");
                         SLACK_INSTANCE.send(AKTO_SLACK_WEBHOOK, customTextAlert.toJson());
                     } catch (Exception e) {
-                        logger.error("Error sending slack alert for completion of test", e);
+                        loggerMaker.error("Error sending slack alert for completion of test", e);
                     }
                     
                 }

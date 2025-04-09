@@ -89,6 +89,7 @@ import TestsTablePage from "../dashboard/pages/test_editor/tests_table/TestsTabl
 import Splunk from "../dashboard/pages/settings/integrations/Splunk";
 import F5Waf from "../dashboard/pages/settings/integrations/F5Waf";
 import AWSWaf from "../dashboard/pages/settings/integrations/AWSWaf";
+import AzureBoards from "../dashboard/pages/settings/integrations/AzureBoards";
 
 // if you add a component in a new path, please verify the search implementation in function -> 'getSearchItemsArr' in func.js
 
@@ -295,6 +296,10 @@ const router = createBrowserRouter([
                     {
                         path: "integrations/jira",
                         element: <Jira/>,
+                    },
+                    {
+                        path: "integrations/azure_boards",
+                        element: <AzureBoards/>,
                     },
                     {
                         path: "integrations/akto_apis",

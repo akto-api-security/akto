@@ -28,7 +28,7 @@ import com.mongodb.client.model.Updates;
 import static com.akto.task.Cluster.callDibs;
 
 public class SyncCron {
-    private static final LoggerMaker loggerMaker = new LoggerMaker(SyncCron.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(SyncCron.class, LogDb.DASHBOARD);
     ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
 
     public void setUpUpdateCronScheduler() {

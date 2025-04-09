@@ -304,6 +304,8 @@ public class Utils {
 
         }
 
+        int newExpiryTime = Context.now() + 1800; // 30 mins
+        List<AuthParam> calculatedAuthParams = new ArrayList<>();
         for (AuthParam param : authMechanism.getAuthParams()) {
             try {
                 String value = executeCode(param.getValue(), valuesMap, false);
@@ -314,8 +316,8 @@ public class Utils {
 
                 // checking on the value of if this is valid jwt token or valid cookie which has expiry time
                 String tempVal = new String(value);
-                if(tempVal.contains("Bearer")){
-                    tempVal = value.split("Bearer ")[1];
+                if(tempVal.contains(" ")){
+                    tempVal = value.split(" ")[1];
                 }
                 if(KeyTypes.isJWT(tempVal)){
                     try {
@@ -326,39 +328,25 @@ public class Utils {
                         String payload = new String(Base64.getUrlDecoder().decode(parts[1]));
                         JSONObject payloadJson = new JSONObject(payload);
                         if (payloadJson.has("exp")) {
-                            int newExpiryTime = payloadJson.getInt("exp");
-                            if(roleName != null){
-                                TestRolesCache.addTokenExpiry(roleName, newExpiryTime);
-                            }
-                            TestExecutor.setExpiryTimeOfAuthToken(newExpiryTime);
+                            newExpiryTime = Math.min(payloadJson.getInt("exp"), newExpiryTime);
+                            
                         } else {
                             throw new IllegalArgumentException("JWT does not have an 'exp' claim");
                         }
                     } catch (Exception e) {
                         e.printStackTrace();
                     }
-                }else{
-                    // check if this cookie with max-age or expiry time
-                    try {
-                        Map<String,String> cookieMap = parseCookie(Arrays.asList(value));
-                        int expiryTsEpoch = CookieExpireFilter.getMaxAgeFromCookie(cookieMap);
-                        if(expiryTsEpoch > 0){
-                            int newExpiryTime = Context.now() + expiryTsEpoch;
-                            if(roleName != null){
-                                TestRolesCache.addTokenExpiry(roleName, newExpiryTime);
-                            }
-                            TestExecutor.setExpiryTimeOfAuthToken(newExpiryTime);
-                        }
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                    }
                 }
 
-                param.setValue(value);
+                calculatedAuthParams.add(new HardcodedAuthParam(param.getWhere(), param.getKey(), value, param.getShowHeader()));
             } catch(Exception e) {
                 return new LoginFlowResponse(responses, "error resolving auth param " + param.getValue(), false);
             }
         }
+
+        authMechanism.updateCacheExpiryEpoch(newExpiryTime);
+        authMechanism.updateAuthParamsCached(calculatedAuthParams);
+
         return new LoginFlowResponse(responses, null, true);
     }
 

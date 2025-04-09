@@ -31,7 +31,7 @@ import java.util.Map;
 public class RoleAccessInterceptor extends AbstractInterceptor {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(RoleAccessInterceptor.class, LoggerMaker.LogDb.DASHBOARD);
-    private static final Logger logger = LoggerFactory.getLogger(RoleAccessInterceptor.class);
+    private static final LoggerMaker logger = new LoggerMaker(RoleAccessInterceptor.class, LogDb.DASHBOARD);
     String featureLabel;
     String accessType;
     String actionDescription;

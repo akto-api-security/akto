@@ -34,7 +34,7 @@ import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo";
   }
 */
 
-let headers = [
+const headers = [
   {
     text:"Test name",
     title: 'Test run name',
@@ -64,6 +64,12 @@ let headers = [
     itemOrder: 3,
     type: CellType.TEXT,
     sortActive: true
+  },
+  {
+    text: 'Scan frequency',
+    title: 'Scan frequency',
+    value: 'scan_frequency',
+    type: CellType.TEXT,
   },
   {
     text: 'Total Apis',
@@ -107,7 +113,6 @@ let filters = [
 ]
 
 function TestRunsPage() {
-
   const apiCollectionMap = PersistStore(state => state.collectionsMap)
 
   function disambiguateLabel(key, value) {

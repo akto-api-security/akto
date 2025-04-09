@@ -4,20 +4,14 @@ import com.akto.action.ExportSampleDataAction;
 import com.akto.action.gpt.GptAction;
 import com.akto.action.gpt.result_fetchers.ResultFetcherStrategy;
 import com.akto.action.gpt.utils.HeadersUtils;
-import com.akto.dto.OriginalHttpRequest;
-import com.google.gson.Gson;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.mongodb.BasicDBObject;
-
 import java.util.List;
-import java.util.Map;
-
-import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public class GenerateCurlForTest implements QueryHandler{
-    private static final Logger logger = LoggerFactory.getLogger(GenerateCurlForTest.class);
+    private static final LoggerMaker logger = new LoggerMaker(GenerateCurlForTest.class, LogDb.DASHBOARD);
     private final ResultFetcherStrategy<BasicDBObject> resultFetcherStrategy;
 
     public GenerateCurlForTest(ResultFetcherStrategy<BasicDBObject> resultFetcherStrategy) {
