@@ -19,6 +19,7 @@ import com.akto.kafka.KafkaConfig;
 import com.akto.proto.generated.threat_detection.message.malicious_event.event_type.v1.EventType;
 import com.akto.proto.generated.threat_detection.message.malicious_event.v1.MaliciousEventKafkaEnvelope;
 import com.akto.proto.generated.threat_detection.message.malicious_event.v1.MaliciousEventMessage;
+import com.akto.proto.generated.threat_detection.message.sample_request.v1.Metadata;
 import com.akto.proto.generated.threat_detection.message.sample_request.v1.SampleMaliciousRequest;
 import com.akto.proto.generated.threat_detection.message.sample_request.v1.SampleRequestKafkaEnvelope;
 import com.akto.proto.http_response_param.v1.HttpResponseParam;
@@ -231,6 +232,7 @@ public class MaliciousTrafficDetectorTask implements Task {
                           .setApiCollectionId(responseParam.getRequestParams().getApiCollectionId())
                           .setTimestamp(responseParam.getTime())
                           .setFilterId(apiFilter.getId())
+                          .setMetadata(Metadata.newBuilder().setCountryCode(metadata.getCountryCode()))
                           .build();
 
                   maliciousMessages.add(
@@ -297,6 +299,7 @@ public class MaliciousTrafficDetectorTask implements Task {
             .setCategory(apiFilter.getInfo().getCategory().getName())
             .setSubCategory(apiFilter.getInfo().getSubCategory())
             .setSeverity(apiFilter.getInfo().getSeverity())
+            .setMetadata(maliciousReq.getMetadata())
             .setType("Rule-Based")
             .build();
     MaliciousEventKafkaEnvelope envelope =
