@@ -4,6 +4,7 @@ import com.akto.dto.ApiInfo;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.ApiInfo.ApiAccessType;
 import com.akto.dto.runtime_filters.RuntimeFilter;
+import com.akto.log.LoggerMaker;
 
 import org.springframework.security.web.util.matcher.IpAddressMatcher;
 
@@ -15,6 +16,7 @@ public class ApiAccessTypePolicy {
     private List<String> privateCidrList;
 
 	public static final String X_FORWARDED_FOR = "x-forwarded-for";
+    private static final LoggerMaker logger = new LoggerMaker(ApiAccessTypePolicy.class);
 
     public ApiAccessTypePolicy(List<String> privateCidrList) {
         this.privateCidrList = privateCidrList;
@@ -60,11 +62,14 @@ public class ApiAccessTypePolicy {
         List<String> clientIps = new ArrayList<>();
         for (String header : CLIENT_IP_HEADERS) {
             List<String> headerValues = httpResponseParams.getRequestParams().getHeaders().get(header);
+            if (header == "x-forwarded-for"){
+                logger.info("X-Forwarded-For header: " + headerValues);
+            }
             if (headerValues != null) {
                 clientIps.addAll(headerValues);
             }
         }
-
+        logger.info("Client IPs: " + clientIps);
         List<String> ipList = new ArrayList<>();
         for (String ip: clientIps) {
             String[] parts = ip.trim().split("\\s*,\\s*"); // This approach splits the string by commas and also trims any whitespace around the individual elements. 
@@ -72,10 +77,12 @@ public class ApiAccessTypePolicy {
         }
 
         String sourceIP = httpResponseParams.getSourceIP();
+        logger.info("Source IP:" + sourceIP);
 
         if (sourceIP != null && !sourceIP.isEmpty() && !sourceIP.equals("null")) {
             ipList.add(sourceIP);
         }
+        logger.info("Final IP list: " + ipList);
         return ipList;
     }
 
