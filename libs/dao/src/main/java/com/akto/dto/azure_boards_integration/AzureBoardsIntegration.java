@@ -5,13 +5,19 @@ import java.util.Map;
 
 public class AzureBoardsIntegration {
 
+    public static final String BASE_URL = "baseUrl";
     private String baseUrl;
+    public static final String ORGANIZATION = "organization";
     private String organization;
     public static final String PERSONAL_AUTH_TOKEN = "personalAuthToken";
     private String personalAuthToken;
+    public static final String CREATED_TS = "createdTs";
     private int createdTs;
+    public static final String UPDATED_TS = "updatedTs";
     private int updatedTs;
+    public static final String PROJECT_LIST = "projectList";
     private List<String> projectList;
+    public static final String PROJECT_TO_WORK_ITEMS_MAP = "projectToWorkItemsMap";
     private Map<String, List<String>> projectToWorkItemsMap;
 
     public AzureBoardsIntegration() {}
