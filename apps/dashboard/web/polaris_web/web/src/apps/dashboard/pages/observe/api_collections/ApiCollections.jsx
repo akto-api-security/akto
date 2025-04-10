@@ -536,14 +536,14 @@ function ApiCollections() {
                 }
             )
         }
-        if (selectedResources.every(v => { return !apiGrous.includes(v) })) {
-            actions.push(
-                {
-                    content: `Remove collection${func.addPlurality(selectedResources.length)}`,
-                    onAction: () => handleCollectionsAction(selectedResources, api.deleteMultipleCollections, "deleted")
-                }
-            )
-        }
+
+        actions.push(
+            {
+                content: `Remove collection${func.addPlurality(selectedResources.length)}`,
+                onAction: () => handleCollectionsAction(selectedResources, api.deleteMultipleCollections, "deleted")
+            }
+        )
+
 
         const apiCollectionShareRenderItem = (item) => {
             const { id, name, login, role } = item;
