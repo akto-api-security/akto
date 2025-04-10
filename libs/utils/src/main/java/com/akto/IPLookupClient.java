@@ -1,6 +1,7 @@
 package com.akto;
 
 import com.akto.util.LRUCache;
+import com.akto.log.LoggerMaker;
 import com.maxmind.geoip2.DatabaseReader;
 import com.maxmind.geoip2.model.CountryResponse;
 import java.io.File;
@@ -12,6 +13,7 @@ import org.apache.commons.io.IOUtils;
 
 public class IPLookupClient {
   private final DatabaseReader db;
+  private static final LoggerMaker logger = new LoggerMaker(IPLookupClient.class);
 
   public IPLookupClient() throws IOException {
     File dbFile = this.getMaxmindFile();
@@ -22,7 +24,9 @@ public class IPLookupClient {
     try {
       InetAddress ipAddr = InetAddress.getByName(ip);
       CountryResponse resp = db.country(ipAddr);
-      return Optional.of(resp.getCountry().getIsoCode());
+      Optional<String> countryCode = Optional.of(resp.getCountry().getIsoCode());
+      logger.info("Request incoming IP: " + ip + ", Country Detected: " + countryCode);
+      return countryCode;
     } catch (Exception e) {
       return Optional.empty();
     }
