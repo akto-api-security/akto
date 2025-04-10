@@ -649,7 +649,7 @@ public class InventoryAction extends UserAction {
     private Map<String, List> filters;
     private Map<String, String> filterOperators;
     private boolean sensitive;
-    private boolean request;
+    private List<String> request;
 
     private Bson prepareFilters(String collection) {
         ArrayList<Bson> filterList = new ArrayList<>();
@@ -662,24 +662,28 @@ public class InventoryAction extends UserAction {
         }
         
         if (sensitive) {
-            Bson sensitveSubTypeFilter;
-            if (request) {
-                List<String> sensitiveInRequest = SingleTypeInfoDao.instance.sensitiveSubTypeInRequestNames();
-                sensitiveInRequest.addAll(SingleTypeInfoDao.instance.sensitiveSubTypeNames());
-                sensitveSubTypeFilter = Filters.and(
-                        Filters.in("subType",sensitiveInRequest),
-                        Filters.eq("responseCode", -1)
-                );
-            } else {
-                List<String> sensitiveInResponse = SingleTypeInfoDao.instance.sensitiveSubTypeInResponseNames();
-                sensitiveInResponse.addAll(SingleTypeInfoDao.instance.sensitiveSubTypeNames());
-                sensitveSubTypeFilter = Filters.and(
-                    Filters.in("subType",sensitiveInResponse),
-                    Filters.gt("responseCode", -1)
-                );
+            List<Bson> sensitiveFilters = new ArrayList<>();
+            for (String val: request) {
+                if (val.equalsIgnoreCase("request")) {
+                    List<String> sensitiveInRequest = SingleTypeInfoDao.instance.sensitiveSubTypeInRequestNames();
+                    sensitiveInRequest.addAll(SingleTypeInfoDao.instance.sensitiveSubTypeNames());
+                    sensitiveFilters.add(Filters.and(
+                            Filters.in("subType",sensitiveInRequest),
+                            Filters.eq("responseCode", -1)
+                    ));
+                } else if (val.equalsIgnoreCase("response")) {
+                    List<String> sensitiveInResponse = SingleTypeInfoDao.instance.sensitiveSubTypeInResponseNames();
+                    sensitiveInResponse.addAll(SingleTypeInfoDao.instance.sensitiveSubTypeNames());
+                    sensitiveFilters.add(Filters.and(
+                        Filters.in("subType",sensitiveInResponse),
+                        Filters.gt("responseCode", -1)
+                    ));
+                }
             }
-
-            filterList.add(sensitveSubTypeFilter);
+            // If any filters were added, combine them with OR
+            if (!sensitiveFilters.isEmpty()) {
+                filterList.add(Filters.or(sensitiveFilters));
+            }
         }
 
         for(Map.Entry<String, List> entry: filters.entrySet()) {
@@ -1212,7 +1216,7 @@ public class InventoryAction extends UserAction {
         this.sensitive = sensitive;
     }
 
-    public void setRequest(boolean request) {
+    public void setRequest(List<String> request) {
         this.request = request;
     }
 
