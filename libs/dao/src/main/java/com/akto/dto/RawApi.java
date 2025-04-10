@@ -1,31 +1,36 @@
 package com.akto.dto;
 
-import java.net.URI;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 import com.akto.dto.type.RequestTemplate;
-import com.alibaba.fastjson2.JSON;
-import com.alibaba.fastjson2.JSONObject;
 import com.mongodb.BasicDBList;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mongodb.BasicDBObject;
 
-import javax.naming.LimitExceededException;
 
 public class RawApi {
 
     private OriginalHttpRequest request;
     private OriginalHttpResponse response;
+    private RawApiMetadata metadata;
     private String originalMessage;
+
     static ObjectMapper om = new ObjectMapper();
 
     public RawApi(OriginalHttpRequest request, OriginalHttpResponse response, String originalMessage) {
         this.request = request;
         this.response = response;
         this.originalMessage = originalMessage;
+    }
+
+    public RawApi(OriginalHttpRequest request, OriginalHttpResponse response, String originalMessage, RawApiMetadata metadata) {
+        this.request = request;
+        this.response = response;
+        this.originalMessage = originalMessage;
+        this.metadata = metadata;
     }
 
     public static RawApi buildFromMessage(String message, boolean overrideHostHeader){
@@ -310,5 +315,13 @@ public class RawApi {
 
     public void setOriginalMessage(String originalMessage) {
         this.originalMessage = originalMessage;
+    }
+
+    public RawApiMetadata getRawApiMetadata(){
+        return this.metadata;
+    }
+
+    public void setRawApiMetdata(RawApiMetadata metadata){
+        this.metadata = metadata;
     }
 }
