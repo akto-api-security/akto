@@ -237,19 +237,18 @@ public class AzureBoardsIntegrationAction extends UserAction {
         descriptionDBObject.put("value", testDescription);
         reqPayload.add(descriptionDBObject);
 
-        BasicDBObject attachmentsDBObject = new BasicDBObject();
-        attachmentsDBObject.put("op", AzureBoardsOperations.ADD.name().toLowerCase());
-        attachmentsDBObject.put("path", "/relations/-");
-
         if(attachmentUrl != null) {
+            BasicDBObject attachmentsDBObject = new BasicDBObject();
+            attachmentsDBObject.put("op", AzureBoardsOperations.ADD.name().toLowerCase());
+            attachmentsDBObject.put("path", "/relations/-");
             BasicDBObject valueDBObject = new BasicDBObject();
             valueDBObject.put("rel", "AttachedFile");
             valueDBObject.put("url", attachmentUrl);
             valueDBObject.put("attributes", new BasicDBObject().put("comment", "Request and Response sample data."));
 
             attachmentsDBObject.put("value", valueDBObject);
-            }
-        reqPayload.add(attachmentsDBObject);
+            reqPayload.add(attachmentsDBObject);
+        }
     }
 
     private String getAttachmentUrl(String originalMessage, String message, AzureBoardsIntegration azureBoardsIntegration) {

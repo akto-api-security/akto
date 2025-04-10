@@ -296,7 +296,7 @@ public class JiraIntegrationAction extends UserAction {
 
             File tmpOutputFile = createRequestFile(origReq, testReq);
             if(tmpOutputFile == null) {
-                return Action.ERROR.toUpperCase();
+                return Action.SUCCESS.toUpperCase();
             }
 
             MediaType mType = MediaType.parse("application/octet-stream");
