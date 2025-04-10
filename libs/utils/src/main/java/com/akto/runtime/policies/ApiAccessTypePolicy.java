@@ -69,7 +69,7 @@ public class ApiAccessTypePolicy {
                 clientIps.addAll(headerValues);
             }
         }
-        logger.debug("Client IPs: " + clientIps);
+        logger.info("Client IPs: " + clientIps);
         List<String> ipList = new ArrayList<>();
         for (String ip: clientIps) {
             String[] parts = ip.trim().split("\\s*,\\s*"); // This approach splits the string by commas and also trims any whitespace around the individual elements. 
