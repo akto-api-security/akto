@@ -535,11 +535,11 @@ const settingRequests = {
         })
     },
 
-    addAzureBoardsIntegration(organization, projectList, personalAuthToken) {
+    addAzureBoardsIntegration(azureBoardsBaseUrl, organization, projectList, personalAuthToken) {
         return request({
             url: '/api/addAzureBoardsIntegration',
             method: 'post',
-            data: {organization, projectList, personalAuthToken}
+            data: {azureBoardsBaseUrl, organization, projectList, personalAuthToken}
         })
     },
     removeAzureBoardsIntegration() {

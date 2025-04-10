@@ -7,6 +7,7 @@ import func from "@/util/func"
 
 const AzureBoards = () => {
     
+    const [baseUrl, setBaseUrl] = useState('')
     const [organization, setOrganization] = useState('')
     const [projectIds, setProjectIds] = useState('')
     const [personalAuthToken, setPersonalAuthToken] = useState('')
@@ -14,6 +15,7 @@ const AzureBoards = () => {
 
     async function fetchAzureBoardsInteg() {
         let azureBoardsInteg = await settingFunctions.fetchAzureBoardsIntegration()
+        setBaseUrl(azureBoardsInteg != null ? azureBoardsInteg.baseUrl : '')
         setOrganization(azureBoardsInteg != null ? azureBoardsInteg.organization : '')
         setProjectIds(azureBoardsInteg != null ? azureBoardsInteg.projectList?.join(',') : '')
         setPersonalAuthToken(azureBoardsInteg != null ? null : '')
@@ -25,7 +27,7 @@ const AzureBoards = () => {
     }, [])
 
     async function addAzureBoardsIntegration(){
-        await settingFunctions.addAzureBoardsIntegration(organization, projectIds.split(','), personalAuthToken)
+        await settingFunctions.addAzureBoardsIntegration(baseUrl, organization, projectIds.split(','), personalAuthToken)
         func.setToast(true, false, "Successfully added Azure Boards Integration")
         fetchAzureBoardsInteg()
     }
@@ -50,6 +52,7 @@ const AzureBoards = () => {
 
           <LegacyCard.Section>
                 <VerticalStack gap={"2"}>
+                    <TextField label="Azure DevOps Board URL" value={baseUrl} helpText="Specify the base url your azure devops board dashboard. (e.g. https://dev.azure.com or https://{organization}.visualstudio.com)" placeholder='Organization name' requiredIndicator onChange={setBaseUrl} />
                     <TextField label="Organization" value={organization} helpText="Specify the organization name" placeholder='Organization name' requiredIndicator onChange={setOrganization} />
                     {personalAuthToken === null ? <></> : <PasswordTextField label="Personal Auth Token" helpText="Specify the personal auth token created for your project" field={personalAuthToken} onFunc={true} setField={setPersonalAuthToken} />}
                     <TextField label="Projects" helpText="Specify the projects names in comma separated string" value={projectIds} placeholder='Project Names' requiredIndicator onChange={setProjectIds} />
