@@ -484,7 +484,7 @@ public class ApiExecutor {
                 loggerMaker.infoAndAddToDb("encoding to grpc payload:" + payload, LogDb.TESTING);
                 payload = ProtoBufUtils.base64EncodedJsonToProtobuf(payload);
             } catch (Exception e) {
-                loggerMaker.errorAndAddToDb("Unable to encode grpc payload:" + payload, LogDb.TESTING);
+                loggerMaker.errorAndAddToDb(e, "Unable to encode grpc payload:" + payload, LogDb.TESTING);
                 payload = request.getBody();
             }
             try {// trying decoding payload
@@ -492,7 +492,7 @@ public class ApiExecutor {
                 loggerMaker.infoAndAddToDb("Final base64 encoded payload:"+ payload, LogDb.TESTING);
                 body = RequestBody.create(payloadByteArray, MediaType.parse(contentType));
             } catch (Exception e) {
-                loggerMaker.errorAndAddToDb("Unable to decode grpc payload:" + payload, LogDb.TESTING);
+                loggerMaker.errorAndAddToDb(e, "Unable to decode grpc payload:" + payload, LogDb.TESTING);
             }
         }
 
