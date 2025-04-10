@@ -38,13 +38,13 @@ import static com.akto.utils.Utils.createRequestFile;
 
 public class AzureBoardsIntegrationAction extends UserAction {
 
+    private String azureBoardsBaseUrl;
     private String organization;
     private List<String> projectList;
     private String personalAuthToken;
 
     private AzureBoardsIntegration azureBoardsIntegration;
 
-    public static final String azureBoardsBaseUrl = "https://dev.azure.com";
     public static final String version = "7.1";
 
 
@@ -55,6 +55,11 @@ public class AzureBoardsIntegrationAction extends UserAction {
     }
 
     public String addAzureBoardsIntegration() {
+        if(azureBoardsBaseUrl == null || azureBoardsBaseUrl.isEmpty()) {
+            addActionError("Please enter a valid base url.");
+            return Action.ERROR.toUpperCase();
+        }
+
         if(organization == null || organization.isEmpty()) {
             addActionError("Please enter a valid organization.");
             return Action.ERROR.toUpperCase();
@@ -65,17 +70,22 @@ public class AzureBoardsIntegrationAction extends UserAction {
             return Action.ERROR.toUpperCase();
         }
 
+        if(azureBoardsBaseUrl.endsWith("/")) {
+            azureBoardsBaseUrl = azureBoardsBaseUrl.substring(0, azureBoardsBaseUrl.length() - 1);
+        }
+
         Bson combineUpdates = Updates.combine(
-                Updates.set("organization", organization),
-                Updates.set("projectList", projectList),
-                Updates.setOnInsert("createdTs", Context.now()),
-                Updates.set("updatedTs", Context.now())
+                Updates.set(AzureBoardsIntegration.BASE_URL, azureBoardsBaseUrl),
+                Updates.set(AzureBoardsIntegration.ORGANIZATION, organization),
+                Updates.set(AzureBoardsIntegration.PROJECT_LIST, projectList),
+                Updates.setOnInsert(AzureBoardsIntegration.CREATED_TS, Context.now()),
+                Updates.set(AzureBoardsIntegration.UPDATED_TS, Context.now())
         );
 
         String basicAuth = ":" + personalAuthToken;
         String base64PersonalAuthToken = Base64.getEncoder().encodeToString(basicAuth.getBytes());
         if(personalAuthToken != null && !personalAuthToken.isEmpty()) {
-            Bson personalAuthTokenUpdate = Updates.set("personalAuthToken", base64PersonalAuthToken);
+            Bson personalAuthTokenUpdate = Updates.set(AzureBoardsIntegration.PERSONAL_AUTH_TOKEN, base64PersonalAuthToken);
             combineUpdates = Updates.combine(combineUpdates, personalAuthTokenUpdate);
         } else {
             AzureBoardsIntegration boardsIntegration = AzureBoardsIntegrationDao.instance.findOne(new BasicDBObject());
@@ -100,7 +110,7 @@ public class AzureBoardsIntegrationAction extends UserAction {
             return Action.ERROR.toUpperCase();
         }
 
-        Bson updateProjectToWorkItemsMap = Updates.set("projectToWorkItemsMap", projectToWorkItemsMap);
+        Bson updateProjectToWorkItemsMap = Updates.set(AzureBoardsIntegration.PROJECT_TO_WORK_ITEMS_MAP, projectToWorkItemsMap);
         combineUpdates = Updates.combine(combineUpdates, updateProjectToWorkItemsMap);
 
         AzureBoardsIntegrationDao.instance.updateOne(
@@ -169,7 +179,7 @@ public class AzureBoardsIntegrationAction extends UserAction {
         BasicDBList reqPayload = new BasicDBList();
         azureBoardsPayloadCreator(testingRunResult, testName, testDescription, attachmentUrl, reqPayload);
 
-        String url = azureBoardsBaseUrl + "/" + azureBoardsIntegration.getOrganization() + "/" + projectName + "/_apis/wit/workitems/$" + workItemType + "?api-version=" + version;
+        String url = azureBoardsIntegration.getBaseUrl() + "/" + azureBoardsIntegration.getOrganization() + "/" + projectName + "/_apis/wit/workitems/$" + workItemType + "?api-version=" + version;
 
         Map<String, List<String>> headers = new HashMap<>();
         headers.put("Authorization", Collections.singletonList("Basic " + azureBoardsIntegration.getPersonalAuthToken()));
@@ -195,7 +205,7 @@ public class AzureBoardsIntegrationAction extends UserAction {
                 TestingRunIssuesDao.instance.getMCollection().updateOne(
                         Filters.eq(Constants.ID, testingIssuesId),
                         Updates.combine(
-                                Updates.set("azureBoardsWorkItemUrl", workItemUrl)
+                                Updates.set(TestingRunIssues.AZURE_BOARDS_WORK_ITEM_URL, workItemUrl)
                         ),
                         updateOptions
                 );
@@ -258,7 +268,7 @@ public class AzureBoardsIntegrationAction extends UserAction {
         }
 
         try {
-            String uploadUrl = azureBoardsBaseUrl + "/" + azureBoardsIntegration.getOrganization() + "/" + projectName + "/_apis/wit/attachments?fileName=" + URLEncoder.encode(requestComparisonFile.getName(), "UTF-8") + "&api-version=" + version;
+            String uploadUrl = azureBoardsIntegration.getBaseUrl() + "/" + azureBoardsIntegration.getOrganization() + "/" + projectName + "/_apis/wit/attachments?fileName=" + URLEncoder.encode(requestComparisonFile.getName(), "UTF-8") + "&api-version=" + version;
 
             byte[] fileBytes = Files.readAllBytes(requestComparisonFile.toPath());
 
@@ -310,7 +320,7 @@ public class AzureBoardsIntegrationAction extends UserAction {
     public String bulkCreateAzureWorkItems() {
         int existingIssues = 0;
         List<TestingRunIssues> testingRunIssuesList = TestingRunIssuesDao.instance.findAll(Filters.and(
-                Filters.in("_id", testingIssuesIdList),
+                Filters.in(Constants.ID, testingIssuesIdList),
                 Filters.exists(TestingRunIssues.AZURE_BOARDS_WORK_ITEM_URL, true)
         ));
 
@@ -340,6 +350,14 @@ public class AzureBoardsIntegrationAction extends UserAction {
     public String removeAzureBoardsIntegration() {
         AzureBoardsIntegrationDao.instance.deleteAll(new BasicDBObject());
         return Action.SUCCESS.toUpperCase();
+    }
+
+    public String getAzureBoardsBaseUrl() {
+        return azureBoardsBaseUrl;
+    }
+
+    public void setAzureBoardsBaseUrl(String azureBoardsBaseUrl) {
+        this.azureBoardsBaseUrl = azureBoardsBaseUrl;
     }
 
     public String getOrganization() {

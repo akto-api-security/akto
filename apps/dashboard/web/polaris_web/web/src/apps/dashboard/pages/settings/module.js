@@ -266,9 +266,9 @@ const settingFunctions = {
       })
       return azureBoardsInteg
     },
-    addAzureBoardsIntegration: async function(organization, projectList, personalAuthToken) {
+    addAzureBoardsIntegration: async function(azureBoardsBaseUrl, organization, projectList, personalAuthToken) {
       let trafficData = {}
-      await settingRequests.addAzureBoardsIntegration(organization, projectList, personalAuthToken).then((resp)=>{
+      await settingRequests.addAzureBoardsIntegration(azureBoardsBaseUrl, organization, projectList, personalAuthToken).then((resp)=>{
         trafficData = resp
       })
       return trafficData

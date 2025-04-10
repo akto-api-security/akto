@@ -5,17 +5,25 @@ import java.util.Map;
 
 public class AzureBoardsIntegration {
 
+    public static final String BASE_URL = "baseUrl";
+    private String baseUrl;
+    public static final String ORGANIZATION = "organization";
     private String organization;
     public static final String PERSONAL_AUTH_TOKEN = "personalAuthToken";
     private String personalAuthToken;
+    public static final String CREATED_TS = "createdTs";
     private int createdTs;
+    public static final String UPDATED_TS = "updatedTs";
     private int updatedTs;
+    public static final String PROJECT_LIST = "projectList";
     private List<String> projectList;
+    public static final String PROJECT_TO_WORK_ITEMS_MAP = "projectToWorkItemsMap";
     private Map<String, List<String>> projectToWorkItemsMap;
 
     public AzureBoardsIntegration() {}
 
-    public AzureBoardsIntegration(String organization, String personalAuthToken, int createdTs, int updatedTs, List<String> projectList, Map<String, List<String>> projectToWorkItemsMap) {
+    public AzureBoardsIntegration(String baseUrl, String organization, String personalAuthToken, int createdTs, int updatedTs, List<String> projectList, Map<String, List<String>> projectToWorkItemsMap) {
+        this.baseUrl = baseUrl;
         this.organization = organization;
         this.personalAuthToken = personalAuthToken;
         this.createdTs = createdTs;
@@ -31,6 +39,14 @@ public class AzureBoardsIntegration {
         REMOVE,
         REPLACE,
         TEST
+    }
+
+    public String getBaseUrl() {
+        return baseUrl;
+    }
+
+    public void setBaseUrl(String baseUrl) {
+        this.baseUrl = baseUrl;
     }
 
     public String getOrganization() {
