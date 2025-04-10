@@ -206,7 +206,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
 
                 handleAddSettings(parentAdvanceSettingsConfig);
                 const getRunTypeLabel = (runType) => {
-                    if (!runType) return "Once";
+                    if (!runType || runType === undefined) return "Once";
                     if (runType === "CI-CD" || runType === "ONE_TIME") return "Once";
                     else if (runType === "RECURRING") return "Daily";
                     else if (runType === "CONTINUOUS_TESTING") return "Continuously";
@@ -214,15 +214,15 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                 setTestRun(prev => ({
                     ...testRun,
                     tests: updatedTests,
-                    overriddenTestAppUrl: testIdConfig.testingRunConfig.overriddenTestAppUrl,
+                    overriddenTestAppUrl: testIdConfig?.testingRunConfig?.overriddenTestAppUrl,
                     hasOverriddenTestAppUrl: testIdConfig?.testingRunConfig?.overriddenTestAppUrl?.length > 0,
-                    maxConcurrentRequests: testIdConfig.maxConcurrentRequests,
-                    testRunTime: testIdConfig.testRunTime,
-                    testRoleId: testIdConfig.testingRunConfig.testRoleId,
+                    maxConcurrentRequests: testIdConfig?.maxConcurrentRequests || 10,
+                    testRunTime: testIdConfig?.testRunTime,
+                    testRoleId: testIdConfig?.testingRunConfig?.testRoleId,
                     testRunTimeLabel: (testIdConfig.testRunTime === -1) ? "30 minutes" : getLabel(testRunTimeOptions, testIdConfig.testRunTime.toString())?.label,
-                    testRoleLabel: getLabel(testRolesArr, testIdConfig?.testingRunConfig?.testRoleId).label,
+                    testRoleLabel: getLabel(testRolesArr, testIdConfig?.testingRunConfig?.testRoleId)?.label || "No test role selected",
                     runTypeLabel: getRunTypeLabel(testRunType),
-                    testName: testIdConfig.name,
+                    testName: testIdConfig?.name || "",
                     sendSlackAlert: testIdConfig?.sendSlackAlert,
                     sendMsTeamsAlert: testIdConfig?.sendMsTeamsAlert,
                     recurringDaily: testIdConfig?.periodInSeconds === 86400,
