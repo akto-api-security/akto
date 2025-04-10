@@ -25,7 +25,7 @@ public class IPLookupClient {
       InetAddress ipAddr = InetAddress.getByName(ip);
       CountryResponse resp = db.country(ipAddr);
       Optional<String> countryCode = Optional.of(resp.getCountry().getIsoCode());
-      logger.debug("Request incoming IP: " + ip + ", Country Detected: " + countryCode);
+      logger.info("Request incoming IP: " + ip + ", Country Detected: " + countryCode);
       return countryCode;
     } catch (Exception e) {
       return Optional.empty();
