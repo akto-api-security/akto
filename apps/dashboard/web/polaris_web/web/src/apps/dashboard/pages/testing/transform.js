@@ -1055,12 +1055,12 @@ getRowInfo(severity, apiInfo,jiraIssueUrl, sensitiveData, isIgnored, azureBoards
       tooltipContent: "Discovered time of the API"
     },
     {
-      title: "Jira",
+      title: "Jira ticket",
       value: jiraComponent,
       tooltipContent:"Jira ticket number attached to the testing run issue"
     },
     {
-      title: "Azure Boards",
+      title: "Azure work item",
       value: azureBoardsComp,
       tooltipContent: "Azure boards work item number attached to the testing run issue"
     }
