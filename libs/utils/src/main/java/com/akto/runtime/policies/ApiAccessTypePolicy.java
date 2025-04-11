@@ -62,7 +62,7 @@ public class ApiAccessTypePolicy {
         List<String> clientIps = new ArrayList<>();
         for (String header : CLIENT_IP_HEADERS) {
             List<String> headerValues = httpResponseParams.getRequestParams().getHeaders().get(header);
-            if (header == "x-forwarded-for"){
+            if ("x-forwarded-for".equalsIgnoreCase(header)){
                 logger.info("X-Forwarded-For header: " + headerValues);
             }
             if (headerValues != null) {
