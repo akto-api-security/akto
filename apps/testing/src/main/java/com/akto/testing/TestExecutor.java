@@ -11,7 +11,6 @@ import com.akto.dao.CustomAuthTypeDao;
 import com.akto.dao.DependencyNodeDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.YamlTemplateDao;
-import com.akto.dao.testing.TestRolesDao;
 import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dao.testing.TestingRunResultSummariesDao;
 import com.akto.dao.testing.VulnerableTestingRunResultDao;
@@ -255,15 +254,24 @@ public class TestExecutor {
         } else {
 
             List<String> testSuiteIds = testingRun.getTestingRunConfig().getTestSuiteIds();
-
-            if (testSuiteIds == null || testSuiteIds.isEmpty() || StringUtils.isEmpty(testSuiteIds.get(0))) {
+            if (testSuiteIds == null || testSuiteIds.isEmpty()) {
+                // default testing
                 testingRunSubCategories = testingRun.getTestingRunConfig().getTestSubCategoryList();
             } else {
-
-                ObjectId testSuiteId = new ObjectId(testSuiteIds.get(0));
-                TestSuites testSuite = TestSuiteDao.instance.findOne(Filters.eq(Constants.ID, testSuiteId));
-
-                testingRunSubCategories = (testSuite != null) ? testSuite.getSubCategoryList() : new ArrayList<>();
+                Set<String> subcategorySet = new HashSet<>();
+                List<ObjectId> testSuiteObjectIds = new ArrayList<>();
+                for (String testSuiteId: testSuiteIds) {
+                    ObjectId testSuiteObjectId = new ObjectId(testSuiteId);
+                    testSuiteObjectIds.add(testSuiteObjectId);
+                }
+                List<TestSuites> testSuites = TestSuiteDao.instance.findAll(Filters.in("_id", testSuiteObjectIds));
+                for (TestSuites testSuite: testSuites) {
+                    List<String> subcategoryList = testSuite.getSubCategoryList();
+                    if (subcategoryList != null && !subcategoryList.isEmpty()) {
+                        subcategorySet.addAll(subcategoryList);
+                    }
+                }
+                testingRunSubCategories = new ArrayList<>(subcategorySet);
             }
         }
 
