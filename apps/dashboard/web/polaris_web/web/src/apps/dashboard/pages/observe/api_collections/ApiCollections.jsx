@@ -511,10 +511,9 @@ function ApiCollections() {
                 onAction: () => exportCsv(selectedResources)
             }
         ];
-
+        const defaultApiGroups = allCollections.filter(x => x.type === "API_GROUP" && x.automated).map(x => x.id);
         const deactivated = deactivateCollections.map(x => x.id);
         const activated = allCollections.filter(x => { return !x.deactivated }).map(x => x.id);
-        const apiGrous = allCollections.filter(x => { return x?.type === 'API_GROUP' }).map(x => x?.id)
         if (selectedResources.every(v => { return activated.includes(v) })) {
             actions.push(
                 {
@@ -540,7 +539,7 @@ function ApiCollections() {
         actions.push(
             {
                 content: `Remove collection${func.addPlurality(selectedResources.length)}`,
-                onAction: () => handleCollectionsAction(selectedResources, api.deleteMultipleCollections, "deleted")
+                onAction: () => handleCollectionsAction(selectedResources.every(v => {return !defaultApiGroups.includes(v)}), api.deleteMultipleCollections, "deleted")
             }
         )
 

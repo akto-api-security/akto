@@ -171,19 +171,8 @@ function SensitiveDataExposure() {
             "location": [],
             "collectionIds": []
         }
-        let isRequestValues = []
-        Object.values(filtersMap)?.forEach(({ filters: filterArray }) => {
-            filterArray?.forEach(({ key, value }) => {
-                if (filters.hasOwnProperty(key)) {
-                    filters[key] = [...new Set([...filters[key], ...value])]
-                }
-                if(key === 'isRequest'){
-                    isRequestValues = [...value]
-                }
-            })
-        })
         filters['subType'] = [subType]
-        await api.fetchChanges('timestamp', -1, 0, 100000, filters, filterOperators, startTimestamp, endTimestamp, true, isRequestValues).then((res) => {
+        await api.fetchChanges('timestamp', -1, 0, 100000, filters, filterOperators, startTimestamp, endTimestamp, true, []).then((res) => {
             
             res.endpoints.forEach(x => {
                 let stringId = x.apiCollectionId + "####" + x.method + "###" + x.url
@@ -244,17 +233,14 @@ function SensitiveDataExposure() {
         filterOperators['subType']="OR"
         let ret = []
         let total = 0;
-        
-        const fetchPromises = [];
-        // if (!isRequestValues.length || isRequestValues.includes('request')) {
-            await api.fetchChanges(sortKey, sortOrder, skip, limit, filters, filterOperators, startTimestamp, endTimestamp, true, isRequestValues, queryValue).then((res)=>{
-                res.endpoints.forEach((endpoint) => {
-                    const dataObj = convertDataIntoTableFormat(endpoint, apiCollectionMap)
-                    ret.push(dataObj);
-                })
-                total += res.total;
-                setLoading(false);
+        await api.fetchChanges(sortKey, sortOrder, skip, limit, filters, filterOperators, startTimestamp, endTimestamp, true, isRequestValues, queryValue).then((res)=>{
+            res.endpoints.forEach((endpoint) => {
+                const dataObj = convertDataIntoTableFormat(endpoint, apiCollectionMap)
+                ret.push(dataObj);
             })
+            total += res.total;
+            setLoading(false);
+        })
 
         setLoading(false);
         return {value: ret, total: total};
