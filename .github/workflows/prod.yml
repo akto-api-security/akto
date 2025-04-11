@@ -8,6 +8,7 @@ on:
   workflow_dispatch:
     inputs:
       release_version:
+        description: "The version of the release to be deployed."
         required: true
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
@@ -60,7 +61,7 @@ jobs:
           REGISTRY_ALIAS: p7q3h0z2
           IMAGE_TAG: kafkalatest
           IMAGE_TAG2: latest
-          IMAGE_TAG3: 1.42.1_local
+          IMAGE_TAG3: ${{ github.event.inputs.release_version }}_local
         run: |
           docker buildx create --use
           # Build a docker container and push it to DockerHub 
@@ -82,8 +83,21 @@ jobs:
           ECR_REPOSITORY: akto-api-security
           IMAGE_TAG: kafkalatest
           IMAGE_TAG2: latest
+          IMAGE_TAG3: ${{ github.event.inputs.release_version }}_local
         run: |
           docker buildx create --use
           # Build a docker container and push it to DockerHub 
           cd apps/database-abstractor
-          docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-api-security-database-abstractor:$IMAGE_TAG -t $ECR_REGISTRY/akto-api-security-database-abstractor:$IMAGE_TAG2 . --push
+          docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-api-security-database-abstractor:$IMAGE_TAG -t $ECR_REGISTRY/akto-api-security-database-abstractor:$IMAGE_TAG2 -t $ECR_REGISTRY/akto-api-security-database-abstractor:$IMAGE_TAG3 . --push
+
+      - name: Send Github release notification to Slack
+        id: slack
+        uses: slackapi/slack-github-action@v1.23.0
+        with:
+          payload: |
+            {
+              "text": "Database abstractor (codename: cyborg) version v${{ github.event.inputs.release_version }} released!"
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
