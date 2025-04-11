@@ -16,6 +16,7 @@ import com.akto.dto.dependency_flow.Node;
 import com.akto.dto.filter.MergedUrls;
 import com.akto.dto.runtime_filters.RuntimeFilter;
 import com.akto.dto.settings.DataControlSettings;
+import com.akto.dto.test_editor.TestingRunPlayground;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
@@ -224,6 +225,7 @@ public class DbAction extends ActionSupport {
     List<YamlTemplate> yamlTemplates;
     SingleTypeInfo sti;
     int scheduleTs;
+    TestingRunPlayground testingRunPlayground;
 
     private static final Gson gson = new Gson();
     ObjectMapper objectMapper = new ObjectMapper().configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false).configure(DeserializationFeature.FAIL_ON_INVALID_SUBTYPE, false).configure(DeserializationFeature.FAIL_ON_IGNORED_PROPERTIES, false);
@@ -1301,19 +1303,20 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
+    private void updateTestingRunApisList(TestingRun testingRun) {
+        if(testingRun != null){
+            if(testingRun.getTestingEndpoints() instanceof CollectionWiseTestingEndpoints){
+                CollectionWiseTestingEndpoints ts = (CollectionWiseTestingEndpoints) testingRun.getTestingEndpoints();
+                CustomTestingEndpoints endpoints = new CustomTestingEndpoints(ts.returnApis());
+                testingRun.setTestingEndpoints(endpoints);
+            }
+        }
+    }
+
     public String findPendingTestingRun() {
         try {
             testingRun = DbLayer.findPendingTestingRun(delta);
-            if (testingRun != null) {
-                /*
-                * There is a db call involved for collectionWiseTestingEndpoints, thus this hack. 
-                */
-                if(testingRun.getTestingEndpoints() instanceof CollectionWiseTestingEndpoints){
-                    CollectionWiseTestingEndpoints ts = (CollectionWiseTestingEndpoints) testingRun.getTestingEndpoints();
-                    CustomTestingEndpoints endpoints = new CustomTestingEndpoints(ts.returnApis());
-                    testingRun.setTestingEndpoints(endpoints);
-                }
-            }
+            updateTestingRunApisList(testingRun);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in findPendingTestingRun " + e.toString());
             return Action.ERROR.toUpperCase();
@@ -1347,6 +1350,7 @@ public class DbAction extends ActionSupport {
     public String findTestingRun() {
         try {
             testingRun = DbLayer.findTestingRun(testingRunId);
+            updateTestingRunApisList(testingRun);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in findTestingRun " + e.toString());
             return Action.ERROR.toUpperCase();
@@ -2308,6 +2312,16 @@ public class DbAction extends ActionSupport {
             testScript = DbLayer.fetchTestScript();
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in fetchTestScript " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String getCurrentTestingRunDetailsFromEditor(){
+        try {
+            testingRunPlayground = DbLayer.getCurrentTestingRunDetailsFromEditor(this.ts);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in getCurrentTestingRunDetailsFromEditor " + e.toString());
             return Action.ERROR.toUpperCase();
         }
         return Action.SUCCESS.toUpperCase();
@@ -3354,6 +3368,14 @@ public class DbAction extends ActionSupport {
 
     public void setOperator(String operator) {
         this.operator = operator;
+    }
+
+    public TestingRunPlayground getTestingRunPlayground() {
+        return testingRunPlayground;
+    }
+
+    public void setTestingRunPlayground(TestingRunPlayground testingRunPlayground) {
+        this.testingRunPlayground = testingRunPlayground;
     }
 
 }
