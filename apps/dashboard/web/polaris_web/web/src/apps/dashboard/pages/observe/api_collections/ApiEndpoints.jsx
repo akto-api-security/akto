@@ -48,6 +48,11 @@ const headings = [
         textValue: "riskScore",
         sortActive: true,
         
+    },{
+        text:"Issues",
+        title: "Issues",
+        value: "issuesComp",
+        textValue: "issues",
     },
     {
         text: "Hostname",
