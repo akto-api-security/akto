@@ -2,7 +2,7 @@ import { VerticalStack, Modal, TextField, Button, Text, HorizontalStack, Collaps
 import { TickMinor, CancelMajor, SearchMinor } from "@shopify/polaris-icons";
 import { useEffect, useRef, useState } from "react";
 import "./run_test_suites.css"
-import createTestName from "./Utils"
+import { createTestName } from "./Utils"
 import RunTestSuiteRow from "./RunTestSuiteRow";
 import testingApi from "../../testing/api";
 import func from "../../../../../util/func";
