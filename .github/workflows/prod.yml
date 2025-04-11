@@ -137,7 +137,7 @@ jobs:
         with:
           payload: |
             {
-              "text": "Hybrid Runtime version v${{ github.event.inputs.release_version }} released!"
+              "text": "Hybrid Runtime and testing version v${{ github.event.inputs.release_version }} released!"
             }
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
