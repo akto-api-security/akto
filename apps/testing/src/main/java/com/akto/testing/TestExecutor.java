@@ -75,6 +75,7 @@ import com.akto.test_editor.filter.data_operands_impl.ValidationResult;
 import com.akto.testing.kafka_utils.Producer;
 import com.akto.testing.kafka_utils.TestingConfigurations;
 import com.akto.testing.yaml_tests.YamlTestTemplate;
+import com.akto.testing_issues.TestingIssuesHandler;
 import com.akto.usage.UsageMetricCalculator;
 import com.akto.util.Constants;
 import com.akto.util.JSONUtils;
@@ -123,6 +124,7 @@ public class TestExecutor {
     public static final String REQUEST_HOUR = "requestHour";
     public static final String COUNT = "count";
     public static final int ALLOWED_REQUEST_PER_HOUR = 100;
+    TestingIssuesHandler issuesHandler = new TestingIssuesHandler();
 
 
     public void init(TestingRun testingRun, ObjectId summaryId, SyncLimit syncLimit, boolean shouldInitOnly) {
@@ -749,8 +751,17 @@ public class TestExecutor {
                 }
                 
                 for(TestingRunResult testingRunResult: testingRunResults){
-                    loggerMaker.info("Sending TRR to kafka: " + testingRunResult.getApiInfoKey().toString() + " : " + testingRunResult.getTestSubType());
-                    Producer.insertTestingResultMessage(testingRunResult);
+                    if(testingRunResult.getWorkflowTest() != null){
+                        TestingRunResultDao.instance.insertOne(testingRunResult);
+                        if(testingRunResult.isVulnerable()){
+                            VulnerableTestingRunResultDao.instance.insertOne(testingRunResult);
+                        }
+                        issuesHandler.handleIssuesCreationFromTestingRunResults(Arrays.asList(testingRunResult), false);
+                    }else{
+                        loggerMaker.info("Sending TRR to kafka: " + testingRunResult.getApiInfoKey().toString() + " : " + testingRunResult.getTestSubType());
+                        Producer.insertTestingResultMessage(testingRunResult);
+                    }
+                    
                 }
     
                 TestingRunResultSummariesDao.instance.getMCollection().withWriteConcern(WriteConcern.W1).findOneAndUpdate(

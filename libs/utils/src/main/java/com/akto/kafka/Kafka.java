@@ -1,14 +1,15 @@
 package com.akto.kafka;
 
 import org.apache.kafka.clients.producer.*;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 
 import java.util.Properties;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class Kafka {
-  private static final Logger logger = LoggerFactory.getLogger(Kafka.class);
+  private static final LoggerMaker logger = new LoggerMaker(Kafka.class, LogDb.TESTING);
   private KafkaProducer<String, String> producer;
   public boolean producerReady;
 
@@ -70,6 +71,7 @@ public class Kafka {
       if (e != null) {
         logger.error("onCompletion error: " + e.getMessage());
       } else {
+        logger.info(message + " sent to topic " + topic + " with offset " + recordMetadata.offset());
         // decrement the counter if message sent successfully
         counter.decrementAndGet();
       }

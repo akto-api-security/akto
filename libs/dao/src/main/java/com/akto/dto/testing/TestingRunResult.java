@@ -3,7 +3,6 @@ package com.akto.dto.testing;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.util.ColorConstants;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import com.mongodb.client.model.Updates;
@@ -26,6 +25,7 @@ public class TestingRunResult implements Comparable<TestingRunResult> {
 
     @BsonIgnore
     private String testRunHexId;
+    @BsonIgnore String testRunResultSummaryHexId;
 
     public static final String API_INFO_KEY = "apiInfoKey";
     private ApiInfo.ApiInfoKey apiInfoKey;
@@ -61,7 +61,13 @@ public class TestingRunResult implements Comparable<TestingRunResult> {
 
     public static final String WORKFLOW_TEST = "workflowTest";
     private WorkflowTest workflowTest;
-    private final static ObjectMapper mapper = new ObjectMapper();
+
+    @BsonIgnore
+    private List<TestResult> singleTestResults;
+    @BsonIgnore
+    private List<MultiExecTestResult> multiExecTestResults;
+
+    
 
     @BsonIgnore
     private List<TestLog> testLogs = new ArrayList<>();
@@ -287,16 +293,6 @@ public class TestingRunResult implements Comparable<TestingRunResult> {
          "\n" + ColorConstants.RESET;
     }
 
-    public String toCompleteString(){
-        try {
-            return mapper.writeValueAsString(this);
-        } catch (Exception e) {
-            e.printStackTrace();
-            return "";
-        }
-        
-    }
-
     public static Bson buildFullUpdate(TestingRunResult runResult) {
         return Updates.combine(
             Updates.set(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, runResult.getTestRunResultSummaryId()),
@@ -397,5 +393,29 @@ public class TestingRunResult implements Comparable<TestingRunResult> {
 
     public void setIgnoredResult(boolean isIgnoredResult) {
         this.isIgnoredResult = isIgnoredResult;
+    }
+
+    public String getTestRunResultSummaryHexId() {
+        return testRunResultSummaryHexId;
+    }
+
+    public void setTestRunResultSummaryHexId(String testRunResultSummaryHexId) {
+        this.testRunResultSummaryHexId = testRunResultSummaryHexId;
+    }
+
+    public List<TestResult> getSingleTestResults() {
+        return singleTestResults;
+    }
+
+    public void setSingleTestResults(List<TestResult> singleTestResults) {
+        this.singleTestResults = singleTestResults;
+    }
+
+    public List<MultiExecTestResult> getMultiExecTestResults() {
+        return multiExecTestResults;
+    }
+
+    public void setMultiExecTestResults(List<MultiExecTestResult> multiExecTestResults) {
+        this.multiExecTestResults = multiExecTestResults;
     }
 }

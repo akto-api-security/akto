@@ -5,7 +5,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Properties;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
@@ -13,15 +12,14 @@ import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.bson.conversions.Bson;
-
 import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dao.testing.VulnerableTestingRunResultDao;
 import com.akto.dto.testing.TestingRunResult;
+import com.akto.dto.testing.info.SingleTestResultPayload;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.testing_issues.TestingIssuesHandler;
 import com.akto.util.Constants;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mongodb.WriteConcern;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.UpdateOneModel;
@@ -40,8 +38,7 @@ public class InsertResultsConsumer {
         properties.put(ConsumerConfig.MAX_POLL_INTERVAL_MS_CONFIG, 1000); 
     }
     private static Consumer<String, String> consumer = new KafkaConsumer<>(properties);
-    private final static ObjectMapper mapper = new ObjectMapper();
-    private static final LoggerMaker loggerMaker = new LoggerMaker(InsertResultsConsumer.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(InsertResultsConsumer.class, LogDb.TESTING);
     
     private boolean insertResultsAndMakeIssuesInBatch(List<TestingRunResult> runResults) {
         // this is the batched run results, by default it is 100
@@ -93,7 +90,7 @@ public class InsertResultsConsumer {
                 }
             }
             if(resultsToBeInserted.size() > 0){
-                loggerMaker.errorAndAddToDb("Error inserting results, retrying... " + resultsToBeInserted.size() + " results failed to insert", LogDb.TESTING);
+                loggerMaker.errorAndAddToDb("Error inserting results, retrying... " + resultsToBeInserted.size() + " results failed to insert");
                 runResults = new ArrayList<>(resultsToBeInserted);
                 resultsToBeInserted.clear();
                 retryCount--;
@@ -107,22 +104,25 @@ public class InsertResultsConsumer {
         consumer.subscribe(Collections.singletonList(Constants.TEST_RESULTS_FOR_INSERTION_TOPIC_NAME));
         List<TestingRunResult> runResults = new ArrayList<>();
         try {
+            loggerMaker.infoAndAddToDb("Fetching records for insertion records");
             while (true) {
                 try {
                     ConsumerRecords<String, String> records = consumer.poll(Duration.ofMillis(1000));
                     if (records.isEmpty() && runResults.size() > 0) {
                         insertResultsWithRetries(runResults);
+                        consumer.commitSync();
                         runResults.clear();
                         continue;
                     }
                     for (ConsumerRecord<String,String> record : records) {
                         String message = record.value();
-                        Object object = mapper.readValue(message, Object.class);
-                        TestingRunResult runResult = mapper.convertValue(object, TestingRunResult.class);
-                        if (runResult == null) {
+                        SingleTestResultPayload payload = SingleTestResultPayload.getTestingRunResultFromMessage(message);
+                        if (payload.getTestingRunResult() == null) {
+                            loggerMaker.errorAndAddToDb("Error in consumer: runResult is null");
                             continue;
+                        }else{
+                            runResults.add(payload.getTestingRunResult());
                         }
-                        runResults.add(runResult);
                     }
                     if(runResults.size() >= 100){
                         insertResultsWithRetries(runResults);
@@ -131,7 +131,7 @@ public class InsertResultsConsumer {
                     }   
                 } catch (Exception e) {
                     e.printStackTrace();
-                    loggerMaker.errorAndAddToDb("Error in consumer: " + e.getMessage(), LogDb.TESTING);
+                    loggerMaker.errorAndAddToDb("Error in consumer: " + e.getMessage());
                 }
             }
         } catch (Exception e) {

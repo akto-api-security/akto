@@ -56,6 +56,7 @@ import com.akto.rules.RequiredConfigs;
 import com.akto.task.Cluster;
 import com.akto.test_editor.execution.Executor;
 import com.akto.testing.kafka_utils.ConsumerUtil;
+import com.akto.testing.kafka_utils.InsertResultsConsumer;
 import com.akto.testing.kafka_utils.Producer;
 import com.akto.testing.kafka_utils.TestingConfigurations;
 import com.akto.util.AccountTask;
@@ -354,7 +355,7 @@ public class Main {
         }
     }
 
-    private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
+    private static final ScheduledExecutorService executorService = Executors.newScheduledThreadPool(2);
 
     //returns true if test is not supposed to run
     private static boolean handleRerunTestingRunResult(TestingRunResultSummary originalSummary) {
@@ -432,9 +433,8 @@ public class Main {
         Producer testingProducer = new Producer();
         ConsumerUtil testingConsumer = new ConsumerUtil();
         TestCompletion testCompletion = new TestCompletion();
-        if(Constants.IS_NEW_TESTING_ENABLED){
-            ConsumerUtil.initializeConsumer();
-        }
+        InsertResultsConsumer insertResultsConsumer = new InsertResultsConsumer();
+        insertResultsConsumer.initializeConsumer();
 
         // read from files here and then see if we want to init the Producer and run the consumer
         // if producer is running, then we can skip the check and let the default testing pick up the job
@@ -506,6 +506,13 @@ public class Main {
             }
         }, 0, 1, TimeUnit.MINUTES);
         GetRunningTestsStatus.getRunningTests().getStatusOfRunningTests();
+
+        // start the consumer for inserting results in a different thread
+        executorService.schedule( new Runnable() {
+                public void run() {
+                    insertResultsConsumer.run();
+                }
+            }, 0 , TimeUnit.SECONDS);
 
         loggerMaker.infoAndAddToDb("sun.arch.data.model: " +  System.getProperty("sun.arch.data.model"), LogDb.TESTING);
         loggerMaker.infoAndAddToDb("os.arch: " + System.getProperty("os.arch"), LogDb.TESTING);
