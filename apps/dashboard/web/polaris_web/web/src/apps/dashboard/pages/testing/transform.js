@@ -1206,23 +1206,19 @@ getMissingConfigs(testResults){
       };
     });
   },
-  prepareEditableConfigObject(testRun,settings,hexId,testSuiteIds=[],testMode,selectedGeneratedSuiteTests){
+  prepareEditableConfigObject(testRun,settings,hexId){
     const tests = testRun.tests;
-    let selectedTests = []
-    if (testMode) {
-      Object.keys(tests).forEach(category => {
+    const selectedTests = []
+    Object.keys(tests).forEach(category => {
         tests[category].forEach(test => {
-          if (test.selected) selectedTests.push(test.value)
+            if (test.selected) selectedTests.push(test.value)
         })
-      })
-    }
-    else {
-      selectedTests = [...selectedGeneratedSuiteTests];
-    }
+    })
+
     return {
       configsAdvancedSettings:settings,
       testRoleId: testRun.testRoleId,
-      testSubCategoryList: testSuiteIds?.length == 0? selectedTests : [],
+      testSubCategoryList: selectedTests,
       overriddenTestAppUrl: testRun.hasOverriddenTestAppUrl ? testRun.overriddenTestAppUrl : "",
       maxConcurrentRequests: testRun.maxConcurrentRequests,
       testingRunHexId: hexId,
@@ -1231,10 +1227,9 @@ getMissingConfigs(testResults){
       sendMsTeamsAlert:testRun.sendMsTeamsAlert,
       recurringDaily: testRun.recurringDaily,
       continuousTesting: testRun.continuousTesting,
-      scheduleTimestamp: testRun?.hourlyLabel === 'Now' && ((testRun.startTimestamp - func.getStartOfTodayEpoch()) < 86400) ? 0 : testRun.startTimestamp,
+      scheduleTimestamp: testRun.startTimestamp,
       recurringWeekly: testRun.recurringWeekly,
-      recurringMonthly: testRun.recurringMonthly,
-      testSuiteIds:testMode? [] : testSuiteIds,
+      recurringMonthly: testRun.recurringMonthly
     }
   }
 }
