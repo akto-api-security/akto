@@ -29,7 +29,6 @@ import com.akto.dto.type.URLMethods;
 import com.akto.github.GithubUtils;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-import com.akto.store.AuthMechanismStore;
 import com.akto.store.SampleMessageStore;
 import com.akto.store.TestingUtil;
 import com.akto.test_editor.execution.Executor;
@@ -137,7 +136,6 @@ public class TestExecutor {
 
         SampleMessageStore sampleMessageStore = SampleMessageStore.create();
         sampleMessageStore.fetchSampleMessages(Main.extractApiCollectionIds(testingRun.getTestingEndpoints().returnApis()));
-        AuthMechanismStore authMechanismStore = AuthMechanismStore.create();
 
         List<ApiInfo.ApiInfoKey> apiInfoKeyList = testingEndpoints.returnApis();
         if (apiInfoKeyList == null || apiInfoKeyList.isEmpty()) return;
@@ -145,23 +143,12 @@ public class TestExecutor {
 
         sampleMessageStore.buildSingleTypeInfoMap(testingEndpoints);
         List<TestRoles> testRoles = sampleMessageStore.fetchTestRoles();
-        AuthMechanism authMechanism = authMechanismStore.getAuthMechanism();;
+        TestRoles attackerTestRole = Executor.fetchOrFindAttackerRole();
 
         Map<String, TestConfig> testConfigMap = YamlTemplateDao.instance.fetchTestConfigMap(false, false);
 
         List<CustomAuthType> customAuthTypes = CustomAuthTypeDao.instance.findAll(CustomAuthType.ACTIVE,true);
-        TestingUtil testingUtil = new TestingUtil(authMechanism, sampleMessageStore, testRoles, testingRun.getUserEmail(), customAuthTypes);
-
-        try {
-            LoginFlowResponse loginFlowResponse = triggerLoginFlow(authMechanism, 3);
-            if (!loginFlowResponse.getSuccess()) {
-                loggerMaker.errorAndAddToDb("login flow failed", LogDb.TESTING);
-                throw new Exception("login flow failed");
-            }
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e.getMessage(), LogDb.TESTING);
-            return;
-        }
+        TestingUtil testingUtil = new TestingUtil(sampleMessageStore, testRoles, testingRun.getUserEmail(), customAuthTypes);
 
         Map<ApiInfo.ApiInfoKey, List<String>> sampleDataMapForStatusCodeAnalyser = new HashMap<>();
         Set<ApiInfo.ApiInfoKey> apiInfoKeySet = new HashSet<>(apiInfoKeyList);
@@ -173,7 +160,7 @@ public class TestExecutor {
         }
 
         try {
-            StatusCodeAnalyser.run(sampleDataMapForStatusCodeAnalyser, sampleMessageStore , authMechanismStore, testingRun.getTestingRunConfig());
+            StatusCodeAnalyser.run(sampleDataMapForStatusCodeAnalyser, sampleMessageStore , attackerTestRole.findMatchingAuthMechanism(null), testingRun.getTestingRunConfig());
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error while running status code analyser " + e.getMessage(), LogDb.TESTING);
         }
@@ -348,14 +335,14 @@ public class TestExecutor {
 
         loggerMaker.infoAndAddToDb("login flow execution started", LogDb.TESTING);
 
-        WorkflowTest workflowObj = convertToWorkflowGraph(authMechanism.getRequestData(), loginFlowParams);
+        WorkflowTest workflowObj = convertToWorkflowGraph(authMechanism.getRequestData());
         ApiWorkflowExecutor apiWorkflowExecutor = new ApiWorkflowExecutor();
         LoginFlowResponse loginFlowResp;
         loginFlowResp =  com.akto.testing.workflow_node_executor.Utils.runLoginFlow(workflowObj, authMechanism, loginFlowParams);
         return loginFlowResp;
     }
 
-    public static WorkflowTest convertToWorkflowGraph(ArrayList<RequestData> requestData, LoginFlowParams loginFlowParams) {
+    public static WorkflowTest convertToWorkflowGraph(ArrayList<RequestData> requestData) {
 
         String source, target;
         List<String> edges = new ArrayList<>();
@@ -387,9 +374,9 @@ public class TestExecutor {
             WorkflowNodeDetails.Type nodeType = WorkflowNodeDetails.Type.API;
             if (data.getType().equals(LoginFlowEnums.LoginStepTypesEnums.OTP_VERIFICATION.toString())) {
                 nodeType = WorkflowNodeDetails.Type.OTP;
-                if (loginFlowParams == null || !loginFlowParams.getFetchValueMap()) {
-                    waitTime = 60;
-                }
+                
+                waitTime = 60;
+                
             }
             if (data.getType().equals(LoginFlowEnums.LoginStepTypesEnums.RECORDED_FLOW.toString())) {
                 nodeType = WorkflowNodeDetails.Type.RECORDED;
@@ -622,8 +609,24 @@ public class TestExecutor {
     }
 
     public TestingRunResult runTestNew(ApiInfo.ApiInfoKey apiInfoKey, ObjectId testRunId, TestingUtil testingUtil,
-                                       ObjectId testRunResultSummaryId, TestConfig testConfig, TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs) {
+        ObjectId testRunResultSummaryId, TestConfig testConfig, TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs) {
+            List<String> sampleMessages = testingUtil.getSampleMessages().get(apiInfoKey);
+            AuthMechanism attackerAuthMechanism = null;
+            if (sampleMessages != null && !sampleMessages.isEmpty()) {           
 
+                RawApi rawApi = RawApi.buildFromMessage(sampleMessages.get(0));
+                TestRoles attackerTestRole = Executor.fetchOrFindAttackerRole();
+                if (attackerTestRole == null) {
+                    loggerMaker.infoAndAddToDb("ATTACKER_TOKEN_ALL test role not found", LogDb.TESTING);
+                } else {
+                    attackerAuthMechanism = attackerTestRole.findMatchingAuthMechanism(rawApi);
+                }
+            }
+            return runTestNew(apiInfoKey, testRunId, testingUtil.getSampleMessageStore(), attackerAuthMechanism, testingUtil.getCustomAuthTypes(), testRunResultSummaryId, testConfig, testingRunConfig, debug, testLogs);
+    }
+
+    public TestingRunResult runTestNew(ApiInfo.ApiInfoKey apiInfoKey, ObjectId testRunId, SampleMessageStore sampleMessageStore, AuthMechanism attackerAuthMechanism, List<CustomAuthType> customAuthTypes,
+                                       ObjectId testRunResultSummaryId, TestConfig testConfig, TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs) {        
         String testSuperType = testConfig.getInfo().getCategory().getName();
         String testSubType = testConfig.getInfo().getSubCategory();
 
@@ -637,7 +640,7 @@ public class TestExecutor {
             );
         }
 
-        List<String> messages = testingUtil.getSampleMessages().get(apiInfoKey);
+        List<String> messages = sampleMessageStore.getSampleDataMap().get(apiInfoKey);
         if (messages == null || messages.isEmpty()){
             List<GenericTestResult> testResults = new ArrayList<>();
             testResults.add(new TestResult(null, null, Collections.singletonList(TestError.NO_PATH.getMessage()),0, false, Confidence.HIGH, null));
@@ -649,7 +652,6 @@ public class TestExecutor {
         }
 
         String message = messages.get(messages.size() - 1);
-
         RawApi rawApi = RawApi.buildFromMessage(message);
         int startTime = Context.now();
 
@@ -675,20 +677,18 @@ public class TestExecutor {
             varMap.put("wordList_" + key, wordListsMap.get(key));
         }
 
-        VariableResolver.resolveWordList(varMap, testingUtil.getSampleMessages(), apiInfoKey);
+        VariableResolver.resolveWordList(varMap, sampleMessageStore.getSampleDataMap(), apiInfoKey);
 
         String testExecutionLogId = UUID.randomUUID().toString();
         
         loggerMaker.infoAndAddToDb("triggering test run for apiInfoKey " + apiInfoKey + "test " + 
             testSubType + "logId" + testExecutionLogId, LogDb.TESTING);
 
-        List<CustomAuthType> customAuthTypes = testingUtil.getCustomAuthTypes();
-        // TestingUtil -> authMechanism
-        // TestingConfig -> auth
-        com.akto.test_editor.execution.Executor executor = new Executor();
+
+            com.akto.test_editor.execution.Executor executor = new Executor();
         executor.overrideTestUrl(rawApi, testingRunConfig);
         YamlTestTemplate yamlTestTemplate = new YamlTestTemplate(apiInfoKey,filterNode, validatorNode, executorNode,
-                rawApi, varMap, auth, testingUtil.getAuthMechanism(), testExecutionLogId, testingRunConfig, customAuthTypes, testConfig.getStrategy());
+                rawApi, varMap, auth, attackerAuthMechanism, testExecutionLogId, testingRunConfig, customAuthTypes, testConfig.getStrategy());
         YamlTestResult testResults = yamlTestTemplate.run(debug, testLogs);
         if (testResults == null || testResults.getTestResults().isEmpty()) {
             List<GenericTestResult> res = new ArrayList<>();

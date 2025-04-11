@@ -301,7 +301,6 @@ public class SaveTestEditorAction extends UserAction {
                 apiInfoKey.getString(ApiInfo.ApiInfoKey.URL),
                 URLMethods.Method.valueOf(apiInfoKey.getString(ApiInfo.ApiInfoKey.METHOD)));
 
-        AuthMechanism authMechanism = TestRolesDao.instance.fetchAttackerToken(0);
         Map<ApiInfo.ApiInfoKey, List<String>> sampleDataMap = new HashMap<>();
         Map<ApiInfo.ApiInfoKey, List<String>> newSampleDataMap = new HashMap<>();
         
@@ -325,7 +324,7 @@ public class SaveTestEditorAction extends UserAction {
 
         SampleMessageStore messageStore = SampleMessageStore.create(sampleDataMap);
         List<CustomAuthType> customAuthTypes = CustomAuthTypeDao.instance.findAll(CustomAuthType.ACTIVE,true);
-        TestingUtil testingUtil = new TestingUtil(authMechanism, messageStore, null, null, customAuthTypes);
+        TestingUtil testingUtil = new TestingUtil(messageStore, null, null, customAuthTypes);
         List<TestingRunResult.TestLog> testLogs = new ArrayList<>();
         int lastSampleIndex = sampleDataList.get(0).getSamples().size() - 1;
         
