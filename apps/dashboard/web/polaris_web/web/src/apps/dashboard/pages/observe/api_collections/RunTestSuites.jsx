@@ -2,7 +2,7 @@ import { VerticalStack, Modal, TextField, Button, Text, HorizontalStack, Collaps
 import { TickMinor, CancelMajor, SearchMinor } from "@shopify/polaris-icons";
 import { useEffect, useRef, useState } from "react";
 import "./run_test_suites.css"
-import createTestName from "./Utils"
+import { createTestName } from "./Utils"
 import RunTestSuiteRow from "./RunTestSuiteRow";
 import testingApi from "../../testing/api";
 import func from "../../../../../util/func";
@@ -20,7 +20,7 @@ const owaspTop10List = {
     "Unsafe Consumption of APIs": ["COMMAND_INJECTION", "INJ", "CRLF", "SSTI", "LFI", "XSS", "INJECT"]
 }
 
-function RunTestSuites({ testRun, setTestRun, apiCollectionName, activeFromTesting, setTestSuiteIds, testSuiteIds,setSelectedGeneratedSuiteTests, selectedGeneratedSuiteTests,setTestNameSuiteModal,testNameSuiteModal }) {
+function RunTestSuites({ testRun, setTestRun, apiCollectionName, checkRemoveAll, handleRemoveAll, handleModifyConfig, activeFromTesting }) {
 
     const [data, setData] = useState({ owaspTop10List: {}, testingMethods:{}, custom : {}, severity: {} });
 
@@ -67,7 +67,7 @@ function RunTestSuites({ testRun, setTestRun, apiCollectionName, activeFromTesti
         // Fetch Custom Test Suite
         const fetchedTestSuite = await testingApi.fetchAllTestSuites();
         const fetchedData = fetchedTestSuite.map((testSuiteItem) => {
-            return { name: testSuiteItem.name, tests: testSuiteItem.subCategoryList, id: testSuiteItem.hexId }
+            return { name: testSuiteItem.name, tests: testSuiteItem.subCategoryList }
 
         });
         setData(prev => {
@@ -91,40 +91,72 @@ function RunTestSuites({ testRun, setTestRun, apiCollectionName, activeFromTesti
     
     useEffect(() => {
         fetchData();
-    }, []);
+    }, []);   
 
 
     function handleTestSuiteSelection(data) {
-        if (!data.id) {
-            let testName = apiCollectionName + "_" + func.joinWordsWithUnderscores(data.name)
-            if(!activeFromTesting)setTestNameSuiteModal(testName)
-            setSelectedGeneratedSuiteTests([...data?.tests])
-            setTestSuiteIds([])
-            return;
-        }
+        setTestRun(prev => {
+            const updatedTests = { ...prev.tests };
+            const testSet = new Set(data.tests);
 
-        setTestSuiteIds((prev) => {
-            if (!prev.includes(data.id)) {
-                return [data.id]
-            }
-        })
-        let testName = apiCollectionName + "_" + data.name;
-        if(!activeFromTesting)setTestNameSuiteModal(testName)
-        setSelectedGeneratedSuiteTests([])
+            const someSelected = Object.keys(updatedTests).some(category =>
+                updatedTests[category]?.some(test => testSet.has(test.value) && test.selected)
+            );
+
+            Object.keys(updatedTests).forEach(category => {
+                if (updatedTests[category]) {
+                    updatedTests[category] = updatedTests[category].map(test => ({
+                        ...test,
+                        selected: testSet.has(test.value)? (someSelected ? false : true): test.selected
+                    }));
+                }
+            });
+
+            let updatedTestName = createTestName(apiCollectionName, updatedTests, activeFromTesting, prev.testName);
+
+            return {
+                ...prev,
+                tests: updatedTests,
+                testName: updatedTestName
+            };
+        });
     }
 
     function countTestSuitesTests(data) {
-        return data?.tests?.length || 0;
+        if (testRun === undefined) return;
+        let count = 0;
+        const updatedTests = { ...testRun?.tests };
+        const testSet = new Set(data.tests);
+        Object.keys(updatedTests).forEach(category => {
+            updatedTests[category]?.forEach(test => {
+                if (testSet.has(test.value)) {
+                    count++;
+                }
+            });
+        });
+        return count;
     }
 
     function checkedSelected(data) {
         if (testRun === undefined) return;
-        if (!data.id) {
-            let allSelected = func.deepArrayComparison(data?.tests, selectedGeneratedSuiteTests)
-            return allSelected;
-        }
-        if (testSuiteIds.includes(data.id)) return true
-        return false
+        let atleastOne = false;
+        let allSelected = true;;
+        const updatedTests = { ...testRun?.tests };
+        const testSet = new Set(data.tests);
+        Object.keys(updatedTests).forEach(category => {
+            if (updatedTests[category] && updatedTests[category].length > 0) {
+                if (updatedTests[category].some(test => !test.selected && testSet.has(test.value))) {
+                    allSelected = false;
+                }
+                if (updatedTests[category].some(test => test.selected  && testSet.has(test.value))) {
+                    atleastOne = true;
+                }
+            }
+        });
+
+        if (atleastOne && allSelected) return true;
+        else if (atleastOne) return "indeterminate";
+        else return false;
     }
 
     function checkDisableTestSuite(data) {
@@ -143,15 +175,25 @@ function RunTestSuites({ testRun, setTestRun, apiCollectionName, activeFromTesti
     }
 
     function checkifSelected(data) {
-        if(checkedSelected(data) === true) {
-            return `${countTestSuitesTests(data)} tests selected`
-        }
-        return `${countTestSuitesTests(data)} tests`;
-    }
-
-    function handleRemoveAll() {
-        setTestSuiteIds([])
-        setSelectedGeneratedSuiteTests([])
+        let text = `${countTestSuitesTests(data)} tests`;
+        let isSomeSelected = false;
+        let countSelected = 0;
+        const updatedTests = { ...testRun?.tests };
+        const testSet = new Set(data.tests);
+        Object.keys(updatedTests).forEach(category => {
+            if (updatedTests[category] && updatedTests[category].length > 0) {
+                if (updatedTests[category].some(test => test.selected && testSet.has(test.value))) {
+                    isSomeSelected = true;
+                }
+                updatedTests[category]?.forEach(test => {
+                    if (test.selected && testSet.has(test.value)) {
+                        countSelected++;
+                    }
+                });
+            }
+        });
+        if (isSomeSelected === false) return text;
+        else return `${countSelected} out of ${countTestSuitesTests(data)} selected`;
     }
 
     return (
@@ -163,9 +205,9 @@ function RunTestSuites({ testRun, setTestRun, apiCollectionName, activeFromTesti
                         <div style={{ maxWidth: "75%" }}>
                             <TextField
                                 placeholder="Enter test name"
-                                value={testNameSuiteModal}
+                                value={testRun.testName}
                                 disabled={activeFromTesting}
-                                onChange={(testName) => setTestNameSuiteModal(testName)}
+                                onChange={(testName) => setTestRun(prev => ({ ...prev, testName: testName }))}
                             />
                         </div>
                         <div className="removeAllButton">
@@ -174,7 +216,7 @@ function RunTestSuites({ testRun, setTestRun, apiCollectionName, activeFromTesti
                                 plain
                                 destructive
                                 onClick={handleRemoveAll}
-                                disabled={testSuiteIds?.length===0 && selectedGeneratedSuiteTests.length === 0}><div data-testid="remove_all_tests">Clear selection</div></Button></div>
+                                disabled={checkRemoveAll()}><div data-testid="remove_all_tests">Clear selection</div></Button></div>
                     </div>
                     {
                         Object.values(data).map((key) => {
