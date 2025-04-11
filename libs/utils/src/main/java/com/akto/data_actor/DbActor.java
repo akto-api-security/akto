@@ -561,8 +561,4 @@ public class DbActor extends DataActor {
         return DbLayer.getCurrentTestingRunDetailsFromEditor(timestamp);
     }
 
-    public void updateTestingRunPlayground(TestingRunPlayground testingRunPlayground) {
-        DbLayer.updateTestingRunPlayground(testingRunPlayground);
-    }
-
 }

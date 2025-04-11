@@ -83,7 +83,7 @@ public class Main {
             private final int timestamp = Context.now()-5*60;
             public void run() {
                 TestExecutor executor = new TestExecutor();
-                TestingRunPlayground testingRunPlayground =  dataActor.getCurrentTestingRunDetailsFromEditor(timestamp); // fetch from Db
+                TestingRunPlayground testingRunPlayground =  null; // fetch from Db
                 TestConfig testConfig = null; 
                 try {
                     testConfig = TestConfigYamlParser.parseTemplate(testingRunPlayground.getTestTemplate());
@@ -107,8 +107,7 @@ public class Main {
                 TestingUtil testingUtil = new TestingUtil(authMechanism, messageStore, null, null, customAuthTypes);
                 TestingRunResult testingRunResult = executor.runTestNew(infoKey, null, testingUtil, null, testConfig, null, true, testLogs);
                 testingRunPlayground.setTestingRunResult(testingRunResult);
-                // update testingRunPlayground in DB
-                // dataActor.updateTestingRunPlayground(testingRunPlayground);
+                // upate testingRunPlayground in DB
             }
         }, 0, 2, TimeUnit.SECONDS);
 
