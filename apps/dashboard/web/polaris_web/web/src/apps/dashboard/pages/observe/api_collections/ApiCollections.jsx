@@ -535,11 +535,10 @@ function ApiCollections() {
                 }
             )
         }
-
         actions.push(
             {
                 content: `Remove collection${func.addPlurality(selectedResources.length)}`,
-                onAction: () => handleCollectionsAction(selectedResources.every(v => {return !defaultApiGroups.includes(v)}), api.deleteMultipleCollections, "deleted")
+                onAction: () => handleCollectionsAction(selectedResources.filter(v => !defaultApiGroups.includes(v)), api.deleteMultipleCollections, "deleted")
             }
         )
 
