@@ -16,12 +16,13 @@ import org.apache.kafka.clients.admin.ListTopicsResult;
 import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.clients.admin.TopicDescription;
 import org.bson.types.ObjectId;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
+import com.akto.dao.context.Context;
 import com.akto.dto.billing.SyncLimit;
 import com.akto.dto.testing.TestingRun;
+import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.info.SingleTestPayload;
+import com.akto.dto.testing.info.SingleTestResultPayload;
 import com.akto.kafka.Kafka;
 import com.akto.testing.TestExecutor;
 import com.akto.util.Constants;
@@ -30,16 +31,27 @@ public class Producer {
 
     private static final LoggerMaker logger = new LoggerMaker(Producer.class, LogDb.TESTING);
 
-    public static final Kafka producer = Constants.IS_NEW_TESTING_ENABLED ?  new Kafka(Constants.LOCAL_KAFKA_BROKER_URL, Constants.LINGER_MS_KAFKA, 100, Constants.MAX_REQUEST_TIMEOUT) : null;
-    public static Void pushMessagesToKafka(List<SingleTestPayload> messages, AtomicInteger totalRecords){
+    public static final Kafka producer = Constants.IS_NEW_TESTING_ENABLED ?  new Kafka(Constants.LOCAL_KAFKA_BROKER_URL, Constants.LINGER_MS_KAFKA, 100, Constants.MAX_REQUEST_TIMEOUT, 3) : null;
+    public static final Kafka producerForInsertion = new Kafka(Constants.LOCAL_KAFKA_BROKER_URL, 1000, 100, 3000, 4);
+    public static Void pushMessagesToKafka(List<SingleTestPayload> messages, AtomicInteger totalRecords, AtomicInteger throttleNumber) {
         for(SingleTestPayload singleTestPayload: messages){
             String messageString = singleTestPayload.toString();
-            producer.send(messageString, Constants.TEST_RESULTS_TOPIC_NAME, totalRecords);
+            try {
+                while (throttleNumber.get() > 500) {
+                    logger.info("Throttling, waiting for throttleNumber to go below 500");
+                    Thread.sleep(200);
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+            totalRecords.incrementAndGet();
+            throttleNumber.incrementAndGet();
+            producer.sendWithCounter(messageString, Constants.TEST_RESULTS_TOPIC_NAME, throttleNumber);
         }
         return null;
     }
 
-    private static void deleteTopicWithRetries(String bootstrapServers, String topicName) {
+    public static void deleteTopicWithRetries(String bootstrapServers, String topicName) {
         int retries = 0;
         int maxRetries = 5;
         int baseBackoff = 500; 
@@ -135,6 +147,11 @@ public class Producer {
         adminProps.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
 
         try (AdminClient adminClient = AdminClient.create(adminProps)) {
+            ListTopicsResult listTopicsResult = adminClient.listTopics();
+            if (listTopicsResult.names().get().contains(topicName)) {
+                logger.info("Topic \"" + topicName + "\" already exists.");
+                return;
+            }
             NewTopic newTopic = new NewTopic(topicName, 1, (short) 1); 
             logger.info("Topic \"" + topicName + "\" creation initiated.");
             adminClient.createTopics(Collections.singletonList(newTopic)).all().get();
@@ -175,5 +192,11 @@ public class Producer {
             }
         }
         executor.init(testingRun, summaryId, syncLimit, doInitOnly);
+    }
+
+    public static Void insertTestingResultMessage(TestingRunResult result){
+        String messageString = SingleTestResultPayload.getMessageString(result);
+        producerForInsertion.send(messageString, Constants.TEST_RESULTS_FOR_INSERTION_TOPIC_NAME);
+        return null;
     }
 }

@@ -5,8 +5,10 @@ import com.akto.dto.type.SingleTypeInfo;
 import com.akto.util.ColorConstants;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
+import com.mongodb.client.model.Updates;
 
 import org.bson.codecs.pojo.annotations.BsonIgnore;
+import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
 import java.util.ArrayList;
@@ -23,6 +25,7 @@ public class TestingRunResult implements Comparable<TestingRunResult> {
 
     @BsonIgnore
     private String testRunHexId;
+    @BsonIgnore String testRunResultSummaryHexId;
 
     public static final String API_INFO_KEY = "apiInfoKey";
     private ApiInfo.ApiInfoKey apiInfoKey;
@@ -58,6 +61,13 @@ public class TestingRunResult implements Comparable<TestingRunResult> {
 
     public static final String WORKFLOW_TEST = "workflowTest";
     private WorkflowTest workflowTest;
+
+    @BsonIgnore
+    private List<TestResult> singleTestResults;
+    @BsonIgnore
+    private List<MultiExecTestResult> multiExecTestResults;
+
+    
 
     @BsonIgnore
     private List<TestLog> testLogs = new ArrayList<>();
@@ -283,6 +293,27 @@ public class TestingRunResult implements Comparable<TestingRunResult> {
          "\n" + ColorConstants.RESET;
     }
 
+    public static Bson buildFullUpdate(TestingRunResult runResult) {
+        return Updates.combine(
+            Updates.setOnInsert(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, runResult.getTestRunResultSummaryId()),
+            Updates.setOnInsert(TestingRunResult.API_INFO_KEY, runResult.getApiInfoKey()),
+            Updates.setOnInsert(TestingRunResult.TEST_SUB_TYPE, runResult.getTestSubType()),
+            Updates.setOnInsert(TestingRunResult.CONFIDENCE_PERCENTAGE, runResult.getConfidencePercentage()),
+            Updates.setOnInsert(TestingRunResult.TEST_RESULTS, runResult.getTestResults()),
+            Updates.setOnInsert(TestingRunResult.TEST_RUN_ID, runResult.getTestRunId()),
+            Updates.setOnInsert(TestingRunResult.TEST_SUPER_TYPE, runResult.getTestSuperType()),
+            Updates.setOnInsert(TestingRunResult.RERUN, runResult.isRerun()),
+            Updates.setOnInsert(TestingRunResult.VULNERABLE, runResult.isVulnerable()),
+            Updates.setOnInsert(TestingRunResult.SINGLE_TYPE_INFOS, runResult.getSingleTypeInfos()),
+            Updates.setOnInsert(TestingRunResult.START_TIMESTAMP, runResult.getStartTimestamp()),
+            Updates.setOnInsert(TestingRunResult.END_TIMESTAMP, runResult.getEndTimestamp()),
+            Updates.setOnInsert(TestingRunResult.IS_IGNORED_RESULT, runResult.isIgnoredResult()),
+            Updates.setOnInsert(TestingRunResult.ERRORS_LIST, runResult.getErrorsList()),
+            Updates.setOnInsert(TestingRunResult.WORKFLOW_TEST, runResult.getWorkflowTest())
+        );
+}
+
+
     public String toOutputString(String severity){
         StringBuilder bld = new StringBuilder();
 
@@ -362,5 +393,29 @@ public class TestingRunResult implements Comparable<TestingRunResult> {
 
     public void setIgnoredResult(boolean isIgnoredResult) {
         this.isIgnoredResult = isIgnoredResult;
+    }
+
+    public String getTestRunResultSummaryHexId() {
+        return testRunResultSummaryHexId;
+    }
+
+    public void setTestRunResultSummaryHexId(String testRunResultSummaryHexId) {
+        this.testRunResultSummaryHexId = testRunResultSummaryHexId;
+    }
+
+    public List<TestResult> getSingleTestResults() {
+        return singleTestResults;
+    }
+
+    public void setSingleTestResults(List<TestResult> singleTestResults) {
+        this.singleTestResults = singleTestResults;
+    }
+
+    public List<MultiExecTestResult> getMultiExecTestResults() {
+        return multiExecTestResults;
+    }
+
+    public void setMultiExecTestResults(List<MultiExecTestResult> multiExecTestResults) {
+        this.multiExecTestResults = multiExecTestResults;
     }
 }

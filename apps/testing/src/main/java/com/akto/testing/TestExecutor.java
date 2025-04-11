@@ -126,12 +126,8 @@ public class TestExecutor {
     public static final String REQUEST_HOUR = "requestHour";
     public static final String COUNT = "count";
     public static final int ALLOWED_REQUEST_PER_HOUR = 100;
+    TestingIssuesHandler issuesHandler = new TestingIssuesHandler();
 
-    private static int expiryTimeOfAuthToken = -1;
-
-    public static synchronized void setExpiryTimeOfAuthToken(int newExpiryTime) {
-        expiryTimeOfAuthToken = newExpiryTime;
-    }
 
     public void init(TestingRun testingRun, ObjectId summaryId, SyncLimit syncLimit, boolean shouldInitOnly) {
         if (testingRun.getTestIdConfig() != 1) {
@@ -323,27 +319,6 @@ public class TestExecutor {
 
         ConcurrentHashMap<String, String> subCategoryEndpointMap = new ConcurrentHashMap<>();
         Map<ApiInfoKey, String> apiInfoKeyToHostMap = new HashMap<>();
-        // for (String testSubCategory: testingRunSubCategories) {
-        //     TestConfig testConfig = testConfigMap.get(testSubCategory);
-        //     if (testConfig == null || testConfig.getStrategy() == null || testConfig.getStrategy().getRunOnce() == null) {
-        //         continue;
-        //     }
-        //     for (ApiInfo.ApiInfoKey apiInfoKey: apiInfoKeyList) {
-        //         try {
-        //             hostName = findHost(apiInfoKey, testingUtil.getSampleMessages(), testingUtil.getSampleMessageStore());
-        //             if (hostName == null) {
-        //                 continue;
-        //             }
-        //             if(hostsToApiCollectionMap.get(hostName) == null) {
-        //                 hostsToApiCollectionMap.put(hostName, apiInfoKey.getApiCollectionId());
-        //             }
-        //             apiInfoKeyToHostMap.put(apiInfoKey, hostName);
-        //             subCategoryEndpointMap.put(apiInfoKey.getApiCollectionId() + "_" + testSubCategory, hostName);
-        //         } catch (URISyntaxException e) {
-        //             loggerMaker.errorAndAddToDb("Error while finding host: " + e, LogDb.TESTING);
-        //         }
-        //     }
-        // }
 
         // init the singleton class here
         TestingConfigurations.getInstance().init(testingUtil, testingRun.getTestingRunConfig(), debug, testConfigMap, testingRun.getMaxConcurrentRequests());
@@ -352,6 +327,7 @@ public class TestExecutor {
             int maxThreads = Math.min(testingRunSubCategories.size(), 500);
             AtomicInteger totalRecordsInsertedInKafka = new AtomicInteger(0);
             AtomicInteger skippedRecordsForKafka = new AtomicInteger(0);
+            AtomicInteger throttleNumber = new AtomicInteger(0);
             if(maxThreads == 0){
                 loggerMaker.infoAndAddToDb("Subcategories list are empty");
                 return;
@@ -390,7 +366,7 @@ public class TestExecutor {
                             insertRecordInKafka(accountId, testSubCategory,
                                     apiInfoKey, messages, summaryId, syncLimit, apiInfoKeyToHostMap, subCategoryEndpointMap,
                                     testConfigMap, testLogs, testingRun, new AtomicBoolean(false),
-                                    totalRecordsInsertedInKafka, skippedRecordsForKafka);
+                                    totalRecordsInsertedInKafka, skippedRecordsForKafka, throttleNumber);
                         }
                     }
                 }
@@ -440,7 +416,7 @@ public class TestExecutor {
                     if(GetRunningTestsStatus.getRunningTests().isTestRunning(summaryId, true)){
                         insertRecordInKafka(accountId, testSubCategory, apiInfoKey, messages, summaryId, syncLimit,
                                 apiInfoKeyToHostMap, subCategoryEndpointMap, testConfigMap, testLogs, testingRun,
-                                isApiInfoTested, new AtomicInteger(), new AtomicInteger());
+                                isApiInfoTested, new AtomicInteger(), new AtomicInteger(), new AtomicInteger());
                     }else{
                         loggerMaker.info("Test stopped for id: " + testingRun.getHexId());
                         break;
@@ -460,7 +436,7 @@ public class TestExecutor {
             List<String> messages, ObjectId summaryId, SyncLimit syncLimit, Map<ApiInfoKey, String> apiInfoKeyToHostMap,
             ConcurrentHashMap<String, String> subCategoryEndpointMap, Map<String, TestConfig> testConfigMap,
             List<TestingRunResult.TestLog> testLogs, TestingRun testingRun, AtomicBoolean isApiInfoTested, 
-            AtomicInteger totalRecords,  AtomicInteger skippedRecords) {
+            AtomicInteger totalRecords,  AtomicInteger skippedRecords, AtomicInteger throttleNumber) {
         Context.accountId.set(accountId);
         TestConfig testConfig = testConfigMap.get(testSubCategory);
                     
@@ -503,7 +479,7 @@ public class TestExecutor {
             }
             
             try {
-                Producer.pushMessagesToKafka(Arrays.asList(singleTestPayload), totalRecords);
+                Producer.pushMessagesToKafka(Arrays.asList(singleTestPayload), totalRecords, throttleNumber);
             } catch (Exception e) {
                 e.printStackTrace();
                 return null;
@@ -611,23 +587,6 @@ public class TestExecutor {
         return null;
     }
 
-    private LoginFlowResponse triggerLoginFlow(AuthMechanism authMechanism, int retries) {
-        LoginFlowResponse loginFlowResponse = null;
-        for (int i=0; i<retries; i++) {
-            try {
-                loggerMaker.info("retry attempt: " + i + " for login flow");
-                loginFlowResponse = executeLoginFlow(authMechanism, null, null);
-                if (loginFlowResponse.getSuccess()) {
-                    loggerMaker.infoAndAddToDb("login flow success", LogDb.TESTING);
-                    break;
-                }
-            } catch (Exception e) {
-                loggerMaker.errorAndAddToDb(e.getMessage(), LogDb.TESTING);
-            }
-        }
-        return loginFlowResponse;
-    }
-
     public static LoginFlowResponse executeLoginFlow(AuthMechanism authMechanism, LoginFlowParams loginFlowParams, String roleName) throws Exception {
 
         if (authMechanism.getType() == null) {
@@ -643,7 +602,6 @@ public class TestExecutor {
         loggerMaker.infoAndAddToDb("login flow execution started", LogDb.TESTING);
 
         WorkflowTest workflowObj = convertToWorkflowGraph(authMechanism.getRequestData());
-        ApiWorkflowExecutor apiWorkflowExecutor = new ApiWorkflowExecutor();
         LoginFlowResponse loginFlowResp;
         loginFlowResp =  com.akto.testing.workflow_node_executor.Utils.runLoginFlow(workflowObj, authMechanism, loginFlowParams, roleName);
         return loginFlowResp;
@@ -789,56 +747,58 @@ public class TestExecutor {
 
     public void insertResultsAndMakeIssues(List<TestingRunResult> testingRunResults, ObjectId testRunResultSummaryId) {
         int resultSize = testingRunResults.size();
-        if (resultSize > 0) {
-            loggerMaker.infoAndAddToDb("testingRunResults size: " + resultSize, LogDb.TESTING);
-            trim(testingRunResults);
-            TestingRunResult originalTestingRunResultForRerun = TestingConfigurations.getInstance().getTestingRunResultForApiKeyInfo(testingRunResults.get(0).getApiInfoKey(), testingRunResults.get(0).getTestSubType());
-            if (originalTestingRunResultForRerun != null) {
-                loggerMaker.infoAndAddToDb("Deleting original testingRunResults for rerun after replaced with run TRR_ID: " + originalTestingRunResultForRerun.getHexId());
-                TestingRunResultDao.instance.deleteAll(Filters.eq(TestingRunResultDao.ID, originalTestingRunResultForRerun.getId()));
-                /*
-                * delete from vulnerableTestResults as well.
-                * assuming if original was vulnerable, entry will be in VulnerableTestingRunResultDao
-                * for API_INFO_KEY, TEST_RUN_RESULT_SUMMARY_ID, TEST_SUB_TYPE, VulnerableTestingRunResultDao will have
-                * single entry
-                * */
-                if (originalTestingRunResultForRerun.isVulnerable()) {
-                    Bson filters = Filters.and(
-                            Filters.eq(TestingRunResult.API_INFO_KEY, originalTestingRunResultForRerun.getApiInfoKey()),
-                            Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, originalTestingRunResultForRerun.getTestRunResultSummaryId()),
-                            Filters.eq(TestingRunResult.TEST_SUB_TYPE, originalTestingRunResultForRerun.getTestSubType())
-                    );
-                    loggerMaker.infoAndAddToDb("Deleting from vulnerableTestingRunResults if present for rerun after replaced with run TRR_ID: " + originalTestingRunResultForRerun.getHexId());
-                    VulnerableTestingRunResultDao.instance.deleteAll(filters);
+        try {
+            if (resultSize > 0) {
+                trim(testingRunResults);
+                TestingRunResult originalTestingRunResultForRerun = TestingConfigurations.getInstance().getTestingRunResultForApiKeyInfo(testingRunResults.get(0).getApiInfoKey(), testingRunResults.get(0).getTestSubType());
+                if (originalTestingRunResultForRerun != null) {
+                    loggerMaker.infoAndAddToDb("Deleting original testingRunResults for rerun after replaced with run TRR_ID: " + originalTestingRunResultForRerun.getHexId());
+                    TestingRunResultDao.instance.deleteAll(Filters.eq(TestingRunResultDao.ID, originalTestingRunResultForRerun.getId()));
+                    /*
+                    * delete from vulnerableTestResults as well.
+                    * assuming if original was vulnerable, entry will be in VulnerableTestingRunResultDao
+                    * for API_INFO_KEY, TEST_RUN_RESULT_SUMMARY_ID, TEST_SUB_TYPE, VulnerableTestingRunResultDao will have
+                    * single entry
+                    * */
+                    if (originalTestingRunResultForRerun.isVulnerable()) {
+                        Bson filters = Filters.and(
+                                Filters.eq(TestingRunResult.API_INFO_KEY, originalTestingRunResultForRerun.getApiInfoKey()),
+                                Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, originalTestingRunResultForRerun.getTestRunResultSummaryId()),
+                                Filters.eq(TestingRunResult.TEST_SUB_TYPE, originalTestingRunResultForRerun.getTestSubType())
+                        );
+                        loggerMaker.infoAndAddToDb("Deleting from vulnerableTestingRunResults if present for rerun after replaced with run TRR_ID: " + originalTestingRunResultForRerun.getHexId());
+                        VulnerableTestingRunResultDao.instance.deleteAll(filters);
+                    }
                 }
-            }
-            TestingRunResultDao.instance.insertMany(testingRunResults);
-            loggerMaker.infoAndAddToDb("Inserted testing results", LogDb.TESTING);
-
-            // insert vulnerable testing run results here
-            List<TestingRunResult> vulTestResults = new ArrayList<>();
-            for(TestingRunResult runResult: testingRunResults){
-                if(runResult != null && runResult.isVulnerable()){
-                    vulTestResults.add(runResult);
+                
+                for(TestingRunResult testingRunResult: testingRunResults){
+                    if(testingRunResult.getWorkflowTest() != null){
+                        TestingRunResultDao.instance.insertOne(testingRunResult);
+                        if(testingRunResult.isVulnerable()){
+                            VulnerableTestingRunResultDao.instance.insertOne(testingRunResult);
+                        }
+                        issuesHandler.handleIssuesCreationFromTestingRunResults(Arrays.asList(testingRunResult), false);
+                    }else{
+                        loggerMaker.info("Sending TRR to kafka: " + testingRunResult.getApiInfoKey().toString() + " : " + testingRunResult.getTestSubType());
+                        Producer.insertTestingResultMessage(testingRunResult);
+                    }
+                    
                 }
+    
+                TestingRunResultSummariesDao.instance.getMCollection().withWriteConcern(WriteConcern.W1).findOneAndUpdate(
+                    Filters.eq(Constants.ID, testRunResultSummaryId),
+                    Updates.inc(TestingRunResultSummary.TEST_RESULTS_COUNT, resultSize)
+                );
+    
+                loggerMaker.infoAndAddToDb("Updated count in summary", LogDb.TESTING);
+    
+                // removed the issues creation from here, moved to the consumer
             }
-
-            if(!vulTestResults.isEmpty()){
-                loggerMaker.infoAndAddToDb("Inserted vul testing results.", LogDb.TESTING);
-                VulnerableTestingRunResultDao.instance.insertMany(vulTestResults);
-            }
-
-            TestingRunResultSummariesDao.instance.getMCollection().withWriteConcern(WriteConcern.W1).findOneAndUpdate(
-                Filters.eq(Constants.ID, testRunResultSummaryId),
-                Updates.inc(TestingRunResultSummary.TEST_RESULTS_COUNT, resultSize)
-            );
-
-            loggerMaker.infoAndAddToDb("Updated count in summary", LogDb.TESTING);
-
-            TestingIssuesHandler handler = new TestingIssuesHandler();
-            boolean triggeredByTestEditor = false;
-            handler.handleIssuesCreationFromTestingRunResults(testingRunResults, triggeredByTestEditor);
+        } catch (Exception e) {
+            e.printStackTrace();
+            loggerMaker.errorAndAddToDb("Error while inserting results in kafka: " + e.getMessage(), LogDb.TESTING);
         }
+        
     }
 
     Set<Integer> deactivatedCollections = UsageMetricCalculator.getDeactivated();

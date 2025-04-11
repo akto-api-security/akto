@@ -63,7 +63,7 @@ public class ConsumerUtil {
 
     private final int maxRunTimeForTests = 5 * 60;
 
-    public void initializeConsumer() {
+    public static void initializeConsumer() {
         String mongoURI = System.getenv("AKTO_MONGO_CONN");
         ReadPreference readPreference = ReadPreference.secondary();
         if(DashboardMode.isOnPremDeployment()){
