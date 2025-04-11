@@ -1498,6 +1498,17 @@ mapCollectionIdToHostName(apiCollections){
     }
 
   },
+  getSeverityTextForEndpoints(val){
+    if(!val) return ""
+    if(val >= 0 && val < 3){
+      return "LOW"
+    }else if(val >= 3 && val < 4){
+      return "MEDIUM"
+    }else if(val >= 4 && val <= 5){
+      return "HIGH"
+    }
+    else return  ""
+  },
 
   getColorForCharts(key){
     switch(key){
