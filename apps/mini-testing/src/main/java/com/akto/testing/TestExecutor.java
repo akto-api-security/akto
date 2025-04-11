@@ -181,8 +181,18 @@ public class TestExecutor {
             }
         }
 
+        int currentTime = Context.now();
+        Map<String, String> hostAndContentType = new HashMap<>();
         try {
-            StatusCodeAnalyser.run(sampleDataMapForStatusCodeAnalyser, sampleMessageStore , attackerTestRole.findMatchingAuthMechanism(null), testingRun.getTestingRunConfig());
+            loggerMaker.infoAndAddToDb("Starting findAllHosts at: " + currentTime, LogDb.TESTING);
+            hostAndContentType = StatusCodeAnalyser.findAllHosts(sampleMessageStore, sampleDataMapForStatusCodeAnalyser);
+            loggerMaker.infoAndAddToDb("Completing findAllHosts in: " + (Context.now() -  currentTime) + " at: " + Context.now(), LogDb.TESTING);
+        } catch (Exception e){
+            loggerMaker.errorAndAddToDb("Error while running findAllHosts " + e.getMessage(), LogDb.TESTING);
+        }
+
+        try {
+            StatusCodeAnalyser.run(sampleDataMapForStatusCodeAnalyser, sampleMessageStore ,  attackerTestRole.findMatchingAuthMechanism(null), testingRun.getTestingRunConfig(), hostAndContentType);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error while running status code analyser " + e.getMessage(), LogDb.TESTING);
         }
@@ -304,24 +314,46 @@ public class TestExecutor {
         return severity;
     }
 
-    public static String findHost(ApiInfo.ApiInfoKey apiInfoKey, Map<ApiInfo.ApiInfoKey, List<String>> sampleMessagesMap, SampleMessageStore sampleMessageStore) throws URISyntaxException {
+    public static OriginalHttpRequest findOriginalHttpRequest(ApiInfo.ApiInfoKey apiInfoKey, Map<ApiInfo.ApiInfoKey, List<String>> sampleMessagesMap, SampleMessageStore sampleMessageStore){
         List<String> sampleMessages = sampleMessagesMap.get(apiInfoKey);
         if (sampleMessages == null || sampleMessagesMap.isEmpty()) return null;
+
+        loggerMaker.infoAndAddToDb("Starting to find host for apiInfoKey: " + apiInfoKey.toString());
 
         List<RawApi> messages = sampleMessageStore.fetchAllOriginalMessages(apiInfoKey);
         if (messages.isEmpty()) return null;
 
-        OriginalHttpRequest originalHttpRequest = messages.get(0).getRequest();
+        return messages.get(0).getRequest();
+    }
 
+    public static String findHostFromOriginalHttpRequest(OriginalHttpRequest originalHttpRequest)
+            throws URISyntaxException {
         String baseUrl = originalHttpRequest.getUrl();
         if (baseUrl.startsWith("http")) {
             URI uri = new URI(baseUrl);
             String host = uri.getScheme() + "://" + uri.getHost();
-            return (uri.getPort() != -1)  ? host + ":" + uri.getPort() : host;
+            return (uri.getPort() != -1) ? host + ":" + uri.getPort() : host;
         } else {
             return "https://" + originalHttpRequest.findHostFromHeader();
         }
     }
+
+    public static String findContentTypeFromOriginalHttpRequest(OriginalHttpRequest originalHttpRequest) {
+        Map<String, List<String>> headers = originalHttpRequest.getHeaders();
+        if (headers == null || headers.isEmpty()) {
+            return null;
+        }
+        final String CONTENT_TYPE = "content-type";
+        if (headers.containsKey(CONTENT_TYPE)) {
+            List<String> headerValues = headers.get(CONTENT_TYPE);
+            if (headerValues == null || headerValues.isEmpty()) {
+                return null;
+            }
+            return headerValues.get(0);
+        }
+        return null;
+    }
+
 
     private LoginFlowResponse triggerLoginFlow(AuthMechanism authMechanism, int retries) {
         LoginFlowResponse loginFlowResponse = null;

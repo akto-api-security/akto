@@ -131,3 +131,14 @@ jobs:
             cd ../testing-db-layer
             docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/testing-db-layer:$IMAGE_TAG -t $ECR_REGISTRY/testing-db-layer:$IMAGE_TAG1 -t $ECR_REGISTRY/testing-db-layer:$IMAGE_TAG2 -t $ECR_REGISTRY/testing-db-layer:$IMAGE_TAG3 . --push
           fi
+      - name: Send Github release notification to Slack
+        id: slack
+        uses: slackapi/slack-github-action@v1.23.0
+        with:
+          payload: |
+            {
+              "text": "Hybrid Runtime version v${{ github.event.inputs.release_version }} released!"
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
