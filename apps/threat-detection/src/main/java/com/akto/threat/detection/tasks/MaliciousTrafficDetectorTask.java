@@ -171,8 +171,14 @@ public class MaliciousTrafficDetectorTask implements Task {
 
   private void processRecord(HttpResponseParam record) throws Exception {
     HttpResponseParams responseParam = buildHttpResponseParam(record);
-    Optional<String> actorIp = SourceIPActorGenerator.instance.generate(responseParam);
-    responseParam.setSourceIP(actorIp.orElse(""));
+    String actor = SourceIPActorGenerator.instance.generate(responseParam).orElse("");
+    responseParam.setSourceIP(actor);
+
+    if (actor == null || actor.isEmpty()) {
+      logger.info("Dropping processing of record with no actor IP");
+      return;
+    }
+
     logger.info("Processing record with actor IP: " + responseParam.getSourceIP());
     Context.accountId.set(Integer.parseInt(responseParam.getAccountId()));
     Map<String, FilterConfig> filters = this.getFilters();
@@ -220,51 +226,49 @@ public class MaliciousTrafficDetectorTask implements Task {
 
         boolean isAggFilter = aggRules != null && !aggRules.getRule().isEmpty();
 
-        actorIp.ifPresent(
-            actor -> {
-              String groupKey = apiFilter.getId();
-              String aggKey = actor + "|" + groupKey;
 
-              SampleMaliciousRequest maliciousReq = SampleMaliciousRequest.newBuilder()
-                  .setUrl(responseParam.getRequestParams().getURL())
-                  .setMethod(responseParam.getRequestParams().getMethod())
-                  .setPayload(responseParam.getOrig())
-                  .setIp(actor) // For now using actor as IP
-                  .setApiCollectionId(responseParam.getRequestParams().getApiCollectionId())
-                  .setTimestamp(responseParam.getTime())
-                  .setFilterId(apiFilter.getId())
-                  .setMetadata(Metadata.newBuilder().setCountryCode(metadata.getCountryCode()))
-                  .build();
+        String groupKey = apiFilter.getId();
+        String aggKey = actor + "|" + groupKey;
 
-              maliciousMessages.add(
-                  SampleRequestKafkaEnvelope.newBuilder()
-                      .setActor(actor)
-                      .setAccountId(responseParam.getAccountId())
-                      .setMaliciousRequest(maliciousReq)
-                      .build());
+        SampleMaliciousRequest maliciousReq = SampleMaliciousRequest.newBuilder()
+            .setUrl(responseParam.getRequestParams().getURL())
+            .setMethod(responseParam.getRequestParams().getMethod())
+            .setPayload(responseParam.getOrig())
+            .setIp(actor) // For now using actor as IP
+            .setApiCollectionId(responseParam.getRequestParams().getApiCollectionId())
+            .setTimestamp(responseParam.getTime())
+            .setFilterId(apiFilter.getId())
+            .setMetadata(Metadata.newBuilder().setCountryCode(metadata.getCountryCode()))
+            .build();
 
-              if (!isAggFilter) {
-                generateAndPushMaliciousEventRequest(
-                    apiFilter, actor, responseParam, maliciousReq, EventType.EVENT_TYPE_SINGLE);
-                return;
-              }
+        maliciousMessages.add(
+            SampleRequestKafkaEnvelope.newBuilder()
+                .setActor(actor)
+                .setAccountId(responseParam.getAccountId())
+                .setMaliciousRequest(maliciousReq)
+                .build());
 
-              // Aggregation rules
-              for (Rule rule : aggRules.getRule()) {
-                WindowBasedThresholdNotifier.Result result = this.windowBasedThresholdNotifier.shouldNotify(aggKey,
-                    maliciousReq, rule);
+        if (!isAggFilter) {
+          generateAndPushMaliciousEventRequest(
+              apiFilter, actor, responseParam, maliciousReq, EventType.EVENT_TYPE_SINGLE);
+          return;
+        }
 
-                if (result.shouldNotify()) {
-                  generateAndPushMaliciousEventRequest(
-                      apiFilter,
-                      actor,
-                      responseParam,
-                      maliciousReq,
-                      EventType.EVENT_TYPE_AGGREGATED);
-                }
-              }
-            });
-      }
+        // Aggregation rules
+        for (Rule rule : aggRules.getRule()) {
+          WindowBasedThresholdNotifier.Result result = this.windowBasedThresholdNotifier.shouldNotify(aggKey,
+              maliciousReq, rule);
+
+          if (result.shouldNotify()) {
+            generateAndPushMaliciousEventRequest(
+                apiFilter,
+                actor,
+                responseParam,
+                maliciousReq,
+                EventType.EVENT_TYPE_AGGREGATED);
+          }
+        }
+            }
     }
 
     // Should we push all the messages in one go
