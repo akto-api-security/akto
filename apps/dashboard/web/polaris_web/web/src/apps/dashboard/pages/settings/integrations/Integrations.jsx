@@ -123,7 +123,7 @@ function Integrations() {
 
     let splunkObj ={
       id: 'splunk',
-      name:'Splunk',
+      name:'Splunk SEIM',
       source: '/public/splunk.svg'
     }
 
@@ -189,7 +189,7 @@ function Integrations() {
         },
         {
           id: 'splunk',
-          content: <span>SIEM <Badge status='new'>{getTabItems('splunk').length}</Badge></span>,
+          content: <span>SEIM <Badge status='new'>{getTabItems('splunk').length}</Badge></span>,
           component: <TabsList />
         },
     ]
