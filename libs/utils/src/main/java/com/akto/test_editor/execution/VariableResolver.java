@@ -35,6 +35,12 @@ public class VariableResolver {
     
     private static final DataActor dataActor = DataActorFactory.fetchInstance();
 
+    private static final Map<String, SampleData> sampleDataCache = new HashMap<>();
+
+    private static String generateSampleDataCacheKey(int apiCollectionId, String url, String method) {
+        return apiCollectionId + "_" + url + "_" + method;
+    }
+
     public static Object getValue(Map<String, Object> varMap, String key) {
         if (!varMap.containsKey(key)) {
             return null;
@@ -589,7 +595,7 @@ public class VariableResolver {
                 if (infKey.equals(infoKey)) {
                     continue;
                 }
-                SampleData sd = dataActor.fetchSampleDataByIdMethod(infoKey.getApiCollectionId(), singleTypeInfo.getUrl(), singleTypeInfo.getMethod());
+                SampleData sd = getSampleDataWithCache(infoKey.getApiCollectionId(), singleTypeInfo.getUrl(), singleTypeInfo.getMethod());
                 newSampleDataMap.put(infKey, sd.getSamples());
 
             }
@@ -648,7 +654,7 @@ public class VariableResolver {
                         continue;
                     }
 
-                    SampleData sd = dataActor.fetchSampleDataByIdMethod(apiInfoKey.getApiCollectionId(), singleTypeInfo.getUrl(), singleTypeInfo.getMethod());
+                    SampleData sd = getSampleDataWithCache(apiInfoKey.getApiCollectionId(), singleTypeInfo.getUrl(), singleTypeInfo.getMethod());
                     newSampleDataMap.put(infKey, sd.getSamples());
 
                 }
@@ -914,5 +920,21 @@ public class VariableResolver {
     //     return null;
 
     // }
+
+    private static SampleData getSampleDataWithCache(int apiCollectionId, String url, String method) {
+        String cacheKey = generateSampleDataCacheKey(apiCollectionId, url, method);
+        
+        if (sampleDataCache.containsKey(cacheKey)) {
+            return sampleDataCache.get(cacheKey);
+        }
+
+        SampleData sd = dataActor.fetchSampleDataByIdMethod(apiCollectionId, url, method);
+        sampleDataCache.put(cacheKey, sd);
+        return sd;
+    }
+
+    public static void clearSampleDataCache() {
+        sampleDataCache.clear();
+    }
 
 }
