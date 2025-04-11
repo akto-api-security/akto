@@ -14,7 +14,7 @@ import AdvancedSettingsComponent from "./component/AdvancedSettingsComponent";
 import { produce } from "immer"
 import RunTestSuites from "./RunTestSuites";
 import RunTestConfiguration from "./RunTestConfiguration";
-import {createTestName,convertToLowerCaseWithUnderscores} from "./Utils"
+import { createTestName } from "./Utils"
 
 function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOutside, closeRunTest, selectedResourcesForPrimaryAction, useLocalSubCategoryData, preActivator, testIdConfig, activeFromTesting, setActiveFromTesting, showEditableSettings, setShowEditableSettings, parentAdvanceSettingsConfig, testRunType, shouldDisable }) {
 
@@ -83,12 +83,6 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
     const [shouldRuntestConfig, setShouldRuntestConfig] = useState(false)
 
     const [openConfigurations, openConfigurationsToggle] = useState(false);
-
-    const [testSuiteIds, setTestSuiteIds] = useState([])
-
-    const [selectedGeneratedSuiteTests, setSelectedGeneratedSuiteTests] = useState([])
-
-    const [testNameSuiteModal, setTestNameSuiteModal] = useState("")
 
     useEffect(() => {
         if (preActivator) {
@@ -178,7 +172,6 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         });
         setLoading(false)
         setShouldRuntestConfig(true);
-        setTestNameSuiteModal(convertToLowerCaseWithUnderscores(apiCollectionName))
     }
 
     useEffect(() => {
@@ -192,7 +185,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
 
     useEffect(() => {
         if (shouldRuntestConfig === false) return;
-        if (testIdConfig?.testingRunConfig?.testSubCategoryList?.length >= 0) {
+        if (testIdConfig?.testingRunConfig?.testSubCategoryList?.length > 0) {
             const testSubCategoryList = [...testIdConfig.testingRunConfig.testSubCategoryList];
 
             const updatedTests = { ...testRun.tests };
@@ -213,7 +206,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
 
                 handleAddSettings(parentAdvanceSettingsConfig);
                 const getRunTypeLabel = (runType) => {
-                    if (!runType || runType === undefined) return "Once";
+                    if (!runType) return "Once";
                     if (runType === "CI-CD" || runType === "ONE_TIME") return "Once";
                     else if (runType === "RECURRING") return "Daily";
                     else if (runType === "CONTINUOUS_TESTING") return "Continuously";
@@ -221,15 +214,15 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                 setTestRun(prev => ({
                     ...testRun,
                     tests: updatedTests,
-                    overriddenTestAppUrl: testIdConfig?.testingRunConfig?.overriddenTestAppUrl,
+                    overriddenTestAppUrl: testIdConfig.testingRunConfig.overriddenTestAppUrl,
                     hasOverriddenTestAppUrl: testIdConfig?.testingRunConfig?.overriddenTestAppUrl?.length > 0,
-                    maxConcurrentRequests: testIdConfig?.maxConcurrentRequests || 10,
-                    testRunTime: testIdConfig?.testRunTime,
-                    testRoleId: testIdConfig?.testingRunConfig?.testRoleId,
+                    maxConcurrentRequests: testIdConfig.maxConcurrentRequests,
+                    testRunTime: testIdConfig.testRunTime,
+                    testRoleId: testIdConfig.testingRunConfig.testRoleId,
                     testRunTimeLabel: (testIdConfig.testRunTime === -1) ? "30 minutes" : getLabel(testRunTimeOptions, testIdConfig.testRunTime.toString())?.label,
-                    testRoleLabel: getLabel(testRolesArr, testIdConfig?.testingRunConfig?.testRoleId)?.label || "No test role selected",
+                    testRoleLabel: getLabel(testRolesArr, testIdConfig?.testingRunConfig?.testRoleId).label,
                     runTypeLabel: getRunTypeLabel(testRunType),
-                    testName: testIdConfig?.name || "",
+                    testName: testIdConfig.name,
                     sendSlackAlert: testIdConfig?.sendSlackAlert,
                     sendMsTeamsAlert: testIdConfig?.sendMsTeamsAlert,
                     recurringDaily: testIdConfig?.periodInSeconds === 86400,
@@ -237,8 +230,6 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                     recurringWeekly: testIdConfig?.periodInSeconds === (86400 * 7),  // one week
                     continuousTesting: testIdConfig?.periodInSeconds === -1
                 }));
-                setTestSuiteIds(testIdConfig?.testingRunConfig?.testSuiteIds || [])
-                setTestNameSuiteModal(testIdConfig?.name||"")
         }
         setShouldRuntestConfig(false);
     }, [shouldRuntestConfig])
@@ -509,24 +500,17 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
     }
 
     async function handleRun() {
-        const { startTimestamp, recurringDaily, recurringMonthly, recurringWeekly, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, cleanUpTestingResources } = testRun
-        let {testName} = testRun;
+        const { startTimestamp, recurringDaily, recurringMonthly, recurringWeekly,  testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, cleanUpTestingResources } = testRun
         const collectionId = parseInt(apiCollectionId)
 
         const tests = testRun.tests
 
-        let selectedTests = []
-        if (testMode) {
-            Object.keys(tests).forEach(category => {
-                tests[category].forEach(test => {
-                    if (test.selected) selectedTests.push(test.value)
-                })
+        const selectedTests = []
+        Object.keys(tests).forEach(category => {
+            tests[category].forEach(test => {
+                if (test.selected) selectedTests.push(test.value)
             })
-        }
-        else {
-            selectedTests = [...selectedGeneratedSuiteTests];
-            testName = testNameSuiteModal  
-        }
+        })
 
         let apiInfoKeyList;
         if (!selectedResourcesForPrimaryAction || selectedResourcesForPrimaryAction.length === 0) {
@@ -557,9 +541,9 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         }
 
         if (filtered || selectedResourcesForPrimaryAction?.length > 0) {
-            await observeApi.scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, recurringWeekly, recurringMonthly, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, "TESTING_UI", testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, finalAdvancedConditions, cleanUpTestingResources, testMode? []: testSuiteIds)
+            await observeApi.scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, recurringWeekly, recurringMonthly, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, "TESTING_UI", testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, finalAdvancedConditions, cleanUpTestingResources)
         } else {
-            await observeApi.scheduleTestForCollection(collectionId, startTimestamp, recurringDaily, recurringWeekly, recurringMonthly, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, finalAdvancedConditions, cleanUpTestingResources, testMode? []: testSuiteIds)
+            await observeApi.scheduleTestForCollection(collectionId, startTimestamp, recurringDaily, recurringWeekly, recurringMonthly, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, finalAdvancedConditions, cleanUpTestingResources)
         }
 
         setActive(false)
@@ -656,7 +640,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
     // only for configurations 
     const handleModifyConfig = async () => {
         const settings = transform.prepareConditionsForTesting(conditions)
-        const editableConfigObject = transform.prepareEditableConfigObject(testRun, settings, testIdConfig.hexId,testSuiteIds,testMode, selectedGeneratedSuiteTests)
+        const editableConfigObject = transform.prepareEditableConfigObject(testRun, settings, testIdConfig.hexId)
         await testingApi.modifyTestingRunConfig(testIdConfig?.testingRunConfig?.id, editableConfigObject).then(() => {
             func.setToast(true, false, "Modified testing run config successfully")
             setShowEditableSettings(false)
@@ -734,11 +718,11 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                 primaryAction={{
                     content: activeFromTesting ? "Save" : scheduleString(),
                     onAction: activeFromTesting ? handleModifyConfig : handleRun,
-                    disabled: (testMode && activeFromTesting && (testSuiteIds.length !== 0 || selectedGeneratedSuiteTests.length != 0)) || (countAllSelectedTests() === 0 && testSuiteIds.length === 0 && selectedGeneratedSuiteTests.length === 0 ) || !testRun.authMechanismPresent
+                    disabled: (countAllSelectedTests() === 0) || !testRun.authMechanismPresent
                 }}
                 secondaryActions={[
-                    countAllSelectedTests() && testMode ? {
-                        content: `${countAllSelectedTests()} tests selected` ,
+                    countAllSelectedTests() ? {
+                        content: `${countAllSelectedTests()} tests selected`,
                         disabled: true,
                         plain: true,
                     } : null,
@@ -897,11 +881,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                                 apiCollectionName={apiCollectionName}
                                 setTestMode={setTestMode}
                                 activeFromTesting={activeFromTesting}
-                                checkRemoveAll={checkRemoveAll} handleModifyConfig={handleModifyConfig} 
-                                setTestSuiteIds={setTestSuiteIds} testSuiteIds={testSuiteIds} selectedGeneratedSuiteTests={selectedGeneratedSuiteTests} 
-                                setSelectedGeneratedSuiteTests={setSelectedGeneratedSuiteTests}
-                                testNameSuiteModal={testNameSuiteModal}
-                                setTestNameSuiteModal={setTestNameSuiteModal}/> :
+                                checkRemoveAll={checkRemoveAll} handleModifyConfig={handleModifyConfig} /> :
                                 <>
                                     <RunTestConfiguration
                                         timeFieldsDisabled={shouldDisable}
