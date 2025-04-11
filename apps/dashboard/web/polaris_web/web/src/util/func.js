@@ -1465,6 +1465,13 @@ mapCollectionIdToHostName(apiCollections){
 
     return collectionsObj
 },
+joinWordsWithUnderscores(input) {
+    if (!input ) return "";
+    const words = input.trim().split(/\s+/);
+    const result = words.map(word => word).join('_');
+
+    return result.toUpperCase();
+  },
   getTimeTakenByTest(startTimestamp, endTimestamp){
     const timeDiff = Math.abs(endTimestamp - startTimestamp);
     const hours = Math.floor(timeDiff / 3600);

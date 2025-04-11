@@ -11,12 +11,12 @@ import com.akto.dao.CustomAuthTypeDao;
 import com.akto.dao.DependencyNodeDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.YamlTemplateDao;
-import com.akto.dao.testing.TestRolesDao;
 import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dao.testing.TestingRunResultSummariesDao;
 import com.akto.dao.testing.VulnerableTestingRunResultDao;
 import com.akto.dao.testing.WorkflowTestResultsDao;
 import com.akto.dao.testing.WorkflowTestsDao;
+import com.akto.dao.testing.config.TestSuiteDao;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.CustomAuthType;
@@ -51,6 +51,7 @@ import com.akto.dto.testing.TestRoles;
 import com.akto.dto.testing.TestingEndpoints;
 import com.akto.dto.testing.TestingRun;
 import com.akto.dto.testing.TestingRun.State;
+import com.akto.dto.testing.config.TestSuites;
 import com.akto.dto.testing.TestingRunConfig;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.TestingRunResultSummary;
@@ -248,10 +249,30 @@ public class TestExecutor {
 
         //Updating the subcategory list if its individual run
         List<String> testingRunSubCategories;
-        if (testingSubCategorySet.isEmpty()) {
-            testingRunSubCategories = testingRun.getTestingRunConfig().getTestSubCategoryList();
-        } else {
+        if (!testingSubCategorySet.isEmpty()) {
             testingRunSubCategories = new ArrayList<>(testingSubCategorySet);
+        } else {
+
+            List<String> testSuiteIds = testingRun.getTestingRunConfig().getTestSuiteIds();
+            if (testSuiteIds == null || testSuiteIds.isEmpty()) {
+                // default testing
+                testingRunSubCategories = testingRun.getTestingRunConfig().getTestSubCategoryList();
+            } else {
+                Set<String> subcategorySet = new HashSet<>();
+                List<ObjectId> testSuiteObjectIds = new ArrayList<>();
+                for (String testSuiteId: testSuiteIds) {
+                    ObjectId testSuiteObjectId = new ObjectId(testSuiteId);
+                    testSuiteObjectIds.add(testSuiteObjectId);
+                }
+                List<TestSuites> testSuites = TestSuiteDao.instance.findAll(Filters.in("_id", testSuiteObjectIds));
+                for (TestSuites testSuite: testSuites) {
+                    List<String> subcategoryList = testSuite.getSubCategoryList();
+                    if (subcategoryList != null && !subcategoryList.isEmpty()) {
+                        subcategorySet.addAll(subcategoryList);
+                    }
+                }
+                testingRunSubCategories = new ArrayList<>(subcategorySet);
+            }
         }
 
         Map<String, TestConfig> testConfigMap = YamlTemplateDao.instance.fetchTestConfigMap(false, true, 0, 10_000, Filters.in("_id", testingRunSubCategories));
