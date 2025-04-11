@@ -295,21 +295,21 @@ public class TestingRunResult implements Comparable<TestingRunResult> {
 
     public static Bson buildFullUpdate(TestingRunResult runResult) {
         return Updates.combine(
-            Updates.set(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, runResult.getTestRunResultSummaryId()),
-            Updates.set(TestingRunResult.API_INFO_KEY, runResult.getApiInfoKey()),
-            Updates.set(TestingRunResult.TEST_SUB_TYPE, runResult.getTestSubType()),
-            Updates.set(TestingRunResult.CONFIDENCE_PERCENTAGE, runResult.getConfidencePercentage()),
-            Updates.set(TestingRunResult.TEST_RESULTS, runResult.getTestResults()),
-            Updates.set(TestingRunResult.TEST_RUN_ID, runResult.getTestRunId()),
-            Updates.set(TestingRunResult.TEST_SUPER_TYPE, runResult.getTestSuperType()),
-            Updates.set(TestingRunResult.RERUN, runResult.isRerun()),
-            Updates.set(TestingRunResult.VULNERABLE, runResult.isVulnerable()),
-            Updates.set(TestingRunResult.SINGLE_TYPE_INFOS, runResult.getSingleTypeInfos()),
-            Updates.set(TestingRunResult.START_TIMESTAMP, runResult.getStartTimestamp()),
-            Updates.set(TestingRunResult.END_TIMESTAMP, runResult.getEndTimestamp()),
-            Updates.set(TestingRunResult.IS_IGNORED_RESULT, runResult.isIgnoredResult()),
-            Updates.set(TestingRunResult.ERRORS_LIST, runResult.getErrorsList()),
-            Updates.set(TestingRunResult.WORKFLOW_TEST, runResult.getWorkflowTest())
+            Updates.setOnInsert(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, runResult.getTestRunResultSummaryId()),
+            Updates.setOnInsert(TestingRunResult.API_INFO_KEY, runResult.getApiInfoKey()),
+            Updates.setOnInsert(TestingRunResult.TEST_SUB_TYPE, runResult.getTestSubType()),
+            Updates.setOnInsert(TestingRunResult.CONFIDENCE_PERCENTAGE, runResult.getConfidencePercentage()),
+            Updates.setOnInsert(TestingRunResult.TEST_RESULTS, runResult.getTestResults()),
+            Updates.setOnInsert(TestingRunResult.TEST_RUN_ID, runResult.getTestRunId()),
+            Updates.setOnInsert(TestingRunResult.TEST_SUPER_TYPE, runResult.getTestSuperType()),
+            Updates.setOnInsert(TestingRunResult.RERUN, runResult.isRerun()),
+            Updates.setOnInsert(TestingRunResult.VULNERABLE, runResult.isVulnerable()),
+            Updates.setOnInsert(TestingRunResult.SINGLE_TYPE_INFOS, runResult.getSingleTypeInfos()),
+            Updates.setOnInsert(TestingRunResult.START_TIMESTAMP, runResult.getStartTimestamp()),
+            Updates.setOnInsert(TestingRunResult.END_TIMESTAMP, runResult.getEndTimestamp()),
+            Updates.setOnInsert(TestingRunResult.IS_IGNORED_RESULT, runResult.isIgnoredResult()),
+            Updates.setOnInsert(TestingRunResult.ERRORS_LIST, runResult.getErrorsList()),
+            Updates.setOnInsert(TestingRunResult.WORKFLOW_TEST, runResult.getWorkflowTest())
         );
 }
 

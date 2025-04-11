@@ -727,7 +727,6 @@ public class TestExecutor {
         int resultSize = testingRunResults.size();
         try {
             if (resultSize > 0) {
-                loggerMaker.infoAndAddToDb("testingRunResults size: " + resultSize, LogDb.TESTING);
                 trim(testingRunResults);
                 TestingRunResult originalTestingRunResultForRerun = TestingConfigurations.getInstance().getTestingRunResultForApiKeyInfo(testingRunResults.get(0).getApiInfoKey(), testingRunResults.get(0).getTestSubType());
                 if (originalTestingRunResultForRerun != null) {
