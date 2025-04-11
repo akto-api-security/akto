@@ -16,6 +16,7 @@ import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.type.URLMethods;
 import com.akto.hybrid_parsers.HttpCallParser;
 import com.akto.kafka.KafkaConfig;
+import com.akto.log.LoggerMaker;
 import com.akto.proto.generated.threat_detection.message.malicious_event.event_type.v1.EventType;
 import com.akto.proto.generated.threat_detection.message.malicious_event.v1.MaliciousEventKafkaEnvelope;
 import com.akto.proto.generated.threat_detection.message.malicious_event.v1.MaliciousEventMessage;
@@ -65,6 +66,7 @@ public class MaliciousTrafficDetectorTask implements Task {
   private final KafkaProtoProducer internalKafka;
 
   private static final DataActor dataActor = DataActorFactory.fetchInstance();
+  private static final LoggerMaker logger = new LoggerMaker(MaliciousTrafficDetectorTask.class);
 
   private static final ObjectMapper objectMapper = new ObjectMapper();
   
@@ -169,7 +171,9 @@ public class MaliciousTrafficDetectorTask implements Task {
 
   private void processRecord(HttpResponseParam record) throws Exception {
     HttpResponseParams responseParam = buildHttpResponseParam(record);
-
+    Optional<String> actorIp = SourceIPActorGenerator.instance.generate(responseParam);
+    responseParam.setSourceIP(actorIp.orElse(""));
+    logger.info("Processing record with actor IP: " + responseParam.getSourceIP());
     Context.accountId.set(Integer.parseInt(responseParam.getAccountId()));
     Map<String, FilterConfig> filters = this.getFilters();
     if (filters.isEmpty()) {
@@ -216,53 +220,50 @@ public class MaliciousTrafficDetectorTask implements Task {
 
         boolean isAggFilter = aggRules != null && !aggRules.getRule().isEmpty();
 
-        SourceIPActorGenerator.instance
-            .generate(responseParam)
-            .ifPresent(
-                actor -> {
-                  String groupKey = apiFilter.getId();
-                  String aggKey = actor + "|" + groupKey;
+        actorIp.ifPresent(
+            actor -> {
+              String groupKey = apiFilter.getId();
+              String aggKey = actor + "|" + groupKey;
 
-                  SampleMaliciousRequest maliciousReq =
-                      SampleMaliciousRequest.newBuilder()
-                          .setUrl(responseParam.getRequestParams().getURL())
-                          .setMethod(responseParam.getRequestParams().getMethod())
-                          .setPayload(responseParam.getOrig())
-                          .setIp(actor) // For now using actor as IP
-                          .setApiCollectionId(responseParam.getRequestParams().getApiCollectionId())
-                          .setTimestamp(responseParam.getTime())
-                          .setFilterId(apiFilter.getId())
-                          .setMetadata(Metadata.newBuilder().setCountryCode(metadata.getCountryCode()))
-                          .build();
+              SampleMaliciousRequest maliciousReq = SampleMaliciousRequest.newBuilder()
+                  .setUrl(responseParam.getRequestParams().getURL())
+                  .setMethod(responseParam.getRequestParams().getMethod())
+                  .setPayload(responseParam.getOrig())
+                  .setIp(actor) // For now using actor as IP
+                  .setApiCollectionId(responseParam.getRequestParams().getApiCollectionId())
+                  .setTimestamp(responseParam.getTime())
+                  .setFilterId(apiFilter.getId())
+                  .setMetadata(Metadata.newBuilder().setCountryCode(metadata.getCountryCode()))
+                  .build();
 
-                  maliciousMessages.add(
-                      SampleRequestKafkaEnvelope.newBuilder()
-                          .setActor(actor)
-                          .setAccountId(responseParam.getAccountId())
-                          .setMaliciousRequest(maliciousReq)
-                          .build());
+              maliciousMessages.add(
+                  SampleRequestKafkaEnvelope.newBuilder()
+                      .setActor(actor)
+                      .setAccountId(responseParam.getAccountId())
+                      .setMaliciousRequest(maliciousReq)
+                      .build());
 
-                  if (!isAggFilter) {
-                    generateAndPushMaliciousEventRequest(
-                        apiFilter, actor, responseParam, maliciousReq, EventType.EVENT_TYPE_SINGLE);
-                    return;
-                  }
+              if (!isAggFilter) {
+                generateAndPushMaliciousEventRequest(
+                    apiFilter, actor, responseParam, maliciousReq, EventType.EVENT_TYPE_SINGLE);
+                return;
+              }
 
-                  // Aggregation rules
-                  for (Rule rule : aggRules.getRule()) {
-                    WindowBasedThresholdNotifier.Result result =
-                        this.windowBasedThresholdNotifier.shouldNotify(aggKey, maliciousReq, rule);
+              // Aggregation rules
+              for (Rule rule : aggRules.getRule()) {
+                WindowBasedThresholdNotifier.Result result = this.windowBasedThresholdNotifier.shouldNotify(aggKey,
+                    maliciousReq, rule);
 
-                    if (result.shouldNotify()) {
-                      generateAndPushMaliciousEventRequest(
-                          apiFilter,
-                          actor,
-                          responseParam,
-                          maliciousReq,
-                          EventType.EVENT_TYPE_AGGREGATED);
-                    }
-                  }
-                });
+                if (result.shouldNotify()) {
+                  generateAndPushMaliciousEventRequest(
+                      apiFilter,
+                      actor,
+                      responseParam,
+                      maliciousReq,
+                      EventType.EVENT_TYPE_AGGREGATED);
+                }
+              }
+            });
       }
     }
 
@@ -345,7 +346,7 @@ public class MaliciousTrafficDetectorTask implements Task {
         HttpRequestResponseUtils.rawToJsonString(httpResponseParamProto.getResponsePayload(), null);
 
     String sourceStr = httpResponseParamProto.getSource();
-    if (sourceStr == null || sourceStr == "") {
+    if (sourceStr == null || sourceStr.isEmpty()) {
       sourceStr = HttpResponseParams.Source.OTHER.name();
     }
 
@@ -397,17 +398,6 @@ public class MaliciousTrafficDetectorTask implements Task {
       System.out.println("error constructing orig obj");
     }
 
-    // JSONObject json = new JSONObject(origObj);
-    // String origStr2 = json.toString();
-
-    // ObjectMapper objectMapper = new ObjectMapper();
-    // String origStr3;
-    // try {
-    //   origStr3 = objectMapper.writeValueAsString(origObj); // Ensures properly escaped JSON
-    //   System.out.println(origStr3);      
-    // } catch (Exception e) {
-    //   // TODO: handle exception
-    // }
 
     return new HttpResponseParams(
         httpResponseParamProto.getType(),
