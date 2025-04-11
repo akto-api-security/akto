@@ -52,7 +52,7 @@ const AzureBoards = () => {
 
           <LegacyCard.Section>
                 <VerticalStack gap={"2"}>
-                    <TextField label="Azure DevOps Board URL" value={baseUrl} helpText="Specify the base url your azure devops board dashboard. (e.g. https://dev.azure.com or https://{organization}.visualstudio.com)" placeholder='Organization name' requiredIndicator onChange={setBaseUrl} />
+                    <TextField label="Azure DevOps Board URL" value={baseUrl} helpText="Specify the base url your azure devops board dashboard. (e.g. https://dev.azure.com or https://{organization}.visualstudio.com)" placeholder='Base url' requiredIndicator onChange={setBaseUrl} />
                     <TextField label="Organization" value={organization} helpText="Specify the organization name" placeholder='Organization name' requiredIndicator onChange={setOrganization} />
                     {personalAuthToken === null ? <></> : <PasswordTextField label="Personal Auth Token" helpText="Specify the personal auth token created for your project" field={personalAuthToken} onFunc={true} setField={setPersonalAuthToken} />}
                     <TextField label="Projects" helpText="Specify the projects names in comma separated string" value={projectIds} placeholder='Project Names' requiredIndicator onChange={setProjectIds} />
