@@ -27,8 +27,14 @@ import java.util.concurrent.TimeUnit;
 import org.bson.conversions.Bson;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.simple.SimpleLogger;
 
 public class LoggerMaker  {
+
+    static {
+        System.setProperty(SimpleLogger.DEFAULT_LOG_LEVEL_KEY, System.getenv().getOrDefault("AKTO_LOG_LEVEL", "WARN"));
+        System.out.printf("AKTO_LOG_LEVEL is set to: %s \n", System.getProperty(SimpleLogger.DEFAULT_LOG_LEVEL_KEY));
+    }
 
     public static final int LOG_SAVE_INTERVAL = 60*60; // 1 hour
 
@@ -44,7 +50,7 @@ public class LoggerMaker  {
 
     static {
         scheduler.scheduleAtFixedRate(new Runnable() {
-            
+
             @Override
             public void run() {
                 try {
