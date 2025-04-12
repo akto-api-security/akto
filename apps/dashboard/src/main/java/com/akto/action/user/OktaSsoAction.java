@@ -2,13 +2,16 @@ package com.akto.action.user;
 
 import java.util.ArrayList;
 
+import org.bson.conversions.Bson;
+
 import com.akto.action.UserAction;
 import com.akto.dao.ConfigsDao;
 import com.akto.dao.UsersDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.Config;
 import com.akto.dto.User;
-import com.akto.util.DashboardMode;
+import com.akto.dto.Config.OktaConfig;
+import com.akto.util.Constants;
 import com.akto.utils.sso.SsoUtils;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
@@ -24,36 +27,32 @@ public class OktaSsoAction extends UserAction {
     private String redirectUri;
 
     public String addOktaSso() {
-
-        if(!DashboardMode.isOnPremDeployment()){
-            addActionError("This feature is only available in on-prem deployment");
-            return ERROR.toUpperCase();
-        }
-
         if (SsoUtils.isAnySsoActive()) {
             addActionError("A SSO Integration already exists.");
             return ERROR.toUpperCase();
         }
 
-        Config.OktaConfig oktaConfig = new Config.OktaConfig();
+        int accountId = Context.accountId.get();
+
+        Config.OktaConfig oktaConfig = new Config.OktaConfig(accountId);
         oktaConfig.setClientId(clientId);
         oktaConfig.setClientSecret(clientSecret);
         oktaConfig.setAuthorisationServerId(authorisationServerId);
         oktaConfig.setOktaDomainUrl(oktaDomain);
         oktaConfig.setRedirectUri(redirectUri);
-
+        oktaConfig.setAccountId(Context.accountId.get());
+        String userLogin = getSUser().getLogin();
+        String domain = userLogin.split("@")[1];
+        oktaConfig.setOrganizationDomain(domain);
         ConfigsDao.instance.insertOne(oktaConfig);
 
         return SUCCESS.toUpperCase();
     }
 
     public String deleteOktaSso() {
-        if(!DashboardMode.isOnPremDeployment()){
-            addActionError("This feature is only available in on-prem deployment");
-            return ERROR.toUpperCase();
-        }
-
-        DeleteResult result = ConfigsDao.instance.deleteAll(Filters.eq("_id", "OKTA-ankush"));
+        int accountId = Context.accountId.get();
+        Bson idFilter = Filters.eq(Constants.ID, OktaConfig.getOktaId(accountId));
+        DeleteResult result = ConfigsDao.instance.deleteAll(idFilter);
 
         if (result.getDeletedCount() > 0) {
             for (Object obj : UsersDao.instance.getAllUsersInfoForTheAccount(Context.accountId.get())) {
@@ -68,13 +67,9 @@ public class OktaSsoAction extends UserAction {
 
     @Override
     public String execute() throws Exception {
+        int accountId = Context.accountId.get();
+        Config.OktaConfig oktaConfig = (Config.OktaConfig) ConfigsDao.instance.findOne(Constants.ID, OktaConfig.getOktaId(accountId));
 
-        if(!DashboardMode.isOnPremDeployment()){
-            addActionError("This feature is only available in on-prem deployment");
-            return ERROR.toUpperCase();
-        }
-
-        Config.OktaConfig oktaConfig = (Config.OktaConfig) ConfigsDao.instance.findOne("_id", "OKTA-ankush");
         if (SsoUtils.isAnySsoActive() && oktaConfig == null) {
             addActionError("A different SSO Integration already exists.");
             return ERROR.toUpperCase();

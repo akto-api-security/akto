@@ -6,7 +6,7 @@ import Store from "../../../store";
 import func from "@/util/func";
 import { MarkFulfilledMinor, ReportMinor, ExternalMinor } from '@shopify/polaris-icons';
 import PersistStore from "../../../../main/PersistStore";
-import { Button, HorizontalGrid, HorizontalStack, IndexFiltersMode } from "@shopify/polaris";
+import { ActionList, Button, HorizontalGrid, HorizontalStack, IndexFiltersMode, Popover } from "@shopify/polaris";
 import EmptyScreensLayout from "../../../components/banners/EmptyScreensLayout";
 import { ISSUES_PAGE_DOCS_URL } from "../../../../main/onboardingData";
 import {SelectCollectionComponent} from "../../testing/TestRunsPage/TestrunsBannerComponent"
@@ -27,6 +27,10 @@ import SpinnerCentered from "../../../components/progress/SpinnerCentered.jsx";
 import TableStore from "../../../components/tables/TableStore.js";
 import CriticalFindingsGraph from "./CriticalFindingsGraph.jsx";
 import CriticalUnsecuredAPIsOverTimeGraph from "./CriticalUnsecuredAPIsOverTimeGraph.jsx";
+import settingFunctions from "../../settings/module.js";
+import JiraTicketCreationModal from "../../../components/shared/JiraTicketCreationModal.jsx";
+import testingApi from "../../testing/api.js"
+import { saveAs } from 'file-saver'
 
 const sortOptions = [
     { label: 'Severity', value: 'severity asc', directionLabel: 'Highest', sortKey: 'severity', columnIndex: 2 },
@@ -49,6 +53,7 @@ let filtersOptions = [
         label: 'Severity',
         title: 'Severity',
         choices: [
+            {label: 'Critical', value: 'CRITICAL'},
             { label: "High", value: "HIGH" }, 
             { label: "Medium", value: "MEDIUM" },
             { label: "Low", value: "LOW" }
@@ -61,10 +66,31 @@ let filtersOptions = [
         choices:[]
     },
     {
+        key: `issueName`,
+        label: 'Issue name',
+        title: 'Issue name',
+        choices: [],
+    },
+    {
         key: 'collectionIds',
         label: 'API groups',
         title: 'API groups',
         choices: [],
+    },
+    {
+        key: 'activeCollections',
+        label: 'Active collections',
+        title: 'Active collections',
+        choices: [
+            {
+                label:"Active collections",
+                value:true
+            },
+            {
+                label:"All collections",
+                value:false
+            }],
+        singleSelect:true
     }
 ]
 
@@ -83,6 +109,7 @@ function IssuesPage() {
             title: "Severity",
             text: "Severity",
             value: "severity",
+            textValue: "severityVal",
             sortActive: true
         },
         {
@@ -104,7 +131,15 @@ function IssuesPage() {
         {
             title: "Domains",
             text: "Domains",
-            value: "domains"
+            value: "domains",
+            textValue:"domainVal"
+        },
+        {
+            title: "Compliance",
+            text: "Compliance",
+            value: "compliance",
+            sortActive: true,
+            textValue: "complianceVal"
         },
         {
             title: "Discovered",
@@ -127,6 +162,16 @@ function IssuesPage() {
     const [selected, setSelected] = useState(0)
     const [tableLoading, setTableLoading] = useState(false)
     const [issuesDataCount, setIssuesDataCount] = useState([])
+    const [jiraModalActive, setJiraModalActive] = useState(false)
+    const [selectedIssuesItems, setSelectedIssuesItems] = useState([])
+    const [jiraProjectMaps,setJiraProjectMap] = useState({})
+    const [issueType, setIssueType] = useState('');
+    const [projId, setProjId] = useState('')
+
+    const [boardsModalActive, setBoardsModalActive] = useState(false)
+    const [projectToWorkItemsMap, setProjectToWorkItemsMap] = useState({})
+    const [projectId, setProjectId] = useState('')
+    const [workItemType, setWorkItemType] = useState('')
 
     const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[5])
 
@@ -166,6 +211,7 @@ function IssuesPage() {
         TableStore.getState().setSelectedItems([])
         selectItems([])
         setKey(!key)
+        setSelectedIssuesItems([])
     }
     
     useEffect(() => {
@@ -185,20 +231,60 @@ function IssuesPage() {
         } else {
             setHeaders(prevHeaders => prevHeaders.filter(header => header.value !== "issueStatus"))
         }
+        resetResourcesSelected();
     }, [selectedTab])
 
     useEffect(() => {
         setKey(!key)
     }, [startTimestamp, endTimestamp])
 
-    useEffect(() => {
-        resetResourcesSelected()
-    }, [selectedTab])
-
     const [searchParams, setSearchParams] = useSearchParams();
-  const resultId = searchParams.get("result")
+    const resultId = searchParams.get("result")
+
+    const filterParams = searchParams.get('filters')
+    let initialValForResponseFilter = true
+    if(filterParams && filterParams !== undefined &&filterParams.split('activeCollections').length > 1){
+        let isRequestVal =  filterParams.split("activeCollections__")[1].split('&')[0]
+        if(isRequestVal.length > 0){
+            initialValForResponseFilter = (isRequestVal === 'true' || isRequestVal.includes('true'))
+        }
+    }
+
+    const appliedFilters = [
+        {
+            key: 'activeCollections',
+            value: [initialValForResponseFilter],
+            onRemove: () => {}
+        }
+    ]
 
     filtersOptions = func.getCollectionFilters(filtersOptions)
+
+    const handleSaveJiraAction = () => {
+        setToast(true, false, "Please wait while we create your Jira ticket.")
+        setJiraModalActive(false)
+        api.bulkCreateJiraTickets(selectedIssuesItems, window.location.origin, projId, issueType).then((res) => {
+            if(res?.errorMessage) {
+                setToast(true, false, res?.errorMessage)
+            } else {
+                setToast(true, false, `${selectedIssuesItems.length} jira ticket${selectedIssuesItems.length === 1 ? "" : "s"} created.`)
+            }
+            resetResourcesSelected()
+        })
+    }
+
+    const handleSaveBulkAzureWorkItemsAction = () => {
+        setToast(true, false, "Please wait while we create your Azure Boards Work Item.")
+        setBoardsModalActive(false)
+        api.bulkCreateAzureWorkItems(selectedIssuesItems, projectId, workItemType, window.location.origin).then((res) => {
+            if(res?.errorMessage) {
+                setToast(true, false, res?.errorMessage)
+            } else {
+                setToast(true, false, `${selectedIssuesItems.length} Azure Boards Work Item${selectedIssuesItems.length === 1 ? "" : "s"} created.`)
+            }
+            resetResourcesSelected()
+        })
+    }
 
     let promotedBulkActions = (selectedResources) => {
         let items
@@ -210,7 +296,7 @@ function IssuesPage() {
         }
         
         function ignoreAction(ignoreReason){
-            api.bulkUpdateIssueStatus(items, "IGNORED", ignoreReason ).then((res) => {
+            api.bulkUpdateIssueStatus(items, "IGNORED", ignoreReason, {} ).then((res) => {
                 setToast(true, false, `Issue${items.length==1 ? "" : "s"} ignored`)
                 resetResourcesSelected()
             })
@@ -220,6 +306,39 @@ function IssuesPage() {
             api.bulkUpdateIssueStatus(items, "OPEN", "" ).then((res) => {
                 setToast(true, false, `Issue${items.length==1 ? "" : "s"} re-opened`)
                 resetResourcesSelected()
+            })
+        }
+
+        function createJiraTicketBulk () {
+            setSelectedIssuesItems(items)
+            settingFunctions.fetchJiraIntegration().then((jirIntegration) => {
+                if(jirIntegration.projectIdsMap !== null && Object.keys(jirIntegration.projectIdsMap).length > 0){
+                    setJiraProjectMap(jirIntegration.projectIdsMap)
+                    if(Object.keys(jirIntegration.projectIdsMap).length > 0){
+                        setProjId(Object.keys(jirIntegration.projectIdsMap)[0])
+                    }
+                }else{
+                    setProjId(jirIntegration.projId)
+                    setIssueType(jirIntegration.issueType)
+                }
+                setJiraModalActive(true)
+            })
+        }
+
+        function createAzureBoardWorkItemBulk() {
+            setSelectedIssuesItems(items)
+            settingFunctions.fetchAzureBoardsIntegration().then((azureBoardsIntegration) => {
+                if(azureBoardsIntegration.projectToWorkItemsMap != null && Object.keys(azureBoardsIntegration.projectToWorkItemsMap).length > 0){
+                    setProjectToWorkItemsMap(azureBoardsIntegration.projectToWorkItemsMap)
+                    if(Object.keys(azureBoardsIntegration.projectToWorkItemsMap).length > 0){
+                        setProjectId(Object.keys(azureBoardsIntegration.projectToWorkItemsMap)[0])
+                        setWorkItemType(Object.values(azureBoardsIntegration.projectToWorkItemsMap)[0]?.[0])
+                    }
+                }else{
+                    setProjectId(azureBoardsIntegration?.projectId)
+                    setWorkItemType(azureBoardsIntegration?.workItemType)
+                }
+                setBoardsModalActive(true)
             })
         }
         
@@ -234,6 +353,20 @@ function IssuesPage() {
         {
             content: 'No time to fix',
             onAction: () => { ignoreAction("No time to fix") }
+        },
+        {
+            content: 'Export selected Issues',
+            onAction: () => { openVulnerabilityReport(items) }
+        },
+        {
+            content: 'Create jira ticket',
+            onAction: () => { createJiraTicketBulk() },
+            disabled: (window.JIRA_INTEGRATED === 'false')
+        },
+        {
+            content: 'Create azure work item',
+            onAction: () => { createAzureBoardWorkItemBulk() },
+            disabled: (window.AZURE_BOARDS_INTEGRATED === 'false')
         }]
         
         let reopen =  [{
@@ -246,12 +379,12 @@ function IssuesPage() {
         
         switch (status) {
             case "OPEN": ret = [].concat(issues); break;
-            case "IGNORED": if (items.length == 1) {
-                ret = [].concat(issues);
-            }
+            case "IGNORED": 
                 ret = ret.concat(reopen);
                 break;
             case "FIXED":
+            default:
+                ret = []
         }
 
         return ret;
@@ -259,6 +392,7 @@ function IssuesPage() {
     
     let store = {}
     let result = []
+    let issueName = []
     Object.values(subCategoryMap).forEach((x) => {
         let superCategory = x.superCategory
         if (!store[superCategory.name]) {
@@ -266,8 +400,10 @@ function IssuesPage() {
             store[superCategory.name] = []
         }
         store[superCategory.name].push(x._name);
+        issueName.push({"label": x.testName, "value": x._name})
     })
     filtersOptions[2].choices = [].concat(result)
+    filtersOptions[3].choices = [].concat(issueName)
     let categoryToSubCategories = store
 
     function disambiguateLabel(key, value) {
@@ -277,19 +413,32 @@ function IssuesPage() {
             case "issueStatus":
             case "severity":
                 return func.convertToDisambiguateLabel(value, func.toSentenceCase, 2)
+            case "compliance":
+                return func.convertToDisambiguateLabel(value, func.toUpperCase(), 2)
+            case "issueName":
             case "issueCategory":
                 return func.convertToDisambiguateLabelObj(value, null, 3)
             case "collectionIds":
             case "apiCollectionId":
                 return func.convertToDisambiguateLabelObj(value, apiCollectionMap, 2)
+            case "activeCollections":
+                if(value[0]){
+                    return "Active collections only"
+                }else{
+                    return "All collections"
+                }
             default:
               return value;
           }          
     }
 
-    const openVulnerabilityReport = () => {
-        let summaryId = btoa(JSON.stringify(issuesFilters))
-        window.open('/dashboard/issues/summary/' + summaryId, '_blank');
+    const openVulnerabilityReport = async(items = []) => {
+        await testingApi.generatePDFReport(issuesFilters, items).then((res) => {
+          const responseId = res.split("=")[1];
+          window.open('/dashboard/issues/summary/' + responseId.split("}")[0], '_blank');
+        })
+
+        resetResourcesSelected();
     }
 
     const infoItems = [
@@ -322,19 +471,26 @@ function IssuesPage() {
         setTableLoading(true)
         let filterStatus = [selectedTab.toUpperCase()]
         let filterSeverity = filters.severity
+        let filterCompliance = filters.compliance
+        const activeCollections = (filters?.activeCollections !== undefined && filters?.activeCollections.length > 0) ? filters?.activeCollections[0] : initialValForResponseFilter;
         const apiCollectionId = filters.apiCollectionId || []
         let filterCollectionsId = apiCollectionId.concat(filters.collectionIds)
         let filterSubCategory = []
         filters?.issueCategory?.forEach((issue) => {
             filterSubCategory = filterSubCategory.concat(categoryToSubCategories[issue])
         })
+        filterSubCategory = [...filterSubCategory, ...filters?.issueName]
+        const collectionIdsArray = filterCollectionsId.map((x) => {return x.toString()})
 
         let obj = {
             'filterStatus': filterStatus,
-            'filterCollectionsId': filterCollectionsId,
+            'filterCollectionsId': collectionIdsArray,
             'filterSeverity': filterSeverity,
+            'filterCompliance': filterCompliance,
             filterSubCategory: filterSubCategory,
-            startEpoch: startTimestamp
+            startEpoch: [startTimestamp.toString()],
+            endTimeStamp: [endTimestamp.toString()],
+            activeCollections: [activeCollections.toString()]
         }
         setIssuesFilters(obj)
 
@@ -343,7 +499,7 @@ function IssuesPage() {
 
         let issueItem = []
 
-        await api.fetchIssues(skip, limit, filterStatus, filterCollectionsId, filterSeverity, filterSubCategory, sortKey, sortOrder, startTimestamp, endTimestamp).then((issuesDataRes) => {
+        await api.fetchIssues(skip, limit, filterStatus, filterCollectionsId, filterSeverity, filterSubCategory, sortKey, sortOrder, startTimestamp, endTimestamp, activeCollections, filterCompliance).then((issuesDataRes) => {
             const uniqueIssuesMap = new Map()
             issuesDataRes.issues.forEach(item => {
                 const key = `${item?.id?.testSubCategory}|${item?.severity}|${item?.unread.toString()}`
@@ -351,6 +507,7 @@ function IssuesPage() {
                     uniqueIssuesMap.set(key, {
                         id: item?.id,
                         severity: func.toSentenceCase(item?.severity),
+                        compliance: Object.keys(subCategoryMap[item?.id?.testSubCategory]?.compliance?.mapComplianceToListClauses || {}),
                         severityType: item?.severity,
                         issueName: item?.id?.testSubCategory,
                         category: item?.id?.testSubCategory,
@@ -400,6 +557,96 @@ function IssuesPage() {
         return {value: ret, total: total}
     }
 
+    async function modifyDataForCSV(){
+        const filters= {}
+        const filtersFromPersistStore = PersistStore.getState().filtersMap;
+        const currentPageKey = "/dashboard/reports/issues/#" + selectedTab
+        let selectedFilters = filtersFromPersistStore[currentPageKey]?.filters || [];
+        selectedFilters.forEach((filter) => {
+            filters[filter.key] = filter.value
+        })
+
+        let filterStatus = [selectedTab.toUpperCase()]
+        let filterSeverity = filters?.severity || []
+        let filterCompliance = filters?.compliance || []
+        const activeCollections = (filters?.activeCollections !== undefined && filters?.activeCollections.length > 0) ? filters?.activeCollections[0] : initialValForResponseFilter;
+        const apiCollectionId = filters?.apiCollectionId || []
+        let filterCollectionsId = (apiCollectionId || []).concat(filters?.collectionIds || [])
+        let filterSubCategory = []
+        filters?.issueCategory?.forEach((issue) => {
+            filterSubCategory = filterSubCategory.concat(categoryToSubCategories[issue])
+        })
+        if(filters?.issueName !== undefined && filters?.issueName.length > 0){
+            filterSubCategory = filterSubCategory.concat(filters?.issueName)
+        }
+        let issueItem = []
+
+        await api.fetchIssues(0, 20000, filterStatus, filterCollectionsId, filterSeverity, filterSubCategory, "severity", -1, startTimestamp, endTimestamp, activeCollections, filterCompliance).then((issuesDataRes) => {
+            const uniqueIssuesMap = new Map()
+            issuesDataRes.issues.forEach(item => {
+                const key = `${item?.id?.testSubCategory}|${item?.severity}|${item?.unread.toString()}`
+                if (!uniqueIssuesMap.has(key)){
+                    const issue = {
+                        id: item?.id,
+                        severityVal: func.toSentenceCase(item?.severity),
+                        complianceVal: Object.keys(subCategoryMap[item?.id?.testSubCategory]?.compliance?.mapComplianceToListClauses || {}),
+                        issueName: item?.id?.testSubCategory,
+                        category: subCategoryMap[item?.id?.testSubCategory]?.superCategory?.shortName,
+                        numberOfEndpoints: 1,
+                        creationTime: func.prettifyEpoch(item?.creationTime),
+                        issueStatus: item?.unread.toString() === 'false' ? "read" : "unread",
+                        domainVal:[(hostNameMap[item?.id?.apiInfoKey?.apiCollectionId] !== null ? hostNameMap[item?.id?.apiInfoKey?.apiCollectionId] : apiCollectionMap[item?.id?.apiInfoKey?.apiCollectionId])],
+                        urls:[`${item?.id?.apiInfoKey?.method} ${item?.id?.apiInfoKey?.url}`]
+                    }
+                    uniqueIssuesMap.set(key, issue)
+                }
+                else {
+                    const existingIssue = uniqueIssuesMap.get(key)
+                    const domain = (hostNameMap[item?.id?.apiInfoKey?.apiCollectionId] !== null ? hostNameMap[item?.id?.apiInfoKey?.apiCollectionId] : apiCollectionMap[item?.id?.apiInfoKey?.apiCollectionId])
+                    if (!existingIssue.domainVal.includes(domain)) {
+                        existingIssue.domainVal.push(domain)
+                    }
+                    existingIssue.urls.push(`${item?.id?.apiInfoKey?.method} ${item?.id?.apiInfoKey?.url}`)
+                    existingIssue.numberOfEndpoints += 1
+                }
+            })
+            issueItem = Array.from(uniqueIssuesMap.values())
+            
+        }).catch((e) => {
+            func.setToast(true, true, e.message)
+        })
+        return issueItem;
+
+    }
+    
+
+
+    async function exportCsv() {
+        func.setToast(true, false, "CSV export in progress")
+        let headerTextToValueMap = {
+            ...Object.fromEntries(
+                headers
+                    .map(x => [x.text, x.textValue ? x.textValue : x.value])
+                    .filter(x => x[0]?.length > 0)
+            ),
+            URLs: "urls"
+        };
+
+
+        let csv = Object.keys(headerTextToValueMap).join(",") + "\r\n"
+        const allIssues = await modifyDataForCSV()
+        allIssues.forEach(i => {
+            csv += Object.values(headerTextToValueMap)
+                .map(h => (Array.isArray(i[h]) ? `"${i[h].join(" ")}"` : (i[h] || "-"))).join(",") + "\r\n";
+        })
+        let blob = new Blob([csv], {
+            type: "application/csvcharset=UTF-8"
+        });
+        saveAs(blob, ("All issues") + ".csv");
+        func.setToast(true, false, <div data-testid="csv_download_message">CSV exported successfully</div>)
+
+    }
+
     const components = (
         <>
             <SummaryInfo
@@ -409,14 +656,15 @@ function IssuesPage() {
             />
 
             <HorizontalGrid gap={5} columns={2} key={"critical-issues-graph-detail"}>
-                <CriticalUnsecuredAPIsOverTimeGraph linkText={""} linkUrl={""} />
-                <CriticalFindingsGraph linkText={""} linkUrl={""} />
+                <CriticalUnsecuredAPIsOverTimeGraph startTimestamp={startTimestamp} endTimestamp={endTimestamp} linkText={""} linkUrl={""} />
+                <CriticalFindingsGraph startTimestamp={startTimestamp} endTimestamp={endTimestamp} linkText={""} linkUrl={""} />
             </HorizontalGrid>
 
             <GithubServerTable
                 key={key}
                 pageLimit={50}
                 fetchData={fetchTableData}
+                appliedFilters={appliedFilters}
                 sortOptions={sortOptions}
                 resourceName={resourceName}
                 filters={filtersOptions}
@@ -440,6 +688,8 @@ function IssuesPage() {
             />
         </>
     )
+
+    const [popOverActive, setPopOverActive] = useState(false)
     
     return (
         <>
@@ -471,9 +721,50 @@ function IssuesPage() {
             : components
             ]}
             primaryAction={<Button primary onClick={() => openVulnerabilityReport()} disabled={showEmptyScreen}>Export results</Button>}
-            secondaryActions={<DateRangeFilter initialDispatch={currDateRange} dispatch={(dateObj) => dispatchCurrDateRange({ type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias })} />}
+            secondaryActions={
+            <HorizontalStack  gap={2}>
+                <DateRangeFilter initialDispatch={currDateRange} dispatch={(dateObj) => dispatchCurrDateRange({ type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias })} />
+                <Popover
+                active={popOverActive}
+                activator={<Button onClick={() => setPopOverActive((prev)=>!prev)} disabled={showEmptyScreen} disclosure>More Actions</Button>}
+                autofocusTarget="first-node"
+                onClose={() => setPopOverActive(false)}
+                >
+                <ActionList
+                  actionRole="menuitem"
+                  items={[
+                    {
+                      content: 'Export results as CSV',
+                      onAction: exportCsv,
+                    },
+                  ]}
+                />
+              </Popover>
+            </HorizontalStack>}
         />
             {(resultId !== null && resultId.length > 0) ? <TestRunResultPage /> : null}
+            <JiraTicketCreationModal
+                modalActive={jiraModalActive}
+                setModalActive={setJiraModalActive}
+                handleSaveAction={handleSaveJiraAction}
+                jiraProjectMaps={jiraProjectMaps}
+                setProjId={setProjId}
+                setIssueType={setIssueType}
+                projId={projId}
+                issueType={issueType}
+            />
+
+            <JiraTicketCreationModal
+                modalActive={boardsModalActive}
+                setModalActive={setBoardsModalActive}
+                handleSaveAction={handleSaveBulkAzureWorkItemsAction}
+                jiraProjectMaps={projectToWorkItemsMap}
+                setProjId={setProjectId}
+                setIssueType={setWorkItemType}
+                projId={projectId}
+                issueType={workItemType}
+                isAzureModal={true}
+            />
         </>
     )
 }

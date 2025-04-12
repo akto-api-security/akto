@@ -112,15 +112,27 @@ function WebhookCore(props) {
         loadWebhookById()
     }, [])
 
-    const customWebhookOptions = [
-        { "title": "New endpoint", "value": "NEW_ENDPOINT", "collectionSelection": true, "collectionStateField": "newEndpointCollections" },
-        { "title": "New endpoint count", "value": "NEW_ENDPOINT_COUNT", "collectionSelection": false },
-        { "title": "New sensitive endpoint", "value": "NEW_SENSITIVE_ENDPOINT", "collectionSelection": true, "collectionStateField": "newSensitiveEndpointCollections" },
-        { "title": "New sensitive endpoint count", "value": "NEW_SENSITIVE_ENDPOINT_COUNT", "collectionSelection": false },
-        { "title": "New sensitive parameter count", "value": "NEW_SENSITIVE_PARAMETER_COUNT", "collectionSelection": false },
-        { "title": "New parameter count", "value": "NEW_PARAMETER_COUNT", "collectionSelection": false },
-        { "title": "New API runtime threats", "value": "API_THREAT_PAYLOADS", "collectionSelection": false }
+    let customWebhookOptions = [
+        { "type":"TRAFFIC", "title": "Traffic alerts", "value": "TRAFFIC_ALERTS", "collectionSelection": false },
+        { "type":"TRAFFIC", "title": "New endpoint", "value": "NEW_ENDPOINT", "collectionSelection": true, "collectionStateField": "newEndpointCollections" },
+        { "type":"TRAFFIC", "title": "New endpoint count", "value": "NEW_ENDPOINT_COUNT", "collectionSelection": false },
+        { "type":"TRAFFIC", "title": "New sensitive endpoint", "value": "NEW_SENSITIVE_ENDPOINT", "collectionSelection": true, "collectionStateField": "newSensitiveEndpointCollections" },
+        { "type":"TRAFFIC", "title": "New sensitive endpoint count", "value": "NEW_SENSITIVE_ENDPOINT_COUNT", "collectionSelection": false },
+        { "type":"TRAFFIC", "title": "New sensitive parameter count", "value": "NEW_SENSITIVE_PARAMETER_COUNT", "collectionSelection": false },
+        { "type":"TRAFFIC", "title": "New parameter count", "value": "NEW_PARAMETER_COUNT", "collectionSelection": false },
+        { "type":"TRAFFIC", "title": "New API runtime threats", "value": "API_THREAT_PAYLOADS", "collectionSelection": false }
     ]
+
+    if (webhookType == "MICROSOFT_TEAMS") {
+        customWebhookOptions.push(
+            {
+                "type":"TESTING",
+                "title": "Testing run results",
+                "value": "TESTING_RUN_RESULTS",
+                "collectionSelection": false
+            }
+        )
+    }
 
     const intervals = [
         { "name": "15 mins", "value": 900 },
@@ -258,9 +270,10 @@ function WebhookCore(props) {
             <SampleData data={data} language="json" minHeight="240px" readOnly={false} getEditorData={setWebhookJson}/>
     )
 
-    const OptionsCard = (
-        <div>
-            {customWebhookOptions.map(customWebhookOption => {
+    const OptionsCard = (type) => {
+        const options = customWebhookOptions.filter(x => x.type == type)
+        return (<div>
+            {options.map(customWebhookOption => {
                 return (
                     <div key={customWebhookOption.title} style={{ paddingBottom: "10px" }}>
                         <Checkbox
@@ -288,14 +301,14 @@ function WebhookCore(props) {
                 )
             })}
         </div>
-    )
+    )}
 
     let CardComponent
     let CardTitle
     let actionContent
     if (showOptions) {
-        CardComponent = OptionsCard
-        CardTitle = "Options"
+        CardComponent = OptionsCard("TRAFFIC")
+        CardTitle = "Traffic options"
         actionContent = "Custom"
     } else {
         CardComponent = CustomWebhookEditor
@@ -307,10 +320,20 @@ function WebhookCore(props) {
         setShowOptions(!showOptions);
     }
 
+    const TestingOptionsCard = (
+        webhookType == "MICROSOFT_TEAMS" ? (<LegacyCard title={"Testing options"} key="testingOptions">
+            <LegacyCard.Section>
+                {OptionsCard("TESTING")}
+            </LegacyCard.Section>
+        </LegacyCard>) : <></>
+    )
+
     const OverallCard = (
         <LegacyCard title={CardTitle} key="options" actions={[{content: actionContent, onAction: toggleShowOptions}]}>
             <LegacyCard.Section>
                 {CardComponent}
+                {(webhook.selectedWebhookOptions && !webhook.selectedWebhookOptions.includes("TRAFFIC_ALERTS")) ?
+                (<>
                 <Divider />
                 <div style={{ paddingTop: "10px" }}>
                     <Text variant="headingMd">Run every</Text>
@@ -326,6 +349,8 @@ function WebhookCore(props) {
                         </span>
                     ))}
                 </div>
+                </>) : null
+                }
                 <br />
                 {(webhook.selectedWebhookOptions && webhook.selectedWebhookOptions.includes("API_THREAT_PAYLOADS")) ? (
                     <>
@@ -383,7 +408,15 @@ function WebhookCore(props) {
             selectedWebhookTab === 0 ?
                 <div key="infoTab">
                     {InfoCard}
-                    {OverallCard}
+                    {(webhook.selectedWebhookOptions &&
+                        webhook.selectedWebhookOptions.length == 1 &&
+                        webhook.selectedWebhookOptions.includes("TESTING_RUN_RESULTS"))
+                        || (webhook.selectedWebhookOptions &&
+                            webhook.selectedWebhookOptions.length == 0) ?
+                        TestingOptionsCard : null}
+                    {(webhook.selectedWebhookOptions &&
+                        !webhook.selectedWebhookOptions.includes("TESTING_RUN_RESULTS")) ?
+                        OverallCard : null}
                 </div>
                 :   webhook.result.length !== 0 ? 
                     <SampleDataList

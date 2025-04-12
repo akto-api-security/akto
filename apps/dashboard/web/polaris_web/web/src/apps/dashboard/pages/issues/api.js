@@ -1,19 +1,19 @@
 import request from "../../../../util/request"
 
 export default {
-    fetchIssues(skip, limit, filterStatus, filterCollectionsId, filterSeverity, filterSubCategory, sortKey, sortOrder, startEpoch, endTimeStamp) {
+    fetchIssues(skip, limit, filterStatus, filterCollectionsId, filterSeverity, filterSubCategory, sortKey, sortOrder, startEpoch, endTimeStamp, activeCollections, filterCompliance) {
         return request({
             url: 'api/fetchAllIssues',
             method: 'post',
-            data: {skip, limit, filterStatus, filterCollectionsId, filterSeverity, filterSubCategory, sortKey, sortOrder, startEpoch, endTimeStamp}
+            data: {skip, limit, filterStatus, filterCollectionsId, filterSeverity, filterSubCategory, sortKey, sortOrder, startEpoch, endTimeStamp, activeCollections, filterCompliance}
         })
     },
-    fetchVulnerableTestingRunResultsFromIssues(filters, skip) {
+    fetchVulnerableTestingRunResultsFromIssues(filters, issuesIds , skip) {
         filters['skip'] = skip
         return request({
             url: 'api/fetchVulnerableTestingRunResultsFromIssues',
             method: 'post',
-            data: filters
+            data: {...filters, issuesIds}
         })
     },
     fetchIssuesFromResultIds(issuesIds, issueStatusQuery) {
@@ -23,11 +23,11 @@ export default {
             data: {issuesIds, issueStatusQuery}
         })
     },
-    bulkUpdateIssueStatus (issueIdArray, statusToBeUpdated, ignoreReason) {
+    bulkUpdateIssueStatus (issueIdArray, statusToBeUpdated, ignoreReason, testingRunResultHexIdsMap) {
         return request({
             url: 'api/bulkUpdateIssueStatus',
             method: 'post',
-            data: {issueIdArray, statusToBeUpdated, ignoreReason}
+            data: {issueIdArray, statusToBeUpdated, ignoreReason, testingRunResultHexIdsMap}
         })
     },
     fetchTestingRunResult (issueId) {
@@ -51,4 +51,25 @@ export default {
             data: {startTimeStamp, endTimeStamp}
         })
     },
+    bulkCreateJiraTickets(issuesIds, aktoDashboardHost, projId, issueType){
+        return request({
+            url: 'api/bulkCreateJiraTickets',
+            method: 'post',
+            data: {issuesIds, aktoDashboardHost, projId, issueType}
+        })
+    },
+    createAzureBoardsWorkItem(testingIssuesId, projectName, workItemType, aktoDashboardHostName) {
+        return request({
+            url: 'api/createAzureBoardsWorkItem',
+            method: 'post',
+            data: {testingIssuesId, projectName, workItemType, aktoDashboardHostName}
+        })
+    },
+    bulkCreateAzureWorkItems(testingIssuesIdList, projectName, workItemType, aktoDashboardHostName) {
+        return request({
+            url: 'api/bulkCreateAzureWorkItems',
+            method: 'post',
+            data: {testingIssuesIdList, projectName, workItemType, aktoDashboardHostName}
+        })
+    }
 }

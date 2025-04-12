@@ -1,5 +1,6 @@
 package com.akto.runtime.utils;
 
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -19,6 +20,7 @@ import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.RawApi;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.util.Constants;
 import com.akto.util.HttpRequestResponseUtils;
 import com.akto.util.JSONUtils;
 import com.alibaba.fastjson2.JSON;
@@ -87,6 +89,45 @@ public class Utils {
         return ret;
     }
 
+    public static String convertToSampleMessage(String message) throws Exception {
+        JSONObject jsonObject = JSON.parseObject(message);
+        JSONObject request = (JSONObject) jsonObject.get("request");
+        JSONObject response = (JSONObject) jsonObject.get("response");
+
+        JSONObject sampleMessage = new JSONObject();
+        if(request != null) {
+            if(request.get("body") != null) {
+                sampleMessage.put("requestPayload", request.get("body"));
+            }
+            if(request.get("headers") != null) {
+                sampleMessage.put("requestHeaders", request.get("headers"));
+            }
+            // TODO: add query params to url
+            if(request.get("url") != null) {
+                sampleMessage.put("path", request.get("url"));
+            }
+            if(request.get("method") != null) {
+                sampleMessage.put("method", request.get("method"));
+            }
+            if(request.get("type") != null) {
+                sampleMessage.put("type", request.get("type"));
+            }
+        }
+        if(response != null) {
+            if(response.get("body") != null) {
+                sampleMessage.put("responsePayload", response.get("body"));
+            }
+            if(response.get("headers") != null) {
+                sampleMessage.put("responseHeaders", response.get("headers"));
+            }
+            if(response.get("statusCode") != null) {
+                sampleMessage.put("statusCode", (Integer)response.getInteger("statusCode"));
+            }
+
+        }
+        return sampleMessage.toJSONString();
+    }
+
     public static Map<String,String> parseCookie(List<String> cookieList){
         Map<String,String> cookieMap = new HashMap<>();
         if(cookieList==null)return cookieMap;
@@ -120,8 +161,19 @@ public class Utils {
         Map<String,List<String>> requestHeaders = OriginalHttpRequest.buildHeadersMap(jsonObject, "requestHeaders");
 
         String rawRequestPayload = jsonObject.getString("requestPayload");
-        String requestPayload = HttpRequestResponseUtils.rawToJsonString(rawRequestPayload,requestHeaders);
-
+        String requestPayload = null;
+        Map<String,String> decryptedRequestPayload = HttpRequestResponseUtils.decryptRequestPayload(rawRequestPayload);
+        if(!decryptedRequestPayload.isEmpty() && decryptedRequestPayload.get("type") != null){
+            requestPayload = decryptedRequestPayload.get("payload");
+            logger.info("decrypted request payload: " + requestPayload,LogDb.RUNTIME);
+            requestHeaders.put(
+                Constants.AKTO_DECRYPT_HEADER,
+                Arrays.asList(decryptedRequestPayload.get("type"))
+            );   
+        }else{
+            requestPayload = HttpRequestResponseUtils.rawToJsonString(rawRequestPayload,requestHeaders);
+        }
+         
         if (GRPC_DEBUG_COUNTER > 0) {
             String acceptableContentType = HttpRequestResponseUtils.getAcceptableContentType(requestHeaders);
             if (acceptableContentType != null && rawRequestPayload.length() > 0) {

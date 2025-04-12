@@ -41,7 +41,7 @@ public class AzureSsoAction extends UserAction{
     public String addSamlSsoInfo(){
         String userLogin = getSUser().getLogin();
         String domain = userLogin.split("@")[1];
-        if (SsoUtils.isAnySsoActive(Context.accountId.get())) {
+        if (SsoUtils.isAnySsoActive()) {
             addActionError("A SSO Integration already exists.");
             return ERROR.toUpperCase();
         }
@@ -79,7 +79,7 @@ public class AzureSsoAction extends UserAction{
                 Filters.eq("configType", configType.name())
             )
         );
-        if (SsoUtils.isAnySsoActive(Context.accountId.get()) && samlConfig == null) {
+        if (SsoUtils.isAnySsoActive() && samlConfig == null) {
             addActionError("A different SSO Integration already exists.");
             return ERROR.toUpperCase();
         }

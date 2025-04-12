@@ -74,13 +74,12 @@ let filters = [
     choices: [
         {
             label:"In request",
-            value:true
+            value:"request"
         },
         {
             label:"In response",
-            value:false
+            value:"response"
         }],
-    singleSelect:true
   },
   {
     key:'location',
@@ -109,8 +108,9 @@ const convertDataIntoTableFormat = (endpoint, apiCollectionMap) => {
     let temp = {}
     const key = func.findLastParamField(endpoint.param)
     // const value = endpoint?.values?.elements?.length > 0 ? endpoint.values.elements[0] : ""
-    const id = endpoint.method + " " + endpoint.url
-    temp['id'] = id
+    const id = endpoint.method + "_" + endpoint.url + "_" + endpoint.param
+    const uniqueKey = `${id}_${endpoint.timestamp}_${endpoint.responseCode}_${endpoint.isHeader}_${endpoint.isUrlParam}`
+    temp['id'] = uniqueKey
     temp['endpoint'] = id;
     temp['url'] = endpoint.url
     temp['method'] = endpoint.method
@@ -122,10 +122,10 @@ const convertDataIntoTableFormat = (endpoint, apiCollectionMap) => {
     temp['isHeader'] = endpoint.isHeader
     temp["paramLocation"] = endpoint.responseCode < 0 ? "Request" : "Response"
     temp['keyValue'] = key
-    temp['endpointComp'] = <GetPrettifyEndpoint key={id} maxWidth="300px" method={endpoint.method} url={endpoint.url} />
+    temp['endpointComp'] = <GetPrettifyEndpoint key={uniqueKey} maxWidth="300px" method={endpoint.method} url={endpoint.url} />
     temp["call"] = endpoint.responseCode < 0 ? "Request" : "Response"
     temp['keyValueComp'] = (
-        <Badge key={id} status="critical" size="slim">
+        <Badge key={uniqueKey} status="critical" size="slim">
             <Box maxWidth="270px">
                 <HorizontalStack gap={"1"} wrap={false}>
                     <Box as="span" maxWidth="180px">
@@ -150,24 +150,7 @@ function SensitiveDataExposure() {
     const apiCollectionMap = PersistStore(state => state.collectionsMap)
     const [modal, setModal] = useState(false)
 
-    const [searchParams] = useSearchParams();
-    const filterParams = searchParams.get('filters')
-    let initialValForResponseFilter = false
-    if(filterParams && filterParams !== undefined &&filterParams.split('isRequest').length > 1){
-        let isRequestVal =  filterParams.split("isRequest__")[1].split('&')[0]
-        if(isRequestVal.length > 0){
-            initialValForResponseFilter = (isRequestVal === 'true' || isRequestVal.includes('true'))
-        }
-    }
-
-    const appliedFilters = [
-        {
-            key: 'isRequest',
-            label: 'In response',
-            value: [initialValForResponseFilter],
-            onRemove: () => {}
-        }
-    ]
+    const filtersMap = PersistStore(state => state.filtersMap)
 
     const handleCreateCollection = async(collectionName) => {
         const filterOperators = {
@@ -182,7 +165,14 @@ function SensitiveDataExposure() {
         setLoading(true)
         const apiInfosSet = new Set()
         let apisList = []
-        await api.fetchChanges('timestamp', -1, 0, 100000, [], filterOperators, startTimestamp, endTimestamp, true, false).then((res) => {
+        let filters = {
+            "subType": [subType],
+            "apiCollectionId": [],
+            "location": [],
+            "collectionIds": []
+        }
+        filters['subType'] = [subType]
+        await api.fetchChanges('timestamp', -1, 0, 100000, filters, filterOperators, startTimestamp, endTimestamp, true, []).then((res) => {
             
             res.endpoints.forEach(x => {
                 let stringId = x.apiCollectionId + "####" + x.method + "###" + x.url
@@ -228,7 +218,7 @@ function SensitiveDataExposure() {
             case "apiCollectionId": 
             return func.convertToDisambiguateLabelObj(value, apiCollectionMap, 2)
             case "isRequest":
-                return value[0] ? "In request" : "In response"
+                return func.convertToDisambiguateLabelObj(value, null, 2)
             default:
                 return value;
         }
@@ -237,21 +227,23 @@ function SensitiveDataExposure() {
     filters = func.getCollectionFilters(filters)
     async function fetchData(sortKey, sortOrder, skip, limit, filters, filterOperators, queryValue){
         setLoading(true);
-        let isRequest = (filters && filters['isRequest'] !== undefined && filters['isRequest'][0]) || initialValForResponseFilter;
+        const isRequestValues = filters?.hasOwnProperty('isRequest') ? (filters.isRequest || []) : [];
         delete filters['isRequest']
         filters['subType'] = [subType]
         filterOperators['subType']="OR"
         let ret = []
-        let total = 0; 
-        await api.fetchChanges(sortKey, sortOrder, skip, limit, filters, filterOperators, startTimestamp, endTimestamp, true,isRequest).then((res)=> {
+        let total = 0;
+        await api.fetchChanges(sortKey, sortOrder, skip, limit, filters, filterOperators, startTimestamp, endTimestamp, true, isRequestValues, queryValue).then((res)=>{
             res.endpoints.forEach((endpoint) => {
                 const dataObj = convertDataIntoTableFormat(endpoint, apiCollectionMap)
                 ret.push(dataObj);
             })
-            total = res.total;
+            total += res.total;
             setLoading(false);
         })
-        return {value:ret , total:total};
+
+        setLoading(false);
+        return {value: ret, total: total};
     }
 
 const handleReset = async () => {
@@ -281,13 +273,13 @@ const primaryActions = (
                 key={startTimestamp + endTimestamp}
                 headers={headers}
                 resourceName={resourceName} 
-                appliedFilters={appliedFilters}
+                appliedFilters={[]}
                 sortOptions={sortOptions}
                 disambiguateLabel={disambiguateLabel}
                 loading={loading}
                 fetchData={fetchData}
                 filters={filters}
-                hideQueryField={true}
+                hideQueryField={false}
                 getStatus={func.getTestResultStatus}
                 useNewRow={true}
                 condensedHeight={true}

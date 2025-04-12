@@ -12,7 +12,7 @@ function SelectCollectionComponent() {
     const allCollections = PersistStore(state => state.allCollections);
     const navigate = useNavigate()
     let urlsCount = 0
-    const allCollectionsOptions = allCollections.filter(x => x.type !== "API_GROUP")
+    const allCollectionsOptions = allCollections.filter(x => (x.type !== "API_GROUP" && x.deactivated === false))
         .map(collection => {
             urlsCount += collection.urlsCount
             return {
@@ -55,7 +55,7 @@ function TestrunsBannerComponent({isInventory,onButtonClick}) {
         )
 
     const subCategoryMap = LocalStore.getState().subCategoryMap;
-    let defaultCount = Math.max(Object.keys(subCategoryMap).length,850);
+    let defaultCount = Math.max(Object.keys(subCategoryMap).length,1000);
     defaultCount = Math.floor(defaultCount / 50) * 50
     return (
         <BannerLayout

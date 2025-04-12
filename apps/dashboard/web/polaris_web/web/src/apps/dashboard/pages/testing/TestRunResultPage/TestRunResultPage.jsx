@@ -63,6 +63,7 @@ function TestRunResultPage(props) {
   const subCategoryFromSourceConfigMap = PersistStore(state => state.subCategoryFromSourceConfigMap);
   const [issueDetails, setIssueDetails] = useState({});
   const [jiraIssueUrl, setJiraIssueUrl] = useState({});
+  const [azureBoardsWorkItemUrl, setAzureBoardsWorkItemUrl] = useState({});
   const subCategoryMap = LocalStore(state => state.subCategoryMap);
   const params = useParams();
   const hexId = params.hexId;
@@ -71,6 +72,7 @@ function TestRunResultPage(props) {
   const [infoState, setInfoState] = useState([])
   const [loading, setLoading] = useState(true);
   const [showDetails, setShowDetails] = useState(true)
+  const [remediation, setRemediation] = useState("")
   const hostNameMap = PersistStore(state => state.hostNameMap)
 
   const useFlyout = location.pathname.includes("test-editor") ? false : true
@@ -169,6 +171,9 @@ function TestRunResultPage(props) {
 
     let jiraTicketKey = ""
     await createJiraTicketApiCall("Host - "+hostName, pathname, window.location.href, description, issueTitle, issueId, projId, issueType).then(async(res)=> {
+      if(res?.errorMessage) {
+        setToast(true, true, res?.errorMessage)
+      }
       jiraTicketKey = res
       await fetchData();
       setToast(true,false,"Jira Ticket Created, scroll down to view")
@@ -203,9 +208,12 @@ function TestRunResultPage(props) {
         runIssuesArr = resp1['similarlyAffectedIssues'];
       })
       let jiraIssueCopy = runIssues.jiraIssueUrl || "";
+      let azureBoardsWorkItemUrlCopy = runIssues.azureBoardsWorkItemUrl || "";
       const moreInfoSections = transform.getInfoSectionsHeaders()
       setJiraIssueUrl(jiraIssueCopy)
+      setAzureBoardsWorkItemUrl(azureBoardsWorkItemUrlCopy)
       setInfoState(transform.fillMoreInformation(subCategoryMap[runIssues?.id?.testSubCategory],moreInfoSections, runIssuesArr, jiraIssueCopy, onClickButton))
+      setRemediation(subCategoryMap[runIssues?.id?.testSubCategory]?.remediation)
       // setJiraIssueUrl(jiraIssueUrl)
       // setInfoState(transform.fillMoreInformation(subCategoryMap[runIssues?.id?.testSubCategory],moreInfoSections, runIssuesArr))
     } else {
@@ -221,7 +229,8 @@ function TestRunResultPage(props) {
     useFlyout ?
     <>
     <TestRunResultFlyout
-      selectedTestRunResult={selectedTestRunResult} 
+      selectedTestRunResult={selectedTestRunResult}
+      remediationSrc={remediation}
       testingRunResult={testingRunResult} 
       loading={loading} 
       issueDetails={issueDetails} 
@@ -234,6 +243,7 @@ function TestRunResultPage(props) {
       setShowDetails={setShowDetails}
       showDetails={showDetails}
       isIssuePage={location.pathname.includes("issues")}
+      azureBoardsWorkItemUrl={azureBoardsWorkItemUrl}
     />
     </>
     :

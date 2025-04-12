@@ -20,7 +20,7 @@ import static com.akto.task.Cluster.callDibs;
 
 public class UpdateSensitiveInfoInApiInfo {
 
-    private static final LoggerMaker loggerMaker = new LoggerMaker(UpdateSensitiveInfoInApiInfo.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(UpdateSensitiveInfoInApiInfo.class, LogDb.DASHBOARD);
 
     ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
     private int cronTime = 15;

@@ -22,6 +22,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.akto.DaoInit;
+import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.TestConfigYamlParser;
 import com.akto.dao.test_editor.TestEditorEnums.ContextOperator;
 import com.akto.dto.AccountSettings;
@@ -40,6 +41,7 @@ import com.akto.store.SampleMessageStore;
 import com.akto.store.TestingUtil;
 import com.akto.testing.ApiExecutor;
 import com.akto.testing.TestExecutor;
+import com.akto.testing.Utils;
 import com.akto.util.ColorConstants;
 import com.akto.util.VersionUtil;
 
@@ -299,7 +301,8 @@ public class Main {
             }
         }
 
-        TestingUtil testingUtil = new TestingUtil(authMechanism, messageStore, null, null, customAuthTypes);
+        // role set to null  is going to throw an exception
+        TestingUtil testingUtil = new TestingUtil(messageStore, null, null, customAuthTypes);
 
         List<TestingRunResult> testingRunResults = new ArrayList<>();
         TestExecutor testExecutor = new TestExecutor();
@@ -317,11 +320,13 @@ public class Main {
         for (String testSubCategory : testingRunConfig.getTestSubCategoryList()) {
             TestConfig testConfig = testConfigMap.get(testSubCategory);
             for (ApiInfo.ApiInfoKey it : apiInfoKeys) {
-
                 TestingRunResult testingRunResult = null;
                 try {
-                    testingRunResult = testExecutor.runTestNew(it, null, testingUtil, null, testConfig,
-                            testingRunConfig, false, new ArrayList<>());
+                    List<String> samples = testingUtil.getSampleMessages().get(it);
+                    testingRunResult = Utils.generateFailedRunResultForMessage(null, it, testConfig.getInfo().getCategory().getName(), testConfig.getInfo().getSubCategory(), null,samples , null);
+                    if(testingRunResult == null){
+                        testingRunResult = testExecutor.runTestNew(it, null, testingUtil, null, testConfig, null, false, new ArrayList<>(), samples.get(samples.size() - 1));
+                    }
                 } catch (Exception e) {
                     e.printStackTrace();
                 }

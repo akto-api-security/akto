@@ -23,7 +23,7 @@ export default {
                 searchString:queryValue
             }
         })
-        return resp.response.data
+        return resp?.data
     },
     fetchRecentParams(startTimestamp, endTimestamp){
         return request({
@@ -56,6 +56,13 @@ export default {
     resetSampleData() {
         return request({
             url: '/api/resetSampleData',
+            method: 'post',
+            data: {}
+        })
+    },
+    fillSensitiveDataTypes() {
+        return request({
+            url: '/api/fillSensitiveDataTypes',
             method: 'post',
             data: {}
         })
@@ -170,6 +177,25 @@ export default {
             data: { apiCollections: items }
         })
     },
+    
+    async updateUserCollections(userCollectionMap) {
+        return await request({
+            url: '/api/updateUserCollections',
+            method: 'post',
+            data: {
+                userCollectionMap: userCollectionMap,
+            }
+        })
+    },
+
+    async getAllUsersCollections() {
+        return await request({
+            url: '/api/getAllUsersCollections',
+            method: 'post',
+            data: {}
+        })
+    },
+
     askAi(data) {
         return request({
             url: '/api/ask_ai',
@@ -561,20 +587,20 @@ export default {
             data: {}
         })
     },
-    scheduleTestForCollection(apiCollectionId, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, testConfigsAdvancedSettings) {
+    scheduleTestForCollection(apiCollectionId, startTimestamp, recurringDaily, recurringWeekly, recurringMonthly, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, testConfigsAdvancedSettings, cleanUpTestingResources, testSuiteIds = []) {
         return request({
             url: '/api/startTest',
             method: 'post',
-            data: { apiCollectionId, type: "COLLECTION_WISE", startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, testConfigsAdvancedSettings}
+            data: { apiCollectionId, type: "COLLECTION_WISE", startTimestamp, recurringDaily,  recurringWeekly, recurringMonthly,selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, testConfigsAdvancedSettings, cleanUpTestingResources, testSuiteIds}
         }).then((resp) => {
             return resp
         })
     },
-    scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, source, testRoleId, continuousTesting, sendSlackAlert, testConfigsAdvancedSettings) {
+    scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, recurringWeekly, recurringMonthly, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, source, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, testConfigsAdvancedSettings, cleanUpTestingResources, testSuiteIds = []) {
         return request({
             url: '/api/startTest',
             method: 'post',
-            data: {apiInfoKeyList, type: "CUSTOM", startTimestamp, recurringDaily, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, source, testRoleId, continuousTesting, sendSlackAlert, testConfigsAdvancedSettings}
+            data: {apiInfoKeyList, type: "CUSTOM", startTimestamp, recurringDaily,  recurringWeekly, recurringMonthly,selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, source, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, testConfigsAdvancedSettings, cleanUpTestingResources, testSuiteIds}
         }).then((resp) => {
             return resp
         })        
@@ -597,6 +623,15 @@ export default {
             url: '/api/fetchSlackWebhooks',
             method: 'post',
             data: {}
+        })
+        return resp
+    },
+
+    async checkWebhook(webhookType, webhookOption) {
+        const resp = await request({
+            url: '/api/checkWebhook',
+            method: 'post',
+            data: { webhookType, webhookOption }
         })
         return resp
     },
@@ -636,6 +671,15 @@ export default {
             method: 'post',
             data: {
                 apiList, collectionName
+            }
+        })
+    },
+    async syncExtractedAPIs(apiCollectionName, projectDir, codeAnalysisApisList) {
+        return await request({
+            url: '/api/syncExtractedAPIs',
+            method: 'post',
+            data: {
+                apiCollectionName, projectDir, codeAnalysisApisList
             }
         })
     },

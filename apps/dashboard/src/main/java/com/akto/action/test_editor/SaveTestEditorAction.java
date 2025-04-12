@@ -1,13 +1,10 @@
 package com.akto.action.test_editor;
 
-import com.akto.DaoInit;
 import com.akto.action.UserAction;
 import com.akto.action.testing_issues.IssuesAction;
 import com.akto.dao.AccountSettingsDao;
-import com.akto.dao.AuthMechanismsDao;
 import com.akto.dao.CustomAuthTypeDao;
 import com.akto.dao.SampleDataDao;
-import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.TestConfigYamlParser;
 import com.akto.dao.test_editor.YamlTemplateDao;
@@ -17,7 +14,6 @@ import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dto.AccountSettings;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.CustomAuthType;
-import com.akto.dto.User;
 import com.akto.dto.test_editor.Category;
 import com.akto.dto.test_editor.Info;
 import com.akto.dto.test_editor.TestConfig;
@@ -29,13 +25,10 @@ import com.akto.dto.testing.AuthMechanism;
 import com.akto.dto.testing.GenericTestResult;
 import com.akto.dto.testing.MultiExecTestResult;
 import com.akto.dto.testing.TestResult;
+import com.akto.dto.testing.TestRoles;
 import com.akto.dto.testing.TestingRunConfig;
-import com.akto.dto.testing.TestResult.Confidence;
 import com.akto.dto.testing.TestingRunResult;
-import com.akto.dto.testing.WorkflowNodeDetails;
-import com.akto.dto.testing.WorkflowTestResult.NodeResult;
 import com.akto.dto.traffic.SampleData;
-import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
 import com.akto.listener.InitializerListener;
 import com.akto.log.LoggerMaker;
@@ -45,6 +38,7 @@ import com.akto.store.SampleMessageStore;
 import com.akto.store.TestingUtil;
 import com.akto.test_editor.execution.VariableResolver;
 import com.akto.testing.TestExecutor;
+import com.akto.testing.Utils;
 import com.akto.util.Constants;
 import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.Severity;
@@ -54,20 +48,14 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator;
 import com.mongodb.BasicDBObject;
-import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Updates;
 
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.File;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -78,8 +66,7 @@ import static com.akto.util.enums.GlobalEnums.YamlTemplateSource;
 public class SaveTestEditorAction extends UserAction {
 
     private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
-    private static final LoggerMaker loggerMaker = new LoggerMaker(SaveTestEditorAction.class);
-    private static final Logger logger = LoggerFactory.getLogger(SaveTestEditorAction.class);
+    private static final LoggerMaker logger = new LoggerMaker(SaveTestEditorAction.class, LogDb.DASHBOARD);;
 
     @Override
     public String execute() throws Exception {
@@ -305,7 +292,6 @@ public class SaveTestEditorAction extends UserAction {
                 apiInfoKey.getString(ApiInfo.ApiInfoKey.URL),
                 URLMethods.Method.valueOf(apiInfoKey.getString(ApiInfo.ApiInfoKey.METHOD)));
 
-        AuthMechanism authMechanism = TestRolesDao.instance.fetchAttackerToken(0, null);
         Map<ApiInfo.ApiInfoKey, List<String>> sampleDataMap = new HashMap<>();
         Map<ApiInfo.ApiInfoKey, List<String>> newSampleDataMap = new HashMap<>();
         
@@ -329,12 +315,16 @@ public class SaveTestEditorAction extends UserAction {
 
         SampleMessageStore messageStore = SampleMessageStore.create(sampleDataMap);
         List<CustomAuthType> customAuthTypes = CustomAuthTypeDao.instance.findAll(CustomAuthType.ACTIVE,true);
-        TestingUtil testingUtil = new TestingUtil(authMechanism, messageStore, null, null, customAuthTypes);
+        TestingUtil testingUtil = new TestingUtil(messageStore, null, null, customAuthTypes);
         List<TestingRunResult.TestLog> testLogs = new ArrayList<>();
         int lastSampleIndex = sampleDataList.get(0).getSamples().size() - 1;
         
         TestingRunConfig testingRunConfig = new TestingRunConfig();
-        testingRunResult = executor.runTestNew(infoKey, null, testingUtil, null, testConfig, testingRunConfig, true, testLogs);
+        List<String> samples = testingUtil.getSampleMessages().get(infoKey);
+        TestingRunResult testingRunResult = Utils.generateFailedRunResultForMessage(null, infoKey, testConfig.getInfo().getCategory().getName(), testConfig.getInfo().getSubCategory(), null,samples , null);
+        if(testingRunResult == null){
+            testingRunResult = executor.runTestNew(infoKey, null, testingUtil, null, testConfig, testingRunConfig, true, testLogs, samples.get(samples.size() - 1));
+        }
         if (testingRunResult == null) {
             testingRunResult = new TestingRunResult(
                     new ObjectId(), infoKey, testConfig.getInfo().getCategory().getName(), testConfig.getInfo().getSubCategory() ,Collections.singletonList(new TestResult(null, sampleDataList.get(0).getSamples().get(lastSampleIndex),
@@ -355,6 +345,7 @@ public class SaveTestEditorAction extends UserAction {
         subCategoryMap.put(testConfig.getId(), infoObj);
 
         List<GenericTestResult> runResults = new ArrayList<>();
+        this.testingRunResult = testingRunResult;
 
         for (GenericTestResult testResult: this.testingRunResult.getTestResults()) {
             if (testResult instanceof TestResult) {
@@ -405,10 +396,10 @@ public class SaveTestEditorAction extends UserAction {
                 try {
                     GithubSync githubSync = new GithubSync();
                     byte[] repoZip = githubSync.syncRepo(repositoryUrl);
-                    loggerMaker.infoAndAddToDb(String.format("Adding test templates from %s for account: %d", repositoryUrl, accountId), LogDb.DASHBOARD);
+                    logger.infoAndAddToDb(String.format("Adding test templates from %s for account: %d", repositoryUrl, accountId), LogDb.DASHBOARD);
                     InitializerListener.processTemplateFilesZip(repoZip, author, YamlTemplateSource.CUSTOM.toString(), repositoryUrl);
                 } catch (Exception e) {
-                    loggerMaker.errorAndAddToDb(String.format("Error while adding test editor templates from %s for account %d, Error: %s", repositoryUrl, accountId, e.getMessage()), LogDb.DASHBOARD);
+                    logger.errorAndAddToDb(String.format("Error while adding test editor templates from %s for account %d, Error: %s", repositoryUrl, accountId, e.getMessage()), LogDb.DASHBOARD);
                 }
             }
         }, 0, TimeUnit.SECONDS);
@@ -528,31 +519,28 @@ public class SaveTestEditorAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
-    public static void main(String[] args) throws Exception {
-        DaoInit.init(new ConnectionString("mongodb://localhost:27017/admini"));
-        Context.accountId.set(1_000_000);
-        String folderPath = "/Users/shivamrawat/akto_code_openSource/akto/libs/dao/src/main/java/com/akto/dao/test_editor/inbuilt_test_yaml_files";
-        Path dir = Paths.get(folderPath);
-        List<String> files = new ArrayList<>();
-        Files.walk(dir).forEach(path -> showFile(path.toFile(), files));
-        for (String filePath : files) {
-            logger.info(filePath);
-            List<String> lines = Files.readAllLines(Paths.get(filePath));
-            String content  = String.join("\n", lines);
-            SaveTestEditorAction saveTestEditorAction = new SaveTestEditorAction();
-            saveTestEditorAction.setContent(content);
-            Map<String,Object> session = new HashMap<>();
-            User user = new User();
-            user.setLogin("AKTO");
-            session.put("user",user);
-            saveTestEditorAction.setSession(session);
-            String success = SUCCESS.toUpperCase();
-            logger.info(success);
+    public String fetchTestContent(){
+        if (originalTestId == null || originalTestId.trim().isEmpty()) {
+            addActionError("TestId cannot be null or empty");
+            return ERROR.toUpperCase();
         }
+
+        YamlTemplate template =  YamlTemplateDao.instance.findOne(Filters.eq(Constants.ID, originalTestId), Projections.include(YamlTemplate.CONTENT));
+        if (template == null) {
+            addActionError("test not found");
+            return ERROR.toUpperCase();
+        }
+
+        this.content = template.getContent();
+        return SUCCESS.toUpperCase();
     }
 
     public void setContent(String content) {
         this.content = content;
+    }
+
+    public String getContent() {
+        return content;
     }
 
     public String getTestingRunHexId() {

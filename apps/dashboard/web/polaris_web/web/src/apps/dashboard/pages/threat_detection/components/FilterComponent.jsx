@@ -1,11 +1,14 @@
-import { Box, Button, HorizontalStack, LegacyCard, Text } from "@shopify/polaris";
+import { Box, Button, HorizontalStack, LegacyCard } from "@shopify/polaris";
 import { useEffect, useState } from "react";
 import SampleData from "../../../components/shared/SampleData";
 import api from "../api"
 import func from '@/util/func';
 import DropdownSearch from "../../../components/shared/DropdownSearch";
+import { useSearchParams } from "react-router-dom";
 
 function FilterComponent() {
+    const[searchParams] = useSearchParams()
+    const filteredPolicy = searchParams.get("policy")
     const [ogData, setOgData] = useState({ message: "" })
     const [data, setData] = useState({ message: "" })
     const [allData, setAllData] = useState([])
@@ -16,10 +19,25 @@ function FilterComponent() {
             setAllData(temp)
             if (temp.length > 0) {
                 const temp2 = temp[0]
-                setId(temp2.id)
-                const temp3 = { message: temp2.content }
-                setData(temp3)
-                setOgData(temp3)
+                if(filteredPolicy && filteredPolicy.length > 0){
+                    setId(filteredPolicy)
+                    try{
+                        let content = temp.filter((x) => x.id === filteredPolicy)[0]?.content
+                        setData({message: content})
+                        setOgData({message: content})
+                    }catch(err){
+                        setId(temp2.id)
+                        const temp3 = { message: temp2.content }
+                        setData(temp3)
+                        setOgData(temp3)
+                    }
+                    
+                }else{
+                    setId(temp2.id)
+                    const temp3 = { message: temp2.content }
+                    setData(temp3)
+                    setOgData(temp3)
+                }
             }
         });
     }
@@ -69,7 +87,7 @@ function FilterComponent() {
                 />
             </LegacyCard.Section>
             <LegacyCard.Section flush>
-                <SampleData data={ogData} editorLanguage="custom_yaml" minHeight="240px" readOnly={false} getEditorData={setData} />
+                <SampleData data={ogData} editorLanguage="custom_yaml" minHeight="65vh" readOnly={false} getEditorData={setData} />
             </LegacyCard.Section>
         </LegacyCard>
     )

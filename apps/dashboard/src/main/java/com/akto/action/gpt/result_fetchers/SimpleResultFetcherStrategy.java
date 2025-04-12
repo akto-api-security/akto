@@ -1,17 +1,21 @@
 package com.akto.action.gpt.result_fetchers;
 
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.http_util.CoreHTTPClient;
 import com.mongodb.BasicDBObject;
-import okhttp3.*;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.IOException;
 import java.util.UUID;
+import okhttp3.MediaType;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.RequestBody;
+import okhttp3.Response;
+import okhttp3.ResponseBody;
 
 public class SimpleResultFetcherStrategy implements ResultFetcherStrategy<BasicDBObject> {
 
-    private static final Logger logger = LoggerFactory.getLogger(SimpleResultFetcherStrategy.class);
+    private static final LoggerMaker logger = new LoggerMaker(SimpleResultFetcherStrategy.class, LogDb.DASHBOARD);;
 
     @Override
     public BasicDBObject fetchResult(BasicDBObject data) {

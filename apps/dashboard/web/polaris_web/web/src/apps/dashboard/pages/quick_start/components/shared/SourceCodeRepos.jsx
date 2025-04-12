@@ -100,7 +100,7 @@ function SourceCodeRepos({type, typeName, orgName}) {
     return (
         <div className='card-items'>
             <Text variant='bodyMd'>
-                Use ${typeName} to import your APIs
+                Use {typeName} to import your APIs
             </Text>
 
             <span>1. Run the below command to setup Source-code-analyser service: </span>

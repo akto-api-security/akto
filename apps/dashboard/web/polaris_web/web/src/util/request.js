@@ -1,7 +1,7 @@
 import axios from 'axios'
-import PersistStore from '../apps/main/PersistStore';
 import func from "./func"
 import { history } from './history';
+import SessionStore from '../apps/main/SessionStore';
 
 const accessTokenUrl = "/dashboard/accessToken"
 
@@ -98,7 +98,7 @@ const err = async (error) => {
 service.interceptors.request.use((config) => {
   config.headers['Access-Control-Allow-Origin'] = '*'
   config.headers['Content-Type'] = 'application/json'
-  config.headers["access-token"] = PersistStore.getState().accessToken
+  config.headers["access-token"] = SessionStore.getState().accessToken
 
 
   if (window.ACTIVE_ACCOUNT) {
@@ -112,7 +112,7 @@ service.interceptors.request.use((config) => {
 // For every response that is sent to the vue app, look for access token in header and set it if not null
 service.interceptors.response.use((response) => {
   if (response.headers["access-token"] != null) {
-    PersistStore.getState().storeAccessToken(response.headers["access-token"])
+    SessionStore.getState().storeAccessToken(response.headers["access-token"])
   }
 
   if (['put', 'post', 'delete', 'patch'].includes(response.method) && response.data.meta) {
@@ -129,7 +129,7 @@ service.interceptors.response.use((response) => {
   return response.data
 }, err)
 
-const black_list_apis = ['dashboard/accessToken', 'api/fetchBurpPluginInfo', 'api/fetchActiveLoaders', 'api/fetchAllSubCategories', 'api/fetchVulnerableRequests']
+const black_list_apis = ['dashboard/accessToken', 'api/fetchBurpPluginInfo', 'api/fetchActiveLoaders', 'api/fetchAllSubCategories', 'api/fetchVulnerableRequests', 'api/fetchActiveTestRunsStatus']
 async function raiseMixpanelEvent(api) {
   if (window?.Intercom) {
     if (api?.startsWith("/api/ingestPostman")) {

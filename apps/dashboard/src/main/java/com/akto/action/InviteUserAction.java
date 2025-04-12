@@ -1,11 +1,13 @@
 package com.akto.action;
 
+import com.akto.dao.CustomRoleDao;
 import com.akto.dao.PendingInviteCodesDao;
 import com.akto.dao.RBACDao;
 import com.akto.dao.UsersDao;
 import com.akto.dao.context.Context;
+import com.akto.dto.CustomRole;
 import com.akto.dto.PendingInviteCode;
-import com.akto.dto.RBAC;
+import com.akto.dto.RBAC.Role;
 import com.akto.dto.User;
 import com.akto.log.LoggerMaker;
 import com.akto.notifications.email.SendgridEmail;
@@ -23,6 +25,8 @@ import java.io.IOException;
 import java.security.NoSuchAlgorithmException;
 import java.security.spec.InvalidKeySpecException;
 import java.util.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class InviteUserAction extends UserAction{
 
@@ -36,6 +40,7 @@ public class InviteUserAction extends UserAction{
     public static final String AKTO_DOMAIN = "akto.io";
 
     public static Map<String, String> commonOrganisationsMap = new HashMap<>();
+    private static final ExecutorService executor = Executors.newFixedThreadPool(1);
 
     public static String validateEmail(String email, String adminLogin) {
         if (email == null) return INVALID_EMAIL_ERROR;
@@ -68,6 +73,8 @@ public class InviteUserAction extends UserAction{
         if (inviteeDomain == null || adminDomain == null) return false;
         if (inviteeDomain.equalsIgnoreCase(adminDomain)) return true;
 
+        if (("consulting-for."+adminDomain).equals(inviteeDomain)) return true;
+
         String inviteeOrg = commonOrganisationsMap.get(inviteeDomain);
         String adminOrg = commonOrganisationsMap.get(adminDomain);
 
@@ -82,7 +89,7 @@ public class InviteUserAction extends UserAction{
     }
 
     private String finalInviteCode;
-    private RBAC.Role inviteeRole;
+    private String inviteeRole;
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(InviteUserAction.class, LoggerMaker.LogDb.DASHBOARD);
 
@@ -105,9 +112,23 @@ public class InviteUserAction extends UserAction{
             return ERROR.toUpperCase();
         }
 
-        RBAC.Role userRole = RBACDao.getCurrentRoleForUser(user_id, Context.accountId.get());
+        Role userRole = RBACDao.getCurrentRoleForUser(user_id, Context.accountId.get());
+        Role baseRole = null;
 
-        if (!Arrays.asList(userRole.getRoleHierarchy()).contains(this.inviteeRole)) {
+        CustomRole customRole = CustomRoleDao.instance.findRoleByName(this.inviteeRole);
+
+        try {
+            if (customRole != null) {
+                baseRole = Role.valueOf(customRole.getBaseRole());
+            } else {
+                baseRole = Role.valueOf(this.inviteeRole);
+            }
+        } catch (Exception e) {
+            addActionError("Invalid role");
+            return ERROR.toUpperCase();
+        }
+
+        if (!Arrays.asList(userRole.getRoleHierarchy()).contains(baseRole)) {
             addActionError("User not allowed to invite for this role");
             return ERROR.toUpperCase();
         }
@@ -161,15 +182,24 @@ public class InviteUserAction extends UserAction{
 
         String inviteFrom = getSUser().getName();
         Mail email = SendgridEmail.getInstance().buildInvitationEmail(inviteeName, inviteeEmail, inviteFrom, finalInviteCode);
+        if (!DashboardMode.isOnPremDeployment()) {
+            sendInviteEmail(email);
+        } else {
+            executor.submit(() -> {
+                sendInviteEmail(email);
+            });
+        }
+
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    private void sendInviteEmail(Mail email) {
         try {
             SendgridEmail.getInstance().send(email);
         } catch (IOException e) {
             loggerMaker.errorAndAddToDb("invite email sending failed" + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
             e.printStackTrace();
-//            return ERROR.toUpperCase();
         }
-
-        return Action.SUCCESS.toUpperCase();
     }
 
     private String invitationCodeToDelete;
@@ -198,11 +228,11 @@ public class InviteUserAction extends UserAction{
         return finalInviteCode;
     }
 
-    public RBAC.Role getInviteeRole() {
+    public String getInviteeRole() {
         return inviteeRole;
     }
 
-    public void setInviteeRole(RBAC.Role inviteeRole) {
+    public void setInviteeRole(String inviteeRole) {
         this.inviteeRole = inviteeRole;
     }
 }

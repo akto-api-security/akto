@@ -7,6 +7,7 @@ import com.akto.dao.filter.MergedUrlsDao;
 import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.CodeAnalysisApiInfo.CodeAnalysisApiInfoKey;
+import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.dto.filter.MergedUrls;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.*;
@@ -356,7 +357,7 @@ public class InventoryAction extends UserAction {
         if(collection.getHostName() == null || collection.getHostName().isEmpty()){
             Bson filter = Filters.and(
                 Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionId),
-                Filters.nin(SingleTypeInfo._COLLECTION_IDS, deactivatedCollections)
+                Filters.nin(SingleTypeInfo._API_COLLECTION_ID, deactivatedCollections)
             );
             list = ApiCollectionsDao.fetchEndpointsInCollection(filter, 0, -1, Utils.DELTA_PERIOD_VALUE);
         }else{
@@ -372,7 +373,7 @@ public class InventoryAction extends UserAction {
         List<ApiInfo> apiInfos = ApiInfoDao.instance.findAll(
             Filters.and(
                 Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionId),
-                Filters.nin(SingleTypeInfo._COLLECTION_IDS, deactivatedCollections)
+                Filters.nin(ApiInfo.ID_API_COLLECTION_ID, deactivatedCollections)
             ));
         for(ApiInfo apiInfo: apiInfos){
             apiInfo.calculateActualAuth();
@@ -381,7 +382,9 @@ public class InventoryAction extends UserAction {
         response.put("apiInfoList", apiInfos);
         if(apiCollectionId != -1){
             ApiCollection apiCollection = ApiCollectionsDao.instance.findOne(Filters.eq(Constants.ID, apiCollectionId));
-             response.put("redacted", apiCollection.getRedact());
+            if (apiCollection != null) {
+                response.put("redacted", apiCollection.getRedact());
+            }
         }
         return Action.SUCCESS.toUpperCase();
     }
@@ -401,6 +404,10 @@ public class InventoryAction extends UserAction {
     private List<String> urls;
     public String fetchSensitiveParamsForEndpoints() {
 
+        if (urls == null || urls.isEmpty()){
+            return Action.SUCCESS.toUpperCase();
+        }
+
         int batchSize = 500;
         List<SingleTypeInfo> list = new ArrayList<>();
         for (int i = 0; i < urls.size(); i += batchSize) {
@@ -415,6 +422,17 @@ public class InventoryAction extends UserAction {
         response = new BasicDBObject();
         response.put("data", new BasicDBObject("endpoints", list));
 
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String getAccessTypes() {
+        response = new BasicDBObject();
+        if (urls == null || urls.size() == 0 ){
+            return Action.SUCCESS.toUpperCase();
+        }
+        Bson filter = Filters.in(ApiInfo.ID_URL, urls);
+        List<ApiInfo> apiInfos = ApiInfoDao.instance.findAll(filter, 0, 2000, null, Projections.include(ApiInfo.API_ACCESS_TYPES, ApiInfo.ID_URL));
+        response.put("apiInfos", apiInfos);
         return Action.SUCCESS.toUpperCase();
     }
 
@@ -456,6 +474,13 @@ public class InventoryAction extends UserAction {
 
         int pageLimit = Math.min(limit == 0 ? 50 : limit, 200);
         Bson filter = Filters.and(prepareFilters("API_INFO"), searchFilter);
+        try {
+            List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+            if(collectionIds != null) {
+                filter = Filters.and(filter, Filters.in(ApiInfo.COLLECTION_IDS, collectionIds));
+            }
+        } catch(Exception e){
+        }
         List<ApiInfo> list = ApiInfoDao.instance.findAll(filter, skip, pageLimit, Sorts.descending(ApiInfo.DISCOVERED_TIMESTAMP));
         for(ApiInfo apiInfo: list){
             apiInfo.calculateActualAuth();
@@ -478,7 +503,7 @@ public class InventoryAction extends UserAction {
             if (apiCollectionId != -1) {
                 Bson apiCollectionIdFilter = Filters.and(
                     Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionId),
-                    Filters.nin(SingleTypeInfo._COLLECTION_IDS, deactivatedCollections)
+                    Filters.nin(SingleTypeInfo._API_COLLECTION_ID, deactivatedCollections)
                 );
                 filterCustomSensitiveParams.add(apiCollectionIdFilter);
             }
@@ -524,6 +549,13 @@ public class InventoryAction extends UserAction {
         List<Bson> pipeline = new ArrayList<>();
         pipeline.add(Aggregates.sort(Sorts.descending(SingleTypeInfo._TIMESTAMP)));
         pipeline.add(Aggregates.match(filterQWithTs));
+        try {
+            List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+            if(collectionIds != null) {
+                pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
+            }
+        } catch(Exception e){
+        }
         pipeline.addAll(SingleTypeInfoDao.instance.buildPipelineForTrend(InitializerListener.isNotKubernetes()));
         getResponseForTrendApis(pipeline);
 
@@ -547,6 +579,13 @@ public class InventoryAction extends UserAction {
 
         pipeline.add(Aggregates.sort(Sorts.descending(SingleTypeInfo._TIMESTAMP)));
         pipeline.add(Aggregates.match(nonHostFilterWithTs));
+        try {
+            List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+            if(collectionIds != null) {
+                pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
+            }
+        } catch(Exception e){
+        }
 
         pipeline.add(Aggregates.group(_id, Accumulators.last(SingleTypeInfo._TIMESTAMP, "$" + SingleTypeInfo._TIMESTAMP)));
         pipeline.addAll(SingleTypeInfoDao.instance.buildPipelineForTrend(InitializerListener.isNotKubernetes()));
@@ -560,6 +599,13 @@ public class InventoryAction extends UserAction {
         pipeline.add(Aggregates.match(Filters.gte("timestamp", startTimestamp)));
         pipeline.add(Aggregates.match(Filters.lte("timestamp", endTimestamp)));
         pipeline.add(Aggregates.match(Filters.nin(SingleTypeInfo._API_COLLECTION_ID, deactivatedCollections)));
+        try {
+            List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+            if(collectionIds != null) {
+                pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
+            }
+        } catch(Exception e){
+        }
         pipeline.add(Aggregates.limit(100_000));
         pipeline.addAll(SingleTypeInfoDao.instance.buildPipelineForTrend(InitializerListener.isNotKubernetes()));
 
@@ -603,7 +649,7 @@ public class InventoryAction extends UserAction {
     private Map<String, List> filters;
     private Map<String, String> filterOperators;
     private boolean sensitive;
-    private boolean request;
+    private List<String> request;
 
     private Bson prepareFilters(String collection) {
         ArrayList<Bson> filterList = new ArrayList<>();
@@ -616,24 +662,28 @@ public class InventoryAction extends UserAction {
         }
         
         if (sensitive) {
-            Bson sensitveSubTypeFilter;
-            if (request) {
-                List<String> sensitiveInRequest = SingleTypeInfoDao.instance.sensitiveSubTypeInRequestNames();
-                sensitiveInRequest.addAll(SingleTypeInfoDao.instance.sensitiveSubTypeNames());
-                sensitveSubTypeFilter = Filters.and(
-                        Filters.in("subType",sensitiveInRequest),
-                        Filters.eq("responseCode", -1)
-                );
-            } else {
-                List<String> sensitiveInResponse = SingleTypeInfoDao.instance.sensitiveSubTypeInResponseNames();
-                sensitiveInResponse.addAll(SingleTypeInfoDao.instance.sensitiveSubTypeNames());
-                sensitveSubTypeFilter = Filters.and(
-                    Filters.in("subType",sensitiveInResponse),
-                    Filters.gt("responseCode", -1)
-                );
+            List<Bson> sensitiveFilters = new ArrayList<>();
+            for (String val: request) {
+                if (val.equalsIgnoreCase("request")) {
+                    List<String> sensitiveInRequest = SingleTypeInfoDao.instance.sensitiveSubTypeInRequestNames();
+                    sensitiveInRequest.addAll(SingleTypeInfoDao.instance.sensitiveSubTypeNames());
+                    sensitiveFilters.add(Filters.and(
+                            Filters.in("subType",sensitiveInRequest),
+                            Filters.eq("responseCode", -1)
+                    ));
+                } else if (val.equalsIgnoreCase("response")) {
+                    List<String> sensitiveInResponse = SingleTypeInfoDao.instance.sensitiveSubTypeInResponseNames();
+                    sensitiveInResponse.addAll(SingleTypeInfoDao.instance.sensitiveSubTypeNames());
+                    sensitiveFilters.add(Filters.and(
+                        Filters.in("subType",sensitiveInResponse),
+                        Filters.gt("responseCode", -1)
+                    ));
+                }
             }
-
-            filterList.add(sensitveSubTypeFilter);
+            // If any filters were added, combine them with OR
+            if (!sensitiveFilters.isEmpty()) {
+                filterList.add(Filters.or(sensitiveFilters));
+            }
         }
 
         for(Map.Entry<String, List> entry: filters.entrySet()) {
@@ -786,17 +836,17 @@ public class InventoryAction extends UserAction {
         return regexPattern;
     }
 
-    private Bson getSearchFilters(){
+    private Bson getSearchFilters(String searchKey){
         String regexPattern = getRegexPattern();
-        if(regexPattern.isEmpty() || regexPattern.length() == 0){
+        if(regexPattern == null || regexPattern.isEmpty()){
             return Filters.empty();
         }
-        Bson filter = Filters.regex(SingleTypeInfo._PARAM, regexPattern, "i");
+        Bson filter = Filters.regex(searchKey, regexPattern, "i");
         return filter;
     }
 
     private String searchString;
-    private List<SingleTypeInfo> getMongoResults() {
+    private List<SingleTypeInfo> getMongoResults(String searchKey) {
 
         List<String> sortFields = new ArrayList<>();
         sortFields.add(sortKey);
@@ -814,21 +864,21 @@ public class InventoryAction extends UserAction {
 
         int pageLimit = Math.min(limit == 0 ? 50 : limit, 200);
 
-        List<SingleTypeInfo> list = SingleTypeInfoDao.instance.findAll(Filters.and(prepareFilters("STI"), getSearchFilters()), skip,pageLimit, sort);
+        List<SingleTypeInfo> list = SingleTypeInfoDao.instance.findAll(Filters.and(prepareFilters("STI"), getSearchFilters(searchKey)), skip,pageLimit, sort);
         return list;        
     }
 
-    private long getTotalParams() {
-        return SingleTypeInfoDao.instance.getMCollection().countDocuments(Filters.and(prepareFilters("STI"), getSearchFilters()));
+    private long getTotalParams(String searchKey) {
+        return SingleTypeInfoDao.instance.getMCollection().countDocuments(Filters.and(prepareFilters("STI"), getSearchFilters(searchKey)));
     }
 
     public String fetchChanges() {
         response = new BasicDBObject();
 
-        long totalParams = getTotalParams();
+        long totalParams = getTotalParams(SingleTypeInfo._URL);
         loggerMaker.infoAndAddToDb("Total params: " + totalParams, LogDb.DASHBOARD);
 
-        List<SingleTypeInfo> singleTypeInfos = getMongoResults();
+        List<SingleTypeInfo> singleTypeInfos = getMongoResults(SingleTypeInfo._URL);
         loggerMaker.infoAndAddToDb("STI count: " + singleTypeInfos.size(), LogDb.DASHBOARD);
 
         response.put("data", new BasicDBObject("endpoints", singleTypeInfos ).append("total", totalParams));
@@ -864,6 +914,15 @@ public class InventoryAction extends UserAction {
                 Filters.lte(SingleTypeInfo._TIMESTAMP, this.endTimestamp)
             )
         ));
+
+        try {
+            List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+            if(collectionIds != null) {
+                pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
+            }
+        } catch(Exception e){
+        }
+
         pipeline.add(Aggregates.project(Projections.exclude(SingleTypeInfo._VALUES)));
         pipeline.add(Aggregates.limit(20_000));
         List<SingleTypeInfo> singleTypeInfos = new ArrayList<>();
@@ -900,7 +959,7 @@ public class InventoryAction extends UserAction {
         ArrayList<Bson> filterList = new ArrayList<>();
         filterList.add(Filters.gt("timestamp", startTimestamp));
         filterList.add(Filters.lt("timestamp", endTimestamp));
-        filterList.add(Filters.nin(SingleTypeInfo._COLLECTION_IDS, UsageMetricCalculator.getDeactivated()));
+        filterList.add(Filters.nin(SingleTypeInfo._API_COLLECTION_ID, UsageMetricCalculator.getDeactivated()));
 
         List<String> sensitiveInRequest = SingleTypeInfoDao.instance.sensitiveSubTypeInRequestNames();
         sensitiveInRequest.addAll(SingleTypeInfoDao.instance.sensitiveSubTypeNames());
@@ -1157,7 +1216,7 @@ public class InventoryAction extends UserAction {
         this.sensitive = sensitive;
     }
 
-    public void setRequest(boolean request) {
+    public void setRequest(List<String> request) {
         this.request = request;
     }
 

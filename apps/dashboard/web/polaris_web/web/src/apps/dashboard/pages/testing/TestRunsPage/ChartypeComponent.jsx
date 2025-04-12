@@ -15,7 +15,9 @@ function ChartypeComponent({data, title,charTitle, chartSubtitle, reverse, isNor
                     <Box >
                         <div style={{display: "flex", gap: "8px", alignItems: "center", maxWidth: '200px'}} key={index}>
                             <span style={{background: data[key]?.color, borderRadius: "50%", width: "8px", height: "8px"}} />
-                            <TooltipText tooltip={key} text={key}/>
+                            <Box width='150px'>
+                                <TooltipText tooltip={key} text={key}/>
+                            </Box>
                         </div>
                     </Box>
                 ),
@@ -41,13 +43,13 @@ function ChartypeComponent({data, title,charTitle, chartSubtitle, reverse, isNor
     )
 
     return (
-        <Box padding={boxPadding != undefined ? boxPadding : 4}>
-            <HorizontalStack gap={8} align={spaceBetween || ''}>
+        <Box className={"issues-severity-graph-container"} padding={boxPadding !== undefined ? boxPadding : 4}>
+            <HorizontalStack wrap={false} gap={8} align={spaceBetween || ''}>
                 {chartOnLeft ? chartComponent: null}
                 <VerticalStack gap="2">
                     <Text fontWeight="semibold" variant="bodySm">{title}</Text>
                     <Scrollable style={{maxHeight: boxHeight}} focusable shadow>
-                        <Box width={dataTableWidth ? dataTableWidth : '260px'}>
+                        <Box className={"issues-severity-graph-table-container"} width={dataTableWidth ? dataTableWidth : '260px'}>
                             <DataTable headings={[]}
                                 columnContentTypes={[
                                     'text',

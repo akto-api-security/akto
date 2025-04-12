@@ -1,5 +1,7 @@
 package com.akto.action;
 
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.regex.Pattern;
 
@@ -8,11 +10,11 @@ import com.akto.dao.*;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dto.*;
 import com.akto.dto.billing.Organization;
+import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.dto.test_run_findings.TestingRunIssues;
-import com.akto.listener.RuntimeListener;
+import com.akto.dto.type.SingleTypeInfo;
 import com.akto.util.enums.GlobalEnums;
 import com.mongodb.client.model.*;
-import org.bouncycastle.util.test.Test;
 import org.bson.conversions.Bson;
 
 import com.akto.dao.context.Context;
@@ -21,15 +23,18 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.usage.UsageMetricCalculator;
 import com.akto.util.ConnectionInfo;
+import com.akto.util.Constants;
+import com.akto.util.GroupByTimeRange;
 import com.akto.util.IssueTrendType;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
 import com.opensymphony.xwork2.Action;
 
+import static com.akto.dto.test_run_findings.TestingRunIssues.KEY_SEVERITY;
+
 public class DashboardAction extends UserAction {
 
-    private Map<Integer,Integer> riskScoreCountMap = new HashMap<>();
     private int startTimeStamp;
     private int endTimeStamp;
     private Map<Integer,List<IssueTrendType>> issuesTrendMap = new HashMap<>() ;
@@ -39,36 +44,7 @@ public class DashboardAction extends UserAction {
     private Map<String,ConnectionInfo> integratedConnectionsInfo = new HashMap<>();
     private String connectionSkipped;
 
-    private static final LoggerMaker loggerMaker = new LoggerMaker(DashboardAction.class);
-
-    private static boolean isBetween(int low, int high, double score){
-        return (score >= low && score < high) ;
-    }
-    
-    // function for getting number of api in between multiple ranges to show trend on dashboard pagecalculateRiskValueForSeverity
-    public String fetchRiskScoreCountMap(){
-        Map<Integer, Integer> riskScoreCounts = new HashMap<>();
-        MongoCursor<ApiInfo> apiCursor = ApiInfoDao.instance.getMCollection().find().projection(Projections.include("_id", ApiInfo.RISK_SCORE)).cursor();
-        while(apiCursor.hasNext()){
-            try {
-                ApiInfo apiInfo = apiCursor.next();
-                float riskScore = apiInfo.getRiskScore();
-                if (isBetween(0, 3, riskScore)) {
-                    riskScoreCounts.put(3, riskScoreCounts.getOrDefault(3,0) + 1);
-                } else if (isBetween(3, 4, riskScore)) {
-                    riskScoreCounts.put(4, riskScoreCounts.getOrDefault(4,0) + 1);
-                } else {
-                    riskScoreCounts.put(5, riskScoreCounts.getOrDefault(5,0) + 1);
-                }
-            }catch (Exception e) {
-                loggerMaker.errorAndAddToDb("error in calculating risk score count " + e.toString(), LogDb.DASHBOARD);
-            }
-        }
-
-        this.riskScoreCountMap = riskScoreCounts;
-
-        return Action.SUCCESS.toUpperCase();
-    }
+    private static final LoggerMaker loggerMaker = new LoggerMaker(DashboardAction.class, LogDb.DASHBOARD);
 
     Set<Integer> deactivatedCollections = UsageMetricCalculator.getDeactivated();
 
@@ -77,11 +53,11 @@ public class DashboardAction extends UserAction {
     public String findTotalIssues() {
         Set<Integer> demoCollections = new HashSet<>();
         demoCollections.addAll(deactivatedCollections);
-        demoCollections.add(RuntimeListener.LLM_API_COLLECTION_ID);
-        demoCollections.add(RuntimeListener.VULNERABLE_API_COLLECTION_ID);
-
-        ApiCollection juiceshopCollection = ApiCollectionsDao.instance.findByName("juice_shop_demo");
-        if (juiceshopCollection != null) demoCollections.add(juiceshopCollection.getId());
+//        demoCollections.add(RuntimeListener.LLM_API_COLLECTION_ID);
+//        demoCollections.add(RuntimeListener.VULNERABLE_API_COLLECTION_ID);
+//
+//        ApiCollection juiceshopCollection = ApiCollectionsDao.instance.findByName("juice_shop_demo");
+//        if (juiceshopCollection != null) demoCollections.add(juiceshopCollection.getId());
 
 
         if (startTimeStamp == 0) startTimeStamp = Context.now() - 24 * 1 * 60 * 60;
@@ -129,53 +105,71 @@ public class DashboardAction extends UserAction {
     }
 
     private List<String> severityToFetch;
-    private final Map<Integer, Integer> trendData = new HashMap<>();
+    private final Map<String, Integer> trendData = new HashMap<>();
+    BasicDBObject response;
+
     public String fetchCriticalIssuesTrend(){
+        Map<String, Map<String, Integer>> severityWiseTrendData= new HashMap<>();
+        response = new BasicDBObject();
         if(endTimeStamp == 0) endTimeStamp = Context.now();
+        long daysBetween = (endTimeStamp - startTimeStamp) / Constants.ONE_DAY_TIMESTAMP;
         if (severityToFetch == null || severityToFetch.isEmpty()) severityToFetch = Arrays.asList("CRITICAL", "HIGH");
 
         Set<Integer> demoCollections = new HashSet<>();
         demoCollections.addAll(deactivatedCollections);
-        demoCollections.add(RuntimeListener.LLM_API_COLLECTION_ID);
-        demoCollections.add(RuntimeListener.VULNERABLE_API_COLLECTION_ID);
 
-        ApiCollection juiceshopCollection = ApiCollectionsDao.instance.findByName("juice_shop_demo");
-        if (juiceshopCollection != null) demoCollections.add(juiceshopCollection.getId());
-        
-        List<GlobalEnums.TestRunIssueStatus> allowedStatus = Arrays.asList(GlobalEnums.TestRunIssueStatus.OPEN, GlobalEnums.TestRunIssueStatus.FIXED);
+
+        List<GlobalEnums.TestRunIssueStatus> allowedStatus = Arrays.asList(GlobalEnums.TestRunIssueStatus.OPEN);
         Bson issuesFilter = Filters.and(
-                Filters.in(TestingRunIssues.KEY_SEVERITY, severityToFetch),
+                Filters.in(KEY_SEVERITY, severityToFetch),
                 Filters.gte(TestingRunIssues.CREATION_TIME, startTimeStamp),
                 Filters.lte(TestingRunIssues.CREATION_TIME, endTimeStamp),
                 Filters.in(TestingRunIssues.TEST_RUN_ISSUES_STATUS, allowedStatus),
-                Filters.nin("_id.apiInfoKey.apiCollectionId", demoCollections)
+                Filters.nin(TestingRunIssues.ID_API_COLLECTION_ID, demoCollections)
         );
-
-        String dayOfYearFloat = "dayOfYearFloat";
-        String dayOfYear = "dayOfYear";
 
         List<Bson> pipeline = new ArrayList<>();
         pipeline.add(Aggregates.match(issuesFilter));
 
-        pipeline.add(Aggregates.project(Projections.computed(dayOfYearFloat, new BasicDBObject("$divide", new Object[]{"$" + TestingRunIssues.CREATION_TIME, 86400}))));
+        try {
+            List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+            if(collectionIds != null) {
+                pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
+            }
+        } catch(Exception e){
+        }
 
-        pipeline.add(Aggregates.project(Projections.computed(dayOfYear, new BasicDBObject("$floor", new Object[]{"$" + dayOfYearFloat}))));
+        BasicDBObject groupedId = new BasicDBObject(SingleTypeInfo._URL, "$" + TestingRunIssues.ID_URL)
+                                                    .append(SingleTypeInfo._METHOD, "$" + TestingRunIssues.ID_METHOD)
+                                                    .append(SingleTypeInfo._API_COLLECTION_ID,  "$" + TestingRunIssues.ID_API_COLLECTION_ID)
+                                                    .append(KEY_SEVERITY, "$" + KEY_SEVERITY);
 
-        BasicDBObject groupedId = new BasicDBObject(dayOfYear, "$"+dayOfYear)
-                                                    .append("url", "$_id.apiInfoKey.url")
-                                                    .append("method", "$_id.apiInfoKey.method")
-                                                    .append("apiCollectionId", "$_id.apiInfoKey.apiCollectionId");
-        pipeline.add(Aggregates.group(groupedId, Accumulators.sum("count", 1)));
-
+        String result = GroupByTimeRange.groupByAllRange(daysBetween, pipeline, TestingRunIssues.CREATION_TIME, "count", 15, groupedId);
         MongoCursor<BasicDBObject> issuesCursor = TestingRunIssuesDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
 
         while(issuesCursor.hasNext()){
             BasicDBObject basicDBObject = issuesCursor.next();
             BasicDBObject o = (BasicDBObject) basicDBObject.get("_id");
-            int date = o.getInt(dayOfYear);
+            String severity = o.getString(KEY_SEVERITY, GlobalEnums.Severity.LOW.name());
+            Map<String, Integer> trendData = severityWiseTrendData.computeIfAbsent(severity, k -> new HashMap<>());
+            int epochVal = 0;
+            if(result.equals("dayOfYear")){
+                String dateString = o.getString(result);
+                DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+                LocalDate localDate = LocalDate.parse(dateString, formatter);
+                epochVal = localDate.getDayOfYear();
+            }else{
+                epochVal = o.getInt(result);
+            }
+            int year = o.getInt("year");
+            String date = year + "_" + epochVal;
             int count = trendData.getOrDefault(date,0);
             trendData.put(date, count+1);
+            count = this.trendData.getOrDefault(date,0);
+            this.trendData.put(date, count+1);
         }
+        response.put("epochKey", result);
+        response.put("issuesTrend", severityWiseTrendData);
 
         return SUCCESS.toUpperCase();
     }
@@ -305,12 +299,6 @@ public class DashboardAction extends UserAction {
         return Action.SUCCESS.toUpperCase();
     }
 
-    private String userEmail;
-
-    public Map<Integer, Integer> getRiskScoreCountMap() {
-        return riskScoreCountMap;
-    }
-
     public int getStartTimeStamp() {
         return startTimeStamp;
     }
@@ -371,7 +359,7 @@ public class DashboardAction extends UserAction {
         this.severityToFetch = severityToFetch;
     }
 
-    public Map<Integer, Integer> getTrendData() {
+    public Map<String, Integer> getTrendData() {
         return trendData;
     }
 
@@ -407,7 +395,7 @@ public class DashboardAction extends UserAction {
         this.organization = organization;
     }
 
-    public void setUserEmail(String userEmail) {
-        this.userEmail = userEmail;
+    public BasicDBObject getResponse() {
+        return response;
     }
 }

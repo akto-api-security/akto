@@ -12,3 +12,9 @@
 .active .Polaris-Navigation__SecondaryNavigation .Polaris-Navigation__Item--selected::before{
     width: 0.1875rem !important;
 }
+
+/* Fix navigation height and scrolling */
+.Polaris-Navigation {
+    height: calc(100% - 70px);
+    overflow-y: hidden !important;
+}

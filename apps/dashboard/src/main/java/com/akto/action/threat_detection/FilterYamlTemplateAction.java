@@ -37,6 +37,11 @@ public class FilterYamlTemplateAction extends UserAction {
             if (filterConfig.getFilter() == null) {
                 throw new Exception("filter field cannot be empty");
             }
+
+            if (!filterConfig.getFilter().getIsValid()) {
+                throw new Exception(filterConfig.getFilter().getErrMsg());
+            }
+
             List<Bson> updates = TrafficFilterUtil.getDbUpdateForTemplate(this.content, getSUser().getLogin());
             FilterYamlTemplateDao.instance.updateOne(
                     Filters.eq(Constants.ID, filterConfig.getId()),

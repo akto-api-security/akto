@@ -1,5 +1,5 @@
 import { Navigation } from "@shopify/polaris"
-import { StoreDetailsFilledMinor, IdentityCardFilledMajor, AutomationFilledMajor, AppsFilledMajor, ComposeMajor} from "@shopify/polaris-icons"
+import { StoreDetailsFilledMinor, IdentityCardFilledMajor, AutomationFilledMajor, AppsFilledMajor, ComposeMajor, ProfileMajor} from "@shopify/polaris-icons"
 import { ListFilledMajor, ReportFilledMinor, LockFilledMajor, CollectionsFilledMajor, PlanMajor, ChatMajor} from "@shopify/polaris-icons"
 import { VariantMajor, VocabularyMajor, AdjustMinor } from "@shopify/polaris-icons"
 import { useLocation, useNavigate } from "react-router-dom"
@@ -11,6 +11,8 @@ const SettingsLeftNav = () => {
     const location = useLocation()
     const path = location.pathname
     const page = path.substring(path.lastIndexOf('/') + 1)
+    let rbacAccess = func.checkForRbacFeatureBasic();
+    let rbacAccessAdvanced = func.checkForRbacFeature();
 
     const usersArr = window.USER_ROLE !== 'GUEST' ? [{
         label: 'Users',
@@ -18,6 +20,14 @@ const SettingsLeftNav = () => {
         selected: page === "users",
         onClick: () => navigate("/dashboard/settings/users")
     }] : []
+
+    const roleArr = window.USER_ROLE === 'ADMIN' && rbacAccess && rbacAccessAdvanced ? [{
+        label: 'Roles',
+        icon: ProfileMajor,
+        selected: page === "roles",
+        onClick: () => navigate("/dashboard/settings/roles")
+    }] : []
+
     const logsArr = window?.IS_SAAS !== 'true' ||
         (window?.USER_NAME && window?.USER_NAME.includes("akto")) ? [{
             label: 'Logs',
@@ -69,6 +79,7 @@ const SettingsLeftNav = () => {
                         onClick: () => navigate("/dashboard/settings/about")
                     },
                     ...usersArr,
+                    ...roleArr,
                     // {
                     //     label: 'Alerts',
                     //     icon: DiamondAlertMinor,

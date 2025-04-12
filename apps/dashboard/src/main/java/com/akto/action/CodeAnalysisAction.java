@@ -3,6 +3,7 @@ package com.akto.action;
 import java.net.URI;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -51,14 +52,14 @@ public class CodeAnalysisAction extends UserAction {
     private CodeAnalysisRepo.SourceCodeType sourceCodeType;
     public static final int MAX_BATCH_SIZE = 100;
 
-    private static final LoggerMaker loggerMaker = new LoggerMaker(CodeAnalysisAction.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(CodeAnalysisAction.class, LogDb.DASHBOARD);;
     private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
 
     public void sendMixpanelEvent() {
         try {
             int accountId = Context.accountId.get();
             DashboardMode dashboardMode = DashboardMode.getDashboardMode();        
-            RBAC record = RBACDao.instance.findOne(RBAC.ACCOUNT_ID, accountId, RBAC.ROLE, Role.ADMIN);
+            RBAC record = RBACDao.instance.findOne(RBAC.ACCOUNT_ID, accountId, RBAC.ROLE, Role.ADMIN.name());
             if (record == null) {
                 return;
             }
@@ -125,9 +126,8 @@ public class CodeAnalysisAction extends UserAction {
         // todo:  If API collection does exist, create it
         ApiCollection apiCollection = ApiCollectionsDao.instance.findByName(apiCollectionName);
         if (apiCollection == null) {
-            loggerMaker.errorAndAddToDb("API collection not found " + apiCollectionName, LogDb.DASHBOARD);
-            addActionError("API collection not found: " + apiCollectionName);
-            return ERROR.toUpperCase();
+            apiCollection = new ApiCollection(Context.now(), apiCollectionName, Context.now(), new HashSet<>(), null, 0, false, false);
+            ApiCollectionsDao.instance.insertOne(apiCollection);
         }
 
         /*
@@ -305,7 +305,9 @@ public class CodeAnalysisAction extends UserAction {
                 singleTypeInfos.addAll(generateSTIsFromPayload(apiCollection.getId(), codeAnalysisApi.getEndpoint(), codeAnalysisApi.getMethod(), requestBody, -1));
                 singleTypeInfos.addAll(generateSTIsFromPayload(apiCollection.getId(), codeAnalysisApi.getEndpoint(), codeAnalysisApi.getMethod(), responseBody, 200));
 
-                Bson update = Updates.combine(Updates.max(SingleTypeInfo.LAST_SEEN, now), Updates.setOnInsert("timestamp", now));
+                Bson update = Updates.combine(Updates.max(SingleTypeInfo.LAST_SEEN, now),
+                        Updates.setOnInsert("timestamp", now),
+                        Updates.set(SingleTypeInfo._COLLECTION_IDS, Arrays.asList(apiCollection.getId())));
 
                 for (SingleTypeInfo singleTypeInfo: singleTypeInfos) {
                     bulkUpdatesSTI.add(

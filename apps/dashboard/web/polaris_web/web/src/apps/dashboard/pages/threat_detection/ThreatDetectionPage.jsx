@@ -1,51 +1,180 @@
-import { useReducer, useState } from "react";
+import { useReducer, useState, useEffect } from "react";
 import DateRangeFilter from "../../components/layouts/DateRangeFilter";
 import PageWithMultipleCards from "../../components/layouts/PageWithMultipleCards";
 import TitleWithInfo from "../../components/shared/TitleWithInfo";
-import FilterComponent from "./components/FilterComponent";
 import SusDataTable from "./components/SusDataTable";
 import values from "@/util/values";
 import { produce } from "immer"
 import func from "@/util/func";
-import transform from "../observe/transform";
-import { HorizontalGrid } from "@shopify/polaris";
 import SampleDetails from "./components/SampleDetails";
-function ThreatDetectionPage() {
+import threatDetectionRequests from "./api";
+import tempFunc from "./dummyData";
+import NormalSampleDetails from "./components/NormalSampleDetails";
+import { HorizontalGrid, VerticalStack } from "@shopify/polaris";
+import TopThreatTypeChart from "./components/TopThreatTypeChart";
+import api from "./api";
+import threatDetectionFunc from "./transform";
+import InfoCard from "../dashboard/new_components/InfoCard";
+import BarGraph from "../../components/charts/BarGraph";
+import SessionStore from "../../../main/SessionStore";
 
-    const [sampleData, setSampleData] = useState([])
+const convertToGraphData = (severityMap) => {
+    let dataArr = []
+    Object.keys(severityMap).forEach((x) => {
+        const color = func.getHexColorForSeverity(x)
+        let text = func.toSentenceCase(x)
+        const value =  severityMap[x]
+        dataArr.push({
+            text, value, color
+        })
+    })
+    return dataArr
+}
+
+const ChartComponent = ({ subCategoryCount, severityCountMap }) => {
+    return (
+      <VerticalStack gap={4} columns={2}>
+        <HorizontalGrid gap={4} columns={2}>
+          <TopThreatTypeChart
+            key={"top-threat-types"}
+            data={subCategoryCount}
+          />
+          <InfoCard
+                title={"Threats by severity"}
+                titleToolTip={"Number of APIs per each category"}
+                component={
+                    <BarGraph
+                        data={severityCountMap}
+                        areaFillHex="true"
+                        height={"280px"}
+                        defaultChartOptions={{
+                            "legend": {
+                                enabled: false
+                            },
+                        }}
+                        showYAxis={true}
+                        yAxisTitle="Number of APIs"
+                        showGridLines={true}
+                        barWidth={100 - (severityCountMap.length * 6)}
+                        barGap={12}
+                    />
+                }
+            />
+        </HorizontalGrid>
+        
+      </VerticalStack>
+    );
+  };
+
+function ThreatDetectionPage() {
+    const [loading, setLoading] = useState(false);
+    const [currentRefId, setCurrentRefId] = useState('')
+    const [rowDataList, setRowDataList] = useState([])
+    const [moreInfoData, setMoreInfoData] = useState({})
     const initialVal = values.ranges[3]
     const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), initialVal);
     const [showDetails, setShowDetails] = useState(false);
-    const rowClicked = (data) => {
-        let tmp = [data.sample];
-        let commonMessages = transform.getCommonSamples(tmp, [])
-        setSampleData(commonMessages)
-        const sameRow = func.deepComparison(commonMessages, sampleData);
-        if (!sameRow) {
-            setShowDetails(true)
-        } else {
-            setShowDetails(!showDetails)
-        }
-    }
+    const [sampleData, setSampleData] = useState([])
+    const [showNewTab, setShowNewTab] = useState(false)
+    const [subCategoryCount, setSubCategoryCount] = useState([]);
+    const [severityCountMap, setSeverityCountMap] = useState([]);
 
-    const horizontalComponent = <HorizontalGrid columns={1} gap={2}>
-        <FilterComponent key={"filter-component"} />
-    </HorizontalGrid>
+    const threatFiltersMap = SessionStore((state) => state.threatFiltersMap);
+
+    const startTimestamp = parseInt(currDateRange.period.since.getTime()/1000)
+    const endTimestamp = parseInt(currDateRange.period.until.getTime()/1000)
+
+    const rowClicked = async(data) => {
+        if(data?.refId === undefined || data?.refId.length === 0){
+            const tempData = tempFunc.getSampleDataOfUrl(data.url);
+            const sameRow = func.deepComparison(tempData, sampleData);
+            if (!sameRow) {
+                setSampleData([{"message": JSON.stringify(tempData),  "highlightPaths": []}])
+                setShowDetails(true)
+            } else {
+                setShowDetails(!showDetails)
+            }
+            setShowNewTab(false)
+        }else{
+            setShowNewTab(true)
+            const sameRow = currentRefId === data?.refId
+            if (!sameRow) {
+                let rowData = [];
+                await threatDetectionRequests.fetchMaliciousRequest(data?.refId, data?.eventType).then((res) => {
+                    rowData = [...res.maliciousPayloadsResponses]
+                }) 
+                setRowDataList(rowData)
+                setCurrentRefId(data?.refId)
+                setShowDetails(true)
+                setMoreInfoData({
+                    url: data.url,
+                    templateId: data.filterId,
+                })
+            } else {
+                setShowDetails(!showDetails)
+            }
+        }
+        
+      }
+
+      useEffect(() => {
+        const fetchThreatCategoryCount = async () => {
+            setLoading(true);
+            const res = await api.fetchThreatCategoryCount(startTimestamp, endTimestamp);
+            const finalObj = threatDetectionFunc.getGraphsData(res);
+            setSubCategoryCount(finalObj.subCategoryCount);
+            setLoading(false);
+          };
+
+          const fetchCountBySeverity = async () => {
+            setLoading(true);
+            let severityMap = {
+                CRITICAL: 0,
+                HIGH: 0,
+                MEDIUM: 0,
+                LOW: 0,
+            }
+            const res = await api.fetchCountBySeverity(startTimestamp, endTimestamp);
+            res.categoryCounts.forEach(({ subCategory, count }) => {
+                severityMap[subCategory] = count;
+            });
+            setSeverityCountMap(convertToGraphData(severityMap));
+            setLoading(false);
+        };
+
+        fetchThreatCategoryCount();
+        fetchCountBySeverity();
+      }, [startTimestamp, endTimestamp]);
 
     const components = [
-        horizontalComponent,
+        <ChartComponent subCategoryCount={subCategoryCount} severityCountMap={severityCountMap} />,
         <SusDataTable key={"sus-data-table"}
             currDateRange={currDateRange}
-            rowClicked={rowClicked} />,
-        <SampleDetails showDetails={showDetails}
+            rowClicked={rowClicked} 
+        />,
+        !showNewTab ? <NormalSampleDetails
+            title={"Attacker payload"}
+            showDetails={showDetails}
             setShowDetails={setShowDetails}
-            sampleData={sampleData} />
+            sampleData={sampleData}
+            key={"sus-sample-details"}
+        /> :  <SampleDetails
+                title={"Attacker payload"}
+                showDetails={showDetails}
+                setShowDetails={setShowDetails}
+                data={rowDataList}
+                key={"sus-sample-details"}
+                moreInfoData={moreInfoData}
+                threatFiltersMap={threatFiltersMap}
+            />
+            
+
     ]
 
     return <PageWithMultipleCards
         title={
             <TitleWithInfo
-                titleText={"Threat detection"}
+                titleText={"API Threat Activity"}
                 tooltipContent={"Identify malicious requests with Akto's powerful threat detection capabilities"}
             />
         }

@@ -48,9 +48,10 @@ import static com.mongodb.client.model.Filters.eq;
 
 public class AccountAction extends UserAction {
 
+    private static final LoggerMaker loggerMaker = new LoggerMaker(AccountAction.class, LogDb.DASHBOARD);;
+
     private String newAccountName;
     private int newAccountId;
-private static final LoggerMaker loggerMaker = new LoggerMaker(AccountAction.class);
 
     public static final int MAX_NUM_OF_LAMBDAS_TO_FETCH = 50;
     private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
@@ -269,13 +270,13 @@ private static final LoggerMaker loggerMaker = new LoggerMaker(AccountAction.cla
             }
         }
    
-        User user = initializeAccount(email, newAccountId, newAccountName,true, RBAC.Role.ADMIN);
+        User user = initializeAccount(email, newAccountId, newAccountName,true, RBAC.Role.ADMIN.name());
         getSession().put("user", user);
         getSession().put("accountId", newAccountId);
         return Action.SUCCESS.toUpperCase();
     }
 
-    public static User initializeAccount(String email, int newAccountId, String newAccountName, boolean isNew, RBAC.Role role) {
+    public static User initializeAccount(String email, int newAccountId, String newAccountName, boolean isNew, String role) {
         User user = UsersDao.addAccount(email, newAccountId, newAccountName);
         RBACDao.instance.insertOne(new RBAC(user.getId(), role, newAccountId));
         Context.accountId.set(newAccountId);
@@ -291,12 +292,12 @@ private static final LoggerMaker loggerMaker = new LoggerMaker(AccountAction.cla
         return user;
     }
 
-    public static void addUserToExistingAccount(String email, int accountId){
+    public static User addUserToExistingAccount(String email, int accountId){
         Account account = AccountsDao.instance.findOne(eq("_id", accountId));
         UsersDao.addNewAccount(email, account);
-        User user = UsersDao.instance.findOne(eq(User.LOGIN, email));
         //RBACDao.instance.insertOne(new RBAC(user.getId(), RBAC.Role.MEMBER, accountId));
         Context.accountId.set(accountId);
+        return UsersDao.instance.findOne(eq(User.LOGIN, email));
     }
 
     private static void intializeCollectionsForTheAccount(int newAccountId) {
@@ -329,6 +330,9 @@ private static final LoggerMaker loggerMaker = new LoggerMaker(AccountAction.cla
                 AccountSettingsDao.instance.updateOnboardingFlag(true);
                 InitializerListener.insertPiiSources();
 
+                AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+                InitializerListener.insertStateInAccountSettings(accountSettings);
+                
                 try {
                     InitializerListener.executePIISourceFetch();
                 } catch (Exception e) {

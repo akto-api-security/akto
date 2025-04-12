@@ -93,32 +93,6 @@ public abstract class MCollection<T> {
         return this.findAll(and(eq(key1, value1), eq(key2, value2)));
     }
 
-    public<V> List<T> findAll(String key, Collection<V> values) {
-        int timeNow = Context.now();
-        if(printDebugLogs){
-            logger.info("Starting find all query at: " + timeNow);
-        }
-
-
-        MongoCursor<T> cursor = this.getMCollection().find(in(key, values)).cursor();
-
-        if(printDebugLogs){
-            logger.info("Finishing find all query in: " + (Context.now() - timeNow));
-        }
-
-        ArrayList<T> ret = new ArrayList<T>();
-
-        while(cursor.hasNext()) {
-            T elem = cursor.next();
-            ret.add(elem);
-        }
-
-        if(printDebugLogs){
-            logger.info("Finishing find all query and returning to call in: " + (Context.now() - timeNow));
-        }
-
-        return ret;
-    }
     public List<T> findAll(Bson q) {
         return findAll(q, null);
     }
@@ -198,14 +172,7 @@ public abstract class MCollection<T> {
     }
 
     public T findOne(Bson q) {
-        MongoCursor<T> cursor = this.getMCollection().find(q).cursor();
-
-        while(cursor.hasNext()) {
-            T elem = cursor.next();
-            return elem;
-        }
-
-        return null;
+        return this.findOne(q, null);
     }
 
     public T findOne(Bson q, Bson projection) {
@@ -422,13 +389,32 @@ public abstract class MCollection<T> {
         ObjectId objectId = findNthDocumentIdFromEnd((int) deleteCount);
         if (objectId == null) return;
 
+        logger.info("Starting trimCappedCollections for " + this.getCollName() + " account " + this.getDBName() + " at " + Context.now());
         DeleteResult deleteResult = this.getMCollection().deleteMany(lt(ID, objectId));
-        logger.info("Trimmed : " + deleteResult.getDeletedCount());
+        logger.info("Trimmed : " + deleteResult.getDeletedCount() + " for collection: " + this.getCollName() + " for account: " + this.getDBName());
+        logger.info("Completed trimCappedCollections for " + this.getCollName() + " account " + this.getDBName() + " at " + Context.now());
+    }
+
+    public boolean dropCollectionWithCondition(long maxDocuments, long dropThreshold) {
+        long count = this.getMCollection().estimatedDocumentCount();
+        if (count <= maxDocuments)
+            return false;
+
+        if (count >= (dropThreshold * maxDocuments)) {
+            this.getMCollection().drop();
+            logger.info(" Dropped collection: " + this.getCollName() + " for account: " + this.getDBName());
+            return true;
+        }
+        return false;
     }
 
     public Document getCollectionStats(){
-        MongoDatabase mongoDatabase = clients[0].getDatabase(getDBName());
-        return mongoDatabase.runCommand(new Document("collStats",getCollName()));
+        return getCollectionStatsFromNames(getDBName(), getCollName());
+    }
+
+    public static Document getCollectionStatsFromNames(String dbName, String collName){
+        MongoDatabase mongoDatabase = clients[0].getDatabase(dbName);
+        return mongoDatabase.runCommand(new Document("collStats",collName));
     }
 
     public Document compactCollection() {

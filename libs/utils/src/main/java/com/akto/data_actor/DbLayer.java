@@ -18,6 +18,7 @@ import com.akto.dao.ApiInfoDao;
 import com.akto.dao.CustomAuthTypeDao;
 import com.akto.dao.CustomDataTypeDao;
 import com.akto.dao.LogsDao;
+import com.akto.dao.PupeteerLogsDao;
 import com.akto.dao.ProtectionLogsDao;
 import com.akto.dao.RuntimeFilterDao;
 import com.akto.dao.RuntimeLogsDao;
@@ -46,6 +47,7 @@ import com.akto.dto.SensitiveParamInfo;
 import com.akto.dto.SensitiveSampleData;
 import com.akto.dto.Setup;
 import com.akto.dto.billing.Organization;
+import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.dto.runtime_filters.RuntimeFilter;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.traffic.SampleData;
@@ -290,6 +292,14 @@ public class DbLayer {
         Bson projections = Projections.fields(
                 Projections.include("timestamp", "apiCollectionId", "url", "method")
         );
+
+        try {
+            List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+            if(collectionIds != null) {
+                pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
+            }
+        } catch(Exception e){
+        }
 
         pipeline.add(Aggregates.project(projections));
         pipeline.add(Aggregates.group(groupedId));

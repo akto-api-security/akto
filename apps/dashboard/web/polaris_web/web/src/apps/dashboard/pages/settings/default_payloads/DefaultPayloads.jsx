@@ -1,5 +1,4 @@
 import { Page, LegacyCard, TextField, VerticalStack, Button } from '@shopify/polaris'
-import Dropdown from '../../../components/layouts/Dropdown'
 import DropdownSearch from '../../../components/shared/DropdownSearch'
 import PersistStore from '@/apps/main/PersistStore';
 
@@ -9,14 +8,8 @@ import func from '@/util/func'
 import {useState, useEffect} from 'react'
 function DefaultPayloads() {
 
-    const allCollections = PersistStore(state => state.allCollections)
-    const allHostnames = allCollections.map(x => x.hostName).filter(x => x!=null)
-    const hostNameOptions = allHostnames.map(x => {
-        return {
-            label: x,
-            value: x
-        }
-    })
+    const hostNameMap = PersistStore(state => state.hostNameMap)
+    const allHostnames = Object.keys(hostNameMap)
 
 
     const [selectedDomain, setSelectedDomain] = useState('')

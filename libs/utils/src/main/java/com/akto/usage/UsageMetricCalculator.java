@@ -17,7 +17,6 @@ import com.akto.dto.billing.Organization;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.TestingRunResult;
-import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.usage.MetricTypes;
 import com.akto.dto.usage.UsageMetric;
 import com.akto.dto.usage.metadata.ActiveAccounts;
@@ -46,7 +45,12 @@ public class UsageMetricCalculator {
     /*
      * to handle multiple accounts using static maps.
      */
+    /*
+     * RBAC_FEATURE is advanced RBAC, for collection based RBAC and custom roles.
+     * RBAC_BASIC is basic RBAC for inviting with multiple roles.
+     */
     private final static String FEATURE_LABEL_STRING = "RBAC_FEATURE";
+    private final static String BASIC_RBAC_FEATURE = "RBAC_BASIC";
     private static Map<Integer, Integer> lastDeactivatedFetchedMap = new HashMap<>();
     private static final int REFRESH_INTERVAL = 60 * 2; // 2 minutes.
     private static final int REFRESH_INTERVAL_RBAC = 60 * 60; // 1 hour.
@@ -75,7 +79,8 @@ public class UsageMetricCalculator {
 
         HashMap<String, FeatureAccess> featureWiseAllowed = organization.getFeatureWiseAllowed();
         FeatureAccess featureAccess = featureWiseAllowed.getOrDefault(FEATURE_LABEL_STRING, FeatureAccess.noAccess);
-        return featureAccess.getIsGranted();
+        FeatureAccess basicAccess = featureWiseAllowed.getOrDefault(BASIC_RBAC_FEATURE, FeatureAccess.noAccess);
+        return featureAccess.getIsGranted() || basicAccess.getIsGranted();
     }
 
     public static boolean isRbacFeatureAvailable(int accountId){
@@ -121,15 +126,12 @@ public class UsageMetricCalculator {
         return invalidErrors;
     }
 
-    public static int calculateActiveEndpoints(UsageMetric usageMetric) {
-        int measureEpoch = usageMetric.getMeasureEpoch();
-        int activeEndpoints = SingleTypeInfoDao.instance.countEndpoints(
-                Filters.and(Filters.or(
-                        Filters.gt(SingleTypeInfo.LAST_SEEN, measureEpoch),
-                        Filters.gt(SingleTypeInfo._TIMESTAMP, measureEpoch)),
-                excludeDemosAndDeactivated(SingleTypeInfo._API_COLLECTION_ID)));
-        
-        return activeEndpoints;
+    public static int calculateActiveEndpoints() {
+        /*
+         * Count all endpoints.
+         * Same query being used on dashboard.
+         */
+        return (int)SingleTypeInfoDao.instance.fetchEndpointsCount(0, Context.now(), getDemosAndDeactivated(), false);
     }
 
     public static int calculateCustomTests(UsageMetric usageMetric) {
@@ -148,6 +150,9 @@ public class UsageMetricCalculator {
             add(Filters.gt(TestingRunResult.END_TIMESTAMP, measureEpoch));
             add(demoAndDeactivatedCollFilter);
         }};
+
+        // TODO: When we shift vulnerable test results into new collection completely {without making copy}, fix count here then.
+
         int testRuns = (int) TestingRunResultDao.instance.count(Filters.and(filters));
 
         /*
@@ -221,7 +226,7 @@ public class UsageMetricCalculator {
         if (metricType != null) {
             switch (metricType) {
                 case ACTIVE_ENDPOINTS:
-                    usage = calculateActiveEndpoints(usageMetric);
+                    usage = calculateActiveEndpoints();
                     break;
                 case CUSTOM_TESTS:
                     usage = calculateCustomTests(usageMetric);

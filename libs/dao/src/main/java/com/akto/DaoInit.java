@@ -8,6 +8,8 @@ import com.akto.dao.testing.TestRolesDao;
 import com.akto.dao.testing.TestingRunDao;
 import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dao.testing.TestingRunResultSummariesDao;
+import com.akto.dao.testing.VulnerableTestingRunResultDao;
+import com.akto.dao.testing_run_findings.SourceCodeVulnerabilitiesDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dao.traffic_metrics.TrafficAlertsDao;
 import com.akto.dao.traffic_metrics.RuntimeMetricsDao;
@@ -65,6 +67,7 @@ import com.akto.dto.CollectionConditions.ConditionsType;
 import com.akto.dto.CollectionConditions.MethodCondition;
 import com.akto.dto.CollectionConditions.TestConfigsAdvancedSettings;
 import com.akto.dto.DependencyNode.ParamInfo;
+import com.akto.dto.agents.State;
 import com.akto.dto.auth.APIAuth;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.billing.OrganizationFlags;
@@ -85,6 +88,8 @@ import org.slf4j.LoggerFactory;
 import static com.akto.dao.MCollection.clients;
 import static org.bson.codecs.configuration.CodecRegistries.fromProviders;
 import static org.bson.codecs.configuration.CodecRegistries.fromRegistries;
+
+import javax.xml.transform.Source;
 
 public class DaoInit {
 
@@ -264,12 +269,18 @@ public class DaoInit {
         ClassModel<SensitiveDataEndpoints> sensitiveDataEndpointsClassModel = ClassModel.builder(SensitiveDataEndpoints.class).enableDiscriminator(true).build();
         ClassModel<AllAPIsGroup> allApisGroupClassModel = ClassModel.builder(AllAPIsGroup.class).enableDiscriminator(true).build();
 
+        ClassModel<Remediation> remediationClassModel = ClassModel.builder(Remediation.class).enableDiscriminator(true).build();
+        ClassModel<ComplianceMapping> complianceMappingModel = ClassModel.builder(ComplianceMapping.class).enableDiscriminator(true).build();
+        ClassModel<ComplianceInfo> complianceInfoModel = ClassModel.builder(ComplianceInfo.class).enableDiscriminator(true).build();
         ClassModel<RuntimeMetrics> RuntimeMetricsClassModel = ClassModel.builder(RuntimeMetrics.class).enableDiscriminator(true).build();
         ClassModel<CodeAnalysisApi>  codeAnalysisApiModel = ClassModel.builder(CodeAnalysisApi.class).enableDiscriminator(true).build();
         ClassModel<CodeAnalysisRepo> codeAnalysisRepoModel = ClassModel.builder(CodeAnalysisRepo.class).enableDiscriminator(true).build();
         ClassModel<HistoricalData> historicalDataClassModel = ClassModel.builder(HistoricalData.class).enableDiscriminator(true).build();
         ClassModel<TestConfigsAdvancedSettings> configSettingClassModel = ClassModel.builder(TestConfigsAdvancedSettings.class).enableDiscriminator(true).build();
         ClassModel<ConditionsType> configSettingsConditionTypeClassModel = ClassModel.builder(ConditionsType.class).enableDiscriminator(true).build();
+        ClassModel<CustomRole> roleClassModel = ClassModel.builder(CustomRole.class).enableDiscriminator(true).build();
+        ClassModel<TestingInstanceHeartBeat> testingInstanceHeartBeat = ClassModel.builder(TestingInstanceHeartBeat.class).enableDiscriminator(true).build();
+
         CodecRegistry pojoCodecRegistry = fromProviders(PojoCodecProvider.builder().register(
                 configClassModel, signupInfoClassModel, apiAuthClassModel, attempResultModel, urlTemplateModel,
                 pendingInviteCodeClassModel, rbacClassModel, kafkaHealthMetricClassModel, singleTypeInfoClassModel,
@@ -299,13 +310,12 @@ public class DaoInit {
                         nodeClassModel, connectionClassModel, edgeClassModel, replaceDetailClassModel, modifyHostDetailClassModel, fileUploadClassModel
                 ,fileUploadLogClassModel, codeAnalysisCollectionClassModel, codeAnalysisApiLocationClassModel, codeAnalysisApiInfoClassModel, codeAnalysisApiInfoKeyClassModel,
                 riskScoreTestingEndpointsClassModel, OrganizationFlagsClassModel, sensitiveDataEndpointsClassModel, unauthenticatedEndpointsClassModel, allApisGroupClassModel,
-                eventsExampleClassModel, RuntimeMetricsClassModel, codeAnalysisRepoModel, codeAnalysisApiModel, historicalDataClassModel, configSettingClassModel, configSettingsConditionTypeClassModel).automatic(true).build());
+                eventsExampleClassModel, remediationClassModel, complianceInfoModel, complianceMappingModel, RuntimeMetricsClassModel, codeAnalysisRepoModel, codeAnalysisApiModel, historicalDataClassModel, configSettingClassModel, configSettingsConditionTypeClassModel, roleClassModel, testingInstanceHeartBeat).automatic(true).build());
 
         final CodecRegistry customEnumCodecs = CodecRegistries.fromCodecs(
                 new EnumCodec<>(Conditions.Operator.class),
                 new EnumCodec<>(SingleTypeInfo.SuperType.class),
                 new EnumCodec<>(Method.class),
-                new EnumCodec<>(RBAC.Role.class),
                 new EnumCodec<>(Credential.Type.class),
                 new EnumCodec<>(ApiToken.Utility.class),
                 new EnumCodec<>(ApiInfo.AuthType.class),
@@ -345,7 +355,8 @@ public class DaoInit {
                 new EnumCodec<>(CustomAuthType.TypeOfToken.class),
                 new EnumCodec<>(TrafficAlerts.ALERT_TYPE.class),
                 new EnumCodec<>(ApiInfo.ApiType.class),
-                new EnumCodec<>(CodeAnalysisRepo.SourceCodeType.class)
+                new EnumCodec<>(CodeAnalysisRepo.SourceCodeType.class),
+                new EnumCodec<>(State.class)
         );
 
         return fromRegistries(MongoClientSettings.getDefaultCodecRegistry(), pojoCodecRegistry,
@@ -409,6 +420,11 @@ public class DaoInit {
         TrafficAlertsDao.instance.createIndicesIfAbsent();
         RuntimeMetricsDao.instance.createIndicesIfAbsent();
         ApiAuditLogsDao.instance.createIndicesIfAbsent();
+        VulnerableTestingRunResultDao.instance.createIndicesIfAbsent();
+        CustomRoleDao.instance.createIndicesIfAbsent();
+        TestingInstanceHeartBeatDao.instance.createIndexIfAbsent();
+        PupeteerLogsDao.instance.createIndicesIfAbsent();
+        SourceCodeVulnerabilitiesDao.instance.createIndicesIfAbsent();
     }
 
 }

@@ -1,7 +1,7 @@
 import {
-  CalendarMinor,ClockMinor,CircleAlertMajor,DynamicSourceMinor, LockMinor, KeyMajor, ProfileMinor, PasskeyMinor,
+  CalendarMinor,ClockMinor,CircleAlertMajor,DynamicSourceMinor,DynamicSourceMajor, LockMinor, KeyMajor, ProfileMinor, PasskeyMinor,
   EmailMajor, CreditCardMajor, IdentityCardMajor, LocationsMinor,PhoneMajor, FileMinor, ImageMajor, BankMajor, HashtagMinor, 
-  ReceiptMajor, MobileMajor, CalendarTimeMinor, LocationMajor,  IdentityCardFilledMajor, CalendarMajor
+  ReceiptMajor, MobileMajor, CalendarTimeMinor, LocationMajor,  IdentityCardFilledMajor, CalendarMajor, PageMajor, AffiliateMajor
 } from '@shopify/polaris-icons';
 import { saveAs } from 'file-saver'
 import inventoryApi from "../apps/dashboard/pages/observe/api"
@@ -13,11 +13,33 @@ import { tokens } from "@shopify/polaris-tokens"
 import PersistStore from '../apps/main/PersistStore';
 
 import { circle_cancel, circle_tick_minor } from "@/apps/dashboard/components/icons";
+import quickStartFunc from '../apps/dashboard/pages/quick_start/transform';
 
 const iconsUsedMap = {
   CalendarMinor,ClockMinor,CircleAlertMajor,DynamicSourceMinor, LockMinor, KeyMajor, ProfileMinor, PasskeyMinor,
   EmailMajor, CreditCardMajor, IdentityCardMajor, LocationsMinor,PhoneMajor, FileMinor, ImageMajor, BankMajor, HashtagMinor, 
   ReceiptMajor, MobileMajor, CalendarTimeMinor,LocationMajor, IdentityCardFilledMajor, CalendarMajor
+}
+
+const searchResultSections = {
+  collections: {
+    type: "collection",
+    title: "Collections",
+    icon: DynamicSourceMajor,
+    sectionPath: "/dashboard/observe/inventory/"
+  },
+  tests: {
+    type: "test",
+    title: "Tests",
+    icon: FileMinor,
+    sectionPath: "/dashboard/test-editor/"
+  },
+  connectors: {
+    type: "connector",
+    title: "Connectors",
+    icon: AffiliateMajor,
+    sectionPath: "/dashboard/quick-start"
+  },
 }
 
 const func = {
@@ -236,17 +258,29 @@ prettifyEpoch(epoch) {
     }
     return result;
   },
+  sortObjectBySeverity(obj) {
+    const severityOrder = this.getAktoSeverities()
+
+    const sortedEntries = Object.entries(obj).sort(
+        ([keyA], [keyB]) => severityOrder.indexOf(keyA) - severityOrder.indexOf(keyB)
+    )
+
+    return Object.fromEntries(sortedEntries)
+  },
   getSeverityStatus(countIssues) {
     if(countIssues==null || countIssues==undefined){
       return [];
     }
-    return Object.keys(countIssues).filter((key) => {
-      return (countIssues[key] > 0)
+
+    const sortedCountIssues = this.sortObjectBySeverity(countIssues)
+
+    return Object.keys(sortedCountIssues).filter((key) => {
+      return (sortedCountIssues[key] > 0)
     })
   },
   getTestingRunIconObj(state) {
     let testState = state?._name || state
-    switch(testState.toUpperCase()){
+    switch(testState?.toUpperCase()){
       case "RUNNING": 
         return {
           color: "subdued",
@@ -366,6 +400,49 @@ prettifyEpoch(epoch) {
   epochToDateTime(timestamp) {
     var date = new Date(timestamp * 1000);
     return date.toLocaleString('en-US',{timeZone: window.TIME_ZONE === 'Us/Pacific' ? 'America/Los_Angeles' : window.TIME_ZONE});
+  },
+  convertEpochToTimezoneEpoch(epochSeconds) {
+    if(epochSeconds == null) return epochSeconds
+    const targetTimeZone = window.TIME_ZONE === 'Us/Pacific' ? 'America/Los_Angeles' : window.TIME_ZONE
+    const date = new Date(epochSeconds * 1000)
+    
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: targetTimeZone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false
+    })
+  
+    const parts = formatter.formatToParts(date).reduce((acc, part) => {
+      acc[part.type] = part.value
+      return acc
+    }, {})
+  
+    const localDateStr = `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}:${parts.second}`
+    const zonedDate = new Date(`${localDateStr}Z`)
+    return Math.floor(zonedDate.getTime() / 1000)
+  },
+  getFormattedDate(epoch) {
+    const date = new Date(epoch * 1000)
+    const day = date.getDate()
+    const month = date.toLocaleString('default', { month: 'long' })
+    const year = date.getFullYear()
+
+    const suffix = (day) => {
+        if (day >= 11 && day <= 13) return 'th'
+        switch (day % 10) {
+            case 1: return 'st'
+            case 2: return 'nd'
+            case 3: return 'rd'
+            default: return 'th'
+        }
+    }
+
+    return `${day}${suffix(day)} ${month}, ${year}`
   },
 
   getListOfHosts(apiCollections) {
@@ -561,10 +638,14 @@ prettifyEpoch(epoch) {
   },
   requestFirstLine(message, queryParams) {
     if (message["request"]) {
-      let url = message["request"]["url"]
+      let url = message["request"]["url"] || ""
       return message["request"]["method"] + " " + url + func.convertQueryParamsToUrl(queryParams) + " " + message["request"]["type"]
     } else {
-      return message.method + " " + message.path.split("?")[0] + func.convertQueryParamsToUrl(queryParams) + " " + message.type
+      let pathString = ""
+      if(message.path !== null && message?.path !== undefined){
+        pathString = message.path.split("?")[0];
+      }
+      return message?.method + " " + pathString + func.convertQueryParamsToUrl(queryParams) + " " + message?.type
     }
   },
   responseFirstLine(message) {
@@ -896,6 +977,8 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName) {
           let authTypeTag = authType.replace(",", "");
           let riskScore = apiInfoMap[key] ? apiInfoMap[key]?.riskScore : 0
           let responseCodesArr = apiInfoMap[key] ? apiInfoMap[key]?.responseCodes : [] 
+          let discoveredTimestamp = apiInfoMap[key] ? (apiInfoMap[key].discoveredTimestamp || apiInfoMap[key].startTs) : 0
+
           ret[key] = {
               id: x.method + "###" + x.url + "###" + x.apiCollectionId + "###" + Math.random(),
               shadow: x.shadow ? x.shadow : false,
@@ -910,10 +993,10 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName) {
               apiCollectionId: x.apiCollectionId,
               last_seen: apiInfoMap[key] ? (this.prettifyEpoch(apiInfoMap[key]["lastSeen"])) : this.prettifyEpoch(x.startTs),
               lastSeenTs: apiInfoMap[key] ? apiInfoMap[key]["lastSeen"] : x.startTs,
-              detectedTs: x.startTs,
+              detectedTs: (x.startTs || discoveredTimestamp),
               changesCount: x.changesCount,
               changes: x.changesCount && x.changesCount > 0 ? (x.changesCount +" new parameter"+(x.changesCount > 1? "s": "")) : 'No new changes',
-              added: "Discovered " + this.prettifyEpoch(x.startTs),
+              added: "Discovered " + this.prettifyEpoch(x.startTs || discoveredTimestamp),
               violations: apiInfoMap[key] ? apiInfoMap[key]["violations"] : {},
               apiCollectionName: idToName ? (idToName[x.apiCollectionId] || '-') : '-',
               auth_type: (authType || "no auth type found").toLowerCase(),
@@ -1224,18 +1307,125 @@ getDeprecatedEndpoints(apiInfoList, unusedEndpoints, apiCollectionId) {
           : dateRange.title;
   return dateStr
  },
+ createSearchResult(section, content, url) {
+  return {
+    content: content,
+    url: url, 
+    type: section.type,
+    icon: section.icon,
+    variant: 'menu',
+    truncate: true,
+  }
+ },
+ getCollectionsSearchItems(allCollections) {
+  const searchItems = []
 
- getSearchItemsArr(allRoutes,allCollections){
+  const activatedColections = allCollections.filter((collection) => collection.deactivated === false)
+  activatedColections.forEach((collection)=> {
+    const collectionUrl = searchResultSections.collections.sectionPath + collection.id
+    const searchResult = this.createSearchResult(
+      searchResultSections.collections,
+      collection.displayName, 
+      collectionUrl
+    )
+    searchItems.push(searchResult)
+  })
+  return searchItems
+ },
+ getTestSearchItems(allTests) {
+  const searchItems = []
+
+  // filter active tests
+  const activeTests = Object.values(allTests).filter((test) => test.inactive === false)
+
+  activeTests.forEach(test => {
+    const testUrl = searchResultSections.tests.sectionPath + test.name
+    const searchResult = this.createSearchResult(
+      searchResultSections.tests,
+      test.testName, 
+      testUrl,
+    )
+    searchItems.push(searchResult)
+  });
+
+  return searchItems
+ },
+ getConnectorSearchItems() {
+  const searchItems = []
+
+  const connectorCategories = quickStartFunc.getConnectorsListCategorized()
+
+  for (const categoryArr of Object.values(connectorCategories)) {
+      for (const connector of categoryArr) {
+        const connectorKey = connector.key?.toLowerCase() ?? "";
+        const connectorUrl = `${searchResultSections.connectors.sectionPath}?connector=${connectorKey}`
+        const searchResult = this.createSearchResult(
+          searchResultSections.connectors,
+          connector.label, 
+          connectorUrl,
+        )
+      searchItems.push(searchResult)
+      }
+  }
+
+  return searchItems
+ },
+ getSearchItemsArr(allCollections, subCategoryMap){
   let combinedArr = []
 
-  let initialStr = "/dashboard/observe/inventory/"
-
-  allCollections.forEach((item)=> {
-    combinedArr.push({content: item.displayName, url: initialStr + item.id, type:'collection'})
-  })
+  const collectionsSearchItems = this.getCollectionsSearchItems(allCollections)
+  const testSearchItems = this.getTestSearchItems(subCategoryMap)
+  const connectorSearchItems = this.getConnectorSearchItems()
+  combinedArr.push(...collectionsSearchItems, ...testSearchItems, ...connectorSearchItems)
 
   return combinedArr
  },
+ createSearchResultsSection(section, filteredItemsArr, handleNavigateSearch) {
+    const SECTION_ITEMS_MAX_COUNT = 10
+    const filteredSectionItems = filteredItemsArr.filter(sectionItem => sectionItem.type === section.type)
+    const filteredSectionResults = filteredSectionItems
+      .slice(0, SECTION_ITEMS_MAX_COUNT)
+      .map(({ url, ...sectionItem }) => ({ ...sectionItem, onAction: () => handleNavigateSearch(url) }));
+    
+    if (filteredSectionItems.length > SECTION_ITEMS_MAX_COUNT) {
+      const { url, ...moreResult } = this.createSearchResult(
+        searchResultSections.collections,
+        `+${filteredSectionItems.length - SECTION_ITEMS_MAX_COUNT} more`,
+        section.sectionPath
+      );
+
+      moreResult.onAction = () => handleNavigateSearch(section.sectionPath);
+      moreResult.icon = ''
+      filteredSectionResults.push(moreResult)
+    }
+
+    if (filteredSectionResults.length === 0) return null
+    else {
+      return { title: section.title, items: filteredSectionResults }
+    }
+},
+ getSearchResults(filteredItemsArr, handleNavigateSearch) {
+  const collectionsSection = this.createSearchResultsSection(searchResultSections.collections, filteredItemsArr, handleNavigateSearch)
+  const testsSection = this.createSearchResultsSection(searchResultSections.tests, filteredItemsArr, handleNavigateSearch)
+  const connectorsSection = this.createSearchResultsSection(searchResultSections.connectors, filteredItemsArr, handleNavigateSearch)
+
+  const allSections = [ collectionsSection, testsSection, connectorsSection ].filter(section => section !== null)
+
+  return allSections
+ },
+
+updateQueryParams(searchParams, setSearchParams, key, value) {
+  const newSearchParams = new URLSearchParams(searchParams);
+  if (value === "") {
+      newSearchParams.delete(key)
+  } else {
+      newSearchParams.set(key, value);
+  }
+  setSearchParams(newSearchParams);
+},
+ getComplianceIcon: (complianceName) => {
+  return "/public/"+complianceName.toUpperCase()+".svg";
+},
 
  convertToDisambiguateLabel(value, convertFunc, maxAllowed){
   if (value.length > maxAllowed) {
@@ -1276,6 +1466,13 @@ mapCollectionIdToHostName(apiCollections){
 
     return collectionsObj
 },
+joinWordsWithUnderscores(input) {
+    if (!input ) return "";
+    const words = input.trim().split(/\s+/);
+    const result = words.map(word => word).join('_');
+
+    return result.toUpperCase();
+  },
   getTimeTakenByTest(startTimestamp, endTimestamp){
     const timeDiff = Math.abs(endTimestamp - startTimestamp);
     const hours = Math.floor(timeDiff / 3600);
@@ -1296,14 +1493,16 @@ mapCollectionIdToHostName(apiCollections){
   },
   getHexColorForSeverity(key){
     switch(key){
+      case "CRITICAL":
+        return "#DF2909"
       case "HIGH":
-        return "#D72C0D"
+        return "#FED3D1"
       case "MEDIUM":
         return "#FFD79D"
       case "LOW":
-        return "#2C6ECB"
+        return "#E4E5E7"
       default:
-        return "#2C6ECB"
+        return "#E4E5E7"
     }
 
   },
@@ -1626,6 +1825,16 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
     }
     return false;
   },
+  checkForRbacFeatureBasic(){
+    const stiggFeatures = window.STIGG_FEATURE_WISE_ALLOWED
+    let rbacAccess = false;
+    if (!stiggFeatures || Object.keys(stiggFeatures).length === 0) {
+        rbacAccess = true
+    } else if(stiggFeatures && stiggFeatures['RBAC_BASIC']){
+        rbacAccess = stiggFeatures['RBAC_BASIC'].isGranted
+    }
+    return rbacAccess;
+  },
   checkForRbacFeature(){
     const stiggFeatures = window.STIGG_FEATURE_WISE_ALLOWED
     let rbacAccess = false;
@@ -1636,13 +1845,25 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
     }
     return rbacAccess;
   },
+
+  checkForFeatureSaas(featureLabel) {
+    const stiggFeatures = window.STIGG_FEATURE_WISE_ALLOWED
+    let access = false;
+    if (!stiggFeatures || Object.keys(stiggFeatures).length === 0 ) {
+      access = this.checkOnPrem()
+    } else if (stiggFeatures && stiggFeatures[featureLabel]) {
+      access = stiggFeatures[featureLabel].isGranted
+    }
+    return access;
+  },
+
   checkUserValidForIntegrations(){
-    const rbacAccess = this.checkForRbacFeature();
+    const rbacAccess = this.checkForRbacFeatureBasic();
     if(!rbacAccess){
       return true;
     }
     const userRole = window.USER_ROLE
-    return !(userRole === "GUEST" || userRole === "MEMBER")
+    return !(userRole === "GUEST" || userRole === "DEVELOPER")
   },
   capitalizeFirstLetter(str) {
     if (!str) return str;
@@ -1749,6 +1970,112 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
     return initialIdx
   },
 
+  getEpochMillis(value, type) {
+    const [year, val] = value.split('_').map(Number);
+    let date;
+    
+    switch (type) {
+        case 'dayOfYear':
+            date = new Date(Date.UTC(year, 0, val)); // January 1st + (val - 1) days
+            break;
+        case 'monthOfYear':
+            date = new Date(Date.UTC(year, val - 1, 1)); // Month is 0-based
+            break;
+        case 'weekOfYear':
+            date = new Date(Date.UTC(year, 0, 1)); // Start of the year
+            const firstDay = date.getUTCDay(); // Get the first day of the year
+            const offset = firstDay === 0 ? 0 : 7 - firstDay; // Move to first Monday
+            date.setUTCDate(date.getUTCDate() + offset + (val - 1) * 7); // Add weeks
+            break;
+        default:
+            throw new Error("Invalid type. Must be 'day', 'month', or 'week'.");
+    }
+    
+    return date.getTime();
+},
+
+  prettifyFutureEpoch(epoch, testsPage=false) {
+      if (!epoch) return "Never";
+      
+      const now = Math.floor(Date.now() / 1000);
+      const diffSeconds = epoch - now;
+      
+      if (diffSeconds < 0){
+        if(diffSeconds < -86400 || testsPage){
+          return this.prettifyEpoch(epoch);
+        } else {
+          return "now";
+        }
+      }
+      
+      const date = new Date(epoch * 1000);
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      
+      // Format time
+      const timeStr = date.toLocaleTimeString('en-US', { 
+        hour: 'numeric', 
+        minute: '2-digit',
+        hour12: true 
+      });
+      
+      // If same day
+      if (date.toDateString() === new Date().toDateString()) {
+        return `today ${timeStr}`;
+      }
+      
+      // If tomorrow
+      if (date.toDateString() === tomorrow.toDateString()) {
+        return `tomorrow ${timeStr}`;
+      }
+      
+      // If within 7 days
+      const daysDiff = Math.floor(diffSeconds / (24 * 60 * 60));
+      if (daysDiff < 7) {
+        return `${date.toLocaleDateString('en-US', { weekday: 'long' })} ${timeStr}`;
+      }
+      
+      // Otherwise show full date and time
+      return `${date.toLocaleDateString('en-US', { 
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric'
+      })} ${timeStr}`;
+  },
+  isDemoAccount(){
+     return window.ACTIVE_ACCOUNT === 1669322524
+  },
+  isSameDateAsToday (givenDate) {
+      const today = new Date();
+      return (
+          givenDate.getUTCFullYear() === today.getUTCFullYear() &&
+          givenDate.getUTCMonth() === today.getUTCMonth() &&
+          givenDate.getDate() === today.getDate()
+      );
+  },
+  getStartOfTodayEpoch() {
+    const now = new Date();
+    return Math.floor(new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime() / 1000);
+  },
+  getDayOfWeek(time){
+    const temp = new Date(time * 1000);
+    switch(temp.getDay()){
+      case 1:
+        return "Monday"
+      case 2:
+        return "Tuesday"
+      case 3:
+        return "Wednesday"
+      case 4: 
+        return "Thursday"
+      case 5:
+        return "Friday"
+      case 6: 
+        return "Saturday"
+      default:
+        return "Sunday"
+    }
+  }
 }
 
 export default func

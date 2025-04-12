@@ -1,11 +1,23 @@
 package com.akto.action;
 
-import com.akto.dao.*;
+import com.akto.action.observe.Utils;
+import com.akto.dao.AccountSettingsDao;
+import com.akto.dao.AccountsDao;
+import com.akto.dao.FilterSampleDataDao;
+import com.akto.dao.SampleDataDao;
+import com.akto.dao.SensitiveSampleDataDao;
+import com.akto.dao.SingleTypeInfoDao;
+import com.akto.dao.UsersDao;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
-import com.akto.dto.type.CollectionReplaceDetails;
-import com.akto.dto.*;
+import com.akto.dto.Account;
+import com.akto.dto.AccountSettings;
+import com.akto.dto.TelemetrySettings;
+import com.akto.dto.User;
 import com.akto.dto.billing.Organization;
+import com.akto.dto.type.CollectionReplaceDetails;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.runtime.Main;
 import com.akto.runtime.policies.ApiAccessTypePolicy;
 import com.akto.util.Constants;
@@ -15,29 +27,25 @@ import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
-
 import com.opensymphony.xwork2.Action;
-import org.bson.conversions.Bson;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.util.Map;
-import java.util.Set;
-
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import org.bson.conversions.Bson;
 
 public class AdminSettingsAction extends UserAction {
 
+    private static final LoggerMaker logger = new LoggerMaker(AdminSettingsAction.class, LogDb.DASHBOARD);
+
     AccountSettings accountSettings;
     private int globalRateLimit = 0;
-    private static final Logger logger = LoggerFactory.getLogger(AdminSettingsAction.class);
     private Organization organization;
     private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
 
@@ -274,20 +282,18 @@ public class AdminSettingsAction extends UserAction {
             }
             ApiAccessTypePolicy policy = new ApiAccessTypePolicy(privateCidrList);
 
-            executorService.schedule(new Runnable() {
-                public void run() {
-                    try {
-                        Context.accountId.set(accountId);
-                        List<String> partnerIpList = new ArrayList<>();
-                        if (accountSettings != null &&
-                                accountSettings.getPartnerIpList() != null &&
-                                !accountSettings.getPartnerIpList().isEmpty()) {
-                            partnerIpList = accountSettings.getPartnerIpList();
-                        }
-                        ApiAccessTypePolicyUtil.calcApiAccessType(policy, partnerIpList);
-                    } catch (Exception e){
-                        logger.error("Error in applyAccessType", e);
+            executorService.schedule(() -> {
+                try {
+                    Context.accountId.set(accountId);
+                    List<String> partnerIpList = new ArrayList<>();
+                    if (accountSettings != null &&
+                            accountSettings.getPartnerIpList() != null &&
+                            !accountSettings.getPartnerIpList().isEmpty()) {
+                        partnerIpList = accountSettings.getPartnerIpList();
                     }
+                    ApiAccessTypePolicyUtil.calcApiAccessType(policy, partnerIpList);
+                } catch (Exception e){
+                    logger.error("Error in applyAccessType", e);
                 }
             }, 0, TimeUnit.SECONDS);
             return Action.SUCCESS.toUpperCase();
@@ -393,7 +399,17 @@ public class AdminSettingsAction extends UserAction {
     public String accountPermission;
     public String modifiedValueForAccount;
 
+    static int maxValueLength = 60;
+
     public String modifyAccountSettings () {
+
+        StringBuilder error = new StringBuilder();
+        boolean sanitized = Utils.isInputSanitized(modifiedValueForAccount, error, maxValueLength);
+        if (!sanitized) {
+            addActionError(error.toString());
+            return ERROR.toUpperCase();
+        }
+
         if(accountPermission.equals("name") || accountPermission.equals("timezone")){
             if(Context.accountId.get() != null && Context.accountId.get() != 0){
                 AccountsDao.instance.updateOne(

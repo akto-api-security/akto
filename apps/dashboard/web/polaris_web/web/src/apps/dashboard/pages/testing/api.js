@@ -24,15 +24,33 @@ export default {
         })
         return resp
     },
-    async fetchTestingRunResults(testingRunResultSummaryHexId, queryMode, sortKey, sortOrder, skip, limit, filters, queryValue) {
+    async fetchTestingRunResults(testingRunResultSummaryHexId, queryMode, sortKey, sortOrder, skip, limit, reportFilterList, queryValue) {
         const resp = await request({
             url: '/api/fetchTestingRunResults',
             method: 'post',
             data: {
-                testingRunResultSummaryHexId, queryMode, sortKey, sortOrder, skip, limit, filters, queryValue
+                testingRunResultSummaryHexId, queryMode, sortKey, sortOrder, skip, limit, reportFilterList, queryValue
             }
         })
         return resp        
+    },
+    async fetchTestRunResultsCount(testingRunResultSummaryHexId) {
+        const resp = await request({
+            url: '/api/fetchTestRunResultsCount',
+            method: 'post',
+            data: {
+                testingRunResultSummaryHexId
+            }
+        })
+        return resp        
+    },
+    async fetchRemediationInfo(testId) {
+        const resp = await request({
+            url: 'api/fetchRemediationInfo',
+            method: 'post',
+            data: {testId}
+        })
+        return resp
     },
     async fetchAllSubCategories(fetchOnlyActive, mode, skip, limit) {
         const resp = await request({
@@ -50,13 +68,22 @@ export default {
         })
         return resp        
     },
-    async rerunTest(testingRunHexId){
+    async rerunTest(testingRunHexId, selectedTestRunForRerun, testingRunResultSummaryHexId ){
+        if (selectedTestRunForRerun === []) {
+            const resp = await request({
+                url: '/api/startTest',
+                method: 'post',
+                data: { testingRunHexId }
+            })
+            return resp        
+        }
+        let selectedTestRunResultHexIds = selectedTestRunForRerun
         const resp = await request({
             url: '/api/startTest',
             method: 'post',
-            data: { testingRunHexId }
+            data: { testingRunHexId, testingRunResultSummaryHexId,  selectedTestRunResultHexIds}
         })
-        return resp        
+        return resp
     },
     fetchAffectedEndpoints (issueId) {
         return request({
@@ -231,13 +258,14 @@ export default {
             }
         })
     },
-    fetchVulnerableTestingRunResults(testingRunResultSummaryHexId, skip) {
+    fetchVulnerableTestingRunResults(testingRunResultSummaryHexId, skip, reportFilterList) {
         return request({
             url: '/api/fetchVulnerableTestRunResults',
             method: 'post',
             data: {
                 testingRunResultSummaryHexId,
-                skip
+                skip,
+                reportFilterList
             }
         })
     },
@@ -255,11 +283,11 @@ export default {
             data: {roleName, index}
         })
     },
-    updateAuthInRole(roleName, apiCond ,index, authParamData, authAutomationType) {
+    updateAuthInRole(roleName, apiCond ,index, authParamData, authAutomationType, reqData, recordedLoginFlowInput) {
         return request({
             url: '/api/updateAuthInRole',
             method: 'post',
-            data: {roleName, apiCond, index, authParamData, authAutomationType}
+            data: {roleName, apiCond, index, authParamData, authAutomationType, reqData, recordedLoginFlowInput}
         })
     },
     deleteTestRuns(testRunIds){
@@ -299,12 +327,13 @@ export default {
             data: {}
         })
     },
-    invokeDependencyTable(apiCollectionIds){
+    invokeDependencyTable(apiCollectionIds, sourceCodeApis){
         return request({
             url: '/api/invokeDependencyTable',
             method: 'post',
             data: {
-                apiCollectionIds
+                apiCollectionIds,
+                sourceCodeApis
             }
         })
     },
@@ -414,11 +443,11 @@ export default {
             data: {}
         })
     },
-    downloadReportPDF(reportId, organizationName, reportDate, reportUrl) {
+    downloadReportPDF(reportId, organizationName, reportDate, reportUrl, username, firstPollRequest) {
         return request({
             url: '/api/downloadReportPDF',
             method: 'post',
-            data: {reportId, organizationName, reportDate, reportUrl}
+            data: {reportId, organizationName, reportDate, reportUrl, username, firstPollRequest}
         })
     },
     fetchScript() {
@@ -449,18 +478,85 @@ export default {
             data: {deltaTimeForScheduledSummaries}
         })
     },
-    fetchIssuesByStatusAndSummaryId(latestTestingRunSummaryId, issueStatusQuery) {
+    fetchIssuesByStatusAndSummaryId(latestTestingRunSummaryId, issueStatusQuery, sortKey, sortOrder, skip, limit, filters) {
         return request({
             url: '/api/fetchIssuesByStatusAndSummaryId',
             method: 'post',
-            data: { latestTestingRunSummaryId, issueStatusQuery }
+            data: { latestTestingRunSummaryId, issueStatusQuery, sortKey, sortOrder, skip, limit, filters }
         })
     },
-    modifyTestingRunConfig(testingRunConfigId, testConfigsAdvancedSettings){
+    modifyTestingRunConfig(testingRunConfigId, editableTestingRunConfig) {
+        const requestData = { testingRunConfigId, editableTestingRunConfig }
         return request({
             url: '/api/modifyTestingRunConfig',
             method: 'post',
-            data: { testingRunConfigId, testConfigsAdvancedSettings }
+            data: requestData
+        })
+    },
+    async fetchTestingRunResultsSummary(testingRunSummaryId) {
+        const resp = await request({
+            url: '/api/fetchTestingRunResultsSummary',
+            method: 'post',
+            data: {
+                testingRunSummaryId
+            }
+        })
+        return resp
+    },
+    generatePDFReport(reportFilterList, issuesIdsForReport){
+        return request({
+            url: '/api/generateReportPDF',
+            method: 'post',
+            data: { reportFilterList, issuesIdsForReport }
+        })
+    },
+    getReportFilters(generatedReportId){
+        return request({
+            url: '/api/getReportFilters',
+            method: 'post',
+            data: { generatedReportId }
+        })
+    },
+    fetchSeverityInfoForIssues(filters, issueIds, endTimeStamp) {
+        return request({
+            url: '/api/fetchSeverityInfoForIssues',
+            method: 'post',
+            data: {...filters, issueIds, endTimeStamp}
+        })
+    },
+    handleRefreshTableCount(testingRunResultSummaryHexId) {
+        return request({
+            url: '/api/handleRefreshTableCount',
+            method: 'post',
+            data: {testingRunResultSummaryHexId}
+        })
+    },
+    createNewTestSuite(testSuiteName,subCategoryList) {
+        return request({
+            url: '/api/createTestSuite',
+            method: 'post',
+            data: {testSuiteName,subCategoryList}
+        })
+    },
+    fetchAllTestSuites() {
+        return request({
+            url: '/api/fetchAllTestSuites',
+            method: 'post',
+            data: {}
+        })
+    },
+    modifyTestSuite(testSuiteHexId, testSuiteName, subCategoryList) {
+        return request({
+            url: '/api/modifyTestSuite',
+            method: 'post',
+            data: {testSuiteHexId, testSuiteName, subCategoryList}
+        })
+    },
+    deleteTestSuite(testSuiteHexId) {
+        return request({
+            url: '/api/deleteTestSuite',
+            method: 'post',
+            data: {testSuiteHexId}
         })
     }
 }

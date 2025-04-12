@@ -8,6 +8,7 @@ import org.bson.conversions.Bson;
 import com.akto.action.UserAction;
 import com.akto.dao.context.Context;
 import com.akto.dao.testing.config.TestScriptsDao;
+import com.akto.dto.User;
 import com.akto.dto.testing.config.TestScript;
 import com.akto.util.DashboardMode;
 import com.mongodb.BasicDBObject;
@@ -24,11 +25,25 @@ public class ScriptAction extends UserAction {
 
     private TestScript testScript;
 
+    public boolean aktoUser(){
+        User user = getSUser();
+
+        if(user==null || user.getLogin()==null || user.getLogin().isEmpty()){
+            return false;
+        }
+
+        if(user.getLogin().contains("@akto.io")){
+            return true;
+        }
+        return false;
+    }
+
     public String addScript() {
 
-        if (!DashboardMode.isSaasDeployment()) {
+        if (DashboardMode.isSaasDeployment() && !aktoUser()) {
             return Action.ERROR.toUpperCase();
         }
+
         if (this.testScript == null || this.testScript.getJavascript() == null) {
             return Action.ERROR.toUpperCase();
         }
@@ -53,7 +68,7 @@ public class ScriptAction extends UserAction {
     
     public String updateScript() {
 
-        if (!DashboardMode.isSaasDeployment()) {
+        if (DashboardMode.isSaasDeployment() && !aktoUser()) {
             return Action.ERROR.toUpperCase();
         }
         

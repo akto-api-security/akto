@@ -227,6 +227,19 @@ const transform = {
                 x["highlightValue"] = val
                 return x
             })
+            if(c.includes("x-akto-decode")){
+                highlightPaths.push({
+                    "highlightValue": {
+                        "value": "x-akto-decode",
+                        "wholeRow": true,
+                        "className": "akto-decoded",
+                        "highlight": true,
+                    },
+                    "responseCode": -1,
+                    "header": 'x-akto-decode',
+                    "param": "x-akto-decode",
+                })
+            }
             paths.push({message:c, highlightPaths:highlightPaths}); 
         }
         return paths;
@@ -398,12 +411,15 @@ const transform = {
     },
 
     getIssuesList(severityInfo){
+        const sortedSeverityInfo = func.sortObjectBySeverity(severityInfo)
         return (
             <HorizontalStack gap="1" wrap={false}>
                 {
-                    Object.keys(severityInfo).length > 0 ? Object.keys(severityInfo).map((key,index)=>{
+                    Object.keys(sortedSeverityInfo).length > 0 ? Object.keys(sortedSeverityInfo).map((key,index)=>{
                         return(
-                            <Badge size="small" status={this.getColor(key)} key={index}>{severityInfo[key].toString()}</Badge>
+                            <div className={`badge-wrapper-${key}`}>
+                                <Badge size="small" key={index}>{sortedSeverityInfo[key].toString()}</Badge>
+                            </div>
                         )
                     }):
                     <Text fontWeight="regular" variant="bodyMd" color="subdued">-</Text>
@@ -413,11 +429,12 @@ const transform = {
     },
 
     getIssuesListText(severityInfo){
+        const sortedSeverityInfo = func.sortObjectBySeverity(severityInfo)
         let val = "-"
-        if(Object.keys(severityInfo).length > 0){
+        if(Object.keys(sortedSeverityInfo).length > 0){
             val = ""
-            Object.keys(severityInfo).map((key) => {
-                val += (key + ": " + severityInfo[key] + " ")
+            Object.keys(sortedSeverityInfo).map((key) => {
+                val += (key + ": " + sortedSeverityInfo[key] + " ")
             })
         } 
         return val
@@ -466,7 +483,7 @@ const transform = {
                 riskScore: c.riskScore,
                 deactivatedRiskScore: c.deactivated ? (c.riskScore - 10 ) : c.riskScore,
                 activatedRiskScore: -1 * (c.deactivated ? c.riskScore : (c.riskScore - 10 )),
-                envTypeComp: isLoading ? loadingComp : c.envType ? <Badge size="small" status="info">{func.toSentenceCase(c.envType)}</Badge> : null,
+                envTypeComp: isLoading ? loadingComp : c.envType ? <Badge size="small" status="info">{c.envType}</Badge> : null,
                 sensitiveSubTypesVal: c?.sensitiveInRespTypes.join(" ") ||  "-"
             }
         })

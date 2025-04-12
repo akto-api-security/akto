@@ -28,6 +28,7 @@ public class TrafficFilterUtil {
                 template.append(FilterConfig._AUTHOR, config.getAuthor());
                 template.append(FilterConfig.CREATED_AT, config.getCreatedAt());
                 template.append(FilterConfig.UPDATED_AT, config.getUpdatedAt());
+                template.append(FilterConfig._INFO, config.getInfo());
                 templates.add(template);
             }
         }
@@ -38,8 +39,9 @@ public class TrafficFilterUtil {
     public static List<Bson> getDbUpdateForTemplate(String content, String userEmail) throws Exception{
          try {
             String author = userEmail;
-            int createdAt = Context.now();
-            int updatedAt = Context.now();
+            int timeNow = Context.now();
+            int createdAt = timeNow;
+            int updatedAt = timeNow;
 
             List<Bson> updates = new ArrayList<>(
                     Arrays.asList(

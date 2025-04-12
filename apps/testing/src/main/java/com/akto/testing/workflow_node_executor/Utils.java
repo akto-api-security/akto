@@ -1,7 +1,6 @@
 package com.akto.testing.workflow_node_executor;
 
 import static com.akto.runtime.utils.Utils.parseCookie;
-import static org.mockito.Answers.values;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -36,6 +35,7 @@ import com.akto.dto.type.KeyTypes;
 import com.akto.dto.type.RequestTemplate;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.store.TestRolesCache;
 import com.akto.util.JSONUtils;
 import com.akto.util.RecordedLoginFlowUtil;
 import com.google.gson.Gson;
@@ -43,9 +43,6 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 
-import io.jsonwebtoken.Claims;
-import io.jsonwebtoken.Jws;
-import io.jsonwebtoken.Jwts;
 
 public class Utils {
     
@@ -144,7 +141,7 @@ public class Utils {
         BasicDBObject data = new BasicDBObject();
         String message;
         
-        String token = fetchToken(recordedLoginFlowInput, 5);
+        String token = fetchToken(null, recordedLoginFlowInput, 5);
 
         if (token == null){
             message = "error processing reorder node";
@@ -172,8 +169,9 @@ public class Utils {
         return new WorkflowTestResult.NodeResult(resp.toString(), false, testErrors);
     }
 
-    public static String fetchToken(RecordedLoginFlowInput recordedLoginFlowInput, int retries) {
+    public static String fetchToken(String roleName, RecordedLoginFlowInput recordedLoginFlowInput, int retries) {
 
+        // need to cache
         String token = null;
         for (int i=0; i<retries; i++) {
             
@@ -200,7 +198,9 @@ public class Utils {
                 break;
             }
         }
-
+        if(roleName == null){
+            return token;
+        }
         return token;
     }
 
@@ -247,7 +247,7 @@ public class Utils {
 
     }
 
-    public static LoginFlowResponse runLoginFlow(WorkflowTest workflowTest, AuthMechanism authMechanism, LoginFlowParams loginFlowParams) throws Exception {
+    public static LoginFlowResponse runLoginFlow(WorkflowTest workflowTest, AuthMechanism authMechanism, LoginFlowParams loginFlowParams, String roleName) throws Exception {
         Graph graph = new Graph();
         graph.buildGraph(workflowTest);
 
@@ -304,9 +304,11 @@ public class Utils {
 
         }
 
+        int newExpiryTime = Context.now() + 1800; // 30 mins
+        List<AuthParam> calculatedAuthParams = new ArrayList<>();
         for (AuthParam param : authMechanism.getAuthParams()) {
             try {
-                String value = executeCode(param.getValue(), valuesMap);
+                String value = executeCode(param.getValue(), valuesMap, false);
                 if (!param.getValue().equals(value) && value == null) {
                     return new LoginFlowResponse(responses, "auth param not found at specified path " + 
                     param.getValue(), false);
@@ -314,8 +316,8 @@ public class Utils {
 
                 // checking on the value of if this is valid jwt token or valid cookie which has expiry time
                 String tempVal = new String(value);
-                if(tempVal.contains("Bearer")){
-                    tempVal = value.split("Bearer ")[1];
+                if(tempVal.contains(" ")){
+                    tempVal = value.split(" ")[1];
                 }
                 if(KeyTypes.isJWT(tempVal)){
                     try {
@@ -326,33 +328,25 @@ public class Utils {
                         String payload = new String(Base64.getUrlDecoder().decode(parts[1]));
                         JSONObject payloadJson = new JSONObject(payload);
                         if (payloadJson.has("exp")) {
-                            int newExpiryTime = payloadJson.getInt("exp");
-                            TestExecutor.setExpiryTimeOfAuthToken(newExpiryTime);
+                            newExpiryTime = Math.min(payloadJson.getInt("exp"), newExpiryTime);
+                            
                         } else {
                             throw new IllegalArgumentException("JWT does not have an 'exp' claim");
                         }
                     } catch (Exception e) {
                         e.printStackTrace();
                     }
-                }else{
-                    // check if this cookie with max-age or expiry time
-                    try {
-                        Map<String,String> cookieMap = parseCookie(Arrays.asList(value));
-                        int expiryTsEpoch = CookieExpireFilter.getMaxAgeFromCookie(cookieMap);
-                        if(expiryTsEpoch > 0){
-                            int newExpiryTime = Context.now() + expiryTsEpoch;
-                            TestExecutor.setExpiryTimeOfAuthToken(newExpiryTime);
-                        }
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                    }
                 }
 
-                param.setValue(value);
+                calculatedAuthParams.add(new HardcodedAuthParam(param.getWhere(), param.getKey(), value, param.getShowHeader()));
             } catch(Exception e) {
                 return new LoginFlowResponse(responses, "error resolving auth param " + param.getValue(), false);
             }
         }
+
+        authMechanism.updateCacheExpiryEpoch(newExpiryTime);
+        authMechanism.updateAuthParamsCached(calculatedAuthParams);
+
         return new LoginFlowResponse(responses, null, true);
     }
 
@@ -544,45 +538,17 @@ public class Utils {
         return request;
     }
 
+    public static String executeCode(String ogPayload, Map<String, Object> valuesMap, boolean shouldThrowException) throws Exception {
+        return replaceVariables(ogPayload,valuesMap, true, shouldThrowException);
+    }
 
     public static String executeCode(String ogPayload, Map<String, Object> valuesMap) throws Exception {
-        return replaceVariables(ogPayload,valuesMap, true);
+        return replaceVariables(ogPayload,valuesMap, true, true);
     }
 
 
-    public static String replaceVariables(String payload, Map<String, Object> valuesMap, boolean escapeString) throws Exception {
-        String regex = "\\$\\{((x|step)\\d+\\.[\\w\\-\\[\\].]+|AKTO\\.changes_info\\..*?)\\}"; 
-        Pattern p = Pattern.compile(regex);
-
-        // replace with values
-        Matcher matcher = p.matcher(payload);
-        StringBuffer sb = new StringBuffer();
-        while (matcher.find()) {
-            String key = matcher.group(1);
-            if (key == null) continue;
-            Object obj = valuesMap.get(key);
-            if (obj == null) {
-                loggerMaker.errorAndAddToDb("couldn't find: " + key, LogDb.TESTING);
-                throw new Exception("Couldn't find " + key);
-            }
-            String val = obj.toString();
-            if (escapeString) {
-                val = val.replace("\\", "\\\\")
-                        .replace("\t", "\\t")
-                        .replace("\b", "\\b")
-                        .replace("\n", "\\n")
-                        .replace("\r", "\\r")
-                        .replace("\f", "\\f")
-                        .replace("\'", "\\'")
-                        .replace("\"", "\\\"");
-            }
-            matcher.appendReplacement(sb, "");
-            sb.append(val);
-        }
-
-        matcher.appendTail(sb);
-
-        return sb.toString();
+    public static String replaceVariables(String payload, Map<String, Object> valuesMap, boolean escapeString, boolean shouldThrowException) throws Exception {
+        return com.akto.testing.Utils.replaceVariables(payload, valuesMap, escapeString, shouldThrowException);
     }
 
     public static String generateKey(String nodeId, boolean isHeader, String param, boolean isRequest) {

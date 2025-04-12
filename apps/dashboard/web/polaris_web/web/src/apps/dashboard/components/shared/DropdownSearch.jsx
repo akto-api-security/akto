@@ -1,4 +1,4 @@
-import { Autocomplete, Avatar, Checkbox, HorizontalStack, Icon, Link, Text, TextContainer } from '@shopify/polaris';
+import { Autocomplete, Avatar, Icon, Link, TextContainer } from '@shopify/polaris';
 import { SearchMinor, ChevronDownMinor } from '@shopify/polaris-icons';
 import React, { useState, useCallback, useEffect } from 'react';
 import func from "@/util/func";
@@ -14,18 +14,16 @@ function DropdownSearch(props) {
     const [options, setOptions] = useState(deselectedOptions);
     const [loading, setLoading] = useState(false);
     const [checked,setChecked] = useState(false)
-
-
     useEffect(() => {
-        if(value!=undefined){
+        if(value!==undefined){
             setInputValue((prev) => {
-                if(prev == value){
+                if(prev === value){
                     return prev;
                 }
                 return value;
             });
         }
-        if(preSelected!=undefined){
+        if(preSelected!==undefined){
             setSelectedOptions((prev) => {
                 if(func.deepComparison(prev,preSelected)){
                     return prev;
@@ -65,9 +63,19 @@ function DropdownSearch(props) {
                 setLoading(true);
             }
 
+            const defaultSliceValue = sliceMaxVal || 20
+
             setTimeout(() => {
                 if (value === '' && selectedOptions.length === 0) {
-                    setOptions(deselectedOptions);
+                    const options = deselectedOptions.slice(0, defaultSliceValue);
+                    const title = deselectedOptions.length != defaultSliceValue && options.length >= defaultSliceValue
+                        ? `Showing ${options.length} result${func.addPlurality(options.length)} only. (type more to refine results)`
+                        : "Showing all results";
+                    const nestedOptions = [{
+                        title: title,
+                        options: options
+                    }]
+                    setOptions(nestedOptions);
                     setLoading(false);
                     return;
                 }
@@ -87,8 +95,17 @@ function DropdownSearch(props) {
                       });
                 }else{
                     resultOptions = deselectedOptions.filter((option) =>
-                    option[searchKey].match(filterRegex)
-                );
+                        option[searchKey].match(filterRegex)
+                    ).slice(0, defaultSliceValue);
+
+                    const title = deselectedOptions.length !== defaultSliceValue && resultOptions.length >= defaultSliceValue
+                        ? `Showing ${resultOptions.length} result${func.addPlurality(resultOptions.length)} only. (type more to refine results)`
+                        : "Showing all results";
+
+                    resultOptions = [{
+                        title: title,
+                        options: resultOptions
+                    }]
                 }
                 setOptions(resultOptions);
                 setLoading(false);

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import FlyLayout from '../../../components/layouts/FlyLayout'
 import func from '@/util/func'
 import transform from '../transform'
@@ -8,6 +8,7 @@ import LayoutWithTabs from '../../../components/layouts/LayoutWithTabs'
 import { Badge, Box, Button, Divider, HorizontalStack, Icon, Popover, Text, VerticalStack, Link, Modal } from '@shopify/polaris'
 import api from '../../observe/api'
 import issuesApi from "../../issues/api"
+import testingApi from "../api"
 import GridRows from '../../../components/shared/GridRows'
 import { useNavigate } from 'react-router-dom'
 import TitleWithInfo from '@/apps/dashboard/components/shared/TitleWithInfo'
@@ -15,12 +16,14 @@ import "./style.css"
 import ActivityTracker from '../../dashboard/components/ActivityTracker'
 import observeFunc from "../../observe/transform.js"
 import settingFunctions from '../../settings/module.js'
-import DropdownSearch from '../../../components/shared/DropdownSearch.jsx'
+import JiraTicketCreationModal from '../../../components/shared/JiraTicketCreationModal.jsx'
+import MarkdownViewer from '../../../components/shared/MarkdownViewer.jsx'
 
 function TestRunResultFlyout(props) {
 
 
-    const { selectedTestRunResult, loading, issueDetails ,getDescriptionText, infoState, createJiraTicket, jiraIssueUrl, showDetails, setShowDetails, isIssuePage} = props
+    const { selectedTestRunResult, loading, issueDetails ,getDescriptionText, infoState, createJiraTicket, jiraIssueUrl, showDetails, setShowDetails, isIssuePage, remediationSrc, azureBoardsWorkItemUrl} = props
+    const [remediationText, setRemediationText] = useState("")
     const [fullDescription, setFullDescription] = useState(false)
     const [rowItems, setRowItems] = useState([])
     const [popoverActive, setPopoverActive] = useState(false)
@@ -28,8 +31,24 @@ function TestRunResultFlyout(props) {
     const [jiraProjectMaps,setJiraProjectMap] = useState({})
     const [issueType, setIssueType] = useState('');
     const [projId, setProjId] = useState('')
+
+    const [boardsModalActive, setBoardsModalActive] = useState(false)
+    const [projectToWorkItemsMap, setProjectToWorkItemsMap] = useState({})
+    const [projectId, setProjectId] = useState('')
+    const [workItemType, setWorkItemType] = useState('')
+
     // modify testing run result and headers
     const infoStateFlyout = infoState && infoState.length > 0 ? infoState.filter((item) => item.title !== 'Jira') : []
+    const fetchRemediationInfo = useCallback (async (testId) => {
+        if (testId && testId.length > 0) {
+            await testingApi.fetchRemediationInfo(testId).then((resp) => {
+                setRemediationText(resp)
+            }).catch((err) => {
+                setRemediationText("Remediations not configured for this test.")
+            })
+        }
+    })
+
     const fetchApiInfo = useCallback( async(apiInfoKey) => {
         let apiInfo = {}
         if(apiInfoKey !== null){
@@ -52,7 +71,7 @@ function TestRunResultFlyout(props) {
                     index++
                 })
             })
-            setRowItems(transform.getRowInfo(issueDetails.severity,apiInfo,issueDetails.jiraIssueUrl,sensitiveParam,issueDetails.testRunIssueStatus === 'IGNORED'))
+            setRowItems(transform.getRowInfo(issueDetails.severity,apiInfo,issueDetails.jiraIssueUrl,sensitiveParam,issueDetails.testRunIssueStatus === 'IGNORED', issueDetails.azureBoardsWorkItemUrl))
         }
     },[issueDetails])
 
@@ -64,8 +83,21 @@ function TestRunResultFlyout(props) {
        }
     },[issueDetails?.id?.apiInfoKey])
 
+    useEffect(() => {
+        if (!remediationSrc) {
+            fetchRemediationInfo("tests-library-master/remediation/"+selectedTestRunResult.testCategoryId+".md")
+        } else {
+            setRemediationText(remediationSrc)
+        }
+    }, [selectedTestRunResult.testCategoryId, remediationSrc])
+
     function ignoreAction(ignoreReason){
-        issuesApi.bulkUpdateIssueStatus([issueDetails.id], "IGNORED", ignoreReason ).then((res) => {
+        const severity = (selectedTestRunResult && selectedTestRunResult.vulnerable) ? issueDetails.severity : "";
+        let obj = {}
+        if(issueDetails?.testRunIssueStatus !== "IGNORED"){
+            obj = {[selectedTestRunResult.id]: severity.toUpperCase()}
+        }
+        issuesApi.bulkUpdateIssueStatus([issueDetails.id], "IGNORED", ignoreReason, obj ).then((res) => {
             func.setToast(true, false, `Issue ignored`)
         })
     }
@@ -100,6 +132,36 @@ function TestRunResultFlyout(props) {
             func.setToast(true, true, "Invalid project id or issue type")
         }
     }
+
+    const handleAzureBoardClick = async() => {
+        if(!boardsModalActive){
+            const azureBoardsIntegration = await settingFunctions.fetchAzureBoardsIntegration()
+            if(azureBoardsIntegration.projectToWorkItemsMap != null && Object.keys(azureBoardsIntegration.projectToWorkItemsMap).length > 0){
+                setProjectToWorkItemsMap(azureBoardsIntegration.projectToWorkItemsMap)
+                if(Object.keys(azureBoardsIntegration.projectToWorkItemsMap).length > 0){
+                    setProjectId(Object.keys(azureBoardsIntegration.projectToWorkItemsMap)[0])
+                    setWorkItemType(Object.values(azureBoardsIntegration.projectToWorkItemsMap)[0]?.[0])
+                }
+            }else{
+                setProjectId(azureBoardsIntegration?.projectId)
+                setWorkItemType(azureBoardsIntegration?.workItemType)
+            }
+        }
+        setBoardsModalActive(!boardsModalActive)
+    }
+
+    const handleAzureBoardWorkitemCreation = async(id) => {
+        if(projectId.length > 0 && workItemType.length > 0){
+            await issuesApi.createAzureBoardsWorkItem(issueDetails.id, projectId, workItemType, window.location.origin).then((res) => {
+                func.setToast(true, false, "Work item created")
+            }).catch((err) => {
+                func.setToast(true, true, err?.response?.data?.errorMessage || "Error creating work item")
+            })
+        }else{
+            func.setToast(true, true, "Invalid project id or work item type")
+        }
+        setBoardsModalActive(false)
+    }
     
     const issues = [{
         content: 'False positive',
@@ -120,7 +182,7 @@ function TestRunResultFlyout(props) {
     }]
 
     const handleClose = () => {
-        const navigateUrl = isIssuePage ? "/dashboard/issues" : window.location.pathname.split("result")[0]
+        const navigateUrl = window.location.pathname.split("result")[0]
         navigate(navigateUrl) 
     }
 
@@ -129,17 +191,6 @@ function TestRunResultFlyout(props) {
         window.open(navUrl, "_blank")
     }
 
-    const getValueFromIssueType = (projId, issueId) => {
-        if(Object.keys(jiraProjectMaps).length > 0 && projId.length > 0 && issueId.length > 0){
-            const jiraTemp = jiraProjectMaps[projId].filter(x => x.issueId === issueId)
-            if(jiraTemp.length > 0){
-                return jiraTemp[0].issueType
-            }
-        }
-        return issueType
-        
-    }
-    
     function ActionsComp (){
         const issuesActions = issueDetails?.testRunIssueStatus === "IGNORED" ? [...issues, ...reopen] : issues
         return(
@@ -190,39 +241,33 @@ function TestRunResultFlyout(props) {
                     <ActionsComp />
 
                     {selectedTestRunResult && selectedTestRunResult.vulnerable && 
-                        <Modal
-                            activator={<Button id={"create-jira-ticket-button"} primary onClick={handleJiraClick} disabled={jiraIssueUrl !== "" || window.JIRA_INTEGRATED !== "true"}>Create Jira Ticket</Button>}
-                            open={modalActive}
-                            onClose={() => setModalActive(false)}
-                            size="small"
-                            title={<Text variant="headingMd">Configure jira ticket details</Text>}
-                            primaryAction={{
-                                content: 'Create ticket',
-                                onAction: () => handleSaveAction(issueDetails.id)
-                            }}
-                        >
-                            <Modal.Section>
-                                <VerticalStack gap={"3"}>
-                                    <DropdownSearch
-                                        disabled={jiraProjectMaps === undefined || Object.keys(jiraProjectMaps).length === 0}
-                                        placeholder="Select JIRA project"
-                                        optionsList={jiraProjectMaps ? Object.keys(jiraProjectMaps).map((x) => {return{label: x, value: x}}): []}
-                                        setSelected={setProjId}
-                                        preSelected={projId}
-                                        value={projId}
-                                    />
-
-                                    <DropdownSearch
-                                        disabled={Object.keys(jiraProjectMaps).length === 0 || projId.length === 0}
-                                        placeholder="Select JIRA issue type"
-                                        optionsList={jiraProjectMaps[projId] && jiraProjectMaps[projId].length > 0 ? jiraProjectMaps[projId].map((x) => {return{label: x.issueType, value: x.issueId}}) : []}
-                                        setSelected={setIssueType}
-                                        preSelected={issueType}
-                                        value={getValueFromIssueType(projId, issueType)}
-                                    />  
-                                </VerticalStack>
-                            </Modal.Section>
-                        </Modal>
+                        <HorizontalStack gap={2} wrap={false}>
+                            <JiraTicketCreationModal
+                                activator={<Button id={"create-jira-ticket-button"} primary onClick={handleJiraClick} disabled={jiraIssueUrl !== "" || window.JIRA_INTEGRATED !== "true"}>Create Jira Ticket</Button>}
+                                modalActive={modalActive}
+                                setModalActive={setModalActive}
+                                handleSaveAction={handleSaveAction}
+                                jiraProjectMaps={jiraProjectMaps}
+                                setProjId={setProjId}
+                                setIssueType={setIssueType}
+                                projId={projId}
+                                issueType={issueType}
+                                issueId={issueDetails.id}
+                            />
+                            <JiraTicketCreationModal
+                                activator={<Button id={"create-azure-boards-ticket-button"} primary onClick={handleAzureBoardClick} disabled={azureBoardsWorkItemUrl !== "" || window.AZURE_BOARDS_INTEGRATED !== "true"}>Create Work Item</Button>}
+                                modalActive={boardsModalActive}
+                                setModalActive={setBoardsModalActive}
+                                handleSaveAction={handleAzureBoardWorkitemCreation}
+                                jiraProjectMaps={projectToWorkItemsMap}
+                                projId={projectId}
+                                setProjId={setProjectId}
+                                issueType={workItemType}
+                                setIssueType={setWorkItemType}
+                                issueId={issueDetails.id}
+                                isAzureModal={true}
+                            />
+                        </HorizontalStack>
                     }
                 </HorizontalStack>
             </div>
@@ -240,27 +285,36 @@ function TestRunResultFlyout(props) {
     const dataStoreTime = 2 * 30 * 24 * 60 * 60;
     const dataExpired = func.timeNow() - (selectedTestRunResult?.endTimestamp || func.timeNow()) > dataStoreTime
 
-    const ValuesTab = {
-        id: 'values',
-        content: "Values",
-        component: (dataExpired && !selectedTestRunResult?.vulnerable && 
-            !(selectedTestRunResult?.testResults?.[0]?.originalMessage || selectedTestRunResult?.testResults?.[0]?.message) )
-            ? dataExpiredComponent :
-            (func.showTestSampleData(selectedTestRunResult) && selectedTestRunResult.testResults &&
-        <Box paddingBlockStart={3} paddingInlineEnd={4} paddingInlineStart={4}><SampleDataList
-            key="Sample values"
-            heading={"Attempt"}
-            minHeight={"30vh"}
-            vertical={true}
-            sampleData={selectedTestRunResult?.testResults.map((result) => {
-                return {originalMessage: result.originalMessage, message:result.message, highlightPaths:[]}
-            })}
-            isNewDiff={true}
-            vulnerable={selectedTestRunResult?.vulnerable}
-            isVulnerable={selectedTestRunResult.vulnerable}
-        />
-        </Box>)
-    }
+    const ValuesTab = typeof selectedTestRunResult === "object" ? useMemo(() => {
+        return {
+            id: 'values',
+            content: "Values",
+            component: (dataExpired && !selectedTestRunResult?.vulnerable)
+                ? dataExpiredComponent :
+                (selectedTestRunResult.testResults &&
+                    <Box paddingBlockStart={3} paddingInlineEnd={4} paddingInlineStart={4}><SampleDataList
+                        key="Sample values"
+                        heading={"Attempt"}
+                        minHeight={"30vh"}
+                        vertical={true}
+                        sampleData={selectedTestRunResult?.testResults.map((result) => {
+                            if (result.errors && result.errors.length > 0) {
+                                let errorList = result.errors.join(", ");
+                                return { errorList: errorList }
+                            }
+                            if (result.originalMessage || result.message) {
+                                return { originalMessage: result.originalMessage, message: result.message, highlightPaths: [] }
+                            }
+                            return { errorList: "No data found" }
+                        })}
+                        isNewDiff={true}
+                        vulnerable={selectedTestRunResult?.vulnerable}
+                        isVulnerable={selectedTestRunResult.vulnerable}
+                    />
+                    </Box>)
+        }
+    }, [JSON.stringify(selectedTestRunResult)]) : <></>
+
     const moreInfoComponent = (
         infoStateFlyout.length > 0 ?
         <VerticalStack gap={"5"}>
@@ -370,10 +424,16 @@ function TestRunResultFlyout(props) {
         component: <ActivityTracker latestActivity={latestActivity} />
     }
 
+    const remediationTab = (selectedTestRunResult && selectedTestRunResult.vulnerable) && {
+        id: "remediation",
+        content: "Remediation",
+        component: (<MarkdownViewer markdown={remediationText}></MarkdownViewer>)
+    }
+
     const errorTab = {
         id: "error",
         content: "Attempt",
-        component:  ( selectedTestRunResult.errors && selectedTestRunResult.errors.length > 0 ) && <Box padding={"4"}>
+        component:  (selectedTestRunResult.errors && selectedTestRunResult.errors.length > 0 ) && <Box padding={"4"}>
             {
             selectedTestRunResult?.errors?.map((error, i) => {
                 if (error) {
@@ -382,7 +442,6 @@ function TestRunResultFlyout(props) {
                     }
                     return (
                         <SampleData key={i} data={data} language="yaml" minHeight="450px" wordWrap={false}/>
-                        // <p className="p-class" key={i}>{error}</p>
                       )
                 }
             })
@@ -390,12 +449,12 @@ function TestRunResultFlyout(props) {
         </Box>
     }
 
-    const attemptTab =  ( selectedTestRunResult.errors && selectedTestRunResult.errors.length > 0 ) ? errorTab : ValuesTab
+    const attemptTab = !selectedTestRunResult.testResults ? errorTab : ValuesTab
 
     const tabsComponent = (
         <LayoutWithTabs
             key={issueDetails?.id}
-            tabs={issueDetails?.id ? [overviewTab,timelineTab,ValuesTab]: [attemptTab]}
+            tabs={issueDetails?.id ? [overviewTab,timelineTab,ValuesTab, remediationTab]: [attemptTab]}
             currTab = {() => {}}
         />
     )

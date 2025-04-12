@@ -14,6 +14,7 @@ import settingRequests from "../../settings/api";
 import TestCollectionConfiguration from '../configurations/TestCollectionConfiguration'
 import InfoCard from "../../dashboard/new_components/InfoCard";
 import LocalStore from "../../../../main/LocalStorageStore";
+import func from "@/util/func"
 
 function UserConfig() {
 
@@ -49,12 +50,15 @@ function UserConfig() {
                 LocalStore.getState().setDefaultIgnoreSummaryTime(val)
             })
         }
+        try {
+            await api.fetchScript().then((resp)=> {
+                if (resp && resp.testScript) { 
+                    setPreRequestScript(resp.testScript)
+                }
+            });
+        } catch(e){
+        }
 
-        await api.fetchScript().then((resp)=> {
-            if (resp) { 
-                setPreRequestScript(resp.testScript)
-            }
-        });
         setIsLoading(false)
     }
 
@@ -65,8 +69,10 @@ function UserConfig() {
     async function addOrUpdateScript() {
         if (preRequestScript.id) {
             api.updateScript(preRequestScript.id, preRequestScript.javascript)
+            func.setToast(true, false, "Pre-request script updated")
         } else {
             api.addScript(preRequestScript)
+            func.setToast(true, false, "Pre-request script added")
         }
     }
 
@@ -222,7 +228,11 @@ function UserConfig() {
         </LegacyCard>
     )
 
-    const components = [<TestCollectionConfiguration/>, rateLimit, updateDeltaPeriodTime]
+    let components = [<TestCollectionConfiguration/>, rateLimit, updateDeltaPeriodTime]
+
+    if (func.checkForFeatureSaas("TEST_PRE_SCRIPT")) {
+        components.push(preRequestScriptComponent)
+    }
 
     return (
         isLoading ? <SpinnerCentered /> 

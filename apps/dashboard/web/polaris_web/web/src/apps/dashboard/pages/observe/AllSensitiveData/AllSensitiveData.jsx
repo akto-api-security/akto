@@ -104,7 +104,10 @@ const convertToDataTypesData = (type, collectionsMap, countMap, subtypeToApiColl
         avatarComp: <Thumbnail source={iconSource} size="small" />,
         priorityVal: priorityText.length > 1 ? severityOrder[priorityText] : 0,
         priorityText: priorityText,
-        priorityComp: priorityText.length > 1 ? <Badge status={transform.getColor(priorityText, true)}>{func.toSentenceCase(priorityText)}</Badge> : "-",
+        priorityComp: priorityText.length > 1 ? 
+        <div key={type.name} className={`badge-wrapper-${priorityText}`}>
+            <Badge status={func.getHexColorForSeverity(priorityText)}>{func.toSentenceCase(priorityText)}</Badge>
+        </div> : "-",
         categoriesArr: categoriesList,
         categoryComp: categoriesList.length > 0 ?  (
             <ShowListInBadge 
@@ -135,7 +138,7 @@ const convertToDataTypesData = (type, collectionsMap, countMap, subtypeToApiColl
 
 function AllSensitiveData() {
 
-    const [data, setData] = useState({'all': [], "enabled":[], 'disabled': []})
+    const [data, setData] = useState({"all":[], "detected": [], "enabled":[], 'disabled': []})
     const [mapData, setMapData] = useState({})
     const [prompts, setPrompts] = useState([])
     const [isGptScreenActive, setIsGptScreenActive] = useState(false)
@@ -151,9 +154,9 @@ function AllSensitiveData() {
     const [severityCountMap, setSeverityCountMap] = useState([])
     const [loading, setLoading] = useState(false)
 
-    const definedTableTabs = ["All", "Enabled", "Disabled"]
+    const definedTableTabs = ["All", "Detected", "Enabled", "Disabled"]
     const tableSelectedTab = PersistStore.getState().tableSelectedTab[window.location.pathname]
-    const initialSelectedTab = tableSelectedTab || "enabled"
+    const initialSelectedTab = tableSelectedTab || "detected"
     const [selectedTab, setSelectedTab] = useState(initialSelectedTab)
     let initialTabIdx = func.getTableTabIndexById(1, definedTableTabs, initialSelectedTab)
     const [selected, setSelected] = useState(initialTabIdx)
@@ -187,7 +190,7 @@ function AllSensitiveData() {
     const convertToGraphData = (severityMap) => {
         let dataArr = []
         Object.keys(severityMap).forEach((x) => {
-            const color = transform.getColorForSensitiveData(x)
+            const color = func.getHexColorForSeverity(x)
             let text = func.toSentenceCase(x)
             const value =  severityMap[x]
             dataArr.push({
@@ -212,7 +215,7 @@ function AllSensitiveData() {
         const dataTypesVsApisCount = results[2].status === 'fulfilled' ? results[2].value : {};
 
         let dataTypesArr = [...(dataTypesRes?.dataTypes?.aktoDataTypes || []) , ...(dataTypesRes?.dataTypes?.customDataTypes || [])]
-        const reqResCountMap = subTypeCountRes?.response?.subTypeCountMap || {REQUEST: {}, RESPONSE: {}}
+        const reqResCountMap = subTypeCountRes?.subTypeCountMap || {REQUEST: {}, RESPONSE: {}}
         let subtypeToNameMap = {}
 
         let totalSensitive = 0;
@@ -242,6 +245,7 @@ function AllSensitiveData() {
             return convertToDataTypesData(type, collectionsMap, reqResCountMap, dataTypesVsApisCount?.apiCollectionsMap || {})
         })
         temp.all = tempArr
+        temp.detected = tempArr.filter((x) => x.response > 0 || x.request > 0)
         temp.enabled = tempArr.filter((x) => x.active === true)
         temp.disabled = tempArr.filter((x) => x.active === false)
         let finalCountMap = {}
@@ -306,10 +310,15 @@ function AllSensitiveData() {
         api.resetSampleData();
     }
 
+    function fillSensitiveDataTypes(){
+        api.fillSensitiveDataTypes();
+    }
+
     const secondaryActionsComp = (
         <HorizontalStack gap={"2"}>
             { (func.checkOnPrem() && window?.USER_NAME !== undefined && window.USER_NAME.includes("razorpay")) ? <Button onClick={resetSampleData}>Reset Sample Data</Button> : <></>}
             <Button onClick={displayGPT}>Ask AktoGPT</Button>
+            <Button onClick={fillSensitiveDataTypes}>Fill Data Types</Button>
         </HorizontalStack>
     )
 

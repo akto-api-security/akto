@@ -25,7 +25,7 @@ function JsonRecording({extractInformation, showOnlyApi, setStoreData}) {
     }])
 
     useEffect(() => {
-        if (!extractInformation) {
+        if (extractInformation) {
             if (authMechanism && authMechanism.type === "LOGIN_REQUEST" && authMechanism.requestData[0].type === "RECORDED_FLOW") {
                 setTokenFetchCommand(authMechanism.requestData[0].tokenFetchCommand)
                 setAuthParams(authMechanism.authParams)
@@ -35,7 +35,7 @@ function JsonRecording({extractInformation, showOnlyApi, setStoreData}) {
         } else {
             return;
         }
-    }, [])
+    }, [authMechanism])
 
     const inputRef = useRef(null);
 

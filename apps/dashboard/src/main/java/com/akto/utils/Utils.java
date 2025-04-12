@@ -1,10 +1,11 @@
 package com.akto.utils;
 
+import com.akto.action.ExportSampleDataAction;
 import com.akto.dao.ThirdPartyAccessDao;
 import com.akto.dao.TrafficInfoDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.AccountSettingsDao;
-import com.akto.dao.AccountsContextDao;
+import com.akto.dao.AccountsContextDaoWithRbac;
 import com.akto.dao.ApiInfoDao;
 import com.akto.dao.FilterSampleDataDao;
 import com.akto.dao.SampleDataDao;
@@ -12,7 +13,6 @@ import com.akto.dao.SensitiveParamInfoDao;
 import com.akto.dao.SensitiveSampleDataDao;
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dto.AccountSettings;
-import com.akto.dependency.DependencyAnalyser;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
@@ -35,14 +35,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
-import com.mongodb.client.model.BulkWriteOptions;
-import com.mongodb.client.model.DeleteManyModel;
 import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.WriteModel;
-
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 
+import java.io.File;
 import java.net.MalformedURLException;
 import java.net.URISyntaxException;
 import java.net.URL;
@@ -50,12 +48,14 @@ import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import javax.servlet.http.HttpServletRequest;
+
 import static com.akto.dto.RawApi.convertHeaders;
 
 
 public class Utils {
 
-    private static final LoggerMaker loggerMaker = new LoggerMaker(Utils.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(Utils.class, LogDb.DASHBOARD);;
     private final static ObjectMapper mapper = new ObjectMapper();
 
     public static Map<String, String> getAuthMap(JsonNode auth, Map<String, String> variableMap) {
@@ -452,7 +452,7 @@ public class Utils {
 
     }
 
-    public static void pushDataToKafka(int apiCollectionId, String topic, List<String> messages, List<String> errors, boolean skipKafka) throws Exception {
+    public static void pushDataToKafka(int apiCollectionId, String topic, List<String> messages, List<String> errors, boolean skipKafka, boolean takeFromMsg) throws Exception {
         List<HttpResponseParams> responses = new ArrayList<>();
         for (String message: messages){
             int messageLimit = (int) Math.round(0.8 * KafkaListener.BATCH_SIZE_CONFIG);
@@ -474,13 +474,17 @@ public class Utils {
 
         //todo:shivam handle resource analyser in AccountHTTPCallParserAktoPolicyInfo
         if(skipKafka) {
-            String accountIdStr = responses.get(0).accountId;
-            if (!StringUtils.isNumeric(accountIdStr)) {
-                return;
-            }
 
-            int accountId = Integer.parseInt(accountIdStr);
-            Context.accountId.set(accountId);
+            int accountId = Context.accountId.get();
+            if (takeFromMsg) {
+                String accountIdStr = responses.get(0).accountId;
+                if (!StringUtils.isNumeric(accountIdStr)) {
+                    return;
+                }
+
+                accountId = Integer.parseInt(accountIdStr);
+                Context.accountId.set(accountId);
+            }
 
             SingleTypeInfo.fetchCustomDataTypes(accountId);
             AccountHTTPCallParserAktoPolicyInfo info = RuntimeListener.accountHTTPParserMap.get(accountId);
@@ -573,6 +577,7 @@ public class Utils {
     public static float calculateRiskValueForSeverity(String severity){
         float riskScore = 0 ;
         switch (severity) {
+            case "CRITICAL":
             case "HIGH":
                 riskScore += 100;
                 break;
@@ -607,13 +612,13 @@ public class Utils {
 
         String id = "_id.";
 
-        AccountsContextDao.deleteApisPerDao(toBeDeleted, SingleTypeInfoDao.instance, "");
-        AccountsContextDao.deleteApisPerDao(toBeDeleted, ApiInfoDao.instance, id);
-        AccountsContextDao.deleteApisPerDao(toBeDeleted, SampleDataDao.instance, id);
-        AccountsContextDao.deleteApisPerDao(toBeDeleted, TrafficInfoDao.instance, id);
-        AccountsContextDao.deleteApisPerDao(toBeDeleted, SensitiveSampleDataDao.instance, id);
-        AccountsContextDao.deleteApisPerDao(toBeDeleted, SensitiveParamInfoDao.instance, "");
-        AccountsContextDao.deleteApisPerDao(toBeDeleted, FilterSampleDataDao.instance, id);
+        AccountsContextDaoWithRbac.deleteApisPerDao(toBeDeleted, SingleTypeInfoDao.instance, "");
+        AccountsContextDaoWithRbac.deleteApisPerDao(toBeDeleted, ApiInfoDao.instance, id);
+        AccountsContextDaoWithRbac.deleteApisPerDao(toBeDeleted, SampleDataDao.instance, id);
+        AccountsContextDaoWithRbac.deleteApisPerDao(toBeDeleted, TrafficInfoDao.instance, id);
+        AccountsContextDaoWithRbac.deleteApisPerDao(toBeDeleted, SensitiveSampleDataDao.instance, id);
+        AccountsContextDaoWithRbac.deleteApisPerDao(toBeDeleted, SensitiveParamInfoDao.instance, "");
+        AccountsContextDaoWithRbac.deleteApisPerDao(toBeDeleted, FilterSampleDataDao.instance, id);
 
     }
 
@@ -625,6 +630,42 @@ public class Utils {
         input = new ArrayList<>();
         input.addAll(copySet);
         return input;
+    }
+
+    public static String createDashboardUrlFromRequest(HttpServletRequest request) {
+        if (request == null) {
+            return "http://localhost:8080";
+        }
+        return request.getScheme() + "://" + request.getServerName() + ":" + request.getServerPort();
+    }
+
+    public static File createRequestFile(String originalMessage, String message) {
+        try {
+            String origCurl = ExportSampleDataAction.getCurl(originalMessage);
+            String testCurl = ExportSampleDataAction.getCurl(message);
+
+            HttpResponseParams origObj = HttpCallParser.parseKafkaMessage(originalMessage);
+            BasicDBObject testRespObj = BasicDBObject.parse(message);
+            BasicDBObject testPayloadObj = BasicDBObject.parse(testRespObj.getString("response"));
+            String testResp = testPayloadObj.getString("body");
+
+            File tmpOutputFile = File.createTempFile("output", ".txt");
+
+            FileUtils.writeStringToFile(tmpOutputFile, "Original Curl ----- \n\n", (String) null);
+            FileUtils.writeStringToFile(tmpOutputFile, origCurl + "\n\n", (String) null, true);
+            FileUtils.writeStringToFile(tmpOutputFile, "Original Api Response ----- \n\n", (String) null, true);
+            FileUtils.writeStringToFile(tmpOutputFile, origObj.getPayload() + "\n\n", (String) null, true);
+
+            FileUtils.writeStringToFile(tmpOutputFile, "Test Curl ----- \n\n", (String) null, true);
+            FileUtils.writeStringToFile(tmpOutputFile, testCurl + "\n\n", (String) null, true);
+            FileUtils.writeStringToFile(tmpOutputFile, "Test Api Response ----- \n\n", (String) null, true);
+            FileUtils.writeStringToFile(tmpOutputFile, testResp + "\n\n", (String) null, true);
+
+            return tmpOutputFile;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
+        }
     }
 
 }

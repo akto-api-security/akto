@@ -1,16 +1,11 @@
 package com.akto.util;
 
 import java.util.HashMap;
-import java.util.Map;
-import java.util.Scanner;
-import java.util.concurrent.TimeUnit;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.net.URL;
 import java.nio.charset.StandardCharsets;
 
 import org.apache.commons.io.FileUtils;
@@ -22,15 +17,12 @@ import org.slf4j.LoggerFactory;
 import com.akto.dao.RecordedLoginInputDao;
 import com.akto.dao.context.Context;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.google.gson.Gson;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 import com.akto.ApiRequest;
 import com.akto.TimeoutObject;
 
 public class RecordedLoginFlowUtil {
-
-    private static final Gson gson = new Gson();
 
     private static final Logger logger = LoggerFactory.getLogger(RecordedLoginFlowUtil.class);
 

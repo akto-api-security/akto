@@ -69,6 +69,11 @@ function Integrations() {
       name:'Jira',
       source: '/public/logo_jira.svg'
     }
+    let azureBoardsObj={
+      id: 'azure_boards',
+      name:'Azure Boards',
+      source: '/public/azure-boards.svg'
+    }
     let jenkinsObj={
       id: `jenkins`,
       name: "Jenkins",
@@ -116,6 +121,24 @@ function Integrations() {
       source: '/public/gcp.svg'
     }
 
+    let splunkObj ={
+      id: 'splunk',
+      name:'Splunk SEIM',
+      source: '/public/splunk.svg'
+    }
+
+    let awsWafObj ={
+      id: 'aws_waf',
+      name:'AWS WAF',
+      source: '/public/awsWaf.svg'
+    }
+
+    let f5WafObj ={
+      id: 'f5_waf',
+      name:'F5 WAF',
+      source: '/public/F5.svg'
+    }
+
     let ssoItems = [githubSsoObj, oktaSsoObj, azureAdSsoObj, googleWorkSpaceObj]
     const [currItems , setCurrentItems] = useState(getTabItems('all'))
     const tabs = [
@@ -158,7 +181,17 @@ function Integrations() {
           id: 'cicd',
           content: <span>CI/CD <Badge status='new'>{getTabItems('cicd').length}</Badge></span>,
           component: <TabsList />
-      },
+        },
+        {
+          id: 'waf',
+          content: <span>WAF <Badge status='new'>{getTabItems('waf').length}</Badge></span>,
+          component: <TabsList />
+        },
+        {
+          id: 'splunk',
+          content: <span>SEIM <Badge status='new'>{getTabItems('splunk').length}</Badge></span>,
+          component: <TabsList />
+        },
     ]
 
   function getTabItems(tabId) {
@@ -168,7 +201,9 @@ function Integrations() {
     const cicdItems = [jenkinsObj, azuredevopsObj, gitlabObj, githubactionsObj, ciCdObj];
     const aiItems = [aktoGptObj];
     const alertsItems = [slackObj, webhooksObj, teamsWebhooksObj];
-    const automationItems = [aktoApiObj, ciCdObj, jiraObj];
+    const automationItems = [aktoApiObj, ciCdObj, jiraObj, azureBoardsObj];
+    const wafItems = [awsWafObj, f5WafObj];
+    const siemItems = [splunkObj];
     switch (tabId) {
       case 'traffic':
         return trafficItems;
@@ -199,6 +234,16 @@ function Integrations() {
           return emptyItem;
         }
         return automationItems;
+      case 'waf':
+        if (func.checkLocal()) {
+          return emptyItem;
+        }
+        return wafItems;
+      case 'splunk':
+        if (func.checkLocal()) {
+          return emptyItem;
+        }
+        return siemItems;
       default:
         let allItems = [...trafficItems, ...aiItems]
         if (!func.checkLocal()){
@@ -206,6 +251,9 @@ function Integrations() {
         }
         if(func.checkOnPrem()){
           allItems = [...allItems, ...reportingItems]
+        }
+        if (func.isDemoAccount()) {
+          allItems = [...allItems, ...wafItems, ...siemItems]
         }
         return allItems;
     }

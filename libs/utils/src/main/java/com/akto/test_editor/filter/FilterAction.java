@@ -52,9 +52,13 @@ public final class FilterAction {
     public final Map<String, DataOperandsImpl> filters = new HashMap<String, DataOperandsImpl>() {{
         put("contains_all", new ContainsAllFilter());
         put("contains_either", new ContainsEitherFilter());
+        put("contains_either_cidr", new ContainsEitherIpFilter());
+        put("not_contains_cidr", new NotContainsIpFilter());
         put("not_contains", new NotContainsFilter());
         put("regex", new RegexFilter());
         put("eq", new EqFilter());
+        put("eq_obj", new EqFilterObj());
+        put("neq_obj", new NeqFilterObj());
         put("neq", new NeqFilter());
         put("gt", new GreaterThanFilter());
         put("gte", new GreaterThanEqFilter());
@@ -113,6 +117,12 @@ public final class FilterAction {
                 return applyFilterOnQueryParams(filterActionRequest);
             case "response_code":
                 return applyFilterOnResponseCode(filterActionRequest);
+            case "source_ip":
+                return applyFilterOnSourceIps(filterActionRequest);
+            case "destination_ip":
+                return applyFilterOnDestinationIps(filterActionRequest);
+            case "country_code":
+                return applyFilterOnCountryCode(filterActionRequest);
             default:
                 return new DataOperandsFilterResponse(false, null, null, null);
 
@@ -249,6 +259,49 @@ public final class FilterAction {
             return;
         }
         varMap.put(querySet.get(0), respCode);
+    }
+
+    public DataOperandsFilterResponse applyFilterOnSourceIps(FilterActionRequest filterActionRequest) {
+
+        RawApi rawApi = filterActionRequest.fetchRawApiBasedOnContext();
+        if (rawApi == null || rawApi.getRequest() == null) {
+            return new DataOperandsFilterResponse(false, null, null, null);
+        }
+
+        String sourceIp = rawApi.getRequest().getSourceIp();
+        DataOperandFilterRequest dataOperandFilterRequest = new DataOperandFilterRequest(sourceIp, filterActionRequest.getQuerySet(), filterActionRequest.getOperand());
+        ValidationResult res = invokeFilter(dataOperandFilterRequest);
+        return new DataOperandsFilterResponse(res.getIsValid(), null, null, null, res.getValidationReason());
+    }
+
+    public DataOperandsFilterResponse applyFilterOnDestinationIps(FilterActionRequest filterActionRequest) {
+
+        RawApi rawApi = filterActionRequest.fetchRawApiBasedOnContext();
+        if (rawApi == null || rawApi.getRequest() == null) {
+            return new DataOperandsFilterResponse(false, null, null, null);
+        }
+
+        String destinationIp = rawApi.getRequest().getDestinationIp();
+        DataOperandFilterRequest dataOperandFilterRequest = new DataOperandFilterRequest(destinationIp, filterActionRequest.getQuerySet(), filterActionRequest.getOperand());
+        ValidationResult res = invokeFilter(dataOperandFilterRequest);
+        return new DataOperandsFilterResponse(res.getIsValid(), null, null, null, res.getValidationReason());
+    }
+
+    public DataOperandsFilterResponse applyFilterOnCountryCode(FilterActionRequest filterActionRequest) {
+
+        RawApi rawApi = filterActionRequest.fetchRawApiBasedOnContext();
+        if (rawApi == null || rawApi.getRequest() == null) {
+            return new DataOperandsFilterResponse(false, null, null, null);
+        }
+
+        String countryCode = rawApi.getRawApiMetadata().getCountryCode();
+        if (countryCode.isEmpty()){
+            return new DataOperandsFilterResponse(false, null, null, null);
+        }
+
+        DataOperandFilterRequest dataOperandFilterRequest = new DataOperandFilterRequest(countryCode, filterActionRequest.getQuerySet(), filterActionRequest.getOperand());
+        ValidationResult res = invokeFilter(dataOperandFilterRequest);
+        return new DataOperandsFilterResponse(res.getIsValid(), null, null, null, res.getValidationReason());
     }
 
     public DataOperandsFilterResponse applyFilterOnRequestPayload(FilterActionRequest filterActionRequest) {

@@ -33,6 +33,7 @@ function HomeDashboard() {
     const [testSummaryInfo, setTestSummaryInfo] = useState([])
 
     const allCollections = PersistStore(state => state.allCollections)
+    const hostNameMap = PersistStore(state => state.hostNameMap)
     const coverageMap = PersistStore(state => state.coverageMap)
     const [authMap, setAuthMap] = useState({})
     const [apiTypesData, setApiTypesData] = useState([{ "data": [], "color": "#D6BBFB" }])
@@ -114,6 +115,7 @@ function HomeDashboard() {
                 finalResult.push({
                     "testName": x["name"],
                     "time": func.prettifyEpoch(x["run_time_epoch"]),
+                    "criticalCount": severityMap["critical"] ? severityMap["critical"] : "0",
                     "highCount": severityMap["high"] ? severityMap["high"] : "0",
                     "mediumCount": severityMap["medium"] ? severityMap["medium"] : "0",
                     "lowCount": severityMap["low"] ? severityMap["low"] : "0",
@@ -134,7 +136,8 @@ function HomeDashboard() {
             observeApi.getUserEndpoints(),
             api.findTotalIssues(startTimestamp, endTimestamp),
             api.fetchApiStats(startTimestamp, endTimestamp),
-            api.fetchEndpointsCount(startTimestamp, endTimestamp)
+            api.fetchEndpointsCount(startTimestamp, endTimestamp),
+            testingApi.fetchSeverityInfoForIssues({}, [], 0)
         ];
 
         let results = await Promise.allSettled(apiPromises);
@@ -143,6 +146,7 @@ function HomeDashboard() {
         let findTotalIssuesResp = results[1].status === 'fulfilled' ? results[1].value : {}
         let apisStatsResp = results[2].status === 'fulfilled' ? results[2].value : {}
         let fetchEndpointsCountResp = results[3].status === 'fulfilled' ? results[3].value : {}
+        let issueSeverityMap = results[4].status === 'fulfilled' ? results[4].value : {}
 
         setShowBannerComponent(!userEndpoints)
 
@@ -153,7 +157,7 @@ function HomeDashboard() {
         buildAuthTypesData(apisStatsResp.apiStatsEnd)
         buildSetRiskScoreData(apisStatsResp.apiStatsEnd) //todo
         getCollectionsWithCoverage()
-        buildSeverityMap(apisStatsResp.apiStatsEnd)
+        buildSeverityMap(issueSeverityMap.severityInfo)
         buildIssuesSummary(findTotalIssuesResp)
 
         const fetchHistoricalDataResp = { "finalHistoricalData": finalHistoricalData, "initialHistoricalData": initialHistoricalData }
@@ -234,9 +238,9 @@ function HomeDashboard() {
             totalTestedApis += x.apisTested
         })
 
-        const tempRiskScore = totalAPIs ? (totalRiskScore / totalApis).toFixed(2) : 0
+        const tempRiskScore = totalApis ? (totalRiskScore / totalApis).toFixed(2) : 0
         setOldRiskScore(parseFloat(tempRiskScore))
-        const tempTestCoverate = totalAPIs ? (100 * totalTestedApis / totalApis).toFixed(2) : 0
+        const tempTestCoverate = totalApis ? (100 * totalTestedApis / totalApis).toFixed(2) : 0
         setOldTestCoverage(parseFloat(tempTestCoverate))
     }
 
@@ -380,9 +384,9 @@ function HomeDashboard() {
     }
 
     function getCollectionsWithCoverage() {
-        const validCollections = allCollections.filter(collection => collection.hostName !== null && collection.hostName !== undefined && !collection.deactivated);
+        const validCollections = allCollections.filter(collection => (hostNameMap[collection.id] && hostNameMap[collection.id] !== undefined)  && !collection.deactivated);
 
-        const sortedCollections = validCollections.sort((a, b) => b.startTs - a.startTs);
+        const sortedCollections = validCollections.sort((a, b) => b?.startTs - a?.startTs);
 
         const result = sortedCollections.slice(0, 10).map(collection => {
             const apisTested = coverageMap[collection.id] || 0;
@@ -447,23 +451,37 @@ function HomeDashboard() {
         />
     ) : null
 
-    function buildSeverityMap(apiStats) {
-        const countMap = apiStats ? apiStats.criticalMap : {};
+    function buildSeverityMap(severityInfo) {
+        const countMap = { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0 }
+
+        if (severityInfo && severityInfo != undefined && severityInfo != null && severityInfo instanceof Object) {
+            for (const apiCollectionId in severityInfo) {
+                let temp = severityInfo[apiCollectionId]
+                for (const key in temp) {
+                    countMap[key] += temp[key]
+                }
+            }
+        }
 
         const result = {
+            "Critical": {
+                "text": countMap.CRITICAL || 0,
+                "color": func.getHexColorForSeverity("CRITICAL"),
+                "filterKey": "Critical"
+            },
             "High": {
                 "text": countMap.HIGH || 0,
-                "color": "#EF864C",
+                "color": func.getHexColorForSeverity("HIGH"),
                 "filterKey": "High"
             },
             "Medium": {
                 "text": countMap.MEDIUM || 0,
-                "color": "#F6C564",
+                "color": func.getHexColorForSeverity("MEDIUM"),
                 "filterKey": "Medium"
             },
             "Low": {
                 "text": countMap.LOW || 0,
-                "color": "#6FD1A6",
+                "color": func.getHexColorForSeverity("LOW"),
                 "filterKey": "Low"
             }
         };
@@ -508,15 +526,15 @@ function HomeDashboard() {
                 />
             </div>
         }
-        title="Vulnerable APIs by Severity"
-        titleToolTip="Breakdown of vulnerable APIs categorized by severity level (High, Medium, Low). Click to see details for each category."
+        title="Issues by Severity"
+        titleToolTip="Breakdown of issues categorized by severity level (High, Medium, Low). Click to see details for each category."
         linkText="Fix critical issues"
         linkUrl="/dashboard/issues"
-    /> : <EmptyCard title="Vulnerable APIs by Severity" subTitleComponent={showTestingComponents ? <Text alignment='center' color='subdued'>No vulnerable APIs found</Text>: runTestEmptyCardComponent}/>
+    /> : <EmptyCard title="Issues by Severity" subTitleComponent={showTestingComponents ? <Text alignment='center' color='subdued'>No issues found for this time-frame</Text>: runTestEmptyCardComponent}/>
 
-    const criticalUnsecuredAPIsOverTime = <CriticalUnsecuredAPIsOverTimeGraph linkText={"Fix critical issues"} linkUrl={"/dashboard/issues"} />
+    const criticalUnsecuredAPIsOverTime = <CriticalUnsecuredAPIsOverTimeGraph startTimestamp={startTimestamp} endTimestamp={endTimestamp} linkText={"Fix critical issues"} linkUrl={"/dashboard/issues"} />
 
-    const criticalFindings = <CriticalFindingsGraph linkText={"Fix critical issues"} linkUrl={"/dashboard/issues"} />
+    const criticalFindings = <CriticalFindingsGraph startTimestamp={startTimestamp} endTimestamp={endTimestamp} linkText={"Fix critical issues"} linkUrl={"/dashboard/issues"} />
 
     const apisByRiskscoreComponent = <InfoCard
         component={

@@ -1,23 +1,23 @@
 package com.akto.action;
 
 import com.akto.dao.SingleTypeInfoDao;
+import com.akto.dao.context.Context;
+import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Aggregates;
-import com.mongodb.client.model.EstimatedDocumentCountOptions;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
-
 import java.util.ArrayList;
 import java.util.List;
-
 import org.bson.Document;
 import org.bson.conversions.Bson;
 
 public class ParamStateAction extends UserAction {
 
-    private static final LoggerMaker loggerMaker = new LoggerMaker(ParamStateAction.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(ParamStateAction.class, LogDb.DASHBOARD);
     @Override
     public String execute() {
         return SUCCESS.toUpperCase();
@@ -33,6 +33,13 @@ public class ParamStateAction extends UserAction {
         String computedFieldName = "computedValue";
 
         pipeline.add(Aggregates.match(Filters.gt(SingleTypeInfo._UNIQUE_COUNT,0)));
+        try {
+            List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+            if(collectionIds != null) {
+                pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
+            }
+        } catch(Exception e){
+        }
 
         Bson projections = Projections.fields(
                 Projections.include(

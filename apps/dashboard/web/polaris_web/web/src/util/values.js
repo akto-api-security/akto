@@ -74,7 +74,7 @@ const ranges = [
         alias: "allTime",
         period:{
             since: new Date(0),
-            until: todayDayEnd,
+            until: new Date(new Date().setFullYear(today.getFullYear() + 1)),
         }
     }
 ];

@@ -20,13 +20,18 @@ public class TestingRun {
     private int testIdConfig;
     public static final String PERIOD_IN_SECONDS = "periodInSeconds";
     private int periodInSeconds;
+    public static final String TEST_RUNTIME = "testRunTime";
     private int testRunTime;
+    public static final String MAX_CONCURRENT_REQUEST = "maxConcurrentRequests";
     private int maxConcurrentRequests;
     private String triggeredBy;
     public static final String TRIGGERED_BY = "triggeredBy";
 
     public static final String _API_COLLECTION_ID = "testingEndpoints.apiCollectionId";
     public static final String _API_COLLECTION_ID_IN_LIST = "testingEndpoints.apisList.apiCollectionId";
+
+    public static final String IS_NEW_TESTING_RUN = "isNewTestRun";
+    private boolean isNewTestRun = true;
 
     @BsonIgnore
     private String hexId;
@@ -42,6 +47,9 @@ public class TestingRun {
 
     public static final String SEND_SLACK_ALERT = "sendSlackAlert";
     private boolean sendSlackAlert = false;
+
+    public static final String SEND_MS_TEAMS_ALERT = "sendMsTeamsAlert";
+    private boolean sendMsTeamsAlert = false;
 
     public TestingRun() { }
 
@@ -59,8 +67,14 @@ public class TestingRun {
         this.name = name;
         this.triggeredBy = triggeredBy;
         this.sendSlackAlert = sendSlackAlert;
+        this.isNewTestRun = true;
     }
+
     public TestingRun(int scheduleTimestamp, String userEmail, TestingEndpoints testingEndpoints, int testIdConfig, State state, int periodInSeconds, String name, int testRunTime, int maxConcurrentRequests, boolean sendSlackAlert) {
+        this(scheduleTimestamp, userEmail,testingEndpoints,testIdConfig, state, periodInSeconds, name, testRunTime, maxConcurrentRequests, sendSlackAlert, false);
+    }
+
+    public TestingRun(int scheduleTimestamp, String userEmail, TestingEndpoints testingEndpoints, int testIdConfig, State state, int periodInSeconds, String name, int testRunTime, int maxConcurrentRequests, boolean sendSlackAlert, boolean sendMsTeamsAlert) {
         this.scheduleTimestamp = scheduleTimestamp;
         this.testRunTime = testRunTime;
         this.maxConcurrentRequests = maxConcurrentRequests;
@@ -73,6 +87,8 @@ public class TestingRun {
         this.periodInSeconds = periodInSeconds;
         this.name = name;
         this.sendSlackAlert = sendSlackAlert;
+        this.isNewTestRun = true;
+        this.sendMsTeamsAlert = sendMsTeamsAlert;
     }
 
     public TestingRunConfig getTestingRunConfig() {
@@ -208,6 +224,14 @@ public class TestingRun {
         this.sendSlackAlert = sendSlackAlert;
     }
 
+    public boolean getSendMsTeamsAlert() {
+        return sendMsTeamsAlert;
+    }
+
+    public void setSendMsTeamsAlert(boolean sendMsTeamsAlert) {
+        this.sendMsTeamsAlert = sendMsTeamsAlert;
+    }
+
     @Override
     public String toString() {
         return "{" +
@@ -222,6 +246,14 @@ public class TestingRun {
             ", periodInSeconds='" + getPeriodInSeconds() + "'" +
             ", name='" + getName() + "'" +
             "}";
+    }
+
+    public boolean isNewTestRun() {
+        return isNewTestRun;
+    }
+
+    public void setNewTestRun(boolean isNewTestRun) {
+        this.isNewTestRun = isNewTestRun;
     }
 
 }

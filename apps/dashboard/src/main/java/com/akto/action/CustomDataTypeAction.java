@@ -6,9 +6,11 @@ import com.akto.dao.context.Context;
 import com.akto.dto.*;
 import com.akto.dto.data_types.Conditions;
 import com.akto.dto.data_types.Predicate;
+import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.listener.InitializerListener;
 import com.akto.listener.RuntimeListener;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -119,6 +121,23 @@ public class CustomDataTypeAction extends UserAction{
         dataTypes.put("usersMap", usersMap);
         List<AktoDataType> aktoDataTypes = AktoDataTypeDao.instance.findAll(new BasicDBObject());
         dataTypes.put("aktoDataTypes", aktoDataTypes);
+
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String fillSensitiveDataTypes() {
+        try {
+            InitializerListener.insertPiiSources();
+        } catch (Exception e) {
+            e.printStackTrace();
+            loggerMaker.errorAndAddToDb("error in insertPiiSources " + e.getMessage());
+        }
+        try {
+            InitializerListener.executePIISourceFetch();
+        } catch (Exception e) {
+            e.printStackTrace();
+            loggerMaker.errorAndAddToDb("error in executePIISourceFetch " + e.getMessage());
+        }
 
         return Action.SUCCESS.toUpperCase();
     }
@@ -247,7 +266,7 @@ public class CustomDataTypeAction extends UserAction{
 
     private AktoDataType aktoDataType;
     
-    public String saveAktoDataType(){
+    public String saveAktoDataType() {
 
         aktoDataType = AktoDataTypeDao.instance.findOne("name",name);
         if(aktoDataType==null){
@@ -304,7 +323,8 @@ public class CustomDataTypeAction extends UserAction{
                 Updates.set(AktoDataType.KEY_CONDITIONS, keyConditions),
                 Updates.set(AktoDataType.VALUE_CONDITIONS, valueConditions),
                 Updates.set(AktoDataType.OPERATOR, mainOperator),
-                Updates.set(AktoDataType.DATA_TYPE_PRIORITY, dataTypePriority)
+                Updates.set(AktoDataType.DATA_TYPE_PRIORITY, dataTypePriority),
+                Updates.set(AktoDataType._INACTIVE, !active)
             ),
             options
         );
@@ -598,6 +618,11 @@ public class CustomDataTypeAction extends UserAction{
             Bson sort = Sorts.ascending("_id.apiCollectionId", "_id.url", "_id.method");    
             List<HttpResponseParams> responses = new ArrayList<>();
             this.customSubTypeMatches = new ArrayList<>();
+
+            SensitiveSampleDataDao.instance.getMCollection().deleteMany(Filters.eq("_id.subType", name));
+            SingleTypeInfoDao.instance.updateMany(Filters.eq(SingleTypeInfo.SUB_TYPE, name),
+                    Updates.set(SingleTypeInfo.SUB_TYPE, SingleTypeInfo.GENERIC.getName()));
+
             do {
                 sampleDataList = SampleDataDao.instance.findAll(Filters.empty(), skip, LIMIT, sort);
                 skip += LIMIT;
@@ -1043,7 +1068,15 @@ public class CustomDataTypeAction extends UserAction{
         List<SingleTypeInfo.ParamId> idsToDelete = new ArrayList<>();
         do {
             idsToDelete = new ArrayList<>();
-            cursor = SensitiveSampleDataDao.instance.getMCollection().find(filterSsdQ).projection(Projections.exclude(SensitiveSampleData.SAMPLE_DATA)).skip(currMarker).limit(BATCH_SIZE).cursor();
+            Bson collectionFilter = Filters.empty();
+            try {
+                List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+                if(collectionIds != null) {
+                    collectionFilter = Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds);
+                }
+            } catch(Exception e){
+            }
+            cursor = SensitiveSampleDataDao.instance.getMCollection().find(Filters.and(filterSsdQ, collectionFilter)).projection(Projections.exclude(SensitiveSampleData.SAMPLE_DATA)).skip(currMarker).limit(BATCH_SIZE).cursor();
             currMarker += BATCH_SIZE;
             dataPoints = 0;
             loggerMaker.infoAndAddToDb("processing batch: " + currMarker, LogDb.DASHBOARD);
@@ -1095,7 +1128,7 @@ public class CustomDataTypeAction extends UserAction{
         BasicDBObject groupedId = new BasicDBObject(SingleTypeInfo._API_COLLECTION_ID, "$apiCollectionId")
                                     .append(SingleTypeInfo._URL, "$url")
                                     .append(SingleTypeInfo._METHOD, "$method");
-        Bson customFilter = Filters.nin(SingleTypeInfo._COLLECTION_IDS, UsageMetricCalculator.getDeactivated());
+        Bson customFilter = Filters.nin(SingleTypeInfo._API_COLLECTION_ID, UsageMetricCalculator.getDeactivated());
 
         List<String> sensitiveSubtypes = SingleTypeInfoDao.instance.sensitiveSubTypeInResponseNames();
         sensitiveSubtypes.addAll(SingleTypeInfoDao.instance.sensitiveSubTypeNames());

@@ -3,27 +3,29 @@ package com.akto.action.gpt;
 import com.akto.action.UserAction;
 import com.akto.dao.AktoGptConfigDao;
 import com.akto.dao.ApiCollectionsDao;
-import com.akto.dto.gpt.AktoGptConfig;
 import com.akto.dto.ApiCollection;
+import com.akto.dto.gpt.AktoGptConfig;
 import com.akto.dto.gpt.AktoGptConfigState;
 import com.akto.listener.InitializerListener;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.mongodb.BasicDBObject;
-
-import java.util.*;
-
 import com.mongodb.client.model.UpdateOptions;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 public class GptConfigAction extends UserAction {
+
+    private static final LoggerMaker logger = new LoggerMaker(GptConfigAction.class, LogDb.DASHBOARD);
 
     private int apiCollectionId;
 
     private List<BasicDBObject> currentState;
 
     public static final AktoGptConfigState DEFAULT_STATE = InitializerListener.isSaas ? AktoGptConfigState.ENABLED : AktoGptConfigState.DISABLED;
-
-    private static final Logger logger = LoggerFactory.getLogger(GptConfigAction.class);
 
     private List<BasicDBObject> fetchUpdatedAktoGptConfigs(){
         List<AktoGptConfig> aktoGptConfigList = AktoGptConfigDao.instance.findAll(new BasicDBObject());
@@ -71,11 +73,15 @@ public class GptConfigAction extends UserAction {
             if(aktoGptConfig == null) {
                 aktoGptConfig = upsertAktoConfig(apiCollectionId, DEFAULT_STATE);
             }
-            String collectionName = ApiCollectionsDao.instance.findOne(new BasicDBObject("_id", apiCollectionId)).getName();
-            currentState = Collections.singletonList(new BasicDBObject("id", aktoGptConfig.getId())
-                    .append("state", aktoGptConfig.getState().toString())
-                    .append("collectionName", collectionName != null ? collectionName : String.valueOf(apiCollectionId)));
-            logger.debug("Fetching AktoGptConfig for collectionId: {}, {}", apiCollectionId, currentState);
+            ApiCollection apiCollection = ApiCollectionsDao.instance.findOne(new BasicDBObject("_id", apiCollectionId));
+            if (apiCollection != null) {
+                String collectionName = apiCollection.getName();
+                currentState = Collections.singletonList(new BasicDBObject("id", aktoGptConfig.getId())
+                        .append("state", aktoGptConfig.getState().toString())
+                        .append("collectionName",
+                                collectionName != null ? collectionName : String.valueOf(apiCollectionId)));
+                logger.debug("Fetching AktoGptConfig for collectionId: {}, {}", apiCollectionId, currentState);
+            }
         }
         return SUCCESS.toUpperCase();
     }

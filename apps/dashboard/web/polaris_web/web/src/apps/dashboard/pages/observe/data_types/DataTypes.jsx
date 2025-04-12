@@ -175,7 +175,7 @@ function DataTypes() {
         valueOperator: currState.valueConditions.operator,
         dataTypePriority: currState?.priority ? currState.priority.toUpperCase() : "",
         ...transform.convertToSensitiveData(currState.sensitiveState),
-        
+        active: JSON.parse(currState.active)
       }
       api.saveAktoDataType(obj).then((response) => {
         func.setToast(true, false, "Data type updated successfully");
@@ -250,11 +250,9 @@ function DataTypes() {
               requiredIndicator={true}
               {...errorMessage.length > 0 ? {error: errorMessage} : {}}
               />
-            {currState.dataType === 'Custom' ?
-              <Dropdown id={"active-dropdown"} menuItems={statusItems}
-                selected={(val) => { handleChange({ active: val }) }}
-                initial={currState.active} label="Active" />
-              : null}
+            <Dropdown id={"active-dropdown"} menuItems={statusItems}
+              selected={(val) => { handleChange({ active: val }) }}
+              initial={currState.active} label="Active" />
             <Dropdown
               menuItems={severityItems}
               initial={currState.priority}

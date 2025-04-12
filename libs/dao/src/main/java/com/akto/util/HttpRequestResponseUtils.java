@@ -3,10 +3,12 @@ package com.akto.util;
 import com.akto.dao.context.Context;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.types.CappedSet;
-import com.fasterxml.jackson.core.JsonProcessingException;
+import com.akto.util.enums.GlobalEnums;
 import com.akto.util.grpc.ProtoBufUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mongodb.BasicDBObject;
+
+import org.apache.commons.lang3.StringUtils;
 import org.json.JSONObject;
 
 import java.io.UnsupportedEncodingException;
@@ -15,8 +17,6 @@ import java.net.URLEncoder;
 import java.util.*;
 
 import static com.akto.dto.OriginalHttpRequest.*;
-import static com.akto.util.grpc.ProtoBufUtils.DECODED_QUERY;
-import static com.akto.util.grpc.ProtoBufUtils.RAW_QUERY;
 
 public class HttpRequestResponseUtils {
 
@@ -85,6 +85,12 @@ public class HttpRequestResponseUtils {
 
     public static String convertGRPCEncodedToJson(byte[] rawRequest) {
         String base64 = Base64.getEncoder().encodeToString(rawRequest);
+
+        // empty grpc response, only headers present
+        if (rawRequest.length <= 5) {
+            return "{}";
+        }
+
         try {
             Map<Object, Object> map = ProtoBufUtils.getInstance().decodeProto(rawRequest);
             if (map.isEmpty()) {
@@ -191,4 +197,26 @@ public class HttpRequestResponseUtils {
                 // .replaceAll("\\%5D", "]");
     }
 
+    public static Map<String, String> decryptRequestPayload(String rawRequest){
+        Map<String, String> decryptedMap = new HashMap<>();
+        if(!StringUtils.isEmpty(rawRequest)){
+            rawRequest = rawRequest.trim();
+            String decodedString = rawRequest;
+            if(rawRequest.startsWith("ey", 0)){ // since jwt starts with ey as base64 encoded string of '{' is needed to be proper json
+                try {
+                    String[] jwtParts = rawRequest.split("\\.");
+                    if(jwtParts.length == 3) {
+                        String payload = jwtParts[1];
+                        byte[] decodedBytes = Base64.getDecoder().decode(payload);
+                        decodedString = new String(decodedBytes);
+                        decryptedMap.put("type", GlobalEnums.ENCODING_TYPE.JWT.name());
+                    }
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+            decryptedMap.put("payload", decodedString);
+        }
+        return decryptedMap;
+    } 
 }

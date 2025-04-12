@@ -1,25 +1,20 @@
 package com.akto.action;
 
-import com.akto.DaoInit;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.OriginalHttpRequest;
-import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.dependency_flow.*;
 import com.akto.dto.traffic.SampleData;
-import com.akto.dto.type.APICatalog;
 import com.akto.dto.type.URLMethods;
-import com.akto.dto.type.URLMethods.Method;
 import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.runtime.RelationshipSync;
 import com.akto.test_editor.execution.Build;
 import com.akto.utils.Utils;
 import com.mongodb.BasicDBObject;
-import com.mongodb.ConnectionString;
 import com.mongodb.client.model.*;
-import org.apache.logging.log4j.util.Strings;
 import org.bson.conversions.Bson;
 
 import java.util.*;
@@ -35,7 +30,7 @@ public class DependencyAction extends UserAction {
 
     private Collection<Node> result;
 
-    private static final LoggerMaker loggerMaker = new LoggerMaker(DependencyAction.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(DependencyAction.class,LogDb.DASHBOARD);
     private boolean dependencyGraphExists = false;
     public String checkIfDependencyGraphAvailable() {
 
@@ -69,7 +64,6 @@ public class DependencyAction extends UserAction {
     private int total;
     private int skip;
 
-
     public String buildDependencyTable() {
         List<Node> nodes = DependencyFlowNodesDao.instance.findNodesForCollectionIds(apiCollectionIds,false, skip, 50);
         dependencyTableList = new ArrayList<>();
@@ -79,6 +73,12 @@ public class DependencyAction extends UserAction {
             apiInfoKeys.add(new ApiInfo.ApiInfoKey(Integer.parseInt(node.getApiCollectionId()), node.getUrl(), URLMethods.Method.fromString(node.getMethod())));
         }
         Map<ApiInfo.ApiInfoKey, List<String>> parametersMap = SingleTypeInfoDao.instance.fetchRequestParameters(apiInfoKeys);
+        Map<ApiInfo.ApiInfoKey, List<String>> sourceCodeParametersMap = CodeAnalysisSingleTypeInfoDao.instance.fetchRequestParameters(apiInfoKeys);
+
+        // Add parameters from source code, if any.
+        if (sourceCodeParametersMap != null && !sourceCodeParametersMap.isEmpty()) {
+            parametersMap.putAll(sourceCodeParametersMap);
+        }
 
         replaceDetails = ReplaceDetailsDao.instance.findAll(Filters.in(ReplaceDetail._API_COLLECTION_ID, apiCollectionIds));
 
@@ -97,17 +97,36 @@ public class DependencyAction extends UserAction {
     private int newCollectionId;
 
     private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
-    public String invokeDependencyTable() {
-        ApiCollectionsAction apiCollectionsAction = new ApiCollectionsAction();
-        apiCollectionsAction.setCollectionName("temp " + Context.now());
-        apiCollectionsAction.createCollection();
-        List<ApiCollection> apiCollections = apiCollectionsAction.getApiCollections();;
 
-        if (apiCollections == null || apiCollections.size() == 0) {
-            addActionError("Couldn't create collection");
+    private boolean sourceCodeApis;
+
+    public String invokeDependencyTable() {
+
+        if(apiCollectionIds== null || apiCollectionIds.isEmpty()){
+            addActionError("No API collections to invoke dependency graph");
             return ERROR.toUpperCase();
         }
-        newCollectionId = apiCollections.get(0).getId();
+
+        if (sourceCodeApis && apiCollectionIds.size() > 1) {
+            addActionError("Please use a single API collection ID with source code APIs");
+            return ERROR.toUpperCase();
+        }
+
+        if(!sourceCodeApis){
+            ApiCollectionsAction apiCollectionsAction = new ApiCollectionsAction();
+            apiCollectionsAction.setCollectionName("temp " + Context.now());
+            apiCollectionsAction.createCollection();
+            List<ApiCollection> apiCollections = apiCollectionsAction.getApiCollections();;
+
+            if (apiCollections == null || apiCollections.size() == 0) {
+                addActionError("Couldn't create collection");
+                return ERROR.toUpperCase();
+            }
+            newCollectionId = apiCollections.get(0).getId();
+        } else {
+            // Insert in original collection for source code APIs.
+            newCollectionId = apiCollectionIds.get(0);
+        }
 
         int accountId = Context.accountId.get();
 
@@ -121,7 +140,7 @@ public class DependencyAction extends UserAction {
                 for (ReplaceDetail replaceDetail: replaceDetailsFromDb) {
                     replaceDetailMap.put(replaceDetail.hashCode(), replaceDetail);
                 }
-                List<Build.RunResult> runResults = build.run(apiCollectionIds, modifyHostDetails, replaceDetailMap);
+                List<Build.RunResult> runResults = build.run(apiCollectionIds, modifyHostDetails, replaceDetailMap, sourceCodeApis);
                 List<String> messages = new ArrayList<>();
 
                 for (Build.RunResult runResult: runResults) {
@@ -129,8 +148,13 @@ public class DependencyAction extends UserAction {
                     messages.add(currentMessage);
                 }
 
+                if(messages.isEmpty()){
+                    loggerMaker.infoAndAddToDb("No messages found for invokeDependencyTable");
+                    return;
+                }
+
                 try {
-                    Utils.pushDataToKafka(newCollectionId, "", messages, new ArrayList<>(), true);
+                    Utils.pushDataToKafka(newCollectionId, "", messages, new ArrayList<>(), true, true);
                 } catch (Exception e) {
                     loggerMaker.errorAndAddToDb(e, "Error while sending data to kafka in invoke dependency graph function", LoggerMaker.LogDb.DASHBOARD);
                 }
@@ -313,5 +337,12 @@ public class DependencyAction extends UserAction {
         return dependencyGraphExists;
     }
 
-    
+    public boolean getSourceCodeApis() {
+        return sourceCodeApis;
+    }
+
+    public void setSourceCodeApis(boolean sourceCodeApis) {
+        this.sourceCodeApis = sourceCodeApis;
+    }
+
 }

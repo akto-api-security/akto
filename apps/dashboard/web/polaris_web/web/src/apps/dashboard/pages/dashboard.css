@@ -101,7 +101,16 @@
    --color-patch: #50e3c2 ;
    --color-disabled: #ebebeb ;
    --color-options: #0d5aa7 ;
+   --color-success-new: #008060;
    --white: #ffffff;
+   --borderShadow-box-shadow: #AEB4B9;
+   --inset-box-shadow: 0px 1px 0px 0px #898F94 inset;
+   --agent-grey-background: #F6F6F7;
+
+   --text-default: #202223;
+   --text-subdued: #6D7175;
+
+   --background-selected: #EDEEEF;
 
     --p-color-bg-primary: var(--akto-primary) !important;
     --p-color-bg-primary-hover: #5400CB !important;
@@ -112,6 +121,7 @@
     --p-color-text-primary: var(--akto-primary) !important;
     --p-color-text-success: var(--akto-primary) !important;
     --p-color-text-primary-hover: var(--akto-primary) !important;
+    --p-color-text-success-new: var(--color-success-new) !important;
     
     --p-color-icon-primary: var(--akto-primary) !important;
     --p-color-bg-interactive-selected: #F6F6F7 !important;
@@ -196,4 +206,28 @@
     background: white;
     margin-top: -20px;
     padding-block: 10px;
+}
+
+.badge-wrapper-CRITICAL .Polaris-Badge {
+    background-color: #DF2909 !important;
+    color: #FFFBFB !important;
+    font-weight: 550 !important;
+}
+
+.badge-wrapper-HIGH .Polaris-Badge {
+    background-color: #FED3D1 !important;
+    color: #202223 !important;
+    font-weight: 550 !important;
+}
+
+.badge-wrapper-MEDIUM .Polaris-Badge {
+    background-color: #FFD79D !important;
+    color: #202223 !important;
+    font-weight: 550 !important;
+}
+
+.badge-wrapper-LOW .Polaris-Badge {
+    background-color: #E4E5E7;
+    color: #202223 !important;
+    font-weight: 550 !important;
 }

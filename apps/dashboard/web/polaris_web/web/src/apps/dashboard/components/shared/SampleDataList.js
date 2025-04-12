@@ -5,6 +5,8 @@ import {
   HorizontalStack, Box, LegacyCard, HorizontalGrid,
   Pagination, Key, Badge} from '@shopify/polaris';
 import SampleDataComponent from './SampleDataComponent';
+import SampleData from './SampleData';
+import func from '../../../../util/func';
 
 function SampleDataList(props) {
 
@@ -40,6 +42,25 @@ function SampleDataList(props) {
         </HorizontalStack>
         <HorizontalGrid columns={vertical ? "1" : "2"} gap="2">
           {
+            sampleData[Math.min(page, sampleData.length - 1)]?.errorList != undefined ?
+              <Box key={"errorList"}>
+                <LegacyCard>
+                  <Box id='error-editor-container'>
+                    <LegacyCard.Section flush>
+                      <Box paddingInlineEnd={"2"} paddingInlineStart={"2"} paddingBlockEnd={"3"} paddingBlockStart={"3"}>
+                        <HorizontalStack padding="2" align='space-between'>
+                          {func.toSentenceCase("Errors")}
+                        </HorizontalStack>
+                      </Box>
+                    </LegacyCard.Section>
+                    <LegacyCard.Section flush>
+                      <SampleData data={{ original: sampleData[Math.min(page, sampleData.length - 1)]?.errorList }}
+                        language="yaml" minHeight={minHeight} wordWrap={false} />
+                    </LegacyCard.Section>
+                  </Box>
+                </LegacyCard>
+              </Box>
+              :
             ["request","response"].map((type) => {
               return (
                 <Box key={type}>

@@ -1,29 +1,21 @@
 package com.akto.testing;
 
-import com.akto.DaoInit;
 import com.akto.dao.ApiCollectionsDao;
-import com.akto.dao.AuthMechanismsDao;
-import com.akto.dao.context.Context;
 import com.akto.dto.*;
 import com.akto.dto.testing.AuthMechanism;
 import com.akto.dto.testing.TestingRunConfig;
 import com.akto.dto.type.URLMethods;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-import com.akto.store.AuthMechanismStore;
 import com.akto.rules.TestPlugin;
 import com.akto.store.SampleMessageStore;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.mongodb.BasicDBObject;
-import com.mongodb.ConnectionString;
-
 import java.util.*;
 
 import static com.akto.runtime.RelationshipSync.extractAllValuesFromPayload;
-import static com.akto.testing.TestExecutor.findHost;
 
 public class StatusCodeAnalyser {
 
@@ -48,7 +40,7 @@ public class StatusCodeAnalyser {
         }
     }
 
-    public static void run(Map<ApiInfo.ApiInfoKey, List<String>> sampleDataMap, SampleMessageStore sampleMessageStore, AuthMechanismStore authMechanismStore, TestingRunConfig testingRunConfig, Set<String> hosts) {
+    public static void run(Map<ApiInfo.ApiInfoKey, List<String>> sampleDataMap, SampleMessageStore sampleMessageStore, AuthMechanism authMechanism, TestingRunConfig testingRunConfig, Map<String, String> hostAndContentType) {
         defaultPayloadsMap = new HashMap<>();
         result = new ArrayList<>();
         if (sampleDataMap == null) {
@@ -57,31 +49,35 @@ public class StatusCodeAnalyser {
         }
         loggerMaker.infoAndAddToDb("started calc default payloads", LogDb.TESTING);
 
-        calculateDefaultPayloads(sampleMessageStore, sampleDataMap, testingRunConfig, hosts);
+        calculateDefaultPayloads(sampleMessageStore, sampleDataMap, testingRunConfig, hostAndContentType);
 
         loggerMaker.infoAndAddToDb("started fill result", LogDb.TESTING);
-        fillResult(sampleMessageStore, sampleDataMap, authMechanismStore, testingRunConfig);
+        fillResult(sampleMessageStore, sampleDataMap, authMechanism, testingRunConfig);
     }
 
-    public static Set<String> findAllHosts(SampleMessageStore sampleMessageStore, Map<ApiInfo.ApiInfoKey, List<String>> sampleDataMap){
-        Set<String> hosts = new HashSet<>();
+    public static Map<String, String> findAllHosts(SampleMessageStore sampleMessageStore, Map<ApiInfo.ApiInfoKey, List<String>> sampleDataMap){
+        Map<String, String> hostAndContentType = new HashMap<>();
         for (ApiInfo.ApiInfoKey apiInfoKey: sampleDataMap.keySet()) {
             String host;
+            String contentType;
             try {
                 loggerMaker.infoAndAddToDb("Finding host for apiInfoKey: " + apiInfoKey.toString());
-                 host = findHost(apiInfoKey, sampleDataMap, sampleMessageStore);
+                OriginalHttpRequest request = TestExecutor.findOriginalHttpRequest(apiInfoKey, sampleDataMap, sampleMessageStore);
+                host = TestExecutor.findHostFromOriginalHttpRequest(request);
+                contentType = TestExecutor.findContentTypeFromOriginalHttpRequest(request);
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb("Error while finding host in status code analyser: " + e, LogDb.TESTING);
                 continue;
             }
-
-            hosts.add(host);
+            if(host != null ){
+                hostAndContentType.put(host, contentType);
+            }
         }
-        return hosts;
+        return hostAndContentType;
     }
 
-    public static void calculateDefaultPayloads(SampleMessageStore sampleMessageStore, Map<ApiInfo.ApiInfoKey, List<String>> sampleDataMap, TestingRunConfig testingRunConfig, Set<String> hosts) {
-        for (String host: hosts) {
+    public static void calculateDefaultPayloads(SampleMessageStore sampleMessageStore, Map<ApiInfo.ApiInfoKey, List<String>> sampleDataMap, TestingRunConfig testingRunConfig, Map<String, String> hostAndContentType) {
+        for (String host: hostAndContentType.keySet()) {
             loggerMaker.infoAndAddToDb("calc default payload for host: " + host, LogDb.TESTING);
             for (int idx=0; idx<11;idx++) {
                 try {
@@ -89,7 +85,17 @@ public class StatusCodeAnalyser {
                     if (!url.endsWith("/")) url += "/";
                     if (idx > 0) url += "akto-"+idx; // we want to hit host url once too
 
-                    OriginalHttpRequest request = new OriginalHttpRequest(url, null, URLMethods.Method.GET.name(), null, new HashMap<>(), "");
+                    String contentType = hostAndContentType.get(host);
+                    Map<String, List<String>> headers = new HashMap<>();
+
+                    if (contentType != null) {
+                        headers.put("content-type", Arrays.asList(contentType));
+                    }
+                    if (host != null && !host.isEmpty()) {
+                        headers.put("host", Arrays.asList(host));
+                    }
+
+                    OriginalHttpRequest request = new OriginalHttpRequest(url, null, URLMethods.Method.GET.name(), null, headers, "");
                     OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, testingRunConfig, false, new ArrayList<>(), Main.SKIP_SSRF_CHECK);
                     boolean isStatusGood = TestPlugin.isStatusGood(response.getStatusCode());
                     if (!isStatusGood) continue;
@@ -119,10 +125,9 @@ public class StatusCodeAnalyser {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(StatusCodeAnalyser.class);
     public static int MAX_COUNT = 30;
-    public static void fillResult(SampleMessageStore sampleMessageStore, Map<ApiInfo.ApiInfoKey, List<String>> sampleDataMap, AuthMechanismStore authMechanismStore, TestingRunConfig testingRunConfig) {
+    public static void fillResult(SampleMessageStore sampleMessageStore, Map<ApiInfo.ApiInfoKey, List<String>> sampleDataMap, AuthMechanism authMechanism, TestingRunConfig testingRunConfig) {
         loggerMaker.infoAndAddToDb("Running status analyser", LogDb.TESTING);
 
-        AuthMechanism authMechanism = authMechanismStore.getAuthMechanism();
         if (authMechanism == null) {
             loggerMaker.errorAndAddToDb("No auth mechanism", LogDb.TESTING);
             return;

@@ -91,4 +91,28 @@ public class MultiExecTestResult extends GenericTestResult {
         return runResults;
     }
 
+    @Override
+    public List<String> getResponses() {
+        List<String> ret = new ArrayList<>();
+        
+        Map<String, NodeResult> nodeResultMap = this.getNodeResultMap();
+        for (int i=0; i < this.executionOrder.size(); i++) {
+            String k = this.executionOrder.get(i);
+            NodeResult nodeRes = nodeResultMap.get(k);
+            List<String> messageList = Arrays.asList(nodeRes.getMessage().split("\"request\": "));
+
+            for (int j = 1; j<messageList.size(); j++) {
+                String message = "{\"request\": " + messageList.get(j);
+                if (j != messageList.size() - 1) {
+                    message = message.substring(0, message.length() - 3);
+                } else {
+                    message = message.substring(0, message.length() - 2);
+                    message = message + "}";
+                }
+                ret.add(message);
+            }       
+        }
+
+        return ret;
+    }
 }

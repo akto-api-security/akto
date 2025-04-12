@@ -24,9 +24,11 @@ public class YamlTemplateDao extends AccountsContextDao<YamlTemplate> {
         Map<String, TestConfig> testConfigMap = new HashMap<>();
         List<Bson> filters = new ArrayList<>();
         filters.add(customFilter);
-        if (fetchOnlyActive) {
-            filters.add(Filters.exists(YamlTemplate.INACTIVE, false));
-            filters.add(Filters.eq(YamlTemplate.INACTIVE, false));
+        if (fetchOnlyActive) {Bson filter = Filters.or(
+                Filters.exists(YamlTemplate.INACTIVE, false),
+                Filters.eq(YamlTemplate.INACTIVE, false)
+        );
+            filters.add(filter);
         } else {
             filters.add(new BasicDBObject());
         }
@@ -38,7 +40,7 @@ public class YamlTemplateDao extends AccountsContextDao<YamlTemplate> {
         int localLimit = Math.min(100, limit);
 
         while (localCounter < limit) {
-            yamlTemplates = YamlTemplateDao.instance.findAll(Filters.or(filters), localSkip, localLimit, Sorts.ascending("_id"), proj);
+            yamlTemplates = YamlTemplateDao.instance.findAll(Filters.and(filters), localSkip, localLimit, Sorts.ascending("_id"), proj);
             for (YamlTemplate yamlTemplate: yamlTemplates) {
                 try {
                     TestConfig testConfig = TestConfigYamlParser.parseTemplate(yamlTemplate.getContent());
@@ -50,6 +52,11 @@ public class YamlTemplateDao extends AccountsContextDao<YamlTemplate> {
                     testConfig.setInactive(yamlTemplate.getInactive());
                     testConfig.setAuthor(yamlTemplate.getAuthor());
                     testConfigMap.put(testConfig.getId(), testConfig);
+
+                    if (testConfig.getInfo() != null && yamlTemplate.getInfo() != null && yamlTemplate.getInfo().getCompliance() != null) {
+                        testConfig.getInfo().setCompliance(yamlTemplate.getInfo().getCompliance());
+                    }
+                    
                 } catch (Exception e) {
                     e.printStackTrace();
                 }

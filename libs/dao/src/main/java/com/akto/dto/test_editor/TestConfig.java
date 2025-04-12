@@ -31,8 +31,11 @@ public class TestConfig {
     final public static String DYNAMIC_SEVERITY = "dynamic_severity";
     private List<SeverityParserResult> dynamicSeverityList;
 
+    public static final String SETTINGS = "attributes";
+    private TemplateSettings attributes;
+
     public TestConfig(String id, Info info, Auth auth, ConfigParserResult apiSelectionFilters, Map<String, List<String>> wordlists, ExecutorConfigParserResult execute, 
-        ConfigParserResult validation, Strategy strategy) {
+        ConfigParserResult validation, Strategy strategy, TemplateSettings attributes) {
         
         this.id = id;
         info.setSubCategory(id);
@@ -43,6 +46,7 @@ public class TestConfig {
         this.execute = execute;
         this.validation = validation;
         this.strategy = strategy;
+        this.attributes = attributes;
     }
 
     public TestConfig() { }
@@ -176,4 +180,11 @@ public class TestConfig {
         this.dynamicSeverityList = dynamicSeverityList;
     }
 
+    public TemplateSettings getAttributes() {
+        return attributes;
+    }
+
+    public void setAttributes(TemplateSettings attributes) {
+        this.attributes = attributes;
+    }
 }

@@ -4,6 +4,7 @@ import com.akto.MongoBasedTest;
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.ApiInfoDao;
 import com.akto.dao.SingleTypeInfoDao;
+import com.akto.dao.context.Context;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
@@ -36,6 +37,7 @@ public class TestApiCollectionsAction extends MongoBasedTest {
     @Test
     public void testHappy() {
         ApiCollectionsDao.instance.getMCollection().drop();
+        Context.userId.set(null);
         ApiCollectionsAction apiCollectionsAction = new ApiCollectionsAction();
         String name = "Avneesh.123-_";
         apiCollectionsAction.setCollectionName(name);
@@ -48,7 +50,7 @@ public class TestApiCollectionsAction extends MongoBasedTest {
     public void testMaxSize() {
         ApiCollectionsDao.instance.getMCollection().drop();
         ApiCollectionsAction apiCollectionsAction = new ApiCollectionsAction();
-        String name = "Avneesh.123-_33333333333333333333333333333333333333333333";
+        String name = "Avneesh.123-_33333333333333333333333333333333333333333333_33333333333333333333333333333333333333333333";
         apiCollectionsAction.setCollectionName(name);
         String result = apiCollectionsAction.createCollection();
         assertEquals(result, "ERROR");
@@ -69,6 +71,7 @@ public class TestApiCollectionsAction extends MongoBasedTest {
     @Test
     public void testUniqueCollectionName() {
         ApiCollectionsDao.instance.getMCollection().drop();
+        Context.userId.set(null);
         ApiCollectionsAction apiCollectionsAction = new ApiCollectionsAction();
         String name = "Avneesh123";
         apiCollectionsAction.setCollectionName(name);
@@ -84,6 +87,7 @@ public class TestApiCollectionsAction extends MongoBasedTest {
     @Test
     public void fetchAllCollections() {
         ApiCollectionsDao.instance.getMCollection().drop();
+        Context.userId.set(null);
         List<ApiCollection> apiCollectionList = new ArrayList<>();
 
         // mirroring collection with host

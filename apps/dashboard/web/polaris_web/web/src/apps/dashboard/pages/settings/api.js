@@ -430,12 +430,11 @@ const settingRequests = {
             }
         });
     },
-    getRoleHierarchy(userRole){
+    getRoleHierarchy(){
         return request({
             url: '/api/getRoleHierarchy',
             method: 'post',
             data: {
-                userRole
             }
         });
     },
@@ -469,6 +468,85 @@ const settingRequests = {
             url: '/api/fetchApiAuditLogsFromDb',
             method: 'post',
             data: {skip, limit, sortOrder, startTimestamp, endTimestamp}
+        })
+    },
+    getCustomRoles() {
+        return request({
+            url: '/api/getCustomRoles',
+            method: 'post',
+            data: {}
+        })
+    },
+    createCustomRole(apiCollectionIds, roleName, baseRole, defaultInviteRole) {
+        return request({
+            url: '/api/createCustomRole',
+            method: 'post',
+            data: { apiCollectionIds, roleName, baseRole, defaultInviteRole }
+        })
+    },
+    updateCustomRole(apiCollectionIds, roleName, baseRole, defaultInviteRole) {
+        return request({
+            url: '/api/updateCustomRole',
+            method: 'post',
+            data: {apiCollectionIds, roleName, baseRole, defaultInviteRole}
+        })
+    },
+    deleteCustomRole(roleName) {
+        return request({
+            url: '/api/deleteCustomRole',
+            method: 'post',
+            data: {roleName}
+        })
+    },
+    addAwsWafIntegration(awsAccessKey, awsSecretKey, region, ruleSetId, ruleSetName) {
+        return request({
+            url: '/api/addAwsWafIntegration',
+            method: 'post',
+            data: {awsAccessKey, awsSecretKey, region, ruleSetId, ruleSetName}
+        })
+    },
+    fetchAwsWafIntegration() {
+        return request({
+            url: '/api/fetchAwsWafIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+    addSplunkIntegration(splunkUrl, splunkToken) {
+        return request({
+            url: '/api/addSplunkIntegration',
+            method: 'post',
+            data: {splunkUrl, splunkToken}
+        })
+    },
+    fetchSplunkIntegration() {
+        return request({
+            url: '/api/fetchSplunkIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    fetchAzureBoardsIntegration() {
+        return request({
+            url: '/api/fetchAzureBoardsIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    addAzureBoardsIntegration(azureBoardsBaseUrl, organization, projectList, personalAuthToken) {
+        return request({
+            url: '/api/addAzureBoardsIntegration',
+            method: 'post',
+            data: {azureBoardsBaseUrl, organization, projectList, personalAuthToken}
+        })
+    },
+    removeAzureBoardsIntegration() {
+        return request({
+            url: '/api/removeAzureBoardsIntegration',
+            method: 'post',
+            data: {}
         })
     }
 }

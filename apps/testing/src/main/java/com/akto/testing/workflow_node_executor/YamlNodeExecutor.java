@@ -10,6 +10,7 @@ import java.util.Map;
 
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.*;
+import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.type.URLMethods;
 import com.akto.test_editor.execution.Memory;
 import org.json.JSONObject;
@@ -41,6 +42,7 @@ import com.akto.test_editor.execution.Executor;
 import com.akto.test_editor.execution.ExecutorAlgorithm;
 import com.akto.testing.ApiExecutor;
 import com.akto.testing.TestExecutor;
+import com.akto.testing.Utils;
 import com.akto.util.Constants;
 import static com.akto.runtime.utils.Utils.convertOriginalReqRespToString;
 import com.google.gson.Gson;
@@ -314,9 +316,14 @@ public class YamlNodeExecutor extends NodeExecutor {
         sampleDataMap.put(yamlNodeDetails.getApiInfoKey(), Collections.singletonList(json.toString()));
         SampleMessageStore messageStore = SampleMessageStore.create(sampleDataMap);
         List<CustomAuthType> customAuthTypes = yamlNodeDetails.getCustomAuthTypes();
-        TestingUtil testingUtil = new TestingUtil(authMechanism, messageStore, null, null, customAuthTypes);
         TestExecutor executor = new TestExecutor();
-        TestingRunResult testingRunResult = executor.runTestNew(yamlNodeDetails.getApiInfoKey(), null, testingUtil, null, testConfig, null, debug, testLogs);
+        ApiInfoKey infoKey = yamlNodeDetails.getApiInfoKey();
+        List<String> samples = messageStore.getSampleDataMap().get(infoKey);
+        TestingRunResult testingRunResult = Utils.generateFailedRunResultForMessage(null, infoKey, testConfig.getInfo().getCategory().getName(), testConfig.getInfo().getSubCategory(), null,samples , null);
+        
+        if(testingRunResult == null){
+            testingRunResult = executor.runTestNew(infoKey, null, messageStore, authMechanism, customAuthTypes, null, testConfig, null, debug, testLogs, RawApi.buildFromMessage(samples.get(samples.size() - 1), true));
+        }
 
         List<String> errors = new ArrayList<>();
         List<String> messages = new ArrayList<>();

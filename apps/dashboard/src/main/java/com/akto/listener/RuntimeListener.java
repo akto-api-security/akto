@@ -1,11 +1,12 @@
 package com.akto.listener;
 
 
-import com.akto.analyser.ResourceAnalyser;
+import static com.akto.listener.InitializerListener.createAndSaveAttackerRole;
+
 import com.akto.action.HarAction;
+import com.akto.analyser.ResourceAnalyser;
 import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.ApiCollectionsDao;
-import com.akto.dao.AuthMechanismsDao;
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.demo.VulnerableRequestForTemplateDao;
@@ -21,6 +22,7 @@ import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.parsers.HttpCallParser;
 import com.akto.runtime.Main;
 import com.akto.runtime.policies.AktoPolicyNew;
@@ -32,23 +34,23 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
-
-import org.bson.conversions.Bson;
-import org.bson.types.ObjectId;
-import org.json.JSONArray;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.URL;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Scanner;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
-
-import static com.akto.listener.InitializerListener.createAndSaveAttackerRole;
+import org.bson.conversions.Bson;
+import org.bson.types.ObjectId;
+import org.json.JSONArray;
 
 public class RuntimeListener extends AfterMongoConnectListener {
 
@@ -63,8 +65,8 @@ public class RuntimeListener extends AfterMongoConnectListener {
     public static final int LLM_API_COLLECTION_ID = 1222222222;
 
     public static Map<Integer, AccountHTTPCallParserAktoPolicyInfo> accountHTTPParserMap = new ConcurrentHashMap<>();
-    private static final Logger logger = LoggerFactory.getLogger(RuntimeListener.class);
-    private static final LoggerMaker loggerMaker= new LoggerMaker(RuntimeListener.class);
+    private static final LoggerMaker logger = new LoggerMaker(RuntimeListener.class, LogDb.DASHBOARD);
+
     @Override
     public void runMainFunction() {
         AccountTask.instance.executeTask(new Consumer<Account>() {
@@ -84,7 +86,7 @@ public class RuntimeListener extends AfterMongoConnectListener {
                     initialiseDemoCollections();
                     //addSampleData();
                 } catch (Exception e) {
-                    loggerMaker.errorAndAddToDb(e,"Error while initialising demo collections: " + e, LoggerMaker.LogDb.DASHBOARD);
+                    logger.errorAndAddToDb(e,"Error while initialising demo collections: " + e, LoggerMaker.LogDb.DASHBOARD);
                 }
             }
         }, "runtime-listner-task");
@@ -97,9 +99,9 @@ public class RuntimeListener extends AfterMongoConnectListener {
             if (count < 1) {
                 //initialise vulnerable requests for templates in case its not present in db
                 //insertVulnerableRequestsForDemo();
-                loggerMaker.infoAndAddToDb("map created in db for vulnerable requests and corresponding templates", LoggerMaker.LogDb.DASHBOARD);
+                logger.infoAndAddToDb("map created in db for vulnerable requests and corresponding templates", LoggerMaker.LogDb.DASHBOARD);
             }
-            loggerMaker.infoAndAddToDb("Demo collections already initialised", LoggerMaker.LogDb.DASHBOARD);
+            logger.infoAndAddToDb("Demo collections already initialised", LoggerMaker.LogDb.DASHBOARD);
             return;
         }
 
@@ -109,7 +111,7 @@ public class RuntimeListener extends AfterMongoConnectListener {
         try {
             harString = new Scanner(new URL(url).openStream(), "UTF-8").useDelimiter("\\A").next();
         } catch (IOException e) {
-            loggerMaker.errorAndAddToDb(e,"Error downlaoding from github: " + e, LoggerMaker.LogDb.DASHBOARD);
+            logger.errorAndAddToDb(e,"Error downlaoding from github: " + e, LoggerMaker.LogDb.DASHBOARD);
             return;
         }
 
@@ -119,7 +121,7 @@ public class RuntimeListener extends AfterMongoConnectListener {
             String tokenJsonString = new Scanner(new URL(tokensUrl).openStream(), "UTF-8").useDelimiter("\\A").next();
             tokens = new Gson().fromJson(tokenJsonString, Map.class);
         } catch (IOException e) {
-            loggerMaker.errorAndAddToDb(e,"Error downloading from github: " + e, LoggerMaker.LogDb.DASHBOARD);
+            logger.errorAndAddToDb(e,"Error downloading from github: " + e, LoggerMaker.LogDb.DASHBOARD);
             return;
         }
 
@@ -136,7 +138,7 @@ public class RuntimeListener extends AfterMongoConnectListener {
         try {
             harAction.executeWithSkipKafka(true);
         } catch (IOException e) {
-            loggerMaker.errorAndAddToDb(e,"Error: " + e, LoggerMaker.LogDb.DASHBOARD);
+            logger.errorAndAddToDb(e,"Error: " + e, LoggerMaker.LogDb.DASHBOARD);
         }
 
         // auth mechanism
@@ -231,12 +233,12 @@ public class RuntimeListener extends AfterMongoConnectListener {
                 urlList.add(singleTypeInfo.getUrl());
             }
             if (urlList.size() != 202) {
-                Utils.pushDataToKafka(VULNERABLE_API_COLLECTION_ID, "", result, new ArrayList<>(), true);
+                Utils.pushDataToKafka(VULNERABLE_API_COLLECTION_ID, "", result, new ArrayList<>(), true, true);
             }
 
         } catch (Exception e) {
             // add log
-            loggerMaker.errorAndAddToDb(e,"error inserting vulnerable app data" + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
+            logger.errorAndAddToDb(e,"error inserting vulnerable app data" + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
         }
 
     }
@@ -244,7 +246,7 @@ public class RuntimeListener extends AfterMongoConnectListener {
     public static void addLlmSampleData(int accountId) {
         List<String> result = new ArrayList<>();
 
-        loggerMaker.infoAndAddToDb("adding llm sample data for account" + accountId, LoggerMaker.LogDb.DASHBOARD);
+        logger.infoAndAddToDb("adding llm sample data for account" + accountId, LoggerMaker.LogDb.DASHBOARD);
         ApiCollection sameNameCollection = ApiCollectionsDao.instance.findByName(LLM_API_COLLECTION_NAME);
         if (sameNameCollection == null){
             ApiCollection apiCollection = new ApiCollection(LLM_API_COLLECTION_ID, LLM_API_COLLECTION_NAME, Context.now(),new HashSet<>(), null, LLM_API_COLLECTION_ID, false, true);
@@ -313,17 +315,17 @@ public class RuntimeListener extends AfterMongoConnectListener {
                         }
                     }
                 } catch (Exception e) {
-                    loggerMaker.errorAndAddToDb(e,"error inserting demo vul req", LoggerMaker.LogDb.DASHBOARD);
+                    logger.errorAndAddToDb(e,"error inserting demo vul req", LoggerMaker.LogDb.DASHBOARD);
                 }
                 
 
             }
-            loggerMaker.infoAndAddToDb("create vulnerable mapping" + accountId, LoggerMaker.LogDb.DASHBOARD);
-            Utils.pushDataToKafka(LLM_API_COLLECTION_ID, "", result, new ArrayList<>(), true);
+            logger.infoAndAddToDb("create vulnerable mapping" + accountId, LoggerMaker.LogDb.DASHBOARD);
+            Utils.pushDataToKafka(LLM_API_COLLECTION_ID, "", result, new ArrayList<>(), true, true);
 
         } catch (Exception e) {
             // add log
-            loggerMaker.errorAndAddToDb(e,"error inserting llm vulnerable app data" + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
+            logger.errorAndAddToDb(e,"error inserting llm vulnerable app data" + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
         }
 
     }
@@ -343,7 +345,7 @@ public class RuntimeListener extends AfterMongoConnectListener {
     private static void insertVulnerableRequestsForDemo() {
         ApiCollection collection = ApiCollectionsDao.instance.findByName(JUICE_SHOP_DEMO_COLLECTION_NAME);
         if (collection == null) {
-            loggerMaker.errorAndAddToDb("Error: collection not found", LoggerMaker.LogDb.DASHBOARD);
+            logger.errorAndAddToDb("Error: collection not found", LoggerMaker.LogDb.DASHBOARD);
             return;
         }
         Map<String, List<String>> apiVsTemplateMap = VulnerableRequestForTemplateDao.getApiVsTemplateMap();

@@ -1,10 +1,11 @@
 package com.akto.dao.testing;
 
-import com.akto.dao.AccountsContextDao;
+import com.akto.dao.AccountsContextDaoWithRbac;
 import com.akto.dao.MCollection;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
+import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.dto.testing.GenericTestResult;
 import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.TestingRunResult;
@@ -22,9 +23,13 @@ import org.bson.types.ObjectId;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
-public class TestingRunResultDao extends AccountsContextDao<TestingRunResult> {
+public class TestingRunResultDao extends AccountsContextDaoWithRbac<TestingRunResult> {
 
     public static final TestingRunResultDao instance = new TestingRunResultDao();
     public static final int maxDocuments = 5_000_000;
@@ -43,6 +48,11 @@ public class TestingRunResultDao extends AccountsContextDao<TestingRunResult> {
     @Override
     public Class<TestingRunResult> getClassT() {
         return TestingRunResult.class;
+    }
+
+    @Override
+    public String getFilterKeyString() {
+        return TestingRunResult.API_INFO_KEY + "." + ApiInfoKey.API_COLLECTION_ID;
     }
 
     public static Bson generateFilter(ObjectId testRunId, ApiInfo.ApiInfoKey apiInfoKey) {
@@ -113,62 +123,93 @@ public class TestingRunResultDao extends AccountsContextDao<TestingRunResult> {
     public List<TestingRunResult> fetchLatestTestingRunResult(Bson filters, int limit, int skip, List<Bson> customAggregation) {
         List<Bson> pipeline = new ArrayList<>();
         pipeline.add(Aggregates.match(filters));
+        try {
+            List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+            if (collectionIds != null) {
+                pipeline.add(Aggregates.match(Filters.in(getFilterKeyString(), collectionIds)));
+            }
+        } catch (Exception e) {
+        }
         pipeline.add(Aggregates.sort(Sorts.descending(Constants.ID)));
         pipeline.add(Aggregates.skip(skip));
         pipeline.add(Aggregates.limit(limit));
         pipeline.addAll(customAggregation);
-        MongoCursor<BasicDBObject> cursor = instance.getMCollection()
+        MongoCursor<BasicDBObject> cursor = this.getMCollection()
                 .aggregate(pipeline, BasicDBObject.class).cursor();
         List<TestingRunResult> testingRunResults = new ArrayList<>();
         while (cursor.hasNext()) {
             TestingRunResult testingRunResult = new TestingRunResult();
             BasicDBObject doc = cursor.next();
-            testingRunResult.setId(new ObjectId(doc.getString(Constants.ID)));
-            testingRunResult.setTestRunId(new ObjectId(doc.getString(TestingRunResult.TEST_RUN_ID)));
-            BasicDBObject apiInfoKeyObj = (BasicDBObject) doc.get(TestingRunResult.API_INFO_KEY);
-            ApiInfoKey apiInfoKey = new ApiInfoKey(apiInfoKeyObj.getInt(ApiInfoKey.API_COLLECTION_ID),
-                    apiInfoKeyObj.getString(ApiInfoKey.URL),
-                    URLMethods.Method.valueOf(apiInfoKeyObj.getString(ApiInfoKey.METHOD)));
-            testingRunResult.setApiInfoKey(apiInfoKey);
-            testingRunResult.setTestSuperType(doc.getString(TestingRunResult.TEST_SUPER_TYPE));
-            testingRunResult.setTestSubType(doc.getString(TestingRunResult.TEST_SUB_TYPE));
-            testingRunResult.setVulnerable(doc.getBoolean(TestingRunResult.VULNERABLE));
-            testingRunResult.setConfidencePercentage(doc.getInt(TestingRunResult.CONFIDENCE_PERCENTAGE));
-            testingRunResult.setStartTimestamp(doc.getInt(TestingRunResult.START_TIMESTAMP));
-            testingRunResult.setEndTimestamp(doc.getInt(TestingRunResult.END_TIMESTAMP));
-            testingRunResult.setTestRunResultSummaryId(
-                    new ObjectId(doc.getString(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID)));        
-
-            BasicDBList testResultsList = (BasicDBList)doc.get(TestingRunResult.TEST_RESULTS);
-
-            List<String> errors = new ArrayList<>();
-            List<GenericTestResult> testResults = new ArrayList<>();
-            if (testResultsList != null && !testResultsList.isEmpty()) {
-                BasicDBObject genericTestResult = (BasicDBObject)testResultsList.get(0);
-                String confidence = "";
-                if (genericTestResult.get(GenericTestResult._CONFIDENCE)!=null) {
-                    TestResult testResult = new TestResult();
-                    confidence = genericTestResult.getString(GenericTestResult._CONFIDENCE);
-                    try {
-                        testResult.setConfidence(Confidence.valueOf(confidence));
-                        testResults.add(testResult);
-                    } catch(Exception e){
+            try {
+                testingRunResult.setId(new ObjectId(doc.getString(Constants.ID)));
+                testingRunResult.setTestRunId(new ObjectId(doc.getString(TestingRunResult.TEST_RUN_ID)));
+                BasicDBObject apiInfoKeyObj = (BasicDBObject) doc.get(TestingRunResult.API_INFO_KEY);
+                ApiInfoKey apiInfoKey = new ApiInfoKey(apiInfoKeyObj.getInt(ApiInfoKey.API_COLLECTION_ID),
+                        apiInfoKeyObj.getString(ApiInfoKey.URL),
+                        URLMethods.Method.valueOf(apiInfoKeyObj.getString(ApiInfoKey.METHOD)));
+                testingRunResult.setApiInfoKey(apiInfoKey);
+                testingRunResult.setTestSuperType(doc.getString(TestingRunResult.TEST_SUPER_TYPE));
+                testingRunResult.setTestSubType(doc.getString(TestingRunResult.TEST_SUB_TYPE));
+                testingRunResult.setVulnerable(doc.getBoolean(TestingRunResult.VULNERABLE));
+                testingRunResult.setConfidencePercentage(doc.getInt(TestingRunResult.CONFIDENCE_PERCENTAGE));
+                testingRunResult.setStartTimestamp(doc.getInt(TestingRunResult.START_TIMESTAMP));
+                testingRunResult.setEndTimestamp(doc.getInt(TestingRunResult.END_TIMESTAMP));
+                testingRunResult.setTestRunResultSummaryId(
+                        new ObjectId(doc.getString(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID)));        
+    
+                BasicDBList testResultsList = (BasicDBList)doc.get(TestingRunResult.TEST_RESULTS);
+    
+                List<String> errors = new ArrayList<>();
+                List<GenericTestResult> testResults = new ArrayList<>();
+                if (testResultsList != null && !testResultsList.isEmpty()) {
+                    BasicDBObject genericTestResult = (BasicDBObject)testResultsList.get(0);
+                    String confidence = "";
+                    if (genericTestResult.get(GenericTestResult._CONFIDENCE)!=null) {
+                        TestResult testResult = new TestResult();
+                        confidence = genericTestResult.getString(GenericTestResult._CONFIDENCE);
+                        try {
+                            testResult.setConfidence(Confidence.valueOf(confidence));
+                            testResults.add(testResult);
+                        } catch(Exception e){
+                        }
+                    }
+                    if (genericTestResult.get(TestResult._ERRORS)!=null) {
+                        try {
+                            errors = (List)genericTestResult.get(TestResult._ERRORS);
+                        } catch(Exception e){
+                        }
                     }
                 }
-                if (genericTestResult.get(TestResult._ERRORS)!=null) {
-                    try {
-                        errors = (List)genericTestResult.get(TestResult._ERRORS);
-                    } catch(Exception e){
-                    }
-                }
+                testingRunResult.setErrorsList(errors);
+                testingRunResult.setTestResults(testResults);
+                testingRunResult.setHexId(testingRunResult.getId().toHexString());
+                testingRunResults.add(testingRunResult);
+            } catch (Exception e) {
+                e.printStackTrace();;
+                continue;
             }
-            testingRunResult.setErrorsList(errors);
-            testingRunResult.setTestResults(testResults);
-            testingRunResult.setHexId(testingRunResult.getId().toHexString());
-            testingRunResults.add(testingRunResult);
+           
         }
 
         return testingRunResults;
+    }
+
+    public Map<ObjectId,String> mapSummaryIdToTestingResultHexId(Set<String> testingRunResultHexIds){
+        Map<ObjectId,String> finalMap = new HashMap<>();
+        if(testingRunResultHexIds == null || testingRunResultHexIds.isEmpty()){
+            return finalMap;
+        }
+
+        List<ObjectId> objectIdList = testingRunResultHexIds.stream()
+                                                .map(ObjectId::new)
+                                                .collect(Collectors.toList());
+
+        List<TestingRunResult> runResults = this.findAll(Filters.in(Constants.ID, objectIdList), Projections.include(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID));
+        for(TestingRunResult runResult: runResults){
+            finalMap.put(runResult.getTestRunResultSummaryId(), runResult.getHexId());
+        }
+
+        return finalMap;
     }
 
     public void createIndicesIfAbsent() {
@@ -198,6 +239,9 @@ public class TestingRunResultDao extends AccountsContextDao<TestingRunResult> {
         fieldNames = new String[]{TestingRunResult.REQUIRES_CONFIG};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
 
+        fieldNames = new String[]{getFilterKeyString()};
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
+
         fieldNames = new String[]{TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, TestingRunResult.API_INFO_KEY+"."+ApiInfoKey.API_COLLECTION_ID};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
 
@@ -208,6 +252,9 @@ public class TestingRunResultDao extends AccountsContextDao<TestingRunResult> {
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
 
         fieldNames = new String[]{TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, TestingRunResult.TEST_SUPER_TYPE};
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
+
+        fieldNames = new String[]{TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, TestingRunResult.VULNERABLE, TestingRunResult.API_INFO_KEY, TestingRunResult.TEST_SUB_TYPE};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
     }
 
