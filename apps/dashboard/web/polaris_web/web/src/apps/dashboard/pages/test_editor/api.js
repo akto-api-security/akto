@@ -57,8 +57,16 @@ const testEditorRequests = {
                 originalTestId: testId,
             }
         })
+    },
+    async fetchTestingRunPlaygroundStatus(hexId){
+        return await request({
+            url: '/api/fetchTestingRunPlaygroundStatus',
+            method: 'post',
+            data:{
+                testingRunPlaygroundHexId:hexId
+            }
+        })
     }
-
 }
 
 export default testEditorRequests
