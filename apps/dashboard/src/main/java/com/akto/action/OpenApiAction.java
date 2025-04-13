@@ -245,7 +245,7 @@ public class OpenApiAction extends UserAction implements ServletResponseAware {
 
                         try {
                             loggerMaker.infoAndAddToDb("Calling Utils.pushDataToKafka for openapi file, for apiCollection id " + apiCollectionId, LogDb.DASHBOARD);
-                            Utils.pushDataToKafka(apiCollectionId, topic, stringMessages, stringErrors, true);
+                            Utils.pushDataToKafka(apiCollectionId, topic, stringMessages, stringErrors, true, false);
                         } catch (Exception e) {
                             throw new RuntimeException(e);
                         }
