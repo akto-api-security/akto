@@ -25,8 +25,6 @@ public class Main {
 
     SessionFactory sessionFactory = SessionFactoryUtils.createFactory();
 
-    // TODO: Remove this before merging. Will be using cyborg for fetching templates
-    DaoInit.init(new ConnectionString(System.getenv("AKTO_MONGO_CONN")));
     KafkaConfig trafficKafka =
         KafkaConfig.newBuilder()
             .setGroupId(CONSUMER_GROUP_ID)
