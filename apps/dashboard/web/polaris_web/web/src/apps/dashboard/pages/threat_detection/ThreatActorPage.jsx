@@ -1,4 +1,4 @@
-import { useReducer, useState, useEffect, useRef, useCallback } from "react";
+import { useReducer, useState, useEffect, useRef } from "react";
 import DateRangeFilter from "../../components/layouts/DateRangeFilter";
 import PageWithMultipleCards from "../../components/layouts/PageWithMultipleCards";
 import TitleWithInfo from "../../components/shared/TitleWithInfo";
@@ -17,10 +17,8 @@ import threatDetectionFunc from "./transform";
 import { ThreatSummary } from "./components/ThreatSummary";
 import ThreatActivityTimeline from "./components/ThreatActivityTimeline";
 import React from "react";
-import ThreatActorFilters from "./components/ThreatActorFilters";
 
-const ChartComponent = ({ mapData, loading, onSubCategoryClick, currDateRange, onCountryClick, appliedFilters }) => {
-  console.log("appliedFilters in charts", appliedFilters);
+const ChartComponent = ({ mapData, loading, onSubCategoryClick, currDateRange, onCountryClick }) => {
     return (
         <VerticalStack gap={4} columns={2}>
             <HorizontalGrid gap={4} columns={2}>
@@ -28,7 +26,6 @@ const ChartComponent = ({ mapData, loading, onSubCategoryClick, currDateRange, o
                     onSubCategoryClick={onSubCategoryClick}
                     startTimestamp={parseInt(currDateRange.period.since.getTime()/1000)}
                     endTimestamp={parseInt(currDateRange.period.until.getTime()/1000)}
-                    appliedFilters={appliedFilters}
                 />
                 <ThreatWorldMap
                     data={mapData}
@@ -39,7 +36,6 @@ const ChartComponent = ({ mapData, loading, onSubCategoryClick, currDateRange, o
                     loading={loading}
                     key={"threat-actor-world-map"}
                     onCountryClick={onCountryClick}
-                    appliedFilters={appliedFilters}
                 />
             </HorizontalGrid>
         </VerticalStack>
@@ -56,31 +52,17 @@ function ThreatActorPage() {
   const [showActorDetails, setShowActorDetails] = useState(false);
 
   const initialVal = values.ranges[3];
-  const [appliedFilters, setAppliedFilters] = useState([]);
   const [currDateRange, dispatchCurrDateRange] = useReducer(
     produce((draft, action) => func.dateRangeReducer(draft, action)),
     initialVal
   );
 
-  const countryFilters = appliedFilters.filter(x => x.key === "country").map(x => x.value) || [];
+  const [externalFilter, setExternalFilter] = useState(null);
 
   useEffect(() => {
-    const fetchThreatCategoryCount = async () => {
+    const fetchActorsPerCountry = async () => {
       setLoading(true);
-      const res = await api.fetchThreatCategoryCount();
-      const finalObj = threatDetectionFunc.getGraphsData(res);
-      // setCategoryCount(finalObj.categoryCountRes);
-      setSubCategoryCount(finalObj.subCategoryCount);
-      setLoading(false);
-    };
-    fetchThreatCategoryCount();
-  }, []);
-
-  useEffect(() => {
-    if (!loading) {
-      const fetchActorsPerCountry = async () => {
-      setLoading(true);
-      const res = await api.getActorsCountPerCounty(countryFilters);
+      const res = await api.getActorsCountPerCounty();
       if (res?.actorsCountPerCountry) {
         setMapData(
           res.actorsCountPerCountry.map((x) => {
@@ -94,19 +76,24 @@ function ThreatActorPage() {
       }
       setLoading(false);
     };
+    const fetchThreatCategoryCount = async () => {
+      setLoading(true);
+      const res = await api.fetchThreatCategoryCount();
+      const finalObj = threatDetectionFunc.getGraphsData(res);
+      // setCategoryCount(finalObj.categoryCountRes);
+      setSubCategoryCount(finalObj.subCategoryCount);
+      setLoading(false);
+    };
     fetchActorsPerCountry();
-    }
-  }, [appliedFilters]);
-
+    fetchThreatCategoryCount();
+  }, []);
 
   const onSubCategoryClick = (subCategory) => {
-    const temp = appliedFilters.filter(x => x.key !== "latestAttack");
-    setAppliedFilters([...temp, {key: "latestAttack", value: [subCategory], label: subCategory}]);
+    setExternalFilter({key: "latestAttack", value: [subCategory]});
   }
 
   const onCountryClick = (country) => {
-    const temp = appliedFilters.filter(x => x.key !== "country");
-    setAppliedFilters([...temp, {key: "country", value: [country], label: country}]);
+    setExternalFilter({key: "country", value: [country]});
   }
 
   const onRowClick = (data) => {
@@ -114,19 +101,13 @@ function ThreatActorPage() {
     setShowActorDetails(true);
   }
 
-  const onFilterChange = (filters) => {
-    setAppliedFilters(filters);
-  }
-
   const components = [
     <ThreatSummary startTimestamp={parseInt(currDateRange.period.since.getTime()/1000)} endTimestamp={parseInt(currDateRange.period.until.getTime()/1000)} />,
-    <ThreatActorFilters onFilterChange={onFilterChange} appliedFilters={appliedFilters} />,
     <MemoizedChartComponent 
       mapData={mapData}
       loading={loading}
       onSubCategoryClick={onSubCategoryClick}
       onCountryClick={onCountryClick}
-      appliedFilters={appliedFilters}
       currDateRange={currDateRange}
     />,
     <ThreatActorTable
@@ -134,7 +115,7 @@ function ThreatActorPage() {
       currDateRange={currDateRange}
       loading={loading}
       handleRowClick={onRowClick}
-      appliedFilters={appliedFilters}
+      externalFilter={externalFilter}
     />,
     ...(showActorDetails ? [<ActorDetails actorDetails={actorDetails} setShowActorDetails={setShowActorDetails} />] : [])
   ];

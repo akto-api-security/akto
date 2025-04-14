@@ -100,8 +100,7 @@ function SusDataTable({ currDateRange, rowClicked, externalFilter }) {
       apiCollectionIdsFilter = [],
       matchingUrlFilter = [],
       typeFilter = [],
-      subCategoryFilter = [],
-      severityFilter = [];
+      subCategoryFilter = [];
     if (filters?.actor) {
       sourceIpsFilter = filters?.actor;
     }
@@ -117,9 +116,6 @@ function SusDataTable({ currDateRange, rowClicked, externalFilter }) {
     if(filters?.subCategory){
       subCategoryFilter = filters?.subCategory
     }
-    if(filters?.severity){
-      severityFilter = filters?.severity
-    }
     const sort = { [sortKey]: sortOrder };
     const res = await api.fetchSuspectSampleData(
       skip,
@@ -131,12 +127,11 @@ function SusDataTable({ currDateRange, rowClicked, externalFilter }) {
       startTimestamp,
       endTimestamp,
       subCategoryFilter,
-      severityFilter
     );
 //    setSubCategoryChoices(distinctSubCategories);
     let total = res.total;
     let ret = res?.maliciousEvents.map((x) => {
-      const severity = x?.severity
+      const severity = threatFiltersMap[x?.filterId]?.severity || "HIGH"
       return {
         ...x,
         id: x.id,
@@ -149,9 +144,10 @@ function SusDataTable({ currDateRange, rowClicked, externalFilter }) {
         sourceIPComponent: x?.ip || "-",
         type: x?.type || "-",
         subCategory: x?.subCategory || "-",
-        severityComp: severity ? (<div className={`badge-wrapper-${severity}`}>
+        severityComp: (<div className={`badge-wrapper-${severity}`}>
                           <Badge size="small">{func.toSentenceCase(severity)}</Badge>
-                      </div>) : "-"
+                      </div>
+        )
       };
     });
     setLoading(false);
@@ -171,21 +167,9 @@ function SusDataTable({ currDateRange, rowClicked, externalFilter }) {
     let subCategoryChoices = res?.subCategory.map((x) => {
       return { label: x, value: x };
     });
-    let severityChoices = res?.severity.map((x) => {
-      return { label:
-        (<div className={`badge-wrapper-${x}`}>
-          <Badge size="small">{func.toSentenceCase(x)}</Badge>
-        </div>), value: x };
-    });
 
 
     filters = [
-      {
-        key: "severity",
-        label: "Severity",
-        title: "Severity",
-        choices: severityChoices,
-      },
       {
         key: "actor",
         label: "Actor",

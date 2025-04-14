@@ -119,20 +119,12 @@ public class DashboardRouter implements ARouter {
             });
 
         router
-            .post("/get_actors_count_per_country")
+            .get("/get_actors_count_per_country")
             .blockingHandler(ctx -> {
-                RequestBody reqBody = ctx.body();
-                ThreatActorByCountryRequest req = ProtoMessageUtils.<
-                    ThreatActorByCountryRequest
-                >toProtoMessage(
-                    ThreatActorByCountryRequest.class,
-                    reqBody.asString()
-                ).orElse(null);
-
                 ProtoMessageUtils.toString(
                     threatActorService.getThreatActorByCountry(
                         ctx.get("accountId"),
-                        req
+                        ThreatActorByCountryRequest.newBuilder().build()
                     )
                 ).ifPresent(s -> ctx.response().setStatusCode(200).end(s));
             });
@@ -309,14 +301,11 @@ public class DashboardRouter implements ARouter {
                     return;
                 }
 
-                System.out.println("req.getCategoryFiltersList(): " + req.getCategoryFiltersList());
-
                 ProtoMessageUtils.toString(
                     threatActorService.getThreatActivityTimeline(
                         ctx.get("accountId"),
                         req.getStartTs(),
-                        req.getEndTs(),
-                        req.getCategoryFiltersList()
+                        req.getEndTs()
                     )
                 ).ifPresent(s -> ctx.response().setStatusCode(200).end(s));
             });

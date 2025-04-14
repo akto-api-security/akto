@@ -40,8 +40,6 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
   Map<String, Integer> sort;
   int startTs;
   int endTs;
-  List<String> categoryFilters;
-  List<String> severityFilters;
 
   private final CloseableHttpClient httpClient;
 
@@ -208,12 +206,10 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
     post.addHeader("Authorization", "Bearer " + this.getApiToken());
     post.addHeader("Content-Type", "application/json");
 
-
     Map<String, Object> body = new HashMap<String, Object>() {
       {
         put("start_ts", startTs);
         put("end_ts", endTs);
-        put("category_filters", categoryFilters);
       }
     };
     String msg = objectMapper.valueToTree(body).toString();
@@ -370,19 +366,4 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
     this.threatActivityTimelines = threatActivityTimelines;
   }
 
-  public List<String> getCategoryFilters() {
-    return categoryFilters;
-  }
-
-  public void setCategoryFilters(List<String> categoryFilters) {
-    this.categoryFilters = categoryFilters;
-  }
-
-  public List<String> getSeverityFilter() {
-    return severityFilters;
-  }
-
-  public void setSeverityFilter(List<String> severityFilters) {
-    this.severityFilters = severityFilters;
-  }
 }

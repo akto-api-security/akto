@@ -53,7 +53,6 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
   String refId;
   List<String> latestAttack;
   List<String> country;
-  List<String> countryFilter;
   List<String> actorId;
   int startTs;
   int endTs;
@@ -75,24 +74,13 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
   }
 
   public String getActorsCountPerCounty() {
-    HttpPost post =
-        new HttpPost(
+    HttpGet get =
+        new HttpGet(
             String.format("%s/api/dashboard/get_actors_count_per_country", this.getBackendUrl()));
-    post.addHeader("Authorization", "Bearer " + this.getApiToken());
-    post.addHeader("Content-Type", "application/json");
+    get.addHeader("Authorization", "Bearer " + this.getApiToken());
+    get.addHeader("Content-Type", "application/json");
 
-    Map<String, Object> body =
-        new HashMap<String, Object>() {
-          {
-            put("country_filters", countryFilter);
-          }
-        };
-    String msg = objectMapper.valueToTree(body).toString();
-
-    StringEntity requestEntity = new StringEntity(msg, ContentType.APPLICATION_JSON);
-    post.setEntity(requestEntity);
-
-    try (CloseableHttpResponse resp = this.httpClient.execute(post)) {
+    try (CloseableHttpResponse resp = this.httpClient.execute(get)) {
       String responseBody = EntityUtils.toString(resp.getEntity());
 
       ProtoMessageUtils.<ThreatActorByCountryResponse>toProtoMessage(
@@ -556,13 +544,5 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
 
   public void setActorId(List<String> actorId) {
     this.actorId = actorId;
-  }
-
-  public List<String> getCountryFilter() {
-    return countryFilter;
-  }
-
-  public void setCountryFilter(List<String> countryFilter) {
-    this.countryFilter = countryFilter;
   }
 }

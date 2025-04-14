@@ -43,7 +43,7 @@ public class MaliciousEventService {
 
   public MaliciousEventService(
       KafkaConfig kafkaConfig, MongoClient mongoClient, IPLookupClient ipLookupClient) {
-    this.kafka = null;
+    this.kafka = new Kafka(kafkaConfig);
     this.mongoClient = mongoClient;
     this.ipLookupClient = ipLookupClient;
   }
@@ -74,7 +74,7 @@ public class MaliciousEventService {
             .setEventType(maliciousEventType)
             .setLatestApiIp(evt.getLatestApiIp())
             .setCountry(
-                "IN")
+                this.ipLookupClient.getCountryISOCodeGivenIp(evt.getLatestApiIp()).orElse(""))
             .setCategory(evt.getCategory())
             .setSubCategory(evt.getSubCategory())
             .setRefId(refId)
@@ -164,11 +164,7 @@ public class MaliciousEventService {
         MaliciousEventService.<String>findDistinctFields(
             coll, "subCategory", String.class, Filters.empty());
 
-    Set<String> severity =
-        MaliciousEventService.<String>findDistinctFields(
-            coll, "severity", String.class, Filters.empty());
-
-    return FetchAlertFiltersResponse.newBuilder().addAllActors(actors).addAllUrls(urls).addAllSubCategory(subCategories).addAllSeverity(severity).build();
+    return FetchAlertFiltersResponse.newBuilder().addAllActors(actors).addAllUrls(urls).addAllSubCategory(subCategories).build();
   }
 
   public ListMaliciousRequestsResponse listMaliciousRequests(
@@ -203,10 +199,6 @@ public class MaliciousEventService {
 
     if (!filter.getSubCategoryList().isEmpty()) {
       query.append("subCategory", new Document("$in", filter.getSubCategoryList()));
-    }
-
-    if (!filter.getSeverityList().isEmpty()) {
-      query.append("severity", new Document("$in", filter.getSeverityList()));
     }
 
     if (filter.hasDetectedAtTimeRange()) {

@@ -85,7 +85,7 @@ const sortOptions = [
 
 let filters = [];
 
-function ThreatActorTable({ data, currDateRange, handleRowClick, appliedFilters }) {
+function ThreatActorTable({ data, currDateRange, handleRowClick, externalFilter }) {
   const [loading, setLoading] = useState(false);
 
   const setToastConfig = Store(state => state.setToastConfig)
@@ -256,8 +256,7 @@ function ThreatActorTable({ data, currDateRange, handleRowClick, appliedFilters 
       disambiguateLabel={disambiguateLabel}
       loading={loading}
       fetchData={fetchData}
-      filters={[]}
-      externalFilters={appliedFilters}
+      filters={filters}
       selectable={false}
       hasRowActions={true}
       getActions={() => { }}
@@ -265,6 +264,7 @@ function ThreatActorTable({ data, currDateRange, handleRowClick, appliedFilters 
       headings={headers}
       useNewRow={true}
       condensedHeight={true}
+      externalFilter={externalFilter}
     />
   );
 }
