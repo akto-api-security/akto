@@ -3,12 +3,14 @@ package com.akto.test_editor.execution;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.concurrent.ConcurrentHashMap;
 
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
@@ -34,12 +36,8 @@ import static com.akto.runtime.parser.SampleParser.parseSampleMessage;
 public class VariableResolver {
     
     private static final DataActor dataActor = DataActorFactory.fetchInstance();
-
-    private static final Map<String, SampleData> sampleDataCache = new HashMap<>();
-
-    private static String generateSampleDataCacheKey(int apiCollectionId, String url, String method) {
-        return apiCollectionId + "_" + url + "_" + method;
-    }
+    private static final ConcurrentHashMap<ApiInfoKey, SampleData> sampleDataCache = new ConcurrentHashMap<>();
+    private static final int MAX_CACHE_SIZE = 1000;
 
     public static Object getValue(Map<String, Object> varMap, String key) {
         if (!varMap.containsKey(key)) {
@@ -595,7 +593,7 @@ public class VariableResolver {
                 if (infKey.equals(infoKey)) {
                     continue;
                 }
-                SampleData sd = getSampleDataWithCache(infoKey.getApiCollectionId(), singleTypeInfo.getUrl(), singleTypeInfo.getMethod());
+                SampleData sd = dataActor.fetchSampleDataByIdMethod(infoKey.getApiCollectionId(), singleTypeInfo.getUrl(), singleTypeInfo.getMethod());
                 newSampleDataMap.put(infKey, sd.getSamples());
 
             }
@@ -654,9 +652,10 @@ public class VariableResolver {
                         continue;
                     }
 
-                    SampleData sd = getSampleDataWithCache(apiInfoKey.getApiCollectionId(), singleTypeInfo.getUrl(), singleTypeInfo.getMethod());
-                    newSampleDataMap.put(infKey, sd.getSamples());
-
+                    SampleData sd = getCachedSampleData(apiInfoKey.getApiCollectionId(), singleTypeInfo.getUrl(), singleTypeInfo.getMethod());
+                    if (sd != null) {
+                        newSampleDataMap.put(infKey, sd.getSamples());
+                    }
                 }
                 
                 List<String> wordListVal = VariableResolver.fetchWordList(newSampleDataMap, key.toString(), location, isRegex);
@@ -921,15 +920,29 @@ public class VariableResolver {
 
     // }
 
-    private static SampleData getSampleDataWithCache(int apiCollectionId, String url, String method) {
-        String cacheKey = generateSampleDataCacheKey(apiCollectionId, url, method);
+    private static SampleData getCachedSampleData(int apiCollectionId, String url, String method) {
+        ApiInfoKey cacheKey = new ApiInfoKey(apiCollectionId, url, URLMethods.Method.fromString(method));
         
-        if (sampleDataCache.containsKey(cacheKey)) {
-            return sampleDataCache.get(cacheKey);
+        // Try to get from cache first
+        SampleData cachedData = sampleDataCache.get(cacheKey);
+        if (cachedData != null) {
+            return cachedData;
+        }
+
+        // If cache is too large, remove some entries
+        if (sampleDataCache.size() >= MAX_CACHE_SIZE) {
+            int entriesToRemove = MAX_CACHE_SIZE / 10;
+            Iterator<ApiInfoKey> iterator = sampleDataCache.keySet().iterator();
+            for (int i = 0; i < entriesToRemove && iterator.hasNext(); i++) {
+                iterator.next();
+                iterator.remove();
+            }
         }
 
         SampleData sd = dataActor.fetchSampleDataByIdMethod(apiCollectionId, url, method);
-        sampleDataCache.put(cacheKey, sd);
+        if (sd != null) {
+            sampleDataCache.put(cacheKey, sd);
+        }
         return sd;
     }
 
