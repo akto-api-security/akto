@@ -84,7 +84,7 @@ public class TestDBSync extends MongoBasedTest {
     @Test
     public void testParameterizedURL() {
         testInitializer();
-        String url = "/link/";
+        String url = "link/";
         HttpResponseParams resp = TestDump2.createSampleParams("user1", url+1);
         URLAggregator aggr = new URLAggregator();
         ArrayList<String> newHeader = new ArrayList<>();
