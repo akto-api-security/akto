@@ -1791,6 +1791,7 @@ public class InitializerListener implements ServletContextListener {
         }
     }
 
+
     public static void dropWorkflowTestResultCollection(BackwardCompatibility backwardCompatibility) {
         if (backwardCompatibility.getDropWorkflowTestResult() == 0) {
             WorkflowTestResultsDao.instance.getMCollection().drop();

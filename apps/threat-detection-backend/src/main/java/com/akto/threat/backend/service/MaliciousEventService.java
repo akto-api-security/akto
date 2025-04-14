@@ -3,6 +3,7 @@ package com.akto.threat.backend.service;
 import com.akto.dto.type.URLMethods;
 import com.akto.kafka.Kafka;
 import com.akto.kafka.KafkaConfig;
+import com.akto.log.LoggerMaker;
 import com.akto.proto.generated.threat_detection.message.malicious_event.event_type.v1.EventType;
 import com.akto.proto.generated.threat_detection.message.malicious_event.v1.MaliciousEventMessage;
 import com.akto.proto.generated.threat_detection.message.sample_request.v1.SampleMaliciousRequest;
@@ -38,6 +39,7 @@ public class MaliciousEventService {
 
   private final Kafka kafka;
   private final MongoClient mongoClient;
+  private static final LoggerMaker logger = new LoggerMaker(MaliciousEventService.class);
 
   public MaliciousEventService(
       KafkaConfig kafkaConfig, MongoClient mongoClient) {
@@ -51,6 +53,7 @@ public class MaliciousEventService {
     String filterId = evt.getFilterId();
 
     String refId = UUID.randomUUID().toString();
+    logger.debug("received malicious event " + evt.getLatestApiEndpoint() + " filterId " + evt.getFilterId() + " eventType " + evt.getEventType().toString());
 
     EventType eventType = evt.getEventType();
 

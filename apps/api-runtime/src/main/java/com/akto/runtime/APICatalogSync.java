@@ -13,9 +13,6 @@ import com.akto.dto.dependency_flow.DependencyFlow;
 import com.akto.dto.filter.MergedUrls;
 import com.akto.dao.monitoring.FilterYamlTemplateDao;
 import com.akto.dao.runtime_filters.AdvancedTrafficFiltersDao;
-import com.akto.dto.*;
-import com.akto.dto.billing.SyncLimit;
-import com.akto.dto.dependency_flow.DependencyFlow;
 import com.akto.dto.monitoring.FilterConfig;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.traffic.Key;
@@ -49,6 +46,7 @@ import com.mongodb.bulk.BulkWriteResult;
 import com.mongodb.client.model.*;
 import com.mongodb.client.result.UpdateResult;
 import org.apache.commons.lang3.math.NumberUtils;
+import org.bson.Document;
 import org.bson.conversions.Bson;
 import org.bson.json.JsonParseException;
 import org.bson.types.ObjectId;
@@ -1290,7 +1288,7 @@ public class APICatalogSync {
         return bulkUpdates;
     }
 
-    public DbUpdateReturn getDBUpdatesForParams(APICatalog currentDelta, APICatalog currentState, boolean redactSampleData, boolean collectionLevelRedact) {
+    public DbUpdateReturn getDBUpdatesForParams(APICatalog currentDelta, APICatalog currentState, boolean redactSampleData, boolean collectionLevelRedact, HttpResponseParams.Source source) {
         Map<String, SingleTypeInfo> dbInfoMap = convertToMap(currentState.getAllTypeInfo());
         Map<String, SingleTypeInfo> deltaInfoMap = convertToMap(currentDelta.getAllTypeInfo());
 
@@ -1323,6 +1321,10 @@ public class APICatalogSync {
             update = Updates.combine(update, Updates.max(SingleTypeInfo.LAST_SEEN, deltaInfo.getLastSeen()));
             update = Updates.combine(update, Updates.max(SingleTypeInfo.MAX_VALUE, deltaInfo.getMaxValue()));
             update = Updates.combine(update, Updates.min(SingleTypeInfo.MIN_VALUE, deltaInfo.getMinValue()));
+            if (source != null) {
+                Bson updateSourceMap = Updates.set(SingleTypeInfo.SOURCES + "." + source.name(), new Document("timestamp", timestamp) );
+                update = Updates.combine(update, updateSourceMap);
+            }
 
             if (!Main.isOnprem) {
                 if (dbInfo != null) {
@@ -1806,7 +1808,7 @@ public class APICatalogSync {
     int counter = 0;
     List<String> partnerIpsList = new ArrayList<>();
     
-    public void syncWithDB(boolean syncImmediately, boolean fetchAllSTI, SyncLimit syncLimit) {
+    public void syncWithDB(boolean syncImmediately, boolean fetchAllSTI, SyncLimit syncLimit, HttpResponseParams.Source source) {
         loggerMaker.infoAndAddToDb("Started sync with db! syncImmediately="+syncImmediately + " fetchAllSTI="+fetchAllSTI, LogDb.RUNTIME);
         List<WriteModel<SingleTypeInfo>> writesForParams = new ArrayList<>();
         List<WriteModel<SensitiveSampleData>> writesForSensitiveSampleData = new ArrayList<>();
@@ -1884,7 +1886,7 @@ public class APICatalogSync {
 
             APICatalog dbCatalog = this.dbState.getOrDefault(apiCollectionId, new APICatalog(apiCollectionId, new HashMap<>(), new HashMap<>()));
             boolean redactCollectionLevel = apiCollectionToRedactPayload.getOrDefault(apiCollectionId, false);
-            DbUpdateReturn dbUpdateReturn = getDBUpdatesForParams(deltaCatalog, dbCatalog, redact, redactCollectionLevel);
+            DbUpdateReturn dbUpdateReturn = getDBUpdatesForParams(deltaCatalog, dbCatalog, redact, redactCollectionLevel, source);
             writesForParams.addAll(dbUpdateReturn.bulkUpdatesForSingleTypeInfo);
             writesForSensitiveSampleData.addAll(dbUpdateReturn.bulkUpdatesForSampleData);
             writesForSensitiveParamInfo.addAll(dbUpdateReturn.bulkUpdatesForSensitiveParamInfo);
@@ -1915,7 +1917,7 @@ public class APICatalogSync {
             } while (from < writesForParams.size());
         }
 
-        aktoPolicyNew.syncWithDb();
+        aktoPolicyNew.syncWithDb(source);
 
         loggerMaker.infoAndAddToDb("adding " + writesForTraffic.size() + " updates for traffic", LogDb.RUNTIME);
         if(writesForTraffic.size() > 0) {
