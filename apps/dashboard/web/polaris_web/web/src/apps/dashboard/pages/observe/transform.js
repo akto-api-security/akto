@@ -542,7 +542,8 @@ const transform = {
                 codeAnalysisEndpoint: false,
                 issuesComp: severityInfo.length > 0 ? <div className={`badge-wrapper-${severityInfo}`}>
                     <Badge status={func.getHexColorForSeverity(severityInfo)}>{func.toSentenceCase(severityInfo)}</Badge>
-                </div> : '-'
+                </div> : '-',
+                issuesComp: url.severityObj? this.getIssuesList(url.severityObj):'-'
             }
         })
 

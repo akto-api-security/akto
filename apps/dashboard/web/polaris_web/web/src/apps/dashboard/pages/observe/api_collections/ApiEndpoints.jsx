@@ -1,6 +1,7 @@
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
 import { Text, HorizontalStack, Button, Popover, Modal, IndexFiltersMode, VerticalStack, Box, Checkbox, TextField } from "@shopify/polaris"
 import api from "../api"
+import IssuesApi from "../../issues/api"
 import { useEffect, useState } from "react"
 import func from "@/util/func"
 import GithubSimpleTable from "../../../components/tables/GithubSimpleTable";
@@ -283,9 +284,13 @@ function ApiEndpoints(props) {
                 sensitiveInResp
             });
         })
+        let allIssues = (await IssuesApi.fetchIssues(0,2000, [], [apiCollectionId], [], [], "severity", -1, 0, 0, true,[]))?.issues;
+
+        let apiInforSeverityMap = func.getSeverityCountPerEndpointList(allIssues);
+
 
         let data = {}
-        let allEndpoints = func.mergeApiInfoAndApiCollection(apiEndpointsInCollection, apiInfoListInCollection, collectionsMap)
+        let allEndpoints = func.mergeApiInfoAndApiCollection(apiEndpointsInCollection, apiInfoListInCollection, collectionsMap,apiInforSeverityMap)
 
         // handle code analysis endpoints
         const codeAnalysisCollectionInfo = sourceCodeData.codeAnalysisCollectionInfo
