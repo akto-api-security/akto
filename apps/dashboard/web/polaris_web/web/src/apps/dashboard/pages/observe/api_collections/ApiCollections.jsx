@@ -430,7 +430,6 @@ function ApiCollections() {
         setCollectionsMap(func.mapCollectionIdToName(tmp.filter(x => !x?.deactivated)))
         const allHostNameMap = func.mapCollectionIdToHostName(tmp.filter(x => !x?.deactivated))
         setHostNameMap(allHostNameMap)
-
         tmp = {}
         tmp.all = dataObj.prettify
         tmp.hostname = dataObj.prettify.filter((c) => c.hostName !== null && c.hostName !== undefined && !c.deactivated)
