@@ -937,7 +937,7 @@ parameterizeUrl(x) {
   });
   return newStr
 },
-mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName,apiInforSeverityMap) {
+mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName,apiInfoSeverityMap) {
   const allCollections = PersistStore.getState().allCollections
   const apiGroupsMap = func.mapCollectionIdToName(allCollections.filter(x => x.type === "API_GROUP"))
 
@@ -1010,7 +1010,7 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName,apiInforSeveri
               sensitiveInReq: [...this.convertSensitiveTags(x.sensitiveInReq)],
               sensitiveInResp: [...this.convertSensitiveTags(x.sensitiveInResp)],
               responseCodes: responseCodesArr,
-              severityObj: (apiInforSeverityMap?.hasOwnProperty(key))? apiInforSeverityMap[key] : {}
+              severityObj: (apiInfoSeverityMap?.hasOwnProperty(key))? apiInfoSeverityMap[key] : {}
           
           }
 
@@ -1025,14 +1025,12 @@ getSeverityCountPerEndpointList(allIssues){
   allIssues.forEach(x => {
     let key = x["id"]["apiInfoKey"]["apiCollectionId"] + "-" + x["id"]["apiInfoKey"]["url"] + "-" + x["id"]["apiInfoKey"]["method"]
     if(!apiInfoSeverityMap[key]){
-      apiInfoSeverityMap[key] = {
-        "CRITICAL": 0,
-        "HIGH": 0,
-        "MEDIUM": 0,
-        "LOW": 0
-      }
+      apiInfoSeverityMap[key] = {}
     }
-    apiInfoSeverityMap[key][x?.severity]++
+    if(!apiInfoSeverityMap[key][x.severity]) {
+      apiInfoSeverityMap[key][x.severity] = 0
+    }
+    apiInfoSeverityMap[key][x.severity]++
 
   }
   )
