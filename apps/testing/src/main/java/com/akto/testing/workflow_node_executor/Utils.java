@@ -7,6 +7,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.Base64;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -29,6 +30,7 @@ import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.RecordedLoginFlowInput;
 import com.akto.dto.api_workflow.Graph;
 import com.akto.dto.api_workflow.Node;
+import com.akto.dto.type.KeyTypes;
 import com.akto.dto.type.RequestTemplate;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -272,6 +274,9 @@ public class Utils {
 
         }
 
+
+        int newExpiryTime = Context.now() + 1800; // 30 mins
+        List<AuthParam> calculatedAuthParams = new ArrayList<>();
         for (AuthParam param : authMechanism.getAuthParams()) {
             try {
                 String value = executeCode(param.getValue(), valuesMap);
@@ -279,14 +284,44 @@ public class Utils {
                     return new LoginFlowResponse(responses, "auth param not found at specified path " + 
                     param.getValue(), false);
                 }
-                param.setValue(value);
+
+                // checking on the value of if this is valid jwt token or valid cookie which has expiry time
+                String tempVal = new String(value);
+                if(tempVal.contains(" ")){
+                    tempVal = value.split(" ")[1];
+                }
+                if(KeyTypes.isJWT(tempVal)){
+                    try {
+                        String[] parts = tempVal.split("\\.");
+                        if (parts.length != 3) {
+                            throw new IllegalArgumentException("Invalid JWT token format");
+                        }
+                        String payload = new String(Base64.getUrlDecoder().decode(parts[1]));
+                        JSONObject payloadJson = new JSONObject(payload);
+                        if (payloadJson.has("exp")) {
+                            newExpiryTime = Math.min(payloadJson.getInt("exp"), newExpiryTime);
+
+                        } else {
+                            throw new IllegalArgumentException("JWT does not have an 'exp' claim");
+                        }
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                }
+
+                calculatedAuthParams.add(new HardcodedAuthParam(param.getWhere(), param.getKey(), value, param.getShowHeader()));
             } catch(Exception e) {
                 return new LoginFlowResponse(responses, "error resolving auth param " + param.getValue(), false);
             }
         }
-        return new LoginFlowResponse(responses, null, true);
-    }
 
+        authMechanism.updateCacheExpiryEpoch(newExpiryTime);
+        authMechanism.updateAuthParamsCached(calculatedAuthParams);
+
+        return new LoginFlowResponse(responses, null, true);
+    }    
+    
+    
     public static Map<String, Object> constructValueMap(LoginFlowParams loginFlowParams) {
         Map<String, Object> valuesMap = new HashMap<>();
         if (loginFlowParams == null || !loginFlowParams.getFetchValueMap()) {
