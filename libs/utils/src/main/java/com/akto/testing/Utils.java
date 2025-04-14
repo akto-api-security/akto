@@ -72,6 +72,9 @@ import okhttp3.MediaType;
 public class Utils {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(Utils.class);
+    private static final ValidationResult filterNodeNullResp = new ValidationResult(true, "");
+    private static final ValidationResult rawApiNullResp = new ValidationResult(true, "raw api is null");
+    private static final Filter filter = new Filter();
 
     public static void populateValuesMap(Map<String, Object> valuesMap, String payloadStr, String nodeId, Map<String,
             List<String>> headers, boolean isRequest, String queryParams) {
@@ -359,13 +362,12 @@ public class Utils {
     }
 
     public static ValidationResult validateFilter(FilterNode filterNode, RawApi rawApi, ApiInfoKey apiInfoKey, Map<String, Object> varMap, String logId) {
-        if (filterNode == null) return new ValidationResult(true, "");
-        if (rawApi == null) return  new ValidationResult(true, "raw api is null");
+        if (filterNode == null) return filterNodeNullResp;
+        if (rawApi == null) return rawApiNullResp;
         return validate(filterNode, rawApi, null, apiInfoKey,"filter", varMap, logId);
     }
 
     private static ValidationResult validate(FilterNode node, RawApi rawApi, RawApi testRawApi, ApiInfoKey apiInfoKey, String context, Map<String, Object> varMap, String logId) {
-        Filter filter = new Filter();
         DataOperandsFilterResponse dataOperandsFilterResponse = filter.isEndpointValid(node, rawApi, testRawApi, apiInfoKey, null, null , false,context, varMap, logId, false);
         return new ValidationResult(dataOperandsFilterResponse.getResult(), dataOperandsFilterResponse.getValidationReason());
     }
