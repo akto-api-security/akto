@@ -1,34 +1,33 @@
 package com.akto.action;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
+import org.bson.Document;
 import org.bson.conversions.Bson;
 
+import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.context.Context;
+import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.User;
 import com.akto.dto.traffic.Key;
-import com.akto.dto.type.SingleTypeInfo;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.usage.UsageMetricCalculator;
-import com.mongodb.client.model.Filters;
 
 public class InternalAction extends UserAction {
     private static final LoggerMaker loggerMaker = new LoggerMaker(InternalAction.class, LogDb.DASHBOARD);
 
-    String headerKey;
     boolean actuallyDelete;
     int count;
+    int timestamp;
 
-    public String deleteApisBasedOnHeader() {
-
-        if (headerKey == null || headerKey.isEmpty()) {
-            addActionError("Invalid header key");
-            return ERROR.toUpperCase();
-        }
+    public String deleteApisWithoutHost() {
 
         User user = getSUser();
         if (user.getLogin() != null && !user.getLogin().contains("@akto")) {
@@ -36,48 +35,77 @@ public class InternalAction extends UserAction {
             return ERROR.toUpperCase();
         }
 
-        int time = Context.now();
-        Bson filter = Filters.and(Filters.eq(SingleTypeInfo._PARAM, headerKey),
-                UsageMetricCalculator.excludeDemosAndDeactivated(SingleTypeInfo._API_COLLECTION_ID));
-        loggerMaker.infoAndAddToDb("Executing deleteApisBasedOnHeader find query");
-        List<ApiInfoKey> apiList = SingleTypeInfoDao.instance.fetchEndpointsInCollection(filter);
+        List<ApiCollection> apiCollections = ApiCollectionsDao.fetchAllHosts();
 
-        int delta = Context.now() - time;
-        loggerMaker.infoAndAddToDb("Finished deleteApisBasedOnHeader find query " + delta);
+        Set<Key> keys = new HashSet<>();
+        int time = Context.nowInMillis();
+        int delta = Context.nowInMillis();
+        Set<Integer> demosAndDeactivated = UsageMetricCalculator.getDemosAndDeactivated();
+        for (ApiCollection apiCollection : apiCollections) {
 
-        if (apiList != null && !apiList.isEmpty()) {
-
-            List<Key> keys = new ArrayList<>();
-            for (ApiInfoKey apiInfoKey : apiList) {
-                loggerMaker.infoAndAddToDb("deleteApisBasedOnHeader " + apiInfoKey.toString());
-                keys.add(new Key(apiInfoKey.getApiCollectionId(), apiInfoKey.getUrl(), apiInfoKey.getMethod(), -1, 0,
-                        0));
+            
+            int apiCollectionId = apiCollection.getId();
+            if (demosAndDeactivated.contains(apiCollectionId)) {
+                loggerMaker.infoAndAddToDb("Skipping deleteApisBasedOnHeader for apiCollectionId " + apiCollectionId);
+                continue;
             }
+            
+            List<Bson> pipeline = Arrays.asList(new Document("$match",
+                    new Document("$and", Arrays.asList(new Document("$or", Arrays.asList(
+                            new Document("lastSeen", new Document("$gt", timestamp)),
+                            new Document("timestamp", new Document("$gt", timestamp)))),
+                            new Document("apiCollectionId", apiCollectionId)))),
+                    new Document("$group",
+                            new Document("_id",
+                                    new Document("apiCollectionId", "$apiCollectionId")
+                                            .append("url", "$url")
+                                            .append("method", "$method"))
+                                    .append("hasHostParam",
+                                            new Document("$max",
+                                                    new Document("$cond",
+                                                            Arrays.asList(new Document("$eq",
+                                                                    Arrays.asList("$param", "host")), 1L, 0L))))
+                                    .append("documents",
+                                            new Document("$push", "$$ROOT"))),
+                    new Document("$match",
+                            new Document("hasHostParam",
+                                    new Document("$eq", 0L))),
+                    new Document("$project",
+                            new Document("_id", 1L)));
 
-            count = apiList.size();
-            if (actuallyDelete) {
-                try {
-                    time = Context.now();
-                    loggerMaker.infoAndAddToDb("deleteApisBasedOnHeader deleting APIs");
-                    com.akto.utils.Utils.deleteApis(keys);
-                    delta = Context.now() - time;
-                    loggerMaker.infoAndAddToDb("deleteApisBasedOnHeader deleted APIs " + delta);
-                } catch (Exception e) {
-                    e.printStackTrace();
-                    addActionError("Error deleting APIs");
-                    return ERROR.toUpperCase();
+            time = Context.nowInMillis();
+            loggerMaker.infoAndAddToDb("Executing deleteApisBasedOnHeader find query " + apiCollectionId);
+            List<ApiInfoKey> apiList = SingleTypeInfoDao.instance.processPipelineForEndpoint(pipeline);
+            delta = Context.nowInMillis() - time;
+            loggerMaker.infoAndAddToDb("Finished deleteApisBasedOnHeader find query " + delta + " " + apiCollectionId);
+            if (apiList != null && !apiList.isEmpty()) {
+                for (ApiInfoKey apiInfoKey : apiList) {
+                    loggerMaker.infoAndAddToDb("deleteApisBasedOnHeader " + apiInfoKey.toString());
+                    keys.add(
+                            new Key(apiInfoKey.getApiCollectionId(), apiInfoKey.getUrl(), apiInfoKey.getMethod(), -1, 0,
+                                    0));
                 }
             }
         }
+
+        count = keys.size();
+        if (keys != null && !keys.isEmpty() && actuallyDelete) {
+            try {
+                time = Context.nowInMillis();
+                loggerMaker.infoAndAddToDb("deleteApisBasedOnHeader deleting APIs");
+                List<Key> keyList = new ArrayList<>();
+                keyList.addAll(keys);
+                com.akto.utils.Utils.deleteApis(keyList);
+                delta = Context.nowInMillis() - time;
+                loggerMaker.infoAndAddToDb("deleteApisBasedOnHeader deleted APIs " + delta);
+            } catch (Exception e) {
+                e.printStackTrace();
+                addActionError("Error deleting APIs");
+                return ERROR.toUpperCase();
+            }
+        }
+
         return SUCCESS.toUpperCase();
-    }
-
-    public String getHeaderKey() {
-        return headerKey;
-    }
-
-    public void setHeaderKey(String headerKey) {
-        this.headerKey = headerKey;
     }
 
     public boolean getActuallyDelete() {
@@ -94,5 +122,13 @@ public class InternalAction extends UserAction {
 
     public void setCount(int count) {
         this.count = count;
+    }
+
+    public int getTimestamp() {
+        return timestamp;
+    }
+
+    public void setTimestamp(int timestamp) {
+        this.timestamp = timestamp;
     }
 }
