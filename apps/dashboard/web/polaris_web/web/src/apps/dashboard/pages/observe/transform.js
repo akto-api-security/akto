@@ -227,6 +227,19 @@ const transform = {
                 x["highlightValue"] = val
                 return x
             })
+            if(c.includes("x-akto-decode")){
+                highlightPaths.push({
+                    "highlightValue": {
+                        "value": "x-akto-decode",
+                        "wholeRow": true,
+                        "className": "akto-decoded",
+                        "highlight": true,
+                    },
+                    "responseCode": -1,
+                    "header": 'x-akto-decode',
+                    "param": "x-akto-decode",
+                })
+            }
             paths.push({message:c, highlightPaths:highlightPaths}); 
         }
         return paths;

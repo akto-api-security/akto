@@ -14,7 +14,7 @@ import AdvancedSettingsComponent from "./component/AdvancedSettingsComponent";
 import { produce } from "immer"
 import RunTestSuites from "./RunTestSuites";
 import RunTestConfiguration from "./RunTestConfiguration";
-import createTestName from "./Utils"
+import { createTestName } from "./Utils"
 
 function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOutside, closeRunTest, selectedResourcesForPrimaryAction, useLocalSubCategoryData, preActivator, testIdConfig, activeFromTesting, setActiveFromTesting, showEditableSettings, setShowEditableSettings, parentAdvanceSettingsConfig, testRunType, shouldDisable }) {
 

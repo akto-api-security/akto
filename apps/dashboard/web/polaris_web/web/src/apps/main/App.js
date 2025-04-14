@@ -33,6 +33,7 @@ import DataTypes from "../dashboard/pages/observe/data_types/DataTypes";
 import IssuesPage from "../dashboard/pages/issues/IssuesPage/IssuesPage";
 import CompliancePage from "../dashboard/pages/issues/IssuesPage/CompliancePage";
 import QuickStart from "../dashboard/pages/quick_start/QuickStart";
+import AgentTeam from "../dashboard/pages/agent_team/AgentTeam";
 import Webhooks from "../dashboard/pages/settings/integrations/webhooks/Webhooks";
 import Webhook from "../dashboard/pages/settings/integrations/webhooks/Webhook";
 import TestRolesPage from "../dashboard/pages/testing/TestRolesPage/TestRolesPage";
@@ -52,7 +53,7 @@ import ApiChanges from "../dashboard/pages/observe/api_collections/ApiChanges";
 
 import Store from "../dashboard/store";
 import {generateSearchData} from "@/util/searchItems"
-import {useEffect} from "react";
+import {useEffect, useMemo} from "react";
 import CICD from "../dashboard/pages/settings/integrations/CICD";
 import ErrorComponent from "../dashboard/components/shared/ErrorComponent";
 import OktaIntegration from "../dashboard/pages/settings/integrations/OktaIntegration";
@@ -88,6 +89,7 @@ import TestsTablePage from "../dashboard/pages/test_editor/tests_table/TestsTabl
 import Splunk from "../dashboard/pages/settings/integrations/Splunk";
 import F5Waf from "../dashboard/pages/settings/integrations/F5Waf";
 import AWSWaf from "../dashboard/pages/settings/integrations/AWSWaf";
+import AzureBoards from "../dashboard/pages/settings/integrations/AzureBoards";
 
 // if you add a component in a new path, please verify the search implementation in function -> 'getSearchItemsArr' in func.js
 
@@ -228,6 +230,15 @@ const router = createBrowserRouter([
                         path: "quick-start",
                         element: <QuickStart/>,
                     },
+                    {
+                        path: "agent-team",
+                        children: [
+                            {
+                                path: "members",
+                                element: <AgentTeam/>
+                            }
+                        ]
+                    },
                 ]
             },
             {
@@ -285,6 +296,10 @@ const router = createBrowserRouter([
                     {
                         path: "integrations/jira",
                         element: <Jira/>,
+                    },
+                    {
+                        path: "integrations/azure_boards",
+                        element: <AzureBoards/>,
                     },
                     {
                         path: "integrations/akto_apis",
@@ -470,13 +485,13 @@ function App() {
         document.body.appendChild(script)
     }, [])
 
-    return (
+    return useMemo(() => {return (
         <PollingProvider>
             <TableContextProvider>
                 <RouterProvider router={router}/>
             </TableContextProvider>
         </PollingProvider>
-    );
+    )}, [router]) ;
 }
 
 export default App;

@@ -60,8 +60,7 @@ import static com.akto.runtime.utils.Utils.createRegexPatternFromList;
 
 public class CleanInventory {
 
-    private static final LoggerMaker loggerMaker = new LoggerMaker(CleanInventory.class, LogDb.DASHBOARD);
-    private static final Logger logger = LoggerFactory.getLogger(CleanInventory.class);
+    private static final LoggerMaker logger = new LoggerMaker(CleanInventory.class, LogDb.DASHBOARD);
 
     final static ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
 
@@ -79,7 +78,7 @@ public class CleanInventory {
                         try {
                             cleanInventoryJob();
                         } catch (Exception e) {
-                            loggerMaker.errorAndAddToDb(e, "Error in cleanInventoryJob");
+                            logger.errorAndAddToDb(e, "Error in cleanInventoryJob");
                         }
                     }
                 }, "clean-inventory-job");
@@ -125,7 +124,7 @@ public class CleanInventory {
         int diff = now2 - now;
 
         if (diff >= 2) {
-            loggerMaker.infoAndAddToDb(String.format("cleanInventoryJob finished, time taken: %d ", diff));
+            logger.infoAndAddToDb(String.format("cleanInventoryJob finished, time taken: %d ", diff));
         }
 
     }
@@ -144,9 +143,9 @@ public class CleanInventory {
 
             try {
                 Utils.pushDataToKafka(allSamples.get(0).getId().getApiCollectionId(), "", messages, new ArrayList<>(), true, false);
-                loggerMaker.infoAndAddToDb("Successfully moved APIs.");
+                logger.infoAndAddToDb("Successfully moved APIs.");
             } catch (Exception e) {
-                loggerMaker.errorAndAddToDb("Error during move APIs: " + e.getMessage());
+                logger.errorAndAddToDb("Error during move APIs: " + e.getMessage());
                 e.printStackTrace();
             }
     }
@@ -228,7 +227,7 @@ public class CleanInventory {
                         // any 1 of the sample is modifiable, we print this block
                         toMove.add(sampleData.getId());
                         if(saveLogsToDB){
-                            loggerMaker.infoAndAddToDb("Filter passed, modify sample data of API: " + sampleData.getId(), LogDb.DASHBOARD);
+                            logger.infoAndAddToDb("Filter passed, modify sample data of API: " + sampleData.getId(), LogDb.DASHBOARD);
                         }else{
                             logger.info("[BadApisUpdater] Updating bad from template API: " + sampleData.getId(), LogDb.DASHBOARD);
                         }
@@ -240,7 +239,7 @@ public class CleanInventory {
                             collectionWiseDeletionCountMap.put(sampleData.getId().getApiCollectionId(),initialCount + 1);
                             toBeDeleted.add(sampleData.getId());
                             if(saveLogsToDB){
-                                loggerMaker.infoAndAddToDb(
+                                logger.infoAndAddToDb(
                                         "Filter passed, deleting bad api found from filter: " + sampleData.getId(), LogDb.DASHBOARD
                                 );
                             }else{
@@ -253,7 +252,7 @@ public class CleanInventory {
                                     SampleDataDao.instance.updateOneNoUpsert(Filters.eq("_id",sampleData.getId()), Updates.set(SampleData.SAMPLES,remainingSamples));
                                 }
                                 if(saveLogsToDB){
-                                    loggerMaker.infoAndAddToDb(
+                                    logger.infoAndAddToDb(
                                             "Deleting bad samples from sample data " + sampleData.getId(), LogDb.DASHBOARD
                                     );
                                 }else{
@@ -264,7 +263,7 @@ public class CleanInventory {
                     } else {
                         // other cases like: => filter from advanced filter is passed || filter from block filter fails
                         if(saveLogsToDB){
-                            loggerMaker.infoAndAddToDb(
+                            logger.infoAndAddToDb(
                                 "Filter did not pass, keeping api found from filter: " + sampleData.getId(), LogDb.DASHBOARD
                             );
                         }else{
@@ -273,7 +272,7 @@ public class CleanInventory {
                         
                     }
                 } catch (Exception e) {
-                    loggerMaker.errorAndAddToDb("[BadApisRemover] Couldn't delete an api for default payload: " + sampleData.getId() + e.getMessage(), LogDb.DASHBOARD);
+                    logger.errorAndAddToDb("[BadApisRemover] Couldn't delete an api for default payload: " + sampleData.getId() + e.getMessage(), LogDb.DASHBOARD);
                 }
             }
             if (shouldDeleteRequest) {
@@ -296,7 +295,7 @@ public class CleanInventory {
             String name = apiCollectionMap.get(collId).getDisplayName();
 
             if(saveLogsToDB){
-                loggerMaker.infoAndAddToDb("Total apis deleted from collection: " + name + " are: " + deletionCount, LogDb.DASHBOARD);
+                logger.infoAndAddToDb("Total apis deleted from collection: " + name + " are: " + deletionCount, LogDb.DASHBOARD);
             }
         }
 
@@ -369,7 +368,7 @@ public class CleanInventory {
             }
 
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("Couldn't complete scan for APIs remover: " + e.getMessage(), LogDb.DASHBOARD);
+            logger.errorAndAddToDb("Couldn't complete scan for APIs remover: " + e.getMessage(), LogDb.DASHBOARD);
             e.printStackTrace();
         }
     }

@@ -20,6 +20,7 @@
                 </script>
                 <script src="https://apis.google.com/js/client:platform.js?onload=start" async defer>
                 </script>
+                <script src="https://unpkg.com/@tailwindcss/browser@4"></script>
                 <script type="text/javascript">
                     (function (f, b) {
                         if (!b.__SV) {
@@ -68,6 +69,7 @@
                     window.STIGG_CUSTOMER_TOKEN='${requestScope.stiggCustomerToken}'
                     window.STIGG_CLIENT_KEY='${requestScope.stiggClientKey}'
                     window.JIRA_INTEGRATED ='${requestScope.jiraIntegrated}'
+                    window.AZURE_BOARDS_INTEGRATED ='${requestScope.azureBoardsIntegrated}'
                     window.USER_ROLE ='${requestScope.userRole}'
                     window.TIME_ZONE = '${requestScope.currentTimeZone}'
                     window.USER_FULL_NAME = '${requestScope.userFullName}'
@@ -182,12 +184,14 @@
                 <script>
                     var script = document.createElement('script');
                     script.type = "text/javascript"
-                    if (window.RELEASE_VERSION_GLOBAL == '' || window.RELEASE_VERSION_GLOBAL == 'akto-release-version') {// Case when akto version is not available
+                    if ('${requestScope.nodeEnv}' === 'development') {
+                        script.src = "http://localhost:3000/dist/main.js";
+                    } else if (window.RELEASE_VERSION_GLOBAL == '' || window.RELEASE_VERSION_GLOBAL == 'akto-release-version') {
                         script.src = "/polaris_web/web/dist/main.js";
                     } else if (window.RELEASE_VERSION == '' || window.RELEASE_VERSION == 'akto-release-version') {
-                        script.src = "https://d1hvi6xs55woen.cloudfront.net/polaris_web/" + window.RELEASE_VERSION_GLOBAL + "/dist/main.js";;
+                        script.src = "https://d1hvi6xs55woen.cloudfront.net/polaris_web/" + window.RELEASE_VERSION_GLOBAL + "/dist/main.js";
                     } else {
-                        script.src = "https://d1hvi6xs55woen.cloudfront.net/polaris_web/" + window.RELEASE_VERSION + "/dist/main.js";;
+                        script.src = "https://d1hvi6xs55woen.cloudfront.net/polaris_web/" + window.RELEASE_VERSION + "/dist/main.js";
                     }
                     document.body.appendChild(script);
                 </script>

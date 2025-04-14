@@ -29,4 +29,4 @@ const createTestName = (collectionName, tests, activeFromTesting, ogTestName) =>
     return testName;
 }
 
-export default createTestName
+export { createTestName, convertToLowerCaseWithUnderscores };

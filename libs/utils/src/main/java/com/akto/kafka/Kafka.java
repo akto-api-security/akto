@@ -4,8 +4,8 @@ import org.apache.kafka.clients.producer.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.time.Duration;
 import java.util.Properties;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class Kafka {
   private static final Logger logger = LoggerFactory.getLogger(Kafka.class);
@@ -58,8 +58,16 @@ public class Kafka {
     this(brokerIP, lingerMS, batchSize, Serializer.STRING, Serializer.STRING, maxRequestTimeout);
   }
 
+  public void send (String message, String topic, AtomicInteger counter){
+    send(message, topic);
+    counter.incrementAndGet();
+  }
+
   public void send(String message, String topic) {
-    if (!this.producerReady) return;
+    if (!this.producerReady) {
+      logger.error("Producer not ready. Cannot send message.");
+      return;
+    };
 
     ProducerRecord<String, String> record = new ProducerRecord<>(topic, message);
     producer.send(record, new DemoProducerCallback());

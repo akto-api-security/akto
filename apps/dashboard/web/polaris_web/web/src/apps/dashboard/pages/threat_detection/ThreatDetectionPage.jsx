@@ -8,7 +8,6 @@ import { produce } from "immer"
 import func from "@/util/func";
 import SampleDetails from "./components/SampleDetails";
 import threatDetectionRequests from "./api";
-import PersistStore from "../../../main/PersistStore";
 import tempFunc from "./dummyData";
 import NormalSampleDetails from "./components/NormalSampleDetails";
 import { HorizontalGrid, VerticalStack } from "@shopify/polaris";
@@ -17,6 +16,7 @@ import api from "./api";
 import threatDetectionFunc from "./transform";
 import InfoCard from "../dashboard/new_components/InfoCard";
 import BarGraph from "../../components/charts/BarGraph";
+import SessionStore from "../../../main/SessionStore";
 
 const convertToGraphData = (severityMap) => {
     let dataArr = []
@@ -80,7 +80,7 @@ function ThreatDetectionPage() {
     const [subCategoryCount, setSubCategoryCount] = useState([]);
     const [severityCountMap, setSeverityCountMap] = useState([]);
     const [externalFilter, setExternalFilter] = useState(null);
-    const threatFiltersMap = PersistStore((state) => state.threatFiltersMap);
+    const threatFiltersMap = SessionStore((state) => state.threatFiltersMap);
 
     const startTimestamp = parseInt(currDateRange.period.since.getTime()/1000)
     const endTimestamp = parseInt(currDateRange.period.until.getTime()/1000)
@@ -101,7 +101,7 @@ function ThreatDetectionPage() {
             const sameRow = currentRefId === data?.refId
             if (!sameRow) {
                 let rowData = [];
-                await threatDetectionRequests.fetchMaliciousRequest(data?.refId).then((res) => {
+                await threatDetectionRequests.fetchMaliciousRequest(data?.refId, data?.eventType).then((res) => {
                     rowData = [...res.maliciousPayloadsResponses]
                 }) 
                 setRowDataList(rowData)

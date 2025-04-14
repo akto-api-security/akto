@@ -1,13 +1,17 @@
 package com.akto.action;
 
 import com.akto.dao.ApiCollectionsDao;
+import com.akto.dao.ApiInfoDao;
 import com.akto.dao.SampleDataDao;
+import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.file.FilesDao;
 import com.akto.dao.upload.FileUploadLogsDao;
 import com.akto.dao.upload.FileUploadsDao;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo;
+import com.akto.dto.HttpResponseParams;
+import com.akto.dto.HttpResponseParams.Source;
 import com.akto.dto.files.File;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.SingleTypeInfo;
@@ -27,7 +31,6 @@ import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 
-import com.mongodb.client.model.InsertManyOptions;
 import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
 import com.mongodb.client.result.InsertOneResult;
@@ -42,10 +45,8 @@ import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
 import javax.servlet.http.HttpServletResponse;
-import java.io.IOException;
-import java.io.PrintWriter;
+import java.io.*;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executors;
@@ -56,7 +57,7 @@ import java.util.stream.IntStream;
 
 public class OpenApiAction extends UserAction implements ServletResponseAware {
 
-    private static final LoggerMaker loggerMaker = new LoggerMaker(OpenApiAction.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(OpenApiAction.class, LogDb.DASHBOARD);
 
     private final boolean skipKafka = DashboardMode.isLocalDeployment();
 
@@ -70,6 +71,7 @@ public class OpenApiAction extends UserAction implements ServletResponseAware {
     private List<ApiInfo.ApiInfoKey> apiInfoKeyList;
 
     private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
+
 
     @Override
     public String execute() {
@@ -140,6 +142,7 @@ public class OpenApiAction extends UserAction implements ServletResponseAware {
     }
 
     private static final String OPEN_API = "OpenAPI";
+    private Source source = null;
 
     public String importDataFromOpenApiSpec(){
 
@@ -155,10 +158,49 @@ public class OpenApiAction extends UserAction implements ServletResponseAware {
         InsertOneResult insertOneResult = FileUploadsDao.instance.insertOne(fileUpload);
         String fileUploadId = insertOneResult.getInsertedId().asObjectId().getValue().toString();
         this.uploadId = fileUploadId;
+        ApiCollection apiCollection = ApiCollectionsDao.instance.getMeta(apiCollectionId);
+        if (apiCollection.getHostName() != null) {
+            source = HttpResponseParams.Source.MIRRORING;
+        }
+
+        if (apiCollection.getType() != null && apiCollection.getType().equals(ApiCollection.Type.API_GROUP)) {
+            addActionError("Can't upload OpenAPI file for collection groups");
+            return ERROR.toUpperCase();
+        }
+
+        ApiInfo apiInfoWithSource = ApiInfoDao.instance.findOne(
+            Filters.and(
+                Filters.eq(ApiInfo.ID_API_COLLECTION_ID, apiCollectionId),
+                Filters.exists(ApiInfo.SOURCES, true)
+            )
+        );
+
+        if (source == null && apiInfoWithSource == null) {
+            addActionError("Source is null");
+            return ERROR.toUpperCase();
+        }
+
         executorService.schedule(new Runnable() {
             public void run() {
                 Context.accountId.set(accountId);
-                loggerMaker.infoAndAddToDb("Starting thread to process openAPI file", LogDb.DASHBOARD);
+                
+
+                if (apiInfoWithSource == null) {
+                    loggerMaker.infoAndAddToDb("Starting to add sources to existing STIs and ApiInfos", LogDb.DASHBOARD);
+
+                    Bson sourceUpdate = Updates.set(SingleTypeInfo.SOURCES + "." + source, new BasicDBObject("timestamp", Context.now()) );
+
+                    Bson apiCollectionIdFilterForStis = Filters.eq(SingleTypeInfo._API_COLLECTION_ID, apiCollectionId);
+                    SingleTypeInfoDao.instance.updateManyNoUpsert(apiCollectionIdFilterForStis, sourceUpdate);
+
+                    Bson apiCollectionIdFilterForApiInfos = Filters.eq(ApiInfo.ID_API_COLLECTION_ID, apiCollectionId);
+                    ApiInfoDao.instance.updateManyNoUpsert(apiCollectionIdFilterForApiInfos, sourceUpdate);
+
+                    loggerMaker.infoAndAddToDb("Starting to process openAPI file", LogDb.DASHBOARD);
+                } else {
+                    loggerMaker.infoAndAddToDb("No need to add sources to STIs and ApiInfos", LogDb.DASHBOARD);
+                }
+
                 SwaggerFileUpload fileUpload = FileUploadsDao.instance.getSwaggerMCollection().find(Filters.eq(Constants.ID, new ObjectId(fileUploadId))).first();
                 String title = OPEN_API + " ";
         
@@ -189,17 +231,26 @@ public class OpenApiAction extends UserAction implements ServletResponseAware {
 
                     for(List<SwaggerUploadLog> chunk : chunkedLists){
                         loggerMaker.infoAndAddToDb("Inserting chunk of size " + chunk.size(), LogDb.DASHBOARD);
-                        FileUploadLogsDao.instance.getSwaggerMCollection().insertMany(chunk, new InsertManyOptions().ordered(true));
-                    }
-                    loggerMaker.infoAndAddToDb("Inserted " + chunkedLists.size() + " chunks of logs", LogDb.DASHBOARD);
 
-                    FileUploadsDao.instance.updateOne(Filters.eq(Constants.ID, new ObjectId(fileUploadId)), Updates.combine(
-                            Updates.set("uploadStatus", FileUpload.UploadStatus.SUCCEEDED),
-                            Updates.set("collectionName", title),
-                            Updates.set("errors", fileErrors),
-                            Updates.set("count",parsedSwagger.getTotalCount())
-                    ));
-                    loggerMaker.infoAndAddToDb("Finished processing openAPI file", LogDb.DASHBOARD);
+                        List<String> stringMessages = messages.stream()
+                                .map(SwaggerUploadLog::getAktoFormat)
+                                .collect(Collectors.toList());
+
+                        List<String> stringErrors = fileErrors.stream()
+                                .map(FileUploadError::getError)
+                                .collect(Collectors.toList());
+
+                        String topic = System.getenv("AKTO_KAFKA_TOPIC_NAME");
+                        if (topic == null) topic = "akto.api.logs";
+
+                        try {
+                            loggerMaker.infoAndAddToDb("Calling Utils.pushDataToKafka for openapi file, for apiCollection id " + apiCollectionId, LogDb.DASHBOARD);
+                            Utils.pushDataToKafka(apiCollectionId, topic, stringMessages, stringErrors, true, false);
+                        } catch (Exception e) {
+                            throw new RuntimeException(e);
+                        }
+
+                    }
 
                 } catch (Exception e) {
                     loggerMaker.errorAndAddToDb(e, "ERROR while parsing openAPI file", LogDb.DASHBOARD);
@@ -399,4 +450,9 @@ public class OpenApiAction extends UserAction implements ServletResponseAware {
     public void setApiInfoKeyList(List<ApiInfo.ApiInfoKey> apiInfoKeyList) {
         this.apiInfoKeyList = apiInfoKeyList;
     }
+
+    public void setSource(Source source) {
+        this.source = source;
+    }
+
 }

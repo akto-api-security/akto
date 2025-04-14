@@ -1,21 +1,25 @@
 package com.akto.action.gpt.result_fetchers;
 
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.http_util.CoreHTTPClient;
 import com.mongodb.BasicDBObject;
-import okhttp3.*;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.IOException;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import okhttp3.MediaType;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.RequestBody;
+import okhttp3.Response;
+import okhttp3.ResponseBody;
 
 public class AsyncResultFetcherStrategy implements ResultFetcherStrategy<BasicDBObject> {
 
     private static final String ASK_GPT_ASYNC_URL = "https://18qazon803.execute-api.ap-south-1.amazonaws.com/ask_gpt_async";
     private static final String FETCH_RESPONSE_URL = "https://18qazon803.execute-api.ap-south-1.amazonaws.com/fetch_response";
 
-    private static final Logger logger = LoggerFactory.getLogger(AsyncResultFetcherStrategy.class);
+    private static final LoggerMaker logger = new LoggerMaker(AsyncResultFetcherStrategy.class, LogDb.DASHBOARD);;
     @Override
     public BasicDBObject fetchResult(BasicDBObject data) {
         return fetchDataFromLambda(data);

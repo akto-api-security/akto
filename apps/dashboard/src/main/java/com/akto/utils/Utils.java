@@ -1,5 +1,6 @@
 package com.akto.utils;
 
+import com.akto.action.ExportSampleDataAction;
 import com.akto.dao.ThirdPartyAccessDao;
 import com.akto.dao.TrafficInfoDao;
 import com.akto.dao.context.Context;
@@ -35,9 +36,11 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 
+import java.io.File;
 import java.net.MalformedURLException;
 import java.net.URISyntaxException;
 import java.net.URL;
@@ -52,7 +55,7 @@ import static com.akto.dto.RawApi.convertHeaders;
 
 public class Utils {
 
-    private static final LoggerMaker loggerMaker = new LoggerMaker(Utils.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(Utils.class, LogDb.DASHBOARD);;
     private final static ObjectMapper mapper = new ObjectMapper();
 
     public static Map<String, String> getAuthMap(JsonNode auth, Map<String, String> variableMap) {
@@ -634,6 +637,35 @@ public class Utils {
             return "http://localhost:8080";
         }
         return request.getScheme() + "://" + request.getServerName() + ":" + request.getServerPort();
+    }
+
+    public static File createRequestFile(String originalMessage, String message) {
+        try {
+            String origCurl = ExportSampleDataAction.getCurl(originalMessage);
+            String testCurl = ExportSampleDataAction.getCurl(message);
+
+            HttpResponseParams origObj = HttpCallParser.parseKafkaMessage(originalMessage);
+            BasicDBObject testRespObj = BasicDBObject.parse(message);
+            BasicDBObject testPayloadObj = BasicDBObject.parse(testRespObj.getString("response"));
+            String testResp = testPayloadObj.getString("body");
+
+            File tmpOutputFile = File.createTempFile("output", ".txt");
+
+            FileUtils.writeStringToFile(tmpOutputFile, "Original Curl ----- \n\n", (String) null);
+            FileUtils.writeStringToFile(tmpOutputFile, origCurl + "\n\n", (String) null, true);
+            FileUtils.writeStringToFile(tmpOutputFile, "Original Api Response ----- \n\n", (String) null, true);
+            FileUtils.writeStringToFile(tmpOutputFile, origObj.getPayload() + "\n\n", (String) null, true);
+
+            FileUtils.writeStringToFile(tmpOutputFile, "Test Curl ----- \n\n", (String) null, true);
+            FileUtils.writeStringToFile(tmpOutputFile, testCurl + "\n\n", (String) null, true);
+            FileUtils.writeStringToFile(tmpOutputFile, "Test Api Response ----- \n\n", (String) null, true);
+            FileUtils.writeStringToFile(tmpOutputFile, testResp + "\n\n", (String) null, true);
+
+            return tmpOutputFile;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
+        }
     }
 
 }

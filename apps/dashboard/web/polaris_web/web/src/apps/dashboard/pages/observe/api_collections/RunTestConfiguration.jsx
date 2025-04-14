@@ -88,7 +88,8 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
                     selected={(hour) => {
                         let scheduledEpoch = new Date().getTime() / 1000;
                         if (hour !== "Now"){
-                            scheduledEpoch += parseInt(hour) * 60 * 60;
+                            let initialTime = func.isSameDateAsToday(state.data) ? startDayToday : testRun.startTimestamp;
+                            scheduledEpoch = initialTime + parseInt(hour) * 60 * 60;
                         }else{
                             scheduledEpoch = testRun.startTimestamp
                         }

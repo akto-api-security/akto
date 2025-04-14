@@ -316,13 +316,13 @@ public class YamlNodeExecutor extends NodeExecutor {
         sampleDataMap.put(yamlNodeDetails.getApiInfoKey(), Collections.singletonList(json.toString()));
         SampleMessageStore messageStore = SampleMessageStore.create(sampleDataMap);
         List<CustomAuthType> customAuthTypes = yamlNodeDetails.getCustomAuthTypes();
-        TestingUtil testingUtil = new TestingUtil(authMechanism, messageStore, null, null, customAuthTypes);
         TestExecutor executor = new TestExecutor();
         ApiInfoKey infoKey = yamlNodeDetails.getApiInfoKey();
-        List<String> samples = testingUtil.getSampleMessages().get(infoKey);
+        List<String> samples = messageStore.getSampleDataMap().get(infoKey);
         TestingRunResult testingRunResult = Utils.generateFailedRunResultForMessage(null, infoKey, testConfig.getInfo().getCategory().getName(), testConfig.getInfo().getSubCategory(), null,samples , null);
+        
         if(testingRunResult == null){
-            testingRunResult = executor.runTestNew(infoKey, null, testingUtil, null, testConfig, null, debug, testLogs, samples.get(samples.size() - 1));
+            testingRunResult = executor.runTestNew(infoKey, null, messageStore, authMechanism, customAuthTypes, null, testConfig, null, debug, testLogs, RawApi.buildFromMessage(samples.get(samples.size() - 1), true));
         }
 
         List<String> errors = new ArrayList<>();

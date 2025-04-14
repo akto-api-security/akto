@@ -28,7 +28,7 @@ public class TestGraphQLUtils{
     @Test
     public void testGraphQLParser() throws Exception {
         HAR har = new HAR();
-        List<String> requests = har.getMessages(harString, 0, 1_000_000);
+        List<String> requests = har.getMessages(harString, 0, 1_000_000, HttpResponseParams.Source.HAR);
         //Even with 2 har entries, we get 10 endpoints
 
         for (String request : requests) {
@@ -41,7 +41,7 @@ public class TestGraphQLUtils{
     @Test
     public void testAddGraphqlField() throws Exception {
         HAR har = new HAR();
-        List<String> requests = har.getMessages(harString, 0, 1_000_000);
+        List<String> requests = har.getMessages(harString, 0, 1_000_000, HttpResponseParams.Source.HAR);
 
         for (String request : requests) {
             HttpResponseParams responseParams = parseKafkaMessage(request);
@@ -56,7 +56,7 @@ public class TestGraphQLUtils{
     @Test
     public void testDeleteGraphqlField() throws Exception {
         HAR har = new HAR();
-        List<String> requests = har.getMessages(harString, 0, 1_000_000);
+        List<String> requests = har.getMessages(harString, 0, 1_000_000, HttpResponseParams.Source.HAR);
 
         for (String request : requests) {
             HttpResponseParams responseParams = parseKafkaMessage(request);
@@ -71,7 +71,7 @@ public class TestGraphQLUtils{
     @Test
     public void testModifyGraphqlField() throws Exception {
         HAR har = new HAR();
-        List<String> requests = har.getMessages(harString, 0, 1_000_000);
+        List<String> requests = har.getMessages(harString, 0, 1_000_000, HttpResponseParams.Source.HAR);
 
         for (String request : requests) {
             HttpResponseParams responseParams = parseKafkaMessage(request);
@@ -86,7 +86,7 @@ public class TestGraphQLUtils{
     @Test
     public void testAddUniqueGraphqlField() throws Exception {
         HAR har = new HAR();
-        List<String> requests = har.getMessages(harString, 0, 1_000_000);
+        List<String> requests = har.getMessages(harString, 0, 1_000_000, HttpResponseParams.Source.HAR);
 
         for (String request : requests) {
             HttpResponseParams responseParams = parseKafkaMessage(request);

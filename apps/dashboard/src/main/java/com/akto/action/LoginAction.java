@@ -1,5 +1,7 @@
 package com.akto.action;
 
+import static com.akto.util.Constants.TWO_HOURS_TIMESTAMP;
+
 import com.akto.dao.BackwardCompatibilityDao;
 import com.akto.dao.SignupDao;
 import com.akto.dao.SingleTypeInfoDao;
@@ -13,11 +15,13 @@ import com.akto.dto.User;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.listener.InitializerListener;
 import com.akto.listener.RuntimeListener;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.notifications.email.SendgridEmail;
 import com.akto.password_reset.PasswordResetUtils;
 import com.akto.util.DashboardMode;
-import com.akto.utils.Token;
 import com.akto.utils.JWT;
+import com.akto.utils.Token;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.FindOneAndUpdateOptions;
@@ -25,27 +29,27 @@ import com.mongodb.client.model.PushOptions;
 import com.mongodb.client.model.ReturnDocument;
 import com.mongodb.client.model.Updates;
 import com.opensymphony.xwork2.Action;
-
 import com.sendgrid.helpers.mail.Mail;
-import org.apache.commons.lang3.StringUtils;
-import org.apache.struts2.interceptor.ServletRequestAware;
-import org.apache.struts2.interceptor.ServletResponseAware;
-import org.bson.conversions.Bson;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
+import java.io.IOException;
+import java.security.NoSuchAlgorithmException;
+import java.security.spec.InvalidKeySpecException;
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
-import java.io.IOException;
-import java.security.NoSuchAlgorithmException;
-import java.security.spec.InvalidKeySpecException;
-import java.util.*;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-
-import static com.akto.util.Constants.TWO_HOURS_TIMESTAMP;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.struts2.interceptor.ServletRequestAware;
+import org.apache.struts2.interceptor.ServletResponseAware;
+import org.bson.conversions.Bson;
 
 // Validates user from the supplied username and password
 // Generates refresh token jwt using the username if valid user
@@ -54,7 +58,8 @@ import static com.akto.util.Constants.TWO_HOURS_TIMESTAMP;
 // Adds the refresh token to http-only cookie
 // Adds the access token to header
 public class LoginAction implements Action, ServletResponseAware, ServletRequestAware {
-    private static final Logger logger = LoggerFactory.getLogger(LoginAction.class);
+
+    private static final LoggerMaker logger = new LoggerMaker(LoginAction.class, LogDb.DASHBOARD);
     
     public static final String REFRESH_TOKEN_COOKIE_NAME = "refreshToken";
     private static final ExecutorService service = Executors.newFixedThreadPool(1);

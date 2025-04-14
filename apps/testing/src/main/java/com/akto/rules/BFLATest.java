@@ -9,6 +9,7 @@ import com.akto.dto.testing.*;
 import com.akto.dto.testing.sources.AuthWithCond;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.store.TestingUtil;
+import com.akto.test_editor.execution.Executor;
 import com.akto.testing.ApiExecutor;
 import com.akto.testing.TestExecutor;
 import com.akto.util.Constants;
@@ -50,46 +51,16 @@ public class BFLATest {
 
     public List<String> updateAllowedRoles(RawApi rawApi, ApiInfo.ApiInfoKey apiInfoKey, TestingUtil testingUtil) throws Exception {
         List<String> ret = new ArrayList<>();
-        OriginalHttpRequest testRequest = rawApi.getRequest().copy();
 
         for (TestRoles testRoles: testingUtil.getTestRoles()) {
-            Map<String, List<String>> reqHeaders = testRequest.getHeaders();
 
-            for(AuthWithCond authWithCond: testRoles.getAuthWithCondList()) {
-                boolean allHeadersMatched = true;
-                if (authWithCond != null && authWithCond.getHeaderKVPairs() != null) {
-                    for(String hKey: authWithCond.getHeaderKVPairs().keySet()) {
-                        String hVal = authWithCond.getHeaderKVPairs().get(hKey);
-                        if (reqHeaders.containsKey(hKey.toLowerCase())) {
-                            if (reqHeaders.get(hKey.toLowerCase()).indexOf(hVal) == -1) {
-                                allHeadersMatched = false;
-                                break;
-                            }
-                        }
-                    }
-                }
-
-                if (allHeadersMatched) {
-                    AuthMechanism authMechanismForRole = authWithCond.getAuthMechanism();
-                    if (authMechanismForRole.getType().equalsIgnoreCase(LoginFlowEnums.AuthMechanismTypes.LOGIN_REQUEST.name())) {
-                        if (authWithCond.getRecordedLoginFlowInput() != null) {
-                            authMechanismForRole.setRecordedLoginFlowInput(authWithCond.getRecordedLoginFlowInput());
-                        }
-                        LoginFlowResponse loginFlowResponse = TestExecutor.executeLoginFlow(authMechanismForRole, null, null);
-                        if (!loginFlowResponse.getSuccess()) throw new Exception(loginFlowResponse.getError());
-
-                        authMechanismForRole.setType(LoginFlowEnums.AuthMechanismTypes.HARDCODED.name());
-                    }
-
-                    authMechanismForRole.addAuthToRequest(testRequest);
-                    break;
-                }
+            RawApi copiedApi = rawApi.copy();
+            if (Executor.modifyAuthTokenInRawApi(testRoles, copiedApi) == null) {
+                continue;
             }
-
-
             RawApi rawApiDuplicate = rawApi.copy();
             try {
-                TestPlugin.ApiExecutionDetails apiExecutionDetails = executeApiAndReturnDetails(testRequest, true, rawApiDuplicate);
+                TestPlugin.ApiExecutionDetails apiExecutionDetails = executeApiAndReturnDetails(copiedApi.getRequest(), true, rawApiDuplicate);
                 if(isStatusGood(apiExecutionDetails.statusCode)) {
                     ret.add(testRoles.getName());
                 }

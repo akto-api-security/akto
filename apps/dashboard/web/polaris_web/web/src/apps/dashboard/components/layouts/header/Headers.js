@@ -1,6 +1,6 @@
 import { TopBar, Icon, Text, ActionList, Modal, TextField, HorizontalStack, Box, Avatar, VerticalStack, Button, Scrollable } from '@shopify/polaris';
 import { NotificationMajor, CustomerPlusMajor, LogOutMinor, NoteMinor, ResourcesMajor, UpdateInventoryMajor, PageMajor, DynamicSourceMajor, PhoneMajor, ChatMajor, SettingsMajor } from '@shopify/polaris-icons';
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Store from '../../../store';
 import PersistStore from '../../../../main/PersistStore';
@@ -11,6 +11,7 @@ import SemiCircleProgress from '../../shared/SemiCircleProgress';
 import { usePolling } from '../../../../main/PollingProvider';
 import { debounce } from 'lodash';
 import LocalStore from '../../../../main/LocalStorageStore';
+import SessionStore from '../../../../main/SessionStore';
 
 function ContentWithIcon({icon,text, isAvatar= false}) {
     return(
@@ -33,14 +34,61 @@ export default function Header() {
     const navigate = useNavigate()
 
     const username = Store((state) => state.username)
-    const storeAccessToken = PersistStore(state => state.storeAccessToken)
     const resetAll = PersistStore(state => state.resetAll)
     const resetStore = LocalStore(state => state.resetStore)
+    const resetSession  = SessionStore(state => state.resetStore)
 
-    const allRoutes = Store((state) => state.allRoutes)
+    /* Search bar */
+    //const allRoutes = Store((state) => state.allRoutes)
     const allCollections = PersistStore((state) => state.allCollections)
-    var searchItemsArr = useMemo(() => func.getSearchItemsArr(allRoutes, allCollections), [])
-    const [filteredItemsArr, setFilteredItemsArr] = useState(searchItemsArr)
+    const subCategoryMap = LocalStore(state => state.subCategoryMap)
+    const searchItemsArr = useMemo(() => func.getSearchItemsArr(allCollections, subCategoryMap), [allCollections, subCategoryMap])
+    const [filteredItemsArr, setFilteredItemsArr] = useState(searchItemsArr);
+    
+    useEffect(() => {
+        setFilteredItemsArr(searchItemsArr);
+    }, [searchItemsArr]);
+
+    const debouncedSearch = useMemo(() => debounce(async (searchQuery) => {    
+        if (searchQuery.length === 0) {
+            setFilteredItemsArr(searchItemsArr);
+        } else {
+            const resultArr = searchItemsArr.filter((x) => x.content.toLowerCase().includes(searchQuery));
+            setFilteredItemsArr(resultArr);
+        }
+    }, 500), [searchItemsArr]); 
+
+    const handleSearchChange = useCallback((value) => {
+        setSearchValue(value);
+        debouncedSearch(value.toLowerCase());
+    }, [debouncedSearch]);
+
+    const handleNavigateSearch = useCallback((url) => {
+            navigate(url);
+            handleSearchChange('');  
+    }, [navigate, handleSearchChange]);
+
+    const searchResultSections = useMemo(() => func.getSearchResults(filteredItemsArr, handleNavigateSearch), [filteredItemsArr, handleNavigateSearch])
+
+    const searchResultsMarkup = (
+        <Scrollable key={searchValue} style={{maxHeight: '500px'}} shadow>
+        <ActionList
+            sections={searchResultSections}
+        />
+        </Scrollable>
+    );
+
+    const searchFieldMarkup = (
+        <TopBar.SearchField
+            placeholder="Search collections, tests and connectors"
+            showFocusBorder
+            onChange={handleSearchChange}
+            value={searchValue}
+        />
+    );
+    /* Search bar */
+
+
     const toggleIsUserMenuOpen = useCallback(
         () => setIsUserMenuOpen((isUserMenuOpen) => !isUserMenuOpen),
         [],
@@ -51,7 +99,7 @@ export default function Header() {
         api.logout().then(res => {
             resetAll();
             resetStore() ;
-            storeAccessToken(null)
+            resetSession();
             if(res.logoutUrl){
                 window.location.href = res.logoutUrl
             } else {
@@ -62,18 +110,6 @@ export default function Header() {
         })
     }
 
-    const debouncedSearch = debounce(async (searchQuery) => {
-        if (searchItemsArr.length === 0) {
-            searchItemsArr = func.getSearchItemsArr(allRoutes, allCollections)
-        }
-
-        if(searchQuery.length === 0){
-            setFilteredItemsArr(searchItemsArr)
-        }else{
-            const resultArr = searchItemsArr.filter((x) => x.content.toLowerCase().includes(searchQuery))
-            setFilteredItemsArr(resultArr)
-        }
-    }, 500);
 
     function createNewAccount() {
         api.saveToAccount(newAccount).then(resp => {
@@ -128,42 +164,6 @@ export default function Header() {
             initials={func.initials(username)}
             open={isUserMenuOpen}
             onToggle={toggleIsUserMenuOpen}
-        />
-    );
-
-    const handleSearchChange = useCallback((value) => {
-        setSearchValue(value);
-        debouncedSearch(value.toLowerCase())
-    }, []);
-
-    const handleNavigateSearch = (url) => {
-        navigate(url)
-        handleSearchChange('')
-    }
-
-    const searchItems = filteredItemsArr.slice(0,20).map((item) => {
-        const icon = item.type === 'page' ? PageMajor : DynamicSourceMajor;
-        return {
-            value: item.content,
-            content: <ContentWithIcon text={item.content} icon={icon} />,
-            onAction: () => handleNavigateSearch(item.url),
-        }
-    })
-
-    const searchResultsMarkup = (
-        <Scrollable style={{maxHeight: '300px'}} shadow>
-        <ActionList
-            items={searchItems}
-        />
-        </Scrollable>
-    );
-
-    const searchFieldMarkup = (
-        <TopBar.SearchField
-            placeholder="Search for API collections"
-            showFocusBorder
-            onChange={handleSearchChange}
-            value={searchValue}
         />
     );
 

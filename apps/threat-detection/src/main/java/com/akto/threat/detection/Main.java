@@ -20,13 +20,11 @@ public class Main {
 
   private static final String CONSUMER_GROUP_ID = "akto.threat_detection";
 
-  public static void main(String[] args) {
+  public static void main(String[] args) throws Exception {
     runMigrations();
 
     SessionFactory sessionFactory = SessionFactoryUtils.createFactory();
 
-    // TODO: Remove this before merging. Will be using cyborg for fetching templates
-    DaoInit.init(new ConnectionString(System.getenv("AKTO_MONGO_CONN")));
     KafkaConfig trafficKafka =
         KafkaConfig.newBuilder()
             .setGroupId(CONSUMER_GROUP_ID)
@@ -86,4 +84,5 @@ public class Main {
 
     flyway.migrate();
   }
+
 }

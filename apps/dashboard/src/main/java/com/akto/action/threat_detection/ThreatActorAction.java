@@ -12,7 +12,6 @@ import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.Li
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatActorByCountryResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatActorFilterResponse;
 import com.akto.proto.utils.ProtoMessageUtils;
-import com.akto.usage.UsageMetricCalculator;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mongodb.client.model.Filters;
 
@@ -60,6 +59,7 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
   String splunkToken;
   String actorIp;
   String status;
+  String eventType;
 
   private final CloseableHttpClient httpClient;
 
@@ -199,6 +199,7 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
         new HashMap<String, Object>() {
           {
             put("ref_id", refId);
+            put("event_type", eventType);
           }
         };
     String msg = objectMapper.valueToTree(body).toString();
@@ -267,7 +268,6 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
         try {
             wafClient = getAwsWafClient(awsWafConfig.getAwsAccessKey(), awsWafConfig.getAwsSecretKey(), awsWafConfig.getRegion());
             //ListWebAcLsResponse webAclsResponse = wafClient.listWebACLs(ListWebAcLsRequest.builder().scope(SCOPE).build());
-            //System.out.println("WebACLs Found: " + webAclsResponse.webACLs().size());
             loggerMaker.infoAndAddToDb("init aws client, for threat actor block");
         } catch (Exception e) {
             e.printStackTrace();
@@ -545,4 +545,13 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
   public void setActorId(List<String> actorId) {
     this.actorId = actorId;
   }
+
+  public String getEventType() {
+    return eventType;
+  }
+
+  public void setEventType(String eventType) {
+    this.eventType = eventType;
+  }
+
 }

@@ -6,7 +6,11 @@ on:
   workflow_dispatch:
     inputs:
       release_version:
+        description: 'Release version for the deployment'
         required: true
+      release_version_threat:
+        description: 'Release version for the Threat Detection deployment'
+        required: false
       skipTests:
         description: 'Do you want to skip unit tests?'
         required: true
@@ -33,12 +37,12 @@ on:
         description: Internal
       threat_detection:
         type: boolean
-        default: true
+        default: false
         description: Threat Detection Client
 
       threat_detection_backend:
         type: boolean
-        default: true
+        default: false
         description: Threat Deteection Backend
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
@@ -84,6 +88,13 @@ jobs:
         run: |
           wget -O Geo-Country.mmdb https://raw.githubusercontent.com/akto-api-security/tests-library/refs/heads/master/resources/Geo-Country.mmdb
 
+      - name: Create maxmind directory
+        run: mkdir -p ./libs/utils/src/main/resources/maxmind
+      - name: Download Maxmind Country database
+        working-directory: ./libs/utils/src/main/resources/maxmind
+        run: |
+          wget -O Geo-Country.mmdb https://raw.githubusercontent.com/akto-api-security/tests-library/refs/heads/master/resources/Geo-Country.mmdb
+
       - name: Prepare Dashboard polaris UI
         working-directory: ./apps/dashboard/web/polaris_web
         run: npm install && export RELEASE_VERSION=${{github.event.inputs.release_version}} && npm run build
@@ -116,7 +127,8 @@ jobs:
           ECR_REPOSITORY: akto-api-security
           IMAGE_TAG_1: local
           IMAGE_TAG_2: ${{ github.event.inputs.release_version }}_local
-          IMAGE_TAG_THREAT: threat_latest_image
+          IMAGE_TAG_THREAT: latest
+          IMAGE_TAG_THREAT_2: ${{github.event.inputs.release_version_threat}}
         run: |
           docker buildx create --use
           # Build a docker container and push it to DockerHub
@@ -153,12 +165,12 @@ jobs:
 
           if [[ "${{ github.event.inputs.threat_detection}}" == "true" ]]; then
             cd ../threat-detection
-            docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-threat-detection:$IMAGE_TAG_THREAT . --push
+            docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-threat-detection:$IMAGE_TAG_THREAT -t $ECR_REGISTRY/akto-threat-detection:$IMAGE_TAG_THREAT_2 . --push
           fi
 
           if [[ "${{ github.event.inputs.threat_detection_backend}}" == "true" ]]; then
             cd ../threat-detection-backend
-            docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-threat-detection-backend:$IMAGE_TAG_THREAT . --push
+            docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-threat-detection-backend:$IMAGE_TAG_THREAT -t $ECR_REGISTRY/akto-threat-detection-backend:$IMAGE_TAG_THREAT_2 . --push
           fi
       - name: Configure AWS Credentials for ECR
         uses: aws-actions/configure-aws-credentials@v1

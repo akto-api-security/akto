@@ -1067,6 +1067,12 @@ const quickStartFunc = {
             "Source Code": sourceCode,
         }
     },
+    getSourceCodeConnectors: function () {
+        const sourceCode = [
+            apiInventoryFromSourceCodeObj, githubObj, gitlabObj, bitbucketObj
+        ];
+        return sourceCode
+    },
 
     getConnectorsList: function () {
 

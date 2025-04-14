@@ -92,7 +92,7 @@ const headers = [
             };
         },
         shouldMerge: true,
-        boxWidth: '100px'
+        boxWidth: '140px'
     },
     {   
         title: 'Sensitive data',
@@ -237,6 +237,7 @@ function ApiCollections() {
     const setFilteredItems = ObserveStore(state => state.setFilteredItems) 
     const setSamples = ObserveStore(state => state.setSamples)
     const setSelectedUrl = ObserveStore(state => state.setSelectedUrl)
+    const [deactivateCollections, setDeactivateCollections] = useState([])
 
     const resetFunc = () => {
         setInventoryFlyout(false)
@@ -412,12 +413,13 @@ function ApiCollections() {
         setNormalData(dataObj.normal)
 
         // Separate active and deactivated collections
-        const deactivatedCollections = dataObj.prettify.filter(c => c.deactivated).map((c)=>{
+        const deactivatedCollectionsCopy = dataObj.prettify.filter(c => c.deactivated).map((c)=>{
             if(deactivatedCountInfo.hasOwnProperty(c.id)){
                 c.urlsCount = deactivatedCountInfo[c.id]
             }
             return c
         });
+        setDeactivateCollections(JSON.parse(JSON.stringify(deactivatedCollectionsCopy)));
         
         // Calculate summary data only for active collections
         const summary = transform.getSummaryData(dataObj.normal)
@@ -435,7 +437,7 @@ function ApiCollections() {
         const allGroupsForTmp = dataObj.prettify.filter((c) => c.type === "API_GROUP" && !c.deactivated);
         tmp.groups = allGroupsForTmp;
         tmp.custom = tmp.all.filter(x => !tmp.hostname.includes(x) && !x.deactivated && !tmp.groups.includes(x));
-        tmp.deactivated = deactivatedCollections
+        tmp.deactivated = deactivatedCollectionsCopy
         setData(tmp);
     }
 
@@ -509,10 +511,9 @@ function ApiCollections() {
                 onAction: () => exportCsv(selectedResources)
             }
         ];
-
-        const deactivated = allCollections.filter(x => { return x.deactivated }).map(x => x.id);
+        const defaultApiGroups = allCollections.filter(x => x.type === "API_GROUP" && x.automated).map(x => x.id);
+        const deactivated = deactivateCollections.map(x => x.id);
         const activated = allCollections.filter(x => { return !x.deactivated }).map(x => x.id);
-        const apiGrous = allCollections.filter(x => { return x?.type === 'API_GROUP' }).map(x => x?.id)
         if (selectedResources.every(v => { return activated.includes(v) })) {
             actions.push(
                 {
@@ -534,14 +535,13 @@ function ApiCollections() {
                 }
             )
         }
-        if (selectedResources.every(v => { return !apiGrous.includes(v) })) {
-            actions.push(
-                {
-                    content: `Remove collection${func.addPlurality(selectedResources.length)}`,
-                    onAction: () => handleCollectionsAction(selectedResources, api.deleteMultipleCollections, "deleted")
-                }
-            )
-        }
+        actions.push(
+            {
+                content: `Remove collection${func.addPlurality(selectedResources.length)}`,
+                onAction: () => handleCollectionsAction(selectedResources.filter(v => !defaultApiGroups.includes(v)), api.deleteMultipleCollections, "deleted")
+            }
+        )
+
 
         const apiCollectionShareRenderItem = (item) => {
             const { id, name, login, role } = item;

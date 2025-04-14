@@ -5,6 +5,7 @@ import {
     MarketingFilledMinor,
     ReportFilledMinor,
     DiamondAlertMinor,
+    StarFilledMinor,
     FinancesMinor,
 } from "@shopify/polaris-icons";
 import {useLocation, useNavigate} from "react-router-dom";
@@ -17,6 +18,7 @@ import api from "../../../../signup/api";
 import {useState} from "react";
 import func from "@/util/func";
 import Dropdown from "../Dropdown";
+import SessionStore from "../../../../main/SessionStore";
 
 export default function LeftNav() {
     const navigate = useNavigate();
@@ -31,16 +33,18 @@ export default function LeftNav() {
     const activeAccount = Store(state => state.activeAccount);
     const resetAll = PersistStore(state => state.resetAll);
     const resetStore = LocalStore(state => state.resetStore);
+    const resetSession = SessionStore(state => state.resetStore);
 
     const handleSelect = (selectedId) => {
         setLeftNavSelected(selectedId);
     };
 
     const handleAccountChange = async (selected) => {
-        await api.goToAccount(selected);
-        func.setToast(true, false, `Switched to account ${accounts[selected]}`);
         resetAll();
         resetStore();
+        resetSession();
+        await api.goToAccount(selected);
+        func.setToast(true, false, `Switched to account ${accounts[selected]}`);
         window.location.href = '/dashboard/observe/inventory';
     };
 
@@ -299,8 +303,7 @@ export default function LeftNav() {
                             subNavigationItems: reportsSubNavigationItems,
                             key: "6",
                         },
-                        window?.STIGG_FEATURE_WISE_ALLOWED?.THREAT_DETECTION?.isGranted ?
-                             {
+                        ...(window?.STIGG_FEATURE_WISE_ALLOWED?.THREAT_DETECTION?.isGranted ? [{
                                 label: (
                                     <Text variant="bodyMd" fontWeight="medium">
                                         API Protection
@@ -356,9 +359,24 @@ export default function LeftNav() {
                                             leftNavSelected === "dashboard_threat_policy",
                                     },
                                 ],
-                            }
-                            : {},
-                    ].filter(item => item.label !== null)}
+                            }] : []),
+                            ...(window?.STIGG_FEATURE_WISE_ALLOWED?.AI_AGENTS?.isGranted ? [{
+                            label: (
+                                <Text variant="bodyMd" fontWeight="medium">
+                                    AI Agents
+                                </Text>
+                            ),
+                            icon: StarFilledMinor,
+                            onClick: () => {
+                                handleSelect("agent_team_members");
+                                navigate("/dashboard/agent-team/members");
+                                setActive("normal");
+                            },
+                            selected: leftNavSelected.includes("agent_team"),
+                            url: "#",
+                            key: "8",
+                        }] : []),
+                    ]}
                 />
             </Navigation>
         </div>

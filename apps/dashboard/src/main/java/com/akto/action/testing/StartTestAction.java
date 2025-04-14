@@ -9,13 +9,16 @@ import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing.sources.TestSourceConfigsDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dao.testing.*;
+import com.akto.dao.testing.config.TestSuiteDao;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.testing.config.EditableTestingRunConfig;
+import com.akto.dto.testing.config.TestSuites;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.User;
 import com.akto.dto.ApiToken.Utility;
 import com.akto.dto.RBAC;
 import com.akto.dto.CollectionConditions.TestConfigsAdvancedSettings;
+import com.akto.dto.RBAC.Role;
 import com.akto.dto.test_editor.Info;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
@@ -84,6 +87,7 @@ public class StartTestAction extends UserAction {
     private String searchString;
     private boolean continuousTesting;
     private int testingRunConfigId;
+    private List<String> testSuiteIds;
 
     private Map<String,Long> allTestsCountMap = new HashMap<>();
     private Map<String,Integer> issuesSummaryInfoMap = new HashMap<>();
@@ -134,7 +138,7 @@ public class StartTestAction extends UserAction {
             }
         }
 
-        AuthMechanism authMechanism = TestRolesDao.instance.fetchAttackerToken(0, null);
+        AuthMechanism authMechanism = TestRolesDao.instance.fetchAttackerToken(null);
         if (authMechanism == null && testIdConfig == 0) {
             addActionError("Please set authentication mechanism before you test any APIs");
             return null;
@@ -172,6 +176,8 @@ public class StartTestAction extends UserAction {
             if(this.testConfigsAdvancedSettings != null && !this.testConfigsAdvancedSettings.isEmpty()){
                 testingRunConfig.setConfigsAdvancedSettings(this.testConfigsAdvancedSettings);
             }
+            List<String> testSuiteIdsObj = new ArrayList<>(testSuiteIds);
+            testingRunConfig.setTestSuiteIds(testSuiteIdsObj);
             this.testIdConfig = testingRunConfig.getId();
             TestingRunConfigDao.instance.insertOne(testingRunConfig);
         }
@@ -289,6 +295,9 @@ public class StartTestAction extends UserAction {
             if (this.overriddenTestAppUrl != null || this.selectedTests != null) {
                 int id = UUID.randomUUID().hashCode() & 0xfffffff;
                 TestingRunConfig testingRunConfig = new TestingRunConfig(id, null, this.selectedTests, null, this.overriddenTestAppUrl, this.testRoleId);
+
+                List<String> testSuiteIdsObj = new ArrayList<>(testSuiteIds);
+                testingRunConfig.setTestSuiteIds(testSuiteIdsObj);
                 this.testIdConfig = testingRunConfig.getId();
                 TestingRunConfigDao.instance.insertOne(testingRunConfig);
             } 
@@ -314,14 +323,24 @@ public class StartTestAction extends UserAction {
         }
 
         try {
-            if (DashboardMode.isSaasDeployment() && !com.akto.testing.Utils.isTestingRunForDemoCollection(localTestingRun)) {
-                int accountId = Context.accountId.get();
-                User user = AccountAction.addUserToExistingAccount("arjun@akto.io", accountId);
-                if (user != null) {
-                    RBACDao.instance.insertOne(
-                            new RBAC(user.getId(), RBAC.Role.DEVELOPER.getName(), accountId));
-                }
-            }
+            // if (DashboardMode.isSaasDeployment() && !com.akto.testing.Utils.isTestingRunForDemoCollection(localTestingRun)) {
+            //     int accountId = Context.accountId.get();
+            //     User user = AccountAction.addUserToExistingAccount("arjun@akto.io", accountId);
+            //     if (user != null) {
+                    
+            //         RBACDao.instance.updateOneNoUpsert(
+            //             Filters.and(
+            //                 Filters.eq(RBAC.USER_ID, user.getId()),
+            //                 Filters.eq(RBAC.ACCOUNT_ID, accountId)
+            //             ),
+            //             Updates.combine(
+            //                 Updates.set(RBAC.USER_ID, user.getId()),
+            //                 Updates.set(RBAC.ACCOUNT_ID, accountId),
+            //                 Updates.set(RBAC.ROLE, Role.DEVELOPER)
+            //             )
+            //         );
+            //     }
+            // }
         } catch (Exception e) {
             e.printStackTrace();
             loggerMaker.errorAndAddToDb(e, "error in adding user startTest " + e.getMessage());
@@ -480,7 +499,7 @@ public class StartTestAction extends UserAction {
 
     public String retrieveAllCollectionTests() {
 
-        this.authMechanism = TestRolesDao.instance.fetchAttackerToken(0, null);
+        this.authMechanism = TestRolesDao.instance.fetchAttackerToken(null);
 
         ArrayList<Bson> testingRunFilters = new ArrayList<>();
         Bson testingRunTypeFilter = getTestingRunTypeFilter(testingRunType);
@@ -1236,9 +1255,12 @@ public class StartTestAction extends UserAction {
                 if (editableTestingRunConfig.getConfigsAdvancedSettings() != null && !editableTestingRunConfig.getConfigsAdvancedSettings().equals(existingTestingRunConfig.getConfigsAdvancedSettings())) {
                     updates.add(Updates.set(TestingRunConfig.TEST_CONFIGS_ADVANCED_SETTINGS, editableTestingRunConfig.getConfigsAdvancedSettings()));
                 }
-                
-                if (editableTestingRunConfig.getTestSubCategoryList() != null &&
-                    !editableTestingRunConfig.getTestSubCategoryList().equals(existingTestingRunConfig.getTestSubCategoryList())) {
+
+                if(editableTestingRunConfig.getTestSuiteIds() != null && !editableTestingRunConfig.getTestSuiteIds().equals(existingTestingRunConfig.getTestSuiteIds())){
+                    updates.add(Updates.set(TestingRunConfig.TEST_SUITE_IDS, editableTestingRunConfig.getTestSuiteIds()));
+                }   
+
+                if (editableTestingRunConfig.getTestSubCategoryList() != null && !editableTestingRunConfig.getTestSubCategoryList().equals(existingTestingRunConfig.getTestSubCategoryList())) {
                     updates.add(Updates.set(TestingRunConfig.TEST_SUBCATEGORY_LIST, editableTestingRunConfig.getTestSubCategoryList()));
                 }
                 
@@ -1796,4 +1818,7 @@ public class StartTestAction extends UserAction {
         this.recurringMonthly = recurringMonthly;
     }
 
+    public void setTestSuiteIds(List<String> testSuiteIds) {
+        this.testSuiteIds = testSuiteIds;
+    }
 }

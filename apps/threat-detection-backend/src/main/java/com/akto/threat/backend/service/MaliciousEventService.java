@@ -14,7 +14,6 @@ import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.Th
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatActorFilterResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.TimeRangeFilter;
 import com.akto.proto.generated.threat_detection.service.malicious_alert_service.v1.RecordMaliciousEventRequest;
-import com.akto.threat.backend.client.IPLookupClient;
 import com.akto.threat.backend.constants.KafkaTopic;
 import com.akto.threat.backend.constants.MongoDBCollection;
 import com.akto.threat.backend.db.AggregateSampleMaliciousEventModel;
@@ -39,13 +38,11 @@ public class MaliciousEventService {
 
   private final Kafka kafka;
   private final MongoClient mongoClient;
-  private final IPLookupClient ipLookupClient;
 
   public MaliciousEventService(
-      KafkaConfig kafkaConfig, MongoClient mongoClient, IPLookupClient ipLookupClient) {
+      KafkaConfig kafkaConfig, MongoClient mongoClient) {
     this.kafka = new Kafka(kafkaConfig);
     this.mongoClient = mongoClient;
-    this.ipLookupClient = ipLookupClient;
   }
 
   public void recordMaliciousEvent(String accountId, RecordMaliciousEventRequest request) {
@@ -73,8 +70,7 @@ public class MaliciousEventService {
             .setLatestApiCollectionId(evt.getLatestApiCollectionId())
             .setEventType(maliciousEventType)
             .setLatestApiIp(evt.getLatestApiIp())
-            .setCountry(
-                this.ipLookupClient.getCountryISOCodeGivenIp(evt.getLatestApiIp()).orElse(""))
+            .setCountry(evt.getMetadata().getCountryCode())
             .setCategory(evt.getCategory())
             .setSubCategory(evt.getSubCategory())
             .setRefId(refId)
@@ -237,6 +233,7 @@ public class MaliciousEventService {
                 .setType(evt.getType())
                 .setRefId(evt.getRefId())
                 .setSeverity(evt.getSeverity())
+                .setEventTypeVal(evt.getEventType().toString())
                 .build());
       }
       return ListMaliciousRequestsResponse.newBuilder()

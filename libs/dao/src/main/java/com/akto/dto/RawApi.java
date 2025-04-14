@@ -1,31 +1,36 @@
 package com.akto.dto;
 
-import java.net.URI;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 import com.akto.dto.type.RequestTemplate;
-import com.alibaba.fastjson2.JSON;
-import com.alibaba.fastjson2.JSONObject;
 import com.mongodb.BasicDBList;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mongodb.BasicDBObject;
 
-import javax.naming.LimitExceededException;
 
 public class RawApi {
 
     private OriginalHttpRequest request;
     private OriginalHttpResponse response;
+    private RawApiMetadata metadata;
     private String originalMessage;
+
     static ObjectMapper om = new ObjectMapper();
 
     public RawApi(OriginalHttpRequest request, OriginalHttpResponse response, String originalMessage) {
         this.request = request;
         this.response = response;
         this.originalMessage = originalMessage;
+    }
+
+    public RawApi(OriginalHttpRequest request, OriginalHttpResponse response, String originalMessage, RawApiMetadata metadata) {
+        this.request = request;
+        this.response = response;
+        this.originalMessage = originalMessage;
+        this.metadata = metadata;
     }
 
     public static RawApi buildFromMessage(String message, boolean overrideHostHeader){
@@ -160,10 +165,7 @@ public class RawApi {
         if (!isPayloadEqual(payload, compareWithPayload)) {
             return false;
         }
-        
-        // System.out.println(m1);
-        // System.out.println(m2);
-        // System.out.println(m1.equals(m2));
+
         // if (!payload.equalsIgnoreCase(compareWithPayload)) {
         //     return false;
         // }
@@ -256,14 +258,14 @@ public class RawApi {
         result.put("method", this.request.getMethod());
         result.put("requestPayload",this.request.getBody());
         result.put("responsePayload",this.response.getBody());
-        result.put("ip", "");
+        result.put("ip", this.request.getSourceIp());
         result.put("time",time+"");
         result.put("statusCode", this.response.getStatusCode()+"");
         result.put("type",type);
         result.put("status", "");
         result.put("contentType",contentType);
         result.put("source", source);
-        result.put("destIp", "");
+        result.put("destIp", this.request.getDestinationIp());
 
         this.originalMessage = om.writeValueAsString(result);
     }
@@ -313,5 +315,13 @@ public class RawApi {
 
     public void setOriginalMessage(String originalMessage) {
         this.originalMessage = originalMessage;
+    }
+
+    public RawApiMetadata getRawApiMetadata(){
+        return this.metadata;
+    }
+
+    public void setRawApiMetdata(RawApiMetadata metadata){
+        this.metadata = metadata;
     }
 }

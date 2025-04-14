@@ -34,13 +34,14 @@ public class ReportAction extends UserAction {
 
     private String reportId;
     private String organizationName;
+    private String username;
     private String reportDate;
     private String reportUrl;
     private String pdf;
     private String status;
     private boolean firstPollRequest;
 
-    private static final LoggerMaker loggerMaker = new LoggerMaker(ReportAction.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(ReportAction.class, LogDb.DASHBOARD);
 
     public String downloadReportPDF() {
         if(reportUrl == null || reportUrl.isEmpty()) {
@@ -101,7 +102,7 @@ public class ReportAction extends UserAction {
                 String url = System.getenv("PUPPETEER_REPLAY_SERVICE_URL") + "/downloadReportPDF";
                 JSONObject requestBody = new JSONObject();
                 requestBody.put("reportId", reportId);
-                requestBody.put("username", user.getName());
+                requestBody.put("username", username);
                 requestBody.put("accessToken", accessToken);
                 requestBody.put("jsessionId", jsessionId);
                 requestBody.put("organizationName", organizationName);
@@ -211,5 +212,9 @@ public class ReportAction extends UserAction {
 
     public void setFirstPollRequest(boolean firstPollRequest) {
         this.firstPollRequest = firstPollRequest;
+    }
+
+    public void setUsername(String username) {
+        this.username = username;
     }
 }

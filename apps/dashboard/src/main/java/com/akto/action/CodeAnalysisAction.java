@@ -52,7 +52,7 @@ public class CodeAnalysisAction extends UserAction {
     private CodeAnalysisRepo.SourceCodeType sourceCodeType;
     public static final int MAX_BATCH_SIZE = 100;
 
-    private static final LoggerMaker loggerMaker = new LoggerMaker(CodeAnalysisAction.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(CodeAnalysisAction.class, LogDb.DASHBOARD);;
     private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
 
     public void sendMixpanelEvent() {
@@ -126,9 +126,8 @@ public class CodeAnalysisAction extends UserAction {
         // todo:  If API collection does exist, create it
         ApiCollection apiCollection = ApiCollectionsDao.instance.findByName(apiCollectionName);
         if (apiCollection == null) {
-            loggerMaker.errorAndAddToDb("API collection not found " + apiCollectionName, LogDb.DASHBOARD);
-            addActionError("API collection not found: " + apiCollectionName);
-            return ERROR.toUpperCase();
+            apiCollection = new ApiCollection(Context.now(), apiCollectionName, Context.now(), new HashSet<>(), null, 0, false, false);
+            ApiCollectionsDao.instance.insertOne(apiCollection);
         }
 
         /*

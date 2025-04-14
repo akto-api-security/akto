@@ -122,6 +122,10 @@ public class GlobalEnums {
         SLOW, FAST
     }
 
+    public enum ENCODING_TYPE{
+        BASE_64_ENCODED, JWT
+    }
+
 
     /* ********************************************************************** */
 }

@@ -17,6 +17,7 @@ public class DashboardMaliciousEvent {
   private String refId;
   private String subCategory;
   private String severity;
+  private String eventType;
 
   public DashboardMaliciousEvent() {}
 
@@ -33,7 +34,8 @@ public class DashboardMaliciousEvent {
       String type,
       String refId,
       String subCategory,
-      String severity) {
+      String severity,
+      String eventType) {
     this.id = id;
     this.actor = actor;
     this.filter_id = filter;
@@ -47,6 +49,7 @@ public class DashboardMaliciousEvent {
     this.refId = refId;
     this.subCategory = subCategory;
     this.severity = severity;
+    this.eventType = eventType;
   }
 
   public String getId() {
@@ -151,6 +154,14 @@ public class DashboardMaliciousEvent {
 
   public void setSeverity(String severity) {
     this.severity = severity;
+  }
+
+  public String getEventType() {
+    return eventType;
+  }
+
+  public void setEventType(String eventType) {
+    this.eventType = eventType;
   }
 
 }

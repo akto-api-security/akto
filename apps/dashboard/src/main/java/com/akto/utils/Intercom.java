@@ -1,16 +1,15 @@
 package com.akto.utils;
 
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
+import com.akto.onprem.Constants;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
-
-import com.akto.onprem.Constants;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 public class Intercom {
 	
-	private static final Logger logger = LoggerFactory.getLogger(Intercom.class);
+	private static final LoggerMaker logger = new LoggerMaker(Intercom.class, LogDb.DASHBOARD);;
 	
 	public static String getUserHash(String email) {
 		try {
