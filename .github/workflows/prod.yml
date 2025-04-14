@@ -127,7 +127,8 @@ jobs:
           ECR_REPOSITORY: akto-api-security
           IMAGE_TAG_1: local
           IMAGE_TAG_2: ${{ github.event.inputs.release_version }}_local
-          IMAGE_TAG_THREAT: logtest
+          IMAGE_TAG_THREAT: latest
+          IMAGE_TAG_THREAT_2: ${{github.event.inputs.release_version_threat}}
         run: |
           docker buildx create --use
           # Build a docker container and push it to DockerHub
@@ -164,12 +165,12 @@ jobs:
 
           if [[ "${{ github.event.inputs.threat_detection}}" == "true" ]]; then
             cd ../threat-detection
-            docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-threat-detection:$IMAGE_TAG_THREAT . --push
+            docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-threat-detection:$IMAGE_TAG_THREAT -t $ECR_REGISTRY/akto-threat-detection:$IMAGE_TAG_THREAT_2 . --push
           fi
 
           if [[ "${{ github.event.inputs.threat_detection_backend}}" == "true" ]]; then
             cd ../threat-detection-backend
-            docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-threat-detection-backend:$IMAGE_TAG_THREAT . --push
+            docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-threat-detection-backend:$IMAGE_TAG_THREAT -t $ECR_REGISTRY/akto-threat-detection-backend:$IMAGE_TAG_THREAT_2 . --push
           fi
       - name: Configure AWS Credentials for ECR
         uses: aws-actions/configure-aws-credentials@v1
