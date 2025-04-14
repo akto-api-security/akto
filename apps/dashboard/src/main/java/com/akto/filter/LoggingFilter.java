@@ -57,7 +57,7 @@ public class LoggingFilter implements Filter {
 
             int endTs = Context.now();
             String result = "url="+uri + ";method="+method + ";statusCode="+statusCode + ";username="+username + ";ip="+ ip + ";totalTime=" + (endTs - startTs) + ";apiCounterVal=" + apiCounter.get();
-            logger.info(result);
+            logger.debug(result);
 
         } catch (Exception e) {
             logger.error("Error: ", e);

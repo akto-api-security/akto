@@ -38,13 +38,13 @@ public class TokenGeneratorCron {
                     @Override
                     public void accept(Account t) {
                         if (!DashboardMode.isOnPremDeployment() && !DashboardMode.isSaasDeployment()) {
-                            loggerMaker.infoAndAddToDb("Skipping tokenGeneratorScheduler, deployment type condition not satisfied");
+                            loggerMaker.debugAndAddToDb("Skipping tokenGeneratorScheduler, deployment type condition not satisfied");
                             return;
                         }
 
                         boolean dibs = callDibs(Cluster.TOKEN_GENERATOR_CRON, 600, 60);
                         if(!dibs){
-                            loggerMaker.infoAndAddToDb("Skipping tokenGeneratorScheduler, lock not acquired");
+                            loggerMaker.debugAndAddToDb("Skipping tokenGeneratorScheduler, lock not acquired");
                             return;
                         }
 
@@ -53,7 +53,7 @@ public class TokenGeneratorCron {
                             Filters.in(Organization.ACCOUNTS, accountId)
                         );
                         if (organization == null) {
-                            loggerMaker.infoAndAddToDb("Skipping token generation for account " +  accountId + "organization not found");
+                            loggerMaker.debugAndAddToDb("Skipping token generation for account " +  accountId + "organization not found");
                             return;
                         }
 
@@ -62,18 +62,18 @@ public class TokenGeneratorCron {
                         reqBody.put(Tokens.ACCOUNT_ID, accountId);
                         BasicDBObject resp = UsageMetricUtils.fetchFromBillingService("saveToken", reqBody);
                         if (resp == null || resp.get("tokens") == null || !(resp.get("tokens") instanceof BasicDBObject)) {
-                            loggerMaker.infoAndAddToDb("Skipping token generation for account " +  accountId + "fetch token call failed");
+                            loggerMaker.debugAndAddToDb("Skipping token generation for account " +  accountId + "fetch token call failed");
                             return;
                         }
                         
                         BasicDBObject respToken = (BasicDBObject) resp.get("tokens");
                         if (respToken.get(Tokens.UPDATED_AT) == null) {
-                            loggerMaker.infoAndAddToDb("Skipping saving token in dashboard for account " +  accountId + "updated at is null");
+                            loggerMaker.debugAndAddToDb("Skipping saving token in dashboard for account " +  accountId + "updated at is null");
                             return;
                         }
 
                         if (respToken.get(Tokens.TOKEN) == null) {
-                            loggerMaker.infoAndAddToDb("Skipping saving token in dashboard for account " +  accountId + "token received is null");
+                            loggerMaker.debugAndAddToDb("Skipping saving token in dashboard for account " +  accountId + "token received is null");
                             return;
                         }
                         Bson filters = Filters.and(

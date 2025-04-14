@@ -51,7 +51,7 @@ public class ListApisEndpointNames implements DataExtractor<String>{
                 result = filter.filterData(result);
                 int newSize = result.size();
                 if(originalSize > newSize){
-                    logger.info("Filtered " + (originalSize - newSize) + " endpoints");
+                    logger.debug("Filtered " + (originalSize - newSize) + " endpoints");
                 }
             }
         }

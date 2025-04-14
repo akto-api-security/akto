@@ -65,7 +65,7 @@ public class AccessTokenAction implements Action, ServletResponseAware, ServletR
         }
 
         if (refreshToken == null) {
-            logger.info("Could not find refresh token in generateAccessTokenFromServletRequest.");
+            logger.debug("Could not find refresh token in generateAccessTokenFromServletRequest.");
             return null;
         }
 
@@ -84,7 +84,7 @@ public class AccessTokenAction implements Action, ServletResponseAware, ServletR
         String username = token.getUsername();
         User user = UsersDao.instance.findOne("login", username);
         if (user == null) {
-            logger.info("Returning as user not found.");
+            logger.debug("Returning as user not found.");
             return null;
         }
 
@@ -92,7 +92,7 @@ public class AccessTokenAction implements Action, ServletResponseAware, ServletR
         if (refreshTokens != null && refreshTokens.contains(refreshToken)) {
             return token;
         } else {
-            logger.info( "NOT FOUND");
+            logger.debug( "NOT FOUND");
             return null;
         }
 

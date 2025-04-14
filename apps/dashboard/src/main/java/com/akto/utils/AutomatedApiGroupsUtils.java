@@ -87,7 +87,7 @@ public class AutomatedApiGroupsUtils {
     }
 
     public static void deleteAutomatedAPIGroup(List<ApiCollection> apiCollectionsDelete) {
-        loggerMaker.infoAndAddToDb("Deleting automated API groups - count: " + apiCollectionsDelete.size(), LogDb.DASHBOARD);
+        loggerMaker.debugAndAddToDb("Deleting automated API groups - count: " + apiCollectionsDelete.size(), LogDb.DASHBOARD);
         
         try {
             ApiCollectionsAction apiCollectionsAction = new ApiCollectionsAction();
@@ -106,7 +106,7 @@ public class AutomatedApiGroupsUtils {
     }
 
     public static void processAutomatedGroups(List<CSVRecord> apiGroupRecords) {
-        loggerMaker.infoAndAddToDb("Syncing automated API groups", LogDb.DASHBOARD);
+        loggerMaker.debugAndAddToDb("Syncing automated API groups", LogDb.DASHBOARD);
 
         try {
             Map<Integer, ApiCollection> apiCollectionsMap = new HashMap<>(); 
@@ -172,7 +172,7 @@ public class AutomatedApiGroupsUtils {
 
             if (bulkUpdatesForApiCollections.size() > 0) {
                 try {
-                    loggerMaker.infoAndAddToDb("Performing automated API group bulk writes, count: " + bulkUpdatesForApiCollections.size(), LogDb.DASHBOARD);
+                    loggerMaker.debugAndAddToDb("Performing automated API group bulk writes, count: " + bulkUpdatesForApiCollections.size(), LogDb.DASHBOARD);
                     for (int start = 0; start < bulkUpdatesForApiCollections.size(); start += AutomatedApiGroupsUtils.UPDATE_BATCH_SIZE) {
                         int end = Math.min(start + AutomatedApiGroupsUtils.UPDATE_BATCH_SIZE, bulkUpdatesForApiCollections.size());
                         List<WriteModel<ApiCollection>> batch = bulkUpdatesForApiCollections.subList(start, end);

@@ -137,7 +137,7 @@ public class TestRolesAction extends UserAction {
     }
 
     public String deleteTestRole() {
-        loggerMaker.infoAndAddToDb("Started deleting role: " + roleName, LoggerMaker.LogDb.DASHBOARD);
+        loggerMaker.debugAndAddToDb("Started deleting role: " + roleName, LoggerMaker.LogDb.DASHBOARD);
         TestRoles role = getRole();
         if (role == null) {
             addActionError("Role doesn't exists");
@@ -167,7 +167,7 @@ public class TestRolesAction extends UserAction {
 
         Bson roleFilterQ = Filters.eq(TestRoles.NAME, roleName);
         DeleteResult delete = TestRolesDao.instance.deleteAll(roleFilterQ);
-        loggerMaker.infoAndAddToDb("Deleted role: " + roleName + " : " + delete, LoggerMaker.LogDb.DASHBOARD);
+        loggerMaker.debugAndAddToDb("Deleted role: " + roleName + " : " + delete, LoggerMaker.LogDb.DASHBOARD);
 
         AccessMatrixTaskAction accessMatrixTaskAction = new AccessMatrixTaskAction();
         accessMatrixTaskAction.setRoleName(roleName);

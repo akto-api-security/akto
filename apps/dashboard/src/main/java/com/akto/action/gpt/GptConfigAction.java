@@ -92,7 +92,7 @@ public class GptConfigAction extends UserAction {
                     new BasicDBObject("$set", new BasicDBObject("state", aktoGptConfig.get("state"))));
         }
         currentState = fetchUpdatedAktoGptConfigs();
-        logger.info("Current state of AktoGptConfig is {}", currentState);
+        logger.debug("Current state of AktoGptConfig is {}", currentState);
         return SUCCESS.toUpperCase();
     }
 

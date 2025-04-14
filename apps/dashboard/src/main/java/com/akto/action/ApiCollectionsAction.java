@@ -76,9 +76,9 @@ public class ApiCollectionsAction extends UserAction {
     
     public List<ApiCollection> fillApiCollectionsUrlCount(List<ApiCollection> apiCollections, Bson filter) {
 	int tsRandom = Context.now();
-	loggerMaker.infoAndAddToDb("fillApiCollectionsUrlCount started: " + tsRandom, LoggerMaker.LogDb.DASHBOARD); 
+	loggerMaker.debugAndAddToDb("fillApiCollectionsUrlCount started: " + tsRandom, LoggerMaker.LogDb.DASHBOARD);
         Map<Integer, Integer> countMap = ApiCollectionsDao.instance.buildEndpointsCountToApiCollectionMap(filter);
-	loggerMaker.infoAndAddToDb("fillApiCollectionsUrlCount buildEndpointsCountToApiCollectionMap done: " + tsRandom, LoggerMaker.LogDb.DASHBOARD);     
+	loggerMaker.debugAndAddToDb("fillApiCollectionsUrlCount buildEndpointsCountToApiCollectionMap done: " + tsRandom, LoggerMaker.LogDb.DASHBOARD);
 
         for (ApiCollection apiCollection: apiCollections) {
             int apiCollectionId = apiCollection.getId();
@@ -380,11 +380,11 @@ public class ApiCollectionsAction extends UserAction {
             return ERROR.toUpperCase();
         }
 
-        loggerMaker.infoAndAddToDb("Started adding " + this.apiList.size() + " apis into custom collection.", LogDb.DASHBOARD);
+        loggerMaker.debugAndAddToDb("Started adding " + this.apiList.size() + " apis into custom collection.", LogDb.DASHBOARD);
 
         CustomTestingEndpoints condition = new CustomTestingEndpoints(apiList, CustomTestingEndpoints.Operator.OR);
         apiCollection.addToConditions(condition);
-        loggerMaker.infoAndAddToDb("Final conditions for collection: " +  apiCollection.getName() + " are: " + apiCollection.getConditions().toString());
+        loggerMaker.debugAndAddToDb("Final conditions for collection: " +  apiCollection.getName() + " are: " + apiCollection.getConditions().toString());
         ApiCollectionUsers.updateApiCollection(apiCollection.getConditions(), apiCollection.getId());
         ApiCollectionUsers.addToCollectionsForCollectionId(apiCollection.getConditions(), apiCollection.getId());
 
@@ -524,21 +524,21 @@ public class ApiCollectionsAction extends UserAction {
     public static void dropSampleDataForApiCollection() {
         List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(Filters.eq(ApiCollection.SAMPLE_COLLECTIONS_DROPPED, false));
         if(apiCollections.isEmpty()) {
-            loggerMaker.infoAndAddToDb("No api collections to fix sample data for", LoggerMaker.LogDb.DASHBOARD);
+            loggerMaker.debugAndAddToDb("No api collections to fix sample data for", LoggerMaker.LogDb.DASHBOARD);
             return;
         }
-        loggerMaker.infoAndAddToDb(String.format("Fixing sample data for %d api collections", apiCollections.size()), LoggerMaker.LogDb.DASHBOARD);
+        loggerMaker.debugAndAddToDb(String.format("Fixing sample data for %d api collections", apiCollections.size()), LoggerMaker.LogDb.DASHBOARD);
         for (ApiCollection apiCollection: apiCollections) {
             int apiCollectionId = apiCollection.getId();
             UpdateResult updateResult = SampleDataDao.instance.updateManyNoUpsert(Filters.eq("_id.apiCollectionId", apiCollectionId), Updates.set("samples", Collections.emptyList()));
-            loggerMaker.infoAndAddToDb(String.format("Fixed %d sample data for api collection %d", updateResult.getModifiedCount(), apiCollectionId), LoggerMaker.LogDb.DASHBOARD);
+            loggerMaker.debugAndAddToDb(String.format("Fixed %d sample data for api collection %d", updateResult.getModifiedCount(), apiCollectionId), LoggerMaker.LogDb.DASHBOARD);
             updateResult = SensitiveSampleDataDao.instance.updateManyNoUpsert(Filters.eq("_id.apiCollectionId", apiCollectionId), Updates.set("sampleData", Collections.emptyList()));
-            loggerMaker.infoAndAddToDb(String.format("Fixed %d sensitive sample data for api collection %d", updateResult.getModifiedCount(), apiCollectionId), LoggerMaker.LogDb.DASHBOARD);
+            loggerMaker.debugAndAddToDb(String.format("Fixed %d sensitive sample data for api collection %d", updateResult.getModifiedCount(), apiCollectionId), LoggerMaker.LogDb.DASHBOARD);
             updateResult = SingleTypeInfoDao.instance.updateManyNoUpsert(Filters.and(Filters.eq("apiCollectionId", apiCollectionId), Filters.exists("values", true)), Updates.set("values.elements", Collections.emptyList()));
-            loggerMaker.infoAndAddToDb(String.format("Fixed %d sti for api collection %d", updateResult.getModifiedCount(), apiCollectionId), LoggerMaker.LogDb.DASHBOARD);
+            loggerMaker.debugAndAddToDb(String.format("Fixed %d sti for api collection %d", updateResult.getModifiedCount(), apiCollectionId), LoggerMaker.LogDb.DASHBOARD);
             ApiCollectionsDao.instance.updateOneNoUpsert(Filters.eq("_id", apiCollectionId), Updates.set(ApiCollection.SAMPLE_COLLECTIONS_DROPPED, true));
         }
-        loggerMaker.infoAndAddToDb(String.format("Fixed sample data for %d api collections", apiCollections.size()), LoggerMaker.LogDb.DASHBOARD);
+        loggerMaker.debugAndAddToDb(String.format("Fixed sample data for %d api collections", apiCollections.size()), LoggerMaker.LogDb.DASHBOARD);
     }
 
     public String redactCollection() {
@@ -551,7 +551,7 @@ public class ApiCollectionsAction extends UserAction {
             int accountId = Context.accountId.get();
             Runnable r = () -> {
                 Context.accountId.set(accountId);
-                loggerMaker.infoAndAddToDb("Triggered job to delete sample data", LoggerMaker.LogDb.DASHBOARD);
+                loggerMaker.debugAndAddToDb("Triggered job to delete sample data", LoggerMaker.LogDb.DASHBOARD);
                 dropSampleDataForApiCollection();
             };
             new Thread(r).start();

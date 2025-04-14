@@ -64,7 +64,7 @@ public class HarAction extends UserAction {
         Set<Integer> demoCollections = UsageMetricCalculator.getDemos();
         Set<Integer> deactivatedCollections = UsageMetricCalculator.getDeactivated();
 
-        loggerMaker.infoAndAddToDb("HarAction.execute() started", LoggerMaker.LogDb.DASHBOARD);
+        loggerMaker.debugAndAddToDb("HarAction.execute() started", LoggerMaker.LogDb.DASHBOARD);
         if (apiCollectionName != null) {
             apiCollection =  ApiCollectionsDao.instance.findByName(apiCollectionName);
             if (apiCollection == null) {
@@ -145,14 +145,14 @@ public class HarAction extends UserAction {
 
         try {
             HAR har = new HAR();
-            loggerMaker.infoAndAddToDb("Har file upload processing for collectionId:" + apiCollectionId, LoggerMaker.LogDb.DASHBOARD);
+            loggerMaker.debugAndAddToDb("Har file upload processing for collectionId:" + apiCollectionId, LoggerMaker.LogDb.DASHBOARD);
             String zippedString = GzipUtils.zipString(harString);
             com.akto.dto.files.File file = new com.akto.dto.files.File(HttpResponseParams.Source.HAR.toString(),zippedString);
             FilesDao.instance.insertOne(file);
             List<String> messages = har.getMessages(harString, apiCollectionId, Context.accountId.get(), source);
             harErrors = har.getErrors();
             Utils.pushDataToKafka(apiCollectionId, topic, messages, harErrors, skipKafka, true);
-            loggerMaker.infoAndAddToDb("Har file upload processing for collectionId:" + apiCollectionId + " finished", LoggerMaker.LogDb.DASHBOARD);
+            loggerMaker.debugAndAddToDb("Har file upload processing for collectionId:" + apiCollectionId + " finished", LoggerMaker.LogDb.DASHBOARD);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e,"Exception while parsing harString", LoggerMaker.LogDb.DASHBOARD);
             e.printStackTrace();

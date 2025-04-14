@@ -56,11 +56,11 @@ public class InviteUserAction extends UserAction{
         String domain = loginArr[1];
         String inviteeEmailDomain = inviteeEmailArr[1];
 
-        loggerMaker.infoAndAddToDb("inviteeEmailDomain: " + inviteeEmailDomain);
-        loggerMaker.infoAndAddToDb("admin domain: " + domain);
+        loggerMaker.debugAndAddToDb("inviteeEmailDomain: " + inviteeEmailDomain);
+        loggerMaker.debugAndAddToDb("admin domain: " + domain);
 
         boolean isSameDomainVal = isSameDomain(inviteeEmailDomain, domain);
-        loggerMaker.infoAndAddToDb("is same domain: " + isSameDomainVal);
+        loggerMaker.debugAndAddToDb("is same domain: " + isSameDomainVal);
 
         if (!isSameDomainVal && !inviteeEmailDomain.equals(AKTO_DOMAIN))  {
             return DIFFERENT_ORG_EMAIL_ERROR;
@@ -78,13 +78,13 @@ public class InviteUserAction extends UserAction{
         String inviteeOrg = commonOrganisationsMap.get(inviteeDomain);
         String adminOrg = commonOrganisationsMap.get(adminDomain);
 
-        loggerMaker.infoAndAddToDb("inviteeOrg: " + inviteeOrg);
-        loggerMaker.infoAndAddToDb("adminOrg: " + adminOrg);
+        loggerMaker.debugAndAddToDb("inviteeOrg: " + inviteeOrg);
+        loggerMaker.debugAndAddToDb("adminOrg: " + adminOrg);
         if (inviteeOrg == null || adminOrg == null) return false;
 
         if (inviteeOrg.equalsIgnoreCase(adminOrg)) return true;
 
-        loggerMaker.infoAndAddToDb("inviteeOrg and adminOrg different");
+        loggerMaker.debugAndAddToDb("inviteeOrg and adminOrg different");
         return false;
     }
 
@@ -96,15 +96,15 @@ public class InviteUserAction extends UserAction{
     @Override
     public String execute() {
         int user_id = getSUser().getId();
-        loggerMaker.infoAndAddToDb(user_id + " inviting " + inviteeEmail);
+        loggerMaker.debugAndAddToDb(user_id + " inviting " + inviteeEmail);
 
         User admin = UsersDao.instance.getFirstUser(Context.accountId.get());
         if (admin == null) {
-            loggerMaker.infoAndAddToDb("admin not found for organization");
+            loggerMaker.debugAndAddToDb("admin not found for organization");
             return ERROR.toUpperCase();
         }
 
-        loggerMaker.infoAndAddToDb("admin user: " + admin.getLogin());
+        loggerMaker.debugAndAddToDb("admin user: " + admin.getLogin());
         String code = validateEmail(this.inviteeEmail, admin.getLogin());
 
         if (code != null) {

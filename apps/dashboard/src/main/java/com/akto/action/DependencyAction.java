@@ -44,7 +44,7 @@ public class DependencyAction extends UserAction {
                 ), Projections.include("_id")
         );
         long end = System.currentTimeMillis();
-        loggerMaker.infoAndAddToDb("checkIfDependencyGraphAvailable db call took: " + (end - start) + " ms");
+        loggerMaker.debugAndAddToDb("checkIfDependencyGraphAvailable db call took: " + (end - start) + " ms");
 
         dependencyGraphExists = node != null;
         return SUCCESS.toUpperCase();
@@ -149,7 +149,7 @@ public class DependencyAction extends UserAction {
                 }
 
                 if(messages.isEmpty()){
-                    loggerMaker.infoAndAddToDb("No messages found for invokeDependencyTable");
+                    loggerMaker.debugAndAddToDb("No messages found for invokeDependencyTable");
                     return;
                 }
 

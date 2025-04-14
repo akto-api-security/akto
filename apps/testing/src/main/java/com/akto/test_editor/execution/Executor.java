@@ -116,17 +116,17 @@ public class Executor {
                 EndpointLogicalGroup endpointLogicalGroup = role.fetchEndpointLogicalGroup();
                 if (endpointLogicalGroup != null && endpointLogicalGroup.getTestingEndpoints() != null  && endpointLogicalGroup.getTestingEndpoints().containsApi(apiInfoKey)) {
                     synchronized(role) {
-                        loggerMaker.infoAndAddToDb("attempting to override auth " + logId, LogDb.TESTING);
+                        loggerMaker.debugAndAddToDb("attempting to override auth " + logId, LogDb.TESTING);
                         if (modifyAuthTokenInRawApi(role, sampleRawApi) == null) {
-                            loggerMaker.infoAndAddToDb("Default auth mechanism absent: " + logId, LogDb.TESTING);
+                            loggerMaker.debugAndAddToDb("Default auth mechanism absent: " + logId, LogDb.TESTING);
                         }
                     }
                 } else {
-                    loggerMaker.infoAndAddToDb("Endpoint didn't satisfy endpoint condition for testRole" + logId, LogDb.TESTING);
+                    loggerMaker.debugAndAddToDb("Endpoint didn't satisfy endpoint condition for testRole" + logId, LogDb.TESTING);
                 }
             } else {
                 String reason = "Test role has been deleted";
-                loggerMaker.infoAndAddToDb(reason + ", going ahead with sample auth", LogDb.TESTING);
+                loggerMaker.debugAndAddToDb(reason + ", going ahead with sample auth", LogDb.TESTING);
             }
         }
         origRawApi = sampleRawApi.copy();
@@ -389,7 +389,7 @@ public class Executor {
         RawApi testRawApi = new RawApi(attempt.getRequest(), attempt.getResponse(), msg);
         boolean vulnerable = TestPlugin.validateValidator(validatorNode, rawApi, testRawApi , apiInfoKey, varMap, logId);
         if (vulnerable) {
-            loggerMaker.infoAndAddToDb("found vulnerable " + logId, LogDb.TESTING);
+            loggerMaker.debugAndAddToDb("found vulnerable " + logId, LogDb.TESTING);
         }
         double percentageMatch = 0;
         if (rawApi.getResponse() != null && testRawApi.getResponse() != null) {
@@ -489,7 +489,7 @@ public class Executor {
         if (shouldCalculateNewToken) {
             try {
                 LoginFlowResponse loginFlowResponse= new LoginFlowResponse();
-                loggerMaker.infoAndAddToDb("trying to fetch token of step builder type for role " + testRole.getName(), LogDb.TESTING);
+                loggerMaker.debugAndAddToDb("trying to fetch token of step builder type for role " + testRole.getName(), LogDb.TESTING);
                 loginFlowResponse = TestExecutor.executeLoginFlow(authMechanismForRole, null, testRole.getName());
                 if (!loginFlowResponse.getSuccess())
                     throw new Exception(loginFlowResponse.getError());

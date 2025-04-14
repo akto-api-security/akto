@@ -36,7 +36,7 @@ public class ListApisByType implements QueryHandler {
         }
 
         List<String> urls =  dataExtractor.extractData(meta);
-        logger.info("Found " + urls.size() + " endpoints");
+        logger.debug("Found " + urls.size() + " endpoints");
         BasicDBObject data = new BasicDBObject();
         data.put("query_type", GptQuery.LIST_APIS_BY_TYPE.getName());
         data.put(GptAction.USER_EMAIL, meta.getString(GptAction.USER_EMAIL));

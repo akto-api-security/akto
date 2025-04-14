@@ -209,7 +209,7 @@ public class QuickStartAction extends UserAction {
                 List<Tag> tags = Utils.fetchTags(DashboardStackDetails.getStackName());
                 String stackId = AwsStack.getInstance().createStack(MirroringStackDetails.getStackName(), parameters, template, tags);
                 AccountSettingsDao.instance.updateInitStackType(this.deploymentMethod.name());
-                logger.infoAndAddToDb(String.format("Stack %s creation started successfully", stackId), LogDb.DASHBOARD);
+                logger.debugAndAddToDb(String.format("Stack %s creation started successfully", stackId), LogDb.DASHBOARD);
             } catch (Exception e) {
                 e.printStackTrace();
             }
@@ -250,7 +250,7 @@ public class QuickStartAction extends UserAction {
                 List<Tag> tags = Utils.fetchTags(DashboardStackDetails.getStackName());
                 String stackId = AwsStack.getInstance().createStack(MirroringStackDetails.getStackName(), parameters, template, tags);
                 AccountSettingsDao.instance.updateInitStackType(DeploymentMethod.AWS_TRAFFIC_MIRRORING.name());
-                logger.info("Started creation of stack with id: " + stackId);
+                logger.debug("Started creation of stack with id: " + stackId);
             } catch (Exception e) {
                 e.printStackTrace();
             }
@@ -263,7 +263,7 @@ public class QuickStartAction extends UserAction {
                 String functionName = AwsStack.getInstance().fetchResourcePhysicalIdByLogicalId(MirroringStackDetails.getStackName(), MirroringStackDetails.CREATE_MIRROR_SESSION_LAMBDA);
                 UpdateFunctionRequest ufr = new UpdateFunctionRequest(updatedEnvVars);
                 Lambda.getInstance().updateFunctionConfiguration(functionName, ufr);
-                logger.info("Successfully updated env var for lambda");
+                logger.debug("Successfully updated env var for lambda");
                 // invoke lambda
             } catch (Exception e) {
                 e.printStackTrace();
@@ -317,20 +317,20 @@ public class QuickStartAction extends UserAction {
         invokeLambdaIfNecessary(stackState);
         if(Stack.StackStatus.CREATION_FAILED.toString().equalsIgnoreCase(this.stackState.getStatus())){
             AwsResourcesDao.instance.getMCollection().deleteOne(Filters.eq("_id", Context.accountId.get()));
-            logger.infoAndAddToDb("Current stack status is failed, so we are removing entry from db", LogDb.DASHBOARD);
+            logger.debugAndAddToDb("Current stack status is failed, so we are removing entry from db", LogDb.DASHBOARD);
         }
         if(Stack.StackStatus.DOES_NOT_EXISTS.toString().equalsIgnoreCase(this.stackState.getStatus())){
             AwsResources resources = AwsResourcesDao.instance.findOne(AwsResourcesDao.generateFilter());
             if(resources != null && resources.getLoadBalancers().size() > 0){
                 AwsResourcesDao.instance.getMCollection().deleteOne(AwsResourcesDao.generateFilter());
-                logger.infoAndAddToDb("Stack does not exists but entry present in DB, removing it", LogDb.DASHBOARD);
+                logger.debugAndAddToDb("Stack does not exists but entry present in DB, removing it", LogDb.DASHBOARD);
                 fetchLoadBalancers();
             } else {
-                logger.infoAndAddToDb("Nothing set in DB, moving on", LogDb.DASHBOARD);
+                logger.debugAndAddToDb("Nothing set in DB, moving on", LogDb.DASHBOARD);
             }
         }
         if(!DeploymentMethod.AWS_TRAFFIC_MIRRORING.equals(this.deploymentMethod) && Stack.StackStatus.CREATE_COMPLETE.toString().equals(this.stackState.getStatus())){
-            logger.infoAndAddToDb("Stack creation complete, fetching outputs", LogDb.DASHBOARD);
+            logger.debugAndAddToDb("Stack creation complete, fetching outputs", LogDb.DASHBOARD);
             Map<String, String> outputsMap = Utils.fetchOutputs(MirroringStackDetails.getStackName());
             this.aktoNLBIp = outputsMap.get("AktoNLB");
             this.aktoMongoConn = System.getenv("AKTO_MONGO_CONN");
@@ -352,12 +352,12 @@ public class QuickStartAction extends UserAction {
                                 Filters.eq("_id", backwardCompatibility.getId()),
                                 Updates.set(BackwardCompatibility.MIRRORING_LAMBDA_TRIGGERED, true)
                         );
-                        logger.infoAndAddToDb("Successfully triggered CreateMirrorSession", LogDb.DASHBOARD);
+                        logger.debugAndAddToDb("Successfully triggered CreateMirrorSession", LogDb.DASHBOARD);
                     } catch(Exception e){
                         logger.errorAndAddToDb(e, String.format("Failed to invoke lambda for the first time : %s", e), LogDb.DASHBOARD);
                     }
                 } else {
-                    logger.infoAndAddToDb("Already invoked", LogDb.DASHBOARD);
+                    logger.debugAndAddToDb("Already invoked", LogDb.DASHBOARD);
                 }
             }
         };
