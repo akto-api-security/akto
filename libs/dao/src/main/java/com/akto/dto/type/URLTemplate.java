@@ -112,9 +112,7 @@ public class URLTemplate {
     public String getTemplateString() {
         String str = "";
         for(int i = 0;i < tokens.length; i++) {
-            if (i > 0) {
-                str += "/";
-            } else if (i == 0 && tokens[i] != null && !tokens[i].startsWith("http")) {
+            if (tokens[i] != null && !tokens[i].startsWith("http")) {
                 str += "/";
             }
             if (tokens[i] == null) {
