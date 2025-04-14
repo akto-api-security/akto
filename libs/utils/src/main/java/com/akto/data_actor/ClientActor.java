@@ -3556,11 +3556,10 @@ public class ClientActor extends DataActor {
             BasicDBObject payloadObj;
             try {
                 payloadObj = BasicDBObject.parse(responsePayload);
-                BasicDBList testSubCategoriesObj = (BasicDBList) payloadObj.get("testSubCategories");
+                BasicDBList testSubCategoriesObj = (BasicDBList) payloadObj.get("testSuiteTestSubCategories");
                 List<String> testSubCategories = new ArrayList<>();
                 for (Object nodeObj : testSubCategoriesObj) {
-                    BasicDBObject obj2 = (BasicDBObject) nodeObj;
-                    testSubCategories.add(objectMapper.readValue(obj2.toJson(), String.class));
+                    testSubCategories.add(String.valueOf(nodeObj));
                 }
                 return testSubCategories;
             } catch (Exception e) {
