@@ -14,10 +14,12 @@ import com.akto.bulk_update_util.ApiInfoBulkUpdate;
 import com.akto.dao.*;
 import com.akto.dao.filter.MergedUrlsDao;
 import com.akto.dao.settings.DataControlSettingsDao;
+import com.akto.dao.testing.config.TestSuiteDao;
 import com.akto.dependency_analyser.DependencyAnalyserUtils;
 import com.akto.dto.*;
 import com.akto.dto.filter.MergedUrls;
 import com.akto.dto.settings.DataControlSettings;
+import com.akto.dto.testing.config.TestSuites;
 import com.mongodb.BasicDBList;
 import com.mongodb.client.model.*;
 import org.bson.conversions.Bson;
@@ -1146,6 +1148,27 @@ public class DbLayer {
     
     public static TestingRunResultSummary findLatestTestingRunResultSummary(Bson filter){
         return TestingRunResultSummariesDao.instance.findLatestOne(filter);
+    }
+
+    public static List<String> findTestSubCategoriesByTestSuiteId(List<String> testSuiteId) {
+        List<ObjectId> testSuiteIds = new ArrayList<>();
+        for (String testSuiteIdStr : testSuiteId) {
+            testSuiteIds.add(new ObjectId(testSuiteIdStr));
+        }
+        List<TestSuites> testSuites = TestSuiteDao.instance.findAll(Filters.in(ID, testSuiteIds));
+        if(testSuites == null || testSuites.isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        Set<String> subcategorySet = new HashSet<>();
+        for (TestSuites testSuite : testSuites) {
+            List<String> subcategoryList = testSuite.getSubCategoryList();
+            if(subcategoryList != null && !subcategoryList.isEmpty()) {
+                subcategorySet.addAll(subcategoryList);
+            }
+        }
+
+        return new ArrayList<>(subcategorySet);
     }
 
     public static TestingRunPlayground getCurrentTestingRunDetailsFromEditor(int timestamp){

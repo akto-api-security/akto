@@ -2317,6 +2317,18 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
+    List<String> testSuiteId;
+    List<String> testSuiteTestSubCategories;
+    public String findTestSubCategoriesByTestSuiteId() {
+        try {
+            testSuiteTestSubCategories = DbLayer.findTestSubCategoriesByTestSuiteId(testSuiteId);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in fetchTestSubCategoriesByTestSuiteId " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+    
     public String getCurrentTestingRunDetailsFromEditor(){
         try {
             testingRunPlayground = DbLayer.getCurrentTestingRunDetailsFromEditor(this.ts);
@@ -3370,6 +3382,14 @@ public class DbAction extends ActionSupport {
         this.operator = operator;
     }
 
+    public void setTestSuiteId(List<String> testSuiteId) {
+        this.testSuiteId = testSuiteId;
+    }
+
+    public List<String> getTestSuiteTestSubCategories() {
+        return testSuiteTestSubCategories;
+    }
+    
     public TestingRunPlayground getTestingRunPlayground() {
         return testingRunPlayground;
     }

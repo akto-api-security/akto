@@ -3643,4 +3643,35 @@ public class ClientActor extends DataActor {
         return null;
     }
 
+    public List<String> findTestSubCategoriesByTestSuiteId(List<String> testSuiteId) {
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("testSuiteId", testSuiteId);
+        Map<String, List<String>> headers = buildHeaders();
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/findTestSubCategoriesByTestSuiteId", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in findTestSubCategoriesByTestSuiteId", LogDb.RUNTIME);
+                return new ArrayList<>();
+            }
+            BasicDBObject payloadObj;
+            try {
+                payloadObj = BasicDBObject.parse(responsePayload);
+                BasicDBList testSubCategoriesObj = (BasicDBList) payloadObj.get("testSubCategories");
+                List<String> testSubCategories = new ArrayList<>();
+                for (Object nodeObj : testSubCategoriesObj) {
+                    BasicDBObject obj2 = (BasicDBObject) nodeObj;
+                    testSubCategories.add(objectMapper.readValue(obj2.toJson(), String.class));
+                }
+                return testSubCategories;
+            } catch (Exception e) {
+                return new ArrayList<>();
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in findTestSubCategoriesByTestSuiteId" + e, LoggerMaker.LogDb.RUNTIME);
+            return new ArrayList<>();
+        }
+    }
+
 }
