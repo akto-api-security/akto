@@ -5,6 +5,7 @@ import com.akto.kafka.KafkaConfig;
 import com.akto.kafka.KafkaConsumerConfig;
 import com.akto.kafka.KafkaProducerConfig;
 import com.akto.kafka.Serializer;
+import com.akto.log.LoggerMaker;
 import com.akto.threat.detection.constants.KafkaTopic;
 import com.akto.threat.detection.session_factory.SessionFactoryUtils;
 import com.akto.threat.detection.tasks.CleanupTask;
@@ -19,6 +20,7 @@ import org.hibernate.SessionFactory;
 public class Main {
 
   private static final String CONSUMER_GROUP_ID = "akto.threat_detection";
+  private static final LoggerMaker logger = new LoggerMaker(Main.class);
 
   public static void main(String[] args) throws Exception {
     runMigrations();
