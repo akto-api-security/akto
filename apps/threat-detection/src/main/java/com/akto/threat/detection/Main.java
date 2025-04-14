@@ -27,7 +27,6 @@ public class Main {
 
     SessionFactory sessionFactory = SessionFactoryUtils.createFactory();
 
-    // TODO: Remove this before merging. Will be using cyborg for fetching templates
     KafkaConfig trafficKafka =
         KafkaConfig.newBuilder()
             .setGroupId(CONSUMER_GROUP_ID)
