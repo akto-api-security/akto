@@ -311,4 +311,12 @@ public class LoggerMaker  {
         }
         return logs;
     }
+
+    public void info(String message, Object... vars) {
+        logger.info(message, vars);
+    }
+
+    public void error(String errorMessage, Object... vars) {
+        logger.error(errorMessage, vars);
+    }
 }

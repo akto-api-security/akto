@@ -1,28 +1,24 @@
 package com.akto.listener;
 
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
-
-import javax.servlet.ServletContextListener;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import com.akto.DaoInit;
 import com.akto.dao.AccountsDao;
 import com.akto.dao.context.Context;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.merging.Cron;
 import com.akto.utils.KafkaUtils;
 import com.mongodb.ConnectionString;
-import com.mongodb.ReadPreference;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+import javax.servlet.ServletContextListener;
 
 
 public class InitializerListener implements ServletContextListener {
     
     public static boolean connectedToMongo = false;
     private final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
-    private static final Logger logger = LoggerFactory.getLogger(InitializerListener.class);
+    private static final LoggerMaker logger = new LoggerMaker(InitializerListener.class, LogDb.DB_ABS);
 
 
     @Override
@@ -46,7 +42,7 @@ public class InitializerListener implements ServletContextListener {
                             logger.info("skipping triggering merging cron");
                         } else {
                             Cron cron = new Cron();
-                            logger.info("triggering merging cron for db abstractor " + Context.now());
+                            logger.info("triggering merging cron for db abstractor {}", Context.now());
                             cron.cron(true);
                         }
 

@@ -1,17 +1,15 @@
 package com.akto.utils;
 
+import com.akto.dao.context.Context;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import java.util.HashMap;
 import java.util.Map;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import com.akto.dao.context.Context;
 
 public class SampleDataLogs {
 
     static Map<String, Integer> countMap = new HashMap<>();
-    private static final Logger logger = LoggerFactory.getLogger(SampleDataLogs.class);
+    private static final LoggerMaker logger = new LoggerMaker(SampleDataLogs.class, LogDb.DB_ABS);
 
     public static int modVal() {
         String val = System.getenv("MOD_VAL");
