@@ -139,24 +139,15 @@ public class TestExecutor {
 
         TestingEndpoints testingEndpoints = testingRun.getTestingEndpoints();
 
-        List<String> testSuiteIds = testingRun.getTestingRunConfig().getTestSuiteIds();
-        Set<String> testSubCategoryList = new HashSet<>();
-        for(String testSuiteId : testSuiteIds) {
-            List<String> testSuiteTestSubCategoryList;
-            if (testSuiteId != null) {
-                testSuiteTestSubCategoryList = dataActor.findTestSubCategoriesByTestSuiteId(testSuiteId);
-            } else {
-                testSuiteTestSubCategoryList = new ArrayList<>();
-            }
-
-            if (testSuiteTestSubCategoryList != null && !testSuiteTestSubCategoryList.isEmpty()) {
-                testSubCategoryList.addAll(testSuiteTestSubCategoryList);
-            } else {
-                testSubCategoryList.addAll(testingRun.getTestingRunConfig().getTestSubCategoryList());
-            }
+        List<String> testingRunSubCategories;
+        if(testingRun.getTestingRunConfig().getTestSuiteIds() != null && !testingRun.getTestingRunConfig().getTestSuiteIds().isEmpty()){
+            testingRunSubCategories = dataActor.findTestSubCategoriesByTestSuiteId(testingRun.getTestingRunConfig().getTestSuiteIds());
+        }else{
+            testingRunSubCategories = testingRun.getTestingRunConfig().getTestSubCategoryList();
         }
+        
         if (testingRun.getTestingRunConfig() != null) {
-            dataActor.updateTestInitiatedCountInTestSummary(summaryId.toHexString(), testSubCategoryList.size());
+            dataActor.updateTestInitiatedCountInTestSummary(summaryId.toHexString(), testingRunSubCategories.size());
         }
 
         SampleMessageStore sampleMessageStore = SampleMessageStore.create();
@@ -168,14 +159,6 @@ public class TestExecutor {
 
         List<TestRoles> testRoles = sampleMessageStore.fetchTestRoles();
         TestRoles attackerTestRole = Executor.fetchOrFindAttackerRole();
-        List<String> testingRunSubCategories = new ArrayList<>();
-        if(testingRun.getTestingRunConfig().getTestSuiteIds() != null && !testingRun.getTestingRunConfig().getTestSuiteIds().isEmpty()){
-            testingRunSubCategories = dataActor.findTestSubCategoriesByTestSuiteId(testSuiteIds);
-        }else{
-            testingRunSubCategories = testingRun.getTestingRunConfig().getTestSubCategoryList();
-        }
-
-        
         
         List<YamlTemplate> yamlTemplates = new ArrayList<>();
         final int TEST_LIMIT = 50;
