@@ -2,15 +2,20 @@ import { HighchartsReact } from "highcharts-react-official";
 import Highcharts from "highcharts";
 import InfoCard from "../../dashboard/new_components/InfoCard";
 import dayjs from "dayjs";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { Spinner } from "@shopify/polaris";
 import api from "../api";
 
 
-const ThreatActivityTimeline = ({ startTimestamp, endTimestamp, onSubCategoryClick }) => {
+const ThreatActivityTimeline = ({ startTimestamp, endTimestamp, onSubCategoryClick, appliedFilters }) => {
     const [seriesData, setSeriesData] = useState([]);
     const [loading, setLoading] = useState(false);
     const [sortedTimelines, setSortedTimelines] = useState([]);
+
+    const subCategoryFilter = useMemo(() => {
+        const subCategory = appliedFilters.find(filter => filter.key === "latestAttack");
+        return subCategory ? subCategory.value : [];
+    }, [appliedFilters]);
 
     const COLORMAP = {
         0: 'rgb(133, 62, 232)',
@@ -21,11 +26,10 @@ const ThreatActivityTimeline = ({ startTimestamp, endTimestamp, onSubCategoryCli
     }
 
     const fetchThreatActivityTimeline = async () => {
-        const response = await api.getThreatActivityTimeline(startTimestamp, endTimestamp);
+        const response = await api.getThreatActivityTimeline(startTimestamp, endTimestamp, subCategoryFilter);
         const sortedTimelines = response.threatActivityTimelines.sort((a, b) => a.ts - b.ts);
         setSortedTimelines(sortedTimelines);
         const distinctSubCategories = [...new Set(response.threatActivityTimelines.flatMap(item => item.subCategoryWiseData.map(subItem => subItem.subcategory)))];
-        console.log({ response });
         const series = distinctSubCategories.map((subCategory, index) => ({
             cursor: "pointer",
             color: COLORMAP[index % 5],
@@ -46,14 +50,10 @@ const ThreatActivityTimeline = ({ startTimestamp, endTimestamp, onSubCategoryCli
         setSeriesData(series);
         setLoading(false);
     }
-    
-    useEffect(() => {
-        console.log('$$$ fetching threat activity timeline');
-    }, []);
 
     useEffect(() => {
         fetchThreatActivityTimeline();
-    }, [startTimestamp, endTimestamp]);
+    }, [startTimestamp, endTimestamp, appliedFilters]);
 
     const chartOptions = {
         chart: {

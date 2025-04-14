@@ -44,6 +44,7 @@ message ListMaliciousRequestsRequest {
       optional TimeRangeFilter detected_at_time_range = 4;
       repeated string types = 5;
       repeated string sub_category = 6;
+      repeated string severity = 7;
     }
 
     // The number of alerts to return
@@ -59,6 +60,7 @@ message FetchAlertFiltersResponse {
   repeated string actors = 1;
   repeated string urls = 2;
   repeated string sub_category = 3;
+  repeated string severity = 4;
 }
 
 message ListThreatActorsRequest {
@@ -141,6 +143,7 @@ message ListThreatApiResponse {
 }
 
 message ThreatActorByCountryRequest {
+  repeated string country_filters = 1;
 }
 
 message ThreatActorByCountryResponse {
@@ -208,6 +211,7 @@ message DailyActorsCountResponse {
 message ThreatActivityTimelineRequest {
   uint32 start_ts = 1;
   uint32 end_ts = 2;
+  repeated string category_filters = 3;
 }
 
 message ThreatActivityTimelineResponse {

@@ -156,6 +156,17 @@ function GithubServerTable(props) {
     }
   }
 
+  useEffect(() => {
+    if (props.externalFilters) {
+      for (const filter of props.externalFilters) {
+        changeAppliedFilters(filter.key, filter.value);
+      }
+      if (props.externalFilters.length === 0) {
+        handleFiltersClearAll();
+      }
+    }
+  }, [props.externalFilters]);
+
   const handleSelectedTab = (x) => {
     const tableTabs = props.tableTabs ? props.tableTabs : props.tabs
     if(tableTabs){
@@ -227,13 +238,6 @@ function GithubServerTable(props) {
     setFiltersMap(tempFilters);
     setAppliedFilters(temp);
   }, [appliedFilters, props.disambiguateLabel, handleRemoveAppliedFilter, setFiltersMap, currentPageKey, pageFiltersMap]);
-
-  useEffect(() => {
-    if (props.externalFilter) {
-      const { key, value } = props.externalFilter;
-      changeAppliedFilters(key, value);
-    }
-  }, [props.externalFilter]);
 
   const debouncedSearch = debounce((searchQuery) => {
       fetchData(searchQuery)

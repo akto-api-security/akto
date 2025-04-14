@@ -144,6 +144,7 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
                 this.ips = msg.getActorsList();
                 this.urls = msg.getUrlsList();
                 this.subCategory = msg.getSubCategoryList();
+                this.severity = msg.getSeverityList();
               });
     } catch (Exception e) {
       e.printStackTrace();

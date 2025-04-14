@@ -16,7 +16,7 @@ const threatDetectionRequests = {
         })
     },
 
-    fetchSuspectSampleData(skip, ips, apiCollectionIds, urls, types, sort, startTimestamp, endTimestamp, subCategory) {
+    fetchSuspectSampleData(skip, ips, apiCollectionIds, urls, types, sort, startTimestamp, endTimestamp, subCategory, severity) {
         return request({
             url: '/api/fetchSuspectSampleData',
             method: 'post',
@@ -29,7 +29,8 @@ const threatDetectionRequests = {
                 sort: sort,
                 startTimestamp: startTimestamp,
                 endTimestamp: endTimestamp,
-                subCategory: subCategory
+                subCategory: subCategory,
+                severity: severity
             }
         })
     },
@@ -65,11 +66,11 @@ const threatDetectionRequests = {
             }
         })
     },
-    getActorsCountPerCounty() {
+    getActorsCountPerCounty(countryFilters) {
         return request({
             url: '/api/getActorsCountPerCounty',
-            method: 'get',
-            data: {}
+            method: 'post',
+            data: {countryFilters}
         })
     },
     fetchThreatCategoryCount(startTs, endTs) {
@@ -93,11 +94,11 @@ const threatDetectionRequests = {
             data: {startTs, endTs}
         })
     },
-    getThreatActivityTimeline(startTs, endTs) {
+    getThreatActivityTimeline(startTs, endTs, categoryFilters = []) {
         return request({
             url: '/api/getThreatActivityTimeline',
             method: 'post',
-            data: {startTs, endTs}
+            data: {startTs, endTs, categoryFilters }
         })
     },
     getDailyThreatActorsCount(startTs, endTs) {

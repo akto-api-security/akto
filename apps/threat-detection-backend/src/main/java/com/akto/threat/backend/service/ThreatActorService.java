@@ -236,8 +236,7 @@ public class ThreatActorService {
         return DailyActorsCountResponse.newBuilder().addAllActorsCounts(actors).build();
   }
 
-  public ThreatActivityTimelineResponse getThreatActivityTimeline(String accountId, long startTs, long endTs) {
-    
+  public ThreatActivityTimelineResponse getThreatActivityTimeline(String accountId, long startTs, long endTs, List<String> categoryFilters) {    
         List<ThreatActivityTimelineResponse.ActivityTimeline> timeline = new ArrayList<>();
         // long sevenDaysInSeconds = TimeUnit.DAYS.toSeconds(7);
         // if (startTs < endTs - sevenDaysInSeconds) {
@@ -248,9 +247,11 @@ public class ThreatActorService {
             .getCollection(MongoDBCollection.ThreatDetection.MALICIOUS_EVENTS, Document.class);
 
         List<Document> pipeline = Arrays.asList(
-        // Stage 1: Match documents within the startTs and endTs range
-        new Document("$match", new Document("detectedAt",
-            new Document("$gte", startTs).append("$lte", endTs))),
+        // Stage 1: Match documents within the startTs and endTs range and filter by category if provided
+        new Document("$match", new Document()
+            .append("detectedAt", new Document("$gte", startTs).append("$lte", endTs))
+            .append("subCategory", categoryFilters.isEmpty() ? new Document("$exists", true) : new Document("$in", categoryFilters))
+        ),
 
         // Stage 2: Project required fields and normalize timestamp to daily granularity
         new Document("$project", new Document("dayStart",
@@ -340,6 +341,10 @@ public class ThreatActorService {
             .getCollection(MongoDBCollection.ThreatDetection.MALICIOUS_EVENTS, Document.class);
 
     List<Document> pipeline = new ArrayList<>();
+    List<String> countryFilters = request.getCountryFiltersList();
+
+    pipeline.add(new Document("$match", new Document("country", countryFilters.isEmpty() ? new Document("$exists", true) :  new Document("$in", countryFilters))));
+
     pipeline.add(
         new Document("$sort", new Document("country", 1).append("detectedAt", -1))); // sort
     pipeline.add(
