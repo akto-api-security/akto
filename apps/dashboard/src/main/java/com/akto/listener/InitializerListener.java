@@ -50,6 +50,7 @@ import com.akto.dao.UsersDao;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.loaders.LoadersDao;
+import com.akto.dao.monitoring.FilterYamlTemplateDao;
 import com.akto.dao.notifications.CustomWebhooksDao;
 import com.akto.dao.notifications.EventsMetricsDao;
 import com.akto.dao.notifications.SlackWebhooksDao;
@@ -3871,6 +3872,92 @@ public class InitializerListener implements ServletContextListener {
             }
         } else {
             logger.debugAndAddToDb("Received null zip file");
+        }
+    }
+
+    public static void processThreatFilterTemplateFilesZip(byte[] zipFile, String author, String source, String repositoryUrl) {
+        if (zipFile != null) {
+            try (ByteArrayInputStream inputStream = new ByteArrayInputStream(zipFile);
+                    ZipInputStream zipInputStream = new ZipInputStream(inputStream)) {
+
+                ZipEntry entry;
+
+                while ((entry = zipInputStream.getNextEntry()) != null) {
+                    if (!entry.isDirectory()) {
+                        String entryName = entry.getName();
+                        if (!entry.getName().contains("Threat-Protection")) {
+                            logger.infoAndAddToDb(
+                                    String.format("%s not a Threat directory, skipping", entryName),
+                                    LogDb.DASHBOARD);
+                            continue;
+                        }
+                        if (!(entryName.endsWith(".yaml") || entryName.endsWith(".yml"))) {
+                            logger.infoAndAddToDb(
+                                    String.format("%s not a YAML template file, skipping", entryName),
+                                    LogDb.DASHBOARD);
+                            continue;
+                        }
+
+                        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+                        byte[] buffer = new byte[1024];
+                        int bytesRead;
+                        while ((bytesRead = zipInputStream.read(buffer)) != -1) {
+                            outputStream.write(buffer, 0, bytesRead);
+                        }
+
+                        String templateContent = new String(outputStream.toByteArray(), "UTF-8");
+
+                        TestConfig testConfig = null;
+                        try {
+                            testConfig = TestConfigYamlParser.parseTemplate(templateContent);
+                        } catch (Exception e) {
+                            logger.errorAndAddToDb(e,
+                                    String.format("Error parsing Threat yaml template file %s %s", entryName, e.toString()),
+                                    LogDb.DASHBOARD);
+                            continue;
+                        }
+
+                        // new or updated template
+                        if (testConfig != null) {
+                            String id = testConfig.getId();
+                            int createdAt = Context.now();
+                            int updatedAt = Context.now();
+
+                            List<Bson> updates = new ArrayList<>(
+                                    Arrays.asList(
+                                            Updates.setOnInsert(YamlTemplate.CREATED_AT, createdAt),
+                                            Updates.setOnInsert(YamlTemplate.AUTHOR, author),
+                                            Updates.set(YamlTemplate.UPDATED_AT, updatedAt),
+                                            Updates.set(YamlTemplate.CONTENT, templateContent),
+                                            Updates.set(YamlTemplate.SOURCE, source)
+                                    ));
+                            try {
+                                FilterYamlTemplateDao.instance.getMCollection().findOneAndUpdate(
+                                    Filters.and(Filters.eq(Constants.ID, id),
+                                            Filters.ne(YamlTemplate.AUTHOR, Constants._AKTO)),
+                                    Updates.combine(updates),
+                                    new FindOneAndUpdateOptions().upsert(true)
+                                );    
+                            } catch (Exception e) {
+                                cacheLoggerMaker.errorAndAddToDb(e,
+                                    String.format("Error while processing Threat template files zip. Error %s", e.getMessage()),
+                                    LogDb.DASHBOARD);
+                            }
+                            
+                        }
+                    }
+
+                    // Close the current entry to proceed to the next one
+                    zipInputStream.closeEntry();
+                }
+
+            } catch (Exception ex) {
+                cacheLoggerMaker.errorAndAddToDb(ex,
+                        String.format("Error while processing Threat template files zip. Error %s", ex.getMessage()),
+                        LogDb.DASHBOARD);
+            }
+        } else {
+            logger.infoAndAddToDb("Received null zip file");
         }
     }
 

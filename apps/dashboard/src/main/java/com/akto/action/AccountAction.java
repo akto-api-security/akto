@@ -364,6 +364,20 @@ public class AccountAction extends UserAction {
                 } catch (Exception e) {
                     loggerMaker.errorAndAddToDb(e,String.format("Error while adding test editor templates for new account %d, Error: %s", newAccountId, e.getMessage()), LogDb.DASHBOARD);
                 }
+
+                // add threat protection filter templates
+                // todo refactor and extract out similar functions like processThreatFilterTemplateFilesZip
+                try {
+                    byte[] threatProtectionTemplates = TestTemplateUtils.getTestingTemplates();
+                    if(threatProtectionTemplates == null){
+                        loggerMaker.errorAndAddToDb("Failed to load threat protection templates", LogDb.DASHBOARD);
+                        return;
+                    }
+                    InitializerListener.processThreatFilterTemplateFilesZip(threatProtectionTemplates, Constants._AKTO, YamlTemplateSource.AKTO_TEMPLATES.toString(), "");
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb(e,String.format("Error while adding threat protection templates for new account %d, Error: %s", e.getMessage()), LogDb.DASHBOARD);
+                }
+                
             }
         }, 0, TimeUnit.SECONDS);
     }
