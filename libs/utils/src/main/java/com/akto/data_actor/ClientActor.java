@@ -3540,4 +3540,34 @@ public class ClientActor extends DataActor {
             return null;
         }
     }
+    
+    public List<String> findTestSubCategoriesByTestSuiteId(List<String> testSuiteId) {
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("testSuiteId", testSuiteId);
+        Map<String, List<String>> headers = buildHeaders();
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/findTestSubCategoriesByTestSuiteId", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in findTestSubCategoriesByTestSuiteId", LogDb.RUNTIME);
+                return new ArrayList<>();
+            }
+            BasicDBObject payloadObj;
+            try {
+                payloadObj = BasicDBObject.parse(responsePayload);
+                BasicDBList testSubCategoriesObj = (BasicDBList) payloadObj.get("testSuiteTestSubCategories");
+                List<String> testSubCategories = new ArrayList<>();
+                for (Object nodeObj : testSubCategoriesObj) {
+                    testSubCategories.add(String.valueOf(nodeObj));
+                }
+                return testSubCategories;
+            } catch (Exception e) {
+                return new ArrayList<>();
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in findTestSubCategoriesByTestSuiteId" + e, LoggerMaker.LogDb.RUNTIME);
+            return new ArrayList<>();
+        }
+    }
 }

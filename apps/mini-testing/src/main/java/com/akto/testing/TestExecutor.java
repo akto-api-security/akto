@@ -139,8 +139,15 @@ public class TestExecutor {
 
         TestingEndpoints testingEndpoints = testingRun.getTestingEndpoints();
 
+        List<String> testingRunSubCategories;
+        if(testingRun.getTestingRunConfig().getTestSuiteIds() != null && !testingRun.getTestingRunConfig().getTestSuiteIds().isEmpty()){
+            testingRunSubCategories = dataActor.findTestSubCategoriesByTestSuiteId(testingRun.getTestingRunConfig().getTestSuiteIds());
+        }else{
+            testingRunSubCategories = testingRun.getTestingRunConfig().getTestSubCategoryList();
+        }
+        
         if (testingRun.getTestingRunConfig() != null) {
-            dataActor.updateTestInitiatedCountInTestSummary(summaryId.toHexString(), testingRun.getTestingRunConfig().getTestSubCategoryList().size());
+            dataActor.updateTestInitiatedCountInTestSummary(summaryId.toHexString(), testingRunSubCategories.size());
         }
 
         SampleMessageStore sampleMessageStore = SampleMessageStore.create();
@@ -152,7 +159,6 @@ public class TestExecutor {
 
         List<TestRoles> testRoles = sampleMessageStore.fetchTestRoles();
         TestRoles attackerTestRole = Executor.fetchOrFindAttackerRole();
-        List<String> testingRunSubCategories = testingRun.getTestingRunConfig().getTestSubCategoryList();
         
         List<YamlTemplate> yamlTemplates = new ArrayList<>();
         final int TEST_LIMIT = 50;
