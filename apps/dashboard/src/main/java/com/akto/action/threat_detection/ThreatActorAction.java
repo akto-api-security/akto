@@ -554,4 +554,11 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
     this.eventType = eventType;
   }
 
+  public Map<String, Integer> getSort() {
+    return sort;
+  }
+
+  public void setSort(Map<String, Integer> sort) {
+    this.sort = sort;
+  }
 }
