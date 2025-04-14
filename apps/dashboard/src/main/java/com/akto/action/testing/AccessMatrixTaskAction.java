@@ -70,16 +70,16 @@ public class AccessMatrixTaskAction extends UserAction{
     }
 
     public String deleteAccessMatrix() {
-        logger.infoAndAddToDb("started deleting access details for: " + roleName, LoggerMaker.LogDb.DASHBOARD);
+        logger.debugAndAddToDb("started deleting access details for: " + roleName, LoggerMaker.LogDb.DASHBOARD);
 
         String endpointLogicalGroupName = roleName + EndpointLogicalGroup.GROUP_NAME_SUFFIX;
         Bson taskInfoFilterQ = Filters.eq(AccessMatrixTaskInfo.ENDPOINT_LOGICAL_GROUP_NAME, endpointLogicalGroupName);
         DeleteResult deleteResult = AccessMatrixTaskInfosDao.instance.deleteAll(taskInfoFilterQ);
-        logger.infoAndAddToDb("Deleted AccessMatrixTaskInfo for: " + roleName + " : " + deleteResult, LoggerMaker.LogDb.DASHBOARD);
+        logger.debugAndAddToDb("Deleted AccessMatrixTaskInfo for: " + roleName + " : " + deleteResult, LoggerMaker.LogDb.DASHBOARD);
 
         Bson urlToRolesUpdateQ = Updates.pull(AccessMatrixUrlToRole.ROLES, roleName);
         UpdateResult updateResult = AccessMatrixUrlToRolesDao.instance.updateMany(Filters.empty(), urlToRolesUpdateQ);
-        logger.infoAndAddToDb("Deleted AccessMatrixUrlToRoles for: " + roleName + " : " +  updateResult, LoggerMaker.LogDb.DASHBOARD);
+        logger.debugAndAddToDb("Deleted AccessMatrixUrlToRoles for: " + roleName + " : " +  updateResult, LoggerMaker.LogDb.DASHBOARD);
 
         return SUCCESS.toUpperCase();
     }
@@ -163,7 +163,7 @@ public class AccessMatrixTaskAction extends UserAction{
             } while (!isListEmpty && numSamples < 50_000);
 
         }
-        logger.info("numSamples= " + numSamples);
+        logger.debug("numSamples= " + numSamples);
         return SUCCESS.toUpperCase();
     }
 

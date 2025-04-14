@@ -85,7 +85,7 @@ public class HomeAction implements Action, SessionAware, ServletResponseAware, S
         } else {
             servletRequest.setAttribute("AktoVersionGlobal", InitializerListener.aktoVersion);
         }
-        logger.info("in Home::execute: settings IS_SAAS to {}", InitializerListener.isSaas);
+        logger.debug("in Home::execute: settings IS_SAAS to {}", InitializerListener.isSaas);
         if(DashboardMode.isSaasDeployment()) {
             if(accessToken != null && servletRequest.getAttribute("username") == null) {
                 try {
@@ -93,11 +93,11 @@ public class HomeAction implements Action, SessionAware, ServletResponseAware, S
                     String username = jws.getBody().get("username").toString();
                     User user = UsersDao.instance.findOne(Filters.eq(User.LOGIN, username));
                     if(user != null && user.getRefreshTokens() != null && !user.getRefreshTokens().isEmpty()){
-                        logger.info("User has refresh tokens, setting up window vars");
+                        logger.debug("User has refresh tokens, setting up window vars");
                         ProfileAction.executeMeta1(null, user, servletRequest, servletResponse);
                     }
                 }catch (Exception e){
-                    logger.info("Access token expired, unable to set window vars", e);
+                    logger.debug("Access token expired, unable to set window vars", e);
                 }
             }
             return redirectToAuth0(servletRequest, servletResponse, accessToken, new BasicDBObject());

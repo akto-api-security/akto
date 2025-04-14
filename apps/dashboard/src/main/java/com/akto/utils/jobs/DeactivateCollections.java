@@ -85,7 +85,7 @@ public class DeactivateCollections {
 
             String infoMessage = String.format("Overage found org: %s , overage: %s , deactivating collections",
                     organizationId, overage);
-            loggerMaker.infoAndAddToDb(infoMessage);
+            loggerMaker.debugAndAddToDb(infoMessage);
 
             for (int accountId : organization.getAccounts()) {
                 Context.accountId.set(accountId);
@@ -97,7 +97,7 @@ public class DeactivateCollections {
                 }
                 // we need to run this job only once.
                 if (backwardCompatibility.getDeactivateCollections() != 0) {
-                    loggerMaker.infoAndAddToDb("This account's collections have been deactivated previously");
+                    loggerMaker.debugAndAddToDb("This account's collections have been deactivated previously");
                     continue;
                 }
 
@@ -115,7 +115,7 @@ public class DeactivateCollections {
                         Updates.set(BackwardCompatibility.DEACTIVATE_COLLECTIONS, Context.now()));
             }
 
-            loggerMaker.infoAndAddToDb("overage after deactivating: " + overage);
+            loggerMaker.debugAndAddToDb("overage after deactivating: " + overage);
 
             int deltaUsage = (-1) * (Math.max(featureAccess.getUsage() - featureAccess.getUsageLimit(), 0) - overage);
             UsageMetricHandler.calcAndFetchFeatureAccessUsingDeltaUsage(MetricTypes.ACTIVE_ENDPOINTS, Context.accountId.get(), deltaUsage);
@@ -180,7 +180,7 @@ public class DeactivateCollections {
         //         Updates.set(ApiCollection._DEACTIVATED, true));
 
         // String infoMessage = String.format("Deactivated collections : %s", apiCollectionIds.toString());
-        // loggerMaker.infoAndAddToDb(infoMessage);
+        // loggerMaker.debugAndAddToDb(infoMessage);
 
         // TODO: handle case for API groups.
 

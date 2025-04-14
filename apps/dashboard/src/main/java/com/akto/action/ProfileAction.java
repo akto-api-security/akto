@@ -76,7 +76,7 @@ public class ProfileAction extends UserAction {
         if (sessionAccId == 0) {
             throw new IllegalStateException("user has no accounts associated");
         } else {
-            logger.error("setting session: " + sessionAccId);
+            logger.debug("setting session: " + sessionAccId);
             request.getSession().setAttribute("accountId", sessionAccId);
             Context.accountId.set(sessionAccId);
         }
@@ -172,7 +172,7 @@ public class ProfileAction extends UserAction {
         // only external API calls have non-null "utility"
         if (DashboardMode.isMetered() &&  utility == null) {
             if(organization == null){
-                logger.infoAndAddToDb("Org not found for user: " + username + " acc: " + sessionAccId + ", creating it now!", LoggerMaker.LogDb.DASHBOARD);
+                logger.debugAndAddToDb("Org not found for user: " + username + " acc: " + sessionAccId + ", creating it now!", LoggerMaker.LogDb.DASHBOARD);
                 InitializerListener.createOrg(sessionAccId);
                 organization = OrganizationsDao.instance.findOne(
                         Filters.in(Organization.ACCOUNTS, sessionAccId)

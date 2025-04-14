@@ -298,14 +298,6 @@ public class LoggerMaker  {
         logger.info(message, vars);
     }
 
-    public void error(String errorMessage) {
-        logger.info(errorMessage);
-    }
-
-    public void error(String errorMessage, Throwable e) {
-        logger.error(errorMessage, e);
-    }
-
     public void error(String errorMessage, Object... vars) {
         logger.error(errorMessage, vars);
     }
@@ -316,5 +308,20 @@ public class LoggerMaker  {
 
     public void warn(String message, Object... vars) {
         logger.warn(message, vars);
+    }
+
+    public void debugAndAddToDb(String message) {
+        debugAndAddToDb(message, this.db);
+    }
+
+    public void debugAndAddToDb(String message, LogDb db) {
+        String accountId = Context.accountId.get() != null ? Context.accountId.get().toString() : "NA";
+        String debugMessage = "acc: " + accountId + ", " + message;
+        debug(debugMessage);
+        try{
+            insert(debugMessage, "debug", db);
+        } catch (Exception e){
+
+        }
     }
 }

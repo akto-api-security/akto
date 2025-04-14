@@ -39,10 +39,13 @@ import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.bson.conversions.Bson;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class AdminSettingsAction extends UserAction {
 
     private static final LoggerMaker logger = new LoggerMaker(AdminSettingsAction.class, LogDb.DASHBOARD);
+    private static final Logger log = LoggerFactory.getLogger(AdminSettingsAction.class);
 
     AccountSettings accountSettings;
     private int globalRateLimit = 0;
@@ -181,7 +184,7 @@ public class AdminSettingsAction extends UserAction {
     }
 
     private static void dropCollectionsInitial(int accountId) {
-        logger.info("Dropping collection initial");
+        logger.debug("Dropping collection initial");
         Context.accountId.set(accountId);
         SampleDataDao.instance.getMCollection().drop();
         FilterSampleDataDao.instance.getMCollection().drop();
@@ -190,7 +193,7 @@ public class AdminSettingsAction extends UserAction {
     }
 
     public static void dropCollections(int accountId) {
-        logger.info("CALLED: " + Context.now());
+        logger.debug("CALLED: " + Context.now());
         dropCollectionsInitial(accountId);
         AccountSettingsDao.instance.getMCollection().updateOne(
                 AccountSettingsDao.generateFilter(), Updates.set(AccountSettings.SAMPLE_DATA_COLLECTION_DROPPED, true), new UpdateOptions().upsert(true)

@@ -191,7 +191,7 @@ public class Utils {
             String key = matcher.group(1);
             if (key == null) continue;
             if (!variableMap.containsKey(key)) {
-                loggerMaker.infoAndAddToDb("Missed: " + key, LogDb.DASHBOARD);
+                loggerMaker.debugAndAddToDb("Missed: " + key, LogDb.DASHBOARD);
                 continue;
             }
             String value = variableMap.get(key);

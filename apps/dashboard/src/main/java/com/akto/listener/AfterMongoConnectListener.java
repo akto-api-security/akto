@@ -41,15 +41,15 @@ public abstract class AfterMongoConnectListener implements ServletContextListene
 
                         int now = Context.now();
                         if (runJobFunctions || runJobFunctionsAnyway) {
-                            logger.info("Starting runtime init functions at " + now);
+                            logger.debug("Starting runtime init functions at " + now);
                             runMainFunction();
                             int now2 = Context.now();
                             int diffNow = now2 - now;
-                            logger.info(String.format(
+                            logger.debug(String.format(
                                     "Completed runtime init functions at %d , time taken : %d", now2,
                                     diffNow));
                         } else {
-                            logger.info("Skipping runtime init functions at " + now);
+                            logger.debug("Skipping runtime init functions at " + now);
                         }
     
                         ranOnce = true;

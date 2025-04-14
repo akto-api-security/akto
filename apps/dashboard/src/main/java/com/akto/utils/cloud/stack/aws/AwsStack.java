@@ -66,7 +66,7 @@ public class AwsStack implements com.akto.utils.cloud.stack.Stack {
             }
             Future<CreateStackResult> future = CLOUD_FORMATION_ASYNC.createStackAsync(createRequest);
             CreateStackResult createStackResult = future.get();
-            logger.infoAndAddToDb("Stack Id: " + createStackResult.getStackId(), LogDb.DASHBOARD);
+            logger.debugAndAddToDb("Stack Id: " + createStackResult.getStackId(), LogDb.DASHBOARD);
             return createStackResult.getStackId();
         } catch (Exception e) {
             logger.errorAndAddToDb(e, e.toString(), LogDb.DASHBOARD);
@@ -100,7 +100,7 @@ public class AwsStack implements com.akto.utils.cloud.stack.Stack {
             String stackStatus = stack.getStackStatus();
 
             if (!ACCEPTABLE_STACK_STATUSES.contains(stackStatus)) {
-                logger.infoAndAddToDb("Actual stack status: " + stackStatus, LogDb.DASHBOARD);
+                logger.debugAndAddToDb("Actual stack status: " + stackStatus, LogDb.DASHBOARD);
                 return new StackState(StackStatus.CREATION_FAILED.toString(), 0);
             }
             return new StackState(stackStatus, stack.getCreationTime().getTime());
@@ -126,7 +126,7 @@ public class AwsStack implements com.akto.utils.cloud.stack.Stack {
         try {
             DescribeStackResourcesResult res = CLOUD_FORMATION_SYNC.describeStackResources(req);
             List<StackResource> resources = res.getStackResources();
-            logger.info(String.valueOf(resources));
+            logger.debug(String.valueOf(resources));
             return resources.get(0).getPhysicalResourceId();
         } catch (Exception e) {
             logger.errorAndAddToDb(e, String.format("Failed to fetch physical id of resource with logical id %s : %s", logicalId, e.toString()), LogDb.DASHBOARD);

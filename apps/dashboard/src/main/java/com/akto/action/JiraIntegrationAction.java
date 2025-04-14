@@ -143,7 +143,7 @@ public class JiraIntegrationAction extends UserAction {
                     if (!inputProjectIds.contains(key)) {
                         continue;
                     }
-                    loggerMaker.infoAndAddToDb("evaluating issuetype for project key " + key + ", project json obj " + obj, LoggerMaker.LogDb.DASHBOARD);
+                    loggerMaker.debugAndAddToDb("evaluating issuetype for project key " + key + ", project json obj " + obj, LoggerMaker.LogDb.DASHBOARD);
                     BasicDBList issueTypes = (BasicDBList) obj.get("issuetypes");
                     List<BasicDBObject> issueIdPairs = getIssueTypesWithIds(issueTypes);
                     this.projectAndIssueMap.put(key, issueIdPairs);

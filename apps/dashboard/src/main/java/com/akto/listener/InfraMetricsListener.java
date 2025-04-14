@@ -23,7 +23,7 @@ public class InfraMetricsListener implements ServletContextListener {
     public void contextInitialized(javax.servlet.ServletContextEvent sce) {
 
         try {
-            logger.info("Infra metrics initializing.......");
+            logger.debug("Infra metrics initializing.......");
             new JvmThreadMetrics().bindTo(registry);
             new JvmGcMetrics().bindTo(registry);
             new JvmMemoryMetrics().bindTo(registry);
@@ -35,7 +35,7 @@ public class InfraMetricsListener implements ServletContextListener {
         }
 
 
-        logger.info("Infra metrics initialized!!!!");
+        logger.debug("Infra metrics initialized!!!!");
 
     }
 }
