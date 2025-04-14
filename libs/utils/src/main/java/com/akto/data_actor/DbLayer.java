@@ -145,7 +145,7 @@ public class DbLayer {
     }
     public static void bulkWriteSingleTypeInfo(List<WriteModel<SingleTypeInfo>> writesForSingleTypeInfo) {
         BulkWriteResult res = SingleTypeInfoDao.instance.getMCollection().bulkWrite(writesForSingleTypeInfo);
-        System.out.println("bulk write result: del:" + res.getDeletedCount() + " ins:" + res.getInsertedCount() + " match:" + res.getMatchedCount() + " modify:" +res.getModifiedCount());
+        loggerMaker.debug("bulk write result: del:" + res.getDeletedCount() + " ins:" + res.getInsertedCount() + " match:" + res.getMatchedCount() + " modify:" +res.getModifiedCount());
     }
 
     public static void bulkWriteSampleData(List<WriteModel<SampleData>> writesForSampleData) {
@@ -242,11 +242,11 @@ public class DbLayer {
                 try {
                     sti.setStrId(sti.getId().toHexString());
                 } catch (Exception e) {
-                    System.out.println("error" + e);
+                    loggerMaker.error("error" + e);
                 }
             }
         } catch (Exception e) {
-            System.out.println("error" + e);
+            loggerMaker.error("error" + e);
         }
         return stis;
     }
@@ -1052,13 +1052,29 @@ public class DbLayer {
         return DependencyNodeDao.instance.findAll(delFilterQ);
     }
 
-    public static List<String> findTestSubCategoriesByTestSuiteId(String testSuiteId) {
-        TestSuites testSuite = TestSuiteDao.instance.findOne(Filters.eq(ID, new ObjectId(testSuiteId)));
-        if(testSuite == null) {
+    public static List<String> findTestSubCategoriesByTestSuiteId(List<String> testSuiteId) {
+        List<ObjectId> testSuiteIds = new ArrayList<>();
+        for (String testSuiteIdStr : testSuiteId) {
+            testSuiteIds.add(new ObjectId(testSuiteIdStr));
+        }
+        List<TestSuites> testSuites = TestSuiteDao.instance.findAll(Filters.in(ID, testSuiteIds));
+        if(testSuites == null || testSuites.isEmpty()) {
             return new ArrayList<>();
         }
 
-        return testSuite.getSubCategoryList();
+        Set<String> subcategorySet = new HashSet<>();
+        for (TestSuites testSuite : testSuites) {
+            List<String> subcategoryList = testSuite.getSubCategoryList();
+            if(subcategoryList != null && !subcategoryList.isEmpty()) {
+                subcategorySet.addAll(subcategoryList);
+            }
+        }
+
+        return new ArrayList<>(subcategorySet);
+    }
+    
+    public static TestingRunResultSummary findLatestTestingRunResultSummary(Bson filter){
+        return TestingRunResultSummariesDao.instance.findLatestOne(filter);
     }
 
 }

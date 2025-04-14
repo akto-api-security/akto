@@ -22,19 +22,15 @@ import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.TrafficInfoDao;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo;
-import com.akto.dto.FilterSampleData;
 import com.akto.dto.SensitiveSampleData;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.traffic.TrafficInfo;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.util.Util;
-import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.InsertManyOptions;
 import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public class MergeOnHostOnly {
 
@@ -46,7 +42,6 @@ public class MergeOnHostOnly {
      * delete in case the _id exists ( i.e. the apicollection already contains this url+method)
      */
 
-    private static final Logger logger = LoggerFactory.getLogger(MergeOnHostOnly.class);
     private static final LoggerMaker loggerMaker = new LoggerMaker(MergeOnHostOnly.class);
 
     public MergeOnHostOnly() {} 
@@ -67,7 +62,7 @@ public class MergeOnHostOnly {
             try{
                 ApiInfoDao.instance.getMCollection().insertMany(apiInfos,options);
             } catch(Exception e){
-                logger.error(e.getMessage());
+                loggerMaker.error(e.getMessage());
             }
             ApiInfoDao.instance.getMCollection().deleteMany(Filters.eq("_id.apiCollectionId", oldId));
         }
@@ -82,7 +77,7 @@ public class MergeOnHostOnly {
             try{
                 SampleDataDao.instance.getMCollection().insertMany(sampleDatas,options);
             } catch(Exception e){
-                logger.error(e.getMessage());
+                loggerMaker.error(e.getMessage());
             }
             SampleDataDao.instance.getMCollection().deleteMany(Filters.eq("_id.apiCollectionId", oldId));
         }
@@ -98,7 +93,7 @@ public class MergeOnHostOnly {
             try{
                 SensitiveSampleDataDao.instance.getMCollection().insertMany(sensitiveSampleDatas,options);
             } catch(Exception e){
-                logger.error(e.getMessage());
+                loggerMaker.error(e.getMessage());
             }
             SensitiveSampleDataDao.instance.getMCollection().deleteMany(Filters.eq("_id.apiCollectionId", oldId));
         }
@@ -114,7 +109,7 @@ public class MergeOnHostOnly {
             try{
                 TrafficInfoDao.instance.getMCollection().insertMany(trafficInfos,options);
             } catch(Exception e){
-                logger.error(e.getMessage());
+                loggerMaker.error(e.getMessage());
             }
             TrafficInfoDao.instance.getMCollection().deleteMany(Filters.eq("_id.apiCollectionId", oldId));
         }
@@ -236,7 +231,7 @@ public class MergeOnHostOnly {
             }
 
         } catch (Exception e) {
-            logger.error("unable to update apiCollectionId, trying again with" + newApiCollectionId);
+            loggerMaker.error("unable to update apiCollectionId, trying again with" + newApiCollectionId);
         }
 
     }

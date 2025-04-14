@@ -80,8 +80,8 @@ import com.google.gson.Gson;
 public class ClientActor extends DataActor {
 
     private static final int batchWriteLimit = 8;
-    private static final String url = buildDbAbstractorUrl();
     private static final LoggerMaker loggerMaker = new LoggerMaker(ClientActor.class);
+    private static final String url = buildDbAbstractorUrl();
     private static final int maxConcurrentBatchWrites = 150;
     private static final Gson gson = new Gson();
     private static final CodecRegistry codecRegistry = DaoInit.createCodecRegistry();
@@ -96,7 +96,7 @@ public class ClientActor extends DataActor {
         if (checkAccount()) {
             dbAbsHost = System.getenv("DATABASE_ABSTRACTOR_SERVICE_URL");
         }
-        System.out.println("dbHost value " + dbAbsHost);
+        loggerMaker.info("dbHost value " + dbAbsHost);
         if (dbAbsHost.endsWith("/")) {
             dbAbsHost = dbAbsHost.substring(0, dbAbsHost.length() - 1);
         }
@@ -590,7 +590,6 @@ public class ClientActor extends DataActor {
     //                 BasicDBObject kConditions = (BasicDBObject) obj2.get("keyConditions");
     //                 BasicDBList predicates = (BasicDBList) kConditions.get("predicates");
     //                 RegexPredicate regexPredicate = objectMapper.readValue(((BasicDBObject) predicates.get(0)).toJson(), RegexPredicate.class);
-    //                 System.out.println("hi");
     //                 //customDataTypes.add(objectMapper.readValue(obj2.toJson(), CustomDataType.class));
     //             }
     //         } catch(Exception e) {
@@ -868,7 +867,7 @@ public class ClientActor extends DataActor {
         obj.put("apiInfoList", writesForApiInfo);
 
         String objString = gson.toJson(obj);
-        System.out.println("api info batch" + objString);
+        loggerMaker.debug("api info batch" + objString);
 
         Map<String, List<String>> headers = buildHeaders();
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/bulkWriteApiInfo", "", "POST", objString, headers, "");
@@ -1143,11 +1142,11 @@ public class ClientActor extends DataActor {
             OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
             String responsePayload = response.getBody();
             if (response.getStatusCode() != 200 || responsePayload == null) {
-                System.out.println("non 2xx response in insertRuntimeLog");
+                loggerMaker.info("non 2xx response in insertRuntimeLog");
                 return;
             }
         } catch (Exception e) {
-            System.out.println("error in insertRuntimeLog" + e);
+            loggerMaker.error("error in insertRuntimeLog" + e);
             return;
         }
     }
@@ -1300,6 +1299,28 @@ public class ClientActor extends DataActor {
         }
     }
 
+    private void fillTestingEndpointsType(String type, Document testingRun) {
+        switch (type) {
+            case "CUSTOM":
+                ((Document) testingRun.get("testingEndpoints")).put("_t", "com.akto.dto.testing.CustomTestingEndpoints");
+                break;
+            case "COLLECTION_WISE":
+                ((Document) testingRun.get("testingEndpoints")).put("_t", "com.akto.dto.testing.CollectionWiseTestingEndpoints");
+                break;
+            case "WORKFLOW":
+                ((Document) testingRun.get("testingEndpoints")).put("_t", "com.akto.dto.testing.WorkflowTestingEndpoints");
+                break;
+            case "ALL":
+                ((Document) testingRun.get("testingEndpoints")).put("_t", "com.akto.dto.testing.AllTestingEndpoints");
+                break;
+            case "LOGICAL_GROUP":
+                ((Document) testingRun.get("testingEndpoints")).put("_t", "com.akto.dto.testing.LogicalGroupTestingEndpoint");
+                break;
+            default:
+                break;
+        }
+    }
+
     public TestingRun findPendingTestingRun(int delta) {
         Map<String, List<String>> headers = buildHeaders();
         BasicDBObject obj = new BasicDBObject();
@@ -1317,25 +1338,7 @@ public class ClientActor extends DataActor {
                 Document testingRun = (Document) doc.get("testingRun");
                 Codec<TestingRun> apiInfoKeyCodec = codecRegistry.get(TestingRun.class);
                 String type = ((Document) testingRun.get("testingEndpoints")).getString("type");
-                switch (type) {
-                    case "CUSTOM":
-                        ((Document) testingRun.get("testingEndpoints")).put("_t", "com.akto.dto.testing.CustomTestingEndpoints");
-                        break;
-                    case "COLLECTION_WISE":
-                        ((Document) testingRun.get("testingEndpoints")).put("_t", "com.akto.dto.testing.CollectionWiseTestingEndpoints");
-                        break;
-                    case "WORKFLOW":
-                        ((Document) testingRun.get("testingEndpoints")).put("_t", "com.akto.dto.testing.WorkflowTestingEndpoints");
-                        break;
-                    case "ALL":
-                        ((Document) testingRun.get("testingEndpoints")).put("_t", "com.akto.dto.testing.AllTestingEndpoints");
-                        break;
-                    case "LOGICAL_GROUP":
-                        ((Document) testingRun.get("testingEndpoints")).put("_t", "com.akto.dto.testing.LogicalGroupTestingEndpoint");
-                        break;
-                    default:
-                        break;
-                }
+                fillTestingEndpointsType(type, testingRun);
                 String hexId = testingRun.getString("hexId");
                 testingRun.put("id", hexId);
                 TestingRun res = decode(apiInfoKeyCodec, testingRun);
@@ -1438,19 +1441,7 @@ public class ClientActor extends DataActor {
                 Document testingRun = (Document) doc.get("testingRun");
                 Codec<TestingRun> apiInfoKeyCodec = codecRegistry.get(TestingRun.class);
                 String type = ((Document) testingRun.get("testingEndpoints")).getString("type");
-                switch (type) {
-                    case "CUSTOM":
-                        ((Document) testingRun.get("testingEndpoints")).put("_t", "com.akto.dto.testing.CustomTestingEndpoints");
-                        break;
-                    case "COLLECTION_WISE":
-                        ((Document) testingRun.get("testingEndpoints")).put("_t", "com.akto.dto.testing.CollectionWiseTestingEndpoints");
-                        break;
-                    case "WORKFLOW":
-                        ((Document) testingRun.get("testingEndpoints")).put("_t", "com.akto.dto.testing.WorkflowTestingEndpoints");
-                        break;
-                    default:
-                        break;
-                }
+                fillTestingEndpointsType(type, testingRun);
                 String hexId = testingRun.getString("hexId");
                 testingRun.put("id", hexId);
                 TestingRun res = decode(apiInfoKeyCodec, testingRun);
@@ -1954,7 +1945,7 @@ public class ClientActor extends DataActor {
         BasicDBObject obj = new BasicDBObject();
         obj.put("testingRunResult", testingRunResult);
         String objString = gson.toJson(obj);
-        System.out.println(objString);
+        loggerMaker.debug(objString);
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/insertTestingRunResults", "", "POST", objString, headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
@@ -3017,11 +3008,11 @@ public class ClientActor extends DataActor {
             OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
             String responsePayload = response.getBody();
             if (response.getStatusCode() != 200 || responsePayload == null) {
-                System.out.println("non 2xx response in insertTestingLog");
+                loggerMaker.info("non 2xx response in insertTestingLog");
                 return;
             }
         } catch (Exception e) {
-            System.out.println("error in insertTestingLog" + e);
+            loggerMaker.error("error in insertTestingLog" + e);
             return;
         }
     }
@@ -3065,10 +3056,10 @@ public class ClientActor extends DataActor {
             String decodedPayload = new String(decodedBytes);
             BasicDBObject basicDBObject = BasicDBObject.parse(decodedPayload);
             int accId = (int) basicDBObject.getInt("accountId");
-            System.out.println("checkaccount accountId log " + accId);
+            loggerMaker.info("checkaccount accountId log " + accId);
             return accId == 1000000;
         } catch (Exception e) {
-            System.out.println("checkaccount error" + e.getStackTrace());
+            loggerMaker.error("checkaccount error" + e.getStackTrace());
         }
         return false;
     }
@@ -3523,8 +3514,34 @@ public class ClientActor extends DataActor {
         }
     }
 
-    @Override
-    public List<String> findTestSubCategoriesByTestSuiteId(String testSuiteId) {
+    public TestingRunResultSummary findLatestTestingRunResultSummary(Bson filter) {
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("filter", filter);
+        Map<String, List<String>> headers = buildHeaders();
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/findLatestTestingRunResultSummary", "", "POST",  obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in findLatestTestingRunResultSummary", LoggerMaker.LogDb.TESTING);
+                return null;
+            }
+            BasicDBObject payloadObj;
+            try {
+                payloadObj =  BasicDBObject.parse(responsePayload);
+                BasicDBObject summaryObject = (BasicDBObject) payloadObj.get("trrs");
+                TestingRunResultSummary summary = objectMapper.readValue(summaryObject.toJson(), TestingRunResultSummary.class);
+                return summary;
+            } catch(Exception e) {
+                return null;
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in findLatestTestingRunResultSummary" + e, LoggerMaker.LogDb.RUNTIME);
+            return null;
+        }
+    }
+    
+    public List<String> findTestSubCategoriesByTestSuiteId(List<String> testSuiteId) {
         BasicDBObject obj = new BasicDBObject();
         obj.put("testSuiteId", testSuiteId);
         Map<String, List<String>> headers = buildHeaders();
@@ -3539,13 +3556,13 @@ public class ClientActor extends DataActor {
             BasicDBObject payloadObj;
             try {
                 payloadObj = BasicDBObject.parse(responsePayload);
-                BasicDBList testSuiteTestSubCategoriesObj = (BasicDBList) payloadObj.get("testSuiteTestSubCategories");
-                List<String> testSuiteTestSubCategories = new ArrayList<>();
-                for (Object testSubCategoryObj : testSuiteTestSubCategoriesObj) {
-                    String testSubCategory = testSubCategoryObj.toString();
-                    testSuiteTestSubCategories.add(testSubCategory);
+                BasicDBList testSubCategoriesObj = (BasicDBList) payloadObj.get("testSubCategories");
+                List<String> testSubCategories = new ArrayList<>();
+                for (Object nodeObj : testSubCategoriesObj) {
+                    BasicDBObject obj2 = (BasicDBObject) nodeObj;
+                    testSubCategories.add(objectMapper.readValue(obj2.toJson(), String.class));
                 }
-                return testSuiteTestSubCategories;
+                return testSubCategories;
             } catch (Exception e) {
                 return new ArrayList<>();
             }
@@ -3554,5 +3571,4 @@ public class ClientActor extends DataActor {
             return new ArrayList<>();
         }
     }
-
 }

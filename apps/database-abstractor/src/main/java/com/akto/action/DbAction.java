@@ -1735,6 +1735,11 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
+    public String findLatestTestingRunResultSummary(){
+        trrs = DbLayer.findLatestTestingRunResultSummary(filter);
+        return Action.SUCCESS.toUpperCase();
+    }
+
     public List<CustomDataTypeMapper> getCustomDataTypes() {
         return customDataTypes;
     }

@@ -1,6 +1,5 @@
 package com.akto.util;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.akto.util.grpc.ProtoBufUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mongodb.BasicDBObject;
@@ -12,8 +11,6 @@ import java.net.URLEncoder;
 import java.util.*;
 
 import static com.akto.dto.OriginalHttpRequest.*;
-import static com.akto.util.grpc.ProtoBufUtils.DECODED_QUERY;
-import static com.akto.util.grpc.ProtoBufUtils.RAW_QUERY;
 
 public class HttpRequestResponseUtils {
 
@@ -48,6 +45,25 @@ public class HttpRequestResponseUtils {
         }
 
         return rawRequest;
+    }
+
+    public static String convertGRPCEncodedToJson(byte[] rawRequest) {
+        String base64 = Base64.getEncoder().encodeToString(rawRequest);
+
+        // empty grpc response, only headers present
+        if (rawRequest.length <= 5) {
+            return "{}";
+        }
+
+        try {
+            Map<Object, Object> map = ProtoBufUtils.getInstance().decodeProto(rawRequest);
+            if (map.isEmpty()) {
+                return base64;
+            }
+            return mapper.writeValueAsString(map);
+        } catch (Exception e) {
+            return base64;
+        }
     }
 
     public static String convertGRPCEncodedToJson(String rawRequest) {

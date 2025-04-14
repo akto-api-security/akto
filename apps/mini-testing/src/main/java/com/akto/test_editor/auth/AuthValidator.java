@@ -13,6 +13,7 @@ import com.akto.test_editor.execution.Operations;
 import com.akto.testing.ApiExecutor;
 import com.akto.testing.Main;
 import com.akto.util.CookieTransformer;
+import com.mongodb.BasicDBObject;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -37,9 +38,20 @@ public class AuthValidator {
         Map<String, List<String>> headers = rawApi.getRequest().getHeaders();
         boolean contains;
         boolean res;
+
+        BasicDBObject payloadObj = new BasicDBObject();
+        String payload = rawApi.getRequest().getBody();
+        if (payload != null && payload.startsWith("[")) {
+            payload = "{\"json\": "+payload+"}";
+        }
+        try {
+            payloadObj = BasicDBObject.parse(payload);
+        } catch (Exception e) {
+        }
+
         List<String> cookieList = headers.getOrDefault("cookie", new ArrayList<>());
         for (String header: headerKeys) {
-            contains = headers.containsKey(header) || CookieTransformer.isKeyPresentInCookie(cookieList, header);
+            contains = headers.containsKey(header) || CookieTransformer.isKeyPresentInCookie(cookieList, header) || payloadObj.containsKey(header);
             res = auth.getAuthenticated() && contains;
             if (res) {
                 return true;
@@ -66,7 +78,13 @@ public class AuthValidator {
 
         if (customAuthTypes != null) {
             for(CustomAuthType customAuthType: customAuthTypes) {
-                headerKeys.addAll(customAuthType.getHeaderKeys());
+                if (customAuthType.getHeaderKeys() != null && customAuthType.getHeaderKeys().size() > 0) {
+                    headerKeys.addAll(customAuthType.getHeaderKeys());
+                }
+
+                if (customAuthType.getPayloadKeys() != null && customAuthType.getPayloadKeys().size() > 0) {
+                    headerKeys.addAll(customAuthType.getPayloadKeys());
+                }
             }
         }
 

@@ -268,5 +268,8 @@ public abstract class DataActor {
 
     public abstract List<DependencyNode> findDependencyNodes(int apiCollectionId, String url, String method, String reqMethod);
 
-    public abstract List<String> findTestSubCategoriesByTestSuiteId(String testSuiteId);
+    public abstract List<String> findTestSubCategoriesByTestSuiteId(List<String> testSuiteId);
+
+    public abstract TestingRunResultSummary findLatestTestingRunResultSummary(Bson filter);
+
 }
