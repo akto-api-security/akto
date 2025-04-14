@@ -540,7 +540,6 @@ const transform = {
     prettifyEndpointsData(inventoryData){
         const hostNameMap = PersistStore.getState().hostNameMap
         const prettifyData = inventoryData.map((url) => {
-            const severityInfo = func.getSeverityTextForEndpoints(url.riskScore);
             return{
                 ...url,
                 last_seen: url.last_seen,
@@ -553,9 +552,6 @@ const transform = {
                 isNew: this.isNewEndpoint(url.lastSeenTs),
                 sensitiveDataTags: url?.sensitiveTags.join(" "),
                 codeAnalysisEndpoint: false,
-                issuesComp: severityInfo.length > 0 ? <div className={`badge-wrapper-${severityInfo}`}>
-                    <Badge status={func.getHexColorForSeverity(severityInfo)}>{func.toSentenceCase(severityInfo)}</Badge>
-                </div> : '-',
                 issuesComp: url.severityObj? this.getIssuesList(url.severityObj):'-'
             }
         })
