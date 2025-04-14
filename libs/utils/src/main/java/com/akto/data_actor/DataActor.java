@@ -284,4 +284,6 @@ public abstract class DataActor {
     
     public abstract TestingRunPlayground getCurrentTestingRunDetailsFromEditor(int timestamp);
 
+    public abstract void updateTestingRunPlayground(TestingRunPlayground testingRunPlayground);
+
 }
