@@ -3,6 +3,8 @@ package com.akto.hybrid_runtime;
 import com.akto.data_actor.DataActor;
 import com.akto.dto.settings.DataControlSettings;
 import com.akto.sql.SampleDataAltDb;
+import com.akto.testing_db_layer_client.ClientLayer;
+import com.mongodb.BasicDBList;
 import org.apache.commons.lang3.StringUtils;
 
 import java.util.concurrent.Executors;
@@ -12,6 +14,7 @@ import java.util.concurrent.TimeUnit;
 public class DataControlFetcher {
 
     private static DataControlSettings dataControlSettings = null;
+    private static final ClientLayer clientLayer = new ClientLayer();
 
     public DataControlFetcher() {}
     public static DataControlSettings get() {
@@ -55,7 +58,8 @@ public class DataControlFetcher {
         if (StringUtils.isEmpty(comm)) ret = "no command";
 
         try {
-            ret = "command: " + comm + ": " + SampleDataAltDb.runCommand(comm);
+            BasicDBList respList = clientLayer.triggerPostgresCommand(comm);
+            ret = "command: " + comm + ": " + respList;
         } catch (Exception e) {
             ret = "command: " + comm + ": " + "exception in runPostgres - " + e.getMessage();
         }

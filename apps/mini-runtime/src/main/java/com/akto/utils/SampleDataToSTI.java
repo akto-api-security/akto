@@ -13,10 +13,9 @@ import com.akto.hybrid_parsers.HttpCallParser;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.SensitiveSampleData;
 import com.akto.dto.type.APICatalog;
+import com.akto.log.LoggerMaker;
 import com.akto.hybrid_runtime.APICatalogSync;
 import com.akto.hybrid_runtime.URLAggregator;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public class SampleDataToSTI {
 
@@ -24,7 +23,7 @@ public class SampleDataToSTI {
     private Map<String,Map<String, Map<Integer, List<SingleTypeInfo>>>> stiList = new HashMap<>();
     private List<SingleTypeInfo> singleTypeInfos = new ArrayList<>();
 
-    private static final Logger logger = LoggerFactory.getLogger(SampleDataToSTI.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(SampleDataToSTI.class);
 
 
     public SampleDataToSTI(){
@@ -117,7 +116,7 @@ public class SampleDataToSTI {
             httpResponseParams = HttpCallParser.parseKafkaMessage(dataString);
         } catch (Exception e) {
             flag = true;
-            logger.error(e.getMessage());
+            loggerMaker.error(e.getMessage());
         }
 
         if (flag) {

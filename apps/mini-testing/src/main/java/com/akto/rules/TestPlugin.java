@@ -20,9 +20,6 @@ import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -36,8 +33,6 @@ public abstract class TestPlugin {
     static final LoggerMaker loggerMaker = new LoggerMaker(TestPlugin.class);
 
     private static final DataActor dataActor = DataActorFactory.fetchInstance();
-
-    private static final Logger logger = LoggerFactory.getLogger(TestPlugin.class);
 
     public abstract Result  start(ApiInfoKey apiInfoKey, TestingUtil testingUtil, TestingRunConfig testingRunConfig);
 
@@ -169,7 +164,7 @@ public abstract class TestPlugin {
             message = convertOriginalReqRespToString(request, response);
         } catch (Exception e) {
             // TODO:
-            logger.error("Error while converting OriginalHttpRequest to string", e);
+            loggerMaker.error("Error while converting OriginalHttpRequest to string", e);
             message = convertOriginalReqRespToString(new OriginalHttpRequest(), new OriginalHttpResponse());
             errors.add(TestResult.TestError.FAILED_TO_CONVERT_TEST_REQUEST_TO_STRING.getMessage());
         }
