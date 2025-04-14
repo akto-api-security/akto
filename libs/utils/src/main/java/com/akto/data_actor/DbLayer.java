@@ -1155,12 +1155,20 @@ public class DbLayer {
         for (String testSuiteIdStr : testSuiteId) {
             testSuiteIds.add(new ObjectId(testSuiteIdStr));
         }
-        TestSuites testSuite = TestSuiteDao.instance.findOne(Filters.in(ID, testSuiteIds));
-        if(testSuite == null) {
+        List<TestSuites> testSuites = TestSuiteDao.instance.findAll(Filters.in(ID, testSuiteIds));
+        if(testSuites == null || testSuites.isEmpty()) {
             return new ArrayList<>();
         }
 
-        return testSuite.getSubCategoryList();
+        Set<String> subcategorySet = new HashSet<>();
+        for (TestSuites testSuite : testSuites) {
+            List<String> subcategoryList = testSuite.getSubCategoryList();
+            if(subcategoryList != null && !subcategoryList.isEmpty()) {
+                subcategorySet.addAll(subcategoryList);
+            }
+        }
+
+        return new ArrayList<>(subcategorySet);
     }
 
     public static TestingRunPlayground getCurrentTestingRunDetailsFromEditor(int timestamp){
