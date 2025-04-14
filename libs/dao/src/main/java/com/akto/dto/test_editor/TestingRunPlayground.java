@@ -1,14 +1,13 @@
 package com.akto.dto.test_editor;
 
-import java.util.Date;
 import java.util.List;
 
 import org.bson.codecs.pojo.annotations.BsonIgnore;
 import org.bson.types.ObjectId;
 
+import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.TestingRun.State;
-import com.mongodb.BasicDBObject;
 
 public class TestingRunPlayground {
 
@@ -34,7 +33,7 @@ public class TestingRunPlayground {
 
     private List<String> samples;
 
-    private BasicDBObject apiInfoKey;
+    private ApiInfoKey apiInfoKey;
 
     private int createdAt;
 
@@ -44,7 +43,7 @@ public class TestingRunPlayground {
     private String hexId;
 
 
-    public TestingRunPlayground(String testTemplate, State state, List<String> samples, BasicDBObject apiInfoKey, int createdAt) {
+    public TestingRunPlayground(String testTemplate, State state, List<String> samples, ApiInfoKey apiInfoKey, int createdAt) {
         this.testTemplate = testTemplate;
         this.state = state;
         this.samples = samples;
@@ -64,11 +63,11 @@ public class TestingRunPlayground {
         this.createdAt = createdAt;
     }
 
-    public BasicDBObject getApiInfoKey() {
+    public ApiInfoKey getApiInfoKey() {
         return apiInfoKey;
     }
 
-    public void setApiInfoKey(BasicDBObject apiInfoKey) {
+    public void setApiInfoKey(ApiInfoKey apiInfoKey) {
         this.apiInfoKey = apiInfoKey;
     }
 
