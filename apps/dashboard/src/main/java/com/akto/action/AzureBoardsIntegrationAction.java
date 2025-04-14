@@ -14,6 +14,7 @@ import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.TestingRunResult;
+import com.akto.log.LoggerMaker;
 import com.akto.testing.ApiExecutor;
 import com.akto.util.Constants;
 import com.mongodb.BasicDBList;
@@ -46,6 +47,8 @@ public class AzureBoardsIntegrationAction extends UserAction {
     private AzureBoardsIntegration azureBoardsIntegration;
 
     public static final String version = "7.1";
+
+    private static final LoggerMaker logger = new LoggerMaker(AzureBoardsIntegrationAction.class, LoggerMaker.LogDb.DASHBOARD);
 
 
     public String fetchAzureBoardsIntegration() {
@@ -129,6 +132,7 @@ public class AzureBoardsIntegrationAction extends UserAction {
         OriginalHttpRequest request = new OriginalHttpRequest(url, "", "GET", null, headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, new ArrayList<>());
+            logger.errorAndAddToDb("Status and Response from the getAzureBoardsWorkItems API: " + response.getStatusCode() + " | " + response.getBody());
             String responsePayload = response.getBody();
             BasicDBObject respPayloadObj = BasicDBObject.parse(responsePayload);
             BasicDBList workItemTypeListObj = (BasicDBList) (respPayloadObj.get("value"));
@@ -187,6 +191,7 @@ public class AzureBoardsIntegrationAction extends UserAction {
         OriginalHttpRequest request = new OriginalHttpRequest(url, "", "POST", reqPayload.toString(), headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, new ArrayList<>());
+            logger.errorAndAddToDb("Status and Response from the createWorkItem API: " + response.getStatusCode() + " | " + response.getBody());
             String responsePayload = response.getBody();
             if (response.getStatusCode() > 201 || responsePayload == null) {
                 return Action.ERROR.toUpperCase();
@@ -278,6 +283,7 @@ public class AzureBoardsIntegrationAction extends UserAction {
 
             OriginalHttpRequest request = new OriginalHttpRequest(uploadUrl, "", "POST", new String(fileBytes, StandardCharsets.UTF_8), headers, "");
             OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, new ArrayList<>());
+            logger.errorAndAddToDb("Status and Response from the uploadAttachmentToAzureDevops API: " + response.getStatusCode() + " | " + response.getBody());
 
             if (response.getStatusCode() >= 200 && response.getStatusCode() < 300) {
                 BasicDBObject responseObj = BasicDBObject.parse(response.getBody());
