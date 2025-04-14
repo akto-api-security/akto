@@ -1180,4 +1180,15 @@ public class DbLayer {
         );
     }
 
+    public static void updateTestingRunPlayground(TestingRunPlayground testingRunPlayground) {
+        TestingRunPlaygroundDao.instance.updateOne(
+                Filters.eq(Constants.ID, testingRunPlayground.getId()),
+                Updates.combine(
+                        Updates.set(TestingRunPlayground.STATE, State.COMPLETED),
+                        Updates.set(TestingRunPlayground.TESTING_RUN_RESULT, testingRunPlayground.getTestingRunResult()
+                    )
+                )
+            );
+    }
+
 }

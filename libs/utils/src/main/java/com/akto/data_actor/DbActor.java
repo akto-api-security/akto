@@ -578,6 +578,10 @@ public class DbActor extends DataActor {
         return DbLayer.getCurrentTestingRunDetailsFromEditor(timestamp);
     }
 
+    public void updateTestingRunPlayground(TestingRunPlayground testingRunPlayground) {
+        DbLayer.updateTestingRunPlayground(testingRunPlayground);
+    }
+
     public List<String> findTestSubCategoriesByTestSuiteId(List<String> testSuiteId) {
         return DbLayer.findTestSubCategoriesByTestSuiteId(testSuiteId);
     }
