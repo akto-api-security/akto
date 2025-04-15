@@ -1010,7 +1010,7 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName,apiInfoSeverit
               sensitiveInReq: [...this.convertSensitiveTags(x.sensitiveInReq)],
               sensitiveInResp: [...this.convertSensitiveTags(x.sensitiveInResp)],
               responseCodes: responseCodesArr,
-              severityObj: (apiInfoSeverityMap?.hasOwnProperty(key))? apiInfoSeverityMap[key] : {}
+              ...(apiInfoSeverityMap?.hasOwnProperty(key) ? { severityObj: apiInfoSeverityMap[key] } : {})
           
           }
 
