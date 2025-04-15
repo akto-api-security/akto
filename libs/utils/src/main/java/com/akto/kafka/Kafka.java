@@ -1,14 +1,15 @@
 package com.akto.kafka;
 
 import org.apache.kafka.clients.producer.*;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 
 import java.util.Properties;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class Kafka {
-  private static final Logger logger = LoggerFactory.getLogger(Kafka.class);
+  private static final LoggerMaker logger = new LoggerMaker(Kafka.class, LogDb.TESTING);
   private KafkaProducer<String, String> producer;
   public boolean producerReady;
 
@@ -55,12 +56,8 @@ public class Kafka {
     this(brokerIP, lingerMS, batchSize, Serializer.STRING, Serializer.STRING);
   }
 
-  public Kafka(String brokerIP, int lingerMS, int batchSize, int maxRequestTimeout) {
-    this(brokerIP, lingerMS, batchSize, Serializer.STRING, Serializer.STRING, maxRequestTimeout, 3);
-  }
-
-  public void send (String message, String topic, AtomicInteger counter){
-    sendWithCounter(message, topic, counter);
+  public Kafka(String brokerIP, int lingerMS, int batchSize, int maxRequestTimeout, int retriesConfig) {
+    this(brokerIP, lingerMS, batchSize, Serializer.STRING, Serializer.STRING, maxRequestTimeout, retriesConfig);
   }
 
   public void sendWithCounter(String message, String topic, AtomicInteger counter) {
@@ -74,6 +71,7 @@ public class Kafka {
       if (e != null) {
         logger.error("onCompletion error: " + e.getMessage());
       } else {
+        logger.info(message + " sent to topic " + topic + " with offset " + recordMetadata.offset());
         // decrement the counter if message sent successfully
         counter.decrementAndGet();
       }

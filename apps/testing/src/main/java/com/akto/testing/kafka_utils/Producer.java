@@ -30,19 +30,20 @@ public class Producer {
 
     private static final LoggerMaker logger = new LoggerMaker(Producer.class, LogDb.TESTING);
 
-    public static final Kafka producer = Constants.IS_NEW_TESTING_ENABLED ?  new Kafka(Constants.LOCAL_KAFKA_BROKER_URL, Constants.LINGER_MS_KAFKA, 100, Constants.MAX_REQUEST_TIMEOUT) : null;
-    public static Void pushMessagesToKafka(List<SingleTestPayload> messages, AtomicInteger totalRecords){
+    public static final Kafka producer = Constants.IS_NEW_TESTING_ENABLED ?  new Kafka(Constants.LOCAL_KAFKA_BROKER_URL, Constants.LINGER_MS_KAFKA, 100, Constants.MAX_REQUEST_TIMEOUT, 3) : null;
+    public static Void pushMessagesToKafka(List<SingleTestPayload> messages, AtomicInteger totalRecords, AtomicInteger throttleNumber){
         for(SingleTestPayload singleTestPayload: messages){
             String messageString = singleTestPayload.toString();
             try {
-                while (totalRecords.get() > 500) {
+                while (throttleNumber.get() > 500) {
                     Thread.sleep(200);
                 }
             } catch (Exception e) {
                 e.printStackTrace();
             }
             totalRecords.incrementAndGet();
-            producer.send(messageString, Constants.TEST_RESULTS_TOPIC_NAME, totalRecords);
+            throttleNumber.incrementAndGet();
+            producer.sendWithCounter(messageString, Constants.TEST_RESULTS_TOPIC_NAME, throttleNumber);
         }
         return null;
     }
