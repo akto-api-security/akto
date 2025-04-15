@@ -21,11 +21,11 @@ import com.akto.dto.test_editor.Info;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.AuthMechanism;
+import com.akto.dto.testing.AutoTicketingDetails;
 import com.akto.dto.testing.CollectionWiseTestingEndpoints;
 import com.akto.dto.testing.CustomTestingEndpoints;
 import com.akto.dto.testing.DeleteTestRuns;
 import com.akto.dto.testing.GenericTestResult;
-import com.akto.dto.testing.AutoTicketingDetails;
 import com.akto.dto.testing.MultiExecTestResult;
 import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.TestResult.TestError;
@@ -47,6 +47,7 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.usage.UsageMetricCalculator;
 import com.akto.util.Constants;
 import com.akto.util.enums.GlobalEnums;
+import com.akto.util.enums.GlobalEnums.Severity;
 import com.akto.util.enums.GlobalEnums.TestErrorSource;
 import com.akto.utils.DeleteTestRunUtils;
 import com.akto.utils.Utils;
@@ -232,6 +233,28 @@ public class StartTestAction extends UserAction {
         if (this.startTimestamp != 0 && this.startTimestamp + 86400 < Context.now()) {
             addActionError("Cannot schedule a test run in the past.");
             return ERROR.toUpperCase();
+        }
+
+        if (this.autoTicketingDetails != null && this.autoTicketingDetails.isShouldCreateTickets()) {
+            if (this.autoTicketingDetails.getProjectId() == null) {
+                addActionError("Project Id is required.");
+                return ERROR.toUpperCase();
+            }
+
+            if (this.autoTicketingDetails.getSeverities() == null
+                || this.autoTicketingDetails.getSeverities().isEmpty()) {
+                addActionError("Severities cannot be empty.");
+                return ERROR.toUpperCase();
+            }
+
+            try {
+                for (String s : this.autoTicketingDetails.getSeverities()) {
+                    Severity.valueOf(s);
+                }
+            } catch (IllegalArgumentException e) {
+                addActionError("Invalid parameter: severities.");
+                return ERROR.toUpperCase();
+            }
         }
 
         int scheduleTimestamp = this.startTimestamp == 0 ? Context.now() : this.startTimestamp;
