@@ -141,17 +141,14 @@ public class ConsumerUtil {
                         firstRecordRead.set(true);
                         try {
                             future.get(maxRunTimeForTests, TimeUnit.SECONDS); 
-                        } catch (InterruptedException e) {
-                            loggerMaker.error("Task timed out");
-                            future.cancel(true);
-                            createTimedOutResultFromMessage(message);
-                        } catch(TimeoutException e){
+                        } catch (InterruptedException | TimeoutException e) {
                             loggerMaker.error("Task timed out");
                             future.cancel(true);
                             createTimedOutResultFromMessage(message);
                         } catch(RejectedExecutionException e){
                             future.cancel(true);
                         } catch (Exception e) {
+                            future.cancel(true);
                             loggerMaker.error("Error in task execution: " + message, e);
                         }
                     }
@@ -172,7 +169,7 @@ public class ConsumerUtil {
                     executor.shutdownNow();
                     break;
                 }else if(firstRecordRead.get() && parallelConsumer.workRemaining() == 0){
-                    int remainingTime = Math.max(0,maxRunTimeInSeconds - (Context.now() - startTime));
+                    int remainingTime = Math.min( Math.max(0,maxRunTimeInSeconds - (Context.now() - startTime)), maxRunTimeForTests);
                     loggerMaker.info("Records are empty now, thus executing final tests");
                     executor.shutdown();
                     executor.awaitTermination(remainingTime, TimeUnit.SECONDS);
