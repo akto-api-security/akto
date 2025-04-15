@@ -477,7 +477,7 @@ const transform = {
                 riskScoreComp: isLoading ? loadingComp : <Badge key={c?.id} status={this.getStatus(c.riskScore)} size="small">{c.riskScore}</Badge>,
                 coverage: isLoading ? '...' : calcCoverage,
                 issuesArr: isLoading ? loadingComp : this.getIssuesList(c.severityInfo),
-                issuesArrVal: this.getIssuesListText(c.severityInfo),
+                issuesArrVal: c.severityInfo,
                 sensitiveSubTypes: isLoading ? loadingComp : this.prettifySubtypes(c.sensitiveInRespTypes, c.deactivated),
                 lastTraffic: isLoading ? '...' : c.detected,
                 riskScore: c.riskScore,

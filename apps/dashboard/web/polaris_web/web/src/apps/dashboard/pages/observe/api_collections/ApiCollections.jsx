@@ -28,6 +28,11 @@ import { saveAs } from 'file-saver'
 import TreeViewTable from "../../../components/shared/treeView/TreeViewTable"
 import TableStore from "../../../components/tables/TableStore";
 import { useNavigate } from "react-router-dom";
+import { AllCommunityModule, ModuleRegistry } from 'ag-grid-community'; 
+
+// Register all Community features
+ModuleRegistry.registerModules([AllCommunityModule]);
+import { AgGridReact } from 'ag-grid-react';
 
 
 const headers = [
@@ -136,6 +141,29 @@ const headers = [
         isText: CellType.TEXT,
         sortActive: true,
     }
+];
+
+const gridHeaders = [
+    { headerName: "API collection name", field: "displayName" },
+    { headerName: "Total endpoints", field: "urlsCount" },
+    { 
+        headerName: "Risk score", 
+        field: "riskScore",
+        cellRenderer: props => {
+            return  <span style={{ display: "flex", height: "100%", width: "100%", alignItems: "center" }}><Badge status={transform.getStatus(props.value)} size="small">{props.value}</Badge></span> ;
+        } 
+    },
+    { headerName: "Test coverage", field: "coverage" },
+    { headerName: "Issues", field: "issuesArrVal",
+        cellRenderer: props => {
+            console.log(props)
+            return <span style={{ display: "flex", height: "100%", width: "100%", alignItems: "center" }}>{transform.getIssuesList(props.value)}</span>;
+        } 
+     },
+    { headerName: "Sensitive data", field: "sensitiveSubTypesVal" },
+    { headerName: "Collection type", field: "envTypeComp" },
+    { headerName: "Last traffic seen", field: "lastTraffic" },
+    { headerName: "Discovered", field: "discovered" }
 ];
 
 const tempSortOptions = [
@@ -439,6 +467,7 @@ function ApiCollections() {
         tmp.custom = tmp.all.filter(x => !tmp.hostname.includes(x) && !x.deactivated && !tmp.groups.includes(x));
         tmp.deactivated = deactivatedCollectionsCopy
         setData(tmp);
+        console.log(tmp);
     }
 
     function disambiguateLabel(key, value) {
@@ -766,7 +795,7 @@ function ApiCollections() {
     const handleSelectedTab = (selectedIndex) => {
         setSelected(selectedIndex)
     }
-
+    const [activeTab, setActiveTab] = useState("all");
     const tableComponent = (
         treeView ?
         <TreeViewTable
@@ -776,26 +805,45 @@ function ApiCollections() {
             tableHeaders={headers.filter((x) => x.shouldMerge !== undefined)}
             promotedBulkActions={promotedBulkActions}
         />:
-        <GithubSimpleTable
-            key={refreshData}
-            pageLimit={100}
-            data={data[selectedTab]} 
-            sortOptions={ selectedTab === 'groups' ? [...tempSortOptions, ...sortOptions] : sortOptions}
-            resourceName={resourceName} 
-            filters={[]}
-            disambiguateLabel={disambiguateLabel} 
-            headers={headers}
-            selectable={true}
-            promotedBulkActions={promotedBulkActions}
-            mode={IndexFiltersMode.Default}
-            headings={headers}
-            useNewRow={true}
-            condensedHeight={true}
-            tableTabs={tableTabs}
-            onSelect={handleSelectedTab}
-            selected={selected}
-            csvFileName={"Inventory"}
-        />
+        // <GithubSimpleTable
+        //     key={refreshData}
+        //     pageLimit={100}
+        //     data={data[selectedTab]} 
+        //     sortOptions={ selectedTab === 'groups' ? [...tempSortOptions, ...sortOptions] : sortOptions}
+        //     resourceName={resourceName} 
+        //     filters={[]}
+        //     disambiguateLabel={disambiguateLabel} 
+        //     headers={headers}
+        //     selectable={true}
+        //     promotedBulkActions={promotedBulkActions}
+        //     mode={IndexFiltersMode.Default}
+        //     headings={headers}
+        //     useNewRow={true}
+        //     condensedHeight={true}
+        //     tableTabs={tableTabs}
+        //     onSelect={handleSelectedTab}
+        //     selected={selected}
+        //     csvFileName={"Inventory"}
+        // />
+        <div style={{ height: 800 }}>
+        <Box paddingInlineStart={1} paddingBlockStart={2} paddingBlockEnd={2}>
+        <HorizontalStack gap={2}>
+        {
+            
+            Object.entries(data).map(([key, value]) => {
+                return <Button size='slim' pressed={key===activeTab} removeUnderline monochrome onClick={()=>setActiveTab(key)} >{key.toUpperCase()}</Button>;
+            })
+            
+        }
+        
+        </HorizontalStack>
+        </Box>
+        <AgGridReact 
+            rowData={data[activeTab]}
+            columnDefs={gridHeaders}
+            pagination={true}
+            onRowClicked={(val)=>navigate(val.data.nextUrl)}
+        /></div>
     )
 
     const components = loading ? [<SpinnerCentered key={"loading"}/>]: [<SummaryCardInfo summaryItems={summaryItems} key="summary"/>, (!hasUsageEndpoints ? <CollectionsPageBanner key="page-banner" /> : null) ,modalComponent, tableComponent]
