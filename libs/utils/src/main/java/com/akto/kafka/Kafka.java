@@ -13,10 +13,10 @@ public class Kafka {
     private KafkaProducer<String, String> producer;
     public boolean producerReady;
 
-    public Kafka(String brokerIP, int lingerMS, int batchSize, int maxRequestTimeout) {
+    public Kafka(String brokerIP, int lingerMS, int batchSize, int maxRequestTimeout, int maxRetries) {
         producerReady = false;
         try {
-            setProducer(brokerIP, lingerMS, batchSize, maxRequestTimeout);
+            setProducer(brokerIP, lingerMS, batchSize, maxRequestTimeout, maxRetries);
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -25,17 +25,27 @@ public class Kafka {
     public Kafka(String brokerIP, int lingerMS, int batchSize) {
         producerReady = false;
         try {
-            setProducer(brokerIP, lingerMS, batchSize, 5000);
+            setProducer(brokerIP, lingerMS, batchSize, 5000, 0);
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
 
-    public void send (String message, String topic, AtomicInteger counter){
-        if(!this.producerReady) return;
+    public void sendWithCounter(String message, String topic, AtomicInteger counter) {
+        if (!this.producerReady) {
+          logger.error("Producer not ready. Cannot send message.");
+          return;
+        };
+    
         ProducerRecord<String, String> record = new ProducerRecord<>(topic, message);
-        producer.send(record, new DemoProducerCallback());
-        counter.incrementAndGet();
+        producer.send(record, (recordMetadata, e) -> {
+            if (e != null) {
+                logger.error("onCompletion error: " + e.getMessage() + " for message: " + message);
+            } else {
+                logger.info(message + " sent to topic " + topic + " with offset " + recordMetadata.offset());
+                counter.decrementAndGet();
+            }
+        });
     }
 
     public void send(String message,String topic) {
@@ -50,7 +60,7 @@ public class Kafka {
         //producer.close(Duration.ofMillis(0)); // close immediately
     }
 
-    private void setProducer(String brokerIP, int lingerMS, int batchSize, int maxRequestTimeout) {
+    private void setProducer(String brokerIP, int lingerMS, int batchSize, int maxRequestTimeout, int maxRetries) {
         if (producer != null) close(); // close existing producer connection
 
         Properties kafkaProps = new Properties();
@@ -59,10 +69,15 @@ public class Kafka {
         kafkaProps.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
         kafkaProps.put(ProducerConfig.BATCH_SIZE_CONFIG, batchSize);
         kafkaProps.put(ProducerConfig.LINGER_MS_CONFIG, lingerMS);
-        kafkaProps.put(ProducerConfig.RETRIES_CONFIG, 0);
+        kafkaProps.put(ProducerConfig.RETRIES_CONFIG, 3);
         kafkaProps.put(ProducerConfig.REQUEST_TIMEOUT_MS_CONFIG, maxRequestTimeout);
         kafkaProps.put(ProducerConfig.DELIVERY_TIMEOUT_MS_CONFIG, lingerMS + maxRequestTimeout);
+
+        if(maxRetries > 0){
+            kafkaProps.put(ProducerConfig.RETRY_BACKOFF_MS_CONFIG, 100);
+        }
         producer = new KafkaProducer<String, String>(kafkaProps);
+
 
         // test if connection successful by sending a test message in a blocking way
         // calling .get() blocks the thread till we receive a message

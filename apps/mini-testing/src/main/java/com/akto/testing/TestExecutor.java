@@ -245,11 +245,12 @@ public class TestExecutor {
 
             final int maxRunTime = tempRunTime;
             AtomicInteger totalRecords = new AtomicInteger(0);
+            AtomicInteger throttleNumber = new AtomicInteger(0);
             for (ApiInfo.ApiInfoKey apiInfoKey: apiInfoKeyList) {
                 List<String> messages = testingUtil.getSampleMessages().get(apiInfoKey);
                 if(Constants.IS_NEW_TESTING_ENABLED){
                     for (String testSubCategory: testingRunSubCategories) {
-                        insertRecordInKafka(accountId, testSubCategory, apiInfoKey, messages, summaryId, syncLimit, apiInfoKeyToHostMap, subCategoryEndpointMap, testConfigMap, testLogs, testingRun, new AtomicBoolean(false), totalRecords);
+                        insertRecordInKafka(accountId, testSubCategory, apiInfoKey, messages, summaryId, syncLimit, apiInfoKeyToHostMap, subCategoryEndpointMap, testConfigMap, testLogs, testingRun, new AtomicBoolean(false), totalRecords, throttleNumber);
                     }
                 }
                 else{
@@ -510,7 +511,7 @@ public class TestExecutor {
         try {
             for (String testSubCategory: testingRunSubCategories) {
                 if(GetRunningTestsStatus.getRunningTests().isTestRunning(summaryId)){
-                    insertRecordInKafka(accountId, testSubCategory, apiInfoKey, messages, summaryId, syncLimit, apiInfoKeyToHostMap, subCategoryEndpointMap, testConfigMap, testLogs, testingRun, isApiInfoTested, new AtomicInteger(0));
+                    insertRecordInKafka(accountId, testSubCategory, apiInfoKey, messages, summaryId, syncLimit, apiInfoKeyToHostMap, subCategoryEndpointMap, testConfigMap, testLogs, testingRun, isApiInfoTested, new AtomicInteger(0), new AtomicInteger(0));
                 }else{
                     loggerMaker.info("Test stopped for id: " + testingRun.getHexId());
                     break;
@@ -611,7 +612,7 @@ public class TestExecutor {
     private Void insertRecordInKafka(int accountId, String testSubCategory, ApiInfo.ApiInfoKey apiInfoKey,
             List<String> messages, ObjectId summaryId, SyncLimit syncLimit, Map<ApiInfoKey, String> apiInfoKeyToHostMap,
             ConcurrentHashMap<String, String> subCategoryEndpointMap, Map<String, TestConfig> testConfigMap,
-            List<TestingRunResult.TestLog> testLogs, TestingRun testingRun, AtomicBoolean isApiInfoTested, AtomicInteger totalRecords) {
+            List<TestingRunResult.TestLog> testLogs, TestingRun testingRun, AtomicBoolean isApiInfoTested, AtomicInteger totalRecords, AtomicInteger throttleNumber) {
         Context.accountId.set(accountId);
         TestConfig testConfig = testConfigMap.get(testSubCategory);
 
@@ -647,7 +648,7 @@ public class TestExecutor {
                 loggerMaker.info("Inserting record for apiInfoKey: " + apiInfoKey.toString() + " subcategory: " + testSubType);
             }
             try {
-                Producer.pushMessagesToKafka(Arrays.asList(singleTestPayload), totalRecords);
+                Producer.pushMessagesToKafka(Arrays.asList(singleTestPayload), totalRecords, throttleNumber);
             } catch (Exception e) {
                 e.printStackTrace();
                 return null;
