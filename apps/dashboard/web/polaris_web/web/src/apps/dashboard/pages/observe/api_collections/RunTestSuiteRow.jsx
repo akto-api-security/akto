@@ -1,7 +1,7 @@
 import { VerticalStack, Modal, TextField, Button, Text, HorizontalStack, Collapsible, Badge, Pagination, TextContainer, Icon, Scrollable, Checkbox, Box, Tooltip, Card, MediaCard, RadioButton } from "@shopify/polaris";
 import { useState } from "react";
 
-function RunTestSuiteRow({data,checkifSelected,checkedSelected,handleTestSuiteSelection,checkDisableTestSuite }) {
+function RunTestSuiteRow({data,checkifSelected,checkedSelected,handleTestSuiteSelection }) {
     const [toggle, setToggle] = useState(true);
     const rowName = data.rowName;
 
@@ -13,7 +13,7 @@ function RunTestSuiteRow({data,checkifSelected,checkedSelected,handleTestSuiteSe
                     <VerticalStack>
                         <div >
                             <Box paddingBlockStart={2} paddingBlockEnd={2} paddingInlineStart={4} paddingInlineEnd={4} borderRadiusEndStart={2} borderRadiusEndEnd="2" borderColor="border">
-                                <RadioButton label={
+                                <Checkbox label={
                                         <Tooltip content={formattedName}>
                                             <Text variant="headingSm" fontWeight="medium" truncate={true}>{formattedName}</Text>
                                         </Tooltip>
@@ -21,7 +21,6 @@ function RunTestSuiteRow({data,checkifSelected,checkedSelected,handleTestSuiteSe
                                     helpText={checkifSelected(data)}
                                     onChange={() => { handleTestSuiteSelection(data) }}
                                     checked={checkedSelected(data)}
-                                    disabled={checkDisableTestSuite(data)}
                                 />
 
                             </Box>

@@ -1163,7 +1163,7 @@ getMissingConfigs(testResults){
       };
     });
   },
-  prepareEditableConfigObject(testRun,settings,hexId,testSuiteIds=[],testMode,selectedGeneratedSuiteTests){
+  prepareEditableConfigObject(testRun,settings,hexId,testSuiteIds=[],testMode){
     const tests = testRun.tests;
     let selectedTests = []
     if (testMode) {
@@ -1172,9 +1172,6 @@ getMissingConfigs(testResults){
           if (test.selected) selectedTests.push(test.value)
         })
       })
-    }
-    else {
-      selectedTests = [...selectedGeneratedSuiteTests];
     }
     return {
       configsAdvancedSettings:settings,
