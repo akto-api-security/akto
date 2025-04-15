@@ -15,6 +15,7 @@ import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.clients.admin.TopicDescription;
 import org.bson.types.ObjectId;
 
+import com.akto.dao.context.Context;
 import com.akto.dto.billing.SyncLimit;
 import com.akto.dto.testing.TestingRun;
 import com.akto.dto.testing.info.SingleTestPayload;
@@ -37,8 +38,9 @@ public class Producer {
         for(SingleTestPayload singleTestPayload: messages){
             String messageString = singleTestPayload.toString();
             try {
-                while (throttleNumber.get() > 500) {
-                    Thread.sleep(200);
+                int waitStart = Context.now();
+                while (throttleNumber.get() > 500 && (Context.now() - waitStart) < Constants.MAX_WAIT_FOR_SLEEP) {
+                    Thread.sleep(2000);
                 }
             } catch (Exception e) {
                 e.printStackTrace();
