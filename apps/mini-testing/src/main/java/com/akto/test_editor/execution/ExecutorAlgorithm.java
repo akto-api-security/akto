@@ -128,7 +128,11 @@ public class ExecutorAlgorithm {
             }
             rawApiIndex++;
             if (keyList.size() > 1) {
-                keyIndex = (keyIndex + 1)%keyList.size();
+                if (valList.size() > 0 && this.allowAllCombinations) {
+                    keyIndex = i/valList.size();
+                } else {
+                    keyIndex = (keyIndex + 1)%keyList.size();
+                }
             }
 
         }
