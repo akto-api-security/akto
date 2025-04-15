@@ -168,7 +168,7 @@ public class ApiCollectionsAction extends UserAction {
         List<Bson> pipeLine = new ArrayList<>();
         pipeLine.add(Aggregates.project(Projections.fields(
             Projections.computed(ApiCollection.URLS_COUNT, new BasicDBObject("$size", new BasicDBObject("$ifNull", Arrays.asList("$urls", Collections.emptyList())))),
-            Projections.include(ApiCollection.ID, ApiCollection.NAME, ApiCollection.HOST_NAME, ApiCollection._TYPE, ApiCollection.USER_ENV_TYPE, ApiCollection._DEACTIVATED,ApiCollection.START_TS, ApiCollection.AUTOMATED)
+            Projections.include(ApiCollection.ID, ApiCollection.NAME, ApiCollection.HOST_NAME, ApiCollection._TYPE, ApiCollection.USER_ENV_TYPE, ApiCollection._DEACTIVATED,ApiCollection.START_TS, ApiCollection.AUTOMATED, ApiCollection.DESCRIPTION)
         )));
 
         try {
@@ -190,7 +190,8 @@ public class ApiCollectionsAction extends UserAction {
                 apiCollection.setDeactivated(collection.getBoolean(ApiCollection._DEACTIVATED));
                 apiCollection.setStartTs(collection.getInt(ApiCollection.START_TS));
                 apiCollection.setAutomated(collection.getBoolean(ApiCollection.AUTOMATED));
-                
+                apiCollection.setDescription(collection.getString(ApiCollection.DESCRIPTION));
+
                 String type = collection.getString(ApiCollection._TYPE);
                 if(type != null && type.length() > 0){
                     ApiCollection.Type typeEnum = ApiCollection.Type.valueOf(type);
@@ -848,6 +849,21 @@ public class ApiCollectionsAction extends UserAction {
         return Action.SUCCESS.toUpperCase();
     }
 
+    private String description;
+    public String saveCollectionDescription() {
+        if(description == null || description.isEmpty()) {
+            addActionError("No description provided");
+            return Action.ERROR.toUpperCase();
+        }
+
+        ApiCollectionsDao.instance.updateOneNoUpsert(
+                Filters.eq(ApiCollection.ID, apiCollectionId),
+                Updates.set(ApiCollection.DESCRIPTION, description)
+        );
+
+        return SUCCESS.toUpperCase();
+    }
+
     public List<ApiCollection> getApiCollections() {
         return this.apiCollections;
     }
@@ -962,5 +978,13 @@ public class ApiCollectionsAction extends UserAction {
 
     public Map<Integer, Integer> getDeactivatedHostnameCountMap() {
         return deactivatedHostnameCountMap;
+    }
+
+    public String getDescription() {
+        return description;
+    }
+
+    public void setDescription(String description) {
+        this.description = description;
     }
 }

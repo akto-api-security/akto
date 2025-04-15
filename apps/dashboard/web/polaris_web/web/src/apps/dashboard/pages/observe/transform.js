@@ -117,6 +117,10 @@ const apiDetailsHeaders = [
         text: 'Non-Sensitive Params',
         value: 'nonSensitiveTags',
         itemOrder: 4,
+    },
+    {
+        text: 'Endpoint Description',
+        value: 'endpointDescription',
     }
 ]
 
@@ -552,6 +556,7 @@ const transform = {
                 isNew: this.isNewEndpoint(url.lastSeenTs),
                 sensitiveDataTags: url?.sensitiveTags.join(" "),
                 codeAnalysisEndpoint: false,
+                description: url.description
             }
         })
 

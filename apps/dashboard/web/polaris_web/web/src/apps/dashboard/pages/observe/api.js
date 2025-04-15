@@ -844,15 +844,6 @@ export default {
         })
     },
 
-    async getEndpointDescription(apiCollectionId, url, method) {
-        const resp = await request({
-            url: '/api/getEndpointDescription',
-            method: 'post',
-            data: { apiCollectionId, url, method }
-        })
-        return resp
-    },
-
     async saveEndpointDescription(apiCollectionId, url, method, description) {
         const resp = await request({
             url: '/api/saveEndpointDescription',
@@ -881,5 +872,15 @@ export default {
             }
         })
     },
+
+    async saveCollectionDescription(apiCollectionId, description) {
+        return await request({
+            url: '/api/saveCollectionDescription',
+            method: 'post',
+            data: {
+                apiCollectionId, description
+            }
+        })
+    }
 
 }

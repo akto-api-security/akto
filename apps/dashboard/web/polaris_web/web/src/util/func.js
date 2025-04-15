@@ -986,7 +986,8 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName) {
               sensitiveInReq: [...this.convertSensitiveTags(x.sensitiveInReq)],
               sensitiveInResp: [...this.convertSensitiveTags(x.sensitiveInResp)],
               responseCodes: responseCodesArr,
-              sources: apiInfoMap[key]?apiInfoMap[key]['sources']:{}
+              sources: apiInfoMap[key]?apiInfoMap[key]['sources']:{},
+              description: apiInfoMap[key] ? apiInfoMap[key]['description'] : "",
           }
 
       }

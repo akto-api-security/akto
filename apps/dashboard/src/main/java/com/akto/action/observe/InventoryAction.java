@@ -1098,6 +1098,23 @@ public class InventoryAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    private String description;
+    public String saveEndpointDescription() {
+        if(description == null || description.isEmpty()) {
+            addActionError("No description provided");
+            return Action.ERROR.toUpperCase();
+        }
+
+        ApiInfoDao.instance.updateManyNoUpsert(Filters.and(
+                Filters.eq(ApiInfo.ID_API_COLLECTION_ID, apiCollectionId),
+                Filters.eq(ApiInfo.ID_METHOD, method),
+                Filters.eq(ApiInfo.ID_URL, url)
+        ), Updates.set(ApiInfo.DESCRIPTION, description));
+
+        return SUCCESS.toUpperCase();
+    }
+
+
     public String getSortKey() {
         return this.sortKey;
     }
@@ -1227,5 +1244,13 @@ public class InventoryAction extends UserAction {
 
     public void setSearchString(String searchString) {
         this.searchString = searchString;
+    }
+
+    public String getDescription() {
+        return description;
+    }
+
+    public void setDescription(String description) {
+        this.description = description;
     }
 }

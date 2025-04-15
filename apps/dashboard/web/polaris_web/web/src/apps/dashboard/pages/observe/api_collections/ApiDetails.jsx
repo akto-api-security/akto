@@ -55,7 +55,7 @@ function ApiDetails(props) {
     const fetchData = async () => {
         if (showDetails) {
             setLoading(true)
-            const { apiCollectionId, endpoint, method } = apiDetail
+            const { apiCollectionId, endpoint, method, description } = apiDetail
             setSelectedUrl({ url: endpoint, method: method })
             api.checkIfDependencyGraphAvailable(apiCollectionId, endpoint, method).then((resp) => {
                 if (!resp.dependencyGraphExists) {
@@ -64,7 +64,10 @@ function ApiDetails(props) {
                     setDisabledTabs([])
                 }
             })
-            fetchEndpointDescription(apiCollectionId, endpoint, method)
+
+            setTimeout(() => {
+                setDescription(description == null ? "" : description)
+            }, 100)
             let commonMessages = []
             await api.fetchSampleData(endpoint, apiCollectionId, method).then((res) => {
                 api.fetchSensitiveSampleData(endpoint, apiCollectionId, method).then(async (resp) => {
@@ -122,24 +125,6 @@ function ApiDetails(props) {
             })
         }
     }
-
-    const fetchEndpointDescription = async (apiCollectionId, url, method) => {
-        try {
-            const resp = await api.getEndpointDescription(apiCollectionId, url, method);
-            if (resp?.error) {
-                console.error("Failed to fetch endpoint description:", resp.error);
-                return;
-            }
-            if (resp?.description) {
-                setDescription(resp.description);
-            } else {
-                setDescription("");
-            }
-        } catch (error) {
-            console.error("Failed to fetch endpoint description:", error);
-            setDescription("");
-        }
-    };
 
     const handleSaveDescription = () => {
         const { apiCollectionId, endpoint, method } = apiDetail;

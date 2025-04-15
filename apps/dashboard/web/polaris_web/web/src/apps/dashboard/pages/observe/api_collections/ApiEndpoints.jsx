@@ -413,28 +413,14 @@ function ApiEndpoints(props) {
             checkGptActive()
         }
         fetchData()
-        fetchDescription()
     }, [apiCollectionId, endpointListFromConditions])
-
-    const fetchDescription = async () => {
-        try {
-            const resp = await api.getCollectionDescription(apiCollectionId);
-            if (resp?.error) {
-                console.error("Failed to fetch description:", resp.error);
-                return;
-            }
-            if (resp?.description) {
-                setDescription(resp.description);
-            }
-        } catch (error) {
-            console.error("Failed to fetch description:", error);
-        }
-    };
 
     useEffect(() => {
         if (pageTitle !== collectionsMap[apiCollectionId]) { 
             setPageTitle(collectionsMap[apiCollectionId])
         }
+
+        setDescription(collectionsObj?.description || "")
     }, [collectionsMap[apiCollectionId]])
 
     const resourceName = {
@@ -1034,6 +1020,14 @@ function ApiEndpoints(props) {
         });
     }
 
+    function updateCollectionDescription(list, apiCollectionId, newDescription) {
+        list.forEach(item => {
+            if (item.id === apiCollectionId) {
+                item.description = newDescription;
+            }
+        });
+    }
+
     
       const handleSaveClick = async () => {
         api.editCollectionName(apiCollectionId, editableTitle).then((resp) => {
@@ -1074,8 +1068,8 @@ function ApiEndpoints(props) {
         setShowDescriptionModal(false);
         api.saveCollectionDescription(apiCollectionId, description)
             .then(() => {
+                updateCollectionDescription(allCollections, apiCollectionId, description);
                 func.setToast(true, false, "Description saved successfully");
-                fetchDescription();
             })
             .catch((err) => {
                 console.error("Failed to save description:", err);
