@@ -16,9 +16,8 @@ import org.apache.kafka.clients.admin.ListTopicsResult;
 import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.clients.admin.TopicDescription;
 import org.bson.types.ObjectId;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
+import com.akto.dao.context.Context;
 import com.akto.dto.billing.SyncLimit;
 import com.akto.dto.testing.TestingRun;
 import com.akto.dto.testing.info.SingleTestPayload;
@@ -30,11 +29,21 @@ public class Producer {
 
     private static final LoggerMaker logger = new LoggerMaker(Producer.class, LogDb.TESTING);
 
-    public static final Kafka producer = Constants.IS_NEW_TESTING_ENABLED ?  new Kafka(Constants.LOCAL_KAFKA_BROKER_URL, Constants.LINGER_MS_KAFKA, 100, Constants.MAX_REQUEST_TIMEOUT) : null;
-    public static Void pushMessagesToKafka(List<SingleTestPayload> messages, AtomicInteger totalRecords){
+    public static final Kafka producer = Constants.IS_NEW_TESTING_ENABLED ?  new Kafka(Constants.LOCAL_KAFKA_BROKER_URL, Constants.LINGER_MS_KAFKA, 100, Constants.MAX_REQUEST_TIMEOUT, 3) : null;
+    public static Void pushMessagesToKafka(List<SingleTestPayload> messages, AtomicInteger totalRecords, AtomicInteger throttleNumber){
         for(SingleTestPayload singleTestPayload: messages){
             String messageString = singleTestPayload.toString();
-            producer.send(messageString, Constants.TEST_RESULTS_TOPIC_NAME, totalRecords);
+            try {
+                int waitStart = Context.now();
+                while (throttleNumber.get() > 500 && (Context.now() - waitStart) < Constants.MAX_WAIT_FOR_SLEEP) {
+                    Thread.sleep(2000);
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+            totalRecords.incrementAndGet();
+            throttleNumber.incrementAndGet();
+            producer.sendWithCounter(messageString, Constants.TEST_RESULTS_TOPIC_NAME, throttleNumber);
         }
         return null;
     }
