@@ -49,7 +49,8 @@ import static com.akto.runtime.utils.Utils.parseKafkaMessage;
 
 public final class FilterAction {
 
-    private final DataOperandFilterRequest dataOperandFilterRequest = new DataOperandFilterRequest();
+    private static final DataOperandFilterRequest dataOperandFilterRequest = new DataOperandFilterRequest();
+    private static List<Object> listVal = new ArrayList<>();
     
     public final Map<String, DataOperandsImpl> filters = new HashMap<String, DataOperandsImpl>() {{
         put("contains_all", new ContainsAllFilter());
@@ -827,7 +828,7 @@ public final class FilterAction {
 
         DataOperandsImpl handler = this.filters.get(dataOperandFilterRequest.getOperand().toLowerCase());
         if (handler == null) {
-          return new ValidationResult(false, "\noperand:" + dataOperandFilterRequest.getOperand().toLowerCase()+ " not found in filters");
+          return ValidationResult.getInstance().resetValues(false, "\noperand:" + dataOperandFilterRequest.getOperand().toLowerCase()+ " not found in filters");
         }
         return handler.isValid(dataOperandFilterRequest);
     }

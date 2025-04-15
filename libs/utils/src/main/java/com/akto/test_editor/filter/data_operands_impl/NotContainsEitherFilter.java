@@ -8,19 +8,20 @@ import com.akto.dto.test_editor.DataOperandFilterRequest;
 
 public class NotContainsEitherFilter extends DataOperandsImpl {
     
+    Boolean res;
+    List<String> querySet = new ArrayList<>();
+    String data;
+
     @Override
     public ValidationResult isValid(DataOperandFilterRequest dataOperandFilterRequest) {
 
-        Boolean result = false;
-        Boolean res;
-        List<String> querySet = new ArrayList<>();
-        String data;
-        String validationString = null;
+        result = false;
+        validationString = null;
         try {
             querySet = (List<String>) dataOperandFilterRequest.getQueryset();
             data = (String) dataOperandFilterRequest.getData();
         } catch(Exception e) {
-            return new ValidationResult(result, ValidationResult.GET_QUERYSET_CATCH_ERROR);
+            return ValidationResult.getInstance().resetValues(result, ValidationResult.GET_QUERYSET_CATCH_ERROR);
         }
 
 
@@ -35,7 +36,7 @@ public class NotContainsEitherFilter extends DataOperandsImpl {
         if (!result) {
             validationString = TestEditorEnums.DataOperands.NOT_CONTAINS_EITHER.name().toLowerCase() + " filter failed due to '"+ data + "' not matching with : " + querySet;
         }
-        return new ValidationResult(result, validationString);
+        return ValidationResult.getInstance().resetValues(result, validationString);
     }
 
 

@@ -21,12 +21,12 @@ public class Filter {
 
     private FilterAction filterAction;
     private static final LoggerMaker loggerMaker = new LoggerMaker(Filter.class);
-    private final DataOperandFilterRequest dataOperandFilterRequest = new DataOperandFilterRequest();
-    private final Set<String> s1 = new HashSet<>();
-    private final Set<String> s2 = new HashSet<>();
-    private final List<String> output = new ArrayList<>();
-    private final FilterActionRequest filterActionRequest = new FilterActionRequest();
-    private final Map<FilterNode, String> childNodeVsValidationReason = new HashMap<>();
+    private static final DataOperandFilterRequest dataOperandFilterRequest = new DataOperandFilterRequest();
+    private static final Set<String> s1 = new HashSet<>();
+    private static final Set<String> s2 = new HashSet<>();
+    private static final List<String> output = new ArrayList<>();
+    private static final FilterActionRequest filterActionRequest = new FilterActionRequest();
+    private static final Map<FilterNode, String> childNodeVsValidationReason = new HashMap<>();
 
     public Filter() {
         this.filterAction = new FilterAction();
@@ -160,12 +160,11 @@ public class Filter {
     public List<String> evaluateMatchingKeySet(List<String> oldSet, List<String> newMatches, String operand) {
         s1.clear();
         s2.clear();
-        output.clear();
 
         if (newMatches == null) {
-            return output;
+            return new ArrayList<>();
         }
-
+        
         if (oldSet == null) {
             // doing this for initial step where oldset would be null, hence assigning initially with newmatches
             s1.addAll(newMatches);
@@ -180,6 +179,7 @@ public class Filter {
             s1.addAll(s2);
         }
 
+        List<String> output = new ArrayList<>();
         output.addAll(s1);
         return output;
     }

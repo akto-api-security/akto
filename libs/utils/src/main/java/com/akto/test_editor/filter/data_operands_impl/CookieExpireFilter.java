@@ -17,6 +17,9 @@ import static com.akto.runtime.utils.Utils.parseCookie;
 
 public class CookieExpireFilter extends DataOperandsImpl {
 
+    private static List<Boolean> querySet = new ArrayList<>();
+    private static Boolean queryVal;
+
     public static int getMaxAgeFromCookie(Map<String,String> cookieMap){
         if (cookieMap.containsKey("Max-Age") || cookieMap.containsKey("max-age")) {
             int maxAge;
@@ -53,23 +56,21 @@ public class CookieExpireFilter extends DataOperandsImpl {
     @Override
     public ValidationResult isValid(DataOperandFilterRequest dataOperandFilterRequest) {
 
-        List<Boolean> querySet = new ArrayList<>();
-        Boolean queryVal;
-        String data;
+        querySet.clear();
         try {
 
             querySet = (List<Boolean>) dataOperandFilterRequest.getQueryset();
             queryVal = (Boolean) querySet.get(0);
-            data = (String) dataOperandFilterRequest.getData();
+            dataStr = (String) dataOperandFilterRequest.getData();
         } catch(Exception e) {
-            return new ValidationResult(false, ValidationResult.GET_QUERYSET_CATCH_ERROR);
+            return ValidationResult.getInstance().resetValues(false, ValidationResult.GET_QUERYSET_CATCH_ERROR);
         }
 
-        if (data == null || queryVal == null) {
-            return new ValidationResult(false, queryVal == null ? TestEditorEnums.DataOperands.COOKIE_EXPIRE_FILTER.name().toLowerCase() + " is not set true": "no data to be matched for validation");
+        if (dataStr == null || queryVal == null) {
+            return ValidationResult.getInstance().resetValues(false, queryVal == null ? TestEditorEnums.DataOperands.COOKIE_EXPIRE_FILTER.name().toLowerCase() + " is not set true": "no data to be matched for validation");
         }
 
-        Map<String,String> cookieMap = parseCookie(Arrays.asList(data));
+        Map<String,String> cookieMap = parseCookie(Arrays.asList(dataStr));
 
         boolean result = queryVal;
         boolean res = false;
@@ -77,12 +78,12 @@ public class CookieExpireFilter extends DataOperandsImpl {
         int maxAgeOfCookieTs = getMaxAgeFromCookie(cookieMap);
         res = maxAgeOfCookieTs/(Constants.ONE_MONTH_TIMESTAMP) > 1;
         if (result == res) {
-            return new ValidationResult(true, result? TestEditorEnums.DataOperands.COOKIE_EXPIRE_FILTER.name().toLowerCase() + ": true passed because cookie:"+ data+" expired":
-                    TestEditorEnums.DataOperands.COOKIE_EXPIRE_FILTER.name().toLowerCase() + ": false passed because cookie:"+ data+" not expired");
+            return ValidationResult.getInstance().resetValues(true, result? TestEditorEnums.DataOperands.COOKIE_EXPIRE_FILTER.name().toLowerCase() + ": true passed because cookie:"+ dataStr+" expired":
+            TestEditorEnums.DataOperands.COOKIE_EXPIRE_FILTER.name().toLowerCase() + ": false passed because cookie:"+ dataStr+" not expired");
         }
         if (result) {
-            return new ValidationResult(false, TestEditorEnums.DataOperands.COOKIE_EXPIRE_FILTER.name().toLowerCase() + ": true failed cookie:"+ data+" not expired");
+            return ValidationResult.getInstance().resetValues(false, TestEditorEnums.DataOperands.COOKIE_EXPIRE_FILTER.name().toLowerCase() + ": true failed cookie:"+ dataStr+" not expired");
         }
-        return new ValidationResult(false, TestEditorEnums.DataOperands.COOKIE_EXPIRE_FILTER.name().toLowerCase() + ": false failed because cookie:"+ data+" expired");
+        return ValidationResult.getInstance().resetValues(false, TestEditorEnums.DataOperands.COOKIE_EXPIRE_FILTER.name().toLowerCase() + ": false failed because cookie:"+ dataStr+" expired");
     }
 }

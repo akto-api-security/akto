@@ -5,13 +5,15 @@ import com.akto.dto.test_editor.DataOperandFilterRequest;
 import com.akto.test_editor.Utils;
 
 public class GreaterThanFilter extends DataOperandsImpl {
-    
+
+    private static Object querySet;
+
     @Override
     public ValidationResult isValid(DataOperandFilterRequest dataOperandFilterRequest) {
 
-        Boolean result = false;
-        Object data = dataOperandFilterRequest.getData();
-        Object querySet = dataOperandFilterRequest.getQueryset();
+        result = false;
+        data = dataOperandFilterRequest.getData();
+        querySet = dataOperandFilterRequest.getQueryset();
         result = Utils.applyIneqalityOperation(data, querySet, "gt");
         String validationReson = null;
         if (result) {
@@ -20,6 +22,6 @@ public class GreaterThanFilter extends DataOperandsImpl {
             validationReson = TestEditorEnums.DataOperands.GT.name().toLowerCase() + " filter failed: '"+ data +"' <= '" + querySet +"'";
         }
 
-        return new ValidationResult(result, validationReson);
+        return ValidationResult.getInstance().resetValues(result, validationReson);
     }
 }

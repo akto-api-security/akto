@@ -8,21 +8,23 @@ import com.akto.dto.test_editor.DataOperandFilterRequest;
 
 public class NotContainsFilter extends DataOperandsImpl {
     
+    Boolean res;
+    List<String> querySet;
+    String data;
+    String failedQueryString;
+
     @Override
     public ValidationResult isValid(DataOperandFilterRequest dataOperandFilterRequest) {
 
-        Boolean result = true;
-        Boolean res;
-        List<String> querySet = new ArrayList<>();
-        String data;
-        String validationString = null;
+        result = true;
+        validationString = null;
         try {
             querySet = (List<String>) dataOperandFilterRequest.getQueryset();
             data = (String) dataOperandFilterRequest.getData();
         } catch(Exception e) {
-            return new ValidationResult(result, ValidationResult.GET_QUERYSET_CATCH_ERROR);
+            return ValidationResult.getInstance().resetValues(result, ValidationResult.GET_QUERYSET_CATCH_ERROR);
         }
-        String failedQueryString = null;
+        failedQueryString = null;
         for (String queryString: querySet) {
             try {
                 res = evaluateOnStringQuerySet(data.trim(), queryString.trim());
@@ -39,7 +41,7 @@ public class NotContainsFilter extends DataOperandsImpl {
         } else {
             validationString = TestEditorEnums.DataOperands.NOT_CONTAINS.name().toLowerCase() + " filter failed due to '" + data + "' not matching with: " + failedQueryString;
         }
-        return new ValidationResult(result, validationString);
+        return ValidationResult.getInstance().resetValues(result, validationString);
     }
 
 
