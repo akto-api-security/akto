@@ -105,6 +105,7 @@ public class TeamAction extends UserAction implements ServletResponseAware, Serv
                                 .append("login", pendingInviteCode.getInviteeEmailId())
                                 .append("name", "-")
                                 .append("role", roleText)
+                                .append("isInvitation", true)
                 );
             }
         }
@@ -284,6 +285,21 @@ public class TeamAction extends UserAction implements ServletResponseAware, Serv
         }
 
         return Action.SUCCESS.toUpperCase();
+    }
+
+    public String removeInvitation() {
+        User sUser = getSUser();
+
+        PendingInviteCode pendingInviteCode = PendingInviteCodesDao.instance.findOne(Filters.eq(PendingInviteCode.INVITEE_EMAIL_ID, email));
+        Role currentRole = RBACDao.getCurrentRoleForUser(getSUser().getId(), Context.accountId.get());
+
+        if(pendingInviteCode.getIssuer() != sUser.getId() && (currentRole == null || !currentRole.name().equals(Role.ADMIN.name()))) {
+            addActionError("User is not allowed to remove this invitation.");
+            return Action.ERROR.toUpperCase();
+        }
+
+        PendingInviteCodesDao.instance.getMCollection().deleteOne(Filters.eq(PendingInviteCode.INVITEE_EMAIL_ID, email));
+        return SUCCESS.toUpperCase();
     }
 
     public int getId() {
