@@ -101,7 +101,8 @@ function SusDataTable({ currDateRange, rowClicked, externalFilter }) {
       apiCollectionIdsFilter = [],
       matchingUrlFilter = [],
       typeFilter = [],
-      subCategoryFilter = [];
+      subCategoryFilter = [],
+      severityFilter = [];
     if (filters?.actor) {
       sourceIpsFilter = filters?.actor;
     }
@@ -117,6 +118,9 @@ function SusDataTable({ currDateRange, rowClicked, externalFilter }) {
     if(filters?.subCategory){
       subCategoryFilter = filters?.subCategory
     }
+    if(filters?.severity){
+      severityFilter = filters?.severity
+    }
     const sort = { [sortKey]: sortOrder };
     const res = await api.fetchSuspectSampleData(
       skip,
@@ -128,11 +132,12 @@ function SusDataTable({ currDateRange, rowClicked, externalFilter }) {
       startTimestamp,
       endTimestamp,
       subCategoryFilter,
+      severityFilter
     );
 //    setSubCategoryChoices(distinctSubCategories);
     let total = res.total;
     let ret = res?.maliciousEvents.map((x) => {
-      const severity = threatFiltersMap[x?.filterId]?.severity || "HIGH"
+      const severity = x?.severity || "HIGH"
       return {
         ...x,
         id: x.id,
@@ -168,6 +173,9 @@ function SusDataTable({ currDateRange, rowClicked, externalFilter }) {
     let subCategoryChoices = res?.subCategory.map((x) => {
       return { label: x, value: x };
     });
+    let severityChoices = res?.severity.map((x) => {
+      return { label: x, value: x };
+    });
 
 
     filters = [
@@ -197,6 +205,12 @@ function SusDataTable({ currDateRange, rowClicked, externalFilter }) {
         label: "Subcategory",
         title: "Subcategory",
         choices: subCategoryChoices,
+      },
+      {
+        key: 'severity',
+        label: "Severity",
+        title: "Severity",
+        choices: severityChoices,
       }
     ];
   }

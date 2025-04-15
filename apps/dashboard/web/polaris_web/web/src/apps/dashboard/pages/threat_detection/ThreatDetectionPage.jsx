@@ -31,7 +31,7 @@ const convertToGraphData = (severityMap) => {
     return dataArr
 }
 
-const ChartComponent = ({ subCategoryCount, severityCountMap, onSubCategoryClick }) => {
+const ChartComponent = ({ subCategoryCount, severityCountMap, onSubCategoryClick, onSeverityClick }) => {
     return (
       <VerticalStack gap={4} columns={2}>
         <HorizontalGrid gap={4} columns={2}>
@@ -58,6 +58,7 @@ const ChartComponent = ({ subCategoryCount, severityCountMap, onSubCategoryClick
                         showGridLines={true}
                         barWidth={100 - (severityCountMap.length * 6)}
                         barGap={12}
+                        onBarClick={(eventPoint) => onSeverityClick(eventPoint.category.toUpperCase())}
                     />
                 }
             />
@@ -151,11 +152,16 @@ function ThreatDetectionPage() {
         setExternalFilter({key: "subCategory", value: [eventPoint.subCategory]});
       }
 
+      const onSeverityClick = (severity) => {
+        setExternalFilter({key: "severity", value: [severity]});
+      }
+
     const components = [
         <ChartComponent
             subCategoryCount={subCategoryCount}
             severityCountMap={severityCountMap}
             onSubCategoryClick={onSubCategoryClick}
+            onSeverityClick={onSeverityClick}
         />,
         <SusDataTable key={"sus-data-table"}
             currDateRange={currDateRange}
