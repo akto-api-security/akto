@@ -21,6 +21,7 @@ public class ExecutorAlgorithm {
     private Map<String, Object> varMap;
     private AuthMechanism authMechanism;
     private List<CustomAuthType> customAuthTypes;
+    private boolean allowAllCombinations;
     private Executor executor = new Executor();
 
     public ExecutorAlgorithm(RawApi sampleRawApi, Map<String, Object> varMap, AuthMechanism authMechanism,
@@ -29,6 +30,16 @@ public class ExecutorAlgorithm {
         this.varMap = varMap;
         this.authMechanism = authMechanism;
         this.customAuthTypes = customAuthTypes;
+        this.allowAllCombinations = false;
+    }
+
+    public ExecutorAlgorithm(RawApi sampleRawApi, Map<String, Object> varMap, AuthMechanism authMechanism,
+        List<CustomAuthType> customAuthTypes, boolean allowAllCombinations) {
+        this.sampleRawApi = sampleRawApi;
+        this.varMap = varMap;
+        this.authMechanism = authMechanism;
+        this.customAuthTypes = customAuthTypes;
+        this.allowAllCombinations = allowAllCombinations;
     }
 
     public ExecutorAlgorithm(){
@@ -137,6 +148,10 @@ public class ExecutorAlgorithm {
 
         if (keyList.size() == 1) {
             return valList.size();
+        }
+
+        if (this.allowAllCombinations) {
+            return keyList.size() * valList.size();
         }
 
         return keyList.size();
