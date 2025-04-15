@@ -401,31 +401,6 @@ prettifyEpoch(epoch) {
     var date = new Date(timestamp * 1000);
     return date.toLocaleString('en-US',{timeZone: window.TIME_ZONE === 'Us/Pacific' ? 'America/Los_Angeles' : window.TIME_ZONE});
   },
-  convertEpochToTimezoneEpoch(epochSeconds) {
-    if(epochSeconds == null) return epochSeconds
-    const targetTimeZone = window.TIME_ZONE === 'Us/Pacific' ? 'America/Los_Angeles' : window.TIME_ZONE
-    const date = new Date(epochSeconds * 1000)
-    
-    const formatter = new Intl.DateTimeFormat('en-US', {
-      timeZone: targetTimeZone,
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: false
-    })
-  
-    const parts = formatter.formatToParts(date).reduce((acc, part) => {
-      acc[part.type] = part.value
-      return acc
-    }, {})
-  
-    const localDateStr = `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}:${parts.second}`
-    const zonedDate = new Date(`${localDateStr}Z`)
-    return Math.floor(zonedDate.getTime() / 1000)
-  },
   getFormattedDate(epoch) {
     const date = new Date(epoch * 1000)
     const day = date.getDate()
