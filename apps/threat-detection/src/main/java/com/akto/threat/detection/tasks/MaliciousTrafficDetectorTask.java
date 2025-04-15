@@ -17,7 +17,6 @@ import com.akto.dto.type.URLMethods;
 import com.akto.hybrid_parsers.HttpCallParser;
 import com.akto.kafka.KafkaConfig;
 import com.akto.log.LoggerMaker;
-import com.akto.log.LoggerMaker.LogDb;
 import com.akto.proto.generated.threat_detection.message.malicious_event.event_type.v1.EventType;
 import com.akto.proto.generated.threat_detection.message.malicious_event.v1.MaliciousEventKafkaEnvelope;
 import com.akto.proto.generated.threat_detection.message.malicious_event.v1.MaliciousEventMessage;
@@ -25,7 +24,6 @@ import com.akto.proto.generated.threat_detection.message.sample_request.v1.Metad
 import com.akto.proto.generated.threat_detection.message.sample_request.v1.SampleMaliciousRequest;
 import com.akto.proto.generated.threat_detection.message.sample_request.v1.SampleRequestKafkaEnvelope;
 import com.akto.proto.http_response_param.v1.HttpResponseParam;
-import com.akto.proto.http_response_param.v1.StringList;
 import com.akto.rules.TestPlugin;
 import com.akto.test_editor.execution.VariableResolver;
 import com.akto.test_editor.filter.data_operands_impl.ValidationResult;
@@ -36,7 +34,6 @@ import com.akto.threat.detection.kafka.KafkaProtoProducer;
 import com.akto.threat.detection.smart_event_detector.window_based.WindowBasedThresholdNotifier;
 import com.akto.util.HttpRequestResponseUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.mongodb.BasicDBObject;
 import com.akto.IPLookupClient;
 import com.akto.RawApiMetadataFactory;
 
@@ -318,13 +315,6 @@ public class MaliciousTrafficDetectorTask implements Task {
 
     Map<String, List<String>> reqHeaders = (Map) httpResponseParamProto.getRequestHeadersMap();
 
-    Map<String, String> reqHeadersStr = new HashMap<>();
-
-    for (Map.Entry<String, StringList> entry :
-      httpResponseParamProto.getRequestHeadersMap().entrySet()) {
-          reqHeadersStr.put(entry.getKey(), entry.getValue().getValuesList().get(0));
-    }
-
     HttpRequestParams requestParams =
         new HttpRequestParams(
             httpResponseParamProto.getMethod(),
@@ -344,52 +334,6 @@ public class MaliciousTrafficDetectorTask implements Task {
 
     HttpResponseParams.Source source = HttpResponseParams.Source.valueOf(sourceStr);
     Map<String, List<String>> respHeaders = (Map) httpResponseParamProto.getResponseHeadersMap();
-    Map<String, String> respHeadersStr = new HashMap<>();
-
-    for (Map.Entry<String, StringList> entry :
-      httpResponseParamProto.getResponseHeadersMap().entrySet()) {
-        respHeadersStr.put(entry.getKey(), entry.getValue().getValuesList().get(0));
-    }
-
-    String reqHeaderStr2 = "";
-    try {
-      reqHeaderStr2 = objectMapper.writeValueAsString(reqHeadersStr); 
-    } catch (Exception e) {
-      // TODO: handle exception
-    }
-
-    String respHeaderStr2 = "";
-    try {
-      respHeaderStr2 = objectMapper.writeValueAsString(respHeadersStr); 
-    } catch (Exception e) {
-      // TODO: handle exception
-    }
-
-
-    BasicDBObject origObj = new BasicDBObject();
-    origObj.put("method", httpResponseParamProto.getMethod());
-    origObj.put("requestPayload", httpResponseParamProto.getRequestPayload());
-    origObj.put("responsePayload", httpResponseParamProto.getResponsePayload());
-    origObj.put("ip", httpResponseParamProto.getIp());
-    origObj.put("destIp", httpResponseParamProto.getDestIp());
-    origObj.put("source", sourceStr);
-    origObj.put("type", httpResponseParamProto.getType());
-    origObj.put("akto_vxlan_id", httpResponseParamProto.getAktoVxlanId());
-    origObj.put("path", httpResponseParamProto.getPath());
-    origObj.put("requestHeaders", reqHeaderStr2);
-    origObj.put("responseHeaders", respHeaderStr2);
-    origObj.put("time", httpResponseParamProto.getTime());
-    origObj.put("akto_account_id", httpResponseParamProto.getAktoAccountId());
-    origObj.put("statusCode", httpResponseParamProto.getStatusCode());
-    origObj.put("status", httpResponseParamProto.getStatus());
-
-    String origStr = "";
-    try {
-      origStr = objectMapper.writeValueAsString(origObj);
-    } catch (Exception e) {
-      System.out.println("error constructing orig obj");
-    }
-
 
     return new HttpResponseParams(
         httpResponseParamProto.getType(),
@@ -402,7 +346,7 @@ public class MaliciousTrafficDetectorTask implements Task {
         httpResponseParamProto.getAktoAccountId(),
         httpResponseParamProto.getIsPending(),
         source,
-        origStr,
+        httpResponseParamProto.toString(),
         httpResponseParamProto.getIp(),
         httpResponseParamProto.getDestIp(),
         httpResponseParamProto.getDirection());
