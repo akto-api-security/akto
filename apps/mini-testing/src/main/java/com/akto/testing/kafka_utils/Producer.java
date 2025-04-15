@@ -28,13 +28,24 @@ import com.akto.util.Constants;
 public class Producer {
 
     public static final Kafka producer = Constants.IS_NEW_TESTING_ENABLED
-            ? new Kafka(Constants.LOCAL_KAFKA_BROKER_URL, Constants.LINGER_MS_KAFKA, 100, Constants.MAX_REQUEST_TIMEOUT)
+            ? new Kafka(Constants.LOCAL_KAFKA_BROKER_URL, Constants.LINGER_MS_KAFKA, 100, Constants.MAX_REQUEST_TIMEOUT, 3)
             : null;
-    private static final LoggerMaker loggerMaker = new LoggerMaker(Producer.class);
-    public static Void pushMessagesToKafka(List<SingleTestPayload> messages, AtomicInteger totalRecords){
+    
+    private static final LoggerMaker loggerMaker = new LoggerMaker(Producer.class, LogDb.TESTING);
+
+    public static Void pushMessagesToKafka(List<SingleTestPayload> messages, AtomicInteger totalRecords, AtomicInteger throttleNumber){
         for(SingleTestPayload singleTestPayload: messages){
             String messageString = singleTestPayload.toString();
-            producer.send(messageString, Constants.TEST_RESULTS_TOPIC_NAME, totalRecords);
+            try {
+                while (throttleNumber.get() > 500) {
+                    Thread.sleep(200);
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+            totalRecords.incrementAndGet();
+            throttleNumber.incrementAndGet();
+            producer.sendWithCounter(messageString, Constants.TEST_RESULTS_TOPIC_NAME, throttleNumber);
         }
         return null;
     }
@@ -51,7 +62,7 @@ public class Producer {
             } catch (Exception e) {
                 retries++;
                 long backoff = (long) (baseBackoff * Math.pow(2, retries));
-                loggerMaker.infoAndAddToDb("Attempt " +retries + " to delete topic failed: " + e.getMessage(), LogDb.TESTING);
+                loggerMaker.infoAndAddToDb("Attempt " +retries + " to delete topic failed: " + e.getMessage());
     
                 try {
                     Thread.sleep(backoff);
@@ -77,7 +88,7 @@ public class Producer {
             } catch (Exception e) {
                 retries++;
                 long backoff = (long) (baseBackoff * Math.pow(2, retries));
-                loggerMaker.infoAndAddToDb("Attempt " +retries + " to create topic failed: " + e.getMessage(), LogDb.TESTING);
+                loggerMaker.infoAndAddToDb("Attempt " +retries + " to create topic failed: " + e.getMessage());
     
                 try {
                     Thread.sleep(backoff);
@@ -99,12 +110,12 @@ public class Producer {
         try (AdminClient adminClient = AdminClient.create(adminProps)) {
             ListTopicsResult listTopicsResult = adminClient.listTopics();
             if (!listTopicsResult.names().get().contains(topicName)) {
-                loggerMaker.infoAndAddToDb("Topic \"" + topicName + "\" does not exist.", LogDb.TESTING);
+                loggerMaker.infoAndAddToDb("Topic \"" + topicName + "\" does not exist.");
                 return;
             }
             DeleteTopicsResult deleteTopicsResult = adminClient.deleteTopics(Collections.singletonList(topicName));
             deleteTopicsResult.all().get();
-            loggerMaker.infoAndAddToDb("Topic \"" + topicName + "\" deletion initiated.", LogDb.TESTING);
+            loggerMaker.infoAndAddToDb("Topic \"" + topicName + "\" deletion initiated.");
 
             int retries = 0;
             int maxRetries = 8;
@@ -120,7 +131,7 @@ public class Producer {
                     return;
                 }
 
-                loggerMaker.infoAndAddToDb("Waiting for topic \"" + topicName + "\" to be fully deleted... retry attempt: " + retries, LogDb.TESTING);
+                loggerMaker.infoAndAddToDb("Waiting for topic \"" + topicName + "\" to be fully deleted... retry attempt: " + retries);
             }
 
             throw new RuntimeException("Topic deletion not confirmed after retries.");
@@ -166,7 +177,7 @@ public class Producer {
             try {
                 deleteTopicWithRetries(Constants.LOCAL_KAFKA_BROKER_URL, Constants.TEST_RESULTS_TOPIC_NAME);
             } catch (Exception e) {
-                loggerMaker.errorAndAddToDb("Error deleting topic: " + e.getMessage(), LogDb.TESTING);
+                loggerMaker.errorAndAddToDb("Error deleting topic: " + e.getMessage());
                 e.printStackTrace();
             }
         }
