@@ -123,6 +123,9 @@ public class AccountSettings {
     public static final String COMPLIANCE_INFOS_UPDATED_TS = "complianceInfosUpdatedTs";
     private int complianceInfosUpdatedTs;
 
+    public static final String THREAT_POLICIES = "threatPolicies";
+    private List<TestLibrary> threatPolicies;
+
     public AccountSettings() {
     }
 
@@ -466,5 +469,13 @@ public class AccountSettings {
 
     public void setComplianceInfosUpdatedTs(int complianceInfosUpdatedTs) {
         this.complianceInfosUpdatedTs = complianceInfosUpdatedTs;
+    }
+
+    public List<TestLibrary> getThreatPolicies() {
+        return this.threatPolicies;
+    }
+
+    public void setThreatPolicies(List<TestLibrary>  threatPolicies) {
+        this.threatPolicies = threatPolicies;
     }
 }
