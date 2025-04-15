@@ -323,29 +323,7 @@ public class TestExecutor {
 
         ConcurrentHashMap<String, String> subCategoryEndpointMap = new ConcurrentHashMap<>();
         Map<ApiInfoKey, String> apiInfoKeyToHostMap = new HashMap<>();
-        // for (String testSubCategory: testingRunSubCategories) {
-        //     TestConfig testConfig = testConfigMap.get(testSubCategory);
-        //     if (testConfig == null || testConfig.getStrategy() == null || testConfig.getStrategy().getRunOnce() == null) {
-        //         continue;
-        //     }
-        //     for (ApiInfo.ApiInfoKey apiInfoKey: apiInfoKeyList) {
-        //         try {
-        //             hostName = findHost(apiInfoKey, testingUtil.getSampleMessages(), testingUtil.getSampleMessageStore());
-        //             if (hostName == null) {
-        //                 continue;
-        //             }
-        //             if(hostsToApiCollectionMap.get(hostName) == null) {
-        //                 hostsToApiCollectionMap.put(hostName, apiInfoKey.getApiCollectionId());
-        //             }
-        //             apiInfoKeyToHostMap.put(apiInfoKey, hostName);
-        //             subCategoryEndpointMap.put(apiInfoKey.getApiCollectionId() + "_" + testSubCategory, hostName);
-        //         } catch (URISyntaxException e) {
-        //             loggerMaker.errorAndAddToDb("Error while finding host: " + e, LogDb.TESTING);
-        //         }
-        //     }
-        // }
 
-        // init the singleton class here
         TestingConfigurations.getInstance().init(testingUtil, testingRun.getTestingRunConfig(), debug, testConfigMap, testingRun.getMaxConcurrentRequests());
 
         if(!shouldInitOnly){
@@ -789,56 +767,61 @@ public class TestExecutor {
     }
 
     public void insertResultsAndMakeIssues(List<TestingRunResult> testingRunResults, ObjectId testRunResultSummaryId) {
-        int resultSize = testingRunResults.size();
-        if (resultSize > 0) {
-            loggerMaker.debugAndAddToDb("testingRunResults size: " + resultSize, LogDb.TESTING);
-            trim(testingRunResults);
-            TestingRunResult originalTestingRunResultForRerun = TestingConfigurations.getInstance().getTestingRunResultForApiKeyInfo(testingRunResults.get(0).getApiInfoKey(), testingRunResults.get(0).getTestSubType());
-            if (originalTestingRunResultForRerun != null) {
-                loggerMaker.debugAndAddToDb("Deleting original testingRunResults for rerun after replaced with run TRR_ID: " + originalTestingRunResultForRerun.getHexId());
-                TestingRunResultDao.instance.deleteAll(Filters.eq(TestingRunResultDao.ID, originalTestingRunResultForRerun.getId()));
-                /*
-                * delete from vulnerableTestResults as well.
-                * assuming if original was vulnerable, entry will be in VulnerableTestingRunResultDao
-                * for API_INFO_KEY, TEST_RUN_RESULT_SUMMARY_ID, TEST_SUB_TYPE, VulnerableTestingRunResultDao will have
-                * single entry
-                * */
-                if (originalTestingRunResultForRerun.isVulnerable()) {
-                    Bson filters = Filters.and(
-                            Filters.eq(TestingRunResult.API_INFO_KEY, originalTestingRunResultForRerun.getApiInfoKey()),
-                            Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, originalTestingRunResultForRerun.getTestRunResultSummaryId()),
-                            Filters.eq(TestingRunResult.TEST_SUB_TYPE, originalTestingRunResultForRerun.getTestSubType())
-                    );
-                    loggerMaker.debugAndAddToDb("Deleting from vulnerableTestingRunResults if present for rerun after replaced with run TRR_ID: " + originalTestingRunResultForRerun.getHexId());
-                    VulnerableTestingRunResultDao.instance.deleteAll(filters);
+        try {
+            int resultSize = testingRunResults.size();
+            if (resultSize > 0) {
+                loggerMaker.debugAndAddToDb("testingRunResults size: " + resultSize, LogDb.TESTING);
+                trim(testingRunResults);
+                TestingRunResult originalTestingRunResultForRerun = TestingConfigurations.getInstance().getTestingRunResultForApiKeyInfo(testingRunResults.get(0).getApiInfoKey(), testingRunResults.get(0).getTestSubType());
+                if (originalTestingRunResultForRerun != null) {
+                    loggerMaker.debugAndAddToDb("Deleting original testingRunResults for rerun after replaced with run TRR_ID: " + originalTestingRunResultForRerun.getHexId());
+                    TestingRunResultDao.instance.deleteAll(Filters.eq(TestingRunResultDao.ID, originalTestingRunResultForRerun.getId()));
+                    /*
+                    * delete from vulnerableTestResults as well.
+                    * assuming if original was vulnerable, entry will be in VulnerableTestingRunResultDao
+                    * for API_INFO_KEY, TEST_RUN_RESULT_SUMMARY_ID, TEST_SUB_TYPE, VulnerableTestingRunResultDao will have
+                    * single entry
+                    * */
+                    if (originalTestingRunResultForRerun.isVulnerable()) {
+                        Bson filters = Filters.and(
+                                Filters.eq(TestingRunResult.API_INFO_KEY, originalTestingRunResultForRerun.getApiInfoKey()),
+                                Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, originalTestingRunResultForRerun.getTestRunResultSummaryId()),
+                                Filters.eq(TestingRunResult.TEST_SUB_TYPE, originalTestingRunResultForRerun.getTestSubType())
+                        );
+                        loggerMaker.debugAndAddToDb("Deleting from vulnerableTestingRunResults if present for rerun after replaced with run TRR_ID: " + originalTestingRunResultForRerun.getHexId());
+                        VulnerableTestingRunResultDao.instance.deleteAll(filters);
+                    }
                 }
-            }
-            TestingRunResultDao.instance.insertMany(testingRunResults);
-            loggerMaker.debugAndAddToDb("Inserted testing results", LogDb.TESTING);
+                TestingRunResultDao.instance.insertMany(testingRunResults);
+                loggerMaker.debugAndAddToDb("Inserted testing results", LogDb.TESTING);
 
-            // insert vulnerable testing run results here
-            List<TestingRunResult> vulTestResults = new ArrayList<>();
-            for(TestingRunResult runResult: testingRunResults){
-                if(runResult != null && runResult.isVulnerable()){
-                    vulTestResults.add(runResult);
+                // insert vulnerable testing run results here
+                List<TestingRunResult> vulTestResults = new ArrayList<>();
+                for(TestingRunResult runResult: testingRunResults){
+                    if(runResult != null && runResult.isVulnerable()){
+                        vulTestResults.add(runResult);
+                    }
                 }
+
+                if(!vulTestResults.isEmpty()){
+                    loggerMaker.debugAndAddToDb("Inserted vul testing results.", LogDb.TESTING);
+                    VulnerableTestingRunResultDao.instance.insertMany(vulTestResults);
+                }
+
+                TestingRunResultSummariesDao.instance.getMCollection().withWriteConcern(WriteConcern.W1).findOneAndUpdate(
+                    Filters.eq(Constants.ID, testRunResultSummaryId),
+                    Updates.inc(TestingRunResultSummary.TEST_RESULTS_COUNT, resultSize)
+                );
+
+                loggerMaker.debugAndAddToDb("Updated count in summary", LogDb.TESTING);
+
+                TestingIssuesHandler handler = new TestingIssuesHandler();
+                boolean triggeredByTestEditor = false;
+                handler.handleIssuesCreationFromTestingRunResults(testingRunResults, triggeredByTestEditor);
             }
-
-            if(!vulTestResults.isEmpty()){
-                loggerMaker.debugAndAddToDb("Inserted vul testing results.", LogDb.TESTING);
-                VulnerableTestingRunResultDao.instance.insertMany(vulTestResults);
-            }
-
-            TestingRunResultSummariesDao.instance.getMCollection().withWriteConcern(WriteConcern.W1).findOneAndUpdate(
-                Filters.eq(Constants.ID, testRunResultSummaryId),
-                Updates.inc(TestingRunResultSummary.TEST_RESULTS_COUNT, resultSize)
-            );
-
-            loggerMaker.debugAndAddToDb("Updated count in summary", LogDb.TESTING);
-
-            TestingIssuesHandler handler = new TestingIssuesHandler();
-            boolean triggeredByTestEditor = false;
-            handler.handleIssuesCreationFromTestingRunResults(testingRunResults, triggeredByTestEditor);
+        } catch (Exception e) {
+            e.printStackTrace();
+            loggerMaker.errorAndAddToDb("Error while inserting testing run results: " + e.getMessage(), LogDb.TESTING);
         }
     }
 
