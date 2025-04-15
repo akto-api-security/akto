@@ -86,8 +86,6 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
 
     const [testSuiteIds, setTestSuiteIds] = useState([])
 
-    const [selectedGeneratedSuiteTests, setSelectedGeneratedSuiteTests] = useState([])
-
     const [testNameSuiteModal, setTestNameSuiteModal] = useState("")
 
     useEffect(() => {
@@ -656,7 +654,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
     // only for configurations 
     const handleModifyConfig = async () => {
         const settings = transform.prepareConditionsForTesting(conditions)
-        const editableConfigObject = transform.prepareEditableConfigObject(testRun, settings, testIdConfig.hexId,testSuiteIds,testMode, selectedGeneratedSuiteTests)
+        const editableConfigObject = transform.prepareEditableConfigObject(testRun, settings, testIdConfig.hexId,testSuiteIds,testMode)
         await testingApi.modifyTestingRunConfig(testIdConfig?.testingRunConfig?.id, editableConfigObject).then(() => {
             func.setToast(true, false, "Modified testing run config successfully")
             setShowEditableSettings(false)
@@ -734,7 +732,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                 primaryAction={{
                     content: activeFromTesting ? "Save" : scheduleString(),
                     onAction: activeFromTesting ? handleModifyConfig : handleRun,
-                    disabled: (testMode && activeFromTesting && (testSuiteIds.length !== 0 || selectedGeneratedSuiteTests.length != 0)) || (countAllSelectedTests() === 0 && testSuiteIds.length === 0 && selectedGeneratedSuiteTests.length === 0 ) || !testRun.authMechanismPresent
+                    disabled: (testMode && activeFromTesting && (testSuiteIds.length !== 0)) || (countAllSelectedTests() === 0 && testSuiteIds.length === 0  ) || !testRun.authMechanismPresent
                 }}
                 secondaryActions={[
                     countAllSelectedTests() && testMode ? {

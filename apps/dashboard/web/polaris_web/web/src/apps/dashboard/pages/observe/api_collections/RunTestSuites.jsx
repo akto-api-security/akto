@@ -20,126 +20,123 @@ const owaspTop10List = {
     "Unsafe Consumption of APIs": ["COMMAND_INJECTION", "INJ", "CRLF", "SSTI", "LFI", "XSS", "INJECT"]
 }
 
-function RunTestSuites({ testRun, setTestRun, apiCollectionName, activeFromTesting, setTestSuiteIds, testSuiteIds,setSelectedGeneratedSuiteTests, selectedGeneratedSuiteTests,setTestNameSuiteModal,testNameSuiteModal }) {
+function RunTestSuites({ testRun, setTestRun, apiCollectionName, activeFromTesting, setTestSuiteIds, testSuiteIds,setTestNameSuiteModal,testNameSuiteModal }) {
 
     const [data, setData] = useState({ owaspTop10List: {}, testingMethods:{}, custom : {}, severity: {} });
+    const [testSuiteIdsNameMap, setTestSuiteIdsNameMap] = useState({});
 
 
     async function fetchData() {
 
+        let idsNameMap = {};
+
         // Generate OWASP Top 10 Test Suites
-        const newOwaspTop10TestSuites = Object.entries(owaspTop10List).map(([key, value]) => {
-            const tests = [];
-            value.forEach((cat) => {
-                testRun?.tests?.[cat]?.forEach((test) => {
-                    tests.push(test.value);
-                });
-            });
-            return { name: key, tests };
-        });
+        // const newOwaspTop10TestSuites = Object.entries(owaspTop10List).map(([key, value]) => {
+        //     const tests = [];
+        //     value.forEach((cat) => {
+        //         testRun?.tests?.[cat]?.forEach((test) => {
+        //             tests.push(test.value);
+        //         });
+        //     });
+        //     return { name: key, tests };
+        // });
 
-        // Generate Testing Methods Test Suites
-        const newTestingMethodsTestSuites = ["Intrusive", "Non_intrusive"].map((val) => {
-            const tests = [];
-            Object.keys(testRun?.tests || {}).forEach((category) => {
-                testRun.tests[category]?.forEach((test) => {
-                    if (test.nature === val.toUpperCase()) {
-                        tests.push(test.value);
-                    }
-                });
-            });
-            return { name: val, tests };
-        });
+        // // Generate Testing Methods Test Suites
+        // const newTestingMethodsTestSuites = ["Intrusive", "Non_intrusive"].map((val) => {
+        //     const tests = [];
+        //     Object.keys(testRun?.tests || {}).forEach((category) => {
+        //         testRun.tests[category]?.forEach((test) => {
+        //             if (test.nature === val.toUpperCase()) {
+        //                 tests.push(test.value);
+        //             }
+        //         });
+        //     });
+        //     return { name: val, tests };
+        // });
 
-        // Fetch Severity Test Suites
-        const severityTestSuites = ["Critical", "High", "Medium", "Low"].map((val) => {
-            const tests = [];
-            Object.keys(testRun?.tests || {}).forEach((category) => {
-                testRun.tests[category]?.forEach((test) => {
-                    if (test.severity === val.toUpperCase()) {
-                        tests.push(test.value);
-                    }
-                });
-            });
-            return { name: val, tests };
-        });
+        // // Fetch Severity Test Suites
+        // const severityTestSuites = ["Critical", "High", "Medium", "Low"].map((val) => {
+        //     const tests = [];
+        //     Object.keys(testRun?.tests || {}).forEach((category) => {
+        //         testRun.tests[category]?.forEach((test) => {
+        //             if (test.severity === val.toUpperCase()) {
+        //                 tests.push(test.value);
+        //             }
+        //         });
+        //     });
+        //     return { name: val, tests };
+        // });
 
         // Fetch Custom Test Suite
         const fetchedTestSuite = await testingApi.fetchAllTestSuites();
         const fetchedData = fetchedTestSuite.map((testSuiteItem) => {
+            idsNameMap[testSuiteItem.hexId] = testSuiteItem.name;
             return { name: testSuiteItem.name, tests: testSuiteItem.subCategoryList, id: testSuiteItem.hexId }
 
         });
         setData(prev => {
             if (
-                !func.deepArrayComparison(prev?.owaspTop10List?.testSuite||[],newOwaspTop10TestSuites) ||
-                !func.deepArrayComparison(prev?.testingMethods?.testSuite||[], newTestingMethodsTestSuites) ||
-                !func.deepArrayComparison(prev?.custom?.testSuite||[], fetchedData) ||
-                !func.deepArrayComparison(prev?.severity?.testSuite||[], severityTestSuites)
+                // !func.deepArrayComparison(prev?.owaspTop10List?.testSuite||[],newOwaspTop10TestSuites) ||
+                // !func.deepArrayComparison(prev?.testingMethods?.testSuite||[], newTestingMethodsTestSuites) ||
+                !func.deepArrayComparison(prev?.custom?.testSuite||[], fetchedData)
+                // !func.deepArrayComparison(prev?.severity?.testSuite||[], severityTestSuites)
             ) {
                 return {
-                    ...prev,
-                    owaspTop10List: { rowName: "OWASP top 10", testSuite: newOwaspTop10TestSuites },
-                    testingMethods: { rowName: "Testing Methods", testSuite: newTestingMethodsTestSuites },
+                    // ...prev,
+                    // owaspTop10List: { rowName: "OWASP top 10", testSuite: newOwaspTop10TestSuites },
+                    // testingMethods: { rowName: "Testing Methods", testSuite: newTestingMethodsTestSuites },
                     custom: { rowName: "Custom", testSuite: fetchedData },
-                    severity: { rowName: "Severity", testSuite: severityTestSuites }
+                    // severity: { rowName: "Severity", testSuite: severityTestSuites }
                 };
             }
             return prev;
         });
+
+        setTestSuiteIdsNameMap(idsNameMap);
+
     }
     
     useEffect(() => {
         fetchData();
     }, []);
 
+    function createTestName(testSuiteIds) {
+        if (activeFromTesting) return;
+
+        let copyTestSuiteIds = [...testSuiteIds];
+        let testName = apiCollectionName;
+        copyTestSuiteIds.forEach(ele => {
+            if (testSuiteIdsNameMap[ele]) {
+                testName += "_" + testSuiteIdsNameMap[ele];
+            }
+        });
+        setTestNameSuiteModal(testName);
+    }
+
+
 
     function handleTestSuiteSelection(data) {
-        if (!data.id) {
-            let testName = apiCollectionName + "_" + func.joinWordsWithUnderscores(data.name)
-            if(!activeFromTesting)setTestNameSuiteModal(testName)
-            setSelectedGeneratedSuiteTests([...data?.tests])
-            setTestSuiteIds([])
-            return;
-        }
-
         setTestSuiteIds((prev) => {
+            let updated;
             if (!prev.includes(data.id)) {
-                return [data.id]
+                updated = [...prev, data.id];
+            } else {
+                updated = prev.filter((id) => id !== data.id);
             }
-        })
-        let testName = apiCollectionName + "_" + data.name;
-        if(!activeFromTesting)setTestNameSuiteModal(testName)
-        setSelectedGeneratedSuiteTests([])
+
+            createTestName(updated);
+            return updated;
+        });
     }
+
 
     function countTestSuitesTests(data) {
         return data?.tests?.length || 0;
     }
 
     function checkedSelected(data) {
-        if (testRun === undefined) return;
-        if (!data.id) {
-            let allSelected = func.deepArrayComparison(data?.tests, selectedGeneratedSuiteTests)
-            return allSelected;
-        }
         if (testSuiteIds.includes(data.id)) return true
         return false
-    }
-
-    function checkDisableTestSuite(data) {
-        if (testRun === undefined) return false;
-        const updatedTests = { ...testRun?.tests };
-        const testSet = new Set(data.tests);
-        let check = true;
-        Object.keys(updatedTests).forEach(category => {
-            updatedTests[category]?.forEach(test => {
-                if (testSet.has(test.value)) {
-                    check = false;
-                }
-            });
-        });
-        return check;
     }
 
     function checkifSelected(data) {
@@ -151,7 +148,7 @@ function RunTestSuites({ testRun, setTestRun, apiCollectionName, activeFromTesti
 
     function handleRemoveAll() {
         setTestSuiteIds([])
-        setSelectedGeneratedSuiteTests([])
+        setTestNameSuiteModal(apiCollectionName)
     }
 
     return (
@@ -174,7 +171,7 @@ function RunTestSuites({ testRun, setTestRun, apiCollectionName, activeFromTesti
                                 plain
                                 destructive
                                 onClick={handleRemoveAll}
-                                disabled={testSuiteIds?.length===0 && selectedGeneratedSuiteTests.length === 0}><div data-testid="remove_all_tests">Clear selection</div></Button></div>
+                                disabled={testSuiteIds?.length===0}><div data-testid="remove_all_tests">Clear selection</div></Button></div>
                     </div>
                     {
                         Object.values(data).map((key) => {
@@ -183,8 +180,7 @@ function RunTestSuites({ testRun, setTestRun, apiCollectionName, activeFromTesti
                                     data={key} 
                                     checkifSelected={checkifSelected} 
                                     checkedSelected={checkedSelected} 
-                                    handleTestSuiteSelection={handleTestSuiteSelection} 
-                                    checkDisableTestSuite={checkDisableTestSuite} 
+                                    handleTestSuiteSelection={handleTestSuiteSelection}
                                 />
                             );
                         })   

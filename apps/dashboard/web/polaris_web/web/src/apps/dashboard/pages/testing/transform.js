@@ -1202,7 +1202,7 @@ getMissingConfigs(testResults){
       };
     });
   },
-  prepareEditableConfigObject(testRun,settings,hexId,testSuiteIds=[],testMode,selectedGeneratedSuiteTests){
+  prepareEditableConfigObject(testRun,settings,hexId,testSuiteIds=[],testMode){
     const tests = testRun.tests;
     const selectedTests = []
     Object.keys(tests).forEach(category => {
