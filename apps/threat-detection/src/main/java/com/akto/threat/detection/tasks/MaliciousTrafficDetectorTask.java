@@ -67,6 +67,8 @@ public class MaliciousTrafficDetectorTask implements Task {
   private static final LoggerMaker logger = new LoggerMaker(MaliciousTrafficDetectorTask.class);
 
   private static final ObjectMapper objectMapper = new ObjectMapper();
+  private static final HttpRequestParams requestParams = new HttpRequestParams();
+  private static final HttpResponseParams responseParams = new HttpResponseParams();
   
 
   public MaliciousTrafficDetectorTask(
@@ -323,14 +325,14 @@ public class MaliciousTrafficDetectorTask implements Task {
 
     Map<String, List<String>> reqHeaders = (Map) httpResponseParamProto.getRequestHeadersMap();
 
-    HttpRequestParams requestParams =
-        new HttpRequestParams(
+    requestParams.resetValues(
             httpResponseParamProto.getMethod(),
             httpResponseParamProto.getPath(),
             httpResponseParamProto.getType(),
             reqHeaders,
             requestPayload,
-            apiCollectionId);
+            apiCollectionId
+    );
 
     String responsePayload =
         HttpRequestResponseUtils.rawToJsonString(httpResponseParamProto.getResponsePayload(), null);
@@ -343,7 +345,7 @@ public class MaliciousTrafficDetectorTask implements Task {
     HttpResponseParams.Source source = HttpResponseParams.Source.valueOf(sourceStr);
     Map<String, List<String>> respHeaders = (Map) httpResponseParamProto.getResponseHeadersMap();
 
-    return new HttpResponseParams(
+    return responseParams.resetValues(
         httpResponseParamProto.getType(),
         httpResponseParamProto.getStatusCode(),
         httpResponseParamProto.getStatus(),
