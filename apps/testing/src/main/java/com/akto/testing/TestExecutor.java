@@ -254,7 +254,6 @@ public class TestExecutor {
         } else {
 
             List<String> testSuiteIds = testingRun.getTestingRunConfig().getTestSuiteIds();
-
             if (testSuiteIds == null || testSuiteIds.isEmpty()) {
                 // default testing
                 testingRunSubCategories = testingRun.getTestingRunConfig().getTestSubCategoryList();
