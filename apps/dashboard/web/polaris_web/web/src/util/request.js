@@ -158,7 +158,12 @@ async function raiseMixpanelEvent(api, data) {
   }
   if (api && !black_list_apis.some(black_list_api => api.includes(black_list_api))) {
     if (api === '/api/fetchEndpointsCount') {
-      window.mixpanel.track('endpoints_count', { newCount: data.newCount })
+      const hour = new Date().getHours()
+      const lastHour = localStorage.getItem('lastEndpointHour')
+      if (lastHour !== hour.toString()) {
+        localStorage.setItem('lastEndpointHour', hour)
+        window.mixpanel.track('endpoints_count', { newCount: data.newCount })
+      }
     } else {
       window.mixpanel.track(api)
     }
