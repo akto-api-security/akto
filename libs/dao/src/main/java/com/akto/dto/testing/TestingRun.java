@@ -51,6 +51,8 @@ public class TestingRun {
     public static final String SEND_MS_TEAMS_ALERT = "sendMsTeamsAlert";
     private boolean sendMsTeamsAlert = false;
 
+    private AutoTicketingDetails autoTicketingDetails;
+
     public TestingRun() { }
 
     public TestingRun(int scheduleTimestamp, String userEmail, TestingEndpoints testingEndpoints, int testIdConfig, State state, int periodInSeconds, String name, String triggeredBy, boolean sendSlackAlert) {
@@ -71,10 +73,12 @@ public class TestingRun {
     }
 
     public TestingRun(int scheduleTimestamp, String userEmail, TestingEndpoints testingEndpoints, int testIdConfig, State state, int periodInSeconds, String name, int testRunTime, int maxConcurrentRequests, boolean sendSlackAlert) {
-        this(scheduleTimestamp, userEmail,testingEndpoints,testIdConfig, state, periodInSeconds, name, testRunTime, maxConcurrentRequests, sendSlackAlert, false);
+        this(scheduleTimestamp, userEmail,testingEndpoints,testIdConfig, state, periodInSeconds, name, testRunTime, maxConcurrentRequests, sendSlackAlert, false, null);
     }
 
-    public TestingRun(int scheduleTimestamp, String userEmail, TestingEndpoints testingEndpoints, int testIdConfig, State state, int periodInSeconds, String name, int testRunTime, int maxConcurrentRequests, boolean sendSlackAlert, boolean sendMsTeamsAlert) {
+    public TestingRun(int scheduleTimestamp, String userEmail, TestingEndpoints testingEndpoints, int testIdConfig,
+        State state, int periodInSeconds, String name, int testRunTime, int maxConcurrentRequests,
+        boolean sendSlackAlert, boolean sendMsTeamsAlert, AutoTicketingDetails autoTicketingDetails) {
         this.scheduleTimestamp = scheduleTimestamp;
         this.testRunTime = testRunTime;
         this.maxConcurrentRequests = maxConcurrentRequests;
@@ -89,6 +93,7 @@ public class TestingRun {
         this.sendSlackAlert = sendSlackAlert;
         this.isNewTestRun = true;
         this.sendMsTeamsAlert = sendMsTeamsAlert;
+        this.autoTicketingDetails = autoTicketingDetails;
     }
 
     public TestingRunConfig getTestingRunConfig() {
@@ -230,6 +235,14 @@ public class TestingRun {
 
     public void setSendMsTeamsAlert(boolean sendMsTeamsAlert) {
         this.sendMsTeamsAlert = sendMsTeamsAlert;
+    }
+
+    public AutoTicketingDetails getAutoTicketingDetails() {
+        return autoTicketingDetails;
+    }
+
+    public void setAutoTicketingDetails(AutoTicketingDetails autoTicketingDetails) {
+        this.autoTicketingDetails = autoTicketingDetails;
     }
 
     @Override

@@ -25,6 +25,7 @@ import com.akto.dto.testing.CollectionWiseTestingEndpoints;
 import com.akto.dto.testing.CustomTestingEndpoints;
 import com.akto.dto.testing.DeleteTestRuns;
 import com.akto.dto.testing.GenericTestResult;
+import com.akto.dto.testing.AutoTicketingDetails;
 import com.akto.dto.testing.MultiExecTestResult;
 import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.TestResult.TestError;
@@ -115,6 +116,8 @@ public class StartTestAction extends UserAction {
     private String testRoleId;
     private boolean cleanUpTestingResources;
 
+    private AutoTicketingDetails autoTicketingDetails;
+
     private static final Gson gson = new Gson();
 
     Set<Integer> deactivatedCollections = UsageMetricCalculator.getDeactivated();
@@ -204,7 +207,7 @@ public class StartTestAction extends UserAction {
 
         return new TestingRun(scheduleTimestamp, user.getLogin(),
                 testingEndpoints, testIdConfig, State.SCHEDULED, periodInSeconds, testName, this.testRunTime,
-                this.maxConcurrentRequests, this.sendSlackAlert, this.sendMsTeamsAlert);
+                this.maxConcurrentRequests, this.sendSlackAlert, this.sendMsTeamsAlert, this.autoTicketingDetails);
     }
 
     private List<String> selectedTests;
@@ -223,6 +226,7 @@ public class StartTestAction extends UserAction {
             return 0;
         }
     }
+
     public String startTest() {
 
         if (this.startTimestamp != 0 && this.startTimestamp + 86400 < Context.now()) {
@@ -1840,5 +1844,13 @@ public class StartTestAction extends UserAction {
 
     public void setTestSuiteIds(List<String> testSuiteIds) {
         this.testSuiteIds = testSuiteIds;
+    }
+
+    public AutoTicketingDetails getAutoTicketingDetails() {
+        return autoTicketingDetails;
+    }
+
+    public void setAutoTicketingDetails(AutoTicketingDetails autoTicketingDetails) {
+        this.autoTicketingDetails = autoTicketingDetails;
     }
 }
