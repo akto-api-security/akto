@@ -7,6 +7,48 @@ import static com.akto.utils.Utils.deleteApis;
 import static com.akto.utils.billing.OrganizationUtils.syncOrganizationWithAkto;
 import static com.mongodb.client.model.Filters.eq;
 
+import java.io.BufferedReader;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.net.URI;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.attribute.FileTime;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Base64;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Objects;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
+
+import javax.servlet.ServletContextListener;
+
+import org.apache.commons.csv.CSVRecord;
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.EnumUtils;
+import org.apache.commons.lang3.StringUtils;
+import org.bson.conversions.Bson;
+import org.bson.types.ObjectId;
+import org.json.JSONObject;
+
 import com.akto.DaoInit;
 import com.akto.action.AdminSettingsAction;
 import com.akto.action.ApiCollectionsAction;
@@ -214,47 +256,9 @@ import com.mongodb.client.result.UpdateResult;
 import com.slack.api.Slack;
 import com.slack.api.util.http.SlackHttpClient;
 import com.slack.api.webhook.WebhookResponse;
+
 import io.intercom.api.Intercom;
-import java.io.BufferedReader;
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.net.URI;
-import java.net.URL;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.attribute.FileTime;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Base64;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Objects;
-import java.util.Set;
-import java.util.UUID;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
-import java.util.function.Consumer;
-import java.util.function.Function;
-import java.util.stream.Collectors;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipInputStream;
-import javax.servlet.ServletContextListener;
 import okhttp3.OkHttpClient;
-import org.apache.commons.csv.CSVRecord;
-import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang3.EnumUtils;
-import org.apache.commons.lang3.StringUtils;
-import org.bson.conversions.Bson;
-import org.bson.types.ObjectId;
-import org.json.JSONObject;
 
 public class InitializerListener implements ServletContextListener {
 
@@ -2626,9 +2630,14 @@ public class InitializerListener implements ServletContextListener {
         return new HashSet<>(Arrays.asList("akto-api-security/tests-library:standard", "akto-api-security/tests-library:pro"));
     }
 
+    public static Set<String> getAktoDefaultThreatPolicies() {
+        return new HashSet<>(Arrays.asList("akto-api-security/tests-library:threat_policies_pro"));
+    }
+
     public static void insertStateInAccountSettings(AccountSettings accountSettings) {
         if (DashboardMode.isMetered()) {
             insertAktoTestLibraries(accountSettings);
+            insertAktoThreatPolicies(accountSettings);
         }
         
         insertCompliances(accountSettings);
@@ -2659,6 +2668,26 @@ public class InitializerListener implements ServletContextListener {
             AccountSettingsDao.instance.updateOne(
                 AccountSettingsDao.generateFilter(), 
                 Updates.addToSet(AccountSettings.TEST_LIBRARIES, new TestLibrary(pendingLib, Constants._AKTO, Context.now())));
+        }
+    }
+
+    private static void insertAktoThreatPolicies(AccountSettings accountSettings) {
+        List<TestLibrary> testLibraries = accountSettings == null ? new ArrayList<>() : accountSettings.getThreatPolicies();
+        Set<String> aktoTestLibraries = getAktoDefaultThreatPolicies();
+
+        if (testLibraries != null) {
+            for (TestLibrary testLibrary: testLibraries) {
+                String author = testLibrary.getAuthor();
+                if (author.equals(Constants._AKTO)) {
+                    aktoTestLibraries.remove(testLibrary.getRepositoryUrl());
+                }
+            }
+        }
+
+        for (String pendingLib: aktoTestLibraries) {
+            AccountSettingsDao.instance.updateOne(
+                AccountSettingsDao.generateFilter(), 
+                Updates.addToSet(AccountSettings.THREAT_POLICIES, new TestLibrary(pendingLib, Constants._AKTO, Context.now())));
         }
     }
 
@@ -3423,6 +3452,7 @@ public class InitializerListener implements ServletContextListener {
                 try {
                     processRemedationFilesZip(testingTemplates);
                     processComplianceInfosFromZip(testingTemplates);
+                    
                 } catch (Exception e) {
                     e.printStackTrace();
                     logger.debugAndAddToDb("Unable to import remediations", LogDb.DASHBOARD);
@@ -3433,7 +3463,6 @@ public class InitializerListener implements ServletContextListener {
                     try {
                         logger.debugAndAddToDb("Updating Test Editor Templates for accountId: " + account.getId(), LogDb.DASHBOARD);
                         processTemplateFilesZip(testingTemplates, Constants._AKTO, YamlTemplateSource.AKTO_TEMPLATES.toString(), "");
-
                         if (!DashboardMode.isMetered()) return;
 
                         logger.debugAndAddToDb("Updating Pro and Standard Templates for accountId: " + account.getId(), LogDb.DASHBOARD);
@@ -3451,10 +3480,16 @@ public class InitializerListener implements ServletContextListener {
                         }
 
                         if (accountSettings.getComplianceInfosUpdatedTs() > 0) {                            
+                            logger.infoAndAddToDb("Updating Compliances for accountId: " + account.getId(), LogDb.DASHBOARD);
                             addComplianceFromCommonToAccount(complianceCommonMap);
                             replaceComplianceFromCommonToAccount(complianceCommonMap);    
                         }
-                        
+
+                        if (accountSettings.getThreatPolicies() != null && !accountSettings.getThreatPolicies().isEmpty()) {
+                            logger.infoAndAddToDb("Updating Threat Policies for accountId: " + account.getId(), LogDb.DASHBOARD);
+                            processThreatFilterTemplateFilesZip(testingTemplates, Constants._AKTO, YamlTemplateSource.AKTO_TEMPLATES.toString(), "");
+                        }
+                         
                     } catch (Exception e) {
                         cacheLoggerMaker.errorAndAddToDb(e,
                                 String.format("Error while updating Test Editor Files %s", e.toString()),
@@ -3735,7 +3770,7 @@ public class InitializerListener implements ServletContextListener {
                     if (!entry.isDirectory()) {
                         String entryName = entry.getName();
 
-                        if (!(entryName.endsWith(".yaml") || entryName.endsWith(".yml"))) {
+                        if (entryName.contains("Threat-Protection") || !(entryName.endsWith(".yaml") || entryName.endsWith(".yml"))) {
                             logger.debugAndAddToDb(
                                     String.format("%s not a YAML template file, skipping", entryName),
                                     LogDb.DASHBOARD);
@@ -3865,6 +3900,8 @@ public class InitializerListener implements ServletContextListener {
 
                 logger.debugAndAddToDb("Skipped " + skipped + " test templates for account: " + Context.accountId.get());
 
+                YamlTemplateDao.instance.deleteAll(Filters.in("_id", Arrays.asList("LocalFileInclusionLFIRFI", "SQLInjection", "SSRF", "SecurityMisconfig", "XSS")));
+
             } catch (Exception ex) {
                 cacheLoggerMaker.errorAndAddToDb(ex,
                         String.format("Error while processing Test template files zip. Error %s", ex.getMessage()),
@@ -3922,7 +3959,7 @@ public class InitializerListener implements ServletContextListener {
                             String id = testConfig.getId();
                             int createdAt = Context.now();
                             int updatedAt = Context.now();
-
+                            int newHashCode = templateContent.hashCode();
                             List<Bson> updates = new ArrayList<>(
                                     Arrays.asList(
                                             Updates.setOnInsert(YamlTemplate.CREATED_AT, createdAt),
@@ -3932,12 +3969,24 @@ public class InitializerListener implements ServletContextListener {
                                             Updates.set(YamlTemplate.SOURCE, source)
                                     ));
                             try {
-                                FilterYamlTemplateDao.instance.getMCollection().findOneAndUpdate(
-                                    Filters.and(Filters.eq(Constants.ID, id),
-                                            Filters.ne(YamlTemplate.AUTHOR, Constants._AKTO)),
-                                    Updates.combine(updates),
-                                    new FindOneAndUpdateOptions().upsert(true)
-                                );    
+                                YamlTemplate threatPolicy = FilterYamlTemplateDao.instance.findOne(Filters.eq(Constants.ID, id), Projections.include(YamlTemplate.HASH));
+
+                                if (threatPolicy == null) {
+                                    logger.infoAndAddToDb("Adding new threat template=" + id +" for account " + Context.accountId, LogDb.DASHBOARD);
+                                    YamlTemplate insertNew = new YamlTemplate(id, createdAt, author, updatedAt, templateContent, null, null);
+                                    insertNew.setSource(YamlTemplateSource.AKTO_TEMPLATES);
+                                    FilterYamlTemplateDao.instance.insertOne(insertNew);
+                                } else if (threatPolicy.getHash() != newHashCode) {
+                                    logger.infoAndAddToDb("Modifying threat template=" + id +" for account " + Context.accountId, LogDb.DASHBOARD);
+                                    updates.add(
+                                        Updates.set(YamlTemplate.HASH, newHashCode)
+                                    );
+                                    FilterYamlTemplateDao.instance.getMCollection().findOneAndUpdate(
+                                        Filters.eq(Constants.ID, id),
+                                        Updates.combine(updates),
+                                        new FindOneAndUpdateOptions().upsert(false)
+                                    );    
+                                }
                             } catch (Exception e) {
                                 cacheLoggerMaker.errorAndAddToDb(e,
                                     String.format("Error while processing Threat template files zip. Error %s", e.getMessage()),
