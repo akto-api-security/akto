@@ -1,0 +1,289 @@
+happy_case:
+  response_code:
+    gte: 200
+    lt: 300
+  url:
+    extract: urlVar
+
+req_payload_key_val_extract:
+  response_code:
+    gte: 200
+    lt: 300
+  request_payload:
+    for_one:
+      key:
+        eq: id
+        extract: keyName
+      value:
+        extract: keyVal
+
+req_payload_val_key_extract:
+  response_code:
+    gte: 200
+    lt: 300
+  request_payload:
+    for_one:
+      value:
+        eq: Stud-101
+        extract: keyVal
+      key:
+        extract: keyName
+      
+req_payload_key_val_neq_extract:
+  response_code:
+    gte: 200
+    lt: 300
+  request_payload:
+    for_one:
+      key:
+        neq: id
+        extract: keyName
+      value:
+        extract: keyVal
+
+req_payload_val_gte_extract:
+  response_code:
+    gte: 200
+    lt: 300
+  request_payload:
+    for_one:
+      key:
+        eq: id
+        extract: keyName
+      value:
+        gte: 101
+        extract: keyVal
+
+req_payload_val_gt_extract:
+  response_code:
+    gte: 200
+    lt: 300
+  request_payload:
+    for_one:
+      key:
+        eq: id
+        extract: keyName
+      value:
+        gte: 100
+        extract: keyVal
+  
+req_payload_val_lt_extract:
+  response_code:
+    gte: 200
+    lt: 300
+  request_payload:
+    for_one:
+      value:
+        lt: 102
+        extract: keyVal
+      key:
+        extract: keyName
+  
+req_payload_val_lte_extract:
+  response_code:
+    gte: 200
+    lt: 300
+  request_payload:
+    for_one:
+      value:
+        lte: 101
+        extract: keyVal
+      key:
+        extract: keyName
+
+req_payload_val_gte_extract_invalid:
+  response_code:
+    gte: 200
+    lt: 300
+  request_payload:
+    for_one:
+      value:
+        gte: 102
+        extract: keyVal
+      key:
+        extract: keyName
+
+contains_either_valid:
+  response_code:
+    gte: 200
+    lt: 300
+  request_payload:
+    for_one:
+      key:
+        contains_either:
+          - id
+          - xyz
+          - abc
+
+contains_either_invalid:
+  response_code:
+    gte: 200
+    lt: 300
+  request_payload:
+    for_one:
+      key:
+        contains_either:
+          - idd
+          - xyz
+          - abc
+
+contains_all_valid:
+  response_code:
+    gte: 200
+    lt: 300
+  request_payload:
+    contains_all:
+      - id
+      - name
+      - email
+
+contains_all_invalid:
+  response_code:
+    gte: 200
+    lt: 300
+  request_payload:
+    contains_all:
+      - id
+      - name
+      - xyz
+
+contains_either_valid_extract:
+  response_code:
+    gte: 200
+    lt: 300
+  request_payload:
+    for_one:
+      key:
+        contains_either:
+          - xyz
+          - course
+        extract: keyName
+      value:
+        extract: keyVal
+  
+complex_and_condition_filter:
+  response_code:
+    gte: 200
+    lt: 300
+  and:
+    - request_payload:
+        for_one:
+          key:
+            contains_either:
+              - xyz
+              - course
+    - method:
+        neq: POST
+    - url:
+        contains_either: details
+
+complex_and_condition_filter_extract:
+  response_code:
+    gte: 200
+    lt: 300
+  and:
+    - request_payload:
+        for_one:
+          key:
+            contains_either:
+              - xyz
+              - course
+            extract: keyName
+    - method:
+        neq: POST
+        extract: methodName
+    - url:
+        contains_either: details
+
+complex_and_condition_filter_invalid:
+  response_code:
+    gte: 200
+    lt: 300
+  and:
+    - request_payload:
+        for_one:
+          key:
+            contains_either:
+              - xyz
+              - course
+    - method:
+        neq: PUT
+    - url:
+        contains_either: details
+
+complex_or_condition_filter:
+  response_code:
+    gte: 200
+    lt: 300
+  or:
+    - request_payload:
+        for_one:
+          key:
+            contains_either:
+              - xyz
+              - course
+    - method:
+        neq: PUT
+    - url:
+        contains_either: xyz
+
+complex_or_condition_filter_extract:
+  response_code:
+    gte: 200
+    lt: 300
+  or:
+    - request_payload:
+        for_one:
+          key:
+            contains_either:
+              - xyz
+              - course
+            extract: keyName
+    - method:
+        neq: PUT
+        extract: methodName
+    - url:
+        contains_either: xyz
+
+complex_or_condition_filter_invalid:
+  response_code:
+    gte: 200
+    lt: 300
+  or:
+    - request_payload:
+        for_one:
+          key:
+            contains_either:
+              - xyz
+              - abc
+    - method:
+        neq: PUT
+    - url:
+        contains_either: xyz
+
+contains_jwt:
+  request_headers:
+    for_one:
+      value:
+        contains_jwt: true
+
+regex_filter:
+  request_payload:
+    for_one:
+      key:
+        regex: .*
+        extract: keyName
+
+regex_filter_invalid:
+  request_payload:
+    for_one:
+      key:
+        regex: xyzabc
+        extract: keyName
+
+regex_filter_extract_multiple:
+  request_payload:
+    for_one:
+      key:
+        regex: .*
+        extractMultiple: keyName
