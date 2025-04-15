@@ -3028,6 +3028,9 @@ public class InitializerListener implements ServletContextListener {
         if(backwardCompatibility.getAddAdminRoleIfAbsent() < 1733228772){
            
             User firstUser = UsersDao.instance.getFirstUser(Context.accountId.get());
+            if(firstUser == null){
+                return;
+            }
 
             RBAC firstUserAdminRbac = RBACDao.instance.findOne(Filters.and(
                 Filters.eq(RBAC.USER_ID, firstUser.getId()),
