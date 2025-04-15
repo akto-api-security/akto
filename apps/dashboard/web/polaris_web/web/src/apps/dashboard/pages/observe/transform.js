@@ -539,7 +539,8 @@ const transform = {
                 isNew: this.isNewEndpoint(url.lastSeenTs),
                 sensitiveDataTags: url?.sensitiveTags.join(" "),
                 codeAnalysisEndpoint: false,
-                issuesComp: url.severityObj? this.getIssuesList(url.severityObj):'-'
+                issuesComp: url.severityObj? this.getIssuesList(url.severityObj):'-',
+                severity: url.severityObj? Object.keys(url.severityObj):[]
             }
         })
 

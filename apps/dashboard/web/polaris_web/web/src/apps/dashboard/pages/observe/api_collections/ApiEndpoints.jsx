@@ -54,6 +54,8 @@ const headings = [
         title: "Issues",
         value: "issuesComp",
         textValue: "issues",
+        showFilter:true,
+        filterKey:"severity"
     },
     {
         text: "Hostname",
@@ -149,6 +151,8 @@ const sortOptions = [
     { label: 'Last seen', value: 'lastSeenTs desc', directionLabel: 'Oldest', sortKey: 'lastSeenTs', columnIndex: 7 }
 ];
 
+
+
 function ApiEndpoints(props) {
     const { endpointListFromConditions, sensitiveParamsForQuery, isQueryPage } = props
     const params = useParams()
@@ -242,7 +246,7 @@ function ApiEndpoints(props) {
                 api.fetchApiInfosForCollection(apiCollectionId),
                 api.fetchAPIsFromSourceCode(apiCollectionId),
                 api.loadSensitiveParameters(apiCollectionId),
-                issuesApi.fetchIssues(0,20000, [], [apiCollectionId], [], [], "severity", -1, 0, 0, true,[])
+                issuesApi.fetchIssues(0,2000, ["OPEN"], [apiCollectionId], [], [], "severity", -1, Math.floor(Date.now() / 1000 - 90 * 24 * 60 * 60), 0, true,[])
             ];
             let results = await Promise.allSettled(apiPromises);
             let stisEndpoints =  results[0].status === 'fulfilled' ? results[0].value : {};
