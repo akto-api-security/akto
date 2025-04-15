@@ -1,7 +1,12 @@
 package com.akto.log;
 
-import com.akto.DaoInit;
-import com.akto.dao.*;
+import com.akto.dao.AnalyserLogsDao;
+import com.akto.dao.BillingLogsDao;
+import com.akto.dao.ConfigsDao;
+import com.akto.dao.DashboardLogsDao;
+import com.akto.dao.LogsDao;
+import com.akto.dao.PupeteerLogsDao;
+import com.akto.dao.RuntimeLogsDao;
 import com.akto.dao.context.Context;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
@@ -11,20 +16,17 @@ import com.akto.dto.Log;
 import com.akto.util.DashboardMode;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
-import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
-
+import com.slack.api.Slack;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-
 import org.bson.conversions.Bson;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import com.slack.api.Slack;
 
 public class LoggerMaker  {
 
@@ -284,5 +286,29 @@ public class LoggerMaker  {
                 break;
         }
         return logs;
+    }
+
+    public void info(String message, Object... vars) {
+        logger.info(message, vars);
+    }
+
+    public void error(String errorMessage) {
+        logger.info(errorMessage);
+    }
+
+    public void error(String errorMessage, Throwable e) {
+        logger.error(errorMessage, e);
+    }
+
+    public void error(String errorMessage, Object... vars) {
+        logger.error(errorMessage, vars);
+    }
+
+    public void debug(String message, Object... vars) {
+        logger.debug(message, vars);
+    }
+
+    public void warn(String message, Object... vars) {
+        logger.warn(message, vars);
     }
 }

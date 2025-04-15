@@ -149,6 +149,13 @@ function RunTestSuites({ testRun, setTestRun, apiCollectionName, activeFromTesti
         setTestSuiteIds([])
         setTestNameSuiteModal(apiCollectionName)
     }
+  
+    function checkifSelected(data) {
+        if(checkedSelected(data) === true) {
+            return `${countTestSuitesTests(data)} tests selected`
+        }
+        return `${countTestSuitesTests(data)} tests`;
+    }
 
     return (
         <Scrollable vertical={true} horizontal={false} shadow={false}>

@@ -23,7 +23,9 @@ import com.mongodb.client.model.Updates;
 
 
 public class LoginRecorderAction extends UserAction {
-    
+
+    private static final LoggerMaker loggerMaker = new LoggerMaker(LoginRecorderAction.class, LogDb.DASHBOARD);;
+
     private String content;
 
     private String tokenFetchCommand;
@@ -34,7 +36,6 @@ public class LoginRecorderAction extends UserAction {
 
     private Boolean tokenFetchInProgress;
 
-    private static final LoggerMaker loggerMaker = new LoggerMaker(LoginRecorderAction.class);
 
     private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
 

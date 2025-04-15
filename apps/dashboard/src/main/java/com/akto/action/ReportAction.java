@@ -41,7 +41,7 @@ public class ReportAction extends UserAction {
     private String status;
     private boolean firstPollRequest;
 
-    private static final LoggerMaker loggerMaker = new LoggerMaker(ReportAction.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(ReportAction.class, LogDb.DASHBOARD);
 
     public String downloadReportPDF() {
         if(reportUrl == null || reportUrl.isEmpty()) {

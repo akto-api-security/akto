@@ -10,22 +10,20 @@ import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
 import com.akto.dto.type.URLStatic;
 import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Sorts;
-import org.bson.conversions.Bson;
-import org.bson.types.ObjectId;
-
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-
-import static com.akto.action.observe.Utils.fetchHostSTI;
+import org.bson.conversions.Bson;
+import org.bson.types.ObjectId;
 
 public class FixMultiSTIs {
 
-    private static final LoggerMaker loggerMaker = new LoggerMaker(InventoryAction.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(InventoryAction.class, LogDb.DASHBOARD);;
 
     public static void run(Set<Integer> whiteList) {
         List<ApiCollection> apiCollectionList = ApiCollectionsDao.instance.getMetaAll();

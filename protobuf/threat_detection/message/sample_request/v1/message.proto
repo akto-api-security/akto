@@ -5,6 +5,10 @@ package threat_detection.message.sample_request.v1;
 option java_outer_classname = "SampleRequestProto";
 option java_package = "threat_detection.message.sample_request.v1";
 
+message Metadata {
+  string country_code = 1;
+}
+
 message SampleMaliciousRequest {
   string ip = 1;
   int64 timestamp = 2;
@@ -13,6 +17,7 @@ message SampleMaliciousRequest {
   int32 api_collection_id = 5;
   string payload = 6;
   string filter_id = 7;
+  Metadata metadata = 8; 
 }
 
 message SampleRequestKafkaEnvelope {

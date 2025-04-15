@@ -266,6 +266,12 @@ public class ConfigParser {
         
         }
 
+        if (isIpProperty(concernedProperty) && !isIpOperand(curNode.getOperand())) {
+            configParserValidationResult.setIsValid(false);
+            configParserValidationResult.setErrMsg("IP properties can only be used with CIDR operands");
+            return configParserValidationResult;
+        }
+
 
         return configParserValidationResult;
 }

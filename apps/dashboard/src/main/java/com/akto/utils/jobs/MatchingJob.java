@@ -43,7 +43,7 @@ public class MatchingJob {
 
     static final int LIMIT = 10_000;
     private static final LoggerMaker loggerMaker = new LoggerMaker(MatchingJob.class, LogDb.THREAT_DETECTION);
-    private static final Logger logger = LoggerFactory.getLogger(MatchingJob.class);
+    private static final LoggerMaker logger = new LoggerMaker(MatchingJob.class);
 
     final static ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
 

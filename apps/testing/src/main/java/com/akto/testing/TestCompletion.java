@@ -1,13 +1,5 @@
 package com.akto.testing;
 
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-
-import org.bson.conversions.Bson;
-import org.bson.types.ObjectId;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import com.akto.billing.UsageMetricUtils;
 import com.akto.crons.GetRunningTestsStatus;
 import com.akto.dao.billing.OrganizationsDao;
@@ -18,14 +10,20 @@ import com.akto.dto.billing.Organization;
 import com.akto.dto.billing.SyncLimit;
 import com.akto.dto.testing.TestingRun;
 import com.akto.dto.usage.MetricTypes;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.usage.UsageMetricHandler;
 import com.mongodb.WriteConcern;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import org.bson.conversions.Bson;
+import org.bson.types.ObjectId;
 
 public class TestCompletion {
 
-    private static final Logger logger = LoggerFactory.getLogger(TestCompletion.class);
+    private static final LoggerMaker logger = new LoggerMaker(TestCompletion.class, LogDb.TESTING);
     public static final ScheduledExecutorService testTelemetryScheduler = Executors.newScheduledThreadPool(2);
 
     public void markTestAsCompleteAndRunFunctions(TestingRun testingRun, ObjectId summaryId){

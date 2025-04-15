@@ -108,6 +108,10 @@ function getTotalSeverityTestRunResult(severity) {
 }
 
 function getRuntime(scheduleTimestamp, endTimestamp, state) {
+  scheduleTimestamp = func.convertEpochToTimezoneEpoch(scheduleTimestamp)
+  if(endTimestamp) {
+    endTimestamp = func.convertEpochToTimezoneEpoch(endTimestamp)
+  }
   let status = getStatus(state);
   if (status === 'RUNNING') {
     return <div data-testid="test_run_status">Currently running</div>;
@@ -165,6 +169,23 @@ function getCweLink(item) {
 
 function getCveLink(item) {
   return `https://nvd.nist.gov/vuln/detail/${item}`
+}
+
+function getScanFrequency(periodInSeconds) {
+  if (periodInSeconds === -1) {
+    return "Continuous"
+  }
+  else if (periodInSeconds === 0) {
+    return "Once"
+  } else if (periodInSeconds <= 86400) {
+    return "Daily"
+  } else if (periodInSeconds <= 604800) {
+    return "Weekly"
+  } else if (periodInSeconds <= 2678400) {
+    return "Monthly"
+  } else {
+    return "-"
+  }
 }
 
 const transform = {
@@ -292,6 +313,7 @@ const transform = {
       obj['metadata'] = func.flattenObject(testingRunResultSummary?.metadata)
       obj['apiCollectionId'] = apiCollectionId
       obj['userEmail'] = data.userEmail
+      obj['scan_frequency'] = getScanFrequency(data.periodInSeconds)
       obj['total_apis'] = testingRunResultSummary.totalApis
       if(prettified){
         
@@ -940,7 +962,7 @@ getTestingRunResultUrl(testingResult){
   return methodObj.method + " " + truncatedUrl
   
 },
-getRowInfo(severity, apiInfo,jiraIssueUrl, sensitiveData, isIgnored){
+getRowInfo(severity, apiInfo,jiraIssueUrl, sensitiveData, isIgnored, azureBoardsWorkItemUrl){
   let auth_type = apiInfo["allAuthTypesFound"].join(", ")
   let access_type = null
   let access_types = apiInfo["apiAccessTypes"]
@@ -972,6 +994,22 @@ getRowInfo(severity, apiInfo,jiraIssueUrl, sensitiveData, isIgnored){
             </Link>
           </HorizontalStack>
         </Tag>
+    </Box>
+  ) : null
+
+      
+  const azureBoardsComp = azureBoardsWorkItemUrl?.length > 0 ? (
+    <Box>
+      <Tag>
+        <HorizontalStack gap={1}>
+          <Avatar size="extraSmall" shape='round' source="/public/azure-boards.svg" />
+          <Link url={azureBoardsWorkItemUrl}>
+            <Text>
+              {azureBoardsWorkItemUrl?.split("/")?.[azureBoardsWorkItemUrl?.split("/")?.length - 1]}
+            </Text>
+          </Link>
+        </HorizontalStack>
+      </Tag>
     </Box>
   ) : null
 
@@ -1020,6 +1058,11 @@ getRowInfo(severity, apiInfo,jiraIssueUrl, sensitiveData, isIgnored){
       title: "Jira",
       value: jiraComponent,
       tooltipContent:"Jira ticket number attached to the testing run issue"
+    },
+    {
+      title: "Azure Boards",
+      value: azureBoardsComp,
+      tooltipContent: "Azure boards work item number attached to the testing run issue"
     }
   ]
   return rowItems
@@ -1173,6 +1216,7 @@ getMissingConfigs(testResults){
         })
       })
     }
+    
     return {
       configsAdvancedSettings:settings,
       testRoleId: testRun.testRoleId,
@@ -1185,7 +1229,7 @@ getMissingConfigs(testResults){
       sendMsTeamsAlert:testRun.sendMsTeamsAlert,
       recurringDaily: testRun.recurringDaily,
       continuousTesting: testRun.continuousTesting,
-      scheduleTimestamp: testRun.startTimestamp,
+      scheduleTimestamp: testRun?.hourlyLabel === 'Now' && ((testRun.startTimestamp - func.getStartOfTodayEpoch()) < 86400) ? 0 : testRun.startTimestamp,
       recurringWeekly: testRun.recurringWeekly,
       recurringMonthly: testRun.recurringMonthly,
       testSuiteIds:testMode? [] : testSuiteIds,

@@ -2,7 +2,7 @@ import { Modal, Text, VerticalStack } from '@shopify/polaris'
 import React, { useState } from 'react'
 import DropdownSearch from './DropdownSearch'
 
-const JiraTicketCreationModal = ({ activator, modalActive, setModalActive, handleSaveAction, jiraProjectMaps, setProjId, setIssueType, projId, issueType, issueId }) => {
+const JiraTicketCreationModal = ({ activator, modalActive, setModalActive, handleSaveAction, jiraProjectMaps, setProjId, setIssueType, projId, issueType, issueId, isAzureModal }) => {
     const [isCreatingTicket, setIsCreatingTicket] = useState(false)
 
     const getValueFromIssueType = (projId, issueId) => {
@@ -21,13 +21,14 @@ const JiraTicketCreationModal = ({ activator, modalActive, setModalActive, handl
             open={modalActive}
             onClose={() => setModalActive(false)}
             size="small"
-            title={<Text variant="headingMd">Configure jira ticket details</Text>}
+            title={<Text variant="headingMd">{isAzureModal ? "Configure Azure Boards Work Item" : "Configure jira ticket details"}</Text>}
             primaryAction={{
-                content: 'Create ticket',
+                content: (isAzureModal ? 'Create work item' : 'Create ticket'),
                 onAction: () => {
                     setIsCreatingTicket(true)
                     handleSaveAction(issueId)
                     setIsCreatingTicket(false)
+                    setModalActive(false)
                 },
                 disabled: (!projId || !issueType || isCreatingTicket)
             }}
@@ -36,7 +37,7 @@ const JiraTicketCreationModal = ({ activator, modalActive, setModalActive, handl
                 <VerticalStack gap={"3"}>
                     <DropdownSearch
                         disabled={jiraProjectMaps === undefined || Object.keys(jiraProjectMaps).length === 0}
-                        placeholder="Select JIRA project"
+                        placeholder={isAzureModal ? "Select Azure Boards project" : "Select JIRA project"}
                         optionsList={jiraProjectMaps ? Object.keys(jiraProjectMaps).map((x) => {return{label: x, value: x}}): []}
                         setSelected={setProjId}
                         preSelected={projId}
@@ -44,12 +45,20 @@ const JiraTicketCreationModal = ({ activator, modalActive, setModalActive, handl
                     />
 
                     <DropdownSearch
-                        disabled={Object.keys(jiraProjectMaps).length === 0 || projId.length === 0}
-                        placeholder="Select JIRA issue type"
-                        optionsList={jiraProjectMaps[projId] && jiraProjectMaps[projId].length > 0 ? jiraProjectMaps[projId].map((x) => {return{label: x.issueType, value: x.issueId}}) : []}
+                        disabled={jiraProjectMaps == undefined || Object.keys(jiraProjectMaps).length === 0}
+                        placeholder={isAzureModal ? "Select work item type" : "Select JIRA issue type"}
+                        optionsList={jiraProjectMaps[projId] && jiraProjectMaps[projId].length > 0 ? jiraProjectMaps[projId].map(
+                            (x) => {
+                                if(isAzureModal){
+                                    return {label: x, value: x}
+                                } else {
+                                    return {label: x.issueType, value: x.issueId}
+                                }
+                            }
+                        ) : []}
                         setSelected={setIssueType}
                         preSelected={issueType}
-                        value={getValueFromIssueType(projId, issueType)}
+                        value={isAzureModal ? issueType : getValueFromIssueType(projId, issueType)}
                     />  
                 </VerticalStack>
             </Modal.Section>

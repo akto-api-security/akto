@@ -1,22 +1,19 @@
 package com.akto.listener;
 
-import javax.servlet.ServletContextEvent;
-import javax.servlet.ServletContextListener;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import com.akto.dao.context.Context;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.utils.jobs.JobUtils;
-
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import javax.servlet.ServletContextEvent;
+import javax.servlet.ServletContextListener;
 
 public abstract class AfterMongoConnectListener implements ServletContextListener {
 
     private boolean ranOnce = false;
-    private static final Logger logger = LoggerFactory.getLogger(AfterMongoConnectListener.class);
+    private static final LoggerMaker logger = new LoggerMaker(AfterMongoConnectListener.class, LogDb.DASHBOARD);
 
     private final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
 
