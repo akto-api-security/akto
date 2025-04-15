@@ -193,6 +193,8 @@ function ApiEndpoints(props) {
     const selectedMethod = queryParams.get('selected_method')
     const [isEditing, setIsEditing] = useState(false);
     const [editableTitle, setEditableTitle] = useState(pageTitle);
+    const [description, setDescription] = useState("");
+    const [showDescriptionModal, setShowDescriptionModal] = useState(false);
 
 
     // the values used here are defined at the server.
@@ -411,7 +413,23 @@ function ApiEndpoints(props) {
             checkGptActive()
         }
         fetchData()
+        fetchDescription()
     }, [apiCollectionId, endpointListFromConditions])
+
+    const fetchDescription = async () => {
+        try {
+            const resp = await api.getCollectionDescription(apiCollectionId);
+            if (resp?.error) {
+                console.error("Failed to fetch description:", resp.error);
+                return;
+            }
+            if (resp?.description) {
+                setDescription(resp.description);
+            }
+        } catch (error) {
+            console.error("Failed to fetch description:", error);
+        }
+    };
 
     useEffect(() => {
         if (pageTitle !== collectionsMap[apiCollectionId]) { 
@@ -1045,6 +1063,26 @@ function ApiEndpoints(props) {
         }
       }
 
+    const handleSaveDescription = () => {
+        // Check for special characters
+        const specialChars = /[!@#$%^&*()\-_=+\[\]{}\\|;:'",.<>/?~]/;
+        if (specialChars.test(description)) {
+            func.setToast(true, true, "Description contains special characters that are not allowed.");
+            return;
+        }
+        
+        setShowDescriptionModal(false);
+        api.saveCollectionDescription(apiCollectionId, description)
+            .then(() => {
+                func.setToast(true, false, "Description saved successfully");
+                fetchDescription();
+            })
+            .catch((err) => {
+                console.error("Failed to save description:", err);
+                func.setToast(true, true, "Failed to save description. Please try again.");
+            });
+    };
+
     return (
         <div>
             {isQueryPage ? (
@@ -1071,14 +1109,65 @@ function ApiEndpoints(props) {
                         ) : (
                             <div style={{ cursor: isApiGroup ? 'pointer' : 'default' }} onClick={isApiGroup ?  () => {setIsEditing(true);} : undefined}>
                                 <Box maxWidth="35vw">
-                                    <TooltipText tooltip={pageTitle} text={pageTitle} textProps={{ variant: 'headingLg' }} />
+                                    <VerticalStack gap={2}>
+                                        <TooltipText tooltip={pageTitle} text={pageTitle} textProps={{ variant: 'headingLg' }} />
+                                        <HorizontalStack gap={2}>
+                                            {!description && (
+                                                <Button plain onClick={() => setShowDescriptionModal(true)}>
+                                                    Add description
+                                                </Button>
+                                            )}
+                                            {description && (
+                                                <Button plain onClick={() => setShowDescriptionModal(true)}>
+                                                    <Text as="span" variant="bodyMd" color="subdued" alignment="start">
+                                                        {description}
+                                                    </Text>
+                                                </Button>
+                                            )}
+                                        </HorizontalStack>
+                                    </VerticalStack>
                                 </Box>
                             </div>
                         )
                     }
                     backUrl="/dashboard/observe/inventory"
                     secondaryActions={secondaryActionsComponent}
-                    components={components}
+                    components={[
+                        <Modal
+                            key="description-modal"
+                            open={showDescriptionModal}
+                            onClose={() => setShowDescriptionModal(false)}
+                            title="Collection Description"
+                            primaryAction={{
+                                content: 'Save',
+                                onAction: handleSaveDescription
+                            }}
+                            secondaryActions={[
+                                {
+                                    content: 'Cancel',
+                                    onAction: () => setShowDescriptionModal(false)
+                                }
+                            ]}
+                        >
+                            <Modal.Section>
+                                <TextField
+                                    label="Description"
+                                    value={description}
+                                    onChange={(value) => {
+                                        // Remove all special characters from the input
+                                        const filteredValue = value.replace(/[!@#$%^&*()\-_=+\[\]{}\\|;:'",.<>/?~]/g, '');
+                                        setDescription(filteredValue);
+                                    }}
+                                    multiline={4}
+                                    autoComplete="off"
+                                    maxLength={64}
+                                    placeholder="Add a brief description for this collection"
+                                    helpText={`${description.length}/64 characters`}
+                                />
+                            </Modal.Section>
+                        </Modal>,
+                        ...components
+                    ]}
                 />
             )}
         </div>
