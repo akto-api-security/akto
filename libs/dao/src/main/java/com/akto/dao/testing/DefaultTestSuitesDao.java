@@ -1,6 +1,5 @@
 package com.akto.dao.testing;
 
-import com.akto.DaoInit;
 import com.akto.dao.CommonContextDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.YamlTemplateDao;
@@ -8,7 +7,6 @@ import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.testing.DefaultTestSuites;
 import com.akto.util.Constants;
 import com.akto.util.enums.GlobalEnums;
-import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 
@@ -19,16 +17,6 @@ import static com.akto.dto.testing.DefaultTestSuites.owaspTop10List;
 public class DefaultTestSuitesDao extends CommonContextDao<DefaultTestSuites> {
 
     public static final DefaultTestSuitesDao instance = new DefaultTestSuitesDao();
-
-    public static void main(String[] args) {
-        Context.accountId.set(1000000);
-        DaoInit.init(new ConnectionString("mongodb://localhost:27017/admini"));
-
-        long documentCount = DefaultTestSuitesDao.instance.estimatedDocumentCount();
-        if(documentCount == 0) {
-            insertDefaultTestSuites();
-        }
-    }
 
     public static Map<String, Map<String, List<String>>> getDefaultTestSuitesMap() {
         return getDefaultTestSuitesMap(null);
