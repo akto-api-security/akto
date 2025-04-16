@@ -9,14 +9,18 @@ public class DashboardThreatApi {
   private int actorsCount;
   private int requestsCount;
   private long discoveredAt;
+  private String severity;
+  private String subCategory;
 
   public DashboardThreatApi(
-      String api, URLMethods.Method method, int actorsCount, int requestsCount, long discoveredAt) {
+      String api, URLMethods.Method method, int actorsCount, int requestsCount, long discoveredAt, String severity, String subCategory) {
     this.api = api;
     this.method = method;
     this.actorsCount = actorsCount;
     this.requestsCount = requestsCount;
     this.discoveredAt = discoveredAt;
+    this.severity = severity;
+    this.subCategory = subCategory;
   }
 
   public String getApi() {
@@ -58,4 +62,21 @@ public class DashboardThreatApi {
   public void setDiscoveredAt(long discoveredAt) {
     this.discoveredAt = discoveredAt;
   }
+
+  public String getSeverity() {
+    return severity;
+  }
+
+  public void setSeverity(String severity) {
+    this.severity = severity;
+  }
+
+  public String getSubCategory() {
+    return subCategory;
+  }
+
+  public void setSubCategory(String subCategory) {
+    this.subCategory = subCategory;
+  }
+
 }
