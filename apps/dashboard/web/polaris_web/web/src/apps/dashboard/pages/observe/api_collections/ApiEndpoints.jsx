@@ -1110,27 +1110,27 @@ function ApiEndpoints(props) {
                                 </div>
                             </Box>
                         ) : (
-                            <div style={{ cursor: isApiGroup ? 'pointer' : 'default' }} onClick={isApiGroup ?  () => {setIsEditing(true);} : undefined}>
-                                <Box maxWidth="35vw">
-                                    <VerticalStack gap={2}>
+                            <Box maxWidth="35vw">
+                                <VerticalStack gap={2}>
+                                    <div style={{ cursor: isApiGroup ? 'pointer' : 'default' }} onClick={isApiGroup ?  () => {setIsEditing(true);} : undefined}>
                                         <TooltipText tooltip={pageTitle} text={pageTitle} textProps={{ variant: 'headingLg' }} />
-                                        <HorizontalStack gap={2}>
-                                            {!description && (
-                                                <Button plain onClick={() => setShowDescriptionModal(true)}>
-                                                    Add description
-                                                </Button>
-                                            )}
-                                            {description && (
-                                                <Button plain onClick={() => setShowDescriptionModal(true)}>
-                                                    <Text as="span" variant="bodyMd" color="subdued" alignment="start">
-                                                        {description}
-                                                    </Text>
-                                                </Button>
-                                            )}
-                                        </HorizontalStack>
-                                    </VerticalStack>
-                                </Box>
-                            </div>
+                                    </div>
+                                    <HorizontalStack gap={2}>
+                                        {!description && (
+                                            <Button plain onClick={() => setShowDescriptionModal(true)}>
+                                                Add description
+                                            </Button>
+                                        )}
+                                        {description && (
+                                            <Button plain onClick={() => setShowDescriptionModal(true)}>
+                                                <Text as="span" variant="bodyMd" color="subdued" alignment="start">
+                                                    {description}
+                                                </Text>
+                                            </Button>
+                                        )}
+                                    </HorizontalStack>
+                                </VerticalStack>
+                            </Box>
                         )
                     }
                     backUrl="/dashboard/observe/inventory"
