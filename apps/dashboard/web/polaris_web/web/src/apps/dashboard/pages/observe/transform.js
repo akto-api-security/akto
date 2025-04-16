@@ -117,10 +117,6 @@ const apiDetailsHeaders = [
         text: 'Non-Sensitive Params',
         value: 'nonSensitiveTags',
         itemOrder: 4,
-    },
-    {
-        text: 'Endpoint Description',
-        value: 'endpointDescription',
     }
 ]
 

@@ -135,6 +135,12 @@ const headers = [
         value: 'discovered',
         isText: CellType.TEXT,
         sortActive: true,
+    },
+    {
+        title: <HeadingWithTooltip content={<Text variant="bodySm">Description of the collection</Text>} title="Description" />,
+        text: 'Description',
+        value: 'descriptionComp',
+        textValue: 'description',
     }
 ];
 
@@ -189,6 +195,7 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
             detectedTimestamp: c.urlsCount === 0 ? 0 : (trafficInfoMap[c.id] || 0),
             riskScore: c.urlsCount === 0 ? 0 : (riskScoreMap[c.id] ? riskScoreMap[c.id] : 0),
             discovered: func.prettifyEpoch(c.startTs || 0),
+            descriptionComp: (<Box maxWidth="300px"><TooltipText tooltip={c.description} text={c.description}/></Box>),
         }
     })
 

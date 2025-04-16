@@ -106,6 +106,13 @@ const headings = [
         title: "Collection",
         showFilter: true,
         filterKey: "apiCollectionName",
+    },
+    {
+        text: "Description",
+        value: "descriptionComp",
+        textValue: "description",
+        title: "Description",
+        tooltipContent: "Description of the API",
     }
 ]
 
@@ -338,7 +345,8 @@ function ApiEndpoints(props) {
                     parameterisedEndpoint: method + " " + endpoint,
                     apiCollectionName: collectionsMap[apiCollectionId],
                     last_seen: func.prettifyEpoch(lastSeenTs),
-                    added: func.prettifyEpoch(discoveredTs)
+                    added: func.prettifyEpoch(discoveredTs),
+                    descriptionComp: (<Box maxWidth="300px"><TooltipText tooltip={codeAnalysisApi.description} text={codeAnalysisApi.description}/></Box>),
                 }
             })
         }
