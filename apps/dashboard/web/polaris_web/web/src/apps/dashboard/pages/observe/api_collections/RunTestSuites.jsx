@@ -69,24 +69,42 @@ function RunTestSuites({ testRun, setTestRun, apiCollectionName, activeFromTesti
 
         // Fetch Custom Test Suite
         const fetchedTestSuite = await testingApi.fetchAllTestSuites();
-        const fetchedData = fetchedTestSuite.map((testSuiteItem) => {
+        const testSuitesFromBackend = fetchedTestSuite == null ? [] : [...fetchedTestSuite.defaultTestSuites]
+
+        const newOwaspTop10TestSuites = testSuitesFromBackend?.filter(testSuiteItem => testSuiteItem.suiteType === "OWASP").map((testSuiteItem) => {
+            idsNameMap[testSuiteItem.hexId] = testSuiteItem.name;
+            return { name: testSuiteItem.name, tests: testSuiteItem.subCategoryList, id: testSuiteItem.hexId }
+        })
+
+        const newTestingMethodsTestSuites = testSuitesFromBackend?.filter(testSuiteItem => testSuiteItem.suiteType === "TESTING_METHODS").map((testSuiteItem) => {
+            idsNameMap[testSuiteItem.hexId] = testSuiteItem.name;
+            return { name: testSuiteItem.name, tests: testSuiteItem.subCategoryList, id: testSuiteItem.hexId }
+        })
+
+        const severityOrder = {"Critical": 0,"High": 1,"Medium": 2,"Low": 3}
+        const severityTestSuites = testSuitesFromBackend?.filter(testSuiteItem => testSuiteItem.suiteType === "SEVERITY").sort((a, b) => severityOrder[a.name] - severityOrder[b.name]).map((testSuiteItem) => {
+            idsNameMap[testSuiteItem.hexId] = testSuiteItem.name;
+            return { name: testSuiteItem.name, tests: testSuiteItem.subCategoryList, id: testSuiteItem.hexId }
+        })
+
+        const fetchedData = fetchedTestSuite?.testSuiteList?.map((testSuiteItem) => {
             idsNameMap[testSuiteItem.hexId] = testSuiteItem.name;
             return { name: testSuiteItem.name, tests: testSuiteItem.subCategoryList, id: testSuiteItem.hexId }
 
         });
         setData(prev => {
             if (
-                // !func.deepArrayComparison(prev?.owaspTop10List?.testSuite||[],newOwaspTop10TestSuites) ||
-                // !func.deepArrayComparison(prev?.testingMethods?.testSuite||[], newTestingMethodsTestSuites) ||
-                !func.deepArrayComparison(prev?.custom?.testSuite||[], fetchedData)
-                // !func.deepArrayComparison(prev?.severity?.testSuite||[], severityTestSuites)
+                !func.deepArrayComparison(prev?.owaspTop10List?.testSuite||[],newOwaspTop10TestSuites) ||
+                !func.deepArrayComparison(prev?.testingMethods?.testSuite||[], newTestingMethodsTestSuites) ||
+                !func.deepArrayComparison(prev?.custom?.testSuite||[], fetchedData) ||
+                !func.deepArrayComparison(prev?.severity?.testSuite||[], severityTestSuites)
             ) {
                 return {
-                    // ...prev,
-                    // owaspTop10List: { rowName: "OWASP top 10", testSuite: newOwaspTop10TestSuites },
-                    // testingMethods: { rowName: "Testing Methods", testSuite: newTestingMethodsTestSuites },
+                    ...prev,
+                    owaspTop10List: { rowName: "OWASP top 10", testSuite: newOwaspTop10TestSuites },
+                    testingMethods: { rowName: "Testing Methods", testSuite: newTestingMethodsTestSuites },
                     custom: { rowName: "Custom", testSuite: fetchedData },
-                    // severity: { rowName: "Severity", testSuite: severityTestSuites }
+                    severity: { rowName: "Severity", testSuite: severityTestSuites }
                 };
             }
             return prev;
