@@ -345,7 +345,7 @@ public abstract class TestPlugin {
     private static ValidationResult validate(FilterNode node, RawApi rawApi, RawApi testRawApi, ApiInfoKey apiInfoKey, String context, Map<String, Object> varMap, String logId) {
         Filter filter = new Filter();
         DataOperandsFilterResponse dataOperandsFilterResponse = filter.isEndpointValid(node, rawApi, testRawApi, apiInfoKey, null, null , false,context, varMap, logId, false);
-        return new ValidationResult(dataOperandsFilterResponse.getResult(), dataOperandsFilterResponse.getValidationReason());
+        return ValidationResult.getInstance().resetValues(dataOperandsFilterResponse.getResult(), dataOperandsFilterResponse.getValidationReason());
     }
 
     public static class ApiExecutionDetails {

@@ -40,4 +40,11 @@ public class DataOperandFilterRequest {
         this.operand = operand;
     }
 
+    public DataOperandFilterRequest modify(Object data, Object queryset, String operand) {
+        this.data = data;
+        this.queryset = queryset;
+        this.operand = operand;
+        return this;
+    }
+
 }

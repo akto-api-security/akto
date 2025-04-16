@@ -9,5 +9,5 @@ public class NotContainsIpFilter extends NotContainsFilter {
         
         IpAddressMatcher ipAddressMatcher = new IpAddressMatcher(query);
         return !ipAddressMatcher.matches(data);
-        }
+    }
 }

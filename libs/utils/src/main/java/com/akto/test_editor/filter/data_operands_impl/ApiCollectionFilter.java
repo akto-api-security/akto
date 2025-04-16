@@ -26,7 +26,7 @@ public class ApiCollectionFilter extends DataOperandsImpl {
             querySet = (List<String>) dataOperandFilterRequest.getQueryset();
             data = (String) dataOperandFilterRequest.getData();
         } catch(Exception e) {
-            return new ValidationResult(result, ValidationResult.GET_QUERYSET_CATCH_ERROR);
+            return ValidationResult.getInstance().resetValues(result, ValidationResult.GET_QUERYSET_CATCH_ERROR);
         }
 
         Bson fQuery = Filters.or(
@@ -57,8 +57,8 @@ public class ApiCollectionFilter extends DataOperandsImpl {
 
         result = ApiInfoDao.instance.findOne(urlInCollectionQuery) != null;
         if (result) {
-            return new ValidationResult(result, "");
+            return ValidationResult.getInstance().resetValues(result, "");
         }
-        return new ValidationResult(result, "Could not find given urls: "+ data +", in list of API collections");
+        return ValidationResult.getInstance().resetValues(result, "Could not find given urls: "+ data +", in list of API collections");
     }
 }

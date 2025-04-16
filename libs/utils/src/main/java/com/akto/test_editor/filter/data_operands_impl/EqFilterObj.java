@@ -10,21 +10,23 @@ import com.akto.dto.test_editor.DataOperandFilterRequest;
 
 public class EqFilterObj extends DataOperandsImpl {
     
+    private static Object querySet;
+
     @Override
     public ValidationResult isValid(DataOperandFilterRequest dataOperandFilterRequest) {
 
         try {
-            Object data = dataOperandFilterRequest.getData();
-            Object querySet = dataOperandFilterRequest.getQueryset();
+            data = dataOperandFilterRequest.getData();
+            querySet = dataOperandFilterRequest.getQueryset();
             List<String> queryList = (List) querySet;
             if (queryList == null || queryList.size() == 0) {
-                return new ValidationResult(false, TestEditorEnums.DataOperands.EQ_OBJ.name().toLowerCase() + " validation failed because of empty query");
+                return ValidationResult.getInstance().resetValues(false, TestEditorEnums.DataOperands.EQ_OBJ.name().toLowerCase() + " validation failed because of empty query");
             }
             Double matchVal = compareWithOriginalResponse(data.toString(), queryList.get(0), new HashMap<>());
             boolean res = (matchVal == 100.0);
-            return new ValidationResult(res, TestEditorEnums.DataOperands.EQ.name().toLowerCase() + " validation passed ");            
+            return ValidationResult.getInstance().resetValues(res, TestEditorEnums.DataOperands.EQ.name().toLowerCase() + " validation passed ");            
         } catch (Exception e) {
-            return new ValidationResult(false, TestEditorEnums.DataOperands.EQ_OBJ.name().toLowerCase() + " validation failed because of error " + e.getMessage());
+            return ValidationResult.getInstance().resetValues(false, TestEditorEnums.DataOperands.EQ_OBJ.name().toLowerCase() + " validation failed because of error " + e.getMessage());
         }
 
     }

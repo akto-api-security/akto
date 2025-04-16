@@ -9,13 +9,17 @@ import com.akto.dto.test_editor.DataOperandFilterRequest;
 
 public class ContainsEitherFilter extends DataOperandsImpl {
     
+    private static List<String> querySet = new ArrayList<>();
+    private static List<String> notMatchedQuerySet = new ArrayList<>();
+    private static Boolean result = false;
+    private static Boolean res;
+
     @Override
     public ValidationResult isValid(DataOperandFilterRequest dataOperandFilterRequest) {
         
-        Boolean result = false;
-        Boolean res;
-        List<String> querySet = new ArrayList<>();
-        List<String> notMatchedQuerySet = new ArrayList<>();
+        result = false;
+        querySet.clear();
+        notMatchedQuerySet.clear();
         String data;
         try {
             Object querysetObj = dataOperandFilterRequest.getQueryset();
@@ -23,12 +27,10 @@ public class ContainsEitherFilter extends DataOperandsImpl {
                 querySet = ((List<?>) querysetObj).stream()
                         .map(String::valueOf)
                         .collect(Collectors.toList());
-            } else {
-                querySet = new ArrayList<>();
             }
             data = (String) dataOperandFilterRequest.getData();
         } catch(Exception e) {
-            return new ValidationResult(false, ValidationResult.GET_QUERYSET_CATCH_ERROR);
+            return ValidationResult.getInstance().resetValues(false, ValidationResult.GET_QUERYSET_CATCH_ERROR);
         }
         for (String queryString: querySet) {
             try {
@@ -42,9 +44,9 @@ public class ContainsEitherFilter extends DataOperandsImpl {
             result = result || res;
         }
         if (result) {
-            return new ValidationResult(result, "");
+            return ValidationResult.getInstance().resetValues(result, "");
         }
-        return new ValidationResult(result, TestEditorEnums.DataOperands.CONTAINS_EITHER.name().toLowerCase() + " failed due to '"+data+"' not matching with :" + notMatchedQuerySet);
+        return ValidationResult.getInstance().resetValues(result, TestEditorEnums.DataOperands.CONTAINS_EITHER.name().toLowerCase() + " failed due to '"+data+"' not matching with :" + notMatchedQuerySet);
     }
 
     public Boolean evaluateOnListQuerySet(String data, List<String> querySet) {

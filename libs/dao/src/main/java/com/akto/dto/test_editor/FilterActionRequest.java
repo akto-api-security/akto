@@ -42,6 +42,26 @@ public class FilterActionRequest {
         this.collectionProperty = collectionProperty;
     }
 
+    public FilterActionRequest modify(Object querySet, RawApi rawApi, RawApi testRunRawApi, ApiInfo.ApiInfoKey apiInfoKey,
+            String concernedProperty, String concernedSubProperty, List<String> matchingKeySet, List<BasicDBObject> contextEntities,
+            String operand, String context, Boolean keyValOperandSeen, String bodyOperand, String contextProperty, String collectionProperty) {
+        this.querySet = querySet;
+        this.rawApi = rawApi;
+        this.testRunRawApi = testRunRawApi;
+        this.apiInfoKey = apiInfoKey;
+        this.concernedProperty = concernedProperty;
+        this.concernedSubProperty = concernedSubProperty;
+        this.matchingKeySet = matchingKeySet;
+        this.contextEntities = contextEntities;
+        this.operand = operand;
+        this.context = context;
+        this.keyValOperandSeen = keyValOperandSeen;
+        this.bodyOperand = bodyOperand;
+        this.contextProperty = contextProperty;
+        this.collectionProperty = collectionProperty;
+        return this;
+    }
+
     public FilterActionRequest() { }
 
     public Object getQuerySet() {

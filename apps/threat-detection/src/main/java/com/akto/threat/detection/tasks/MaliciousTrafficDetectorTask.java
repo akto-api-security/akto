@@ -68,6 +68,7 @@ public class MaliciousTrafficDetectorTask implements Task {
 
   private static final DataActor dataActor = DataActorFactory.fetchInstance();
   private static final LoggerMaker logger = new LoggerMaker(MaliciousTrafficDetectorTask.class);
+  Map<String, Object> varMap = new HashMap<>();
 
   private static final ObjectMapper objectMapper = new ObjectMapper();
   
@@ -147,16 +148,7 @@ public class MaliciousTrafficDetectorTask implements Task {
   private boolean validateFilterForRequest(
       FilterConfig apiFilter, RawApi rawApi, ApiInfo.ApiInfoKey apiInfoKey, String message) {
     try {
-      Map<String, Object> varMap = apiFilter.resolveVarMap();
-      VariableResolver.resolveWordList(
-          varMap,
-          new HashMap<ApiInfo.ApiInfoKey, List<String>>() {
-            {
-              put(apiInfoKey, Collections.singletonList(message));
-            }
-          },
-          apiInfoKey);
-
+      varMap.clear();
       String filterExecutionLogId = UUID.randomUUID().toString();
       ValidationResult res =
           TestPlugin.validateFilter(

@@ -8,19 +8,24 @@ import com.akto.dto.test_editor.DataOperandFilterRequest;
 
 public class ContainsAllFilter extends DataOperandsImpl {
     
+    private static List<String> querySet = new ArrayList<>();
+    private static List<String> notMatchedQuerySet = new ArrayList<>();
+    private static Boolean result = true;
+    private static Boolean res;
+
     @Override
     public ValidationResult isValid(DataOperandFilterRequest dataOperandFilterRequest) {
 
-        Boolean result = true;
-        Boolean res;
-        List<String> querySet = new ArrayList<>();
-        List<String> notMatchedQuerySet = new ArrayList<>();
+        querySet.clear();
+        notMatchedQuerySet.clear();
+
+        result = true;
         String data;
         try {
             querySet = (List<String>) dataOperandFilterRequest.getQueryset();
             data = (String) dataOperandFilterRequest.getData();
         } catch(Exception e) {
-            return new ValidationResult(result, ValidationResult.GET_QUERYSET_CATCH_ERROR);
+            return ValidationResult.getInstance().resetValues(result, ValidationResult.GET_QUERYSET_CATCH_ERROR);
         }
         for (String queryString: querySet) {
             try {
@@ -35,9 +40,9 @@ public class ContainsAllFilter extends DataOperandsImpl {
             result = result && res;
         }
         if (result) {
-            return new ValidationResult(result, "");
+            return ValidationResult.getInstance().resetValues(result, "");
         }
-        return new ValidationResult(result, TestEditorEnums.DataOperands.CONTAINS_ALL.name().toLowerCase() + " failed due to '"+data+"' not matching with :" + notMatchedQuerySet);
+        return ValidationResult.getInstance().resetValues(result, TestEditorEnums.DataOperands.CONTAINS_ALL.name().toLowerCase() + " failed due to '"+data+"' not matching with :" + notMatchedQuerySet);
     }
 
     public Boolean evaluateOnListQuerySet(String data, List<String> querySet) {

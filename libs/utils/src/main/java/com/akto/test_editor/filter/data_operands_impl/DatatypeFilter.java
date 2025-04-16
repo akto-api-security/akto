@@ -12,24 +12,27 @@ import com.akto.dto.type.SingleTypeInfo;
 
 public class DatatypeFilter extends DataOperandsImpl {
 
+    private static Object querySet;
+    private static List<String> queryList;
+
     @Override
     public ValidationResult isValid(DataOperandFilterRequest dataOperandFilterRequest) {
-        Object data = dataOperandFilterRequest.getData();
-        Object querySet = dataOperandFilterRequest.getQueryset();        
+        data = dataOperandFilterRequest.getData();
+        querySet = dataOperandFilterRequest.getQueryset();        
         try {
-            List<String> queryList = (List) querySet;
+            queryList = (List) querySet;
             if (queryList == null || queryList.size() == 0) {
-                return new ValidationResult(false, TestEditorEnums.DataOperands.DATATYPE.name().toLowerCase() + " validation is passed without any query");
+                return ValidationResult.getInstance().resetValues(false, TestEditorEnums.DataOperands.DATATYPE.name().toLowerCase() + " validation is passed without any query");
             }
 
             if (data instanceof String && queryList.get(0).equalsIgnoreCase("string")) {
-                return new ValidationResult(true, TestEditorEnums.DataOperands.DATATYPE.name().toLowerCase() + ": string validation is passed because: "+ data + " is string type");
+                return ValidationResult.getInstance().resetValues(true, TestEditorEnums.DataOperands.DATATYPE.name().toLowerCase() + ": string validation is passed because: "+ data + " is string type");
             }
             if (data instanceof Integer && queryList.get(0).equalsIgnoreCase("number")) {
-                return new ValidationResult(true, TestEditorEnums.DataOperands.DATATYPE.name().toLowerCase() + ": number validation is passed because: "+ data + " is number type");
+                return ValidationResult.getInstance().resetValues(true, TestEditorEnums.DataOperands.DATATYPE.name().toLowerCase() + ": number validation is passed because: "+ data + " is number type");
             }
             if (data instanceof Boolean && queryList.get(0).equalsIgnoreCase("boolean")) {
-                return new ValidationResult(true, TestEditorEnums.DataOperands.DATATYPE.name().toLowerCase() + ": boolean validation is passed");
+                return ValidationResult.getInstance().resetValues(true, TestEditorEnums.DataOperands.DATATYPE.name().toLowerCase() + ": boolean validation is passed");
             }
 
             int accountId = Context.accountId.get();
@@ -58,8 +61,8 @@ public class DatatypeFilter extends DataOperandsImpl {
                         break;
                 }
                 if (isValid) {
-                    return new ValidationResult(true, TestEditorEnums.DataOperands.DATATYPE.name().toLowerCase() + ": "
-                            + dataType + " validation is passed");
+                    return ValidationResult.getInstance().resetValues(true, TestEditorEnums.DataOperands.DATATYPE.name().toLowerCase() + ": "
+                    + dataType + " validation is passed");
                 }
             }
 
@@ -70,14 +73,14 @@ public class DatatypeFilter extends DataOperandsImpl {
                 SingleTypeInfo.SubType subType = KeyTypes.findSubType(data, null, null, true);
                 isValid = subType.getName().equals(dataType);
                 if (isValid) {
-                    return new ValidationResult(true, TestEditorEnums.DataOperands.DATATYPE.name().toLowerCase() + ": "
-                            + dataType + " validation is passed");
+                    return ValidationResult.getInstance().resetValues(true, TestEditorEnums.DataOperands.DATATYPE.name().toLowerCase() + ": "
+                    + dataType + " validation is passed");
                 }
             }
 
-            return new ValidationResult(false, ValidationResult.GET_QUERYSET_CATCH_ERROR);
+            return ValidationResult.getInstance().resetValues(false, ValidationResult.GET_QUERYSET_CATCH_ERROR);
         } catch (Exception e) {
-            return new ValidationResult(false, ValidationResult.GET_QUERYSET_CATCH_ERROR);
+            return ValidationResult.getInstance().resetValues(false, ValidationResult.GET_QUERYSET_CATCH_ERROR);
         }
         
     }

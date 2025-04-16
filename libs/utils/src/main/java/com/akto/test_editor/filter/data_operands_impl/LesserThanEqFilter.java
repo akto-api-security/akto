@@ -6,21 +6,23 @@ import com.akto.test_editor.Utils;
 
 public class LesserThanEqFilter extends DataOperandsImpl {
     
+    private static Object querySet;
+
     @Override
     public ValidationResult isValid(DataOperandFilterRequest dataOperandFilterRequest) {
 
-        Boolean result = false;
-        Object data = dataOperandFilterRequest.getData();
-        Object querySet = dataOperandFilterRequest.getQueryset();
+        result = false;
+        data = dataOperandFilterRequest.getData();
+        querySet = dataOperandFilterRequest.getQueryset();
 
         result = Utils.applyIneqalityOperation(data, querySet, "lte");
-        String validationReson = null;
+        validationReson = null;
         if (result) {
             validationReson = TestEditorEnums.DataOperands.LTE.name().toLowerCase() + " filter passed";
         } else {
             validationReson = TestEditorEnums.DataOperands.LTE.name().toLowerCase() + " filter failed: ''"+ data +"' > '" + querySet +"'";
         }
 
-        return new ValidationResult(result, validationReson);
+        return ValidationResult.getInstance().resetValues(result, validationReson);
     }
 }
