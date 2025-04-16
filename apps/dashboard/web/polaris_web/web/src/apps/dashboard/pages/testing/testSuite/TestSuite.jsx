@@ -78,7 +78,6 @@ function TestSuite() {
     };
 
     const fetchData = async () => {
-        const listData = transform.getOwaspTop10List();
         const subCategoryMap = await transform.getSubCategoryMap(LocalStore);
         const all = [], by_akto = [], custom = [];
 

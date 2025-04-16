@@ -522,7 +522,6 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
             })
         }
         else {
-            selectedTests = [...selectedGeneratedSuiteTests];
             testName = testNameSuiteModal
         }
 
@@ -896,8 +895,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                                 setTestMode={setTestMode}
                                 activeFromTesting={activeFromTesting}
                                 checkRemoveAll={checkRemoveAll} handleModifyConfig={handleModifyConfig}
-                                setTestSuiteIds={setTestSuiteIds} testSuiteIds={testSuiteIds} selectedGeneratedSuiteTests={selectedGeneratedSuiteTests}
-                                setSelectedGeneratedSuiteTests={setSelectedGeneratedSuiteTests}
+                                setTestSuiteIds={setTestSuiteIds} testSuiteIds={testSuiteIds}
                                 testNameSuiteModal={testNameSuiteModal}
                                 setTestNameSuiteModal={setTestNameSuiteModal}/> :
                                 <>

@@ -7,19 +7,6 @@ import RunTestSuiteRow from "./RunTestSuiteRow";
 import testingApi from "../../testing/api";
 import func from "../../../../../util/func";
 
-const owaspTop10List = {
-    "Broken Object Level Authorization": ["BOLA"],
-    "Broken Authentication": ["NO_AUTH"],
-    "Broken Object Property Level Authorization": ["EDE", "MA"],
-    "Unrestricted Resource Consumption": ["RL"],
-    "Broken Function Level Authorization": ["BFLA"],
-    "Unrestricted Access to Sensitive Business Flows": ["INPUT"],
-    "Server Side Request Forgery": ['SSRF'],
-    "Security Misconfiguration": ["SM", "UHM", "VEM", "MHH", "SVD", "CORS", "ILM"],
-    "Improper Inventory Management": ["IAM", "IIM"],
-    "Unsafe Consumption of APIs": ["COMMAND_INJECTION", "INJ", "CRLF", "SSTI", "LFI", "XSS", "INJECT"]
-}
-
 function RunTestSuites({ testRun, setTestRun, apiCollectionName, activeFromTesting, setTestSuiteIds, testSuiteIds,setTestNameSuiteModal,testNameSuiteModal }) {
 
     const [data, setData] = useState({ owaspTop10List: {}, testingMethods:{}, custom : {}, severity: {} });
