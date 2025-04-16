@@ -112,6 +112,7 @@ const headings = [
         value: "descriptionComp",
         textValue: "description",
         title: "Description",
+        filterKey: "description",
         tooltipContent: "Description of the API",
     }
 ]

@@ -137,10 +137,12 @@ const headers = [
         sortActive: true,
     },
     {
-        title: <HeadingWithTooltip content={<Text variant="bodySm">Description of the collection</Text>} title="Description" />,
+        title: "Description",
         text: 'Description',
         value: 'descriptionComp',
         textValue: 'description',
+        filterKey: "description",
+        tooltipContent: 'Description of the collection'
     }
 ];
 
