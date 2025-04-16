@@ -9321,7 +9321,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">INVITE_MEMBERS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">User has removed an user's invite</param>
+                <param name="actionDescription">User has removed a user's invite</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
