@@ -17,6 +17,7 @@ import values from "@/util/values";
 
 import { HorizontalDotsMinor, FileMinor } from "@shopify/polaris-icons"
 import LocalStore from "../../../../main/LocalStorageStore";
+import APICollectionDescriptionModal from "../../../components/shared/APICollectionDescriptionModal";
 
 function ApiDetails(props) {
 
@@ -356,38 +357,15 @@ function ApiDetails(props) {
                 components={components}
                 loading={loading}
             />
-            <Modal
-                open={showDescriptionModal}
-                onClose={() => setShowDescriptionModal(false)}
+            <APICollectionDescriptionModal
+                showDescriptionModal={showDescriptionModal}
+                setShowDescriptionModal={setShowDescriptionModal}
                 title="API Endpoint Description"
-                primaryAction={{
-                    content: 'Save',
-                    onAction: handleSaveDescription
-                }}
-                secondaryActions={[
-                    {
-                        content: 'Cancel',
-                        onAction: () => setShowDescriptionModal(false)
-                    }
-                ]}
-            >
-                <Modal.Section>
-                    <TextField
-                        label="Description"
-                        value={description}
-                        onChange={(value) => {
-                            // Remove all special characters from the input
-                            const filteredValue = value.replace(/[!@#$%^&*()\-_=+\[\]{}\\|;:'",.<>/?~]/g, '');
-                            setDescription(filteredValue);
-                        }}
-                        multiline={4}
-                        autoComplete="off"
-                        maxLength={64}
-                        placeholder="Add a brief description for this endpoint"
-                        helpText={`${description.length}/64 characters`}
-                    />
-                </Modal.Section>
-            </Modal>
+                handleSaveDescription={handleSaveDescription}
+                description={description}
+                setDescription={setDescription}
+                placeholder={"Add a brief description for this endpoint"}
+            />
             <Modal large open={isGptScreenActive} onClose={() => setIsGptScreenActive(false)} title="Akto GPT">
                 <Modal.Section flush>
                     <AktoGptLayout prompts={prompts} closeModal={() => setIsGptScreenActive(false)} runCustomTests={(tests) => runTests(tests)} />
