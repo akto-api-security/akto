@@ -3,12 +3,14 @@ package com.akto.test_editor.execution;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.concurrent.ConcurrentHashMap;
 
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
@@ -34,6 +36,8 @@ import static com.akto.runtime.parser.SampleParser.parseSampleMessage;
 public class VariableResolver {
     
     private static final DataActor dataActor = DataActorFactory.fetchInstance();
+    private static final ConcurrentHashMap<ApiInfoKey, SampleData> sampleDataCache = new ConcurrentHashMap<>();
+    private static final int MAX_CACHE_SIZE = 1000;
 
     public static Object getValue(Map<String, Object> varMap, String key) {
         if (!varMap.containsKey(key)) {
@@ -648,9 +652,10 @@ public class VariableResolver {
                         continue;
                     }
 
-                    SampleData sd = dataActor.fetchSampleDataByIdMethod(apiInfoKey.getApiCollectionId(), singleTypeInfo.getUrl(), singleTypeInfo.getMethod());
-                    newSampleDataMap.put(infKey, sd.getSamples());
-
+                    SampleData sd = getCachedSampleData(apiInfoKey.getApiCollectionId(), singleTypeInfo.getUrl(), singleTypeInfo.getMethod());
+                    if (sd != null) {
+                        newSampleDataMap.put(infKey, sd.getSamples());
+                    }
                 }
                 
                 List<String> wordListVal = VariableResolver.fetchWordList(newSampleDataMap, key.toString(), location, isRegex);
@@ -914,5 +919,35 @@ public class VariableResolver {
     //     return null;
 
     // }
+
+    private static SampleData getCachedSampleData(int apiCollectionId, String url, String method) {
+        ApiInfoKey cacheKey = new ApiInfoKey(apiCollectionId, url, URLMethods.Method.fromString(method));
+        
+        // Try to get from cache first
+        SampleData cachedData = sampleDataCache.get(cacheKey);
+        if (cachedData != null) {
+            return cachedData;
+        }
+
+        // If cache is too large, remove some entries
+        if (sampleDataCache.size() >= MAX_CACHE_SIZE) {
+            int entriesToRemove = MAX_CACHE_SIZE / 10;
+            Iterator<ApiInfoKey> iterator = sampleDataCache.keySet().iterator();
+            for (int i = 0; i < entriesToRemove && iterator.hasNext(); i++) {
+                iterator.next();
+                iterator.remove();
+            }
+        }
+
+        SampleData sd = dataActor.fetchSampleDataByIdMethod(apiCollectionId, url, method);
+        if (sd != null) {
+            sampleDataCache.put(cacheKey, sd);
+        }
+        return sd;
+    }
+
+    public static void clearSampleDataCache() {
+        sampleDataCache.clear();
+    }
 
 }
