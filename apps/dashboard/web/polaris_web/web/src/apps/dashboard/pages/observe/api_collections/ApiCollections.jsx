@@ -38,7 +38,6 @@ ModuleRegistry.registerModules([AllEnterpriseModule]);
 import { AgGridReact } from 'ag-grid-react';
 LicenseManager.setLicenseKey("api key");
 
-
 const headers = [
     {
         title: "API collection name",
@@ -903,7 +902,6 @@ function ApiCollections() {
             quickFilterText={quickFilterText}
             rowGroupPanelShow={"always"}
             defaultColDef={{
-                flex: 1,
                 filter: true,
                 enableRowGroup: true,
                 enableValue: true,
