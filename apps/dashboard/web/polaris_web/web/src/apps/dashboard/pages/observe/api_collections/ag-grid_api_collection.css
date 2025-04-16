@@ -1,0 +1,52 @@
+.tabButton {
+    appearance: none;
+    display: inline-block;
+    padding: 0.375em 1em 0.5em;
+    white-space: nowrap;
+    font-size: 14px;
+    font-weight: 500;
+    border-radius: 6px;
+    border: none;
+    background-color: var(--color-bg-secondary, #f9fafb);
+    color: var(--color-text-secondary, #39485d);
+    cursor: pointer;
+    box-shadow: none;
+    transition: background 0.3s, color 0.3s;
+  }
+  
+  .tabButton:hover {
+    background: #7c7c7c23;
+    color: rgba(37, 37, 37, 0.6);
+  }
+  
+  .tabButton.active {
+    background: #fff;
+    color: #000;
+    font-weight: 500;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  }
+
+
+  .inputWrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+    overflow: visible;
+  }
+  
+  .inputWrapper svg {
+    position: absolute;
+    left: 8px;
+    pointer-events: none;
+  }
+  
+  .inputWrapper input {
+    font-size: 14px;
+    padding: 0.375em 0.75em 0.375em 2.4em;
+    line-height: 1.4;
+    border-radius: 6px;
+    border: 1px solid var(--color-input-border, #d0d5dd);
+    background-color: transparent;
+    outline: none;
+  }
+  
