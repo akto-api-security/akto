@@ -30,10 +30,13 @@ import TableStore from "../../../components/tables/TableStore";
 import { useNavigate } from "react-router-dom";
 import { AllCommunityModule, ModuleRegistry } from 'ag-grid-community'; 
 import "./ag-grid_api_collection.css"
+import { AllEnterpriseModule, LicenseManager } from "ag-grid-enterprise";
 
 // Register all Community features
 ModuleRegistry.registerModules([AllCommunityModule]);
+ModuleRegistry.registerModules([AllEnterpriseModule]);
 import { AgGridReact } from 'ag-grid-react';
+LicenseManager.setLicenseKey("api key");
 
 
 const headers = [
@@ -146,19 +149,34 @@ const headers = [
 
 const gridHeaders = [
     { headerName: "API collection name", field: "displayName",filter: true },
-    { headerName: "Total endpoints", field: "urlsCount" },
+    { headerName: "Total endpoints", field: "urlsCount",aggFunc: "sum", },
     { 
         headerName: "Risk score", 
         field: "riskScore",
+        aggFunc: "avg",
+        defaultAggFunc:"Risk score",
         cellRenderer: props => {
-            return  <span style={{ display: "flex", height: "100%", width: "100%", alignItems: "center" }}><Badge status={transform.getStatus(props.value)} size="small">{String(props.value)}</Badge></span> ;
+            return  <span style={{ display: "flex", height: "100%", width: "100%", alignItems: "center" }}><Badge status={transform.getStatus(props.value)} size="small">{(String(props.value)).substring(0,3)}</Badge></span> ;
         } 
     },
-    { headerName: "Test coverage", field: "coverage" },
+    { headerName: "Test coverage", field: "coverage",aggFunc:"avg"},
     { headerName: "Issues", field: "issuesArr",
+        aggFunc:prop=>{
+            const countObj = {};
+            prop.values.forEach((item) => {
+                Object.entries(item).forEach(([key, value]) => {
+                    if (countObj[key]) {
+                        countObj[key] += value;
+                    } else {
+                        countObj[key] = value;
+                    }
+                });
+            });
+            return countObj;
+        },
         cellRenderer: props => {
             
-            return <span style={{ display: "flex", height: "100%", width: "100%", alignItems: "center" }}>{props.value}</span>;
+            return <span style={{ display: "flex", height: "100%", width: "100%", alignItems: "center" }}>{transform.getIssuesList(props.value)}</span>;
         } 
      },
     { headerName: "Sensitive data", field: "sensitiveSubTypes",
@@ -472,7 +490,6 @@ function ApiCollections() {
         tmp.custom = tmp.all.filter(x => !tmp.hostname.includes(x) && !x.deactivated && !tmp.groups.includes(x));
         tmp.deactivated = deactivatedCollectionsCopy
         setData(tmp);
-        console.log(tmp);
     }
 
     function disambiguateLabel(key, value) {
@@ -884,6 +901,13 @@ function ApiCollections() {
             pagination={true}
             onRowClicked={(val)=>navigate(val.data.nextUrl)}
             quickFilterText={quickFilterText}
+            rowGroupPanelShow={"always"}
+            defaultColDef={{
+                flex: 1,
+                filter: true,
+                enableRowGroup: true,
+                enableValue: true,
+              }}
 
         /></div>
     )
