@@ -69,6 +69,12 @@ function ApiDetails(props) {
             setTimeout(() => {
                 setDescription(description == null ? "" : description)
             }, 100)
+            headers.forEach((header) => {
+                if (header.value === "description") {
+                    header.action = () => setShowDescriptionModal(true)
+                }
+            })
+
             let commonMessages = []
             await api.fetchSampleData(endpoint, apiCollectionId, method).then((res) => {
                 api.fetchSensitiveSampleData(endpoint, apiCollectionId, method).then(async (resp) => {
@@ -127,19 +133,12 @@ function ApiDetails(props) {
         }
     }
 
-    const handleSaveDescription = () => {
+    const handleSaveDescription = async () => {
         const { apiCollectionId, endpoint, method } = apiDetail;
-        
-        // Check for special characters
-        const specialChars = /[!@#$%^&*()\-_=+\[\]{}\\|;:'",.<>/?~]/;
-        if (specialChars.test(description)) {
-            func.setToast(true, true, "Description contains special characters that are not allowed.");
-            return;
-        }
         
         setShowDescriptionModal(false);
         
-        api.saveEndpointDescription(apiCollectionId, endpoint, method, description)
+        await api.saveEndpointDescription(apiCollectionId, endpoint, method, description)
             .then(() => {
                 func.setToast(true, false, "Description saved successfully");
             })
@@ -285,20 +284,6 @@ function ApiDetails(props) {
                         badgeClicked={badgeClicked}
                     />
                 </div>
-                <HorizontalStack gap={2} align="start" blockAlign="start">
-                    {!description && (
-                        <Button plain onClick={() => setShowDescriptionModal(true)} textAlign="left">
-                            Add description
-                        </Button>
-                    )}
-                    {description && (
-                        <Button plain onClick={() => setShowDescriptionModal(true)} textAlign="left">
-                            <Text as="span" variant="bodyMd" color="subdued" alignment="start">
-                                {description}
-                            </Text>
-                        </Button>
-                    )}
-                </HorizontalStack>
             </div>
             <div style={{ display: "flex", gap: '8px' }}>
                 <RunTest
