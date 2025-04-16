@@ -163,7 +163,8 @@ public class Executor {
 
         List<RawApi> testRawApis = new ArrayList<>();
         testRawApis.add(sampleRawApi.copy());
-        ExecutorAlgorithm executorAlgorithm = new ExecutorAlgorithm(sampleRawApi, varMap, authMechanism, customAuthTypes);
+        boolean allowAllCombinations = executionListBuilder.isAllowAllCombinations();
+        ExecutorAlgorithm executorAlgorithm = new ExecutorAlgorithm(sampleRawApi, varMap, authMechanism, customAuthTypes, allowAllCombinations);
         Map<Integer, ExecuteAlgoObj> algoMap = new HashMap<>();
         ExecutorSingleRequest singleReq = executorAlgorithm.execute(executorNodes, 0, algoMap, testRawApis, false, 0, apiInfoKey);
         

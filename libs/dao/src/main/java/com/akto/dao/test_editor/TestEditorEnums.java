@@ -216,6 +216,7 @@ public class TestEditorEnums {
         JWT_REPLACE_BODY,
         ATTACH_FILE,
         SEND_SSRF_REQ,
+        FOR_EACH_COMBINATION
     }
 
     public enum NonTerminalExecutorDataOperands {
