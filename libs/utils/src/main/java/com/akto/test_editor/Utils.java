@@ -45,6 +45,13 @@ public class Utils {
     private static final ObjectMapper mapper = new ObjectMapper();
     private static final JsonFactory factory = mapper.getFactory();
     private static final Gson gson = new Gson();
+    private static List<Integer> queryList;
+    private static Integer dataInt;
+    private static Object query;
+    private static int queryInt;
+    private static Double queryDouble;
+    private static Double dataDouble;
+    private static Boolean result;
 
     public static boolean SKIP_SSRF_CHECK = ("true".equalsIgnoreCase(System.getenv("SKIP_SSRF_CHECK")) || !DashboardMode.isSaasDeployment());
 
@@ -122,19 +129,19 @@ public class Utils {
     }
 
     public static Boolean applyIneqalityOperation(Object data, Object querySet, String operator) {
-        Boolean result = false;
+        result = false;
         try {
             if (data instanceof Integer) {
-                List<Integer> queryList = (List) querySet;
+                queryList = (List) querySet;
                 if (queryList == null || queryList.size() == 0) {
                     return false;
                 }
-                Integer dataInt = (Integer) data;
-                Object query = queryList.get(0);
+                dataInt = (Integer) data;
+                query = queryList.get(0);
 
                 if (query instanceof String) {
                     try {
-                        int queryInt = Integer.parseInt((String) query);
+                        queryInt = Integer.parseInt((String) query);
                         result = compareIntegers(operator, dataInt, queryInt);
                     } catch (Exception e) {
                         Double queryDouble = Double.parseDouble(query.toString());
@@ -147,23 +154,23 @@ public class Utils {
                     result = compareIntegers(operator, (int) dataInt, (int) queryList.get(0));
                 }
             } else if (data instanceof Double) {
-                List<Integer> queryList = (List) querySet;
+                queryList = (List) querySet;
                 if (queryList == null || queryList.size() == 0) {
                     return false;
                 }
-                Double dataDouble = (Double) data;
-                Object query = queryList.get(0);
+                dataDouble = (Double) data;
+                query = queryList.get(0);
 
                 if (query instanceof String) {
                     try {
                         int queryInt = Integer.parseInt((String) query);
                         result = compareDoubles(operator, dataDouble, Double.valueOf(queryInt));
                     } catch (Exception e) {
-                        Double queryDouble = Double.parseDouble(query.toString());
+                        queryDouble = Double.parseDouble(query.toString());
                         result = compareDoubles(operator, dataDouble, queryDouble);
                     }
                 } else if (query instanceof Double) {
-                    Double queryDouble = Double.parseDouble(query.toString());
+                    queryDouble = Double.parseDouble(query.toString());
                     result = compareDoubles(operator, dataDouble, queryDouble);
                 } else {
                     result = compareDoubles(operator, dataDouble, (Double.valueOf(queryList.get(0))));
