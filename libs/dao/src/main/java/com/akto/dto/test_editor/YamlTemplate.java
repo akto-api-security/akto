@@ -23,8 +23,10 @@ public class YamlTemplate {
     public static final String INACTIVE = "inactive";
     private String repositoryUrl;
     public static final String REPOSITORY_URL = "repositoryUrl";
+    public static final String SETTINGS = "attributes";
+    private TemplateSettings attributes;
 
-    public YamlTemplate(String id, int createdAt, String author, int updatedAt, String content, Info info) {
+    public YamlTemplate(String id, int createdAt, String author, int updatedAt, String content, Info info, TemplateSettings attributes) {
         this.id = id;
         this.createdAt = createdAt;
         this.author = author;
@@ -32,6 +34,7 @@ public class YamlTemplate {
         this.content = content;
         this.info = info;
         this.hash = content.hashCode();
+        this.attributes = attributes;
     }
 
     public YamlTemplate() {
@@ -85,7 +88,7 @@ public class YamlTemplate {
     public void setInfo(Info info) {
         this.info = info;
     }
-    
+
     public boolean getInactive() {
         return inactive;
     }
@@ -104,7 +107,7 @@ public class YamlTemplate {
     public void setSource(GlobalEnums.YamlTemplateSource source) {
         this.source = source;
     }
-    
+
     public String getRepositoryUrl() {
         return repositoryUrl;
     }
@@ -123,5 +126,13 @@ public class YamlTemplate {
 
     public boolean isInactive() {
         return inactive;
+    }
+
+    public TemplateSettings getAttributes() {
+        return attributes;
+    }
+
+    public void setAttributes(TemplateSettings attributes) {
+        this.attributes = attributes;
     }
 }
