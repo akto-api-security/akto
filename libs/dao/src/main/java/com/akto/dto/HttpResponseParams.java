@@ -58,6 +58,27 @@ public class HttpResponseParams {
         this.direction = direction;
     }
 
+    public HttpResponseParams resetValues(String type, int statusCode, String status, Map<String, List<String>> headers, String payload,
+                              HttpRequestParams requestParams, int time, String accountId, boolean isPending, Source source,
+                              String orig, String sourceIP, String destIP, String direction) {
+        this.type = type;
+        this.statusCode = statusCode;
+        this.status = status;
+        this.headers = headers;
+        this.payload = payload;
+        this.requestParams = requestParams;
+        this.time = time;
+        this.accountId = accountId;
+        this.isPending = isPending;
+        this.source = source;
+        this.orig = orig;
+        this.sourceIP = sourceIP;
+        this.destIP = destIP;
+        this.direction = direction;
+
+        return this;
+    }
+
     public static boolean validHttpResponseCode(int statusCode)  {
         return statusCode >= 200 && (statusCode < 300 || statusCode == 302);
     }
@@ -224,7 +245,7 @@ public class HttpResponseParams {
             reqHeaderStr2 = objectMapper.writeValueAsString(reqHeaders);
             respHeaderStr2 = objectMapper.writeValueAsString(respHeaders);
         } catch (Exception e) {
-            // TODO: handle exception
+            return origStr;
         }
 
         origObj.put("method", httpResponseParamProto.getMethod());
@@ -246,6 +267,7 @@ public class HttpResponseParams {
         try {
           origStr = objectMapper.writeValueAsString(origObj);
         } catch (Exception e) {
+            return origStr;
         }
 
         return origStr;
