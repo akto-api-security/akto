@@ -30,10 +30,13 @@ import TableStore from "../../../components/tables/TableStore";
 import { useNavigate } from "react-router-dom";
 import { AllCommunityModule, ModuleRegistry } from 'ag-grid-community'; 
 import "./ag-grid_api_collection.css"
+import { AllEnterpriseModule, LicenseManager } from "ag-grid-enterprise";
 
 // Register all Community features
 ModuleRegistry.registerModules([AllCommunityModule]);
+ModuleRegistry.registerModules([AllEnterpriseModule]);
 import { AgGridReact } from 'ag-grid-react';
+LicenseManager.setLicenseKey("[TRIAL]_this_{AG_Charts_and_AG_Grid}_Enterprise_key_{AG-086015}_is_granted_for_evaluation_only___Use_in_production_is_not_permitted___Please_report_misuse_to_legal@ag-grid.com___For_help_with_purchasing_a_production_key_please_contact_info@ag-grid.com___You_are_granted_a_{Single_Application}_Developer_License_for_one_application_only___All_Front-End_JavaScript_developers_working_on_the_application_would_need_to_be_licensed___This_key_will_deactivate_on_{14 May 2025}____[v3]_[0102]_MTc0NzE3NzIwMDAwMA==1127112b2eb5fda550f75b9d26691ef0");
 
 
 const headers = [
@@ -146,19 +149,34 @@ const headers = [
 
 const gridHeaders = [
     { headerName: "API collection name", field: "displayName",filter: true },
-    { headerName: "Total endpoints", field: "urlsCount" },
+    { headerName: "Total endpoints", field: "urlsCount",aggFunc: "sum", },
     { 
         headerName: "Risk score", 
         field: "riskScore",
+        aggFunc: "avg",
+        defaultAggFunc:"Risk score",
         cellRenderer: props => {
-            return  <span style={{ display: "flex", height: "100%", width: "100%", alignItems: "center" }}><Badge status={transform.getStatus(props.value)} size="small">{String(props.value)}</Badge></span> ;
+            return  <span style={{ display: "flex", height: "100%", width: "100%", alignItems: "center" }}><Badge status={transform.getStatus(props.value)} size="small">{(String(props.value)).substring(0,3)}</Badge></span> ;
         } 
     },
-    { headerName: "Test coverage", field: "coverage" },
+    { headerName: "Test coverage", field: "coverage",aggFunc:"avg"},
     { headerName: "Issues", field: "issuesArr",
+        aggFunc:prop=>{
+            const countObj = {};
+            prop.values.forEach((item) => {
+                Object.entries(item).forEach(([key, value]) => {
+                    if (countObj[key]) {
+                        countObj[key] += value;
+                    } else {
+                        countObj[key] = value;
+                    }
+                });
+            });
+            return countObj;
+        },
         cellRenderer: props => {
             
-            return <span style={{ display: "flex", height: "100%", width: "100%", alignItems: "center" }}>{props.value}</span>;
+            return <span style={{ display: "flex", height: "100%", width: "100%", alignItems: "center" }}>{transform.getIssuesList(props.value)}</span>;
         } 
      },
     { headerName: "Sensitive data", field: "sensitiveSubTypes",
@@ -472,7 +490,6 @@ function ApiCollections() {
         tmp.custom = tmp.all.filter(x => !tmp.hostname.includes(x) && !x.deactivated && !tmp.groups.includes(x));
         tmp.deactivated = deactivatedCollectionsCopy
         setData(tmp);
-        console.log(tmp);
     }
 
     function disambiguateLabel(key, value) {
@@ -884,6 +901,13 @@ function ApiCollections() {
             pagination={true}
             onRowClicked={(val)=>navigate(val.data.nextUrl)}
             quickFilterText={quickFilterText}
+            rowGroupPanelShow={"always"}
+            defaultColDef={{
+                flex: 1,
+                filter: true,
+                enableRowGroup: true,
+                enableValue: true,
+              }}
 
         /></div>
     )
