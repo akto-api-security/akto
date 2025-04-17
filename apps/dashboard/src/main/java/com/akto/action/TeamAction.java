@@ -293,7 +293,10 @@ public class TeamAction extends UserAction implements ServletResponseAware, Serv
         PendingInviteCode pendingInviteCode = PendingInviteCodesDao.instance.findOne(Filters.eq(PendingInviteCode.INVITEE_EMAIL_ID, email));
         Role currentRole = RBACDao.getCurrentRoleForUser(getSUser().getId(), Context.accountId.get());
 
-        if(pendingInviteCode.getIssuer() != sUser.getId() && (currentRole == null || !currentRole.name().equals(Role.ADMIN.name()))) {
+        boolean isNotIssuer = pendingInviteCode.getIssuer() != sUser.getId();
+        boolean isNotAdmin = currentRole == null || !Role.ADMIN.name().equals(currentRole.name());
+
+        if (isNotIssuer && isNotAdmin) {
             addActionError("User is not allowed to remove this invitation.");
             return Action.ERROR.toUpperCase();
         }
