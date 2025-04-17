@@ -9,20 +9,26 @@ import org.bson.types.ObjectId;
 
 public class TestSuites {
 
+    public static final String ID = "_id";
     private ObjectId id;
+
+    public static final String NAME = "name";
     private String name;
+
+    public static final String SUB_CATEGORY_LIST = "subCategoryList";
     private List<String> subCategoryList;
+
+    public static final String CREATED_BY = "createdBy";
     private String createdBy;
+
+    public static final String LAST_UPDATED = "lastUpdated";
     private long lastUpdated;
+
+    public static final String CREATED_AT = "createdAt";
     private long createdAt;
+
     @BsonIgnore
     private String hexId;
-
-    public static final String FIELD_NAME = "name";
-    public static final String FIELD_SUB_CATEGORY_LIST = "subCategoryList";
-    public static final String FIELD_CREATED_BY = "createdBy";
-    public static final String FIELD_LAST_UPDATED = "lastUpdated";
-    public static final String FIELD_CREATED_AT = "createdAt";
 
     public TestSuites() {
     }

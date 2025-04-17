@@ -21,8 +21,8 @@ public class TestSuiteDao extends AccountsContextDao<TestSuites>{
     public static List<String> getAllTestSuitesSubCategories(List<ObjectId> testSuitesIds) {
         Set<String> testSubCategories = new HashSet<>();
 
-        List<TestSuites> customTestSuites = TestSuiteDao.instance.findAll(Filters.in(Constants.ID, testSuitesIds), Projections.include(Constants.ID, TestSuites.FIELD_SUB_CATEGORY_LIST));
-        List<DefaultTestSuites> defaultTestSuites = DefaultTestSuitesDao.instance.findAll(Filters.in(Constants.ID, testSuitesIds), Projections.include(Constants.ID, TestSuites.FIELD_SUB_CATEGORY_LIST));
+        List<TestSuites> customTestSuites = TestSuiteDao.instance.findAll(Filters.in(Constants.ID, testSuitesIds), Projections.include(Constants.ID, TestSuites.SUB_CATEGORY_LIST));
+        List<DefaultTestSuites> defaultTestSuites = DefaultTestSuitesDao.instance.findAll(Filters.in(Constants.ID, testSuitesIds), Projections.include(Constants.ID, TestSuites.SUB_CATEGORY_LIST));
 
         for(TestSuites testSuite : customTestSuites) {
             testSubCategories.addAll(testSuite.getSubCategoryList());

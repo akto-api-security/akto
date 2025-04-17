@@ -104,13 +104,13 @@ public class TestSuiteAction extends UserAction {
         
         List<Bson> updates = new ArrayList<>();
         if (StringUtils.hasText(this.testSuiteName)) {
-            updates.add(Updates.set(TestSuites.FIELD_NAME, this.testSuiteName));
+            updates.add(Updates.set(TestSuites.NAME, this.testSuiteName));
         }
 
         if (this.subCategoryList != null) {
-            updates.add(Updates.set(TestSuites.FIELD_SUB_CATEGORY_LIST, this.subCategoryList));
+            updates.add(Updates.set(TestSuites.SUB_CATEGORY_LIST, this.subCategoryList));
         }
-        updates.add(Updates.set(TestSuites.FIELD_LAST_UPDATED, (long) (System.currentTimeMillis() / 1000l)));
+        updates.add(Updates.set(TestSuites.LAST_UPDATED, (long) (System.currentTimeMillis() / 1000l)));
         TestSuiteDao.instance.updateOne(
                 Filters.eq(Constants.ID, testSuiteId),
                 Updates.combine(updates));
