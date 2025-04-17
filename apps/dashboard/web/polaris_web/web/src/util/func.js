@@ -925,11 +925,11 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName,apiInfoSeverit
 
   if (apiInfoList) {
       apiInfoList.forEach(x => {
-          apiInfoMap[x["id"]["apiCollectionId"] + "-" + x["id"]["url"] + "-" + x["id"]["method"]] = x
+          apiInfoMap[Object.values(x["id"]).join("-")] = x
       })
   }
   listEndpoints.forEach(x => {
-      let key = x.apiCollectionId + "-" + x.url + "-" + x.method
+      let key = x.apiCollectionId + "-" + x.method + "-" + x.url
       if (!ret[key]) {
           let access_type = null
           if (apiInfoMap[key]) {
@@ -991,14 +991,13 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName,apiInfoSeverit
 
       }
   })
-  
   return Object.values(ret) 
 },
 getSeverityCountPerEndpointList(allIssues){
   if(!allIssues) return {}
   let apiInfoSeverityMap = {}
   allIssues.forEach(x => {
-    let key = x["id"]["apiInfoKey"]["apiCollectionId"] + "-" + x["id"]["apiInfoKey"]["url"] + "-" + x["id"]["apiInfoKey"]["method"]
+    let key = Object.values(x["id"]["apiInfoKey"]).join("-")
     if(!apiInfoSeverityMap[key]){
       apiInfoSeverityMap[key] = {}
     }
