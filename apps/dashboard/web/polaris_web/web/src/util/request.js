@@ -157,11 +157,11 @@ async function raiseMixpanelEvent(api, data) {
     }
   }
   if (api && !black_list_apis.some(black_list_api => api.includes(black_list_api))) {
-    if (api === '/api/fetchEndpointsCount') {
-      const hour = new Date().getHours()
-      const lastHour = localStorage.getItem('lastEndpointHour')
-      if (lastHour !== hour.toString()) {
-        localStorage.setItem('lastEndpointHour', hour)
+    if (api?.startsWith('/api/fetchEndpointsCount')) {
+      const lastEpoch = Number(SessionStore.getState().lastEndpointEpoch) || 0
+      const now = Date.now()/1000
+      if (now - lastEpoch > 3600) {
+        SessionStore.getState().setLastEndpointEpoch(now)
         window.mixpanel.track('endpoints_count', { newCount: data.newCount })
       }
     } else {

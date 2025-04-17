@@ -4126,9 +4126,7 @@ public class InitializerListener implements ServletContextListener {
                         LogDb.DASHBOARD
                 );
                 UsageMetricUtils.syncUsageMetricWithAkto(usageMetric);
-                
-                // Send to mixpanel
-                UsageMetricUtils.syncUsageMetricWithMixpanel(usageMetric);
+
             }
         } catch (Exception e) {
             logger.errorAndAddToDb(e, String.format("Error while syncing usage metrics. Error: %s", e.getMessage()), LogDb.DASHBOARD);
