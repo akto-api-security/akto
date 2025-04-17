@@ -548,6 +548,13 @@ const settingRequests = {
             method: 'post',
             data: {}
         })
+    },
+    removeInvitation(email) {
+        return request({
+            url: '/api/removeInvitation',
+            method: 'post',
+            data: {email}
+        })
     }
 }
 
