@@ -1,5 +1,4 @@
-.testSuiteCard .Polaris-Choice.Polaris-Checkbox__ChoiceLabel 
-.testSuiteCard .Polaris-Choice.Polaris-RadioButton__ChoiceLabel {
+.testSuiteCard .Polaris-Choice.Polaris-Checkbox__ChoiceLabel {
     max-width: 100% !important;
 }
 
@@ -14,6 +13,7 @@
 .testSuiteCard .Polaris-VerticalStack{
     box-shadow: 0px 1px 2px 0px #00000026, 0px 0px 5px 0px #0000000D;
     border-radius: 0.5rem;
+    overflow: hidden;
 }
 
 .removeAllButton .Polaris-Button--plain.Polaris-Button--disabled svg {

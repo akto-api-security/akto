@@ -258,20 +258,13 @@ public class TestExecutor {
                 // default testing
                 testingRunSubCategories = testingRun.getTestingRunConfig().getTestSubCategoryList();
             } else {
-                Set<String> subcategorySet = new HashSet<>();
                 List<ObjectId> testSuiteObjectIds = new ArrayList<>();
                 for (String testSuiteId: testSuiteIds) {
                     ObjectId testSuiteObjectId = new ObjectId(testSuiteId);
                     testSuiteObjectIds.add(testSuiteObjectId);
                 }
-                List<TestSuites> testSuites = TestSuiteDao.instance.findAll(Filters.in("_id", testSuiteObjectIds));
-                for (TestSuites testSuite: testSuites) {
-                    List<String> subcategoryList = testSuite.getSubCategoryList();
-                    if (subcategoryList != null && !subcategoryList.isEmpty()) {
-                        subcategorySet.addAll(subcategoryList);
-                    }
-                }
-                testingRunSubCategories = new ArrayList<>(subcategorySet);
+
+                testingRunSubCategories = TestSuiteDao.getAllTestSuitesSubCategories(testSuiteObjectIds);
             }
         }
 
