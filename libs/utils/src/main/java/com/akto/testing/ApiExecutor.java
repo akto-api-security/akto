@@ -276,6 +276,11 @@ public class ApiExecutor {
             loggerMaker.infoAndAddToDb("Final url is: " + url, LogDb.TESTING);
         }
 
+        // todo: remove this
+        if (url.contains("api.uat.be.edenred.io/api.uat.be.edenred.io")) {
+            url = url.replace("api.uat.be.edenred.io/api.uat.be.edenred.io", "api.uat.be.edenred.io");
+        }
+
         if (url.contains("login_submit")) {
             loggerMaker.infoAndAddToDb("Request Payload " + request.getBody(), LogDb.TESTING);
         }
