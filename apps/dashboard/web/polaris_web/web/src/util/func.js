@@ -14,6 +14,8 @@ import PersistStore from '../apps/main/PersistStore';
 
 import { circle_cancel, circle_tick_minor } from "@/apps/dashboard/components/icons";
 import quickStartFunc from '../apps/dashboard/pages/quick_start/transform';
+import { Box } from '@shopify/polaris';
+import TooltipText from '../apps/dashboard/components/shared/TooltipText';
 
 const iconsUsedMap = {
   CalendarMinor,ClockMinor,CircleAlertMajor,DynamicSourceMinor, LockMinor, KeyMajor, ProfileMinor, PasskeyMinor,
@@ -953,6 +955,7 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName) {
           let riskScore = apiInfoMap[key] ? apiInfoMap[key]?.riskScore : 0
           let responseCodesArr = apiInfoMap[key] ? apiInfoMap[key]?.responseCodes : [] 
           let discoveredTimestamp = apiInfoMap[key] ? (apiInfoMap[key].discoveredTimestamp || apiInfoMap[key].startTs) : 0
+          let description = apiInfoMap[key] ? apiInfoMap[key]['description'] : ""
 
           ret[key] = {
               id: x.method + "###" + x.url + "###" + x.apiCollectionId + "###" + Math.random(),
@@ -986,7 +989,9 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName) {
               sensitiveInReq: [...this.convertSensitiveTags(x.sensitiveInReq)],
               sensitiveInResp: [...this.convertSensitiveTags(x.sensitiveInResp)],
               responseCodes: responseCodesArr,
-              sources: apiInfoMap[key]?apiInfoMap[key]['sources']:{}
+              sources: apiInfoMap[key]?apiInfoMap[key]['sources']:{},
+              description: description,
+              descriptionComp: (<Box maxWidth="300px"><TooltipText tooltip={description} text={description}/></Box>),
           }
 
       }

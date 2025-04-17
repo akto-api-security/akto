@@ -60,6 +60,9 @@ public class ApiInfo {
     public static final String SOURCES = "sources";
     Map<String, Object> sources;
 
+    public static final String DESCRIPTION = "description";
+    private String description;
+
     public enum ApiType {
         REST, GRAPHQL, GRPC, SOAP
     }
@@ -462,5 +465,13 @@ public class ApiInfo {
 
     public void setSources(Map<String, Object> sources) {
         this.sources = sources;
+    }
+
+    public String getDescription() {
+        return description;
+    }
+
+    public void setDescription(String description) {
+        this.description = description;
     }
 }

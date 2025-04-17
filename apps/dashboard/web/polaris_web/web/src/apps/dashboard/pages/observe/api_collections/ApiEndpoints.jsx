@@ -30,6 +30,7 @@ import SourceLocation from "./component/SourceLocation"
 import useTable from "../../../components/tables/TableContext"
 import HeadingWithTooltip from "../../../components/shared/HeadingWithTooltip"
 import { SelectSource } from "./SelectSource"
+import APICollectionDescriptionModal from "../../../components/shared/APICollectionDescriptionModal"
 
 const headings = [
     {
@@ -106,6 +107,14 @@ const headings = [
         title: "Collection",
         showFilter: true,
         filterKey: "apiCollectionName",
+    },
+    {
+        text: "Description",
+        value: "descriptionComp",
+        textValue: "description",
+        title: "Description",
+        filterKey: "description",
+        tooltipContent: "Description of the API",
     }
 ]
 
@@ -193,6 +202,8 @@ function ApiEndpoints(props) {
     const selectedMethod = queryParams.get('selected_method')
     const [isEditing, setIsEditing] = useState(false);
     const [editableTitle, setEditableTitle] = useState(pageTitle);
+    const [description, setDescription] = useState("");
+    const [showDescriptionModal, setShowDescriptionModal] = useState(false);
 
 
     // the values used here are defined at the server.
@@ -336,7 +347,8 @@ function ApiEndpoints(props) {
                     parameterisedEndpoint: method + " " + endpoint,
                     apiCollectionName: collectionsMap[apiCollectionId],
                     last_seen: func.prettifyEpoch(lastSeenTs),
-                    added: func.prettifyEpoch(discoveredTs)
+                    added: func.prettifyEpoch(discoveredTs),
+                    descriptionComp: (<Box maxWidth="300px"><TooltipText tooltip={codeAnalysisApi.description} text={codeAnalysisApi.description}/></Box>),
                 }
             })
         }
@@ -417,6 +429,8 @@ function ApiEndpoints(props) {
         if (pageTitle !== collectionsMap[apiCollectionId]) { 
             setPageTitle(collectionsMap[apiCollectionId])
         }
+
+        setDescription(collectionsObj?.description || "")
     }, [collectionsMap[apiCollectionId]])
 
     const resourceName = {
@@ -1016,6 +1030,14 @@ function ApiEndpoints(props) {
         });
     }
 
+    function updateCollectionDescription(list, apiCollectionId, newDescription) {
+        list.forEach(item => {
+            if (item.id === apiCollectionId) {
+                item.description = newDescription;
+            }
+        });
+    }
+
     
       const handleSaveClick = async () => {
         api.editCollectionName(apiCollectionId, editableTitle).then((resp) => {
@@ -1045,6 +1067,26 @@ function ApiEndpoints(props) {
         }
       }
 
+    const handleSaveDescription = () => {
+        // Check for special characters
+        const specialChars = /[!@#$%^&*()\-_=+\[\]{}\\|;:'",.<>/?~]/;
+        if (specialChars.test(description)) {
+            func.setToast(true, true, "Description contains special characters that are not allowed.");
+            return;
+        }
+        
+        setShowDescriptionModal(false);
+        api.saveCollectionDescription(apiCollectionId, description)
+            .then(() => {
+                updateCollectionDescription(allCollections, apiCollectionId, description);
+                func.setToast(true, false, "Description saved successfully");
+            })
+            .catch((err) => {
+                console.error("Failed to save description:", err);
+                func.setToast(true, true, "Failed to save description. Please try again.");
+            });
+    };
+
     return (
         <div>
             {isQueryPage ? (
@@ -1069,16 +1111,43 @@ function ApiEndpoints(props) {
                                 </div>
                             </Box>
                         ) : (
-                            <div style={{ cursor: isApiGroup ? 'pointer' : 'default' }} onClick={isApiGroup ?  () => {setIsEditing(true);} : undefined}>
-                                <Box maxWidth="35vw">
-                                    <TooltipText tooltip={pageTitle} text={pageTitle} textProps={{ variant: 'headingLg' }} />
-                                </Box>
-                            </div>
+                            <Box maxWidth="35vw">
+                                <VerticalStack gap={2}>
+                                    <div style={{ cursor: isApiGroup ? 'pointer' : 'default' }} onClick={isApiGroup ?  () => {setIsEditing(true);} : undefined}>
+                                        <TooltipText tooltip={pageTitle} text={pageTitle} textProps={{ variant: 'headingLg' }} />
+                                    </div>
+                                    <HorizontalStack gap={2}>
+                                        {!description && (
+                                            <Button plain onClick={() => setShowDescriptionModal(true)}>
+                                                Add description
+                                            </Button>
+                                        )}
+                                        {description && (
+                                            <Button plain onClick={() => setShowDescriptionModal(true)}>
+                                                <Text as="span" variant="bodyMd" color="subdued" alignment="start">
+                                                    {description}
+                                                </Text>
+                                            </Button>
+                                        )}
+                                    </HorizontalStack>
+                                </VerticalStack>
+                            </Box>
                         )
                     }
                     backUrl="/dashboard/observe/inventory"
                     secondaryActions={secondaryActionsComponent}
-                    components={components}
+                    components={[
+                        <APICollectionDescriptionModal
+                            showDescriptionModal={showDescriptionModal}
+                            setShowDescriptionModal={setShowDescriptionModal}
+                            title="Collection Description"
+                            handleSaveDescription={handleSaveDescription}
+                            description={description}
+                            setDescription={setDescription}
+                            placeholder={"Add a brief description for this collection"}
+                        />,
+                        ...components
+                    ]}
                 />
             )}
         </div>
