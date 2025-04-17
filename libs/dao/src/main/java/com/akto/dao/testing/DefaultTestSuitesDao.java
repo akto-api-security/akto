@@ -9,6 +9,7 @@ import com.akto.util.Constants;
 import com.akto.util.enums.GlobalEnums;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
+import com.mongodb.client.model.Updates;
 
 import java.util.*;
 
@@ -116,9 +117,11 @@ public class DefaultTestSuitesDao extends CommonContextDao<DefaultTestSuites> {
 
         long yamlTemplatesCount = YamlTemplateDao.instance.count(Filters.empty());
 
-        List<YamlTemplate> yamlTemplateList = YamlTemplateDao.instance.findAll(Filters.and(
-                Filters.gte(YamlTemplate.CREATED_AT, sevenDaysAgo)
-        ), Projections.include(Constants.ID, YamlTemplate.CREATED_AT, YamlTemplate.INFO, YamlTemplate.SETTINGS));
+//        List<YamlTemplate> yamlTemplateList = YamlTemplateDao.instance.findAll(Filters.and(
+//                Filters.gte(YamlTemplate.CREATED_AT, sevenDaysAgo)
+//        ), Projections.include(Constants.ID, YamlTemplate.CREATED_AT, YamlTemplate.INFO, YamlTemplate.SETTINGS));
+
+        List<YamlTemplate> yamlTemplateList = YamlTemplateDao.instance.findAll(Filters.empty(), Projections.include(Constants.ID, YamlTemplate.CREATED_AT, YamlTemplate.INFO, YamlTemplate.SETTINGS));
 
         List<DefaultTestSuites> defaultTestSuites = DefaultTestSuitesDao.instance.findAll(Filters.empty());
 
@@ -139,7 +142,24 @@ public class DefaultTestSuitesDao extends CommonContextDao<DefaultTestSuites> {
         }
 
         Map<String, Map<String, List<String>>> defaultTestSuitesMap = getDefaultTestSuitesMap(newTemplates);
-        insertDefaultTestSuites(defaultTestSuitesMap);
+
+        for(DefaultTestSuites.DefaultSuitesType defaultSuitesType : DefaultTestSuites.DefaultSuitesType.values()) {
+            Map<String, List<String>> defaultSuiteMap = defaultTestSuitesMap.get(defaultSuitesType.name());
+            for (String key : defaultSuiteMap.keySet()) {
+                DefaultTestSuitesDao.instance.updateOne(Filters.and(
+                        Filters.eq(DefaultTestSuites.NAME, key),
+                        Filters.eq(DefaultTestSuites.SUITE_TYPE, defaultSuitesType.name())
+                    ),
+                    Updates.combine(
+                        Updates.setOnInsert(DefaultTestSuites.CREATED_AT, Context.now()),
+                        Updates.set(DefaultTestSuites.LAST_UPDATED, Context.now()),
+                        Updates.setOnInsert(DefaultTestSuites.CREATED_BY, "Akto"),
+                        Updates.setOnInsert(DefaultTestSuites.SUITE_TYPE, defaultSuitesType.name()),
+                        Updates.addEachToSet(DefaultTestSuites.SUB_CATEGORY_LIST, defaultSuiteMap.get(key))
+                    )
+                );
+            }
+        }
     }
 
     @Override
