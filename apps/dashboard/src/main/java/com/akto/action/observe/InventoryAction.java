@@ -1105,7 +1105,7 @@ public class InventoryAction extends UserAction {
             return Action.ERROR.toUpperCase();
         }
 
-        ApiInfoDao.instance.updateManyNoUpsert(Filters.and(
+        ApiInfoDao.instance.updateOneNoUpsert(Filters.and(
                 Filters.eq(ApiInfo.ID_API_COLLECTION_ID, apiCollectionId),
                 Filters.eq(ApiInfo.ID_METHOD, method),
                 Filters.eq(ApiInfo.ID_URL, url)
