@@ -4,6 +4,7 @@ import { devtools, persist, createJSONStorage } from "zustand/middleware"
 const initialState = {
     threatFiltersMap: {},
     accessToken: null,
+    lastEndpointEpoch: 0
 };
 
 let sessionStore = (set) => ({
@@ -20,6 +21,13 @@ let sessionStore = (set) => ({
             set({ threatFiltersMap });
         } catch (error) {
             console.error("Error setting threatFiltersMap:", error);
+        }
+    },
+    setLastEndpointEpoch: (lastEndpointEpoch) => {
+        try {
+            set({ lastEndpointEpoch });
+        } catch (error) {
+            console.error("Error setting lastEndpointEpoch:", error);
         }
     },
     resetStore: () => {

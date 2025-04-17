@@ -115,6 +115,11 @@ public class UsageMetricUtils {
         return props;
     }
 
+    /*
+     * Depracting this function currently.
+     * Can pe used in future.
+     */
+    @Deprecated
     public static void syncUsageMetricWithMixpanel(UsageMetric usageMetric) {
         try {
             String organizationId = usageMetric.getOrganizationId();
