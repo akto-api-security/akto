@@ -13,6 +13,7 @@ import com.mongodb.client.model.Projections;
 import java.util.*;
 
 import static com.akto.dto.testing.DefaultTestSuites.owaspTop10List;
+import static com.akto.util.Constants.ONE_DAY_TIMESTAMP;
 
 public class DefaultTestSuitesDao extends CommonContextDao<DefaultTestSuites> {
 
@@ -24,7 +25,7 @@ public class DefaultTestSuitesDao extends CommonContextDao<DefaultTestSuites> {
 
     public static Map<String, Map<String, List<String>>> getDefaultTestSuitesMap(List<YamlTemplate> yamlTemplateList) {
         if(yamlTemplateList == null || yamlTemplateList.isEmpty()) {
-            yamlTemplateList = YamlTemplateDao.instance.findAll(Filters.ne(YamlTemplate.INACTIVE, true), Projections.include(Constants.ID, YamlTemplate.INFO, YamlTemplate.SETTINGS));
+            yamlTemplateList = YamlTemplateDao.instance.findAll(Filters.empty(), Projections.include(Constants.ID, YamlTemplate.INFO, YamlTemplate.SETTINGS));
         }
 
         Map<String, List<String>> owaspSuites = new HashMap<>();
@@ -111,12 +112,11 @@ public class DefaultTestSuitesDao extends CommonContextDao<DefaultTestSuites> {
 
     public static void updateDefaultTestSuites() {
         long now = Context.now();
-        long sevenDaysAgo = now - 7 * 24 * 60 * 60;
+        long sevenDaysAgo = now - 7 * ONE_DAY_TIMESTAMP;
 
-        long yamlTemplatesCount = YamlTemplateDao.instance.count(Filters.ne(YamlTemplate.INACTIVE, true));
+        long yamlTemplatesCount = YamlTemplateDao.instance.count(Filters.empty());
 
         List<YamlTemplate> yamlTemplateList = YamlTemplateDao.instance.findAll(Filters.and(
-                Filters.ne(YamlTemplate.INACTIVE, true),
                 Filters.gte(YamlTemplate.CREATED_AT, sevenDaysAgo)
         ), Projections.include(Constants.ID, YamlTemplate.CREATED_AT, YamlTemplate.INFO, YamlTemplate.SETTINGS));
 

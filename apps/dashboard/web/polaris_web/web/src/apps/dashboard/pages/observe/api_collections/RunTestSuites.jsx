@@ -17,43 +17,6 @@ function RunTestSuites({ testRun, setTestRun, apiCollectionName, activeFromTesti
 
         let idsNameMap = {};
 
-        // Generate OWASP Top 10 Test Suites
-        // const newOwaspTop10TestSuites = Object.entries(owaspTop10List).map(([key, value]) => {
-        //     const tests = [];
-        //     value.forEach((cat) => {
-        //         testRun?.tests?.[cat]?.forEach((test) => {
-        //             tests.push(test.value);
-        //         });
-        //     });
-        //     return { name: key, tests };
-        // });
-
-        // // Generate Testing Methods Test Suites
-        // const newTestingMethodsTestSuites = ["Intrusive", "Non_intrusive"].map((val) => {
-        //     const tests = [];
-        //     Object.keys(testRun?.tests || {}).forEach((category) => {
-        //         testRun.tests[category]?.forEach((test) => {
-        //             if (test.nature === val.toUpperCase()) {
-        //                 tests.push(test.value);
-        //             }
-        //         });
-        //     });
-        //     return { name: val, tests };
-        // });
-
-        // // Fetch Severity Test Suites
-        // const severityTestSuites = ["Critical", "High", "Medium", "Low"].map((val) => {
-        //     const tests = [];
-        //     Object.keys(testRun?.tests || {}).forEach((category) => {
-        //         testRun.tests[category]?.forEach((test) => {
-        //             if (test.severity === val.toUpperCase()) {
-        //                 tests.push(test.value);
-        //             }
-        //         });
-        //     });
-        //     return { name: val, tests };
-        // });
-
         // Fetch Custom Test Suite
         const fetchedTestSuite = await testingApi.fetchAllTestSuites();
         const testSuitesFromBackend = fetchedTestSuite == null ? [] : [...fetchedTestSuite.defaultTestSuites]
