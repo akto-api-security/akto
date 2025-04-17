@@ -158,7 +158,8 @@ async function raiseMixpanelEvent(api, data) {
   }
   if (api && !black_list_apis.some(black_list_api => api.includes(black_list_api))) {
     if (api?.startsWith('/api/fetchEndpointsCount')) {
-      window.mixpanel.track('endpoints_count', { newCount: data.newCount })
+      console.log('Endpoints tracking - Count:', data.newCount, 'Version:', window.RELEASE_VERSION || "na")
+      window.mixpanel.track('endpoints_count', { newCount: data.newCount, version: (window.RELEASE_VERSION || "na") })
     } else {
       window.mixpanel.track(api)
     }
