@@ -51,6 +51,7 @@ import okhttp3.RequestBody;
 import okhttp3.Response;
 
 import static com.akto.utils.Utils.createRequestFile;
+import static com.akto.utils.Utils.getTestResultFromTestingRunResult;
 
 public class JiraIntegrationAction extends UserAction {
 
@@ -537,32 +538,14 @@ public class JiraIntegrationAction extends UserAction {
                     BasicDBObject issue = issues.get(i);
                     TestingRunResult testingRunResult = testingRunResultList.get(i);
                     String issueKey = issue.getString("key");
-                    GenericTestResult gtr = testingRunResult.getTestResults().get(testingRunResult.getTestResults().size() - 1);
-                    TestResult testResult;
-                    try {
-                        if (gtr instanceof TestResult) {
-                            testResult = (TestResult) gtr;
-                        } else if (gtr instanceof MultiExecTestResult) {
-                            MultiExecTestResult multiTestRes = (MultiExecTestResult) gtr;
-                            List<GenericTestResult> genericTestResults = multiTestRes.convertToExistingTestResult(testingRunResult);
-                            GenericTestResult genericTestResult = genericTestResults.get(genericTestResults.size() - 1);
-                            if (genericTestResult instanceof TestResult) {
-                                testResult = (TestResult) genericTestResult;
-                            } else {
-                                testResult = null;
-                            }
-                        } else {
-                            testResult = null;
-                        }
-                    } catch (Exception e) {
-                        loggerMaker.errorAndAddToDb("Error while casting GenericTestResult obj to TestResult obj: " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
-                        testResult = null;
-                    }
+                    TestResult testResult = getTestResultFromTestingRunResult(testingRunResult);
 
                     setIssueId(issueKey);
                     if(testResult != null) {
                         setOrigReq(testResult.getOriginalMessage());
                         setTestReq(testResult.getMessage());
+                    } else {
+                        loggerMaker.errorAndAddToDb("TestResult obj not found.", LoggerMaker.LogDb.DASHBOARD);
                     }
                     String status = attachFileToIssue();
                     if (status.equals(ERROR.toUpperCase())) {
