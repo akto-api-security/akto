@@ -1,5 +1,8 @@
 package com.akto.testing;
 
+import com.akto.dto.jobs.AutoTicketParams;
+import com.akto.dto.jobs.JobExecutorType;
+import com.akto.jobs.JobScheduler;
 import com.akto.billing.UsageMetricUtils;
 import com.akto.crons.GetRunningTestsStatus;
 import com.akto.dao.billing.OrganizationsDao;
@@ -13,6 +16,7 @@ import com.akto.dto.usage.MetricTypes;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.usage.UsageMetricHandler;
+import com.mongodb.BasicDBObject;
 import com.mongodb.WriteConcern;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
@@ -60,6 +64,8 @@ public class TestCompletion {
 
         Main.raiseMixpanelEvent(summaryId, testingRun, accountId);
 
+        scheduleTicketCreationJob(testingRun, accountId, summaryId);
+
         Organization organization = OrganizationsDao.instance.findOne(
                         Filters.in(Organization.ACCOUNTS, accountId));
 
@@ -89,5 +95,21 @@ public class TestCompletion {
         }
 
         UsageMetricHandler.calcAndFetchFeatureAccessUsingDeltaUsage(MetricTypes.TEST_RUNS, accountId, deltaUsage);
+    }
+
+    private void scheduleTicketCreationJob(TestingRun testingRun, int accountId, ObjectId summaryId) {
+        if (testingRun.getAutoTicketingDetails() == null || !testingRun.getAutoTicketingDetails().isShouldCreateTickets()) {
+            return;
+        }
+
+        AutoTicketParams params = new AutoTicketParams(
+            testingRun.getId(),
+            summaryId,
+            testingRun.getAutoTicketingDetails().getProjectId(),
+            testingRun.getAutoTicketingDetails().getIssueType(),
+            testingRun.getAutoTicketingDetails().getSeverities(),
+            "JIRA"
+        );
+        JobScheduler.scheduleRunOnceJob(accountId, params, JobExecutorType.DASHBOARD);
     }
 }
