@@ -215,7 +215,7 @@ function ApiEndpoints(props) {
         let unusedEndpointsInCollection;
         let sensitiveParamsResp;
         let sourceCodeData = {};
-        let allIssues ;
+        let apiInfoSeverityMap ;
         if (isQueryPage) {
             let apiCollectionData = endpointListFromConditions
             if (Object.keys(endpointListFromConditions).length === 0) {
@@ -246,14 +246,14 @@ function ApiEndpoints(props) {
                 api.fetchApiInfosForCollection(apiCollectionId),
                 api.fetchAPIsFromSourceCode(apiCollectionId),
                 api.loadSensitiveParameters(apiCollectionId),
-                issuesApi.fetchIssues(0,2000, ["OPEN"], [apiCollectionId], [], [], "severity", -1, Math.floor(Date.now() / 1000 - 90 * 24 * 60 * 60), 0, true,[])
+                api.getSeveritiesCountPerCollection(apiCollectionId)
             ];
             let results = await Promise.allSettled(apiPromises);
             let stisEndpoints =  results[0].status === 'fulfilled' ? results[0].value : {};
             let apiInfosData = results[1].status === 'fulfilled' ? results[1].value : {};
             sourceCodeData = results[2].status === 'fulfilled' ? results[2].value : {};
             sensitiveParamsResp =  results[3].status === 'fulfilled' ? results[3].value : {};
-            allIssues = results[4].status === 'fulfilled' ? results[4].value : {};
+            apiInfoSeverityMap = results[4].status === 'fulfilled' ? results[4].value : {};
             setShowEmptyScreen(stisEndpoints?.list !== undefined && stisEndpoints?.list?.length === 0)
             apiEndpointsInCollection = stisEndpoints?.list !== undefined && stisEndpoints.list.map(x => { return { ...x._id, startTs: x.startTs, changesCount: x.changesCount, shadow: x.shadow ? x.shadow : false } })
             apiInfoListInCollection = apiInfosData.apiInfoList
@@ -291,7 +291,7 @@ function ApiEndpoints(props) {
                 sensitiveInResp
             });
         })
-        let apiInfoSeverityMap = func.getSeverityCountPerEndpointList(allIssues?.issues||[]);
+        apiInfoSeverityMap = func.getSeverityCountPerEndpointList(apiInfoSeverityMap)
 
 
         let data = {}
