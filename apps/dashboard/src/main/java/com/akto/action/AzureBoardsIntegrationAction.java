@@ -12,6 +12,8 @@ import com.akto.dto.test_editor.Info;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
+import com.akto.dto.testing.GenericTestResult;
+import com.akto.dto.testing.MultiExecTestResult;
 import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.log.LoggerMaker;
@@ -36,6 +38,7 @@ import java.nio.file.Files;
 import java.util.*;
 
 import static com.akto.utils.Utils.createRequestFile;
+import static com.akto.utils.Utils.getTestResultFromTestingRunResult;
 
 public class AzureBoardsIntegrationAction extends UserAction {
 
@@ -168,7 +171,7 @@ public class AzureBoardsIntegrationAction extends UserAction {
         TestingRunResult testingRunResult = TestingRunResultDao.instance.findOne(Filters.and(
                 Filters.in(TestingRunResult.TEST_SUB_TYPE, testingIssuesId.getTestSubCategory()),
                 Filters.in(TestingRunResult.API_INFO_KEY, testingIssuesId.getApiInfoKey())
-        ), Projections.include(Constants.ID, TestingRunResult.API_INFO_KEY, TestingRunResult.TEST_SUB_TYPE, TestingRunResult.TEST_SUPER_TYPE, TestingRunResult.TEST_RESULTS));
+        ));
 
         logger.infoAndAddToDb("Found testingRunResult for: " + testingIssuesId.getTestSubCategory(), LoggerMaker.LogDb.DASHBOARD);
 
@@ -182,9 +185,16 @@ public class AzureBoardsIntegrationAction extends UserAction {
         String testName = testInfo.getName();
         String testDescription = testInfo.getDescription();
 
-        TestResult genericTestResult = (TestResult) testingRunResult.getTestResults().get(testingRunResult.getTestResults().size() - 1);
+        TestResult testResult = getTestResultFromTestingRunResult(testingRunResult);
+
         logger.infoAndAddToDb("TestResult size for the given test: " + testingRunResult.getTestResults().size(), LoggerMaker.LogDb.DASHBOARD);
-        String attachmentUrl = getAttachmentUrl(genericTestResult.getOriginalMessage(), genericTestResult.getMessage(), azureBoardsIntegration);
+        String attachmentUrl;
+        if(testResult != null) {
+            attachmentUrl = getAttachmentUrl(testResult.getOriginalMessage(), testResult.getMessage(), azureBoardsIntegration);
+        } else {
+            logger.errorAndAddToDb("TestResult obj not found.", LoggerMaker.LogDb.DASHBOARD);
+            attachmentUrl = null;
+        }
         logger.infoAndAddToDb("Attachment URL: " + attachmentUrl, LoggerMaker.LogDb.DASHBOARD);
 
         BasicDBList reqPayload = new BasicDBList();
@@ -263,7 +273,7 @@ public class AzureBoardsIntegrationAction extends UserAction {
         descriptionDBObject.put("value", testDescription);
         reqPayload.add(descriptionDBObject);
 
-        if(attachmentUrl != null) {
+        if(attachmentUrl != null && !attachmentUrl.isEmpty()) {
             BasicDBObject attachmentsDBObject = new BasicDBObject();
             attachmentsDBObject.put("op", AzureBoardsOperations.ADD.name().toLowerCase());
             attachmentsDBObject.put("path", "/relations/-");
