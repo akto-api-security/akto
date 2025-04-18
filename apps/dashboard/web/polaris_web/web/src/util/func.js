@@ -950,11 +950,11 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName,apiInfoSeverit
 
   if (apiInfoList) {
       apiInfoList.forEach(x => {
-          apiInfoMap[Object.values(x["id"]).join("-")] = x
+          apiInfoMap[x["id"]["apiCollectionId"] + "-" + x["id"]["url"] + "-" + x["id"]["method"]] = x
       })
   }
   listEndpoints.forEach(x => {
-      let key = x.apiCollectionId + "-" + x.method + "-" + x.url
+      let key = x.apiCollectionId + "-" + x.url + "-" + x.method
       if (!ret[key]) {
           let access_type = null
           if (apiInfoMap[key]) {
@@ -1018,22 +1018,15 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName,apiInfoSeverit
   })
   return Object.values(ret) 
 },
-getSeverityCountPerEndpointList(allIssues){
-  if(!allIssues) return {}
-  let apiInfoSeverityMap = {}
-  allIssues.forEach(x => {
-    let key = Object.values(x["id"]["apiInfoKey"]).join("-")
-    if(!apiInfoSeverityMap[key]){
-      apiInfoSeverityMap[key] = {}
-    }
-    if(!apiInfoSeverityMap[key][x.severity]) {
-      apiInfoSeverityMap[key][x.severity] = 0
-    }
-    apiInfoSeverityMap[key][x.severity]++
+getSeverityCountPerEndpointList(apiInfoSeverityMap){
+  if(!apiInfoSeverityMap) return {}
+  let apiInfoIdSeverityMap = {}
+  Object.entries(apiInfoSeverityMap).forEach(([key, value]) => {
+    let keyId = key.split(" ").join("-");
+    apiInfoIdSeverityMap[keyId] = value;
 
-  }
-  )
-  return apiInfoSeverityMap;
+  });
+  return apiInfoIdSeverityMap;
 },
 
 convertSensitiveTags(subTypeList) {

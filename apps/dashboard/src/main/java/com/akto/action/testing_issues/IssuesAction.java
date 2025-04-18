@@ -143,7 +143,6 @@ public class IssuesAction extends UserAction {
     long ignoredIssuesCount;
     String sortKey;
     int sortOrder;
-    List<String> fieldsToInclude;
 
     public String fetchAllIssues() {
         Bson filters = createFilters(true);
@@ -180,11 +179,6 @@ public class IssuesAction extends UserAction {
                     Aggregates.sort(Sorts.ascending(TestingRunIssues.CREATION_TIME)) :
                     Aggregates.sort(Sorts.descending(TestingRunIssues.CREATION_TIME));
             pipeline.add(sortStage);
-        }
-
-        if(fieldsToInclude != null && !fieldsToInclude.isEmpty()) {
-            Bson projectStage = Aggregates.project(Projections.include(fieldsToInclude));
-            pipeline.add(projectStage);
         }
 
         pipeline.add(Aggregates.skip(skip));
@@ -1076,9 +1070,5 @@ public class IssuesAction extends UserAction {
 
     public void setFilterCompliance(List<String> filterCompliance) {
         this.filterCompliance = filterCompliance;
-    }
-
-    public void setFieldsToInclude(List<String> fieldsToInclude) {
-        this.fieldsToInclude = fieldsToInclude;
     }
 }
