@@ -8,11 +8,13 @@ import com.akto.dao.AccountsContextDaoWithRbac;
 import com.akto.dao.MCollection;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiCollectionUsers;
+import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.TestingEndpoints;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.dto.type.URLMethods.Method;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.test_run_findings.TestingIssuesId;
@@ -64,12 +66,7 @@ public class TestingRunIssuesDao extends AccountsContextDaoWithRbac<TestingRunIs
     
     }
 
-    public Map<Integer,Map<String,Integer>> getSeveritiesMapForCollections(){
-        return getSeveritiesMapForCollections(null, true);
-    }
-
-    public Map<Integer,Map<String,Integer>> getSeveritiesMapForCollections(Bson filter, boolean expandApiGroups){
-        Map<Integer,Map<String,Integer>> resultMap = new HashMap<>() ;
+    private List<Bson> getPipelineForSeverityCount(Bson filter, boolean expandApiGroups, BasicDBObject groupedId) {
         List<Bson> pipeline = new ArrayList<>();
         pipeline.add(Aggregates.match(Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS, "OPEN")));
 
@@ -85,25 +82,33 @@ public class TestingRunIssuesDao extends AccountsContextDaoWithRbac<TestingRunIs
         } catch(Exception e){
         }
 
-        BasicDBObject groupedId = new BasicDBObject("apiCollectionId", "$_id.apiInfoKey.apiCollectionId")
-                .append("severity", "$severity");
-
         if (expandApiGroups) {
             UnwindOptions unwindOptions = new UnwindOptions();
             unwindOptions.preserveNullAndEmptyArrays(false);
-            pipeline.add(Aggregates.unwind("$collectionIds", unwindOptions));
-            groupedId = new BasicDBObject("apiCollectionId", "$collectionIds")
-                    .append("severity", "$severity");
+            pipeline.add(Aggregates.unwind("$" + SingleTypeInfo._COLLECTION_IDS, unwindOptions));
+            groupedId = new BasicDBObject(SingleTypeInfo._API_COLLECTION_ID, "$" + SingleTypeInfo._COLLECTION_IDS)
+                        .append(TestingRunIssues.KEY_SEVERITY, "$" + TestingRunIssues.KEY_SEVERITY);
         }
 
         pipeline.add(Aggregates.group(groupedId, Accumulators.sum("count", 1)));
+        return pipeline;
+    }
 
+    public Map<Integer,Map<String,Integer>> getSeveritiesMapForCollections(){
+        BasicDBObject groupedId = new BasicDBObject(SingleTypeInfo._API_COLLECTION_ID, "$" + TestingRunIssues.ID_API_COLLECTION_ID)
+                .append(TestingRunIssues.KEY_SEVERITY, "$" + TestingRunIssues.KEY_SEVERITY);
+        return getSeveritiesMapForCollections(null, true, groupedId);
+    }
+
+    public Map<Integer,Map<String,Integer>> getSeveritiesMapForCollections(Bson filter, boolean expandApiGroups, BasicDBObject groupedId){
+        Map<Integer,Map<String,Integer>> resultMap = new HashMap<>() ;
+        List<Bson> pipeline = getPipelineForSeverityCount(filter, expandApiGroups, groupedId);
         MongoCursor<BasicDBObject> severitiesCursor = TestingRunIssuesDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
         while(severitiesCursor.hasNext()) {
             try {
                 BasicDBObject basicDBObject = severitiesCursor.next();
-                String severity = ((BasicDBObject) basicDBObject.get("_id")).getString("severity");
-                int apiCollectionId = ((BasicDBObject) basicDBObject.get("_id")).getInt("apiCollectionId");
+                String severity = ((BasicDBObject) basicDBObject.get(Constants.ID)).getString(TestingRunIssues.KEY_SEVERITY);
+                int apiCollectionId = ((BasicDBObject) basicDBObject.get(Constants.ID)).getInt(SingleTypeInfo._API_COLLECTION_ID);
                 int count = basicDBObject.getInt("count");
                 if(resultMap.containsKey(apiCollectionId)){
                     Map<String,Integer> severityMap = resultMap.get(apiCollectionId);
@@ -119,6 +124,47 @@ public class TestingRunIssuesDao extends AccountsContextDaoWithRbac<TestingRunIs
             }
         }
         return resultMap;
+    }
+
+    public Map<ApiInfoKey, Map<String, Integer>> getSeveritiesMapForApiInfoKeys(Bson filter, boolean expandApiGroups) {
+        Map<ApiInfoKey, Map<String, Integer>> resultMap = new HashMap<>();
+        BasicDBObject groupedId = new BasicDBObject(SingleTypeInfo._API_COLLECTION_ID, "$" + TestingRunIssues.ID_API_COLLECTION_ID)
+                .append(SingleTypeInfo._URL, "$" + TestingRunIssues.ID_URL)
+                .append(SingleTypeInfo._METHOD, "$" + TestingRunIssues.ID_METHOD)
+                .append(TestingRunIssues.KEY_SEVERITY, "$" + TestingRunIssues.KEY_SEVERITY);
+        List<Bson> pipeline = getPipelineForSeverityCount(filter, expandApiGroups, groupedId);
+        if(pipeline.isEmpty()){
+            return resultMap;
+        }
+        MongoCursor<BasicDBObject> severitiesCursor = TestingRunIssuesDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
+
+        while(severitiesCursor.hasNext()) {
+            try {
+                BasicDBObject basicDBObject = severitiesCursor.next();
+                BasicDBObject id = (BasicDBObject) basicDBObject.get(Constants.ID);
+
+                String severity = id.getString(TestingRunIssues.KEY_SEVERITY);
+                int apiCollectionId = id.getInt(SingleTypeInfo._API_COLLECTION_ID);
+                String url = id.getString(SingleTypeInfo._URL);
+                String method = id.getString(SingleTypeInfo._METHOD);
+
+                int count = basicDBObject.getInt("count");
+                ApiInfoKey apiInfoKey = new ApiInfoKey(apiCollectionId, url, Method.valueOf(method));
+                if(resultMap.containsKey(apiInfoKey)){
+                    Map<String,Integer> severityMap = resultMap.get(apiInfoKey);
+                    severityMap.put(severity, count);
+                }else{
+                    Map<String,Integer> severityMap = new HashMap<>();
+                    severityMap.put(severity, count);
+                    resultMap.put(apiInfoKey, severityMap);
+                }
+
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+        return resultMap;
+
     }
   
     public Map<String, Integer> getTotalSubcategoriesCountMap(int startTimeStamp, int endTimeStamp, Set<Integer> deactivatedCollections){
