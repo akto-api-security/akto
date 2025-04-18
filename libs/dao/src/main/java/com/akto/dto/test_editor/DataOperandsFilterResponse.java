@@ -12,6 +12,15 @@ public class DataOperandsFilterResponse {
     private FilterNode extractNode;
     private String validationReason;
 
+    private static DataOperandsFilterResponse instance;
+
+    public static DataOperandsFilterResponse getInstance(){
+        if(instance == null){
+            instance = new DataOperandsFilterResponse();
+        }
+        return instance;
+    }
+
     public DataOperandsFilterResponse(Boolean result, List<String> matchedEntities, List<BasicDBObject> contextEntities, FilterNode extractNode) {
         this.result = result;
         this.matchedEntities = matchedEntities;
@@ -26,6 +35,23 @@ public class DataOperandsFilterResponse {
         this.contextEntities = contextEntities;
         this.extractNode = extractNode;
         this.validationReason = validationReason;
+    }
+
+    public DataOperandsFilterResponse resetValues(Boolean result, List<String> matchedEntities, List<BasicDBObject> contextEntities, FilterNode extractNode, String validationReason) {
+        this.result = result;
+        this.matchedEntities = matchedEntities;
+        this.contextEntities = contextEntities;
+        this.extractNode = extractNode;
+        this.validationReason = validationReason;
+        return this;
+    }
+
+    public DataOperandsFilterResponse resetValues(Boolean result, List<String> matchedEntities, List<BasicDBObject> contextEntities, FilterNode extractNode) {
+        this.result = result;
+        this.matchedEntities = matchedEntities;
+        this.contextEntities = contextEntities;
+        this.extractNode = extractNode;
+        return this;
     }
 
     public DataOperandsFilterResponse() { }

@@ -48,17 +48,17 @@ public class Filter {
                 List<Object> val = (List<Object>) updatedQuerySet;
                 dataOperandFilterRequest.modify(val.get(0), Arrays.asList(val.get(1)), "gt");
                 ValidationResult validationResult = filterAction.invokeFilter(dataOperandFilterRequest);
-                return new DataOperandsFilterResponse(validationResult.getIsValid(), matchingKeySet, contextEntities, null, validationResult.getValidationReason());
+                return DataOperandsFilterResponse.getInstance().resetValues(validationResult.getIsValid(), matchingKeySet, contextEntities, null, validationResult.getValidationReason());
             }
             if (node.getOperand().equalsIgnoreCase(TestEditorEnums.PredicateOperator.SSRF_URL_HIT.toString())) {
                 Object updatedQuerySet = filterAction.resolveQuerySetValues(null, node.fetchNodeValues(), varMap);
                 List<Object> val = (List<Object>) updatedQuerySet;
                 dataOperandFilterRequest.modify(null, val, "ssrf_url_hit");
                 ValidationResult validationResult = filterAction.invokeFilter(dataOperandFilterRequest);
-                return new DataOperandsFilterResponse(validationResult.getIsValid(), matchingKeySet, contextEntities, null, validationResult.getValidationReason());
+                return DataOperandsFilterResponse.getInstance().resetValues(validationResult.getIsValid(), matchingKeySet, contextEntities, null, validationResult.getValidationReason());
             }
             if (! (node.getNodeType().toLowerCase().equals(OperandTypes.Data.toString().toLowerCase()) || node.getNodeType().toLowerCase().equals(OperandTypes.Extract.toString().toLowerCase()) || node.getNodeType().toLowerCase().equals(OperandTypes.Context.toString().toLowerCase() ))) {
-                return new DataOperandsFilterResponse(false, null, null, null);
+                return DataOperandsFilterResponse.getInstance().resetValues(false, null, null, null);
             }
             String operand = node.getOperand();
             filterActionRequest.modify(node.getValues(), rawApi, testRawApi, apiInfoKey, node.getConcernedProperty(), node.getSubConcernedProperty(), matchingKeySet, contextEntities, operand, context, keyValOperandSeen, node.getBodyOperand(), node.getContextProperty(), node.getCollectionProperty());
@@ -69,7 +69,7 @@ public class Filter {
                 boolean extractMultiple = node.getOperand().equalsIgnoreCase(ExtractOperator.EXTRACTMULTIPLE.toString());
                 if (node.getCollectionProperty() != null && (node.getCollectionProperty().equalsIgnoreCase(TestEditorEnums.CollectionOperands.FOR_ONE.toString()) || node.getCollectionProperty().equalsIgnoreCase(TestEditorEnums.CollectionOperands.FOR_ALL.toString()))) {
                     if (skipExtractExecution) {
-                        return new DataOperandsFilterResponse(true, null, null, node);
+                        return DataOperandsFilterResponse.getInstance().resetValues(true, null, null, node);
                     }
                 }
                 if (filterActionRequest.getConcernedProperty() != null) {
@@ -77,7 +77,7 @@ public class Filter {
                 } else {
                     resp = filterAction.extractContextVar(filterActionRequest, varMap);
                 }
-                return new DataOperandsFilterResponse(resp, null, null, null);
+                return DataOperandsFilterResponse.getInstance().resetValues(resp, null, null, null);
             } else if (filterActionRequest.getConcernedProperty() != null && !node.getNodeType().equalsIgnoreCase("context")) {
                 return filterAction.apply(filterActionRequest);
             } else {
@@ -153,7 +153,7 @@ public class Filter {
             result = resp.getResult();
         }
 
-        return new DataOperandsFilterResponse(result, matchingKeySet, contextEntities, firstExtractNode, validationReason.toString());
+        return DataOperandsFilterResponse.getInstance().resetValues(result, matchingKeySet, contextEntities, firstExtractNode, validationReason.toString());
 
     }
 
