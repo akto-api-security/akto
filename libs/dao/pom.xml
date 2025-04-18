@@ -182,6 +182,12 @@
             <artifactId>fastjson2</artifactId>
             <version>2.0.51</version>
         </dependency>
+        <dependency>
+            <groupId>com.akto.libs.protobuf</groupId>
+            <artifactId>protobuf</artifactId>
+            <version>1.0-SNAPSHOT</version>
+            <scope>compile</scope>
+        </dependency>
     </dependencies>
     <build>
         <plugins>

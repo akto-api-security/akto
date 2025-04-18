@@ -1,5 +1,6 @@
 package com.akto.threat.backend.service;
 
+import com.akto.dto.HttpResponseParams;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.DailyActorsCountResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchMaliciousEventsRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchMaliciousEventsResponse;
@@ -322,7 +323,7 @@ public class ThreatActorService {
         for (Document doc: respList) {
             maliciousPayloadsResponse.add(
                 FetchMaliciousEventsResponse.MaliciousPayloadsResponse.newBuilder().
-                setOrig((doc.getString("latestApiOrig"))).
+                setOrig(HttpResponseParams.getSampleStringFromProtoString(doc.getString("latestApiOrig"))).
                 setTs(doc.getLong("detectedAt")).build());
         }
     } else {
@@ -331,7 +332,7 @@ public class ThreatActorService {
         for (Document doc: respList) {
             maliciousPayloadsResponse.add(
                 FetchMaliciousEventsResponse.MaliciousPayloadsResponse.newBuilder().
-                setOrig((doc.getString("orig"))).
+                setOrig(HttpResponseParams.getSampleStringFromProtoString(doc.getString("orig"))).
                 setTs(doc.getLong("requestTime")).build());
         }
     }

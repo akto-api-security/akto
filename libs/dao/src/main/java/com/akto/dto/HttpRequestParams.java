@@ -29,6 +29,17 @@ public class HttpRequestParams {
 
     }
 
+    public HttpRequestParams resetValues(String method, String url, String type, Map<String, List<String>> headers, String payload, int apiCollectionId) {
+        this.method = method;
+        this.url = url;
+        this.type = type;
+        this.headers = headers;
+        this.payload = payload;
+        this.apiCollectionId = apiCollectionId;
+        return this;
+    }
+
+
     public HttpRequestParams copy() {
         return new HttpRequestParams(this.method, this.url, this.type, this.headers, this.payload, this.apiCollectionId);
     }
