@@ -20,13 +20,13 @@ public class EqFilterObj extends DataOperandsImpl {
             querySet = dataOperandFilterRequest.getQueryset();
             List<String> queryList = (List) querySet;
             if (queryList == null || queryList.size() == 0) {
-                return ValidationResult.getInstance().resetValues(false, TestEditorEnums.DataOperands.EQ_OBJ.name().toLowerCase() + " validation failed because of empty query");
+                return ValidationResult.getInstance().resetValues(false, "");
             }
             Double matchVal = compareWithOriginalResponse(data.toString(), queryList.get(0), new HashMap<>());
             boolean res = (matchVal == 100.0);
-            return ValidationResult.getInstance().resetValues(res, TestEditorEnums.DataOperands.EQ.name().toLowerCase() + " validation passed ");            
+            return ValidationResult.getInstance().resetValues(res, "");      
         } catch (Exception e) {
-            return ValidationResult.getInstance().resetValues(false, TestEditorEnums.DataOperands.EQ_OBJ.name().toLowerCase() + " validation failed because of error " + e.getMessage());
+            return ValidationResult.getInstance().resetValues(false, "");
         }
 
     }

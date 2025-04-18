@@ -23,6 +23,6 @@ public class LesserThanFilter extends DataOperandsImpl {
             validationReson = TestEditorEnums.DataOperands.LT.name().toLowerCase() + " filter failed: ''"+ data +"' >= '" + querySet +"'";
         }
 
-        return ValidationResult.getInstance().resetValues(result, validationReson);
+        return ValidationResult.getInstance().resetValues(result, "");
     }
 }

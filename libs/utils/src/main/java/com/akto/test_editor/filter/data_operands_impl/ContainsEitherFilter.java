@@ -30,7 +30,7 @@ public class ContainsEitherFilter extends DataOperandsImpl {
             }
             data = (String) dataOperandFilterRequest.getData();
         } catch(Exception e) {
-            return ValidationResult.getInstance().resetValues(false, ValidationResult.GET_QUERYSET_CATCH_ERROR);
+            return ValidationResult.getInstance().resetValues(false, "");
         }
         for (String queryString: querySet) {
             try {
@@ -46,7 +46,7 @@ public class ContainsEitherFilter extends DataOperandsImpl {
         if (result) {
             return ValidationResult.getInstance().resetValues(result, "");
         }
-        return ValidationResult.getInstance().resetValues(result, TestEditorEnums.DataOperands.CONTAINS_EITHER.name().toLowerCase() + " failed due to '"+data+"' not matching with :" + notMatchedQuerySet);
+        return ValidationResult.getInstance().resetValues(result, "");
     }
 
     public Boolean evaluateOnListQuerySet(String data, List<String> querySet) {

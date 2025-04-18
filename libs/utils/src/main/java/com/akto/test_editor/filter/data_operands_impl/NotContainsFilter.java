@@ -22,7 +22,7 @@ public class NotContainsFilter extends DataOperandsImpl {
             querySet = (List<String>) dataOperandFilterRequest.getQueryset();
             data = (String) dataOperandFilterRequest.getData();
         } catch(Exception e) {
-            return ValidationResult.getInstance().resetValues(result, ValidationResult.GET_QUERYSET_CATCH_ERROR);
+            return ValidationResult.getInstance().resetValues(result, "");
         }
         failedQueryString = null;
         for (String queryString: querySet) {
@@ -36,12 +36,8 @@ public class NotContainsFilter extends DataOperandsImpl {
             }
             result = result && res;
         }
-        if (result) {
-            validationString = TestEditorEnums.DataOperands.NOT_CONTAINS.name().toLowerCase() + " filter passed";
-        } else {
-            validationString = TestEditorEnums.DataOperands.NOT_CONTAINS.name().toLowerCase() + " filter failed due to '" + data + "' not matching with: " + failedQueryString;
-        }
-        return ValidationResult.getInstance().resetValues(result, validationString);
+
+        return ValidationResult.getInstance().resetValues(result, "");
     }
 
 

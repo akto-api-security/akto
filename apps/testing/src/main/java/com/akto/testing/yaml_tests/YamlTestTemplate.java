@@ -101,7 +101,7 @@ public class YamlTestTemplate extends SecurityTestTemplate {
             // loggerMaker.debugAndAddToDb("validating auth, authenticated value is " + this.auth.getAuthenticated() + " " + logId, LogDb.TESTING);
             boolean validAuthHeaders = AuthValidator.validate(this.auth, this.rawApi, this.authMechanism, this.customAuthTypes);
             if (!validAuthHeaders) {
-                return ValidationResult.getInstance().resetValues(false, "No valid auth headers");
+                return ValidationResult.getInstance().resetValues(false, "");
             }
         }
         ValidationResult isValid = TestPlugin.validateFilter(this.getFilterNode(),this.getRawApi(), this.getApiInfoKey(), this.varMap, this.logId);

@@ -29,7 +29,7 @@ public class ContainsJwt extends DataOperandsImpl {
             queryVal = (Boolean) querySet.get(0);
             data = (String) dataOperandFilterRequest.getData();
         } catch(Exception e) {
-            return ValidationResult.getInstance().resetValues(result, ValidationResult.GET_QUERYSET_CATCH_ERROR);
+            return ValidationResult.getInstance().resetValues(result, "");
         }
 
         if (data == null || queryVal == null) {
@@ -46,13 +46,11 @@ public class ContainsJwt extends DataOperandsImpl {
             }
         }
         if (queryVal == result) {
-            return ValidationResult.getInstance().resetValues(true,
-            queryVal? TestEditorEnums.DataOperands.CONTAINS_JWT.name().toLowerCase() + ": true passed because key:"+ jwtKeyType+" is jwt type":
-                    TestEditorEnums.DataOperands.CONTAINS_JWT.name().toLowerCase() + ": false passed because no jwt type found");
+            return ValidationResult.getInstance().resetValues(true, "");
         }
         if (queryVal) {
-            return ValidationResult.getInstance().resetValues(false, TestEditorEnums.DataOperands.CONTAINS_JWT.name().toLowerCase() + ": true failed because no jwt type found");
+            return ValidationResult.getInstance().resetValues(false, "");
         }
-        return ValidationResult.getInstance().resetValues(false, TestEditorEnums.DataOperands.CONTAINS_JWT.name().toLowerCase() + ": false failed because key:"+ jwtKeyType+" is jwt type");
+        return ValidationResult.getInstance().resetValues(false, "");
     }
 }

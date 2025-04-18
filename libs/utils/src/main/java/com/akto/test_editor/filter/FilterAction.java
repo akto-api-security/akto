@@ -828,7 +828,7 @@ public final class FilterAction {
 
         DataOperandsImpl handler = this.filters.get(dataOperandFilterRequest.getOperand().toLowerCase());
         if (handler == null) {
-          return ValidationResult.getInstance().resetValues(false, "\noperand:" + dataOperandFilterRequest.getOperand().toLowerCase()+ " not found in filters");
+          return ValidationResult.getInstance().resetValues(false, "");
         }
         return handler.isValid(dataOperandFilterRequest);
     }

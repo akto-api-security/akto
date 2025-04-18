@@ -15,14 +15,8 @@ public class GreaterThanEqFilter extends DataOperandsImpl {
         data = dataOperandFilterRequest.getData();
         querySet = dataOperandFilterRequest.getQueryset();
         result = Utils.applyIneqalityOperation(data, querySet, "gte");
-        validationReson = null;
-        if (result) {
-            validationReson = TestEditorEnums.DataOperands.GTE.name().toLowerCase() + " filter passed";
-        } else {
-            validationReson = TestEditorEnums.DataOperands.GTE.name().toLowerCase() + " filter failed: '"+ data +"' < '" + querySet +"'";
-        }
 
-        return ValidationResult.getInstance().resetValues(result, validationReson);
+        return ValidationResult.getInstance().resetValues(result, "");
     }
 
 }

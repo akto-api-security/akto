@@ -63,11 +63,11 @@ public class CookieExpireFilter extends DataOperandsImpl {
             queryVal = (Boolean) querySet.get(0);
             dataStr = (String) dataOperandFilterRequest.getData();
         } catch(Exception e) {
-            return ValidationResult.getInstance().resetValues(false, ValidationResult.GET_QUERYSET_CATCH_ERROR);
+            return ValidationResult.getInstance().resetValues(false, "");
         }
 
         if (dataStr == null || queryVal == null) {
-            return ValidationResult.getInstance().resetValues(false, queryVal == null ? TestEditorEnums.DataOperands.COOKIE_EXPIRE_FILTER.name().toLowerCase() + " is not set true": "no data to be matched for validation");
+            return ValidationResult.getInstance().resetValues(false, "");
         }
 
         Map<String,String> cookieMap = parseCookie(Arrays.asList(dataStr));
@@ -78,12 +78,11 @@ public class CookieExpireFilter extends DataOperandsImpl {
         int maxAgeOfCookieTs = getMaxAgeFromCookie(cookieMap);
         res = maxAgeOfCookieTs/(Constants.ONE_MONTH_TIMESTAMP) > 1;
         if (result == res) {
-            return ValidationResult.getInstance().resetValues(true, result? TestEditorEnums.DataOperands.COOKIE_EXPIRE_FILTER.name().toLowerCase() + ": true passed because cookie:"+ dataStr+" expired":
-            TestEditorEnums.DataOperands.COOKIE_EXPIRE_FILTER.name().toLowerCase() + ": false passed because cookie:"+ dataStr+" not expired");
+            return ValidationResult.getInstance().resetValues(true, null);
         }
         if (result) {
-            return ValidationResult.getInstance().resetValues(false, TestEditorEnums.DataOperands.COOKIE_EXPIRE_FILTER.name().toLowerCase() + ": true failed cookie:"+ dataStr+" not expired");
+            return ValidationResult.getInstance().resetValues(false, "");
         }
-        return ValidationResult.getInstance().resetValues(false, TestEditorEnums.DataOperands.COOKIE_EXPIRE_FILTER.name().toLowerCase() + ": false failed because cookie:"+ dataStr+" expired");
+        return ValidationResult.getInstance().resetValues(false, "");
     }
 }

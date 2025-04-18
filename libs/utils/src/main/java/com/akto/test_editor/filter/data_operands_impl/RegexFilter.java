@@ -21,7 +21,7 @@ public class RegexFilter extends DataOperandsImpl {
             querySet = (List<String>) dataOperandFilterRequest.getQueryset();
             data = (String) dataOperandFilterRequest.getData();
         } catch(Exception e) {
-            return ValidationResult.getInstance().resetValues(result, ValidationResult.GET_QUERYSET_CATCH_ERROR);
+            return ValidationResult.getInstance().resetValues(result, "");
         }
         for (String queryString: querySet) {
             try {
@@ -32,12 +32,8 @@ public class RegexFilter extends DataOperandsImpl {
             result = result || res;
         }
         validationString = null;
-        if (result) {
-            validationString = TestEditorEnums.DataOperands.REGEX.name().toLowerCase() + " filter passed";
-        } else {
-            validationString = TestEditorEnums.DataOperands.REGEX.name().toLowerCase() + " filter failed due to '" + data + "' not matching for - " + querySet;;
-        }
-        return ValidationResult.getInstance().resetValues(result, validationString);
+
+        return ValidationResult.getInstance().resetValues(result, "");
     }
 
 }

@@ -21,7 +21,7 @@ public class NotContainsEitherFilter extends DataOperandsImpl {
             querySet = (List<String>) dataOperandFilterRequest.getQueryset();
             data = (String) dataOperandFilterRequest.getData();
         } catch(Exception e) {
-            return ValidationResult.getInstance().resetValues(result, ValidationResult.GET_QUERYSET_CATCH_ERROR);
+            return ValidationResult.getInstance().resetValues(result, "");
         }
 
 
@@ -33,10 +33,8 @@ public class NotContainsEitherFilter extends DataOperandsImpl {
             }
             result = result || res;
         }
-        if (!result) {
-            validationString = TestEditorEnums.DataOperands.NOT_CONTAINS_EITHER.name().toLowerCase() + " filter failed due to '"+ data + "' not matching with : " + querySet;
-        }
-        return ValidationResult.getInstance().resetValues(result, validationString);
+
+        return ValidationResult.getInstance().resetValues(result, "");
     }
 
 

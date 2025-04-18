@@ -21,13 +21,13 @@ public class EqFilter extends DataOperandsImpl {
             if (data instanceof String) {
                 List<String> queryList = (List) querySet;
                 if (queryList == null || queryList.size() == 0) {
-                    return ValidationResult.getInstance().resetValues(false, TestEditorEnums.DataOperands.EQ.name().toLowerCase() + " validation failed because of empty query");
+                    return ValidationResult.getInstance().resetValues(false, "");
                 }
                 result = data.toString().trim().toLowerCase().equals(queryList.get(0).trim().toLowerCase());
                 if (result) {
-                    return ValidationResult.getInstance().resetValues(result, TestEditorEnums.DataOperands.EQ.name().toLowerCase() + " validation passed ");
+                    return ValidationResult.getInstance().resetValues(result, "");
                 } else {
-                    return ValidationResult.getInstance().resetValues(result, TestEditorEnums.DataOperands.EQ.name().toLowerCase() + " validation failed because: string query do not match");
+                    return ValidationResult.getInstance().resetValues(result, "");
                 }
             }
 
@@ -46,16 +46,16 @@ public class EqFilter extends DataOperandsImpl {
                     result = ((int) dataInt == (int) queryList.get(0));
                 }
                 if (result) {
-                    return ValidationResult.getInstance().resetValues(result, TestEditorEnums.DataOperands.EQ.name().toLowerCase() + " validation passed ");
+                    return ValidationResult.getInstance().resetValues(result, "");
                 } else {
-                    return ValidationResult.getInstance().resetValues(result, TestEditorEnums.DataOperands.EQ.name().toLowerCase() + " validation failed because: "+ dataInt +" != " + query);
+                    return ValidationResult.getInstance().resetValues(result, "");
                 }
             }
             
             if (data instanceof Boolean ) {
                 List<Boolean> queryList = (List) querySet;
                 if (queryList == null || queryList.size() == 0) {
-                    return ValidationResult.getInstance().resetValues(false, TestEditorEnums.DataOperands.EQ.name().toLowerCase() + " validation failed because of empty query");
+                    return ValidationResult.getInstance().resetValues(false, "");
                 }
                 dataBool = (Boolean) data;
 
@@ -67,16 +67,16 @@ public class EqFilter extends DataOperandsImpl {
                     result = ((boolean) dataBool == (boolean) queryList.get(0));
                 }
                 if (result) {
-                    return ValidationResult.getInstance().resetValues(result, TestEditorEnums.DataOperands.EQ.name().toLowerCase() + " validation passed ");
+                    return ValidationResult.getInstance().resetValues(result, "");
                 } else {
-                    return ValidationResult.getInstance().resetValues(result, TestEditorEnums.DataOperands.EQ.name().toLowerCase() + " validation failed because: boolean query do not match");
+                    return ValidationResult.getInstance().resetValues(result, "");
                 }
             }
             
         } catch (Exception e) {
-            return ValidationResult.getInstance().resetValues(false, TestEditorEnums.DataOperands.EQ.name().toLowerCase() + " validation failed because of empty query");
+            return ValidationResult.getInstance().resetValues(false, "");
         }
-        return ValidationResult.getInstance().resetValues(result, TestEditorEnums.DataOperands.EQ.name().toLowerCase() + " validation failed because of empty query");
+        return ValidationResult.getInstance().resetValues(result, "");
     }
 
 }

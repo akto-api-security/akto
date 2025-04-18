@@ -16,13 +16,7 @@ public class LesserThanEqFilter extends DataOperandsImpl {
         querySet = dataOperandFilterRequest.getQueryset();
 
         result = Utils.applyIneqalityOperation(data, querySet, "lte");
-        validationReson = null;
-        if (result) {
-            validationReson = TestEditorEnums.DataOperands.LTE.name().toLowerCase() + " filter passed";
-        } else {
-            validationReson = TestEditorEnums.DataOperands.LTE.name().toLowerCase() + " filter failed: ''"+ data +"' > '" + querySet +"'";
-        }
 
-        return ValidationResult.getInstance().resetValues(result, validationReson);
+        return ValidationResult.getInstance().resetValues(result, "");
     }
 }

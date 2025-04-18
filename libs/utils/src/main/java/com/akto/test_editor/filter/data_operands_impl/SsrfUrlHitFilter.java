@@ -18,7 +18,7 @@ public class SsrfUrlHitFilter extends DataOperandsImpl {
             querySet = (List<String>) dataOperandFilterRequest.getQueryset();
             data = (String) dataOperandFilterRequest.getData();
         } catch(Exception e) {
-            return ValidationResult.getInstance().resetValues(result, ValidationResult.GET_QUERYSET_CATCH_ERROR);
+            return ValidationResult.getInstance().resetValues(result, "");
         }
 
         for (String queryString: querySet) {
@@ -27,13 +27,8 @@ public class SsrfUrlHitFilter extends DataOperandsImpl {
                 break;
             }
         }
-        String validationString;
-        if (result) {
-            validationString = TestEditorEnums.PredicateOperator.SSRF_URL_HIT.name().toLowerCase() + " filter passed";
-        } else {
-            validationString = TestEditorEnums.PredicateOperator.SSRF_URL_HIT.name().toLowerCase() + " filter failed due to - " + querySet;;
-        }
-        return ValidationResult.getInstance().resetValues(result, validationString);
+
+        return ValidationResult.getInstance().resetValues(result, "");
     }
 
 }

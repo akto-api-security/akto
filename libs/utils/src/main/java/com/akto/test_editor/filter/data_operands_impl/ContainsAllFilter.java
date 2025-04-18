@@ -25,7 +25,7 @@ public class ContainsAllFilter extends DataOperandsImpl {
             querySet = (List<String>) dataOperandFilterRequest.getQueryset();
             data = (String) dataOperandFilterRequest.getData();
         } catch(Exception e) {
-            return ValidationResult.getInstance().resetValues(result, ValidationResult.GET_QUERYSET_CATCH_ERROR);
+            return ValidationResult.getInstance().resetValues(result, "");
         }
         for (String queryString: querySet) {
             try {
@@ -42,7 +42,7 @@ public class ContainsAllFilter extends DataOperandsImpl {
         if (result) {
             return ValidationResult.getInstance().resetValues(result, "");
         }
-        return ValidationResult.getInstance().resetValues(result, TestEditorEnums.DataOperands.CONTAINS_ALL.name().toLowerCase() + " failed due to '"+data+"' not matching with :" + notMatchedQuerySet);
+        return ValidationResult.getInstance().resetValues(result, "");
     }
 
     public Boolean evaluateOnListQuerySet(String data, List<String> querySet) {

@@ -22,17 +22,17 @@ public class DatatypeFilter extends DataOperandsImpl {
         try {
             queryList = (List) querySet;
             if (queryList == null || queryList.size() == 0) {
-                return ValidationResult.getInstance().resetValues(false, TestEditorEnums.DataOperands.DATATYPE.name().toLowerCase() + " validation is passed without any query");
+                return ValidationResult.getInstance().resetValues(false, "");
             }
 
             if (data instanceof String && queryList.get(0).equalsIgnoreCase("string")) {
-                return ValidationResult.getInstance().resetValues(true, TestEditorEnums.DataOperands.DATATYPE.name().toLowerCase() + ": string validation is passed because: "+ data + " is string type");
+                return ValidationResult.getInstance().resetValues(true, "");
             }
             if (data instanceof Integer && queryList.get(0).equalsIgnoreCase("number")) {
-                return ValidationResult.getInstance().resetValues(true, TestEditorEnums.DataOperands.DATATYPE.name().toLowerCase() + ": number validation is passed because: "+ data + " is number type");
+                return ValidationResult.getInstance().resetValues(true, "");
             }
             if (data instanceof Boolean && queryList.get(0).equalsIgnoreCase("boolean")) {
-                return ValidationResult.getInstance().resetValues(true, TestEditorEnums.DataOperands.DATATYPE.name().toLowerCase() + ": boolean validation is passed");
+                return ValidationResult.getInstance().resetValues(true, "");
             }
 
             int accountId = Context.accountId.get();
@@ -61,8 +61,7 @@ public class DatatypeFilter extends DataOperandsImpl {
                         break;
                 }
                 if (isValid) {
-                    return ValidationResult.getInstance().resetValues(true, TestEditorEnums.DataOperands.DATATYPE.name().toLowerCase() + ": "
-                    + dataType + " validation is passed");
+                    return ValidationResult.getInstance().resetValues(true, null);
                 }
             }
 
@@ -73,14 +72,13 @@ public class DatatypeFilter extends DataOperandsImpl {
                 SingleTypeInfo.SubType subType = KeyTypes.findSubType(data, null, null, true);
                 isValid = subType.getName().equals(dataType);
                 if (isValid) {
-                    return ValidationResult.getInstance().resetValues(true, TestEditorEnums.DataOperands.DATATYPE.name().toLowerCase() + ": "
-                    + dataType + " validation is passed");
+                    return ValidationResult.getInstance().resetValues(true, null);
                 }
             }
 
-            return ValidationResult.getInstance().resetValues(false, ValidationResult.GET_QUERYSET_CATCH_ERROR);
+            return ValidationResult.getInstance().resetValues(false, "");
         } catch (Exception e) {
-            return ValidationResult.getInstance().resetValues(false, ValidationResult.GET_QUERYSET_CATCH_ERROR);
+            return ValidationResult.getInstance().resetValues(false, "");
         }
         
     }
