@@ -9,24 +9,18 @@ import com.akto.util.Constants;
 import com.akto.util.enums.GlobalEnums;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
+import com.mongodb.client.model.Updates;
 
 import java.util.*;
 
 import static com.akto.dto.testing.DefaultTestSuites.owaspTop10List;
-import static com.akto.util.Constants.ONE_DAY_TIMESTAMP;
 
 public class DefaultTestSuitesDao extends CommonContextDao<DefaultTestSuites> {
 
     public static final DefaultTestSuitesDao instance = new DefaultTestSuitesDao();
 
     public static Map<String, Map<String, List<String>>> getDefaultTestSuitesMap() {
-        return getDefaultTestSuitesMap(null);
-    }
-
-    public static Map<String, Map<String, List<String>>> getDefaultTestSuitesMap(List<YamlTemplate> yamlTemplateList) {
-        if(yamlTemplateList == null || yamlTemplateList.isEmpty()) {
-            yamlTemplateList = YamlTemplateDao.instance.findAll(Filters.empty(), Projections.include(Constants.ID, YamlTemplate.INFO, YamlTemplate.SETTINGS));
-        }
+        List<YamlTemplate> yamlTemplateList = YamlTemplateDao.instance.findAll(Filters.empty(), Projections.include(Constants.ID, YamlTemplate.INFO, YamlTemplate.SETTINGS));
 
         Map<String, List<String>> owaspSuites = new HashMap<>();
         for(Map.Entry<String, List<String>> entry : owaspTop10List.entrySet()) {
@@ -85,40 +79,7 @@ public class DefaultTestSuitesDao extends CommonContextDao<DefaultTestSuites> {
     }
 
     public static void insertDefaultTestSuites() {
-        insertDefaultTestSuites(null);
-    }
-
-    public static void insertDefaultTestSuites(Map<String, Map<String, List<String>>> defaultTestSuitesMap) {
-        if(defaultTestSuitesMap == null || defaultTestSuitesMap.isEmpty()) {
-            defaultTestSuitesMap = getDefaultTestSuitesMap();
-        }
-
-        for(DefaultTestSuites.DefaultSuitesType defaultSuitesType : DefaultTestSuites.DefaultSuitesType.values()) {
-            Map<String, List<String>> defaultSuiteMap = defaultTestSuitesMap.get(defaultSuitesType.name());
-            for(String key : defaultSuiteMap.keySet()) {
-                DefaultTestSuites defaultTestSuites = new DefaultTestSuites();
-
-                defaultTestSuites.setCreatedAt(Context.now());
-                defaultTestSuites.setCreatedBy("Akto");
-                defaultTestSuites.setLastUpdated(Context.now());
-                defaultTestSuites.setName(key);
-                defaultTestSuites.setSubCategoryList(defaultSuiteMap.get(key));
-                defaultTestSuites.setSuiteType(defaultSuitesType);
-
-                DefaultTestSuitesDao.instance.insertOne(defaultTestSuites);
-            }
-        }
-    }
-
-    public static void updateDefaultTestSuites() {
-        long now = Context.now();
-        long sevenDaysAgo = now - 7 * ONE_DAY_TIMESTAMP;
-
         long yamlTemplatesCount = YamlTemplateDao.instance.count(Filters.empty());
-
-        List<YamlTemplate> yamlTemplateList = YamlTemplateDao.instance.findAll(Filters.and(
-                Filters.gte(YamlTemplate.CREATED_AT, sevenDaysAgo)
-        ), Projections.include(Constants.ID, YamlTemplate.CREATED_AT, YamlTemplate.INFO, YamlTemplate.SETTINGS));
 
         List<DefaultTestSuites> defaultTestSuites = DefaultTestSuitesDao.instance.findAll(Filters.empty());
 
@@ -131,15 +92,25 @@ public class DefaultTestSuitesDao extends CommonContextDao<DefaultTestSuites> {
             return;
         }
 
-        List<YamlTemplate> newTemplates = new ArrayList<>();
-        for(YamlTemplate yamlTemplate : yamlTemplateList) {
-            if(!allTestSuitesTemplates.contains(yamlTemplate.getId())) {
-                newTemplates.add(yamlTemplate);
+        Map<String, Map<String, List<String>>> defaultTestSuitesMap = getDefaultTestSuitesMap();
+
+        for(DefaultTestSuites.DefaultSuitesType defaultSuitesType : DefaultTestSuites.DefaultSuitesType.values()) {
+            Map<String, List<String>> defaultSuiteMap = defaultTestSuitesMap.get(defaultSuitesType.name());
+            for (String key : defaultSuiteMap.keySet()) {
+                DefaultTestSuitesDao.instance.updateOne(Filters.and(
+                        Filters.eq(DefaultTestSuites.NAME, key),
+                        Filters.eq(DefaultTestSuites.SUITE_TYPE, defaultSuitesType.name())
+                    ),
+                    Updates.combine(
+                        Updates.setOnInsert(DefaultTestSuites.CREATED_AT, Context.now()),
+                        Updates.set(DefaultTestSuites.LAST_UPDATED, Context.now()),
+                        Updates.setOnInsert(DefaultTestSuites.CREATED_BY, "Akto"),
+                        Updates.setOnInsert(DefaultTestSuites.SUITE_TYPE, defaultSuitesType.name()),
+                        Updates.addEachToSet(DefaultTestSuites.SUB_CATEGORY_LIST, defaultSuiteMap.get(key))
+                    )
+                );
             }
         }
-
-        Map<String, Map<String, List<String>>> defaultTestSuitesMap = getDefaultTestSuitesMap(newTemplates);
-        insertDefaultTestSuites(defaultTestSuitesMap);
     }
 
     @Override
