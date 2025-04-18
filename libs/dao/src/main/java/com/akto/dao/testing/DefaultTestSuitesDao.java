@@ -1,6 +1,6 @@
 package com.akto.dao.testing;
 
-import com.akto.dao.CommonContextDao;
+import com.akto.dao.AccountsContextDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dto.test_editor.YamlTemplate;
@@ -15,7 +15,7 @@ import java.util.*;
 
 import static com.akto.dto.testing.DefaultTestSuites.owaspTop10List;
 
-public class DefaultTestSuitesDao extends CommonContextDao<DefaultTestSuites> {
+public class DefaultTestSuitesDao extends AccountsContextDao<DefaultTestSuites> {
 
     public static final DefaultTestSuitesDao instance = new DefaultTestSuitesDao();
 
