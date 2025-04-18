@@ -14,13 +14,7 @@
     <artifactId>testing</artifactId>
     <packaging>jar</packaging>
     
-    <dependencies>
-        <dependency>
-            <groupId>com.google.cloud</groupId>
-            <artifactId>google-cloud-batch</artifactId>
-            <version>0.60.0</version>
-        </dependency>
-        
+    <dependencies>        
         <dependency>
             <groupId>com.akto.libs.dao</groupId>
             <artifactId>dao</artifactId>
