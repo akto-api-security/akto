@@ -840,10 +840,17 @@ export default {
         return request({
             url: '/api/resetDataTypeRetro',
             method: 'post',
-            data: {
-                name: name,
-            }
+            data: { name }
         })
+    },
+
+    async saveEndpointDescription(apiCollectionId, url, method, description) {
+        const resp = await request({
+            url: '/api/saveEndpointDescription',
+            method: 'post',
+            data: { apiCollectionId, url, method, description }
+        })
+        return resp
     },
 
     async checkIfDependencyGraphAvailable(apiCollectionId, url, method) {
@@ -865,5 +872,25 @@ export default {
             }
         })
     },
+
+    async getSeveritiesCountPerCollection(apiCollectionId) {
+        return await request({
+            url: '/api/getSeveritiesCountPerCollection',
+            method: 'post',
+            data: {
+                apiCollectionId
+            }
+        })
+    },
+    
+    async saveCollectionDescription(apiCollectionId, description) {
+        return await request({
+            url: '/api/saveCollectionDescription',
+            method: 'post',
+            data: {
+                apiCollectionId, description
+            }
+        })
+    }
 
 }

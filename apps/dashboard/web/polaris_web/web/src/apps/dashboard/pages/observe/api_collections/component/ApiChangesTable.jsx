@@ -70,7 +70,7 @@ function ApiChangesTable(props) {
           await api.fetchSensitiveParamsForEndpoints(apiInfos.map((x) => {return x.id.url})).then(allSensitiveFields => {
               const sensitiveParams = allSensitiveFields.data.endpoints
               const mappedData = transform.fillSensitiveParams(sensitiveParams, apiInfos.map((x)=> {return x.id}));
-              const normalData = func.mergeApiInfoAndApiCollection(mappedData, apiInfos, apiCollectionMap);
+              const normalData = func.mergeApiInfoAndApiCollection(mappedData, apiInfos, apiCollectionMap,{});
               ret = transform.prettifyEndpointsData(normalData);
         })
         setLoading(false)

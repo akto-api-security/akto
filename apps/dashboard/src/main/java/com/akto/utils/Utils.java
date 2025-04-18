@@ -17,6 +17,10 @@ import com.akto.dto.HttpResponseParams;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.dependency_flow.DependencyFlow;
+import com.akto.dto.testing.GenericTestResult;
+import com.akto.dto.testing.MultiExecTestResult;
+import com.akto.dto.testing.TestResult;
+import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.third_party_access.Credential;
 import com.akto.dto.third_party_access.PostmanCredential;
 import com.akto.dto.third_party_access.ThirdPartyAccess;
@@ -640,6 +644,9 @@ public class Utils {
     }
 
     public static File createRequestFile(String originalMessage, String message) {
+        if(originalMessage == null || message == null) {
+            return null;
+        }
         try {
             String origCurl = ExportSampleDataAction.getCurl(originalMessage);
             String testCurl = ExportSampleDataAction.getCurl(message);
@@ -668,4 +675,30 @@ public class Utils {
         }
     }
 
+    public static TestResult getTestResultFromTestingRunResult(TestingRunResult testingRunResult) {
+        TestResult testResult;
+        try {
+            GenericTestResult gtr = testingRunResult.getTestResults().get(testingRunResult.getTestResults().size() - 1);
+            if (gtr instanceof TestResult) {
+                testResult = (TestResult) gtr;
+            } else if (gtr instanceof MultiExecTestResult) {
+                MultiExecTestResult multiTestRes = (MultiExecTestResult) gtr;
+                List<GenericTestResult> genericTestResults = multiTestRes.convertToExistingTestResult(testingRunResult);
+                GenericTestResult genericTestResult = genericTestResults.get(genericTestResults.size() - 1);
+                if (genericTestResult instanceof TestResult) {
+                    testResult = (TestResult) genericTestResult;
+                } else {
+
+                    testResult = null;
+                }
+            } else {
+                testResult = null;
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error while casting GenericTestResult obj to TestResult obj: " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
+            testResult = null;
+        }
+
+        return testResult;
+    }
 }

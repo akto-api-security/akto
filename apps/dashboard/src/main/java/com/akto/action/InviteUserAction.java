@@ -98,6 +98,17 @@ public class InviteUserAction extends UserAction{
         int user_id = getSUser().getId();
         loggerMaker.debugAndAddToDb(user_id + " inviting " + inviteeEmail);
 
+        Integer accountId = Context.accountId.get();
+        User user = UsersDao.instance.findOne(Filters.and(
+                Filters.eq(User.LOGIN, inviteeEmail),
+                Filters.eq(User.ACCOUNTS+"."+accountId+".accountId", accountId)
+        ));
+        if(user != null) {
+            addActionError("User already exists");
+            return ERROR.toUpperCase();
+        }
+
+
         User admin = UsersDao.instance.getFirstUser(Context.accountId.get());
         if (admin == null) {
             loggerMaker.debugAndAddToDb("admin not found for organization");

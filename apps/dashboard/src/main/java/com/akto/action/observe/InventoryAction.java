@@ -4,10 +4,13 @@ import com.akto.action.UserAction;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
 import com.akto.dao.filter.MergedUrlsDao;
+import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.CodeAnalysisApiInfo.CodeAnalysisApiInfoKey;
 import com.akto.dto.rbac.UsersCollectionsList;
+import com.akto.dto.test_run_findings.TestingRunIssues;
+import com.akto.dto.testing.TestingRun;
 import com.akto.dto.filter.MergedUrls;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.*;
@@ -1098,6 +1101,39 @@ public class InventoryAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    Map<ApiInfoKey, Map<String, Integer>> severityMapForCollection;
+
+    public String getSeveritiesCountPerCollection(){
+        if(apiCollectionId == -1){
+            return ERROR.toUpperCase();
+        }
+
+        if(deactivatedCollections.contains(apiCollectionId)){
+            return SUCCESS.toUpperCase();
+        }
+        
+        Bson filter = Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionId);   
+        this.severityMapForCollection = TestingRunIssuesDao.instance.getSeveritiesMapForApiInfoKeys(filter, false);
+        return SUCCESS.toUpperCase();
+    }
+
+    private String description;
+    public String saveEndpointDescription() {
+        if(description == null || description.isEmpty()) {
+            addActionError("No description provided");
+            return Action.ERROR.toUpperCase();
+        }
+
+        ApiInfoDao.instance.updateOneNoUpsert(Filters.and(
+                Filters.eq(ApiInfo.ID_API_COLLECTION_ID, apiCollectionId),
+                Filters.eq(ApiInfo.ID_METHOD, method),
+                Filters.eq(ApiInfo.ID_URL, url)
+        ), Updates.set(ApiInfo.DESCRIPTION, description));
+
+        return SUCCESS.toUpperCase();
+    }
+
+
     public String getSortKey() {
         return this.sortKey;
     }
@@ -1227,5 +1263,17 @@ public class InventoryAction extends UserAction {
 
     public void setSearchString(String searchString) {
         this.searchString = searchString;
+    }
+
+    public Map<ApiInfoKey, Map<String, Integer>> getSeverityMapForCollection() {
+        return severityMapForCollection;
+    }
+    
+    public String getDescription() {
+        return description;
+    }
+
+    public void setDescription(String description) {
+        this.description = description;
     }
 }

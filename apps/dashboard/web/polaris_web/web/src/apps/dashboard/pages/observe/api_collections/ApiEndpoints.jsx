@@ -1,6 +1,7 @@
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
 import { Text, HorizontalStack, Button, Popover, Modal, IndexFiltersMode, VerticalStack, Box, Checkbox, TextField } from "@shopify/polaris"
 import api from "../api"
+import issuesApi from "../../issues/api"
 import { useEffect, useState } from "react"
 import func from "@/util/func"
 import GithubSimpleTable from "../../../components/tables/GithubSimpleTable";
@@ -30,6 +31,7 @@ import SourceLocation from "./component/SourceLocation"
 import useTable from "../../../components/tables/TableContext"
 import HeadingWithTooltip from "../../../components/shared/HeadingWithTooltip"
 import { SelectSource } from "./SelectSource"
+import APICollectionDescriptionModal from "../../../components/shared/APICollectionDescriptionModal"
 
 const headings = [
     {
@@ -49,6 +51,13 @@ const headings = [
         textValue: "riskScore",
         sortActive: true,
         
+    },{
+        text:"Issues",
+        title: "Issues",
+        value: "issuesComp",
+        textValue: "issues",
+        showFilter:true,
+        filterKey:"severity"
     },
     {
         text: "Hostname",
@@ -106,6 +115,14 @@ const headings = [
         title: "Collection",
         showFilter: true,
         filterKey: "apiCollectionName",
+    },
+    {
+        text: "Description",
+        value: "descriptionComp",
+        textValue: "description",
+        title: "Description",
+        filterKey: "description",
+        tooltipContent: "Description of the API",
     }
 ]
 
@@ -143,6 +160,8 @@ const sortOptions = [
     { label: 'Last seen', value: 'lastSeenTs asc', directionLabel: 'Newest', sortKey: 'lastSeenTs', columnIndex: 7 },
     { label: 'Last seen', value: 'lastSeenTs desc', directionLabel: 'Oldest', sortKey: 'lastSeenTs', columnIndex: 7 }
 ];
+
+
 
 function ApiEndpoints(props) {
     const { endpointListFromConditions, sensitiveParamsForQuery, isQueryPage } = props
@@ -193,6 +212,8 @@ function ApiEndpoints(props) {
     const selectedMethod = queryParams.get('selected_method')
     const [isEditing, setIsEditing] = useState(false);
     const [editableTitle, setEditableTitle] = useState(pageTitle);
+    const [description, setDescription] = useState("");
+    const [showDescriptionModal, setShowDescriptionModal] = useState(false);
 
 
     // the values used here are defined at the server.
@@ -209,6 +230,7 @@ function ApiEndpoints(props) {
         let unusedEndpointsInCollection;
         let sensitiveParamsResp;
         let sourceCodeData = {};
+        let apiInfoSeverityMap ;
         if (isQueryPage) {
             let apiCollectionData = endpointListFromConditions
             if (Object.keys(endpointListFromConditions).length === 0) {
@@ -238,13 +260,15 @@ function ApiEndpoints(props) {
                 api.fetchApisFromStis(apiCollectionId),
                 api.fetchApiInfosForCollection(apiCollectionId),
                 api.fetchAPIsFromSourceCode(apiCollectionId),
-                api.loadSensitiveParameters(apiCollectionId)
+                api.loadSensitiveParameters(apiCollectionId),
+                api.getSeveritiesCountPerCollection(apiCollectionId)
             ];
             let results = await Promise.allSettled(apiPromises);
             let stisEndpoints =  results[0].status === 'fulfilled' ? results[0].value : {};
             let apiInfosData = results[1].status === 'fulfilled' ? results[1].value : {};
             sourceCodeData = results[2].status === 'fulfilled' ? results[2].value : {};
             sensitiveParamsResp =  results[3].status === 'fulfilled' ? results[3].value : {};
+            apiInfoSeverityMap = results[4].status === 'fulfilled' ? results[4].value : {};
             setShowEmptyScreen(stisEndpoints?.list !== undefined && stisEndpoints?.list?.length === 0)
             apiEndpointsInCollection = stisEndpoints?.list !== undefined && stisEndpoints.list.map(x => { return { ...x._id, startTs: x.startTs, changesCount: x.changesCount, shadow: x.shadow ? x.shadow : false } })
             apiInfoListInCollection = apiInfosData.apiInfoList
@@ -282,9 +306,11 @@ function ApiEndpoints(props) {
                 sensitiveInResp
             });
         })
+        apiInfoSeverityMap = func.getSeverityCountPerEndpointList(apiInfoSeverityMap)
+
 
         let data = {}
-        let allEndpoints = func.mergeApiInfoAndApiCollection(apiEndpointsInCollection, apiInfoListInCollection, collectionsMap)
+        let allEndpoints = func.mergeApiInfoAndApiCollection(apiEndpointsInCollection, apiInfoListInCollection, collectionsMap,apiInfoSeverityMap)
 
         // handle code analysis endpoints
         const codeAnalysisCollectionInfo = sourceCodeData.codeAnalysisCollectionInfo
@@ -336,7 +362,8 @@ function ApiEndpoints(props) {
                     parameterisedEndpoint: method + " " + endpoint,
                     apiCollectionName: collectionsMap[apiCollectionId],
                     last_seen: func.prettifyEpoch(lastSeenTs),
-                    added: func.prettifyEpoch(discoveredTs)
+                    added: func.prettifyEpoch(discoveredTs),
+                    descriptionComp: (<Box maxWidth="300px"><TooltipText tooltip={codeAnalysisApi.description} text={codeAnalysisApi.description}/></Box>),
                 }
             })
         }
@@ -417,6 +444,8 @@ function ApiEndpoints(props) {
         if (pageTitle !== collectionsMap[apiCollectionId]) { 
             setPageTitle(collectionsMap[apiCollectionId])
         }
+
+        setDescription(collectionsObj?.description || "")
     }, [collectionsMap[apiCollectionId]])
 
     const resourceName = {
@@ -1016,6 +1045,14 @@ function ApiEndpoints(props) {
         });
     }
 
+    function updateCollectionDescription(list, apiCollectionId, newDescription) {
+        list.forEach(item => {
+            if (item.id === apiCollectionId) {
+                item.description = newDescription;
+            }
+        });
+    }
+
     
       const handleSaveClick = async () => {
         api.editCollectionName(apiCollectionId, editableTitle).then((resp) => {
@@ -1045,6 +1082,26 @@ function ApiEndpoints(props) {
         }
       }
 
+    const handleSaveDescription = () => {
+        // Check for special characters
+        const specialChars = /[!@#$%^&*()\-_=+\[\]{}\\|;:'",.<>/?~]/;
+        if (specialChars.test(description)) {
+            func.setToast(true, true, "Description contains special characters that are not allowed.");
+            return;
+        }
+        
+        setShowDescriptionModal(false);
+        api.saveCollectionDescription(apiCollectionId, description)
+            .then(() => {
+                updateCollectionDescription(allCollections, apiCollectionId, description);
+                func.setToast(true, false, "Description saved successfully");
+            })
+            .catch((err) => {
+                console.error("Failed to save description:", err);
+                func.setToast(true, true, "Failed to save description. Please try again.");
+            });
+    };
+
     return (
         <div>
             {isQueryPage ? (
@@ -1069,16 +1126,43 @@ function ApiEndpoints(props) {
                                 </div>
                             </Box>
                         ) : (
-                            <div style={{ cursor: isApiGroup ? 'pointer' : 'default' }} onClick={isApiGroup ?  () => {setIsEditing(true);} : undefined}>
-                                <Box maxWidth="35vw">
-                                    <TooltipText tooltip={pageTitle} text={pageTitle} textProps={{ variant: 'headingLg' }} />
-                                </Box>
-                            </div>
+                            <Box maxWidth="35vw">
+                                <VerticalStack gap={2}>
+                                    <div style={{ cursor: isApiGroup ? 'pointer' : 'default' }} onClick={isApiGroup ?  () => {setIsEditing(true);} : undefined}>
+                                        <TooltipText tooltip={pageTitle} text={pageTitle} textProps={{ variant: 'headingLg' }} />
+                                    </div>
+                                    <HorizontalStack gap={2}>
+                                        {!description && (
+                                            <Button plain onClick={() => setShowDescriptionModal(true)}>
+                                                Add description
+                                            </Button>
+                                        )}
+                                        {description && (
+                                            <Button plain onClick={() => setShowDescriptionModal(true)}>
+                                                <Text as="span" variant="bodyMd" color="subdued" alignment="start">
+                                                    {description}
+                                                </Text>
+                                            </Button>
+                                        )}
+                                    </HorizontalStack>
+                                </VerticalStack>
+                            </Box>
                         )
                     }
                     backUrl="/dashboard/observe/inventory"
                     secondaryActions={secondaryActionsComponent}
-                    components={components}
+                    components={[
+                        <APICollectionDescriptionModal
+                            showDescriptionModal={showDescriptionModal}
+                            setShowDescriptionModal={setShowDescriptionModal}
+                            title="Collection Description"
+                            handleSaveDescription={handleSaveDescription}
+                            description={description}
+                            setDescription={setDescription}
+                            placeholder={"Add a brief description for this collection"}
+                        />,
+                        ...components
+                    ]}
                 />
             )}
         </div>

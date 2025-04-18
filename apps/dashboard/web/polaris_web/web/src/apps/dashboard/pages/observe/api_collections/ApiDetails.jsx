@@ -1,5 +1,5 @@
 import LayoutWithTabs from "../../../components/layouts/LayoutWithTabs"
-import { Box, Button, Popover, Modal, Tooltip, VerticalStack } from "@shopify/polaris"
+import { Box, Button, Popover, Modal, Tooltip, VerticalStack, HorizontalStack, Text, TextField } from "@shopify/polaris"
 import FlyLayout from "../../../components/layouts/FlyLayout";
 import GithubCell from "../../../components/tables/cells/GithubCell";
 import SampleDataList from "../../../components/shared/SampleDataList";
@@ -17,6 +17,7 @@ import values from "@/util/values";
 
 import { HorizontalDotsMinor, FileMinor } from "@shopify/polaris-icons"
 import LocalStore from "../../../../main/LocalStorageStore";
+import APICollectionDescriptionModal from "../../../components/shared/APICollectionDescriptionModal";
 
 function ApiDetails(props) {
 
@@ -35,6 +36,8 @@ function ApiDetails(props) {
     const [showMoreActions, setShowMoreActions] = useState(false)
     const setSelectedSampleApi = PersistStore(state => state.setSelectedSampleApi)
     const [disabledTabs, setDisabledTabs] = useState([])
+    const [description, setDescription] = useState("")
+    const [showDescriptionModal, setShowDescriptionModal] = useState(false)
 
     const [useLocalSubCategoryData, setUseLocalSubCategoryData] = useState(false)
 
@@ -53,7 +56,7 @@ function ApiDetails(props) {
     const fetchData = async () => {
         if (showDetails) {
             setLoading(true)
-            const { apiCollectionId, endpoint, method } = apiDetail
+            const { apiCollectionId, endpoint, method, description } = apiDetail
             setSelectedUrl({ url: endpoint, method: method })
             api.checkIfDependencyGraphAvailable(apiCollectionId, endpoint, method).then((resp) => {
                 if (!resp.dependencyGraphExists) {
@@ -62,6 +65,16 @@ function ApiDetails(props) {
                     setDisabledTabs([])
                 }
             })
+
+            setTimeout(() => {
+                setDescription(description == null ? "" : description)
+            }, 100)
+            headers.forEach((header) => {
+                if (header.value === "description") {
+                    header.action = () => setShowDescriptionModal(true)
+                }
+            })
+
             let commonMessages = []
             await api.fetchSampleData(endpoint, apiCollectionId, method).then((res) => {
                 api.fetchSensitiveSampleData(endpoint, apiCollectionId, method).then(async (resp) => {
@@ -119,6 +132,21 @@ function ApiDetails(props) {
             })
         }
     }
+
+    const handleSaveDescription = async () => {
+        const { apiCollectionId, endpoint, method } = apiDetail;
+        
+        setShowDescriptionModal(false);
+        
+        await api.saveEndpointDescription(apiCollectionId, endpoint, method, description)
+            .then(() => {
+                func.setToast(true, false, "Description saved successfully");
+            })
+            .catch((err) => {
+                console.error("Failed to save description:", err);
+                func.setToast(true, true, "Failed to save description. Please try again.");
+            });
+    };
 
     const runTests = async (testsList) => {
         setIsGptScreenActive(false)
@@ -245,15 +273,17 @@ function ApiDetails(props) {
 
     const headingComp = (
         <div style={{ display: "flex", justifyContent: "space-between" }} key="heading">
-            <div style={{ display: "flex", gap: '8px' }}>
-                <GithubCell
-                    width="32vw"
-                    data={newData}
-                    headers={headers}
-                    getStatus={statusFunc}
-                    isBadgeClickable={true}
-                    badgeClicked={badgeClicked}
-                />
+            <div style={{ display: "flex", flexDirection: "column"}}>
+                <div style={{ display: "flex", gap: '8px' }}>
+                    <GithubCell
+                        width="32vw"
+                        data={newData}
+                        headers={headers}
+                        getStatus={statusFunc}
+                        isBadgeClickable={true}
+                        badgeClicked={badgeClicked}
+                    />
+                </div>
             </div>
             <div style={{ display: "flex", gap: '8px' }}>
                 <RunTest
@@ -294,8 +324,7 @@ function ApiDetails(props) {
     )
 
     const components = [
-        headingComp
-        ,
+        headingComp,
         <LayoutWithTabs
             key="tabs"
             tabs={[ValuesTab, SchemaTab, DependencyTab]}
@@ -312,6 +341,15 @@ function ApiDetails(props) {
                 setShow={setShowDetails}
                 components={components}
                 loading={loading}
+            />
+            <APICollectionDescriptionModal
+                showDescriptionModal={showDescriptionModal}
+                setShowDescriptionModal={setShowDescriptionModal}
+                title="API Endpoint Description"
+                handleSaveDescription={handleSaveDescription}
+                description={description}
+                setDescription={setDescription}
+                placeholder={"Add a brief description for this endpoint"}
             />
             <Modal large open={isGptScreenActive} onClose={() => setIsGptScreenActive(false)} title="Akto GPT">
                 <Modal.Section flush>
