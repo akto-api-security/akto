@@ -143,7 +143,6 @@ public class IssuesAction extends UserAction {
     long ignoredIssuesCount;
     String sortKey;
     int sortOrder;
-
     public String fetchAllIssues() {
         Bson filters = createFilters(true);
 
