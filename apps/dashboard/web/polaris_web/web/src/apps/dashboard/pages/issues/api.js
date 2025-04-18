@@ -57,5 +57,19 @@ export default {
             method: 'post',
             data: {issuesIds, aktoDashboardHost, projId, issueType}
         })
+    },
+    createAzureBoardsWorkItem(testingIssuesId, projectName, workItemType, aktoDashboardHostName) {
+        return request({
+            url: 'api/createAzureBoardsWorkItem',
+            method: 'post',
+            data: {testingIssuesId, projectName, workItemType, aktoDashboardHostName}
+        })
+    },
+    bulkCreateAzureWorkItems(testingIssuesIdList, projectName, workItemType, aktoDashboardHostName) {
+        return request({
+            url: 'api/bulkCreateAzureWorkItems',
+            method: 'post',
+            data: {testingIssuesIdList, projectName, workItemType, aktoDashboardHostName}
+        })
     }
 }

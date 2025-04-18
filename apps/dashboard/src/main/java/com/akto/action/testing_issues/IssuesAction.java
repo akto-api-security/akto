@@ -47,8 +47,6 @@ import org.apache.commons.lang3.StringUtils;
 import org.bson.Document;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.util.*;
 import java.util.concurrent.Executors;
@@ -60,8 +58,8 @@ import static com.akto.util.Constants.ONE_DAY_TIMESTAMP;
 
 public class IssuesAction extends UserAction {
 
-    private static final LoggerMaker loggerMaker = new LoggerMaker(IssuesAction.class, LogDb.DASHBOARD);
-    private static final Logger logger = LoggerFactory.getLogger(IssuesAction.class);
+    private static final LoggerMaker logger = new LoggerMaker(IssuesAction.class, LogDb.DASHBOARD);
+
     private List<TestingRunIssues> issues;
     private TestingIssuesId issueId;
     private List<TestingIssuesId> issueIdArray;
@@ -566,7 +564,7 @@ public class IssuesAction extends UserAction {
                 }
             } catch (Exception e) {
                 String err = "Error while fetching subcategories for " + entry.getKey();
-                loggerMaker.errorAndAddToDb(e, err, LogDb.DASHBOARD);
+                logger.errorAndAddToDb(e, err, LogDb.DASHBOARD);
             }
         }
 
@@ -795,8 +793,9 @@ public class IssuesAction extends UserAction {
         if (issuesIds != null && !issuesIds.isEmpty()) {
             filter = Filters.and(filter, Filters.in(Constants.ID, issuesIds));
         }
-
-        this.severityInfo = TestingRunIssuesDao.instance.getSeveritiesMapForCollections(filter, false);
+        BasicDBObject groupedId = new BasicDBObject(SingleTypeInfo._API_COLLECTION_ID, "$" + TestingRunIssues.ID_API_COLLECTION_ID)
+                .append(TestingRunIssues.KEY_SEVERITY, "$" + TestingRunIssues.KEY_SEVERITY);
+        this.severityInfo = TestingRunIssuesDao.instance.getSeveritiesMapForCollections(filter, false, groupedId);
         return Action.SUCCESS.toUpperCase();
     }
 

@@ -41,7 +41,7 @@ import com.mongodb.client.model.WriteModel;
 
 public class AutomatedApiGroupsUtils {
 
-    private static final LoggerMaker loggerMaker = new LoggerMaker(RiskScoreTestingEndpointsUtils.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(RiskScoreTestingEndpointsUtils.class, LogDb.DASHBOARD);;
 
     private static final ExecutorService executorService = Executors.newFixedThreadPool(1);
 

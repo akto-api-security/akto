@@ -92,7 +92,7 @@ const headers = [
             };
         },
         shouldMerge: true,
-        boxWidth: '100px'
+        boxWidth: '140px'
     },
     {   
         title: 'Sensitive data',

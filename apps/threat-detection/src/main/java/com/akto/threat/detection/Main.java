@@ -20,7 +20,7 @@ public class Main {
 
   private static final String CONSUMER_GROUP_ID = "akto.threat_detection";
 
-  public static void main(String[] args) {
+  public static void main(String[] args) throws Exception {
     runMigrations();
 
     SessionFactory sessionFactory = SessionFactoryUtils.createFactory();
@@ -86,4 +86,5 @@ public class Main {
 
     flyway.migrate();
   }
+
 }

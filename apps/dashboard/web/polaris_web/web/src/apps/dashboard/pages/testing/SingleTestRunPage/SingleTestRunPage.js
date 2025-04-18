@@ -660,7 +660,7 @@ function SingleTestRunPage() {
 
 
   const components = [
-    runningTestsComp, <TrendChart key={tempLoading.running} hexId={hexId} setSummary={setSummary} show={selectedTestRun.run_type && selectedTestRun.run_type !== 'One-time'} />,
+    runningTestsComp, <TrendChart key={tempLoading.running} hexId={hexId} setSummary={setSummary} show={selectedTestRun.run_type && selectedTestRun.run_type !== 'One-time'} totalVulnerabilities={tableCountObj.vulnerable} />,
     metadataComponent(), loading ? <SpinnerCentered key="loading" /> : (!workflowTest ? resultTable : workflowTestBuilder)];
 
   const openVulnerabilityReport = async () => {

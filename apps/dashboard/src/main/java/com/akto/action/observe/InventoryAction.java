@@ -4,10 +4,13 @@ import com.akto.action.UserAction;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
 import com.akto.dao.filter.MergedUrlsDao;
+import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.CodeAnalysisApiInfo.CodeAnalysisApiInfoKey;
 import com.akto.dto.rbac.UsersCollectionsList;
+import com.akto.dto.test_run_findings.TestingRunIssues;
+import com.akto.dto.testing.TestingRun;
 import com.akto.dto.filter.MergedUrls;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.*;
@@ -649,7 +652,7 @@ public class InventoryAction extends UserAction {
     private Map<String, List> filters;
     private Map<String, String> filterOperators;
     private boolean sensitive;
-    private boolean request;
+    private List<String> request;
 
     private Bson prepareFilters(String collection) {
         ArrayList<Bson> filterList = new ArrayList<>();
@@ -662,24 +665,28 @@ public class InventoryAction extends UserAction {
         }
         
         if (sensitive) {
-            Bson sensitveSubTypeFilter;
-            if (request) {
-                List<String> sensitiveInRequest = SingleTypeInfoDao.instance.sensitiveSubTypeInRequestNames();
-                sensitiveInRequest.addAll(SingleTypeInfoDao.instance.sensitiveSubTypeNames());
-                sensitveSubTypeFilter = Filters.and(
-                        Filters.in("subType",sensitiveInRequest),
-                        Filters.eq("responseCode", -1)
-                );
-            } else {
-                List<String> sensitiveInResponse = SingleTypeInfoDao.instance.sensitiveSubTypeInResponseNames();
-                sensitiveInResponse.addAll(SingleTypeInfoDao.instance.sensitiveSubTypeNames());
-                sensitveSubTypeFilter = Filters.and(
-                    Filters.in("subType",sensitiveInResponse),
-                    Filters.gt("responseCode", -1)
-                );
+            List<Bson> sensitiveFilters = new ArrayList<>();
+            for (String val: request) {
+                if (val.equalsIgnoreCase("request")) {
+                    List<String> sensitiveInRequest = SingleTypeInfoDao.instance.sensitiveSubTypeInRequestNames();
+                    sensitiveInRequest.addAll(SingleTypeInfoDao.instance.sensitiveSubTypeNames());
+                    sensitiveFilters.add(Filters.and(
+                            Filters.in("subType",sensitiveInRequest),
+                            Filters.eq("responseCode", -1)
+                    ));
+                } else if (val.equalsIgnoreCase("response")) {
+                    List<String> sensitiveInResponse = SingleTypeInfoDao.instance.sensitiveSubTypeInResponseNames();
+                    sensitiveInResponse.addAll(SingleTypeInfoDao.instance.sensitiveSubTypeNames());
+                    sensitiveFilters.add(Filters.and(
+                        Filters.in("subType",sensitiveInResponse),
+                        Filters.gt("responseCode", -1)
+                    ));
+                }
             }
-
-            filterList.add(sensitveSubTypeFilter);
+            // If any filters were added, combine them with OR
+            if (!sensitiveFilters.isEmpty()) {
+                filterList.add(Filters.or(sensitiveFilters));
+            }
         }
 
         for(Map.Entry<String, List> entry: filters.entrySet()) {
@@ -1094,6 +1101,22 @@ public class InventoryAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    Map<ApiInfoKey, Map<String, Integer>> severityMapForCollection;
+
+    public String getSeveritiesCountPerCollection(){
+        if(apiCollectionId == -1){
+            return ERROR.toUpperCase();
+        }
+
+        if(deactivatedCollections.contains(apiCollectionId)){
+            return SUCCESS.toUpperCase();
+        }
+        
+        Bson filter = Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionId);   
+        this.severityMapForCollection = TestingRunIssuesDao.instance.getSeveritiesMapForApiInfoKeys(filter, false);
+        return SUCCESS.toUpperCase();
+    }
+
     public String getSortKey() {
         return this.sortKey;
     }
@@ -1212,7 +1235,7 @@ public class InventoryAction extends UserAction {
         this.sensitive = sensitive;
     }
 
-    public void setRequest(boolean request) {
+    public void setRequest(List<String> request) {
         this.request = request;
     }
 
@@ -1223,5 +1246,9 @@ public class InventoryAction extends UserAction {
 
     public void setSearchString(String searchString) {
         this.searchString = searchString;
+    }
+
+    public Map<ApiInfoKey, Map<String, Integer>> getSeverityMapForCollection() {
+        return severityMapForCollection;
     }
 }
