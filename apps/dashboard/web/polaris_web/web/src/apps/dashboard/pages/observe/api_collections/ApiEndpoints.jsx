@@ -246,7 +246,7 @@ function ApiEndpoints(props) {
                 api.fetchApiInfosForCollection(apiCollectionId),
                 api.fetchAPIsFromSourceCode(apiCollectionId),
                 api.loadSensitiveParameters(apiCollectionId),
-                issuesApi.fetchIssues(0,2000, ["OPEN"], [apiCollectionId], [], [], "severity", -1, Math.floor(Date.now() / 1000 - 90 * 24 * 60 * 60), 0, true,[])
+                issuesApi.fetchIssues(0,2000, ["OPEN"], [apiCollectionId], [], [], "severity", -1, Math.floor(Date.now() / 1000 - 90 * 24 * 60 * 60), 0, true,[],["severity"])
             ];
             let results = await Promise.allSettled(apiPromises);
             let stisEndpoints =  results[0].status === 'fulfilled' ? results[0].value : {};
