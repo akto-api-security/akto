@@ -786,8 +786,9 @@ public class IssuesAction extends UserAction {
         if (issuesIds != null && !issuesIds.isEmpty()) {
             filter = Filters.and(filter, Filters.in(Constants.ID, issuesIds));
         }
-
-        this.severityInfo = TestingRunIssuesDao.instance.getSeveritiesMapForCollections(filter, false);
+        BasicDBObject groupedId = new BasicDBObject(SingleTypeInfo._API_COLLECTION_ID, "$" + TestingRunIssues.ID_API_COLLECTION_ID)
+                .append(TestingRunIssues.KEY_SEVERITY, "$" + TestingRunIssues.KEY_SEVERITY);
+        this.severityInfo = TestingRunIssuesDao.instance.getSeveritiesMapForCollections(filter, false, groupedId);
         return Action.SUCCESS.toUpperCase();
     }
 

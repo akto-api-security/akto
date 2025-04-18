@@ -1,7 +1,7 @@
 import {
   CalendarMinor,ClockMinor,CircleAlertMajor,DynamicSourceMinor,DynamicSourceMajor, LockMinor, KeyMajor, ProfileMinor, PasskeyMinor,
   EmailMajor, CreditCardMajor, IdentityCardMajor, LocationsMinor,PhoneMajor, FileMinor, ImageMajor, BankMajor, HashtagMinor, 
-  ReceiptMajor, MobileMajor, CalendarTimeMinor, LocationMajor,  IdentityCardFilledMajor, CalendarMajor, PageMajor, AffiliateMajor
+  ReceiptMajor, MobileMajor, CalendarTimeMinor, LocationMajor,  IdentityCardFilledMajor, CalendarMajor, AffiliateMajor
 } from '@shopify/polaris-icons';
 import { saveAs } from 'file-saver'
 import inventoryApi from "../apps/dashboard/pages/observe/api"
@@ -914,7 +914,7 @@ parameterizeUrl(x) {
   });
   return newStr
 },
-mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName) {
+mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName,apiInfoSeverityMap) {
   const allCollections = PersistStore.getState().allCollections
   const apiGroupsMap = func.mapCollectionIdToName(allCollections.filter(x => x.type === "API_GROUP"))
 
@@ -930,7 +930,6 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName) {
           apiInfoMap[x["id"]["apiCollectionId"] + "-" + x["id"]["url"] + "-" + x["id"]["method"]] = x
       })
   }
-
   listEndpoints.forEach(x => {
       let key = x.apiCollectionId + "-" + x.url + "-" + x.method
       if (!ret[key]) {
@@ -989,6 +988,7 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName) {
               sensitiveInReq: [...this.convertSensitiveTags(x.sensitiveInReq)],
               sensitiveInResp: [...this.convertSensitiveTags(x.sensitiveInResp)],
               responseCodes: responseCodesArr,
+              ...(apiInfoSeverityMap?.hasOwnProperty(key) ? { severityObj: apiInfoSeverityMap[key] } : {}),
               sources: apiInfoMap[key]?apiInfoMap[key]['sources']:{},
               description: description,
               descriptionComp: (<Box maxWidth="300px"><TooltipText tooltip={description} text={description}/></Box>),
@@ -996,8 +996,17 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName) {
 
       }
   })
-  
   return Object.values(ret) 
+},
+getSeverityCountPerEndpointList(apiInfoSeverityMap){
+  if(!apiInfoSeverityMap) return {}
+  let apiInfoIdSeverityMap = {}
+  Object.entries(apiInfoSeverityMap).forEach(([key, value]) => {
+    let keyId = key.split(" ").join("-");
+    apiInfoIdSeverityMap[keyId] = value;
+
+  });
+  return apiInfoIdSeverityMap;
 },
 
 convertSensitiveTags(subTypeList) {

@@ -1,6 +1,7 @@
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
 import { Text, HorizontalStack, Button, Popover, Modal, IndexFiltersMode, VerticalStack, Box, Checkbox, TextField } from "@shopify/polaris"
 import api from "../api"
+import issuesApi from "../../issues/api"
 import { useEffect, useState } from "react"
 import func from "@/util/func"
 import GithubSimpleTable from "../../../components/tables/GithubSimpleTable";
@@ -50,6 +51,13 @@ const headings = [
         textValue: "riskScore",
         sortActive: true,
         
+    },{
+        text:"Issues",
+        title: "Issues",
+        value: "issuesComp",
+        textValue: "issues",
+        showFilter:true,
+        filterKey:"severity"
     },
     {
         text: "Hostname",
@@ -153,6 +161,8 @@ const sortOptions = [
     { label: 'Last seen', value: 'lastSeenTs desc', directionLabel: 'Oldest', sortKey: 'lastSeenTs', columnIndex: 7 }
 ];
 
+
+
 function ApiEndpoints(props) {
     const { endpointListFromConditions, sensitiveParamsForQuery, isQueryPage } = props
     const params = useParams()
@@ -220,6 +230,7 @@ function ApiEndpoints(props) {
         let unusedEndpointsInCollection;
         let sensitiveParamsResp;
         let sourceCodeData = {};
+        let apiInfoSeverityMap ;
         if (isQueryPage) {
             let apiCollectionData = endpointListFromConditions
             if (Object.keys(endpointListFromConditions).length === 0) {
@@ -249,13 +260,15 @@ function ApiEndpoints(props) {
                 api.fetchApisFromStis(apiCollectionId),
                 api.fetchApiInfosForCollection(apiCollectionId),
                 api.fetchAPIsFromSourceCode(apiCollectionId),
-                api.loadSensitiveParameters(apiCollectionId)
+                api.loadSensitiveParameters(apiCollectionId),
+                api.getSeveritiesCountPerCollection(apiCollectionId)
             ];
             let results = await Promise.allSettled(apiPromises);
             let stisEndpoints =  results[0].status === 'fulfilled' ? results[0].value : {};
             let apiInfosData = results[1].status === 'fulfilled' ? results[1].value : {};
             sourceCodeData = results[2].status === 'fulfilled' ? results[2].value : {};
             sensitiveParamsResp =  results[3].status === 'fulfilled' ? results[3].value : {};
+            apiInfoSeverityMap = results[4].status === 'fulfilled' ? results[4].value : {};
             setShowEmptyScreen(stisEndpoints?.list !== undefined && stisEndpoints?.list?.length === 0)
             apiEndpointsInCollection = stisEndpoints?.list !== undefined && stisEndpoints.list.map(x => { return { ...x._id, startTs: x.startTs, changesCount: x.changesCount, shadow: x.shadow ? x.shadow : false } })
             apiInfoListInCollection = apiInfosData.apiInfoList
@@ -293,9 +306,11 @@ function ApiEndpoints(props) {
                 sensitiveInResp
             });
         })
+        apiInfoSeverityMap = func.getSeverityCountPerEndpointList(apiInfoSeverityMap)
+
 
         let data = {}
-        let allEndpoints = func.mergeApiInfoAndApiCollection(apiEndpointsInCollection, apiInfoListInCollection, collectionsMap)
+        let allEndpoints = func.mergeApiInfoAndApiCollection(apiEndpointsInCollection, apiInfoListInCollection, collectionsMap,apiInfoSeverityMap)
 
         // handle code analysis endpoints
         const codeAnalysisCollectionInfo = sourceCodeData.codeAnalysisCollectionInfo

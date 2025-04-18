@@ -873,6 +873,16 @@ export default {
         })
     },
 
+    async getSeveritiesCountPerCollection(apiCollectionId) {
+        return await request({
+            url: '/api/getSeveritiesCountPerCollection',
+            method: 'post',
+            data: {
+                apiCollectionId
+            }
+        })
+    },
+    
     async saveCollectionDescription(apiCollectionId, description) {
         return await request({
             url: '/api/saveCollectionDescription',
