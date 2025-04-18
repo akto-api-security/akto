@@ -11,6 +11,8 @@ import com.akto.dto.ApiInfo;
 import com.akto.dto.test_editor.Info;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.test_run_findings.TestingRunIssues;
+import com.akto.dto.testing.GenericTestResult;
+import com.akto.dto.testing.MultiExecTestResult;
 import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.TestingRunResult;
 import com.mongodb.client.model.Projections;
@@ -287,8 +289,6 @@ public class JiraIntegrationAction extends UserAction {
 
     public String attachFileToIssue() {
 
-        String origCurl, testCurl;
-
         try {
             jiraIntegration = JiraIntegrationDao.instance.findOne(new BasicDBObject());
             String url = jiraIntegration.getBaseUrl() + CREATE_ISSUE_ENDPOINT + "/" + issueId + ATTACH_FILE_ENDPOINT;
@@ -419,7 +419,7 @@ public class JiraIntegrationAction extends UserAction {
             TestingRunResult testingRunResult = TestingRunResultDao.instance.findOne(Filters.and(
                     Filters.in(TestingRunResult.TEST_SUB_TYPE, testingIssuesId.getTestSubCategory()),
                     Filters.in(TestingRunResult.API_INFO_KEY, testingIssuesId.getApiInfoKey())
-            ), Projections.include("_id", TestingRunResult.TEST_RESULTS));
+            ));
 
             if(testingRunResult == null) {
                 loggerMaker.errorAndAddToDb("Error: Testing Run Result not found", LogDb.DASHBOARD);
@@ -537,10 +537,33 @@ public class JiraIntegrationAction extends UserAction {
                     BasicDBObject issue = issues.get(i);
                     TestingRunResult testingRunResult = testingRunResultList.get(i);
                     String issueKey = issue.getString("key");
-                    TestResult genericTestResult = (TestResult) testingRunResult.getTestResults().get(testingRunResult.getTestResults().size() - 1);
+                    GenericTestResult gtr = testingRunResult.getTestResults().get(testingRunResult.getTestResults().size() - 1);
+                    TestResult testResult;
+                    try {
+                        if (gtr instanceof TestResult) {
+                            testResult = (TestResult) gtr;
+                        } else if (gtr instanceof MultiExecTestResult) {
+                            MultiExecTestResult multiTestRes = (MultiExecTestResult) gtr;
+                            List<GenericTestResult> genericTestResults = multiTestRes.convertToExistingTestResult(testingRunResult);
+                            GenericTestResult genericTestResult = genericTestResults.get(genericTestResults.size() - 1);
+                            if (genericTestResult instanceof TestResult) {
+                                testResult = (TestResult) genericTestResult;
+                            } else {
+                                testResult = null;
+                            }
+                        } else {
+                            testResult = null;
+                        }
+                    } catch (Exception e) {
+                        loggerMaker.errorAndAddToDb("Error while casting GenericTestResult obj to TestResult obj: " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
+                        testResult = null;
+                    }
+
                     setIssueId(issueKey);
-                    setOrigReq(genericTestResult.getOriginalMessage());
-                    setTestReq(genericTestResult.getMessage());
+                    if(testResult != null) {
+                        setOrigReq(testResult.getOriginalMessage());
+                        setTestReq(testResult.getMessage());
+                    }
                     String status = attachFileToIssue();
                     if (status.equals(ERROR.toUpperCase())) {
                         return ERROR.toUpperCase();

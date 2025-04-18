@@ -640,6 +640,9 @@ public class Utils {
     }
 
     public static File createRequestFile(String originalMessage, String message) {
+        if(originalMessage == null || message == null) {
+            return null;
+        }
         try {
             String origCurl = ExportSampleDataAction.getCurl(originalMessage);
             String testCurl = ExportSampleDataAction.getCurl(message);
