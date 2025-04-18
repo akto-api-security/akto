@@ -13,10 +13,14 @@ import java.util.Set;
 import com.akto.bulk_update_util.ApiInfoBulkUpdate;
 import com.akto.dao.*;
 import com.akto.dao.filter.MergedUrlsDao;
+import com.akto.dao.graph.SvcToSvcGraphEdgesDao;
+import com.akto.dao.graph.SvcToSvcGraphNodesDao;
 import com.akto.dao.settings.DataControlSettingsDao;
 import com.akto.dependency_analyser.DependencyAnalyserUtils;
 import com.akto.dto.*;
 import com.akto.dto.filter.MergedUrls;
+import com.akto.dto.graph.SvcToSvcGraphEdge;
+import com.akto.dto.graph.SvcToSvcGraphNode;
 import com.akto.dto.settings.DataControlSettings;
 import com.mongodb.BasicDBList;
 import com.mongodb.client.model.*;
@@ -1144,6 +1148,49 @@ public class DbLayer {
     
     public static TestingRunResultSummary findLatestTestingRunResultSummary(Bson filter){
         return TestingRunResultSummariesDao.instance.findLatestOne(filter);
+    }
+
+    public static List<SvcToSvcGraphEdge> findSvcToSvcGraphEdges(int startTs, int endTs, int skip, int limit) {
+        return SvcToSvcGraphEdgesDao.instance.findAll(Filters.and(
+                Filters.gte(SvcToSvcGraphEdge.CREATTION_EPOCH, startTs),
+                Filters.lte(SvcToSvcGraphEdge.CREATTION_EPOCH, endTs)
+        ), skip, limit, Sorts.ascending(SvcToSvcGraphEdge.CREATTION_EPOCH));
+    }
+
+    public static List<SvcToSvcGraphNode> findSvcToSvcGraphNodes(int startTs, int endTs, int skip, int limit) {
+        return SvcToSvcGraphNodesDao.instance.findAll(Filters.and(
+                Filters.gte(SvcToSvcGraphEdge.CREATTION_EPOCH, startTs),
+                Filters.lte(SvcToSvcGraphEdge.CREATTION_EPOCH, endTs)
+        ), skip, limit, Sorts.ascending(SvcToSvcGraphEdge.CREATTION_EPOCH));
+    }
+
+    public static void updateSvcToSvcGraphEdges(List<SvcToSvcGraphEdge> edges) {
+        if (edges == null || edges.isEmpty()) {
+            return;
+        }
+
+        BulkWriteOptions options = new BulkWriteOptions().ordered(false).bypassDocumentValidation(true);
+        List<WriteModel<SvcToSvcGraphEdge>> bulkList = new ArrayList<>();    
+        for(SvcToSvcGraphEdge edge: edges) {
+            bulkList.add(new InsertOneModel<SvcToSvcGraphEdge>(edge));
+        }
+
+        SvcToSvcGraphEdgesDao.instance.bulkWrite(bulkList, options);
+    }
+
+    public static void updateSvcToSvcGraphNodes(List<SvcToSvcGraphNode> nodes) {
+
+        if (nodes == null || nodes.isEmpty()) {
+            return;
+        }
+
+        BulkWriteOptions options = new BulkWriteOptions().ordered(false).bypassDocumentValidation(true);
+        List<WriteModel<SvcToSvcGraphNode>> bulkList = new ArrayList<>();    
+        for(SvcToSvcGraphNode node: nodes) {
+            bulkList.add(new InsertOneModel<SvcToSvcGraphNode>(node));
+        }
+
+        SvcToSvcGraphNodesDao.instance.bulkWrite(bulkList, options);
     }
 
 }
