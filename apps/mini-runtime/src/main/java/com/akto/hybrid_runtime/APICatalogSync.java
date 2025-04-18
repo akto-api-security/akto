@@ -29,6 +29,7 @@ import com.akto.hybrid_runtime.filter_updates.FilterUpdates;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.metrics.AllMetrics;
+import com.akto.runtime.SvcToSvcGraphManager;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
 import com.akto.hybrid_runtime.policies.AktoPolicyNew;
@@ -61,6 +62,7 @@ public class APICatalogSync {
     public Map<Integer, APICatalog> dbState;
     public Map<Integer, APICatalog> delta;
     public AktoPolicyNew aktoPolicyNew;
+    public SvcToSvcGraphManager svcToSvcGraphManager = null;
     public Map<SensitiveParamInfo, Boolean> sensitiveParamInfoBooleanMap;
     public static boolean mergeAsyncOutside = true;
     public int lastStiFetchTs = 0;
@@ -86,6 +88,7 @@ public class APICatalogSync {
         this.mergedUrls = new HashSet<>();
         if (buildFromDb) {
             buildFromDB(false, fetchAllSTI);
+            this.svcToSvcGraphManager = SvcToSvcGraphManager.createFromEdgesAndNodes(dataActor);
         }
     }
 
@@ -212,6 +215,9 @@ public class APICatalogSync {
             for (HttpResponseParams responseParams: value) {
                 try {
                     aktoPolicyNew.process(responseParams);
+                    if (svcToSvcGraphManager != null) {
+                        svcToSvcGraphManager.processRecord(responseParams.getSvcToSvcGraphParams());
+                    }
                 } catch (Exception e) {
                     e.printStackTrace();
                     throw new RuntimeException(e);
@@ -1501,6 +1507,12 @@ public class APICatalogSync {
             now = Context.now();
             loggerMaker.infoAndAddToDb("Finished syncing with db at : " + now, LogDb.RUNTIME);
             lastBuildFromDb = now;
+            if (svcToSvcGraphManager != null){
+                svcToSvcGraphManager.updateWithNewDataAndReturnDelta(dataActor);            
+                if (svcToSvcGraphManager.getLastFetchFromDb() < Context.now() - 6 * 60 * 60) {
+                    svcToSvcGraphManager = SvcToSvcGraphManager.createFromEdgesAndNodes(dataActor);
+                }
+            }
         }
     }
 

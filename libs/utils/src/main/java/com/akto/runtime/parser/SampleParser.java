@@ -1,5 +1,6 @@
 package com.akto.runtime.parser;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -8,6 +9,8 @@ import org.apache.commons.lang3.math.NumberUtils;
 import com.akto.dto.HttpRequestParams;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.OriginalHttpRequest;
+import com.akto.dto.graph.K8sDaemonsetGraphParams;
+import com.akto.dto.graph.SvcToSvcGraphParams;
 import com.akto.util.HttpRequestResponseUtils;
 import com.akto.util.JSONUtils;
 import com.google.gson.Gson;
@@ -58,8 +61,20 @@ public class SampleParser {
         String sourceStr = (String) json.getOrDefault("source", HttpResponseParams.Source.OTHER.name());
         HttpResponseParams.Source source = HttpResponseParams.Source.valueOf(sourceStr);
         
+        String enableGraph = (String) json.getOrDefault("enable_graph", "false");
+        SvcToSvcGraphParams graphParams = null; 
+        if (enableGraph.equals("true")) {
+            List<String> hostNameList = requestHeaders.getOrDefault("host", requestHeaders.getOrDefault(":authority", new ArrayList<>()));
+            if (hostNameList != null && hostNameList.size()>0) {
+                String processId = (String) json.get("process_id");
+                String socketId = (String) json.get("socket_id");
+                String daemonsetId = (String) json.get("daemonset_id");
+                graphParams = new K8sDaemonsetGraphParams(hostNameList.get(0), processId, socketId, daemonsetId, direction);
+            }
+            
+        }
         return new HttpResponseParams(
-                type,statusCode, status, responseHeaders, payload, requestParams, time, accountId, isPending, source, message, sourceIP, destIP, direction
+                type,statusCode, status, responseHeaders, payload, requestParams, time, accountId, isPending, source, message, sourceIP, destIP, direction, graphParams
         );
 
     }

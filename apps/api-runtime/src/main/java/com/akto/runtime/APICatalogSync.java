@@ -8,6 +8,9 @@ import com.akto.dao.*;
 import com.akto.dao.context.Context;
 import com.akto.dao.monitoring.FilterYamlTemplateDao;
 import com.akto.dao.runtime_filters.AdvancedTrafficFiltersDao;
+import com.akto.data_actor.DataActor;
+import com.akto.data_actor.DataActorFactory;
+import com.akto.data_actor.DbActor;
 import com.akto.dao.filter.MergedUrlsDao;
 import com.akto.dto.*;
 import com.akto.dto.billing.SyncLimit;
@@ -27,6 +30,8 @@ import com.akto.dto.usage.MetricTypes;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.filter.DictionaryFilter;
+import com.akto.runtime.APICatalogSync.ApiMergerResult;
+import com.akto.runtime.APICatalogSync.DbUpdateReturn;
 import com.akto.runtime.merge.MergeOnHostOnly;
 import com.akto.runtime.policies.AktoPolicyNew;
 import com.akto.task.Cluster;
@@ -66,6 +71,8 @@ public class APICatalogSync {
     public Map<Integer, APICatalog> dbState;
     public Map<Integer, APICatalog> delta;
     public AktoPolicyNew aktoPolicyNew;
+    public SvcToSvcGraphManager svcToSvcGraphManager = null;
+    public DataActor dataActor = DataActorFactory.fetchInstance();
     public Map<SensitiveParamInfo, Boolean> sensitiveParamInfoBooleanMap;
     public static boolean mergeAsyncOutside = true;
     public BloomFilter<CharSequence> existingAPIsInDb = BloomFilter.create(Funnels.stringFunnel(Charsets.UTF_8), 1_000_000, 0.001 );
@@ -88,6 +95,7 @@ public class APICatalogSync {
         mergedUrls = new HashSet<>();
         if (buildFromDb) {
             buildFromDB(false, fetchAllSTI);
+            this.svcToSvcGraphManager = SvcToSvcGraphManager.createFromEdgesAndNodes(dataActor);
         }
     }
 
@@ -214,6 +222,9 @@ public class APICatalogSync {
             for (HttpResponseParams responseParams: value) {
                 try {
                     aktoPolicyNew.process(responseParams);
+                    if (svcToSvcGraphManager != null) {
+                        svcToSvcGraphManager.processRecord(responseParams.getSvcToSvcGraphParams());
+                    }
                 } catch (Exception e) {
                     e.printStackTrace();
                     throw new RuntimeException(e);
@@ -1890,7 +1901,14 @@ public class APICatalogSync {
         }
 
         loggerMaker.infoAndAddToDb("starting build from db inside syncWithDb", LogDb.RUNTIME);
+
         buildFromDB(true, fetchAllSTI);
+        if (svcToSvcGraphManager != null){
+            svcToSvcGraphManager.updateWithNewDataAndReturnDelta(dataActor);            
+            if (svcToSvcGraphManager.getLastFetchFromDb() < Context.now() - 6 * 60 * 60) {
+                svcToSvcGraphManager = SvcToSvcGraphManager.createFromEdgesAndNodes(dataActor);
+            }
+        }
         loggerMaker.infoAndAddToDb("Finished syncing with db", LogDb.RUNTIME);
     }
 

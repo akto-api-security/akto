@@ -2,6 +2,7 @@ package com.akto.dto;
 
 
 import com.akto.dao.context.Context;
+import com.akto.dto.graph.SvcToSvcGraphParams;
 
 import java.util.HashMap;
 import java.util.List;
@@ -27,6 +28,8 @@ public class HttpResponseParams {
     String sourceIP;
     String destIP;
     String direction;
+    SvcToSvcGraphParams svcToSvcGraphParams;
+    
 
     public HttpResponseParams() {}
 
@@ -34,12 +37,12 @@ public class HttpResponseParams {
                               HttpRequestParams requestParams, int time, String accountId, boolean isPending, Source source, 
                               String orig, String sourceIP) {
         this(type, statusCode, status, headers, payload, requestParams, time, accountId, isPending, source, orig,
-                sourceIP, "", "");
+                sourceIP, "", "", null);
     }
 
     public HttpResponseParams(String type, int statusCode, String status, Map<String, List<String>> headers, String payload,
                               HttpRequestParams requestParams, int time, String accountId, boolean isPending, Source source,
-                              String orig, String sourceIP, String destIP, String direction) {
+                              String orig, String sourceIP, String destIP, String direction, SvcToSvcGraphParams svcToSvcGraphParams) {
         this.type = type;
         this.statusCode = statusCode;
         this.status = status;
@@ -54,6 +57,7 @@ public class HttpResponseParams {
         this.sourceIP = sourceIP;
         this.destIP = destIP;
         this.direction = direction;
+        this.svcToSvcGraphParams = svcToSvcGraphParams;
     }
 
     public static boolean validHttpResponseCode(int statusCode)  {
@@ -73,7 +77,10 @@ public class HttpResponseParams {
                 this.isPending,
                 this.source,
                 this.orig,
-                this.sourceIP
+                this.sourceIP,
+                this.destIP,
+                this.direction,
+                this.svcToSvcGraphParams
         );
     }
 
@@ -160,5 +167,9 @@ public class HttpResponseParams {
 
     public void setRequestParams(HttpRequestParams requestParams) {
         this.requestParams = requestParams;
+    }
+
+    public SvcToSvcGraphParams getSvcToSvcGraphParams() {
+        return svcToSvcGraphParams;
     }
 }

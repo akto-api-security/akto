@@ -5,6 +5,8 @@ import com.akto.dto.billing.Organization;
 import com.akto.dto.billing.Tokens;
 import com.akto.dto.dependency_flow.Node;
 import com.akto.dto.filter.MergedUrls;
+import com.akto.dto.graph.SvcToSvcGraphEdge;
+import com.akto.dto.graph.SvcToSvcGraphNode;
 import com.akto.dto.runtime_filters.RuntimeFilter;
 import com.akto.dto.settings.DataControlSettings;
 import com.akto.dto.test_editor.YamlTemplate;
@@ -30,6 +32,7 @@ import com.akto.dto.type.URLMethods;
 import com.akto.dto.usage.MetricTypes;
 import com.mongodb.BasicDBObject;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -269,5 +272,66 @@ public abstract class DataActor {
     public abstract List<DependencyNode> findDependencyNodes(int apiCollectionId, String url, String method, String reqMethod);
 
     public abstract TestingRunResultSummary findLatestTestingRunResultSummary(Bson filter);
+
+
+    public List<SvcToSvcGraphEdge> findAllSvcToSvcGraphEdges(int startTs, int endTs) {
+        List<SvcToSvcGraphEdge> ret = new ArrayList<>();
+        int skip = 0;
+        int limit = 1000;
+        while (true) {
+            List<SvcToSvcGraphEdge> newList = findSvcToSvcGraphEdges(startTs, endTs, skip, limit);
+
+            ret.addAll(newList);
+            skip += limit;
+            if (newList.size() < limit) {
+                return ret;
+            }
+        }
+    }
+
+    protected abstract List<SvcToSvcGraphEdge> findSvcToSvcGraphEdges(int startTs, int endTs, int skip, int limit);
+
+    public List<SvcToSvcGraphNode> findAllSvcToSvcGraphNodes(int startTs, int endTs) {
+        List<SvcToSvcGraphNode> ret = new ArrayList<>();
+        int skip = 0;
+        int limit = 1000;
+        while (true) {
+            List<SvcToSvcGraphNode> newList = findSvcToSvcGraphNodes(startTs, endTs, skip, limit);
+
+            ret.addAll(newList);
+            skip += limit;
+            if (newList.size() < limit) {
+                return ret;
+            }
+        }
+    }
+
+    protected abstract List<SvcToSvcGraphNode> findSvcToSvcGraphNodes(int startTs, int endTs, int skip, int limit);
+
+    public abstract void updateSvcToSvcGraphEdges(List<SvcToSvcGraphEdge> edges);
+    public abstract void updateSvcToSvcGraphNodes(List<SvcToSvcGraphNode> nodes);
+
+    public void updateNewEdgesInBatches(List<SvcToSvcGraphEdge> updateEdges) {
+        if (updateEdges.isEmpty()) return;
+        
+        int start = 0;
+        
+        do {
+            updateSvcToSvcGraphEdges(updateEdges.subList(start, Math.min(start + 1000, updateEdges.size())));
+            start += 1000;
+        } while (start < updateEdges.size());
+    }
+
+    
+    public void updateNewNodesInBatches(List<SvcToSvcGraphNode> updateNodes) {
+        if (updateNodes.isEmpty()) return;
+        
+        int start = 0;
+        
+        do {
+            updateSvcToSvcGraphNodes(updateNodes.subList(start, Math.min(start + 1000, updateNodes.size())));
+            start += 1000;
+        } while (start < updateNodes.size());
+    }
 
 }
