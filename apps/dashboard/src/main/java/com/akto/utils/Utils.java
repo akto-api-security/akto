@@ -676,9 +676,9 @@ public class Utils {
     }
 
     public static TestResult getTestResultFromTestingRunResult(TestingRunResult testingRunResult) {
-        GenericTestResult gtr = testingRunResult.getTestResults().get(testingRunResult.getTestResults().size() - 1);
         TestResult testResult;
         try {
+            GenericTestResult gtr = testingRunResult.getTestResults().get(testingRunResult.getTestResults().size() - 1);
             if (gtr instanceof TestResult) {
                 testResult = (TestResult) gtr;
             } else if (gtr instanceof MultiExecTestResult) {
@@ -688,6 +688,7 @@ public class Utils {
                 if (genericTestResult instanceof TestResult) {
                     testResult = (TestResult) genericTestResult;
                 } else {
+
                     testResult = null;
                 }
             } else {

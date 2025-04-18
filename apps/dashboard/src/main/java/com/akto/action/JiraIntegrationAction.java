@@ -497,6 +497,7 @@ public class JiraIntegrationAction extends UserAction {
                                 + request.getBody() + " ,response body " + response.getBody() + " ,response status " + response.getStatusCode(),
                         LoggerMaker.LogDb.DASHBOARD);
 
+                // TODO: This is a duplicated function remove it.
                 if (responsePayload != null) {
                     try {
                         BasicDBObject obj = BasicDBObject.parse(responsePayload);
