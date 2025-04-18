@@ -21,6 +21,8 @@ public class ApiInfo {
     public static final String ALL_AUTH_TYPES_FOUND = "allAuthTypesFound";
     private Set<Set<AuthType>> allAuthTypesFound;
 
+
+
     // this annotation makes sure that data is not stored in mongo
     @BsonIgnore
     private List<AuthType> actualAuthType;
@@ -54,6 +56,12 @@ public class ApiInfo {
 
     public static final String DISCOVERED_TIMESTAMP = "discoveredTimestamp";
     private int discoveredTimestamp;
+
+    public static final String SOURCES = "sources";
+    Map<String, Object> sources;
+
+    public static final String DESCRIPTION = "description";
+    private String description;
 
     public enum ApiType {
         REST, GRAPHQL, GRPC, SOAP
@@ -449,5 +457,21 @@ public class ApiInfo {
 
     public void setDiscoveredTimestamp(int discoveredTimestamp) {
         this.discoveredTimestamp = discoveredTimestamp;
+    }
+
+    public Map<String, Object> getSources() {
+        return this.sources;
+    }
+
+    public void setSources(Map<String, Object> sources) {
+        this.sources = sources;
+    }
+
+    public String getDescription() {
+        return description;
+    }
+
+    public void setDescription(String description) {
+        this.description = description;
     }
 }

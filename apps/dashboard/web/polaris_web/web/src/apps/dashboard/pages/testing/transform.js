@@ -108,10 +108,6 @@ function getTotalSeverityTestRunResult(severity) {
 }
 
 function getRuntime(scheduleTimestamp, endTimestamp, state) {
-  scheduleTimestamp = func.convertEpochToTimezoneEpoch(scheduleTimestamp)
-  if(endTimestamp) {
-    endTimestamp = func.convertEpochToTimezoneEpoch(endTimestamp)
-  }
   let status = getStatus(state);
   if (status === 'RUNNING') {
     return <div data-testid="test_run_status">Currently running</div>;
@@ -997,7 +993,7 @@ getRowInfo(severity, apiInfo,jiraIssueUrl, sensitiveData, isIgnored, azureBoards
     </Box>
   ) : null
 
-      
+
   const azureBoardsComp = azureBoardsWorkItemUrl?.length > 0 ? (
     <Box>
       <Tag>
@@ -1055,12 +1051,12 @@ getRowInfo(severity, apiInfo,jiraIssueUrl, sensitiveData, isIgnored, azureBoards
       tooltipContent: "Discovered time of the API"
     },
     {
-      title: "Jira",
+      title: "Jira ticket",
       value: jiraComponent,
       tooltipContent:"Jira ticket number attached to the testing run issue"
     },
     {
-      title: "Azure Boards",
+      title: "Azure work item",
       value: azureBoardsComp,
       tooltipContent: "Azure boards work item number attached to the testing run issue"
     }
@@ -1206,19 +1202,19 @@ getMissingConfigs(testResults){
       };
     });
   },
-  prepareEditableConfigObject(testRun,settings,hexId){
+  prepareEditableConfigObject(testRun,settings,hexId,testSuiteIds=[],testMode){
     const tests = testRun.tests;
     const selectedTests = []
-        Object.keys(tests).forEach(category => {
-            tests[category].forEach(test => {
-                if (test.selected) selectedTests.push(test.value)
-            })
+    Object.keys(tests).forEach(category => {
+        tests[category].forEach(test => {
+            if (test.selected) selectedTests.push(test.value)
         })
+    })
 
     return {
       configsAdvancedSettings:settings,
       testRoleId: testRun.testRoleId,
-      testSubCategoryList: selectedTests,
+      testSubCategoryList: testSuiteIds?.length == 0? selectedTests : [],
       overriddenTestAppUrl: testRun.hasOverriddenTestAppUrl ? testRun.overriddenTestAppUrl : "",
       maxConcurrentRequests: testRun.maxConcurrentRequests,
       testingRunHexId: hexId,
@@ -1227,9 +1223,10 @@ getMissingConfigs(testResults){
       sendMsTeamsAlert:testRun.sendMsTeamsAlert,
       recurringDaily: testRun.recurringDaily,
       continuousTesting: testRun.continuousTesting,
-      scheduleTimestamp: testRun.startTimestamp,
+      scheduleTimestamp: testRun?.hourlyLabel === 'Now' && ((testRun.startTimestamp - func.getStartOfTodayEpoch()) < 86400) ? 0 : testRun.startTimestamp,
       recurringWeekly: testRun.recurringWeekly,
-      recurringMonthly: testRun.recurringMonthly
+      recurringMonthly: testRun.recurringMonthly,
+      testSuiteIds:testMode? [] : testSuiteIds,
     }
   }
 }

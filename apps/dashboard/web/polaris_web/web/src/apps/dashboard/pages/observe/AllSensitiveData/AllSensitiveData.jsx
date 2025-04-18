@@ -138,7 +138,7 @@ const convertToDataTypesData = (type, collectionsMap, countMap, subtypeToApiColl
 
 function AllSensitiveData() {
 
-    const [data, setData] = useState({'all': [], "enabled":[], 'disabled': []})
+    const [data, setData] = useState({"all":[], "detected": [], "enabled":[], 'disabled': []})
     const [mapData, setMapData] = useState({})
     const [prompts, setPrompts] = useState([])
     const [isGptScreenActive, setIsGptScreenActive] = useState(false)
@@ -154,9 +154,9 @@ function AllSensitiveData() {
     const [severityCountMap, setSeverityCountMap] = useState([])
     const [loading, setLoading] = useState(false)
 
-    const definedTableTabs = ["All", "Enabled", "Disabled"]
+    const definedTableTabs = ["All", "Detected", "Enabled", "Disabled"]
     const tableSelectedTab = PersistStore.getState().tableSelectedTab[window.location.pathname]
-    const initialSelectedTab = tableSelectedTab || "enabled"
+    const initialSelectedTab = tableSelectedTab || "detected"
     const [selectedTab, setSelectedTab] = useState(initialSelectedTab)
     let initialTabIdx = func.getTableTabIndexById(1, definedTableTabs, initialSelectedTab)
     const [selected, setSelected] = useState(initialTabIdx)
@@ -245,6 +245,7 @@ function AllSensitiveData() {
             return convertToDataTypesData(type, collectionsMap, reqResCountMap, dataTypesVsApisCount?.apiCollectionsMap || {})
         })
         temp.all = tempArr
+        temp.detected = tempArr.filter((x) => x.response > 0 || x.request > 0)
         temp.enabled = tempArr.filter((x) => x.active === true)
         temp.disabled = tempArr.filter((x) => x.active === false)
         let finalCountMap = {}

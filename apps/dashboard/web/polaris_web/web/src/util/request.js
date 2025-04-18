@@ -122,7 +122,7 @@ service.interceptors.response.use((response) => {
     func.setToast(true, true, response.data.error )
   } else {
     if ( window?.mixpanel?.track && response?.config?.url) {
-      raiseMixpanelEvent(response.config.url);
+      raiseMixpanelEvent(response.config.url, response.data)
     }
   }
 
@@ -130,7 +130,7 @@ service.interceptors.response.use((response) => {
 }, err)
 
 const black_list_apis = ['dashboard/accessToken', 'api/fetchBurpPluginInfo', 'api/fetchActiveLoaders', 'api/fetchAllSubCategories', 'api/fetchVulnerableRequests', 'api/fetchActiveTestRunsStatus']
-async function raiseMixpanelEvent(api) {
+async function raiseMixpanelEvent(api, data) {
   if (window?.Intercom) {
     if (api?.startsWith("/api/ingestPostman")) {
         window.Intercom("trackEvent", "created-api-collection", {"type": "Postman"})
@@ -157,7 +157,11 @@ async function raiseMixpanelEvent(api) {
     }
   }
   if (api && !black_list_apis.some(black_list_api => api.includes(black_list_api))) {
-    window.mixpanel.track(api)
+    if (api?.startsWith('/api/fetchEndpointsCount')) {
+      window.mixpanel.track('endpoints_count', { newCount: data.newCount, version: (window.RELEASE_VERSION || "na") })
+    } else {
+      window.mixpanel.track(api)
+    }
   }
 }
 

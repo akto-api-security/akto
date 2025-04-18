@@ -135,6 +135,14 @@ const headers = [
         value: 'discovered',
         isText: CellType.TEXT,
         sortActive: true,
+    },
+    {
+        title: "Description",
+        text: 'Description',
+        value: 'descriptionComp',
+        textValue: 'description',
+        filterKey: "description",
+        tooltipContent: 'Description of the collection'
     }
 ];
 
@@ -189,6 +197,7 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
             detectedTimestamp: c.urlsCount === 0 ? 0 : (trafficInfoMap[c.id] || 0),
             riskScore: c.urlsCount === 0 ? 0 : (riskScoreMap[c.id] ? riskScoreMap[c.id] : 0),
             discovered: func.prettifyEpoch(c.startTs || 0),
+            descriptionComp: (<Box maxWidth="300px"><TooltipText tooltip={c.description} text={c.description}/></Box>),
         }
     })
 
@@ -511,10 +520,9 @@ function ApiCollections() {
                 onAction: () => exportCsv(selectedResources)
             }
         ];
-
+        const defaultApiGroups = allCollections.filter(x => x.type === "API_GROUP" && x.automated).map(x => x.id);
         const deactivated = deactivateCollections.map(x => x.id);
         const activated = allCollections.filter(x => { return !x.deactivated }).map(x => x.id);
-        const apiGrous = allCollections.filter(x => { return x?.type === 'API_GROUP' }).map(x => x?.id)
         if (selectedResources.every(v => { return activated.includes(v) })) {
             actions.push(
                 {
@@ -536,14 +544,13 @@ function ApiCollections() {
                 }
             )
         }
-        if (selectedResources.every(v => { return !apiGrous.includes(v) })) {
-            actions.push(
-                {
-                    content: `Remove collection${func.addPlurality(selectedResources.length)}`,
-                    onAction: () => handleCollectionsAction(selectedResources, api.deleteMultipleCollections, "deleted")
-                }
-            )
-        }
+        actions.push(
+            {
+                content: `Remove collection${func.addPlurality(selectedResources.length)}`,
+                onAction: () => handleCollectionsAction(selectedResources.filter(v => !defaultApiGroups.includes(v)), api.deleteMultipleCollections, "deleted")
+            }
+        )
+
 
         const apiCollectionShareRenderItem = (item) => {
             const { id, name, login, role } = item;

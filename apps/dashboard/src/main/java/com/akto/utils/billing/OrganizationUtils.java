@@ -87,7 +87,7 @@ public class OrganizationUtils {
                     result.put(featureLabel, new FeatureAccess(isGranted, overageFirstDetected, usageLimit, usage));
                 }
             } catch (Exception e) {
-                logger.infoAndAddToDb("unable to parse usage: " + o.toString(), LoggerMaker.LogDb.DASHBOARD);
+                logger.debugAndAddToDb("unable to parse usage: " + o.toString(), LoggerMaker.LogDb.DASHBOARD);
                 continue;
             }
         }
@@ -122,7 +122,7 @@ public class OrganizationUtils {
             return BasicDBObject.parse(responseBody.string());
 
         } catch (IOException e) {
-            logger.info("Failed to sync organization with Akto. Error - " +  e.getMessage());
+            logger.debug("Failed to sync organization with Akto. Error - " +  e.getMessage());
             return null;
         } finally {
             if (response != null) {
@@ -197,7 +197,7 @@ public class OrganizationUtils {
                 Updates.set(Organization.SYNCED_WITH_AKTO, true)
             );
         } catch (IOException e) {
-            logger.info("Failed to sync organization with Akto. Error - " +  e.getMessage());
+            logger.debug("Failed to sync organization with Akto. Error - " +  e.getMessage());
             return false;
         } finally {
             if (response != null) {

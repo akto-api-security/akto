@@ -99,9 +99,9 @@ public class Utils {
             try {
                 int waitInSeconds = Math.min(workflowNodeDetails.getWaitInSeconds(), 60);
                 if (waitInSeconds > 0) {
-                    loggerMaker.infoAndAddToDb("WAITING: " + waitInSeconds + " seconds", LogDb.TESTING);
+                    loggerMaker.debugAndAddToDb("WAITING: " + waitInSeconds + " seconds", LogDb.TESTING);
                     Thread.sleep(waitInSeconds*1000);
-                    loggerMaker.infoAndAddToDb("DONE WAITING!!!!", LogDb.TESTING);
+                    loggerMaker.debugAndAddToDb("DONE WAITING!!!!", LogDb.TESTING);
                 }
             } catch (InterruptedException e) {
                 throw new RuntimeException(e);
@@ -121,7 +121,7 @@ public class Utils {
     }
 
     private static String extractOtpCode(String text, String regex) {
-        loggerMaker.infoAndAddToDb(regex, LogDb.TESTING);
+        loggerMaker.debugAndAddToDb(regex, LogDb.TESTING);
 
         Pattern pattern = Pattern.compile(regex);
         Matcher matcher = pattern.matcher(text);
@@ -160,7 +160,7 @@ public class Utils {
         for (String param: flattened.keySet()) {
             String key = node.getId() + ".response.body" + "." + param;
             valuesMap.put(key, flattened.get(param));
-	        loggerMaker.infoAndAddToDb("kv pair: " + key + " " + flattened.get(param));
+	        loggerMaker.debugAndAddToDb("kv pair: " + key + " " + flattened.get(param));
         }	
 
         data.put("token", token);
@@ -488,21 +488,21 @@ public class Utils {
 
         boolean userSuppliedQueryParamsNullOrEmpty = queryParams == null || queryParams.trim().length() == 0;
         if (requestUrl != null) {
-            loggerMaker.infoAndAddToDb("requestUrl: " + requestUrl, LogDb.TESTING);
+            loggerMaker.debugAndAddToDb("requestUrl: " + requestUrl, LogDb.TESTING);
             String rawUrl = executeCode(requestUrl, valuesMap);
-            loggerMaker.infoAndAddToDb("rawUrl: " + requestUrl, LogDb.TESTING);
+            loggerMaker.debugAndAddToDb("rawUrl: " + requestUrl, LogDb.TESTING);
             // this url might contain urlQueryParams. We need to move it queryParams
             String[] rawUrlArr = rawUrl.split("\\?");
             request.setUrl(rawUrlArr[0]);
             if (rawUrlArr.length > 1) {
                 queryFromReplacedUrl = rawUrlArr[1];
             }
-            loggerMaker.infoAndAddToDb("final url: " + request.getUrl(), LogDb.TESTING);
-            loggerMaker.infoAndAddToDb("queryFromReplacedUrl: " + queryFromReplacedUrl, LogDb.TESTING);
+            loggerMaker.debugAndAddToDb("final url: " + request.getUrl(), LogDb.TESTING);
+            loggerMaker.debugAndAddToDb("queryFromReplacedUrl: " + queryFromReplacedUrl, LogDb.TESTING);
         }
 
         if (userSuppliedQueryParamsNullOrEmpty) {
-            loggerMaker.infoAndAddToDb("setting null", LogDb.TESTING);
+            loggerMaker.debugAndAddToDb("setting null", LogDb.TESTING);
             request.setQueryParams(null);
         }
 
@@ -520,15 +520,15 @@ public class Utils {
         boolean queryFromReplacedUrlNullOrEmpty = queryFromReplacedUrl == null || queryFromReplacedUrl.trim().isEmpty();
 
         if (!userSuppliedQueryParamsNullOrEmpty) {
-            loggerMaker.infoAndAddToDb("user has supplied query params", LogDb.TESTING);
+            loggerMaker.debugAndAddToDb("user has supplied query params", LogDb.TESTING);
             String finalQueryParams = executeCode(queryParams, valuesMap);
-            loggerMaker.infoAndAddToDb("finalQueryParams: " + finalQueryParams, LogDb.TESTING);
+            loggerMaker.debugAndAddToDb("finalQueryParams: " + finalQueryParams, LogDb.TESTING);
             if (queryFromReplacedUrlNullOrEmpty) {
                 request.setQueryParams(finalQueryParams);
             } else {
                 // combine original query params and user defined query params and latter overriding former
                 String combinedQueryParams = OriginalHttpRequest.combineQueryParams(queryFromReplacedUrl, finalQueryParams);
-                loggerMaker.infoAndAddToDb("combinedQueryParams: " + combinedQueryParams, LogDb.TESTING);
+                loggerMaker.debugAndAddToDb("combinedQueryParams: " + combinedQueryParams, LogDb.TESTING);
                 request.setQueryParams(combinedQueryParams);
             }
         } else if (!queryFromReplacedUrlNullOrEmpty) {

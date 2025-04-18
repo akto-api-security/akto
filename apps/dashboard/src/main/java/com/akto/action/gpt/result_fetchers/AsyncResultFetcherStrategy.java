@@ -28,7 +28,7 @@ public class AsyncResultFetcherStrategy implements ResultFetcherStrategy<BasicDB
     private BasicDBObject fetchDataFromLambda(BasicDBObject data) {
         String requestId = UUID.randomUUID().toString();
         data.put("request_id", requestId);
-        logger.info("Request body:" + data.toJson());
+        logger.debug("Request body:" + data.toJson());
         OkHttpClient client = CoreHTTPClient.client.newBuilder()
                 .writeTimeout(3, TimeUnit.SECONDS)
                 .readTimeout(3, TimeUnit.SECONDS)
@@ -76,7 +76,7 @@ public class AsyncResultFetcherStrategy implements ResultFetcherStrategy<BasicDB
                 .build();
 
         while (attempts < 10 && !status.equalsIgnoreCase("READY")) {
-            logger.info("Attempt: {} for request id: {}", attempts, requestId);
+            logger.debug("Attempt: {} for request id: {}", attempts, requestId);
             BasicDBObject data = new BasicDBObject("request_id", requestId);
             MediaType mediaType = MediaType.parse("application/json");
             RequestBody body = RequestBody.create(mediaType, new BasicDBObject("data", data).toJson());
@@ -91,11 +91,11 @@ public class AsyncResultFetcherStrategy implements ResultFetcherStrategy<BasicDB
                 if (responseBody != null) {
                     String resp_body = responseBody.string();
                     BasicDBObject responseJson = BasicDBObject.parse(resp_body);
-                    logger.info("Response from lambda: {}, attempt #{}", responseJson, attempts);
+                    logger.debug("Response from lambda: {}, attempt #{}", responseJson, attempts);
                     status = responseJson.getString("status");
 
                     if (status.equalsIgnoreCase("READY")) {
-                        logger.info("Response from lambda: {}. Found response in {} attempts", responseJson, attempts);
+                        logger.debug("Response from lambda: {}. Found response in {} attempts", responseJson, attempts);
                         String response1 = responseJson.getString("response");
                         return BasicDBObject.parse(response1);
                     }
@@ -106,7 +106,7 @@ public class AsyncResultFetcherStrategy implements ResultFetcherStrategy<BasicDB
 
             attempts++;
             try {
-                logger.info("Sleeping for 5 seconds");
+                logger.debug("Sleeping for 5 seconds");
                 Thread.sleep(5000);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();

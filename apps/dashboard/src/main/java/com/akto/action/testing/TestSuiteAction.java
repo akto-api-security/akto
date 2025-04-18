@@ -3,9 +3,11 @@ package com.akto.action.testing;
 import com.akto.action.UserAction;
 import com.akto.dao.RBACDao;
 import com.akto.dao.context.Context;
+import com.akto.dao.testing.DefaultTestSuitesDao;
 import com.akto.dao.testing.config.TestSuiteDao;
 import com.akto.dto.RBAC;
 import com.akto.dto.User;
+import com.akto.dto.testing.DefaultTestSuites;
 import com.akto.dto.testing.config.TestSuites;
 import com.akto.util.Constants;
 import com.mongodb.client.model.Filters;
@@ -102,13 +104,13 @@ public class TestSuiteAction extends UserAction {
         
         List<Bson> updates = new ArrayList<>();
         if (StringUtils.hasText(this.testSuiteName)) {
-            updates.add(Updates.set(TestSuites.FIELD_NAME, this.testSuiteName));
+            updates.add(Updates.set(TestSuites.NAME, this.testSuiteName));
         }
 
         if (this.subCategoryList != null) {
-            updates.add(Updates.set(TestSuites.FIELD_SUB_CATEGORY_LIST, this.subCategoryList));
+            updates.add(Updates.set(TestSuites.SUB_CATEGORY_LIST, this.subCategoryList));
         }
-        updates.add(Updates.set(TestSuites.FIELD_LAST_UPDATED, (long) (System.currentTimeMillis() / 1000l)));
+        updates.add(Updates.set(TestSuites.LAST_UPDATED, (long) (System.currentTimeMillis() / 1000l)));
         TestSuiteDao.instance.updateOne(
                 Filters.eq(Constants.ID, testSuiteId),
                 Updates.combine(updates));
@@ -116,8 +118,10 @@ public class TestSuiteAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    private List<DefaultTestSuites> defaultTestSuites;
     public String getAllTestSuites() {
         this.testSuiteList = TestSuiteDao.instance.findAll(Filters.empty());
+        this.defaultTestSuites = DefaultTestSuitesDao.instance.findAll(Filters.empty());
         return SUCCESS.toUpperCase();
     }
 
@@ -154,4 +158,11 @@ public class TestSuiteAction extends UserAction {
         this.testSuiteList = testSuites;
     }
 
+    public List<DefaultTestSuites> getDefaultTestSuites() {
+        return defaultTestSuites;
+    }
+
+    public void setDefaultTestSuites(List<DefaultTestSuites> defaultTestSuites) {
+        this.defaultTestSuites = defaultTestSuites;
+    }
 }

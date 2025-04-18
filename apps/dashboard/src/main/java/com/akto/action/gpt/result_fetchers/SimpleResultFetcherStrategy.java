@@ -21,7 +21,7 @@ public class SimpleResultFetcherStrategy implements ResultFetcherStrategy<BasicD
     public BasicDBObject fetchResult(BasicDBObject data) {
         String responseFromLambda = fetchDataFromLambda(data);
         if(!responseFromLambda.isEmpty()){
-            logger.info("Response from lambda: " + responseFromLambda);
+            logger.debug("Response from lambda: " + responseFromLambda);
             return BasicDBObject.parse(responseFromLambda);
         } else {
             logger.error("Empty response from lambda");
@@ -32,7 +32,7 @@ public class SimpleResultFetcherStrategy implements ResultFetcherStrategy<BasicD
     private String fetchDataFromLambda(BasicDBObject data) {
         String requestId = UUID.randomUUID().toString();
         data.put("request_id", requestId);
-        logger.info("Request body:" + data.toJson() );
+        logger.debug("Request body:" + data.toJson() );
         OkHttpClient client = CoreHTTPClient.client.newBuilder()
                 .writeTimeout(45, java.util.concurrent.TimeUnit.SECONDS)
                 .readTimeout(45, java.util.concurrent.TimeUnit.SECONDS)

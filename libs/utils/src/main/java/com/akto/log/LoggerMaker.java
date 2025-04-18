@@ -27,8 +27,14 @@ import java.util.concurrent.TimeUnit;
 import org.bson.conversions.Bson;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.simple.SimpleLogger;
 
 public class LoggerMaker  {
+
+    static {
+        System.setProperty(SimpleLogger.DEFAULT_LOG_LEVEL_KEY, System.getenv().getOrDefault("AKTO_LOG_LEVEL", "WARN"));
+        System.out.printf("AKTO_LOG_LEVEL is set to: %s \n", System.getProperty(SimpleLogger.DEFAULT_LOG_LEVEL_KEY));
+    }
 
     public static final int LOG_SAVE_INTERVAL = 60*60; // 1 hour
 
@@ -44,7 +50,7 @@ public class LoggerMaker  {
 
     static {
         scheduler.scheduleAtFixedRate(new Runnable() {
-            
+
             @Override
             public void run() {
                 try {
@@ -292,14 +298,6 @@ public class LoggerMaker  {
         logger.info(message, vars);
     }
 
-    public void error(String errorMessage) {
-        logger.info(errorMessage);
-    }
-
-    public void error(String errorMessage, Throwable e) {
-        logger.error(errorMessage, e);
-    }
-
     public void error(String errorMessage, Object... vars) {
         logger.error(errorMessage, vars);
     }
@@ -310,5 +308,20 @@ public class LoggerMaker  {
 
     public void warn(String message, Object... vars) {
         logger.warn(message, vars);
+    }
+
+    public void debugAndAddToDb(String message) {
+        debugAndAddToDb(message, this.db);
+    }
+
+    public void debugAndAddToDb(String message, LogDb db) {
+        String accountId = Context.accountId.get() != null ? Context.accountId.get().toString() : "NA";
+        String debugMessage = "acc: " + accountId + ", " + message;
+        debug(debugMessage);
+        try{
+            insert(debugMessage, "debug", db);
+        } catch (Exception e){
+
+        }
     }
 }

@@ -255,7 +255,7 @@ function TestRunResultFlyout(props) {
                                 issueId={issueDetails.id}
                             />
                             <JiraTicketCreationModal
-                                activator={<Button id={"create-azure-boards-ticket-button"} primary onClick={handleAzureBoardClick} disabled={azureBoardsWorkItemUrl !== "" || window.AZURE_BOARDS_INTEGRATED !== "true"}>Create Work Item</Button>}
+                                activator={window.AZURE_BOARDS_INTEGRATED === 'true' ? <Button id={"create-azure-boards-ticket-button"} primary onClick={handleAzureBoardClick} disabled={azureBoardsWorkItemUrl !== "" || window.AZURE_BOARDS_INTEGRATED !== "true"}>Create Work Item</Button> : <></>}
                                 modalActive={boardsModalActive}
                                 setModalActive={setBoardsModalActive}
                                 handleSaveAction={handleAzureBoardWorkitemCreation}

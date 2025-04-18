@@ -68,18 +68,18 @@ public class TestCompletion {
         int usageLeft = syncLimit.getUsageLeft();
 
         if(organization != null && organization.getTestTelemetryEnabled()){
-            logger.info("Test telemetry enabled for account: " + accountId + ", sending results");
+            logger.debug("Test telemetry enabled for account: " + accountId + ", sending results");
             testTelemetryScheduler.execute(() -> {
                 Context.accountId.set(accountId);
                 try {
                     com.akto.onprem.Constants.sendTestResults(summaryId, organization);
-                    logger.info("Test telemetry sent for account: " + accountId);
+                    logger.debug("Test telemetry sent for account: " + accountId);
                 } catch (Exception e) {
                     logger.error("Error in sending test telemetry for account: " + accountId + " " + e.getMessage());
                 }
             });
         } else {
-            logger.info("Test telemetry disabled for account: " + accountId);
+            logger.debug("Test telemetry disabled for account: " + accountId);
         }
 
         // update usage after test is completed.

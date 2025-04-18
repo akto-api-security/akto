@@ -268,7 +268,7 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
         try {
             wafClient = getAwsWafClient(awsWafConfig.getAwsAccessKey(), awsWafConfig.getAwsSecretKey(), awsWafConfig.getRegion());
             //ListWebAcLsResponse webAclsResponse = wafClient.listWebACLs(ListWebAcLsRequest.builder().scope(SCOPE).build());
-            loggerMaker.infoAndAddToDb("init aws client, for threat actor block");
+            loggerMaker.debugAndAddToDb("init aws client, for threat actor block");
         } catch (Exception e) {
             e.printStackTrace();
             loggerMaker.errorAndAddToDb("error initialising aws client " + e.getMessage());
@@ -321,7 +321,7 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
                   post.setEntity(requestEntity);
 
                   try (CloseableHttpResponse response = this.httpClient.execute(post)) {
-                      loggerMaker.infoAndAddToDb("updated threat actor status");
+                      loggerMaker.debugAndAddToDb("updated threat actor status");
                   } catch (Exception e) {
                     e.printStackTrace();
                     return ERROR.toUpperCase();
@@ -333,7 +333,7 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
             return SUCCESS.toUpperCase();
             
         } catch (Wafv2Exception e) {
-            loggerMaker.infoAndAddToDb("Error modiftying threat actor status: " + e.getMessage());
+            loggerMaker.debugAndAddToDb("Error modiftying threat actor status: " + e.getMessage());
             return ERROR.toUpperCase();
         }
     }
@@ -351,10 +351,10 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
                     .build();
 
             wafClient.updateIPSet(updateRequest);
-            loggerMaker.infoAndAddToDb("Blocked Threat Actor: " + actorIp);
+            loggerMaker.debugAndAddToDb("Blocked Threat Actor: " + actorIp);
             return true;
         } else {
-            loggerMaker.infoAndAddToDb("Threat Actor " + actorIp + " is already blocked.");
+            loggerMaker.debugAndAddToDb("Threat Actor " + actorIp + " is already blocked.");
             return false;
         }
     }
@@ -372,10 +372,10 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
                   .build();
 
           wafClient.updateIPSet(updateRequest);
-          loggerMaker.infoAndAddToDb("Unblocked Threat Actor: " + actorIp);
+          loggerMaker.debugAndAddToDb("Unblocked Threat Actor: " + actorIp);
           return true;
       } else {
-          loggerMaker.infoAndAddToDb("Threat Actor " + actorIp + " is currently active");
+          loggerMaker.debugAndAddToDb("Threat Actor " + actorIp + " is currently active");
           return false;
       }
   }
@@ -554,4 +554,11 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
     this.eventType = eventType;
   }
 
+  public Map<String, Integer> getSort() {
+    return sort;
+  }
+
+  public void setSort(Map<String, Integer> sort) {
+    this.sort = sort;
+  }
 }

@@ -8,6 +8,7 @@ import com.akto.kafka.KafkaConfig;
 import com.akto.kafka.KafkaConsumerConfig;
 import com.akto.kafka.KafkaProducerConfig;
 import com.akto.kafka.Serializer;
+import com.akto.log.LoggerMaker;
 import com.akto.threat.backend.service.MaliciousEventService;
 import com.akto.threat.backend.service.ThreatActorService;
 import com.akto.threat.backend.service.ThreatApiService;
@@ -22,6 +23,9 @@ import org.bson.codecs.configuration.CodecRegistry;
 import org.bson.codecs.pojo.PojoCodecProvider;
 
 public class Main {
+
+  private static final LoggerMaker logger = new LoggerMaker(Main.class);
+
   public static void main(String[] args) throws Exception {
 
     DaoInit.init(new ConnectionString(System.getenv("AKTO_MONGO_CONN")));

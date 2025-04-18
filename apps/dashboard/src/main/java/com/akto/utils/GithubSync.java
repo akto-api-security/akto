@@ -134,7 +134,7 @@ public class GithubSync {
                     throw new Exception("Repo size is too large, max allowed size is 10 MB");
                 }
 
-                loggerMaker.infoAndAddToDb(String.format("Downloaded github repo archive: %s", url), LogDb.DASHBOARD);
+                loggerMaker.debugAndAddToDb(String.format("Downloaded github repo archive: %s", url), LogDb.DASHBOARD);
                 repoZip = response.body().bytes();
             } else {
                 loggerMaker.errorAndAddToDb(String.format("Failed to download the zip archive from url %s. Status code: %d", url, response.code()), LogDb.DASHBOARD);

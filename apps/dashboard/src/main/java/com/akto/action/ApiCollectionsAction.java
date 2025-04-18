@@ -76,9 +76,9 @@ public class ApiCollectionsAction extends UserAction {
     
     public List<ApiCollection> fillApiCollectionsUrlCount(List<ApiCollection> apiCollections, Bson filter) {
 	int tsRandom = Context.now();
-	loggerMaker.infoAndAddToDb("fillApiCollectionsUrlCount started: " + tsRandom, LoggerMaker.LogDb.DASHBOARD); 
+	loggerMaker.debugAndAddToDb("fillApiCollectionsUrlCount started: " + tsRandom, LoggerMaker.LogDb.DASHBOARD);
         Map<Integer, Integer> countMap = ApiCollectionsDao.instance.buildEndpointsCountToApiCollectionMap(filter);
-	loggerMaker.infoAndAddToDb("fillApiCollectionsUrlCount buildEndpointsCountToApiCollectionMap done: " + tsRandom, LoggerMaker.LogDb.DASHBOARD);     
+	loggerMaker.debugAndAddToDb("fillApiCollectionsUrlCount buildEndpointsCountToApiCollectionMap done: " + tsRandom, LoggerMaker.LogDb.DASHBOARD);
 
         for (ApiCollection apiCollection: apiCollections) {
             int apiCollectionId = apiCollection.getId();
@@ -168,7 +168,7 @@ public class ApiCollectionsAction extends UserAction {
         List<Bson> pipeLine = new ArrayList<>();
         pipeLine.add(Aggregates.project(Projections.fields(
             Projections.computed(ApiCollection.URLS_COUNT, new BasicDBObject("$size", new BasicDBObject("$ifNull", Arrays.asList("$urls", Collections.emptyList())))),
-            Projections.include(ApiCollection.ID, ApiCollection.NAME, ApiCollection.HOST_NAME, ApiCollection._TYPE, ApiCollection.USER_ENV_TYPE, ApiCollection._DEACTIVATED,ApiCollection.START_TS, ApiCollection.AUTOMATED)
+            Projections.include(ApiCollection.ID, ApiCollection.NAME, ApiCollection.HOST_NAME, ApiCollection._TYPE, ApiCollection.USER_ENV_TYPE, ApiCollection._DEACTIVATED,ApiCollection.START_TS, ApiCollection.AUTOMATED, ApiCollection.DESCRIPTION)
         )));
 
         try {
@@ -190,7 +190,8 @@ public class ApiCollectionsAction extends UserAction {
                 apiCollection.setDeactivated(collection.getBoolean(ApiCollection._DEACTIVATED));
                 apiCollection.setStartTs(collection.getInt(ApiCollection.START_TS));
                 apiCollection.setAutomated(collection.getBoolean(ApiCollection.AUTOMATED));
-                
+                apiCollection.setDescription(collection.getString(ApiCollection.DESCRIPTION));
+
                 String type = collection.getString(ApiCollection._TYPE);
                 if(type != null && type.length() > 0){
                     ApiCollection.Type typeEnum = ApiCollection.Type.valueOf(type);
@@ -307,16 +308,6 @@ public class ApiCollectionsAction extends UserAction {
             apiCollectionIds.add(apiCollection.getId());
         }
 
-        boolean hasApiGroups = false;
-
-        List<ApiCollection> apiGroupsList = ApiCollectionsDao.instance.fetchApiGroups();
-        for(ApiCollection apiGroup : apiGroupsList) {
-            if(apiCollectionIds.contains(apiGroup.getId())) {
-                hasApiGroups = true;
-                apiCollectionIds.remove(Integer.valueOf(apiGroup.getId()));
-            }
-        }
-
         ApiCollectionsDao.instance.deleteAll(Filters.in("_id", apiCollectionIds));
 
         Bson filter = Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionIds);
@@ -365,11 +356,6 @@ public class ApiCollectionsAction extends UserAction {
         } catch (Exception e) {
         }
 
-        if(hasApiGroups) {
-            addActionError("API groups cannot be deleted!");
-            return ERROR.toUpperCase();
-        }
-
         return SUCCESS.toUpperCase();
     }
 
@@ -395,11 +381,11 @@ public class ApiCollectionsAction extends UserAction {
             return ERROR.toUpperCase();
         }
 
-        loggerMaker.infoAndAddToDb("Started adding " + this.apiList.size() + " apis into custom collection.", LogDb.DASHBOARD);
+        loggerMaker.debugAndAddToDb("Started adding " + this.apiList.size() + " apis into custom collection.", LogDb.DASHBOARD);
 
         CustomTestingEndpoints condition = new CustomTestingEndpoints(apiList, CustomTestingEndpoints.Operator.OR);
         apiCollection.addToConditions(condition);
-        loggerMaker.infoAndAddToDb("Final conditions for collection: " +  apiCollection.getName() + " are: " + apiCollection.getConditions().toString());
+        loggerMaker.debugAndAddToDb("Final conditions for collection: " +  apiCollection.getName() + " are: " + apiCollection.getConditions().toString());
         ApiCollectionUsers.updateApiCollection(apiCollection.getConditions(), apiCollection.getId());
         ApiCollectionUsers.addToCollectionsForCollectionId(apiCollection.getConditions(), apiCollection.getId());
 
@@ -539,21 +525,21 @@ public class ApiCollectionsAction extends UserAction {
     public static void dropSampleDataForApiCollection() {
         List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(Filters.eq(ApiCollection.SAMPLE_COLLECTIONS_DROPPED, false));
         if(apiCollections.isEmpty()) {
-            loggerMaker.infoAndAddToDb("No api collections to fix sample data for", LoggerMaker.LogDb.DASHBOARD);
+            loggerMaker.debugAndAddToDb("No api collections to fix sample data for", LoggerMaker.LogDb.DASHBOARD);
             return;
         }
-        loggerMaker.infoAndAddToDb(String.format("Fixing sample data for %d api collections", apiCollections.size()), LoggerMaker.LogDb.DASHBOARD);
+        loggerMaker.debugAndAddToDb(String.format("Fixing sample data for %d api collections", apiCollections.size()), LoggerMaker.LogDb.DASHBOARD);
         for (ApiCollection apiCollection: apiCollections) {
             int apiCollectionId = apiCollection.getId();
             UpdateResult updateResult = SampleDataDao.instance.updateManyNoUpsert(Filters.eq("_id.apiCollectionId", apiCollectionId), Updates.set("samples", Collections.emptyList()));
-            loggerMaker.infoAndAddToDb(String.format("Fixed %d sample data for api collection %d", updateResult.getModifiedCount(), apiCollectionId), LoggerMaker.LogDb.DASHBOARD);
+            loggerMaker.debugAndAddToDb(String.format("Fixed %d sample data for api collection %d", updateResult.getModifiedCount(), apiCollectionId), LoggerMaker.LogDb.DASHBOARD);
             updateResult = SensitiveSampleDataDao.instance.updateManyNoUpsert(Filters.eq("_id.apiCollectionId", apiCollectionId), Updates.set("sampleData", Collections.emptyList()));
-            loggerMaker.infoAndAddToDb(String.format("Fixed %d sensitive sample data for api collection %d", updateResult.getModifiedCount(), apiCollectionId), LoggerMaker.LogDb.DASHBOARD);
+            loggerMaker.debugAndAddToDb(String.format("Fixed %d sensitive sample data for api collection %d", updateResult.getModifiedCount(), apiCollectionId), LoggerMaker.LogDb.DASHBOARD);
             updateResult = SingleTypeInfoDao.instance.updateManyNoUpsert(Filters.and(Filters.eq("apiCollectionId", apiCollectionId), Filters.exists("values", true)), Updates.set("values.elements", Collections.emptyList()));
-            loggerMaker.infoAndAddToDb(String.format("Fixed %d sti for api collection %d", updateResult.getModifiedCount(), apiCollectionId), LoggerMaker.LogDb.DASHBOARD);
+            loggerMaker.debugAndAddToDb(String.format("Fixed %d sti for api collection %d", updateResult.getModifiedCount(), apiCollectionId), LoggerMaker.LogDb.DASHBOARD);
             ApiCollectionsDao.instance.updateOneNoUpsert(Filters.eq("_id", apiCollectionId), Updates.set(ApiCollection.SAMPLE_COLLECTIONS_DROPPED, true));
         }
-        loggerMaker.infoAndAddToDb(String.format("Fixed sample data for %d api collections", apiCollections.size()), LoggerMaker.LogDb.DASHBOARD);
+        loggerMaker.debugAndAddToDb(String.format("Fixed sample data for %d api collections", apiCollections.size()), LoggerMaker.LogDb.DASHBOARD);
     }
 
     public String redactCollection() {
@@ -566,7 +552,7 @@ public class ApiCollectionsAction extends UserAction {
             int accountId = Context.accountId.get();
             Runnable r = () -> {
                 Context.accountId.set(accountId);
-                loggerMaker.infoAndAddToDb("Triggered job to delete sample data", LoggerMaker.LogDb.DASHBOARD);
+                loggerMaker.debugAndAddToDb("Triggered job to delete sample data", LoggerMaker.LogDb.DASHBOARD);
                 dropSampleDataForApiCollection();
             };
             new Thread(r).start();
@@ -863,6 +849,21 @@ public class ApiCollectionsAction extends UserAction {
         return Action.SUCCESS.toUpperCase();
     }
 
+    private String description;
+    public String saveCollectionDescription() {
+        if(description == null || description.isEmpty()) {
+            addActionError("No description provided");
+            return Action.ERROR.toUpperCase();
+        }
+
+        ApiCollectionsDao.instance.updateOneNoUpsert(
+                Filters.eq(ApiCollection.ID, apiCollectionId),
+                Updates.set(ApiCollection.DESCRIPTION, description)
+        );
+
+        return SUCCESS.toUpperCase();
+    }
+
     public List<ApiCollection> getApiCollections() {
         return this.apiCollections;
     }
@@ -977,5 +978,9 @@ public class ApiCollectionsAction extends UserAction {
 
     public Map<Integer, Integer> getDeactivatedHostnameCountMap() {
         return deactivatedHostnameCountMap;
+    }
+
+    public void setDescription(String description) {
+        this.description = description;
     }
 }

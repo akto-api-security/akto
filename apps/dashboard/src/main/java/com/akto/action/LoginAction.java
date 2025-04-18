@@ -74,7 +74,7 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
     BasicDBObject loginResult = new BasicDBObject();
     @Override
     public String execute() throws IOException {
-        logger.info("LoginAction Hit");
+        logger.debug("LoginAction Hit");
 
         if (username == null) {
             return Action.ERROR.toUpperCase();
@@ -107,7 +107,7 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
                 }
             }
 
-            logger.info("Auth Failed");
+            logger.debug("Auth Failed");
             return "ERROR";
         }
         String result = loginUser(user, servletResponse, true, servletRequest);
@@ -129,7 +129,7 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
         for (String accountIdStr: user.getAccounts().keySet()) {
             int accountId = Integer.parseInt(accountIdStr);
             Context.accountId.set(accountId);
-            logger.info("updating vulnerable api's collection for account " + accountId);
+            logger.debug("updating vulnerable api's collection for account " + accountId);
             try {
                 BackwardCompatibility backwardCompatibility = BackwardCompatibilityDao.instance.findOne(new BasicDBObject());
                 if (backwardCompatibility == null || backwardCompatibility.getVulnerableApiUpdationVersionV1() == 0) {
@@ -149,10 +149,10 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
         Context.accountId.set(accountId);
         long count = SingleTypeInfoDao.instance.getEstimatedCount();
         if(count == 0){
-            logger.info("New user, showing quick start page");
+            logger.debug("New user, showing quick start page");
             loginResult.put("redirect", "dashboard/quick-start");
         } else {
-            logger.info("Existing user, not redirecting to quick start page");
+            logger.debug("Existing user, not redirecting to quick start page");
         }
     }
 
@@ -218,7 +218,7 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
                                 int accountId = Integer.parseInt(accountIdStr);
                                 Context.accountId.set(accountId);
                                 SingleTypeInfo.fetchCustomDataTypes(accountId);
-                                logger.info("updating data type test templates for account " + accountId);
+                                logger.debug("updating data type test templates for account " + accountId);
                                 InitializerListener.executeDataTypeToTemplate();
                             }
                         } catch (Exception e) {
@@ -273,7 +273,7 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
         User user = UsersDao.instance.findOne(filters);
 
         if(user == null) {
-            logger.info("user not found while sending password reset link");
+            logger.debug("user not found while sending password reset link");
             return Action.SUCCESS.toUpperCase();
         }
 

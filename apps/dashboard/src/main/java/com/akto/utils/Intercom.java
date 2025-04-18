@@ -24,7 +24,7 @@ public class Intercom {
 				result.append(String.format("%02x", b));
 			}
 
-			logger.info("Hash {}", result.toString());
+			logger.debug("Hash {}", result.toString());
 			return result.toString();
 		}
 		catch (Exception e){

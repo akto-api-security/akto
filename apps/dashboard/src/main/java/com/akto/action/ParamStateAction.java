@@ -66,7 +66,7 @@ public class ParamStateAction extends UserAction {
             privateSingleTypeInfo.add(singleTypeInfo);
         }
 
-        loggerMaker.infoAndAddToDb("Found " + privateSingleTypeInfo.size() + " private STIs", LoggerMaker.LogDb.DASHBOARD);
+        loggerMaker.debugAndAddToDb("Found " + privateSingleTypeInfo.size() + " private STIs", LoggerMaker.LogDb.DASHBOARD);
 
         if (privateSingleTypeInfo.isEmpty()) {
             Bson filter = Filters.or(
@@ -74,7 +74,7 @@ public class ParamStateAction extends UserAction {
                     Filters.gt(SingleTypeInfo._UNIQUE_COUNT, 0)
             );
             SingleTypeInfo singleTypeInfo = SingleTypeInfoDao.instance.findOne(filter);
-            loggerMaker.infoAndAddToDb("Did find STI with unique count url=" + singleTypeInfo.getUrl() + "count="+ singleTypeInfo.uniqueCount, LoggerMaker.LogDb.DASHBOARD);
+            loggerMaker.debugAndAddToDb("Did find STI with unique count url=" + singleTypeInfo.getUrl() + "count="+ singleTypeInfo.uniqueCount, LoggerMaker.LogDb.DASHBOARD);
         }
 
         return SUCCESS.toUpperCase();
