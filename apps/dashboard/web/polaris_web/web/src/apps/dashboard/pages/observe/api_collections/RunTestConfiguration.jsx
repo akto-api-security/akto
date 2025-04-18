@@ -1,5 +1,5 @@
 import React, { useReducer } from 'react';
-import { VerticalStack, HorizontalGrid, Checkbox, TextField } from '@shopify/polaris';
+import { VerticalStack, HorizontalGrid, Checkbox, TextField, HorizontalStack } from '@shopify/polaris';
 import Dropdown from "../../../components/layouts/Dropdown";
 import SingleDate from "../../../components/layouts/SingleDate";
 import func from "@/util/func"
@@ -164,6 +164,25 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
                 onChange={() => setTestRun(prev => ({ ...prev, sendMsTeamsAlert: !prev.sendMsTeamsAlert }))}
                 disabled={!teamsTestingWebhookIntegrated}
             />
+            <HorizontalStack gap={4}>
+                <Checkbox
+                    label="Auto-create tickets"
+                    />
+                <Dropdown 
+                    menuItems={[]}
+                    initial={"Select Project"}
+                    selected={() => {}}
+                    />
+                <Dropdown 
+                    menuItems={[]}
+                    initial={"Select Issue Type"}
+                    selected={() => {}}/>
+                <Dropdown 
+                    menuItems={[]}
+                    initial={"Select Priority"}
+                    selected={() => {}}
+                    />
+            </HorizontalStack>
             <HorizontalGrid columns={2}>
                 <Checkbox
                     label="Use different target for testing"
