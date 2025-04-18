@@ -27,7 +27,7 @@ public class GenerateCurlForTest implements QueryHandler{
         String modifiedSampleData = modifiedHeaders.getLeft();
         try {
             curl = ExportSampleDataAction.getCurl(modifiedSampleData);
-            logger.info("curl: " + curl);
+            logger.debug("curl: " + curl);
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -36,7 +36,7 @@ public class GenerateCurlForTest implements QueryHandler{
         request.put("test_type", meta.getString("test_type"));
         request.put("response_details", meta.getString("response_details"));
         request.put(GptAction.USER_EMAIL, meta.getString(GptAction.USER_EMAIL));
-        logger.info("request: " + request.toJson());
+        logger.debug("request: " + request.toJson());
         BasicDBObject resp =  this.resultFetcherStrategy.fetchResult(request);
         String respStr = resp.toJson();
         respStr = HeadersUtils.replaceHeadersWithValues(Pair.of(respStr, modifiedHeaders.getRight()));

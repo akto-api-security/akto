@@ -47,11 +47,11 @@ public class StatusCodeAnalyser {
             loggerMaker.errorAndAddToDb("No sample data", LogDb.TESTING);
             return;
         }
-        loggerMaker.infoAndAddToDb("started calc default payloads", LogDb.TESTING);
+        loggerMaker.debugAndAddToDb("started calc default payloads", LogDb.TESTING);
 
         calculateDefaultPayloads(sampleMessageStore, sampleDataMap, testingRunConfig, hostAndContentType);
 
-        loggerMaker.infoAndAddToDb("started fill result", LogDb.TESTING);
+        loggerMaker.debugAndAddToDb("started fill result", LogDb.TESTING);
         fillResult(sampleMessageStore, sampleDataMap, authMechanism, testingRunConfig);
     }
 
@@ -61,7 +61,7 @@ public class StatusCodeAnalyser {
             String host;
             String contentType;
             try {
-                loggerMaker.infoAndAddToDb("Finding host for apiInfoKey: " + apiInfoKey.toString());
+                loggerMaker.debugAndAddToDb("Finding host for apiInfoKey: " + apiInfoKey.toString());
                 OriginalHttpRequest request = TestExecutor.findOriginalHttpRequest(apiInfoKey, sampleDataMap, sampleMessageStore);
                 host = TestExecutor.findHostFromOriginalHttpRequest(request);
                 contentType = TestExecutor.findContentTypeFromOriginalHttpRequest(request);
@@ -78,7 +78,7 @@ public class StatusCodeAnalyser {
 
     public static void calculateDefaultPayloads(SampleMessageStore sampleMessageStore, Map<ApiInfo.ApiInfoKey, List<String>> sampleDataMap, TestingRunConfig testingRunConfig, Map<String, String> hostAndContentType) {
         for (String host: hostAndContentType.keySet()) {
-            loggerMaker.infoAndAddToDb("calc default payload for host: " + host, LogDb.TESTING);
+            loggerMaker.debugAndAddToDb("calc default payload for host: " + host, LogDb.TESTING);
             for (int idx=0; idx<11;idx++) {
                 try {
                     String url = host;
@@ -126,7 +126,7 @@ public class StatusCodeAnalyser {
     private static final LoggerMaker loggerMaker = new LoggerMaker(StatusCodeAnalyser.class);
     public static int MAX_COUNT = 30;
     public static void fillResult(SampleMessageStore sampleMessageStore, Map<ApiInfo.ApiInfoKey, List<String>> sampleDataMap, AuthMechanism authMechanism, TestingRunConfig testingRunConfig) {
-        loggerMaker.infoAndAddToDb("Running status analyser", LogDb.TESTING);
+        loggerMaker.debugAndAddToDb("Running status analyser", LogDb.TESTING);
 
         if (authMechanism == null) {
             loggerMaker.errorAndAddToDb("No auth mechanism", LogDb.TESTING);
@@ -146,7 +146,7 @@ public class StatusCodeAnalyser {
             }
 
             if (inc >= 5) {
-                loggerMaker.infoAndAddToDb("5 error API calls. Exiting status code analyser", LogDb.TESTING);
+                loggerMaker.debugAndAddToDb("5 error API calls. Exiting status code analyser", LogDb.TESTING);
                 break;
             }
 
@@ -162,7 +162,7 @@ public class StatusCodeAnalyser {
                 }
                 if (success)  {
                     count += 1;
-                    loggerMaker.infoAndAddToDb("count: " + count, LogDb.TESTING);
+                    loggerMaker.debugAndAddToDb("count: " + count, LogDb.TESTING);
                 }
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb("Error while filling frequency map: " + e, LogDb.TESTING);
@@ -171,7 +171,7 @@ public class StatusCodeAnalyser {
 
         calculateResult(frequencyMap, 5);
 
-        loggerMaker.infoAndAddToDb("result of status code analyser : " + result, LogDb.TESTING);
+        loggerMaker.debugAndAddToDb("result of status code analyser : " + result, LogDb.TESTING);
     }
 
     public static void calculateResult(Map<Set<String>, Map<String,Integer>> frequencyMap, int threshold) {

@@ -2,6 +2,7 @@ package com.akto.threat.backend.tasks;
 
 import com.akto.dao.context.Context;
 import com.akto.kafka.KafkaConfig;
+import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.runtime.utils.Utils;
 import com.akto.threat.backend.constants.KafkaTopic;
@@ -9,6 +10,7 @@ import com.akto.threat.backend.constants.MongoDBCollection;
 import com.akto.threat.backend.db.AggregateSampleMaliciousEventModel;
 import com.akto.threat.backend.db.MaliciousEventModel;
 import com.akto.threat.backend.db.SplunkIntegrationModel;
+import com.akto.threat.backend.service.MaliciousEventService;
 import com.akto.threat.backend.utils.SplunkEvent;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -44,6 +46,7 @@ public class FlushMessagesToDB {
   ExecutorService executorService = Executors.newFixedThreadPool(3);
   private static int lastSplunkConfigFetched = 0;
   SplunkIntegrationModel splunkConfig = null;
+  private static final LoggerMaker logger = new LoggerMaker(MaliciousEventService.class);
 
   public FlushMessagesToDB(KafkaConfig kafkaConfig, MongoClient mongoClient) {
     String kafkaBrokerUrl = kafkaConfig.getBootstrapServers();
@@ -113,6 +116,8 @@ public class FlushMessagesToDB {
     String eventType = (String) json.get("eventType");
     String payload = (String) json.get("payload");
     String accountId = (String) json.get("accountId");
+
+    logger.debug("inserting malicious event in db for accountId " + accountId + " eventType " + eventType);
 
     switch (eventType) {
       case MongoDBCollection.ThreatDetection.AGGREGATE_SAMPLE_MALICIOUS_REQUESTS:

@@ -134,7 +134,7 @@ public class UsageAction extends UserAction {
             return ERROR.toUpperCase();
         }
 
-        loggerMaker.infoAndAddToDb("Calculating usage for organization: " + organization.getId() + " adminEmail: "
+        loggerMaker.debugAndAddToDb("Calculating usage for organization: " + organization.getId() + " adminEmail: "
                 + organization.getAdminEmail(), LogDb.DASHBOARD);
 
         // calculation may take time, so we do it in a separate thread to avoid timeout.
@@ -142,7 +142,7 @@ public class UsageAction extends UserAction {
             public void run() {
 
                 OrgUtils.getSiblingAccounts(currentAccountId).forEach(account -> {
-                    loggerMaker.infoAndAddToDb("Calculating usage for account: " + account.getId(),
+                    loggerMaker.debugAndAddToDb("Calculating usage for account: " + account.getId(),
                             LogDb.DASHBOARD);
                     Context.accountId.set(account.getId());
                     int accountId = account.getId();
@@ -151,7 +151,7 @@ public class UsageAction extends UserAction {
 
                 try {
                     String orgId = organization.getId();
-                    loggerMaker.infoAndAddToDb("Flushing usage pipeline for " + orgId, LogDb.DASHBOARD);
+                    loggerMaker.debugAndAddToDb("Flushing usage pipeline for " + orgId, LogDb.DASHBOARD);
                     OrganizationUtils.flushUsagePipelineForOrg(orgId);
                 } catch (Exception e) {
                     loggerMaker.errorAndAddToDb(e, "Failed to flush usage pipeline", LogDb.DASHBOARD);

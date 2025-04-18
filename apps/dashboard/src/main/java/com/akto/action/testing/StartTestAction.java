@@ -1,53 +1,77 @@
 package com.akto.action.testing;
 
-import com.akto.action.AccountAction;
 import com.akto.action.UserAction;
-import com.akto.dao.ApiCollectionsDao;
-import com.akto.dao.RBACDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.YamlTemplateDao;
+import com.akto.dao.testing.DeleteTestRunsDao;
+import com.akto.dao.testing.TestRolesDao;
+import com.akto.dao.testing.TestingRunConfigDao;
+import com.akto.dao.testing.TestingRunDao;
+import com.akto.dao.testing.TestingRunResultDao;
+import com.akto.dao.testing.TestingRunResultSummariesDao;
+import com.akto.dao.testing.VulnerableTestingRunResultDao;
+import com.akto.dao.testing.WorkflowTestsDao;
 import com.akto.dao.testing.sources.TestSourceConfigsDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dao.testing.*;
+import com.akto.dao.testing.config.TestSuiteDao;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.testing.config.EditableTestingRunConfig;
+import com.akto.dto.testing.config.TestSuites;
 import com.akto.dto.ApiInfo;
-import com.akto.dto.User;
 import com.akto.dto.ApiToken.Utility;
-import com.akto.dto.RBAC;
 import com.akto.dto.CollectionConditions.TestConfigsAdvancedSettings;
-import com.akto.dto.RBAC.Role;
+import com.akto.dto.User;
 import com.akto.dto.test_editor.Info;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
-import com.akto.dto.testing.*;
+import com.akto.dto.testing.AuthMechanism;
+import com.akto.dto.testing.CollectionWiseTestingEndpoints;
+import com.akto.dto.testing.CustomTestingEndpoints;
+import com.akto.dto.testing.DeleteTestRuns;
+import com.akto.dto.testing.GenericTestResult;
+import com.akto.dto.testing.MultiExecTestResult;
+import com.akto.dto.testing.TestResult;
+import com.akto.dto.testing.TestResult.TestError;
+import com.akto.dto.testing.TestingEndpoints;
+import com.akto.dto.testing.TestingRun;
 import com.akto.dto.testing.TestingRun.State;
 import com.akto.dto.testing.TestingRun.TestingRunType;
-import com.akto.dto.testing.TestResult.TestError;
+import com.akto.dto.testing.TestingRunConfig;
+import com.akto.dto.testing.TestingRunResult;
+import com.akto.dto.testing.TestingRunResultSummary;
+import com.akto.dto.testing.WorkflowTest;
+import com.akto.dto.testing.WorkflowTestingEndpoints;
+import com.akto.dto.testing.config.EditableTestingRunConfig;
 import com.akto.dto.testing.info.CurrentTestsStatus;
 import com.akto.dto.testing.info.CurrentTestsStatus.StatusForIndividualTest;
 import com.akto.dto.testing.sources.TestSourceConfig;
-import com.akto.listener.RuntimeListener;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.usage.UsageMetricCalculator;
 import com.akto.util.Constants;
-import com.akto.util.DashboardMode;
 import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.TestErrorSource;
 import com.akto.utils.DeleteTestRunUtils;
 import com.akto.utils.Utils;
 import com.google.gson.Gson;
-import com.mongodb.client.model.*;
+import com.mongodb.client.model.Aggregates;
+import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Projections;
+import com.mongodb.client.model.Sorts;
+import com.mongodb.client.model.Updates;
 import com.mongodb.client.result.InsertOneResult;
 import com.opensymphony.xwork2.Action;
-
-import org.apache.commons.lang3.StringUtils;
-import org.bson.conversions.Bson;
-import org.bson.types.ObjectId;
-
 import java.time.Instant;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -56,6 +80,9 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import org.apache.commons.lang3.StringUtils;
+import org.bson.conversions.Bson;
+import org.bson.types.ObjectId;
 
 public class StartTestAction extends UserAction {
 
@@ -85,6 +112,7 @@ public class StartTestAction extends UserAction {
     private String searchString;
     private boolean continuousTesting;
     private int testingRunConfigId;
+    private List<String> testSuiteIds;
 
     private Map<String,Long> allTestsCountMap = new HashMap<>();
     private Map<String,Integer> issuesSummaryInfoMap = new HashMap<>();
@@ -173,6 +201,8 @@ public class StartTestAction extends UserAction {
             if(this.testConfigsAdvancedSettings != null && !this.testConfigsAdvancedSettings.isEmpty()){
                 testingRunConfig.setConfigsAdvancedSettings(this.testConfigsAdvancedSettings);
             }
+            List<String> testSuiteIdsObj = new ArrayList<>(testSuiteIds);
+            testingRunConfig.setTestSuiteIds(testSuiteIdsObj);
             this.testIdConfig = testingRunConfig.getId();
             TestingRunConfigDao.instance.insertOne(testingRunConfig);
         }
@@ -264,7 +294,7 @@ public class StartTestAction extends UserAction {
                                 0, localTestingRun.getId(), localTestingRun.getId().toHexString(), 0, localTestingRun.getTestIdConfig(),0 );
                         summary.setState(TestingRun.State.SCHEDULED);
                         summary.setOriginalTestingRunResultSummaryId(new ObjectId(testingRunResultSummaryHexId));
-                        loggerMaker.infoAndAddToDb("Rerun test triggered at " + Context.now(), LogDb.DASHBOARD);
+                        loggerMaker.debugAndAddToDb("Rerun test triggered at " + Context.now(), LogDb.DASHBOARD);
 
                         InsertOneResult result = TestingRunResultSummariesDao.instance.insertOne(summary);
                         this.testingRunResultSummaryHexId = result.getInsertedId().asObjectId().getValue().toHexString();
@@ -290,6 +320,9 @@ public class StartTestAction extends UserAction {
             if (this.overriddenTestAppUrl != null || this.selectedTests != null) {
                 int id = UUID.randomUUID().hashCode() & 0xfffffff;
                 TestingRunConfig testingRunConfig = new TestingRunConfig(id, null, this.selectedTests, null, this.overriddenTestAppUrl, this.testRoleId);
+
+                List<String> testSuiteIdsObj = new ArrayList<>(testSuiteIds);
+                testingRunConfig.setTestSuiteIds(testSuiteIdsObj);
                 this.testIdConfig = testingRunConfig.getId();
                 TestingRunConfigDao.instance.insertOne(testingRunConfig);
             } 
@@ -306,7 +339,7 @@ public class StartTestAction extends UserAction {
                     0, localTestingRun.getId(), localTestingRun.getId().toHexString(), 0, this.testIdConfig,testsCounts );
             summary.setState(TestingRun.State.SCHEDULED);
             if (metadata != null) {
-                loggerMaker.infoAndAddToDb("CICD test triggered at " + Context.now(), LogDb.DASHBOARD);
+                loggerMaker.debugAndAddToDb("CICD test triggered at " + Context.now(), LogDb.DASHBOARD);
                 summary.setMetadata(metadata);
             }
             InsertOneResult result = TestingRunResultSummariesDao.instance.insertOne(summary);
@@ -319,7 +352,7 @@ public class StartTestAction extends UserAction {
             //     int accountId = Context.accountId.get();
             //     User user = AccountAction.addUserToExistingAccount("arjun@akto.io", accountId);
             //     if (user != null) {
-                    
+
             //         RBACDao.instance.updateOneNoUpsert(
             //             Filters.and(
             //                 Filters.eq(RBAC.USER_ID, user.getId()),
@@ -346,11 +379,11 @@ public class StartTestAction extends UserAction {
 
     private void handleCallFromAktoGpt() {
         if (this.source == null) {
-            loggerMaker.infoAndAddToDb("Call from testing UI, skipping", LoggerMaker.LogDb.DASHBOARD);
+            loggerMaker.debugAndAddToDb("Call from testing UI, skipping", LoggerMaker.LogDb.DASHBOARD);
             return;
         }
         if (this.source.isCallFromAktoGpt() && !this.selectedTests.isEmpty()) {
-            loggerMaker.infoAndAddToDb("Call from Akto GPT, " + this.selectedTests, LoggerMaker.LogDb.DASHBOARD);
+            loggerMaker.debugAndAddToDb("Call from Akto GPT, " + this.selectedTests, LoggerMaker.LogDb.DASHBOARD);
             Map<String, Info> testInfoMap = YamlTemplateDao.instance.fetchTestInfoMap();
             List<String> tests = new ArrayList<>();
             for (String selectedTest : this.selectedTests) {
@@ -363,7 +396,7 @@ public class StartTestAction extends UserAction {
                 if (testSubCategories.isEmpty()) {
                     loggerMaker.errorAndAddToDb("Test not found for " + selectedTest, LoggerMaker.LogDb.DASHBOARD);
                 } else {
-                    loggerMaker.infoAndAddToDb(
+                    loggerMaker.debugAndAddToDb(
                             String.format("Category: %s, tests: %s", selectedTest, testSubCategories),
                             LoggerMaker.LogDb.DASHBOARD);
                     tests.addAll(testSubCategories);
@@ -371,7 +404,7 @@ public class StartTestAction extends UserAction {
             }
             if (!tests.isEmpty()) {
                 this.selectedTests = tests;
-                loggerMaker.infoAndAddToDb("Tests found for " + this.selectedTests, LoggerMaker.LogDb.DASHBOARD);
+                loggerMaker.debugAndAddToDb("Tests found for " + this.selectedTests, LoggerMaker.LogDb.DASHBOARD);
             } else {
                 loggerMaker.errorAndAddToDb("No tests found for " + this.selectedTests, LoggerMaker.LogDb.DASHBOARD);
             }
@@ -782,8 +815,8 @@ public class StartTestAction extends UserAction {
         }
 
 
-        if (testingRunResultSummaryHexId != null) loggerMaker.infoAndAddToDb("fetchTestingRunResults called for hexId=" + testingRunResultSummaryHexId);
-        if (queryMode != null) loggerMaker.infoAndAddToDb("fetchTestingRunResults called for queryMode="+queryMode);
+        if (testingRunResultSummaryHexId != null) loggerMaker.debugAndAddToDb("fetchTestingRunResults called for hexId=" + testingRunResultSummaryHexId);
+        if (queryMode != null) loggerMaker.debugAndAddToDb("fetchTestingRunResults called for queryMode="+queryMode);
 
         int timeNow = Context.now();
         Bson ignoredIssuesFilters = Filters.and(
@@ -792,7 +825,7 @@ public class StartTestAction extends UserAction {
         );
         List<TestingRunIssues> issueslist = TestingRunIssuesDao.instance.findAll(ignoredIssuesFilters, Projections.include("_id"));
         this.issueslistCount = issueslist.size();
-        loggerMaker.infoAndAddToDb("[" + (Context.now() - timeNow) + "] Fetched testing run issues of size: " + issueslist.size(), LogDb.DASHBOARD);
+        loggerMaker.debugAndAddToDb("[" + (Context.now() - timeNow) + "] Fetched testing run issues of size: " + issueslist.size(), LogDb.DASHBOARD);
 
         List<Bson> testingRunResultFilters = prepareTestRunResultsFilters(testingRunResultSummaryId, queryMode);
 
@@ -814,17 +847,17 @@ public class StartTestAction extends UserAction {
             Bson filters = testingRunResultFilters.isEmpty() ? Filters.empty() : Filters.and(testingRunResultFilters);
             this.testingRunResults = VulnerableTestingRunResultDao.instance
                     .fetchLatestTestingRunResultWithCustomAggregations(filters, pageLimit, skip, sortStage, testingRunResultSummaryId, queryMode.equals(QueryMode.VULNERABLE));
-            loggerMaker.infoAndAddToDb("[" + (Context.now() - timeNow) + "] Fetched testing run results of size: " + testingRunResults.size(), LogDb.DASHBOARD);
+            loggerMaker.debugAndAddToDb("[" + (Context.now() - timeNow) + "] Fetched testing run results of size: " + testingRunResults.size(), LogDb.DASHBOARD);
 
             timeNow = Context.now();
             removeTestingRunResultsByIssues(testingRunResults, issueslist, false);
-            loggerMaker.infoAndAddToDb("[" + (Context.now() - timeNow) + "] Removed ignored issues from testing run results. Current size of testing run results: " + testingRunResults.size(), LogDb.DASHBOARD);
+            loggerMaker.debugAndAddToDb("[" + (Context.now() - timeNow) + "] Removed ignored issues from testing run results. Current size of testing run results: " + testingRunResults.size(), LogDb.DASHBOARD);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "error in fetchLatestTestingRunResult: " + e);
         }
 
         timeNow = Context.now();
-        loggerMaker.infoAndAddToDb("fetchTestingRunResults completed in: " + (Context.now() - timeNow), LogDb.DASHBOARD);
+        loggerMaker.debugAndAddToDb("fetchTestingRunResults completed in: " + (Context.now() - timeNow), LogDb.DASHBOARD);
 
         return SUCCESS.toUpperCase();
     }
@@ -840,7 +873,7 @@ public class StartTestAction extends UserAction {
             String key = apiInfoKeyString + "|" + issue.getId().getTestSubCategory();
             issuesSet.add(key);
         }
-        loggerMaker.infoAndAddToDb("Total issues to be removed from TestingRunResults list: " + issuesSet.size(), LogDb.DASHBOARD);
+        loggerMaker.debugAndAddToDb("Total issues to be removed from TestingRunResults list: " + issuesSet.size(), LogDb.DASHBOARD);
 
         Iterator<TestingRunResult> resultIterator = testingRunResults.iterator();
 
@@ -862,7 +895,7 @@ public class StartTestAction extends UserAction {
 
         long endTime = System.currentTimeMillis();
         long duration = endTime - startTime;
-        loggerMaker.infoAndAddToDb("[" + Instant.now() + "] Removed elements from TestingRunResults list in " + duration + " ms", LogDb.DASHBOARD);
+        loggerMaker.debugAndAddToDb("[" + Instant.now() + "] Removed elements from TestingRunResults list in " + duration + " ms", LogDb.DASHBOARD);
     }
 
     private Map<String, List<String>> reportFilterList;
@@ -1247,9 +1280,12 @@ public class StartTestAction extends UserAction {
                 if (editableTestingRunConfig.getConfigsAdvancedSettings() != null && !editableTestingRunConfig.getConfigsAdvancedSettings().equals(existingTestingRunConfig.getConfigsAdvancedSettings())) {
                     updates.add(Updates.set(TestingRunConfig.TEST_CONFIGS_ADVANCED_SETTINGS, editableTestingRunConfig.getConfigsAdvancedSettings()));
                 }
-                
-                if (editableTestingRunConfig.getTestSubCategoryList() != null &&
-                    !editableTestingRunConfig.getTestSubCategoryList().equals(existingTestingRunConfig.getTestSubCategoryList())) {
+
+                if(editableTestingRunConfig.getTestSuiteIds() != null && !editableTestingRunConfig.getTestSuiteIds().equals(existingTestingRunConfig.getTestSuiteIds())){
+                    updates.add(Updates.set(TestingRunConfig.TEST_SUITE_IDS, editableTestingRunConfig.getTestSuiteIds()));
+                }
+
+                if (editableTestingRunConfig.getTestSubCategoryList() != null && !editableTestingRunConfig.getTestSubCategoryList().equals(existingTestingRunConfig.getTestSubCategoryList())) {
                     updates.add(Updates.set(TestingRunConfig.TEST_SUBCATEGORY_LIST, editableTestingRunConfig.getTestSubCategoryList()));
                 }
                 
@@ -1807,4 +1843,7 @@ public class StartTestAction extends UserAction {
         this.recurringMonthly = recurringMonthly;
     }
 
+    public void setTestSuiteIds(List<String> testSuiteIds) {
+        this.testSuiteIds = testSuiteIds;
+    }
 }

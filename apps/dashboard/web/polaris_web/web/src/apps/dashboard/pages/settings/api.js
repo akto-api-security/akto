@@ -535,11 +535,11 @@ const settingRequests = {
         })
     },
 
-    addAzureBoardsIntegration(organization, projectList, personalAuthToken) {
+    addAzureBoardsIntegration(azureBoardsBaseUrl, organization, projectList, personalAuthToken) {
         return request({
             url: '/api/addAzureBoardsIntegration',
             method: 'post',
-            data: {organization, projectList, personalAuthToken}
+            data: {azureBoardsBaseUrl, organization, projectList, personalAuthToken}
         })
     },
     removeAzureBoardsIntegration() {
@@ -547,6 +547,13 @@ const settingRequests = {
             url: '/api/removeAzureBoardsIntegration',
             method: 'post',
             data: {}
+        })
+    },
+    removeInvitation(email) {
+        return request({
+            url: '/api/removeInvitation',
+            method: 'post',
+            data: {email}
         })
     }
 }

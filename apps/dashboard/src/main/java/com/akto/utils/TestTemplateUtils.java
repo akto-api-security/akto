@@ -21,9 +21,9 @@ public class TestTemplateUtils {
             repoZip = githubSync.syncRepo("akto-api-security/tests-library", "master");
 
             if(repoZip == null) {
-                loggerMaker.infoAndAddToDb("Failed to load test templates from github, trying to load from local directory");
+                loggerMaker.debugAndAddToDb("Failed to load test templates from github, trying to load from local directory");
             } else {
-                loggerMaker.infoAndAddToDb("Loaded test templates from github");
+                loggerMaker.debugAndAddToDb("Loaded test templates from github");
             }
         }
         
@@ -33,7 +33,7 @@ public class TestTemplateUtils {
             if(repoZip == null) {
                 loggerMaker.errorAndAddToDb("Failed to load test templates from local directory");
             } else {
-                loggerMaker.infoAndAddToDb("Loaded test templates from local directory");
+                loggerMaker.debugAndAddToDb("Loaded test templates from local directory");
             }
         }
         
@@ -68,9 +68,9 @@ public class TestTemplateUtils {
             repoZip = githubSync.syncRepo(repositoryUrl, branch);
 
             if(repoZip == null) {
-                loggerMaker.infoAndAddToDb("Failed to load test templates from github, trying to load from local directory");
+                loggerMaker.debugAndAddToDb("Failed to load test templates from github, trying to load from local directory");
             } else {
-                loggerMaker.infoAndAddToDb("Loaded test templates from github");
+                loggerMaker.debugAndAddToDb("Loaded test templates from github");
             }
         }
         

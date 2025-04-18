@@ -12,8 +12,11 @@ import com.akto.dto.test_editor.Info;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
+import com.akto.dto.testing.GenericTestResult;
+import com.akto.dto.testing.MultiExecTestResult;
 import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.TestingRunResult;
+import com.akto.log.LoggerMaker;
 import com.akto.testing.ApiExecutor;
 import com.akto.util.Constants;
 import com.mongodb.BasicDBList;
@@ -35,17 +38,20 @@ import java.nio.file.Files;
 import java.util.*;
 
 import static com.akto.utils.Utils.createRequestFile;
+import static com.akto.utils.Utils.getTestResultFromTestingRunResult;
 
 public class AzureBoardsIntegrationAction extends UserAction {
 
+    private String azureBoardsBaseUrl;
     private String organization;
     private List<String> projectList;
     private String personalAuthToken;
 
     private AzureBoardsIntegration azureBoardsIntegration;
 
-    public static final String azureBoardsBaseUrl = "https://dev.azure.com";
     public static final String version = "7.1";
+
+    private static final LoggerMaker logger = new LoggerMaker(AzureBoardsIntegrationAction.class, LoggerMaker.LogDb.DASHBOARD);
 
 
     public String fetchAzureBoardsIntegration() {
@@ -55,6 +61,11 @@ public class AzureBoardsIntegrationAction extends UserAction {
     }
 
     public String addAzureBoardsIntegration() {
+        if(azureBoardsBaseUrl == null || azureBoardsBaseUrl.isEmpty()) {
+            addActionError("Please enter a valid base url.");
+            return Action.ERROR.toUpperCase();
+        }
+
         if(organization == null || organization.isEmpty()) {
             addActionError("Please enter a valid organization.");
             return Action.ERROR.toUpperCase();
@@ -65,17 +76,22 @@ public class AzureBoardsIntegrationAction extends UserAction {
             return Action.ERROR.toUpperCase();
         }
 
+        if(azureBoardsBaseUrl.endsWith("/")) {
+            azureBoardsBaseUrl = azureBoardsBaseUrl.substring(0, azureBoardsBaseUrl.length() - 1);
+        }
+
         Bson combineUpdates = Updates.combine(
-                Updates.set("organization", organization),
-                Updates.set("projectList", projectList),
-                Updates.setOnInsert("createdTs", Context.now()),
-                Updates.set("updatedTs", Context.now())
+                Updates.set(AzureBoardsIntegration.BASE_URL, azureBoardsBaseUrl),
+                Updates.set(AzureBoardsIntegration.ORGANIZATION, organization),
+                Updates.set(AzureBoardsIntegration.PROJECT_LIST, projectList),
+                Updates.setOnInsert(AzureBoardsIntegration.CREATED_TS, Context.now()),
+                Updates.set(AzureBoardsIntegration.UPDATED_TS, Context.now())
         );
 
         String basicAuth = ":" + personalAuthToken;
         String base64PersonalAuthToken = Base64.getEncoder().encodeToString(basicAuth.getBytes());
         if(personalAuthToken != null && !personalAuthToken.isEmpty()) {
-            Bson personalAuthTokenUpdate = Updates.set("personalAuthToken", base64PersonalAuthToken);
+            Bson personalAuthTokenUpdate = Updates.set(AzureBoardsIntegration.PERSONAL_AUTH_TOKEN, base64PersonalAuthToken);
             combineUpdates = Updates.combine(combineUpdates, personalAuthTokenUpdate);
         } else {
             AzureBoardsIntegration boardsIntegration = AzureBoardsIntegrationDao.instance.findOne(new BasicDBObject());
@@ -100,7 +116,7 @@ public class AzureBoardsIntegrationAction extends UserAction {
             return Action.ERROR.toUpperCase();
         }
 
-        Bson updateProjectToWorkItemsMap = Updates.set("projectToWorkItemsMap", projectToWorkItemsMap);
+        Bson updateProjectToWorkItemsMap = Updates.set(AzureBoardsIntegration.PROJECT_TO_WORK_ITEMS_MAP, projectToWorkItemsMap);
         combineUpdates = Updates.combine(combineUpdates, updateProjectToWorkItemsMap);
 
         AzureBoardsIntegrationDao.instance.updateOne(
@@ -119,6 +135,7 @@ public class AzureBoardsIntegrationAction extends UserAction {
         OriginalHttpRequest request = new OriginalHttpRequest(url, "", "GET", null, headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, new ArrayList<>());
+            logger.errorAndAddToDb("Status and Response from the getAzureBoardsWorkItems API: " + response.getStatusCode() + " | " + response.getBody());
             String responsePayload = response.getBody();
             BasicDBObject respPayloadObj = BasicDBObject.parse(responsePayload);
             BasicDBList workItemTypeListObj = (BasicDBList) (respPayloadObj.get("value"));
@@ -146,6 +163,7 @@ public class AzureBoardsIntegrationAction extends UserAction {
     public String createWorkItem() {
         AzureBoardsIntegration azureBoardsIntegration = AzureBoardsIntegrationDao.instance.findOne(new BasicDBObject());
         if(azureBoardsIntegration == null) {
+            logger.errorAndAddToDb("Azure Boards Integration not found for account: " + Context.accountId.get(), LoggerMaker.LogDb.DASHBOARD);
             addActionError("Azure Boards Integration is not integrated.");
             return Action.ERROR.toUpperCase();
         }
@@ -153,30 +171,47 @@ public class AzureBoardsIntegrationAction extends UserAction {
         TestingRunResult testingRunResult = TestingRunResultDao.instance.findOne(Filters.and(
                 Filters.in(TestingRunResult.TEST_SUB_TYPE, testingIssuesId.getTestSubCategory()),
                 Filters.in(TestingRunResult.API_INFO_KEY, testingIssuesId.getApiInfoKey())
-        ), Projections.include(Constants.ID, TestingRunResult.API_INFO_KEY, TestingRunResult.TEST_SUB_TYPE, TestingRunResult.TEST_SUPER_TYPE, TestingRunResult.TEST_RESULTS));
+        ));
+
+        logger.infoAndAddToDb("Found testingRunResult for: " + testingIssuesId.getTestSubCategory(), LoggerMaker.LogDb.DASHBOARD);
 
         Info testInfo = YamlTemplateDao.instance.findOne(
                 Filters.in(Constants.ID, testingIssuesId.getTestSubCategory()),
                 Projections.include(YamlTemplate.INFO+".description", YamlTemplate.INFO+".name")
         ).getInfo();
 
+        logger.infoAndAddToDb("Found YamlTemplate info for: " + testInfo.getName(), LoggerMaker.LogDb.DASHBOARD);
+
         String testName = testInfo.getName();
         String testDescription = testInfo.getDescription();
 
-        TestResult genericTestResult = (TestResult) testingRunResult.getTestResults().get(testingRunResult.getTestResults().size() - 1);
-        String attachmentUrl = getAttachmentUrl(genericTestResult.getOriginalMessage(), genericTestResult.getMessage(), azureBoardsIntegration);
+        TestResult testResult = getTestResultFromTestingRunResult(testingRunResult);
+
+        logger.infoAndAddToDb("TestResult size for the given test: " + testingRunResult.getTestResults().size(), LoggerMaker.LogDb.DASHBOARD);
+        String attachmentUrl;
+        if(testResult != null) {
+            attachmentUrl = getAttachmentUrl(testResult.getOriginalMessage(), testResult.getMessage(), azureBoardsIntegration);
+        } else {
+            logger.errorAndAddToDb("TestResult obj not found.", LoggerMaker.LogDb.DASHBOARD);
+            attachmentUrl = null;
+        }
+        logger.infoAndAddToDb("Attachment URL: " + attachmentUrl, LoggerMaker.LogDb.DASHBOARD);
 
         BasicDBList reqPayload = new BasicDBList();
         azureBoardsPayloadCreator(testingRunResult, testName, testDescription, attachmentUrl, reqPayload);
+        logger.infoAndAddToDb("Azure board payload: " + reqPayload.toString(), LoggerMaker.LogDb.DASHBOARD);
 
-        String url = azureBoardsBaseUrl + "/" + azureBoardsIntegration.getOrganization() + "/" + projectName + "/_apis/wit/workitems/$" + workItemType + "?api-version=" + version;
+        String url = azureBoardsIntegration.getBaseUrl() + "/" + azureBoardsIntegration.getOrganization() + "/" + projectName + "/_apis/wit/workitems/$" + workItemType + "?api-version=" + version;
+        logger.infoAndAddToDb("Azure board final url: " + url, LoggerMaker.LogDb.DASHBOARD);
 
         Map<String, List<String>> headers = new HashMap<>();
         headers.put("Authorization", Collections.singletonList("Basic " + azureBoardsIntegration.getPersonalAuthToken()));
         headers.put("content-type", Collections.singletonList("application/json-patch+json"));
+        logger.infoAndAddToDb("Azure board headers: " + headers.toString(), LoggerMaker.LogDb.DASHBOARD);
         OriginalHttpRequest request = new OriginalHttpRequest(url, "", "POST", reqPayload.toString(), headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, new ArrayList<>());
+            logger.infoAndAddToDb("Status and Response from the createWorkItem API: " + response.getStatusCode() + " | " + response.getBody());
             String responsePayload = response.getBody();
             if (response.getStatusCode() > 201 || responsePayload == null) {
                 return Action.ERROR.toUpperCase();
@@ -195,12 +230,13 @@ public class AzureBoardsIntegrationAction extends UserAction {
                 TestingRunIssuesDao.instance.getMCollection().updateOne(
                         Filters.eq(Constants.ID, testingIssuesId),
                         Updates.combine(
-                                Updates.set("azureBoardsWorkItemUrl", workItemUrl)
+                                Updates.set(TestingRunIssues.AZURE_BOARDS_WORK_ITEM_URL, workItemUrl)
                         ),
                         updateOptions
                 );
             }
         } catch (Exception e) {
+            logger.errorAndAddToDb("Error while creating work item for azure boards: " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
             e.printStackTrace();
         }
 
@@ -237,7 +273,7 @@ public class AzureBoardsIntegrationAction extends UserAction {
         descriptionDBObject.put("value", testDescription);
         reqPayload.add(descriptionDBObject);
 
-        if(attachmentUrl != null) {
+        if(attachmentUrl != null && !attachmentUrl.isEmpty()) {
             BasicDBObject attachmentsDBObject = new BasicDBObject();
             attachmentsDBObject.put("op", AzureBoardsOperations.ADD.name().toLowerCase());
             attachmentsDBObject.put("path", "/relations/-");
@@ -258,7 +294,7 @@ public class AzureBoardsIntegrationAction extends UserAction {
         }
 
         try {
-            String uploadUrl = azureBoardsBaseUrl + "/" + azureBoardsIntegration.getOrganization() + "/" + projectName + "/_apis/wit/attachments?fileName=" + URLEncoder.encode(requestComparisonFile.getName(), "UTF-8") + "&api-version=" + version;
+            String uploadUrl = azureBoardsIntegration.getBaseUrl() + "/" + azureBoardsIntegration.getOrganization() + "/" + projectName + "/_apis/wit/attachments?fileName=" + URLEncoder.encode(requestComparisonFile.getName(), "UTF-8") + "&api-version=" + version;
 
             byte[] fileBytes = Files.readAllBytes(requestComparisonFile.toPath());
 
@@ -268,6 +304,7 @@ public class AzureBoardsIntegrationAction extends UserAction {
 
             OriginalHttpRequest request = new OriginalHttpRequest(uploadUrl, "", "POST", new String(fileBytes, StandardCharsets.UTF_8), headers, "");
             OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, new ArrayList<>());
+            logger.errorAndAddToDb("Status and Response from the uploadAttachmentToAzureDevops API: " + response.getStatusCode() + " | " + response.getBody());
 
             if (response.getStatusCode() >= 200 && response.getStatusCode() < 300) {
                 BasicDBObject responseObj = BasicDBObject.parse(response.getBody());
@@ -310,7 +347,7 @@ public class AzureBoardsIntegrationAction extends UserAction {
     public String bulkCreateAzureWorkItems() {
         int existingIssues = 0;
         List<TestingRunIssues> testingRunIssuesList = TestingRunIssuesDao.instance.findAll(Filters.and(
-                Filters.in("_id", testingIssuesIdList),
+                Filters.in(Constants.ID, testingIssuesIdList),
                 Filters.exists(TestingRunIssues.AZURE_BOARDS_WORK_ITEM_URL, true)
         ));
 
@@ -340,6 +377,14 @@ public class AzureBoardsIntegrationAction extends UserAction {
     public String removeAzureBoardsIntegration() {
         AzureBoardsIntegrationDao.instance.deleteAll(new BasicDBObject());
         return Action.SUCCESS.toUpperCase();
+    }
+
+    public String getAzureBoardsBaseUrl() {
+        return azureBoardsBaseUrl;
+    }
+
+    public void setAzureBoardsBaseUrl(String azureBoardsBaseUrl) {
+        this.azureBoardsBaseUrl = azureBoardsBaseUrl;
     }
 
     public String getOrganization() {

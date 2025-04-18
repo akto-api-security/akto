@@ -66,7 +66,7 @@ public class Lambda implements ServerlessFunction {
 
             if (keysUpdatedCount == 0) {
                 // no env vars to update, returning
-                loggerMaker.infoAndAddToDb("No env vars to update for funciton: " + functionName + ", returning", LogDb.DASHBOARD);
+                loggerMaker.debugAndAddToDb("No env vars to update for funciton: " + functionName + ", returning", LogDb.DASHBOARD);
                 return;
             }
 
@@ -77,7 +77,7 @@ public class Lambda implements ServerlessFunction {
             req.setEnvironment(updatedEnvironment);
 
             awsLambda.updateFunctionConfiguration(req);
-            loggerMaker.infoAndAddToDb("Successfully updated function configuration for function: " + functionName, LogDb.DASHBOARD);
+            loggerMaker.debugAndAddToDb("Successfully updated function configuration for function: " + functionName, LogDb.DASHBOARD);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, e.toString(), LogDb.DASHBOARD);
         }
@@ -99,11 +99,11 @@ public class Lambda implements ServerlessFunction {
         InvokeResult invokeResult = null;
         try {
 
-            loggerMaker.infoAndAddToDb("Invoke lambda "+functionName, LogDb.DASHBOARD);
+            loggerMaker.debugAndAddToDb("Invoke lambda "+functionName, LogDb.DASHBOARD);
             invokeResult = awsLambda.invoke(invokeRequest);
 
             String resp = new String(invokeResult.getPayload().array(), StandardCharsets.UTF_8);
-            loggerMaker.infoAndAddToDb(String.format("Function: %s, response: %s", functionName, resp), LogDb.DASHBOARD);
+            loggerMaker.debugAndAddToDb(String.format("Function: %s, response: %s", functionName, resp), LogDb.DASHBOARD);
         } catch (AWSLambdaException e) {
             loggerMaker.errorAndAddToDb(e, String.format("Error while invoking Lambda, %s : %s", functionName, e.toString()), LogDb.DASHBOARD);
         }

@@ -121,6 +121,8 @@ public final class FilterAction {
                 return applyFilterOnSourceIps(filterActionRequest);
             case "destination_ip":
                 return applyFilterOnDestinationIps(filterActionRequest);
+            case "country_code":
+                return applyFilterOnCountryCode(filterActionRequest);
             default:
                 return new DataOperandsFilterResponse(false, null, null, null);
 
@@ -281,6 +283,23 @@ public final class FilterAction {
 
         String destinationIp = rawApi.getRequest().getDestinationIp();
         DataOperandFilterRequest dataOperandFilterRequest = new DataOperandFilterRequest(destinationIp, filterActionRequest.getQuerySet(), filterActionRequest.getOperand());
+        ValidationResult res = invokeFilter(dataOperandFilterRequest);
+        return new DataOperandsFilterResponse(res.getIsValid(), null, null, null, res.getValidationReason());
+    }
+
+    public DataOperandsFilterResponse applyFilterOnCountryCode(FilterActionRequest filterActionRequest) {
+
+        RawApi rawApi = filterActionRequest.fetchRawApiBasedOnContext();
+        if (rawApi == null || rawApi.getRequest() == null) {
+            return new DataOperandsFilterResponse(false, null, null, null);
+        }
+
+        String countryCode = rawApi.getRawApiMetadata().getCountryCode();
+        if (countryCode.isEmpty()){
+            return new DataOperandsFilterResponse(false, null, null, null);
+        }
+
+        DataOperandFilterRequest dataOperandFilterRequest = new DataOperandFilterRequest(countryCode, filterActionRequest.getQuerySet(), filterActionRequest.getOperand());
         ValidationResult res = invokeFilter(dataOperandFilterRequest);
         return new DataOperandsFilterResponse(res.getIsValid(), null, null, null, res.getValidationReason());
     }

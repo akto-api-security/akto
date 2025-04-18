@@ -396,7 +396,7 @@ public class SaveTestEditorAction extends UserAction {
                 try {
                     GithubSync githubSync = new GithubSync();
                     byte[] repoZip = githubSync.syncRepo(repositoryUrl);
-                    logger.infoAndAddToDb(String.format("Adding test templates from %s for account: %d", repositoryUrl, accountId), LogDb.DASHBOARD);
+                    logger.debugAndAddToDb(String.format("Adding test templates from %s for account: %d", repositoryUrl, accountId), LogDb.DASHBOARD);
                     InitializerListener.processTemplateFilesZip(repoZip, author, YamlTemplateSource.CUSTOM.toString(), repositoryUrl);
                 } catch (Exception e) {
                     logger.errorAndAddToDb(String.format("Error while adding test editor templates from %s for account %d, Error: %s", repositoryUrl, accountId, e.getMessage()), LogDb.DASHBOARD);

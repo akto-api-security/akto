@@ -25,8 +25,8 @@ public class ApiNodeExecutor extends NodeExecutor {
     private static final LoggerMaker loggerMaker = new LoggerMaker(ApiNodeExecutor.class);
 
     public NodeResult processNode(Node node, Map<String, Object> valuesMap, Boolean allowAllStatusCodes, boolean debug, List<TestingRunResult.TestLog> testLogs, Memory memory) {
-        loggerMaker.infoAndAddToDb("\n", LogDb.TESTING);
-        loggerMaker.infoAndAddToDb("NODE: " + node.getId(), LogDb.TESTING);
+        loggerMaker.debugAndAddToDb("\n", LogDb.TESTING);
+        loggerMaker.debugAndAddToDb("NODE: " + node.getId(), LogDb.TESTING);
         List<String> testErrors = new ArrayList<>();
         String nodeId = node.getId();
         WorkflowNodeDetails workflowNodeDetails = node.getWorkflowNodeDetails();
@@ -55,9 +55,9 @@ public class ApiNodeExecutor extends NodeExecutor {
         try {
             int waitInSeconds = Math.min(workflowNodeDetails.getWaitInSeconds(),60);
             if (waitInSeconds > 0) {
-                loggerMaker.infoAndAddToDb("WAITING: " + waitInSeconds + " seconds", LogDb.TESTING);
+                loggerMaker.debugAndAddToDb("WAITING: " + waitInSeconds + " seconds", LogDb.TESTING);
                 Thread.sleep(waitInSeconds*1000);
-                loggerMaker.infoAndAddToDb("DONE WAITING!!!!", LogDb.TESTING);
+                loggerMaker.debugAndAddToDb("DONE WAITING!!!!", LogDb.TESTING);
             }
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
@@ -67,7 +67,7 @@ public class ApiNodeExecutor extends NodeExecutor {
             try {
                 if (i > 0) {
                     int sleep = workflowNodeDetails.getPollRetryDuration();
-                    loggerMaker.infoAndAddToDb("Waiting "+ (sleep/1000) +" before sending another request......", LogDb.TESTING);
+                    loggerMaker.debugAndAddToDb("Waiting "+ (sleep/1000) +" before sending another request......", LogDb.TESTING);
                     Thread.sleep(sleep);
                 }
 

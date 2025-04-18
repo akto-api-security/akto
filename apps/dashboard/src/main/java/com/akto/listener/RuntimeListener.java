@@ -99,9 +99,9 @@ public class RuntimeListener extends AfterMongoConnectListener {
             if (count < 1) {
                 //initialise vulnerable requests for templates in case its not present in db
                 //insertVulnerableRequestsForDemo();
-                logger.infoAndAddToDb("map created in db for vulnerable requests and corresponding templates", LoggerMaker.LogDb.DASHBOARD);
+                logger.debugAndAddToDb("map created in db for vulnerable requests and corresponding templates", LoggerMaker.LogDb.DASHBOARD);
             }
-            logger.infoAndAddToDb("Demo collections already initialised", LoggerMaker.LogDb.DASHBOARD);
+            logger.debugAndAddToDb("Demo collections already initialised", LoggerMaker.LogDb.DASHBOARD);
             return;
         }
 
@@ -202,7 +202,7 @@ public class RuntimeListener extends AfterMongoConnectListener {
                 //vulnerableRequestForTemplate.setTemplateIds(testList);
 
                 if (testId.equals("XSS_VIA_APPENDING_TO_QUERY_PARAMS")) {
-                    logger.info("hi");
+                    logger.debug("hi");
                 }
 
                 String p = (String) sampleDataMap.get("path");
@@ -246,7 +246,7 @@ public class RuntimeListener extends AfterMongoConnectListener {
     public static void addLlmSampleData(int accountId) {
         List<String> result = new ArrayList<>();
 
-        logger.infoAndAddToDb("adding llm sample data for account" + accountId, LoggerMaker.LogDb.DASHBOARD);
+        logger.debugAndAddToDb("adding llm sample data for account" + accountId, LoggerMaker.LogDb.DASHBOARD);
         ApiCollection sameNameCollection = ApiCollectionsDao.instance.findByName(LLM_API_COLLECTION_NAME);
         if (sameNameCollection == null){
             ApiCollection apiCollection = new ApiCollection(LLM_API_COLLECTION_ID, LLM_API_COLLECTION_NAME, Context.now(),new HashSet<>(), null, LLM_API_COLLECTION_ID, false, true);
@@ -320,7 +320,7 @@ public class RuntimeListener extends AfterMongoConnectListener {
                 
 
             }
-            logger.infoAndAddToDb("create vulnerable mapping" + accountId, LoggerMaker.LogDb.DASHBOARD);
+            logger.debugAndAddToDb("create vulnerable mapping" + accountId, LoggerMaker.LogDb.DASHBOARD);
             Utils.pushDataToKafka(LLM_API_COLLECTION_ID, "", result, new ArrayList<>(), true, true);
 
         } catch (Exception e) {

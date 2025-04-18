@@ -230,6 +230,13 @@ export default {
             data: formData,
         })
     },
+    uploadOpenApiFile(formData) {
+        return request({
+            url: '/api/importDataFromOpenApiSpec',
+            method: 'post',
+            data: formData,
+        })
+    },
     uploadTcpFile(content, apiCollectionId, skipKafka) {
         return request({
             url: '/api/uploadTcp',
@@ -580,20 +587,20 @@ export default {
             data: {}
         })
     },
-    scheduleTestForCollection(apiCollectionId, startTimestamp, recurringDaily, recurringWeekly, recurringMonthly, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, testConfigsAdvancedSettings, cleanUpTestingResources) {
+    scheduleTestForCollection(apiCollectionId, startTimestamp, recurringDaily, recurringWeekly, recurringMonthly, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, testConfigsAdvancedSettings, cleanUpTestingResources, testSuiteIds = []) {
         return request({
             url: '/api/startTest',
             method: 'post',
-            data: { apiCollectionId, type: "COLLECTION_WISE", startTimestamp, recurringDaily,  recurringWeekly, recurringMonthly,selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, testConfigsAdvancedSettings, cleanUpTestingResources}
+            data: { apiCollectionId, type: "COLLECTION_WISE", startTimestamp, recurringDaily,  recurringWeekly, recurringMonthly,selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, testConfigsAdvancedSettings, cleanUpTestingResources, testSuiteIds}
         }).then((resp) => {
             return resp
         })
     },
-    scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, recurringWeekly, recurringMonthly, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, source, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, testConfigsAdvancedSettings, cleanUpTestingResources) {
+    scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, recurringWeekly, recurringMonthly, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, source, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, testConfigsAdvancedSettings, cleanUpTestingResources, testSuiteIds = []) {
         return request({
             url: '/api/startTest',
             method: 'post',
-            data: {apiInfoKeyList, type: "CUSTOM", startTimestamp, recurringDaily,  recurringWeekly, recurringMonthly,selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, source, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, testConfigsAdvancedSettings, cleanUpTestingResources}
+            data: {apiInfoKeyList, type: "CUSTOM", startTimestamp, recurringDaily,  recurringWeekly, recurringMonthly,selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, source, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, testConfigsAdvancedSettings, cleanUpTestingResources, testSuiteIds}
         }).then((resp) => {
             return resp
         })        
@@ -833,10 +840,17 @@ export default {
         return request({
             url: '/api/resetDataTypeRetro',
             method: 'post',
-            data: {
-                name: name,
-            }
+            data: { name }
         })
+    },
+
+    async saveEndpointDescription(apiCollectionId, url, method, description) {
+        const resp = await request({
+            url: '/api/saveEndpointDescription',
+            method: 'post',
+            data: { apiCollectionId, url, method, description }
+        })
+        return resp
     },
 
     async checkIfDependencyGraphAvailable(apiCollectionId, url, method) {
@@ -858,5 +872,25 @@ export default {
             }
         })
     },
+
+    async getSeveritiesCountPerCollection(apiCollectionId) {
+        return await request({
+            url: '/api/getSeveritiesCountPerCollection',
+            method: 'post',
+            data: {
+                apiCollectionId
+            }
+        })
+    },
+    
+    async saveCollectionDescription(apiCollectionId, description) {
+        return await request({
+            url: '/api/saveCollectionDescription',
+            method: 'post',
+            data: {
+                apiCollectionId, description
+            }
+        })
+    }
 
 }

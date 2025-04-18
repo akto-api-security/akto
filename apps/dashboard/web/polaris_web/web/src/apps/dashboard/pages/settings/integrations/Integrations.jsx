@@ -123,7 +123,7 @@ function Integrations() {
 
     let splunkObj ={
       id: 'splunk',
-      name:'Splunk',
+      name:'Splunk SIEM',
       source: '/public/splunk.svg'
     }
 
