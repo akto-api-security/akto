@@ -2,6 +2,8 @@ package com.akto.data_actor;
 
 import com.akto.DaoInit;
 import com.akto.dto.filter.MergedUrls;
+import com.akto.dto.graph.SvcToSvcGraphEdge;
+import com.akto.dto.graph.SvcToSvcGraphNode;
 import com.akto.dto.settings.DataControlSettings;
 import com.akto.testing.ApiExecutor;
 import com.auth0.jwt.JWT;
@@ -3671,6 +3673,116 @@ public class ClientActor extends DataActor {
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("error in findTestSubCategoriesByTestSuiteId" + e, LoggerMaker.LogDb.RUNTIME);
             return new ArrayList<>();
+        }
+    }
+
+
+    public List<SvcToSvcGraphEdge> findSvcToSvcGraphEdges(int startTs, int endTs, int skip, int limit) {
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("startTs", startTs);
+        obj.put("endTs", endTs);
+        obj.put("skip", skip);
+        obj.put("limit", limit);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/findAllSvcToSvcGraphEdges", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in findAllSvcToSvcGraphEdges", LoggerMaker.LogDb.RUNTIME);
+                return null;
+            }
+            BasicDBObject payloadObj;
+            try {
+                payloadObj =  BasicDBObject.parse(responsePayload);
+                BasicDBList edges = (BasicDBList) payloadObj.get("edges");
+                List<SvcToSvcGraphEdge> edgesList = new ArrayList<>();
+                for (Object edge: edges) {
+                    BasicDBObject edgeObj = (BasicDBObject) edge;
+                    SvcToSvcGraphEdge svcToSvcGraphEdge = objectMapper.readValue(edgeObj.toJson(), SvcToSvcGraphEdge.class);
+                    edgesList.add(svcToSvcGraphEdge);
+                }
+                return edgesList;
+            } catch(Exception e) {
+                return null;
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in findAllSvcToSvcGraphEdges" + e, LoggerMaker.LogDb.RUNTIME);
+            return null;
+        }
+    }
+
+    public List<SvcToSvcGraphNode> findSvcToSvcGraphNodes(int startTs, int endTs, int skip, int limit) {
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("startTs", startTs);
+        obj.put("endTs", endTs);
+        obj.put("skip", skip);
+        obj.put("limit", limit);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/findAllSvcToSvcGraphNodes", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in findAllSvcToSvcGraphNodes", LoggerMaker.LogDb.RUNTIME);
+                return null;
+            }
+            BasicDBObject payloadObj;
+            try {
+                payloadObj =  BasicDBObject.parse(responsePayload);
+                BasicDBList nodes = (BasicDBList) payloadObj.get("nodes");
+                List<SvcToSvcGraphNode> nodesList = new ArrayList<>();
+                for (Object node: nodes) {
+                    BasicDBObject nodeObj = (BasicDBObject) node;
+                    SvcToSvcGraphNode svcToSvcGraphNode = objectMapper.readValue(nodeObj.toJson(), SvcToSvcGraphNode.class);
+                    nodesList.add(svcToSvcGraphNode);
+                }
+                return nodesList;
+            } catch(Exception e) {
+                return null;
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in findAllSvcToSvcGraphNodes" + e, LoggerMaker.LogDb.RUNTIME);
+            return null;
+        }
+    }
+
+    @Override
+    public void updateSvcToSvcGraphEdges(List<SvcToSvcGraphEdge> edges) {
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("edges", edges);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/updateSvcToSvcGraphEdges", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in updateSvcToSvcGraphEdges", LoggerMaker.LogDb.RUNTIME);
+                return;
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in updateSvcToSvcGraphEdges" + e, LoggerMaker.LogDb.RUNTIME);
+            return;
+        }
+    }
+
+    @Override
+    public void updateSvcToSvcGraphNodes(List<SvcToSvcGraphNode> nodes) {
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("nodes", nodes);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/updateSvcToSvcGraphNodes", "", "POST", obj.toString(), headers, "");
+
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in updateSvcToSvcGraphNodes", LoggerMaker.LogDb.RUNTIME);
+                return;
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in updateSvcToSvcGraphNodes" + e, LoggerMaker.LogDb.RUNTIME);
+            return;
         }
     }
 
