@@ -1,0 +1,182 @@
+
+[
+    {
+    "companyId": "COMP-g5w6ye4s7",
+    "companyName": "Tech Innovations Inc. Branch 1",
+    "headquarters": {
+      "address": {
+        "street": "123 Innovation Drive",
+        "city": "San Francisco",
+        "state": "CA",
+        "zipCode": "94105",
+        "country": "United States"
+      },
+      "contact": {
+        "phone": "+1-415-555-0100",
+        "email": "contact@techinnovations.com",
+        "fax": "+1-415-555-0101"
+      }
+    },
+    "financials": {
+      "revenue": 150000000.75,
+      "employees": 250,
+      "valuation": 2000000000,
+      "departments": {
+        "engineering": {
+          "headcount": 100,
+          "budget": 5000000,
+          "location": "Building A"
+        },
+        "sales": {
+          "headcount": 50,
+          "budget": 3000000,
+          "region": "North America"
+        }
+      }
+    },
+    "metadata": {
+      "founded": "2010-06-15",
+      "industry": "Technology",
+      "description": "A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. ",
+      "legal": {
+        "taxId": "EIN-94-1234567",
+        "registration": "CA-REG-7890123",
+        "status": "Active"
+      }
+    }
+  },
+  {
+    "companyId": "COMP-3l16ooirz",
+    "companyName": "Tech Innovations Inc. Branch 2",
+    "headquarters": {
+      "address": {
+        "street": "123 Innovation Drive",
+        "city": "San Francisco",
+        "state": "CA",
+        "zipCode": "94105",
+        "country": "United States"
+      },
+      "contact": {
+        "phone": "+1-415-555-0100",
+        "email": "contact@techinnovations.com",
+        "fax": "+1-415-555-0101"
+      }
+    },
+    "financials": {
+      "revenue": 150000000.75,
+      "employees": 250,
+      "valuation": 2000000000,
+      "departments": {
+        "engineering": {
+          "headcount": 100,
+          "budget": 5000000,
+          "location": "Building A"
+        },
+        "sales": {
+          "headcount": 50,
+          "budget": 3000000,
+          "region": "North America"
+        }
+      }
+    },
+    "metadata": {
+      "founded": "2010-06-15",
+      "industry": "Technology",
+      "description": "A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. ",
+      "legal": {
+        "taxId": "EIN-94-1234567",
+        "registration": "CA-REG-7890123",
+        "status": "Active"
+      }
+    }
+  },
+  {
+    "companyId": "COMP-whz1oyllg",
+    "companyName": "Tech Innovations Inc. Branch 3",
+    "headquarters": {
+      "address": {
+        "street": "123 Innovation Drive",
+        "city": "San Francisco",
+        "state": "CA",
+        "zipCode": "94105",
+        "country": "United States"
+      },
+      "contact": {
+        "phone": "+1-415-555-0100",
+        "email": "contact@techinnovations.com",
+        "fax": "+1-415-555-0101"
+      }
+    },
+    "financials": {
+      "revenue": 150000000.75,
+      "employees": 250,
+      "valuation": 2000000000,
+      "departments": {
+        "engineering": {
+          "headcount": 100,
+          "budget": 5000000,
+          "location": "Building A"
+        },
+        "sales": {
+          "headcount": 50,
+          "budget": 3000000,
+          "region": "North America"
+        }
+      }
+    },
+    "metadata": {
+      "founded": "2010-06-15",
+      "industry": "Technology",
+      "description": "A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. ",
+      "legal": {
+        "taxId": "EIN-94-1234567",
+        "registration": "CA-REG-7890123",
+        "status": "Active"
+      }
+    }
+  },
+  {
+    "companyId": "COMP-m5hmzpb93",
+    "companyName": "Tech Innovations Inc. Branch 4",
+    "headquarters": {
+      "address": {
+        "street": "123 Innovation Drive",
+        "city": "San Francisco",
+        "state": "CA",
+        "zipCode": "94105",
+        "country": "United States"
+      },
+      "contact": {
+        "phone": "+1-415-555-0100",
+        "email": "contact@techinnovations.com",
+        "fax": "+1-415-555-0101"
+      }
+    },
+    "financials": {
+      "revenue": 150000000.75,
+      "employees": 250,
+      "valuation": 2000000000,
+      "departments": {
+        "engineering": {
+          "headcount": 100,
+          "budget": 5000000,
+          "location": "Building A"
+        },
+        "sales": {
+          "headcount": 50,
+          "budget": 3000000,
+          "region": "North America"
+        }
+      }
+    },
+    "metadata": {
+      "founded": "2010-06-15",
+      "industry": "Technology",
+      "description": "A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. A leading innovator in cloud computing solutions and artificial intelligence technologies. ",
+      "legal": {
+        "taxId": "EIN-94-1234567",
+        "registration": "CA-REG-7890123",
+        "status": "Active"
+      }
+    }
+  }]
