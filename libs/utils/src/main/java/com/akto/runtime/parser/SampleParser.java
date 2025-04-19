@@ -69,7 +69,10 @@ public class SampleParser {
                 String processId = (String) json.get("process_id");
                 String socketId = (String) json.get("socket_id");
                 String daemonsetId = (String) json.get("daemonset_id");
-                graphParams = new K8sDaemonsetGraphParams(hostNameList.get(0), processId, socketId, daemonsetId, direction);
+                String hostname = hostNameList.get(0);
+                if (hostname.charAt(0) >= 'a' && hostname.charAt(0) <= 'z') {
+                    graphParams = new K8sDaemonsetGraphParams(hostNameList.get(0), processId, socketId, daemonsetId, direction);
+                }   
             }
             
         }
