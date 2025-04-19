@@ -28,6 +28,18 @@ import { saveAs } from 'file-saver'
 import TreeViewTable from "../../../components/shared/treeView/TreeViewTable"
 import TableStore from "../../../components/tables/TableStore";
 import { useNavigate } from "react-router-dom";
+import ReactFlow, {
+    Background,  useNodesState,
+    useEdgesState,
+  
+  } from 'react-flow-renderer';
+import { on } from "stream";
+  
+const CenterViewType = {
+    Table: 0,
+    Tree: 1,
+    Graph: 2
+  }
 
 
 const headers = [
@@ -212,8 +224,7 @@ function ApiCollections() {
     const [data, setData] = useState({'all': [], 'hostname':[], 'groups': [], 'custom': [], 'deactivated': []})
     const [active, setActive] = useState(false);
     const [loading, setLoading] = useState(false)
-    
-   
+          
     const [summaryData, setSummaryData] = useState({totalEndpoints:0 , totalTestedEndpoints: 0, totalSensitiveEndpoints: 0, totalCriticalEndpoints: 0})
     const [hasUsageEndpoints, setHasUsageEndpoints] = useState(true)
     const [envTypeMap, setEnvTypeMap] = useState({})
@@ -223,7 +234,7 @@ function ApiCollections() {
     const [usersCollection, setUsersCollection] = useState([])
     const [selectedItems, setSelectedItems] = useState([])
     const [normalData, setNormalData] = useState([])
-    const [treeView, setTreeView] = useState(false);
+    const [centerView, setCenterView] = useState(CenterViewType.Table);
     const [moreActions, setMoreActions] = useState(false);
     const [textFieldActive, setTextFieldActive] = useState(false);
     const [customEnv,setCustomEnv] = useState('')
@@ -282,6 +293,8 @@ function ApiCollections() {
     const setLastFetchedSeverityResp = PersistStore.getState().setLastFetchedSeverityResp
     const setLastFetchedSensitiveResp = PersistStore.getState().setLastFetchedSensitiveResp
     const [totalAPIs, setTotalAPIs] = useState(0)
+    const [allEdges, setAllEdges, onAllEdgesChange] = useEdgesState([])
+    const [allNodes, setAllNodes, onAllNodesChange] = useNodesState([])
 
     // as riskScore cron runs every 5 min, we will cache the data and refresh in 5 mins
     // similarly call sensitive and severityInfo
@@ -454,6 +467,16 @@ function ApiCollections() {
         return func.convertToDisambiguateLabelObj(value, null, 2)
     }
 
+    async function fetchSvcToSvcGraphData() {
+        setLoading(true)
+        const {svcTosvcGraphEdges} = await api.findSvcToSvcGraphEdges()
+        const {svcTosvcGraphNodes} = await api.findSvcToSvcGraphNodes()
+        setLoading(false)
+
+        setAllEdges(svcTosvcGraphEdges.map(x => {return { id: x.id, source: x.source, target: x.target}}))
+        setAllNodes(svcTosvcGraphNodes.map((x, i) => {return { id: x.id, type: 'default', data: {label: x.id}, position: {x: (100 + 100*i), y: (100 + 100*i)} }}))
+    }
+
     useEffect(() => {
         fetchData()
         resetFunc()    
@@ -509,7 +532,7 @@ function ApiCollections() {
 
     const promotedBulkActions = (selectedResourcesArr) => {
         let selectedResources;
-        if(treeView){
+        if(centerView === CenterViewType.Tree){
             selectedResources = selectedResourcesArr.flat();
         }else{
             selectedResources = selectedResourcesArr
@@ -735,6 +758,11 @@ function ApiCollections() {
         }
     ]
 
+    function switchToGraphView() {
+        setCenterView(centerView === CenterViewType.Graph ? CenterViewType.Table : CenterViewType.Graph)
+        fetchSvcToSvcGraphData()
+    }
+
     const secondaryActionsComp = (
         <HorizontalStack gap={2}>
             <Popover
@@ -757,14 +785,22 @@ function ApiCollections() {
                             </HorizontalStack>
                         </Button>
                         </Popover.Section>
-                    <Popover.Section>
-                        <Button plain monochrome onClick={() => setTreeView(!treeView)} removeUnderline>
+                        <Popover.Section>
+                        <Button plain monochrome onClick={() => setCenterView(centerView === CenterViewType.Tree ? CenterViewType.Table : CenterViewType.Tree)} removeUnderline>
                             <HorizontalStack gap={"2"}>
-                                <Box><Icon source={treeView ? HideMinor : ViewMinor} /></Box>
-                                <Text>{treeView ? "Hide tree view": "Display tree view"}</Text>
+                                <Box><Icon source={centerView === CenterViewType.Tree ? HideMinor : ViewMinor} /></Box>
+                                <Text>{centerView === CenterViewType.Tree ? "Hide tree view": "Display tree view"}</Text>
                             </HorizontalStack>
                         </Button>
                     </Popover.Section>
+                    {window.USER_NAME && window.USER_NAME.endsWith("akto.io") && <Popover.Section>
+                        <Button plain monochrome onClick={() => switchToGraphView()} removeUnderline>
+                            <HorizontalStack gap={"2"}>
+                                <Box><Icon source={centerView === CenterViewType.Graph ? HideMinor : ViewMinor} /></Box>
+                                <Text>{centerView === CenterViewType.Tree ? "Hide graph view": "Display graph view"}</Text>
+                            </HorizontalStack>
+                        </Button>
+                    </Popover.Section>}
                 </Popover.Pane>
             </Popover>
             <Button id={"create-new-collection-popup"} secondaryActions onClick={showCreateNewCollectionPopup}>Create new collection</Button>
@@ -774,10 +810,10 @@ function ApiCollections() {
 
     const handleSelectedTab = (selectedIndex) => {
         setSelected(selectedIndex)
-    }
+    }      
 
     const tableComponent = (
-        treeView ?
+        centerView === CenterViewType.Tree ?
         <TreeViewTable
             collectionsArr={normalData.filter((x) => (!x?.deactivated && x?.type !== "API_GROUP"))}
             sortOptions={sortOptions}
@@ -785,6 +821,7 @@ function ApiCollections() {
             tableHeaders={headers.filter((x) => x.shouldMerge !== undefined)}
             promotedBulkActions={promotedBulkActions}
         />:
+        (centerView === CenterViewType.Table ?
         <GithubSimpleTable
             key={refreshData}
             pageLimit={100}
@@ -804,7 +841,17 @@ function ApiCollections() {
             onSelect={handleSelectedTab}
             selected={selected}
             csvFileName={"Inventory"}
-        />
+        />:    <div style={{height: "800px"}}>
+
+        <ReactFlow
+            nodes={allNodes}
+            edges={allEdges}
+            onNodesChange={onAllNodesChange}
+            onEdgesChange={onAllEdgesChange}
+        >
+            <Background color="#aaa" gap={16} />
+        </ReactFlow>    </div>    
+        )
     )
 
     const components = loading ? [<SpinnerCentered key={"loading"}/>]: [<SummaryCardInfo summaryItems={summaryItems} key="summary"/>, (!hasUsageEndpoints ? <CollectionsPageBanner key="page-banner" /> : null) ,modalComponent, tableComponent]
