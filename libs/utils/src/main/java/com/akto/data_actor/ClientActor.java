@@ -3548,8 +3548,8 @@ public class ClientActor extends DataActor {
     public List<SvcToSvcGraphEdge> findSvcToSvcGraphEdges(int startTs, int endTs, int skip, int limit) {
         Map<String, List<String>> headers = buildHeaders();
         BasicDBObject obj = new BasicDBObject();
-        obj.put("startTs", startTs);
-        obj.put("endTs", endTs);
+        obj.put("startTimestamp", startTs);
+        obj.put("endTimestamp", endTs);
         obj.put("skip", skip);
         obj.put("limit", limit);
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/findAllSvcToSvcGraphEdges", "", "POST", obj.toString(), headers, "");
@@ -3583,8 +3583,8 @@ public class ClientActor extends DataActor {
     public List<SvcToSvcGraphNode> findSvcToSvcGraphNodes(int startTs, int endTs, int skip, int limit) {
         Map<String, List<String>> headers = buildHeaders();
         BasicDBObject obj = new BasicDBObject();
-        obj.put("startTs", startTs);
-        obj.put("endTs", endTs);
+        obj.put("startTimestamp", startTs);
+        obj.put("endTimestamp", endTs);
         obj.put("skip", skip);
         obj.put("limit", limit);
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/findAllSvcToSvcGraphNodes", "", "POST", obj.toString(), headers, "");
