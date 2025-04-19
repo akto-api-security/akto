@@ -3552,18 +3552,18 @@ public class ClientActor extends DataActor {
         obj.put("endTimestamp", endTs);
         obj.put("skip", skip);
         obj.put("limit", limit);
-        OriginalHttpRequest request = new OriginalHttpRequest(url + "/findAllSvcToSvcGraphEdges", "", "POST", obj.toString(), headers, "");
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/findSvcToSvcGraphEdges", "", "POST", obj.toString(), headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
             String responsePayload = response.getBody();
             if (response.getStatusCode() != 200 || responsePayload == null) {
-                loggerMaker.errorAndAddToDb("non 2xx response in findAllSvcToSvcGraphEdges", LoggerMaker.LogDb.RUNTIME);
+                loggerMaker.errorAndAddToDb("non 2xx response in findSvcToSvcGraphEdges", LoggerMaker.LogDb.RUNTIME);
                 return null;
             }
             BasicDBObject payloadObj;
             try {
                 payloadObj =  BasicDBObject.parse(responsePayload);
-                BasicDBList edges = (BasicDBList) payloadObj.get("edges");
+                BasicDBList edges = (BasicDBList) payloadObj.get("svcToSvcGraphEdges");
                 List<SvcToSvcGraphEdge> edgesList = new ArrayList<>();
                 for (Object edge: edges) {
                     BasicDBObject edgeObj = (BasicDBObject) edge;
@@ -3575,7 +3575,7 @@ public class ClientActor extends DataActor {
                 return null;
             }
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("error in findAllSvcToSvcGraphEdges" + e, LoggerMaker.LogDb.RUNTIME);
+            loggerMaker.errorAndAddToDb("error in findSvcToSvcGraphEdges" + e, LoggerMaker.LogDb.RUNTIME);
             return null;
         }
     }
@@ -3587,18 +3587,18 @@ public class ClientActor extends DataActor {
         obj.put("endTimestamp", endTs);
         obj.put("skip", skip);
         obj.put("limit", limit);
-        OriginalHttpRequest request = new OriginalHttpRequest(url + "/findAllSvcToSvcGraphNodes", "", "POST", obj.toString(), headers, "");
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/findSvcToSvcGraphNodes", "", "POST", obj.toString(), headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
             String responsePayload = response.getBody();
             if (response.getStatusCode() != 200 || responsePayload == null) {
-                loggerMaker.errorAndAddToDb("non 2xx response in findAllSvcToSvcGraphNodes", LoggerMaker.LogDb.RUNTIME);
+                loggerMaker.errorAndAddToDb("non 2xx response in findSvcToSvcGraphNodes", LoggerMaker.LogDb.RUNTIME);
                 return null;
             }
             BasicDBObject payloadObj;
             try {
                 payloadObj =  BasicDBObject.parse(responsePayload);
-                BasicDBList nodes = (BasicDBList) payloadObj.get("nodes");
+                BasicDBList nodes = (BasicDBList) payloadObj.get("svcToSvcGraphNodes");
                 List<SvcToSvcGraphNode> nodesList = new ArrayList<>();
                 for (Object node: nodes) {
                     BasicDBObject nodeObj = (BasicDBObject) node;
@@ -3610,7 +3610,7 @@ public class ClientActor extends DataActor {
                 return null;
             }
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("error in findAllSvcToSvcGraphNodes" + e, LoggerMaker.LogDb.RUNTIME);
+            loggerMaker.errorAndAddToDb("error in findSvcToSvcGraphNodes" + e, LoggerMaker.LogDb.RUNTIME);
             return null;
         }
     }
@@ -3619,8 +3619,8 @@ public class ClientActor extends DataActor {
     public void updateSvcToSvcGraphEdges(List<SvcToSvcGraphEdge> edges) {
         Map<String, List<String>> headers = buildHeaders();
         BasicDBObject obj = new BasicDBObject();
-        obj.put("edges", edges);
-        OriginalHttpRequest request = new OriginalHttpRequest(url + "/updateSvcToSvcGraphEdges", "", "POST", obj.toString(), headers, "");
+        obj.put("svcToSvcGraphEdges", edges);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/updateSvcToSvcGraphEdges", "", "POST", gson.toJson(obj), headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
             String responsePayload = response.getBody();
@@ -3638,8 +3638,8 @@ public class ClientActor extends DataActor {
     public void updateSvcToSvcGraphNodes(List<SvcToSvcGraphNode> nodes) {
         Map<String, List<String>> headers = buildHeaders();
         BasicDBObject obj = new BasicDBObject();
-        obj.put("nodes", nodes);
-        OriginalHttpRequest request = new OriginalHttpRequest(url + "/updateSvcToSvcGraphNodes", "", "POST", obj.toString(), headers, "");
+        obj.put("svcToSvcGraphNodes", nodes);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/updateSvcToSvcGraphNodes", "", "POST", gson.toJson(obj), headers, "");
         
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
