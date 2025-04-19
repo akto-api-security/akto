@@ -172,4 +172,8 @@ public class HttpResponseParams {
     public SvcToSvcGraphParams getSvcToSvcGraphParams() {
         return svcToSvcGraphParams;
     }
+
+    public void setSvcToSvcGraphParams(SvcToSvcGraphParams svcToSvcGraphParams) {
+        this.svcToSvcGraphParams = svcToSvcGraphParams;
+    }
 }
