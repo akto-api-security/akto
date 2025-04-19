@@ -3450,4 +3450,17 @@ public class DbAction extends ActionSupport {
         this.testingRunPlayground = testingRunPlayground;
     }
 
+    public List<SvcToSvcGraphEdge> getSvcToSvcGraphEdges() {
+        return svcToSvcGraphEdges;
+    }
+    public void setSvcToSvcGraphEdges(List<SvcToSvcGraphEdge> svcToSvcGraphEdges) {
+        this.svcToSvcGraphEdges = svcToSvcGraphEdges;
+    }
+    public List<SvcToSvcGraphNode> getSvcToSvcGraphNodes() {
+        return svcToSvcGraphNodes;
+    }   
+    public void setSvcToSvcGraphNodes(List<SvcToSvcGraphNode> svcToSvcGraphNodes) {
+        this.svcToSvcGraphNodes = svcToSvcGraphNodes;
+    }
+
 }
