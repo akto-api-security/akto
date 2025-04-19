@@ -32,6 +32,7 @@ import com.akto.dto.data_types.Conditions.Operator;
 import com.akto.dto.runtime_filters.FieldExistsFilter;
 import com.akto.dto.runtime_filters.ResponseCodeRuntimeFilter;
 import com.akto.dto.runtime_filters.RuntimeFilter;
+import com.akto.dto.test_editor.TestingRunPlayground;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
@@ -3616,6 +3617,65 @@ public class ClientActor extends DataActor {
             return null;
         }
     }
+
+    public TestingRunPlayground getCurrentTestingRunDetailsFromEditor(int timestamp){
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("ts", timestamp);
+
+        Map<String, List<String>> headers = buildHeaders();
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchEditorTest", "", "POST",  obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in fetchEditorTest", LoggerMaker.LogDb.TESTING);
+                return null;
+            }
+            BasicDBObject payloadObj;
+            try {
+                payloadObj = BasicDBObject.parse(responsePayload);
+                BasicDBObject testingRunPlaygroundObj = (BasicDBObject) payloadObj.get("testingRunPlayground");
+                return objectMapper.readValue(testingRunPlaygroundObj.toJson(), TestingRunPlayground.class);
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("error extracting response in fetchEditorTest" + e, LoggerMaker.LogDb.TESTING);
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in fetchEditorTest" + e, LoggerMaker.LogDb.TESTING);
+        }
+        return null;
+    }
+
+    public List<String> findTestSubCategoriesByTestSuiteId(List<String> testSuiteId) {
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("testSuiteId", testSuiteId);
+        Map<String, List<String>> headers = buildHeaders();
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/findTestSubCategoriesByTestSuiteId", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in findTestSubCategoriesByTestSuiteId", LogDb.RUNTIME);
+                return new ArrayList<>();
+            }
+            BasicDBObject payloadObj;
+            try {
+                payloadObj = BasicDBObject.parse(responsePayload);
+                BasicDBList testSubCategoriesObj = (BasicDBList) payloadObj.get("testSubCategories");
+                List<String> testSubCategories = new ArrayList<>();
+                for (Object nodeObj : testSubCategoriesObj) {
+                    BasicDBObject obj2 = (BasicDBObject) nodeObj;
+                    testSubCategories.add(objectMapper.readValue(obj2.toJson(), String.class));
+                }
+                return testSubCategories;
+            } catch (Exception e) {
+                return new ArrayList<>();
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in findTestSubCategoriesByTestSuiteId" + e, LoggerMaker.LogDb.RUNTIME);
+            return new ArrayList<>();
+        }
+    }
+
 
     public List<SvcToSvcGraphEdge> findSvcToSvcGraphEdges(int startTs, int endTs, int skip, int limit) {
         Map<String, List<String>> headers = buildHeaders();

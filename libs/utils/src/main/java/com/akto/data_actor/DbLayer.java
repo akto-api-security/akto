@@ -16,12 +16,14 @@ import com.akto.dao.filter.MergedUrlsDao;
 import com.akto.dao.graph.SvcToSvcGraphEdgesDao;
 import com.akto.dao.graph.SvcToSvcGraphNodesDao;
 import com.akto.dao.settings.DataControlSettingsDao;
+import com.akto.dao.testing.config.TestSuiteDao;
 import com.akto.dependency_analyser.DependencyAnalyserUtils;
 import com.akto.dto.*;
 import com.akto.dto.filter.MergedUrls;
 import com.akto.dto.graph.SvcToSvcGraphEdge;
 import com.akto.dto.graph.SvcToSvcGraphNode;
 import com.akto.dto.settings.DataControlSettings;
+import com.akto.dto.testing.config.TestSuites;
 import com.mongodb.BasicDBList;
 import com.mongodb.client.model.*;
 import org.bson.conversions.Bson;
@@ -32,6 +34,7 @@ import com.akto.dao.billing.TokensDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.monitoring.FilterYamlTemplateDao;
 import com.akto.dao.runtime_filters.AdvancedTrafficFiltersDao;
+import com.akto.dao.test_editor.TestingRunPlaygroundDao;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing.AccessMatrixTaskInfosDao;
 import com.akto.dao.testing.AccessMatrixUrlToRolesDao;
@@ -56,6 +59,7 @@ import com.akto.dto.billing.Organization;
 import com.akto.dto.billing.Tokens;
 import com.akto.dto.dependency_flow.Node;
 import com.akto.dto.runtime_filters.RuntimeFilter;
+import com.akto.dto.test_editor.TestingRunPlayground;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
@@ -1191,6 +1195,35 @@ public class DbLayer {
         }
 
         SvcToSvcGraphNodesDao.instance.bulkWrite(bulkList, options);
+    }
+    public static List<String> findTestSubCategoriesByTestSuiteId(List<String> testSuiteId) {
+        List<ObjectId> testSuiteIds = new ArrayList<>();
+        for (String testSuiteIdStr : testSuiteId) {
+            testSuiteIds.add(new ObjectId(testSuiteIdStr));
+        }
+        List<TestSuites> testSuites = TestSuiteDao.instance.findAll(Filters.in(ID, testSuiteIds));
+        if(testSuites == null || testSuites.isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        Set<String> subcategorySet = new HashSet<>();
+        for (TestSuites testSuite : testSuites) {
+            List<String> subcategoryList = testSuite.getSubCategoryList();
+            if(subcategoryList != null && !subcategoryList.isEmpty()) {
+                subcategorySet.addAll(subcategoryList);
+            }
+        }
+
+        return new ArrayList<>(subcategorySet);
+    }
+
+    public static TestingRunPlayground getCurrentTestingRunDetailsFromEditor(int timestamp){
+        return TestingRunPlaygroundDao.instance.findOne(
+                Filters.and(
+                        Filters.gte(TestingRunPlayground.CREATED_AT, timestamp),
+                        Filters.eq(TestingRunPlayground.STATE, State.SCHEDULED)
+                )
+        );
     }
 
 }

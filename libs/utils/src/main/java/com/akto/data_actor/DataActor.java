@@ -9,6 +9,7 @@ import com.akto.dto.graph.SvcToSvcGraphEdge;
 import com.akto.dto.graph.SvcToSvcGraphNode;
 import com.akto.dto.runtime_filters.RuntimeFilter;
 import com.akto.dto.settings.DataControlSettings;
+import com.akto.dto.test_editor.TestingRunPlayground;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
@@ -282,7 +283,6 @@ public abstract class DataActor {
 
     public abstract TestingRunResultSummary findLatestTestingRunResultSummary(Bson filter);
 
-
     public List<SvcToSvcGraphEdge> findAllSvcToSvcGraphEdges(int startTs, int endTs) {
         List<SvcToSvcGraphEdge> ret = new ArrayList<>();
         int skip = 0;
@@ -342,4 +342,8 @@ public abstract class DataActor {
             start += 1000;
         } while (start < updateNodes.size());
     }
+    public abstract List<String> findTestSubCategoriesByTestSuiteId(List<String> testSuiteId);
+    
+    public abstract TestingRunPlayground getCurrentTestingRunDetailsFromEditor(int timestamp);
+
 }
