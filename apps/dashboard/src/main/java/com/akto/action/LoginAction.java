@@ -208,6 +208,11 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
                         ),
                         new FindOneAndUpdateOptions().returnDocument(ReturnDocument.BEFORE)
                 );
+
+                if(tempUser == null) {
+                    return Action.ERROR.toUpperCase();
+                }
+
                 /*
                  * Creating datatype to template on user login.
                  * TODO: Remove this job once templates for majority users are created.
@@ -216,23 +221,23 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
                 // update default test suites list on login instead of initializing
                 try {
                     // need this loop for default insertion of test suites upon login
-                    boolean isValidForSuitesUpdate = false;
+                    Map<Integer, Boolean> accountToIsFirstTimeMap = new HashMap<>();
                     for(String accountIdStr : user.getAccounts().keySet()) {
                         int accountId = Integer.parseInt(accountIdStr);
                         Context.accountId.set(accountId);
                         int count = (int) DefaultTestSuitesDao.instance.estimatedDocumentCount();
                         if (count == 0) {
-                            isValidForSuitesUpdate = true;
+                            accountToIsFirstTimeMap.put(accountId, true);
                             break;
                         }
                     }
-                    if(isValidForSuitesUpdate || (tempUser.getLastLoginTs() + REFRESH_INTERVAL) < Context.now()){
+                    if(!accountToIsFirstTimeMap.isEmpty() || (tempUser.getLastLoginTs() + REFRESH_INTERVAL) < Context.now()){
                         service.submit(() -> {
                             try {
                                 for(String accountIdStr : user.getAccounts().keySet()) {
                                     int accountId = Integer.parseInt(accountIdStr);
                                     Context.accountId.set(accountId);
-                                    DefaultTestSuitesDao.insertDefaultTestSuites();
+                                    DefaultTestSuitesDao.insertDefaultTestSuites(accountToIsFirstTimeMap.getOrDefault(accountId, false));
                                 }
                             } catch (Exception e) {
                                 e.printStackTrace();

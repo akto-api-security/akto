@@ -9,6 +9,7 @@ import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.TestConfigYamlParser;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.test_editor.info.InfoParser;
+import com.akto.dao.testing.DefaultTestSuitesDao;
 import com.akto.dao.testing.TestRolesDao;
 import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dto.AccountSettings;
@@ -242,6 +243,8 @@ public class SaveTestEditorAction extends UserAction {
             YamlTemplateDao.instance.updateOne(
                     Filters.eq(Constants.ID, id),
                     Updates.combine(updates));
+
+            DefaultTestSuitesDao.instance.saveYamlTestTemplateInDefaultSuite(testConfig.getInfo(), author);
 
         } else {
             addActionError("Cannot save template, specify a different test id");
