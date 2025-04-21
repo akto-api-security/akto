@@ -2,7 +2,6 @@ package com.akto.jobs;
 
 import com.akto.dto.jobs.JobParams;
 import com.akto.dto.jobs.JobType;
-import com.akto.log.LoggerMaker;
 import com.akto.jobs.executors.JiraTicketJobExecutor;
 import java.util.Collections;
 import java.util.HashMap;
@@ -13,7 +12,7 @@ public class JobExecutorFactory {
 
     static {
         Map<JobType, JobExecutor<? extends JobParams>> map = new HashMap<>();
-        map.put(JobType.JIRA_AUTO_CREATE_ISSUES, JiraTicketJobExecutor.INSTANCE);
+        map.put(JobType.JIRA_AUTO_CREATE_TICKETS, JiraTicketJobExecutor.INSTANCE);
 
         registry = Collections.unmodifiableMap(map);
     }

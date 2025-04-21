@@ -1893,7 +1893,6 @@ public class StartTestAction extends UserAction {
     public void setRecurringWeekly(boolean recurringWeekly) {
         this.recurringWeekly = recurringWeekly;
     }
-
     
     public void setRecurringMonthly(boolean recurringMonthly) {
         this.recurringMonthly = recurringMonthly;
@@ -1901,10 +1900,6 @@ public class StartTestAction extends UserAction {
 
     public void setTestSuiteIds(List<String> testSuiteIds) {
         this.testSuiteIds = testSuiteIds;
-    }
-
-    public AutoTicketingDetails getAutoTicketingDetails() {
-        return autoTicketingDetails;
     }
 
     public void setAutoTicketingDetails(AutoTicketingDetails autoTicketingDetails) {
