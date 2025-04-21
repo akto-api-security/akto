@@ -14,9 +14,11 @@ import editorSetup from "./editor_config/editorSetup";
 import SampleData from "../../../components/shared/SampleData";
 import transform from "../../../components/shared/customDiffEditor";
 import EmptySampleApi from "./EmptySampleApi";
+import Store from "../../../store";
 
 const SampleApi = () => {
 
+    const setToastConfig = Store(state => state.setToastConfig)
     const allCollections = PersistStore(state => state.allCollections);
     const [selected, setSelected] = useState(0);
     const [selectApiActive, setSelectApiActive] = useState(false)
@@ -234,30 +236,36 @@ const SampleApi = () => {
             let resp = await testEditorRequests.runTestForTemplate(currentContent,apiKeyInfo,sampleDataList)
             console.log(resp);
             if(resp.testingRunPlaygroundHexId !== null && resp?.testingRunPlaygroundHexId !== undefined) {
-                let maxAttempts = 100; // Maximum number of polling attempts
-                let pollInterval = 3000; // Poll every 2 seconds
-                let attempts = 0;
-
-
-                intervalRef.current = setInterval(async () => {
-                    if (attempts >= maxAttempts) {
-                        clearInterval(intervalRef.current);
-                        intervalRef.current = null;
-                        setToastConfig({ isActive: true, isError: true, message: "Error while running the test" });
-                        return;
-                    }
-                    try {
-                        const result = await testEditorRequests.fetchTestingRunPlaygroundStatus(resp?.testingRunPlaygroundHexId);
-                        if (result?.testingRunPlaygroundStatus === "COMPLETED") {
+                await new Promise((resolve) => {
+                    let maxAttempts = 100;
+                    let pollInterval = 3000;
+                    let attempts = 0;
+    
+                    intervalRef.current = setInterval(async () => {
+                        if (attempts >= maxAttempts) {
                             clearInterval(intervalRef.current);
-                            intervalRef.current = null
-                            setTestResult(result);
+                            intervalRef.current = null;
+                            setToastConfig({ isActive: true, isError: true, message: "Error while running the test" });
+                            resolve();
+                            return;
                         }
-                    } catch (err) {
-                        console.error("Error fetching updateResult:", err);
-                    }
-                    attempts++;
-                }, pollInterval);
+    
+                        try {
+                            const result = await testEditorRequests.fetchTestingRunPlaygroundStatus(resp?.testingRunPlaygroundHexId);
+                            if (result?.testingRunPlaygroundStatus === "COMPLETED") {
+                                clearInterval(intervalRef.current);
+                                intervalRef.current = null;
+                                setTestResult(result);
+                                resolve();
+                                return;
+                            }
+                        } catch (err) {
+                            console.error("Error fetching updateResult:", err);
+                        }
+    
+                        attempts++;
+                    }, pollInterval);
+                });
             }
             else setTestResult(resp)
         } catch (err){
