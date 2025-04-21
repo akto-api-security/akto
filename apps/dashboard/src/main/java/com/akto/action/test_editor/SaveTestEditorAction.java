@@ -292,13 +292,25 @@ public class SaveTestEditorAction extends UserAction {
                 URLMethods.Method.valueOf(apiInfoKey.getString(ApiInfo.ApiInfoKey.METHOD)));
 
         if (account.getHybridTestingEnabled()) {
+            TestingRunPlayground testingRunPlayground = new TestingRunPlayground();
+            testingRunPlayground.setTestTemplate(content);
+            testingRunPlayground.setState(State.SCHEDULED);
+            testingRunPlayground.setSamples(sampleDataList.get(0).getSamples());
+            testingRunPlayground.setApiInfoKey(infoKey);
+            testingRunPlayground.setCreatedAt(Context.now());
+
+            InsertOneResult insertOne = TestingRunPlaygroundDao.instance.insertOne(testingRunPlayground);
+            if (insertOne.wasAcknowledged()) {
+                testingRunPlaygroundHexId = Objects.requireNonNull(insertOne.getInsertedId()).asObjectId().getValue().toHexString();
+                return SUCCESS.toUpperCase();
+            }
+            insertOne.getInsertedId();
             Bson updates = Updates.combine(
                     Updates.set(TestingRunPlayground.TEST_TEMPLATE, content),
                     Updates.set(TestingRunPlayground.STATE, State.SCHEDULED),
                     Updates.set(TestingRunPlayground.SAMPLES, sampleDataList.get(0).getSamples()),
                     Updates.set(TestingRunPlayground.API_INFO_KEY, infoKey),
-                    Updates.set(TestingRunPlayground.CREATED_AT, Context.now()),
-                    Updates.set(TestingRunPlayground.TESTING_RUN_RESULT, new TestingRunResult()));
+                    Updates.set(TestingRunPlayground.CREATED_AT, Context.now()));
 
             TestingRunPlayground result = TestingRunPlaygroundDao.instance.getMCollection().findOneAndUpdate(
                     Filters.empty(),
@@ -409,8 +421,9 @@ public class SaveTestEditorAction extends UserAction {
                 false,null,0,Context.now(),
                 Context.now(), new ObjectId(), null, testLogs
         );
+        failedResult.setId(failedResult.getTestRunId());
 
-        if(!testingRunPlayGround.getState().equals(State.SCHEDULED)){
+        if(testingRunPlayGround.getState().equals(State.SCHEDULED)){
             this.testingRunResult = failedResult;
         }else {
             if(testingRunPlayGround.getTestingRunResult() != null) {

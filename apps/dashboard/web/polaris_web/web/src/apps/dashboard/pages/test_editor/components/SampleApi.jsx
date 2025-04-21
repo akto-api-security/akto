@@ -233,9 +233,9 @@ const SampleApi = () => {
         try {
             let resp = await testEditorRequests.runTestForTemplate(currentContent,apiKeyInfo,sampleDataList)
             console.log(resp);
-            if(resp?.testingRunPlaygroundHexId.trim() != ""){
+            if(resp.testingRunPlaygroundHexId !== null && resp?.testingRunPlaygroundHexId !== undefined) {
                 let maxAttempts = 100; // Maximum number of polling attempts
-                let pollInterval = 2000; // Poll every 2 seconds
+                let pollInterval = 3000; // Poll every 2 seconds
                 let attempts = 0;
 
 

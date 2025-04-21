@@ -101,10 +101,13 @@ public class TestingRunPlayground {
 
     public void setTestTemplate(String testTemplate) {
         this.testTemplate = testTemplate;
-    } 
+    }
 
     public String getHexId() {
-        return this.id.toHexString();
+        if (hexId == null) {
+            return this.id.toHexString();
+        }
+        return this.hexId;
     }
 
     public TestingRunResult getTestingRunResult() {
