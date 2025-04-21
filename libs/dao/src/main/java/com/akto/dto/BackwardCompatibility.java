@@ -112,6 +112,9 @@ public class BackwardCompatibility {
     public static final String CLEANUP_RBAC_ENTRIES = "cleanupRbacEntries";
     private int cleanupRbacEntries;
 
+    public static final String MULTIPLE_USER_ENV_TYPES_SUPPORT = "multipleUserEnvTypesSupport";
+    private int multipleUserEnvTypesSupport;
+
     public BackwardCompatibility(int id, int dropFilterSampleData, int resetSingleTypeInfoCount, int dropWorkflowTestResult,
                                  int readyForNewTestingFramework,int addAktoDataTypes, boolean deploymentStatusUpdated,
                                  int authMechanismData, boolean mirroringLambdaTriggered, int deleteAccessListFromApiToken,
@@ -122,7 +125,7 @@ public class BackwardCompatibility {
                                  int deactivateCollections, int disableAwsSecretPii, int apiCollectionAutomatedField, 
                                  int automatedApiGroups, int addAdminRoleIfAbsent, int dropSpecialCharacterApiCollections, int fixApiAccessType,
                                  int addDefaultFilters, int moveAzureSamlToNormalSaml, int deleteOptionsAPIs, int moveOktaOidcSSO, int markSummariesVulnerable,
-                                 int changeOperatorConditionInCDT, int cleanupRbacEntries) {
+                                 int changeOperatorConditionInCDT, int cleanupRbacEntries, int multipleUserEnvTypesSupport) {
         this.id = id;
         this.dropFilterSampleData = dropFilterSampleData;
         this.resetSingleTypeInfoCount = resetSingleTypeInfoCount;
@@ -158,6 +161,7 @@ public class BackwardCompatibility {
         this.markSummariesVulnerable = markSummariesVulnerable;
         this.changeOperatorConditionInCDT = changeOperatorConditionInCDT;
         this.cleanupRbacEntries = cleanupRbacEntries;
+        this.multipleUserEnvTypesSupport = multipleUserEnvTypesSupport;
     }
 
     public BackwardCompatibility() {
@@ -473,5 +477,13 @@ public class BackwardCompatibility {
 
     public void setCleanupRbacEntries(int cleanupRbacEntries) {
         this.cleanupRbacEntries = cleanupRbacEntries;
+    }
+
+    public int getMultipleUserEnvTypesSupport() {
+        return multipleUserEnvTypesSupport;
+    }
+
+    public void setMultipleUserEnvTypesSupport(int multipleUserEnvTypesSupport) {
+        this.multipleUserEnvTypesSupport = multipleUserEnvTypesSupport;
     }
 }
