@@ -14,6 +14,8 @@ import com.akto.dto.test_editor.Info;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
+import com.akto.dto.testing.GenericTestResult;
+import com.akto.dto.testing.MultiExecTestResult;
 import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.jobs.JobExecutor;
@@ -84,6 +86,11 @@ public class JiraTicketJobExecutor extends JobExecutor<AutoTicketParams> {
 
         for (TestingRunIssues issue : issues) {
 
+            if (issue.getJiraIssueUrl() != null && !issue.getJiraIssueUrl().isEmpty()) {
+                logger.info("Skipping already ticketed issue: {}", issue.getId());
+                continue;
+            }
+
             TestingIssuesId id = issue.getId();
             Info info = infoMap.get(id.getTestSubCategory());
             if (info == null) {
@@ -94,10 +101,10 @@ public class JiraTicketJobExecutor extends JobExecutor<AutoTicketParams> {
             TestingRunResult testingRunResult = TestingRunResultDao.instance.findOne(Filters.and(
                 Filters.in(TestingRunResult.TEST_SUB_TYPE, issue.getId().getTestSubCategory()),
                 Filters.in(TestingRunResult.API_INFO_KEY, issue.getId().getApiInfoKey())
-            ), Projections.include("_id", TestingRunResult.TEST_RESULTS));
+            ));
 
             if(testingRunResult == null) {
-                logger.errorAndAddToDb("Error: Testing Run Result not found", LogDb.DASHBOARD);
+                logger.error("Testing Run Result not found. issueId: {}", issue.getId());
                 continue;
             }
 
@@ -180,54 +187,28 @@ public class JiraTicketJobExecutor extends JobExecutor<AutoTicketParams> {
             .distinct()
             .collect(Collectors.toList());
         List<YamlTemplate> templates = YamlTemplateDao.instance.findAll(
-            Filters.in("_id", subCategories), Projections.include("info")
+            Filters.in("_id", subCategories),
+            Projections.include(YamlTemplate.INFO)
         );
 
         Map<String, Info> infoMap = new HashMap<>();
         for (YamlTemplate template : templates) {
-            if (template != null && template.getInfo() != null) {
-                Info info = template.getInfo();
-                infoMap.put(info.getSubCategory(), info);
+            if (template == null || template.getInfo() == null) {
+                logger.error("YamlTemplate or YamlTemplate.info is null", LogDb.DASHBOARD);
+                continue;
             }
+            Info info = template.getInfo();
+            infoMap.put(info.getSubCategory(), info);
         }
         return infoMap;
     }
 
-    private void processJiraBatch(List<JiraMetaData> batch, String issueType, String projId, JiraIntegration jira) {
+    private void processJiraBatch(List<JiraMetaData> batch, String issueType, String projId, JiraIntegration jira) throws Exception {
         BasicDBObject payload = buildJiraPayload(batch, issueType, projId);
         List<String> createdKeys = sendJiraBulkCreate(jira, payload, batch);
-
+        logger.info("Created {} Jira issues out of {} Akto issues", createdKeys.size(), batch.size());
         List<TestingRunResult> results = fetchRunResults(batch);
         attachFilesToIssues(jira, createdKeys, results);
-    }
-
-    private JiraMetaData enrichIssuesWithMeta(TestingRunIssues issue, Map<String, Info> infoMap) {
-        /*List<JiraMetaData> list = new ArrayList<>();
-        for (TestingRunIssues issue : issues)
-        return list;*/
-            //if (issue.getJiraIssueUrl() != null && !issue.getJiraIssueUrl().isEmpty()) continue;
-
-            TestingIssuesId id = issue.getId();
-            Info info = infoMap.get(id.getTestSubCategory());
-            if (info == null) {
-                logger.error("YAML Template is empty. SubCategory: {}", id.getTestSubCategory());
-                return null;
-            }
-
-            try {
-                URL url = new URL(id.getApiInfoKey().getUrl());
-                return new JiraMetaData(
-                    info.getName(),
-                    "Host - " + url.getHost(),
-                    url.getPath(),
-                    "https://app.akto.io/dashboard/issues?result=" + id.getTestSubCategory(),
-                    info.getDescription(),
-                    id
-                );
-            } catch (Exception e) {
-                logger.error("Error parsing URL: {}", e.getMessage());
-                return null;
-            }
     }
 
     private List<TestingRunResult> fetchRunResults(List<JiraMetaData> metaDataList) {
@@ -257,7 +238,7 @@ public class JiraTicketJobExecutor extends JobExecutor<AutoTicketParams> {
         return payload;
     }
 
-    private List<String> sendJiraBulkCreate(JiraIntegration jira, BasicDBObject payload, List<JiraMetaData> metaList) {
+    private List<String> sendJiraBulkCreate(JiraIntegration jira, BasicDBObject payload, List<JiraMetaData> metaList) throws Exception {
         String url = jira.getBaseUrl() + CREATE_ISSUE_ENDPOINT_BULK;
         String authHeader = Base64.getEncoder().encodeToString((jira.getUserEmail() + ":" + jira.getApiToken()).getBytes());
 
@@ -267,31 +248,34 @@ public class JiraTicketJobExecutor extends JobExecutor<AutoTicketParams> {
         OriginalHttpRequest request = new OriginalHttpRequest(url, "", "POST", payload.toString(), headers, "");
 
         List<String> createdKeys = new ArrayList<>();
+        OriginalHttpResponse response;
         try {
-            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, new ArrayList<>());
-            if (response.getStatusCode() > 201 || response.getBody() == null) {
+            response = ApiExecutor.sendRequest(request, true, null, false, new ArrayList<>());
+            if (response.getStatusCode() > 201) {
                 logger.error("Failed Jira bulk create. Status: {}, Body: {}", response.getStatusCode(), response.getBody());
+                // add error handling for 4xx errors. Add retry for 429.
                 return createdKeys;
             }
-
-            BasicDBObject resObj = BasicDBObject.parse(response.getBody());
-            List<BasicDBObject> issues = (List<BasicDBObject>) resObj.get("issues");
-
-            for (int i = 0; i < issues.size(); i++) {
-                BasicDBObject issue = issues.get(i);
-                String key = issue.getString("key");
-                createdKeys.add(key);
-
-                JiraMetaData meta = metaList.get(i);
-                TestingRunIssuesDao.instance.getMCollection().updateOne(
-                    Filters.eq(Constants.ID, meta.getTestingIssueId()),
-                    Updates.set("jiraIssueUrl", jira.getBaseUrl() + "/browse/" + key),
-                    new UpdateOptions().upsert(false)
-                );
-            }
-
         } catch (Exception e) {
             logger.error("Exception in Jira bulk create: {}", e.getMessage());
+            throw e;
+        }
+
+        BasicDBObject resObj = BasicDBObject.parse(response.getBody());
+        List<BasicDBObject> issues = (List<BasicDBObject>) resObj.get("issues");
+
+        for (int i = 0; i < issues.size(); i++) {
+            BasicDBObject issue = issues.get(i);
+            String key = issue.getString("key");
+            createdKeys.add(key);
+
+            JiraMetaData meta = metaList.get(i);
+            TestingRunIssuesDao.instance.getMCollection().updateOne(
+                Filters.eq(Constants.ID, meta.getTestingIssueId()),
+                Updates.set("jiraIssueUrl", jira.getBaseUrl() + "/browse/" + key),
+                new UpdateOptions().upsert(false)
+            );
+            logger.info("Created Jira issue: {} for TestingRunIssue ID: {}", key, meta.getTestingIssueId());
         }
 
         return createdKeys;
@@ -300,9 +284,36 @@ public class JiraTicketJobExecutor extends JobExecutor<AutoTicketParams> {
     private void attachFilesToIssues(JiraIntegration jira, List<String> issueKeys, List<TestingRunResult> results) {
         for (int i = 0; i < issueKeys.size(); i++) {
             String issueKey = issueKeys.get(i);
-            TestResult result = (TestResult) results.get(i).getTestResults().get(results.get(i).getTestResults().size() - 1);
+            TestResult result = getTestResultFromTestingRunResult(results.get(i));
             attachFileToIssue(jira, issueKey, result.getOriginalMessage(), result.getMessage());
         }
+    }
+
+    private TestResult getTestResultFromTestingRunResult(TestingRunResult testingRunResult) {
+        TestResult testResult;
+        try {
+            GenericTestResult gtr = testingRunResult.getTestResults().get(testingRunResult.getTestResults().size() - 1);
+            if (gtr instanceof TestResult) {
+                testResult = (TestResult) gtr;
+            } else if (gtr instanceof MultiExecTestResult) {
+                MultiExecTestResult multiTestRes = (MultiExecTestResult) gtr;
+                List<GenericTestResult> genericTestResults = multiTestRes.convertToExistingTestResult(testingRunResult);
+                GenericTestResult genericTestResult = genericTestResults.get(genericTestResults.size() - 1);
+                if (genericTestResult instanceof TestResult) {
+                    testResult = (TestResult) genericTestResult;
+                } else {
+
+                    testResult = null;
+                }
+            } else {
+                testResult = null;
+            }
+        } catch (Exception e) {
+            logger.errorAndAddToDb("Error while casting GenericTestResult obj to TestResult obj: " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
+            testResult = null;
+        }
+
+        return testResult;
     }
 
     private void attachFileToIssue(JiraIntegration jira, String issueId, String origReq, String testReq) {
@@ -326,14 +337,10 @@ public class JiraTicketJobExecutor extends JobExecutor<AutoTicketParams> {
                 .build();
 
             try (Response ignored = client.newCall(request).execute()) {
-            } catch (Exception ex) {
-                logger.errorAndAddToDb(ex,
-                    String.format("Failed to call jira from url %s. Error %s", url, ex.getMessage()),
-                    LogDb.DASHBOARD);
+                logger.info("File attached to Jira issue: {}", issueId);
             }
-
         } catch (Exception e) {
-            logger.error("Error attaching file to Jira: {}", e.getMessage());
+            logger.error("Error attaching file to Jira: issueId: {}", issueId, e.getMessage());
         }
     }
 
