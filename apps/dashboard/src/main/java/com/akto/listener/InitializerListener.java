@@ -2477,6 +2477,7 @@ public class InitializerListener implements ServletContextListener {
                     // CleanTestingJob.cleanTestingJobRunner();
 
                     MatchingJob.MatchingJobRunner();
+                    JobsCron.instance.jobsScheduler(JobExecutorType.DASHBOARD);
 
                     int now2 = Context.now();
                     int diffNow = now2 - now;
@@ -2484,7 +2485,6 @@ public class InitializerListener implements ServletContextListener {
                 } else {
                     logger.debug("Skipping init functions and scheduling jobs at " + now);
                 }
-                JobsCron.instance.jobsScheduler(JobExecutorType.DASHBOARD);
                 // setUpAktoMixpanelEndpointsScheduler();
                 //fetchGithubZip();
                 if(isSaas){

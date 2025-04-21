@@ -1,7 +1,9 @@
 package com.akto.testing;
 
+import com.akto.dao.testing.TestingRunConfigDao;
 import com.akto.dto.jobs.AutoTicketParams;
 import com.akto.dto.jobs.JobExecutorType;
+import com.akto.dto.testing.TestingRunConfig;
 import com.akto.jobs.JobScheduler;
 import com.akto.billing.UsageMetricUtils;
 import com.akto.crons.GetRunningTestsStatus;
@@ -16,7 +18,7 @@ import com.akto.dto.usage.MetricTypes;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.usage.UsageMetricHandler;
-import com.mongodb.BasicDBObject;
+import com.akto.util.Constants;
 import com.mongodb.WriteConcern;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
@@ -28,7 +30,7 @@ import org.bson.types.ObjectId;
 public class TestCompletion {
 
     private static final LoggerMaker logger = new LoggerMaker(TestCompletion.class, LogDb.TESTING);
-    public static final ScheduledExecutorService testTelemetryScheduler = Executors.newScheduledThreadPool(2);
+    private static final ScheduledExecutorService testTelemetryScheduler = Executors.newScheduledThreadPool(2);
 
     public void markTestAsCompleteAndRunFunctions(TestingRun testingRun, ObjectId summaryId){
         Bson completedUpdate = Updates.combine(
@@ -64,7 +66,7 @@ public class TestCompletion {
 
         Main.raiseMixpanelEvent(summaryId, testingRun, accountId);
 
-        scheduleTicketCreationJob(testingRun, accountId, summaryId);
+        scheduleAutoTicketCreationJob(testingRun, accountId, summaryId);
 
         Organization organization = OrganizationsDao.instance.findOne(
                         Filters.in(Organization.ACCOUNTS, accountId));
@@ -97,19 +99,26 @@ public class TestCompletion {
         UsageMetricHandler.calcAndFetchFeatureAccessUsingDeltaUsage(MetricTypes.TEST_RUNS, accountId, deltaUsage);
     }
 
-    private void scheduleTicketCreationJob(TestingRun testingRun, int accountId, ObjectId summaryId) {
-        if (testingRun.getAutoTicketingDetails() == null || !testingRun.getAutoTicketingDetails().isShouldCreateTickets()) {
+    public void scheduleAutoTicketCreationJob(TestingRun testingRun, int accountId, ObjectId summaryId) {
+
+        TestingRunConfig testRunConfig = TestingRunConfigDao.instance.findOne(Constants.ID,
+            testingRun.getTestIdConfig());
+
+        if (testRunConfig.getAutoTicketingDetails() == null || !testRunConfig.getAutoTicketingDetails()
+            .isShouldCreateTickets()) {
             return;
         }
 
-        AutoTicketParams params = new AutoTicketParams(
-            testingRun.getId(),
-            summaryId,
-            testingRun.getAutoTicketingDetails().getProjectId(),
-            testingRun.getAutoTicketingDetails().getIssueType(),
-            testingRun.getAutoTicketingDetails().getSeverities(),
-            "JIRA"
-        );
+        FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccessSaas(accountId, "JIRA_INTEGRATION");
+        if (!featureAccess.getIsGranted()) {
+            logger.error("Auto Create Tickets plan is not activated for the account - {}", accountId);
+            return;
+        }
+
+        AutoTicketParams params = new AutoTicketParams(testingRun.getId(), summaryId,
+            testRunConfig.getAutoTicketingDetails().getProjectId(),
+            testRunConfig.getAutoTicketingDetails().getIssueType(),
+            testRunConfig.getAutoTicketingDetails().getSeverities(), "JIRA");
         JobScheduler.scheduleRunOnceJob(accountId, params, JobExecutorType.DASHBOARD);
     }
 }

@@ -25,12 +25,13 @@ public class JobsCron {
 
     private static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
     private static final ExecutorService executorService = Executors.newFixedThreadPool(2);
+    private static final int MAX_HEARTBEAT_THRESHOLD_SECONDS = 300;
 
     private static final LoggerMaker logger = new LoggerMaker(JobsCron.class, LogDb.DASHBOARD);
 
     public void jobsScheduler(JobExecutorType jobExecutorType) {
         scheduler.scheduleAtFixedRate(() -> {
-            logger.info("started jobs");
+            logger.debug("started jobs");
 
             // filters -
             /* OR
@@ -51,7 +52,7 @@ public class JobsCron {
                         ),
                         Filters.and(
                             Filters.eq(Job.JOB_STATUS, JobStatus.RUNNING.name()),
-                            Filters.lt(Job.HEARTBEAT_AT, now - 300)
+                            Filters.lt(Job.HEARTBEAT_AT, now - MAX_HEARTBEAT_THRESHOLD_SECONDS)
                         )
                     )
                 );
@@ -83,7 +84,7 @@ public class JobsCron {
             }
 
             if (job == null) {
-                logger.info("No jobs to run");
+                logger.debug("No jobs to run");
                 return;
             }
 
