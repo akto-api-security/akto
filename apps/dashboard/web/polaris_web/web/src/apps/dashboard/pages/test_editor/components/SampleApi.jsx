@@ -234,7 +234,6 @@ const SampleApi = () => {
 
         try {
             let resp = await testEditorRequests.runTestForTemplate(currentContent,apiKeyInfo,sampleDataList)
-            console.log(resp);
             if(resp.testingRunPlaygroundHexId !== null && resp?.testingRunPlaygroundHexId !== undefined) {
                 await new Promise((resolve) => {
                     let maxAttempts = 100;
