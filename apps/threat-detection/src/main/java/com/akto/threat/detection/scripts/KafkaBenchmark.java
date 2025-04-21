@@ -28,7 +28,7 @@ public class KafkaBenchmark {
     public static String FILE_PATH = "sample-payloads/";
     public static String payloadFormat = "json";
     public static String payloadSize = payloadSizes.get(0);
-    public static long numRecords = 200000L;
+    public static long numRecords = 410000L;
     
     
     
@@ -117,7 +117,7 @@ public class KafkaBenchmark {
             .setStatusCode(200)
             .setStatus("OK")
             .setTime((int) (System.currentTimeMillis() / 1000))
-            .setAktoAccountId("account-id")
+            .setAktoAccountId("1000000")
             .setIp("14.143.179.162")
             .setDestIp("154.248.155.13")
             .setDirection("INBOUND")
