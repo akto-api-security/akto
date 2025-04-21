@@ -43,11 +43,8 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
         }))
         : [];
   
-
-    const allSeverity = ["Critical", "High", "Medium", "Low"].map((ele) => {
-        return {label: ele, value: ele.toUpperCase()}
-    }
-    )
+    const severitiesArr = func.getAktoSeverities()
+    const allSeverity = severitiesArr.map((x) => {return{value: x, label: func.toSentenceCase(x), id: func.toSentenceCase(x)}})
 
     function toggleCreateTicketCheckbox() {
         const firstProject = allProjects[0]?.value || "";
