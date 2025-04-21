@@ -1,9 +1,6 @@
 package com.akto.testing_issues;
 
 import com.akto.dao.context.Context;
-import com.akto.dao.testing.TestingRunResultSummariesDao;
-import com.akto.dao.testing.sources.TestSourceConfigsDao;
-import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.bulk_updates.BulkUpdates;
@@ -15,16 +12,10 @@ import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.testing.TestExecutor;
-import com.akto.testing_utils.TestingUtils;
 import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.Severity;
 import com.akto.util.enums.GlobalEnums.TestRunIssueStatus;
-import com.mongodb.bulk.BulkWriteResult;
-import com.mongodb.client.model.*;
-import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -33,7 +24,6 @@ import java.util.List;
 import java.util.Map;
 
 import static com.akto.util.Constants.ID;
-import static com.akto.util.enums.GlobalEnums.*;
 
 public class TestingIssuesHandler {
 

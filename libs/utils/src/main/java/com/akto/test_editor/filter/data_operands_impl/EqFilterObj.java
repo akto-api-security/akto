@@ -1,0 +1,30 @@
+package com.akto.test_editor.filter.data_operands_impl;
+
+import static com.akto.testing.Utils.compareWithOriginalResponse;
+
+import java.util.HashMap;
+import java.util.List;
+
+import com.akto.dto.test_editor.DataOperandFilterRequest;
+
+public class EqFilterObj extends DataOperandsImpl {
+    
+    @Override
+    public Boolean isValid(DataOperandFilterRequest dataOperandFilterRequest) {
+
+        try {
+            Object data = dataOperandFilterRequest.getData();
+            Object querySet = dataOperandFilterRequest.getQueryset();
+            List<String> queryList = (List) querySet;
+            if (queryList == null || queryList.size() == 0) {
+                return false;
+            }
+            Double matchVal = compareWithOriginalResponse(data.toString(), queryList.get(0), new HashMap<>());
+            boolean res = (matchVal == 100.0);
+            return res;          
+        } catch (Exception e) {
+            return false;
+        }
+
+    }
+}

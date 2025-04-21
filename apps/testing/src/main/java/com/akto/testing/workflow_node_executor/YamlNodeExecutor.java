@@ -9,6 +9,7 @@ import java.util.Map;
 
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.*;
+import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.type.URLMethods;
 import com.akto.test_editor.execution.Memory;
 import org.json.JSONObject;
@@ -301,9 +302,10 @@ public class YamlNodeExecutor extends NodeExecutor {
         sampleDataMap.put(yamlNodeDetails.getApiInfoKey(), Collections.singletonList(json.toString()));
         SampleMessageStore messageStore = SampleMessageStore.create(sampleDataMap);
         List<CustomAuthType> customAuthTypes = yamlNodeDetails.getCustomAuthTypes();
-        TestingUtil testingUtil = new TestingUtil(authMechanism, messageStore, null, null, customAuthTypes);
+        ApiInfoKey infoKey = yamlNodeDetails.getApiInfoKey();
+
         TestExecutor executor = new TestExecutor();
-        TestingRunResult testingRunResult = executor.runTestNew(yamlNodeDetails.getApiInfoKey(), null, testingUtil, null, testConfig, null, debug, testLogs);
+        TestingRunResult testingRunResult = executor.runTestNew(yamlNodeDetails.getApiInfoKey(), null, messageStore, authMechanism, customAuthTypes, null, testConfig, null, debug, testLogs);
 
         List<String> errors = new ArrayList<>();
         List<String> messages = new ArrayList<>();

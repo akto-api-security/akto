@@ -8,7 +8,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 
 import com.akto.RuntimeMode;
-import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
 import com.akto.dto.*;
@@ -17,30 +16,27 @@ import com.akto.kafka.Kafka;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.metrics.AllMetrics;
-import com.akto.sql.SampleDataAltDb;
 import com.akto.hybrid_parsers.HttpCallParser;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
 import com.akto.testing_db_layer_client.ClientLayer;
 import com.akto.util.DashboardMode;
-import com.akto.util.filter.DictionaryFilter;
 import com.google.gson.Gson;
 import org.apache.kafka.clients.consumer.*;
 import org.apache.kafka.common.Metric;
 import org.apache.kafka.common.MetricName;
 import org.apache.kafka.common.errors.WakeupException;
 import org.apache.kafka.common.serialization.StringDeserializer;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public class Main {
+
     private Consumer<String, String> consumer;
     public static final String GROUP_NAME = "group_name";
     public static final String VXLAN_ID = "vxlanId";
     public static final String VPC_CIDR = "vpc_cidr";
     public static final String ACCOUNT_ID = "account_id";
-    private static final Logger logger = LoggerFactory.getLogger(Main.class);
     private static final LoggerMaker loggerMaker = new LoggerMaker(Main.class, LogDb.RUNTIME);
 
     public static final DataActor dataActor = DataActorFactory.fetchInstance();
@@ -53,7 +49,7 @@ public class Main {
     private static void printL(Object o) {
         if (debugPrintCounter > 0) {
             debugPrintCounter--;
-            logger.info(o.toString());
+            loggerMaker.info(o.toString());
         }
     }   
 
@@ -66,7 +62,7 @@ public class Main {
 
             Map<String, Object> json = gson.fromJson(message, Map.class);
 
-            // logger.info("Json size: " + json.size());
+            // loggerMaker.info("Json size: " + json.size());
             boolean withoutCidrCond = json.containsKey(GROUP_NAME) && json.containsKey(VXLAN_ID);
             boolean withCidrCond = json.containsKey(GROUP_NAME) && json.containsKey(VXLAN_ID) && json.containsKey(VPC_CIDR);
             if (withCidrCond || withoutCidrCond) {
@@ -78,7 +74,7 @@ public class Main {
 
                 if (json.containsKey(VPC_CIDR)) {
                     List<String> cidrList = (List<String>) json.get(VPC_CIDR);
-                    logger.info("cidrList: " + cidrList);
+                    loggerMaker.info("cidrList: " + cidrList);
                     dataActor.updateCidrList(cidrList);
                 }
             }
@@ -97,7 +93,7 @@ public class Main {
 
     public static Kafka kafkaProducer = null;
     private static void buildKafka() {
-        logger.info("Building kafka...................");
+        loggerMaker.info("Building kafka...................");
         AccountSettings accountSettings = dataActor.fetchAccountSettings();
         if (accountSettings != null && accountSettings.getCentralKafkaIp()!= null) {
             String centralKafkaBrokerUrl = accountSettings.getCentralKafkaIp();
@@ -105,10 +101,10 @@ public class Main {
             int centralKafkaLingerMS = AccountSettings.DEFAULT_CENTRAL_KAFKA_LINGER_MS;
             if (centralKafkaBrokerUrl != null) {
                 kafkaProducer = new Kafka(centralKafkaBrokerUrl, centralKafkaLingerMS, centralKafkaBatchSize);
-                logger.info("Connected to central kafka @ " + Context.now());
+                loggerMaker.info("Connected to central kafka @ " + Context.now());
             }
         } else {
-            logger.info(String.valueOf(accountSettings));
+            loggerMaker.info(String.valueOf(accountSettings));
         }
     }
 
@@ -138,7 +134,7 @@ public class Main {
         public void setAccountSettings(AccountSettings accountSettings) {
             this.accountSettings = accountSettings;
             if (accountSettings != null) {
-                logger.info("Received " + accountSettings.convertApiCollectionNameMapperToRegex().size() + " apiCollectionNameMappers");
+                loggerMaker.info("Received " + accountSettings.convertApiCollectionNameMapperToRegex().size() + " apiCollectionNameMappers");
             }
         }
     }
@@ -323,7 +319,7 @@ public class Main {
                         }
 
                         if (lastSyncOffset % 100 == 0) {
-                            logger.info("Committing offset at position: " + lastSyncOffset);
+                            loggerMaker.info("Committing offset at position: " + lastSyncOffset);
                         }
 
                         if (tryForCollectionName(r.value())) {
@@ -533,7 +529,7 @@ public class Main {
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
                 List<CustomDataType> customDataTypes = dataActor.fetchCustomDataTypes();
-                System.out.println("customdata type " + customDataTypes.size());
+                loggerMaker.debug("customdata type " + customDataTypes.size());
                 List<AktoDataType> aktoDataTypes = dataActor.fetchAktoDataTypes();
                 List<CustomAuthType> customAuthTypes = dataActor.fetchCustomAuthTypes();
                 SingleTypeInfo.fetchCustomDataTypes(accountId, customDataTypes, aktoDataTypes);

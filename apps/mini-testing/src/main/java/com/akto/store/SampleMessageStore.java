@@ -75,12 +75,15 @@ public class SampleMessageStore {
         try {
             long start = System.currentTimeMillis();
             List<String> samples = new ArrayList<>();
-            try {
-                samples = clientLayer.fetchSamples(apiInfoKey);
-            } catch (Exception e) {
-                e.printStackTrace();
-                System.out.println("error in fetchAllOriginalMessages " + e.getMessage());
+            if(System.getenv("TESTING_DB_LAYER_SERVICE_URL") != null && !System.getenv("TESTING_DB_LAYER_SERVICE_URL").isEmpty()){
+                try {
+                    samples = clientLayer.fetchSamples(apiInfoKey);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    System.out.println("error in fetchAllOriginalMessages " + e.getMessage());
+                }
             }
+            
             if (samples == null) {
                 samples = new ArrayList<>();
             }

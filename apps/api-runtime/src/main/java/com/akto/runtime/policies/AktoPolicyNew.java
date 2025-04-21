@@ -1,7 +1,6 @@
 package com.akto.runtime.policies;
 
 import com.akto.dao.*;
-import com.akto.dao.context.Context;
 import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.runtime_filters.RuntimeFilter;
@@ -18,8 +17,6 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.*;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 import java.util.*;
@@ -294,7 +291,7 @@ public class AktoPolicyNew {
         List<WriteModel<FilterSampleData>> updatesForSampleData = getUpdatesForSampleData(filterSampleDataList);
         Map<ApiInfoKey, List<Integer>> updatesForApiGroups = getUpdatesForApiGroups(apiInfoList);
 
-        System.out.println(StringUtils.join(updatesForApiGroups));
+        loggerMaker.debug(StringUtils.join(updatesForApiGroups));
 
         return new UpdateReturn(updatesForApiInfo, updatesForSampleData);
     }
