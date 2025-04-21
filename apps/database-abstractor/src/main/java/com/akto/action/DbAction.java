@@ -51,6 +51,7 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.enums.GlobalEnums.TestErrorSource;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.opensymphony.xwork2.Action;
 import com.opensymphony.xwork2.ActionSupport;
 import com.mongodb.BasicDBList;
@@ -226,6 +227,7 @@ public class DbAction extends ActionSupport {
     SingleTypeInfo sti;
     int scheduleTs;
     TestingRunPlayground testingRunPlayground;
+    private String testingRunPlaygroundId;
 
     private static final Gson gson = new Gson();
     ObjectMapper objectMapper = new ObjectMapper().configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false).configure(DeserializationFeature.FAIL_ON_INVALID_SUBTYPE, false).configure(DeserializationFeature.FAIL_ON_IGNORED_PROPERTIES, false);
@@ -2341,8 +2343,16 @@ public class DbAction extends ActionSupport {
 
     public String updateTestingRunPlaygroundStateAndResult(){
         try {
-            DbLayer.updateTestingRunPlayground(this.testingRunPlayground);
+            TestingRunResult testingRunResult = objectMapper.readValue(this.testingRunResult.toJson(), TestingRunResult.class);
+            if(testingRunResult.getSingleTestResults()!=null){
+                testingRunResult.setTestResults(new ArrayList<>(testingRunResult.getSingleTestResults()));
+            }else if(testingRunResult.getMultiExecTestResults() !=null){
+                testingRunResult.setTestResults(new ArrayList<>(testingRunResult.getMultiExecTestResults()));
+            }
+
+            DbLayer.updateTestingRunPlayground(new ObjectId(this.testingRunPlaygroundId), testingRunResult);
         } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in updateTestingRunPlaygroundStateAndResult " + e.toString());
             return Action.ERROR.toUpperCase();
         }
         return Action.SUCCESS.toUpperCase();
@@ -3407,4 +3417,11 @@ public class DbAction extends ActionSupport {
         this.testingRunPlayground = testingRunPlayground;
     }
 
+    public String getTestingRunPlaygroundId() {
+        return testingRunPlaygroundId;
+    }
+
+    public void setTestingRunPlaygroundId(String testingRunPlaygroundId) {
+        this.testingRunPlaygroundId = testingRunPlaygroundId;
+    }
 }

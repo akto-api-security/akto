@@ -1191,4 +1191,14 @@ public class DbLayer {
             );
     }
 
+    public static void updateTestingRunPlayground(ObjectId id, TestingRunResult testingRunResult) {
+        TestingRunPlaygroundDao.instance.updateOne(
+                Filters.eq(Constants.ID, id),
+                Updates.combine(
+                        Updates.set(TestingRunPlayground.STATE, State.COMPLETED),
+                        Updates.set(TestingRunPlayground.TESTING_RUN_RESULT, testingRunResult)
+                )
+            );
+    }
+
 }
