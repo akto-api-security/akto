@@ -4,7 +4,7 @@ import Dropdown from "../../../components/layouts/Dropdown";
 import SingleDate from "../../../components/layouts/SingleDate";
 import func from "@/util/func"
 
-const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes, testRunTimeOptions, testRolesArr, maxConcurrentRequestsOptions, slackIntegrated, generateLabelForSlackIntegration,getLabel, timeFieldsDisabled, teamsTestingWebhookIntegrated, generateLabelForTeamsIntegration, jiraProjectMap}) => {
+const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes, testRunTimeOptions, testRolesArr, maxConcurrentRequestsOptions, slackIntegrated, generateLabelForSlackIntegration,getLabel, timeFieldsDisabled, teamsTestingWebhookIntegrated, generateLabelForTeamsIntegration, jiraProjectMap,activeFromTesting}) => {
     const reducer = (state, action) => {
         switch (action.type) {
           case "update":
@@ -48,6 +48,41 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
         return {label: ele, value: ele.toUpperCase()}
     }
     )
+
+    function toggleCreateTicketCheckbox() {
+        const firstProject = allProjects[0]?.value || "";
+        const firstIssueType =
+            Array.isArray(jiraProjectMap?.[firstProject]) &&
+            jiraProjectMap[firstProject]?.[0]?.issueType
+                ? jiraProjectMap[firstProject][0].issueType
+                : "";
+    
+        const checkPrevToggle = !testRun?.autoTicketingDetails?.shouldCreateTickets;
+    
+        if (checkPrevToggle) {
+            setTestRun((prev) => ({
+                ...prev,
+                autoTicketingDetails: {
+                    ...prev.autoTicketingDetails,
+                    shouldCreateTickets: true,
+                    projectId: firstProject,
+                    severities: ["CRITICAL", "HIGH"],
+                    issueType: firstIssueType,
+                },
+            }));
+        } else {
+            setTestRun((prev) => ({
+                ...prev,
+                autoTicketingDetails: {
+                    ...prev.autoTicketingDetails,
+                    shouldCreateTickets: false,
+                    projectId: "",
+                    severities: [],
+                    issueType: "",
+                },
+            }));
+        }
+    }
 
     return (
         <VerticalStack gap={"4"}>
@@ -185,11 +220,10 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
             />
             <HorizontalStack gap={4}>
                 <Checkbox
+                    disabled={activeFromTesting}
                     label="Auto-create tickets"
                     checked={testRun.autoTicketingDetails.shouldCreateTickets}
-                    onChange={() => {
-                        setTestRun(prev => ({ ...prev, autoTicketingDetails: { ...prev.autoTicketingDetails, shouldCreateTickets: !prev.autoTicketingDetails.shouldCreateTickets } }))
-                    }}
+                    onChange={() => { toggleCreateTicketCheckbox()}}
                 />
                 {testRun.autoTicketingDetails.shouldCreateTickets &&
                     <>
@@ -198,12 +232,12 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
                             selected={(val) => {
                                 setTestRun(prev => ({ ...prev, autoTicketingDetails: { ...prev.autoTicketingDetails, projectId: val } }))
                             }}
-                            disabled={!testRun.autoTicketingDetails.shouldCreateTickets}
+                            disabled={activeFromTesting || !testRun.autoTicketingDetails.shouldCreateTickets}
                             placeHolder={"Select Project"}
                             initial={testRun.autoTicketingDetails.projectId}
                         />
                         <Dropdown
-                            disabled={!testRun.autoTicketingDetails.shouldCreateTickets}
+                            disabled={activeFromTesting || !testRun.autoTicketingDetails.shouldCreateTickets}
                             menuItems={allIssuesType}
                             selected={(val) => { setTestRun(prev => ({ ...prev, autoTicketingDetails: { ...prev.autoTicketingDetails, issueType: val } })) }}
                             placeHolder={"Select Issue Type"}
@@ -212,9 +246,9 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
                         <Dropdown
                             menuItems={allSeverity}
                             placeHolder={"Select Severity"}
-                            selected={(val) => {console.log(val); setTestRun(prev => ({ ...prev, autoTicketingDetails: { ...prev.autoTicketingDetails, severities: val }})) }}                            
+                            selected={(val) => {setTestRun(prev => ({ ...prev, autoTicketingDetails: { ...prev.autoTicketingDetails, severities: val }})) }}                            
                             allowMultiple={true}
-                            disabled={!testRun.autoTicketingDetails.shouldCreateTickets}
+                            disabled={activeFromTesting || !testRun.autoTicketingDetails.shouldCreateTickets}
                             initial={testRun.autoTicketingDetails.severities}
                         />
                     </>}

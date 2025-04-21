@@ -17,6 +17,13 @@ import RunTestConfiguration from "./RunTestConfiguration";
 import {createTestName,convertToLowerCaseWithUnderscores} from "./Utils"
 import settingsApi from "../../settings/api";
 
+const initialAutoTicketingDetails = {
+    shouldCreateTickets: false,
+    projectId: "",
+    severities: [],
+    issueType: "",
+}
+
 function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOutside, closeRunTest, selectedResourcesForPrimaryAction, useLocalSubCategoryData, preActivator, testIdConfig, activeFromTesting, setActiveFromTesting, showEditableSettings, setShowEditableSettings, parentAdvanceSettingsConfig, testRunType, shouldDisable }) {
 
     const initialState = {
@@ -42,12 +49,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         sendSlackAlert: false,
         sendMsTeamsAlert: false,
         cleanUpTestingResources: false,
-        autoTicketingDetails: {
-            shouldCreateTickets: false,
-            projectId: "",
-            severities: [],
-            issueType: "",
-        }
+        autoTicketingDetails: initialAutoTicketingDetails,
     }
     const navigate = useNavigate()
 
@@ -114,7 +116,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         })
 
         settingsApi.fetchJiraIntegration().then((res) => {
-            setJiraProjectMap(res?.projectIdsMap||null);
+            setJiraProjectMap(res?.jiraIntegration?.projectIdsMap||null);
         });
 
         observeApi.checkWebhook("MICROSOFT_TEAMS", "TESTING_RUN_RESULTS").then((resp) => {
@@ -245,7 +247,8 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                     recurringDaily: testIdConfig?.periodInSeconds === 86400,
                     recurringMonthly: testIdConfig?.periodInSeconds === (86400 * 30), // 30 days
                     recurringWeekly: testIdConfig?.periodInSeconds === (86400 * 7),  // one week
-                    continuousTesting: testIdConfig?.periodInSeconds === -1
+                    continuousTesting: testIdConfig?.periodInSeconds === -1,
+                    autoTicketingDetails: testIdConfig?.autoTicketingDetails || initialAutoTicketingDetails,
                 }));
                 setTestSuiteIds(testIdConfig?.testingRunConfig?.testSuiteIds || [])
                 setTestNameSuiteModal(testIdConfig?.name||"")
@@ -718,6 +721,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                         generateLabelForSlackIntegration={generateLabelForSlackIntegration}
                         generateLabelForTeamsIntegration={generateLabelForTeamsIntegration}
                         getLabel={getLabel}
+                        activeFromTesting={activeFromTesting || testIdConfig !== undefined}
                     />
                     <AdvancedSettingsComponent dispatchConditions={dispatchConditions} conditions={conditions} />
                 </>
@@ -893,6 +897,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                                     generateLabelForTeamsIntegration={generateLabelForTeamsIntegration}
                                     getLabel={getLabel}
                                     jiraProjectMap={jiraProjectMap}
+                                    activeFromTesting={activeFromTesting}
                                 />
 
                             </VerticalStack>
@@ -927,6 +932,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                                         generateLabelForTeamsIntegration={generateLabelForTeamsIntegration}
                                         getLabel={getLabel}
                                         jiraProjectMap={jiraProjectMap}
+                                        activeFromTesting={activeFromTesting}
                                     />
                                     <AdvancedSettingsComponent dispatchConditions={dispatchConditions} conditions={conditions} />
                                 </>
