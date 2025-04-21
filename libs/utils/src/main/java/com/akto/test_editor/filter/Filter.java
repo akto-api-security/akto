@@ -21,6 +21,12 @@ public class Filter {
 
     private FilterAction filterAction;
     private static final LoggerMaker loggerMaker = new LoggerMaker(Filter.class);
+    private static final DataOperandFilterRequest dataOperandFilterRequest = new DataOperandFilterRequest();
+    private static final Set<String> s1 = new HashSet<>();
+    private static final Set<String> s2 = new HashSet<>();
+    private static final List<String> output = new ArrayList<>();
+    private static final FilterActionRequest filterActionRequest = new FilterActionRequest();
+    private static final Map<FilterNode, String> childNodeVsValidationReason = new HashMap<>();
 
     public Filter() {
         this.filterAction = new FilterAction();
@@ -40,14 +46,14 @@ public class Filter {
             if (node.getOperand().equalsIgnoreCase(TestEditorEnums.PredicateOperator.COMPARE_GREATER.toString())) {
                 Object updatedQuerySet = filterAction.resolveQuerySetValues(null, node.fetchNodeValues(), varMap);
                 List<Object> val = (List<Object>) updatedQuerySet;
-                DataOperandFilterRequest dataOperandFilterRequest = new DataOperandFilterRequest(val.get(0), Arrays.asList(val.get(1)), "gt");
+                dataOperandFilterRequest.modify(val.get(0), Arrays.asList(val.get(1)), "gt");
                 ValidationResult validationResult = filterAction.invokeFilter(dataOperandFilterRequest);
                 return new DataOperandsFilterResponse(validationResult.getIsValid(), matchingKeySet, contextEntities, null, validationResult.getValidationReason());
             }
             if (node.getOperand().equalsIgnoreCase(TestEditorEnums.PredicateOperator.SSRF_URL_HIT.toString())) {
                 Object updatedQuerySet = filterAction.resolveQuerySetValues(null, node.fetchNodeValues(), varMap);
                 List<Object> val = (List<Object>) updatedQuerySet;
-                DataOperandFilterRequest dataOperandFilterRequest = new DataOperandFilterRequest(null, val, "ssrf_url_hit");
+                dataOperandFilterRequest.modify(null, val, "ssrf_url_hit");
                 ValidationResult validationResult = filterAction.invokeFilter(dataOperandFilterRequest);
                 return new DataOperandsFilterResponse(validationResult.getIsValid(), matchingKeySet, contextEntities, null, validationResult.getValidationReason());
             }
@@ -55,7 +61,7 @@ public class Filter {
                 return new DataOperandsFilterResponse(false, null, null, null);
             }
             String operand = node.getOperand();
-            FilterActionRequest filterActionRequest = new FilterActionRequest(node.getValues(), rawApi, testRawApi, apiInfoKey, node.getConcernedProperty(), node.getSubConcernedProperty(), matchingKeySet, contextEntities, operand, context, keyValOperandSeen, node.getBodyOperand(), node.getContextProperty(), node.getCollectionProperty());
+            filterActionRequest.modify(node.getValues(), rawApi, testRawApi, apiInfoKey, node.getConcernedProperty(), node.getSubConcernedProperty(), matchingKeySet, contextEntities, operand, context, keyValOperandSeen, node.getBodyOperand(), node.getContextProperty(), node.getCollectionProperty());
             Object updatedQuerySet = filterAction.resolveQuerySetValues(filterActionRequest, node.fetchNodeValues(), varMap);
             filterActionRequest.setQuerySet(updatedQuerySet);
             if (node.getOperand().equalsIgnoreCase(ExtractOperator.EXTRACT.toString()) || node.getOperand().equalsIgnoreCase(ExtractOperator.EXTRACTMULTIPLE.toString())) {
@@ -94,7 +100,7 @@ public class Filter {
         FilterNode firstExtractNode = null;
         StringBuilder validationReason = new StringBuilder();
         try {
-            Map<FilterNode, String> childNodeVsValidationReason = new HashMap<>();
+            childNodeVsValidationReason.clear();
             for (int i = 0; i < childNodes.size(); i++) {
                 FilterNode childNode = childNodes.get(i);
                 boolean skipExecutingExtractNode = skipExtractExecution;
@@ -152,28 +158,29 @@ public class Filter {
     }
 
     public List<String> evaluateMatchingKeySet(List<String> oldSet, List<String> newMatches, String operand) {
-        Set<String> s1 = new HashSet<>();
+        s1.clear();
+        s2.clear();
+
         if (newMatches == null) {
             return new ArrayList<>();
         }
+        
         if (oldSet == null) {
             // doing this for initial step where oldset would be null, hence assigning initially with newmatches
-            s1 = new HashSet<>(newMatches);
+            s1.addAll(newMatches);
         } else {
-            s1 = new HashSet<>(oldSet);
+            s1.addAll(oldSet);
         }
-        Set<String> s2 = new HashSet<>(newMatches);
+        s2.addAll(newMatches);
 
-        if (operand == "and") {
+        if (operand.equals("and")) {
             s1.retainAll(s2);
         } else {
             s1.addAll(s2);
         }
 
         List<String> output = new ArrayList<>();
-        for (String s: s1) {
-            output.add(s);
-        }
+        output.addAll(s1);
         return output;
     }
 

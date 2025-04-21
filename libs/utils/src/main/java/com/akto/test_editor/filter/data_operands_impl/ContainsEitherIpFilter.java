@@ -9,5 +9,5 @@ public class ContainsEitherIpFilter extends ContainsEitherFilter {
         
         IpAddressMatcher ipAddressMatcher = new IpAddressMatcher(query);
         return ipAddressMatcher.matches(data);
-        }
+    }
 }
