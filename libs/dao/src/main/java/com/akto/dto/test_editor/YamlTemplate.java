@@ -85,7 +85,7 @@ public class YamlTemplate {
     public void setInfo(Info info) {
         this.info = info;
     }
-    
+
     public boolean getInactive() {
         return inactive;
     }
@@ -104,7 +104,7 @@ public class YamlTemplate {
     public void setSource(GlobalEnums.YamlTemplateSource source) {
         this.source = source;
     }
-    
+
     public String getRepositoryUrl() {
         return repositoryUrl;
     }
