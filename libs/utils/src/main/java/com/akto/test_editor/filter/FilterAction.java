@@ -344,9 +344,9 @@ public final class FilterAction {
         String origPayload = payload;
         BasicDBObject payloadObj = new BasicDBObject();
         try {
-           payload = Utils.jsonifyIfArray(payload);
-           JSONObject jsonObj = JSON.parseObject(payload);
-           payloadObj = new BasicDBObject(jsonObj);
+        //    payload = Utils.jsonifyIfArray(payload);
+        //    JSONObject jsonObj = JSON.parseObject(payload);
+        //    payloadObj = new BasicDBObject(jsonObj);
         } catch(Exception e) {
             // add log
         }
