@@ -15,6 +15,7 @@ import { produce } from "immer"
 import RunTestSuites from "./RunTestSuites";
 import RunTestConfiguration from "./RunTestConfiguration";
 import {createTestName,convertToLowerCaseWithUnderscores} from "./Utils"
+import settingsApi from "../../settings/api";
 
 function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOutside, closeRunTest, selectedResourcesForPrimaryAction, useLocalSubCategoryData, preActivator, testIdConfig, activeFromTesting, setActiveFromTesting, showEditableSettings, setShowEditableSettings, parentAdvanceSettingsConfig, testRunType, shouldDisable }) {
 
@@ -40,7 +41,13 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         testRoleId: "",
         sendSlackAlert: false,
         sendMsTeamsAlert: false,
-        cleanUpTestingResources: false
+        cleanUpTestingResources: false,
+        autoTicketingDetails: {
+            shouldCreateTickets: false,
+            projectId: "",
+            severities: [],
+            issueType: "",
+        }
     }
     const navigate = useNavigate()
 
@@ -87,6 +94,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
     const [testSuiteIds, setTestSuiteIds] = useState([])
 
     const [testNameSuiteModal, setTestNameSuiteModal] = useState("")
+    const [jiraProjectMap, setJiraProjectMap] = useState(null);
 
     useEffect(() => {
         if (preActivator) {
@@ -104,6 +112,10 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
             const apiTokenList = resp.apiTokenList
             setSlackIntegrated(apiTokenList && apiTokenList.length > 0)
         })
+
+        settingsApi.fetchJiraIntegration().then((res) => {
+            setJiraProjectMap(res?.jiraIntegration?.projectIdsMap||null);
+        });
 
         observeApi.checkWebhook("MICROSOFT_TEAMS", "TESTING_RUN_RESULTS").then((resp) => {
             // console.log(resp.webhookPresent, resp)
@@ -880,6 +892,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                                     generateLabelForSlackIntegration={generateLabelForSlackIntegration}
                                     generateLabelForTeamsIntegration={generateLabelForTeamsIntegration}
                                     getLabel={getLabel}
+                                    jiraProjectMap={jiraProjectMap}
                                 />
 
                             </VerticalStack>
@@ -913,6 +926,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                                         generateLabelForSlackIntegration={generateLabelForSlackIntegration}
                                         generateLabelForTeamsIntegration={generateLabelForTeamsIntegration}
                                         getLabel={getLabel}
+                                        jiraProjectMap={jiraProjectMap}
                                     />
                                     <AdvancedSettingsComponent dispatchConditions={dispatchConditions} conditions={conditions} />
                                 </>
