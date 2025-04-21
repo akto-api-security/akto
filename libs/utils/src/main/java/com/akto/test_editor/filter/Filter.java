@@ -62,8 +62,8 @@ public class Filter {
             }
             String operand = node.getOperand();
             filterActionRequest.modify(node.getValues(), rawApi, testRawApi, apiInfoKey, node.getConcernedProperty(), node.getSubConcernedProperty(), matchingKeySet, contextEntities, operand, context, keyValOperandSeen, node.getBodyOperand(), node.getContextProperty(), node.getCollectionProperty());
-            Object updatedQuerySet = filterAction.resolveQuerySetValues(filterActionRequest, node.fetchNodeValues(), varMap);
-            filterActionRequest.setQuerySet(updatedQuerySet);
+            //Object updatedQuerySet = filterAction.resolveQuerySetValues(filterActionRequest, node.fetchNodeValues(), varMap);
+            //filterActionRequest.setQuerySet(updatedQuerySet);
             if (node.getOperand().equalsIgnoreCase(ExtractOperator.EXTRACT.toString()) || node.getOperand().equalsIgnoreCase(ExtractOperator.EXTRACTMULTIPLE.toString())) {
                 boolean resp = true;
                 boolean extractMultiple = node.getOperand().equalsIgnoreCase(ExtractOperator.EXTRACTMULTIPLE.toString());

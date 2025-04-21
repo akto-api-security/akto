@@ -59,7 +59,7 @@ public class Main {
 
     RedisClient localRedis = createLocalRedisClient();
 
-    new MaliciousTrafficDetectorTask(trafficKafka, internalKafka, localRedis).run();
+    new MaliciousTrafficDetectorTask(trafficKafka, internalKafka, localRedis).run2();
     new FlushSampleDataTask(
             sessionFactory, internalKafka, KafkaTopic.ThreatDetection.MALICIOUS_EVENTS)
         .run();

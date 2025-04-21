@@ -31,6 +31,7 @@ import com.akto.threat.detection.actor.SourceIPActorGenerator;
 import com.akto.threat.detection.cache.RedisBackedCounterCache;
 import com.akto.threat.detection.constants.KafkaTopic;
 import com.akto.threat.detection.kafka.KafkaProtoProducer;
+import com.akto.threat.detection.scripts.KafkaBenchmark;
 import com.akto.threat.detection.smart_event_detector.window_based.WindowBasedThresholdNotifier;
 import com.akto.util.HttpRequestResponseUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -42,6 +43,8 @@ import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.function.Supplier;
+
 import org.apache.commons.lang3.math.NumberUtils;
 import org.apache.kafka.clients.consumer.*;
 
@@ -70,6 +73,7 @@ public class MaliciousTrafficDetectorTask implements Task {
   private static final ObjectMapper objectMapper = new ObjectMapper();
   private static final HttpRequestParams requestParams = new HttpRequestParams();
   private static final HttpResponseParams responseParams = new HttpResponseParams();
+  private static Supplier<String> lazyToString;
   
 
   public MaliciousTrafficDetectorTask(
@@ -103,32 +107,62 @@ public class MaliciousTrafficDetectorTask implements Task {
     this.rawApiFactory = new RawApiMetadataFactory(new IPLookupClient());
   }
 
+  public void run2() {
+    List<HttpResponseParam> records = KafkaBenchmark.buildRecords(KafkaBenchmark.payloadSize, KafkaBenchmark.numRecords);
+    Scanner scanner = new Scanner(System.in);
+    System.out.print("Enter a number: ");
+    int number = scanner.nextInt(); // This line waits until a number is entered
+    int ts = Context.nowInMillis();
+    System.out.println("initiating benchmark + " + ts);
+    int tbuildsample = 0;
+
+    int tsBuild = 0;
+
+    for (int i = 0; i < records.size(); i++) {
+      try {
+        if ((i % 10000) == 0) {
+          System.out.println("processed records + " + i + " tsBuild " + tsBuild +  " cur_ts " + Context.now() + " time taken " + (Context.nowInMillis() - ts));
+        }
+        tbuildsample = Context.nowInMillis();
+        HttpResponseParams responseParam = buildHttpResponseParam(records.get(i));
+        tsBuild += Context.nowInMillis() - tbuildsample;
+        processRecord(responseParam);
+      } catch (Exception e) {
+        e.printStackTrace();
+        logger.warn("error in process record " + e.getMessage());
+      }
+    }
+    System.out.println("done benchmarking + " + Context.now() + " time taken " + (Context.nowInMillis() - ts));
+  }
+
+
+
   public void run() {
-    this.kafkaConsumer.subscribe(Collections.singletonList("akto.api.logs2"));
-    ExecutorService pollingExecutor = Executors.newSingleThreadExecutor();
-    pollingExecutor.execute(
-        () -> {
-          // Poll data from Kafka topic
-          while (true) {
-            ConsumerRecords<String, byte[]> records =
-                kafkaConsumer.poll(
-                    Duration.ofMillis(kafkaConfig.getConsumerConfig().getPollDurationMilli()));
+    // this.kafkaConsumer.subscribe(Collections.singletonList("akto.api.logs2"));
+    // ExecutorService pollingExecutor = Executors.newSingleThreadExecutor();
+    // pollingExecutor.execute(
+    //     () -> {
+    //       // Poll data from Kafka topic
+    //       while (true) {
+    //         ConsumerRecords<String, byte[]> records =
+    //             kafkaConsumer.poll(
+    //                 Duration.ofMillis(kafkaConfig.getConsumerConfig().getPollDurationMilli()));
 
-            try {
-              for (ConsumerRecord<String, byte[]> record : records) {
-                HttpResponseParam httpResponseParam = HttpResponseParam.parseFrom(record.value());
-                processRecord(httpResponseParam);
-              }
+    //         try {
+    //           for (ConsumerRecord<String, byte[]> record : records) {
+    //             HttpResponseParam httpResponseParam = HttpResponseParam.parseFrom(record.value());
+    //             processRecord(httpResponseParam);
+    //           }
 
-              if (!records.isEmpty()) {
-                // Should we commit even if there are no records ?
-                kafkaConsumer.commitSync();
-              }
-            } catch (Exception e) {
-              e.printStackTrace();
-            }
-          }
-        });
+    //           if (!records.isEmpty()) {
+    //             // Should we commit even if there are no records ?
+    //             kafkaConsumer.commitSync();
+    //           }
+    //         } catch (Exception e) {
+    //           e.printStackTrace();
+    //         }
+    //       }
+    //     });
   }
 
   private Map<String, FilterConfig> getFilters() {
@@ -139,13 +173,13 @@ public class MaliciousTrafficDetectorTask implements Task {
 
     List<YamlTemplate> templates = dataActor.fetchFilterYamlTemplates();
     apiFilters = FilterYamlTemplateDao.fetchFilterConfig(false, templates, false);
-    logger.debug("total filters fetched " + + apiFilters.size());
+    logger.warn("total filters fetched " + + apiFilters.size());
     this.filterLastUpdatedAt = now;
     return apiFilters;
   }
 
   private boolean validateFilterForRequest(
-      FilterConfig apiFilter, RawApi rawApi, ApiInfo.ApiInfoKey apiInfoKey, String message) {
+      FilterConfig apiFilter, RawApi rawApi, ApiInfo.ApiInfoKey apiInfoKey) {
     try {
       varMap.clear();
       String filterExecutionLogId = UUID.randomUUID().toString();
@@ -161,8 +195,7 @@ public class MaliciousTrafficDetectorTask implements Task {
     return false;
   }
 
-  private void processRecord(HttpResponseParam record) throws Exception {
-    HttpResponseParams responseParam = buildHttpResponseParam(record);
+  private void processRecordCopy(HttpResponseParams responseParam) throws Exception {
     String actor = SourceIPActorGenerator.instance.generate(responseParam).orElse("");
     responseParam.setSourceIP(actor);
 
@@ -180,7 +213,6 @@ public class MaliciousTrafficDetectorTask implements Task {
 
     List<SampleRequestKafkaEnvelope> maliciousMessages = new ArrayList<>();
 
-    String message = responseParam.getOrig();
     RawApi rawApi = RawApi.buildFromMessageNew(responseParam);
     RawApiMetadata metadata = this.rawApiFactory.buildFromHttp(rawApi.getRequest(), rawApi.getResponse());
     rawApi.setRawApiMetdata(metadata);
@@ -193,12 +225,12 @@ public class MaliciousTrafficDetectorTask implements Task {
     ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(apiCollectionId, url, method);
 
     for (FilterConfig apiFilter : apiFilters.values()) {
-      boolean hasPassedFilter = validateFilterForRequest(apiFilter, rawApi, apiInfoKey, message);
+      boolean hasPassedFilter = validateFilterForRequest(apiFilter, rawApi, apiInfoKey);
 
       // If a request passes any of the filter, then it's a malicious request,
       // and so we push it to kafka
       if (hasPassedFilter) {
-        logger.debug("filter condition satisfied for url " + apiInfoKey.getUrl() + " filterId " + apiFilter.getId());
+        logger.warn("filter condition satisfied for url " + apiInfoKey.getUrl() + " filterId " + apiFilter.getId());
         // Later we will also add aggregation support
         // Eg: 100 4xx requests in last 10 minutes.
         // But regardless of whether request falls in aggregation or not,
@@ -219,7 +251,7 @@ public class MaliciousTrafficDetectorTask implements Task {
         SampleMaliciousRequest maliciousReq = SampleMaliciousRequest.newBuilder()
             .setUrl(responseParam.getRequestParams().getURL())
             .setMethod(responseParam.getRequestParams().getMethod())
-            .setPayload(responseParam.getOrig())
+            .setPayload(responseParam.getOriginalMsg().get())
             .setIp(actor) // For now using actor as IP
             .setApiCollectionId(responseParam.getRequestParams().getApiCollectionId())
             .setTimestamp(responseParam.getTime())
@@ -246,7 +278,7 @@ public class MaliciousTrafficDetectorTask implements Task {
               maliciousReq, rule);
 
           if (result.shouldNotify()) {
-            logger.debug("aggregate condition satisfied for url " + apiInfoKey.getUrl() + " filterId " + apiFilter.getId());
+            logger.warn("aggregate condition satisfied for url " + apiInfoKey.getUrl() + " filterId " + apiFilter.getId());
             generateAndPushMaliciousEventRequest(
                 apiFilter,
                 actor,
@@ -303,6 +335,10 @@ public class MaliciousTrafficDetectorTask implements Task {
     internalKafka.send(KafkaTopic.ThreatDetection.ALERTS, envelope);
   }
 
+  private void processRecord(HttpResponseParams responseParam) throws Exception {
+    processRecordCopy(responseParam);
+  }
+
   public static HttpResponseParams buildHttpResponseParam(
       HttpResponseParam httpResponseParamProto) {
 
@@ -336,6 +372,7 @@ public class MaliciousTrafficDetectorTask implements Task {
 
     HttpResponseParams.Source source = HttpResponseParams.Source.valueOf(sourceStr);
     Map<String, List<String>> respHeaders = (Map) httpResponseParamProto.getResponseHeadersMap();
+    lazyToString = httpResponseParamProto::toString;
 
     return responseParams.resetValues(
         httpResponseParamProto.getType(),
@@ -348,9 +385,10 @@ public class MaliciousTrafficDetectorTask implements Task {
         httpResponseParamProto.getAktoAccountId(),
         httpResponseParamProto.getIsPending(),
         source,
-        httpResponseParamProto.toString(),
+        "",
         httpResponseParamProto.getIp(),
         httpResponseParamProto.getDestIp(),
-        httpResponseParamProto.getDirection());
+        httpResponseParamProto.getDirection(),
+        lazyToString);
   }
 }

@@ -10,7 +10,6 @@ import com.akto.dto.test_editor.DataOperandFilterRequest;
 public class ContainsEitherFilter extends DataOperandsImpl {
     
     private static List<String> querySet = new ArrayList<>();
-    private static List<String> notMatchedQuerySet = new ArrayList<>();
     private static Boolean result = false;
     private static Boolean res;
 
@@ -19,14 +18,14 @@ public class ContainsEitherFilter extends DataOperandsImpl {
         
         result = false;
         querySet.clear();
-        notMatchedQuerySet.clear();
         String data;
         try {
             Object querysetObj = dataOperandFilterRequest.getQueryset();
             if (querysetObj instanceof List<?>) {
-                querySet = ((List<?>) querysetObj).stream()
-                        .map(String::valueOf)
-                        .collect(Collectors.toList());
+                querySet = (List<String>) querysetObj; 
+                // querySet = ((List<?>) querysetObj).stream()
+                //         .map(String::valueOf)
+                //         .collect(Collectors.toList());
             }
             data = (String) dataOperandFilterRequest.getData();
         } catch(Exception e) {
@@ -34,14 +33,14 @@ public class ContainsEitherFilter extends DataOperandsImpl {
         }
         for (String queryString: querySet) {
             try {
-                res = evaluateOnStringQuerySet(data.trim(), queryString.trim());
+                res = evaluateOnStringQuerySet(data, queryString);
             } catch (Exception e) {
                 res = false;
             }
-            if (!res) {
-                notMatchedQuerySet.add(queryString);
-            }
             result = result || res;
+            if (result == true) {
+                break;
+            }
         }
         if (result) {
             return ValidationResult.getInstance().resetValues(result, "");
@@ -49,18 +48,11 @@ public class ContainsEitherFilter extends DataOperandsImpl {
         return ValidationResult.getInstance().resetValues(result, "");
     }
 
-    public Boolean evaluateOnListQuerySet(String data, List<String> querySet) {
-        Boolean result = false;
-        Boolean res;
-        for (String queryString: querySet) {
-            res = evaluateOnStringQuerySet(data.trim(), queryString.trim());
-            result = result || res;
-        }
-        return result;
-    }
-
     public Boolean evaluateOnStringQuerySet(String data, String query) {
-        return data.toLowerCase().contains(query.toLowerCase());
+        if (data.length() < query.length()) {
+            return false;
+        }
+        return data.contains(query);
     }
 
 }
