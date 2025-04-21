@@ -2,6 +2,8 @@ package com.akto.store;
 
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 public class StandardHeaders {
@@ -85,5 +87,27 @@ public class StandardHeaders {
         // todo:
         add("idempotency-key");
 
+    }
+
+    public static void removeStandardAndAuthHeaders(Map<String, List<String>> headers, boolean isRequest) {
+        Set<String> authRelatedHeaders = new HashSet<>(Arrays.asList(
+            "authorization", "x-auth-token", "x-requested-with",
+            "x-request-id", "x-correlation-id", "access-token", "token", "auth"
+        ));
+
+        for (Map.Entry<String, List<String>> entry : headers.entrySet()) {
+            try {
+                String headerKey = entry.getKey().toLowerCase().trim();
+                if (StandardHeaders.isStandardHeader(headerKey)) {
+                    headers.remove(entry.getKey());
+                }else if(isRequest && authRelatedHeaders.contains(headerKey.toLowerCase())) {
+                    headers.remove(entry.getKey());
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+                // TODO: handle exception
+            }
+            
+        }
     }
 }

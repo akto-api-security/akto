@@ -5,18 +5,17 @@ import com.akto.dao.testing.config.TestCollectionPropertiesDao;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.testing.config.TestCollectionProperty;
 import com.akto.dto.traffic.SampleData;
+import com.akto.dto.type.URLMethods;
 import com.akto.store.StandardHeaders;
+import com.akto.util.Pair;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Sorts;
-import com.opensymphony.xwork2.Action;
-import okhttp3.*;
 import org.apache.commons.lang3.NotImplementedException;
 import org.bson.conversions.Bson;
 
-import java.io.IOException;
 import java.util.*;
 
 import static com.akto.dto.ApiInfo.COLLECTION_IDS;
@@ -49,6 +48,42 @@ public class TestCollectionConfigurationAction {
             }
         }
 
+        return ret;
+    }
+
+    public List<Pair<String, String>> extractHeaderKeysWithValues(int apiCollectionId, String url, URLMethods.Method method) { 
+        List<Pair<String, String>> ret = new ArrayList<>();
+        SampleData sampleData = SampleDataDao.instance.findOne(Filters.and(
+                Filters.eq(ApiInfo.ID_API_COLLECTION_ID, apiCollectionId),
+                Filters.eq(ApiInfo.ID_URL, url),
+                Filters.eq(ApiInfo.ID_METHOD, method)
+        )); 
+
+        if(sampleData == null || sampleData.getSamples() == null || sampleData.getSamples().isEmpty()) {
+            return ret;
+        }
+
+        for(String sample: sampleData.getSamples()) {
+            Map<String, Object> json = gson.fromJson(sample, Map.class);
+            Map<String, List<String>> reqHeaders = buildHeadersMap(json, "requestHeaders");
+            Map<String, List<String>> resHeaders = buildHeadersMap(json, "responseHeaders");
+
+            StandardHeaders.removeStandardAndAuthHeaders(resHeaders, false);
+            StandardHeaders.removeStandardAndAuthHeaders(reqHeaders, true);
+
+            for(String header: reqHeaders.keySet()) {
+                List<String> values = reqHeaders.get(header);
+                if (values != null && !values.isEmpty()) {
+                    ret.add(new Pair<>(header, values.get(0)));
+                }
+            }
+            for(String header: resHeaders.keySet()) {
+                List<String> values = resHeaders.get(header);
+                if (values != null && !values.isEmpty()) {
+                    ret.add(new Pair<>(header, values.get(0)));
+                }
+            }
+        }
         return ret;
     }
 
