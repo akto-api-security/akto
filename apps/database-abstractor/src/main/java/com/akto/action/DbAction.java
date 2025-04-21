@@ -14,6 +14,9 @@ import com.akto.dto.bulk_updates.BulkUpdates;
 import com.akto.dto.bulk_updates.UpdatePayload;
 import com.akto.dto.dependency_flow.Node;
 import com.akto.dto.filter.MergedUrls;
+import com.akto.dto.graph.SvcToSvcGraph;
+import com.akto.dto.graph.SvcToSvcGraphEdge;
+import com.akto.dto.graph.SvcToSvcGraphNode;
 import com.akto.dto.runtime_filters.RuntimeFilter;
 import com.akto.dto.settings.DataControlSettings;
 import com.akto.dto.test_editor.TestingRunPlayground;
@@ -2341,6 +2344,55 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
+
+    public List<SvcToSvcGraphEdge> svcToSvcGraphEdges;
+    public List<SvcToSvcGraphNode> svcToSvcGraphNodes;
+
+    public String findSvcToSvcGraphNodes() {
+        try {
+            this.svcToSvcGraphNodes = DbLayer.findSvcToSvcGraphNodes(startTimestamp, endTimestamp, skip, limit);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in findSvcToSvcGraphNodes " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+
+        return Action.SUCCESS.toUpperCase();
+
+    }
+
+    public String findSvcToSvcGraphEdges() {
+        try {
+            this.svcToSvcGraphEdges = DbLayer.findSvcToSvcGraphEdges(startTimestamp, endTimestamp, skip, limit);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in findSvcToSvcGraphEdges " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String updateSvcToSvcGraphEdges() {
+        try {
+            DbLayer.updateSvcToSvcGraphEdges(this.svcToSvcGraphEdges);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in updateSvcToSvcGraphEdges " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String updateSvcToSvcGraphNodes() {
+        try {
+            DbLayer.updateSvcToSvcGraphNodes(this.svcToSvcGraphNodes);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in updateSvcToSvcGraphNodes " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+
+        return Action.SUCCESS.toUpperCase();
+    }
+
     public String updateTestingRunPlaygroundStateAndResult(){
         try {
             TestingRunResult testingRunResult = objectMapper.readValue(this.testingRunResult.toJson(), TestingRunResult.class);
@@ -3415,6 +3467,19 @@ public class DbAction extends ActionSupport {
 
     public void setTestingRunPlayground(TestingRunPlayground testingRunPlayground) {
         this.testingRunPlayground = testingRunPlayground;
+    }
+
+    public List<SvcToSvcGraphEdge> getSvcToSvcGraphEdges() {
+        return svcToSvcGraphEdges;
+    }
+    public void setSvcToSvcGraphEdges(List<SvcToSvcGraphEdge> svcToSvcGraphEdges) {
+        this.svcToSvcGraphEdges = svcToSvcGraphEdges;
+    }
+    public List<SvcToSvcGraphNode> getSvcToSvcGraphNodes() {
+        return svcToSvcGraphNodes;
+    }
+    public void setSvcToSvcGraphNodes(List<SvcToSvcGraphNode> svcToSvcGraphNodes) {
+        this.svcToSvcGraphNodes = svcToSvcGraphNodes;
     }
 
     public String getTestingRunPlaygroundId() {
