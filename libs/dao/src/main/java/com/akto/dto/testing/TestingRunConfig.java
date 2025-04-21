@@ -3,7 +3,6 @@ package com.akto.dto.testing;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.CollectionConditions.TestConfigsAdvancedSettings;
 
-import javax.ws.rs.GET;
 import lombok.Getter;
 import lombok.Setter;
 import org.bson.codecs.pojo.annotations.BsonId;

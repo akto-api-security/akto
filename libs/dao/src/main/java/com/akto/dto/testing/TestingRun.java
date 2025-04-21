@@ -50,9 +50,7 @@ public class TestingRun {
 
     public static final String SEND_MS_TEAMS_ALERT = "sendMsTeamsAlert";
     private boolean sendMsTeamsAlert = false;
-
-    private AutoTicketingDetails autoTicketingDetails;
-
+    
     public TestingRun() { }
 
     public TestingRun(int scheduleTimestamp, String userEmail, TestingEndpoints testingEndpoints, int testIdConfig, State state, int periodInSeconds, String name, String triggeredBy, boolean sendSlackAlert) {
@@ -234,14 +232,6 @@ public class TestingRun {
 
     public void setSendMsTeamsAlert(boolean sendMsTeamsAlert) {
         this.sendMsTeamsAlert = sendMsTeamsAlert;
-    }
-
-    public AutoTicketingDetails getAutoTicketingDetails() {
-        return autoTicketingDetails;
-    }
-
-    public void setAutoTicketingDetails(AutoTicketingDetails autoTicketingDetails) {
-        this.autoTicketingDetails = autoTicketingDetails;
     }
 
     @Override
