@@ -1,6 +1,5 @@
 package com.akto.dao;
 
-import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -13,14 +12,12 @@ import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiAccessType;
 import com.akto.dto.ApiInfo.AuthType;
 import com.akto.dto.type.SingleTypeInfo;
-import com.akto.dto.type.SingleTypeInfo.SubType;
 import com.akto.dto.type.URLMethods.Method;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 
 import org.bson.conversions.Bson;
-import org.junit.Test;
 
 public class DemoData extends DaoConnect {
     BasicDBObject defaultCollKey = new BasicDBObject("_id", 0);
@@ -28,10 +25,6 @@ public class DemoData extends DaoConnect {
     private void updateDB(Map<String, String> origToNewURL) throws IOException {
         Set<String> newUrls = new HashSet<>();
         newUrls.addAll(origToNewURL.values());
-
-        for(String newUrl: origToNewURL.values()) {
-            System.out.println("newurl: " + newUrl);
-        }
 
         ApiCollectionsDao.instance.updateOne(defaultCollKey, Updates.set("urls", newUrls));
         updateSingleTypeInfos(origToNewURL);
@@ -166,10 +159,6 @@ public class DemoData extends DaoConnect {
 
         Set<String> newUrls = new HashSet<>();
         newUrls.addAll(origToNewURL.values());
-
-        for(String newUrl: origToNewURL.values()) {
-            System.out.println("newurl: " + newUrl);
-        }
 
         updateDB(origToNewURL);
     }

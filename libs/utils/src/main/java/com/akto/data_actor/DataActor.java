@@ -269,6 +269,10 @@ public abstract class DataActor {
 
     public abstract List<DependencyNode> findDependencyNodes(int apiCollectionId, String url, String method, String reqMethod);
 
+    public abstract List<String> findTestSubCategoriesByTestSuiteId(List<String> testSuiteId);
+
+    public abstract TestingRunResultSummary findLatestTestingRunResultSummary(Bson filter);
+
     public abstract TestingRunPlayground getCurrentTestingRunDetailsFromEditor(int timestamp);
 
     public abstract void updateTestingRunPlayground(TestingRunPlayground testingRunPlayground);

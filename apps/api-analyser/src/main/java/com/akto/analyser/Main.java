@@ -1,7 +1,6 @@
 package com.akto.analyser;
 
 import com.akto.DaoInit;
-import com.akto.InstanceDetails;
 import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.AccountSettings;
@@ -15,8 +14,6 @@ import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.common.errors.WakeupException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
 import java.util.*;

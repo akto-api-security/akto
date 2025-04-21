@@ -61,8 +61,6 @@ public class DictionaryFilterCreator {
         try(InputStream fis = DictionaryFilterCreator.class.getResourceAsStream("/DictionaryBinary")) {
             BloomFilter<CharSequence> bloomFilter = BloomFilter.readFrom(fis, Funnels.stringFunnel(StandardCharsets.UTF_8));
 
-            System.out.println(bloomFilter.mightContain("aa".toUpperCase()));
-
         } catch (IOException e) {
             e.printStackTrace();
         }
