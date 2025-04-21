@@ -1,8 +1,8 @@
 package com.akto.dao.testing;
 
-import com.akto.dao.CommonContextDao;
+import com.akto.dao.AccountsContextDao;
 import com.akto.dto.testing.DefaultTestSuites;
-public class DefaultTestSuitesDao extends CommonContextDao<DefaultTestSuites> {
+public class DefaultTestSuitesDao extends AccountsContextDao<DefaultTestSuites> {
 
     public static final DefaultTestSuitesDao instance = new DefaultTestSuitesDao();
 
