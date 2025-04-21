@@ -53,7 +53,7 @@ public class Main {
 
     private static final DataActor dataActor = DataActorFactory.fetchInstance();
 
-    public static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
+    public static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
 
     public static final ScheduledExecutorService testTelemetryScheduler = Executors.newScheduledThreadPool(2);
 
@@ -79,7 +79,7 @@ public class Main {
     }
 
     public static void checkForPlaygroundTest(){
-        scheduler.scheduleAtFixedRate(new Runnable() {
+        scheduler.scheduleWithFixedDelay(new Runnable() {
             private final int timestamp = Context.now()-5*60;
             public void run() {
                 TestExecutor executor = new TestExecutor();
@@ -106,9 +106,29 @@ public class Main {
                 
                 TestingUtil testingUtil = new TestingUtil(authMechanism, messageStore, null, null, customAuthTypes);
                 TestingRunResult testingRunResult = executor.runTestNew(infoKey, null, testingUtil, null, testConfig, null, true, testLogs);
+                testingRunResult.setId(testingRunPlayground.getId());
+                testingRunResult.setTestRunId(testingRunPlayground.getId());
+                testingRunResult.setTestRunResultSummaryId(testingRunPlayground.getId());
+
+                GenericTestResult testRes = testingRunResult.getTestResults().get(0);
+                if (testRes instanceof TestResult) {
+                    List<TestResult> list = new ArrayList<>();
+                    for(GenericTestResult testResult: testingRunResult.getTestResults()){
+                        list.add((TestResult) testResult);
+                    }
+                    testingRunResult.setSingleTestResults(list);
+                } else {
+                    List<MultiExecTestResult> list = new ArrayList<>();
+                    for(GenericTestResult testResult: testingRunResult.getTestResults()){
+                        list.add((MultiExecTestResult) testResult);
+                    }
+                    testingRunResult.setMultiExecTestResults(list);
+                }
+                testingRunResult.setTestResults(null);
+                testingRunResult.setTestLogs(null);
                 testingRunPlayground.setTestingRunResult(testingRunResult);
                 // update testingRunPlayground in DB
-                // dataActor.updateTestingRunPlayground(testingRunPlayground);
+                dataActor.updateTestingRunPlayground(testingRunPlayground);
             }
         }, 0, 2, TimeUnit.SECONDS);
 

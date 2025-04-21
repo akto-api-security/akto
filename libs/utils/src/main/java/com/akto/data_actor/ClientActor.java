@@ -3554,8 +3554,10 @@ public class ClientActor extends DataActor {
     public void updateTestingRunPlayground(TestingRunPlayground testingRunPlayground) {
         Map<String, List<String>> headers = buildHeaders();
         BasicDBObject obj = new BasicDBObject();
-        obj.put("testingRunPlayground", testingRunPlayground);
-        OriginalHttpRequest request = new OriginalHttpRequest(url + "/updateTestingRunPlaygroundStateAndResult", "", "POST",  obj.toString(), headers, "");
+        obj.put("testingRunPlaygroundId", testingRunPlayground.getHexId());
+        obj.put("testingRunResult", testingRunPlayground.getTestingRunResult());
+        String jsonString = gson.toJson(obj);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/updateTestingRunPlaygroundStateAndResult", "", "POST",  jsonString, headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
             String responsePayload = response.getBody();
@@ -3568,5 +3570,4 @@ public class ClientActor extends DataActor {
             return;
         }
     }
-
 }
