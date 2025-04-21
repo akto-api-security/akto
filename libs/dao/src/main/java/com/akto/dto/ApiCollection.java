@@ -78,13 +78,17 @@ public class ApiCollection {
 
     Type type;
     public static final String _TYPE = "type";
-    
+
+    @Deprecated
     String userSetEnvType;
 
 	public static final String USER_ENV_TYPE = "userSetEnvType";
 
     List<TestingEndpoints> conditions;
     public static final String CONDITIONS_STRING = "conditions";
+
+    List<String> userEnvTypes;
+    public static final String USER_ENV_TYPES = "userEnvTypes";
 
     public ApiCollection() {
     }
@@ -142,25 +146,25 @@ public class ApiCollection {
         this.urls = urls;
     }
 
-    public String getEnvType(){
+    public List<String> getEnvType(){
         if(this.type != null && this.type == Type.API_GROUP) return null;
         
-        if(this.userSetEnvType == null){
+        if(this.userEnvTypes == null || this.userEnvTypes.isEmpty()){
             if (this.hostName != null) {
                 for (String keyword : ENV_KEYWORDS_WITH_DOT) {
                     if (this.hostName.contains("." + keyword)) {
-                        return "STAGING";
+                        return Arrays.asList("STAGING");
                     }
                 }
                 for (String keyword : ENV_KEYWORDS_WITHOUT_DOT) {
                     if (this.hostName.contains(keyword)) {
-                        return "STAGING";
+                        return Arrays.asList("STAGING");
                     }
                 }
             }
             return null;
         }else{
-            return this.userSetEnvType;
+            return this.userEnvTypes;
         }
     }
 
@@ -300,10 +304,12 @@ public class ApiCollection {
         this.sampleCollectionsDropped = sampleCollectionsDropped;
     }
 
+    @Deprecated
     public String getUserSetEnvType() {
 		return userSetEnvType;
 	}
 
+    @Deprecated
 	public void setUserSetEnvType(String userSetEnvType) {
 		this.userSetEnvType = userSetEnvType;
 	}
@@ -342,5 +348,13 @@ public class ApiCollection {
 
     public void setDescription(String description) {
         this.description = description;
+    }
+
+    public List<String> getUserEnvTypes() {
+        return userEnvTypes;
+    }
+
+    public void setUserEnvTypes(List<String> userEnvTypes) {
+        this.userEnvTypes = userEnvTypes;
     }
 }

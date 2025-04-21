@@ -3326,6 +3326,29 @@ public class InitializerListener implements ServletContextListener {
         addDefaultAdvancedFilters(backwardCompatibility);
         moveAzureSamlConfig(backwardCompatibility);
         moveOktaOidcSSO(backwardCompatibility);
+        addSupportForMultipleUserEnvTypes(backwardCompatibility);
+    }
+
+    private static void addSupportForMultipleUserEnvTypes(BackwardCompatibility backwardCompatibility) {
+        if(backwardCompatibility.getMultipleUserEnvTypesSupport() == 0) {
+            List<ApiCollection> apiCollectionList = ApiCollectionsDao.instance.findAll(Filters.exists(ApiCollection.USER_ENV_TYPE, true), Projections.include(Constants.ID, ApiCollection.USER_ENV_TYPE, ApiCollection.USER_ENV_TYPES));
+
+            for(ApiCollection apiCollection : apiCollectionList) {
+                List<String> userEnvTypes = Arrays.asList(apiCollection.getUserSetEnvType());
+                if(apiCollection.getUserEnvTypes() != null) {
+                    userEnvTypes.addAll(apiCollection.getUserEnvTypes());
+                }
+                ApiCollectionsDao.instance.updateOne(Filters.eq(Constants.ID, apiCollection.getId()), Updates.combine(
+                        Updates.unset(ApiCollection.USER_ENV_TYPE),
+                        Updates.set(ApiCollection.USER_ENV_TYPES, userEnvTypes)
+                ));
+            }
+
+            BackwardCompatibilityDao.instance.updateOne(
+                    Filters.eq("_id", backwardCompatibility.getId()),
+                    Updates.set(BackwardCompatibility.MULTIPLE_USER_ENV_TYPES_SUPPORT, Context.now())
+            );
+        }
     }
 
     public static void printMultipleHosts(int apiCollectionId) {

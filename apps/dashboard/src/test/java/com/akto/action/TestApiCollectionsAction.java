@@ -177,10 +177,10 @@ public class TestApiCollectionsAction extends MongoBasedTest {
         collection5.setId(5);
         collection5.setHostName("kubernetes-121212-akto.io");
 
-        assertEquals(ApiCollection.ENV_TYPE.STAGING.name().toString(), collection1.getEnvType());
-        assertEquals(ApiCollection.ENV_TYPE.STAGING.name().toString(), collection2.getEnvType());
-        assertNotEquals(ApiCollection.ENV_TYPE.STAGING.name().toString(), collection3.getEnvType());
-        assertEquals(ApiCollection.ENV_TYPE.STAGING.name().toString(), collection4.getEnvType());
-        assertEquals(ApiCollection.ENV_TYPE.STAGING.name().toString(), collection5.getEnvType());
+        assertTrue(collection1.getEnvType() != null && collection1.getEnvType().contains(ApiCollection.ENV_TYPE.STAGING.name()));
+        assertTrue(collection2.getEnvType() != null && collection2.getEnvType().contains(ApiCollection.ENV_TYPE.STAGING.name()));
+        assertTrue(collection3.getEnvType() == null || !collection3.getEnvType().contains(ApiCollection.ENV_TYPE.STAGING.name()));
+        assertTrue(collection4.getEnvType() != null && collection4.getEnvType().contains(ApiCollection.ENV_TYPE.STAGING.name()));
+        assertTrue(collection5.getEnvType() != null && collection5.getEnvType().contains(ApiCollection.ENV_TYPE.STAGING.name()));
     }
 }
