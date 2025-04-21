@@ -32,7 +32,7 @@ public class LogoutAction extends UserAction implements ServletRequestAware,Serv
     @Override
     public String execute() throws Exception {
         User user = getSUser();
-        logger.info(String.valueOf(user.getId()));
+        logger.debug(String.valueOf(user.getId()));
         UsersDao.instance.updateOne(
                 Filters.eq("_id", user.getId()),
                 Updates.set("refreshTokens", new ArrayList<>())

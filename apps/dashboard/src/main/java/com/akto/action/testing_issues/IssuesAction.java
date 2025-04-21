@@ -457,7 +457,7 @@ public class IssuesAction extends UserAction {
         );
         testingRunResult = VulnerableTestingRunResultDao.instance.findOneWithComparison(filterForRunResult, null);
         if (issue.isUnread() && (currentUserRole.equals(Role.ADMIN) || currentUserRole.equals(Role.MEMBER))) {
-            logger.info("Issue id from db to be marked as read " + issueId);
+            logger.debug("Issue id from db to be marked as read " + issueId);
             Bson update = Updates.combine(Updates.set(TestingRunIssues.UNREAD, false),
                     Updates.set(TestingRunIssues.LAST_UPDATED, Context.now()));
             TestingRunIssues updatedIssue = TestingRunIssuesDao.instance.updateOneNoUpsert(Filters.eq(ID, issueId), update);
@@ -569,9 +569,9 @@ public class IssuesAction extends UserAction {
             throw new IllegalStateException();
         }
 
-        logger.info("Issue id from db to be updated " + issueId);
-        logger.info("status id from db to be updated " + statusToBeUpdated);
-        logger.info("status reason from db to be updated " + ignoreReason);
+        logger.debug("Issue id from db to be updated " + issueId);
+        logger.debug("status id from db to be updated " + statusToBeUpdated);
+        logger.debug("status reason from db to be updated " + ignoreReason);
         Bson update = Updates.combine(Updates.set(TestingRunIssues.TEST_RUN_ISSUES_STATUS, statusToBeUpdated),
                                         Updates.set(TestingRunIssues.LAST_UPDATED, Context.now()));
 
@@ -594,9 +594,9 @@ public class IssuesAction extends UserAction {
             throw new IllegalStateException();
         }
 
-        logger.info("Issue id from db to be updated " + issueIdArray);
-        logger.info("status id from db to be updated " + statusToBeUpdated);
-        logger.info("status reason from db to be updated " + ignoreReason);
+        logger.debug("Issue id from db to be updated " + issueIdArray);
+        logger.debug("status id from db to be updated " + statusToBeUpdated);
+        logger.debug("status reason from db to be updated " + ignoreReason);
         Bson update = Updates.combine(Updates.set(TestingRunIssues.TEST_RUN_ISSUES_STATUS, statusToBeUpdated),
                 Updates.set(TestingRunIssues.LAST_UPDATED, Context.now()));
 
@@ -786,8 +786,9 @@ public class IssuesAction extends UserAction {
         if (issuesIds != null && !issuesIds.isEmpty()) {
             filter = Filters.and(filter, Filters.in(Constants.ID, issuesIds));
         }
-
-        this.severityInfo = TestingRunIssuesDao.instance.getSeveritiesMapForCollections(filter, false);
+        BasicDBObject groupedId = new BasicDBObject(SingleTypeInfo._API_COLLECTION_ID, "$" + TestingRunIssues.ID_API_COLLECTION_ID)
+                .append(TestingRunIssues.KEY_SEVERITY, "$" + TestingRunIssues.KEY_SEVERITY);
+        this.severityInfo = TestingRunIssuesDao.instance.getSeveritiesMapForCollections(filter, false, groupedId);
         return Action.SUCCESS.toUpperCase();
     }
 

@@ -90,12 +90,12 @@ public class OpenApiAction extends UserAction implements ServletResponseAware {
                 );
             }
 
-            loggerMaker.infoAndAddToDb("Found API Collection " + apiCollection.getHostName(), LogDb.DASHBOARD);
+            loggerMaker.debugAndAddToDb("Found API Collection " + apiCollection.getHostName(), LogDb.DASHBOARD);
             String host =  apiCollection.getHostName();
             String apiCollectionName = apiCollection.getDisplayName();
 
             int size = sampleDataList.size();
-            loggerMaker.infoAndAddToDb("Fetched sample data list " + size, LogDb.DASHBOARD);
+            loggerMaker.debugAndAddToDb("Fetched sample data list " + size, LogDb.DASHBOARD);
 
             if (size < limit) {
                 lastFetchedUrl = null;
@@ -105,18 +105,18 @@ public class OpenApiAction extends UserAction implements ServletResponseAware {
                 lastFetchedUrl = last.getId().getUrl();
                 lastFetchedMethod = last.getId().getMethod().name();
             }
-            loggerMaker.infoAndAddToDb("Fetching for " + lastFetchedUrl + " " + lastFetchedMethod, LogDb.DASHBOARD);
+            loggerMaker.debugAndAddToDb("Fetching for " + lastFetchedUrl + " " + lastFetchedMethod, LogDb.DASHBOARD);
 
             SampleDataToSTI sampleDataToSTI = new SampleDataToSTI();
             sampleDataToSTI.setSampleDataToSTI(sampleDataList);
-            loggerMaker.infoAndAddToDb("Converted to STI", LogDb.DASHBOARD);
+            loggerMaker.debugAndAddToDb("Converted to STI", LogDb.DASHBOARD);
 
             Map<String,Map<String, Map<Integer, List<SingleTypeInfo>>>> stiList = sampleDataToSTI.getSingleTypeInfoMap();
             OpenAPI openAPI = Main.init(apiCollectionName,stiList, includeHeaders, host);
-            loggerMaker.infoAndAddToDb("Initialized openAPI", LogDb.DASHBOARD);
+            loggerMaker.debugAndAddToDb("Initialized openAPI", LogDb.DASHBOARD);
 
             openAPIString = Main.convertOpenApiToJSON(openAPI);
-            loggerMaker.infoAndAddToDb("Initialize openAPI", LogDb.DASHBOARD);
+            loggerMaker.debugAndAddToDb("Initialize openAPI", LogDb.DASHBOARD);
 
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e,"ERROR while downloading openApi file " + e, LogDb.DASHBOARD);
@@ -183,10 +183,10 @@ public class OpenApiAction extends UserAction implements ServletResponseAware {
         executorService.schedule(new Runnable() {
             public void run() {
                 Context.accountId.set(accountId);
-                
+
 
                 if (apiInfoWithSource == null) {
-                    loggerMaker.infoAndAddToDb("Starting to add sources to existing STIs and ApiInfos", LogDb.DASHBOARD);
+                    loggerMaker.debugAndAddToDb("Starting to add sources to existing STIs and ApiInfos", LogDb.DASHBOARD);
 
                     Bson sourceUpdate = Updates.set(SingleTypeInfo.SOURCES + "." + source, new BasicDBObject("timestamp", Context.now()) );
 
@@ -196,9 +196,9 @@ public class OpenApiAction extends UserAction implements ServletResponseAware {
                     Bson apiCollectionIdFilterForApiInfos = Filters.eq(ApiInfo.ID_API_COLLECTION_ID, apiCollectionId);
                     ApiInfoDao.instance.updateManyNoUpsert(apiCollectionIdFilterForApiInfos, sourceUpdate);
 
-                    loggerMaker.infoAndAddToDb("Starting to process openAPI file", LogDb.DASHBOARD);
+                    loggerMaker.debugAndAddToDb("Starting to process openAPI file", LogDb.DASHBOARD);
                 } else {
-                    loggerMaker.infoAndAddToDb("No need to add sources to STIs and ApiInfos", LogDb.DASHBOARD);
+                    loggerMaker.debugAndAddToDb("No need to add sources to STIs and ApiInfos", LogDb.DASHBOARD);
                 }
 
                 SwaggerFileUpload fileUpload = FileUploadsDao.instance.getSwaggerMCollection().find(Filters.eq(Constants.ID, new ObjectId(fileUploadId))).first();
@@ -244,7 +244,7 @@ public class OpenApiAction extends UserAction implements ServletResponseAware {
                         if (topic == null) topic = "akto.api.logs";
 
                         try {
-                            loggerMaker.infoAndAddToDb("Calling Utils.pushDataToKafka for openapi file, for apiCollection id " + apiCollectionId, LogDb.DASHBOARD);
+                            loggerMaker.debugAndAddToDb("Calling Utils.pushDataToKafka for openapi file, for apiCollection id " + apiCollectionId, LogDb.DASHBOARD);
                             Utils.pushDataToKafka(apiCollectionId, topic, stringMessages, stringErrors, true, false);
                         } catch (Exception e) {
                             throw new RuntimeException(e);
@@ -365,7 +365,7 @@ public class OpenApiAction extends UserAction implements ServletResponseAware {
 
         new Thread(()-> {
             Context.accountId.set(accountId);
-            loggerMaker.infoAndAddToDb(String.format("Starting thread to import %d swagger apis, import type: %s", uploads.size(), importType), LogDb.DASHBOARD);
+            loggerMaker.debugAndAddToDb(String.format("Starting thread to import %d swagger apis, import type: %s", uploads.size(), importType), LogDb.DASHBOARD);
             String topic = System.getenv("AKTO_KAFKA_TOPIC_NAME");
 
             try {
@@ -373,21 +373,21 @@ public class OpenApiAction extends UserAction implements ServletResponseAware {
                 int aktoCollectionId = collectionId.hashCode();
                 aktoCollectionId = aktoCollectionId < 0 ? aktoCollectionId * -1: aktoCollectionId;
                 List<String> msgs = new ArrayList<>();
-                loggerMaker.infoAndAddToDb(String.format("Processing swagger collection %s, aktoCollectionId: %s", swaggerFileUpload.getCollectionName(), aktoCollectionId), LogDb.DASHBOARD);
+                loggerMaker.debugAndAddToDb(String.format("Processing swagger collection %s, aktoCollectionId: %s", swaggerFileUpload.getCollectionName(), aktoCollectionId), LogDb.DASHBOARD);
                 for(SwaggerUploadLog upload : uploads){
                     String aktoFormat = upload.getAktoFormat();
                     msgs.add(aktoFormat);
                 }
                 if(ApiCollectionsDao.instance.findOne(Filters.eq("_id", aktoCollectionId)) == null){
                     String collectionName = swaggerFileUpload.getCollectionName();
-                    loggerMaker.infoAndAddToDb(String.format("Creating manual collection for aktoCollectionId: %s and name: %s", aktoCollectionId, collectionName), LogDb.DASHBOARD);
+                    loggerMaker.debugAndAddToDb(String.format("Creating manual collection for aktoCollectionId: %s and name: %s", aktoCollectionId, collectionName), LogDb.DASHBOARD);
                     ApiCollectionsDao.instance.insertOne(ApiCollection.createManualCollection(aktoCollectionId, collectionName));
                 }
-                loggerMaker.infoAndAddToDb(String.format("Pushing data in akto collection id %s", aktoCollectionId), LogDb.DASHBOARD);
+                loggerMaker.debugAndAddToDb(String.format("Pushing data in akto collection id %s", aktoCollectionId), LogDb.DASHBOARD);
                 Utils.pushDataToKafka(aktoCollectionId, topic, msgs, new ArrayList<>(), skipKafka, true);
-                loggerMaker.infoAndAddToDb(String.format("Pushed data in akto collection id %s", aktoCollectionId), LogDb.DASHBOARD);
+                loggerMaker.debugAndAddToDb(String.format("Pushed data in akto collection id %s", aktoCollectionId), LogDb.DASHBOARD);
                 FileUploadsDao.instance.getSwaggerMCollection().updateOne(Filters.eq("_id", new ObjectId(uploadId)), new BasicDBObject("$set", new BasicDBObject("ingestionComplete", true).append("markedForDeletion", true)), new UpdateOptions().upsert(false));
-                loggerMaker.infoAndAddToDb("Ingestion complete for " + swaggerFileUpload.getId().toString(), LogDb.DASHBOARD);
+                loggerMaker.debugAndAddToDb("Ingestion complete for " + swaggerFileUpload.getId().toString(), LogDb.DASHBOARD);
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb(e,"Error pushing data to kafka", LogDb.DASHBOARD);
             }

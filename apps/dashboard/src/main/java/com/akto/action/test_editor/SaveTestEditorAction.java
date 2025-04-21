@@ -9,6 +9,7 @@ import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.TestConfigYamlParser;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.test_editor.info.InfoParser;
+import com.akto.dao.testing.DefaultTestSuitesDao;
 import com.akto.dao.testing.TestRolesDao;
 import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dto.AccountSettings;
@@ -243,6 +244,8 @@ public class SaveTestEditorAction extends UserAction {
                     Filters.eq(Constants.ID, id),
                     Updates.combine(updates));
 
+            DefaultTestSuitesDao.instance.saveYamlTestTemplateInDefaultSuite(testConfig.getInfo(), author);
+
         } else {
             addActionError("Cannot save template, specify a different test id");
             return ERROR.toUpperCase();
@@ -396,7 +399,7 @@ public class SaveTestEditorAction extends UserAction {
                 try {
                     GithubSync githubSync = new GithubSync();
                     byte[] repoZip = githubSync.syncRepo(repositoryUrl);
-                    logger.infoAndAddToDb(String.format("Adding test templates from %s for account: %d", repositoryUrl, accountId), LogDb.DASHBOARD);
+                    logger.debugAndAddToDb(String.format("Adding test templates from %s for account: %d", repositoryUrl, accountId), LogDb.DASHBOARD);
                     InitializerListener.processTemplateFilesZip(repoZip, author, YamlTemplateSource.CUSTOM.toString(), repositoryUrl);
                 } catch (Exception e) {
                     logger.errorAndAddToDb(String.format("Error while adding test editor templates from %s for account %d, Error: %s", repositoryUrl, accountId, e.getMessage()), LogDb.DASHBOARD);

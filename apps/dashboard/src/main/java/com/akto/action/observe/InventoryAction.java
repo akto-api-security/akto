@@ -4,10 +4,13 @@ import com.akto.action.UserAction;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
 import com.akto.dao.filter.MergedUrlsDao;
+import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.CodeAnalysisApiInfo.CodeAnalysisApiInfoKey;
 import com.akto.dto.rbac.UsersCollectionsList;
+import com.akto.dto.test_run_findings.TestingRunIssues;
+import com.akto.dto.testing.TestingRun;
 import com.akto.dto.filter.MergedUrls;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.*;
@@ -794,7 +797,7 @@ public class InventoryAction extends UserAction {
             filterList.add(Filters.nin(ApiInfo.ID_API_COLLECTION_ID, deactivatedCollections));
         }
         
-        loggerMaker.infoAndAddToDb(filterList.toString(), LogDb.DASHBOARD);
+        loggerMaker.debugAndAddToDb(filterList.toString(), LogDb.DASHBOARD);
         return Filters.and(filterList);
 
     }
@@ -853,7 +856,7 @@ public class InventoryAction extends UserAction {
 
         Bson sort = sortOrder == 1 ? Sorts.ascending(sortFields) : Sorts.descending(sortFields);
 
-        loggerMaker.infoAndAddToDb(String.format("skip: %s, limit: %s, sort: %s", skip, limit, sort), LogDb.DASHBOARD);
+        loggerMaker.debugAndAddToDb(String.format("skip: %s, limit: %s, sort: %s", skip, limit, sort), LogDb.DASHBOARD);
         if(skip < 0){
             skip *= -1;
         }
@@ -876,10 +879,10 @@ public class InventoryAction extends UserAction {
         response = new BasicDBObject();
 
         long totalParams = getTotalParams(SingleTypeInfo._URL);
-        loggerMaker.infoAndAddToDb("Total params: " + totalParams, LogDb.DASHBOARD);
+        loggerMaker.debugAndAddToDb("Total params: " + totalParams, LogDb.DASHBOARD);
 
         List<SingleTypeInfo> singleTypeInfos = getMongoResults(SingleTypeInfo._URL);
-        loggerMaker.infoAndAddToDb("STI count: " + singleTypeInfos.size(), LogDb.DASHBOARD);
+        loggerMaker.debugAndAddToDb("STI count: " + singleTypeInfos.size(), LogDb.DASHBOARD);
 
         response.put("data", new BasicDBObject("endpoints", singleTypeInfos ).append("total", totalParams));
 
@@ -1028,7 +1031,7 @@ public class InventoryAction extends UserAction {
 
         SampleData sampleData = SampleDataDao.instance.fetchSampleDataForApi(apiCollectionId, url, urlMethod);
         List<String> samples = sampleData.getSamples();
-        loggerMaker.infoAndAddToDb("Found " + samples.size() + " samples for API: " + apiCollectionId + " " + url + method, LogDb.DASHBOARD);
+        loggerMaker.debugAndAddToDb("Found " + samples.size() + " samples for API: " + apiCollectionId + " " + url + method, LogDb.DASHBOARD);
 
         Bson stiFilter = SingleTypeInfoDao.filterForSTIUsingURL(apiCollectionId, url, urlMethod);
         SingleTypeInfoDao.instance.deleteAll(stiFilter);
@@ -1039,7 +1042,7 @@ public class InventoryAction extends UserAction {
         SensitiveSampleDataDao.instance.deleteAll(sampleDataFilter);
         TrafficInfoDao.instance.deleteAll(sampleDataFilter);
 
-        loggerMaker.infoAndAddToDb("Cleanup done", LogDb.DASHBOARD);
+        loggerMaker.debugAndAddToDb("Cleanup done", LogDb.DASHBOARD);
 
         List<HttpResponseParams> responses = new ArrayList<>();
         for (String sample : samples) {
@@ -1048,7 +1051,7 @@ public class InventoryAction extends UserAction {
                 httpResponseParams.requestParams.setApiCollectionId(apiCollectionId);
                 responses.add(httpResponseParams);
             } catch (Exception e) {
-                loggerMaker.infoAndAddToDb("Error while processing sample message while de-merging : " + e.getMessage(), LogDb.DASHBOARD);
+                loggerMaker.debugAndAddToDb("Error while processing sample message while de-merging : " + e.getMessage(), LogDb.DASHBOARD);
             }
         }
 
@@ -1075,19 +1078,19 @@ public class InventoryAction extends UserAction {
             URLTemplate urlTemplate = APICatalogSync.createUrlTemplate(url, URLMethods.Method.GET);
             if (info.getHttpCallParser().apiCatalogSync.getDbState(apiCollectionId) != null) {
                 RequestTemplate requestTemplate = info.getHttpCallParser().apiCatalogSync.getDbState(apiCollectionId).getTemplateURLToMethods().get(urlTemplate);
-                loggerMaker.infoAndAddToDb("Request template exists for url " + urlTemplate.getTemplateString() + " : " + ( requestTemplate != null), LogDb.DASHBOARD);
+                loggerMaker.debugAndAddToDb("Request template exists for url " + urlTemplate.getTemplateString() + " : " + ( requestTemplate != null), LogDb.DASHBOARD);
             } else {
-                loggerMaker.infoAndAddToDb("Clean dbState for apiCollectionId: " + apiCollectionId,LogDb.DASHBOARD);
+                loggerMaker.debugAndAddToDb("Clean dbState for apiCollectionId: " + apiCollectionId,LogDb.DASHBOARD);
             }
         } catch (Exception e) {
             e.printStackTrace();
             loggerMaker.errorAndAddToDb("Error while checking requestTemplate: " + e.getMessage(), LogDb.DASHBOARD);
         }
 
-        loggerMaker.infoAndAddToDb("Processing " + responses.size() + " httpResponseParams for API: " + apiCollectionId + " " + url + method, LogDb.DASHBOARD);
+        loggerMaker.debugAndAddToDb("Processing " + responses.size() + " httpResponseParams for API: " + apiCollectionId + " " + url + method, LogDb.DASHBOARD);
 
         responses = com.akto.runtime.Main.filterBasedOnHeaders(responses, AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter()));
-        loggerMaker.infoAndAddToDb("After filter: Processing " + responses.size() + " httpResponseParams for API: " + apiCollectionId + " " + url + method, LogDb.DASHBOARD);
+        loggerMaker.debugAndAddToDb("After filter: Processing " + responses.size() + " httpResponseParams for API: " + apiCollectionId + " " + url + method, LogDb.DASHBOARD);
         try {
             info.getHttpCallParser().syncFunction(responses, true, false, accountSettings);
         } catch (Exception e) {
@@ -1097,6 +1100,39 @@ public class InventoryAction extends UserAction {
 
         return SUCCESS.toUpperCase();
     }
+
+    Map<ApiInfoKey, Map<String, Integer>> severityMapForCollection;
+
+    public String getSeveritiesCountPerCollection(){
+        if(apiCollectionId == -1){
+            return ERROR.toUpperCase();
+        }
+
+        if(deactivatedCollections.contains(apiCollectionId)){
+            return SUCCESS.toUpperCase();
+        }
+        
+        Bson filter = Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionId);   
+        this.severityMapForCollection = TestingRunIssuesDao.instance.getSeveritiesMapForApiInfoKeys(filter, false);
+        return SUCCESS.toUpperCase();
+    }
+
+    private String description;
+    public String saveEndpointDescription() {
+        if(description == null || description.isEmpty()) {
+            addActionError("No description provided");
+            return Action.ERROR.toUpperCase();
+        }
+
+        ApiInfoDao.instance.updateOneNoUpsert(Filters.and(
+                Filters.eq(ApiInfo.ID_API_COLLECTION_ID, apiCollectionId),
+                Filters.eq(ApiInfo.ID_METHOD, method),
+                Filters.eq(ApiInfo.ID_URL, url)
+        ), Updates.set(ApiInfo.DESCRIPTION, description));
+
+        return SUCCESS.toUpperCase();
+    }
+
 
     public String getSortKey() {
         return this.sortKey;
@@ -1227,5 +1263,17 @@ public class InventoryAction extends UserAction {
 
     public void setSearchString(String searchString) {
         this.searchString = searchString;
+    }
+
+    public Map<ApiInfoKey, Map<String, Integer>> getSeverityMapForCollection() {
+        return severityMapForCollection;
+    }
+    
+    public String getDescription() {
+        return description;
+    }
+
+    public void setDescription(String description) {
+        this.description = description;
     }
 }

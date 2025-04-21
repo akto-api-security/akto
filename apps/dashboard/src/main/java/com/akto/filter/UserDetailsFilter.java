@@ -151,7 +151,7 @@ public class UserDetailsFilter implements Filter {
             Token token = AccessTokenAction.generateAccessTokenFromServletRequest(httpServletRequest);
             if (token == null) {
                 Cookie cookie = AccessTokenAction.generateDeleteCookie();
-                logger.info("resetting refresh token cookie");
+                logger.debug("resetting refresh token cookie");
                 httpServletResponse.addCookie(cookie);
                 if (accessTokenFromRequest != null) {
                     httpServletResponse.sendError(403);
@@ -173,7 +173,7 @@ public class UserDetailsFilter implements Filter {
 
         // session will be non-null for external API Key requests and when session data has not been deleted
         if (session == null ) {
-            logger.info("Session expired");
+            logger.debug("Session expired");
             Token tempToken = AccessTokenAction.generateAccessTokenFromServletRequest(httpServletRequest);
             // If we are able to extract token from Refresh Token then this means RT is valid and new session can be created
             if (tempToken== null) {
@@ -184,7 +184,7 @@ public class UserDetailsFilter implements Filter {
             session.setAttribute("username", username);
             session.setAttribute("login", Context.now());
             session.setAttribute("signedUp", signedUp);
-            logger.info("New session created");
+            logger.debug("New session created");
         }
 
         // only for access-token based auth we check if session is valid or not
@@ -212,7 +212,7 @@ public class UserDetailsFilter implements Filter {
                         return ;
                     }
                 }else{
-                    //logger.info("Logout object not found");
+                    //logger.debug("Logout object not found");
                 }
             } catch (Exception ignored) {
                 redirectIfNotLoginURI(filterChain, httpServletRequest, httpServletResponse);
@@ -286,7 +286,7 @@ public class UserDetailsFilter implements Filter {
                 if (accountId > 0) {
                     if(user.getAccounts().containsKey(accountIdStr)) {
                         Context.accountId.set(accountId);
-                        //logger.info("choosing account: " + accountIdStr);
+                        //logger.debug("choosing account: " + accountIdStr);
                     } else {
 
                         accountIdStr = user.findAnyAccountId();

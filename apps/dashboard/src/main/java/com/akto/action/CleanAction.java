@@ -50,11 +50,11 @@ public class CleanAction extends UserAction {
                     Projections.include("_id"));
 
             if(apiInfos == null) {
-                loggerMaker.infoAndAddToDb("No API Info found for API Collection Id: " + apiCollectionId);
+                loggerMaker.debugAndAddToDb("No API Info found for API Collection Id: " + apiCollectionId);
                 continue;
             }
 
-            loggerMaker.infoAndAddToDb("Checking ApiInfos count: " + apiInfos.size());
+            loggerMaker.debugAndAddToDb("Checking ApiInfos count: " + apiInfos.size());
             List<ApiInfoKey> filters = new ArrayList<>();
             for (ApiInfo apiInfo : apiInfos) {
                 ApiInfoKey key = apiInfo.getId();
@@ -70,12 +70,12 @@ public class CleanAction extends UserAction {
                 deleteFilters.addAll(checkSTIs(filters, runActually));
             }
         }
-        loggerMaker.infoAndAddToDb("Total API Info to delete: " + deleteFilters.size());
+        loggerMaker.debugAndAddToDb("Total API Info to delete: " + deleteFilters.size());
 
         if (runActually && deleteFilters.size() > 0) {
-            loggerMaker.infoAndAddToDb("deleteExtraApiInfo Actually deleting : " + deleteFilters.size());
+            loggerMaker.debugAndAddToDb("deleteExtraApiInfo Actually deleting : " + deleteFilters.size());
             DeleteResult res = ApiInfoDao.instance.deleteAll(Filters.or(deleteFilters));
-            loggerMaker.infoAndAddToDb("deleteExtraApiInfo Actually deleted : " + res.getDeletedCount());
+            loggerMaker.debugAndAddToDb("deleteExtraApiInfo Actually deleted : " + res.getDeletedCount());
         }
         
     });
@@ -100,7 +100,7 @@ public class CleanAction extends UserAction {
             if(stiSet.contains(key)) {
                 continue;
             }
-            loggerMaker.infoAndAddToDb("STI not found for STI: " + key.toString());
+            loggerMaker.debugAndAddToDb("STI not found for STI: " + key.toString());
             if (runActually) {
                 deleteFilters.add(ApiInfoDao.getFilter(key));
             }
@@ -127,7 +127,7 @@ public class CleanAction extends UserAction {
 
                 if (urls != null && !urls.isEmpty()) {
 
-                    loggerMaker.infoAndAddToDb("deleteNonHostSTIs STIs with host found: " + urls.size());
+                    loggerMaker.debugAndAddToDb("deleteNonHostSTIs STIs with host found: " + urls.size());
                     List<Bson> filters = new ArrayList<>();
                     for (SingleTypeInfo url : urls) {
                         filters.add(SingleTypeInfoDao.filterForSTIUsingURL(url.getApiCollectionId(), url.getUrl(),
@@ -140,7 +140,7 @@ public class CleanAction extends UserAction {
 
                     long count = SingleTypeInfoDao.instance.count(filter);
 
-                    loggerMaker.infoAndAddToDb("deleteNonHostSTIs STIs for deletion found: " + count);
+                    loggerMaker.debugAndAddToDb("deleteNonHostSTIs STIs for deletion found: " + count);
 
                     if (runActually) {
 
@@ -154,7 +154,7 @@ public class CleanAction extends UserAction {
                                 if (batchFilter.size() >= 50) {
                                     UpdateResult res = SingleTypeInfoDao.instance.updateMany(Filters.or(batchFilter),
                                             Updates.set(TEMP_RETAIN, true));
-                                    loggerMaker.infoAndAddToDb("deleteNonHostSTIs temp retain initial update: matched: "
+                                    loggerMaker.debugAndAddToDb("deleteNonHostSTIs temp retain initial update: matched: "
                                             + res.getMatchedCount() + " modified: " + res.getModifiedCount());
                                     batchFilter.clear();
                                 }
@@ -162,7 +162,7 @@ public class CleanAction extends UserAction {
                             if (batchFilter.size() > 0) {
                                 UpdateResult res = SingleTypeInfoDao.instance.updateMany(Filters.or(batchFilter),
                                         Updates.set(TEMP_RETAIN, true));
-                                loggerMaker.infoAndAddToDb("deleteNonHostSTIs temp retain initial update: matched: "
+                                loggerMaker.debugAndAddToDb("deleteNonHostSTIs temp retain initial update: matched: "
                                         + res.getMatchedCount() + " modified: " + res.getModifiedCount());
                                 batchFilter.clear();
                             }
@@ -176,10 +176,10 @@ public class CleanAction extends UserAction {
                             if (countVerify == count) {
 
                                 DeleteResult res = SingleTypeInfoDao.instance.deleteAll(deleteFilter);
-                                loggerMaker.infoAndAddToDb("deleteNonHostSTIs deleted STIs: " + res.getDeletedCount());
+                                loggerMaker.debugAndAddToDb("deleteNonHostSTIs deleted STIs: " + res.getDeletedCount());
 
                             } else {
-                                loggerMaker.infoAndAddToDb("deleteNonHostSTIs delete count mismatch: " + count
+                                loggerMaker.debugAndAddToDb("deleteNonHostSTIs delete count mismatch: " + count
                                         + " deleteCount: " + countVerify);
                             }
                         } catch (Exception e) {
@@ -200,7 +200,7 @@ public class CleanAction extends UserAction {
 
             UpdateResult res = SingleTypeInfoDao.instance.updateMany(updateFilter,
                     Updates.unset(TEMP_RETAIN));
-            loggerMaker.infoAndAddToDb("unsetTemp temp retain undo update: matched: "
+            loggerMaker.debugAndAddToDb("unsetTemp temp retain undo update: matched: "
                     + res.getMatchedCount() + " modified: " + res.getModifiedCount());
         }
         return Action.SUCCESS.toUpperCase();

@@ -7,6 +7,7 @@ import com.akto.dao.SignupDao;
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.UsersDao;
 import com.akto.dao.context.Context;
+import com.akto.dao.testing.DefaultTestSuitesDao;
 import com.akto.dto.BackwardCompatibility;
 import com.akto.dto.Config;
 import com.akto.dto.SignupInfo;
@@ -74,7 +75,7 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
     BasicDBObject loginResult = new BasicDBObject();
     @Override
     public String execute() throws IOException {
-        logger.info("LoginAction Hit");
+        logger.debug("LoginAction Hit");
 
         if (username == null) {
             return Action.ERROR.toUpperCase();
@@ -107,7 +108,7 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
                 }
             }
 
-            logger.info("Auth Failed");
+            logger.debug("Auth Failed");
             return "ERROR";
         }
         String result = loginUser(user, servletResponse, true, servletRequest);
@@ -129,7 +130,7 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
         for (String accountIdStr: user.getAccounts().keySet()) {
             int accountId = Integer.parseInt(accountIdStr);
             Context.accountId.set(accountId);
-            logger.info("updating vulnerable api's collection for account " + accountId);
+            logger.debug("updating vulnerable api's collection for account " + accountId);
             try {
                 BackwardCompatibility backwardCompatibility = BackwardCompatibilityDao.instance.findOne(new BasicDBObject());
                 if (backwardCompatibility == null || backwardCompatibility.getVulnerableApiUpdationVersionV1() == 0) {
@@ -149,10 +150,10 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
         Context.accountId.set(accountId);
         long count = SingleTypeInfoDao.instance.getEstimatedCount();
         if(count == 0){
-            logger.info("New user, showing quick start page");
+            logger.debug("New user, showing quick start page");
             loginResult.put("redirect", "dashboard/quick-start");
         } else {
-            logger.info("Existing user, not redirecting to quick start page");
+            logger.debug("Existing user, not redirecting to quick start page");
         }
     }
 
@@ -207,10 +208,45 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
                         ),
                         new FindOneAndUpdateOptions().returnDocument(ReturnDocument.BEFORE)
                 );
+
+                if(tempUser == null) {
+                    return Action.ERROR.toUpperCase();
+                }
+
                 /*
                  * Creating datatype to template on user login.
                  * TODO: Remove this job once templates for majority users are created.
                  */
+
+                // update default test suites list on login instead of initializing
+                try {
+                    // need this loop for default insertion of test suites upon login
+                    Map<Integer, Boolean> accountToIsFirstTimeMap = new HashMap<>();
+                    for(String accountIdStr : user.getAccounts().keySet()) {
+                        int accountId = Integer.parseInt(accountIdStr);
+                        Context.accountId.set(accountId);
+                        int count = (int) DefaultTestSuitesDao.instance.estimatedDocumentCount();
+                        if (count == 0) {
+                            accountToIsFirstTimeMap.put(accountId, true);
+                        }
+                    }
+                    if(!accountToIsFirstTimeMap.isEmpty() || (tempUser.getLastLoginTs() + REFRESH_INTERVAL) < Context.now()){
+                        service.submit(() -> {
+                            try {
+                                for(String accountIdStr : user.getAccounts().keySet()) {
+                                    int accountId = Integer.parseInt(accountIdStr);
+                                    Context.accountId.set(accountId);
+                                    DefaultTestSuitesDao.insertDefaultTestSuites(accountToIsFirstTimeMap.getOrDefault(accountId, false));
+                                }
+                            } catch (Exception e) {
+                                e.printStackTrace();
+                            }
+                        });
+                    }
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+
                 if ((tempUser.getLastLoginTs() + REFRESH_INTERVAL) < Context.now()) {
                     service.submit(() -> {
                         try {
@@ -218,7 +254,7 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
                                 int accountId = Integer.parseInt(accountIdStr);
                                 Context.accountId.set(accountId);
                                 SingleTypeInfo.fetchCustomDataTypes(accountId);
-                                logger.info("updating data type test templates for account " + accountId);
+                                logger.debug("updating data type test templates for account " + accountId);
                                 InitializerListener.executeDataTypeToTemplate();
                             }
                         } catch (Exception e) {
@@ -273,7 +309,7 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
         User user = UsersDao.instance.findOne(filters);
 
         if(user == null) {
-            logger.info("user not found while sending password reset link");
+            logger.debug("user not found while sending password reset link");
             return Action.SUCCESS.toUpperCase();
         }
 

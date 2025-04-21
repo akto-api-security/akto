@@ -16,9 +16,8 @@ import org.apache.kafka.clients.admin.ListTopicsResult;
 import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.clients.admin.TopicDescription;
 import org.bson.types.ObjectId;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
+import com.akto.dao.context.Context;
 import com.akto.dto.billing.SyncLimit;
 import com.akto.dto.testing.TestingRun;
 import com.akto.dto.testing.info.SingleTestPayload;
@@ -30,11 +29,21 @@ public class Producer {
 
     private static final LoggerMaker logger = new LoggerMaker(Producer.class, LogDb.TESTING);
 
-    public static final Kafka producer = Constants.IS_NEW_TESTING_ENABLED ?  new Kafka(Constants.LOCAL_KAFKA_BROKER_URL, Constants.LINGER_MS_KAFKA, 100, Constants.MAX_REQUEST_TIMEOUT) : null;
-    public static Void pushMessagesToKafka(List<SingleTestPayload> messages, AtomicInteger totalRecords){
+    public static final Kafka producer = Constants.IS_NEW_TESTING_ENABLED ?  new Kafka(Constants.LOCAL_KAFKA_BROKER_URL, Constants.LINGER_MS_KAFKA, 100, Constants.MAX_REQUEST_TIMEOUT, 3) : null;
+    public static Void pushMessagesToKafka(List<SingleTestPayload> messages, AtomicInteger totalRecords, AtomicInteger throttleNumber){
         for(SingleTestPayload singleTestPayload: messages){
             String messageString = singleTestPayload.toString();
-            producer.send(messageString, Constants.TEST_RESULTS_TOPIC_NAME, totalRecords);
+            try {
+                int waitStart = Context.now();
+                while (throttleNumber.get() > 500 && (Context.now() - waitStart) < Constants.MAX_WAIT_FOR_SLEEP) {
+                    Thread.sleep(2000);
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+            totalRecords.incrementAndGet();
+            throttleNumber.incrementAndGet();
+            producer.sendWithCounter(messageString, Constants.TEST_RESULTS_TOPIC_NAME, throttleNumber);
         }
         return null;
     }
@@ -51,7 +60,7 @@ public class Producer {
             } catch (Exception e) {
                 retries++;
                 long backoff = (long) (baseBackoff * Math.pow(2, retries));
-                logger.info("Attempt {} to delete topic '{}' failed: {}. Retrying in {}ms...", retries, topicName, e.getMessage(), backoff);
+                logger.debug("Attempt {} to delete topic '{}' failed: {}. Retrying in {}ms...", retries, topicName, e.getMessage(), backoff);
     
                 try {
                     Thread.sleep(backoff);
@@ -101,11 +110,11 @@ public class Producer {
         try (AdminClient adminClient = AdminClient.create(adminProps)) {
             ListTopicsResult listTopicsResult = adminClient.listTopics();
             if (!listTopicsResult.names().get().contains(topicName)) {
-                logger.info("Topic \"" + topicName + "\" does not exist.");
+                logger.debug("Topic \"" + topicName + "\" does not exist.");
                 return;
             }
             DeleteTopicsResult deleteTopicsResult = adminClient.deleteTopics(Collections.singletonList(topicName));
-            logger.info("Topic \"" + topicName + "\" deletion initiated.");
+            logger.debug("Topic \"" + topicName + "\" deletion initiated.");
             deleteTopicsResult.all().get();
 
             int retries = 0;
@@ -118,11 +127,11 @@ public class Producer {
 
                 Set<String> topics = adminClient.listTopics().names().get();
                 if (!topics.contains(topicName)) {
-                    logger.info("Confirmed topic \"" + topicName + "\" is deleted on retry attempt: " + retries);
+                    logger.debug("Confirmed topic \"" + topicName + "\" is deleted on retry attempt: " + retries);
                     return;
                 }
 
-                logger.info("Waiting for topic \"" + topicName + "\" to be fully deleted... retry attempt: " + retries);
+                logger.debug("Waiting for topic \"" + topicName + "\" to be fully deleted... retry attempt: " + retries);
             }
 
             throw new RuntimeException("Topic deletion not confirmed after retries.");
@@ -136,7 +145,7 @@ public class Producer {
 
         try (AdminClient adminClient = AdminClient.create(adminProps)) {
             NewTopic newTopic = new NewTopic(topicName, 1, (short) 1); 
-            logger.info("Topic \"" + topicName + "\" creation initiated.");
+            logger.debug("Topic \"" + topicName + "\" creation initiated.");
             adminClient.createTopics(Collections.singletonList(newTopic)).all().get();
 
             int retries = 0;
@@ -151,14 +160,14 @@ public class Producer {
                     TopicDescription description = adminClient.describeTopics(Collections.singletonList(topicName)).all().get().get(topicName);
                     boolean allHaveLeaders = description.partitions().stream().allMatch(p -> p.leader() != null);
                     if (allHaveLeaders) {
-                        logger.info("Confirmed topic \"" + topicName + "\" has leader assigned on retry attempt: " + retries);
+                        logger.debug("Confirmed topic \"" + topicName + "\" has leader assigned on retry attempt: " + retries);
                         return;
                     }
                 } catch (Exception e) {
                     logger.warn("Retry {}: Topic metadata not ready yet - {}", retries, e.getMessage());
                 }
 
-                logger.info("Waiting for topic \"" + topicName + "\" to be fully created with leader on retry attempt: " + retries);
+                logger.debug("Waiting for topic \"" + topicName + "\" to be fully created with leader on retry attempt: " + retries);
             }
 
             throw new RuntimeException("Topic creation not confirmed after retries.");

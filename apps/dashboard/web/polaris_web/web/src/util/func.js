@@ -1,7 +1,7 @@
 import {
   CalendarMinor,ClockMinor,CircleAlertMajor,DynamicSourceMinor,DynamicSourceMajor, LockMinor, KeyMajor, ProfileMinor, PasskeyMinor,
   EmailMajor, CreditCardMajor, IdentityCardMajor, LocationsMinor,PhoneMajor, FileMinor, ImageMajor, BankMajor, HashtagMinor, 
-  ReceiptMajor, MobileMajor, CalendarTimeMinor, LocationMajor,  IdentityCardFilledMajor, CalendarMajor, PageMajor, AffiliateMajor
+  ReceiptMajor, MobileMajor, CalendarTimeMinor, LocationMajor,  IdentityCardFilledMajor, CalendarMajor, AffiliateMajor
 } from '@shopify/polaris-icons';
 import { saveAs } from 'file-saver'
 import inventoryApi from "../apps/dashboard/pages/observe/api"
@@ -14,6 +14,8 @@ import PersistStore from '../apps/main/PersistStore';
 
 import { circle_cancel, circle_tick_minor } from "@/apps/dashboard/components/icons";
 import quickStartFunc from '../apps/dashboard/pages/quick_start/transform';
+import { Box } from '@shopify/polaris';
+import TooltipText from '../apps/dashboard/components/shared/TooltipText';
 
 const iconsUsedMap = {
   CalendarMinor,ClockMinor,CircleAlertMajor,DynamicSourceMinor, LockMinor, KeyMajor, ProfileMinor, PasskeyMinor,
@@ -400,31 +402,6 @@ prettifyEpoch(epoch) {
   epochToDateTime(timestamp) {
     var date = new Date(timestamp * 1000);
     return date.toLocaleString('en-US',{timeZone: window.TIME_ZONE === 'Us/Pacific' ? 'America/Los_Angeles' : window.TIME_ZONE});
-  },
-  convertEpochToTimezoneEpoch(epochSeconds) {
-    if(epochSeconds == null) return epochSeconds
-    const targetTimeZone = window.TIME_ZONE === 'Us/Pacific' ? 'America/Los_Angeles' : window.TIME_ZONE
-    const date = new Date(epochSeconds * 1000)
-    
-    const formatter = new Intl.DateTimeFormat('en-US', {
-      timeZone: targetTimeZone,
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: false
-    })
-  
-    const parts = formatter.formatToParts(date).reduce((acc, part) => {
-      acc[part.type] = part.value
-      return acc
-    }, {})
-  
-    const localDateStr = `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}:${parts.second}`
-    const zonedDate = new Date(`${localDateStr}Z`)
-    return Math.floor(zonedDate.getTime() / 1000)
   },
   getFormattedDate(epoch) {
     const date = new Date(epoch * 1000)
@@ -937,7 +914,7 @@ parameterizeUrl(x) {
   });
   return newStr
 },
-mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName) {
+mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName,apiInfoSeverityMap) {
   const allCollections = PersistStore.getState().allCollections
   const apiGroupsMap = func.mapCollectionIdToName(allCollections.filter(x => x.type === "API_GROUP"))
 
@@ -953,7 +930,6 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName) {
           apiInfoMap[x["id"]["apiCollectionId"] + "-" + x["id"]["url"] + "-" + x["id"]["method"]] = x
       })
   }
-
   listEndpoints.forEach(x => {
       let key = x.apiCollectionId + "-" + x.url + "-" + x.method
       if (!ret[key]) {
@@ -978,6 +954,7 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName) {
           let riskScore = apiInfoMap[key] ? apiInfoMap[key]?.riskScore : 0
           let responseCodesArr = apiInfoMap[key] ? apiInfoMap[key]?.responseCodes : [] 
           let discoveredTimestamp = apiInfoMap[key] ? (apiInfoMap[key].discoveredTimestamp || apiInfoMap[key].startTs) : 0
+          let description = apiInfoMap[key] ? apiInfoMap[key]['description'] : ""
 
           ret[key] = {
               id: x.method + "###" + x.url + "###" + x.apiCollectionId + "###" + Math.random(),
@@ -1011,13 +988,25 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName) {
               sensitiveInReq: [...this.convertSensitiveTags(x.sensitiveInReq)],
               sensitiveInResp: [...this.convertSensitiveTags(x.sensitiveInResp)],
               responseCodes: responseCodesArr,
-              sources: apiInfoMap[key]?apiInfoMap[key]['sources']:{}
+              ...(apiInfoSeverityMap?.hasOwnProperty(key) ? { severityObj: apiInfoSeverityMap[key] } : {}),
+              sources: apiInfoMap[key]?apiInfoMap[key]['sources']:{},
+              description: description,
+              descriptionComp: (<Box maxWidth="300px"><TooltipText tooltip={description} text={description}/></Box>),
           }
 
       }
   })
-  
   return Object.values(ret) 
+},
+getSeverityCountPerEndpointList(apiInfoSeverityMap){
+  if(!apiInfoSeverityMap) return {}
+  let apiInfoIdSeverityMap = {}
+  Object.entries(apiInfoSeverityMap).forEach(([key, value]) => {
+    let keyId = key.split(" ").join("-");
+    apiInfoIdSeverityMap[keyId] = value;
+
+  });
+  return apiInfoIdSeverityMap;
 },
 
 convertSensitiveTags(subTypeList) {

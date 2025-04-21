@@ -31,13 +31,13 @@ public class OtpAction extends UserAction {
     private String text;
     @Override
     public String execute() {
-        logger.infoAndAddToDb(text, LogDb.DASHBOARD);
+        logger.debugAndAddToDb(text, LogDb.DASHBOARD);
         if (text == null || !text.contains("OTP")) {
-            logger.infoAndAddToDb("But doesn't contain the word 'OTP' ", LogDb.DASHBOARD);
+            logger.debugAndAddToDb("But doesn't contain the word 'OTP' ", LogDb.DASHBOARD);
             return SUCCESS.toUpperCase();
         }
 
-        logger.infoAndAddToDb("And contains OTP", LogDb.DASHBOARD);
+        logger.debugAndAddToDb("And contains OTP", LogDb.DASHBOARD);
         OTPMessage otpMessage = new OTPMessage(Context.now(), from, text, Context.now());
         OtpMessagesDao.instance.insertOne(otpMessage);
         return SUCCESS.toUpperCase();
@@ -53,7 +53,7 @@ public class OtpAction extends UserAction {
         if (val == null || val.isEmpty()) return ERROR.toUpperCase();
 
         otp = val;
-        logger.infoAndAddToDb("found otp: " + otp, LogDb.DASHBOARD);
+        logger.debugAndAddToDb("found otp: " + otp, LogDb.DASHBOARD);
 
         return SUCCESS.toUpperCase();
     }
@@ -74,15 +74,15 @@ public class OtpAction extends UserAction {
 
     private Integer latestMessageId = null;
     public String fetchLatestMessageId() {
-        logger.infoAndAddToDb(apiKey, LogDb.DASHBOARD);
-        logger.infoAndAddToDb(authToken, LogDb.DASHBOARD);
-        logger.infoAndAddToDb(address, LogDb.DASHBOARD);
+        logger.debugAndAddToDb(apiKey, LogDb.DASHBOARD);
+        logger.debugAndAddToDb(authToken, LogDb.DASHBOARD);
+        logger.debugAndAddToDb(address, LogDb.DASHBOARD);
         BasicDBObject result;
         try {
             result = makeRequestToMySms();
-            logger.info("****");
-            logger.info(String.valueOf(result));
-            logger.info("****");
+            logger.debug("****");
+            logger.debug(String.valueOf(result));
+            logger.debug("****");
 
             List<Map> messages = (List<Map>) result.get("messages");
             if (messages.size() == 0) return SUCCESS.toUpperCase();
@@ -100,9 +100,9 @@ public class OtpAction extends UserAction {
         try {
             BasicDBObject result = makeRequestToMySms();
 
-            logger.info("((((");
-            logger.info(String.valueOf(result));
-            logger.info("((((");
+            logger.debug("((((");
+            logger.debug(String.valueOf(result));
+            logger.debug("((((");
 
             List<Map> messages = (List<Map>) result.get("messages");
 
@@ -115,7 +115,7 @@ public class OtpAction extends UserAction {
             if (val == null || val.isEmpty()) return ERROR.toUpperCase();
 
             otp = val;
-            logger.infoAndAddToDb("found otp: " + otp, LogDb.DASHBOARD);
+            logger.debugAndAddToDb("found otp: " + otp, LogDb.DASHBOARD);
 
         } catch (Exception e) {
             return ERROR.toUpperCase();
@@ -149,7 +149,7 @@ public class OtpAction extends UserAction {
             os.write(json.getBytes(StandardCharsets.UTF_8));
         }
 
-        logger.info(String.valueOf(http.getResponseCode()));
+        logger.debug(String.valueOf(http.getResponseCode()));
         InputStream inputStream = http.getInputStream();
 
 

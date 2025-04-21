@@ -11,6 +11,8 @@ import com.akto.dto.ApiInfo;
 import com.akto.dto.test_editor.Info;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.test_run_findings.TestingRunIssues;
+import com.akto.dto.testing.GenericTestResult;
+import com.akto.dto.testing.MultiExecTestResult;
 import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.TestingRunResult;
 import com.mongodb.client.model.Projections;
@@ -49,6 +51,7 @@ import okhttp3.RequestBody;
 import okhttp3.Response;
 
 import static com.akto.utils.Utils.createRequestFile;
+import static com.akto.utils.Utils.getTestResultFromTestingRunResult;
 
 public class JiraIntegrationAction extends UserAction {
 
@@ -143,7 +146,7 @@ public class JiraIntegrationAction extends UserAction {
                     if (!inputProjectIds.contains(key)) {
                         continue;
                     }
-                    loggerMaker.infoAndAddToDb("evaluating issuetype for project key " + key + ", project json obj " + obj, LoggerMaker.LogDb.DASHBOARD);
+                    loggerMaker.debugAndAddToDb("evaluating issuetype for project key " + key + ", project json obj " + obj, LoggerMaker.LogDb.DASHBOARD);
                     BasicDBList issueTypes = (BasicDBList) obj.get("issuetypes");
                     List<BasicDBObject> issueIdPairs = getIssueTypesWithIds(issueTypes);
                     this.projectAndIssueMap.put(key, issueIdPairs);
@@ -287,8 +290,6 @@ public class JiraIntegrationAction extends UserAction {
 
     public String attachFileToIssue() {
 
-        String origCurl, testCurl;
-
         try {
             jiraIntegration = JiraIntegrationDao.instance.findOne(new BasicDBObject());
             String url = jiraIntegration.getBaseUrl() + CREATE_ISSUE_ENDPOINT + "/" + issueId + ATTACH_FILE_ENDPOINT;
@@ -419,7 +420,7 @@ public class JiraIntegrationAction extends UserAction {
             TestingRunResult testingRunResult = TestingRunResultDao.instance.findOne(Filters.and(
                     Filters.in(TestingRunResult.TEST_SUB_TYPE, testingIssuesId.getTestSubCategory()),
                     Filters.in(TestingRunResult.API_INFO_KEY, testingIssuesId.getApiInfoKey())
-            ), Projections.include("_id", TestingRunResult.TEST_RESULTS));
+            ));
 
             if(testingRunResult == null) {
                 loggerMaker.errorAndAddToDb("Error: Testing Run Result not found", LogDb.DASHBOARD);
@@ -496,6 +497,7 @@ public class JiraIntegrationAction extends UserAction {
                                 + request.getBody() + " ,response body " + response.getBody() + " ,response status " + response.getStatusCode(),
                         LoggerMaker.LogDb.DASHBOARD);
 
+                // TODO: This is a duplicated function remove it.
                 if (responsePayload != null) {
                     try {
                         BasicDBObject obj = BasicDBObject.parse(responsePayload);
@@ -537,10 +539,15 @@ public class JiraIntegrationAction extends UserAction {
                     BasicDBObject issue = issues.get(i);
                     TestingRunResult testingRunResult = testingRunResultList.get(i);
                     String issueKey = issue.getString("key");
-                    TestResult genericTestResult = (TestResult) testingRunResult.getTestResults().get(testingRunResult.getTestResults().size() - 1);
+                    TestResult testResult = getTestResultFromTestingRunResult(testingRunResult);
+
                     setIssueId(issueKey);
-                    setOrigReq(genericTestResult.getOriginalMessage());
-                    setTestReq(genericTestResult.getMessage());
+                    if(testResult != null) {
+                        setOrigReq(testResult.getOriginalMessage());
+                        setTestReq(testResult.getMessage());
+                    } else {
+                        loggerMaker.errorAndAddToDb("TestResult obj not found.", LoggerMaker.LogDb.DASHBOARD);
+                    }
                     String status = attachFileToIssue();
                     if (status.equals(ERROR.toUpperCase())) {
                         return ERROR.toUpperCase();

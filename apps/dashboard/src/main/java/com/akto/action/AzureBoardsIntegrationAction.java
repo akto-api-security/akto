@@ -12,6 +12,8 @@ import com.akto.dto.test_editor.Info;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
+import com.akto.dto.testing.GenericTestResult;
+import com.akto.dto.testing.MultiExecTestResult;
 import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.log.LoggerMaker;
@@ -36,6 +38,7 @@ import java.nio.file.Files;
 import java.util.*;
 
 import static com.akto.utils.Utils.createRequestFile;
+import static com.akto.utils.Utils.getTestResultFromTestingRunResult;
 
 public class AzureBoardsIntegrationAction extends UserAction {
 
@@ -160,6 +163,7 @@ public class AzureBoardsIntegrationAction extends UserAction {
     public String createWorkItem() {
         AzureBoardsIntegration azureBoardsIntegration = AzureBoardsIntegrationDao.instance.findOne(new BasicDBObject());
         if(azureBoardsIntegration == null) {
+            logger.errorAndAddToDb("Azure Boards Integration not found for account: " + Context.accountId.get(), LoggerMaker.LogDb.DASHBOARD);
             addActionError("Azure Boards Integration is not integrated.");
             return Action.ERROR.toUpperCase();
         }
@@ -167,31 +171,47 @@ public class AzureBoardsIntegrationAction extends UserAction {
         TestingRunResult testingRunResult = TestingRunResultDao.instance.findOne(Filters.and(
                 Filters.in(TestingRunResult.TEST_SUB_TYPE, testingIssuesId.getTestSubCategory()),
                 Filters.in(TestingRunResult.API_INFO_KEY, testingIssuesId.getApiInfoKey())
-        ), Projections.include(Constants.ID, TestingRunResult.API_INFO_KEY, TestingRunResult.TEST_SUB_TYPE, TestingRunResult.TEST_SUPER_TYPE, TestingRunResult.TEST_RESULTS));
+        ));
+
+        logger.infoAndAddToDb("Found testingRunResult for: " + testingIssuesId.getTestSubCategory(), LoggerMaker.LogDb.DASHBOARD);
 
         Info testInfo = YamlTemplateDao.instance.findOne(
                 Filters.in(Constants.ID, testingIssuesId.getTestSubCategory()),
                 Projections.include(YamlTemplate.INFO+".description", YamlTemplate.INFO+".name")
         ).getInfo();
 
+        logger.infoAndAddToDb("Found YamlTemplate info for: " + testInfo.getName(), LoggerMaker.LogDb.DASHBOARD);
+
         String testName = testInfo.getName();
         String testDescription = testInfo.getDescription();
 
-        TestResult genericTestResult = (TestResult) testingRunResult.getTestResults().get(testingRunResult.getTestResults().size() - 1);
-        String attachmentUrl = getAttachmentUrl(genericTestResult.getOriginalMessage(), genericTestResult.getMessage(), azureBoardsIntegration);
+        TestResult testResult = getTestResultFromTestingRunResult(testingRunResult);
+
+        logger.infoAndAddToDb("TestResult size for the given test: " + testingRunResult.getTestResults().size(), LoggerMaker.LogDb.DASHBOARD);
+        String attachmentUrl;
+        if(testResult != null) {
+            attachmentUrl = getAttachmentUrl(testResult.getOriginalMessage(), testResult.getMessage(), azureBoardsIntegration);
+        } else {
+            logger.errorAndAddToDb("TestResult obj not found.", LoggerMaker.LogDb.DASHBOARD);
+            attachmentUrl = null;
+        }
+        logger.infoAndAddToDb("Attachment URL: " + attachmentUrl, LoggerMaker.LogDb.DASHBOARD);
 
         BasicDBList reqPayload = new BasicDBList();
         azureBoardsPayloadCreator(testingRunResult, testName, testDescription, attachmentUrl, reqPayload);
+        logger.infoAndAddToDb("Azure board payload: " + reqPayload.toString(), LoggerMaker.LogDb.DASHBOARD);
 
         String url = azureBoardsIntegration.getBaseUrl() + "/" + azureBoardsIntegration.getOrganization() + "/" + projectName + "/_apis/wit/workitems/$" + workItemType + "?api-version=" + version;
+        logger.infoAndAddToDb("Azure board final url: " + url, LoggerMaker.LogDb.DASHBOARD);
 
         Map<String, List<String>> headers = new HashMap<>();
         headers.put("Authorization", Collections.singletonList("Basic " + azureBoardsIntegration.getPersonalAuthToken()));
         headers.put("content-type", Collections.singletonList("application/json-patch+json"));
+        logger.infoAndAddToDb("Azure board headers: " + headers.toString(), LoggerMaker.LogDb.DASHBOARD);
         OriginalHttpRequest request = new OriginalHttpRequest(url, "", "POST", reqPayload.toString(), headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, new ArrayList<>());
-            logger.errorAndAddToDb("Status and Response from the createWorkItem API: " + response.getStatusCode() + " | " + response.getBody());
+            logger.infoAndAddToDb("Status and Response from the createWorkItem API: " + response.getStatusCode() + " | " + response.getBody());
             String responsePayload = response.getBody();
             if (response.getStatusCode() > 201 || responsePayload == null) {
                 return Action.ERROR.toUpperCase();
@@ -216,6 +236,7 @@ public class AzureBoardsIntegrationAction extends UserAction {
                 );
             }
         } catch (Exception e) {
+            logger.errorAndAddToDb("Error while creating work item for azure boards: " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
             e.printStackTrace();
         }
 
@@ -252,7 +273,7 @@ public class AzureBoardsIntegrationAction extends UserAction {
         descriptionDBObject.put("value", testDescription);
         reqPayload.add(descriptionDBObject);
 
-        if(attachmentUrl != null) {
+        if(attachmentUrl != null && !attachmentUrl.isEmpty()) {
             BasicDBObject attachmentsDBObject = new BasicDBObject();
             attachmentsDBObject.put("op", AzureBoardsOperations.ADD.name().toLowerCase());
             attachmentsDBObject.put("path", "/relations/-");

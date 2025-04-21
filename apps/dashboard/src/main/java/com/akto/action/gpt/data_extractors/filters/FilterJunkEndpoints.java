@@ -55,11 +55,11 @@ public class FilterJunkEndpoints implements Filter<String>{
             if(!skipEndpoint){
                 result.add(endpoint);
             } else {
-                logger.info("skipping: " + endpoint);
+                logger.debug("skipping: " + endpoint);
             }
 
             if (result.size() > 100) {
-                logger.info("skipping remaining: " + (result.size() - 100));
+                logger.debug("skipping remaining: " + (result.size() - 100));
                 break;
             }
         }

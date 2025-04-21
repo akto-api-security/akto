@@ -98,7 +98,7 @@ public class ConsumerUtil {
         if(messagesList == null || messagesList.isEmpty()){}
         else{
             String sample = messagesList.get(messagesList.size() - 1);
-            logger.info("Running test for: " + apiInfoKey + " with subcategory: " + subCategory);
+            logger.debug("Running test for: " + apiInfoKey + " with subcategory: " + subCategory);
             TestingRunResult runResult = executor.runTestNew(apiInfoKey, singleTestPayload.getTestingRunId(), instance.getTestingUtil(), singleTestPayload.getTestingRunResultSummaryId(),testConfig , instance.getTestingRunConfig(), instance.isDebug(), singleTestPayload.getTestLogs(), sample);
             executor.insertResultsAndMakeIssues(Collections.singletonList(runResult), singleTestPayload.getTestingRunResultSummaryId());
         }
@@ -168,7 +168,7 @@ public class ConsumerUtil {
             parallelConsumer.poll(record -> {
                 String threadName = Thread.currentThread().getName();
                 String message = record.value();
-                logger.info("Thread [" + threadName + "] picked up record: " + message);
+                logger.debug("Thread [" + threadName + "] picked up record: " + message);
                 try {
                     if(!executor.isShutdown()){
                         Future<?> future = executor.submit(() -> runTestFromMessage(message));
@@ -189,35 +189,35 @@ public class ConsumerUtil {
                     }
                     
                 } finally {
-                    logger.info("Thread [" + threadName + "] finished processing record: " + message);
+                    logger.debug("Thread [" + threadName + "] finished processing record: " + message);
                 }
             });
 
             while (parallelConsumer != null) {
                 if(!GetRunningTestsStatus.getRunningTests().isTestRunning(summaryObjectId, true)){
-                    logger.info("Tests have been marked stopped.");
+                    logger.debug("Tests have been marked stopped.");
                     executor.shutdownNow();
                     break;
                 }
                 else if ((Context.now() - startTime > maxRunTimeInSeconds)) {
-                    logger.info("Max run time reached. Stopping consumer.");
+                    logger.debug("Max run time reached. Stopping consumer.");
                     executor.shutdownNow();
                     break;
                 }else if(firstRecordRead.get() && parallelConsumer.workRemaining() == 0){
                     int timeConsumed = Context.now() - startTime;
-                    int timeLeft = maxRunTimeInSeconds - timeConsumed;
-                    logger.info("Records are empty now, thus executing final tests");
+                    int timeLeft = Math.min(Math.abs(maxRunTimeInSeconds - timeConsumed), maxRunTimeForTests);
+                    logger.debug("Records are empty now, thus executing final tests");
                     executor.shutdown();
-                    executor.awaitTermination(Math.abs(timeLeft), TimeUnit.SECONDS);
+                    executor.awaitTermination(timeLeft, TimeUnit.SECONDS);
                     break;
                 }
                 Thread.sleep(100);
             }
 
         } catch (Exception e) {
-            logger.info("Error in polling records");
+            logger.debug("Error in polling records");
         }finally{
-            logger.info("Closing consumer as all results have been executed.");
+            logger.debug("Closing consumer as all results have been executed.");
             parallelConsumer.closeDrainFirst();
             parallelConsumer = null;
             consumer.close();

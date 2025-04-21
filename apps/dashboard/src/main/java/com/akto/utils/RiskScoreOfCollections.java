@@ -95,7 +95,7 @@ public class RiskScoreOfCollections {
             return new HashMap<>();
         }
 
-        loggerMaker.infoAndAddToDb("Updating severity score for " + updatedApiInfoKeys.size() + " apis at timestamp " + Context.now() , LogDb.DASHBOARD);
+        loggerMaker.debugAndAddToDb("Updating severity score for " + updatedApiInfoKeys.size() + " apis at timestamp " + Context.now() , LogDb.DASHBOARD);
 
         Bson filterQ = Filters.and(
             Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS, "OPEN"),
