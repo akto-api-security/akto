@@ -304,7 +304,6 @@ public class SaveTestEditorAction extends UserAction {
                 testingRunPlaygroundHexId = Objects.requireNonNull(insertOne.getInsertedId()).asObjectId().getValue().toHexString();
                 return SUCCESS.toUpperCase();
             }
-            insertOne.getInsertedId();
             Bson updates = Updates.combine(
                     Updates.set(TestingRunPlayground.TEST_TEMPLATE, content),
                     Updates.set(TestingRunPlayground.STATE, State.SCHEDULED),
