@@ -58,6 +58,7 @@ public class JobsCron {
 
             Bson updateQ = Updates.combine(
                 Updates.set(Job.JOB_STATUS, JobStatus.RUNNING.name()),
+                Updates.set(Job.STARTED_AT, now),
                 Updates.set(Job.HEARTBEAT_AT, now)
             );
 
