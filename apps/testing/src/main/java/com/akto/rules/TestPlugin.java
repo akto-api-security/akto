@@ -325,8 +325,8 @@ public abstract class TestPlugin {
         return comparisonExcludedKeys;
     }
 
-    public static ValidationResult validateFilter(FilterNode filterNode, RawApi rawApi, ApiInfoKey apiInfoKey, Map<String, Object> varMap, String logId) {
-        return com.akto.testing.Utils.validateFilter(filterNode, rawApi, apiInfoKey, varMap, logId);
+    public static ValidationResult validateFilter(FilterNode filterNode, RawApi rawApi, ApiInfoKey apiInfoKey, Map<String, Object> varMap, String logId, boolean isTestingContext) {
+        return com.akto.testing.Utils.validateFilter(filterNode, rawApi, apiInfoKey, varMap, logId, isTestingContext);
     }
 
     public static boolean validateValidator(FilterNode validatorNode, RawApi rawApi, RawApi testRawApi, ApiInfoKey apiInfoKey, Map<String, Object> varMap, String logId) {
@@ -344,7 +344,7 @@ public abstract class TestPlugin {
 
     private static ValidationResult validate(FilterNode node, RawApi rawApi, RawApi testRawApi, ApiInfoKey apiInfoKey, String context, Map<String, Object> varMap, String logId) {
         Filter filter = new Filter();
-        DataOperandsFilterResponse dataOperandsFilterResponse = filter.isEndpointValid(node, rawApi, testRawApi, apiInfoKey, null, null , false,context, varMap, logId, false);
+        DataOperandsFilterResponse dataOperandsFilterResponse = filter.isEndpointValid(node, rawApi, testRawApi, apiInfoKey, null, null , false,context, varMap, logId, false, true);
         return new ValidationResult(dataOperandsFilterResponse.getResult(), dataOperandsFilterResponse.getValidationReason());
     }
 

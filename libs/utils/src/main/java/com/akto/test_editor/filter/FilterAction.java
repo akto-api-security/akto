@@ -11,6 +11,8 @@ import com.akto.dao.testing.AccessMatrixUrlToRolesDao;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.testing.AccessMatrixUrlToRole;
 
+import com.alibaba.fastjson2.JSON;
+import com.alibaba.fastjson2.JSONObject;
 import org.bson.conversions.Bson;
 
 import com.akto.dao.ApiInfoDao;
@@ -338,11 +340,14 @@ public final class FilterAction {
 
         String origPayload = payload;
         BasicDBObject payloadObj = new BasicDBObject();
-        try {
-            payload = Utils.jsonifyIfArray(payload);
-            payloadObj =  BasicDBObject.parse(payload);
-        } catch(Exception e) {
-            // add log
+        if (!(filterActionRequest.getOperand().equals(TestEditorEnums.DataOperands.REGEX.toString()))) {
+            try {
+                payload = Utils.jsonifyIfArray(payload);
+                JSONObject jsonObj = JSON.parseObject(payload);
+                payloadObj = new BasicDBObject(jsonObj);
+            } catch(Exception e) {
+                // add log
+            }
         }
 
         Set<String> matchingKeySet = new HashSet<>();

@@ -106,7 +106,7 @@ public class YamlTestTemplate extends SecurityTestTemplate {
                 return validationResult;
             }
         }
-        ValidationResult isValid = TestPlugin.validateFilter(this.getFilterNode(),this.getRawApi(), this.getApiInfoKey(), this.varMap, this.logId);
+        ValidationResult isValid = TestPlugin.validateFilter(this.getFilterNode(),this.getRawApi(), this.getApiInfoKey(), this.varMap, this.logId, true);
         // loggerMaker.debugAndAddToDb("filter status " + isValid + " " + logId, LogDb.TESTING);
         return isValid;
     }

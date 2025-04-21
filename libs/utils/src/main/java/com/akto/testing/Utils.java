@@ -358,15 +358,15 @@ public class Utils {
 
     }
 
-    public static ValidationResult validateFilter(FilterNode filterNode, RawApi rawApi, ApiInfoKey apiInfoKey, Map<String, Object> varMap, String logId) {
+    public static ValidationResult validateFilter(FilterNode filterNode, RawApi rawApi, ApiInfoKey apiInfoKey, Map<String, Object> varMap, String logId, boolean isTestingContext) {
         if (filterNode == null) return new ValidationResult(true, "");
         if (rawApi == null) return  new ValidationResult(true, "raw api is null");
-        return validate(filterNode, rawApi, null, apiInfoKey,"filter", varMap, logId);
+        return validate(filterNode, rawApi, null, apiInfoKey,"filter", varMap, logId, isTestingContext);
     }
 
-    private static ValidationResult validate(FilterNode node, RawApi rawApi, RawApi testRawApi, ApiInfoKey apiInfoKey, String context, Map<String, Object> varMap, String logId) {
+    private static ValidationResult validate(FilterNode node, RawApi rawApi, RawApi testRawApi, ApiInfoKey apiInfoKey, String context, Map<String, Object> varMap, String logId, boolean isTestingContext) {
         Filter filter = new Filter();
-        DataOperandsFilterResponse dataOperandsFilterResponse = filter.isEndpointValid(node, rawApi, testRawApi, apiInfoKey, null, null , false,context, varMap, logId, false);
+        DataOperandsFilterResponse dataOperandsFilterResponse = filter.isEndpointValid(node, rawApi, testRawApi, apiInfoKey, null, null , false,context, varMap, logId, false, isTestingContext);
         return new ValidationResult(dataOperandsFilterResponse.getResult(), dataOperandsFilterResponse.getValidationReason());
     }
 

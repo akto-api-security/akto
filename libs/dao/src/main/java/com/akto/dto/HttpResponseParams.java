@@ -8,6 +8,7 @@ import com.mongodb.BasicDBObject;
 import com.google.protobuf.TextFormat;
 
 import java.util.*;
+import java.util.function.Supplier;
 
 public class HttpResponseParams {
 
@@ -29,6 +30,7 @@ public class HttpResponseParams {
     String sourceIP;
     String destIP;
     String direction;
+    Supplier<String> originalMsg;
 
     public HttpResponseParams() {}
 
@@ -60,7 +62,7 @@ public class HttpResponseParams {
 
     public HttpResponseParams resetValues(String type, int statusCode, String status, Map<String, List<String>> headers, String payload,
                               HttpRequestParams requestParams, int time, String accountId, boolean isPending, Source source,
-                              String orig, String sourceIP, String destIP, String direction) {
+                              String orig, String sourceIP, String destIP, String direction, Supplier<String> originalMsg) {
         this.type = type;
         this.statusCode = statusCode;
         this.status = status;
@@ -75,6 +77,7 @@ public class HttpResponseParams {
         this.sourceIP = sourceIP;
         this.destIP = destIP;
         this.direction = direction;
+        this.originalMsg = originalMsg;
 
         return this;
     }
@@ -215,6 +218,14 @@ public class HttpResponseParams {
 
     public void setRequestParams(HttpRequestParams requestParams) {
         this.requestParams = requestParams;
+    }
+
+    public Supplier<String> getOriginalMsg() {
+        return originalMsg;
+    }
+
+    public void setOriginalMsg(Supplier<String> originalMsg) {
+        this.originalMsg = originalMsg;
     }
 
     public static String getSampleStringFromProtoString(String httpResponseParamProtoString){
