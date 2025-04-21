@@ -24,6 +24,7 @@ import com.akto.dto.traffic.SampleData;
 import com.akto.dto.traffic.TrafficInfo;
 import com.akto.dto.traffic_metrics.TrafficMetrics;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.log.LoggerMaker;
 import com.akto.utils.KafkaUtils;
 import com.akto.dto.type.URLMethods;
 import com.akto.dto.type.URLMethods.Method;
@@ -79,6 +80,7 @@ public class DbAction extends ActionSupport {
     List<DependencyNode> dependencyNodeList;
     TestScript testScript;
 
+    private static final LoggerMaker loggerMaker = new LoggerMaker(DbAction.class, LoggerMaker.LogDb.DASHBOARD);
     public List<BulkUpdates> getWritesForTestingRunIssues() {
         return writesForTestingRunIssues;
     }
