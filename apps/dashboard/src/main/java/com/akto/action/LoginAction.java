@@ -228,7 +228,6 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
                         int count = (int) DefaultTestSuitesDao.instance.estimatedDocumentCount();
                         if (count == 0) {
                             accountToIsFirstTimeMap.put(accountId, true);
-                            break;
                         }
                     }
                     if(!accountToIsFirstTimeMap.isEmpty() || (tempUser.getLastLoginTs() + REFRESH_INTERVAL) < Context.now()){
