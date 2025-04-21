@@ -170,7 +170,7 @@ public class ApiCollectionsAction extends UserAction {
         List<Bson> pipeLine = new ArrayList<>();
         pipeLine.add(Aggregates.project(Projections.fields(
             Projections.computed(ApiCollection.URLS_COUNT, new BasicDBObject("$size", new BasicDBObject("$ifNull", Arrays.asList("$urls", Collections.emptyList())))),
-            Projections.include(ApiCollection.ID, ApiCollection.NAME, ApiCollection.HOST_NAME, ApiCollection._TYPE, ApiCollection.USER_ENV_TYPE, ApiCollection._DEACTIVATED,ApiCollection.START_TS, ApiCollection.AUTOMATED, ApiCollection.DESCRIPTION)
+            Projections.include(ApiCollection.ID, ApiCollection.NAME, ApiCollection.HOST_NAME, ApiCollection._TYPE, ApiCollection.USER_ENV_TYPES, ApiCollection._DEACTIVATED,ApiCollection.START_TS, ApiCollection.AUTOMATED, ApiCollection.DESCRIPTION)
         )));
 
         try {
@@ -199,9 +199,16 @@ public class ApiCollectionsAction extends UserAction {
                     ApiCollection.Type typeEnum = ApiCollection.Type.valueOf(type);
                     apiCollection.setType(typeEnum);
                 }
-                String userEnvType = collection.getString(ApiCollection.USER_ENV_TYPE);
-                if(userEnvType != null && userEnvType.length() > 0){
-                    apiCollection.setUserSetEnvType(userEnvType);
+                List<String> userEnvTypes = new ArrayList<>();
+                Object value = collection.get(ApiCollection.USER_ENV_TYPES);
+                if (value instanceof List) {
+                    List<?> list = (List<?>) value;
+                    if (list.stream().allMatch(e -> e instanceof String)) {
+                        userEnvTypes = (List<String>) list;
+                    }
+                }
+                if(!userEnvTypes.isEmpty()){
+                    apiCollection.setUserEnvTypes(userEnvTypes);
                 }
                 this.apiCollections.add(apiCollection);
             } catch (Exception e) {
@@ -739,9 +746,14 @@ public class ApiCollectionsAction extends UserAction {
 
     List<Integer> apiCollectionIds;
 
-    private String envType;
+    private List<String> envType;
+    private boolean resetEnvTypes;
 
 	public String updateEnvType(){
+        if(!resetEnvTypes && (envType == null || envType.isEmpty())) {
+            addActionError("Please enter a valid ENV type.");
+            return Action.ERROR.toUpperCase();
+        }
         try {
             Bson filter =  Filters.in("_id", apiCollectionIds);
             FindOneAndUpdateOptions updateOptions = new FindOneAndUpdateOptions();
@@ -760,9 +772,44 @@ public class ApiCollectionsAction extends UserAction {
             } catch(Exception e){
             }
 
-            UpdateResult result = ApiCollectionsDao.instance.getMCollection().updateMany(filter,
-                                            Updates.set(ApiCollection.USER_ENV_TYPE,envType)
-                                    );
+            if(resetEnvTypes) {
+                UpdateResult updateResult = ApiCollectionsDao.instance.getMCollection().updateOne(filter, Updates.unset(ApiCollection.USER_ENV_TYPES));
+                if(updateResult == null) {
+                    return Action.ERROR.toUpperCase();
+                }
+                return Action.SUCCESS.toUpperCase();
+            }
+
+            List<String> userEnvTypes = ApiCollectionsDao.instance.findOne(filter, Projections.include(ApiCollection.USER_ENV_TYPES)).getUserEnvTypes();
+
+            List<String> toPull = new ArrayList<>();
+            List<String> toAdd = new ArrayList<>();
+            if(userEnvTypes == null || userEnvTypes.isEmpty()) {
+                toAdd.addAll(envType);
+            }
+            else {
+                for (String env : envType) {
+                    if (userEnvTypes.contains(env)) {
+                        toPull.add(env);
+                    } else {
+                        toAdd.add(env);
+                    }
+                }
+            }
+
+            UpdateResult result = null;
+            if(!toPull.isEmpty()) {
+                result = ApiCollectionsDao.instance.getMCollection().updateOne(filter,
+                        Updates.pullAll(ApiCollection.USER_ENV_TYPES, toPull)
+                );
+            }
+
+            if(!toAdd.isEmpty()) {
+                result = ApiCollectionsDao.instance.getMCollection().updateOne(filter,
+                        Updates.addEachToSet(ApiCollection.USER_ENV_TYPES, toAdd)
+                );
+            }
+
             if(result == null){
                 return Action.ERROR.toUpperCase();
             }
@@ -946,7 +993,7 @@ public class ApiCollectionsAction extends UserAction {
         this.redacted = redacted;
     }
 
-    public void setEnvType(String envType) {
+    public void setEnvType(List<String> envType) {
 		this.envType = envType;
 	}
 
@@ -984,5 +1031,9 @@ public class ApiCollectionsAction extends UserAction {
 
     public void setDescription(String description) {
         this.description = description;
+    }
+
+    public void setResetEnvTypes(boolean resetEnvTypes) {
+        this.resetEnvTypes = resetEnvTypes;
     }
 }
