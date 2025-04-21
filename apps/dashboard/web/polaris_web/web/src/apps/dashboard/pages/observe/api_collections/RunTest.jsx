@@ -114,7 +114,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         })
 
         settingsApi.fetchJiraIntegration().then((res) => {
-            setJiraProjectMap(res?.jiraIntegration?.projectIdsMap||null);
+            setJiraProjectMap(res?.projectIdsMap||null);
         });
 
         observeApi.checkWebhook("MICROSOFT_TEAMS", "TESTING_RUN_RESULTS").then((resp) => {
@@ -519,7 +519,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
     }
 
     async function handleRun() {
-        const { startTimestamp, recurringDaily, recurringMonthly, recurringWeekly, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, cleanUpTestingResources } = testRun
+        const { startTimestamp, recurringDaily, recurringMonthly, recurringWeekly, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, cleanUpTestingResources,autoTicketingDetails } = testRun
         let {testName} = testRun;
         const collectionId = parseInt(apiCollectionId)
 
@@ -566,9 +566,9 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         }
 
         if (filtered || selectedResourcesForPrimaryAction?.length > 0) {
-            await observeApi.scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, recurringWeekly, recurringMonthly, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, "TESTING_UI", testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, finalAdvancedConditions, cleanUpTestingResources, testMode? []: testSuiteIds)
+            await observeApi.scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, recurringWeekly, recurringMonthly, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, "TESTING_UI", testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, finalAdvancedConditions, cleanUpTestingResources, testMode? []: testSuiteIds,autoTicketingDetails)
         } else {
-            await observeApi.scheduleTestForCollection(collectionId, startTimestamp, recurringDaily, recurringWeekly, recurringMonthly, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, finalAdvancedConditions, cleanUpTestingResources, testMode? []: testSuiteIds)
+            await observeApi.scheduleTestForCollection(collectionId, startTimestamp, recurringDaily, recurringWeekly, recurringMonthly, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, finalAdvancedConditions, cleanUpTestingResources, testMode? []: testSuiteIds,autoTicketingDetails)
         }
 
         setActive(false)
