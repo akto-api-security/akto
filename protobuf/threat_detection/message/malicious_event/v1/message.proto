@@ -3,6 +3,7 @@ syntax = "proto3";
 package threat_detection.message.malicious_event.v1;
 
 import "threat_detection/message/malicious_event/event_type/v1/event_type.proto";
+import "threat_detection/message/sample_request/v1/message.proto";
 
 option java_outer_classname = "MaliciousEventProto";
 option java_package = "threat_detection.message.malicious_event.v1";
@@ -21,6 +22,7 @@ message MaliciousEventMessage {
   string sub_category = 11;
   string severity = 12;
   string type = 13;
+  threat_detection.message.sample_request.v1.Metadata metadata = 14; 
 }
 
 message MaliciousEventKafkaEnvelope {

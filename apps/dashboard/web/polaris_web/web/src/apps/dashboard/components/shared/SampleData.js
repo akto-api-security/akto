@@ -21,13 +21,23 @@ function highlightPaths(highlightPathMap, ref){
           console.log("mainKey: " + mainKey)
         }
         matches.forEach((match) => {
-          ref.createDecorationsCollection([
-              {
-                range: new monaco.Range(match.range.startLineNumber, match.range.endColumn + 3 , match.range.endLineNumber + 1, 1),
-                options: {
-                  inlineClassName: highlightPathMap[key].other ? "highlightOther" : "highlight",
-                },
+          let matchDecObj ={
+            range: new monaco.Range(match.range.startLineNumber, match.range.endColumn + 3 , match.range.endLineNumber + 1, 1),
+            options: {
+              inlineClassName: highlightPathMap[key].other ? "highlightOther" : "highlight",
+            },
+          }
+          if(highlightPathMap[key]?.wholeRow === true){
+            matchDecObj = {
+              range: new monaco.Range(match.range.startLineNumber, 1, match.range.endLineNumber, 100),
+              options: {
+                blockClassName: highlightPathMap[key]?.className,
+                isWholeLine: true
               }
+            }
+          }
+          ref.createDecorationsCollection([
+              matchDecObj
             ])
           ref.revealLineInCenter(match.range.startLineNumber);
         })

@@ -10,22 +10,20 @@ import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
 import com.akto.dto.type.URLStatic;
 import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Sorts;
-import org.bson.conversions.Bson;
-import org.bson.types.ObjectId;
-
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-
-import static com.akto.action.observe.Utils.fetchHostSTI;
+import org.bson.conversions.Bson;
+import org.bson.types.ObjectId;
 
 public class FixMultiSTIs {
 
-    private static final LoggerMaker loggerMaker = new LoggerMaker(InventoryAction.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(InventoryAction.class, LogDb.DASHBOARD);;
 
     public static void run(Set<Integer> whiteList) {
         List<ApiCollection> apiCollectionList = ApiCollectionsDao.instance.getMetaAll();
@@ -34,9 +32,9 @@ public class FixMultiSTIs {
                 // because we want to run only for mirroring collections
                 try {
                     int start = Context.now();
-                    loggerMaker.infoAndAddToDb("Starting fix for collection: " + apiCollection.getId(), LoggerMaker.LogDb.DASHBOARD);
+                    loggerMaker.debugAndAddToDb("Starting fix for collection: " + apiCollection.getId(), LoggerMaker.LogDb.DASHBOARD);
                     fixForCollection(apiCollection.getId());
-                    loggerMaker.infoAndAddToDb("Finished fix for collection: " + apiCollection.getId() + " in " + (Context.now() - start) + " seconds" , LoggerMaker.LogDb.DASHBOARD);
+                    loggerMaker.debugAndAddToDb("Finished fix for collection: " + apiCollection.getId() + " in " + (Context.now() - start) + " seconds" , LoggerMaker.LogDb.DASHBOARD);
                 } catch (Exception e) {
                     loggerMaker.errorAndAddToDb("Error while fixing collection: " + apiCollection.getId() + " : " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
                 }
@@ -55,7 +53,7 @@ public class FixMultiSTIs {
             Bson filterQ = Filters.and(filterForHostHeader, Filters.regex(SingleTypeInfo._URL, "STRING|INTEGER"));
             List<SingleTypeInfo> stiBatch = SingleTypeInfoDao.instance.findAll(filterQ, skip,limit, null);
 
-            loggerMaker.infoAndAddToDb("stiBatch size: " + stiBatch.size(), LoggerMaker.LogDb.DASHBOARD);
+            loggerMaker.debugAndAddToDb("stiBatch size: " + stiBatch.size(), LoggerMaker.LogDb.DASHBOARD);
 
             for (SingleTypeInfo singleTypeInfo: stiBatch) {
                 String url = singleTypeInfo.getUrl();
@@ -70,9 +68,9 @@ public class FixMultiSTIs {
                 allUrlsInCollection.add(urlStatic);
 
                 try {
-                    loggerMaker.infoAndAddToDb("Starting fix for url: " + urlStatic, LoggerMaker.LogDb.DASHBOARD);
+                    loggerMaker.debugAndAddToDb("Starting fix for url: " + urlStatic, LoggerMaker.LogDb.DASHBOARD);
                     duplicates.addAll(fixForUrl(apiCollectionId, urlStatic));
-                    loggerMaker.infoAndAddToDb("Finished fix for url: " + urlStatic, LoggerMaker.LogDb.DASHBOARD);
+                    loggerMaker.debugAndAddToDb("Finished fix for url: " + urlStatic, LoggerMaker.LogDb.DASHBOARD);
                 } catch (Exception e) {
                     loggerMaker.errorAndAddToDb("Error while fixing url: " + urlStatic + " : " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
                 }
@@ -80,7 +78,7 @@ public class FixMultiSTIs {
 
             // todo: batch
             if (duplicates.size() > 0) {
-                loggerMaker.infoAndAddToDb("Delete count : " + duplicates.size(), LoggerMaker.LogDb.DASHBOARD);
+                loggerMaker.debugAndAddToDb("Delete count : " + duplicates.size(), LoggerMaker.LogDb.DASHBOARD);
                 SingleTypeInfoDao.instance.deleteAll(Filters.in("_id", duplicates));
             }
 

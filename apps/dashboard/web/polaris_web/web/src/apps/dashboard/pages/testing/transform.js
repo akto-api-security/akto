@@ -167,6 +167,23 @@ function getCveLink(item) {
   return `https://nvd.nist.gov/vuln/detail/${item}`
 }
 
+function getScanFrequency(periodInSeconds) {
+  if (periodInSeconds === -1) {
+    return "Continuous"
+  }
+  else if (periodInSeconds === 0) {
+    return "Once"
+  } else if (periodInSeconds <= 86400) {
+    return "Daily"
+  } else if (periodInSeconds <= 604800) {
+    return "Weekly"
+  } else if (periodInSeconds <= 2678400) {
+    return "Monthly"
+  } else {
+    return "-"
+  }
+}
+
 const transform = {
 
   tagList: (list, linkType) => {
@@ -292,6 +309,7 @@ const transform = {
       obj['metadata'] = func.flattenObject(testingRunResultSummary?.metadata)
       obj['apiCollectionId'] = apiCollectionId
       obj['userEmail'] = data.userEmail
+      obj['scan_frequency'] = getScanFrequency(data.periodInSeconds)
       obj['total_apis'] = testingRunResultSummary.totalApis
       if(prettified){
         
@@ -940,7 +958,7 @@ getTestingRunResultUrl(testingResult){
   return methodObj.method + " " + truncatedUrl
   
 },
-getRowInfo(severity, apiInfo,jiraIssueUrl, sensitiveData, isIgnored){
+getRowInfo(severity, apiInfo,jiraIssueUrl, sensitiveData, isIgnored, azureBoardsWorkItemUrl){
   let auth_type = apiInfo["allAuthTypesFound"].join(", ")
   let access_type = null
   let access_types = apiInfo["apiAccessTypes"]
@@ -972,6 +990,22 @@ getRowInfo(severity, apiInfo,jiraIssueUrl, sensitiveData, isIgnored){
             </Link>
           </HorizontalStack>
         </Tag>
+    </Box>
+  ) : null
+
+
+  const azureBoardsComp = azureBoardsWorkItemUrl?.length > 0 ? (
+    <Box>
+      <Tag>
+        <HorizontalStack gap={1}>
+          <Avatar size="extraSmall" shape='round' source="/public/azure-boards.svg" />
+          <Link url={azureBoardsWorkItemUrl}>
+            <Text>
+              {azureBoardsWorkItemUrl?.split("/")?.[azureBoardsWorkItemUrl?.split("/")?.length - 1]}
+            </Text>
+          </Link>
+        </HorizontalStack>
+      </Tag>
     </Box>
   ) : null
 
@@ -1017,9 +1051,14 @@ getRowInfo(severity, apiInfo,jiraIssueUrl, sensitiveData, isIgnored){
       tooltipContent: "Discovered time of the API"
     },
     {
-      title: "Jira",
+      title: "Jira ticket",
       value: jiraComponent,
       tooltipContent:"Jira ticket number attached to the testing run issue"
+    },
+    {
+      title: "Azure work item",
+      value: azureBoardsComp,
+      tooltipContent: "Azure boards work item number attached to the testing run issue"
     }
   ]
   return rowItems
@@ -1163,19 +1202,19 @@ getMissingConfigs(testResults){
       };
     });
   },
-  prepareEditableConfigObject(testRun,settings,hexId){
+  prepareEditableConfigObject(testRun,settings,hexId,testSuiteIds=[],testMode){
     const tests = testRun.tests;
     const selectedTests = []
-        Object.keys(tests).forEach(category => {
-            tests[category].forEach(test => {
-                if (test.selected) selectedTests.push(test.value)
-            })
+    Object.keys(tests).forEach(category => {
+        tests[category].forEach(test => {
+            if (test.selected) selectedTests.push(test.value)
         })
+    })
 
     return {
       configsAdvancedSettings:settings,
       testRoleId: testRun.testRoleId,
-      testSubCategoryList: selectedTests,
+      testSubCategoryList: testSuiteIds?.length == 0? selectedTests : [],
       overriddenTestAppUrl: testRun.hasOverriddenTestAppUrl ? testRun.overriddenTestAppUrl : "",
       maxConcurrentRequests: testRun.maxConcurrentRequests,
       testingRunHexId: hexId,
@@ -1184,9 +1223,10 @@ getMissingConfigs(testResults){
       sendMsTeamsAlert:testRun.sendMsTeamsAlert,
       recurringDaily: testRun.recurringDaily,
       continuousTesting: testRun.continuousTesting,
-      scheduleTimestamp: testRun.startTimestamp,
+      scheduleTimestamp: testRun?.hourlyLabel === 'Now' && ((testRun.startTimestamp - func.getStartOfTodayEpoch()) < 86400) ? 0 : testRun.startTimestamp,
       recurringWeekly: testRun.recurringWeekly,
-      recurringMonthly: testRun.recurringMonthly
+      recurringMonthly: testRun.recurringMonthly,
+      testSuiteIds:testMode? [] : testSuiteIds,
     }
   }
 }

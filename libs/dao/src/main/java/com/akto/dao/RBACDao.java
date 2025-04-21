@@ -1,26 +1,24 @@
 package com.akto.dao;
 
-import com.akto.util.Pair;
-import com.mongodb.client.model.Projections;
-import org.bson.conversions.Bson;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import static com.mongodb.client.model.Filters.eq;
+import static com.mongodb.client.model.Updates.set;
 
 import com.akto.dao.context.Context;
 import com.akto.dto.CustomRole;
 import com.akto.dto.RBAC;
 import com.akto.dto.RBAC.Role;
+import com.akto.util.Pair;
 import com.mongodb.client.model.Filters;
-
+import com.mongodb.client.model.Projections;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-
-import static com.mongodb.client.model.Filters.*;
-import static com.mongodb.client.model.Updates.set;
+import org.bson.conversions.Bson;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class RBACDao extends CommonContextDao<RBAC> {
     public static final RBACDao instance = new RBACDao();
@@ -96,12 +94,12 @@ public class RBACDao extends CommonContextDao<RBAC> {
                 Projections.include(RBAC.API_COLLECTIONS_ID, RBAC.ROLE));
 
         if (rbac == null) {
-            logger.info(String.format("Rbac not found userId: %d accountId: %d", userId, accountId));
+            logger.debug(String.format("Rbac not found userId: %d accountId: %d", userId, accountId));
             return new ArrayList<>();
         }
 
         if (RBAC.Role.ADMIN.name().equals(rbac.getRole())) {
-            logger.info(String.format("Rbac is admin userId: %d accountId: %d", userId, accountId));
+            logger.debug(String.format("Rbac is admin userId: %d accountId: %d", userId, accountId));
             return null;
         }
 
@@ -118,9 +116,9 @@ public class RBACDao extends CommonContextDao<RBAC> {
         }
 
         if (rbac.getApiCollectionsId() == null) {
-            logger.info(String.format("Rbac collections not found userId: %d accountId: %d", userId, accountId));
+            logger.debug(String.format("Rbac collections not found userId: %d accountId: %d", userId, accountId));
         } else {
-            logger.info(String.format("Rbac found userId: %d accountId: %d", userId, accountId));
+            logger.debug(String.format("Rbac found userId: %d accountId: %d", userId, accountId));
             apiCollectionsId.addAll(rbac.getApiCollectionsId());
         }
 

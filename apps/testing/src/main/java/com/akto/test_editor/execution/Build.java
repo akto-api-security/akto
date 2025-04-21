@@ -282,18 +282,18 @@ public class Build {
                 continue;
             }
 
-            loggerMaker.infoAndAddToDb("Running level: " + level, LoggerMaker.LogDb.DASHBOARD);
+            loggerMaker.debugAndAddToDb("Running level: " + level, LoggerMaker.LogDb.DASHBOARD);
             try {
                 List<RunResult> runResultsPerLevel = runPerLevel(sdList, modifyHostDetailMap, replaceDetailsMap, parentToChildMap, apisReplayedSet, sourceCodeApis);
                 runResults.addAll(runResultsPerLevel);
-                loggerMaker.infoAndAddToDb("Finished running level " + level, LoggerMaker.LogDb.DASHBOARD);
+                loggerMaker.debugAndAddToDb("Finished running level " + level, LoggerMaker.LogDb.DASHBOARD);
             } catch (Exception e) {
                 e.printStackTrace();
                 loggerMaker.errorAndAddToDb(e, "Error while running for level " + level , LoggerMaker.LogDb.DASHBOARD);
             }
         }
 
-        loggerMaker.infoAndAddToDb("Running independent APIs", LoggerMaker.LogDb.DASHBOARD);
+        loggerMaker.debugAndAddToDb("Running independent APIs", LoggerMaker.LogDb.DASHBOARD);
         int skip = 0;
         int limit = 1000;
         while (true) {
@@ -310,7 +310,7 @@ public class Build {
             skip += limit;
             if (all.size() < limit) break;
         }
-        loggerMaker.infoAndAddToDb("Finished running independent APIs", LoggerMaker.LogDb.DASHBOARD);
+        loggerMaker.debugAndAddToDb("Finished running independent APIs", LoggerMaker.LogDb.DASHBOARD);
 
         return runResults;
     }

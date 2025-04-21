@@ -22,7 +22,7 @@ import MarkdownViewer from '../../../components/shared/MarkdownViewer.jsx'
 function TestRunResultFlyout(props) {
 
 
-    const { selectedTestRunResult, loading, issueDetails ,getDescriptionText, infoState, createJiraTicket, jiraIssueUrl, showDetails, setShowDetails, isIssuePage, remediationSrc} = props
+    const { selectedTestRunResult, loading, issueDetails ,getDescriptionText, infoState, createJiraTicket, jiraIssueUrl, showDetails, setShowDetails, isIssuePage, remediationSrc, azureBoardsWorkItemUrl} = props
     const [remediationText, setRemediationText] = useState("")
     const [fullDescription, setFullDescription] = useState(false)
     const [rowItems, setRowItems] = useState([])
@@ -31,6 +31,12 @@ function TestRunResultFlyout(props) {
     const [jiraProjectMaps,setJiraProjectMap] = useState({})
     const [issueType, setIssueType] = useState('');
     const [projId, setProjId] = useState('')
+
+    const [boardsModalActive, setBoardsModalActive] = useState(false)
+    const [projectToWorkItemsMap, setProjectToWorkItemsMap] = useState({})
+    const [projectId, setProjectId] = useState('')
+    const [workItemType, setWorkItemType] = useState('')
+
     // modify testing run result and headers
     const infoStateFlyout = infoState && infoState.length > 0 ? infoState.filter((item) => item.title !== 'Jira') : []
     const fetchRemediationInfo = useCallback (async (testId) => {
@@ -65,7 +71,7 @@ function TestRunResultFlyout(props) {
                     index++
                 })
             })
-            setRowItems(transform.getRowInfo(issueDetails.severity,apiInfo,issueDetails.jiraIssueUrl,sensitiveParam,issueDetails.testRunIssueStatus === 'IGNORED'))
+            setRowItems(transform.getRowInfo(issueDetails.severity,apiInfo,issueDetails.jiraIssueUrl,sensitiveParam,issueDetails.testRunIssueStatus === 'IGNORED', issueDetails.azureBoardsWorkItemUrl))
         }
     },[issueDetails])
 
@@ -125,6 +131,36 @@ function TestRunResultFlyout(props) {
         }else{
             func.setToast(true, true, "Invalid project id or issue type")
         }
+    }
+
+    const handleAzureBoardClick = async() => {
+        if(!boardsModalActive){
+            const azureBoardsIntegration = await settingFunctions.fetchAzureBoardsIntegration()
+            if(azureBoardsIntegration.projectToWorkItemsMap != null && Object.keys(azureBoardsIntegration.projectToWorkItemsMap).length > 0){
+                setProjectToWorkItemsMap(azureBoardsIntegration.projectToWorkItemsMap)
+                if(Object.keys(azureBoardsIntegration.projectToWorkItemsMap).length > 0){
+                    setProjectId(Object.keys(azureBoardsIntegration.projectToWorkItemsMap)[0])
+                    setWorkItemType(Object.values(azureBoardsIntegration.projectToWorkItemsMap)[0]?.[0])
+                }
+            }else{
+                setProjectId(azureBoardsIntegration?.projectId)
+                setWorkItemType(azureBoardsIntegration?.workItemType)
+            }
+        }
+        setBoardsModalActive(!boardsModalActive)
+    }
+
+    const handleAzureBoardWorkitemCreation = async(id) => {
+        if(projectId.length > 0 && workItemType.length > 0){
+            await issuesApi.createAzureBoardsWorkItem(issueDetails.id, projectId, workItemType, window.location.origin).then((res) => {
+                func.setToast(true, false, "Work item created")
+            }).catch((err) => {
+                func.setToast(true, true, err?.response?.data?.errorMessage || "Error creating work item")
+            })
+        }else{
+            func.setToast(true, true, "Invalid project id or work item type")
+        }
+        setBoardsModalActive(false)
     }
     
     const issues = [{
@@ -205,18 +241,33 @@ function TestRunResultFlyout(props) {
                     <ActionsComp />
 
                     {selectedTestRunResult && selectedTestRunResult.vulnerable && 
-                        <JiraTicketCreationModal
-                            activator={<Button id={"create-jira-ticket-button"} primary onClick={handleJiraClick} disabled={jiraIssueUrl !== "" || window.JIRA_INTEGRATED !== "true"}>Create Jira Ticket</Button>}
-                            modalActive={modalActive}
-                            setModalActive={setModalActive}
-                            handleSaveAction={handleSaveAction}
-                            jiraProjectMaps={jiraProjectMaps}
-                            setProjId={setProjId}
-                            setIssueType={setIssueType}
-                            projId={projId}
-                            issueType={issueType}
-                            issueId={issueDetails.id}
-                        />
+                        <HorizontalStack gap={2} wrap={false}>
+                            <JiraTicketCreationModal
+                                activator={<Button id={"create-jira-ticket-button"} primary onClick={handleJiraClick} disabled={jiraIssueUrl !== "" || window.JIRA_INTEGRATED !== "true"}>Create Jira Ticket</Button>}
+                                modalActive={modalActive}
+                                setModalActive={setModalActive}
+                                handleSaveAction={handleSaveAction}
+                                jiraProjectMaps={jiraProjectMaps}
+                                setProjId={setProjId}
+                                setIssueType={setIssueType}
+                                projId={projId}
+                                issueType={issueType}
+                                issueId={issueDetails.id}
+                            />
+                            <JiraTicketCreationModal
+                                activator={window.AZURE_BOARDS_INTEGRATED === 'true' ? <Button id={"create-azure-boards-ticket-button"} primary onClick={handleAzureBoardClick} disabled={azureBoardsWorkItemUrl !== "" || window.AZURE_BOARDS_INTEGRATED !== "true"}>Create Work Item</Button> : <></>}
+                                modalActive={boardsModalActive}
+                                setModalActive={setBoardsModalActive}
+                                handleSaveAction={handleAzureBoardWorkitemCreation}
+                                jiraProjectMaps={projectToWorkItemsMap}
+                                projId={projectId}
+                                setProjId={setProjectId}
+                                issueType={workItemType}
+                                setIssueType={setWorkItemType}
+                                issueId={issueDetails.id}
+                                isAzureModal={true}
+                            />
+                        </HorizontalStack>
                     }
                 </HorizontalStack>
             </div>

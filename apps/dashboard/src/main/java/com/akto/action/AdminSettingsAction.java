@@ -1,12 +1,23 @@
 package com.akto.action;
 
 import com.akto.action.observe.Utils;
-import com.akto.dao.*;
+import com.akto.dao.AccountSettingsDao;
+import com.akto.dao.AccountsDao;
+import com.akto.dao.FilterSampleDataDao;
+import com.akto.dao.SampleDataDao;
+import com.akto.dao.SensitiveSampleDataDao;
+import com.akto.dao.SingleTypeInfoDao;
+import com.akto.dao.UsersDao;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
-import com.akto.dto.type.CollectionReplaceDetails;
-import com.akto.dto.*;
+import com.akto.dto.Account;
+import com.akto.dto.AccountSettings;
+import com.akto.dto.TelemetrySettings;
+import com.akto.dto.User;
 import com.akto.dto.billing.Organization;
+import com.akto.dto.type.CollectionReplaceDetails;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.runtime.Main;
 import com.akto.runtime.policies.ApiAccessTypePolicy;
 import com.akto.util.Constants;
@@ -16,29 +27,28 @@ import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
-
 import com.opensymphony.xwork2.Action;
-import org.bson.conversions.Bson;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.util.Map;
-import java.util.Set;
-
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import org.bson.conversions.Bson;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class AdminSettingsAction extends UserAction {
 
+    private static final LoggerMaker logger = new LoggerMaker(AdminSettingsAction.class, LogDb.DASHBOARD);
+    private static final Logger log = LoggerFactory.getLogger(AdminSettingsAction.class);
+
     AccountSettings accountSettings;
     private int globalRateLimit = 0;
-    private static final Logger logger = LoggerFactory.getLogger(AdminSettingsAction.class);
     private Organization organization;
     private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
 
@@ -174,7 +184,7 @@ public class AdminSettingsAction extends UserAction {
     }
 
     private static void dropCollectionsInitial(int accountId) {
-        logger.info("Dropping collection initial");
+        logger.debug("Dropping collection initial");
         Context.accountId.set(accountId);
         SampleDataDao.instance.getMCollection().drop();
         FilterSampleDataDao.instance.getMCollection().drop();
@@ -183,7 +193,7 @@ public class AdminSettingsAction extends UserAction {
     }
 
     public static void dropCollections(int accountId) {
-        logger.info("CALLED: " + Context.now());
+        logger.debug("CALLED: " + Context.now());
         dropCollectionsInitial(accountId);
         AccountSettingsDao.instance.getMCollection().updateOne(
                 AccountSettingsDao.generateFilter(), Updates.set(AccountSettings.SAMPLE_DATA_COLLECTION_DROPPED, true), new UpdateOptions().upsert(true)
@@ -275,20 +285,18 @@ public class AdminSettingsAction extends UserAction {
             }
             ApiAccessTypePolicy policy = new ApiAccessTypePolicy(privateCidrList);
 
-            executorService.schedule(new Runnable() {
-                public void run() {
-                    try {
-                        Context.accountId.set(accountId);
-                        List<String> partnerIpList = new ArrayList<>();
-                        if (accountSettings != null &&
-                                accountSettings.getPartnerIpList() != null &&
-                                !accountSettings.getPartnerIpList().isEmpty()) {
-                            partnerIpList = accountSettings.getPartnerIpList();
-                        }
-                        ApiAccessTypePolicyUtil.calcApiAccessType(policy, partnerIpList);
-                    } catch (Exception e){
-                        logger.error("Error in applyAccessType", e);
+            executorService.schedule(() -> {
+                try {
+                    Context.accountId.set(accountId);
+                    List<String> partnerIpList = new ArrayList<>();
+                    if (accountSettings != null &&
+                            accountSettings.getPartnerIpList() != null &&
+                            !accountSettings.getPartnerIpList().isEmpty()) {
+                        partnerIpList = accountSettings.getPartnerIpList();
                     }
+                    ApiAccessTypePolicyUtil.calcApiAccessType(policy, partnerIpList);
+                } catch (Exception e){
+                    logger.error("Error in applyAccessType", e);
                 }
             }, 0, TimeUnit.SECONDS);
             return Action.SUCCESS.toUpperCase();

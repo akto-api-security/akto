@@ -43,7 +43,7 @@ public class MatchingJob {
 
     static final int LIMIT = 10_000;
     private static final LoggerMaker loggerMaker = new LoggerMaker(MatchingJob.class, LogDb.THREAT_DETECTION);
-    private static final Logger logger = LoggerFactory.getLogger(MatchingJob.class);
+    private static final LoggerMaker logger = new LoggerMaker(MatchingJob.class);
 
     final static ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
 
@@ -58,7 +58,7 @@ public class MatchingJob {
                 jobRunning = true;
 
                 int now = Context.now();
-                logger.info("Starting MatchingJobRunner for all accounts at " + now);
+                logger.debug("Starting MatchingJobRunner for all accounts at " + now);
 
                 AccountTask.instance.executeTask(new Consumer<Account>() {
                     @Override
@@ -81,7 +81,7 @@ public class MatchingJob {
 
                 int now2 = Context.now();
                 int diffNow = now2 - now;
-                logger.info(String.format("Completed MatchingJobRunner for all accounts at %d , time taken : %d", now2,
+                logger.debug(String.format("Completed MatchingJobRunner for all accounts at %d , time taken : %d", now2,
                         diffNow));
                 jobRunning = false;
             }
@@ -183,7 +183,7 @@ public class MatchingJob {
         do {
             singleTypeInfos = SingleTypeInfoDao.instance.findAll(filterQ, offset, limit, null,
                     Projections.exclude("values"));
-            loggerMaker.infoAndAddToDb("SingleTypeInfo size in fillDbState : " + singleTypeInfos.size());
+            loggerMaker.debugAndAddToDb("SingleTypeInfo size in fillDbState : " + singleTypeInfos.size());
             Map<Integer, APICatalog> temp = new HashMap<>();
             temp = APICatalogSync.build(singleTypeInfos, null);
             dbState.putAll(temp);

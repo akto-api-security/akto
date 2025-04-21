@@ -1,7 +1,7 @@
 import {
   CalendarMinor,ClockMinor,CircleAlertMajor,DynamicSourceMinor,DynamicSourceMajor, LockMinor, KeyMajor, ProfileMinor, PasskeyMinor,
   EmailMajor, CreditCardMajor, IdentityCardMajor, LocationsMinor,PhoneMajor, FileMinor, ImageMajor, BankMajor, HashtagMinor, 
-  ReceiptMajor, MobileMajor, CalendarTimeMinor, LocationMajor,  IdentityCardFilledMajor, CalendarMajor, PageMajor, AffiliateMajor
+  ReceiptMajor, MobileMajor, CalendarTimeMinor, LocationMajor,  IdentityCardFilledMajor, CalendarMajor, AffiliateMajor
 } from '@shopify/polaris-icons';
 import { saveAs } from 'file-saver'
 import inventoryApi from "../apps/dashboard/pages/observe/api"
@@ -14,6 +14,8 @@ import PersistStore from '../apps/main/PersistStore';
 
 import { circle_cancel, circle_tick_minor } from "@/apps/dashboard/components/icons";
 import quickStartFunc from '../apps/dashboard/pages/quick_start/transform';
+import { Box } from '@shopify/polaris';
+import TooltipText from '../apps/dashboard/components/shared/TooltipText';
 
 const iconsUsedMap = {
   CalendarMinor,ClockMinor,CircleAlertMajor,DynamicSourceMinor, LockMinor, KeyMajor, ProfileMinor, PasskeyMinor,
@@ -912,7 +914,7 @@ parameterizeUrl(x) {
   });
   return newStr
 },
-mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName) {
+mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName,apiInfoSeverityMap) {
   const allCollections = PersistStore.getState().allCollections
   const apiGroupsMap = func.mapCollectionIdToName(allCollections.filter(x => x.type === "API_GROUP"))
 
@@ -928,7 +930,6 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName) {
           apiInfoMap[x["id"]["apiCollectionId"] + "-" + x["id"]["url"] + "-" + x["id"]["method"]] = x
       })
   }
-
   listEndpoints.forEach(x => {
       let key = x.apiCollectionId + "-" + x.url + "-" + x.method
       if (!ret[key]) {
@@ -953,6 +954,7 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName) {
           let riskScore = apiInfoMap[key] ? apiInfoMap[key]?.riskScore : 0
           let responseCodesArr = apiInfoMap[key] ? apiInfoMap[key]?.responseCodes : [] 
           let discoveredTimestamp = apiInfoMap[key] ? (apiInfoMap[key].discoveredTimestamp || apiInfoMap[key].startTs) : 0
+          let description = apiInfoMap[key] ? apiInfoMap[key]['description'] : ""
 
           ret[key] = {
               id: x.method + "###" + x.url + "###" + x.apiCollectionId + "###" + Math.random(),
@@ -985,13 +987,26 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName) {
               riskScore: riskScore,
               sensitiveInReq: [...this.convertSensitiveTags(x.sensitiveInReq)],
               sensitiveInResp: [...this.convertSensitiveTags(x.sensitiveInResp)],
-              responseCodes: responseCodesArr
+              responseCodes: responseCodesArr,
+              ...(apiInfoSeverityMap?.hasOwnProperty(key) ? { severityObj: apiInfoSeverityMap[key] } : {}),
+              sources: apiInfoMap[key]?apiInfoMap[key]['sources']:{},
+              description: description,
+              descriptionComp: (<Box maxWidth="300px"><TooltipText tooltip={description} text={description}/></Box>),
           }
 
       }
   })
-  
   return Object.values(ret) 
+},
+getSeverityCountPerEndpointList(apiInfoSeverityMap){
+  if(!apiInfoSeverityMap) return {}
+  let apiInfoIdSeverityMap = {}
+  Object.entries(apiInfoSeverityMap).forEach(([key, value]) => {
+    let keyId = key.split(" ").join("-");
+    apiInfoIdSeverityMap[keyId] = value;
+
+  });
+  return apiInfoIdSeverityMap;
 },
 
 convertSensitiveTags(subTypeList) {
@@ -1440,6 +1455,13 @@ mapCollectionIdToHostName(apiCollections){
 
     return collectionsObj
 },
+joinWordsWithUnderscores(input) {
+    if (!input ) return "";
+    const words = input.trim().split(/\s+/);
+    const result = words.map(word => word).join('_');
+
+    return result.toUpperCase();
+  },
   getTimeTakenByTest(startTimestamp, endTimestamp){
     const timeDiff = Math.abs(endTimestamp - startTimestamp);
     const hours = Math.floor(timeDiff / 3600);
@@ -1816,9 +1838,8 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
   checkForFeatureSaas(featureLabel) {
     const stiggFeatures = window.STIGG_FEATURE_WISE_ALLOWED
     let access = false;
-    if (!stiggFeatures || Object.keys(stiggFeatures).length === 0) {
-      // for feature map not present, no access. For saas only.
-      access = false;
+    if (!stiggFeatures || Object.keys(stiggFeatures).length === 0 ) {
+      access = this.checkOnPrem()
     } else if (stiggFeatures && stiggFeatures[featureLabel]) {
       access = stiggFeatures[featureLabel].isGranted
     }

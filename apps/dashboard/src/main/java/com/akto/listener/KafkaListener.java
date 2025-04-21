@@ -18,12 +18,12 @@ public class KafkaListener implements ServletContextListener {
         String brokerIP = "kafka1:19092"; //System.getenv("AKTO_KAFKA_BROKER_URL");
         
         if (DashboardMode.isKubernetes()) {
-            loggerMaker.infoAndAddToDb("is_kubernetes: true", LogDb.DASHBOARD);
+            loggerMaker.debugAndAddToDb("is_kubernetes: true", LogDb.DASHBOARD);
             return;
         }
 
         if (DashboardMode.isLocalDeployment() && !DashboardMode.isSaasDeployment()) {
-            loggerMaker.infoAndAddToDb("local: true", LogDb.DASHBOARD);
+            loggerMaker.debugAndAddToDb("local: true", LogDb.DASHBOARD);
             return;
         }
 

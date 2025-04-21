@@ -1,25 +1,25 @@
 package com.akto.action;
 
+import static com.akto.action.LoginAction.REFRESH_TOKEN_COOKIE_NAME;
+
 import com.akto.dao.UsersDao;
 import com.akto.dto.User;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.utils.Token;
 import com.opensymphony.xwork2.Action;
-import org.apache.struts2.interceptor.ServletRequestAware;
-import org.apache.struts2.interceptor.ServletResponseAware;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
+import java.util.List;
+import java.util.Objects;
 import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import java.util.List;
-import java.util.Objects;
-
-import static com.akto.action.LoginAction.REFRESH_TOKEN_COOKIE_NAME;
+import org.apache.struts2.interceptor.ServletRequestAware;
+import org.apache.struts2.interceptor.ServletResponseAware;
 
 public class AccessTokenAction implements Action, ServletResponseAware, ServletRequestAware {
+
+    private static final LoggerMaker logger = new LoggerMaker(AccessTokenAction.class, LogDb.DASHBOARD);
     public static final String ACCESS_TOKEN_HEADER_NAME = "access-token";
-    private static final Logger logger = LoggerFactory.getLogger(AccessTokenAction.class);
 
     @Override
     public String execute() {
@@ -65,7 +65,7 @@ public class AccessTokenAction implements Action, ServletResponseAware, ServletR
         }
 
         if (refreshToken == null) {
-            logger.info("Could not find refresh token in generateAccessTokenFromServletRequest.");
+            logger.debug("Could not find refresh token in generateAccessTokenFromServletRequest.");
             return null;
         }
 
@@ -84,7 +84,7 @@ public class AccessTokenAction implements Action, ServletResponseAware, ServletR
         String username = token.getUsername();
         User user = UsersDao.instance.findOne("login", username);
         if (user == null) {
-            logger.info("Returning as user not found.");
+            logger.debug("Returning as user not found.");
             return null;
         }
 
@@ -92,7 +92,7 @@ public class AccessTokenAction implements Action, ServletResponseAware, ServletR
         if (refreshTokens != null && refreshTokens.contains(refreshToken)) {
             return token;
         } else {
-            logger.info( "NOT FOUND");
+            logger.debug( "NOT FOUND");
             return null;
         }
 

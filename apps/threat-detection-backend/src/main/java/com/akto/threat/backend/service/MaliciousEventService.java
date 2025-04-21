@@ -3,6 +3,7 @@ package com.akto.threat.backend.service;
 import com.akto.dto.type.URLMethods;
 import com.akto.kafka.Kafka;
 import com.akto.kafka.KafkaConfig;
+import com.akto.log.LoggerMaker;
 import com.akto.proto.generated.threat_detection.message.malicious_event.event_type.v1.EventType;
 import com.akto.proto.generated.threat_detection.message.malicious_event.v1.MaliciousEventMessage;
 import com.akto.proto.generated.threat_detection.message.sample_request.v1.SampleMaliciousRequest;
@@ -14,7 +15,6 @@ import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.Th
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatActorFilterResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.TimeRangeFilter;
 import com.akto.proto.generated.threat_detection.service.malicious_alert_service.v1.RecordMaliciousEventRequest;
-import com.akto.threat.backend.client.IPLookupClient;
 import com.akto.threat.backend.constants.KafkaTopic;
 import com.akto.threat.backend.constants.MongoDBCollection;
 import com.akto.threat.backend.db.AggregateSampleMaliciousEventModel;
@@ -39,13 +39,12 @@ public class MaliciousEventService {
 
   private final Kafka kafka;
   private final MongoClient mongoClient;
-  private final IPLookupClient ipLookupClient;
+  private static final LoggerMaker logger = new LoggerMaker(MaliciousEventService.class);
 
   public MaliciousEventService(
-      KafkaConfig kafkaConfig, MongoClient mongoClient, IPLookupClient ipLookupClient) {
+      KafkaConfig kafkaConfig, MongoClient mongoClient) {
     this.kafka = new Kafka(kafkaConfig);
     this.mongoClient = mongoClient;
-    this.ipLookupClient = ipLookupClient;
   }
 
   public void recordMaliciousEvent(String accountId, RecordMaliciousEventRequest request) {
@@ -54,6 +53,7 @@ public class MaliciousEventService {
     String filterId = evt.getFilterId();
 
     String refId = UUID.randomUUID().toString();
+    logger.debug("received malicious event " + evt.getLatestApiEndpoint() + " filterId " + evt.getFilterId() + " eventType " + evt.getEventType().toString());
 
     EventType eventType = evt.getEventType();
 
@@ -73,8 +73,7 @@ public class MaliciousEventService {
             .setLatestApiCollectionId(evt.getLatestApiCollectionId())
             .setEventType(maliciousEventType)
             .setLatestApiIp(evt.getLatestApiIp())
-            .setCountry(
-                this.ipLookupClient.getCountryISOCodeGivenIp(evt.getLatestApiIp()).orElse(""))
+            .setCountry(evt.getMetadata().getCountryCode())
             .setCategory(evt.getCategory())
             .setSubCategory(evt.getSubCategory())
             .setRefId(refId)

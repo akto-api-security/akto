@@ -4,8 +4,7 @@ import com.akto.action.UserAction;
 import com.akto.dao.UsersDao;
 import com.akto.dto.User;
 import com.akto.log.LoggerMaker;
-import com.akto.util.Constants;
-import com.mongodb.BasicDBObject;
+import com.akto.log.LoggerMaker.LogDb;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 import com.opensymphony.xwork2.Action;
@@ -13,7 +12,7 @@ import com.opensymphony.xwork2.Action;
 public class UserInfoAction extends UserAction {
 
     private String aktoUIMode;
-    private static final LoggerMaker loggerMaker = new LoggerMaker(UserInfoAction.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(UserInfoAction.class, LogDb.DASHBOARD);;
 
     @Override
     public String execute() throws Exception {

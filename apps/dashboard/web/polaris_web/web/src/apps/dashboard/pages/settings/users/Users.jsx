@@ -261,6 +261,12 @@ const Users = () => {
         return usersCollection[userId] || [];
     };
 
+    const handleRemoveInvitations = async (data) => {
+        await settingRequests.removeInvitation(data.login)
+        func.setToast(true, false, "Invitation removed successfully")
+        await getTeamData();
+    }
+
     return (
         <Page
             title="Users"
@@ -365,6 +371,15 @@ const Users = () => {
                                                         }))}
                                                     />
                                                 </Popover>
+                                            </HorizontalStack>
+                                        )
+                                    }
+                                ] : item?.isInvitation ? [
+                                    {
+                                        content: (
+                                            <HorizontalStack gap={4}>
+                                                <Text color="subdued">{func.toSentenceCase(getRoleDisplayName(role))}</Text>
+                                                <div onClick={() => handleRemoveInvitations(item)}><Icon source={DeleteMajor}/></div>
                                             </HorizontalStack>
                                         )
                                     }

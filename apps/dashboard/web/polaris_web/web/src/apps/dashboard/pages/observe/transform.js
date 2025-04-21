@@ -1,5 +1,5 @@
 import func from "@/util/func";
-import { Badge, Box, HorizontalStack, Icon, Text, Tooltip } from "@shopify/polaris";
+import { Badge, Box, Button, HorizontalStack, Icon, Text, Tooltip } from "@shopify/polaris";
 import PersistStore from "../../../main/PersistStore";
 import TooltipText from "../../components/shared/TooltipText";
 import StyledEndpoint from "./api_collections/component/StyledEndpoint"
@@ -117,6 +117,14 @@ const apiDetailsHeaders = [
         text: 'Non-Sensitive Params',
         value: 'nonSensitiveTags',
         itemOrder: 4,
+    },
+    {
+        text: 'Description',
+        itemOrder: 2,
+        value: 'description',
+        alignVertical: "bottom",
+        component: (data) => (<Button plain onClick={data?.action} textAlign="left">Add description</Button>),
+        action: () => {}
     }
 ]
 
@@ -227,6 +235,19 @@ const transform = {
                 x["highlightValue"] = val
                 return x
             })
+            if(c.includes("x-akto-decode")){
+                highlightPaths.push({
+                    "highlightValue": {
+                        "value": "x-akto-decode",
+                        "wholeRow": true,
+                        "className": "akto-decoded",
+                        "highlight": true,
+                    },
+                    "responseCode": -1,
+                    "header": 'x-akto-decode',
+                    "param": "x-akto-decode",
+                })
+            }
             paths.push({message:c, highlightPaths:highlightPaths}); 
         }
         return paths;
@@ -539,6 +560,9 @@ const transform = {
                 isNew: this.isNewEndpoint(url.lastSeenTs),
                 sensitiveDataTags: url?.sensitiveTags.join(" "),
                 codeAnalysisEndpoint: false,
+                issuesComp: url.severityObj? this.getIssuesList(url.severityObj):'-',
+                severity: url.severityObj? Object.keys(url.severityObj):[],
+                description: url.description
             }
         })
 

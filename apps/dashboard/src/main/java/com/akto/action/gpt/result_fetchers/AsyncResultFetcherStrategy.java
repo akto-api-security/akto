@@ -1,21 +1,25 @@
 package com.akto.action.gpt.result_fetchers;
 
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.http_util.CoreHTTPClient;
 import com.mongodb.BasicDBObject;
-import okhttp3.*;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.IOException;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import okhttp3.MediaType;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.RequestBody;
+import okhttp3.Response;
+import okhttp3.ResponseBody;
 
 public class AsyncResultFetcherStrategy implements ResultFetcherStrategy<BasicDBObject> {
 
     private static final String ASK_GPT_ASYNC_URL = "https://18qazon803.execute-api.ap-south-1.amazonaws.com/ask_gpt_async";
     private static final String FETCH_RESPONSE_URL = "https://18qazon803.execute-api.ap-south-1.amazonaws.com/fetch_response";
 
-    private static final Logger logger = LoggerFactory.getLogger(AsyncResultFetcherStrategy.class);
+    private static final LoggerMaker logger = new LoggerMaker(AsyncResultFetcherStrategy.class, LogDb.DASHBOARD);;
     @Override
     public BasicDBObject fetchResult(BasicDBObject data) {
         return fetchDataFromLambda(data);
@@ -24,7 +28,7 @@ public class AsyncResultFetcherStrategy implements ResultFetcherStrategy<BasicDB
     private BasicDBObject fetchDataFromLambda(BasicDBObject data) {
         String requestId = UUID.randomUUID().toString();
         data.put("request_id", requestId);
-        logger.info("Request body:" + data.toJson());
+        logger.debug("Request body:" + data.toJson());
         OkHttpClient client = CoreHTTPClient.client.newBuilder()
                 .writeTimeout(3, TimeUnit.SECONDS)
                 .readTimeout(3, TimeUnit.SECONDS)
@@ -72,7 +76,7 @@ public class AsyncResultFetcherStrategy implements ResultFetcherStrategy<BasicDB
                 .build();
 
         while (attempts < 10 && !status.equalsIgnoreCase("READY")) {
-            logger.info("Attempt: {} for request id: {}", attempts, requestId);
+            logger.debug("Attempt: {} for request id: {}", attempts, requestId);
             BasicDBObject data = new BasicDBObject("request_id", requestId);
             MediaType mediaType = MediaType.parse("application/json");
             RequestBody body = RequestBody.create(mediaType, new BasicDBObject("data", data).toJson());
@@ -87,11 +91,11 @@ public class AsyncResultFetcherStrategy implements ResultFetcherStrategy<BasicDB
                 if (responseBody != null) {
                     String resp_body = responseBody.string();
                     BasicDBObject responseJson = BasicDBObject.parse(resp_body);
-                    logger.info("Response from lambda: {}, attempt #{}", responseJson, attempts);
+                    logger.debug("Response from lambda: {}, attempt #{}", responseJson, attempts);
                     status = responseJson.getString("status");
 
                     if (status.equalsIgnoreCase("READY")) {
-                        logger.info("Response from lambda: {}. Found response in {} attempts", responseJson, attempts);
+                        logger.debug("Response from lambda: {}. Found response in {} attempts", responseJson, attempts);
                         String response1 = responseJson.getString("response");
                         return BasicDBObject.parse(response1);
                     }
@@ -102,7 +106,7 @@ public class AsyncResultFetcherStrategy implements ResultFetcherStrategy<BasicDB
 
             attempts++;
             try {
-                logger.info("Sleeping for 5 seconds");
+                logger.debug("Sleeping for 5 seconds");
                 Thread.sleep(5000);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();

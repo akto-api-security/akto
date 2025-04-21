@@ -1,5 +1,6 @@
 package com.akto.utils;
 
+import com.akto.action.ExportSampleDataAction;
 import com.akto.dao.ThirdPartyAccessDao;
 import com.akto.dao.TrafficInfoDao;
 import com.akto.dao.context.Context;
@@ -16,6 +17,10 @@ import com.akto.dto.HttpResponseParams;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.dependency_flow.DependencyFlow;
+import com.akto.dto.testing.GenericTestResult;
+import com.akto.dto.testing.MultiExecTestResult;
+import com.akto.dto.testing.TestResult;
+import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.third_party_access.Credential;
 import com.akto.dto.third_party_access.PostmanCredential;
 import com.akto.dto.third_party_access.ThirdPartyAccess;
@@ -35,9 +40,11 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 
+import java.io.File;
 import java.net.MalformedURLException;
 import java.net.URISyntaxException;
 import java.net.URL;
@@ -52,7 +59,7 @@ import static com.akto.dto.RawApi.convertHeaders;
 
 public class Utils {
 
-    private static final LoggerMaker loggerMaker = new LoggerMaker(Utils.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(Utils.class, LogDb.DASHBOARD);;
     private final static ObjectMapper mapper = new ObjectMapper();
 
     public static Map<String, String> getAuthMap(JsonNode auth, Map<String, String> variableMap) {
@@ -188,7 +195,7 @@ public class Utils {
             String key = matcher.group(1);
             if (key == null) continue;
             if (!variableMap.containsKey(key)) {
-                loggerMaker.infoAndAddToDb("Missed: " + key, LogDb.DASHBOARD);
+                loggerMaker.debugAndAddToDb("Missed: " + key, LogDb.DASHBOARD);
                 continue;
             }
             String value = variableMap.get(key);
@@ -636,4 +643,62 @@ public class Utils {
         return request.getScheme() + "://" + request.getServerName() + ":" + request.getServerPort();
     }
 
+    public static File createRequestFile(String originalMessage, String message) {
+        if(originalMessage == null || message == null) {
+            return null;
+        }
+        try {
+            String origCurl = ExportSampleDataAction.getCurl(originalMessage);
+            String testCurl = ExportSampleDataAction.getCurl(message);
+
+            HttpResponseParams origObj = HttpCallParser.parseKafkaMessage(originalMessage);
+            BasicDBObject testRespObj = BasicDBObject.parse(message);
+            BasicDBObject testPayloadObj = BasicDBObject.parse(testRespObj.getString("response"));
+            String testResp = testPayloadObj.getString("body");
+
+            File tmpOutputFile = File.createTempFile("output", ".txt");
+
+            FileUtils.writeStringToFile(tmpOutputFile, "Original Curl ----- \n\n", (String) null);
+            FileUtils.writeStringToFile(tmpOutputFile, origCurl + "\n\n", (String) null, true);
+            FileUtils.writeStringToFile(tmpOutputFile, "Original Api Response ----- \n\n", (String) null, true);
+            FileUtils.writeStringToFile(tmpOutputFile, origObj.getPayload() + "\n\n", (String) null, true);
+
+            FileUtils.writeStringToFile(tmpOutputFile, "Test Curl ----- \n\n", (String) null, true);
+            FileUtils.writeStringToFile(tmpOutputFile, testCurl + "\n\n", (String) null, true);
+            FileUtils.writeStringToFile(tmpOutputFile, "Test Api Response ----- \n\n", (String) null, true);
+            FileUtils.writeStringToFile(tmpOutputFile, testResp + "\n\n", (String) null, true);
+
+            return tmpOutputFile;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    public static TestResult getTestResultFromTestingRunResult(TestingRunResult testingRunResult) {
+        TestResult testResult;
+        try {
+            GenericTestResult gtr = testingRunResult.getTestResults().get(testingRunResult.getTestResults().size() - 1);
+            if (gtr instanceof TestResult) {
+                testResult = (TestResult) gtr;
+            } else if (gtr instanceof MultiExecTestResult) {
+                MultiExecTestResult multiTestRes = (MultiExecTestResult) gtr;
+                List<GenericTestResult> genericTestResults = multiTestRes.convertToExistingTestResult(testingRunResult);
+                GenericTestResult genericTestResult = genericTestResults.get(genericTestResults.size() - 1);
+                if (genericTestResult instanceof TestResult) {
+                    testResult = (TestResult) genericTestResult;
+                } else {
+
+                    testResult = null;
+                }
+            } else {
+                testResult = null;
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error while casting GenericTestResult obj to TestResult obj: " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
+            testResult = null;
+        }
+
+        return testResult;
+    }
 }

@@ -9,6 +9,7 @@ import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.TestConfigYamlParser;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.test_editor.info.InfoParser;
+import com.akto.dao.testing.DefaultTestSuitesDao;
 import com.akto.dao.testing.TestRolesDao;
 import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dto.AccountSettings;
@@ -25,6 +26,7 @@ import com.akto.dto.testing.AuthMechanism;
 import com.akto.dto.testing.GenericTestResult;
 import com.akto.dto.testing.MultiExecTestResult;
 import com.akto.dto.testing.TestResult;
+import com.akto.dto.testing.TestRoles;
 import com.akto.dto.testing.TestingRunConfig;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.traffic.SampleData;
@@ -41,6 +43,7 @@ import com.akto.testing.Utils;
 import com.akto.util.Constants;
 import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.Severity;
+import com.akto.util.enums.GlobalEnums.YamlTemplateSource;
 import com.akto.utils.GithubSync;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
@@ -52,8 +55,6 @@ import com.mongodb.client.model.Updates;
 
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.util.*;
@@ -66,8 +67,7 @@ import static com.akto.util.enums.GlobalEnums.YamlTemplateSource;
 public class SaveTestEditorAction extends UserAction {
 
     private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
-    private static final LoggerMaker loggerMaker = new LoggerMaker(SaveTestEditorAction.class);
-    private static final Logger logger = LoggerFactory.getLogger(SaveTestEditorAction.class);
+    private static final LoggerMaker logger = new LoggerMaker(SaveTestEditorAction.class, LogDb.DASHBOARD);;
 
     @Override
     public String execute() throws Exception {
@@ -244,6 +244,8 @@ public class SaveTestEditorAction extends UserAction {
                     Filters.eq(Constants.ID, id),
                     Updates.combine(updates));
 
+            DefaultTestSuitesDao.instance.saveYamlTestTemplateInDefaultSuite(testConfig.getInfo(), author);
+
         } else {
             addActionError("Cannot save template, specify a different test id");
             return ERROR.toUpperCase();
@@ -293,7 +295,6 @@ public class SaveTestEditorAction extends UserAction {
                 apiInfoKey.getString(ApiInfo.ApiInfoKey.URL),
                 URLMethods.Method.valueOf(apiInfoKey.getString(ApiInfo.ApiInfoKey.METHOD)));
 
-        AuthMechanism authMechanism = TestRolesDao.instance.fetchAttackerToken(0, null);
         Map<ApiInfo.ApiInfoKey, List<String>> sampleDataMap = new HashMap<>();
         Map<ApiInfo.ApiInfoKey, List<String>> newSampleDataMap = new HashMap<>();
         
@@ -317,7 +318,7 @@ public class SaveTestEditorAction extends UserAction {
 
         SampleMessageStore messageStore = SampleMessageStore.create(sampleDataMap);
         List<CustomAuthType> customAuthTypes = CustomAuthTypeDao.instance.findAll(CustomAuthType.ACTIVE,true);
-        TestingUtil testingUtil = new TestingUtil(authMechanism, messageStore, null, null, customAuthTypes);
+        TestingUtil testingUtil = new TestingUtil(messageStore, null, null, customAuthTypes);
         List<TestingRunResult.TestLog> testLogs = new ArrayList<>();
         int lastSampleIndex = sampleDataList.get(0).getSamples().size() - 1;
         
@@ -398,10 +399,10 @@ public class SaveTestEditorAction extends UserAction {
                 try {
                     GithubSync githubSync = new GithubSync();
                     byte[] repoZip = githubSync.syncRepo(repositoryUrl);
-                    loggerMaker.infoAndAddToDb(String.format("Adding test templates from %s for account: %d", repositoryUrl, accountId), LogDb.DASHBOARD);
+                    logger.debugAndAddToDb(String.format("Adding test templates from %s for account: %d", repositoryUrl, accountId), LogDb.DASHBOARD);
                     InitializerListener.processTemplateFilesZip(repoZip, author, YamlTemplateSource.CUSTOM.toString(), repositoryUrl);
                 } catch (Exception e) {
-                    loggerMaker.errorAndAddToDb(String.format("Error while adding test editor templates from %s for account %d, Error: %s", repositoryUrl, accountId, e.getMessage()), LogDb.DASHBOARD);
+                    logger.errorAndAddToDb(String.format("Error while adding test editor templates from %s for account %d, Error: %s", repositoryUrl, accountId, e.getMessage()), LogDb.DASHBOARD);
                 }
             }
         }, 0, TimeUnit.SECONDS);

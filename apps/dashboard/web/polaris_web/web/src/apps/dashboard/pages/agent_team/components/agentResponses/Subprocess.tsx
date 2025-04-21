@@ -22,7 +22,7 @@ interface SubProcessProps {
 
 export const Subprocess = ({ agentId, processId, subProcessFromProp, triggerCallForSubProcesses, setCurrentAgentRun }: SubProcessProps) => {
     const [subprocess, setSubprocess] = useState<AgentSubprocess | null>(subProcessFromProp);
-    const [expanded, setExpanded] = useState(true);
+    const [expanded, setExpanded] = useState((subProcessFromProp?.state == "SCHEDULED" || subProcessFromProp?.state == "RUNNING") ? true : false);
 
     const { finalCTAShow, setFinalCTAShow, setCurrentAttempt, 
         setCurrentSubprocess, currentSubprocess, currentAttempt, setAgentState, setPRState, PRstate,
@@ -233,7 +233,7 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, triggerCall
                 </button>
 
                 <AnimatePresence>
-                    <motion.div animate={subprocess.state === "RUNNING" ? "open" : "closed"} variants={{ open: { height: "auto", opacity: 1 }, closed: { height: 0, opacity: 0 } }} transition={{ duration: 0.2 }} className="overflow-hidden">
+                    <motion.div animate={expanded ? "open" : "closed"} variants={{ open: { height: "auto", opacity: 1 }, closed: { height: 0, opacity: 0 } }} transition={{ duration: 0.2 }} className="overflow-hidden">
                         <div className="bg-[#F6F6F7] ml-2.5 pt-0 space-y-1 border-l border-[#D2D5D8]">
                             <AnimatePresence initial={false}>
                                 {subprocess?.logs?.sort((a,b) => {

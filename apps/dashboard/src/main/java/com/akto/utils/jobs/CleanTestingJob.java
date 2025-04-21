@@ -24,8 +24,8 @@ import com.mongodb.client.model.Updates;
 import com.mongodb.client.result.UpdateResult;
 
 public class CleanTestingJob {
-    private static final LoggerMaker loggerMaker = new LoggerMaker(CleanTestingJob.class, LogDb.DASHBOARD);
-    private static final Logger logger = LoggerFactory.getLogger(CleanTestingJob.class);
+
+    private static final LoggerMaker logger = new LoggerMaker(CleanTestingJob.class, LogDb.DASHBOARD);
 
     final static ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
 
@@ -35,7 +35,7 @@ public class CleanTestingJob {
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
                 int now = Context.now();
-                logger.info("Starting cleanTestingJob for all accounts at " + now);
+                logger.debug("Starting cleanTestingJob for all accounts at " + now);
 
                 AccountTask.instance.executeTask(new Consumer<Account>() {
                     @Override
@@ -43,13 +43,13 @@ public class CleanTestingJob {
                         try {
                             cleanTestingJob();
                         } catch (Exception e) {
-                            loggerMaker.errorAndAddToDb(e, "Error in cleanTestingJob " + e.getMessage());
+                            logger.errorAndAddToDb(e, "Error in cleanTestingJob " + e.getMessage());
                         }
                     }
                 }, "clean-testing-job");
                 int now2 = Context.now();
                 int diffNow = now2 - now;
-                logger.info(String.format("Completed cleanTestingJob for all accounts at %d , time taken : %d", now2,
+                logger.debug(String.format("Completed cleanTestingJob for all accounts at %d , time taken : %d", now2,
                         diffNow));
             }
         }, 0, 5, TimeUnit.HOURS);
@@ -70,7 +70,7 @@ public class CleanTestingJob {
         UpdateResult result = TestingRunResultDao.instance.updateManyNoUpsert(filter,
                 // normal tests
                 Updates.set(TestingRunResult.TEST_RESULTS + ".$[]." + TestResult._MESSAGE, updatedData));
-        loggerMaker.infoAndAddToDb(String.format("Result cleanTestingJob message: matched: %d modified: %d",
+        logger.debugAndAddToDb(String.format("Result cleanTestingJob message: matched: %d modified: %d",
                 result.getMatchedCount(), result.getModifiedCount()));
 
         filter = Filters.and(
@@ -79,7 +79,7 @@ public class CleanTestingJob {
         result = TestingRunResultDao.instance.updateManyNoUpsert(filter,
                 // normal tests
                 Updates.set(TestingRunResult.TEST_RESULTS + ".$[]." + TestResult.ORIGINAL_MESSAGE, updatedData));
-        loggerMaker.infoAndAddToDb(String.format("Result cleanTestingJob originalMessage: matched: %d modified: %d",
+        logger.debugAndAddToDb(String.format("Result cleanTestingJob originalMessage: matched: %d modified: %d",
                 result.getMatchedCount(), result.getModifiedCount()));
 
         filter = Filters.and(
@@ -88,7 +88,7 @@ public class CleanTestingJob {
         result = TestingRunResultDao.instance.updateManyNoUpsert(filter,
                 // multi-exec tests
                 Updates.unset(TestingRunResult.TEST_RESULTS + ".$[]." + MultiExecTestResult.NODE_RESULT_MAP));
-        loggerMaker.infoAndAddToDb(String.format("Result cleanTestingJob multi-exec nodeResultMap: matched: %d modified: %d",
+        logger.debugAndAddToDb(String.format("Result cleanTestingJob multi-exec nodeResultMap: matched: %d modified: %d",
                 result.getMatchedCount(), result.getModifiedCount()));
 
         filter = Filters.and(
@@ -100,7 +100,7 @@ public class CleanTestingJob {
                 Updates.unset(TestingRunResult.WORKFLOW_TEST + "."
                         + WorkflowTest.MAP_NODE_ID_TO_WORKFLOW_NODE_DETAILS));
 
-        loggerMaker.infoAndAddToDb(String.format("Result cleanTestingJob workflowTest mapNodeIdToWorkflowNodeDetails: matched: %d modified: %d",
+        logger.debugAndAddToDb(String.format("Result cleanTestingJob workflowTest mapNodeIdToWorkflowNodeDetails: matched: %d modified: %d",
                 result.getMatchedCount(), result.getModifiedCount()));
     }
 }
