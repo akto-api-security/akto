@@ -130,7 +130,7 @@ function Integrations() {
     let agentConfigObj ={
       id: 'agents',
       name:'Agents',
-      source: '/public/wand.svg'
+      source: '/public/wizard.svg'
     }
 
     let awsWafObj ={

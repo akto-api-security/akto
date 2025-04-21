@@ -9214,6 +9214,7 @@
                 <param name="accessType">READ_WRITE</param>
                 <param name="actionDescription">Save an agent model</param>
             </interceptor-ref>
+            <interceptor-ref name="usageInterceptor">
                 <param name="featureLabel">AI_AGENTS</param>
             </interceptor-ref>
             <result name="SUCCESS"  type="json"></result>
@@ -9237,6 +9238,7 @@
                 <param name="accessType">READ_WRITE</param>
                 <param name="actionDescription">Delete an agent model</param>
             </interceptor-ref>
+            <interceptor-ref name="usageInterceptor">
                 <param name="featureLabel">AI_AGENTS</param>
             </interceptor-ref>
             <result name="SUCCESS"  type="json"></result>
