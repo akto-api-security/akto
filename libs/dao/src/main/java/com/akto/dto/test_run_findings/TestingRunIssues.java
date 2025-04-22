@@ -169,7 +169,9 @@ public class TestingRunIssues {
     }
 
     public String getAzureBoardsWorkItemUrl() {
-        return azureBoardsWorkItemUrl;
+        return (azureBoardsWorkItemUrl != null && azureBoardsWorkItemUrl.contains("/_apis/wit/workItems/"))
+                ? azureBoardsWorkItemUrl.replace("/_apis/wit/workItems/", "/_workItems/edit/")
+                : azureBoardsWorkItemUrl;
     }
 
     public void setAzureBoardsWorkItemUrl(String azureBoardsWorkItemUrl) {
