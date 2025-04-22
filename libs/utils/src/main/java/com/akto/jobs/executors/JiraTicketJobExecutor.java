@@ -1,9 +1,13 @@
 package com.akto.jobs.executors;
 
+import com.akto.dao.ConfigsDao;
 import com.akto.dao.JiraIntegrationDao;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
+import com.akto.dto.Config;
+import com.akto.dto.Config.AktoHostUrlConfig;
+import com.akto.dto.Config.ConfigType;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.jira_integration.JiraIntegration;
@@ -78,6 +82,10 @@ public class JiraTicketJobExecutor extends JobExecutor<AutoTicketParams> {
             return;
         }
 
+        AktoHostUrlConfig aktoUrlConfig = (AktoHostUrlConfig) ConfigsDao.instance.findOne(
+            Filters.eq(Constants.ID, ConfigType.AKTO_DASHBOARD_HOST_URL.name()));
+        String dashboardUrl = aktoUrlConfig == null ? Constants.DEFAULT_AKTO_DASHBOARD_URL : aktoUrlConfig.getHostUrl();
+
         Map<String, Info> infoMap = fetchYamlInfoMap(issues);
 
         List<JiraMetaData> batchMetaList = new ArrayList<>();
@@ -114,7 +122,7 @@ public class JiraTicketJobExecutor extends JobExecutor<AutoTicketParams> {
                     info.getName(),
                     "Host - " + url.getHost(),
                     url.getPath(),
-                    "https://app.akto.io/dashboard/issues?result=" + testingRunResult.getId().toHexString(),
+                    dashboardUrl + "/dashboard/issues?result=" + testingRunResult.getId().toHexString(),
                     info.getDescription(),
                     id,
                     summaryId

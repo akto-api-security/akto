@@ -1,5 +1,9 @@
 package com.akto.action;
 
+import com.akto.dao.ConfigsDao;
+import com.akto.dto.Config.AktoHostUrlConfig;
+import com.akto.dto.Config.ConfigType;
+import com.akto.util.DashboardMode;
 import java.io.File;
 import java.net.URL;
 import java.util.*;
@@ -7,22 +11,21 @@ import java.util.concurrent.TimeUnit;
 
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing.TestingRunResultDao;
-import com.akto.dto.ApiInfo;
 import com.akto.dto.test_editor.Info;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.test_run_findings.TestingRunIssues;
-import com.akto.dto.testing.GenericTestResult;
-import com.akto.dto.testing.MultiExecTestResult;
 import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.TestingRunResult;
 import com.mongodb.client.model.Projections;
-import org.apache.commons.io.FileUtils;
+import javax.servlet.http.HttpServletRequest;
+import org.apache.struts2.interceptor.ServletRequestAware;
+import org.bson.BsonDocument;
+import org.bson.Document;
 import org.bson.conversions.Bson;
 
 import com.akto.dao.JiraIntegrationDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
-import com.akto.dto.HttpResponseParams;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.jira_integration.JiraIntegration;
@@ -30,7 +33,6 @@ import com.akto.dto.jira_integration.JiraMetaData;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-import com.akto.parsers.HttpCallParser;
 import com.akto.test_editor.Utils;
 import com.akto.testing.ApiExecutor;
 import com.akto.util.Constants;
@@ -53,7 +55,7 @@ import okhttp3.Response;
 import static com.akto.utils.Utils.createRequestFile;
 import static com.akto.utils.Utils.getTestResultFromTestingRunResult;
 
-public class JiraIntegrationAction extends UserAction {
+public class JiraIntegrationAction extends UserAction implements ServletRequestAware {
 
     private String baseUrl;
     private String projId;
@@ -68,6 +70,8 @@ public class JiraIntegrationAction extends UserAction {
     private String origReq;
     private String testReq;
     private String issueId;
+
+    private String dashboardUrl;
 
     private Map<String,List<BasicDBObject>> projectAndIssueMap;
 
@@ -185,6 +189,8 @@ public class JiraIntegrationAction extends UserAction {
 
     public String addIntegration() {
 
+        addAktoHostUrl();
+
         UpdateOptions updateOptions = new UpdateOptions();
         updateOptions.upsert(true);
         Bson tokenUpdate = Updates.set("apiToken", apiToken);
@@ -211,6 +217,9 @@ public class JiraIntegrationAction extends UserAction {
     }
 
     public String fetchIntegration() {
+
+        addAktoHostUrl();
+
         jiraIntegration = JiraIntegrationDao.instance.findOne(new BasicDBObject());
         if(jiraIntegration != null){
             jiraIntegration.setApiToken("****************************");
@@ -443,7 +452,8 @@ public class JiraIntegrationAction extends UserAction {
                         endpoint,
                         aktoDashboardHost+"/dashboard/issues?result="+testingRunResult.getId().toHexString(),
                         info.getDescription(),
-                        testingIssuesId
+                        testingIssuesId,
+                        null
                 );
 
             } catch (Exception e) {
@@ -707,5 +717,29 @@ public class JiraIntegrationAction extends UserAction {
 
     public String getErrorMessage() {
         return errorMessage;
+    }
+
+    @Override
+    public void setServletRequest(HttpServletRequest request) {
+        this.dashboardUrl = com.akto.utils.Utils.createDashboardUrlFromRequest(request);
+    }
+
+    private void addAktoHostUrl() {
+        if (DashboardMode.isOnPremDeployment()) {
+
+            AktoHostUrlConfig existingConfig = (AktoHostUrlConfig) ConfigsDao.instance.findOne(
+                Filters.eq(Constants.ID, ConfigType.AKTO_DASHBOARD_HOST_URL.name()));
+
+            int now = Context.now();
+
+            if (existingConfig == null || (now - existingConfig.getLastSyncedAt()) > 3600) {
+                AktoHostUrlConfig config = new AktoHostUrlConfig();
+                config.setHostUrl(this.dashboardUrl);
+                config.setLastSyncedAt(now);
+                ConfigsDao.instance.updateOne(Filters.eq(Constants.ID, ConfigType.AKTO_DASHBOARD_HOST_URL.name()),
+                    new Document("$set", config)
+                );
+            }
+        }
     }
 }

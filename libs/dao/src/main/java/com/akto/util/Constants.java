@@ -41,4 +41,6 @@ public class Constants {
     public static final String UNDERSCORE = "_";
 
     public final static String _AKTO = "AKTO";
+
+    public final static String DEFAULT_AKTO_DASHBOARD_URL = "https://app.akto.io";
 }
