@@ -289,28 +289,28 @@ public class SaveTestEditorAction extends UserAction {
             return ERROR.toUpperCase();
         }
 
-        Account account = AccountsDao.instance.findOne(Filters.eq(Constants.ID, Context.accountId.get()));
+//        Account account = AccountsDao.instance.findOne(Filters.eq(Constants.ID, Context.accountId.get()));
         ApiInfo.ApiInfoKey infoKey = new ApiInfo.ApiInfoKey(apiInfoKey.getInt(ApiInfo.ApiInfoKey.API_COLLECTION_ID),
                 apiInfoKey.getString(ApiInfo.ApiInfoKey.URL),
                 URLMethods.Method.valueOf(apiInfoKey.getString(ApiInfo.ApiInfoKey.METHOD)));
 
-        if (account.getHybridTestingEnabled()) {
-            TestingRunPlayground testingRunPlayground = new TestingRunPlayground();
-            testingRunPlayground.setTestTemplate(content);
-            testingRunPlayground.setState(State.SCHEDULED);
-            testingRunPlayground.setSamples(sampleDataList.get(0).getSamples());
-            testingRunPlayground.setApiInfoKey(infoKey);
-            testingRunPlayground.setCreatedAt(Context.now());
-
-            InsertOneResult insertOne = TestingRunPlaygroundDao.instance.insertOne(testingRunPlayground);
-            if (insertOne.wasAcknowledged()) {
-                testingRunPlaygroundHexId = Objects.requireNonNull(insertOne.getInsertedId()).asObjectId().getValue().toHexString();
-                return SUCCESS.toUpperCase();
-            } else {
-                addActionError("Failed to create TestingRunPlayground");
-                return ERROR.toUpperCase();
-            }
-        }
+//        if (account.getHybridTestingEnabled()) {
+//            TestingRunPlayground testingRunPlayground = new TestingRunPlayground();
+//            testingRunPlayground.setTestTemplate(content);
+//            testingRunPlayground.setState(State.SCHEDULED);
+//            testingRunPlayground.setSamples(sampleDataList.get(0).getSamples());
+//            testingRunPlayground.setApiInfoKey(infoKey);
+//            testingRunPlayground.setCreatedAt(Context.now());
+//
+//            InsertOneResult insertOne = TestingRunPlaygroundDao.instance.insertOne(testingRunPlayground);
+//            if (insertOne.wasAcknowledged()) {
+//                testingRunPlaygroundHexId = Objects.requireNonNull(insertOne.getInsertedId()).asObjectId().getValue().toHexString();
+//                return SUCCESS.toUpperCase();
+//            } else {
+//                addActionError("Failed to create TestingRunPlayground");
+//                return ERROR.toUpperCase();
+//            }
+//        }
 
         try {
             if (!TestConfig.DYNAMIC_SEVERITY.equals(testConfig.getInfo().getSeverity())) {
