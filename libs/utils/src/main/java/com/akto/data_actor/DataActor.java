@@ -227,6 +227,8 @@ public abstract class DataActor {
 
     public abstract void modifyHybridTestingSetting(boolean hybridTestingEnabled);
 
+    public abstract void modifyHybridTestingSettingWithCustomName(boolean hybridTestingEnabled, String serviceName);
+
     public abstract void insertTestingLog(Log log);
 
     public abstract EndpointLogicalGroup fetchEndpointLogicalGroupById(String endpointLogicalGroupId);

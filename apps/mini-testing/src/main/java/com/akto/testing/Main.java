@@ -62,6 +62,8 @@ public class Main {
     public static boolean SKIP_SSRF_CHECK = ("true".equalsIgnoreCase(System.getenv("SKIP_SSRF_CHECK")) || !DashboardMode.isSaasDeployment());
     public static final boolean IS_SAAS = "true".equalsIgnoreCase(System.getenv("IS_SAAS"));
 
+    private static String customMiniTestingServiceName = System.getenv("MINI_TESTING_NAME");
+
     private static void setupRateLimitWatcher (AccountSettings settings) {
         
         scheduler.scheduleAtFixedRate(new Runnable() {
@@ -184,8 +186,20 @@ public class Main {
         }, 0, 5, TimeUnit.MINUTES);
     }
 
+    public static void modifyHybridTestingSettingWithCustomName() {
+        scheduler.scheduleAtFixedRate(new Runnable() {
+            public void run() {
+                dataActor.modifyHybridTestingSettingWithCustomName(RuntimeMode.isHybridDeployment(), customMiniTestingServiceName);
+            }
+        }, 0, 1, TimeUnit.MINUTES);
+    }
+
     public static void main(String[] args) throws InterruptedException {
         AccountSettings accountSettings = dataActor.fetchAccountSettings();
+        if(customMiniTestingServiceName == null || customMiniTestingServiceName.trim().isEmpty()) {
+            customMiniTestingServiceName = "Default_" + UUID.randomUUID().toString().substring(0, 4);
+        }
+        modifyHybridTestingSettingWithCustomName();
         dataActor.modifyHybridTestingSetting(RuntimeMode.isHybridDeployment());
         setupRateLimitWatcher(accountSettings);
 

@@ -1,5 +1,7 @@
 package com.akto.dto;
 
+import java.util.List;
+
 public class Account {
     private int id;
     private String name;
@@ -15,6 +17,8 @@ public class Account {
     public static final String HYBRID_TESTING_ENABLED = "hybridTestingEnabled";
     private boolean hybridTestingEnabled;
     private boolean mergingRunning = false;
+    public static final String MINI_TESTING_HEARTBEAT = "miniTestingHeartbeat";
+    private List<MiniTestingServiceHeartbeat> miniTestingHeartbeat;
 
     private int mergingInitiateTs = 0;
     public Account() {}
@@ -102,6 +106,14 @@ public class Account {
 
     public void setHybridTestingEnabled(boolean hybridTestingEnabled) {
         this.hybridTestingEnabled = hybridTestingEnabled;
+    }
+
+    public List<MiniTestingServiceHeartbeat> getMiniTestingHeartbeat() {
+        return miniTestingHeartbeat;
+    }
+
+    public void setMiniTestingHeartbeat(List<MiniTestingServiceHeartbeat> miniTestingHeartbeat) {
+        this.miniTestingHeartbeat = miniTestingHeartbeat;
     }
 
 }
