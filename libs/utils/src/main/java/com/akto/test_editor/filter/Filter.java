@@ -21,9 +21,12 @@ public class Filter {
 
     private FilterAction filterAction;
     private static final LoggerMaker loggerMaker = new LoggerMaker(Filter.class);
+    
+    private static boolean isTestingContext = true;
 
     public Filter() {
         this.filterAction = new FilterAction();
+        this.isTestingContext = System.getenv().getOrDefault("IS_TESTING_CONTEXT", "true").equals("true");
     }
 //    public DataOperandsFilterResponse isEndpointValid(FilterNode node, RawApi rawApi, RawApi testRawApi, ApiInfo.ApiInfoKey apiInfoKey, List<String> matchingKeySet, List<BasicDBObject> contextEntities, boolean keyValOperandSeen, String context, Map<String, Object> varMap, String logId, boolean skipExtractExecution) {
 //        StringBuilder stringBuilder = new StringBuilder();
@@ -56,8 +59,10 @@ public class Filter {
             }
             String operand = node.getOperand();
             FilterActionRequest filterActionRequest = new FilterActionRequest(node.getValues(), rawApi, testRawApi, apiInfoKey, node.getConcernedProperty(), node.getSubConcernedProperty(), matchingKeySet, contextEntities, operand, context, keyValOperandSeen, node.getBodyOperand(), node.getContextProperty(), node.getCollectionProperty());
-            Object updatedQuerySet = filterAction.resolveQuerySetValues(filterActionRequest, node.fetchNodeValues(), varMap);
-            filterActionRequest.setQuerySet(updatedQuerySet);
+            if (this.isTestingContext) {
+                Object updatedQuerySet = filterAction.resolveQuerySetValues(filterActionRequest, node.fetchNodeValues(), varMap);
+                filterActionRequest.setQuerySet(updatedQuerySet);
+            }
             if (node.getOperand().equalsIgnoreCase(ExtractOperator.EXTRACT.toString()) || node.getOperand().equalsIgnoreCase(ExtractOperator.EXTRACTMULTIPLE.toString())) {
                 boolean resp = true;
                 boolean extractMultiple = node.getOperand().equalsIgnoreCase(ExtractOperator.EXTRACTMULTIPLE.toString());
