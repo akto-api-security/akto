@@ -6678,6 +6678,18 @@
             </result>
         </action>
 
+        <action name="api/fetchTestingRunPlaygroundStatus" class="com.akto.action.test_editor.SaveTestEditorAction" method="fetchTestingRunPlaygroundStatus">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json">
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
         <action name="tools/createSampleDataJson" class="com.akto.action.growth_tools.PublicApiAction" method="createSampleDataJson">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
