@@ -87,7 +87,11 @@ public class JiraTicketJobExecutor extends JobExecutor<AutoTicketParams> {
         if (DashboardMode.isOnPremDeployment()) {
             AktoHostUrlConfig aktoUrlConfig = (AktoHostUrlConfig) ConfigsDao.instance.findOne(
                 Filters.eq(Constants.ID, ConfigType.AKTO_DASHBOARD_HOST_URL.name()));
-            dashboardUrl = aktoUrlConfig == null ? Constants.DEFAULT_AKTO_DASHBOARD_URL : aktoUrlConfig.getHostUrl();
+            if (aktoUrlConfig == null) {
+                logger.error("Akto Dashboard URL not found. jobId: {}", job.getId());
+            } else {
+                dashboardUrl = aktoUrlConfig.getHostUrl();
+            }
         }
 
         Map<String, Info> infoMap = fetchYamlInfoMap(issues);
