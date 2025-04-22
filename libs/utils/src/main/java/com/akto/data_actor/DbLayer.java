@@ -1175,8 +1175,19 @@ public class DbLayer {
 
         BulkWriteOptions options = new BulkWriteOptions().ordered(false).bypassDocumentValidation(true);
         List<WriteModel<SvcToSvcGraphEdge>> bulkList = new ArrayList<>();    
+        UpdateOptions updateOptions = new UpdateOptions().upsert(true).bypassDocumentValidation(true);
         for(SvcToSvcGraphEdge edge: edges) {
-            bulkList.add(new InsertOneModel<SvcToSvcGraphEdge>(edge));
+            Bson updates = Updates.combine(
+                Updates.setOnInsert(SvcToSvcGraphEdge.SOURCE, edge.getSource()),
+                Updates.setOnInsert(SvcToSvcGraphEdge.TARGET, edge.getTarget()),
+                Updates.setOnInsert(SvcToSvcGraphEdge.TYPE, edge.getType().toString()),
+                Updates.setOnInsert(SvcToSvcGraphEdge.COUNTER, edge.getCounter()),
+                Updates.setOnInsert(SvcToSvcGraphEdge.LAST_SEEN_EPOCH, edge.getLastSeenEpoch()),
+                Updates.setOnInsert(SvcToSvcGraphEdge.CREATTION_EPOCH, edge.getCreationEpoch()),
+                Updates.setOnInsert(ID, edge.getId())
+            );
+
+            bulkList.add(new UpdateOneModel<>(Filters.eq(ID, edge.getId()), updates, updateOptions));
         }
 
         SvcToSvcGraphEdgesDao.instance.bulkWrite(bulkList, options);
@@ -1188,10 +1199,20 @@ public class DbLayer {
             return;
         }
 
+        UpdateOptions updateOptions = new UpdateOptions().upsert(true).bypassDocumentValidation(true);
+
         BulkWriteOptions options = new BulkWriteOptions().ordered(false).bypassDocumentValidation(true);
         List<WriteModel<SvcToSvcGraphNode>> bulkList = new ArrayList<>();    
         for(SvcToSvcGraphNode node: nodes) {
-            bulkList.add(new InsertOneModel<SvcToSvcGraphNode>(node));
+            Bson updates = Updates.combine(
+                Updates.setOnInsert(SvcToSvcGraphEdge.TYPE, node.getType().toString()),
+                Updates.setOnInsert(SvcToSvcGraphEdge.COUNTER, node.getCounter()),
+                Updates.setOnInsert(SvcToSvcGraphEdge.LAST_SEEN_EPOCH, node.getLastSeenEpoch()),
+                Updates.setOnInsert(SvcToSvcGraphEdge.CREATTION_EPOCH, node.getCreationEpoch()),
+                Updates.setOnInsert(ID, node.getId())
+            );
+
+            bulkList.add(new UpdateOneModel<>(Filters.eq(ID, node.getId()), updates, updateOptions));
         }
 
         SvcToSvcGraphNodesDao.instance.bulkWrite(bulkList, options);
@@ -1225,5 +1246,4 @@ public class DbLayer {
                 )
         );
     }
-
 }
