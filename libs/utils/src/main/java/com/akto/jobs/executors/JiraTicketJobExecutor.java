@@ -25,6 +25,7 @@ import com.akto.jobs.JobExecutor;
 import com.akto.log.LoggerMaker;
 import com.akto.testing.ApiExecutor;
 import com.akto.util.Constants;
+import com.akto.util.DashboardMode;
 import com.akto.util.http_util.CoreHTTPClient;
 
 import com.akto.utils.FileUtils;
@@ -82,9 +83,12 @@ public class JiraTicketJobExecutor extends JobExecutor<AutoTicketParams> {
             return;
         }
 
-        AktoHostUrlConfig aktoUrlConfig = (AktoHostUrlConfig) ConfigsDao.instance.findOne(
-            Filters.eq(Constants.ID, ConfigType.AKTO_DASHBOARD_HOST_URL.name()));
-        String dashboardUrl = aktoUrlConfig == null ? Constants.DEFAULT_AKTO_DASHBOARD_URL : aktoUrlConfig.getHostUrl();
+        String dashboardUrl = Constants.DEFAULT_AKTO_DASHBOARD_URL;
+        if (DashboardMode.isOnPremDeployment()) {
+            AktoHostUrlConfig aktoUrlConfig = (AktoHostUrlConfig) ConfigsDao.instance.findOne(
+                Filters.eq(Constants.ID, ConfigType.AKTO_DASHBOARD_HOST_URL.name()));
+            dashboardUrl = aktoUrlConfig == null ? Constants.DEFAULT_AKTO_DASHBOARD_URL : aktoUrlConfig.getHostUrl();
+        }
 
         Map<String, Info> infoMap = fetchYamlInfoMap(issues);
 
