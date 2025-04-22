@@ -17,7 +17,6 @@ import com.akto.dto.type.URLMethods;
 import com.akto.hybrid_parsers.HttpCallParser;
 import com.akto.kafka.KafkaConfig;
 import com.akto.log.LoggerMaker;
-import com.akto.log.LoggerMaker.LogDb;
 import com.akto.proto.generated.threat_detection.message.malicious_event.event_type.v1.EventType;
 import com.akto.proto.generated.threat_detection.message.malicious_event.v1.MaliciousEventKafkaEnvelope;
 import com.akto.proto.generated.threat_detection.message.malicious_event.v1.MaliciousEventMessage;
@@ -25,7 +24,6 @@ import com.akto.proto.generated.threat_detection.message.sample_request.v1.Metad
 import com.akto.proto.generated.threat_detection.message.sample_request.v1.SampleMaliciousRequest;
 import com.akto.proto.generated.threat_detection.message.sample_request.v1.SampleRequestKafkaEnvelope;
 import com.akto.proto.http_response_param.v1.HttpResponseParam;
-import com.akto.proto.http_response_param.v1.StringList;
 import com.akto.rules.TestPlugin;
 import com.akto.test_editor.execution.VariableResolver;
 import com.akto.test_editor.filter.data_operands_impl.ValidationResult;
@@ -36,7 +34,6 @@ import com.akto.threat.detection.kafka.KafkaProtoProducer;
 import com.akto.threat.detection.smart_event_detector.window_based.WindowBasedThresholdNotifier;
 import com.akto.util.HttpRequestResponseUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.mongodb.BasicDBObject;
 import com.akto.IPLookupClient;
 import com.akto.RawApiMetadataFactory;
 
@@ -45,6 +42,8 @@ import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.function.Supplier;
+
 import org.apache.commons.lang3.math.NumberUtils;
 import org.apache.kafka.clients.consumer.*;
 
@@ -70,7 +69,10 @@ public class MaliciousTrafficDetectorTask implements Task {
   private static final LoggerMaker logger = new LoggerMaker(MaliciousTrafficDetectorTask.class);
 
   private static final ObjectMapper objectMapper = new ObjectMapper();
-  
+  private static final HttpRequestParams requestParams = new HttpRequestParams();
+  private static final HttpResponseParams responseParams = new HttpResponseParams();
+  private static Map<String, Object> varMap = new HashMap<>();
+  private static Supplier<String> lazyToString;
 
   public MaliciousTrafficDetectorTask(
       KafkaConfig trafficConfig, KafkaConfig internalConfig, RedisClient redisClient) throws Exception {
@@ -88,6 +90,7 @@ public class MaliciousTrafficDetectorTask implements Task {
         ConsumerConfig.MAX_POLL_RECORDS_CONFIG,
         trafficConfig.getConsumerConfig().getMaxPollRecords());
     properties.put(ConsumerConfig.GROUP_ID_CONFIG, trafficConfig.getGroupId());
+    properties.put(ConsumerConfig.FETCH_MAX_BYTES_CONFIG, 100 * 1024 * 1024);
     properties.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
     properties.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, false);
     this.kafkaConsumer = new KafkaConsumer<>(properties);
@@ -139,25 +142,16 @@ public class MaliciousTrafficDetectorTask implements Task {
 
     List<YamlTemplate> templates = dataActor.fetchFilterYamlTemplates();
     apiFilters = FilterYamlTemplateDao.fetchFilterConfig(false, templates, false);
-    logger.debug("total filters fetched " + + apiFilters.size());
+    logger.debug("total filters fetched {} ", apiFilters.size());
     this.filterLastUpdatedAt = now;
     return apiFilters;
   }
 
   private boolean validateFilterForRequest(
-      FilterConfig apiFilter, RawApi rawApi, ApiInfo.ApiInfoKey apiInfoKey, String message) {
+      FilterConfig apiFilter, RawApi rawApi, ApiInfo.ApiInfoKey apiInfoKey) {
     try {
-      Map<String, Object> varMap = apiFilter.resolveVarMap();
-      VariableResolver.resolveWordList(
-          varMap,
-          new HashMap<ApiInfo.ApiInfoKey, List<String>>() {
-            {
-              put(apiInfoKey, Collections.singletonList(message));
-            }
-          },
-          apiInfoKey);
-
-      String filterExecutionLogId = UUID.randomUUID().toString();
+      varMap.clear();
+      String filterExecutionLogId = "";
       ValidationResult res =
           TestPlugin.validateFilter(
               apiFilter.getFilter().getNode(), rawApi, apiInfoKey, varMap, filterExecutionLogId);
@@ -180,7 +174,7 @@ public class MaliciousTrafficDetectorTask implements Task {
       return;
     }
 
-    logger.debug("Processing record with actor IP: " + responseParam.getSourceIP());
+    logger.debug("Processing record with actor IP: {}", responseParam.getSourceIP());
     Context.accountId.set(Integer.parseInt(responseParam.getAccountId()));
     Map<String, FilterConfig> filters = this.getFilters();
     if (filters.isEmpty()) {
@@ -189,7 +183,6 @@ public class MaliciousTrafficDetectorTask implements Task {
 
     List<SampleRequestKafkaEnvelope> maliciousMessages = new ArrayList<>();
 
-    String message = responseParam.getOrig();
     RawApi rawApi = RawApi.buildFromMessageNew(responseParam);
     RawApiMetadata metadata = this.rawApiFactory.buildFromHttp(rawApi.getRequest(), rawApi.getResponse());
     rawApi.setRawApiMetdata(metadata);
@@ -202,12 +195,12 @@ public class MaliciousTrafficDetectorTask implements Task {
     ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(apiCollectionId, url, method);
 
     for (FilterConfig apiFilter : apiFilters.values()) {
-      boolean hasPassedFilter = validateFilterForRequest(apiFilter, rawApi, apiInfoKey, message);
+      boolean hasPassedFilter = validateFilterForRequest(apiFilter, rawApi, apiInfoKey);
 
       // If a request passes any of the filter, then it's a malicious request,
       // and so we push it to kafka
       if (hasPassedFilter) {
-        logger.debug("filter condition satisfied for url " + apiInfoKey.getUrl() + " filterId " + apiFilter.getId());
+        logger.debug("filter condition satisfied for url {} filterId {}", apiInfoKey.getUrl(), apiFilter.getId());
         // Later we will also add aggregation support
         // Eg: 100 4xx requests in last 10 minutes.
         // But regardless of whether request falls in aggregation or not,
@@ -228,7 +221,7 @@ public class MaliciousTrafficDetectorTask implements Task {
         SampleMaliciousRequest maliciousReq = SampleMaliciousRequest.newBuilder()
             .setUrl(responseParam.getRequestParams().getURL())
             .setMethod(responseParam.getRequestParams().getMethod())
-            .setPayload(responseParam.getOrig())
+            .setPayload(responseParam.getOriginalMsg().get())
             .setIp(actor) // For now using actor as IP
             .setApiCollectionId(responseParam.getRequestParams().getApiCollectionId())
             .setTimestamp(responseParam.getTime())
@@ -255,7 +248,7 @@ public class MaliciousTrafficDetectorTask implements Task {
               maliciousReq, rule);
 
           if (result.shouldNotify()) {
-            logger.debug("aggregate condition satisfied for url " + apiInfoKey.getUrl() + " filterId " + apiFilter.getId());
+            logger.debug("aggregate condition satisfied for url {} filterId {}", apiInfoKey.getUrl(), apiFilter.getId());
             generateAndPushMaliciousEventRequest(
                 apiFilter,
                 actor,
@@ -326,21 +319,14 @@ public class MaliciousTrafficDetectorTask implements Task {
 
     Map<String, List<String>> reqHeaders = (Map) httpResponseParamProto.getRequestHeadersMap();
 
-    Map<String, String> reqHeadersStr = new HashMap<>();
-
-    for (Map.Entry<String, StringList> entry :
-      httpResponseParamProto.getRequestHeadersMap().entrySet()) {
-          reqHeadersStr.put(entry.getKey(), entry.getValue().getValuesList().get(0));
-    }
-
-    HttpRequestParams requestParams =
-        new HttpRequestParams(
+    requestParams.resetValues(
             httpResponseParamProto.getMethod(),
             httpResponseParamProto.getPath(),
             httpResponseParamProto.getType(),
             reqHeaders,
             requestPayload,
-            apiCollectionId);
+            apiCollectionId
+    );
 
     String responsePayload =
         HttpRequestResponseUtils.rawToJsonString(httpResponseParamProto.getResponsePayload(), null);
@@ -352,54 +338,9 @@ public class MaliciousTrafficDetectorTask implements Task {
 
     HttpResponseParams.Source source = HttpResponseParams.Source.valueOf(sourceStr);
     Map<String, List<String>> respHeaders = (Map) httpResponseParamProto.getResponseHeadersMap();
-    Map<String, String> respHeadersStr = new HashMap<>();
+    lazyToString = httpResponseParamProto::toString;
 
-    for (Map.Entry<String, StringList> entry :
-      httpResponseParamProto.getResponseHeadersMap().entrySet()) {
-        respHeadersStr.put(entry.getKey(), entry.getValue().getValuesList().get(0));
-    }
-
-    String reqHeaderStr2 = "";
-    try {
-      reqHeaderStr2 = objectMapper.writeValueAsString(reqHeadersStr); 
-    } catch (Exception e) {
-      // TODO: handle exception
-    }
-
-    String respHeaderStr2 = "";
-    try {
-      respHeaderStr2 = objectMapper.writeValueAsString(respHeadersStr); 
-    } catch (Exception e) {
-      // TODO: handle exception
-    }
-
-
-    BasicDBObject origObj = new BasicDBObject();
-    origObj.put("method", httpResponseParamProto.getMethod());
-    origObj.put("requestPayload", httpResponseParamProto.getRequestPayload());
-    origObj.put("responsePayload", httpResponseParamProto.getResponsePayload());
-    origObj.put("ip", httpResponseParamProto.getIp());
-    origObj.put("destIp", httpResponseParamProto.getDestIp());
-    origObj.put("source", sourceStr);
-    origObj.put("type", httpResponseParamProto.getType());
-    origObj.put("akto_vxlan_id", httpResponseParamProto.getAktoVxlanId());
-    origObj.put("path", httpResponseParamProto.getPath());
-    origObj.put("requestHeaders", reqHeaderStr2);
-    origObj.put("responseHeaders", respHeaderStr2);
-    origObj.put("time", httpResponseParamProto.getTime());
-    origObj.put("akto_account_id", httpResponseParamProto.getAktoAccountId());
-    origObj.put("statusCode", httpResponseParamProto.getStatusCode());
-    origObj.put("status", httpResponseParamProto.getStatus());
-
-    String origStr = "";
-    try {
-      origStr = objectMapper.writeValueAsString(origObj);
-    } catch (Exception e) {
-      System.out.println("error constructing orig obj");
-    }
-
-
-    return new HttpResponseParams(
+    return responseParams.resetValues(
         httpResponseParamProto.getType(),
         httpResponseParamProto.getStatusCode(),
         httpResponseParamProto.getStatus(),
@@ -410,9 +351,10 @@ public class MaliciousTrafficDetectorTask implements Task {
         httpResponseParamProto.getAktoAccountId(),
         httpResponseParamProto.getIsPending(),
         source,
-        origStr,
+        "",
         httpResponseParamProto.getIp(),
         httpResponseParamProto.getDestIp(),
-        httpResponseParamProto.getDirection());
+        httpResponseParamProto.getDirection(),
+        lazyToString);
   }
 }

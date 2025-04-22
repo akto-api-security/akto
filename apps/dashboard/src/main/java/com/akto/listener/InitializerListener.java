@@ -2411,14 +2411,6 @@ public class InitializerListener implements ServletContextListener {
 
                 setDashboardMode();
                 updateGlobalAktoVersion();
-                try {
-                    int accountId = !DashboardMode.isSaasDeployment() ? 1_000_000 : 1669322524;
-                    Context.accountId.set(accountId);
-                    DefaultTestSuitesDao.insertDefaultTestSuites();
-                } catch (Exception e) {
-                    e.printStackTrace();
-                    logger.errorAndAddToDb("Error while inserting default test suites in DB: " + e.getMessage());
-                }
 
                 AccountTask.instance.executeTask(new Consumer<Account>() {
                     @Override

@@ -5,6 +5,7 @@ import com.akto.dao.audit_logs.ApiAuditLogsDao;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.jobs.JobsDao;
 import com.akto.dao.loaders.LoadersDao;
+import com.akto.dao.test_editor.TestingRunPlaygroundDao;
 import com.akto.dao.testing.TestRolesDao;
 import com.akto.dao.testing.TestingRunDao;
 import com.akto.dao.testing.TestingRunResultDao;
@@ -70,6 +71,8 @@ import com.akto.dto.CollectionConditions.ConditionsType;
 import com.akto.dto.CollectionConditions.MethodCondition;
 import com.akto.dto.CollectionConditions.TestConfigsAdvancedSettings;
 import com.akto.dto.DependencyNode.ParamInfo;
+import com.akto.dto.agents.Model;
+import com.akto.dto.agents.ModelType;
 import com.akto.dto.agents.State;
 import com.akto.dto.auth.APIAuth;
 import com.akto.dto.billing.Organization;
@@ -91,8 +94,6 @@ import org.slf4j.LoggerFactory;
 import static com.akto.dao.MCollection.clients;
 import static org.bson.codecs.configuration.CodecRegistries.fromProviders;
 import static org.bson.codecs.configuration.CodecRegistries.fromRegistries;
-
-import javax.xml.transform.Source;
 
 public class DaoInit {
 
@@ -285,6 +286,7 @@ public class DaoInit {
         ClassModel<TestingInstanceHeartBeat> testingInstanceHeartBeat = ClassModel.builder(TestingInstanceHeartBeat.class).enableDiscriminator(true).build();
         ClassModel<JobParams> jobParams = ClassModel.builder(JobParams.class).enableDiscriminator(true).build();
         ClassModel<AutoTicketParams> autoTicketParams = ClassModel.builder(AutoTicketParams.class).enableDiscriminator(true).build();
+        ClassModel<Model> agentModel = ClassModel.builder(Model.class).enableDiscriminator(true).build();
 
         CodecRegistry pojoCodecRegistry = fromProviders(PojoCodecProvider.builder().register(
                 configClassModel, signupInfoClassModel, apiAuthClassModel, attempResultModel, urlTemplateModel,
@@ -325,7 +327,7 @@ public class DaoInit {
                 eventsExampleClassModel, remediationClassModel, complianceInfoModel, complianceMappingModel,
                 RuntimeMetricsClassModel, codeAnalysisRepoModel, codeAnalysisApiModel, historicalDataClassModel,
                 configSettingClassModel, configSettingsConditionTypeClassModel, roleClassModel, testingInstanceHeartBeat,
-                jobParams, autoTicketParams)
+                jobParams, autoTicketParams, agentModel)
             .automatic(true).build());
 
         final CodecRegistry customEnumCodecs = CodecRegistries.fromCodecs(
@@ -372,7 +374,8 @@ public class DaoInit {
                 new EnumCodec<>(TrafficAlerts.ALERT_TYPE.class),
                 new EnumCodec<>(ApiInfo.ApiType.class),
                 new EnumCodec<>(CodeAnalysisRepo.SourceCodeType.class),
-                new EnumCodec<>(State.class)
+                new EnumCodec<>(State.class),
+                new EnumCodec<>(ModelType.class)
         );
 
         return fromRegistries(MongoClientSettings.getDefaultCodecRegistry(), pojoCodecRegistry,
@@ -425,6 +428,7 @@ public class DaoInit {
         TestingRunResultDao.instance.createIndicesIfAbsent();
         TestingRunResultSummariesDao.instance.createIndicesIfAbsent();
         TestingRunDao.instance.createIndicesIfAbsent();
+        TestingRunPlaygroundDao.instance.createIndicesIfAbsent();
         TestingRunIssuesDao.instance.createIndicesIfAbsent();
         ApiCollectionsDao.instance.createIndicesIfAbsent();
         ActivitiesDao.instance.createIndicesIfAbsent();

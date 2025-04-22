@@ -1,7 +1,7 @@
 import { Box, Button, Divider, Frame, HorizontalStack, LegacyTabs, Modal, Text, Tooltip} from "@shopify/polaris"
 import {ChevronUpMinor } from "@shopify/polaris-icons"
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import DropdownSearch from "../../../components/shared/DropdownSearch";
 import api from "../../testing/api"
 import testEditorRequests from "../api";
@@ -14,9 +14,11 @@ import editorSetup from "./editor_config/editorSetup";
 import SampleData from "../../../components/shared/SampleData";
 import transform from "../../../components/shared/customDiffEditor";
 import EmptySampleApi from "./EmptySampleApi";
+import Store from "../../../store";
 
 const SampleApi = () => {
 
+    const setToastConfig = Store(state => state.setToastConfig)
     const allCollections = PersistStore(state => state.allCollections);
     const [selected, setSelected] = useState(0);
     const [selectApiActive, setSelectApiActive] = useState(false)
@@ -221,6 +223,8 @@ const SampleApi = () => {
         toggleSelectApiActive()
     }
 
+    const intervalRef = useRef(null);
+
     const runTest = async()=>{
         setLoading(true)
         const apiKeyInfo = {
@@ -230,11 +234,51 @@ const SampleApi = () => {
 
         try {
             let resp = await testEditorRequests.runTestForTemplate(currentContent,apiKeyInfo,sampleDataList)
-            setTestResult(resp)
+            if(resp.testingRunPlaygroundHexId !== null && resp?.testingRunPlaygroundHexId !== undefined) {
+                await new Promise((resolve) => {
+                    let maxAttempts = 100;
+                    let pollInterval = 3000;
+                    let attempts = 0;
+    
+                    intervalRef.current = setInterval(async () => {
+                        if (attempts >= maxAttempts) {
+                            clearInterval(intervalRef.current);
+                            intervalRef.current = null;
+                            setToastConfig({ isActive: true, isError: true, message: "Error while running the test" });
+                            resolve();
+                            return;
+                        }
+    
+                        try {
+                            const result = await testEditorRequests.fetchTestingRunPlaygroundStatus(resp?.testingRunPlaygroundHexId);
+                            if (result?.testingRunPlaygroundStatus === "COMPLETED") {
+                                clearInterval(intervalRef.current);
+                                intervalRef.current = null;
+                                setTestResult(result);
+                                resolve();
+                                return;
+                            }
+                        } catch (err) {
+                            console.error("Error fetching updateResult:", err);
+                        }
+    
+                        attempts++;
+                    }, pollInterval);
+                });
+            }
+            else setTestResult(resp)
         } catch (err){
         }
         setLoading(false)
     }
+
+    useEffect(() => {
+        return () => {
+            if (intervalRef.current) {
+                clearInterval(intervalRef.current);
+            }
+        };
+    }, []);
 
     const showResults = () => {
         setShowTestResult(!showTestResult);

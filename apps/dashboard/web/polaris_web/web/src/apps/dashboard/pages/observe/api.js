@@ -891,6 +891,32 @@ export default {
                 apiCollectionId, description
             }
         })
+    },
+
+    async findSvcToSvcGraphEdges() {
+        return await request({
+            url: '/api/findSvcToSvcGraphEdges',
+            method: 'post',
+            data: {
+                startTimestamp: 0,
+                endTimestamp: 0,
+                skip: 0,
+                limit: 1000
+            }
+        })
+    },
+
+    async findSvcToSvcGraphNodes() {
+        return await request({
+            url: '/api/findSvcToSvcGraphNodes',
+            method: 'post',
+            data: {
+                startTimestamp: 0,
+                endTimestamp: 0,
+                skip: 0,
+                limit: 1000
+            }
+        })
     }
 
 }

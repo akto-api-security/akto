@@ -33,7 +33,7 @@ public class Main {
             .setBootstrapServers(System.getenv("AKTO_TRAFFIC_KAFKA_BOOTSTRAP_SERVER"))
             .setConsumerConfig(
                 KafkaConsumerConfig.newBuilder()
-                    .setMaxPollRecords(100)
+                    .setMaxPollRecords(500)
                     .setPollDurationMilli(100)
                     .build())
             .setProducerConfig(
