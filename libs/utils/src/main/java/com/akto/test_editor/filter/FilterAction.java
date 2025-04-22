@@ -340,7 +340,7 @@ public final class FilterAction {
 
         String origPayload = payload;
         BasicDBObject payloadObj = new BasicDBObject();
-        if (!(filterActionRequest.getOperand().equals(TestEditorEnums.DataOperands.REGEX.toString()))) {
+        if (!filterActionRequest.getOperand().equals(TestEditorEnums.DataOperands.REGEX.toString()) || (filterActionRequest.getCollectionProperty().equals(TestEditorEnums.CollectionOperands.FOR_ONE.toString())) ) {
             try {
                 payload = Utils.jsonifyIfArray(payload);
                 JSONObject jsonObj = JSON.parseObject(payload);
