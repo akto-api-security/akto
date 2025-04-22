@@ -347,7 +347,7 @@ public class FilterValidationTests {
     public Map<String, Object> initconfig() {
         Map<String, Object> config = new HashMap<>();
         try {
-            InputStream inputStream = getClass().getClassLoader().getResourceAsStream("com/akto/testing/filter.yaml");
+            InputStream inputStream = getClass().getClassLoader().getResourceAsStream("filter.yaml");
             config = new ObjectMapper(new YAMLFactory()).readValue(inputStream, Map.class);
         } catch(Exception e) {
             System.out.println("error " + e.getMessage());
