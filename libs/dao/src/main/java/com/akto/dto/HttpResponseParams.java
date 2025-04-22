@@ -235,8 +235,7 @@ public class HttpResponseParams {
         try {
           TextFormat.getParser().merge(httpResponseParamProtoString, httpBuilder);
         } catch (Exception e) {
-          System.out.println("error parsing httpresponse param proto string");
-          return origStr;
+          return httpResponseParamProtoString;
         }
         HttpResponseParam httpResponseParamProto = httpBuilder.build();
 
@@ -256,7 +255,7 @@ public class HttpResponseParams {
             reqHeaderStr2 = objectMapper.writeValueAsString(reqHeaders);
             respHeaderStr2 = objectMapper.writeValueAsString(respHeaders);
         } catch (Exception e) {
-            return origStr;
+            return httpResponseParamProtoString;
         }
 
         origObj.put("method", httpResponseParamProto.getMethod());
@@ -278,7 +277,7 @@ public class HttpResponseParams {
         try {
           origStr = objectMapper.writeValueAsString(origObj);
         } catch (Exception e) {
-            return origStr;
+            return httpResponseParamProtoString;
         }
 
         return origStr;
