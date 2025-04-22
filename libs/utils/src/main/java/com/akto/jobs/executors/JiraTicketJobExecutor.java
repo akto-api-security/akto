@@ -100,7 +100,8 @@ public class JiraTicketJobExecutor extends JobExecutor<AutoTicketParams> {
 
             TestingRunResult testingRunResult = TestingRunResultDao.instance.findOne(Filters.and(
                 Filters.in(TestingRunResult.TEST_SUB_TYPE, issue.getId().getTestSubCategory()),
-                Filters.in(TestingRunResult.API_INFO_KEY, issue.getId().getApiInfoKey())
+                Filters.in(TestingRunResult.API_INFO_KEY, issue.getId().getApiInfoKey()),
+                Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, summaryId)
             ));
 
             if(testingRunResult == null) {
@@ -117,7 +118,8 @@ public class JiraTicketJobExecutor extends JobExecutor<AutoTicketParams> {
                     url.getPath(),
                     "https://app.akto.io/dashboard/issues?result=" + testingRunResult.getId().toHexString(),
                     info.getDescription(),
-                    id
+                    id,
+                    summaryId
                 );
             } catch (Exception e) {
                 logger.error("Error parsing URL for issue {}: {}", id, e.getMessage(), e);
@@ -186,21 +188,7 @@ public class JiraTicketJobExecutor extends JobExecutor<AutoTicketParams> {
             .map(i -> i.getId().getTestSubCategory())
             .distinct()
             .collect(Collectors.toList());
-        List<YamlTemplate> templates = YamlTemplateDao.instance.findAll(
-            Filters.in("_id", subCategories),
-            Projections.include(YamlTemplate.INFO)
-        );
-
-        Map<String, Info> infoMap = new HashMap<>();
-        for (YamlTemplate template : templates) {
-            if (template == null || template.getInfo() == null) {
-                logger.error("YamlTemplate or YamlTemplate.info is null", LogDb.DASHBOARD);
-                continue;
-            }
-            Info info = template.getInfo();
-            infoMap.put(info.getSubCategory(), info);
-        }
-        return infoMap;
+        return YamlTemplateDao.instance.fetchTestInfoMap(Filters.in(YamlTemplateDao.ID, subCategories));
     }
 
     private void processJiraBatch(List<JiraMetaData> batch, String issueType, String projId, JiraIntegration jira) throws Exception {
@@ -217,8 +205,9 @@ public class JiraTicketJobExecutor extends JobExecutor<AutoTicketParams> {
             TestingIssuesId id = data.getTestingIssueId();
             TestingRunResult result = TestingRunResultDao.instance.findOne(
                 Filters.and(
-                    Filters.eq("testSubType", id.getTestSubCategory()),
-                    Filters.eq("apiInfoKey", id.getApiInfoKey())
+                    Filters.eq(TestingRunResult.TEST_SUB_TYPE, id.getTestSubCategory()),
+                    Filters.eq(TestingRunResult.API_INFO_KEY, id.getApiInfoKey()),
+                    Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, data.getTestSummaryId())
                 ),
                 Projections.include("_id", "testResults")
             );

@@ -16,4 +16,8 @@ public class JobsDao extends CommonContextDao<Job> {
     public Class<Job> getClassT() {
         return Job.class;
     }
+
+    public static void createIndexes() {
+
+    }
 }
