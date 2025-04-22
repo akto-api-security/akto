@@ -194,7 +194,7 @@ public class HttpCallParser {
                 }, apiInfoKey);
                 String filterExecutionLogId = UUID.randomUUID().toString();
                 ValidationResult res = validateFilter(apiFilter.getFilter().getNode(), rawApi,
-                        apiInfoKey, varMap, filterExecutionLogId, true);
+                        apiInfoKey, varMap, filterExecutionLogId);
                 if (res.getIsValid()) {
                     // handle custom filters here
                     if(apiFilter.getId().equals(FilterConfig.DEFAULT_BLOCK_FILTER)){

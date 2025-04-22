@@ -154,7 +154,7 @@ public class MaliciousTrafficDetectorTask implements Task {
       String filterExecutionLogId = "";
       ValidationResult res =
           TestPlugin.validateFilter(
-              apiFilter.getFilter().getNode(), rawApi, apiInfoKey, varMap, filterExecutionLogId, false);
+              apiFilter.getFilter().getNode(), rawApi, apiInfoKey, varMap, filterExecutionLogId);
 
       return res.getIsValid();
     } catch (Exception e) {

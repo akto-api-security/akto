@@ -43,7 +43,7 @@ public class FilterValidationTests {
         ConfigParserResult configParserResult = parser.parse(filterObj);
         Filter filter = new Filter();
         Map<String, Object> varMap = new HashMap<>();
-        DataOperandsFilterResponse dataOperandsFilterResponse = filter.isEndpointValid(configParserResult.getNode(), rawApi, rawApi, apiInfoKey, null, null, false, "filter", varMap, "logId", false, true);
+        DataOperandsFilterResponse dataOperandsFilterResponse = filter.isEndpointValid(configParserResult.getNode(), rawApi, rawApi, apiInfoKey, null, null, false, "filter", varMap, "logId", false);
         assertEquals(true, dataOperandsFilterResponse.getResult());
         assertEquals(1, varMap.size());
         assertEquals(true, varMap.containsKey("urlVar"));
@@ -60,7 +60,7 @@ public class FilterValidationTests {
         ConfigParserResult configParserResult = parser.parse(filterObj);
         Filter filter = new Filter();
         Map<String, Object> varMap = new HashMap<>();
-        DataOperandsFilterResponse dataOperandsFilterResponse = filter.isEndpointValid(configParserResult.getNode(), rawApi, rawApi, apiInfoKey, null, null, false, "filter", varMap, "logId", false, true);
+        DataOperandsFilterResponse dataOperandsFilterResponse = filter.isEndpointValid(configParserResult.getNode(), rawApi, rawApi, apiInfoKey, null, null, false, "filter", varMap, "logId", false);
         assertEquals(true, dataOperandsFilterResponse.getResult());
         assertEquals(2, varMap.size());
         assertEquals(true, varMap.containsKey("keyName"));
@@ -78,7 +78,7 @@ public class FilterValidationTests {
         ConfigParserResult configParserResult = parser.parse(filterObj);
         Filter filter = new Filter();
         Map<String, Object> varMap = new HashMap<>();
-        DataOperandsFilterResponse dataOperandsFilterResponse = filter.isEndpointValid(configParserResult.getNode(), rawApi, rawApi, apiInfoKey, null, null, false, "filter", varMap, "logId", false, true);
+        DataOperandsFilterResponse dataOperandsFilterResponse = filter.isEndpointValid(configParserResult.getNode(), rawApi, rawApi, apiInfoKey, null, null, false, "filter", varMap, "logId", false);
         assertEquals(true, dataOperandsFilterResponse.getResult());
         assertEquals(2, varMap.size());
         assertEquals(true, varMap.containsKey("keyName"));
@@ -97,7 +97,7 @@ public class FilterValidationTests {
         ConfigParserResult configParserResult = parser.parse(filterObj);
         Filter filter = new Filter();
         Map<String, Object> varMap = new HashMap<>();
-        DataOperandsFilterResponse dataOperandsFilterResponse = filter.isEndpointValid(configParserResult.getNode(), rawApi, rawApi, apiInfoKey, null, null, false, "filter", varMap, "logId", false, true);
+        DataOperandsFilterResponse dataOperandsFilterResponse = filter.isEndpointValid(configParserResult.getNode(), rawApi, rawApi, apiInfoKey, null, null, false, "filter", varMap, "logId", false);
         assertEquals(true, dataOperandsFilterResponse.getResult());
         assertEquals(2, varMap.size());
         assertEquals(true, varMap.containsKey("keyName"));
@@ -116,7 +116,7 @@ public class FilterValidationTests {
         ConfigParserResult configParserResult = parser.parse(filterObj);
         Filter filter = new Filter();
         Map<String, Object> varMap = new HashMap<>();
-        DataOperandsFilterResponse dataOperandsFilterResponse = filter.isEndpointValid(configParserResult.getNode(), rawApi, rawApi, apiInfoKey, null, null, false, "filter", varMap, "logId", false, true);
+        DataOperandsFilterResponse dataOperandsFilterResponse = filter.isEndpointValid(configParserResult.getNode(), rawApi, rawApi, apiInfoKey, null, null, false, "filter", varMap, "logId", false);
         assertEquals(true, dataOperandsFilterResponse.getResult());
         assertEquals(2, varMap.size());
         assertEquals(true, varMap.containsKey("keyName"));
@@ -135,7 +135,7 @@ public class FilterValidationTests {
         ConfigParserResult configParserResult = parser.parse(filterObj);
         Filter filter = new Filter();
         Map<String, Object> varMap = new HashMap<>();
-        DataOperandsFilterResponse dataOperandsFilterResponse = filter.isEndpointValid(configParserResult.getNode(), rawApi, rawApi, apiInfoKey, null, null, false, "filter", varMap, "logId", false, true);
+        DataOperandsFilterResponse dataOperandsFilterResponse = filter.isEndpointValid(configParserResult.getNode(), rawApi, rawApi, apiInfoKey, null, null, false, "filter", varMap, "logId", false);
         assertEquals(true, dataOperandsFilterResponse.getResult());
         assertEquals(2, varMap.size());
         assertEquals(true, varMap.containsKey("keyName"));
@@ -154,7 +154,7 @@ public class FilterValidationTests {
         ConfigParserResult configParserResult = parser.parse(filterObj);
         Filter filter = new Filter();
         Map<String, Object> varMap = new HashMap<>();
-        DataOperandsFilterResponse dataOperandsFilterResponse = filter.isEndpointValid(configParserResult.getNode(), rawApi, rawApi, apiInfoKey, null, null, false, "filter", varMap, "logId", false, true);
+        DataOperandsFilterResponse dataOperandsFilterResponse = filter.isEndpointValid(configParserResult.getNode(), rawApi, rawApi, apiInfoKey, null, null, false, "filter", varMap, "logId", false);
         assertEquals(true, dataOperandsFilterResponse.getResult());
         assertEquals(2, varMap.size());
         assertEquals(true, varMap.containsKey("keyName"));
@@ -173,7 +173,7 @@ public class FilterValidationTests {
         ConfigParserResult configParserResult = parser.parse(filterObj);
         Filter filter = new Filter();
         Map<String, Object> varMap = new HashMap<>();
-        DataOperandsFilterResponse dataOperandsFilterResponse = filter.isEndpointValid(configParserResult.getNode(), rawApi, rawApi, apiInfoKey, null, null, false, "filter", varMap, "logId", false, true);
+        DataOperandsFilterResponse dataOperandsFilterResponse = filter.isEndpointValid(configParserResult.getNode(), rawApi, rawApi, apiInfoKey, null, null, false, "filter", varMap, "logId", false);
         assertEquals(false, dataOperandsFilterResponse.getResult());
         assertEquals(0, varMap.size());
     }
@@ -189,7 +189,7 @@ public class FilterValidationTests {
         ConfigParserResult configParserResult = parser.parse(filterObj);
         Filter filter = new Filter();
         Map<String, Object> varMap = new HashMap<>();
-        DataOperandsFilterResponse dataOperandsFilterResponse = filter.isEndpointValid(configParserResult.getNode(), rawApi, rawApi, apiInfoKey, null, null, false, "filter", varMap, "logId", false, true);
+        DataOperandsFilterResponse dataOperandsFilterResponse = filter.isEndpointValid(configParserResult.getNode(), rawApi, rawApi, apiInfoKey, null, null, false, "filter", varMap, "logId", false);
         assertEquals(false, dataOperandsFilterResponse.getResult());
         assertEquals(0, varMap.size());
     }
@@ -205,31 +205,31 @@ public class FilterValidationTests {
         ConfigParserResult configParserResult = parser.parse(filterObj);
         Filter filter = new Filter();
         Map<String, Object> varMap = new HashMap<>();
-        DataOperandsFilterResponse dataOperandsFilterResponse = filter.isEndpointValid(configParserResult.getNode(), rawApi, rawApi, apiInfoKey, null, null, false, "filter", varMap, "logId", false, true);
+        DataOperandsFilterResponse dataOperandsFilterResponse = filter.isEndpointValid(configParserResult.getNode(), rawApi, rawApi, apiInfoKey, null, null, false, "filter", varMap, "logId", false);
         assertEquals(true, dataOperandsFilterResponse.getResult());
 
         filterObj = config.get("contains_either_invalid");
         configParserResult = parser.parse(filterObj);
         varMap = new HashMap<>();
-        dataOperandsFilterResponse = filter.isEndpointValid(configParserResult.getNode(), rawApi, rawApi, apiInfoKey, null, null, false, "filter", varMap, "logId", false, true);
+        dataOperandsFilterResponse = filter.isEndpointValid(configParserResult.getNode(), rawApi, rawApi, apiInfoKey, null, null, false, "filter", varMap, "logId", false);
         assertEquals(false, dataOperandsFilterResponse.getResult());
 
         filterObj = config.get("contains_all_valid");
         configParserResult = parser.parse(filterObj);
         varMap = new HashMap<>();
-        dataOperandsFilterResponse = filter.isEndpointValid(configParserResult.getNode(), rawApi, rawApi, apiInfoKey, null, null, false, "filter", varMap, "logId", false, true);
+        dataOperandsFilterResponse = filter.isEndpointValid(configParserResult.getNode(), rawApi, rawApi, apiInfoKey, null, null, false, "filter", varMap, "logId", false);
         assertEquals(true, dataOperandsFilterResponse.getResult());
 
         filterObj = config.get("contains_all_invalid");
         configParserResult = parser.parse(filterObj);
         varMap = new HashMap<>();
-        dataOperandsFilterResponse = filter.isEndpointValid(configParserResult.getNode(), rawApi, rawApi, apiInfoKey, null, null, false, "filter", varMap, "logId", false, true);
+        dataOperandsFilterResponse = filter.isEndpointValid(configParserResult.getNode(), rawApi, rawApi, apiInfoKey, null, null, false, "filter", varMap, "logId", false);
         assertEquals(false, dataOperandsFilterResponse.getResult());
 
         filterObj = config.get("contains_either_valid_extract");
         configParserResult = parser.parse(filterObj);
         varMap = new HashMap<>();
-        dataOperandsFilterResponse = filter.isEndpointValid(configParserResult.getNode(), rawApi, rawApi, apiInfoKey, null, null, false, "filter", varMap, "logId", false, true);
+        dataOperandsFilterResponse = filter.isEndpointValid(configParserResult.getNode(), rawApi, rawApi, apiInfoKey, null, null, false, "filter", varMap, "logId", false);
         assertEquals(true, dataOperandsFilterResponse.getResult());
         assertEquals(2, varMap.size());
         assertEquals(true, varMap.containsKey("keyName"));
@@ -248,31 +248,31 @@ public class FilterValidationTests {
         ConfigParserResult configParserResult = parser.parse(filterObj);
         Filter filter = new Filter();
         Map<String, Object> varMap = new HashMap<>();
-        DataOperandsFilterResponse dataOperandsFilterResponse = filter.isEndpointValid(configParserResult.getNode(), rawApi, rawApi, apiInfoKey, null, null, false, "filter", varMap, "logId", false, true);
+        DataOperandsFilterResponse dataOperandsFilterResponse = filter.isEndpointValid(configParserResult.getNode(), rawApi, rawApi, apiInfoKey, null, null, false, "filter", varMap, "logId", false);
         assertEquals(true, dataOperandsFilterResponse.getResult());
 
         filterObj = config.get("complex_and_condition_filter_invalid");
         configParserResult = parser.parse(filterObj);
         varMap = new HashMap<>();
-        dataOperandsFilterResponse = filter.isEndpointValid(configParserResult.getNode(), rawApi, rawApi, apiInfoKey, null, null, false, "filter", varMap, "logId", false, true);
+        dataOperandsFilterResponse = filter.isEndpointValid(configParserResult.getNode(), rawApi, rawApi, apiInfoKey, null, null, false, "filter", varMap, "logId", false);
         assertEquals(false, dataOperandsFilterResponse.getResult());
 
         filterObj = config.get("complex_or_condition_filter");
         configParserResult = parser.parse(filterObj);
         varMap = new HashMap<>();
-        dataOperandsFilterResponse = filter.isEndpointValid(configParserResult.getNode(), rawApi, rawApi, apiInfoKey, null, null, false, "filter", varMap, "logId", false, true);
+        dataOperandsFilterResponse = filter.isEndpointValid(configParserResult.getNode(), rawApi, rawApi, apiInfoKey, null, null, false, "filter", varMap, "logId", false);
         assertEquals(true, dataOperandsFilterResponse.getResult());
 
         filterObj = config.get("complex_or_condition_filter_invalid");
         configParserResult = parser.parse(filterObj);
         varMap = new HashMap<>();
-        dataOperandsFilterResponse = filter.isEndpointValid(configParserResult.getNode(), rawApi, rawApi, apiInfoKey, null, null, false, "filter", varMap, "logId", false, true);
+        dataOperandsFilterResponse = filter.isEndpointValid(configParserResult.getNode(), rawApi, rawApi, apiInfoKey, null, null, false, "filter", varMap, "logId", false);
         assertEquals(false, dataOperandsFilterResponse.getResult());
 
         filterObj = config.get("complex_and_condition_filter_extract");
         configParserResult = parser.parse(filterObj);
         varMap = new HashMap<>();
-        dataOperandsFilterResponse = filter.isEndpointValid(configParserResult.getNode(), rawApi, rawApi, apiInfoKey, null, null, false, "filter", varMap, "logId", false, true);
+        dataOperandsFilterResponse = filter.isEndpointValid(configParserResult.getNode(), rawApi, rawApi, apiInfoKey, null, null, false, "filter", varMap, "logId", false);
         assertEquals(true, dataOperandsFilterResponse.getResult());
         assertEquals(2, varMap.size());
         assertEquals(true, varMap.containsKey("keyName"));
@@ -281,7 +281,7 @@ public class FilterValidationTests {
         filterObj = config.get("complex_or_condition_filter_extract");
         configParserResult = parser.parse(filterObj);
         varMap = new HashMap<>();
-        dataOperandsFilterResponse = filter.isEndpointValid(configParserResult.getNode(), rawApi, rawApi, apiInfoKey, null, null, false, "filter", varMap, "logId", false, true);
+        dataOperandsFilterResponse = filter.isEndpointValid(configParserResult.getNode(), rawApi, rawApi, apiInfoKey, null, null, false, "filter", varMap, "logId", false);
         assertEquals(true, dataOperandsFilterResponse.getResult());
         assertEquals(2, varMap.size());
         assertEquals(true, varMap.containsKey("keyName"));
@@ -300,7 +300,7 @@ public class FilterValidationTests {
         ConfigParserResult configParserResult = parser.parse(filterObj);
         Filter filter = new Filter();
         Map<String, Object> varMap = new HashMap<>();
-        DataOperandsFilterResponse dataOperandsFilterResponse = filter.isEndpointValid(configParserResult.getNode(), rawApi, rawApi, apiInfoKey, null, null, false, "filter", varMap, "logId", false, true);
+        DataOperandsFilterResponse dataOperandsFilterResponse = filter.isEndpointValid(configParserResult.getNode(), rawApi, rawApi, apiInfoKey, null, null, false, "filter", varMap, "logId", false);
         assertEquals(true, dataOperandsFilterResponse.getResult());
 
         Map<String, List<String>> headers = rawApi.getRequest().getHeaders();
@@ -309,7 +309,7 @@ public class FilterValidationTests {
         filterObj = config.get("contains_jwt");
         configParserResult = parser.parse(filterObj);
         varMap = new HashMap<>();
-        dataOperandsFilterResponse = filter.isEndpointValid(configParserResult.getNode(), rawApi, rawApi, apiInfoKey, null, null, false, "filter", varMap, "logId", false, true);
+        dataOperandsFilterResponse = filter.isEndpointValid(configParserResult.getNode(), rawApi, rawApi, apiInfoKey, null, null, false, "filter", varMap, "logId", false);
         assertEquals(false, dataOperandsFilterResponse.getResult());
     }
 
@@ -324,21 +324,21 @@ public class FilterValidationTests {
         ConfigParserResult configParserResult = parser.parse(filterObj);
         Filter filter = new Filter();
         Map<String, Object> varMap = new HashMap<>();
-        DataOperandsFilterResponse dataOperandsFilterResponse = filter.isEndpointValid(configParserResult.getNode(), rawApi, rawApi, apiInfoKey, null, null, false, "filter", varMap, "logId", false, true);
+        DataOperandsFilterResponse dataOperandsFilterResponse = filter.isEndpointValid(configParserResult.getNode(), rawApi, rawApi, apiInfoKey, null, null, false, "filter", varMap, "logId", false);
         assertEquals(true, dataOperandsFilterResponse.getResult());
         assertEquals(1, varMap.size());
 
         filterObj = config.get("regex_filter_invalid");
         configParserResult = parser.parse(filterObj);
         varMap = new HashMap<>();
-        dataOperandsFilterResponse = filter.isEndpointValid(configParserResult.getNode(), rawApi, rawApi, apiInfoKey, null, null, false, "filter", varMap, "logId", false, true);
+        dataOperandsFilterResponse = filter.isEndpointValid(configParserResult.getNode(), rawApi, rawApi, apiInfoKey, null, null, false, "filter", varMap, "logId", false);
         assertEquals(false, dataOperandsFilterResponse.getResult());
         assertEquals(0, varMap.size());
 
         filterObj = config.get("regex_filter_extract_multiple");
         configParserResult = parser.parse(filterObj);
         varMap = new HashMap<>();
-        dataOperandsFilterResponse = filter.isEndpointValid(configParserResult.getNode(), rawApi, rawApi, apiInfoKey, null, null, false, "filter", varMap, "logId", false, true);
+        dataOperandsFilterResponse = filter.isEndpointValid(configParserResult.getNode(), rawApi, rawApi, apiInfoKey, null, null, false, "filter", varMap, "logId", false);
         assertEquals(true, dataOperandsFilterResponse.getResult());
         assertEquals(1, varMap.size());
         assertEquals(4, ((List) varMap.get("keyName")).size());

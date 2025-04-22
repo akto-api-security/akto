@@ -93,7 +93,7 @@ public class ConditionalGraphExecutor extends GraphExecutor {
             }
 
             if (shouldConsiderParentValidateBlock(graphExecutorRequest, yamlNodeDetails, validatorParentNode, node.getId(), success)) {
-                DataOperandsFilterResponse dataOperandsFilterResponse = filter.isEndpointValid(yamlNodeDetails.getValidatorNode(), null, null, null, null, null , false, "", graphExecutorRequest.getValuesMap(), "", false, true);
+                DataOperandsFilterResponse dataOperandsFilterResponse = filter.isEndpointValid(yamlNodeDetails.getValidatorNode(), null, null, null, null, null , false, "", graphExecutorRequest.getValuesMap(), "", false);
                 return new GraphExecutorResult(graphExecutorRequest.getWorkflowTestResult(), dataOperandsFilterResponse.getResult(), errors);
             } else {
                 return new GraphExecutorResult(graphExecutorRequest.getWorkflowTestResult(), success, errors);
