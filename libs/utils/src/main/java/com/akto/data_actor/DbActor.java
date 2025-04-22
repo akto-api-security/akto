@@ -599,7 +599,11 @@ public class DbActor extends DataActor {
     public void updateSvcToSvcGraphNodes(List<SvcToSvcGraphNode> nodes) {
         DbLayer.updateSvcToSvcGraphNodes(nodes);
     }
-    
+
+    public void updateTestingRunPlayground(TestingRunPlayground testingRunPlayground) {
+        DbLayer.updateTestingRunPlayground(testingRunPlayground);
+    }
+
     public List<String> findTestSubCategoriesByTestSuiteId(List<String> testSuiteId) {
         return DbLayer.findTestSubCategoriesByTestSuiteId(testSuiteId);
     }

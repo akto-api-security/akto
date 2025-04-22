@@ -1222,20 +1222,7 @@ public class DbLayer {
         for (String testSuiteIdStr : testSuiteId) {
             testSuiteIds.add(new ObjectId(testSuiteIdStr));
         }
-        List<TestSuites> testSuites = TestSuiteDao.instance.findAll(Filters.in(ID, testSuiteIds));
-        if(testSuites == null || testSuites.isEmpty()) {
-            return new ArrayList<>();
-        }
-
-        Set<String> subcategorySet = new HashSet<>();
-        for (TestSuites testSuite : testSuites) {
-            List<String> subcategoryList = testSuite.getSubCategoryList();
-            if(subcategoryList != null && !subcategoryList.isEmpty()) {
-                subcategorySet.addAll(subcategoryList);
-            }
-        }
-
-        return new ArrayList<>(subcategorySet);
+        return TestSuiteDao.getAllTestSuitesSubCategories(testSuiteIds);
     }
 
     public static TestingRunPlayground getCurrentTestingRunDetailsFromEditor(int timestamp){
@@ -1246,4 +1233,25 @@ public class DbLayer {
                 )
         );
     }
+    public static void updateTestingRunPlayground(TestingRunPlayground testingRunPlayground) {
+        TestingRunPlaygroundDao.instance.updateOne(
+                Filters.eq(Constants.ID, testingRunPlayground.getId()),
+                Updates.combine(
+                        Updates.set(TestingRunPlayground.STATE, State.COMPLETED),
+                        Updates.set(TestingRunPlayground.TESTING_RUN_RESULT, testingRunPlayground.getTestingRunResult()
+                    )
+                )
+            );
+    }
+
+    public static void updateTestingRunPlayground(ObjectId id, TestingRunResult testingRunResult) {
+        TestingRunPlaygroundDao.instance.updateOne(
+                Filters.eq(Constants.ID, id),
+                Updates.combine(
+                        Updates.set(TestingRunPlayground.STATE, State.COMPLETED),
+                        Updates.set(TestingRunPlayground.TESTING_RUN_RESULT, testingRunResult)
+                )
+            );
+    }
+
 }
