@@ -3,8 +3,8 @@ import React, { useState } from 'react'
 import SSOTextfield from '../../../../signup/components/SSOTextfield'
 import { RepoPayload, RepoType } from '../types'
 import func from "../../../../../util/func"
-import DropdownSearch from '../../../components/shared/DropdownSearch'
 import agentApi from '../api'
+import { useAgentsStore } from '../agents.store'
 
 function RepoSelector({ handleClickRepo, selectedRepo, selectedProject, selectedConnection }) {
     const [reposList, setReposList] = useState<RepoPayload[]>([])
@@ -97,6 +97,8 @@ function RepositoryInitializer({ agentType }: { agentType: string }) {
     const [selectedRepo, setSelectedRepo] = React.useState<string>('')
     const [selectedProject, setSelectedProject] = React.useState<string>('')
     const [temp, setTemp] = React.useState<string>('')
+    const {selectedModel} = useAgentsStore(state => state)
+
     const getIcon = (id: string) => {
         switch (id) {
             case 'GITHUB':
@@ -143,7 +145,11 @@ function RepositoryInitializer({ agentType }: { agentType: string }) {
 
         if (Object.keys(data).length === 0) return;
 
-        await agentApi.createAgentRun({ agent: agentType, data });
+        await agentApi.createAgentRun({ 
+            agent: agentType, 
+            data,
+            modelName: selectedModel?.id
+         });
         func.setToast(true, false, "Starting agent");
     };
 
