@@ -303,22 +303,6 @@ public class SaveTestEditorAction extends UserAction {
             if (insertOne.wasAcknowledged()) {
                 testingRunPlaygroundHexId = Objects.requireNonNull(insertOne.getInsertedId()).asObjectId().getValue().toHexString();
                 return SUCCESS.toUpperCase();
-            }
-            Bson updates = Updates.combine(
-                    Updates.set(TestingRunPlayground.TEST_TEMPLATE, content),
-                    Updates.set(TestingRunPlayground.STATE, State.SCHEDULED),
-                    Updates.set(TestingRunPlayground.SAMPLES, sampleDataList.get(0).getSamples()),
-                    Updates.set(TestingRunPlayground.API_INFO_KEY, infoKey),
-                    Updates.set(TestingRunPlayground.CREATED_AT, Context.now()));
-
-            TestingRunPlayground result = TestingRunPlaygroundDao.instance.getMCollection().findOneAndUpdate(
-                    Filters.empty(),
-                    updates,
-                    new FindOneAndUpdateOptions().upsert(true).returnDocument(ReturnDocument.AFTER));
-
-            if (result != null) {
-                testingRunPlaygroundHexId = result.getHexId();
-                return SUCCESS.toUpperCase();
             } else {
                 addActionError("Failed to create TestingRunPlayground");
                 return ERROR.toUpperCase();
