@@ -12,10 +12,15 @@ function SampleDataList(props) {
 
     const {showDiff, sampleData, heading, minHeight, vertical, isVulnerable, isNewDiff} = props;
 
-    const [page, setPage] = useState(0);
+    const [page, setPage] = useState(props?.isAPISampleData ? sampleData?.length-1 : 0);
 
     useEffect(() => {
-      setPage(0);
+      if (props?.isAPISampleData) {
+        setPage(sampleData?.length-1);
+      }
+      else{
+        setPage(0);
+      }
     }, [sampleData])
   
     return (
