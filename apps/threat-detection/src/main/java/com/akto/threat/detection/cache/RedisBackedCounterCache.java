@@ -39,7 +39,11 @@ public class RedisBackedCounterCache implements CounterCache {
 
   public RedisBackedCounterCache(RedisClient redisClient, String prefix) {
     this.prefix = prefix;
-    this.redis = redisClient.connect(new LongValueCodec());
+    if (redisClient != null) {
+      this.redis = redisClient.connect(new LongValueCodec());
+    } else {
+      this.redis = null;
+    }
     this.localCache = Caffeine.newBuilder().maximumSize(10000).expireAfterWrite(3, TimeUnit.HOURS).build();
     this.pendingOps = new ConcurrentLinkedQueue<>();
   }
