@@ -28,6 +28,7 @@ import com.akto.notifications.slack.APITestStatusAlert;
 import com.akto.notifications.slack.NewIssuesModel;
 import com.akto.notifications.slack.SlackAlerts;
 import com.akto.notifications.slack.SlackSender;
+import com.akto.test_editor.execution.Executor;
 import com.akto.testing.kafka_utils.ConsumerUtil;
 import com.akto.testing.kafka_utils.Producer;
 import com.akto.util.Constants;
@@ -247,7 +248,6 @@ public class Main {
                 Organization organization = dataActor.fetchOrganization(accountId);
                 FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccess(organization, MetricTypes.TEST_RUNS);   
                 SyncLimit syncLimit = featureAccess.fetchSyncLimit();
-
                 String testingRunSummaryId = currentTestInfo.getString("summaryId");
                 TestingRun testingRun = dataActor.findTestingRun(testingRunSummaryId);
                 TestingRunConfig baseConfig = dataActor.findTestingRunConfig(testingRun.getTestIdConfig());
@@ -440,6 +440,7 @@ public class Main {
                 Organization organization = dataActor.fetchOrganization(accountId);
                 FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccess(organization, MetricTypes.TEST_RUNS);   
                 SyncLimit syncLimit = featureAccess.fetchSyncLimit();
+                Executor.clearRoleCache();
 
                 if(!maxRetriesReached){
                     if(Constants.IS_NEW_TESTING_ENABLED){

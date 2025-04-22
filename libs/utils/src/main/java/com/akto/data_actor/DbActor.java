@@ -558,6 +558,10 @@ public class DbActor extends DataActor {
         return DbLayer.findDependencyNodes(apiCollectionId, url, method, reqMethod);
     }
 
+    public List<String> findTestSubCategoriesByTestSuiteId(List<String> testSuiteId) {
+        return DbLayer.findTestSubCategoriesByTestSuiteId(testSuiteId);
+    }
+
     public TestingRunResultSummary findLatestTestingRunResultSummary(Bson filter){
         return DbLayer.findLatestTestingRunResultSummary(filter);
     }
