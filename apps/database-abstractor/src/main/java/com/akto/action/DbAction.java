@@ -11,6 +11,9 @@ import com.akto.dto.billing.Tokens;
 import com.akto.dto.bulk_updates.BulkUpdates;
 import com.akto.dto.bulk_updates.UpdatePayload;
 import com.akto.dto.filter.MergedUrls;
+import com.akto.dto.graph.SvcToSvcGraph;
+import com.akto.dto.graph.SvcToSvcGraphEdge;
+import com.akto.dto.graph.SvcToSvcGraphNode;
 import com.akto.dto.runtime_filters.RuntimeFilter;
 import com.akto.dto.settings.DataControlSettings;
 import com.akto.dto.test_editor.YamlTemplate;
@@ -1740,6 +1743,54 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
+    public List<SvcToSvcGraphEdge> svcToSvcGraphEdges;
+    public List<SvcToSvcGraphNode> svcToSvcGraphNodes;
+
+    public String findSvcToSvcGraphNodes() {
+        try {
+            this.svcToSvcGraphNodes = DbLayer.findSvcToSvcGraphNodes(startTimestamp, endTimestamp, skip, limit);
+        } catch (Exception e) {
+            System.out.println("Error in findSvcToSvcGraphNodes " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+
+        return Action.SUCCESS.toUpperCase();
+
+    }
+
+    public String findSvcToSvcGraphEdges() {
+        try {
+            this.svcToSvcGraphEdges = DbLayer.findSvcToSvcGraphEdges(startTimestamp, endTimestamp, skip, limit);
+        } catch (Exception e) {
+            System.out.println("Error in findSvcToSvcGraphEdges " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String updateSvcToSvcGraphEdges() {
+        try {
+            DbLayer.updateSvcToSvcGraphEdges(this.svcToSvcGraphEdges);
+        } catch (Exception e) {
+            System.out.println("Error in updateSvcToSvcGraphEdges " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String updateSvcToSvcGraphNodes() {
+        try {
+            DbLayer.updateSvcToSvcGraphNodes(this.svcToSvcGraphNodes);
+        } catch (Exception e) {
+            System.out.println("Error in updateSvcToSvcGraphNodes " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+
+        return Action.SUCCESS.toUpperCase();
+    }    
+    
     public List<CustomDataTypeMapper> getCustomDataTypes() {
         return customDataTypes;
     }
