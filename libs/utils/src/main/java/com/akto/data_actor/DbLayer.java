@@ -984,6 +984,42 @@ public class DbLayer {
         AccountsDao.instance.updateOne(Filters.eq("_id", accountId), Updates.set(Account.HYBRID_TESTING_ENABLED, hybridTestingEnabled));
     }
 
+    public static void modifyHybridTestingSettingWithCustomName(boolean hybridTestingEnabled, String serviceName) {
+        Integer accountId = Context.accountId.get();
+
+        boolean serviceExists;
+        Account account = AccountsDao.instance.findOne(
+                Filters.and(
+                        Filters.eq("_id", accountId),
+                        Filters.eq("miniTestingHeartbeat.miniTestingServiceName", serviceName)
+                )
+        );
+        serviceExists = account != null && (serviceName != null && !serviceName.trim().isEmpty());
+
+        if (serviceExists) {
+            AccountsDao.instance.updateOne(
+                    Filters.and(
+                            Filters.eq("_id", accountId),
+                            Filters.eq("miniTestingHeartbeat.miniTestingServiceName", serviceName)
+                    ),
+                    Updates.combine(
+                            Updates.set(Account.HYBRID_TESTING_ENABLED, hybridTestingEnabled),
+                            Updates.set("miniTestingHeartbeat.$.lastHeartbeatTimestamp", Context.now())
+                    )
+            );
+        } else {
+            AccountsDao.instance.updateOne(
+                    Filters.eq("_id", accountId),
+                    Updates.combine(
+                            Updates.set(Account.HYBRID_TESTING_ENABLED, hybridTestingEnabled),
+                            Updates.addToSet(Account.MINI_TESTING_HEARTBEAT,
+                                    new MiniTestingServiceHeartbeat(serviceName, Context.now()))
+                    )
+            );
+        }
+
+    }
+
 
     public static DataControlSettings fetchDataControlSettings(String prevResult, String prevCommand) {
         Integer accountId = Context.accountId.get();
