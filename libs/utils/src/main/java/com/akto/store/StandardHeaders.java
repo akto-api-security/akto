@@ -2,6 +2,7 @@ package com.akto.store;
 
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -95,19 +96,20 @@ public class StandardHeaders {
             "x-request-id", "x-correlation-id", "access-token", "token", "auth"
         ));
 
-        for (Map.Entry<String, List<String>> entry : headers.entrySet()) {
+        Iterator<Map.Entry<String, List<String>>> iterator = headers.entrySet().iterator();
+        while (iterator.hasNext()) {
             try {
+                Map.Entry<String, List<String>> entry = iterator.next();
                 String headerKey = entry.getKey().toLowerCase().trim();
                 if (StandardHeaders.isStandardHeader(headerKey)) {
-                    headers.remove(entry.getKey());
-                }else if(isRequest && authRelatedHeaders.contains(headerKey.toLowerCase())) {
-                    headers.remove(entry.getKey());
+                    iterator.remove(); 
+                } else if (isRequest && authRelatedHeaders.contains(headerKey)) {
+                    iterator.remove();
                 }
             } catch (Exception e) {
                 e.printStackTrace();
                 // TODO: handle exception
             }
-            
         }
     }
 }

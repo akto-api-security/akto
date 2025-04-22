@@ -25,11 +25,14 @@ public class FindRequestResponseHeaders implements QueryHandler {
         String headersWithValues = "";
         try {
             List<Pair<String, String>> headerKeysWithValues = new ListHeaderNamesWithValues().extractData(meta);
-            StringBuilder result = new StringBuilder();
             for (Pair<String, String> pair : headerKeysWithValues) {
-                result.append(pair.getFirst()).append(": ").append(pair.getSecond()).append("\n");
+                String currentHeaderString = pair.getFirst() + ": " + pair.getSecond();
+                if (headersWithValues.isEmpty()) {
+                    headersWithValues = currentHeaderString;
+                } else {
+                    headersWithValues += ", " + currentHeaderString;
+                }
             }
-            headersWithValues = result.toString();
         } catch (Exception e) {
             logger.error(e.getMessage(), e);
         }
