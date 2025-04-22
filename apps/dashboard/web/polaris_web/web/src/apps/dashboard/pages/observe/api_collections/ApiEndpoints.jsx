@@ -31,7 +31,7 @@ import SourceLocation from "./component/SourceLocation"
 import useTable from "../../../components/tables/TableContext"
 import HeadingWithTooltip from "../../../components/shared/HeadingWithTooltip"
 import { SelectSource } from "./SelectSource"
-import APICollectionDescriptionModal from "../../../components/shared/APICollectionDescriptionModal"
+import InlineEditableText from "../../../components/shared/InlineEditableText"
 
 const headings = [
     {
@@ -213,7 +213,8 @@ function ApiEndpoints(props) {
     const [isEditing, setIsEditing] = useState(false);
     const [editableTitle, setEditableTitle] = useState(pageTitle);
     const [description, setDescription] = useState("");
-    const [showDescriptionModal, setShowDescriptionModal] = useState(false);
+    const [isEditingDescription, setIsEditingDescription] = useState(false)
+    const [editableDescription, setEditableDescription] = useState(description)
 
 
     // the values used here are defined at the server.
@@ -446,6 +447,7 @@ function ApiEndpoints(props) {
         }
 
         setDescription(collectionsObj?.description || "")
+        setEditableDescription(collectionsObj?.description || "")
     }, [collectionsMap[apiCollectionId]])
 
     const resourceName = {
@@ -1055,6 +1057,10 @@ function ApiEndpoints(props) {
 
     
       const handleSaveClick = async () => {
+        if(editableTitle === pageTitle) {
+            setIsEditing(false);
+            return;
+        }
         api.editCollectionName(apiCollectionId, editableTitle).then((resp) => {
             func.setToast(true, false, 'Collection name updated successfully!')
             setPageTitle(editableTitle)
@@ -1085,16 +1091,17 @@ function ApiEndpoints(props) {
     const handleSaveDescription = () => {
         // Check for special characters
         const specialChars = /[!@#$%^&*()\-_=+\[\]{}\\|;:'",.<>/?~]/;
-        if (specialChars.test(description)) {
+        if (specialChars.test(editableDescription)) {
             func.setToast(true, true, "Description contains special characters that are not allowed.");
             return;
         }
         
-        setShowDescriptionModal(false);
-        api.saveCollectionDescription(apiCollectionId, description)
+        setIsEditingDescription(false);
+        api.saveCollectionDescription(apiCollectionId, editableDescription)
             .then(() => {
-                updateCollectionDescription(allCollections, apiCollectionId, description);
+                updateCollectionDescription(allCollections, apiCollectionId, editableDescription);
                 func.setToast(true, false, "Description saved successfully");
+                setDescription(editableDescription);
             })
             .catch((err) => {
                 console.error("Failed to save description:", err);
@@ -1110,21 +1117,7 @@ function ApiEndpoints(props) {
                 <PageWithMultipleCards
                     title={
                         isEditing ? (
-                            <Box maxWidth="20vw">
-                                <div onKeyDown={(e) => handleKeyDown(e)}>
-                                    <TextField
-                                        value={editableTitle}
-                                        onChange={handleTitleChange}
-                                        autoFocus
-                                        autoComplete="off"
-                                        maxLength="24"
-                                        suffix={(
-                                            <Text>{editableTitle.length}/24</Text>
-                                        )}
-                                        onKeyDown={handleKeyDown}
-                                    />
-                                </div>
-                            </Box>
+                            <InlineEditableText textValue={editableTitle} setTextValue={handleTitleChange} handleSaveClick={handleSaveClick} setIsEditing={setIsEditing} maxLength={24}/>
                         ) : (
                             <Box maxWidth="35vw">
                                 <VerticalStack gap={2}>
@@ -1132,17 +1125,20 @@ function ApiEndpoints(props) {
                                         <TooltipText tooltip={pageTitle} text={pageTitle} textProps={{ variant: 'headingLg' }} />
                                     </div>
                                     <HorizontalStack gap={2}>
-                                        {!description && (
-                                            <Button plain onClick={() => setShowDescriptionModal(true)}>
-                                                Add description
-                                            </Button>
-                                        )}
-                                        {description && (
-                                            <Button plain onClick={() => setShowDescriptionModal(true)}>
-                                                <Text as="span" variant="bodyMd" color="subdued" alignment="start">
-                                                    {description}
-                                                </Text>
-                                            </Button>
+                                        {isEditingDescription ? (
+                                            <InlineEditableText textValue={editableDescription} setTextValue={setEditableDescription} handleSaveClick={handleSaveDescription} setIsEditing={setIsEditingDescription} placeholder={"Add a brief description for this collection"} maxLength={64}/>
+                                            ) : (
+                                            !description ? (
+                                                <Button plain onClick={() => setIsEditingDescription(true)}>
+                                                    Add description
+                                                </Button>
+                                            ) : (
+                                                <Button plain onClick={() => setIsEditingDescription(true)}>
+                                                    <Text as="span" variant="bodyMd" color="subdued" alignment="start">
+                                                        {description}
+                                                    </Text>
+                                                </Button>
+                                            )
                                         )}
                                     </HorizontalStack>
                                 </VerticalStack>
@@ -1152,15 +1148,6 @@ function ApiEndpoints(props) {
                     backUrl="/dashboard/observe/inventory"
                     secondaryActions={secondaryActionsComponent}
                     components={[
-                        <APICollectionDescriptionModal
-                            showDescriptionModal={showDescriptionModal}
-                            setShowDescriptionModal={setShowDescriptionModal}
-                            title="Collection Description"
-                            handleSaveDescription={handleSaveDescription}
-                            description={description}
-                            setDescription={setDescription}
-                            placeholder={"Add a brief description for this collection"}
-                        />,
                         ...components
                     ]}
                 />
