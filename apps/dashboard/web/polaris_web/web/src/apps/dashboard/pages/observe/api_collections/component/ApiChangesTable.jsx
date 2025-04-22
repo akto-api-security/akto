@@ -41,12 +41,15 @@ function ApiChangesTable(props) {
   function disambiguateLabel(key, value) {
     if(selectedTab.includes('param')){
       switch (key) {
-          case "apiCollectionId": 
+          case "apiCollectionId":
               return func.convertToDisambiguateLabelObj(value, apiCollectionMap, 3)
           default:
               return value;
       }
     }else{
+      if(key === "apiCollectionId"){
+          return func.convertToDisambiguateLabelObj(value, apiCollectionMap, 3)
+      }
       return func.convertToDisambiguateLabelObj(value, null, 2);
     }
   }
