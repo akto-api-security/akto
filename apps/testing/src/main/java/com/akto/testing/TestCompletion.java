@@ -101,24 +101,28 @@ public class TestCompletion {
 
     public void scheduleAutoTicketCreationJob(TestingRun testingRun, int accountId, ObjectId summaryId) {
 
-        TestingRunConfig testRunConfig = TestingRunConfigDao.instance.findOne(Constants.ID,
-            testingRun.getTestIdConfig());
+        try {
+            TestingRunConfig testRunConfig = TestingRunConfigDao.instance.findOne(Constants.ID,
+                testingRun.getTestIdConfig());
 
-        if (testRunConfig.getAutoTicketingDetails() == null || !testRunConfig.getAutoTicketingDetails()
-            .isShouldCreateTickets()) {
-            return;
+            if (testRunConfig == null || testRunConfig.getAutoTicketingDetails() == null
+                || !testRunConfig.getAutoTicketingDetails().isShouldCreateTickets()) {
+                return;
+            }
+
+            FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccessSaas(accountId, "JIRA_INTEGRATION");
+            if (!featureAccess.getIsGranted()) {
+                logger.error("Auto Create Tickets plan is not activated for the account - {}", accountId);
+                return;
+            }
+
+            AutoTicketParams params = new AutoTicketParams(testingRun.getId(), summaryId,
+                testRunConfig.getAutoTicketingDetails().getProjectId(),
+                testRunConfig.getAutoTicketingDetails().getIssueType(),
+                testRunConfig.getAutoTicketingDetails().getSeverities(), "JIRA");
+            JobScheduler.scheduleRunOnceJob(accountId, params, JobExecutorType.DASHBOARD);
+        } catch (Exception e) {
+            logger.error("Error scheduling auto ticket creation job: {}", e.getMessage(), e);
         }
-
-        FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccessSaas(accountId, "JIRA_INTEGRATION");
-        if (!featureAccess.getIsGranted()) {
-            logger.error("Auto Create Tickets plan is not activated for the account - {}", accountId);
-            return;
-        }
-
-        AutoTicketParams params = new AutoTicketParams(testingRun.getId(), summaryId,
-            testRunConfig.getAutoTicketingDetails().getProjectId(),
-            testRunConfig.getAutoTicketingDetails().getIssueType(),
-            testRunConfig.getAutoTicketingDetails().getSeverities(), "JIRA");
-        JobScheduler.scheduleRunOnceJob(accountId, params, JobExecutorType.DASHBOARD);
     }
 }
