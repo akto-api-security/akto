@@ -63,6 +63,8 @@ public class TestCollectionConfigurationAction {
             return ret;
         }
 
+        Map<String,String> headerKeyValMap = new HashMap<>();
+
         for(String sample: sampleData.getSamples()) {
             Map<String, Object> json = gson.fromJson(sample, Map.class);
             Map<String, List<String>> reqHeaders = buildHeadersMap(json, "requestHeaders");
@@ -74,14 +76,18 @@ public class TestCollectionConfigurationAction {
             for(String header: reqHeaders.keySet()) {
                 List<String> values = reqHeaders.get(header);
                 if (values != null && !values.isEmpty()) {
-                    ret.add(new Pair<>(header, values.get(0)));
+                    headerKeyValMap.put(header, values.get(0));
                 }
             }
             for(String header: resHeaders.keySet()) {
                 List<String> values = resHeaders.get(header);
-                if (values != null && !values.isEmpty()) {
-                    ret.add(new Pair<>(header, values.get(0)));
-                }
+                headerKeyValMap.put(header, values.get(0));
+            }
+        }
+        for(String header: headerKeyValMap.keySet()) {
+            String value = headerKeyValMap.get(header);
+            if (value != null) {
+                ret.add(new Pair<>(header.toLowerCase(), value));
             }
         }
         return ret;
