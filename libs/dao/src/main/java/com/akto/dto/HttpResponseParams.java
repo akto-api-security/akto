@@ -235,7 +235,6 @@ public class HttpResponseParams {
         try {
           TextFormat.getParser().merge(httpResponseParamProtoString, httpBuilder);
         } catch (Exception e) {
-          System.out.println("error parsing httpresponse param proto string");
           return origStr;
         }
         HttpResponseParam httpResponseParamProto = httpBuilder.build();
