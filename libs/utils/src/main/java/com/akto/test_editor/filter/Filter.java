@@ -26,9 +26,7 @@ public class Filter {
 
     public Filter() {
         this.filterAction = new FilterAction();
-        if (System.getenv("IS_TESTING_CONTEXT") != null) {
-            this.isTestingContext = System.getenv("IS_TESTING_CONTEXT") == "true";
-        }
+        this.isTestingContext = System.getenv().getOrDefault("IS_TESTING_CONTEXT", "true") == "true";
     }
 //    public DataOperandsFilterResponse isEndpointValid(FilterNode node, RawApi rawApi, RawApi testRawApi, ApiInfo.ApiInfoKey apiInfoKey, List<String> matchingKeySet, List<BasicDBObject> contextEntities, boolean keyValOperandSeen, String context, Map<String, Object> varMap, String logId, boolean skipExtractExecution) {
 //        StringBuilder stringBuilder = new StringBuilder();
