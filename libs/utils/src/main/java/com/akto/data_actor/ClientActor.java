@@ -3006,6 +3006,25 @@ public class ClientActor extends DataActor {
         }
     }
 
+    public void modifyHybridTestingSettingWithCustomName(boolean hybridTestingEnabled, String serviceName) {
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("hybridTestingEnabled", hybridTestingEnabled);
+        obj.put("miniTestingServiceName", serviceName);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/modifyTestingSettingWithCustomName", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in modifyTestingSettingWithCustomName", LoggerMaker.LogDb.RUNTIME);
+                return;
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in modifyTestingSettingWithCustomName" + e, LoggerMaker.LogDb.RUNTIME);
+            return;
+        }
+    }
+
     public void insertTestingLog(Log log) {
         Map<String, List<String>> headers = buildHeaders();
         BasicDBObject obj = new BasicDBObject();
