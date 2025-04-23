@@ -24,6 +24,7 @@ public class TestingRunIssues {
     private ObjectId latestTestingRunSummaryId;
     public static final String IGNORE_REASON = "ignoreReason";
     private String ignoreReason;
+    public static final String JIRA_ISSUE_URL = "jiraIssueUrl";
     private String jiraIssueUrl;
     public static final String AZURE_BOARDS_WORK_ITEM_URL = "azureBoardsWorkItemUrl";
     private String azureBoardsWorkItemUrl;

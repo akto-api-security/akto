@@ -1,6 +1,7 @@
 package com.akto.action.testing;
 
 import com.akto.action.UserAction;
+import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing.DeleteTestRunsDao;
@@ -16,6 +17,7 @@ import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dao.testing.*;
 import com.akto.dao.testing.config.TestSuiteDao;
 import com.akto.dto.ApiCollection;
+import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.testing.config.EditableTestingRunConfig;
 import com.akto.dto.testing.config.TestSuites;
 import com.akto.dto.ApiInfo;
@@ -26,6 +28,7 @@ import com.akto.dto.test_editor.Info;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.AuthMechanism;
+import com.akto.dto.testing.AutoTicketingDetails;
 import com.akto.dto.testing.CollectionWiseTestingEndpoints;
 import com.akto.dto.testing.CustomTestingEndpoints;
 import com.akto.dto.testing.DeleteTestRuns;
@@ -46,11 +49,16 @@ import com.akto.dto.testing.config.EditableTestingRunConfig;
 import com.akto.dto.testing.info.CurrentTestsStatus;
 import com.akto.dto.testing.info.CurrentTestsStatus.StatusForIndividualTest;
 import com.akto.dto.testing.sources.TestSourceConfig;
+import com.akto.dto.usage.MetricTypes;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.testing.TestCompletion;
 import com.akto.usage.UsageMetricCalculator;
+import com.akto.usage.UsageMetricHandler;
 import com.akto.util.Constants;
+import com.akto.util.UsageUtils;
 import com.akto.util.enums.GlobalEnums;
+import com.akto.util.enums.GlobalEnums.Severity;
 import com.akto.util.enums.GlobalEnums.TestErrorSource;
 import com.akto.utils.DeleteTestRunUtils;
 import com.akto.utils.Utils;
@@ -119,6 +127,8 @@ public class StartTestAction extends UserAction {
 
     private String testRoleId;
     private boolean cleanUpTestingResources;
+
+    private AutoTicketingDetails autoTicketingDetails;
 
     private static final Gson gson = new Gson();
 
@@ -196,7 +206,9 @@ public class StartTestAction extends UserAction {
         }
         if (this.selectedTests != null) {
             int id = UUID.randomUUID().hashCode() & 0xfffffff;
-            TestingRunConfig testingRunConfig = new TestingRunConfig(id, null, this.selectedTests, authMechanism.getId(), this.overriddenTestAppUrl, this.testRoleId, this.cleanUpTestingResources);
+            TestingRunConfig testingRunConfig = new TestingRunConfig(id, null, this.selectedTests,
+                authMechanism.getId(), this.overriddenTestAppUrl, this.testRoleId, this.cleanUpTestingResources,
+                this.autoTicketingDetails);
             // add advanced setting here
             if(this.testConfigsAdvancedSettings != null && !this.testConfigsAdvancedSettings.isEmpty()){
                 testingRunConfig.setConfigsAdvancedSettings(this.testConfigsAdvancedSettings);
@@ -228,11 +240,16 @@ public class StartTestAction extends UserAction {
             return 0;
         }
     }
+
     public String startTest() {
 
         if (this.startTimestamp != 0 && this.startTimestamp + 86400 < Context.now()) {
             addActionError("Cannot schedule a test run in the past.");
             return ERROR.toUpperCase();
+        }
+
+        if (!validateAutoTicketingDetails(this.autoTicketingDetails)) {
+            return Action.ERROR.toUpperCase();
         }
 
         int scheduleTimestamp = this.startTimestamp == 0 ? Context.now() : this.startTimestamp;
@@ -1263,6 +1280,7 @@ public class StartTestAction extends UserAction {
             addActionError("Invalid editableTestingRunConfig");
             return Action.ERROR.toUpperCase();
         }
+
         try {
             if (this.testingRunConfigId == 0) {
                 addActionError("Invalid testing run config id");
@@ -1296,6 +1314,12 @@ public class StartTestAction extends UserAction {
                 if (editableTestingRunConfig.getOverriddenTestAppUrl() != null && !editableTestingRunConfig.getOverriddenTestAppUrl().equals(existingTestingRunConfig.getOverriddenTestAppUrl())) {
                     updates.add(Updates.set(TestingRunConfig.OVERRIDDEN_TEST_APP_URL, editableTestingRunConfig.getOverriddenTestAppUrl()));
                 }
+
+                if (editableTestingRunConfig.getAutoTicketingDetails() != null && validateAutoTicketingDetails(
+                    editableTestingRunConfig.getAutoTicketingDetails())) {
+                    updates.add(Updates.set(TestingRunConfig.AUTO_TICKETING_DETAILS,
+                        editableTestingRunConfig.getAutoTicketingDetails()));
+                }
                 
                 if (!updates.isEmpty()) {
                     TestingRunConfigDao.instance.updateOne(
@@ -1303,7 +1327,6 @@ public class StartTestAction extends UserAction {
                         Updates.combine(updates) 
                     );
                 }
-
             }
 
             if (editableTestingRunConfig.getTestingRunHexId() != null) {
@@ -1453,6 +1476,39 @@ public class StartTestAction extends UserAction {
         }, 0 , TimeUnit.SECONDS);
 
         return SUCCESS.toUpperCase();
+    }
+
+    private boolean validateAutoTicketingDetails(AutoTicketingDetails autoTicketingDetails) {
+        if (autoTicketingDetails != null && autoTicketingDetails.isShouldCreateTickets()) {
+
+            FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccessSaas(Context.accountId.get(),
+                "JIRA_INTEGRATION");
+            if (!featureAccess.getIsGranted()) {
+                addActionError("Auto Create Tickets plan is not activated for this account.");
+                return false;
+            }
+
+            if (autoTicketingDetails.getProjectId() == null) {
+                addActionError("Project Id is required.");
+                return false;
+            }
+
+            if (autoTicketingDetails.getSeverities() == null
+                || autoTicketingDetails.getSeverities().isEmpty()) {
+                addActionError("Severities cannot be empty.");
+                return false;
+            }
+
+            try {
+                for (String s : autoTicketingDetails.getSeverities()) {
+                    Severity.valueOf(s);
+                }
+            } catch (IllegalArgumentException e) {
+                addActionError("Invalid parameter: severities.");
+                return false;
+            }
+        }
+        return true;
     }
 
 
@@ -1837,7 +1893,6 @@ public class StartTestAction extends UserAction {
     public void setRecurringWeekly(boolean recurringWeekly) {
         this.recurringWeekly = recurringWeekly;
     }
-
     
     public void setRecurringMonthly(boolean recurringMonthly) {
         this.recurringMonthly = recurringMonthly;
@@ -1845,5 +1900,9 @@ public class StartTestAction extends UserAction {
 
     public void setTestSuiteIds(List<String> testSuiteIds) {
         this.testSuiteIds = testSuiteIds;
+    }
+
+    public void setAutoTicketingDetails(AutoTicketingDetails autoTicketingDetails) {
+        this.autoTicketingDetails = autoTicketingDetails;
     }
 }
