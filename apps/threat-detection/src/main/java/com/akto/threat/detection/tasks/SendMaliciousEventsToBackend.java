@@ -11,6 +11,7 @@ import com.akto.proto.utils.ProtoMessageUtils;
 import com.akto.threat.detection.db.entity.MaliciousEventEntity;
 import com.google.protobuf.InvalidProtocolBufferException;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
@@ -42,6 +43,9 @@ public class SendMaliciousEventsToBackend extends AbstractKafkaConsumerTask<byte
   }
 
   private void markSampleDataAsSent(List<UUID> ids) {
+    if (this.sessionFactory == null) {
+      return;
+    }
     Session session = this.sessionFactory.openSession();
     Transaction txn = session.beginTransaction();
     try {
@@ -60,6 +64,9 @@ public class SendMaliciousEventsToBackend extends AbstractKafkaConsumerTask<byte
   }
 
   private List<MaliciousEventEntity> getSampleMaliciousRequests(String actor, String filterId) {
+    if (this.sessionFactory == null) {
+      return new ArrayList<>();
+    }
     Session session = this.sessionFactory.openSession();
     Transaction txn = session.beginTransaction();
     try {

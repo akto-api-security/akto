@@ -170,7 +170,7 @@ public class MaliciousTrafficDetectorTask implements Task {
     responseParam.setSourceIP(actor);
 
     if (actor == null || actor.isEmpty()) {
-      logger.info("Dropping processing of record with no actor IP, account:{}", responseParam.getAccountId());
+      logger.warn("Dropping processing of record with no actor IP, account:{}", responseParam.getAccountId());
       return;
     }
 
