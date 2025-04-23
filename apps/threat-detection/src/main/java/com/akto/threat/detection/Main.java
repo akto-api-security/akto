@@ -28,13 +28,12 @@ public class Main {
     SessionFactory sessionFactory = null;
     RedisClient localRedis = null;
 
-    logger.warn("agg boolean value {}", aggregationRulesEnabled);
+    logger.warn("aggregation rules enabled {}", aggregationRulesEnabled);
 
     if (aggregationRulesEnabled) {
-        logger.warn("agg boolean value {}", aggregationRulesEnabled);
         runMigrations();
         sessionFactory = SessionFactoryUtils.createFactory();
-        createLocalRedisClient();
+        localRedis = createLocalRedisClient();
     }
 
     KafkaConfig trafficKafka =

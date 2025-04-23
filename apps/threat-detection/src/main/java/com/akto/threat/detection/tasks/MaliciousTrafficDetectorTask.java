@@ -170,11 +170,11 @@ public class MaliciousTrafficDetectorTask implements Task {
     responseParam.setSourceIP(actor);
 
     if (actor == null || actor.isEmpty()) {
-      logger.info("Dropping processing of record with no actor IP, account:{}", responseParam.getAccountId());
+      logger.warn("Dropping processing of record with no actor IP, account:{}", responseParam.getAccountId());
       return;
     }
 
-    logger.warn("Processing record with actor IP: {}", responseParam.getSourceIP());
+    logger.debug("Processing record with actor IP: {}", responseParam.getSourceIP());
     Context.accountId.set(Integer.parseInt(responseParam.getAccountId()));
     Map<String, FilterConfig> filters = this.getFilters();
     if (filters.isEmpty()) {
@@ -200,7 +200,7 @@ public class MaliciousTrafficDetectorTask implements Task {
       // If a request passes any of the filter, then it's a malicious request,
       // and so we push it to kafka
       if (hasPassedFilter) {
-        logger.warn("filter condition satisfied for url {} filterId {}", apiInfoKey.getUrl(), apiFilter.getId());
+        logger.debug("filter condition satisfied for url {} filterId {}", apiInfoKey.getUrl(), apiFilter.getId());
         // Later we will also add aggregation support
         // Eg: 100 4xx requests in last 10 minutes.
         // But regardless of whether request falls in aggregation or not,
@@ -248,7 +248,7 @@ public class MaliciousTrafficDetectorTask implements Task {
               maliciousReq, rule);
 
           if (result.shouldNotify()) {
-            logger.warn("aggregate condition satisfied for url {} filterId {}", apiInfoKey.getUrl(), apiFilter.getId());
+            logger.debug("aggregate condition satisfied for url {} filterId {}", apiInfoKey.getUrl(), apiFilter.getId());
             generateAndPushMaliciousEventRequest(
                 apiFilter,
                 actor,
