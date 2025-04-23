@@ -122,7 +122,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                     setTeamsTestingWebhookIntegrated(true)
                 }
                 
-                setJiraProjectMap(jiraResp?.jiraIntegration?.projectIdsMap || null);
+                setJiraProjectMap(jiraResp?.projectIdsMap || null);
             })
 
         let metaDataObj = {
