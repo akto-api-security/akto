@@ -5,7 +5,9 @@ import com.akto.dto.type.SingleTypeInfo;
 import com.akto.types.CappedSet;
 import com.akto.util.enums.GlobalEnums;
 import com.akto.util.grpc.ProtoBufUtils;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.dataformat.xml.XmlMapper;
 import com.mongodb.BasicDBObject;
 
 import org.apache.commons.lang3.StringUtils;
@@ -24,8 +26,6 @@ public class HttpRequestResponseUtils {
 
     public static final String FORM_URL_ENCODED_CONTENT_TYPE = "application/x-www-form-urlencoded";
     public static final String GRPC_CONTENT_TYPE = "application/grpc";
-    private static final List<String> acceptableContentTypes = Arrays.asList(JSON_CONTENT_TYPE, FORM_URL_ENCODED_CONTENT_TYPE, GRPC_CONTENT_TYPE);
-    private static List<String> contentTypeValues;
 
     public static List<SingleTypeInfo> generateSTIsFromPayload(int apiCollectionId, String url, String method,String body, int responseCode) {
         int now = Context.now();
@@ -56,6 +56,8 @@ public class HttpRequestResponseUtils {
 
         return SingleTypeInfo.GENERIC;
     }
+    public static final String SOAP = "soap";
+    public static final String XML = "xml";
 
     public static Map<String, Set<Object>> extractValuesFromPayload(String body) {
         if (body == null) return new HashMap<>();
@@ -79,6 +81,8 @@ public class HttpRequestResponseUtils {
                 return convertFormUrlEncodedToJson(rawRequest);
             } else if (acceptableContentType.equals(GRPC_CONTENT_TYPE)) {
                 return convertGRPCEncodedToJson(rawRequest);
+            } else if (acceptableContentType.contains(XML) || acceptableContentType.contains(SOAP) ) {
+                return convertXmlToJson(rawRequest);
             }
         }
 
@@ -104,6 +108,27 @@ public class HttpRequestResponseUtils {
         }
     }
 
+    private static ObjectMapper objectMapper = new ObjectMapper();
+    private static XmlMapper xmlMapper = new XmlMapper();
+
+    public static String convertXmlToJson(String rawRequest) {
+        try {
+            String removeXmlLine = rawRequest.replaceFirst("<\\?xml.*?\\?>", "").trim();
+            JsonNode rootNode = xmlMapper.readTree(removeXmlLine);
+            JsonNode bodyNode = rootNode.get("Body");
+            if (bodyNode == null) {
+                bodyNode = rootNode.get("body");
+            }
+
+            if (bodyNode == null) {
+                bodyNode = rootNode;
+            }
+            return objectMapper.writeValueAsString(bodyNode);
+        } catch (Exception e) {
+            return rawRequest;
+        }
+    }
+
     public static String convertGRPCEncodedToJson(String rawRequest) {
         try {
             Map<Object, Object> map = ProtoBufUtils.getInstance().decodeProto(rawRequest);
@@ -117,6 +142,8 @@ public class HttpRequestResponseUtils {
     }
     
     public static String getAcceptableContentType(Map<String,List<String>> headers) {
+        List<String> acceptableContentTypes = Arrays.asList(JSON_CONTENT_TYPE, FORM_URL_ENCODED_CONTENT_TYPE, GRPC_CONTENT_TYPE, XML, SOAP);
+        List<String> contentTypeValues;
         if (headers == null) return null;
         contentTypeValues = headers.get("content-type");
         if (contentTypeValues != null) {
