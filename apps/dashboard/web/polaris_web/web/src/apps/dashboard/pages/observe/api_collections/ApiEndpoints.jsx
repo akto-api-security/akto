@@ -106,7 +106,7 @@ const headings = [
         text: 'Discovered At',
         title: <HeadingWithTooltip 
                 title={"Last Seen"}
-                content={"Time when API was last detected in traffic."}
+                content={"Time when API was first discovered in traffic."}
             />,
         value: 'added',
         isText: true,
