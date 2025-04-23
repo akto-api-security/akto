@@ -15,6 +15,14 @@ import { produce } from "immer"
 import RunTestSuites from "./RunTestSuites";
 import RunTestConfiguration from "./RunTestConfiguration";
 import {createTestName,convertToLowerCaseWithUnderscores} from "./Utils"
+import settingsApi from "../../settings/api";
+
+const initialAutoTicketingDetails = {
+    shouldCreateTickets: false,
+    projectId: "",
+    severities: [],
+    issueType: "",
+}
 
 function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOutside, closeRunTest, selectedResourcesForPrimaryAction, useLocalSubCategoryData, preActivator, testIdConfig, activeFromTesting, setActiveFromTesting, showEditableSettings, setShowEditableSettings, parentAdvanceSettingsConfig, testRunType, shouldDisable }) {
 
@@ -40,7 +48,8 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         testRoleId: "",
         sendSlackAlert: false,
         sendMsTeamsAlert: false,
-        cleanUpTestingResources: false
+        cleanUpTestingResources: false,
+        autoTicketingDetails: initialAutoTicketingDetails,
     }
     const navigate = useNavigate()
 
@@ -87,6 +96,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
     const [testSuiteIds, setTestSuiteIds] = useState([])
 
     const [testNameSuiteModal, setTestNameSuiteModal] = useState("")
+    const [jiraProjectMap, setJiraProjectMap] = useState(null);
 
     useEffect(() => {
         if (preActivator) {
@@ -100,18 +110,20 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
     async function fetchData() {
         setLoading(true)
 
-        observeApi.fetchSlackWebhooks().then((resp) => {
-            const apiTokenList = resp.apiTokenList
-            setSlackIntegrated(apiTokenList && apiTokenList.length > 0)
-        })
+        Promise.all([
+            observeApi.fetchSlackWebhooks(),
+            observeApi.checkWebhook("MICROSOFT_TEAMS", "TESTING_RUN_RESULTS"),
+            settingsApi.fetchJiraIntegration()]).then(([slackResp, teamsResp, jiraResp]) => {
+                const apiTokenList = slackResp.apiTokenList
+                setSlackIntegrated(apiTokenList && apiTokenList.length > 0)
 
-        observeApi.checkWebhook("MICROSOFT_TEAMS", "TESTING_RUN_RESULTS").then((resp) => {
-            // console.log(resp.webhookPresent, resp)
-            const webhookPresent = resp.webhookPresent
-            if(webhookPresent){
-                setTeamsTestingWebhookIntegrated(true)
-            }
-        })
+                const webhookPresent = teamsResp.webhookPresent
+                if (webhookPresent) {
+                    setTeamsTestingWebhookIntegrated(true)
+                }
+                
+                setJiraProjectMap(jiraResp?.projectIdsMap || null);
+            })
 
         let metaDataObj = {
             categories: [],
@@ -233,7 +245,8 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                     recurringDaily: testIdConfig?.periodInSeconds === 86400,
                     recurringMonthly: testIdConfig?.periodInSeconds === (86400 * 30), // 30 days
                     recurringWeekly: testIdConfig?.periodInSeconds === (86400 * 7),  // one week
-                    continuousTesting: testIdConfig?.periodInSeconds === -1
+                    continuousTesting: testIdConfig?.periodInSeconds === -1,
+                    autoTicketingDetails: testIdConfig?.autoTicketingDetails || initialAutoTicketingDetails,
                 }));
                 setTestSuiteIds(testIdConfig?.testingRunConfig?.testSuiteIds || [])
                 setTestNameSuiteModal(testIdConfig?.name||"")
@@ -509,6 +522,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
     async function handleRun() {
         const { startTimestamp, recurringDaily, recurringMonthly, recurringWeekly, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, cleanUpTestingResources } = testRun
         let {testName} = testRun;
+        const autoTicketingDetails = jiraProjectMap ? testRun.autoTicketingDetails : null;
         const collectionId = parseInt(apiCollectionId)
 
         const tests = testRun.tests
@@ -554,9 +568,9 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         }
 
         if (filtered || selectedResourcesForPrimaryAction?.length > 0) {
-            await observeApi.scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, recurringWeekly, recurringMonthly, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, "TESTING_UI", testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, finalAdvancedConditions, cleanUpTestingResources, testMode? []: testSuiteIds)
+            await observeApi.scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, recurringWeekly, recurringMonthly, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, "TESTING_UI", testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, finalAdvancedConditions, cleanUpTestingResources, testMode? []: testSuiteIds,autoTicketingDetails)
         } else {
-            await observeApi.scheduleTestForCollection(collectionId, startTimestamp, recurringDaily, recurringWeekly, recurringMonthly, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, finalAdvancedConditions, cleanUpTestingResources, testMode? []: testSuiteIds)
+            await observeApi.scheduleTestForCollection(collectionId, startTimestamp, recurringDaily, recurringWeekly, recurringMonthly, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, finalAdvancedConditions, cleanUpTestingResources, testMode? []: testSuiteIds,autoTicketingDetails)
         }
 
         setActive(false)
@@ -653,7 +667,8 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
     // only for configurations 
     const handleModifyConfig = async () => {
         const settings = transform.prepareConditionsForTesting(conditions)
-        const editableConfigObject = transform.prepareEditableConfigObject(testRun, settings, testIdConfig.hexId,testSuiteIds,testMode)
+        let autoTicketingDetails = jiraProjectMap? testRun.autoTicketingDetails : null;
+        const editableConfigObject = transform.prepareEditableConfigObject(testRun, settings, testIdConfig.hexId,testSuiteIds,testMode,autoTicketingDetails)
         await testingApi.modifyTestingRunConfig(testIdConfig?.testingRunConfig?.id, editableConfigObject).then(() => {
             func.setToast(true, false, "Modified testing run config successfully")
             setShowEditableSettings(false)
@@ -706,6 +721,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                         generateLabelForSlackIntegration={generateLabelForSlackIntegration}
                         generateLabelForTeamsIntegration={generateLabelForTeamsIntegration}
                         getLabel={getLabel}
+                        jiraProjectMap={jiraProjectMap}
                     />
                     <AdvancedSettingsComponent dispatchConditions={dispatchConditions} conditions={conditions} />
                 </>
@@ -880,6 +896,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                                     generateLabelForSlackIntegration={generateLabelForSlackIntegration}
                                     generateLabelForTeamsIntegration={generateLabelForTeamsIntegration}
                                     getLabel={getLabel}
+                                    jiraProjectMap={jiraProjectMap}
                                 />
 
                             </VerticalStack>
@@ -913,6 +930,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                                         generateLabelForSlackIntegration={generateLabelForSlackIntegration}
                                         generateLabelForTeamsIntegration={generateLabelForTeamsIntegration}
                                         getLabel={getLabel}
+                                        jiraProjectMap={jiraProjectMap}
                                     />
                                     <AdvancedSettingsComponent dispatchConditions={dispatchConditions} conditions={conditions} />
                                 </>
