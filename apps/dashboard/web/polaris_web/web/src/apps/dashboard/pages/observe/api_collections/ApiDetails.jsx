@@ -229,11 +229,10 @@ function ApiDetails(props) {
         component: sampleData.length > 0 && <Box paddingBlockStart={"4"}>
             <SampleDataList
                 key="Sample values"
-                sampleData={sampleData}
+                sampleData={sampleData.reverse()}
                 heading={"Sample values"}
                 minHeight={"35vh"}
                 vertical={true}
-                isAPISampleData={true}
             />
         </Box>,
     }
