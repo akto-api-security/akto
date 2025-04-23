@@ -26,6 +26,7 @@ import com.akto.log.LoggerMaker;
 import com.akto.testing.ApiExecutor;
 import com.akto.util.Constants;
 import com.akto.util.DashboardMode;
+import com.akto.util.enums.GlobalEnums.TestRunIssueStatus;
 import com.akto.util.http_util.CoreHTTPClient;
 
 import com.akto.utils.FileUtils;
@@ -153,16 +154,6 @@ public class JiraTicketJobExecutor extends JobExecutor<AutoTicketParams> {
             processJiraBatch(batchMetaList, issueType, projId, jira);
             updateJobHeartbeat(job);
         }
-/*        List<JiraMetaData> jiraMetaDataList = enrichIssuesWithMeta(issues, infoMap);
-        if (jiraMetaDataList.isEmpty()) {
-            return;
-        }
-
-        BasicDBObject jiraPayload = buildJiraPayload(jiraMetaDataList, issueType, projId);
-        List<String> createdIssues = sendJiraBulkCreate(jira, jiraPayload, jiraMetaDataList);
-
-        List<TestingRunResult> resultList = fetchRunResults(jiraMetaDataList);
-        attachFilesToIssues(jira, createdIssues, resultList);*/
     }
 
     private JiraIntegration loadJiraIntegration() throws Exception {
@@ -192,6 +183,7 @@ public class JiraTicketJobExecutor extends JobExecutor<AutoTicketParams> {
         Bson filter = Filters.and(
             Filters.eq(TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_ID, summaryId),
             Filters.in(TestingRunIssues.KEY_SEVERITY, severities),
+            Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.OPEN),
             Filters.exists(TestingRunIssues.JIRA_ISSUE_URL, false)
         );
         return TestingRunIssuesDao.instance.findAll(filter);
