@@ -667,7 +667,8 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
     // only for configurations 
     const handleModifyConfig = async () => {
         const settings = transform.prepareConditionsForTesting(conditions)
-        const editableConfigObject = transform.prepareEditableConfigObject(testRun, settings, testIdConfig.hexId,testSuiteIds,testMode)
+        let autoTicketingDetails = jiraProjectMap? testRun.autoTicketingDetails : null;
+        const editableConfigObject = transform.prepareEditableConfigObject(testRun, settings, testIdConfig.hexId,testSuiteIds,testMode,autoTicketingDetails)
         await testingApi.modifyTestingRunConfig(testIdConfig?.testingRunConfig?.id, editableConfigObject).then(() => {
             func.setToast(true, false, "Modified testing run config successfully")
             setShowEditableSettings(false)
@@ -896,7 +897,6 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                                     generateLabelForTeamsIntegration={generateLabelForTeamsIntegration}
                                     getLabel={getLabel}
                                     jiraProjectMap={jiraProjectMap}
-                                    activeFromTesting={activeFromTesting}
                                 />
 
                             </VerticalStack>
@@ -931,7 +931,6 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                                         generateLabelForTeamsIntegration={generateLabelForTeamsIntegration}
                                         getLabel={getLabel}
                                         jiraProjectMap={jiraProjectMap}
-                                        activeFromTesting={activeFromTesting}
                                     />
                                     <AdvancedSettingsComponent dispatchConditions={dispatchConditions} conditions={conditions} />
                                 </>
