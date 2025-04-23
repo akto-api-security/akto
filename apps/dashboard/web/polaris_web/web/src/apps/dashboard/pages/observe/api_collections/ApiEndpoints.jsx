@@ -105,7 +105,7 @@ const headings = [
     {
         text: 'Discovered At',
         title: <HeadingWithTooltip 
-                title={"Last Seen"}
+                title={"Discovered At"}
                 content={"Time when API was first discovered in traffic."}
             />,
         value: 'added',
