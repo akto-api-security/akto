@@ -132,7 +132,10 @@ function DropdownSearch(props) {
             if (avatarIcon) {
                 setInputValue(selected[0])
             } else if (allowMultiple) {
-                if(showSelectedItemLabels) setInputValue(selected.join(", "))
+                if(showSelectedItemLabels) {                    
+                    if(selectedText.length === optionsList.length) setInputValue("All items selected");
+                    else setInputValue(func.getSelectedItemsText(selectedText))
+                }
                 else setInputValue(`${selected.length} ${itemName ? itemName : "item"}${selected.length == 1 ? "" : "s"} selected`)
             }
             else {

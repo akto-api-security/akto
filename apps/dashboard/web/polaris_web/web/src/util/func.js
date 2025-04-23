@@ -1872,6 +1872,16 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
     return ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW']
   },
 
+  getSelectedItemsText(selectedItem) {
+    if (!Array.isArray(selectedItem) || selectedItem?.length === 0) return "";
+  
+    if (selectedItem.length === 1) return selectedItem[0];
+  
+    const allButLast = selectedItem.slice(0, -1).join(", ");
+    const last = selectedItem[selectedItem.length - 1];
+    return `${allButLast} & ${last}`;
+  },  
+
   getIconFromString(iconString){
     if(iconsUsedMap[iconString] !== undefined){
       return iconsUsedMap[iconString]

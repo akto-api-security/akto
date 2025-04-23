@@ -246,7 +246,7 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
                             placeholder={"Select Severity"}
                             setSelected={(val) => {setTestRun(prev => ({ ...prev, autoTicketingDetails: { ...prev.autoTicketingDetails, severities: val } })) }}
                             allowMultiple={true}
-                            value={testRun.autoTicketingDetails.severities}
+                            value={(severitiesArr?.length === testRun?.autoTicketingDetails?.severities?.length)? "All items selected" : func.getSelectedItemsText(testRun?.autoTicketingDetails?.severities?.map((item) => func.toSentenceCase(item)))}
                             preSelected={testRun.autoTicketingDetails.severities}
                             showSelectedItemLabels={true}
                             searchDisable={true}
