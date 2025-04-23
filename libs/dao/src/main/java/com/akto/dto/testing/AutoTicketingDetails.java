@@ -1,6 +1,7 @@
 package com.akto.dto.testing;
 
-import com.akto.util.enums.GlobalEnums.Severity;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import java.util.List;
 import java.util.Set;
 import lombok.Getter;
 import lombok.Setter;
@@ -9,7 +10,9 @@ import lombok.Setter;
 @Setter
 public class AutoTicketingDetails {
 
+    @JsonProperty("shouldCreateTickets")
     private boolean shouldCreateTickets;
-    private Set<Severity> severities;
+    private List<String> severities;
     private String projectId;
+    private String issueType;
 }
