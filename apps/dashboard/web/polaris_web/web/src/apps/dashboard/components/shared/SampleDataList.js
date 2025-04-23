@@ -15,7 +15,7 @@ function SampleDataList(props) {
     const [page, setPage] = useState(0);
 
     useEffect(() => {
-        setPage(0);
+      setPage(0);
     }, [sampleData])
   
     return (
