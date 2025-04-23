@@ -1202,7 +1202,7 @@ getMissingConfigs(testResults){
       };
     });
   },
-  prepareEditableConfigObject(testRun,settings,hexId,testSuiteIds=[],testMode){
+  prepareEditableConfigObject(testRun,settings,hexId,testSuiteIds=[],testMode,autoTicketingDetails){
     const tests = testRun.tests;
     const selectedTests = []
     Object.keys(tests).forEach(category => {
@@ -1227,6 +1227,7 @@ getMissingConfigs(testResults){
       recurringWeekly: testRun.recurringWeekly,
       recurringMonthly: testRun.recurringMonthly,
       testSuiteIds:testMode? [] : testSuiteIds,
+      autoTicketingDetails: autoTicketingDetails,
     }
   }
 }
