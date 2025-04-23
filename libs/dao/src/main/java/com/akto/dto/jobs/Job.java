@@ -17,6 +17,7 @@ public class Job {
     public static final String ID = "_id";
     public static final String JOB_STATUS = "jobStatus";
     public static final String HEARTBEAT_AT = "heartbeatAt";
+    public static final String STARTED_AT = "startedAt";
     public static final String FINISHED_AT = "finishedAt";
     public static final String SCHEDULED_AT = "scheduledAt";
     public static final String JOB_EXECUTOR_TYPE = "jobExecutorType";

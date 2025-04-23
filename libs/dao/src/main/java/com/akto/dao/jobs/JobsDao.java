@@ -2,7 +2,9 @@ package com.akto.dao.jobs;
 
 import com.akto.dao.CommonContextDao;
 import com.akto.dao.MCollection;
+import com.akto.dao.context.Context;
 import com.akto.dto.jobs.Job;
+import com.akto.dto.testing.TestingRun;
 import com.mongodb.client.model.CreateCollectionOptions;
 
 public class JobsDao extends CommonContextDao<Job> {
@@ -28,5 +30,4 @@ public class JobsDao extends CommonContextDao<Job> {
         fieldNames = new String[]{Job.JOB_EXECUTOR_TYPE, Job.JOB_STATUS, Job.HEARTBEAT_AT};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames,true);
     }
-
 }
