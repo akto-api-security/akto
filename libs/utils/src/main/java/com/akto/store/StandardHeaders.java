@@ -26,7 +26,7 @@ public class StandardHeaders {
         "expect-ctdeprecated","expires", "forwarded", "from", "host", "if-match", "if-modified-since", "if-none-match", "if-range", "if-unmodified-since", 
         "keep-alive","last-modified","link", "location", "max-forwards", "nelexperimental", "no-vary-searchexperimental", "observe-browsing-topicsexperimentalnon-standard", "origin", 
         "origin-agent-cluster", "permissions-policyexperimental", "pragmadeprecated", "prefer", "preference-applied", "priority", "proxy-authenticate", "proxy-authorization", "range", "referer",
-        "referrer-policy", "refresh", "report-tonon-standarddeprecated", "reporting-endpoints", "repr-digest", "retry-after", "rttexperimental", "save-dataexperimental", "sec-browsing-topicsexperimentalnon-standard", "sec-ch-ua",
+        "referrer-policy", "refresh", "report-tonon-standarddeprecated", "reporting-endpoints", "repr-digest", "retry-after", "rttexperimental", "save-dataexperimental", "sec-browsing-topicsexperimentalnon-standard", "sec-ch-ua", "sec-ch-ua-mobile",
         "sec-ch-prefers-color-schemeexperimental", "sec-ch-prefers-reduced-motionexperimental", "sec-ch-prefers-reduced-transparencyexperimental", "sec-ch-uaexperimental", "sec-ch-ua-archexperimental", "sec-ch-ua-bitnessexperimental",
         "sec-ch-ua-form-factorsexperimental","sec-ch-ua-full-versiondeprecated", "sec-ch-ua-full-version-listexperimental", "sec-ch-ua-mobileexperimental", "sec-ch-ua-modelexperimental", "sec-ch-ua-platformexperimental", "sec-ch-ua-platform-versionexperimental",
         "sec-ch-ua-wow64experimental", "sec-fetch-dest", "sec-fetch-mode", "sec-fetch-site", "sec-fetch-user", "sec-gpcexperimental", "sec-purpose", "sec-speculation-tagsexperimental",
