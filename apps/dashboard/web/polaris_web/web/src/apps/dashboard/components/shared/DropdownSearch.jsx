@@ -6,7 +6,7 @@ function DropdownSearch(props) {
 
     const id = props.id ? props.id : "dropdown-search"
 
-    const { disabled, label, placeholder, optionsList, setSelected, value , avatarIcon, preSelected, allowMultiple, itemName, dropdownSearchKey, isNested, sliceMaxVal} = props
+    const { disabled, label, placeholder, optionsList, setSelected, value , avatarIcon, preSelected, allowMultiple, itemName, dropdownSearchKey, isNested, sliceMaxVal, showSelectedItemLabels=false, searchDisable=false} = props
 
     const deselectedOptions = optionsList
     const [selectedOptions, setSelectedOptions] = useState(preSelected ? preSelected : []);
@@ -30,7 +30,6 @@ function DropdownSearch(props) {
                 }
                 return [...preSelected];
             });
-
         }
         setOptions((prev) => {
             if(selectedOptions.length > 0 || prev.length > 0){
@@ -130,11 +129,11 @@ function DropdownSearch(props) {
                 return matchedOption && matchedOption.label;
             });
             setSelectedOptions([...selected]);
-
             if (avatarIcon) {
                 setInputValue(selected[0])
             } else if (allowMultiple) {
-                setInputValue(`${selected.length} ${itemName ? itemName : "item"}${selected.length == 1 ? "" : "s"} selected`)
+                if(showSelectedItemLabels) setInputValue(selected.join(", "))
+                else setInputValue(`${selected.length} ${itemName ? itemName : "item"}${selected.length == 1 ? "" : "s"} selected`)
             }
             else {
                 setInputValue(selectedText[0] || '');
@@ -174,19 +173,21 @@ function DropdownSearch(props) {
         <Autocomplete.TextField
             id={id}
             disabled={disabled}
-            onChange={updateText}
+            {...(!searchDisable ? {onChange:updateText}:{})}
             label={label}
             value={inputValue}
-            prefix={
-                <div style={{display: 'flex', gap: '4px', alignItems: 'center'}}>
-                    <Icon source={SearchMinor} color="base" />
-                    {avatarIcon && avatarIcon.length > 0 ? <Avatar customer size="extraSmall" name={avatarIcon} source={avatarIcon}/> : null}
-                </div>
-            }
+            {...(!searchDisable ? { 
+                prefix: (
+                    <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                        <Icon source={SearchMinor} color="base" />
+                        {avatarIcon && avatarIcon.length > 0 ? <Avatar customer size="extraSmall" name={avatarIcon} source={avatarIcon} /> : null}
+                    </div>
+                ) 
+            } : {})}
             suffix={<Icon source={ChevronDownMinor} color="base" />}
             placeholder={placeholder}
             autoComplete="off"
-            onFocus={handleFocusEvent}
+            {...(!searchDisable? {onFocus:handleFocusEvent}: {})}
         />
     );
 

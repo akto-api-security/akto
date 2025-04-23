@@ -1227,6 +1227,7 @@ getMissingConfigs(testResults){
       recurringWeekly: testRun.recurringWeekly,
       recurringMonthly: testRun.recurringMonthly,
       testSuiteIds:testMode? [] : testSuiteIds,
+      autoTicketingDetails: testRun.autoTicketingDetails,
     }
   }
 }

@@ -110,22 +110,20 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
     async function fetchData() {
         setLoading(true)
 
-        observeApi.fetchSlackWebhooks().then((resp) => {
-            const apiTokenList = resp.apiTokenList
-            setSlackIntegrated(apiTokenList && apiTokenList.length > 0)
-        })
+        Promise.all([
+            observeApi.fetchSlackWebhooks(),
+            observeApi.checkWebhook("MICROSOFT_TEAMS", "TESTING_RUN_RESULTS"),
+            settingsApi.fetchJiraIntegration()]).then(([slackResp, teamsResp, jiraResp]) => {
+                const apiTokenList = slackResp.apiTokenList
+                setSlackIntegrated(apiTokenList && apiTokenList.length > 0)
 
-        settingsApi.fetchJiraIntegration().then((res) => {
-            setJiraProjectMap(res?.jiraIntegration?.projectIdsMap||null);
-        });
-
-        observeApi.checkWebhook("MICROSOFT_TEAMS", "TESTING_RUN_RESULTS").then((resp) => {
-            // console.log(resp.webhookPresent, resp)
-            const webhookPresent = resp.webhookPresent
-            if(webhookPresent){
-                setTeamsTestingWebhookIntegrated(true)
-            }
-        })
+                const webhookPresent = teamsResp.webhookPresent
+                if (webhookPresent) {
+                    setTeamsTestingWebhookIntegrated(true)
+                }
+                
+                setJiraProjectMap(jiraResp?.jiraIntegration?.projectIdsMap || null);
+            })
 
         let metaDataObj = {
             categories: [],
@@ -522,8 +520,9 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
     }
 
     async function handleRun() {
-        const { startTimestamp, recurringDaily, recurringMonthly, recurringWeekly, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, cleanUpTestingResources,autoTicketingDetails } = testRun
+        const { startTimestamp, recurringDaily, recurringMonthly, recurringWeekly, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, cleanUpTestingResources } = testRun
         let {testName} = testRun;
+        const autoTicketingDetails = jiraProjectMap ? testRun.autoTicketingDetails : null;
         const collectionId = parseInt(apiCollectionId)
 
         const tests = testRun.tests
@@ -721,7 +720,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                         generateLabelForSlackIntegration={generateLabelForSlackIntegration}
                         generateLabelForTeamsIntegration={generateLabelForTeamsIntegration}
                         getLabel={getLabel}
-                        activeFromTesting={activeFromTesting || testIdConfig !== undefined}
+                        jiraProjectMap={jiraProjectMap}
                     />
                     <AdvancedSettingsComponent dispatchConditions={dispatchConditions} conditions={conditions} />
                 </>

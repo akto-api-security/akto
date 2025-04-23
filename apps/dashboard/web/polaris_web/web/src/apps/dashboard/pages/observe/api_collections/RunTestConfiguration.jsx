@@ -1,8 +1,9 @@
-import React, { useReducer, useState } from 'react';
+import React, { useEffect, useReducer, useState } from 'react';
 import { VerticalStack, HorizontalGrid, Checkbox, TextField, HorizontalStack } from '@shopify/polaris';
 import Dropdown from "../../../components/layouts/Dropdown";
 import SingleDate from "../../../components/layouts/SingleDate";
 import func from "@/util/func"
+import DropdownSearch from '../../../components/shared/DropdownSearch';
 
 const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes, testRunTimeOptions, testRolesArr, maxConcurrentRequestsOptions, slackIntegrated, generateLabelForSlackIntegration,getLabel, timeFieldsDisabled, teamsTestingWebhookIntegrated, generateLabelForTeamsIntegration, jiraProjectMap,activeFromTesting}) => {
     const reducer = (state, action) => {
@@ -217,7 +218,7 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
             />
             <HorizontalStack gap={4}>
                 <Checkbox
-                    disabled={activeFromTesting}
+                    disabled={!jiraProjectMap}
                     label="Auto-create tickets"
                     checked={testRun.autoTicketingDetails.shouldCreateTickets}
                     onChange={() => { toggleCreateTicketCheckbox()}}
@@ -229,24 +230,27 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
                             selected={(val) => {
                                 setTestRun(prev => ({ ...prev, autoTicketingDetails: { ...prev.autoTicketingDetails, projectId: val } }))
                             }}
-                            disabled={activeFromTesting || !testRun.autoTicketingDetails.shouldCreateTickets}
+                            disabled={!testRun.autoTicketingDetails.shouldCreateTickets}
                             placeHolder={"Select Project"}
                             initial={testRun.autoTicketingDetails.projectId}
                         />
                         <Dropdown
-                            disabled={activeFromTesting || !testRun.autoTicketingDetails.shouldCreateTickets}
+                            disabled={!testRun.autoTicketingDetails.shouldCreateTickets}
                             menuItems={allIssuesType}
                             selected={(val) => { setTestRun(prev => ({ ...prev, autoTicketingDetails: { ...prev.autoTicketingDetails, issueType: val } })) }}
                             placeHolder={"Select Issue Type"}
                             initial={testRun.autoTicketingDetails.issueType}
                         />
-                        <Dropdown
-                            menuItems={allSeverity}
-                            placeHolder={"Select Severity"}
-                            selected={(val) => {setTestRun(prev => ({ ...prev, autoTicketingDetails: { ...prev.autoTicketingDetails, severities: val }})) }}                            
+                        <DropdownSearch    
+                            optionsList={allSeverity}
+                            placeholder={"Select Severity"}
+                            setSelected={(val) => {setTestRun(prev => ({ ...prev, autoTicketingDetails: { ...prev.autoTicketingDetails, severities: val } })) }}
                             allowMultiple={true}
-                            disabled={activeFromTesting || !testRun.autoTicketingDetails.shouldCreateTickets}
-                            initial={testRun.autoTicketingDetails.severities}
+                            value={testRun.autoTicketingDetails.severities}
+                            preSelected={testRun.autoTicketingDetails.severities}
+                            showSelectedItemLabels={true}
+                            searchDisable={true}
+                            disabled={!testRun.autoTicketingDetails.shouldCreateTickets}
                         />
                     </>}
 

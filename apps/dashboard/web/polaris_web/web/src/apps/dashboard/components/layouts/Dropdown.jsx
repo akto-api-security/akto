@@ -6,7 +6,7 @@ import func from "@/util/func"
 function Dropdown(props) {
 
     const id = props.id ? props.id : "dropdown";
-    const allowMultiple = props.allowMultiple ? props.allowMultiple : false;
+
     const deselectedOptions = useMemo(() => props.menuItems,[props.menuItems],);
     const [selectedOptions, setSelectedOptions] = useState([]);
     const [inputValue, setInputValue] = useState(props.initial);
@@ -22,25 +22,10 @@ function Dropdown(props) {
             });
             return matchedOption && matchedOption.label;
         });
-        allowMultiple? props.selected(selected): props.selected(selected[0]);
+        props.selected(selected[0])
         setSelectedOptions(selected);
-        allowMultiple? setInputValue(selectedValue): setInputValue(selectedValue[0]);
+        setInputValue(selectedValue[0]);
     },[options]);
-
-
-    const getLabelMultiple = (initialValues) => {
-        setSelectedOptions((prev) => {
-            return initialValues;
-        })
-        const labelVal = [];
-        props.menuItems.forEach(element => {
-            if(initialValues.includes(element.value)){
-                labelVal.push(element.label);                
-            }
-        });
-        setInputValue(labelVal.join(","));
-
-    }
 
     const getLabel  = (id) => {
         props.menuItems.forEach(element => {
@@ -63,10 +48,7 @@ function Dropdown(props) {
     }
 
     useEffect(()=>{
-        if(allowMultiple){
-            getLabelMultiple(Array.isArray(props.initial) ? props.initial : [props.initial]);
-        }
-        else getLabel(props.initial);
+        getLabel(props.initial)
         setOptions(deselectedOptions)
     },[deselectedOptions, props.initial])
 
@@ -85,7 +67,6 @@ function Dropdown(props) {
     );
     return (
         <Autocomplete
-            allowMultiple={allowMultiple}
             options={options}
             selected={selectedOptions}
             onSelect={updateSelection}
