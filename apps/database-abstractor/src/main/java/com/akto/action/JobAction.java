@@ -15,6 +15,8 @@ import java.util.Map;
 import lombok.Getter;
 import lombok.Setter;
 
+@Getter
+@Setter
 public class JobAction extends ActionSupport {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(JobAction.class, LogDb.DB_ABS);
@@ -22,8 +24,6 @@ public class JobAction extends ActionSupport {
     private static final ObjectMapper mapper = new ObjectMapper()
         .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
-    @Getter
-    @Setter
     Map<String, Object> job;
 
     public String insertJob() {
@@ -37,7 +37,7 @@ public class JobAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
-    public Job convertMapToJob(Map<String, Object> jobMap) {
+    private Job convertMapToJob(Map<String, Object> jobMap) {
         Map<String, Object> jobParamsMap = (Map<String, Object>) jobMap.remove(Job.JOB_PARAMS);
 
         Job job = mapper.convertValue(jobMap, Job.class);
