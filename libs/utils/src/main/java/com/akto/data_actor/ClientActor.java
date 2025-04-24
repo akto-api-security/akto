@@ -1,7 +1,14 @@
 package com.akto.data_actor;
 
 import com.akto.DaoInit;
+import com.akto.dao.context.Context;
+import com.akto.dao.jobs.JobsDao;
 import com.akto.dto.filter.MergedUrls;
+import com.akto.dto.jobs.Job;
+import com.akto.dto.jobs.JobExecutorType;
+import com.akto.dto.jobs.JobParams;
+import com.akto.dto.jobs.JobStatus;
+import com.akto.dto.jobs.ScheduleType;
 import com.akto.dto.settings.DataControlSettings;
 import com.akto.testing.ApiExecutor;
 import com.auth0.jwt.JWT;
@@ -3540,7 +3547,40 @@ public class ClientActor extends DataActor {
             return null;
         }
     }
-    
+
+    @Override
+    public void scheduleRunOnceJob(int accountId, JobParams params, JobExecutorType jobExecutorType) {
+        Map<String, List<String>> headers = buildHeaders();
+
+        int now = Context.now();
+        Job job = new Job(new ObjectId(),
+            accountId,
+            ScheduleType.RUN_ONCE,
+            JobStatus.SCHEDULED,
+            params,
+            jobExecutorType,
+            now,
+            0,
+            0,
+            0,
+            now
+        );
+
+        String objString = gson.toJson(job);
+        loggerMaker.debug(objString);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/insertJob", "", "POST", objString, headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in insertJob", LoggerMaker.LogDb.RUNTIME);
+                return;
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in insertJob" + e, LoggerMaker.LogDb.RUNTIME);
+        }
+    }
+
     public List<String> findTestSubCategoriesByTestSuiteId(List<String> testSuiteId) {
         BasicDBObject obj = new BasicDBObject();
         obj.put("testSuiteId", testSuiteId);
