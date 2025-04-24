@@ -9,9 +9,15 @@ const InlineEditableText = (props) => {
             setIsEditing(false);
         }
       }
+    
+    const handleBlurEvent = () => {
+        handleSaveClick();
+        setIsEditing(false);
+    }
+
     return (
-        <Box maxWidth='20vw'>
-            <div style={{width:"auto"}} onKeyDown={handleKeyDown}>
+        <Box minWidth='320px' maxWidth='20vw'>
+            <div style={{width:"auto"}} onKeyDown={handleKeyDown} onBlur={()=>handleBlurEvent()}>
                 <TextField
                     value={textValue}
                     onChange={(val) => setTextValue(val)}
