@@ -18,7 +18,7 @@ import org.bson.types.ObjectId;
 @ToString
 public class AutoTicketParams extends JobParams {
 
-    private static final JobType jobType = JobType.JIRA_AUTO_CREATE_ISSUES;
+    private static final JobType jobType = JobType.JIRA_AUTO_CREATE_TICKETS;
 
     private ObjectId testingRunId;
     private ObjectId summaryId;

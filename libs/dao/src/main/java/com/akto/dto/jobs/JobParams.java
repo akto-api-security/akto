@@ -12,4 +12,3 @@ public abstract class JobParams {
     @BsonIgnore
     public abstract Class<? extends JobParams> getParamsClass();
 }
-
