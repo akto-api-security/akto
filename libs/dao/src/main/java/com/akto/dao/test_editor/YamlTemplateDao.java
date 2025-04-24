@@ -72,9 +72,13 @@ public class YamlTemplateDao extends AccountsContextDao<YamlTemplate> {
     }
 
     public Map<String, Info> fetchTestInfoMap() {
+        return fetchTestInfoMap(new BasicDBObject());
+    }
+
+    public Map<String, Info> fetchTestInfoMap(Bson filter) {
         Map<String, Info> ret = new HashMap<>();
-        List<YamlTemplate> yamlTemplates = YamlTemplateDao.instance.findAll(new BasicDBObject(), Projections.include("info"));
-        for (YamlTemplate yamlTemplate: yamlTemplates) {
+        List<YamlTemplate> yamlTemplates = YamlTemplateDao.instance.findAll(filter, Projections.include("info"));
+        for (YamlTemplate yamlTemplate : yamlTemplates) {
             ret.put(yamlTemplate.getId(), yamlTemplate.getInfo());
         }
 

@@ -1,0 +1,52 @@
+[
+    {
+      "_id": "6800c062029972425f857822",
+      "index": 0,
+      "guid": "e0d5f494-39a5-49c0-8155-d16c98bed870",
+      "isActive": true,
+      "balance": "$1,645.41",
+      "picture": "http://placehold.it/32x32",
+      "age": 40,
+      "eyeColor": "brown",
+      "name": "Genevieve Middleton",
+      "gender": "female",
+      "company": "OPTICON",
+      "email": "genevievemiddleton@opticon.com",
+      "phone": "+1 (967) 572-2709",
+      "address": "557 Stryker Court, Manitou, Illinois, 8379",
+      "about": "Velit excepteur excepteur cillum nisi laborum anim esse duis eiusmod magna cupidatat amet. Non non voluptate occaecat exercitation ex veniam ad. Sint dolore non sunt sunt laborum dolor nostrud quis cillum Lorem culpa est amet. Laborum nisi exercitation amet voluptate occaecat aliquip aliquip sunt labore minim sint velit.",
+      "registered": "2024-09-02T04:22:11 -06:-30",
+      "latitude": 53.931709,
+      "longitude": 43.037895,
+      "tags": [
+        "laboris"
+      ],
+      "greeting": "Hello, Genevieve Middleton! You have 10 unread messages.",
+      "favoriteFruit": "apple"
+    },
+    {
+      "_id": "6800c0625a32a8a3dd347898",
+      "index": 1,
+      "guid": "12daa10d-7b14-459c-b4e0-3d7253517129",
+      "isActive": false,
+      "balance": "$3,232.96",
+      "picture": "http://placehold.it/32x32",
+      "age": 32,
+      "eyeColor": "brown",
+      "name": "Luisa Burks",
+      "gender": "female",
+      "company": "PROSELY",
+      "email": "luisaburks@prosely.com",
+      "phone": "+1 (894) 552-2060",
+      "address": "511 Conduit Boulevard, Newkirk, North Dakota, 7469",
+      "about": "Incididunt eu excepteur minim ex duis esse. Ex aute minim nulla aliquip voluptate velit proident ea reprehenderit nulla cupidatat ex. Id ex labore cillum velit ad cupidatat proident eiusmod sint id officia enim voluptate est. Ex aute ex ipsum ea commodo minim nostrud sit anim amet non anim voluptate.",
+      "registered": "2015-12-09T12:20:50 -06:-30",
+      "latitude": -44.436853,
+      "longitude": -58.643122,
+      "tags": [
+        "voluptate"
+      ],
+      "greeting": "Hello, Luisa Burks! You have 10 unread messages.",
+      "favoriteFruit": "banana"
+    }
+  ]

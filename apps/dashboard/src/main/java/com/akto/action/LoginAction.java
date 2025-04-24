@@ -7,6 +7,7 @@ import com.akto.dao.SignupDao;
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.UsersDao;
 import com.akto.dao.context.Context;
+import com.akto.dao.testing.DefaultTestSuitesDao;
 import com.akto.dto.BackwardCompatibility;
 import com.akto.dto.Config;
 import com.akto.dto.SignupInfo;
@@ -207,10 +208,45 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
                         ),
                         new FindOneAndUpdateOptions().returnDocument(ReturnDocument.BEFORE)
                 );
+
+                if(tempUser == null) {
+                    return Action.ERROR.toUpperCase();
+                }
+
                 /*
                  * Creating datatype to template on user login.
                  * TODO: Remove this job once templates for majority users are created.
                  */
+
+                // update default test suites list on login instead of initializing
+                try {
+                    // need this loop for default insertion of test suites upon login
+                    Map<Integer, Boolean> accountToIsFirstTimeMap = new HashMap<>();
+                    for(String accountIdStr : user.getAccounts().keySet()) {
+                        int accountId = Integer.parseInt(accountIdStr);
+                        Context.accountId.set(accountId);
+                        int count = (int) DefaultTestSuitesDao.instance.estimatedDocumentCount();
+                        if (count == 0) {
+                            accountToIsFirstTimeMap.put(accountId, true);
+                        }
+                    }
+                    if(!accountToIsFirstTimeMap.isEmpty() || (tempUser.getLastLoginTs() + REFRESH_INTERVAL) < Context.now()){
+                        service.submit(() -> {
+                            try {
+                                for(String accountIdStr : user.getAccounts().keySet()) {
+                                    int accountId = Integer.parseInt(accountIdStr);
+                                    Context.accountId.set(accountId);
+                                    DefaultTestSuitesDao.insertDefaultTestSuites(accountToIsFirstTimeMap.getOrDefault(accountId, false));
+                                }
+                            } catch (Exception e) {
+                                e.printStackTrace();
+                            }
+                        });
+                    }
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+
                 if ((tempUser.getLastLoginTs() + REFRESH_INTERVAL) < Context.now()) {
                     service.submit(() -> {
                         try {

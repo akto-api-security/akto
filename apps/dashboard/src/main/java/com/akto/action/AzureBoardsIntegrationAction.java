@@ -218,23 +218,27 @@ public class AzureBoardsIntegrationAction extends UserAction {
             }
 
             BasicDBObject respPayloadObj = BasicDBObject.parse(responsePayload);
-            String workItemUrl = respPayloadObj.get("url").toString();
+
+            String workItemUrl;
+            try {
+                Object linksObj = respPayloadObj.get("_links");
+                BasicDBObject links = BasicDBObject.parse(linksObj.toString());
+                Object htmlObj = links.get("html");
+                BasicDBObject html = BasicDBObject.parse(htmlObj.toString());
+                Object href = html.get("href");
+                workItemUrl = href.toString();
+            } catch (Exception e) {
+                workItemUrl = respPayloadObj.get("url").toString();
+            }
 
             if(workItemUrl == null) {
                 return Action.ERROR.toUpperCase();
             }
 
-            if(!workItemUrl.isEmpty()){
-                UpdateOptions updateOptions = new UpdateOptions();
-                updateOptions.upsert(false);
-                TestingRunIssuesDao.instance.getMCollection().updateOne(
-                        Filters.eq(Constants.ID, testingIssuesId),
-                        Updates.combine(
-                                Updates.set(TestingRunIssues.AZURE_BOARDS_WORK_ITEM_URL, workItemUrl)
-                        ),
-                        updateOptions
-                );
-            }
+            TestingRunIssuesDao.instance.updateOneNoUpsert(
+                    Filters.eq(Constants.ID, testingIssuesId),
+                    Updates.set(TestingRunIssues.AZURE_BOARDS_WORK_ITEM_URL, workItemUrl)
+            );
         } catch (Exception e) {
             logger.errorAndAddToDb("Error while creating work item for azure boards: " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
             e.printStackTrace();

@@ -1,26 +1,35 @@
 package com.akto.dao.testing;
 
-import com.akto.dao.CommonContextDao;
+import com.akto.dao.AccountsContextDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.YamlTemplateDao;
+import com.akto.dto.test_editor.Info;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.testing.DefaultTestSuites;
 import com.akto.util.Constants;
 import com.akto.util.enums.GlobalEnums;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
+import com.mongodb.client.model.Sorts;
 import com.mongodb.client.model.Updates;
+import org.apache.commons.lang3.StringUtils;
+import org.bson.conversions.Bson;
 
 import java.util.*;
 
 import static com.akto.dto.testing.DefaultTestSuites.owaspTop10List;
 
-public class DefaultTestSuitesDao extends CommonContextDao<DefaultTestSuites> {
+public class DefaultTestSuitesDao extends AccountsContextDao<DefaultTestSuites> {
 
     public static final DefaultTestSuitesDao instance = new DefaultTestSuitesDao();
 
-    public static Map<String, Map<String, List<String>>> getDefaultTestSuitesMap() {
-        List<YamlTemplate> yamlTemplateList = YamlTemplateDao.instance.findAll(Filters.empty(), Projections.include(Constants.ID, YamlTemplate.INFO, YamlTemplate.SETTINGS));
+    public static Map<String, Map<String, List<String>>> getDefaultTestSuitesMap(boolean isFirstTime, long lastUpdatedDefaultTestSuite) {
+        List<YamlTemplate> yamlTemplateList;
+        if (!isFirstTime) {
+            yamlTemplateList = YamlTemplateDao.instance.findAll(Filters.gt(YamlTemplate.CREATED_AT, lastUpdatedDefaultTestSuite), Projections.include(Constants.ID, YamlTemplate.INFO, YamlTemplate.SETTINGS));
+        } else {
+            yamlTemplateList = YamlTemplateDao.instance.findAll(Filters.empty(), Projections.include(Constants.ID, YamlTemplate.INFO, YamlTemplate.SETTINGS));
+        }
 
         Map<String, List<String>> owaspSuites = new HashMap<>();
         for(Map.Entry<String, List<String>> entry : owaspTop10List.entrySet()) {
@@ -78,8 +87,23 @@ public class DefaultTestSuitesDao extends CommonContextDao<DefaultTestSuites> {
         return defaultTestSuites;
     }
 
-    public static void insertDefaultTestSuites() {
-        long yamlTemplatesCount = YamlTemplateDao.instance.count(Filters.empty());
+    public static void insertDefaultTestSuites(boolean isFirstTime) {
+        long yamlTemplatesCount;
+        long lastUpdatedDefaultTestSuite;
+        if(!isFirstTime) {
+            List<DefaultTestSuites> defaultTestSuites = DefaultTestSuitesDao.instance.findAll(Filters.empty(), 0, 1, Sorts.descending(DefaultTestSuites.CREATED_AT), null);
+            if(!defaultTestSuites.isEmpty()) {
+                lastUpdatedDefaultTestSuite = defaultTestSuites.get(0).getLastUpdated();
+                yamlTemplatesCount = YamlTemplateDao.instance.count(Filters.gt(YamlTemplate.CREATED_AT, lastUpdatedDefaultTestSuite));
+            } else {
+                yamlTemplatesCount = 0;
+                lastUpdatedDefaultTestSuite = 0;
+            }
+        } else {
+            lastUpdatedDefaultTestSuite = 0;
+            yamlTemplatesCount = YamlTemplateDao.instance.count(Filters.empty());
+        }
+
 
         List<DefaultTestSuites> defaultTestSuites = DefaultTestSuitesDao.instance.findAll(Filters.empty());
 
@@ -92,7 +116,7 @@ public class DefaultTestSuitesDao extends CommonContextDao<DefaultTestSuites> {
             return;
         }
 
-        Map<String, Map<String, List<String>>> defaultTestSuitesMap = getDefaultTestSuitesMap();
+        Map<String, Map<String, List<String>>> defaultTestSuitesMap = getDefaultTestSuitesMap(isFirstTime, lastUpdatedDefaultTestSuite);
 
         for(DefaultTestSuites.DefaultSuitesType defaultSuitesType : DefaultTestSuites.DefaultSuitesType.values()) {
             Map<String, List<String>> defaultSuiteMap = defaultTestSuitesMap.get(defaultSuitesType.name());
@@ -108,6 +132,41 @@ public class DefaultTestSuitesDao extends CommonContextDao<DefaultTestSuites> {
                         Updates.setOnInsert(DefaultTestSuites.SUITE_TYPE, defaultSuitesType.name()),
                         Updates.addEachToSet(DefaultTestSuites.SUB_CATEGORY_LIST, defaultSuiteMap.get(key))
                     )
+                );
+            }
+        }
+    }
+
+    public void saveYamlTestTemplateInDefaultSuite(Info info, String author) {
+        for(Map.Entry<String, List<String>> entry : owaspTop10List.entrySet()) {
+            String key = entry.getKey();
+            List<String> categories = entry.getValue();
+
+            if(!categories.contains(info.getCategory().getName())) {
+                continue;
+            }
+
+            for(DefaultTestSuites.DefaultSuitesType defaultSuitesType : DefaultTestSuites.DefaultSuitesType.values()) {
+                if(defaultSuitesType.name().equals(DefaultTestSuites.DefaultSuitesType.TESTING_METHODS.name())) {
+                    continue;
+                }
+
+                Bson keyFilter = Filters.eq(DefaultTestSuites.NAME, key);
+                if(defaultSuitesType.name().equals(DefaultTestSuites.DefaultSuitesType.SEVERITY.name())) {
+                    keyFilter = Filters.eq(DefaultTestSuites.NAME, StringUtils.capitalize(info.getSeverity().toLowerCase()));
+                }
+
+                DefaultTestSuitesDao.instance.updateOne(Filters.and(
+                                keyFilter,
+                                Filters.eq(DefaultTestSuites.SUITE_TYPE, defaultSuitesType.name())
+                        ),
+                        Updates.combine(
+                                Updates.setOnInsert(DefaultTestSuites.CREATED_AT, Context.now()),
+                                Updates.set(DefaultTestSuites.LAST_UPDATED, Context.now()),
+                                Updates.setOnInsert(DefaultTestSuites.CREATED_BY, author),
+                                Updates.setOnInsert(DefaultTestSuites.SUITE_TYPE, defaultSuitesType.name()),
+                                Updates.addEachToSet(DefaultTestSuites.SUB_CATEGORY_LIST, Arrays.asList(info.getSubCategory()))
+                        )
                 );
             }
         }

@@ -7,6 +7,8 @@ import static com.akto.utils.Utils.deleteApis;
 import static com.akto.utils.billing.OrganizationUtils.syncOrganizationWithAkto;
 import static com.mongodb.client.model.Filters.eq;
 
+import com.akto.dto.jobs.JobExecutorType;
+import com.akto.utils.crons.JobsCron;
 import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -301,7 +303,7 @@ public class InitializerListener implements ServletContextListener {
         return true;
     }
 
-    public void setUpTrafficAlertScheduler(){
+    private void setUpTrafficAlertScheduler(){
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
                 AccountTask.instance.executeTask(new Consumer<Account>() {
@@ -2409,14 +2411,6 @@ public class InitializerListener implements ServletContextListener {
 
                 setDashboardMode();
                 updateGlobalAktoVersion();
-                try {
-                    int accountId = !DashboardMode.isSaasDeployment() ? 1_000_000 : 1669322524;
-                    Context.accountId.set(accountId);
-                    DefaultTestSuitesDao.insertDefaultTestSuites();
-                } catch (Exception e) {
-                    e.printStackTrace();
-                    logger.errorAndAddToDb("Error while inserting default test suites in DB: " + e.getMessage());
-                }
 
                 AccountTask.instance.executeTask(new Consumer<Account>() {
                     @Override
@@ -2475,6 +2469,7 @@ public class InitializerListener implements ServletContextListener {
                     // CleanTestingJob.cleanTestingJobRunner();
 
                     MatchingJob.MatchingJobRunner();
+                    JobsCron.instance.jobsScheduler(JobExecutorType.DASHBOARD);
 
                     int now2 = Context.now();
                     int diffNow = now2 - now;
