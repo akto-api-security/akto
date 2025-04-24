@@ -970,10 +970,10 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName,apiInfoSeverit
               apiCollectionId: x.apiCollectionId,
               last_seen: apiInfoMap[key] ? (this.prettifyEpoch(apiInfoMap[key]["lastSeen"])) : this.prettifyEpoch(x.startTs),
               lastSeenTs: apiInfoMap[key] ? apiInfoMap[key]["lastSeen"] : x.startTs,
-              detectedTs: (x.startTs || discoveredTimestamp),
+              detectedTs: discoveredTimestamp,
               changesCount: x.changesCount,
               changes: x.changesCount && x.changesCount > 0 ? (x.changesCount +" new parameter"+(x.changesCount > 1? "s": "")) : 'No new changes',
-              added: "Discovered " + this.prettifyEpoch(x.startTs || discoveredTimestamp),
+              added: this.prettifyEpoch(discoveredTimestamp),
               violations: apiInfoMap[key] ? apiInfoMap[key]["violations"] : {},
               apiCollectionName: idToName ? (idToName[x.apiCollectionId] || '-') : '-',
               auth_type: (authType || "no auth type found").toLowerCase(),
@@ -1880,6 +1880,16 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
   getAktoSeverities(){
     return ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW']
   },
+
+  getSelectedItemsText(selectedItem) {
+    if (!Array.isArray(selectedItem) || selectedItem?.length === 0) return "";
+  
+    if (selectedItem.length === 1) return selectedItem[0];
+  
+    const allButLast = selectedItem.slice(0, -1).join(", ");
+    const last = selectedItem[selectedItem.length - 1];
+    return `${allButLast} & ${last}`;
+  },  
 
   getIconFromString(iconString){
     if(iconsUsedMap[iconString] !== undefined){

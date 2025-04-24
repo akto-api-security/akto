@@ -4,6 +4,8 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
 
+import lombok.Getter;
+import lombok.Setter;
 import org.bson.codecs.pojo.annotations.BsonDiscriminator;
 
 import com.akto.dao.ConfigsDao;
@@ -34,7 +36,7 @@ public abstract class Config {
     public String id;
 
     public enum ConfigType {
-        SLACK, GOOGLE, WEBPUSH, PASSWORD, SALESFORCE, SENDGRID, AUTH0, GITHUB, STIGG, MIXPANEL, SLACK_ALERT, OKTA, AZURE, HYBRID_SAAS, SLACK_ALERT_USAGE, GOOGLE_SAML, AWS_WAF, SPLUNK_SIEM;
+        SLACK, GOOGLE, WEBPUSH, PASSWORD, SALESFORCE, SENDGRID, AUTH0, GITHUB, STIGG, MIXPANEL, SLACK_ALERT, OKTA, AZURE, HYBRID_SAAS, SLACK_ALERT_USAGE, GOOGLE_SAML, AWS_WAF, SPLUNK_SIEM, AKTO_DASHBOARD_HOST_URL;
     }
 
     public ConfigType configType;
@@ -802,6 +804,23 @@ public abstract class Config {
             this.splunkToken = splunkToken;
         }
        
+    }
+
+    @Getter
+    @Setter
+    @BsonDiscriminator
+    public static class AktoHostUrlConfig extends Config {
+
+        public static final String HOST_URL = "hostUrl";
+        public static final String LAST_SYNCED_AT = "lastSyncedAt";
+
+        private String hostUrl;
+        private int lastSyncedAt;
+
+        public AktoHostUrlConfig() {
+            this.configType = ConfigType.AKTO_DASHBOARD_HOST_URL;
+            this.id = ConfigType.AKTO_DASHBOARD_HOST_URL.name();
+        }
     }
 
     public static boolean isConfigSSOType(ConfigType configType){

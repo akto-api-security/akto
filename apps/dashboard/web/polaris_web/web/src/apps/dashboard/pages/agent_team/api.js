@@ -70,6 +70,21 @@ const api = {
             data: data 
         })
     },
+    saveAgentModel: async (data) => {
+        return await request({
+            url: '/api/saveAgentModel',
+            method: 'post',
+            data: data 
+        })
+    },
+    deleteAgentModel: async (data) => {
+        return await request({
+            url: '/api/deleteAgentModel',
+            method: 'post',
+            data: data 
+        })
+    },
+
 }
 
 export default api;

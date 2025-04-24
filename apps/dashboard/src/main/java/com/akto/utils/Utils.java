@@ -648,8 +648,8 @@ public class Utils {
             return null;
         }
         try {
-            String origCurl = ExportSampleDataAction.getCurl(originalMessage);
-            String testCurl = ExportSampleDataAction.getCurl(message);
+            String origCurl = CurlUtils.getCurl(originalMessage);
+            String testCurl = CurlUtils.getCurl(message);
 
             HttpResponseParams origObj = HttpCallParser.parseKafkaMessage(originalMessage);
             BasicDBObject testRespObj = BasicDBObject.parse(message);

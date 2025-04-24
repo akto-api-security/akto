@@ -2,8 +2,13 @@ package com.akto.dto;
 
 
 import com.akto.dao.context.Context;
+import com.akto.proto.http_response_param.v1.HttpResponseParam;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.mongodb.BasicDBObject;
+import com.google.protobuf.TextFormat;
 
 import java.util.*;
+import java.util.function.Supplier;
 
 public class HttpResponseParams {
 
@@ -25,6 +30,7 @@ public class HttpResponseParams {
     String sourceIP;
     String destIP;
     String direction;
+    Supplier<String> originalMsg;
 
     public HttpResponseParams() {}
 
@@ -52,6 +58,28 @@ public class HttpResponseParams {
         this.sourceIP = sourceIP;
         this.destIP = destIP;
         this.direction = direction;
+    }
+
+    public HttpResponseParams resetValues(String type, int statusCode, String status, Map<String, List<String>> headers, String payload,
+                              HttpRequestParams requestParams, int time, String accountId, boolean isPending, Source source,
+                              String orig, String sourceIP, String destIP, String direction, Supplier<String> originalMsg) {
+        this.type = type;
+        this.statusCode = statusCode;
+        this.status = status;
+        this.headers = headers;
+        this.payload = payload;
+        this.requestParams = requestParams;
+        this.time = time;
+        this.accountId = accountId;
+        this.isPending = isPending;
+        this.source = source;
+        this.orig = orig;
+        this.sourceIP = sourceIP;
+        this.destIP = destIP;
+        this.direction = direction;
+        this.originalMsg = originalMsg;
+
+        return this;
     }
 
     public static boolean validHttpResponseCode(int statusCode)  {
@@ -190,5 +218,68 @@ public class HttpResponseParams {
 
     public void setRequestParams(HttpRequestParams requestParams) {
         this.requestParams = requestParams;
+    }
+
+    public Supplier<String> getOriginalMsg() {
+        return originalMsg;
+    }
+
+    public void setOriginalMsg(Supplier<String> originalMsg) {
+        this.originalMsg = originalMsg;
+    }
+
+    public static String getSampleStringFromProtoString(String httpResponseParamProtoString){
+
+        String origStr = "";
+        HttpResponseParam.Builder httpBuilder = HttpResponseParam.newBuilder();
+        try {
+          TextFormat.getParser().merge(httpResponseParamProtoString, httpBuilder);
+        } catch (Exception e) {
+          return httpResponseParamProtoString;
+        }
+        HttpResponseParam httpResponseParamProto = httpBuilder.build();
+
+        BasicDBObject origObj = new BasicDBObject();
+        ObjectMapper objectMapper = new ObjectMapper();
+
+        String sourceStr = httpResponseParamProto.getSource();
+        if (sourceStr == null || sourceStr.isEmpty()) {
+          sourceStr = HttpResponseParams.Source.OTHER.name();
+        }
+        Map<String, List<String>> reqHeaders = (Map) httpResponseParamProto.getRequestHeadersMap();
+        Map<String, List<String>> respHeaders = (Map) httpResponseParamProto.getResponseHeadersMap();
+        String reqHeaderStr2 = "";
+        String respHeaderStr2 = "";
+
+        try {
+            reqHeaderStr2 = objectMapper.writeValueAsString(reqHeaders);
+            respHeaderStr2 = objectMapper.writeValueAsString(respHeaders);
+        } catch (Exception e) {
+            return httpResponseParamProtoString;
+        }
+
+        origObj.put("method", httpResponseParamProto.getMethod());
+        origObj.put("requestPayload", httpResponseParamProto.getRequestPayload());
+        origObj.put("responsePayload", httpResponseParamProto.getResponsePayload());
+        origObj.put("ip", httpResponseParamProto.getIp());
+        origObj.put("destIp", httpResponseParamProto.getDestIp());
+        origObj.put("source", sourceStr);
+        origObj.put("type", httpResponseParamProto.getType());
+        origObj.put("akto_vxlan_id", httpResponseParamProto.getAktoVxlanId());
+        origObj.put("path", httpResponseParamProto.getPath());
+        origObj.put("requestHeaders", reqHeaderStr2);
+        origObj.put("responseHeaders", respHeaderStr2);
+        origObj.put("time", httpResponseParamProto.getTime());
+        origObj.put("akto_account_id", httpResponseParamProto.getAktoAccountId());
+        origObj.put("statusCode", httpResponseParamProto.getStatusCode());
+        origObj.put("status", httpResponseParamProto.getStatus());
+
+        try {
+          origStr = objectMapper.writeValueAsString(origObj);
+        } catch (Exception e) {
+            return httpResponseParamProtoString;
+        }
+
+        return origStr;
     }
 }

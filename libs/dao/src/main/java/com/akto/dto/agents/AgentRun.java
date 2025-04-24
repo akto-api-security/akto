@@ -32,8 +32,10 @@ public class AgentRun {
     State state;
     final public static String _STATE = "state";
 
+    Model model;
+
     public AgentRun(String processId, Map<String, Object> agentInitDocument, Agent agent, int createdTimestamp,
-            int startTimestamp, int endTimestamp, State state) {
+            int startTimestamp, int endTimestamp, State state, Model model) {
         this.processId = processId;
         this.agentInitDocument = agentInitDocument;
         this.agent = agent;
@@ -41,6 +43,7 @@ public class AgentRun {
         this.startTimestamp = startTimestamp;
         this.endTimestamp = endTimestamp;
         this.state = state;
+        this.model = model;
     }
 
     public AgentRun() {
@@ -100,6 +103,14 @@ public class AgentRun {
 
     public void setState(State state) {
         this.state = state;
+    }
+
+    public Model getModel() {
+        return model;
+    }
+
+    public void setModel(Model model) {
+        this.model = model;
     }
 
 }

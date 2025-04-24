@@ -24,6 +24,8 @@ public class HttpRequestResponseUtils {
 
     public static final String FORM_URL_ENCODED_CONTENT_TYPE = "application/x-www-form-urlencoded";
     public static final String GRPC_CONTENT_TYPE = "application/grpc";
+    private static final List<String> acceptableContentTypes = Arrays.asList(JSON_CONTENT_TYPE, FORM_URL_ENCODED_CONTENT_TYPE, GRPC_CONTENT_TYPE);
+    private static List<String> contentTypeValues;
 
     public static List<SingleTypeInfo> generateSTIsFromPayload(int apiCollectionId, String url, String method,String body, int responseCode) {
         int now = Context.now();
@@ -115,17 +117,13 @@ public class HttpRequestResponseUtils {
     }
     
     public static String getAcceptableContentType(Map<String,List<String>> headers) {
-        List<String> acceptableContentTypes = Arrays.asList(JSON_CONTENT_TYPE, FORM_URL_ENCODED_CONTENT_TYPE, GRPC_CONTENT_TYPE);
-        List<String> contentTypeValues;
         if (headers == null) return null;
-        for (String k: headers.keySet()) {
-            if (k.equalsIgnoreCase("content-type")) {
-                contentTypeValues = headers.get(k);
-                for (String value: contentTypeValues) {
-                    for (String acceptableContentType: acceptableContentTypes) {
-                        if (value.contains(acceptableContentType)) {
-                            return acceptableContentType;
-                        }
+        contentTypeValues = headers.get("content-type");
+        if (contentTypeValues != null) {
+            for (String value: contentTypeValues) {
+                for (String acceptableContentType: acceptableContentTypes) {
+                    if (value.contains(acceptableContentType)) {
+                        return acceptableContentType;
                     }
                 }
             }

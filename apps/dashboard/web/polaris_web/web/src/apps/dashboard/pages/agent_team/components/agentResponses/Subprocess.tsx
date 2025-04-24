@@ -25,7 +25,8 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, triggerCall
     const [expanded, setExpanded] = useState((subProcessFromProp?.state == "SCHEDULED" || subProcessFromProp?.state == "RUNNING") ? true : false);
 
     const { finalCTAShow, setFinalCTAShow, setCurrentAttempt, 
-        setCurrentSubprocess, currentSubprocess, currentAttempt, setAgentState, setPRState, PRstate } = useAgentsStore(state => ({
+        setCurrentSubprocess, currentSubprocess, currentAttempt, setAgentState, setPRState, PRstate,
+        selectedModel } = useAgentsStore(state => ({
         finalCTAShow: state.finalCTAShow,
         setFinalCTAShow: state.setFinalCTAShow,
         setCurrentAttempt: state.setCurrentAttempt,
@@ -34,7 +35,8 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, triggerCall
         currentAttempt: state.currentAttempt,
         setAgentState: state.setAgentState,
         setPRState: state.setPRState,
-        PRstate: state.PRstate
+        PRstate: state.PRstate,
+        selectedModel: state.selectedModel
     }));  // Only subscribe to necessary store values
 
     const { setFilteredUserInput, setOutputOptions } = intermediateStore(state => ({ setFilteredUserInput: state.setFilteredUserInput, setOutputOptions: state.setOutputOptions })); 
@@ -201,7 +203,8 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, triggerCall
             const previousAgentRun = res.agentRun
             let data = await api.createAgentRun({
                 agent: previousAgentRun.agent,
-                data: previousAgentRun.agentInitDocument
+                data: previousAgentRun.agentInitDocument,
+                modelName: selectedModel?.id
             })
             if(data.agentRun){
                 setCurrentAgentRun(data?.agentRun)

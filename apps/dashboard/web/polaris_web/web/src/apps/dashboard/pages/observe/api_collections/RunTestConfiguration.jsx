@@ -1,10 +1,11 @@
-import React, { useReducer } from 'react';
-import { VerticalStack, HorizontalGrid, Checkbox, TextField } from '@shopify/polaris';
+import React, { useEffect, useReducer, useState } from 'react';
+import { VerticalStack, HorizontalGrid, Checkbox, TextField, HorizontalStack } from '@shopify/polaris';
 import Dropdown from "../../../components/layouts/Dropdown";
 import SingleDate from "../../../components/layouts/SingleDate";
 import func from "@/util/func"
+import DropdownSearch from '../../../components/shared/DropdownSearch';
 
-const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes, testRunTimeOptions, testRolesArr, maxConcurrentRequestsOptions, slackIntegrated, generateLabelForSlackIntegration,getLabel, timeFieldsDisabled, teamsTestingWebhookIntegrated, generateLabelForTeamsIntegration}) => {
+const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes, testRunTimeOptions, testRolesArr, maxConcurrentRequestsOptions, slackIntegrated, generateLabelForSlackIntegration,getLabel, timeFieldsDisabled, teamsTestingWebhookIntegrated, generateLabelForTeamsIntegration, jiraProjectMap}) => {
     const reducer = (state, action) => {
         switch (action.type) {
           case "update":
@@ -30,6 +31,57 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
     const initialState = {data: new Date()};
     const startDayToday = func.getStartOfTodayEpoch()
     const [state, dispatch] = useReducer(reducer, initialState);
+
+
+    const allProjects = Object.keys(jiraProjectMap||{}).map((key) => {
+        return {label:key, value: key}
+    })
+
+    const allIssuesType = Array.isArray(jiraProjectMap?.[testRun?.autoTicketingDetails?.projectId])
+        ? jiraProjectMap[testRun.autoTicketingDetails.projectId].map((ele) => ({
+            label: ele.issueType,
+            value: ele.issueType
+        }))
+        : [];
+  
+    const severitiesArr = func.getAktoSeverities()
+    const allSeverity = severitiesArr.map((x) => {return{value: x, label: func.toSentenceCase(x), id: func.toSentenceCase(x)}})
+
+    function toggleCreateTicketCheckbox() {
+        const firstProject = allProjects[0]?.value || "";
+        const firstIssueType =
+            Array.isArray(jiraProjectMap?.[firstProject]) &&
+            jiraProjectMap[firstProject]?.[0]?.issueType
+                ? jiraProjectMap[firstProject][0].issueType
+                : "";
+    
+        const checkPrevToggle = !testRun?.autoTicketingDetails?.shouldCreateTickets;
+    
+        if (checkPrevToggle) {
+            setTestRun((prev) => ({
+                ...prev,
+                autoTicketingDetails: {
+                    ...prev.autoTicketingDetails,
+                    shouldCreateTickets: true,
+                    projectId: firstProject,
+                    severities: ["CRITICAL", "HIGH"],
+                    issueType: firstIssueType,
+                },
+            }));
+        } else {
+            setTestRun((prev) => ({
+                ...prev,
+                autoTicketingDetails: {
+                    ...prev.autoTicketingDetails,
+                    shouldCreateTickets: false,
+                    projectId: "",
+                    severities: [],
+                    issueType: "",
+                },
+            }));
+        }
+    }
+
     return (
         <VerticalStack gap={"4"}>
             <HorizontalGrid gap={"4"} columns={"3"}>
@@ -164,6 +216,46 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
                 onChange={() => setTestRun(prev => ({ ...prev, sendMsTeamsAlert: !prev.sendMsTeamsAlert }))}
                 disabled={!teamsTestingWebhookIntegrated}
             />
+            <HorizontalStack gap={4}>
+                <Checkbox
+                    disabled={!jiraProjectMap}
+                    label="Auto-create tickets"
+                    checked={testRun.autoTicketingDetails.shouldCreateTickets}
+                    onChange={() => { toggleCreateTicketCheckbox()}}
+                />
+                {testRun.autoTicketingDetails.shouldCreateTickets &&
+                    <>
+                        <Dropdown
+                            menuItems={allProjects}
+                            selected={(val) => {
+                                setTestRun(prev => ({ ...prev, autoTicketingDetails: { ...prev.autoTicketingDetails, projectId: val } }))
+                            }}
+                            disabled={!testRun.autoTicketingDetails.shouldCreateTickets}
+                            placeHolder={"Select Project"}
+                            initial={testRun.autoTicketingDetails.projectId}
+                        />
+                        <Dropdown
+                            disabled={!testRun.autoTicketingDetails.shouldCreateTickets}
+                            menuItems={allIssuesType}
+                            selected={(val) => { setTestRun(prev => ({ ...prev, autoTicketingDetails: { ...prev.autoTicketingDetails, issueType: val } })) }}
+                            placeHolder={"Select Issue Type"}
+                            initial={testRun.autoTicketingDetails.issueType}
+                        />
+                        <DropdownSearch    
+                            optionsList={allSeverity}
+                            placeholder={"Select Severity"}
+                            setSelected={(val) => {setTestRun(prev => ({ ...prev, autoTicketingDetails: { ...prev.autoTicketingDetails, severities: val } })) }}
+                            allowMultiple={true}
+                            value={(severitiesArr?.length === testRun?.autoTicketingDetails?.severities?.length)? "All items selected" : func.getSelectedItemsText(testRun?.autoTicketingDetails?.severities?.map((item) => func.toSentenceCase(item)))}
+                            preSelected={testRun.autoTicketingDetails.severities}
+                            showSelectedItemLabels={true}
+                            searchDisable={true}
+                            disabled={!testRun.autoTicketingDetails.shouldCreateTickets}
+                        />
+                    </>}
+
+
+            </HorizontalStack>
             <HorizontalGrid columns={2}>
                 <Checkbox
                     label="Use different target for testing"

@@ -21,11 +21,20 @@ public class Main {
 
   private static final String CONSUMER_GROUP_ID = "akto.threat_detection";
   private static final LoggerMaker logger = new LoggerMaker(Main.class);
+  private static boolean aggregationRulesEnabled = System.getenv().getOrDefault("AGGREGATION_RULES_ENABLED", "true").equals("true");
 
   public static void main(String[] args) throws Exception {
-    runMigrations();
+    
+    SessionFactory sessionFactory = null;
+    RedisClient localRedis = null;
 
-    SessionFactory sessionFactory = SessionFactoryUtils.createFactory();
+    logger.warn("aggregation rules enabled {}", aggregationRulesEnabled);
+
+    if (aggregationRulesEnabled) {
+        runMigrations();
+        sessionFactory = SessionFactoryUtils.createFactory();
+        localRedis = createLocalRedisClient();
+    }
 
     KafkaConfig trafficKafka =
         KafkaConfig.newBuilder()
@@ -33,7 +42,7 @@ public class Main {
             .setBootstrapServers(System.getenv("AKTO_TRAFFIC_KAFKA_BOOTSTRAP_SERVER"))
             .setConsumerConfig(
                 KafkaConsumerConfig.newBuilder()
-                    .setMaxPollRecords(100)
+                    .setMaxPollRecords(500)
                     .setPollDurationMilli(100)
                     .build())
             .setProducerConfig(
@@ -57,16 +66,19 @@ public class Main {
             .setValueSerializer(Serializer.BYTE_ARRAY)
             .build();
 
-    RedisClient localRedis = createLocalRedisClient();
 
     new MaliciousTrafficDetectorTask(trafficKafka, internalKafka, localRedis).run();
-    new FlushSampleDataTask(
+
+    if (aggregationRulesEnabled) {
+        new FlushSampleDataTask(
             sessionFactory, internalKafka, KafkaTopic.ThreatDetection.MALICIOUS_EVENTS)
         .run();
+        new CleanupTask(sessionFactory).run();
+    }
+
     new SendMaliciousEventsToBackend(
             sessionFactory, internalKafka, KafkaTopic.ThreatDetection.ALERTS)
         .run();
-    new CleanupTask(sessionFactory).run();
   }
 
   public static RedisClient createLocalRedisClient() {
