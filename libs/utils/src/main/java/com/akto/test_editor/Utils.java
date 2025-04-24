@@ -60,7 +60,7 @@ public class Utils {
 
     public static Boolean checkIfContainsMatch(String text, String keyword) {
         Pattern pattern = Pattern.compile(keyword);
-        return pattern.matcher(text).matches();
+        return pattern.matcher(text).find();
     }
 
     public static boolean deleteKeyFromPayload(Object obj, String parentKey, String queryKey) {
