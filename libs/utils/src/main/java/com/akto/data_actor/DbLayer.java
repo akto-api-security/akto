@@ -2,6 +2,8 @@ package com.akto.data_actor;
 
 import static com.akto.util.Constants.ID;
 
+import com.akto.dao.jobs.JobsDao;
+import com.akto.dto.jobs.Job;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -23,7 +25,6 @@ import com.akto.dto.filter.MergedUrls;
 import com.akto.dto.graph.SvcToSvcGraphEdge;
 import com.akto.dto.graph.SvcToSvcGraphNode;
 import com.akto.dto.settings.DataControlSettings;
-import com.akto.dto.testing.config.TestSuites;
 import com.mongodb.BasicDBList;
 import com.mongodb.client.model.*;
 import org.bson.conversions.Bson;
@@ -48,7 +49,6 @@ import com.akto.dao.testing.TestingRunResultSummariesDao;
 import com.akto.dao.testing.VulnerableTestingRunResultDao;
 import com.akto.dao.testing.WorkflowTestResultsDao;
 import com.akto.dao.testing.WorkflowTestsDao;
-import com.akto.dao.testing.config.TestCollectionPropertiesDao;
 import com.akto.dao.testing.config.TestScriptsDao;
 import com.akto.dao.testing.sources.TestSourceConfigsDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
@@ -1254,4 +1254,7 @@ public class DbLayer {
             );
     }
 
+    public static void insertJob(Job job) {
+        JobsDao.instance.insertOne(job);
+    }
 }
