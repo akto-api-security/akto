@@ -357,6 +357,7 @@ const transform = {
             }
             
         })
+        uniqueNonSensitive = uniqueNonSensitive.reverse();
         let finalArr = [...uniqueNonSensitive]
         if(samples.size > 0){
             finalArr = [...sensitiveSamples, ...finalArr]

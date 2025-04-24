@@ -90,6 +90,7 @@ function ApiDetails(props) {
                             sensitiveData = res3.data.endpoints;
                         })
                         let samples = res.sampleDataList.map(x => x.samples)
+                        samples = samples.reverse();
                         samples = samples.flat()
                         let newResp = transform.convertSampleDataToSensitiveSampleData(samples, sensitiveData)
                         commonMessages = transform.prepareSampleData(newResp, '')
