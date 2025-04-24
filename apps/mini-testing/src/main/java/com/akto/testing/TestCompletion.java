@@ -66,32 +66,4 @@ public class TestCompletion {
             loggerMaker.infoAndAddToDb("Test telemetry disabled for account: " + accountId, LogDb.TESTING);
         }
     }
-
-    public void scheduleAutoTicketCreationJob(TestingRun testingRun, int accountId, ObjectId summaryId) {
-
-        try {
-            TestingRunConfig testRunConfig = TestingRunConfigDao.instance.findOne(Constants.ID,
-                testingRun.getTestIdConfig());
-
-            if (testRunConfig == null || testRunConfig.getAutoTicketingDetails() == null
-                || !testRunConfig.getAutoTicketingDetails().isShouldCreateTickets()) {
-                return;
-            }
-
-            FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccessSaas(accountId, "JIRA_INTEGRATION");
-            if (!featureAccess.getIsGranted()) {
-                loggerMaker.error("Auto Create Tickets plan is not activated for the account - {}", accountId);
-                return;
-            }
-
-            AutoTicketParams params = new AutoTicketParams(testingRun.getId(), summaryId,
-                testRunConfig.getAutoTicketingDetails().getProjectId(),
-                testRunConfig.getAutoTicketingDetails().getIssueType(),
-                testRunConfig.getAutoTicketingDetails().getSeverities(), "JIRA");
-            JobScheduler.scheduleRunOnceJob(accountId, params, JobExecutorType.DASHBOARD);
-        } catch (Exception e) {
-            loggerMaker.error("Error scheduling auto ticket creation job: {}", e.getMessage(), e);
-        }
-    }
-
 }
