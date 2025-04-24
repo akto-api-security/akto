@@ -12,10 +12,8 @@ import org.bson.types.ObjectId;
 
 @Getter
 @Setter
-@AllArgsConstructor
-@NoArgsConstructor
-@BsonDiscriminator
 @ToString
+@BsonDiscriminator
 public class AutoTicketParams extends JobParams {
 
     private static final JobType jobType = JobType.JIRA_AUTO_CREATE_TICKETS;
@@ -27,9 +25,19 @@ public class AutoTicketParams extends JobParams {
     private List<String> severities;
     private String integrationType;
 
-    @Override
-    public JobType getJobType() {
-        return jobType;
+    public AutoTicketParams() {
+        super.jobType = jobType;
+    }
+
+    public AutoTicketParams(ObjectId testingRunId, ObjectId summaryId, String projectId, String issueType,
+        List<String> severities, String integrationType) {
+        this();
+        this.testingRunId = testingRunId;
+        this.summaryId = summaryId;
+        this.projectId = projectId;
+        this.issueType = issueType;
+        this.severities = severities;
+        this.integrationType = integrationType;
     }
 
     @Override
