@@ -3566,7 +3566,7 @@ public class ClientActor extends DataActor {
             now
         );
 
-        String objString = gson.toJson(job);
+        String objString = gson.toJson(new BasicDBObject("job", job));
         loggerMaker.debug(objString);
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/insertJob", "", "POST", objString, headers, "");
         try {
