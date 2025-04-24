@@ -246,7 +246,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                     recurringMonthly: testIdConfig?.periodInSeconds === (86400 * 30), // 30 days
                     recurringWeekly: testIdConfig?.periodInSeconds === (86400 * 7),  // one week
                     continuousTesting: testIdConfig?.periodInSeconds === -1,
-                    autoTicketingDetails: testIdConfig?.autoTicketingDetails || initialAutoTicketingDetails,
+                    autoTicketingDetails: testIdConfig?.testingRunConfig?.autoTicketingDetails || initialAutoTicketingDetails,
                 }));
                 setTestSuiteIds(testIdConfig?.testingRunConfig?.testSuiteIds || [])
                 setTestNameSuiteModal(testIdConfig?.name||"")
@@ -660,6 +660,19 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         );
     }
 
+    function generateLabelForJiraIntegration() {
+        return (
+            <HorizontalStack gap={1}>
+                {!jiraProjectMap && <Link url='/dashboard/settings/integrations/jira' target="_blank" rel="noopener noreferrer" style={{ color: "#3385ff", textDecoration: 'none' }}>
+                    Enable
+                </Link>}
+                <Text>
+                    Auto-create tickets
+                </Text>
+            </HorizontalStack>
+        )
+    }
+
     const handleButtonClick = (check) => {
         setTestMode(check);
     }
@@ -722,6 +735,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                         generateLabelForTeamsIntegration={generateLabelForTeamsIntegration}
                         getLabel={getLabel}
                         jiraProjectMap={jiraProjectMap}
+                        generateLabelForJiraIntegration={generateLabelForJiraIntegration}
                     />
                     <AdvancedSettingsComponent dispatchConditions={dispatchConditions} conditions={conditions} />
                 </>
@@ -897,6 +911,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                                     generateLabelForTeamsIntegration={generateLabelForTeamsIntegration}
                                     getLabel={getLabel}
                                     jiraProjectMap={jiraProjectMap}
+                                    generateLabelForJiraIntegration={generateLabelForJiraIntegration}
                                 />
 
                             </VerticalStack>
@@ -931,6 +946,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                                         generateLabelForTeamsIntegration={generateLabelForTeamsIntegration}
                                         getLabel={getLabel}
                                         jiraProjectMap={jiraProjectMap}
+                                        generateLabelForJiraIntegration={generateLabelForJiraIntegration}
                                     />
                                     <AdvancedSettingsComponent dispatchConditions={dispatchConditions} conditions={conditions} />
                                 </>
