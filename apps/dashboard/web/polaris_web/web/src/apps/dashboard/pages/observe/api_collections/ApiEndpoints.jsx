@@ -1150,25 +1150,25 @@ function ApiEndpoints(props) {
                 apiEndpointTable
             ) : (
                 <PageWithMultipleCards
-                    title={
-                        isEditing ? (
-                            <InlineEditableText textValue={editableTitle} setTextValue={handleTitleChange} handleSaveClick={handleSaveClick} setIsEditing={setIsEditing} maxLength={24}/>
-                        ) : (
+                        title={(
                             <Box maxWidth="35vw">
                                 <VerticalStack gap={2}>
-                                    <div style={{ cursor: isApiGroup ? 'pointer' : 'default' }} onClick={isApiGroup ?  () => {setIsEditing(true);} : undefined}>
-                                        <TooltipText tooltip={pageTitle} text={pageTitle} textProps={{ variant: 'headingLg' }} />
-                                    </div>
+                                    {isEditing ? (
+                                        <InlineEditableText textValue={editableTitle} setTextValue={handleTitleChange} handleSaveClick={handleSaveClick} setIsEditing={setIsEditing} maxLength={24} />
+                                    ) :
+                                        <div style={{ cursor: isApiGroup ? 'pointer' : 'default' }} onClick={isApiGroup ? () => { setIsEditing(true); } : undefined}>
+                                            <TooltipText tooltip={pageTitle} text={pageTitle} textProps={{ variant: 'headingLg' }} />
+                                        </div>}
                                     <HorizontalStack gap={2}>
                                         {isEditingDescription ? (
-                                            <InlineEditableText textValue={editableDescription} setTextValue={setEditableDescription} handleSaveClick={handleSaveDescription} setIsEditing={setIsEditingDescription} placeholder={"Add a brief description for this collection"} maxLength={64}/>
-                                            ) : (
+                                            <InlineEditableText textValue={editableDescription} setTextValue={setEditableDescription} handleSaveClick={handleSaveDescription} setIsEditing={setIsEditingDescription} placeholder={"Add a brief description for this collection"} maxLength={64} />
+                                        ) : (
                                             !description ? (
-                                                <Button plain onClick={() => setIsEditingDescription(true)}>
+                                                <Button plain removeUnderline onClick={() => setIsEditingDescription(true)}>
                                                     Add description
                                                 </Button>
                                             ) : (
-                                                <Button plain onClick={() => setIsEditingDescription(true)}>
+                                                <Button plain removeUnderline onClick={() => setIsEditingDescription(true)}>
                                                     <Text as="span" variant="bodyMd" color="subdued" alignment="start">
                                                         {description}
                                                     </Text>
