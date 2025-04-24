@@ -1,5 +1,5 @@
 import React, { useEffect, useReducer, useState } from 'react';
-import { VerticalStack, HorizontalGrid, Checkbox, TextField, HorizontalStack, Link, Text } from '@shopify/polaris';
+import { VerticalStack, HorizontalGrid, Checkbox, TextField, HorizontalStack } from '@shopify/polaris';
 import Dropdown from "../../../components/layouts/Dropdown";
 import SingleDate from "../../../components/layouts/SingleDate";
 import func from "@/util/func"
