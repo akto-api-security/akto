@@ -68,16 +68,7 @@ monitor_memory() {
 
         if (( MEM_USAGE_PERCENT >= MEMORY_RESTART_THRESHOLD )); then
             echo "Memory usage exceeded ${MEMORY_RESTART_THRESHOLD}%. Restarting application..."
-            
-            # Find the PID of the Java process and terminate it
-            JAVA_PID=$(ps aux | grep "java -XX:+ExitOnOutOfMemoryError" | grep -v grep | awk '{print $2}')
-            if [[ -n "$JAVA_PID" ]]; then
-                kill -9 "$JAVA_PID"
-                echo "Java process with PID $JAVA_PID terminated."
-            else
-                echo "Java process not found."
-            fi
-
+            kill -9 "$JAVA_PID" 2>/dev/null
             break
         fi
 
@@ -94,17 +85,27 @@ if [[ "${ENABLE_LOGS}" == "false" ]]; then
     done &
 fi
 
-# Start the application and monitor memory usage in the background
-monitor_memory &  
+# Start Java and monitor it
+start_java() {
+    if [[ "${ENABLE_LOGS}" == "false" ]]; then
+        java -XX:+ExitOnOutOfMemoryError -Xmx${XMX_MEM}m -jar /app/mini-runtime-1.0-SNAPSHOT-jar-with-dependencies.jar >> "$LOG_FILE" 2>&1 &
+    else
+        java -XX:+ExitOnOutOfMemoryError -Xmx${XMX_MEM}m -jar /app/mini-runtime-1.0-SNAPSHOT-jar-with-dependencies.jar &
+    fi
 
-while :
-do
-if [[ "${ENABLE_LOGS}" == "false" ]]; then
-    {
-        exec java -XX:+ExitOnOutOfMemoryError -Xmx${XMX_MEM}m -jar /app/mini-runtime-1.0-SNAPSHOT-jar-with-dependencies.jar
-    } >> "$LOG_FILE" 2>&1 
-else
-    exec java -XX:+ExitOnOutOfMemoryError -Xmx${XMX_MEM}m -jar /app/mini-runtime-1.0-SNAPSHOT-jar-with-dependencies.jar
-fi
+    JAVA_PID=$!
+    echo "Started Java with PID: $JAVA_PID"
+
+    monitor_memory &
+    MONITOR_PID=$!
+
+    wait "$JAVA_PID"
+    echo "Java process exited. Cleaning up memory monitor..."
+    kill "$MONITOR_PID" 2>/dev/null
+}
+
+while true; do
+    start_java
+    echo "Restarting Java after crash or memory limit..."
     sleep 2
 done
