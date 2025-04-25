@@ -867,7 +867,7 @@ public class ClientActor extends DataActor {
         obj.put("apiInfoList", writesForApiInfo);
 
         String objString = gson.toJson(obj);
-        loggerMaker.debug("api info batch" + objString);
+        loggerMaker.info("api info batch" + objString);
 
         Map<String, List<String>> headers = buildHeaders();
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/bulkWriteApiInfo", "", "POST", objString, headers, "");
@@ -1945,7 +1945,7 @@ public class ClientActor extends DataActor {
         BasicDBObject obj = new BasicDBObject();
         obj.put("testingRunResult", testingRunResult);
         String objString = gson.toJson(obj);
-        loggerMaker.debug(objString);
+        loggerMaker.info(objString);
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/insertTestingRunResults", "", "POST", objString, headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
