@@ -274,5 +274,5 @@ public abstract class DataActor {
 
     public abstract TestingRunResultSummary findLatestTestingRunResultSummary(Bson filter);
 
-    public abstract void scheduleRunOnceJob(int accountId, JobParams params, JobExecutorType jobExecutorType);
+    public abstract void scheduleAutoCreateTicketsJob(int accountId, JobParams params, JobExecutorType jobExecutorType);
 }

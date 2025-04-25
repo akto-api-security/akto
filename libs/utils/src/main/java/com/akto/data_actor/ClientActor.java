@@ -2,7 +2,6 @@ package com.akto.data_actor;
 
 import com.akto.DaoInit;
 import com.akto.dao.context.Context;
-import com.akto.dao.jobs.JobsDao;
 import com.akto.dto.filter.MergedUrls;
 import com.akto.dto.jobs.Job;
 import com.akto.dto.jobs.JobExecutorType;
@@ -68,8 +67,6 @@ import org.bson.codecs.DecoderContext;
 import org.bson.codecs.configuration.CodecRegistry;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.Base64;
@@ -3549,12 +3546,11 @@ public class ClientActor extends DataActor {
     }
 
     @Override
-    public void scheduleRunOnceJob(int accountId, JobParams params, JobExecutorType jobExecutorType) {
+    public void scheduleAutoCreateTicketsJob(int accountId, JobParams params, JobExecutorType jobExecutorType) {
         Map<String, List<String>> headers = buildHeaders();
 
         int now = Context.now();
-        Job job = new Job(new ObjectId(),
-            accountId,
+        Job job = new Job(accountId,
             ScheduleType.RUN_ONCE,
             JobStatus.SCHEDULED,
             params,

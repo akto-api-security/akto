@@ -557,8 +557,7 @@ public class DbActor extends DataActor {
         return DbLayer.findLatestTestingRunResultSummary(filter);
     }
 
-    @Override
-    public void scheduleRunOnceJob(int accountId, JobParams params, JobExecutorType jobExecutorType) {
+    public void scheduleAutoCreateTicketsJob(int accountId, JobParams params, JobExecutorType jobExecutorType) {
         JobScheduler.scheduleRunOnceJob(accountId, params, jobExecutorType);
     }
 }

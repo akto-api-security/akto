@@ -87,7 +87,7 @@ public class TestCompletion {
                 testRunConfig.getAutoTicketingDetails().getProjectId(),
                 testRunConfig.getAutoTicketingDetails().getIssueType(),
                 testRunConfig.getAutoTicketingDetails().getSeverities(), "JIRA");
-            dataActor.scheduleRunOnceJob(accountId, params, JobExecutorType.DASHBOARD);
+            dataActor.scheduleAutoCreateTicketsJob(accountId, params, JobExecutorType.DASHBOARD);
         } catch (Exception e) {
             loggerMaker.error("Error scheduling auto ticket creation job: {}", e.getMessage(), e);
         }
