@@ -304,6 +304,6 @@ public class LoggerMaker {
     }
 
     public void debug(String msg, Object... vars){
-        logger.error(msg, vars);
+        logger.debug(msg, vars);
     }
 }
