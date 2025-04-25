@@ -1,6 +1,5 @@
 package com.akto.dto.jobs;
 
-import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -11,7 +10,6 @@ import org.bson.types.ObjectId;
 @Setter
 @ToString
 @NoArgsConstructor
-@AllArgsConstructor
 public class Job {
 
     public static final String ID = "_id";
@@ -35,4 +33,26 @@ public class Job {
     private int finishedAt;
     private int heartbeatAt;
     private int createdAt;
+
+    public Job(int accountId,
+        ScheduleType scheduleType,
+        JobStatus jobStatus,
+        JobParams jobParams,
+        JobExecutorType jobExecutorType,
+        int scheduledAt,
+        int startedAt,
+        int finishedAt,
+        int heartbeatAt,
+        int createdAt) {
+        this.accountId = accountId;
+        this.scheduleType = scheduleType;
+        this.jobStatus = jobStatus;
+        this.jobParams = jobParams;
+        this.jobExecutorType = jobExecutorType;
+        this.scheduledAt = scheduledAt;
+        this.startedAt = startedAt;
+        this.finishedAt = finishedAt;
+        this.heartbeatAt = heartbeatAt;
+        this.createdAt = createdAt;
+    }
 }

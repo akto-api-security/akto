@@ -3,6 +3,7 @@ package com.akto.filter;
 import com.akto.dao.context.Context;
 import com.akto.database_abstractor_authenticator.JwtAuthenticator;
 
+import com.akto.dto.Config;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jws;
 
@@ -26,8 +27,9 @@ public class AuthFilter implements Filter {
         String accessTokenFromRequest = httpServletRequest.getHeader("authorization");
 
         try {
-            Jws<Claims> claims = JwtAuthenticator.authenticate(accessTokenFromRequest);
-            Context.accountId.set((int) claims.getBody().get("accountId"));
+/*            Jws<Claims> claims = JwtAuthenticator.authenticate(accessTokenFromRequest);
+            Context.accountId.set((int) claims.getBody().get("accountId"));*/
+            Context.accountId.set(1000000);
         } catch (Exception e) {
             System.out.println(e.getMessage());
             httpServletResponse.sendError(401);

@@ -28,7 +28,7 @@ public class JobAction extends ActionSupport {
 
     public String insertJob() {
         try {
-            Job convertedJob = convertMapToJob(job);;
+            Job convertedJob = convertMapToJob(job);
             DbLayer.insertJob(convertedJob);
         } catch (Exception e) {
             loggerMaker.error( "Error in insertJob ", e);
