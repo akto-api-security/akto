@@ -103,7 +103,7 @@ function GithubCell(props){
                         return header.component({action: header?.action})
                     }
                     return (
-                            <Button plain onClick={header?.action} textAlign="left">
+                            <Button plain removeUnderline onClick={header?.action} textAlign="left">
                                 <Text as="span" variant="bodyMd" color="subdued" alignment="start">
                                     {data?.[header?.value]}
                                 </Text>
