@@ -300,6 +300,6 @@ public class LoggerMaker {
     }
 
     public void debug(String msg){
-        logger.error(msg);
+        logger.info(msg);
     }
 }
