@@ -3,6 +3,7 @@
 LOG_FILE="/tmp/dump.log"
 MAX_LOG_SIZE=${MAX_LOG_SIZE:-10485760}  # Default to 10 MB if not set (10 MB = 10 * 1024 * 1024 bytes)
 CHECK_INTERVAL=60                        # Check interval in seconds
+MEMORY_RESTART_THRESHOLD=${MEMORY_RESTART_THRESHOLD:-95}  # Restart if memory usage exceeds 95%
 
 # 1. Detect and read cgroup memory limits
 if [ -f /sys/fs/cgroup/memory.max ]; then
@@ -45,15 +46,65 @@ rotate_log() {
     fi
 }
 
+# Function to monitor memory usage and restart if necessary
+monitor_memory() {
+    while true; do
+        # Get the current memory usage in bytes
+        if [ -f /sys/fs/cgroup/memory.current ]; then
+            # cgroup v2
+            MEM_USAGE_BYTES=$(cat /sys/fs/cgroup/memory.current)
+        elif [ -f /sys/fs/cgroup/memory/memory.usage_in_bytes ]; then
+            # cgroup v1
+            MEM_USAGE_BYTES=$(cat /sys/fs/cgroup/memory/memory.usage_in_bytes)
+        else
+            # Fallback to free -b (bytes) if cgroup file not found
+            echo "Neither cgroup v2 nor v1 memory file found, defaulting to free -b"
+            MEM_USAGE_BYTES=$(free -b | awk '/Mem:/ {print $3}')
+        fi
+
+        MEM_USAGE_PERCENT=$((MEM_USAGE_BYTES * 100 / MEM_LIMIT_BYTES))
+
+        echo "Current memory usage: ${MEM_USAGE_PERCENT}%"
+
+        if (( MEM_USAGE_PERCENT >= MEMORY_RESTART_THRESHOLD )); then
+            echo "Memory usage exceeded ${MEMORY_RESTART_THRESHOLD}%. Restarting application..."
+            
+            # Find the PID of the Java process and terminate it
+            JAVA_PID=$(ps aux | grep "java -XX:+ExitOnOutOfMemoryError" | grep -v grep | awk '{print $2}')
+            if [[ -n "$JAVA_PID" ]]; then
+                kill -9 "$JAVA_PID"
+                echo "Java process with PID $JAVA_PID terminated."
+            else
+                echo "Java process not found."
+            fi
+
+            break
+        fi
+
+        sleep "$CHECK_INTERVAL"
+    done
+}
+
+
 if [[ "${ENABLE_LOGS}" == "false" ]]; then
     # Start monitoring in the background
     while true; do
         rotate_log   # Check and rotate logs if necessary
         sleep "$CHECK_INTERVAL"  # Wait for the specified interval before checking again
     done &
+fi
+
+# Start the application and monitor memory usage in the background
+monitor_memory &  
+
+while :
+do
+if [[ "${ENABLE_LOGS}" == "false" ]]; then
     {
         exec java -XX:+ExitOnOutOfMemoryError -Xmx${XMX_MEM}m -jar /app/mini-runtime-1.0-SNAPSHOT-jar-with-dependencies.jar
     } >> "$LOG_FILE" 2>&1 
 else
     exec java -XX:+ExitOnOutOfMemoryError -Xmx${XMX_MEM}m -jar /app/mini-runtime-1.0-SNAPSHOT-jar-with-dependencies.jar
 fi
+    sleep 2
+done
