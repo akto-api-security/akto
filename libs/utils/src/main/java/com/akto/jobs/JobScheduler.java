@@ -17,8 +17,7 @@ public final class JobScheduler {
         try {
             int now = Context.now();
             JobsDao.instance.insertOne(
-                new Job(new ObjectId(),
-                    accountId,
+                new Job(accountId,
                     ScheduleType.RUN_ONCE,
                     JobStatus.SCHEDULED,
                     params,
