@@ -12,11 +12,25 @@ import com.mongodb.BasicDBObject;
 
 import org.apache.commons.lang3.StringUtils;
 import org.json.JSONObject;
+import org.w3c.dom.NodeList;
+import org.xml.sax.InputSource;
 
+import java.io.StringReader;
+import java.io.StringWriter;
 import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.util.*;
+
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.transform.OutputKeys;
+import javax.xml.transform.TransformerFactory;
+import javax.xml.transform.dom.DOMSource;
+import javax.xml.transform.stream.StreamResult;
+
+import org.w3c.dom.*;
+import javax.xml.transform.*;
 
 import static com.akto.dto.OriginalHttpRequest.*;
 
@@ -128,6 +142,64 @@ public class HttpRequestResponseUtils {
             return rawRequest;
         }
     }
+
+    public static String updateXmlWithModifiedJson(String originalXml, String modifiedJson) throws Exception {
+        ObjectMapper objectMapper = new ObjectMapper();
+
+        // Parse original XML with namespace awareness
+        DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+        factory.setNamespaceAware(true);
+        DocumentBuilder builder = factory.newDocumentBuilder();
+        Document doc = builder.parse(new InputSource(new StringReader(originalXml)));
+
+        // Find the Body element in any namespace
+        NodeList bodyNodes = doc.getElementsByTagNameNS("*", "Body");
+        if (bodyNodes.getLength() == 0) {
+            throw new RuntimeException("No Body element found in the SOAP envelope.");
+        }
+
+        Element bodyElement = (Element) bodyNodes.item(0);
+
+        // Clear existing content in Body
+        while (bodyElement.hasChildNodes()) {
+            bodyElement.removeChild(bodyElement.getFirstChild());
+        }
+
+        // Parse the modified JSON into nodes
+        JsonNode modifiedBody = objectMapper.readTree(modifiedJson);
+
+        // Append modified JSON as XML
+        appendJsonToXml(modifiedBody, doc, bodyElement);
+
+        // Convert back to string
+        TransformerFactory tf = TransformerFactory.newInstance();
+        Transformer transformer = tf.newTransformer();
+        transformer.setOutputProperty(OutputKeys.OMIT_XML_DECLARATION, "no");
+        transformer.setOutputProperty(OutputKeys.INDENT, "yes");
+
+        StringWriter writer = new StringWriter();
+        transformer.transform(new DOMSource(doc), new StreamResult(writer));
+        return writer.toString();
+    }
+
+    private static void appendJsonToXml(JsonNode jsonNode, Document doc, Element parent) {
+        if (jsonNode.isObject()) {
+            jsonNode.fields().forEachRemaining(field -> {
+                Element child = doc.createElement(field.getKey());
+                appendJsonToXml(field.getValue(), doc, child);
+                parent.appendChild(child);
+            });
+        } else if (jsonNode.isArray()) {
+            jsonNode.forEach(item -> {
+                Element itemElement = doc.createElement("item");
+                appendJsonToXml(item, doc, itemElement);
+                parent.appendChild(itemElement);
+            });
+        } else {
+            parent.setTextContent(jsonNode.asText());
+        }
+    }
+
 
     public static String convertGRPCEncodedToJson(String rawRequest) {
         try {

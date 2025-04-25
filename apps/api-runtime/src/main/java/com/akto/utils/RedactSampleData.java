@@ -22,6 +22,9 @@ import java.util.*;
 
 import static com.akto.dto.RawApi.convertHeaders;
 import static com.akto.runtime.utils.Utils.parseCookie;
+import static com.akto.util.HttpRequestResponseUtils.SOAP;
+import static com.akto.util.HttpRequestResponseUtils.XML;
+import static com.akto.util.HttpRequestResponseUtils.getAcceptableContentType;
 
 public class RedactSampleData {
     static ObjectMapper mapper = new ObjectMapper();
@@ -112,12 +115,19 @@ public class RedactSampleData {
     // never use this function directly. This alters the httpResponseParams
     public static String redact(HttpResponseParams httpResponseParams, final boolean redactAll) throws Exception {
         // response headers
+        // check for content type in both request and response headers, if they are xml format, read payload from original payload instead of httpResponseParams
         Map<String, List<String>> responseHeaders = httpResponseParams.getHeaders();
         if (responseHeaders == null) responseHeaders = new HashMap<>();
         handleHeaders(responseHeaders, redactAll);
 
+        // check for header here for content type
+        String acceptableContentType = getAcceptableContentType(responseHeaders);
         // response payload
         String responsePayload = httpResponseParams.getPayload();
+        if (acceptableContentType != null && (acceptableContentType.contains(XML) || acceptableContentType.contains(SOAP))) {
+            responsePayload = httpResponseParams.getOriginalPayload();
+        }
+
         if (responsePayload == null) responsePayload = "{}";
         try {
             JsonParser jp = factory.createParser(responsePayload);

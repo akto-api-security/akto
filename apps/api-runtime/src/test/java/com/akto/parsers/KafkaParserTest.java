@@ -1,13 +1,20 @@
 package com.akto.parsers;
 
 import com.akto.dto.HttpResponseParams;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
 
 import org.junit.Test;
 
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
+import static com.akto.util.HttpRequestResponseUtils.rawToJsonString;
+import static com.akto.util.HttpRequestResponseUtils.updateXmlWithModifiedJson;
 import static org.junit.jupiter.api.Assertions.*;
 
 public class KafkaParserTest {
@@ -110,5 +117,59 @@ public class KafkaParserTest {
         }
         assertNotNull(httpResponseParams);
 
+    }
+
+    @Test
+    public void testJsonToValidXml(){
+        Map<String,List<String>> requestHeaders = new HashMap<>();
+        requestHeaders.put("content-type", Arrays.asList("text/html,application/xhtml+xml,application/xml"));
+        String originalXml = "<env:Envelope xmlns:env=\"http://www.w3.org/2003/05/soap-envelope\">\n" +
+                "  <env:Header>\n" +
+                "    <m:reservation xmlns:m=\"http://travelcompany.example.org/reservation\"\n" +
+                "        env:role=\"http://www.w3.org/2003/05/soap-envelope/role/next\">\n" +
+                "      <m:reference>uuid:093a2da1-q345-739r-ba5d-pqff98fe8j7d</m:reference>\n" +
+                "      <m:dateAndTime>2007-11-29T13:20:00.000-05:00</m:dateAndTime>\n" +
+                "    </m:reservation>\n" +
+                "    <n:passenger xmlns:n=\"http://mycompany.example.com/employees\"\n" +
+                "        env:role=\"http://www.w3.org/2003/05/soap-envelope/role/next\">\n" +
+                "      <n:name>Fred Bloggs</n:name>\n" +
+                "    </n:passenger>\n" +
+                "  </env:Header>\n" +
+                "  <env:Body>\n" +
+                "    <p:itinerary xmlns:p=\"http://travelcompany.example.org/reservation/travel\">\n" +
+                "      <p:departure>\n" +
+                "        <p:departing>New York</p:departing>\n" +
+                "        <p:arriving>Los Angeles</p:arriving>\n" +
+                "        <p:departureDate>2007-12-14</p:departureDate>\n" +
+                "        <p:departureTime>late afternoon</p:departureTime>\n" +
+                "        <p:seatPreference>aisle</p:seatPreference>\n" +
+                "      </p:departure>\n" +
+                "      <p:return>\n" +
+                "        <p:departing>Los Angeles</p:departing>\n" +
+                "        <p:arriving>New York</p:arriving>\n" +
+                "        <p:departureDate>2007-12-20</p:departureDate>\n" +
+                "        <p:departureTime>mid-morning</p:departureTime>\n" +
+                "        <p:seatPreference></p:seatPreference>\n" +
+                "      </p:return>\n" +
+                "    </p:itinerary>\n" +
+                "  </env:Body>\n" +
+                "</env:Envelope>";
+
+
+        String jsonString = rawToJsonString(originalXml, requestHeaders);
+        System.out.println(jsonString);
+        assertEquals(true, jsonString.length() > 0);
+        try {
+            Map<String, Object> json = gson.fromJson(jsonString, Map.class);
+            System.out.println(json);
+            json.put("aryan", "rocks");
+            String modified = gson.toJson(json);
+            System.out.println(modified);
+            String xmlString = updateXmlWithModifiedJson(originalXml, modified);
+            System.out.println(xmlString);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        
     }
 }
