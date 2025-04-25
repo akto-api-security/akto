@@ -852,7 +852,7 @@ public class ApiCollectionsAction extends UserAction {
     private String description;
     public String saveCollectionDescription() {
         if(description == null) {
-            addActionError("Description cannot be null");
+            addActionError("No description provided");
             return Action.ERROR.toUpperCase();
         }
 

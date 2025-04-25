@@ -1119,7 +1119,7 @@ public class InventoryAction extends UserAction {
 
     private String description;
     public String saveEndpointDescription() {
-        if(description == null || description.isEmpty()) {
+        if(description == null) {
             addActionError("No description provided");
             return Action.ERROR.toUpperCase();
         }
