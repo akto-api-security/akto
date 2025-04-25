@@ -397,11 +397,6 @@ public class Main {
     }
 
     public static void main(String[] args) throws InterruptedException {
-        if ("true".equalsIgnoreCase(System.getenv("TESTING_JOB_MODE"))) {
-            SubmitTestingJob submitTestingJob = new SubmitTestingJob();
-            submitTestingJob.submitTestingJob();
-            System.exit(0);
-        }    
 
         String mongoURI = System.getenv("AKTO_MONGO_CONN");
         ReadPreference readPreference = ReadPreference.primary();
@@ -527,6 +522,15 @@ public class Main {
         while (true) {
             AccountTask.instance.executeTaskForNonHybridAccounts(account -> {
                 int accountId = account.getId();
+                /*
+                 * GCP Cloud run job change
+                 * 
+                 * double check to ensure that only Oren's SaaS account executes the rest of the loop
+                 */
+                if (accountId != 1_692_211_733) {
+                    return;
+                }
+
                 AccountSettings accountSettings = AccountSettingsDao.instance.findOne(
                     Filters.eq(Constants.ID, accountId), Projections.include(AccountSettings.DELTA_IGNORE_TIME_FOR_SCHEDULED_SUMMARIES)
                 );
@@ -622,7 +626,33 @@ public class Main {
                 }
 
                 SyncLimit syncLimit = featureAccess.fetchSyncLimit();
+               
                 /*
+                 * GCP Cloud run job change
+                 * 
+                 * Submit a job instead of running the executor in the testing instance
+                 * Make it explicit that only Oren's SaaS account submits a GCP cloud run job
+                 */
+                if (accountId == 1_692_211_733) { 
+                    loggerMaker.info(String.format("Submitting job to GCP for the execution of testing run with hex id - %s", testingRun.getHexId()));
+                    
+                    try {
+                        TestingInstanceHeartBeatDao.instance.setTestingRunId(testingInstanceId, testingRun.getHexId());
+                        ExecuteJob.executeTestingJob(accountId, testingRun.getHexId());
+
+                        Bson completedUpdate = Updates.combine(
+                                Updates.set(TestingRun.STATE, TestingRun.State.COMPLETED),
+                                Updates.set(TestingRun.END_TIMESTAMP, Context.now()));
+
+                        TestingRunDao.instance.getMCollection().withWriteConcern(WriteConcern.W1).findOneAndUpdate(
+                                Filters.eq("_id", testingRun.getId()), completedUpdate);
+                    } catch(Exception e) {
+                        e.printStackTrace();
+                    }
+                    return;
+                } 
+
+                 /*
                  * Since the role cache is static
                  * so to prevent it from being shared across accounts.
                  */

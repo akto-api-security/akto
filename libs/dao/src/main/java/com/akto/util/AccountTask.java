@@ -261,12 +261,23 @@ public class AccountTask {
             Filters.eq(Account.HYBRID_TESTING_ENABLED, false)
         );
 
-        List<Account> activeAccounts = AccountsDao.instance.findAll(Filters.and(activeFilter, nonHybridAccountsFilter));
+        /*
+         * GCP Cloud run job change
+         * Added filter to only get Oren's SaaS account
+         */
+        Bson orensSaasAccountFilter = Filters.eq("_id", 1_692_211_733);
+
+        List<Account> activeAccounts = AccountsDao.instance.findAll(Filters.and(activeFilter, nonHybridAccountsFilter, orensSaasAccountFilter));
         for(Account account: activeAccounts) {
             if (inactiveAccountsSet.contains(account.getId())) {
                 continue;
             }
             try {
+                /*
+                 * GCP Cloud run job change
+                 * log to verify account task is only being run for Oren's SaaS account
+                 */
+                logger.info(String.format("%s %d %s", taskName, account.getId(), account.getName()));
                 Context.accountId.set(account.getId());
                 consumeAccount.accept(account);
             } catch (Exception e) {
