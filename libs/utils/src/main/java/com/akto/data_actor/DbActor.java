@@ -9,6 +9,7 @@ import com.akto.dto.billing.Organization;
 import com.akto.dto.billing.Tokens;
 import com.akto.dto.dependency_flow.Node;
 import com.akto.dto.filter.MergedUrls;
+import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.dto.runtime_filters.RuntimeFilter;
 import com.akto.dto.settings.DataControlSettings;
 import com.akto.dto.test_editor.YamlTemplate;
@@ -563,5 +564,10 @@ public class DbActor extends DataActor {
     public TestingRunResultSummary findLatestTestingRunResultSummary(Bson filter){
         return DbLayer.findLatestTestingRunResultSummary(filter);
     }
+
+    @Override
+    public void updateModuleInfo(ModuleInfo moduleInfo) {
+    }
+
 
 }
