@@ -12,7 +12,7 @@ import com.mongodb.BasicDBObject;
 
 public class FindRequestResponseHeaders implements QueryHandler {
 
-    private static final LoggerMaker logger = new LoggerMaker(FindAuthRelatedTokens.class, LogDb.DASHBOARD);
+    private static final LoggerMaker logger = new LoggerMaker(FindRequestResponseHeaders.class, LogDb.DASHBOARD);
     private final ResultFetcherStrategy<BasicDBObject> resultFetcherStrategy;
 
     public FindRequestResponseHeaders(ResultFetcherStrategy<BasicDBObject> resultFetcherStrategy) {
