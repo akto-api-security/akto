@@ -104,7 +104,9 @@ public class HttpCallParser {
         for (ApiCollection apiCollection: apiCollections) {
             apiCollectionsMap.put(apiCollection.getId(), apiCollection);
         }
-        //this.dependencyAnalyser = new DependencyAnalyser(apiCatalogSync.dbState, Main.isOnprem, RuntimeMode.isHybridDeployment(), apiCollectionsMap);
+        if (Main.actualAccountId == 1745303931) {
+            this.dependencyAnalyser = new DependencyAnalyser(apiCatalogSync.dbState, Main.isOnprem, RuntimeMode.isHybridDeployment(), apiCollectionsMap);
+        }
     }
     
     public static HttpResponseParams parseKafkaMessage(String message) throws Exception {
@@ -274,9 +276,11 @@ public class HttpCallParser {
             apiCatalogSync.computeDelta(aggregator, false, apiCollectionId);
         }
 
-        //  for (HttpResponseParams responseParam: filteredResponseParams) {
-        //      dependencyAnalyser.analyse(responseParam.getOrig(), responseParam.requestParams.getApiCollectionId());
-        //  }
+        if (Main.actualAccountId == 1745303931) {
+            for (HttpResponseParams responseParam: filteredResponseParams) {
+                dependencyAnalyser.analyse(responseParam.getOrig(), responseParam.requestParams.getApiCollectionId());
+            }
+        }
 
         this.sync_count += filteredResponseParams.size();
         int syncThresh = numberOfSyncs < 10 ? 10000 : sync_threshold_count;
@@ -288,8 +292,10 @@ public class HttpCallParser {
             }
             SyncLimit syncLimit = fetchSyncLimit();
             apiCatalogSync.syncWithDB(syncImmediately, fetchAllSTI, syncLimit);
-            // dependencyAnalyser.dbState = apiCatalogSync.dbState;
-            // dependencyAnalyser.syncWithDb();
+            if (Main.actualAccountId == 1745303931) {
+                dependencyAnalyser.dbState = apiCatalogSync.dbState;
+                dependencyAnalyser.syncWithDb();
+            }
             syncTrafficMetricsWithDB();
             this.last_synced = Context.now();
             this.sync_count = 0;
