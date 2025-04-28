@@ -31,7 +31,6 @@ public class TestingConfigurations {
     Map<String, TestConfig> testConfigMap;
 
     Map<ApiInfoKey, RawApi> rawApiMap;
-    Map<String, String> originalRequestPayloadMap;
 
     private TestingConfigurations() {
     }

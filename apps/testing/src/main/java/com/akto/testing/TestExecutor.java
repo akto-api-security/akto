@@ -362,6 +362,7 @@ public class TestExecutor {
                     continue;
                 }
 
+                // optimizing raw api creation, create only once for that api
                 RawApi rawApi = RawApi.buildFromMessage(sample, true);
                 TestingConfigurations.getInstance().getRawApiMap().put(apiInfoKey, rawApi);
                 if(sample.contains("originalRequestPayload")){
@@ -370,7 +371,7 @@ public class TestExecutor {
                     String originalRequestPayload = (String) json.get("originalRequestPayload");
                     if(originalRequestPayload != null && !originalRequestPayload.isEmpty()){
                         String key = apiInfoKey.getMethod() + "_" + apiInfoKey.getUrl();
-                        TestingConfigurations.getInstance().getOriginalRequestPayloadMap().put(key, originalRequestPayload);
+                        OriginalReqResPayloadInformation.getInstance().getOriginalReqPayloadMap().put(key, originalRequestPayload);
                     }
                 }
                 if(Constants.IS_NEW_TESTING_ENABLED){

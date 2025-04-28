@@ -475,9 +475,18 @@ public class ApiExecutor {
         }else if(contentType.contains(HttpRequestResponseUtils.SOAP) || contentType.contains(HttpRequestResponseUtils.XML)){
             // here we are assuming that the request is in xml format
             // now convert this into valid json body string
-            String originalXmlPayload =""; // get original payload
+
+            // get the url and method from temp headers
+            String url = request.getHeaders().get("x-akto-original-url").get(0);
+            String method = request.getHeaders().get("x-akto-original-method").get(0);
+
+            String originalXmlPayload = OriginalReqResPayloadInformation.getInstance().getOriginalReqPayloadMap().get(method + "_" + url); // get original payload
             String modifiedXmlPayload = HttpRequestResponseUtils.updateXmlWithModifiedJson(originalXmlPayload, payload);
             payload = modifiedXmlPayload;
+
+            // remove the temp headers
+            request.getHeaders().remove("x-akto-original-url");
+            request.getHeaders().remove("x-akto-original-method");
         } 
 
         if (payload == null) payload = "";
