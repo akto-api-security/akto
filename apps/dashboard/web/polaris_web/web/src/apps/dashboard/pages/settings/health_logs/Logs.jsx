@@ -95,7 +95,9 @@ const Logs = () => {
         }
     }
 
-    const moduleInfoRows = moduleInfos.map(module => [
+    // Sort moduleInfos by lastHeartbeatReceived in descending order
+    const sortedModuleInfos = [...moduleInfos].sort((a, b) => (b.lastHeartbeatReceived || 0) - (a.lastHeartbeatReceived || 0));
+    const moduleInfoRows = sortedModuleInfos.map(module => [
         module.moduleType || '-',
         module.currentVersion || '-',
         func.epochToDateTime(module.startedTs),
