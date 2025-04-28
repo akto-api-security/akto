@@ -5,6 +5,8 @@ import com.akto.dto.billing.Organization;
 import com.akto.dto.billing.Tokens;
 import com.akto.dto.dependency_flow.Node;
 import com.akto.dto.filter.MergedUrls;
+import com.akto.dto.jobs.JobExecutorType;
+import com.akto.dto.jobs.JobParams;
 import com.akto.dto.runtime_filters.RuntimeFilter;
 import com.akto.dto.settings.DataControlSettings;
 import com.akto.dto.test_editor.TestingRunPlayground;
@@ -97,7 +99,7 @@ public abstract class DataActor {
     public abstract void createCollectionForHost(String host, int colId);
 
     public abstract AccountSettings fetchAccountSettingsForAccount(int accountId);
-    
+
     public abstract void insertRuntimeLog(Log log);
 
     public abstract void insertAnalyserLog(Log log);
@@ -240,7 +242,7 @@ public abstract class DataActor {
     public abstract List<YamlTemplate> fetchActiveAdvancedFilters();
 
     public abstract List<TestingRunResultSummary> fetchStatusOfTests();
-    
+
     public abstract Set<MergedUrls> fetchMergedUrls();
 
     public abstract void createCollectionSimpleForVpc(int vxlanId, String vpcId);
@@ -277,4 +279,5 @@ public abstract class DataActor {
 
     public abstract void updateTestingRunPlayground(TestingRunPlayground testingRunPlayground);
 
+    public abstract void scheduleAutoCreateTicketsJob(int accountId, JobParams params, JobExecutorType jobExecutorType);
 }
