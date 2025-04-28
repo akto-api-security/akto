@@ -20,6 +20,7 @@ import com.akto.dto.gpt.AktoGptConfigState;
 import com.akto.dto.loaders.Loader;
 import com.akto.dto.loaders.NormalLoader;
 import com.akto.dto.loaders.PostmanUploadLoader;
+import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.dto.notifications.CustomWebhook;
 import com.akto.dto.notifications.CustomWebhookResult;
 import com.akto.dto.runtime_filters.FieldExistsFilter;
@@ -256,6 +257,7 @@ public class DaoInit {
         ClassModel<AllAPIsGroup> allApisGroupClassModel = ClassModel.builder(AllAPIsGroup.class).enableDiscriminator(true).build();
 
         ClassModel<RuntimeMetrics> RuntimeMetricsClassModel = ClassModel.builder(RuntimeMetrics.class).enableDiscriminator(true).build();
+        ClassModel<ModuleInfo> ModuleInfoClassModel = ClassModel.builder(ModuleInfo.class).enableDiscriminator(true).build();
 
         CodecRegistry pojoCodecRegistry = fromProviders(PojoCodecProvider.builder().register(
                 configClassModel, signupInfoClassModel, apiAuthClassModel, attempResultModel, urlTemplateModel,
@@ -285,7 +287,8 @@ public class DaoInit {
                 yamlNodeDetails, multiExecTestResultClassModel, workflowTestClassModel, dependencyNodeClassModel, paramInfoClassModel,
                         nodeClassModel, connectionClassModel, edgeClassModel, replaceDetailClassModel, modifyHostDetailClassModel, fileUploadClassModel
                 ,fileUploadLogClassModel, codeAnalysisCollectionClassModel, codeAnalysisApiLocationClassModel, codeAnalysisApiInfoClassModel, codeAnalysisApiInfoKeyClassModel,
-                riskScoreTestingEndpointsClassModel, OrganizationFlagsClassModel, sensitiveDataEndpointsClassModel, unauthenticatedEndpointsClassModel, allApisGroupClassModel, RuntimeMetricsClassModel).automatic(true).build());
+                riskScoreTestingEndpointsClassModel, OrganizationFlagsClassModel, sensitiveDataEndpointsClassModel, unauthenticatedEndpointsClassModel, allApisGroupClassModel,
+                RuntimeMetricsClassModel, ModuleInfoClassModel).automatic(true).build());
 
         final CodecRegistry customEnumCodecs = CodecRegistries.fromCodecs(
                 new EnumCodec<>(Conditions.Operator.class),
@@ -328,7 +331,8 @@ public class DaoInit {
                 new EnumCodec<>(FileUpload.UploadStatus.class),
                 new EnumCodec<>(FileUploadLog.UploadLogStatus.class),
                 new EnumCodec<>(TestCollectionProperty.Id.class),
-                new EnumCodec<>(CustomAuthType.TypeOfToken.class)
+                new EnumCodec<>(CustomAuthType.TypeOfToken.class),
+                new EnumCodec<>(ModuleInfo.ModuleType.class)
         );
 
         return fromRegistries(MongoClientSettings.getDefaultCodecRegistry(), pojoCodecRegistry,

@@ -15,6 +15,7 @@ import com.akto.dao.*;
 import com.akto.dao.filter.MergedUrlsDao;
 import com.akto.dao.graph.SvcToSvcGraphEdgesDao;
 import com.akto.dao.graph.SvcToSvcGraphNodesDao;
+import com.akto.dao.monitoring.ModuleInfoDao;
 import com.akto.dao.settings.DataControlSettingsDao;
 import com.akto.dao.testing.config.TestSuiteDao;
 import com.akto.dependency_analyser.DependencyAnalyserUtils;
@@ -22,6 +23,7 @@ import com.akto.dto.*;
 import com.akto.dto.filter.MergedUrls;
 import com.akto.dto.graph.SvcToSvcGraphEdge;
 import com.akto.dto.graph.SvcToSvcGraphNode;
+import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.dto.settings.DataControlSettings;
 import com.akto.dto.testing.config.TestSuites;
 import com.mongodb.BasicDBList;
@@ -121,6 +123,21 @@ public class DbLayer {
                 Updates.set(ApiCollection.NAME, name)
         );
     }
+
+    public static void updateModuleInfo(ModuleInfo moduleInfo) {
+        ModuleInfo moduleInfoFromDB = ModuleInfoDao.instance.findOne(Filters.eq(ModuleInfo.MODULE_TYPE, moduleInfo.getModuleType()));
+        if (moduleInfoFromDB == null) {
+            ModuleInfoDao.instance.insertOne(moduleInfo);
+            return;
+        }
+        ModuleInfoDao.instance.updateOne(Filters.eq(ModuleInfo.MODULE_TYPE, moduleInfo.getModuleType()),
+                Updates.combine(
+                        Updates.set(ModuleInfo.CURRENT_VERSION, moduleInfo.getCurrentVersion()),
+                        Updates.set(ModuleInfo.LAST_HEARTBEAT_RECEIVED, moduleInfo.getLastHeartbeatReceived()),
+                        Updates.set(ModuleInfo.STARTED_TS, moduleInfo.getStartedTs())
+                ));
+    }
+
 
     public static void updateCidrList(List<String> cidrList) {
         AccountSettingsDao.instance.getMCollection().updateOne(
