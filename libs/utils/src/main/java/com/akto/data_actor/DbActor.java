@@ -8,6 +8,7 @@ import com.akto.dto.dependency_flow.Node;
 import com.akto.dto.filter.MergedUrls;
 import com.akto.dto.jobs.JobExecutorType;
 import com.akto.dto.jobs.JobParams;
+import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.dto.runtime_filters.RuntimeFilter;
 import com.akto.dto.settings.DataControlSettings;
 import com.akto.dto.test_editor.TestingRunPlayground;
@@ -569,4 +570,9 @@ public class DbActor extends DataActor {
     public void scheduleAutoCreateTicketsJob(int accountId, JobParams params, JobExecutorType jobExecutorType) {
         JobScheduler.scheduleRunOnceJob(accountId, params, jobExecutorType);
     }
+    @Override
+    public void updateModuleInfo(ModuleInfo moduleInfo) {
+    }
+
+
 }

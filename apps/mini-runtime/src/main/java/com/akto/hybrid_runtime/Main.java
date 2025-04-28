@@ -11,6 +11,7 @@ import com.akto.RuntimeMode;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
 import com.akto.dto.*;
+import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.kafka.Kafka;
 import com.akto.log.LoggerMaker;
@@ -19,6 +20,7 @@ import com.akto.metrics.AllMetrics;
 import com.akto.hybrid_parsers.HttpCallParser;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
+import com.akto.metrics.ModuleInfoWorker;
 import com.akto.testing_db_layer_client.ClientLayer;
 import com.akto.util.DashboardMode;
 import com.google.gson.Gson;
@@ -183,7 +185,7 @@ public class Main {
         DataControlFetcher.init(dataActor);
 
         aSettings = dataActor.fetchAccountSettings();
-
+        ModuleInfoWorker.init(ModuleInfo.ModuleType.MINI_RUNTIME, dataActor);
         //DaoInit.init(new ConnectionString(mongoURI));
         // DictionaryFilter.readDictionaryBinary();
 
