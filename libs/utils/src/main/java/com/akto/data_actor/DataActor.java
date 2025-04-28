@@ -7,6 +7,7 @@ import com.akto.dto.dependency_flow.Node;
 import com.akto.dto.filter.MergedUrls;
 import com.akto.dto.jobs.JobExecutorType;
 import com.akto.dto.jobs.JobParams;
+import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.dto.runtime_filters.RuntimeFilter;
 import com.akto.dto.settings.DataControlSettings;
 import com.akto.dto.test_editor.TestingRunPlayground;
@@ -274,6 +275,7 @@ public abstract class DataActor {
     public abstract List<String> findTestSubCategoriesByTestSuiteId(List<String> testSuiteId);
 
     public abstract TestingRunResultSummary findLatestTestingRunResultSummary(Bson filter);
+    public abstract void updateModuleInfo(ModuleInfo moduleInfo);
 
     public abstract TestingRunPlayground getCurrentTestingRunDetailsFromEditor(int timestamp);
 

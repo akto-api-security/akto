@@ -13,6 +13,7 @@ import com.akto.dto.billing.Organization;
 import com.akto.dto.billing.SyncLimit;
 import com.akto.dto.test_editor.TestConfig;
 import com.akto.dto.test_editor.TestingRunPlayground;
+import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.*;
 import com.akto.dto.testing.TestingEndpoints.Operator;
@@ -26,6 +27,7 @@ import com.akto.github.GithubUtils;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.metrics.AllMetrics;
+import com.akto.metrics.ModuleInfoWorker;
 import com.akto.mixpanel.AktoMixpanel;
 import com.akto.notifications.slack.APITestStatusAlert;
 import com.akto.notifications.slack.NewIssuesModel;
@@ -261,7 +263,7 @@ public class Main {
         Producer testingProducer = new Producer();
         ConsumerUtil testingConsumer = new ConsumerUtil();
         TestCompletion testCompletion = new TestCompletion();
-
+        ModuleInfoWorker.init(ModuleInfo.ModuleType.MINI_TESTING, dataActor);
         loggerMaker.infoAndAddToDb("Starting.......", LogDb.TESTING);
 
         if(Constants.IS_NEW_TESTING_ENABLED){
