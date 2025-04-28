@@ -44,6 +44,7 @@ public class Main {
 
     // this sync threshold time is used for deleting sample data
     public static final int sync_threshold_time = 120;
+    public static int actualAccountId;
 
     private static int debugPrintCounter = 500;
     private static void printL(Object o) {
@@ -177,6 +178,7 @@ public class Main {
             loggerMaker.errorAndAddToDb("error fetch account settings, exiting process");
             System.exit(0);
         }
+        actualAccountId = aSettings.getId();
 
         DataControlFetcher.init(dataActor);
 
