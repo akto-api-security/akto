@@ -501,13 +501,14 @@ prettifyEpoch(epoch) {
       return acc;
     }, {});
   },
-  requestJson: function (message, highlightPaths) {
-
+  requestJson: function (message, highlightPaths, metadata = []) {
     if(!message || typeof message !== "object" || Object.keys(message).length === 0){
       return {}
     }
     let result = {}
     let requestHeaders = {}
+
+    const metaDataSet = new Set(metadata.map((x) => x.toLowerCase()))
 
     let requestHeadersString = "{}"
     let requestPayloadString = "{}"
@@ -539,6 +540,23 @@ prettifyEpoch(epoch) {
       // eat it
     }
 
+    Object.keys(requestHeaders).forEach((key) => {
+      const temp = key.toLowerCase()
+      if(metaDataSet.has(temp)){
+        highlightPaths.push({
+            "highlightValue": {
+                "value": temp,
+                "wholeRow": true,
+                "className": "akto-decoded",
+                "highlight": true,
+            },
+            "responseCode": -1,
+            "header": temp,
+            "param": temp,
+        })
+      }
+    })
+
     let requestPayload = {}
     try {
       requestPayload = JSON.parse(requestPayloadString)
@@ -567,7 +585,7 @@ prettifyEpoch(epoch) {
     }
     return result
   },
-  responseJson: function (message, highlightPaths) {
+  responseJson: function (message, highlightPaths, metadata = []) {
 
     if(!message || typeof message !== "object" || Object.keys(message).length === 0){
       return {}
@@ -596,6 +614,25 @@ prettifyEpoch(epoch) {
     } catch (e) {
       responsePayload = responsePayloadString
     }
+    const metaDataSet = new Set(metadata.map((x) => x.toLowerCase()))
+
+    Object.keys(responseHeaders).forEach((key) => {
+      const temp = key.toLowerCase()
+      if(metaDataSet.has(temp)){
+        highlightPaths.push({
+            "highlightValue": {
+                "value": temp,
+                "wholeRow": true,
+                "className": "akto-decoded",
+                "highlight": true,
+            },
+            "responseCode": -1,
+            "header": temp,
+            "param": temp,
+        })
+      }
+    })
+
     result["json"] = { "responseHeaders": responseHeaders, "responsePayload": responsePayload }
     result["highlightPaths"] = {}
     result['firstLine'] = func.responseFirstLine(message)

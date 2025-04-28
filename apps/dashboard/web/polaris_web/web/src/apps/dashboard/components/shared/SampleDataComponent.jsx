@@ -13,7 +13,7 @@ import transform from './customDiffEditor';
 
 function SampleDataComponent(props) {
 
-    const { type, sampleData, minHeight, showDiff, isNewDiff } = props;
+    const { type, sampleData, minHeight, showDiff, isNewDiff, metadata } = props;
     const [sampleJsonData, setSampleJsonData] = useState({ request: { message: "" }, response: { message: "" } });
     const [popoverActive, setPopoverActive] = useState({});
     const [lineNumbers, setLineNumbers] = useState({request: [], response: []})
@@ -34,8 +34,8 @@ function SampleDataComponent(props) {
             setIpObj({sourceIP: parsed?.ip, destIP: parsed?.destIp})
         }
         
-        let responseJson = func.responseJson(parsed, sampleData?.highlightPaths)
-        let requestJson = func.requestJson(parsed, sampleData?.highlightPaths)
+        let responseJson = func.responseJson(parsed, sampleData?.highlightPaths, metadata)
+        let requestJson = func.requestJson(parsed, sampleData?.highlightPaths, metadata)
 
         let responseTime = parsed?.responseTime;
         setResponseTime(responseTime)
@@ -72,7 +72,7 @@ function SampleDataComponent(props) {
                 response: { message: transform.formatData(responseJson,"http"), original: transform.formatData(originalResponseJson,"http"), highlightPaths:responseJson?.highlightPaths },
             })
         }
-      }, [sampleData])
+      }, [sampleData, metadata])
 
     const copyContent = async(type,completeData) => {
         let copyString = "";
