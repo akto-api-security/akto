@@ -122,10 +122,16 @@ public class RedactSampleData {
         // check for content type in both request and response headers, if they are xml format, read payload from original payload instead of httpResponseParams
         Map<String, List<String>> responseHeaders = httpResponseParams.getHeaders();
         if (responseHeaders == null) responseHeaders = new HashMap<>();
-        handleHeaders(responseHeaders, redactAll);
+
+        // request headers
+        Map<String, List<String>> requestHeaders = httpResponseParams.requestParams.getHeaders();
+        if (requestHeaders == null) requestHeaders = new HashMap<>();
 
         // check for header here for content type
         String acceptableContentType = getAcceptableContentType(responseHeaders);
+        if(acceptableContentType == null) {
+            acceptableContentType = getAcceptableContentType(requestHeaders);
+        }
         // response payload
         String responsePayload = httpResponseParams.getPayload();
         String finalOrigReqPayload = "";
@@ -145,6 +151,9 @@ public class RedactSampleData {
             }
         }
 
+        handleHeaders(responseHeaders, redactAll);
+        handleHeaders(requestHeaders, redactAll);
+
         if (responsePayload == null) responsePayload = "{}";
         try {
             JsonParser jp = factory.createParser(responsePayload);
@@ -162,11 +171,6 @@ public class RedactSampleData {
         }
 
         httpResponseParams.setPayload(responsePayload);
-
-        // request headers
-        Map<String, List<String>> requestHeaders = httpResponseParams.requestParams.getHeaders();
-        if (requestHeaders == null) requestHeaders = new HashMap<>();
-        handleHeaders(requestHeaders, redactAll);
 
         // request payload
         String requestPayload = httpResponseParams.requestParams.getPayload();
