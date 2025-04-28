@@ -42,13 +42,10 @@ import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.bson.conversions.Bson;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public class AdminSettingsAction extends UserAction {
 
     private static final LoggerMaker logger = new LoggerMaker(AdminSettingsAction.class, LogDb.DASHBOARD);
-    private static final Logger log = LoggerFactory.getLogger(AdminSettingsAction.class);
 
     AccountSettings accountSettings;
     private int globalRateLimit = 0;
@@ -70,7 +67,7 @@ public class AdminSettingsAction extends UserAction {
         if(Context.accountId.get() != null && Context.accountId.get() != 0){
             currentAccount = AccountsDao.instance.findOne(
                 Filters.eq(Constants.ID, Context.accountId.get()),
-                Projections.include("name", "timezone")
+                Projections.include("name", "timezone", Account.HYBRID_SAAS_ACCOUNT, Account.HYBRID_TESTING_ENABLED)
             );
         }
         return SUCCESS.toUpperCase();

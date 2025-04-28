@@ -59,7 +59,7 @@ function About() {
         }
         setCurrentTimeZone(accountSettingsDetails?.timezone)
         setAccountName(accountSettingsDetails?.name)
-        setMiniTesting(accountSettingsDetails?.hybridTestingEnabled)
+        setMiniTesting(!accountSettingsDetails?.hybridTestingEnabled)
         setSetuptype(resp.setupType)
         setRedactPayload(resp.redactPayload)
         setNewMerging(resp.urlRegexMatchingEnabled)
@@ -231,7 +231,7 @@ function About() {
 
     const toggleMiniTesting = async(val) => {
         setMiniTesting(val) ;
-        await settingRequests.switchTestingModule(val);
+        await settingRequests.switchTestingModule(!val);
     }
 
     
@@ -367,7 +367,7 @@ function About() {
                 />
             </Box>
             <ToggleComponent text={"Treat URLs as case insensitive"} onToggle={handleApisCaseInsensitive} initial={toggleCaseSensitiveApis} />
-            {window.IS_SAAS === true && <ToggleComponent text={"Switch to akto's testing module"} onToggle={toggleMiniTesting} initial={miniTesting}/>}
+            <ToggleComponent text={"Use akto's testing module"} onToggle={toggleMiniTesting} initial={miniTesting}/>
         </VerticalStack>
     )
     
