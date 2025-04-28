@@ -68,7 +68,6 @@ function Jira() {
 
 
     function projectMapReducer(draft, action){
-        console.log(draft,action)
         switch(action.type){
             case 'ADD':
                 return draft.push({
@@ -82,7 +81,8 @@ function Jira() {
                     }
                 });
             case 'REMOVE':
-                return draft.filter((item,idx) => idx !== action.index);
+                draft.splice(action.index, 1);
+                break
             case 'UPDATE':
                 const { projectId: projectIdToUpdate, updates } = action.payload;
                 const indexToUpdate = draft.findIndex(item => item.projectId === projectIdToUpdate);
@@ -174,15 +174,15 @@ function Jira() {
                                 />
                             {project.enableBiDirIntegraion &&
                                 <VerticalStack gap={3} align='start'>
-                                    <HorizontalStack gap={10}>
+                                    <HorizontalStack gap={12}>
                                         <Text fontWeight='semibold' variant='headingXs'>Akto Status</Text>
                                         <Text fontWeight='semibold' variant='headingXs'>Jira Status</Text>
                                     </HorizontalStack>
                                     {
                                         aktoStatusForJira.map(val => {
                                             return (
-                                                <HorizontalStack gap={10}>
-                                                    <Badge >{val}</Badge>
+                                                <HorizontalStack gap={8}>
+                                                    <Box width='82px'><Badge >{val}</Badge></Box>
                                                     <Dropdown selected={(value) => {
                                                         setProjectMap({
                                                             type: 'UPDATE',
