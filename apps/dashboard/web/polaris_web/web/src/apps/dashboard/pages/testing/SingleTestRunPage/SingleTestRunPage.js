@@ -559,6 +559,7 @@ function SingleTestRunPage() {
     <>
       <RunTest
         key={"run-test"} 
+        setTestingRunResultSummariesObj={setTestingRunResultSummariesObj}
         activeFromTesting={activeFromTesting} 
         setActiveFromTesting={setActiveFromTesting} 
         preActivator={true}

@@ -1202,15 +1202,7 @@ getMissingConfigs(testResults){
       };
     });
   },
-  prepareEditableConfigObject(testRun,settings,hexId,testSuiteIds=[],testMode,autoTicketingDetails){
-    const tests = testRun.tests;
-    const selectedTests = []
-    Object.keys(tests).forEach(category => {
-        tests[category].forEach(test => {
-            if (test.selected) selectedTests.push(test.value)
-        })
-    })
-
+  prepareEditableConfigObject(testRun,settings,hexId,testSuiteIds=[],testMode,autoTicketingDetails,selectedTests){
     return {
       configsAdvancedSettings:settings,
       testRoleId: testRun.testRoleId,
@@ -1229,7 +1221,18 @@ getMissingConfigs(testResults){
       testSuiteIds:testMode? [] : testSuiteIds,
       autoTicketingDetails: autoTicketingDetails,
     }
-  }
+  },
+  getSelectedTestsList(testRun){
+    if(!testRun || !testRun.tests) return [];
+    let selectedTests = [];
+    Object.keys(testRun.tests).forEach(category => {
+        testRun.tests[category].forEach(test => {
+            if (test.selected) selectedTests.push(test.value)
+        })
+    })
+    
+    return selectedTests;
+}
 }
 
 export default transform
