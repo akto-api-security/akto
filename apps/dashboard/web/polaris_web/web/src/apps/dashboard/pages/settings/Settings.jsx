@@ -4,13 +4,15 @@ import { Outlet, useNavigate } from "react-router-dom"
 import './settings.css'
 import SettingsLeftNav from "./nav/SettingsLeftNav";
 import PersistStore from "../../../main/PersistStore";
+import { useEffect } from "react";
 
 function SettingsHeader() {
     const navigate = useNavigate();
     const setActive = PersistStore(state => state.setActive)
-    
+
     const handleSettingsClose = () => {
-        navigate('/dashboard/testing')
+        // Go back to previous page instead of hardcoded destination
+        navigate(-1);
         setActive('active')
     }
 
@@ -22,7 +24,7 @@ function SettingsHeader() {
                 </Box>
                 <Text variant="headingMd" as="h4">Settings</Text>
             </HorizontalStack>
-            <Button plain icon={CancelMajor} onClick={handleSettingsClose} />
+            <Button icon={CancelMajor} onClick={handleSettingsClose} />
         </div>
     )
 
@@ -32,6 +34,29 @@ function SettingsHeader() {
 }
 
 const Settings = () => {
+    const navigate = useNavigate();
+    const setActive = PersistStore(state => state.setActive)
+
+    const handleSettingsClose = () => {
+        // Go back to previous page instead of hardcoded destination
+        navigate(-1);
+        setActive('active')
+    }
+
+    useEffect(() => {
+        const handleEscKey = (event) => {
+            if (event.key === "Escape") {
+                handleSettingsClose();
+            }
+        };
+
+        window.addEventListener("keydown", handleEscKey);
+
+        // Cleanup the event listener on component unmount
+        return () => {
+            window.removeEventListener("keydown", handleEscKey);
+        };
+    }, [navigate, setActive]);
 
     return (
         <Frame navigation={<SettingsLeftNav />} topBar={<SettingsHeader />}>
