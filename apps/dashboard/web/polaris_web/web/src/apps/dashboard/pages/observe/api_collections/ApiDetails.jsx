@@ -137,17 +137,17 @@ function ApiDetails(props) {
                 })
             })
 
-            // const queryPayload = dashboardFunc.getApiPrompts(apiCollectionId, endpoint, method)[0].prepareQuery();
+            const queryPayload = dashboardFunc.getApiPrompts(apiCollectionId, endpoint, method)[0].prepareQuery();
 
-            // await gptApi.ask_ai(queryPayload).then((res) => {
-            //     if (res.response.responses && res.response.responses.length > 0) {
-            //         setHeadersWithData(res.response.responses)
-            //     }
-            // }
-            // ).catch((err) => {
-            //     console.error("Failed to fetch prompts:", err);
-            //     func.setToast(true, true, "Failed to fetch prompts. Please try again.");
-            // })
+            await gptApi.ask_ai(queryPayload).then((res) => {
+                if (res.response.responses && res.response.responses.length > 0) {
+                    setHeadersWithData(res.response.responses)
+                }
+            }
+            ).catch((err) => {
+                console.error("Failed to fetch prompts:", err);
+                func.setToast(true, true, "Failed to fetch prompts. Please try again.");
+            })
         }
     }
 
