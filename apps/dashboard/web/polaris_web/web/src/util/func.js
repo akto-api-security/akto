@@ -2074,17 +2074,6 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
       default:
         return "Sunday"
     }
-  },
-  getPeriodInSeconds(recurringDaily, recurringWeekly, recurringMonthly) {
-    if (recurringDaily) {
-      return 86400;
-    } else if (recurringWeekly) {
-      return 7 * 86400;
-    } else if (recurringMonthly) {
-      return 2592000;
-    } else {
-      return 0;
-    }
   }
 }
 

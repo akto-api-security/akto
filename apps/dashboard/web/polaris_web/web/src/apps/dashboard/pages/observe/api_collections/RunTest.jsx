@@ -24,7 +24,7 @@ const initialAutoTicketingDetails = {
     issueType: "",
 }
 
-function RunTest({setTestingRunResultSummariesObj, endpoints, filtered, apiCollectionId, disabled, runTestFromOutside, closeRunTest, selectedResourcesForPrimaryAction, useLocalSubCategoryData, preActivator, testIdConfig, activeFromTesting, setActiveFromTesting, showEditableSettings, setShowEditableSettings, parentAdvanceSettingsConfig, testRunType, shouldDisable }) {
+function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOutside, closeRunTest, selectedResourcesForPrimaryAction, useLocalSubCategoryData, preActivator, testIdConfig, activeFromTesting, setActiveFromTesting, showEditableSettings, setShowEditableSettings, parentAdvanceSettingsConfig, testRunType, shouldDisable }) {
 
     const initialState = {
         categories: [],
@@ -529,7 +529,11 @@ function RunTest({setTestingRunResultSummariesObj, endpoints, filtered, apiColle
 
         let selectedTests = []
         if (testMode) {
-            selectedTests = transform.getSelectedTestsList(testRun);
+            Object.keys(tests).forEach(category => {
+                tests[category].forEach(test => {
+                    if (test.selected) selectedTests.push(test.value)
+                })
+            })
         }
         else {
             testName = testNameSuiteModal
@@ -673,44 +677,14 @@ function RunTest({setTestingRunResultSummariesObj, endpoints, filtered, apiColle
         setTestMode(check);
     }
 
-
-    function updateTestingRunResultSummariesObj() {
-        const periodInSeconds = testRun.continuousTesting ? -1 : func.getPeriodInSeconds(testRun.recurringDaily, testRun.recurringWeekly, testRun.recurringMonthly);
-        setTestingRunResultSummariesObj((prev)=>{
-            return {
-                ...prev,
-                testingRun:{
-                    ...prev.testingRun,
-                    maxConcurrentRequests: testRun.maxConcurrentRequests,
-                    testRunTime: testRun.testRunTime,
-                    sendSlackAlert: testRun.sendSlackAlert,
-                    sendMsTeamsAlert: testRun.sendMsTeamsAlert,
-                    periodInSeconds: testRun.continuousTesting ? -1 : func.getPeriodInSeconds(testRun.recurringDaily, testRun.recurringWeekly, testRun.recurringMonthly), // implement this function,
-                    testingRunConfig:{
-                        ...prev.testingRun.testingRunConfig,
-                        overriddenTestAppUrl: testRun.hasOverriddenTestAppUrl ? testRun.overriddenTestAppUrl : "",
-                        hasOverriddenTestAppUrl: testRun.hasOverriddenTestAppUrl,
-                        testRoleId: testRun.testRoleId,
-                        testSubCategoryList: transform.getSelectedTestsList(testRun),
-                        testSuiteIds: testSuiteIds,
-                        autoTicketingDetails: testRun.autoTicketingDetails
-                    }
-                },
-                testingRunType: periodInSeconds==-1 ? "CONTINUOUS_TESTING" : periodInSeconds>0 ? "RECURRING" : "ONE_TIME"
-            }
-        })
-    }
-
     // only for configurations 
     const handleModifyConfig = async () => {
         const settings = transform.prepareConditionsForTesting(conditions)
         let autoTicketingDetails = jiraProjectMap? testRun.autoTicketingDetails : null;
-        let selectedTests = transform.getSelectedTestsList(testRun);
-        const editableConfigObject = transform.prepareEditableConfigObject(testRun, settings, testIdConfig.hexId,testSuiteIds,testMode,autoTicketingDetails,selectedTests)
+        const editableConfigObject = transform.prepareEditableConfigObject(testRun, settings, testIdConfig.hexId,testSuiteIds,testMode,autoTicketingDetails)
         await testingApi.modifyTestingRunConfig(testIdConfig?.testingRunConfig?.id, editableConfigObject).then(() => {
             func.setToast(true, false, "Modified testing run config successfully")
             setShowEditableSettings(false)
-            updateTestingRunResultSummariesObj()
         })
         if(activeFromTesting){
             toggleRunTest();
