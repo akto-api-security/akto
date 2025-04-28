@@ -249,7 +249,7 @@ const settingFunctions = {
     fetchJiraIntegration: async function(){
       let jiraInteg = {}
       await settingRequests.fetchJiraIntegration().then((resp)=>{
-        jiraInteg = resp.jiraIntegration
+        jiraInteg = resp
       })
       return jiraInteg
     },

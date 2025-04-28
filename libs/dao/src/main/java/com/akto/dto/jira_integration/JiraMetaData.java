@@ -9,6 +9,8 @@ import org.bson.types.ObjectId;
 
 @Getter
 @AllArgsConstructor
+@Setter
+@NoArgsConstructor
 public class JiraMetaData {
     
     private String issueTitle;
