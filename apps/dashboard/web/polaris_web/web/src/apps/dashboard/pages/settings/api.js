@@ -555,6 +555,13 @@ const settingRequests = {
             method: 'post',
             data: {email}
         })
+    },
+    async fetchModuleInfo() {
+        return await request({
+            url: '/api/fetchModuleInfo',
+            method: 'post',
+            data: {}
+        })
     }
 }
 

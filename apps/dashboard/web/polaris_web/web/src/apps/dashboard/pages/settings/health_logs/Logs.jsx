@@ -1,4 +1,4 @@
-import { Button, ButtonGroup, LegacyCard, Text } from "@shopify/polaris"
+import { Button, ButtonGroup, LegacyCard, Text, DataTable } from "@shopify/polaris"
 import { useEffect, useState } from "react";
 import settingRequests from "../api";
 import func from "@/util/func";
@@ -16,6 +16,7 @@ const Logs = () => {
         logData: []
     })
     const [ loading, setLoading ] = useState(false)
+    const [ moduleInfos, setModuleInfos ] = useState([])
     const logGroupSelected = logs.logGroup !== ''
     const hasAccess = func.checkUserValidForIntegrations()
 
@@ -51,11 +52,17 @@ const Logs = () => {
         }
     }
 
+    const fetchModuleInfo = async () => {
+        const response = await settingRequests.fetchModuleInfo();
+        setModuleInfos(response.moduleInfos || []);
+    }
+
     useEffect(() => {
         const startTime = Date.now() - fiveMins
         const endTime = Date.now() 
         if(hasAccess){
             fetchLogsFromDb(startTime, endTime)
+            fetchModuleInfo()
         }
     }, [logs.logGroup])
 
@@ -76,6 +83,7 @@ const Logs = () => {
         const endTime = Date.now();
         if(hasAccess){
             fetchLogsFromDb(startTime, endTime, true)
+            fetchModuleInfo()
         }
     }
 
@@ -87,42 +95,68 @@ const Logs = () => {
         }
     }
 
+    const moduleInfoRows = moduleInfos.map(module => [
+        module.moduleType || '-',
+        module.currentVersion || '-',
+        func.epochToDateTime(module.startedTs),
+        func.epochToDateTime(module.lastHeartbeatReceived)
+    ]);
+
     return (
-        <LegacyCard
-            sectioned
-            title="Logs"
-            actions={[
-                { content: 'Export', onAction: exportLogsCsv },
-                { content: 'Configure log level'}
-            ]}
-        >
-            <Text variant="bodyMd">
-                API logs capture detailed records of API requests and responses, including metadata such as timestamps, request headers, payload data, and authentication details.
-            </Text>
-            <br />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <LegacyCard
+                sectioned
+                title="Logs"
+                actions={[
+                    { content: 'Export', onAction: exportLogsCsv },
+                    { content: 'Configure log level'}
+                ]}
+            >
+                <Text variant="bodyMd">
+                    API logs capture detailed records of API requests and responses, including metadata such as timestamps, request headers, payload data, and authentication details.
+                </Text>
+                <br />
 
-            <div style={{ display: "grid", gridTemplateColumns: "auto max-content", gap: "10px"}}>
-                <Dropdown
-                    menuItems={logGroupOptions}
-                    initial="Dashboard"
-                    selected={handleSelectLogGroup}
-                    />
-                <ButtonGroup segmented>
-                    <Button onClick={handleRefresh} disabled={!logGroupSelected}>Refresh</Button>
-                    <Button onClick={handlePreviousFiveMinutesLogs} disabled={!logGroupSelected}>-5 minutes</Button>
-                </ButtonGroup>
-            </div>
-          
-            <br />
+                <div style={{ display: "grid", gridTemplateColumns: "auto max-content", gap: "10px"}}>
+                    <Dropdown
+                        menuItems={logGroupOptions}
+                        initial="Dashboard"
+                        selected={handleSelectLogGroup}
+                        />
+                    <ButtonGroup segmented>
+                        <Button onClick={handleRefresh} disabled={!logGroupSelected}>Refresh</Button>
+                        <Button onClick={handlePreviousFiveMinutesLogs} disabled={!logGroupSelected}>-5 minutes</Button>
+                    </ButtonGroup>
+                </div>
+              
+                <br />
 
-            {
-                logGroupSelected ? 
-                    // loading ? <SpinnerCentered/> : <LogsContainer logs={logs} />  
-                    <LogsContainer logs={logs} />  
-                    : <Text variant="bodyMd">Select log group to fetch logs</Text>
-            }
+                {
+                    logGroupSelected ? 
+                        // loading ? <SpinnerCentered/> : <LogsContainer logs={logs} />  
+                        <LogsContainer logs={logs} />  
+                        : <Text variant="bodyMd">Select log group to fetch logs</Text>
+                }
+            </LegacyCard>
 
-        </LegacyCard>
+            <LegacyCard sectioned title="Module Information">
+                <DataTable
+                    columnContentTypes={[
+                        'text',
+                        'text',
+                        'text',
+                        'text'
+                    ]}
+                    headings={[
+                        'Type',
+                        'Version',
+                        'Started At',
+                        'Last Heartbeat'
+                    ]}
+                    rows={moduleInfoRows}
+                />
+            </LegacyCard>
+        </div>
     )
 }
 
