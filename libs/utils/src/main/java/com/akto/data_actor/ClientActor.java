@@ -213,7 +213,8 @@ public class ClientActor extends DataActor {
         Map<String, List<String>> headers = buildHeaders();
         BasicDBObject obj = new BasicDBObject();
         obj.put("moduleInfo", moduleInfo);
-        OriginalHttpRequest request = new OriginalHttpRequest(url + "/updateModuleInfoForHeartbeat", "", "POST", obj.toString(), headers, "");
+
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/updateModuleInfoForHeartbeat", "", "POST", gson.toJson(obj), headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
             if (response.getStatusCode() != 200) {
