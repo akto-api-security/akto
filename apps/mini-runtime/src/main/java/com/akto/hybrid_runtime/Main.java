@@ -44,6 +44,7 @@ public class Main {
 
     // this sync threshold time is used for deleting sample data
     public static final int sync_threshold_time = 120;
+    public static int actualAccountId;
 
     private static int debugPrintCounter = 500;
     private static void printL(Object o) {
@@ -177,6 +178,7 @@ public class Main {
             loggerMaker.errorAndAddToDb("error fetch account settings, exiting process");
             System.exit(0);
         }
+        actualAccountId = aSettings.getId();
 
         DataControlFetcher.init(dataActor);
 
@@ -529,7 +531,7 @@ public class Main {
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
                 List<CustomDataType> customDataTypes = dataActor.fetchCustomDataTypes();
-                loggerMaker.debug("customdata type " + customDataTypes.size());
+                loggerMaker.info("customData type " + customDataTypes.size());
                 List<AktoDataType> aktoDataTypes = dataActor.fetchAktoDataTypes();
                 List<CustomAuthType> customAuthTypes = dataActor.fetchCustomAuthTypes();
                 SingleTypeInfo.fetchCustomDataTypes(accountId, customDataTypes, aktoDataTypes);
