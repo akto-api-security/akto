@@ -4,12 +4,15 @@ import com.akto.RuntimeMode;
 import com.akto.billing.UsageMetricUtils;
 import com.akto.crons.GetRunningTestsStatus;
 import com.akto.dao.context.Context;
+import com.akto.dao.test_editor.TestConfigYamlParser;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.*;
 import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.billing.SyncLimit;
+import com.akto.dto.test_editor.TestConfig;
+import com.akto.dto.test_editor.TestingRunPlayground;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.*;
 import com.akto.dto.testing.TestingEndpoints.Operator;
@@ -32,6 +35,8 @@ import com.akto.test_editor.execution.Executor;
 import com.akto.testing.kafka_utils.ConsumerUtil;
 import com.akto.testing.kafka_utils.Producer;
 import com.akto.util.Constants;
+import com.akto.store.SampleMessageStore;
+import com.akto.store.TestingUtil;
 import com.akto.util.DashboardMode;
 import com.akto.util.EmailAccountName;
 import com.akto.util.enums.GlobalEnums;
@@ -53,7 +58,7 @@ public class Main {
 
     private static final DataActor dataActor = DataActorFactory.fetchInstance();
 
-    public static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
+    public static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
 
     public static final ScheduledExecutorService testTelemetryScheduler = Executors.newScheduledThreadPool(2);
 
@@ -78,6 +83,60 @@ public class Main {
         }, 0, 1, TimeUnit.MINUTES);
     }
 
+    public static void checkForPlaygroundTest(){
+        scheduler.scheduleWithFixedDelay(new Runnable() {
+            private final int timestamp = Context.now()-5*60;
+            public void run() {
+                TestExecutor executor = new TestExecutor();
+                TestingRunPlayground testingRunPlayground =  dataActor.getCurrentTestingRunDetailsFromEditor(timestamp); // fetch from Db
+                TestConfig testConfig = null;
+                try {
+                    testConfig = TestConfigYamlParser.parseTemplate(testingRunPlayground.getTestTemplate());
+                } catch (Exception e) {
+                    return ;
+                }
+                ApiInfo.ApiInfoKey infoKey = testingRunPlayground.getApiInfoKey();
+
+                List<String> sampleData = testingRunPlayground.getSamples(); // get sample data from DB
+
+                List<TestingRunResult.TestLog> testLogs = new ArrayList<>();
+                Map<ApiInfo.ApiInfoKey, List<String>> sampleDataMap = new HashMap<>();
+                sampleDataMap.put(infoKey, sampleData); // get sample list from DB
+                SampleMessageStore messageStore = SampleMessageStore.create(sampleDataMap);
+
+                List<CustomAuthType> customAuthTypes = dataActor.fetchCustomAuthTypes();
+
+                TestingUtil testingUtil = new TestingUtil(messageStore, null, null, customAuthTypes);
+                String message = messageStore.getSampleDataMap().get(infoKey).get(messageStore.getSampleDataMap().get(infoKey).size() - 1);
+                TestingRunResult testingRunResult = executor.runTestNew(infoKey, null, testingUtil, null, testConfig, null, true, testLogs, message);
+                testingRunResult.setId(testingRunPlayground.getId());
+                testingRunResult.setTestRunId(testingRunPlayground.getId());
+                testingRunResult.setTestRunResultSummaryId(testingRunPlayground.getId());
+
+                GenericTestResult testRes = testingRunResult.getTestResults().get(0);
+                if (testRes instanceof TestResult) {
+                    List<TestResult> list = new ArrayList<>();
+                    for(GenericTestResult testResult: testingRunResult.getTestResults()){
+                        list.add((TestResult) testResult);
+                    }
+                    testingRunResult.setSingleTestResults(list);
+                } else {
+                    List<MultiExecTestResult> list = new ArrayList<>();
+                    for(GenericTestResult testResult: testingRunResult.getTestResults()){
+                        list.add((MultiExecTestResult) testResult);
+                    }
+                    testingRunResult.setMultiExecTestResults(list);
+                }
+                testingRunResult.setTestResults(null);
+                testingRunResult.setTestLogs(null);
+                testingRunPlayground.setTestingRunResult(testingRunResult);
+                // update testingRunPlayground in DB
+                dataActor.updateTestingRunPlayground(testingRunPlayground);
+            }
+        }, 0, 2, TimeUnit.SECONDS);
+
+    }
+
     public static Set<Integer> extractApiCollectionIds(List<ApiInfo.ApiInfoKey> apiInfoKeyList) {
         Set<Integer> ret = new HashSet<>();
         for(ApiInfo.ApiInfoKey apiInfoKey: apiInfoKeyList) {
@@ -90,7 +149,7 @@ public class Main {
     private static final int MAX_RETRIES_FOR_FAILED_SUMMARIES = 3;
 
      private static BasicDBObject checkIfAlreadyTestIsRunningOnMachine(){
-        // this will return true if consumer is running and this the latest summary of the testing run 
+        // this will return true if consumer is running and this the latest summary of the testing run
         // and also the summary should be in running state
         try {
             BasicDBObject currentTestInfo = readJsonContentFromFile(Constants.TESTING_STATE_FOLDER_PATH, Constants.TESTING_STATE_FILE_NAME, BasicDBObject.class);
@@ -116,13 +175,13 @@ public class Main {
                 return currentTestInfo;
             }else{
                 return null;
-            }   
+            }
         } catch (Exception e) {
             loggerMaker.error("Error in reading the testing state file: " + e.getMessage());
             return null;
         }
     }
-    
+
 
     private static void setTestingRunConfig(TestingRun testingRun, TestingRunResultSummary trrs) {
         long timestamp = testingRun.getId().getTimestamp();
@@ -188,6 +247,7 @@ public class Main {
         AccountSettings accountSettings = dataActor.fetchAccountSettings();
         dataActor.modifyHybridTestingSetting(RuntimeMode.isHybridDeployment());
         setupRateLimitWatcher(accountSettings);
+        checkForPlaygroundTest();
 
         if (!SKIP_SSRF_CHECK) {
             Setup setup = dataActor.fetchSetup();
@@ -246,7 +306,7 @@ public class Main {
             try {
                 loggerMaker.infoAndAddToDb("Tests were already running on this machine, thus resuming the test for account: "+ accountId, LogDb.TESTING);
                 Organization organization = dataActor.fetchOrganization(accountId);
-                FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccess(organization, MetricTypes.TEST_RUNS);   
+                FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccess(organization, MetricTypes.TEST_RUNS);
                 SyncLimit syncLimit = featureAccess.fetchSyncLimit();
                 String testingRunSummaryId = currentTestInfo.getString("summaryId");
                 TestingRun testingRun = dataActor.findTestingRun(testingRunSummaryId);
@@ -267,9 +327,9 @@ public class Main {
                 //     } catch (Exception e) {
                 //         loggerMaker.error("Error sending slack alert for completion of test", e);
                 //     }
-                    
+
                 // }
-                
+
                 // deleteScheduler.execute(() -> {
                 //     Context.accountId.set(accountId);
                 //     try {
@@ -438,18 +498,18 @@ public class Main {
                 }
 
                 Organization organization = dataActor.fetchOrganization(accountId);
-                FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccess(organization, MetricTypes.TEST_RUNS);   
+                FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccess(organization, MetricTypes.TEST_RUNS);
                 SyncLimit syncLimit = featureAccess.fetchSyncLimit();
                 Executor.clearRoleCache();
 
                 if(!maxRetriesReached){
                     if(Constants.IS_NEW_TESTING_ENABLED){
                         int maxRunTime = testingRun.getTestRunTime() <= 0 ? 30*60 : testingRun.getTestRunTime();
-                        testingProducer.initProducer(testingRun, summaryId, false, syncLimit);  
-                        testingConsumer.init(maxRunTime);  
+                        testingProducer.initProducer(testingRun, summaryId, false, syncLimit);
+                        testingConsumer.init(maxRunTime);
                     }else{
                         testExecutor.init(testingRun, summaryId, syncLimit, false);
-                    } 
+                    }
                     AllMetrics.instance.setTestingRunCount(1);
                 }
                 // raiseMixpanelEvent(summaryId, testingRun, accountId);
@@ -457,7 +517,7 @@ public class Main {
                 e.printStackTrace();
                 loggerMaker.errorAndAddToDb(e, "Error in init " + e);
             }
-            
+
             testCompletion.markTestAsCompleteAndRunFunctions(testingRun, summaryId, startDetailed);
 
             Thread.sleep(1000);
