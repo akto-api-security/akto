@@ -1097,6 +1097,7 @@ function ApiEndpoints(props) {
         }
         
         setIsEditingDescription(false);
+        if(editableDescription === description) return;
         api.saveCollectionDescription(apiCollectionId, editableDescription)
             .then(() => {
                 updateCollectionDescription(allCollections, apiCollectionId, editableDescription);
