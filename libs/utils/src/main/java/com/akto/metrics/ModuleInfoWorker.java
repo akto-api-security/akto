@@ -38,6 +38,7 @@ public class ModuleInfoWorker {
         moduleInfo.setModuleType(this.moduleType);
         moduleInfo.setCurrentVersion(this.version);
         moduleInfo.setStartedTs(this.startedTs);
+        moduleInfo.setId(moduleInfo.getId());//Setting new uuid for id
 
         scheduler.scheduleWithFixedDelay(() -> {
             moduleInfo.setLastHeartbeatReceived(Context.now());
