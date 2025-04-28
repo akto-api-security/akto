@@ -311,4 +311,8 @@ public class LoggerMaker  {
         }
         return logs;
     }
+
+    public void error(String message, Object... vars) {
+        logger.error(message, vars);
+    }
 }

@@ -2,6 +2,7 @@ package com.akto;
 
 import com.akto.dao.*;
 import com.akto.dao.billing.OrganizationsDao;
+import com.akto.dao.jobs.JobsDao;
 import com.akto.dao.loaders.LoadersDao;
 import com.akto.dao.testing.TestRolesDao;
 import com.akto.dao.testing.TestingRunDao;
@@ -17,6 +18,7 @@ import com.akto.dto.demo.VulnerableRequestForTemplate;
 import com.akto.dto.dependency_flow.*;
 import com.akto.dto.gpt.AktoGptConfig;
 import com.akto.dto.gpt.AktoGptConfigState;
+import com.akto.dto.jobs.JobParams;
 import com.akto.dto.loaders.Loader;
 import com.akto.dto.loaders.NormalLoader;
 import com.akto.dto.loaders.PostmanUploadLoader;
@@ -39,7 +41,6 @@ import com.akto.dto.testing.info.TestInfo;
 import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.dto.third_party_access.Credential;
 import com.akto.dto.third_party_access.ThirdPartyAccess;
-import com.akto.dto.traffic.SampleData;
 import com.akto.dto.traffic_metrics.RuntimeMetrics;
 import com.akto.dto.traffic_metrics.TrafficMetrics;
 import com.akto.dto.traffic_metrics.TrafficMetricsAlert;
@@ -255,8 +256,8 @@ public class DaoInit {
         ClassModel<OrganizationFlags> OrganizationFlagsClassModel = ClassModel.builder(OrganizationFlags.class).enableDiscriminator(true).build();
         ClassModel<SensitiveDataEndpoints> sensitiveDataEndpointsClassModel = ClassModel.builder(SensitiveDataEndpoints.class).enableDiscriminator(true).build();
         ClassModel<AllAPIsGroup> allApisGroupClassModel = ClassModel.builder(AllAPIsGroup.class).enableDiscriminator(true).build();
-
         ClassModel<RuntimeMetrics> RuntimeMetricsClassModel = ClassModel.builder(RuntimeMetrics.class).enableDiscriminator(true).build();
+        ClassModel<JobParams> jobsParam = ClassModel.builder(JobParams.class).enableDiscriminator(true).build();
         ClassModel<ModuleInfo> ModuleInfoClassModel = ClassModel.builder(ModuleInfo.class).enableDiscriminator(true).build();
 
         CodecRegistry pojoCodecRegistry = fromProviders(PojoCodecProvider.builder().register(
@@ -288,7 +289,7 @@ public class DaoInit {
                         nodeClassModel, connectionClassModel, edgeClassModel, replaceDetailClassModel, modifyHostDetailClassModel, fileUploadClassModel
                 ,fileUploadLogClassModel, codeAnalysisCollectionClassModel, codeAnalysisApiLocationClassModel, codeAnalysisApiInfoClassModel, codeAnalysisApiInfoKeyClassModel,
                 riskScoreTestingEndpointsClassModel, OrganizationFlagsClassModel, sensitiveDataEndpointsClassModel, unauthenticatedEndpointsClassModel, allApisGroupClassModel,
-                RuntimeMetricsClassModel, ModuleInfoClassModel).automatic(true).build());
+                RuntimeMetricsClassModel, jobsParam, ModuleInfoClassModel).automatic(true).build());
 
         final CodecRegistry customEnumCodecs = CodecRegistries.fromCodecs(
                 new EnumCodec<>(Conditions.Operator.class),
@@ -390,6 +391,7 @@ public class DaoInit {
         CodeAnalysisApiInfoDao.instance.createIndicesIfAbsent();
         RBACDao.instance.createIndicesIfAbsent();
         RuntimeMetricsDao.instance.createIndicesIfAbsent();
+        JobsDao.instance.createIndicesIfAbsent();
     }
 
 }
