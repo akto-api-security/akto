@@ -2428,6 +2428,8 @@ public class InitializerListener implements ServletContextListener {
 
                     logger.debug("Starting init functions and scheduling jobs at " + now);
 
+                    JobsCron.instance.jobsScheduler(JobExecutorType.DASHBOARD);
+
                     AccountTask.instance.executeTask(new Consumer<Account>() {
                         @Override
                         public void accept(Account account) {
@@ -2469,7 +2471,6 @@ public class InitializerListener implements ServletContextListener {
                     // CleanTestingJob.cleanTestingJobRunner();
 
                     MatchingJob.MatchingJobRunner();
-                    JobsCron.instance.jobsScheduler(JobExecutorType.DASHBOARD);
 
                     int now2 = Context.now();
                     int diffNow = now2 - now;
