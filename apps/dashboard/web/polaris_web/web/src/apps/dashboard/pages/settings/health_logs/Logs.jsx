@@ -139,23 +139,28 @@ const Logs = () => {
                 }
             </LegacyCard>
 
-            <LegacyCard sectioned title="Module Information">
-                <DataTable
-                    columnContentTypes={[
-                        'text',
-                        'text',
-                        'text',
-                        'text'
-                    ]}
-                    headings={[
-                        'Type',
-                        'Version',
-                        'Started At',
-                        'Last Heartbeat'
-                    ]}
-                    rows={moduleInfoRows}
-                />
-            </LegacyCard>
+            
+                {moduleInfos && moduleInfos.length > 0 ? (
+                    <LegacyCard sectioned title="Module Information">
+
+                    <DataTable
+                        columnContentTypes={[
+                            'text',
+                            'text',
+                            'text',
+                            'text'
+                        ]}
+                        headings={[
+                            'Type',
+                            'Version',
+                            'Started At',
+                            'Last Heartbeat'
+                        ]}
+                        rows={moduleInfoRows}
+                    />
+                                </LegacyCard>
+
+                ) : <></>}
         </div>
     )
 }
