@@ -129,6 +129,7 @@ public class DbLayer {
         updateOptions.upsert(true);
         ModuleInfoDao.instance.getMCollection().findOneAndUpdate(Filters.eq(ModuleInfoDao.ID, moduleInfo.getId()),
                 Updates.combine(
+                        //putting class name because findOneAndUpdate doesn't put class name by default
                         Updates.setOnInsert("_t", moduleInfo.getClass().getName()),
                         Updates.setOnInsert(ModuleInfo.MODULE_TYPE, moduleInfo.getModuleType()),
                         Updates.setOnInsert(ModuleInfo.STARTED_TS, moduleInfo.getStartedTs()),
