@@ -125,17 +125,16 @@ public class DbLayer {
     }
 
     public static void updateModuleInfo(ModuleInfo moduleInfo) {
-        ModuleInfo moduleInfoFromDB = ModuleInfoDao.instance.findOne(Filters.eq(ModuleInfo.MODULE_TYPE, moduleInfo.getModuleType()));
-        if (moduleInfoFromDB == null) {
-            ModuleInfoDao.instance.insertOne(moduleInfo);
-            return;
-        }
-        ModuleInfoDao.instance.updateOne(Filters.eq(ModuleInfo.MODULE_TYPE, moduleInfo.getModuleType()),
+        FindOneAndUpdateOptions updateOptions = new FindOneAndUpdateOptions();
+        updateOptions.upsert(true);
+        ModuleInfoDao.instance.getMCollection().findOneAndUpdate(Filters.eq(ModuleInfoDao.ID, moduleInfo.getId()),
                 Updates.combine(
-                        Updates.set(ModuleInfo.CURRENT_VERSION, moduleInfo.getCurrentVersion()),
-                        Updates.set(ModuleInfo.LAST_HEARTBEAT_RECEIVED, moduleInfo.getLastHeartbeatReceived()),
-                        Updates.set(ModuleInfo.STARTED_TS, moduleInfo.getStartedTs())
-                ));
+                        Updates.setOnInsert("_t", moduleInfo.getClass().getName()),
+                        Updates.setOnInsert(ModuleInfo.MODULE_TYPE, moduleInfo.getModuleType()),
+                        Updates.setOnInsert(ModuleInfo.STARTED_TS, moduleInfo.getStartedTs()),
+                        Updates.setOnInsert(ModuleInfo.CURRENT_VERSION, moduleInfo.getCurrentVersion()),
+                        Updates.set(ModuleInfo.LAST_HEARTBEAT_RECEIVED, moduleInfo.getLastHeartbeatReceived())
+                ), updateOptions);
     }
 
 
