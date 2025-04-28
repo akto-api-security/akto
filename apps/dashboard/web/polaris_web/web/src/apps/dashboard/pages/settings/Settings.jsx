@@ -3,17 +3,9 @@ import { CancelMajor, SettingsMinor } from '@shopify/polaris-icons';
 import { Outlet, useNavigate } from "react-router-dom"
 import './settings.css'
 import SettingsLeftNav from "./nav/SettingsLeftNav";
-import PersistStore from "../../../main/PersistStore";
+import { useEffect } from "react";
 
-function SettingsHeader() {
-    const navigate = useNavigate();
-    const setActive = PersistStore(state => state.setActive)
-    
-    const handleSettingsClose = () => {
-        navigate('/dashboard/testing')
-        setActive('active')
-    }
-
+function SettingsHeader({ onHandleClose }) {
     const buttonComp = (
         <div className="header-css">
             <HorizontalStack gap="2">
@@ -22,7 +14,7 @@ function SettingsHeader() {
                 </Box>
                 <Text variant="headingMd" as="h4">Settings</Text>
             </HorizontalStack>
-            <Button plain icon={CancelMajor} onClick={handleSettingsClose} />
+            <Button icon={CancelMajor} onClick={()=>onHandleClose()} />
         </div>
     )
 
@@ -32,9 +24,29 @@ function SettingsHeader() {
 }
 
 const Settings = () => {
+    const navigate = useNavigate();
+
+    const handleSettingsClose = () => {
+        navigate(-1);
+    }
+
+    useEffect(() => {
+        const handleEscKey = (event) => {
+            if (event.key === "Escape") {
+                handleSettingsClose();
+            }
+        };
+
+        window.addEventListener("keydown", handleEscKey);
+
+        // Cleanup the event listener on component unmount
+        return () => {
+            window.removeEventListener("keydown", handleEscKey);
+        };
+    }, []);
 
     return (
-        <Frame navigation={<SettingsLeftNav />} topBar={<SettingsHeader />}>
+        <Frame navigation={<SettingsLeftNav />} topBar={<SettingsHeader onHandleClose={handleSettingsClose} />}>
             <Box paddingBlockEnd={"20"}>
                 <Outlet />
             </Box>
