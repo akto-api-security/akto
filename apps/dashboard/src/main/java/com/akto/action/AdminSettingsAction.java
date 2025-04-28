@@ -28,6 +28,9 @@ import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
 import com.opensymphony.xwork2.Action;
+
+import lombok.Setter;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -82,6 +85,9 @@ public class AdminSettingsAction extends UserAction {
 	private Set<String> partnerIpList;
     private List<String> allowRedundantEndpointsList;
     private boolean toggleCaseSensitiveApis;
+
+    @Setter
+    private boolean miniTestingEnabled;
 
     public String updateSetupType() {
         AccountSettingsDao.instance.getMCollection().updateOne(
@@ -461,6 +467,14 @@ public class AdminSettingsAction extends UserAction {
         );
 
         return SUCCESS.toUpperCase();
+    }
+
+    public String switchTestingModule(){
+        AccountsDao.instance.updateOne(
+            Filters.eq(Constants.ID, Context.accountId.get()),
+            Updates.set(Account.HYBRID_TESTING_ENABLED, this.miniTestingEnabled)
+        );
+        return SUCCESS.toUpperCase();   
     }
 
     public void setAccountPermission(String accountPermission) {

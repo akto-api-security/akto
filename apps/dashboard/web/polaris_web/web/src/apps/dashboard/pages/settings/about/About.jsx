@@ -46,6 +46,7 @@ function About() {
 
     const initialUrlsList = settingFunctions.getRedundantUrlOptions()
     const [selectedUrlList, setSelectedUrlsList] = useState([])
+    const [miniTesting, setMiniTesting] = useState(false)
 
     const setupOptions = settingFunctions.getSetupOptions()
 
@@ -58,6 +59,7 @@ function About() {
         }
         setCurrentTimeZone(accountSettingsDetails?.timezone)
         setAccountName(accountSettingsDetails?.name)
+        setMiniTesting(accountSettingsDetails?.hybridTestingEnabled)
         setSetuptype(resp.setupType)
         setRedactPayload(resp.redactPayload)
         setNewMerging(resp.urlRegexMatchingEnabled)
@@ -227,6 +229,11 @@ function About() {
         await settingRequests.updateApisCaseInsensitive(val);
     }
 
+    const toggleMiniTesting = async(val) => {
+        setMiniTesting(val) ;
+        await settingRequests.switchTestingModule(val);
+    }
+
     
     const handleIpsChange = async(ip, isAdded, type) => {
         let ipList = ip.split(",")
@@ -360,6 +367,7 @@ function About() {
                 />
             </Box>
             <ToggleComponent text={"Treat URLs as case insensitive"} onToggle={handleApisCaseInsensitive} initial={toggleCaseSensitiveApis} />
+            {window.IS_SAAS === true && <ToggleComponent text={"Switch to akto's testing module"} onToggle={toggleMiniTesting} initial={miniTesting}/>}
         </VerticalStack>
     )
     
