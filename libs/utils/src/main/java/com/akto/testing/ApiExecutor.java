@@ -2,8 +2,6 @@ package com.akto.testing;
 
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.TestEditorEnums;
-import com.akto.data_actor.DataActor;
-import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.CollectionConditions.ConditionsType;
@@ -74,7 +72,7 @@ public class ApiExecutor {
 
         OkHttpClient client = debug ?
                 HTTPClientHandler.instance.getNewDebugClient(isSaasDeployment, followRedirects, testLogs, requestProtocol) :
-                HTTPClientHandler.instance.getHTTPClient(followRedirects, requestProtocol);
+                HTTPClientHandler.instance.getHTTPClient(request.isHttps(), followRedirects, requestProtocol);
 
         if (!skipSSRFCheck && !HostDNSLookup.isRequestValid(request.url().host())) {
             throw new IllegalArgumentException("SSRF attack attempt");
