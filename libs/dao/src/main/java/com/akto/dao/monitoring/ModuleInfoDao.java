@@ -9,6 +9,9 @@ public class ModuleInfoDao extends AccountsContextDao<ModuleInfo> {
         return "module_info";
     }
 
+    public static final ModuleInfoDao instance = new ModuleInfoDao();
+    private ModuleInfoDao(){}
+
     @Override
     public Class<ModuleInfo> getClassT() {
         return ModuleInfo.class;
