@@ -299,7 +299,11 @@ public class LoggerMaker {
         logger.error(msg, t);
     }
 
-    public void debug(String msg){
-        logger.info(msg);
+    public void error(String msg, Object... vars){
+        logger.error(msg, vars);
+    }
+
+    public void debug(String msg, Object... vars){
+        logger.debug(msg, vars);
     }
 }

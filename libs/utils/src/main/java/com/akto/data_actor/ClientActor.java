@@ -1,7 +1,13 @@
 package com.akto.data_actor;
 
 import com.akto.DaoInit;
+import com.akto.dao.context.Context;
 import com.akto.dto.filter.MergedUrls;
+import com.akto.dto.jobs.Job;
+import com.akto.dto.jobs.JobExecutorType;
+import com.akto.dto.jobs.JobParams;
+import com.akto.dto.jobs.JobStatus;
+import com.akto.dto.jobs.ScheduleType;
 import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.dto.settings.DataControlSettings;
 import com.akto.testing.ApiExecutor;
@@ -63,8 +69,6 @@ import org.bson.codecs.DecoderContext;
 import org.bson.codecs.configuration.CodecRegistry;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.Base64;
@@ -3558,6 +3562,38 @@ public class ClientActor extends DataActor {
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("error in findLatestTestingRunResultSummary" + e, LoggerMaker.LogDb.RUNTIME);
             return null;
+        }
+    }
+
+    @Override
+    public void scheduleAutoCreateTicketsJob(int accountId, JobParams params, JobExecutorType jobExecutorType) {
+        Map<String, List<String>> headers = buildHeaders();
+
+        int now = Context.now();
+        Job job = new Job(accountId,
+            ScheduleType.RUN_ONCE,
+            JobStatus.SCHEDULED,
+            params,
+            jobExecutorType,
+            now,
+            0,
+            0,
+            0,
+            now
+        );
+
+        String objString = gson.toJson(new BasicDBObject("job", job));
+        loggerMaker.debug(objString);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/insertJob", "", "POST", objString, headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in insertJob", LoggerMaker.LogDb.RUNTIME);
+                return;
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in insertJob" + e, LoggerMaker.LogDb.RUNTIME);
         }
     }
 
