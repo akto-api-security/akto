@@ -26,6 +26,7 @@ import com.akto.dto.data_types.Conditions.Operator;
 import com.akto.dto.runtime_filters.FieldExistsFilter;
 import com.akto.dto.runtime_filters.ResponseCodeRuntimeFilter;
 import com.akto.dto.runtime_filters.RuntimeFilter;
+import com.akto.dto.test_editor.TestingRunPlayground;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
@@ -3540,7 +3541,7 @@ public class ClientActor extends DataActor {
             return null;
         }
     }
-    
+
     public List<String> findTestSubCategoriesByTestSuiteId(List<String> testSuiteId) {
         BasicDBObject obj = new BasicDBObject();
         obj.put("testSuiteId", testSuiteId);
@@ -3568,6 +3569,52 @@ public class ClientActor extends DataActor {
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("error in findTestSubCategoriesByTestSuiteId" + e, LoggerMaker.LogDb.RUNTIME);
             return new ArrayList<>();
+        }
+    }
+    public TestingRunPlayground getCurrentTestingRunDetailsFromEditor(int timestamp){
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("ts", timestamp);
+
+        Map<String, List<String>> headers = buildHeaders();
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchEditorTest", "", "POST",  obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in fetchEditorTest", LoggerMaker.LogDb.TESTING);
+                return null;
+            }
+            BasicDBObject payloadObj;
+            try {
+                payloadObj = BasicDBObject.parse(responsePayload);
+                BasicDBObject testingRunPlaygroundObj = (BasicDBObject) payloadObj.get("testingRunPlayground");
+                return objectMapper.readValue(testingRunPlaygroundObj.toJson(), TestingRunPlayground.class);
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("error extracting response in fetchEditorTest" + e, LoggerMaker.LogDb.TESTING);
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in fetchEditorTest" + e, LoggerMaker.LogDb.TESTING);
+        }
+        return null;
+    }
+
+    public void updateTestingRunPlayground(TestingRunPlayground testingRunPlayground) {
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("testingRunPlaygroundId", testingRunPlayground.getHexId());
+        obj.put("testingRunResult", testingRunPlayground.getTestingRunResult());
+        String jsonString = gson.toJson(obj);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/updateTestingRunPlaygroundStateAndResult", "", "POST",  jsonString, headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in updateTestingRunPlaygroundStateAndResult", LoggerMaker.LogDb.TESTING);
+                return;
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in updateTestingRunPlaygroundStateAndResult" + e, LoggerMaker.LogDb.RUNTIME);
+            return;
         }
     }
 }
