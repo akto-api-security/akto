@@ -1161,7 +1161,7 @@ function ApiEndpoints(props) {
                                         </div>}
                                     <HorizontalStack gap={2}>
                                         {isEditingDescription ? (
-                                            <InlineEditableText textValue={editableDescription} setTextValue={setEditableDescription} handleSaveClick={handleSaveDescription} setIsEditing={setIsEditingDescription} placeholder={"Add a brief description for this collection"} maxLength={64} />
+                                            <InlineEditableText textValue={editableDescription} setTextValue={setEditableDescription} handleSaveClick={handleSaveDescription} setIsEditing={setIsEditingDescription} placeholder={"Add a brief description"} maxLength={64} />
                                         ) : (
                                             !description ? (
                                                 <Button plain removeUnderline onClick={() => setIsEditingDescription(true)}>

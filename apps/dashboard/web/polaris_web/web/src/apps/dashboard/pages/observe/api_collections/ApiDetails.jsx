@@ -305,7 +305,7 @@ function ApiDetails(props) {
     } catch (e) {
     }
 
-    newData['description'] = (isEditingDescription?<InlineEditableText textValue={editableDescription} setTextValue={setEditableDescription} handleSaveClick={handleSaveDescription} setIsEditing={setIsEditingDescription}  placeholder={"Add a brief description for this endpoint"} maxLength={64}/> : description )
+    newData['description'] = (isEditingDescription?<InlineEditableText textValue={editableDescription} setTextValue={setEditableDescription} handleSaveClick={handleSaveDescription} setIsEditing={setIsEditingDescription}  placeholder={"Add a brief description"} maxLength={64}/> : description )
 
     const headingComp = (
         <div style={{ display: "flex", justifyContent: "space-between" }} key="heading">
