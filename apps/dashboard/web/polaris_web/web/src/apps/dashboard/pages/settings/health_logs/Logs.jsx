@@ -1,4 +1,4 @@
-import { Button, ButtonGroup, LegacyCard, Text, DataTable } from "@shopify/polaris"
+import { Button, ButtonGroup, LegacyCard, Text, DataTable, VerticalStack } from "@shopify/polaris"
 import { useEffect, useState } from "react";
 import settingRequests from "../api";
 import func from "@/util/func";
@@ -105,7 +105,7 @@ const Logs = () => {
     ]);
 
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <VerticalStack>
             <LegacyCard
                 sectioned
                 title="Logs"
@@ -163,7 +163,7 @@ const Logs = () => {
                                 </LegacyCard>
 
                 ) : <></>}
-        </div>
+        </VerticalStack>
     )
 }
 
