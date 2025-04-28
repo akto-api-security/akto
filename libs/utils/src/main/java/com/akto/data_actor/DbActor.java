@@ -1,14 +1,13 @@
 package com.akto.data_actor;
 
-import com.akto.dao.DependencyFlowNodesDao;
-import com.akto.dao.context.Context;
-import com.akto.dao.testing.TestingRunResultSummariesDao;
 import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.billing.Tokens;
 import com.akto.dto.dependency_flow.Node;
 import com.akto.dto.filter.MergedUrls;
+import com.akto.dto.jobs.JobExecutorType;
+import com.akto.dto.jobs.JobParams;
 import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.dto.runtime_filters.RuntimeFilter;
 import com.akto.dto.settings.DataControlSettings;
@@ -23,7 +22,6 @@ import com.akto.dto.testing.LoginFlowStepsData;
 import com.akto.dto.testing.OtpTestData;
 import com.akto.dto.testing.TestRoles;
 import com.akto.dto.testing.TestingRun;
-import com.akto.dto.testing.TestingRun.State;
 import com.akto.dto.testing.config.TestScript;
 import com.akto.dto.testing.TestingRunConfig;
 import com.akto.dto.testing.TestingRunResult;
@@ -35,15 +33,10 @@ import com.akto.dto.traffic.SampleData;
 import com.akto.dto.traffic.TrafficInfo;
 import com.akto.dto.traffic_metrics.TrafficMetrics;
 import com.akto.dto.type.SingleTypeInfo;
-import com.akto.dto.type.URLMethods;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.dto.usage.MetricTypes;
-import com.akto.util.Constants;
+import com.akto.jobs.JobScheduler;
 import com.mongodb.BasicDBObject;
-import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.FindOneAndUpdateOptions;
-import com.mongodb.client.model.ReturnDocument;
-import com.mongodb.client.model.Updates;
 import com.mongodb.client.model.WriteModel;
 
 import java.util.ArrayList;
@@ -574,6 +567,9 @@ public class DbActor extends DataActor {
         DbLayer.updateTestingRunPlayground(testingRunPlayground);
     }
 
+    public void scheduleAutoCreateTicketsJob(int accountId, JobParams params, JobExecutorType jobExecutorType) {
+        JobScheduler.scheduleRunOnceJob(accountId, params, jobExecutorType);
+    }
     @Override
     public void updateModuleInfo(ModuleInfo moduleInfo) {
     }
