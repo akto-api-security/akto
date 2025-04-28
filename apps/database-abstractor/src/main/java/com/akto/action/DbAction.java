@@ -17,6 +17,7 @@ import com.akto.dto.filter.MergedUrls;
 import com.akto.dto.graph.SvcToSvcGraph;
 import com.akto.dto.graph.SvcToSvcGraphEdge;
 import com.akto.dto.graph.SvcToSvcGraphNode;
+import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.dto.runtime_filters.RuntimeFilter;
 import com.akto.dto.settings.DataControlSettings;
 import com.akto.dto.test_editor.TestingRunPlayground;
@@ -98,6 +99,8 @@ public class DbAction extends ActionSupport {
     List<BulkUpdates> writesForSuspectSampleData;
     List<DependencyNode> dependencyNodeList;
     TestScript testScript;
+
+    private ModuleInfo moduleInfo;
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(DbAction.class, LogDb.DB_ABS);
 
@@ -332,6 +335,16 @@ public class DbAction extends ActionSupport {
     public String updateApiCollectionNameForVxlan() {
         try {
             DbLayer.updateApiCollectionName(vxlanId, name);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "error in updateApiCollectionNameForVxlan " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String updateModuleInfo() {
+        try {
+            DbLayer.updateModuleInfo(moduleInfo);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "error in updateApiCollectionNameForVxlan " + e.toString());
             return Action.ERROR.toUpperCase();
@@ -3488,5 +3501,13 @@ public class DbAction extends ActionSupport {
 
     public void setTestingRunPlaygroundId(String testingRunPlaygroundId) {
         this.testingRunPlaygroundId = testingRunPlaygroundId;
+    }
+
+    public ModuleInfo getModuleInfo() {
+        return moduleInfo;
+    }
+
+    public void setModuleInfo(ModuleInfo moduleInfo) {
+        this.moduleInfo = moduleInfo;
     }
 }
