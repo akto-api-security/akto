@@ -1,5 +1,5 @@
 import LayoutWithTabs from "../../../components/layouts/LayoutWithTabs"
-import { Box, Button, Popover, Modal, Tooltip, VerticalStack } from "@shopify/polaris"
+import { Box, Button, Popover, Modal, Tooltip, VerticalStack, ActionList } from "@shopify/polaris"
 import FlyLayout from "../../../components/layouts/FlyLayout";
 import GithubCell from "../../../components/tables/cells/GithubCell";
 import SampleDataList from "../../../components/shared/SampleDataList";
@@ -332,12 +332,12 @@ function ApiDetails(props) {
                         onClose={() => setShowMoreActions(false)}
                     >
                         <Popover.Pane fixed>
-                            <Popover.Section>
-                                <VerticalStack gap={"2"}>
-                                    {isGptActive ? <Button plain monochrome removeUnderline onClick={displayGPT} size="slim">Ask AktoGPT</Button> : null}
-                                    {isDemergingActive ? <Button plain monochrome removeUnderline size="slim" onClick={deMergeApis}>De merge</Button> : null}
-                                </VerticalStack>
-                            </Popover.Section>
+                            <ActionList
+                                items={[
+                                    isGptActive ? { content: "Ask AktoGPT", onAction: displayGPT } : null,
+                                    isDemergingActive ? { content: "De-merge", onAction: deMergeApis } : null,
+                                ]}
+                            />
                         </Popover.Pane>
                     </Popover> : null
                 }

@@ -1,13 +1,12 @@
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
-import { Text, HorizontalStack, Button, Popover, Modal, IndexFiltersMode, VerticalStack, Box, Checkbox, TextField } from "@shopify/polaris"
+import { Text, HorizontalStack, Button, Popover, Modal, IndexFiltersMode, VerticalStack, Box, Checkbox, TextField, ActionList, Icon } from "@shopify/polaris"
 import api from "../api"
-import issuesApi from "../../issues/api"
 import { useEffect, useState } from "react"
 import func from "@/util/func"
 import GithubSimpleTable from "../../../components/tables/GithubSimpleTable";
 import {useLocation, useNavigate, useParams } from "react-router-dom"
 import { saveAs } from 'file-saver'
-
+import {FileMinor} from '@shopify/polaris-icons';
 import "./api_inventory.css"
 import ApiDetails from "./ApiDetails"
 import UploadFile from "../../../components/shared/UploadFile"
@@ -774,79 +773,83 @@ function ApiEndpoints(props) {
                 onClose={() => { setExportOpen(false) }}
                 preferredAlignment="right"
             >
-                <Popover.Pane fixed>
-                    <Popover.Section>
-                        <VerticalStack gap={2}>
-                            <div onClick={handleRefresh} style={{cursor: 'pointer'}}>
-                                <Text fontWeight="regular" variant="bodyMd">Refresh</Text>
-                            </div>
-                            {
-                                isApiGroup ?
-                                    <div onClick={computeApiGroup} style={{ cursor: 'pointer' }}>
-                                        <Text fontWeight="regular" variant="bodyMd">Re-compute api group</Text>
-                                    </div> :
-                                    null
-                            }
-                            { !isApiGroup && !(isHostnameCollection) ?
-                                <UploadFile
-                                fileFormat=".har"
-                                fileChanged={file => handleFileChange(file)}
-                                tooltipText="Upload traffic(.har)"
-                                label={<Text fontWeight="regular" variant="bodyMd">Upload traffic</Text>}
-                                primary={false} 
-                                /> : null
-                            }
-                        </VerticalStack>
-                    </Popover.Section>
-                    {!isApiGroup ? <Popover.Section>
-                        <VerticalStack gap={2}>
-                            <UploadFile
-                            fileFormat=".json,.yaml,.yml"
-                            fileChanged={file => uploadOpenApiFile(file)}
-                            tooltipText="Upload openapi file"
-                            label={<Text fontWeight="regular" variant="bodyMd">Upload OpenAPI file</Text>}
-                            primary={false} 
-                            />
-                        </VerticalStack>
-                    </Popover.Section> : null}
-                    <Popover.Section>
-                        <VerticalStack gap={2}>
-                            <Text>Export as</Text>
-                                <VerticalStack gap={1}>
-                                <div data-testid="openapi_spec_option" onClick={(selectedResourcesForPrimaryAction && selectedResourcesForPrimaryAction.length > 0) ? exportOpenApiForSelectedApi : exportOpenApi} style={{cursor: 'pointer'}}>
-                                    <Text fontWeight="regular" variant="bodyMd">OpenAPI spec</Text>
-                                </div>
-                                <div data-testid="postman_option" onClick={exportPostman} style={{cursor: 'pointer'}}>
-                                    <Text fontWeight="regular" variant="bodyMd">Postman</Text>
-                                </div>
-                                <div data-testid="csv_option" onClick={() =>exportCsv()} style={{cursor: 'pointer'}}>
-                                    <Text fontWeight="regular" variant="bodyMd">CSV</Text>
-                                </div>
-                            </VerticalStack>
-                        </VerticalStack>
-                    </Popover.Section>
-                    <Popover.Section>
-                        <VerticalStack gap={2}>
-                            <Text>Others</Text>
-                                <VerticalStack gap={1}>
-                                <Checkbox
-                                    label='Redact'
-                                    checked={redacted}
-                                    onChange={() => redactCheckBoxClicked()}
-                                />
-                            </VerticalStack>
-                        </VerticalStack>
-                    </Popover.Section>
-                    <Popover.Section>
-                        <VerticalStack gap={2}>
-                            <div onClick={toggleWorkflowTests} style={{ cursor: 'pointer' }}>
-                                <Text fontWeight="regular" variant="bodyMd">
-                                    {`${showWorkflowTests ? "Hide" : "Show"} workflow tests`}
-                                </Text>
-                            </div>
-                        </VerticalStack>
-                    </Popover.Section>
-                </Popover.Pane>
+                <ActionList
+                    sections={[
+                        {
+                            title:'Re-Compute',
+                            items: [
+                                {
+                                    content: 'Refresh',
+                                    onAction: () => { handleRefresh() },
+                                },
+                                isApiGroup ? {
+                                    content: 'Re-compute API Group',
+                                    onAction: () => { computeApiGroup() },
+                                }: {}
+                            ]
+                        },
+                        {
+                            title: 'Upload',
+                            items: [
+                                !isApiGroup &&{
+                                    content: 'Upload OpenAPI file',
+                                    prefix: <UploadFile
+                                                fileFormat=".json,.yaml,.yml"
+                                                fileChanged={file => uploadOpenApiFile(file)}
+                                                tooltipText="Upload openapi file"
+                                                label={<Box><Icon source={FileMinor} /></Box>}
+                                                primary={false} 
+                                            />
+                                },
+                                !isApiGroup && !(isHostnameCollection)  && {
+                                    content: 'Upload traffic .har',
+                                    prefix:  <UploadFile
+                                                fileFormat=".har"
+                                                fileChanged={file => handleFileChange(file)}
+                                                tooltipText="Upload traffic(.har)"
+                                                label={<Box><Icon source={FileMinor} /></Box>}
+                                                primary={false} 
+                                            />
+                                }
+                            ]
+                        },
+                        {
+                            title: 'Export as',
+                            items: [
+                                {
+                                    content: 'OpenAPI spec',
+                                    onAction: () => { (selectedResourcesForPrimaryAction && selectedResourcesForPrimaryAction.length > 0) ? exportOpenApiForSelectedApi() : exportOpenApi()},
+                                },
+                                {
+                                    content: 'Postman',
+                                    onAction: () => { exportPostman() },
+                                },
+                                {
+                                    content: 'CSV',
+                                    onAction: () => { exportCsv() },
+                                }
+                            ]
+                        },
+                        {
+                            title: 'Others',
+                            items: [
+                                {
+                                    content: `${showWorkflowTests ? "Hide" : "Show"} workflow tests`,
+                                    onAction: () => { toggleWorkflowTests() },
+                                },
+                                {
+                                    content: 'Redact',
+                                    prefix: <Box paddingInlineStart={"2"}><Checkbox
+                                                label=''
+                                                checked={redacted}
+                                                onChange={() => redactCheckBoxClicked()}
+                                            /></Box>,
+                                    onAction: () => { redactCheckBoxClicked() },
+                                }
+                            ]
+                        }
+                    ]}
+                />
             </Popover>
 
             {isApiGroup &&collectionsObj?.automated !== true ? <Button onClick={() => navigate("/dashboard/observe/query_mode?collectionId=" + apiCollectionId)}>Edit conditions</Button> : null}
