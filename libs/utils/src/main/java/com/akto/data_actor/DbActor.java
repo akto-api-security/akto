@@ -12,6 +12,7 @@ import com.akto.dto.filter.MergedUrls;
 import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.dto.runtime_filters.RuntimeFilter;
 import com.akto.dto.settings.DataControlSettings;
+import com.akto.dto.test_editor.TestingRunPlayground;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
@@ -563,6 +564,14 @@ public class DbActor extends DataActor {
 
     public TestingRunResultSummary findLatestTestingRunResultSummary(Bson filter){
         return DbLayer.findLatestTestingRunResultSummary(filter);
+    }
+
+    public TestingRunPlayground getCurrentTestingRunDetailsFromEditor(int timestamp){
+        return DbLayer.getCurrentTestingRunDetailsFromEditor(timestamp);
+    }
+
+    public void updateTestingRunPlayground(TestingRunPlayground testingRunPlayground) {
+        DbLayer.updateTestingRunPlayground(testingRunPlayground);
     }
 
     @Override
