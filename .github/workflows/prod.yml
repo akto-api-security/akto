@@ -44,7 +44,7 @@ jobs:
           node-version: '17'
 
       - name: mvn package command
-        run: mvn package
+        run: mvn package -Dakto-image-tag=${{ github.event.inputs.release_version }} -Dakto-build-time=$(eval "date +%s") -Dakto-release-version=${{github.event.inputs.release_version}}
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v1
