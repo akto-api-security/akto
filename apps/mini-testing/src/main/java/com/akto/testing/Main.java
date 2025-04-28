@@ -35,7 +35,6 @@ import com.akto.test_editor.execution.Executor;
 import com.akto.testing.kafka_utils.ConsumerUtil;
 import com.akto.testing.kafka_utils.Producer;
 import com.akto.util.Constants;
-import com.akto.store.AuthMechanismStore;
 import com.akto.store.SampleMessageStore;
 import com.akto.store.TestingUtil;
 import com.akto.util.DashboardMode;
@@ -105,13 +104,11 @@ public class Main {
                 sampleDataMap.put(infoKey, sampleData); // get sample list from DB
                 SampleMessageStore messageStore = SampleMessageStore.create(sampleDataMap);
 
-                AuthMechanismStore authMechanismStore = AuthMechanismStore.create();
-                AuthMechanism authMechanism = authMechanismStore.getAuthMechanism();
-
                 List<CustomAuthType> customAuthTypes = dataActor.fetchCustomAuthTypes();
 
-                TestingUtil testingUtil = new TestingUtil(authMechanism, messageStore, null, null, customAuthTypes);
-                TestingRunResult testingRunResult = executor.runTestNew(infoKey, null, testingUtil, null, testConfig, null, true, testLogs);
+                TestingUtil testingUtil = new TestingUtil(messageStore, null, null, customAuthTypes);
+                String message = messageStore.getSampleDataMap().get(infoKey).get(messageStore.getSampleDataMap().get(infoKey).size() - 1);
+                TestingRunResult testingRunResult = executor.runTestNew(infoKey, null, testingUtil, null, testConfig, null, true, testLogs, message);
                 testingRunResult.setId(testingRunPlayground.getId());
                 testingRunResult.setTestRunId(testingRunPlayground.getId());
                 testingRunResult.setTestRunResultSummaryId(testingRunPlayground.getId());
