@@ -529,7 +529,7 @@ public class Main {
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
                 List<CustomDataType> customDataTypes = dataActor.fetchCustomDataTypes();
-                loggerMaker.debug("customdata type " + customDataTypes.size());
+                loggerMaker.info("customData type " + customDataTypes.size());
                 List<AktoDataType> aktoDataTypes = dataActor.fetchAktoDataTypes();
                 List<CustomAuthType> customAuthTypes = dataActor.fetchCustomAuthTypes();
                 SingleTypeInfo.fetchCustomDataTypes(accountId, customDataTypes, aktoDataTypes);
