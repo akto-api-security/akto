@@ -1,4 +1,4 @@
-import { Button, Frame, Icon, Text, Box, TopBar, HorizontalStack } from "@shopify/polaris"
+import { Frame, Icon, Text, Box, TopBar, HorizontalStack } from "@shopify/polaris"
 import { CancelMajor, SettingsMinor } from '@shopify/polaris-icons';
 import { Outlet, useNavigate } from "react-router-dom"
 import './settings.css'
@@ -14,7 +14,7 @@ function SettingsHeader({ onHandleClose }) {
                 </Box>
                 <Text variant="headingMd" as="h4">Settings</Text>
             </HorizontalStack>
-            <Button icon={CancelMajor} onClick={()=>onHandleClose()} />
+            <button className="Polaris-Modal-CloseButton" onClick={() => onHandleClose()}><Box><Icon source={CancelMajor} /></Box></button>
         </div>
     )
 
