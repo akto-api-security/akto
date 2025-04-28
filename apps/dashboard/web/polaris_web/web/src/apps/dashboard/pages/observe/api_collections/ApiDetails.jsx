@@ -146,7 +146,6 @@ function ApiDetails(props) {
             }
             ).catch((err) => {
                 console.error("Failed to fetch prompts:", err);
-                func.setToast(true, true, "Failed to fetch prompts. Please try again.");
             })
         }
     }
