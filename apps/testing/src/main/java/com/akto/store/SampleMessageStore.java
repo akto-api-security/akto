@@ -1,13 +1,9 @@
 package com.akto.store;
 
 import com.akto.dao.SampleDataDao;
-import com.akto.dao.testing.EndpointLogicalGroupDao;
 import com.akto.dao.testing.TestRolesDao;
 import com.akto.dto.*;
 import com.akto.dao.SingleTypeInfoDao;
-import com.akto.dto.ApiInfo;
-import com.akto.dto.HttpRequestParams;
-import com.akto.dto.HttpResponseParams;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.testing.*;
 import com.akto.dto.traffic.Key;
@@ -18,15 +14,13 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import org.bson.conversions.Bson;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.util.*;
 
 public class SampleMessageStore {
 
 
-    private static final LoggerMaker loggerMaker = new LoggerMaker(SampleMessageStore.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(SampleMessageStore.class, LogDb.TESTING);
     private Map<ApiInfo.ApiInfoKey, List<String>> sampleDataMap = new HashMap<>();
     private Map<String, SingleTypeInfo> singleTypeInfos = new HashMap<>();
     public void buildSingleTypeInfoMap(TestingEndpoints testingEndpoints) {
@@ -89,7 +83,11 @@ public class SampleMessageStore {
 
     public void fetchSampleMessages(Set<Integer> apiCollectionIds) {
         Bson filterQ = Filters.in("_id.apiCollectionId", apiCollectionIds);
-        List<SampleData> sampleDataList = SampleDataDao.instance.findAll(filterQ, 0, 10_000, null);
+        fillSampleDataMap(filterQ);
+    }
+
+    private void fillSampleDataMap(Bson filter){
+        List<SampleData> sampleDataList = SampleDataDao.instance.findAll(filter, 0, 10_000, null);
         Map<ApiInfo.ApiInfoKey, List<String>> tempSampleDataMap = new HashMap<>();
         for (SampleData sampleData: sampleDataList) {
             if (sampleData.getSamples() == null) continue;
@@ -105,7 +103,20 @@ public class SampleMessageStore {
         sampleDataMap = new HashMap<>(tempSampleDataMap);
     }
 
+    public void fetchSampleMessages(List<ApiInfo.ApiInfoKey> apiInfoKeys){
+        List<Bson> orFilters = new ArrayList<>();
+        for (ApiInfo.ApiInfoKey apiInfoKey: apiInfoKeys) {
+            Bson filter = Filters.and(
+                Filters.eq(ApiInfo.ID_API_COLLECTION_ID, apiInfoKey.getApiCollectionId()),
+                Filters.eq(ApiInfo.ID_URL, apiInfoKey.getUrl()),
+                Filters.eq(ApiInfo.ID_METHOD, apiInfoKey.getMethod())
+            );
+            orFilters.add(filter);
+        }
 
+        Bson finalFilter = Filters.or(orFilters);
+        fillSampleDataMap(finalFilter);
+    }
 
     public List<RawApi> fetchAllOriginalMessages(ApiInfoKey apiInfoKey) {
         List<RawApi> messages = new ArrayList<>();

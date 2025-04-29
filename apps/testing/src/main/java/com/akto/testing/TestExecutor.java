@@ -127,12 +127,6 @@ public class TestExecutor {
     public static final String COUNT = "count";
     public static final int ALLOWED_REQUEST_PER_HOUR = 100;
 
-    private static int expiryTimeOfAuthToken = -1;
-
-    public static synchronized void setExpiryTimeOfAuthToken(int newExpiryTime) {
-        expiryTimeOfAuthToken = newExpiryTime;
-    }
-
     public void init(TestingRun testingRun, ObjectId summaryId, SyncLimit syncLimit, boolean shouldInitOnly) {
         if (testingRun.getTestIdConfig() != 1) {
             apiWiseInit(testingRun, summaryId, false, new ArrayList<>(), syncLimit, shouldInitOnly);
@@ -204,6 +198,7 @@ public class TestExecutor {
         }
 
         TestingEndpoints testingEndpoints = testingRun.getTestingEndpoints();
+        boolean collectionWise = testingEndpoints.getType().equals(TestingEndpoints.Type.COLLECTION_WISE);
         List<ApiInfoKey> apiInfoKeyList;
         Map<ApiInfoKey, List<String>> apiInfoKeySubcategoryMap = null;
         Set<String> testingSubCategorySet = new HashSet<>();
@@ -220,11 +215,13 @@ public class TestExecutor {
 
                 testingSubCategorySet.add(testingRunResult.getTestSubType());
             }
-
+            collectionWise = false;
             apiInfoKeyList = new ArrayList<>(apiInfoKeySet);
         } else {
             apiInfoKeyList = testingEndpoints.returnApis();
         }
+        if (apiInfoKeyList == null || apiInfoKeyList.isEmpty()) return;
+        loggerMaker.debugAndAddToDb("APIs found: " + apiInfoKeyList.size(), LogDb.TESTING);
 
         final Map<ApiInfoKey, List<String>> finalApiInfoKeySubcategoryMap = apiInfoKeySubcategoryMap;
         
@@ -235,10 +232,12 @@ public class TestExecutor {
         }
 
         SampleMessageStore sampleMessageStore = SampleMessageStore.create();
-        sampleMessageStore.fetchSampleMessages(Main.extractApiCollectionIds(apiInfoKeyList));
-
-        if (apiInfoKeyList == null || apiInfoKeyList.isEmpty()) return;
-        loggerMaker.debugAndAddToDb("APIs found: " + apiInfoKeyList.size(), LogDb.TESTING);
+        if(collectionWise || apiInfoKeyList.size() > 500){
+            // using collection wise only for more than 500 apis, such that filter doesn't exceed 16mb
+            sampleMessageStore.fetchSampleMessages(Main.extractApiCollectionIds(apiInfoKeyList));
+        }else{
+            sampleMessageStore.fetchSampleMessages(apiInfoKeyList);
+        }  
 
         TestingRunResultSummariesDao.instance.updateOne(
             Filters.eq("_id", summaryId),
@@ -356,6 +355,22 @@ public class TestExecutor {
             for (ApiInfo.ApiInfoKey apiInfoKey: apiInfoKeyList) {
 
                 List<String> messages = testingUtil.getSampleMessages().get(apiInfoKey);
+                // create the map of api info key to original raw payload if any
+                // we create raw api for every test, optimizing this to create only once for that api
+                // storing in memory for now
+                if (messages == null || messages.isEmpty()) {
+                    loggerMaker.debugAndAddToDb("No sample messages found for apiInfoKey: " + apiInfoKey.toString(), LogDb.TESTING);
+                    continue;
+                }
+                String sample = messages.get(messages.size() - 1);
+                if(sample == null || sample.isEmpty()){
+                    loggerMaker.debugAndAddToDb("Sample message is empty for apiInfoKey: " + apiInfoKey.toString(), LogDb.TESTING);
+                    continue;
+                }
+
+                // optimizing raw api creation, create only once for that api
+                RawApi rawApi = RawApi.buildFromMessage(sample, true);
+                TestingConfigurations.getInstance().getRawApiMap().put(apiInfoKey, rawApi);
                 if(Constants.IS_NEW_TESTING_ENABLED){
                     for (String testSubCategory: testingRunSubCategories) {
                         if (apiInfoKeySubcategoryMap == null || apiInfoKeySubcategoryMap.get(apiInfoKey).contains(testSubCategory)) {
@@ -583,23 +598,6 @@ public class TestExecutor {
         return null;
     }
 
-    private LoginFlowResponse triggerLoginFlow(AuthMechanism authMechanism, int retries) {
-        LoginFlowResponse loginFlowResponse = null;
-        for (int i=0; i<retries; i++) {
-            try {
-                loggerMaker.debug("retry attempt: " + i + " for login flow");
-                loginFlowResponse = executeLoginFlow(authMechanism, null, null);
-                if (loginFlowResponse.getSuccess()) {
-                    loggerMaker.debugAndAddToDb("login flow success", LogDb.TESTING);
-                    break;
-                }
-            } catch (Exception e) {
-                loggerMaker.errorAndAddToDb(e.getMessage(), LogDb.TESTING);
-            }
-        }
-        return loginFlowResponse;
-    }
-
     public static LoginFlowResponse executeLoginFlow(AuthMechanism authMechanism, LoginFlowParams loginFlowParams, String roleName) throws Exception {
 
         if (authMechanism.getType() == null) {
@@ -615,7 +613,6 @@ public class TestExecutor {
         loggerMaker.debugAndAddToDb("login flow execution started", LogDb.TESTING);
 
         WorkflowTest workflowObj = convertToWorkflowGraph(authMechanism.getRequestData());
-        ApiWorkflowExecutor apiWorkflowExecutor = new ApiWorkflowExecutor();
         LoginFlowResponse loginFlowResp;
         loginFlowResp =  com.akto.testing.workflow_node_executor.Utils.runLoginFlow(workflowObj, authMechanism, loginFlowParams, roleName);
         return loginFlowResp;
@@ -969,7 +966,7 @@ public class TestExecutor {
 
     public TestingRunResult runTestNew(ApiInfo.ApiInfoKey apiInfoKey, ObjectId testRunId, TestingUtil testingUtil,
         ObjectId testRunResultSummaryId, TestConfig testConfig, TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs, String message) {
-            RawApi rawApi = RawApi.buildFromMessage(message, true);
+            RawApi rawApi = TestingConfigurations.getInstance().getRawApiMap().get(apiInfoKey);
             TestRoles attackerTestRole = Executor.fetchOrFindAttackerRole();
             AuthMechanism attackerAuthMechanism = null;
             if (attackerTestRole == null) {
