@@ -12,7 +12,6 @@ import com.akto.dto.type.SingleTypeInfo;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.metrics.AllMetrics;
-import com.akto.sql.SampleDataAltDb;
 import com.akto.testing_db_layer_client.ClientLayer;
 
 import java.util.*;
@@ -42,7 +41,6 @@ public class SampleMessageStore {
         return dataActor.fetchTestRoles();
     }
 
-
     public void fetchSampleMessages(Set<Integer> apiCollectionIds) {
         List<SampleData> sampleDataList = new ArrayList<>();
         for (int i = 0; i < 200; i++) {
@@ -53,6 +51,10 @@ public class SampleMessageStore {
             }
             sampleDataList.addAll(sampleDataBatch);
         }
+        fillSampleDataMap(sampleDataList);
+    }
+
+    private void fillSampleDataMap(List<SampleData> sampleDataList){
         Map<ApiInfo.ApiInfoKey, List<String>> tempSampleDataMap = new HashMap<>();
         for (SampleData sampleData: sampleDataList) {
             if (sampleData.getSamples() == null) continue;
@@ -68,7 +70,18 @@ public class SampleMessageStore {
         sampleDataMap = new HashMap<>(tempSampleDataMap);
     }
 
-
+    public void fetchSampleMessages(List<ApiInfo.ApiInfoKey> apiInfoKeyList){
+        List<SampleData> sampleDataList = new ArrayList<>();
+        for(int i = 0 ; i < apiInfoKeyList.size(); i += DbLayer.SAMPLE_DATA_LIMIT){
+            List<ApiInfo.ApiInfoKey> subList = apiInfoKeyList.subList(i, Math.min(i + DbLayer.SAMPLE_DATA_LIMIT, apiInfoKeyList.size()));  
+            List<SampleData> sampleDataBatch = dataActor.fetchSampleDataForEndpoints(subList);
+            if (sampleDataBatch == null || sampleDataBatch.isEmpty()) {
+                break;
+            }
+            sampleDataList.addAll(sampleDataBatch);
+        }
+        fillSampleDataMap(sampleDataList);
+    }
 
     public List<RawApi> fetchAllOriginalMessages(ApiInfoKey apiInfoKey) {
         List<RawApi> messages = new ArrayList<>();

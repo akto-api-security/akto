@@ -3,6 +3,8 @@ package com.akto.testing.kafka_utils;
 
 import java.util.Map;
 
+import com.akto.dto.ApiInfo.ApiInfoKey;
+import com.akto.dto.RawApi;
 import com.akto.dto.test_editor.TestConfig;
 import com.akto.dto.testing.TestingRunConfig;
 import com.akto.store.TestingUtil;
@@ -17,6 +19,7 @@ public class TestingConfigurations {
     private int maxConcurrentRequest;
 
     Map<String, TestConfig> testConfigMap;
+    private  Map<ApiInfoKey, RawApi> rawApiMap;
 
     private TestingConfigurations() {
     }
@@ -55,6 +58,14 @@ public class TestingConfigurations {
 
     public void setMaxConcurrentRequest(int maxConcurrentRequest) {
         this.maxConcurrentRequest = maxConcurrentRequest;
+    }
+
+    public Map<ApiInfoKey, RawApi> getRawApiMap() {
+        return rawApiMap;
+    }
+
+    public void setRawApiMap(Map<ApiInfoKey, RawApi> rawApiMap) {
+        this.rawApiMap = rawApiMap;
     }
     
 }
