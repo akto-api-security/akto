@@ -247,13 +247,23 @@ public class HttpResponseParams {
           sourceStr = HttpResponseParams.Source.OTHER.name();
         }
         Map<String, List<String>> reqHeaders = (Map) httpResponseParamProto.getRequestHeadersMap();
+        Map<String, String> reqHeadersStr = new HashMap<>();
+        Map<String, String> respHeadersStr = new HashMap<>();
         Map<String, List<String>> respHeaders = (Map) httpResponseParamProto.getResponseHeadersMap();
         String reqHeaderStr2 = "";
         String respHeaderStr2 = "";
 
+        for (Map.Entry<String, List<String>> entry : reqHeaders.entrySet()) {
+            reqHeadersStr.put(entry.getKey(), entry.getValue().get(0));
+        }
+
+        for (Map.Entry<String, List<String>> entry : respHeaders.entrySet()) {
+            respHeadersStr.put(entry.getKey(), entry.getValue().get(0));
+        }
+
         try {
-            reqHeaderStr2 = objectMapper.writeValueAsString(reqHeaders);
-            respHeaderStr2 = objectMapper.writeValueAsString(respHeaders);
+            reqHeaderStr2 = objectMapper.writeValueAsString(reqHeadersStr);
+            respHeaderStr2 = objectMapper.writeValueAsString(respHeadersStr);
         } catch (Exception e) {
             return httpResponseParamProtoString;
         }

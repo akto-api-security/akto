@@ -106,7 +106,7 @@ public class TestDBSync extends MongoBasedTest {
 
         Map.Entry<URLTemplate, RequestTemplate> entry = sync.getDbState(123).getTemplateURLToMethods().entrySet().iterator().next();
 
-        assertEquals(url+"INTEGER", entry.getKey().getTemplateString());
+        assertEquals("/link/INTEGER", entry.getKey().getTemplateString());
         RequestTemplate reqTemplate = entry.getValue();
 
         assertEquals(2, reqTemplate.getParameters().size());

@@ -1,5 +1,5 @@
 import LayoutWithTabs from "../../../components/layouts/LayoutWithTabs"
-import { Box, Button, Popover, Modal, Tooltip, VerticalStack, HorizontalStack, Text, TextField } from "@shopify/polaris"
+import { Box, Button, Popover, Modal, Tooltip, VerticalStack } from "@shopify/polaris"
 import FlyLayout from "../../../components/layouts/FlyLayout";
 import GithubCell from "../../../components/tables/cells/GithubCell";
 import SampleDataList from "../../../components/shared/SampleDataList";
@@ -14,6 +14,7 @@ import ApiDependency from "./ApiDependency";
 import RunTest from "./RunTest";
 import PersistStore from "../../../../main/PersistStore";
 import values from "@/util/values";
+import gptApi from "../../../components/aktoGpt/api";
 
 import { HorizontalDotsMinor, FileMinor } from "@shopify/polaris-icons"
 import LocalStore from "../../../../main/LocalStorageStore";
@@ -38,6 +39,7 @@ function ApiDetails(props) {
     const [disabledTabs, setDisabledTabs] = useState([])
     const [description, setDescription] = useState("")
     const [showDescriptionModal, setShowDescriptionModal] = useState(false)
+    const [headersWithData, setHeadersWithData] = useState([])
 
     const [useLocalSubCategoryData, setUseLocalSubCategoryData] = useState(false)
 
@@ -46,6 +48,9 @@ function ApiDetails(props) {
             if (paramList && paramList.length > 0 &&
                 paramList.filter(x => x?.nonSensitiveDataType).map(x => x.subTypeString).includes(x)) {
                 return "info"
+            }else if(headersWithData && headersWithData.length > 0 &&
+                headersWithData.filter(h => h.includes(x)).length > 0){
+                return "success"
             }
         } catch (e) {
 
@@ -130,6 +135,17 @@ function ApiDetails(props) {
                     }
                     setParamList(resp.data.params)
                 })
+            })
+
+            const queryPayload = dashboardFunc.getApiPrompts(apiCollectionId, endpoint, method)[0].prepareQuery();
+
+            await gptApi.ask_ai(queryPayload).then((res) => {
+                if (res.response.responses && res.response.responses.length > 0) {
+                    setHeadersWithData(res.response.responses)
+                }
+            }
+            ).catch((err) => {
+                console.error("Failed to fetch prompts:", err);
             })
         }
     }
@@ -234,6 +250,7 @@ function ApiDetails(props) {
                 heading={"Sample values"}
                 minHeight={"35vh"}
                 vertical={true}
+                metadata={headersWithData.map(x => x.split(" ")[0])}
             />
         </Box>,
     }
@@ -270,6 +287,11 @@ function ApiDetails(props) {
         newData['sensitiveTags'] = apiDetail?.sensitiveTags && apiDetail?.sensitiveTags.length > 0 ? apiDetail?.sensitiveTags : 
         [...new Set(paramList.filter(x => x?.savedAsSensitive || x?.sensitive).map(x => x.subTypeString))]
     } catch (e){
+    }
+
+    try {
+        newData['headersInfo'] = [...new Set(headersWithData.map(x => x.split(" ").slice(1,x.length - 1).join(" ")))]
+    } catch (e) {
     }
 
     const headingComp = (
