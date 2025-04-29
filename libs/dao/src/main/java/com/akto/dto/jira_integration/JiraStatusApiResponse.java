@@ -14,37 +14,4 @@ import lombok.Setter;
 public class JiraStatusApiResponse {
 
     List<JiraStatus> statuses;
-
-    @Getter
-    @Setter
-    @NoArgsConstructor
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    public static class JiraStatus {
-        private String id;
-        private String name;
-        private JiraStatusCategory statusCategory;
-
-        @Override
-        public boolean equals(Object o) {
-            if (this == o) return true;
-            if (!(o instanceof JiraStatus)) return false;
-            JiraStatus that = (JiraStatus) o;
-            return Objects.equals(id, that.id);
-        }
-
-        @Override
-        public int hashCode() {
-            return Objects.hash(id);
-        }
-    }
-
-    @Getter
-    @Setter
-    @NoArgsConstructor
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    public static class JiraStatusCategory {
-        private String id;
-        private String name;
-        private String key;
-    }
 }
