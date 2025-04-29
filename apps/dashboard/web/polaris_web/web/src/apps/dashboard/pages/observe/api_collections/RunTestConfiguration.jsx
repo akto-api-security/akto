@@ -5,7 +5,7 @@ import SingleDate from "../../../components/layouts/SingleDate";
 import func from "@/util/func"
 import DropdownSearch from '../../../components/shared/DropdownSearch';
 
-const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes, testRunTimeOptions, testRolesArr, maxConcurrentRequestsOptions, slackIntegrated, generateLabelForSlackIntegration,getLabel, timeFieldsDisabled, teamsTestingWebhookIntegrated, generateLabelForTeamsIntegration, , isHybridTestingEnabled, miniTestingServiceNames, jiraProjectMap}) => {
+const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes, testRunTimeOptions, testRolesArr, maxConcurrentRequestsOptions, slackIntegrated, generateLabelForSlackIntegration,getLabel, timeFieldsDisabled, teamsTestingWebhookIntegrated, generateLabelForTeamsIntegration, isHybridTestingEnabled, miniTestingServiceNames, jiraProjectMap}) => {
     const reducer = (state, action) => {
         switch (action.type) {
           case "update":
