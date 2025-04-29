@@ -327,8 +327,7 @@ public class Main {
                     testingRunResult = Utils.generateFailedRunResultForMessage(null, it, testConfig.getInfo().getCategory().getName(), testConfig.getInfo().getSubCategory(), null,samples , null);
                     if(testingRunResult == null){
                         String sample = samples.get(samples.size() - 1);
-                        RawApi rawApi = RawApi.buildFromMessage(sample, true);
-                        testingRunResult = testExecutor.runTestNew(it, null, testingUtil, null, testConfig, null, false, new ArrayList<>(), rawApi);
+                        testingRunResult = testExecutor.runTestNew(it, null, testingUtil, null, testConfig, null, false, new ArrayList<>(), sample);
                     }
                 } catch (Exception e) {
                     e.printStackTrace();

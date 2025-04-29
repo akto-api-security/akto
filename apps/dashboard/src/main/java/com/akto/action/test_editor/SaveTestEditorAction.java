@@ -356,8 +356,7 @@ public class SaveTestEditorAction extends UserAction {
         TestingRunResult testingRunResult = Utils.generateFailedRunResultForMessage(null, infoKey, testConfig.getInfo().getCategory().getName(), testConfig.getInfo().getSubCategory(), null,samples , null);
         if(testingRunResult == null){
             String sample = samples.get(samples.size() - 1);
-            RawApi rawApi = RawApi.buildFromMessage(sample, true);
-            testingRunResult = executor.runTestNew(infoKey, null, testingUtil, null, testConfig, testingRunConfig, true, testLogs, rawApi);
+            testingRunResult = executor.runTestNew(infoKey, null, testingUtil, null, testConfig, testingRunConfig, true, testLogs, sample);
         }
         if (testingRunResult == null) {
             testingRunResult = new TestingRunResult(

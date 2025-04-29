@@ -82,6 +82,8 @@ import com.akto.util.Constants;
 import com.akto.util.JSONUtils;
 import com.akto.util.enums.GlobalEnums.Severity;
 import com.akto.util.enums.LoginFlowEnums;
+import com.alibaba.fastjson2.JSON;
+import com.alibaba.fastjson2.JSONObject;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
@@ -112,8 +114,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
-import org.json.JSONObject;
-import org.mortbay.util.ajax.JSON;
 
 public class TestExecutor {
 
@@ -349,9 +349,6 @@ public class TestExecutor {
             for (ApiInfo.ApiInfoKey apiInfoKey: apiInfoKeyList) {
 
                 List<String> messages = testingUtil.getSampleMessages().get(apiInfoKey);
-                // create the map of api info key to original raw payload if any
-                // we create raw api for every test, optimizing this to create only once for that api
-                // storing in memory for now
                 if (messages == null || messages.isEmpty()) {
                     loggerMaker.debugAndAddToDb("No sample messages found for apiInfoKey: " + apiInfoKey.toString(), LogDb.TESTING);
                     continue;
@@ -361,10 +358,6 @@ public class TestExecutor {
                     loggerMaker.debugAndAddToDb("Sample message is empty for apiInfoKey: " + apiInfoKey.toString(), LogDb.TESTING);
                     continue;
                 }
-
-                // optimizing raw api creation, create only once for that api
-                RawApi rawApi = RawApi.buildFromMessage(sample, true);
-                TestingConfigurations.getInstance().getRawApiMap().put(apiInfoKey, rawApi);
                 if(sample.contains("originalRequestPayload")){
                     // make map of original request payload if this key is present
                     Map<String, Object> json = gson.fromJson(sample, Map.class);
@@ -502,8 +495,8 @@ public class TestExecutor {
         }else{
             if(GetRunningTestsStatus.getRunningTests().isTestRunning(summaryId, true)){
                 TestingConfigurations instance = TestingConfigurations.getInstance();
-                RawApi rawApi = instance.getRawApiMap().get(apiInfoKey);
-                testingRunResult = runTestNew(apiInfoKey, summaryId, instance.getTestingUtil(), summaryId, testConfig, instance.getTestingRunConfig(), instance.isDebug(), testLogs, rawApi);
+                String sampleMessage = messages.get(messages.size() - 1);
+                testingRunResult = runTestNew(apiInfoKey, summaryId, instance.getTestingUtil(), summaryId, testConfig, instance.getTestingRunConfig(), instance.isDebug(), testLogs, sampleMessage);
                 if (testingRunResult != null) {
                     List<String> errorList = testingRunResult.getErrorsList();
                     if (errorList == null || !errorList.contains(TestResult.API_CALL_FAILED_ERROR_STRING)) {
@@ -968,7 +961,8 @@ public class TestExecutor {
     }
 
     public TestingRunResult runTestNew(ApiInfo.ApiInfoKey apiInfoKey, ObjectId testRunId, TestingUtil testingUtil,
-        ObjectId testRunResultSummaryId, TestConfig testConfig, TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs, RawApi rawApi) {
+        ObjectId testRunResultSummaryId, TestConfig testConfig, TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs, String message) {
+            RawApi rawApi = RawApi.buildFromMessage(message, true);
             TestRoles attackerTestRole = Executor.fetchOrFindAttackerRole();
             AuthMechanism attackerAuthMechanism = null;
             if (attackerTestRole == null) {

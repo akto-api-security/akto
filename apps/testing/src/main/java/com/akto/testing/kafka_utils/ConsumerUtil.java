@@ -99,8 +99,8 @@ public class ConsumerUtil {
         if(messagesList == null || messagesList.isEmpty()){}
         else{
             logger.debug("Running test for: " + apiInfoKey + " with subcategory: " + subCategory);
-            RawApi rawApi = instance.getRawApiMap().get(apiInfoKey);
-            TestingRunResult runResult = executor.runTestNew(apiInfoKey, singleTestPayload.getTestingRunId(), instance.getTestingUtil(), singleTestPayload.getTestingRunResultSummaryId(),testConfig , instance.getTestingRunConfig(), instance.isDebug(), singleTestPayload.getTestLogs(), rawApi);
+            String sample = messagesList.get(messagesList.size() - 1);
+            TestingRunResult runResult = executor.runTestNew(apiInfoKey, singleTestPayload.getTestingRunId(), instance.getTestingUtil(), singleTestPayload.getTestingRunResultSummaryId(),testConfig , instance.getTestingRunConfig(), instance.isDebug(), singleTestPayload.getTestLogs(), sample);
             executor.insertResultsAndMakeIssues(Collections.singletonList(runResult), singleTestPayload.getTestingRunResultSummaryId());
         }
     }
