@@ -967,6 +967,10 @@ public class TestExecutor {
     public TestingRunResult runTestNew(ApiInfo.ApiInfoKey apiInfoKey, ObjectId testRunId, TestingUtil testingUtil,
         ObjectId testRunResultSummaryId, TestConfig testConfig, TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs, String message) {
             RawApi rawApi = TestingConfigurations.getInstance().getRawApiMap().get(apiInfoKey);
+            if(rawApi == null){
+                // cases for test editor and cli
+                rawApi = RawApi.buildFromMessage(message, true);
+            }
             TestRoles attackerTestRole = Executor.fetchOrFindAttackerRole();
             AuthMechanism attackerAuthMechanism = null;
             if (attackerTestRole == null) {
