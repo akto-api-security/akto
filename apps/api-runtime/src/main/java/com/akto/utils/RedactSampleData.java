@@ -143,12 +143,20 @@ public class RedactSampleData {
             String rawRequestPayload = jsonObject.getString("requestPayload");
             String rawResponsePayload = jsonObject.getString("responsePayload");
 
-            if (rawRequestPayload != null && !rawRequestPayload.isEmpty()) {
-                finalOrigReqPayload = redactXmlWithRegex(rawRequestPayload, redactValue, redactAll);
+            try {
+                if (rawRequestPayload != null && !rawRequestPayload.isEmpty()) {
+                    finalOrigReqPayload = redactXmlWithRegex(rawRequestPayload, redactValue, redactAll);
+                }
+                if(rawResponsePayload != null && !rawResponsePayload.isEmpty()){
+                    finalOrigResPayload = redactXmlWithRegex(rawResponsePayload, redactValue, redactAll);
+                }
+            } catch (Exception e) {
+                // TODO: handle exception
+                e.printStackTrace();
+                loggerMaker.errorAndAddToDb("Error in redacting original payloads for xml content type: " +e.getMessage());
             }
-            if(rawResponsePayload != null && !rawResponsePayload.isEmpty()){
-                finalOrigResPayload = redactXmlWithRegex(rawResponsePayload, redactValue, redactAll);
-            }
+
+            
         }
 
         handleHeaders(responseHeaders, redactAll);

@@ -192,7 +192,11 @@ public class Executor {
                     }
                 }
                 List<String> contentType = origRawApi.getRequest().getHeaders().getOrDefault("content-type", new ArrayList<>());
-                if(!contentType.isEmpty() && (contentType.contains(HttpRequestResponseUtils.SOAP) || contentType.contains(HttpRequestResponseUtils.XML))){
+                String contentTypeString = "";
+                if(!contentType.isEmpty()){
+                    contentTypeString = contentType.get(0);
+                }
+                if(!contentTypeString.isEmpty() && (contentTypeString.contains(HttpRequestResponseUtils.SOAP) || contentTypeString.contains(HttpRequestResponseUtils.XML))){
                     // since we are storing a map for original raw payload, we need original raw url and method to float to api executor
                     // we are adding custom header here and when sending request we will remove them
                     testReq.getRequest().getHeaders().put("x-akto-original-url", Collections.singletonList(origRawApi.getRequest().getUrl()));
