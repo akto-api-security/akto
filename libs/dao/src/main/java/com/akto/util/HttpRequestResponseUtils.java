@@ -12,7 +12,6 @@ import com.mongodb.BasicDBObject;
 
 import org.apache.commons.lang3.StringUtils;
 import org.json.JSONObject;
-import org.w3c.dom.NodeList;
 import org.xml.sax.InputSource;
 
 import java.io.StringReader;
@@ -24,8 +23,6 @@ import java.util.*;
 
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
-import javax.xml.transform.OutputKeys;
-import javax.xml.transform.TransformerFactory;
 import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.stream.StreamResult;
 
@@ -146,32 +143,43 @@ public class HttpRequestResponseUtils {
     public static String updateXmlWithModifiedJson(String originalXml, String modifiedJson) throws Exception {
         ObjectMapper objectMapper = new ObjectMapper();
 
-        // Parse original XML with namespace awareness
         DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
         factory.setNamespaceAware(true);
         DocumentBuilder builder = factory.newDocumentBuilder();
         Document doc = builder.parse(new InputSource(new StringReader(originalXml)));
 
-        // Find the Body element in any namespace
         NodeList bodyNodes = doc.getElementsByTagNameNS("*", "Body");
-        if (bodyNodes.getLength() == 0) {
-            throw new RuntimeException("No Body element found in the SOAP envelope.");
+        boolean hasBody = bodyNodes.getLength() > 0;
+        Element targetElement;
+
+        if (hasBody) {
+            targetElement = (Element) bodyNodes.item(0);
+
+            // Clear existing content inside Body
+            while (targetElement.hasChildNodes()) {
+                targetElement.removeChild(targetElement.getFirstChild());
+            }
+        } else {
+            // No Body, target the document root itself
+            targetElement = doc.getDocumentElement();
+
+            // Clear existing content under root
+            while (targetElement.hasChildNodes()) {
+                targetElement.removeChild(targetElement.getFirstChild());
+            }
         }
 
-        Element bodyElement = (Element) bodyNodes.item(0);
-
-        // Clear existing content in Body
-        while (bodyElement.hasChildNodes()) {
-            bodyElement.removeChild(bodyElement.getFirstChild());
-        }
-
-        // Parse the modified JSON into nodes
         JsonNode modifiedBody = objectMapper.readTree(modifiedJson);
 
-        // Append modified JSON as XML
-        appendJsonToXml(modifiedBody, doc, bodyElement);
+        if (modifiedBody.isTextual()) {
+            String xmlContent = modifiedBody.asText();
+            Document tempDoc = builder.parse(new InputSource(new StringReader(xmlContent)));
+            Node importedNode = doc.importNode(tempDoc.getDocumentElement(), true);
+            targetElement.appendChild(importedNode);
+        } else {
+            appendJsonToXml(modifiedBody, doc, targetElement);
+        }
 
-        // Convert back to string
         TransformerFactory tf = TransformerFactory.newInstance();
         Transformer transformer = tf.newTransformer();
         transformer.setOutputProperty(OutputKeys.OMIT_XML_DECLARATION, "no");
