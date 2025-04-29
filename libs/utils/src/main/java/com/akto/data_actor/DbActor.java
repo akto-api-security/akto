@@ -607,4 +607,8 @@ public class DbActor extends DataActor {
     public List<String> findTestSubCategoriesByTestSuiteId(List<String> testSuiteId) {
         return DbLayer.findTestSubCategoriesByTestSuiteId(testSuiteId);
     }
+
+    public String fetchOpenApiSchema(int apiCollectionId) {
+        return DbLayer.fetchOpenApiSchema(apiCollectionId);
+    }
 }
