@@ -1651,6 +1651,18 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
+    List<String> ids;
+
+    public String fetchYamlTemplatesWithIds() {
+        try {
+            yamlTemplates = DbLayer.fetchYamlTemplatesWithIds(ids, fetchOnlyActive);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in fetchYamlTemplatesWithIds " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
     public String findApiCollectionByName() {
         try {
             apiCollection = DbLayer.findApiCollectionByName(apiCollectionName);
@@ -3509,5 +3521,13 @@ public class DbAction extends ActionSupport {
 
     public void setModuleInfo(ModuleInfo moduleInfo) {
         this.moduleInfo = moduleInfo;
+    }
+
+    public List<String> getIds() {
+        return ids;
+    }
+
+    public void setIds(List<String> ids) {
+        this.ids = ids;
     }
 }
