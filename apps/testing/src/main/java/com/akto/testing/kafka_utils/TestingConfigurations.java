@@ -5,12 +5,19 @@ import java.util.List;
 import java.util.Map;
 
 import com.akto.dto.ApiInfo;
+import com.akto.dto.ApiInfo.ApiInfoKey;
+import com.akto.dto.RawApi;
 import com.akto.dto.test_editor.TestConfig;
 import com.akto.dto.testing.TestingRunConfig;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.TestingRunResultSummary;
 import com.akto.store.TestingUtil;
 
+import lombok.Getter;
+import lombok.Setter;
+
+@Getter
+@Setter
 public class TestingConfigurations {
 
     private static final TestingConfigurations instance = new TestingConfigurations();
@@ -22,6 +29,7 @@ public class TestingConfigurations {
     private List<TestingRunResult> testingRunResultList;
     private TestingRunResultSummary rerunTestingRunResultSummary;
     Map<String, TestConfig> testConfigMap;
+    private  Map<ApiInfoKey, RawApi> rawApiMap;
 
     private TestingConfigurations() {
     }
@@ -38,38 +46,6 @@ public class TestingConfigurations {
         this.maxConcurrentRequest = maxConcurrentRequests == -1 ? 10 : maxConcurrentRequests;
     }
 
-    public boolean isDebug() {
-        return debug;
-    }
-
-    public TestingRunConfig getTestingRunConfig() {
-        return testingRunConfig;
-    }
-
-    public TestingUtil getTestingUtil() {
-        return testingUtil;
-    }
-
-    public Map<String, TestConfig> getTestConfigMap() {
-        return testConfigMap;
-    }
-
-    public int getMaxConcurrentRequest() {
-        return maxConcurrentRequest;
-    }
-
-    public void setMaxConcurrentRequest(int maxConcurrentRequest) {
-        this.maxConcurrentRequest = maxConcurrentRequest;
-    }
-
-    public List<TestingRunResult> getTestingRunResultList() {
-        return testingRunResultList;
-    }
-
-    public void setTestingRunResultList(List<TestingRunResult> testingRunResultList) {
-        this.testingRunResultList = testingRunResultList;
-    }
-
     public TestingRunResult getTestingRunResultForApiKeyInfo(ApiInfo.ApiInfoKey apiInfoKey, String testSubCategory) {
         if (testingRunResultList == null || apiInfoKey == null || testSubCategory == null) {
             return null;
@@ -79,13 +55,5 @@ public class TestingConfigurations {
                 .filter(result -> apiInfoKey.equals(result.getApiInfoKey()) && testSubCategory.equals(result.getTestSubType()))
                 .findFirst()
                 .orElse(null);
-    }
-
-    public TestingRunResultSummary getRerunTestingRunResultSummary() {
-        return rerunTestingRunResultSummary;
-    }
-
-    public void setRerunTestingRunResultSummary(TestingRunResultSummary rerunTestingRunResultSummary) {
-        this.rerunTestingRunResultSummary = rerunTestingRunResultSummary;
     }
 }
