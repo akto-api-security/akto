@@ -3,11 +3,12 @@ package com.akto.dto.monitoring;
 import java.util.UUID;
 
 public class ModuleInfo {
-
+    public static final String MODULE_TYPE = "moduleType";
     private ModuleType moduleType;
     private String currentVersion;
     private String id;//UUID
     private int startedTs;
+    public static final String LAST_HEARTBEAT_RECEIVED = "lastHeartbeatReceived";
     private int lastHeartbeatReceived;
     private String name;
 

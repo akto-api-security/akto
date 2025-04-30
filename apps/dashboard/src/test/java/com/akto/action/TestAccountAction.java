@@ -22,17 +22,18 @@ public class TestAccountAction extends MongoBasedTest {
 
     @Test
     public void testInitializeAccount() {
-        Context.accountId.set(ACCOUNT_ID);
+        int testAccount = ACCOUNT_ID + 100;
+        Context.accountId.set(testAccount);
         String email = "test@akto.io";
         int newAccountId = 12390;
         String newAccountName = "NEW_ACCOUNT";
         Map<String, UserAccountEntry> accounts = new HashMap<>();
-        accounts.put(ACCOUNT_ID + "", new UserAccountEntry(ACCOUNT_ID));
+        accounts.put(testAccount + "", new UserAccountEntry(testAccount));
         UsersDao.instance.deleteAll(new BasicDBObject());
         RBACDao.instance.deleteAll(new BasicDBObject());
         UsersDao.instance.insertOne(new User("test", "test@akto.io", accounts, null));
         User user = UsersDao.instance.findOne(new BasicDBObject());
-        RBACDao.instance.insertOne(new RBAC(user.getId(), RBAC.Role.ADMIN.name(), ACCOUNT_ID));
+        RBACDao.instance.insertOne(new RBAC(user.getId(), RBAC.Role.ADMIN.name(), testAccount));
         List<RBAC> rbacList = RBACDao.instance.findAll(new BasicDBObject());
 
         assertEquals(1, user.getAccounts().size());
@@ -47,7 +48,7 @@ public class TestAccountAction extends MongoBasedTest {
 
         Role role = RBACDao.getCurrentRoleForUser(user.getId(), newAccountId);
         assertEquals(Role.ADMIN, role);
-        role = RBACDao.getCurrentRoleForUser(user.getId(), ACCOUNT_ID);
+        role = RBACDao.getCurrentRoleForUser(user.getId(), testAccount);
         assertEquals(Role.ADMIN, role);
 
         
