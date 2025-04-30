@@ -2234,6 +2234,9 @@ public class ClientActor extends DataActor {
                     case "LOGIN_REQUEST":
                         authParam.put("_t", "com.akto.dto.testing.LoginRequestAuthParam");
                         break;
+                    case "TLS_AUTH":
+                        authParam.put("_t", "com.akto.dto.testing.TLSAuthParam");
+                        break;
                     default:
                         break;
                 }
@@ -2252,6 +2255,9 @@ public class ClientActor extends DataActor {
                         break;
                     case "LOGIN_REQUEST":
                         defaultAuthParam.put("_t", "com.akto.dto.testing.LoginRequestAuthParam");
+                        break;
+                    case "TLS_AUTH":
+                        defaultAuthParam.put("_t", "com.akto.dto.testing.TLSAuthParam");
                         break;
                     default:
                         break;
@@ -3642,13 +3648,16 @@ public class ClientActor extends DataActor {
             BasicDBObject payloadObj;
             try {
                 payloadObj = BasicDBObject.parse(responsePayload);
-                BasicDBObject testingRunPlaygroundObj = (BasicDBObject) payloadObj.get("testingRunPlayground");
+                BasicDBObject testingRunPlaygroundObj = (BasicDBObject) payloadObj.getOrDefault("testingRunPlayground", null);
+                if (testingRunPlaygroundObj == null) {
+                    return null;
+                }
                 return objectMapper.readValue(testingRunPlaygroundObj.toJson(), TestingRunPlayground.class);
             } catch (Exception e) {
-                loggerMaker.errorAndAddToDb("error extracting response in fetchEditorTest" + e, LoggerMaker.LogDb.TESTING);
+                loggerMaker.errorAndAddToDb("error extracting response in fetchEditorTest " + e, LoggerMaker.LogDb.TESTING);
             }
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("error in fetchEditorTest" + e, LoggerMaker.LogDb.TESTING);
+            loggerMaker.errorAndAddToDb("error in fetchEditorTest " + e, LoggerMaker.LogDb.TESTING);
         }
         return null;
     }

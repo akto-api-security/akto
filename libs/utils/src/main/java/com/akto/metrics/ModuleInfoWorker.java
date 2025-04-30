@@ -44,7 +44,7 @@ public class ModuleInfoWorker {
             moduleInfo.setLastHeartbeatReceived(Context.now());
             assert _this.dataActor != null;
             _this.dataActor.updateModuleInfo(moduleInfo);
-            loggerMaker.info("Sending heartbeat at :" + moduleInfo.getLastHeartbeatReceived() + " for module:" + moduleInfo.getModuleType().name());
+            loggerMaker.info("Sending heartbeat at : " + moduleInfo.getLastHeartbeatReceived() + " for module: " + moduleInfo.getModuleType().name());
         }, 0, 30, TimeUnit.SECONDS);
     }
 
@@ -60,7 +60,7 @@ public class ModuleInfoWorker {
             loggerMaker.error("Error getting local version, skipping heartbeat check");
             return;
         }
-        loggerMaker.infoAndAddToDb("Starting heartbeat update for module:" + moduleType.name());
+        loggerMaker.infoAndAddToDb("Starting heartbeat update for module: " + moduleType.name());
         ModuleInfoWorker infoWorker = new ModuleInfoWorker(moduleType, version, dataActor);
         infoWorker.scheduleHeartBeatUpdate();
     }

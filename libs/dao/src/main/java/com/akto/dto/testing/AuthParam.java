@@ -2,8 +2,6 @@ package com.akto.dto.testing;
 
 import com.akto.dto.OriginalHttpRequest;
 
-import java.util.ArrayList;
-
 public abstract class AuthParam {
 
     abstract boolean addAuthTokens(OriginalHttpRequest request);
@@ -23,6 +21,7 @@ public abstract class AuthParam {
 
     public enum Location {
         HEADER,
-        BODY
+        BODY,
+        TLS
     }
 }
