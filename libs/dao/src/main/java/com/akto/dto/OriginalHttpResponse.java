@@ -36,7 +36,18 @@ public class OriginalHttpResponse {
         String responsePayload = (String) json.get("responsePayload");
         this.body = responsePayload != null ? responsePayload.trim() : null;
         this.headers = OriginalHttpRequest.buildHeadersMap(json, "responseHeaders");
-        this.statusCode = Integer.parseInt(json.get("statusCode").toString());
+        Object obj = json.get("statusCode");
+        if(obj instanceof Double){
+            obj = ((Double) obj).intValue();
+        }
+        this.statusCode = Integer.parseInt(obj.toString());
+    }
+
+    public void buildFromSampleMessageNew(HttpResponseParams responseParam) {
+        String responsePayload = responseParam.getPayload();
+        this.body = responsePayload != null ? responsePayload.trim() : null;
+        this.headers = responseParam.getHeaders();
+        this.statusCode = responseParam.getStatusCode();
     }
 
     public void addHeaderFromLine(String line) {

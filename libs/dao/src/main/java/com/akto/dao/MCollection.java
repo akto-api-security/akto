@@ -1,5 +1,6 @@
 package com.akto.dao;
 
+import com.akto.dao.context.Context;
 import com.akto.util.DbMode;
 import com.mongodb.BasicDBObject;
 import com.mongodb.CreateIndexCommitQuorum;
@@ -10,7 +11,6 @@ import com.mongodb.client.result.DeleteResult;
 import com.mongodb.client.result.InsertManyResult;
 import com.mongodb.client.result.InsertOneResult;
 
-import com.mongodb.BasicDBObject;
 import org.bson.Document;
 import com.mongodb.client.result.UpdateResult;
 
@@ -32,6 +32,9 @@ public abstract class MCollection<T> {
     public static final String ID = "_id";
     public static final String NAME = "name";
     public static final String ROOT_ELEMENT = "$$ROOT";
+    public static final String _COUNT = "count";
+    public static final String _SIZE = "size";
+    private boolean printDebugLogs = (System.getenv("MONGO_DEBUG_MODE") != null && System.getenv("MONGO_DEBUG_MODE").equalsIgnoreCase("true")) ? true : false;
     abstract public String getDBName();
     abstract public String getCollName();
     abstract public Class<T> getClassT();
@@ -90,18 +93,6 @@ public abstract class MCollection<T> {
         return this.findAll(and(eq(key1, value1), eq(key2, value2)));
     }
 
-    public<V> List<T> findAll(String key, Collection<V> values) {
-        MongoCursor<T> cursor = this.getMCollection().find(in(key, values)).cursor();
-
-        ArrayList<T> ret = new ArrayList<T>();
-
-        while(cursor.hasNext()) {
-            T elem = cursor.next();
-            ret.add(elem);
-        }
-
-        return ret;
-    }
     public List<T> findAll(Bson q) {
         return findAll(q, null);
     }
@@ -115,9 +106,16 @@ public abstract class MCollection<T> {
     }
 
     public List<T> findAll(Bson q, int skip, int limit, Bson sort, Bson projection) {
-        
+        int timeNow = Context.now();
+        if(printDebugLogs){
+            logger.info("Starting find all query at: " + timeNow);
+        }
+
         FindIterable<T> commands = this.getMCollection().find(q).skip(skip).limit(limit);
 
+        if(printDebugLogs){
+            logger.info("Finishing find all query in: " + (Context.now() - timeNow));
+        }
         if (projection != null) {
             commands.projection(projection);
         }
@@ -133,6 +131,10 @@ public abstract class MCollection<T> {
         while(cursor.hasNext()) {
             T elem = cursor.next();
             ret.add(elem);
+        }
+
+        if(printDebugLogs){
+            logger.info("Finishing find all query and returning to call in: " + (Context.now() - timeNow));
         }
 
         return ret;
@@ -170,14 +172,7 @@ public abstract class MCollection<T> {
     }
 
     public T findOne(Bson q) {
-        MongoCursor<T> cursor = this.getMCollection().find(q).cursor();
-
-        while(cursor.hasNext()) {
-            T elem = cursor.next();
-            return elem;
-        }
-
-        return null;
+        return this.findOne(q, null);
     }
 
     public T findOne(Bson q, Bson projection) {
@@ -212,13 +207,28 @@ public abstract class MCollection<T> {
     }
 
     public UpdateResult updateMany (Bson q, Bson obj) {
-        return this.getMCollection().updateMany(q, obj);
+        int timeNow = Context.now();
+        UpdateResult result =  this.getMCollection().updateMany(q, obj);
+        if(printDebugLogs){
+            logger.info("Finishing updateMany query in: " + (Context.now() - timeNow));
+        }
+        return result;
     }
     public UpdateResult updateManyNoUpsert (Bson q, Bson obj) {
-        return this.getMCollection().updateMany(q, obj, new UpdateOptions().upsert(false));
+        int timeNow = Context.now();
+        UpdateResult result = this.getMCollection().updateMany(q, obj, new UpdateOptions().upsert(false));
+        if(printDebugLogs){
+            logger.info("Finishing updateManyNoUpsert query in: " + (Context.now() - timeNow));
+        }
+        return result;
     }
     public BulkWriteResult bulkWrite (List<WriteModel<T>> modelList, BulkWriteOptions options) {
-        return this.getMCollection().bulkWrite(modelList, options);
+        int timeNow = Context.now();
+        BulkWriteResult result =  this.getMCollection().bulkWrite(modelList, options);
+        if(printDebugLogs){
+            logger.info("Finishing bulkWrite query in: " + (Context.now() - timeNow));
+        }
+        return result;
     }
 
     public UpdateResult replaceOne(Bson q, T obj) {
@@ -230,23 +240,39 @@ public abstract class MCollection<T> {
     }
 
     public InsertManyResult insertMany(List<T> elems) {
-
-        return getMCollection().insertMany(elems);
+        int timeNow = Context.now();
+        InsertManyResult result =  getMCollection().insertMany(elems);
+        if(printDebugLogs){
+            logger.info("Finishing insertMany query in: " + (Context.now() - timeNow));
+        }
+        return result;
     }
 
 
     
     public DeleteResult deleteAll(Bson q) {
-        return this.getMCollection().deleteMany(q);
+        int timeNow = Context.now();
+        DeleteResult result = this.getMCollection().deleteMany(q);
+        if(printDebugLogs){
+            logger.info("Finishing deleteAll query in: " + (Context.now() - timeNow));
+        }
+        return result;
     }
  
 
     public <TResult> Set<TResult> findDistinctFields(String fieldName, Class<TResult> resultClass, Bson filter) {
+        int timeNow = Context.now();
         DistinctIterable<TResult> r = getMCollection().distinct(fieldName,filter,resultClass);
+        if(printDebugLogs){
+            logger.info("Finishing findDistinctFields in: " + (Context.now() - timeNow));
+        }
         Set<TResult> result = new HashSet<>();
         MongoCursor<TResult> cursor = r.cursor();
         while (cursor.hasNext()) {
             result.add(cursor.next());
+        }
+        if(printDebugLogs){
+            logger.info("Finishing findDistinctFields and returning from method in: " + (Context.now() - timeNow));
         }
         return result;
     }
@@ -363,9 +389,37 @@ public abstract class MCollection<T> {
         ObjectId objectId = findNthDocumentIdFromEnd((int) deleteCount);
         if (objectId == null) return;
 
+        logger.info("Starting trimCappedCollections for " + this.getCollName() + " account " + this.getDBName() + " at " + Context.now());
         DeleteResult deleteResult = this.getMCollection().deleteMany(lt(ID, objectId));
-        logger.info("Trimmed : " + deleteResult.getDeletedCount());
+        logger.info("Trimmed : " + deleteResult.getDeletedCount() + " for collection: " + this.getCollName() + " for account: " + this.getDBName());
+        logger.info("Completed trimCappedCollections for " + this.getCollName() + " account " + this.getDBName() + " at " + Context.now());
     }
 
+    public boolean dropCollectionWithCondition(long maxDocuments, long dropThreshold) {
+        long count = this.getMCollection().estimatedDocumentCount();
+        if (count <= maxDocuments)
+            return false;
+
+        if (count >= (dropThreshold * maxDocuments)) {
+            this.getMCollection().drop();
+            logger.info(" Dropped collection: " + this.getCollName() + " for account: " + this.getDBName());
+            return true;
+        }
+        return false;
+    }
+
+    public Document getCollectionStats(){
+        return getCollectionStatsFromNames(getDBName(), getCollName());
+    }
+
+    public static Document getCollectionStatsFromNames(String dbName, String collName){
+        MongoDatabase mongoDatabase = clients[0].getDatabase(dbName);
+        return mongoDatabase.runCommand(new Document("collStats",collName));
+    }
+
+    public Document compactCollection() {
+        MongoDatabase mongoDatabase = clients[0].getDatabase(getDBName());
+        return mongoDatabase.runCommand(new Document("compact", getCollName()));
+    }
 
 }

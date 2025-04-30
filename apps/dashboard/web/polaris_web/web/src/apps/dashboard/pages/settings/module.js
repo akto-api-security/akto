@@ -27,6 +27,7 @@ const urlOptionsList = [
     title: 'JS files',
     options: [
       {value: 'js', label: '.js'},
+      {value: 'js.map', label: '.js.map'}
     ],
   },
   {
@@ -38,6 +39,7 @@ const urlOptionsList = [
       {value: 'gif', label: '.gif'},
       {value: 'svg', label: '.svg'},
       {value: 'webp', label: '.webp'},
+      {value: 'ico', label: '.ico'}
     ],
   },
   {
@@ -80,6 +82,12 @@ const urlOptionsList = [
       {value: 'ttf', label: '.ttf'},
       {value: 'otf', label: '.otf'},
     ],
+  },
+  {
+    title: 'Content-type header',
+    options: [
+      { value: 'CONTENT-TYPE html', label: 'text/html'}
+    ]
   },
 ]
 
@@ -167,13 +175,17 @@ const settingFunctions = {
       const loginInfo = await this.fetchLoginInfo()
       let arr = []
       let resp = {}
+      let accountSettingsDetails = {}
       await settingRequests.fetchAdminSettings().then((response)=>{
         resp = JSON.parse(JSON.stringify(response.accountSettings))
         let respOrgStr = "-"
         if (response.organization) {
             let respOrg = JSON.parse(JSON.stringify(response.organization))
-            respOrgStr = respOrg.id + " (" + respOrg.adminEmail + ")"
+            respOrgStr = respOrg.id + " (" 
+            + respOrg.adminEmail + ")"
         }
+
+        accountSettingsDetails=response.currentAccount
 
         if(window.IS_SAAS === "true"){
           arr = [
@@ -209,7 +221,7 @@ const settingFunctions = {
           ]
         }
       })
-      return {arr,resp}
+      return {arr,resp, accountSettingsDetails}
     },
 
 
@@ -228,26 +240,46 @@ const settingFunctions = {
       return trafficData
     },
     testJiraIntegration: async function(userEmail, apiToken, baseUrl, projId){
-      let issueType = ""
+      let issueTypeMap = {}
       await settingRequests.testJiraIntegration(userEmail, apiToken, baseUrl, projId).then((resp)=>{
-        issueType = resp.issueType
+        issueTypeMap = resp
       })
-      return issueType
+      return issueTypeMap
     },
     fetchJiraIntegration: async function(){
       let jiraInteg = {}
       await settingRequests.fetchJiraIntegration().then((resp)=>{
-        jiraInteg = resp.jiraIntegration
+        jiraInteg = resp
       })
       return jiraInteg
     },
-    addJiraIntegration: async function(userEmail, apiToken, baseUrl, projId, issueType){
+    addJiraIntegration: async function(userEmail, apiToken, baseUrl, projId, projectAndIssueMap){
       let trafficData = {}
-      await settingRequests.addJiraIntegration(userEmail, apiToken, baseUrl, projId, issueType).then((resp)=>{
+      await settingRequests.addJiraIntegration(userEmail, apiToken, baseUrl, projId, projectAndIssueMap).then((resp)=>{
       })
       return trafficData
     },
-
+    fetchAzureBoardsIntegration: async function(){
+      let azureBoardsInteg = {}
+      await settingRequests.fetchAzureBoardsIntegration().then((resp)=>{
+        azureBoardsInteg = resp.azureBoardsIntegration
+      })
+      return azureBoardsInteg
+    },
+    addAzureBoardsIntegration: async function(azureBoardsBaseUrl, organization, projectList, personalAuthToken) {
+      let trafficData = {}
+      await settingRequests.addAzureBoardsIntegration(azureBoardsBaseUrl, organization, projectList, personalAuthToken).then((resp)=>{
+        trafficData = resp
+      })
+      return trafficData
+    },
+    removeAzureBoardsIntegration: async function() {
+      let trafficData = {}
+      await settingRequests.removeAzureBoardsIntegration().then((resp)=>{
+        trafficData = resp
+      })
+      return trafficData
+    },
     getSetupOptions: function(){
       return setupOptions;
     },

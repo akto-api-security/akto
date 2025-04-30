@@ -5,7 +5,6 @@ import com.akto.dto.billing.Organization;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
-import com.akto.dto.User;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.DashboardMode;
@@ -45,7 +44,7 @@ public class UsageAction extends UserAction {
 
     public static final HashSet<String> freeDomainsSet = new HashSet<>(Arrays.asList(freeDomains));
 
-    private static final LoggerMaker loggerMaker = new LoggerMaker(UsageAction.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(UsageAction.class, LogDb.DASHBOARD);
 
     String customerId;
     String planId;
@@ -124,24 +123,26 @@ public class UsageAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
-    public String refreshUsageData(){
-        User sUser = getSUser();
-        int anyAccountId = Integer.parseInt(sUser.findAnyAccountId());
+    public String refreshUsageData() {
+        int currentAccountId = Context.accountId.get();
         
         Organization organization = OrganizationsDao.instance.findOne(
-                Filters.in(Organization.ACCOUNTS, anyAccountId));
+                Filters.in(Organization.ACCOUNTS, currentAccountId));
 
         if(organization == null){
             addActionError("Organization not found");
             return ERROR.toUpperCase();
         }
 
+        loggerMaker.debugAndAddToDb("Calculating usage for organization: " + organization.getId() + " adminEmail: "
+                + organization.getAdminEmail(), LogDb.DASHBOARD);
+
         // calculation may take time, so we do it in a separate thread to avoid timeout.
         executorService.schedule(new Runnable() {
             public void run() {
 
-                OrgUtils.getSiblingAccounts(anyAccountId).forEach(account -> {
-                    loggerMaker.infoAndAddToDb("Calculating usage for account: " + account.getId(),
+                OrgUtils.getSiblingAccounts(currentAccountId).forEach(account -> {
+                    loggerMaker.debugAndAddToDb("Calculating usage for account: " + account.getId(),
                             LogDb.DASHBOARD);
                     Context.accountId.set(account.getId());
                     int accountId = account.getId();
@@ -150,7 +151,7 @@ public class UsageAction extends UserAction {
 
                 try {
                     String orgId = organization.getId();
-                    loggerMaker.infoAndAddToDb("Flushing usage pipeline for " + orgId, LogDb.DASHBOARD);
+                    loggerMaker.debugAndAddToDb("Flushing usage pipeline for " + orgId, LogDb.DASHBOARD);
                     OrganizationUtils.flushUsagePipelineForOrg(orgId);
                 } catch (Exception e) {
                     loggerMaker.errorAndAddToDb(e, "Failed to flush usage pipeline", LogDb.DASHBOARD);

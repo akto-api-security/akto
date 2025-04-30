@@ -1,0 +1,22 @@
+.testSuiteCard .Polaris-Choice.Polaris-Checkbox__ChoiceLabel {
+    max-width: 100% !important;
+}
+
+.testSuiteCard .Polaris-Choice__Label {
+    overflow: hidden !important;
+}
+
+.testSuiteDisclosureButton svg {
+    fill: #5C5F62  !important;
+}
+
+.testSuiteCard .Polaris-VerticalStack{
+    box-shadow: 0px 1px 2px 0px #00000026, 0px 0px 5px 0px #0000000D;
+    border-radius: 0.5rem;
+    overflow: hidden;
+}
+
+.removeAllButton .Polaris-Button--plain.Polaris-Button--disabled svg {
+    fill: var(--p-color-icon-disabled) !important;
+}
+

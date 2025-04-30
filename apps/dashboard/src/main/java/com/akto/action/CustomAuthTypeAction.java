@@ -10,8 +10,7 @@ import com.akto.dao.UsersDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.CustomAuthType;
 import com.akto.log.LoggerMaker;
-import com.akto.testing.ApiExecutor;
-import com.akto.util.AccountTask;
+import com.akto.log.LoggerMaker.LogDb;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
@@ -19,11 +18,11 @@ import com.opensymphony.xwork2.Action;
 import com.akto.dto.User;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.utils.CustomAuthUtil;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
-public class CustomAuthTypeAction extends UserAction{
-    private static final Logger logger = LoggerFactory.getLogger(CustomAuthTypeAction.class);
+public class CustomAuthTypeAction extends UserAction {
+
+    private static final LoggerMaker logger = new LoggerMaker(CustomAuthTypeAction.class, LogDb.DASHBOARD);
+
     private String name;
     private List<String> headerKeys;
     private List<String> payloadKeys;
@@ -33,7 +32,6 @@ public class CustomAuthTypeAction extends UserAction{
     private CustomAuthType customAuthType;
 
     private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
-    private static final LoggerMaker loggerMaker = new LoggerMaker(CustomAuthTypeAction.class);
 
     public String fetchCustomAuthTypes(){
         customAuthTypes = CustomAuthTypeDao.instance.findAll(new BasicDBObject());
@@ -89,12 +87,9 @@ public class CustomAuthTypeAction extends UserAction{
         int accountId = Context.accountId.get();
         SingleTypeInfo.fetchCustomAuthTypes(accountId);
         customAuthType = CustomAuthTypeDao.instance.findOne(CustomAuthType.NAME,name);
-        executorService.schedule( new Runnable() {
-            public void run() {
-                logger.info("RUNNING");
-                Context.accountId.set(accountId);
-                CustomAuthUtil.customAuthTypeUtil(SingleTypeInfo.getCustomAuthType(accountId));
-            }
+        executorService.schedule(() -> {
+            Context.accountId.set(accountId);
+            CustomAuthUtil.customAuthTypeUtil(SingleTypeInfo.getCustomAuthType(accountId));
         }, 5 , TimeUnit.SECONDS);
         return Action.SUCCESS.toUpperCase();
     }
@@ -130,7 +125,7 @@ public class CustomAuthTypeAction extends UserAction{
             }, 5 , TimeUnit.SECONDS);
             return SUCCESS.toUpperCase();
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "ERROR: Reset custom auth types - " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
+            logger.errorAndAddToDb(e, "ERROR: Reset custom auth types - " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
             return ERROR.toUpperCase();
         }
     }

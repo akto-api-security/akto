@@ -13,6 +13,7 @@ import com.akto.hybrid_parsers.HttpCallParser;
 import com.akto.hybrid_runtime.APICatalogSync;
 import com.akto.hybrid_runtime.URLAggregator;
 import com.akto.hybrid_runtime.policies.AuthPolicy;
+import com.akto.log.LoggerMaker;
 import com.akto.util.HTTPHeadersExample;
 import com.akto.util.JSONUtils;
 import com.google.common.base.Charsets;
@@ -31,6 +32,7 @@ public class DependencyAnalyser {
     Store valueStore; // this is to store all the values seen in response payload
     Store urlValueStore; // this is to store all the url$value seen in response payload
     Store urlParamValueStore; // this is to store all the url$param$value seen in response payload
+    private static final LoggerMaker loggerMaker = new LoggerMaker(DependencyAnalyser.class, LoggerMaker.LogDb.RUNTIME);
 
     Map<String, Set<String>> urlsToResponseParam = new HashMap<>();
 
@@ -147,18 +149,20 @@ public class DependencyAnalyser {
         if (APICatalog.isTemplateUrl(url)) {
             String ogUrl = urlStatic.getUrl();
             String[] ogUrlSplit = ogUrl.split("/");
-            URLTemplate urlTemplate = APICatalogSync.createUrlTemplate(url, URLMethods.Method.fromString(method));
-            for (int i = 0; i < urlTemplate.getTypes().length; i++) {
-                SingleTypeInfo.SuperType superType = urlTemplate.getTypes()[i];
-                if (superType == null) continue;
-                int idx = ogUrl.startsWith("http") ? i:i+1;
-                Object s = ogUrlSplit[idx]; // because ogUrl=/api/books/123 while template url=api/books/INTEGER
-                if (superType.equals(SingleTypeInfo.SuperType.INTEGER)) {
-                    s = Integer.parseInt(ogUrlSplit[idx]);
+            if (ogUrlSplit.length > 0) {
+                URLTemplate urlTemplate = APICatalogSync.createUrlTemplate(url, URLMethods.Method.fromString(method));
+                for (int i = 0; i < urlTemplate.getTypes().length; i++) {
+                    SingleTypeInfo.SuperType superType = urlTemplate.getTypes()[i];
+                    if (superType == null) continue;
+                    int idx = ogUrl.startsWith("http") ? i:i+1;
+                    Object s = ogUrlSplit[idx]; // because ogUrl=/api/books/123 while template url=api/books/INTEGER
+                    if (superType.equals(SingleTypeInfo.SuperType.INTEGER)) {
+                        s = Integer.parseInt(ogUrlSplit[idx]);
+                    }
+                    Set<Object> val = new HashSet<>();
+                    val.add(s);
+                    processRequestParam(i+"", val, combinedUrl, true, false);
                 }
-                Set<Object> val = new HashSet<>();
-                val.add(s);
-                processRequestParam(i+"", val, combinedUrl, true, false);
             }
         }
 
@@ -341,10 +345,12 @@ public class DependencyAnalyser {
     }
 
     public void syncWithDb() {
+        loggerMaker.infoAndAddToDb("Syncing dependency analyser nodes");
         ArrayList<WriteModel<DependencyNode>> bulkUpdates1 = new ArrayList<>();
         ArrayList<WriteModel<DependencyNode>> bulkUpdates2 = new ArrayList<>();
         ArrayList<WriteModel<DependencyNode>> bulkUpdates3 = new ArrayList<>();
 
+        loggerMaker.infoAndAddToDb("dependency analyser nodes size: " + nodes.size());
         mergeNodes();
 
         for (DependencyNode dependencyNode: nodes.values()) {
@@ -437,8 +443,10 @@ public class DependencyAnalyser {
         }
 
         // ordered has to be true or else won't work
-        
 
+        loggerMaker.infoAndAddToDb("dependency analyser bulkUpdates1 size: " + bulkUpdates1.size());
+        loggerMaker.infoAndAddToDb("dependency analyser bulkUpdates2 size: " + bulkUpdates2.size());
+        loggerMaker.infoAndAddToDb("dependency analyser bulkUpdates3 size: " + bulkUpdates3.size());
 
 
         if (bulkUpdates1.size() > 0) DependencyNodeDao.instance.getMCollection().bulkWrite(bulkUpdates1, new BulkWriteOptions().ordered(false));

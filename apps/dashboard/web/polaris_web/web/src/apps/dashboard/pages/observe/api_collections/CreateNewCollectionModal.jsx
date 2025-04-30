@@ -2,7 +2,7 @@ import { Text, Modal, TextField, VerticalStack, HorizontalStack, Button, Card } 
 import api from "../api"
 import func from "@/util/func"
 import CollectionComponent from "../../../components/CollectionComponent";
-import React, { useState, useReducer, useCallback } from 'react'
+import React, { useState, useReducer, useCallback, useMemo } from 'react'
 import { produce } from "immer"
 import OperatorDropdown from "../../../components/layouts/OperatorDropdown";
 
@@ -12,6 +12,10 @@ function CreateNewCollectionModal(props) {
 
     const [newCollectionName, setNewCollectionName] = useState('');
     const [showApiSelector, setShowApiSelector] = useState(false);
+
+    const isCreateButtonDisabled = useMemo(() => {
+        return newCollectionName.trim().length === 0;
+    }, [newCollectionName]);
 
     function prepareData(){
         let dt = []
@@ -59,23 +63,11 @@ function CreateNewCollectionModal(props) {
             []);
 
     const emptyCondition = { data: {}, operator: "AND", type: "CUSTOM" };
-    const [conditions, dispatchConditions] = useReducer(produce((draft, action) => conditionsReducer(draft, action)), [emptyCondition]);
+    const [conditions, dispatchConditions] = useReducer(produce((draft, action) => func.conditionsReducer(draft, action)), [emptyCondition]);
 
     const handleAddField = () => {
         dispatchConditions({ type: "add", obj: emptyCondition })
     };
-
-    function conditionsReducer(draft, action) {
-        switch (action.type) {
-            case "add": draft.push(action.obj); break;
-            case "overwrite": draft[action.index][action.key] = { };
-            case "update": draft[action.index][action.key] = { ...draft[action.index][action.key], ...action.obj }; break;
-            case "updateKey": draft[action.index] = { ...draft[action.index], [action.key]: action.obj }; break;
-            case "delete": return draft.filter((item, index) => index !== action.index);
-            case "clear": return [];
-            default: break;
-        }
-    }
 
     const [apiCount, setApiCount] = useState({});
 
@@ -110,6 +102,7 @@ function CreateNewCollectionModal(props) {
             id: "create-new-collection",
             content: 'Create',
             onAction: createNewCollection,
+            disabled: isCreateButtonDisabled
         }}
         secondaryActions={showApiSelector ? [{
             id: "verify-new-collection",
@@ -130,7 +123,6 @@ function CreateNewCollectionModal(props) {
                         <Text>{newCollectionName.length}/24</Text>
                     )}
                     autoFocus
-                    {...newCollectionName.length === 0 ? {error: "Collection name cannot be empty"} : {}}
                 />
                 <span>
                     <Button plain onClick={() => setShowApiSelector(!showApiSelector)}>

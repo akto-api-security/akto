@@ -1,41 +1,34 @@
 package com.akto.action;
 
 
+import static com.mongodb.client.model.Filters.in;
+
 import com.akto.billing.UsageMetricUtils;
-import com.akto.dao.AccountSettingsDao;
-import com.akto.dao.AccountsDao;
-import com.akto.dao.JiraIntegrationDao;
-import com.akto.dao.RBACDao;
-import com.akto.dao.UsersDao;
+import com.akto.dao.*;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.Account;
 import com.akto.dto.AccountSettings;
-import com.akto.dto.JiraIntegration;
+import com.akto.dto.ApiToken.Utility;
 import com.akto.dto.RBAC;
 import com.akto.dto.User;
 import com.akto.dto.UserAccountEntry;
-import com.akto.dto.ApiToken.Utility;
 import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.billing.Organization;
+import com.akto.dto.jira_integration.JiraIntegration;
 import com.akto.listener.InitializerListener;
 import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.Constants;
+import com.akto.util.DashboardMode;
 import com.akto.util.EmailAccountName;
 import com.akto.utils.Intercom;
-import com.akto.util.DashboardMode;
 import com.akto.utils.billing.OrganizationUtils;
 import com.akto.utils.cloud.Utils;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.Updates;
-
-import io.micrometer.core.instrument.util.StringUtils;
-import org.apache.commons.codec.digest.HmacAlgorithms;
-import org.apache.commons.codec.digest.HmacUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import com.mongodb.client.model.Projections;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -43,14 +36,10 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-
-import static com.mongodb.client.model.Filters.in;
 
 public class ProfileAction extends UserAction {
 
-    private static final LoggerMaker loggerMaker = new LoggerMaker(ProfileAction.class);
-    private static final Logger logger = LoggerFactory.getLogger(ProfileAction.class);
+    private static final LoggerMaker logger = new LoggerMaker(ProfileAction.class, LogDb.DASHBOARD);
 
 
     private int accountId;
@@ -87,13 +76,13 @@ public class ProfileAction extends UserAction {
         if (sessionAccId == 0) {
             throw new IllegalStateException("user has no accounts associated");
         } else {
-            logger.error("setting session: " + sessionAccId);
+            logger.debug("setting session: " + sessionAccId);
             request.getSession().setAttribute("accountId", sessionAccId);
             Context.accountId.set(sessionAccId);
         }
 
         BasicDBList listDashboards = new BasicDBList();
-
+        Account currAccount = AccountsDao.instance.findOne(Filters.eq(Constants.ID, sessionAccId),Projections.include("name", "timezone"));
 
         AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
         boolean showOnboarding = accountSettings == null ? true : accountSettings.isShowOnboarding();
@@ -110,7 +99,17 @@ public class ProfileAction extends UserAction {
 
         EmailAccountName emailAccountName = new EmailAccountName(username); // username is the email id of the current user
         String accountName = emailAccountName.getAccountName();
-        String dashboardVersion = accountSettings.getDashboardVersion();
+        if(currAccount != null && !currAccount.getName().isEmpty() && !currAccount.getName().equals("My account")){
+            accountName = currAccount.getName();
+        }
+        String timeZone = "US/Pacific";
+        if(currAccount != null && !currAccount.getTimezone().isEmpty()){
+            timeZone = currAccount.getTimezone();
+        }
+        String dashboardVersion = InitializerListener.aktoVersion;
+        if(accountSettings != null){
+            dashboardVersion = accountSettings.getDashboardVersion();
+        }
         String[] versions = dashboardVersion.split(" - ");
         User userFromDB = UsersDao.instance.findOne(Filters.eq(Constants.ID, user.getId()));
         RBAC.Role userRole = RBACDao.getCurrentRoleForUser(user.getId(), Context.accountId.get());
@@ -124,8 +123,34 @@ public class ProfileAction extends UserAction {
         } catch (Exception e) {
         }
 
+        boolean azureBoardsIntegrated = false;
+        try {
+            long documentCount = AzureBoardsIntegrationDao.instance.estimatedDocumentCount();
+            if (documentCount > 0) {
+                azureBoardsIntegrated = true;
+            }
+        } catch (Exception e) {
+        }
+
+        InitializerListener.insertStateInAccountSettings(accountSettings);
+
+        Organization organization = OrganizationsDao.instance.findOne(
+                Filters.in(Organization.ACCOUNTS, sessionAccId)
+        );
+
+        String userActualName = "";
+        if(userFromDB.getNameLastUpdate() > 0) {
+            userActualName = userFromDB.getName();
+        }
+
+        String orgName = "";
+        if(organization != null && organization.getNameLastUpdate() > 0) {
+            orgName = organization.getName();
+        }
+
         userDetails.append("accounts", accounts)
                 .append("username",username)
+                .append("userFullName", userActualName)
                 .append("avatar", "dummy")
                 .append("activeAccount", sessionAccId)
                 .append("dashboardMode", DashboardMode.getDashboardMode())
@@ -135,7 +160,10 @@ public class ProfileAction extends UserAction {
                 .append("accountName", accountName)
                 .append("aktoUIMode", userFromDB.getAktoUIMode().name())
                 .append("jiraIntegrated", jiraIntegrated)
-                .append("userRole", userRole.toString().toUpperCase());
+                .append("azureBoardsIntegrated", azureBoardsIntegrated)
+                .append("userRole", userRole.toString().toUpperCase())
+                .append("currentTimeZone", timeZone)
+                .append("organizationName", orgName);
 
         if (DashboardMode.isOnPremDeployment()) {
             userDetails.append("userHash", Intercom.getUserHash(user.getLogin()));
@@ -143,11 +171,8 @@ public class ProfileAction extends UserAction {
 
         // only external API calls have non-null "utility"
         if (DashboardMode.isMetered() &&  utility == null) {
-            Organization organization = OrganizationsDao.instance.findOne(
-                    Filters.in(Organization.ACCOUNTS, sessionAccId)
-            );
             if(organization == null){
-                loggerMaker.infoAndAddToDb("Org not found for user: " + username + " acc: " + sessionAccId + ", creating it now!", LoggerMaker.LogDb.DASHBOARD);
+                logger.debugAndAddToDb("Org not found for user: " + username + " acc: " + sessionAccId + ", creating it now!", LoggerMaker.LogDb.DASHBOARD);
                 InitializerListener.createOrg(sessionAccId);
                 organization = OrganizationsDao.instance.findOne(
                         Filters.in(Organization.ACCOUNTS, sessionAccId)
@@ -174,11 +199,10 @@ public class ProfileAction extends UserAction {
 
                 isOverage = OrganizationUtils.isOverage(featureWiseAllowed);
             } catch (Exception e) {
-                loggerMaker.errorAndAddToDb(e,"Customer not found in stigg. User: " + username + " org: " + organizationId + " acc: " + accountIdInt, LoggerMaker.LogDb.DASHBOARD);
+                logger.errorAndAddToDb(e,"Customer not found in stigg. User: " + username + " org: " + organizationId + " acc: " + accountIdInt, LoggerMaker.LogDb.DASHBOARD);
             }
 
             userDetails.append("organizationId", organizationId);
-            userDetails.append("organizationName", organization.getName());
             userDetails.append("stiggIsOverage", isOverage);
             BasicDBObject stiggFeatureWiseAllowed = new BasicDBObject();
             for (String key : featureWiseAllowed.keySet()) {
@@ -205,6 +229,8 @@ public class ProfileAction extends UserAction {
             userDetails.append("stiggClientKey", OrganizationUtils.fetchClientKey(organizationId, organization.getAdminEmail()));
             userDetails.append("expired", organization.checkExpirationWithAktoSync());
             userDetails.append("hotjarSiteId", organization.getHotjarSiteId());
+            userDetails.append("planType", organization.getplanType());
+            userDetails.append("trialMsg", organization.gettrialMsg());
         }
 
         if (versions.length > 2) {

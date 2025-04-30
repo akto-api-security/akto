@@ -9,7 +9,7 @@ import { useState } from 'react';
 
 function TestRoleAccessMatrix() {
     const location = useLocation()
-    const name = location?.state?.name || null
+    const [name, setName] = useState(location?.state?.name || null);
 
     const [roleToUrls, setRoleToUrls] = useState([])
 

@@ -1,5 +1,5 @@
 import { DynamicSourceMinor , MagicMinor, PasskeyMinor } from "@shopify/polaris-icons"
-import PersistStore from "../../main/PersistStore"
+import func from "@/util/func"
 
 const dataTypesPrompt = [
     {
@@ -165,6 +165,20 @@ const dashboardFunc = {
         return tempArr
     },
 
+    getApiPrompts: function(apiCollectionId, url, method){ 
+        return [{
+            prepareQuery: () => { return {
+                type: "analyze_request_response_headers",
+                label: "Analyze request/response headers for the protocols and api gateways",
+                meta: {
+                    "url": url,
+                    "method": method,
+                    "apiCollectionId": apiCollectionId
+                }                        
+            }}}
+        ]
+    },
+
     getPrompts: function(requestObj) {
         switch(requestObj.key){
             case "DATA_TYPES":
@@ -176,9 +190,62 @@ const dashboardFunc = {
             case "PARAMETER":
                 return this.getParameterPrompts(requestObj.jsonStr, requestObj.apiCollectionId)
 
+            case "API":
+                return this.getApiPrompts(requestObj.apiCollectionId, requestObj.url, requestObj.method)
+
             default :
                 return []
         }
+    },
+
+    getAlertMessageFromType(alertType){
+        switch (alertType){
+            case "TRAFFIC_STOPPED":
+                return "Can't capture traffic";
+            case "TRAFFIC_OVERLOADED":
+                return "Latency captured, traffic rate high";
+            case "CYBORG_STOPPED_RECEIVING_TRAFFIC":
+                return "Akto not receiving traffic";
+            default:
+                return "Unknown error occurred"
+        }
+    },
+
+    replaceEpochWithFormattedDate(input) {
+        const match = input.match(/\$\{(\d+)\}/);
+
+        if (match && match[1]) {
+            const epochTime = Number(match[1]);
+            const date = new Date(epochTime * 1000);
+            const formattedDate = date.toLocaleString('en-US',{timeZone: window.TIME_ZONE === 'Us/Pacific' ? 'America/Los_Angeles' : window.TIME_ZONE});
+            const result = input.replace(match[0], formattedDate);
+            return result;
+        } else {
+            return input;
+        }
+    },
+
+    getBannerStatus(key){
+        switch(key.toUpperCase()){
+            case "HIGH" : return "critical";
+            case "MEDIUM": return "warning";
+            case "LOW": return "info";
+            default:
+                return "bg";
+        }
+    },
+    sortAndFilterAlerts(alerts) {
+        const severityOrder = { 'CRITICAL': 4, 'HIGH': 3, 'MEDIUM': 2, 'LOW': 1 };
+        const dismissLimit =  60 * 60;
+        const currentTime = func.timeNow()
+    
+        const filteredAlerts = alerts.filter(alert => 
+            currentTime - (alert?.lastDismissed || 0) > dismissLimit
+        );
+    
+        filteredAlerts.sort((a, b) => severityOrder[b.severity] - severityOrder[a.severity]);
+    
+        return filteredAlerts.slice(0, Math.min(3, filteredAlerts.length));
     }
 }
 

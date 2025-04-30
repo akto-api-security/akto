@@ -1,0 +1,12 @@
+.idea
+target/
+output/
+gen/
+yarn.lock
+.DS_Store
+*.iml
+*.pem
+*.env
+.settings
+.project
+.classpath

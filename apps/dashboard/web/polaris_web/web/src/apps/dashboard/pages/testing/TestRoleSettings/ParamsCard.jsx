@@ -3,9 +3,9 @@ import React from 'react'
 import TooltipText from "../../../components/shared/TooltipText"
 import { DeleteMajor } from "@shopify/polaris-icons"
 
-function ParamsCard({dataObj, handleDelete}) {
+function ParamsCard({dataObj, handleDelete, showEdit}) {
     const authMechanism = dataObj.authMechanism
-    const headerConditions = dataObj.headerKVPairs
+    const headerConditions = dataObj.headerKVPairs || {}
     const headerKey = Object.keys(headerConditions).length > 0 ? Object.keys(headerConditions)[0] : ''
     const headerValue = headerKey.length > 0 ? headerConditions[headerKey] : ''
 
@@ -48,10 +48,10 @@ function ParamsCard({dataObj, handleDelete}) {
             <VerticalStack gap={2}>
                 <VerticalStack gap={3}>
 
-                    <VerticalStack gap={2}>
+                    {headerKey.length > 0 ? <VerticalStack gap={2}>
                         <TitleComponent title={"Api header conditions"} />
                         <Box paddingInlineStart={4}>{headerKey.length > 0 ? <LineComponent title={headerKey + " :"} value={headerValue}/> : <Text variant="headingMd">-</Text>}</Box>
-                    </VerticalStack>
+                    </VerticalStack> : null}
 
                     <VerticalStack gap={2}>
                         <TitleComponent title={"Token details"} />
@@ -67,8 +67,9 @@ function ParamsCard({dataObj, handleDelete}) {
                     </VerticalStack>
 
                 </VerticalStack>
-                <HorizontalStack align="end">
-                    <Button onClick={handleDelete} icon={DeleteMajor}><div data-testid="delete_button">Delete</div></Button>
+                <HorizontalStack gap={"2"} align="end">
+                    <Button size="slim" onClick={handleDelete} icon={DeleteMajor}><div data-testid="delete_button">Delete</div></Button>
+                    <Button size="slim" primary onClick={() => showEdit()}>Edit</Button>
                 </HorizontalStack>
             </VerticalStack>
         </Box>

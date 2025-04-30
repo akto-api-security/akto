@@ -26,6 +26,8 @@ public class TestingRunResult implements Comparable<TestingRunResult> {
 
     public static final String API_INFO_KEY = "apiInfoKey";
     private ApiInfo.ApiInfoKey apiInfoKey;
+    public static final String RERUN = "rerun";
+    private boolean rerun;
     public static final String TEST_SUPER_TYPE = "testSuperType";
     private String testSuperType;
     public static final String TEST_SUB_TYPE = "testSubType";
@@ -46,16 +48,27 @@ public class TestingRunResult implements Comparable<TestingRunResult> {
     public static final String TEST_RUN_RESULT_SUMMARY_ID = "testRunResultSummaryId";
     private ObjectId testRunResultSummaryId;
 
+    public static final String IS_IGNORED_RESULT = "isIgnoredResult";
+    private boolean isIgnoredResult ;
 
     public static final String ERRORS_LIST = "errorsList";
     private  List<String> errorsList;
 
     public static final String REQUIRES_CONFIG = TEST_RESULTS + ".0." + TestResult.REQUIRES_CONFIG;
 
+    public static final String WORKFLOW_TEST = "workflowTest";
     private WorkflowTest workflowTest;
 
     @BsonIgnore
     private List<TestLog> testLogs = new ArrayList<>();
+
+    public boolean isRerun() {
+        return rerun;
+    }
+
+    public void setRerun(boolean rerun) {
+        this.rerun = rerun;
+    }
 
     public static class TestLog {
         TestLogType testLogType;
@@ -341,5 +354,13 @@ public class TestingRunResult implements Comparable<TestingRunResult> {
 
     public void setErrorsList(List<String> errorsList) {
         this.errorsList = errorsList;
+    }
+
+    public boolean isIgnoredResult() {
+        return isIgnoredResult;
+    }
+
+    public void setIgnoredResult(boolean isIgnoredResult) {
+        this.isIgnoredResult = isIgnoredResult;
     }
 }

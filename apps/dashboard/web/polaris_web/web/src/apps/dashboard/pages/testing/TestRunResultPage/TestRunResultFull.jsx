@@ -94,8 +94,8 @@ function TestRunResultFull(props) {
           </LegacyCard>
         ,
         (testingRunResult && testingRunResult["testLogs"] && testingRunResult["testLogs"].length > 0) ?  testLogsComponent : null,
-        ( selectedTestRunResult.errors && selectedTestRunResult.errors.length > 0 ) && testErrorComponent ,
-        (!(selectedTestRunResult.errors && selectedTestRunResult.errors.length > 0 && func.showTestSampleData(selectedTestRunResult))) && selectedTestRunResult.testResults &&
+        (!func.showTestSampleData(selectedTestRunResult)) && testErrorComponent ,
+        (func.showTestSampleData(selectedTestRunResult))&& selectedTestRunResult.testResults &&
         <SampleDataList
           key={"sampleData"}
           sampleData={selectedTestRunResult?.testResults.map((result) => {
@@ -129,7 +129,7 @@ function TestRunResultFull(props) {
             divider= {true}
             backUrl = {source === "editor" ? undefined : (hexId ==="issues" ? "/dashboard/issues" : `/dashboard/testing/${hexId}`)}
             isFirstPage = {source === "editor"}
-            primaryAction = {<Button primary onClick={()=>createJiraTicket(issueDetails)} disabled={jiraIssueUrl !== "" || window.JIRA_INTEGRATED !== "true"} >Create Jira Ticket</Button>} 
+            // primaryAction = {<Button primary onClick={()=>createJiraTicket(issueDetails)} disabled={jiraIssueUrl !== "" || window.JIRA_INTEGRATED !== "true"} >Create Jira Ticket</Button>} 
             components = {components}
         />
     )

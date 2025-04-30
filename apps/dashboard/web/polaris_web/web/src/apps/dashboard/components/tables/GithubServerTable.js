@@ -9,9 +9,11 @@ import {
   HorizontalStack,
   Key,
   ChoiceList,
-  Tabs} from '@shopify/polaris';
-import {CellType, GithubRow} from './rows/GithubRow';
-import { useState, useCallback, useEffect } from 'react';
+  Tabs,
+  Text,
+  Link} from '@shopify/polaris';
+import { GithubRow} from './rows/GithubRow';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import "./style.css"
 import transform from '../../pages/observe/transform';
 import DropdownSearch from '../shared/DropdownSearch';
@@ -21,6 +23,8 @@ import useTable from './TableContext';
 import { debounce } from 'lodash';
 
 import { useSearchParams } from 'react-router-dom';
+import TableStore from './TableStore';
+import func from '../../../../util/func';
 
 function GithubServerTable(props) {
 
@@ -35,8 +39,14 @@ function GithubServerTable(props) {
   const setFiltersMap = PersistStore(state => state.setFiltersMap)
   const tableInitialState = PersistStore(state => state.tableInitialState)
   const setTableInitialState = PersistStore(state => state.setTableInitialState)
+  const tableSelectedMap = PersistStore(state => state.tableSelectedTab)
+  const setTableSelectedMap = PersistStore(state => state.setTableSelectedTab)
   const currentPageKey = props?.filterStateUrl || (window.location.pathname + "/" +  window.location.hash)
-  const pageFiltersMap = filtersMap[currentPageKey]
+  const pageFiltersMap = filtersMap[currentPageKey];
+
+  const abortControllerRef = useRef(null);
+
+  const { selectedItems, selectItems, applyFilter } = useTable();
 
   const handleRemoveAppliedFilter = (key) => {
     let temp = appliedFilters
@@ -68,13 +78,25 @@ function GithubServerTable(props) {
   const pageLimit = props?.pageLimit || 20;
   const [appliedFilters, setAppliedFilters] = useState(initialStateFilters);
   const [queryValue, setQueryValue] = useState('');
-
-  const { applyFilter } = useTable()
+  const [fullDataIds, setFullDataIds] = useState([])
 
   const [sortableColumns, setSortableColumns] = useState([])
   const [activeColumnSort, setActiveColumnSort] = useState({columnIndex: -1, sortDirection: 'descending'})
 
-  let filterOperators = props.headers.reduce((map, e) => { map[e.sortKey || e.value] = 'OR'; return map }, {})
+  let filterOperators = props.headers.reduce((map, e) => { map[e.sortKey || e.filterKey || e.value] = 'OR'; return map }, {})
+
+  useEffect(() => {
+    const handleEsc = (event) => {
+      if (event.key === "Escape") {
+        setMode(IndexFiltersMode.Default)
+      }
+    }
+
+    window.addEventListener("keydown", handleEsc)
+    return () => {
+      window.removeEventListener("keydown", handleEsc)
+    }
+  }, [])
 
   useEffect(()=> {
     let queryFilters 
@@ -84,7 +106,13 @@ function GithubServerTable(props) {
       queryFilters = tableFunc.getFiltersMapFromUrl(decodeURIComponent(searchParams.get("filters") || ""), props?.disambiguateLabel, handleRemoveAppliedFilter, currentPageKey)
     }
     const currentFilters = tableFunc.mergeFilters(queryFilters,initialStateFilters,props?.disambiguateLabel, handleRemoveAppliedFilter)
-    setAppliedFilters(currentFilters)
+    setAppliedFilters((prev) => {
+      if(func.deepComparison(prev, currentFilters)){
+        return prev
+      }else{
+        return currentFilters;
+      }
+    })
     setSortSelected(tableFunc.getInitialSortSelected(props.sortOptions, pageFiltersMap))
   },[currentPageKey])
 
@@ -92,15 +120,33 @@ function GithubServerTable(props) {
     updateQueryParams("filters",tableFunc.getPrettifiedFilter(appliedFilters))
   },[appliedFilters])
 
-  async function fetchData(searchVal) {
+  async function fetchData(searchVal, tempFilters = []) {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort(); // Cancel the previous request
+    }
+    abortControllerRef.current = new AbortController();
+    const { signal } = abortControllerRef.current;
+
     let [sortKey, sortOrder] = sortSelected.length == 0 ? ["", ""] : sortSelected[0].split(" ");
     let filters = props.headers.reduce((map, e) => { map[e.filterKey || e.value] = []; return map }, {})
-    appliedFilters.forEach((filter) => {
-      filters[filter.key] = filter.value
-    })
+    if(tempFilters.length === 0){
+      appliedFilters.forEach((filter) => {
+        filters[filter.key] = filter.value
+      })
+    }else{
+      tempFilters.forEach((filter) => {
+        filters[filter.key] = filter.value
+      })
+    }
+  
     let tempData = await props.fetchData(sortKey, sortOrder == 'asc' ? -1 : 1, page * pageLimit, pageLimit, filters, filterOperators, searchVal);
+    if(signal.aborted){
+      return;
+    }
     tempData ? setData([...tempData.value]) : setData([])
     tempData ? setTotal(tempData.total) : setTotal(0)
+    tempData ? setFullDataIds(tempData?.fullDataIds) : setFullDataIds([])
+    
     applyFilter(tempData.total)
     if (!performance.getEntriesByType('navigation')[0].type === 'reload') {
       setTableInitialState({
@@ -113,6 +159,11 @@ function GithubServerTable(props) {
   const handleSelectedTab = (x) => {
     const tableTabs = props.tableTabs ? props.tableTabs : props.tabs
     if(tableTabs){
+      const id = tableTabs[x]?.id;
+      setTableSelectedMap({
+        ...tableSelectedMap,
+        [window.location.pathname]: id
+      })
       const primitivePath = window.location.origin + window.location.pathname + window.location?.search
       const newUrl = primitivePath + "#" +  tableTabs[x].id
       window.history.replaceState(null, null, newUrl)
@@ -135,7 +186,9 @@ function GithubServerTable(props) {
   },[props?.headers])
 
   useEffect(() => {
-    fetchData(queryValue)
+    if (props?.callFromOutside) {
+      fetchData(queryValue);
+    }    
   },[props?.callFromOutside])
 
   const handleSort = (col, dir) => {
@@ -155,39 +208,38 @@ function GithubServerTable(props) {
     setFiltersMap(copyFilters)
   }
 
-  const changeAppliedFilters = (key, value) => {
-    let temp = appliedFilters
-    temp = temp.filter((filter) => {
-      return filter.key !== key
-    })
+  const changeAppliedFilters = useCallback((key, value) => {
+    let temp = appliedFilters.filter(filter => filter.key !== key);
     if (value.length > 0 || Object.keys(value).length > 0) {
       temp.push({
         key: key,
         label: props.disambiguateLabel(key, value),
         onRemove: handleRemoveAppliedFilter,
         value: value
-      })
+      });
     }
     setPage(0);
     let tempFilters = filtersMap
-    tempFilters[currentPageKey] = {
-      'filters': temp,
-      'sort': pageFiltersMap?.sort || []
+    tempFilters[currentPageKey]= {
+      filters: temp,
+      sort: pageFiltersMap?.sort || []
     }
-    setFiltersMap(tempFilters)
+    setFiltersMap(tempFilters);
     setAppliedFilters(temp);
-  };
+  }, [appliedFilters, props.disambiguateLabel, handleRemoveAppliedFilter, setFiltersMap, currentPageKey, pageFiltersMap]);
 
   const debouncedSearch = debounce((searchQuery) => {
       fetchData(searchQuery)
   }, 500);
 
-  const handleFiltersQueryChange = (val) =>{
-    setQueryValue(val)
-    debouncedSearch(val)
-  }
+  const handleFiltersQueryChange = useCallback((val) => {
+    setQueryValue(val);
+    debouncedSearch(val);
+  }, []);
+
   const handleFiltersQueryClear = useCallback(
-    () => setQueryValue(""),
+    () => {setQueryValue("");
+    debouncedSearch("")},
     [],
   );
 
@@ -199,7 +251,9 @@ function GithubServerTable(props) {
     return choices.sort((a, b) => (a?.label || a) - (b?.label || b));
   }
 
-  let filters = formatFilters(props.filters)
+  const filters = useMemo(() => {
+    return formatFilters(props.filters);
+  }, [props.filters, appliedFilters]);
 
   function formatFilters(filters) {
     return filters 
@@ -252,24 +306,70 @@ function GithubServerTable(props) {
   const resourceIDResolver = (data) => {
     return data.id;
   };
+  
 
-  const { selectedResources, allResourcesSelected, handleSelectionChange } =
-    useIndexResourceState(data, {
+  const {selectedResources, allResourcesSelected, handleSelectionChange } =
+    useIndexResourceState(fullDataIds!== undefined ? fullDataIds : data , {
       resourceIDResolver,
     });
+
+  const customSelectionChange = (selectionType,toggleType, selection) => {
+    if(props?.treeView || props?.isMultipleItemsSelected === true){
+      let tempItems = selection;
+        if(typeof selectItems !== 'object'){
+          tempItems = [selection]
+        }
+      if(selectionType !== "page"){
+        let newItems = []
+        if(toggleType){
+          newItems = [...new Set([...selectedItems, ...tempItems])]
+        }else{
+          newItems = selectedItems.filter((x) => !tempItems.includes(x))
+        }
+        selectItems(newItems);
+        TableStore.getState().setSelectedItems(newItems)
+      }else{
+        if(selection === false){
+          selectItems([])
+          TableStore.getState().setSelectedItems([])
+        }else{
+        //todo: handle
+          if (data) {
+            if (toggleType) {
+              let allItemsSet = new Set()
+              for (let row of data) {
+                  if (row?.id instanceof Array) {
+                    row?.id.forEach(item => allItemsSet.add(item));
+                  }
+              }
+              selectItems([...allItemsSet])
+              TableStore.getState().setSelectedItems([...allItemsSet])
+            } else {
+              selectItems([])
+              TableStore.getState().setSelectedItems([])
+            }
+          }
+        }
+      }
+    }
+    if(selectionType === "page"){
+      handleSelectionChange("all",toggleType, selection)
+    }else{
+      handleSelectionChange(selectionType,toggleType, selection)
+    }
+    
+  }
 
   const [popoverActive, setPopoverActive] = useState(-1);
 
   // sending all data in case of simple table because the select-all state is controlled from the data.
   // not doing this affects bulk select functionality.
-  let tmp = data && data.length <= pageLimit ? data :
-    data.slice(page * pageLimit, Math.min((page + 1) * pageLimit, data.length))
-  let rowMarkup = tmp
-    .map(
-      (
-        data,
-        index,
-      ) => (
+  // let tmp = data && data.length <= pageLimit ? data :
+  //   data.slice(page * pageLimit, Math.min((page + 1) * pageLimit, data.length))
+
+  const rowMarkup = useMemo(() => {
+    return data.map(
+      (data, index) => (
         <GithubRow
           key={data.id}
           id={data.id}
@@ -289,9 +389,11 @@ function GithubServerTable(props) {
           notHighlightOnselected={props.notHighlightOnselected}
           popoverActive={popoverActive}
           setPopoverActive={setPopoverActive}
+          treeView={props?.treeView}
         />
       ),
     );
+  }, [data, selectedResources, props, popoverActive, setPopoverActive]);
 
   const onPageNext = () => {
     setPage((page) => (page + 1));
@@ -309,8 +411,12 @@ function GithubServerTable(props) {
 
   let tableHeightClass = props.increasedHeight ? "control-row" : (props.condensedHeight ? "condensed-row" : '') 
   let tableClass = props.useNewRow ? "new-table" : (props.selectable ? "removeHeaderColor" : "hideTableHead")
+  const bulkActionResources = selectedItems.length > 0 ? selectedItems : selectedResources
+  if (typeof props.setSelectedResourcesForPrimaryAction === 'function') {
+    props.setSelectedResourcesForPrimaryAction(bulkActionResources)
+  }
   return (
-    <div className={tableClass}>
+    <div className={tableClass} style={{display: "flex", flexDirection: "column", gap: "20px"}}>
       <LegacyCard>
         {props.tabs && <Tabs tabs={props.tabs} selected={props.selected} onSelect={(x) => handleTabChange(x)}></Tabs>}
         {props.tabs && props.tabs[props.selected].component ? props.tabs[props.selected].component :
@@ -320,12 +426,13 @@ function GithubServerTable(props) {
                 sortOptions={props.sortOptions}
                 sortSelected={sortSelected}
                 queryValue={queryValue}
-                queryPlaceholder={`Searching in ${transform.formatNumberWithCommas(total)} ${total == 1 ? props.resourceName.singular : props.resourceName.plural}`}
+                queryPlaceholder={`Search in ${transform.formatNumberWithCommas(total)} ${total == 1 ? props.resourceName.singular : props.resourceName.plural}`}
                 onQueryChange={handleFiltersQueryChange}
                 onQueryClear={handleFiltersQueryClear}
                 {...(props.hideQueryField ? { hideQueryField: props.hideQueryField } : {})}
                 onSort={setSortSelected}
                 cancelAction={{
+                  onAction: () => {},
                   disabled: false,
                   loading: false,
                 }}
@@ -346,11 +453,11 @@ function GithubServerTable(props) {
                 resourceName={props.resourceName}
                 itemCount={data.length}
                 selectedItemsCount={
-                  allResourcesSelected ? 'All' : selectedResources.length
+                  allResourcesSelected ? 'All' : bulkActionResources.length
                 }
                 // condensed
                 selectable={props.selectable || false}
-                onSelectionChange={handleSelectionChange}
+                onSelectionChange={customSelectionChange}
                 headings={props?.headings ? props.headings :[
                   {
                     id: "data",
@@ -358,13 +465,13 @@ function GithubServerTable(props) {
                     flush: true
                   }
                 ]}
-                bulkActions={props.selectable ? props.bulkActions && props.bulkActions(selectedResources) : []}
-                promotedBulkActions={props.selectable ? props.promotedBulkActions && props.promotedBulkActions(selectedResources) : []}
+                promotedBulkActions={props.selectable ? props.promotedBulkActions && props.promotedBulkActions(bulkActionResources) : []}
                 hasZebraStriping={props.hasZebraStriping || false}
                 sortable={sortableColumns}
                 sortColumnIndex={activeColumnSort.columnIndex}
                 sortDirection={activeColumnSort.sortDirection}
                 onSort={handleSort}
+                lastColumnSticky={props?.lastColumnSticky || false}
               >
                 {rowMarkup}
               </IndexTable>
@@ -393,9 +500,16 @@ function GithubServerTable(props) {
         }
 
       </LegacyCard>
+      {(props?.showFooter !== false) && <HorizontalStack gap="1" align="center">
+        <Text>Stuck? feel free to</Text>
+        <Link onClick={() => {
+          window?.Intercom("show")
+        }}>Contact us</Link>
+        <Text>or</Text>
+        <Link url="https://akto.io/api-security-demo" target="_blank">Book a call</Link>
+      </HorizontalStack>}
     </div>
   );
-
 }
 
 export default GithubServerTable

@@ -1,7 +1,7 @@
 import { Navigation } from "@shopify/polaris"
-import { StoreDetailsFilledMinor, IdentityCardFilledMajor, AutomationFilledMajor, AppsFilledMajor} from "@shopify/polaris-icons"
-import { ListFilledMajor, ReportFilledMinor, LockFilledMajor, CollectionsFilledMajor, PlanMajor} from "@shopify/polaris-icons"
-import { VariantMajor, VocabularyMajor } from "@shopify/polaris-icons"
+import { StoreDetailsFilledMinor, IdentityCardFilledMajor, AutomationFilledMajor, AppsFilledMajor, ComposeMajor, ProfileMajor} from "@shopify/polaris-icons"
+import { ListFilledMajor, ReportFilledMinor, LockFilledMajor, CollectionsFilledMajor, PlanMajor, ChatMajor} from "@shopify/polaris-icons"
+import { VariantMajor, VocabularyMajor, AdjustMinor } from "@shopify/polaris-icons"
 import { useLocation, useNavigate } from "react-router-dom"
 import func from "@/util/func"
 
@@ -11,13 +11,30 @@ const SettingsLeftNav = () => {
     const location = useLocation()
     const path = location.pathname
     const page = path.substring(path.lastIndexOf('/') + 1)
-    
-    const logsArr = window.IS_SAAS === 'true' ? [] : [{
-        label: 'Logs',
-        icon: ListFilledMajor,
-        selected: page === "logs",
-        onClick: () => navigate("/dashboard/settings/logs")
-    }]
+    let rbacAccess = func.checkForRbacFeatureBasic();
+    let rbacAccessAdvanced = func.checkForRbacFeature();
+
+    const usersArr = window.USER_ROLE !== 'GUEST' ? [{
+        label: 'Users',
+        icon: IdentityCardFilledMajor,
+        selected: page === "users",
+        onClick: () => navigate("/dashboard/settings/users")
+    }] : []
+
+    const roleArr = window.USER_ROLE === 'ADMIN' && rbacAccess && rbacAccessAdvanced ? [{
+        label: 'Roles',
+        icon: ProfileMajor,
+        selected: page === "roles",
+        onClick: () => navigate("/dashboard/settings/roles")
+    }] : []
+
+    const logsArr = window?.IS_SAAS !== 'true' ||
+        (window?.USER_NAME && window?.USER_NAME.includes("akto")) ? [{
+            label: 'Logs',
+            icon: ListFilledMajor,
+            selected: page === "logs",
+            onClick: () => navigate("/dashboard/settings/logs")
+        }] : []
     const metricsArr = window.IS_SAAS === 'true' ? [] : [{
         label: 'Metrics',
         icon: ReportFilledMinor,
@@ -29,6 +46,12 @@ const SettingsLeftNav = () => {
         icon: PlanMajor,
         selected: page === "self-hosted",
         onClick: () => navigate("/dashboard/settings/self-hosted")
+    }] : []
+    const auditLogsArr = ((window.IS_SAAS === 'true' || window.DASHBOARD_MODE === 'ON_PREM') && window.USER_ROLE === 'ADMIN') ? [{
+        label: 'Audit logs',
+        icon: ComposeMajor,
+        selected: page === 'audit-logs',
+        onClick: () => navigate("/dashboard/settings/audit-logs")
     }] : []
 
     const billingArr = window.IS_SAAS === 'true' || window.DASHBOARD_MODE === 'ON_PREM' ? [{
@@ -55,12 +78,8 @@ const SettingsLeftNav = () => {
                         selected: page === "about",
                         onClick: () => navigate("/dashboard/settings/about")
                     },
-                    {
-                        label: 'Users',
-                        icon: IdentityCardFilledMajor,
-                        selected: page === "users",
-                        onClick: () => navigate("/dashboard/settings/users")
-                    },
+                    ...usersArr,
+                    ...roleArr,
                     // {
                     //     label: 'Alerts',
                     //     icon: DiamondAlertMinor,
@@ -90,6 +109,12 @@ const SettingsLeftNav = () => {
                         onClick: () => navigate("/dashboard/settings/default-payloads")
                     },
                     {
+                        label: 'Advanced traffic filters',
+                        icon: AdjustMinor,
+                        selected: page === "advanced-filters",
+                        onClick: () => navigate("/dashboard/settings/advanced-filters")
+                    }, 
+                    {
                         label: 'Tags',
                         icon: CollectionsFilledMajor,
                         selected: page === "tags",
@@ -102,7 +127,14 @@ const SettingsLeftNav = () => {
                         onClick: () => navigate("/dashboard/settings/test-library")
                     },
                     ...billingArr,
-                    ...selfHostedArr
+                    ...selfHostedArr,
+                    ...auditLogsArr,
+                    {
+                        label: 'Help & Support',
+                        icon: ChatMajor,
+                        selected: page === "help",
+                        onClick: () => navigate("/dashboard/settings/help")
+                    }
                 ]}
             />
         </Navigation>

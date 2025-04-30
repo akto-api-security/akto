@@ -15,7 +15,7 @@ import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.SingleTypeInfo.SubType;
 import com.akto.dto.type.URLMethods;
 import com.akto.types.CappedSet;
-
+import com.akto.util.Constants;
 import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.YamlTemplateSource;
 import com.akto.utils.GithubSync;
@@ -41,6 +41,7 @@ public class TestInitializerListener extends MongoBasedTest {
 
     @Test
     public void testChangesInfo() {
+        Context.userId.set(null);
         ApiCollection apiCollection1 = new ApiCollection(0, "coll1", Context.now(), new HashSet<>(), "akto.io", 1, false, true);
         ApiCollection apiCollection2 = new ApiCollection(1, "coll2", Context.now(), new HashSet<>(), "app.akto.io", 2, false, true);
         ApiCollection apiCollection3 = new ApiCollection(2, "coll3", Context.now(), new HashSet<>(), null, 3, false, true);
@@ -88,6 +89,7 @@ public class TestInitializerListener extends MongoBasedTest {
     @Test
     public void deleteNullSubCategoryIssues() {
         TestingRunIssuesDao.instance.getMCollection().drop();
+        Context.userId.set(null);
 
         ApiInfo.ApiInfoKey apiInfoKey1 = new ApiInfo.ApiInfoKey(0, "url1", URLMethods.Method.GET);
         TestingRunIssues testingRunIssues1 = new TestingRunIssues(new TestingIssuesId(apiInfoKey1, GlobalEnums.TestErrorSource.AUTOMATED_TESTING,null, "something"), GlobalEnums.Severity.HIGH, GlobalEnums.TestRunIssueStatus.OPEN, 0, 0, new ObjectId(),null, 0);
@@ -120,7 +122,7 @@ public class TestInitializerListener extends MongoBasedTest {
         GithubSync githubSync = new GithubSync();
         byte[] repoZip = githubSync.syncRepo("akto-api-security/tests-library", "master");
 
-        InitializerListener.processTemplateFilesZip(repoZip, InitializerListener._AKTO, YamlTemplateSource.AKTO_TEMPLATES.toString(), "");
+        InitializerListener.processTemplateFilesZip(repoZip, Constants._AKTO, YamlTemplateSource.AKTO_TEMPLATES.toString(), "");
 
         count = YamlTemplateDao.instance.getMCollection().estimatedDocumentCount();
         assertTrue(count > 0);

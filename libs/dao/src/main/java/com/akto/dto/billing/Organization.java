@@ -12,6 +12,7 @@ public class Organization {
     @BsonId
     private String id;
     public static final String ID = "_id";
+    public static final String NAME = "name";
     private String name;
     private String adminEmail;
     public static final String ADMIN_EMAIL = "adminEmail";
@@ -35,6 +36,12 @@ public class Organization {
 
     public String hotjarSiteId = "hotjarSiteId";
 
+    public static final String PLAN_TYPE = "planType";
+    public String planType = "planType";
+
+    public static final String TRIAL_MSG = "trialMsg";
+    public String trialMsg = "trialMsg";
+
     public static final String TEST_TELEMETRY_ENABLED = "testTelemetryEnabled";
     private boolean testTelemetryEnabled;
     private int gracePeriod;
@@ -43,6 +50,9 @@ public class Organization {
     private boolean expired;
 
     public static final int NO_SYNC_PERIOD = 60 * 60 * 24 * 3; // 3 days.
+
+    public static final String NAME_LAST_UPDATE = "nameLastUpdate";
+    private int nameLastUpdate;
 
     public Organization() { }
 
@@ -127,6 +137,22 @@ public class Organization {
         this.hotjarSiteId = hotjarSiteId;
     }
 
+    public  String getplanType() {
+        return planType;
+    }
+
+    public  void setplanType(String planType) {
+        this.planType = planType;
+    }
+
+    public  String gettrialMsg() {
+        return trialMsg;
+    }
+
+    public  void settrialMsg(String trialMsg) {
+        this.trialMsg = trialMsg;
+    }
+
     public int getLastFeatureMapUpdate() {
         return lastFeatureMapUpdate;
     }
@@ -164,5 +190,13 @@ public class Organization {
 
     public void setTestTelemetryEnabled(boolean testTelemetryEnabled) {
         this.testTelemetryEnabled = testTelemetryEnabled;
+    }
+
+    public int getNameLastUpdate() {
+        return nameLastUpdate;
+    }
+
+    public void setNameLastUpdate(int nameLastUpdate) {
+        this.nameLastUpdate = nameLastUpdate;
     }
 }

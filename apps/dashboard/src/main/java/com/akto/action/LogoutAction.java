@@ -1,42 +1,38 @@
 package com.akto.action;
 
+import static com.akto.filter.UserDetailsFilter.LOGIN_URI;
+
 import com.akto.dao.UsersDao;
 import com.akto.dao.context.Context;
-import com.akto.dto.Config;
-import com.akto.dto.SignupInfo;
 import com.akto.dto.User;
-import com.akto.utils.Auth0;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.DashboardMode;
+import com.akto.utils.Auth0;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 import com.opensymphony.xwork2.Action;
-import org.apache.commons.lang3.StringUtils;
-import org.apache.struts2.interceptor.ServletRequestAware;
-import org.apache.struts2.interceptor.ServletResponseAware;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import javax.servlet.http.Cookie;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-import javax.servlet.http.HttpSession;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.util.ArrayList;
-import java.util.Map;
-
-import static com.akto.filter.UserDetailsFilter.LOGIN_URI;
+import javax.servlet.http.Cookie;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import javax.servlet.http.HttpSession;
+import org.apache.struts2.interceptor.ServletRequestAware;
+import org.apache.struts2.interceptor.ServletResponseAware;
 
 public class LogoutAction extends UserAction implements ServletRequestAware,ServletResponseAware {
-    private static final Logger logger = LoggerFactory.getLogger(LogoutAction.class);
+
+    private static final LoggerMaker logger = new LoggerMaker(LogoutAction.class, LogDb.DASHBOARD);
 
     private String logoutUrl;
     private String redirectUrl;
     @Override
     public String execute() throws Exception {
         User user = getSUser();
-        logger.info(String.valueOf(user.getId()));
+        logger.debug(String.valueOf(user.getId()));
         UsersDao.instance.updateOne(
                 Filters.eq("_id", user.getId()),
                 Updates.set("refreshTokens", new ArrayList<>())

@@ -25,6 +25,7 @@ import com.akto.dto.ApiInfo;
 import com.akto.dto.BackwardCompatibility;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.ApiInfo.ApiInfoKey;
+import com.akto.dto.HttpResponseParams.Source;
 import com.akto.dto.billing.SyncLimit;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
@@ -70,7 +71,7 @@ public class TestUpdatesInCollections extends MongoBasedTest {
         }
 
         httpCallParser.syncFunction(httpResponseParamsList, false, true, null);
-        httpCallParser.apiCatalogSync.syncWithDB(false, true, SyncLimit.noLimit);
+        httpCallParser.apiCatalogSync.syncWithDB(false, true, SyncLimit.noLimit, Source.HAR);
     }
 
     public TestingRunIssues generateTestResultIssue(String url, String method, Severity severity, String testSubCategory) throws Exception{
@@ -94,6 +95,7 @@ public class TestUpdatesInCollections extends MongoBasedTest {
         AktoDataTypeDao.instance.getMCollection().drop();
         CustomDataTypeDao.instance.getMCollection().drop();
         SampleDataDao.instance.getMCollection().drop();
+        Context.userId.set(null);
 
         InitializerListener.addAktoDataTypes(new BackwardCompatibility());
         SingleTypeInfo.fetchCustomDataTypes(MongoBasedTest.ACCOUNT_ID);
@@ -155,6 +157,7 @@ public class TestUpdatesInCollections extends MongoBasedTest {
         CustomDataTypeDao.instance.getMCollection().drop();
         SampleDataDao.instance.getMCollection().drop();
         TestingRunIssuesDao.instance.getMCollection().drop();
+        Context.userId.set(null);
 
         InitializerListener.addAktoDataTypes(new BackwardCompatibility());
         SingleTypeInfo.fetchCustomDataTypes(MongoBasedTest.ACCOUNT_ID);

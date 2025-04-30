@@ -1,35 +1,76 @@
 package com.akto.action;
 
-import com.akto.DaoInit;
 import com.akto.MongoBasedTest;
+import com.akto.action.observe.InventoryAction;
 import com.akto.analyser.ResourceAnalyser;
 import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.ApiCollectionsDao;
+import com.akto.dao.ApiInfoDao;
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.context.Context;
-import com.akto.dto.AccountSettings;
-import com.akto.dto.ApiCollection;
-import com.akto.dto.User;
-import com.akto.dto.type.SingleTypeInfo;
+import com.akto.dto.*;
+import com.akto.dto.type.RequestTemplate;
+import com.akto.dto.type.URLStatic;
+import com.akto.dto.type.URLTemplate;
 import com.akto.listener.RuntimeListener;
 import com.akto.parsers.HttpCallParser;
-import com.akto.runtime.policies.AktoPolicyNew;
 import com.akto.utils.AccountHTTPCallParserAktoPolicyInfo;
-import com.mongodb.ConnectionString;
+import com.mongodb.client.model.Filters;
 import org.bson.conversions.Bson;
-import org.checkerframework.checker.units.qual.A;
-import org.junit.Ignore;
 import org.junit.Test;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
+import java.util.*;
 
 import static org.junit.Assert.assertEquals;
 
 public class TestHarAction extends MongoBasedTest{
+
+    @Test
+    public void testDemergeAfterReuploadingApis() throws Exception {
+        ApiInfoDao.instance.getMCollection().drop();
+        Context.userId.set(null);
+
+        HttpCallParser httpCallParser = new HttpCallParser("",0,0,0, true);
+
+        String payload = "{\"method\":\"GET\",\"requestPayload\":\"{\\\"photoUrls\\\":[\\\"string\\\"],\\\"name\\\":\\\"doggie\\\",\\\"id\\\":0,\\\"category\\\":{\\\"id\\\":0,\\\"name\\\":\\\"string\\\"},\\\"tags\\\":[{\\\"id\\\":0,\\\"name\\\":\\\"string\\\"}],\\\"status\\\":\\\"available\\\"}\",\"responsePayload\":\"{\\\"id\\\":9223372036854775807,\\\"category\\\":{\\\"id\\\":0,\\\"name\\\":\\\"string\\\"},\\\"name\\\":\\\"doggie\\\",\\\"photoUrls\\\":[\\\"string\\\"],\\\"tags\\\":[{\\\"id\\\":0,\\\"name\\\":\\\"string\\\"}],\\\"status\\\":\\\"available\\\"}\",\"ip\":\"null\",\"source\":\"MIRRORING\",\"type\":\"HTTP/2\",\"akto_vxlan_id\":\"1661807253\",\"path\":\"https://juice-shop.herokuapp.com/api/Deliverys/ec6d5f9d-94a7-4096-bcf1-7a0818bba867\",\"requestHeaders\":\"{\\\"Origin\\\":\\\"https://petstore.swagger.io\\\",\\\"Accept\\\":\\\"application/json\\\",\\\"User-Agent\\\":\\\"Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:95.0) Gecko/20100101 Firefox/95.0\\\",\\\"Referer\\\":\\\"https://petstore.swagger.io/\\\",\\\"Connection\\\":\\\"keep-alive\\\",\\\"Sec-Fetch-Dest\\\":\\\"empty\\\",\\\"Sec-Fetch-Site\\\":\\\"same-origin\\\",\\\"Host\\\":\\\"petstore.swagger.io\\\",\\\"Accept-Encoding\\\":\\\"gzip, deflate, br\\\",\\\"Sec-Fetch-Mode\\\":\\\"cors\\\",\\\"TE\\\":\\\"trailers\\\",\\\"Accept-Language\\\":\\\"en-US,en;q=0.5\\\",\\\"Content-Length\\\":\\\"215\\\",\\\"Content-Type\\\":\\\"application/json\\\"}\",\"responseHeaders\":\"{\\\"date\\\":\\\"Tue, 04 Jan 2022 20:11:58 GMT\\\",\\\"access-control-allow-origin\\\":\\\"*\\\",\\\"server\\\":\\\"Jetty(9.2.9.v20150224)\\\",\\\"access-control-allow-headers\\\":\\\"Content-Type, api_key, Authorization\\\",\\\"X-Firefox-Spdy\\\":\\\"h2\\\",\\\"content-type\\\":\\\"application/json\\\",\\\"access-control-allow-methods\\\":\\\"GET, POST, DELETE, PUT\\\"}\",\"time\":\"1641327118\",\"contentType\":\"application/json\",\"akto_account_id\":\"1000000\",\"statusCode\":\"200\",\"status\":\"OK\"}";
+        HttpResponseParams httpResponseParams = HttpCallParser.parseKafkaMessage(payload);
+        httpCallParser.syncFunction(Collections.singletonList(httpResponseParams),true, true, null);
+
+        List<ApiInfo> apiInfoList = ApiInfoDao.instance.findAll(Filters.empty());
+
+        assertEquals(1, apiInfoList.size());
+        
+        int apiCollectionId = apiInfoList.get(0).getId().getApiCollectionId();
+
+        assertEquals("https://juice-shop.herokuapp.com/api/Deliverys/STRING", apiInfoList.get(0).getId().getUrl());
+
+        InventoryAction action = new InventoryAction();
+        action.setUrl("https://juice-shop.herokuapp.com/api/Deliverys/STRING");
+        action.setMethod("GET");
+        action.setApiCollectionId(apiCollectionId);
+        action.deMergeApi();
+
+        Map<URLStatic, RequestTemplate> strictURLToMethods = httpCallParser.apiCatalogSync.dbState.get(apiCollectionId).getStrictURLToMethods();
+        Map<URLTemplate, RequestTemplate> templateURLToMethods = httpCallParser.apiCatalogSync.dbState.get(apiCollectionId).getTemplateURLToMethods();
+
+        assertEquals(0, strictURLToMethods.size());
+        assertEquals(1, templateURLToMethods.size());
+
+        List<ApiInfo> apiInfoList1 = ApiInfoDao.instance.findAll(Filters.empty());
+        assertEquals("https://juice-shop.herokuapp.com/api/Deliverys/ec6d5f9d-94a7-4096-bcf1-7a0818bba867", apiInfoList1.get(0).getId().getUrl());
+
+        httpCallParser.syncFunction(Collections.singletonList(httpResponseParams),true, true, null);
+
+        Map<URLStatic, RequestTemplate> strictURLToMethods1 = httpCallParser.apiCatalogSync.dbState.get(apiCollectionId).getStrictURLToMethods();
+        Map<URLTemplate, RequestTemplate> templateURLToMethods1 = httpCallParser.apiCatalogSync.dbState.get(apiCollectionId).getTemplateURLToMethods();
+
+        assertEquals(1, strictURLToMethods1.size());
+        assertEquals(0, templateURLToMethods1.size());
+
+        List<ApiInfo> apiInfoList2 = ApiInfoDao.instance.findAll(Filters.empty());
+        assertEquals("https://juice-shop.herokuapp.com/api/Deliverys/ec6d5f9d-94a7-4096-bcf1-7a0818bba867", apiInfoList2.get(0).getId().getUrl());
+    }
 
 
     @Test
@@ -58,6 +99,7 @@ public class TestHarAction extends MongoBasedTest{
         user.setLogin("test@akto.io");
         session.put("user",user);
         harAction.setSession(session);
+        Context.userId.set(null);
         harAction.setHarString(harString);
         harAction.setApiCollectionId(0);
 

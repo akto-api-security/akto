@@ -24,6 +24,16 @@
     background-color: rgba(255, 0, 0, 0.1);
 }
 
+.akto-decoded{
+    border-left: 4px solid var(--akto-primary);
+    border-top: 1px solid var(--akto-primary);
+    border-bottom: 1px solid var(--akto-primary);
+    margin-left: -62px;
+    width: 100vw !important;
+    border-radius: 2px;
+    background-color: rgba(224, 134, 247, 0.226);
+}
+
 .updated-content{
     color: #916A00 !important;
     font-weight: 600 !important;
@@ -101,4 +111,24 @@
     width: 92px !important;
     height: 92px !important;
     border-radius: unset !important;
+}
+
+.styled-name label.Polaris-Choice.Polaris-Checkbox__ChoiceLabel {
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+.styled-name .Polaris-Choice__Control {
+    padding: 0 !important;
+    margin: 0 !important;
+}
+
+.control-row .Polaris-DataTable__Cell {
+    padding-top: 8px !important;
+    padding-bottom: 8px !important;
+    vertical-align: middle;
+}
+
+.control-row .Polaris-DataTable__Cell--firstColumn {
+    padding-left: 8px !important;
 }

@@ -1,13 +1,20 @@
 package com.akto;
 
 import com.akto.dao.*;
+import com.akto.dao.audit_logs.ApiAuditLogsDao;
 import com.akto.dao.billing.OrganizationsDao;
+import com.akto.dao.jobs.JobsDao;
 import com.akto.dao.loaders.LoadersDao;
+import com.akto.dao.test_editor.TestingRunPlaygroundDao;
 import com.akto.dao.testing.TestRolesDao;
 import com.akto.dao.testing.TestingRunDao;
 import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dao.testing.TestingRunResultSummariesDao;
+import com.akto.dao.testing.VulnerableTestingRunResultDao;
+import com.akto.dao.testing_run_findings.SourceCodeVulnerabilitiesDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
+import com.akto.dao.traffic_metrics.TrafficAlertsDao;
+import com.akto.dao.traffic_metrics.RuntimeMetricsDao;
 import com.akto.dao.traffic_metrics.TrafficMetricsDao;
 import com.akto.dao.usage.UsageMetricsDao;
 import com.akto.dto.*;
@@ -17,15 +24,18 @@ import com.akto.dto.dependency_flow.*;
 import com.akto.dto.events.EventsExample;
 import com.akto.dto.gpt.AktoGptConfig;
 import com.akto.dto.gpt.AktoGptConfigState;
+import com.akto.dto.jira_integration.JiraIntegration;
+import com.akto.dto.jobs.AutoTicketParams;
+import com.akto.dto.jobs.JobParams;
 import com.akto.dto.loaders.Loader;
 import com.akto.dto.loaders.NormalLoader;
 import com.akto.dto.loaders.PostmanUploadLoader;
+import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.dto.notifications.CustomWebhook;
 import com.akto.dto.notifications.CustomWebhookResult;
 import com.akto.dto.runtime_filters.FieldExistsFilter;
 import com.akto.dto.runtime_filters.ResponseCodeRuntimeFilter;
 import com.akto.dto.runtime_filters.RuntimeFilter;
-import com.akto.dto.test_editor.Info;
 import com.akto.dto.test_editor.TestLibrary;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
@@ -38,7 +48,8 @@ import com.akto.dto.testing.info.TestInfo;
 import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.dto.third_party_access.Credential;
 import com.akto.dto.third_party_access.ThirdPartyAccess;
-import com.akto.dto.traffic.SampleData;
+import com.akto.dto.traffic_metrics.TrafficAlerts;
+import com.akto.dto.traffic_metrics.RuntimeMetrics;
 import com.akto.dto.traffic_metrics.TrafficMetrics;
 import com.akto.dto.traffic_metrics.TrafficMetricsAlert;
 import com.akto.dto.type.SingleTypeInfo;
@@ -57,8 +68,13 @@ import com.akto.util.ConnectionInfo;
 import com.akto.util.EnumCodec;
 import com.akto.util.LastCronRunInfo;
 import com.akto.dto.Attempt.AttemptResult;
+import com.akto.dto.CollectionConditions.ConditionsType;
 import com.akto.dto.CollectionConditions.MethodCondition;
+import com.akto.dto.CollectionConditions.TestConfigsAdvancedSettings;
 import com.akto.dto.DependencyNode.ParamInfo;
+import com.akto.dto.agents.Model;
+import com.akto.dto.agents.ModelType;
+import com.akto.dto.agents.State;
 import com.akto.dto.auth.APIAuth;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.billing.OrganizationFlags;
@@ -66,6 +82,7 @@ import com.akto.util.enums.GlobalEnums;
 import com.mongodb.ConnectionString;
 import com.mongodb.MongoClientSettings;
 import com.mongodb.ReadPreference;
+import com.mongodb.WriteConcern;
 import com.mongodb.client.MongoClients;
 
 import org.bson.codecs.configuration.CodecRegistries;
@@ -257,6 +274,21 @@ public class DaoInit {
         ClassModel<SensitiveDataEndpoints> sensitiveDataEndpointsClassModel = ClassModel.builder(SensitiveDataEndpoints.class).enableDiscriminator(true).build();
         ClassModel<AllAPIsGroup> allApisGroupClassModel = ClassModel.builder(AllAPIsGroup.class).enableDiscriminator(true).build();
 
+        ClassModel<Remediation> remediationClassModel = ClassModel.builder(Remediation.class).enableDiscriminator(true).build();
+        ClassModel<ComplianceMapping> complianceMappingModel = ClassModel.builder(ComplianceMapping.class).enableDiscriminator(true).build();
+        ClassModel<ComplianceInfo> complianceInfoModel = ClassModel.builder(ComplianceInfo.class).enableDiscriminator(true).build();
+        ClassModel<RuntimeMetrics> RuntimeMetricsClassModel = ClassModel.builder(RuntimeMetrics.class).enableDiscriminator(true).build();
+        ClassModel<CodeAnalysisApi>  codeAnalysisApiModel = ClassModel.builder(CodeAnalysisApi.class).enableDiscriminator(true).build();
+        ClassModel<CodeAnalysisRepo> codeAnalysisRepoModel = ClassModel.builder(CodeAnalysisRepo.class).enableDiscriminator(true).build();
+        ClassModel<HistoricalData> historicalDataClassModel = ClassModel.builder(HistoricalData.class).enableDiscriminator(true).build();
+        ClassModel<TestConfigsAdvancedSettings> configSettingClassModel = ClassModel.builder(TestConfigsAdvancedSettings.class).enableDiscriminator(true).build();
+        ClassModel<ConditionsType> configSettingsConditionTypeClassModel = ClassModel.builder(ConditionsType.class).enableDiscriminator(true).build();
+        ClassModel<CustomRole> roleClassModel = ClassModel.builder(CustomRole.class).enableDiscriminator(true).build();
+        ClassModel<TestingInstanceHeartBeat> testingInstanceHeartBeat = ClassModel.builder(TestingInstanceHeartBeat.class).enableDiscriminator(true).build();
+        ClassModel<JobParams> jobParams = ClassModel.builder(JobParams.class).enableDiscriminator(true).build();
+        ClassModel<AutoTicketParams> autoTicketParams = ClassModel.builder(AutoTicketParams.class).enableDiscriminator(true).build();
+        ClassModel<Model> agentModel = ClassModel.builder(Model.class).enableDiscriminator(true).build();
+        ClassModel<ModuleInfo> ModuleInfoClassModel = ClassModel.builder(ModuleInfo.class).enableDiscriminator(true).build();
 
         CodecRegistry pojoCodecRegistry = fromProviders(PojoCodecProvider.builder().register(
                 configClassModel, signupInfoClassModel, apiAuthClassModel, attempResultModel, urlTemplateModel,
@@ -276,23 +308,34 @@ public class DaoInit {
                 nodeResultClassModel, awsResourcesModel, AktoDataTypeClassModel, testingRunIssuesClassModel,
                 testingIssuesIdClassModel, testSourceConfigClassModel, endpointLogicalGroupClassModel, testRolesClassModel,
                 logicalGroupTestingEndpointClassModel, testInfoClassModel, bflaTestInfoClassModel, customAuthTypeModel,
-                containsPredicateClassModel, notBelongsToPredicateClassModel, belongsToPredicateClassModel, loginFlowStepsData,
+                containsPredicateClassModel, notBelongsToPredicateClassModel, belongsToPredicateClassModel,
+                loginFlowStepsData,
                 accessMatrixUrlToRoleClassModel, accessMatrixTaskInfoClassModel,
                 loaderClassModel, normalLoaderClassModel, postmanUploadLoaderClassModel, aktoGptConfigClassModel,
-                vulnerableRequestForTemplateClassModel, trafficMetricsAlertClassModel,jiraintegrationClassModel, setupClassModel,
+                vulnerableRequestForTemplateClassModel, trafficMetricsAlertClassModel, jiraintegrationClassModel,
+                setupClassModel,
                 cronTimersClassModel, connectionInfoClassModel, testLibraryClassModel,
-                methodConditionClassModel, regexTestingEndpointsClassModel, hostRegexTestingEndpointsClassModel, allTestingEndpointsClassModel,
+                methodConditionClassModel, regexTestingEndpointsClassModel, hostRegexTestingEndpointsClassModel,
+                allTestingEndpointsClassModel,
                 UsageMetricClassModel, UsageMetricInfoClassModel, UsageSyncClassModel, OrganizationClassModel,
-                yamlNodeDetails, multiExecTestResultClassModel, workflowTestClassModel, dependencyNodeClassModel, paramInfoClassModel,
-                        nodeClassModel, connectionClassModel, edgeClassModel, replaceDetailClassModel, modifyHostDetailClassModel, fileUploadClassModel
-                ,fileUploadLogClassModel, codeAnalysisCollectionClassModel, codeAnalysisApiLocationClassModel, codeAnalysisApiInfoClassModel, codeAnalysisApiInfoKeyClassModel,
-                riskScoreTestingEndpointsClassModel, OrganizationFlagsClassModel, sensitiveDataEndpointsClassModel, unauthenticatedEndpointsClassModel, allApisGroupClassModel, eventsExampleClassModel).automatic(true).build());
+                yamlNodeDetails, multiExecTestResultClassModel, workflowTestClassModel, dependencyNodeClassModel,
+                paramInfoClassModel,
+                nodeClassModel, connectionClassModel, edgeClassModel, replaceDetailClassModel, modifyHostDetailClassModel,
+                fileUploadClassModel, fileUploadLogClassModel, codeAnalysisCollectionClassModel,
+                codeAnalysisApiLocationClassModel,
+                codeAnalysisApiInfoClassModel, codeAnalysisApiInfoKeyClassModel,
+                riskScoreTestingEndpointsClassModel, OrganizationFlagsClassModel, sensitiveDataEndpointsClassModel,
+                unauthenticatedEndpointsClassModel, allApisGroupClassModel,
+                eventsExampleClassModel, remediationClassModel, complianceInfoModel, complianceMappingModel,
+                RuntimeMetricsClassModel, codeAnalysisRepoModel, codeAnalysisApiModel, historicalDataClassModel,
+                configSettingClassModel, configSettingsConditionTypeClassModel, roleClassModel, testingInstanceHeartBeat,
+                jobParams, autoTicketParams, agentModel, ModuleInfoClassModel)
+            .automatic(true).build());
 
         final CodecRegistry customEnumCodecs = CodecRegistries.fromCodecs(
                 new EnumCodec<>(Conditions.Operator.class),
                 new EnumCodec<>(SingleTypeInfo.SuperType.class),
                 new EnumCodec<>(Method.class),
-                new EnumCodec<>(RBAC.Role.class),
                 new EnumCodec<>(Credential.Type.class),
                 new EnumCodec<>(ApiToken.Utility.class),
                 new EnumCodec<>(ApiInfo.AuthType.class),
@@ -329,14 +372,20 @@ public class DaoInit {
                 new EnumCodec<>(FileUpload.UploadStatus.class),
                 new EnumCodec<>(FileUploadLog.UploadLogStatus.class),
                 new EnumCodec<>(TestCollectionProperty.Id.class),
-                new EnumCodec<>(CustomAuthType.TypeOfToken.class)
+                new EnumCodec<>(CustomAuthType.TypeOfToken.class),
+                new EnumCodec<>(TrafficAlerts.ALERT_TYPE.class),
+                new EnumCodec<>(ApiInfo.ApiType.class),
+                new EnumCodec<>(CodeAnalysisRepo.SourceCodeType.class),
+                new EnumCodec<>(State.class),
+                new EnumCodec<>(ModelType.class),
+                new EnumCodec<>(ModuleInfo.ModuleType.class)
         );
 
         return fromRegistries(MongoClientSettings.getDefaultCodecRegistry(), pojoCodecRegistry,
                 customEnumCodecs);
     }
 
-    public static void init(ConnectionString connectionString, ReadPreference readPreference) {
+    public static void init(ConnectionString connectionString, ReadPreference readPreference, WriteConcern writeConcern) {
         DbMode.refreshDbType(connectionString.getConnectionString());
         logger.info("DB type: {}", DbMode.dbType);
         DbMode.refreshSetupType(connectionString);
@@ -346,6 +395,7 @@ public class DaoInit {
 
         MongoClientSettings clientSettings = MongoClientSettings.builder()
                 .readPreference(readPreference)
+                .writeConcern(writeConcern)
                 .applyConnectionString(connectionString)
                 .codecRegistry(codecRegistry)
                 .build();
@@ -353,7 +403,7 @@ public class DaoInit {
         clients[0] = MongoClients.create(clientSettings);
     }
     public static void init(ConnectionString connectionString) {
-        init(connectionString, ReadPreference.secondary());
+        init(connectionString, ReadPreference.secondary(), WriteConcern.ACKNOWLEDGED);
     }
 
     public static void createIndices() {
@@ -381,6 +431,7 @@ public class DaoInit {
         TestingRunResultDao.instance.createIndicesIfAbsent();
         TestingRunResultSummariesDao.instance.createIndicesIfAbsent();
         TestingRunDao.instance.createIndicesIfAbsent();
+        TestingRunPlaygroundDao.instance.createIndicesIfAbsent();
         TestingRunIssuesDao.instance.createIndicesIfAbsent();
         ApiCollectionsDao.instance.createIndicesIfAbsent();
         ActivitiesDao.instance.createIndicesIfAbsent();
@@ -389,6 +440,15 @@ public class DaoInit {
         CodeAnalysisCollectionDao.instance.createIndicesIfAbsent();
         CodeAnalysisApiInfoDao.instance.createIndicesIfAbsent();
         RBACDao.instance.createIndicesIfAbsent();
+        TrafficAlertsDao.instance.createIndicesIfAbsent();
+        RuntimeMetricsDao.instance.createIndicesIfAbsent();
+        ApiAuditLogsDao.instance.createIndicesIfAbsent();
+        VulnerableTestingRunResultDao.instance.createIndicesIfAbsent();
+        CustomRoleDao.instance.createIndicesIfAbsent();
+        TestingInstanceHeartBeatDao.instance.createIndexIfAbsent();
+        PupeteerLogsDao.instance.createIndicesIfAbsent();
+        SourceCodeVulnerabilitiesDao.instance.createIndicesIfAbsent();
+        JobsDao.instance.createIndicesIfAbsent();
     }
 
 }

@@ -37,7 +37,9 @@ function TestLibrary() {
     }
 
     useEffect(() => {
-        fetchData();
+        if(window.USER_ROLE === 'ADMIN') {
+            fetchData();
+        }
     }, [])
 
     async function handleRemoveTestLibrary(repositoryUrl) {

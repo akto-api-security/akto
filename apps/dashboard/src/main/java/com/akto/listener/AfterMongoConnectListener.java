@@ -1,14 +1,19 @@
 package com.akto.listener;
 
-import javax.servlet.ServletContextEvent;
-import javax.servlet.ServletContextListener;
+import com.akto.dao.context.Context;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
+import com.akto.utils.jobs.JobUtils;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import javax.servlet.ServletContextEvent;
+import javax.servlet.ServletContextListener;
 
 public abstract class AfterMongoConnectListener implements ServletContextListener {
 
     private boolean ranOnce = false;
+    private static final LoggerMaker logger = new LoggerMaker(AfterMongoConnectListener.class, LogDb.DASHBOARD);
 
     private final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
 
@@ -29,8 +34,24 @@ public abstract class AfterMongoConnectListener implements ServletContextListene
                         continue;
                     }
 
+                    boolean runJobFunctions = JobUtils.getRunJobFunctions();
+                    boolean runJobFunctionsAnyway = JobUtils.getRunJobFunctionsAnyway();
+
                     try {
-                        runMainFunction();
+
+                        int now = Context.now();
+                        if (runJobFunctions || runJobFunctionsAnyway) {
+                            logger.debug("Starting runtime init functions at " + now);
+                            runMainFunction();
+                            int now2 = Context.now();
+                            int diffNow = now2 - now;
+                            logger.debug(String.format(
+                                    "Completed runtime init functions at %d , time taken : %d", now2,
+                                    diffNow));
+                        } else {
+                            logger.debug("Skipping runtime init functions at " + now);
+                        }
+    
                         ranOnce = true;
                     } catch (Exception e) {
                         e.printStackTrace();

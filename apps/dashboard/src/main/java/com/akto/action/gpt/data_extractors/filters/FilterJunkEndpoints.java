@@ -1,5 +1,7 @@
 package com.akto.action.gpt.data_extractors.filters;
 
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
@@ -7,11 +9,8 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.regex.Pattern;
 
-import org.slf4j.Logger;
-
 public class FilterJunkEndpoints implements Filter<String>{
-
-    private static final Logger logger = org.slf4j.LoggerFactory.getLogger(FilterJunkEndpoints.class);
+    private static final LoggerMaker logger = new LoggerMaker(FilterJunkEndpoints.class, LogDb.DASHBOARD);
     private final static Pattern urlPattern = Pattern.compile("^((((https?|ftps?|gopher|telnet|nntp)://)|(mailto:|news:))(.*))$", Pattern.CASE_INSENSITIVE);
 
     private static int countSwitches(String endpoint) {
@@ -56,20 +55,14 @@ public class FilterJunkEndpoints implements Filter<String>{
             if(!skipEndpoint){
                 result.add(endpoint);
             } else {
-                logger.info("skipping: " + endpoint);
+                logger.debug("skipping: " + endpoint);
             }
 
             if (result.size() > 100) {
-                logger.info("skipping remaining: " + (result.size() - 100));
+                logger.debug("skipping remaining: " + (result.size() - 100));
                 break;
             }
         }
         return result;
-    }
-
-    public static void main(String[] args) {
-        String e = "/questions/70067185/css-only-typewriter-animation-over-multiple-lines";
-        
-        logger.info(String.valueOf(countSwitches(e)));
     }
 }

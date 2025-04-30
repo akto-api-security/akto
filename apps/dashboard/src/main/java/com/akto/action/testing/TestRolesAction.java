@@ -1,31 +1,44 @@
 package com.akto.action.testing;
 
 import com.akto.action.UserAction;
+import com.akto.dao.RBACDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.testing.EndpointLogicalGroupDao;
 import com.akto.dao.testing.TestRolesDao;
 import com.akto.dao.testing.config.TestCollectionPropertiesDao;
-import com.akto.dto.testing.config.TestCollectionProperty;
+import com.akto.dto.RBAC;
 import com.akto.dto.RecordedLoginFlowInput;
+import com.akto.dto.User;
 import com.akto.dto.data_types.Conditions;
 import com.akto.dto.data_types.Conditions.Operator;
 import com.akto.dto.data_types.Predicate;
 import com.akto.dto.data_types.Predicate.Type;
-import com.akto.dto.testing.*;
+import com.akto.dto.testing.AuthMechanism;
+import com.akto.dto.testing.AuthParam;
+import com.akto.dto.testing.AuthParamData;
+import com.akto.dto.testing.EndpointLogicalGroup;
+import com.akto.dto.testing.HardcodedAuthParam;
+import com.akto.dto.testing.LoginRequestAuthParam;
+import com.akto.dto.testing.RequestData;
+import com.akto.dto.testing.TestRoles;
+import com.akto.dto.testing.config.TestCollectionProperty;
 import com.akto.dto.testing.sources.AuthWithCond;
 import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.Constants;
 import com.akto.util.enums.LoginFlowEnums;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 import com.mongodb.client.result.DeleteResult;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 import org.bson.conversions.Bson;
 
-import java.util.*;
-
 public class TestRolesAction extends UserAction {
-    private static final LoggerMaker loggerMaker = new LoggerMaker(TestRolesAction.class);
+
+    private static final LoggerMaker loggerMaker = new LoggerMaker(TestRolesAction.class, LogDb.DASHBOARD);;
 
     private List<TestRoles> testRoles;
     private TestRoles selectedRole;
@@ -77,13 +90,13 @@ public class TestRolesAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
-    public void addAuthMechanism(TestRoles role){
+    private AuthWithCond makeAuthWithConditionFromParamData(TestRoles role){
         if (authParamData != null) {            
             List<AuthParam> authParams = new ArrayList<>();
 
             for (AuthParamData authParamDataElem : authParamData) {
                 AuthParam param = null;
-                if (authAutomationType.equals(LoginFlowEnums.AuthMechanismTypes.HARDCODED.toString())) {
+                if (authAutomationType.toUpperCase().equals(LoginFlowEnums.AuthMechanismTypes.HARDCODED.toString())) {
                     param = new HardcodedAuthParam(authParamDataElem.getWhere(), authParamDataElem.getKey(), authParamDataElem.getValue(), true);
                 } else {
                     param = new LoginRequestAuthParam(authParamDataElem.getWhere(), authParamDataElem.getKey(), authParamDataElem.getValue(), authParamDataElem.getShowHeader());
@@ -93,7 +106,18 @@ public class TestRolesAction extends UserAction {
 
             AuthMechanism authM = new AuthMechanism(authParams, this.reqData, authAutomationType, null);
             AuthWithCond authWithCond = new AuthWithCond(authM, apiCond, recordedLoginFlowInput);
-            TestRolesDao.instance.updateOne(Filters.eq(Constants.ID, role.getId()), Updates.push(TestRoles.AUTH_WITH_COND_LIST, authWithCond));
+            return authWithCond;
+        }else{
+            return null;
+        }
+    }
+
+    public void addAuthMechanism(TestRoles role){
+        if (authParamData != null) {            
+            AuthWithCond authWithCond = makeAuthWithConditionFromParamData(role);
+            if(authWithCond != null){
+                TestRolesDao.instance.updateOne(Filters.eq(Constants.ID, role.getId()), Updates.push(TestRoles.AUTH_WITH_COND_LIST, authWithCond));
+            }
         }
     }
 
@@ -113,16 +137,37 @@ public class TestRolesAction extends UserAction {
     }
 
     public String deleteTestRole() {
-        loggerMaker.infoAndAddToDb("Started deleting role: " + roleName, LoggerMaker.LogDb.DASHBOARD);
+        loggerMaker.debugAndAddToDb("Started deleting role: " + roleName, LoggerMaker.LogDb.DASHBOARD);
         TestRoles role = getRole();
         if (role == null) {
             addActionError("Role doesn't exists");
             return ERROR.toUpperCase();
         }
 
+        if(role.getCreatedBy().equals("System")) {
+            addActionError("The role cannot be removed.");
+            return ERROR.toUpperCase();
+        }
+
+        User user = getSUser();
+        if(user == null) {
+            addActionError("User not found.");
+            return ERROR.toUpperCase();
+        }
+
+        boolean noAccess = !user.getLogin().equals(role.getCreatedBy());
+
+        if(noAccess) {
+            RBAC.Role currentRoleForUser = RBACDao.getCurrentRoleForUser(user.getId(), Context.accountId.get());
+            if (!currentRoleForUser.equals(RBAC.Role.ADMIN)) {
+                addActionError("You do not have permission to delete this role.");
+                return ERROR.toUpperCase();
+            }
+        }
+
         Bson roleFilterQ = Filters.eq(TestRoles.NAME, roleName);
         DeleteResult delete = TestRolesDao.instance.deleteAll(roleFilterQ);
-        loggerMaker.infoAndAddToDb("Deleted role: " + roleName + " : " + delete, LoggerMaker.LogDb.DASHBOARD);
+        loggerMaker.debugAndAddToDb("Deleted role: " + roleName + " : " + delete, LoggerMaker.LogDb.DASHBOARD);
 
         AccessMatrixTaskAction accessMatrixTaskAction = new AccessMatrixTaskAction();
         accessMatrixTaskAction.setRoleName(roleName);
@@ -145,8 +190,8 @@ public class TestRolesAction extends UserAction {
             isAttackerRole = role.getId().equals(attackerRole.getId());
         }
         if (isAttackerRole) {
-            addActionError("Unable to update endpoint conditions for attacker role");
-            return ERROR.toUpperCase();
+            this.orConditions = null;
+            this.andConditions = null;
         }
 
         Conditions orConditions = null;
@@ -227,6 +272,20 @@ public class TestRolesAction extends UserAction {
         Bson removeNull = Updates.pull(TestRoles.AUTH_WITH_COND_LIST, null);
         TestRolesDao.instance.updateOne(roleFilter, removeFromArr);
         TestRolesDao.instance.updateOne(roleFilter, removeNull);
+        this.selectedRole = getRole();
+        return SUCCESS.toUpperCase();
+    }
+
+    public String updateAuthInRole(){
+        TestRoles role = getRole();
+        if (role == null) {
+            return ERROR.toUpperCase();
+        }
+        Bson roleFilter = Filters.eq(TestRoles.NAME, roleName);
+        AuthWithCond authWithCond = makeAuthWithConditionFromParamData(role);
+        TestRolesDao.instance.updateOne(roleFilter,
+            Updates.set(TestRoles.AUTH_WITH_COND_LIST+"."+index, authWithCond)
+        );
         this.selectedRole = getRole();
         return SUCCESS.toUpperCase();
     }

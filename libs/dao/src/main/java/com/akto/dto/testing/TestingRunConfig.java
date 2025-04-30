@@ -1,6 +1,10 @@
 package com.akto.dto.testing;
 
 import com.akto.dto.ApiInfo;
+import com.akto.dto.CollectionConditions.TestConfigsAdvancedSettings;
+
+import lombok.Getter;
+import lombok.Setter;
 import org.bson.codecs.pojo.annotations.BsonId;
 import org.bson.types.ObjectId;
 
@@ -13,21 +17,46 @@ public class TestingRunConfig {
     @BsonId
     private int id;
     private Map<Integer, List<ApiInfo.ApiInfoKey>> collectionWiseApiInfoKey;
+    public static final String TEST_SUBCATEGORY_LIST = "testSubCategoryList";
     private List<String> testSubCategoryList;
     private ObjectId authMechanismId;
-
+    public static final String TEST_ROLE_ID = "testRoleId";
     private String testRoleId;
+    public static final String OVERRIDDEN_TEST_APP_URL = "overriddenTestAppUrl";
     private String overriddenTestAppUrl;
+    public static final String TEST_CONFIGS_ADVANCED_SETTINGS = "configsAdvancedSettings";
+    private List<TestConfigsAdvancedSettings> configsAdvancedSettings;
+    private boolean cleanUp;
+
+    private List<String> testSuiteIds;
+    public static final String TEST_SUITE_IDS = "testSuiteIds";
+
+    public static final String AUTO_TICKETING_DETAILS = "autoTicketingDetails";
+
+    @Getter
+    @Setter
+    private AutoTicketingDetails autoTicketingDetails;
+
     public TestingRunConfig() {}
+
     public TestingRunConfig(int id, Map<Integer, List<ApiInfo.ApiInfoKey>> collectionWiseApiInfoKey,
-                            List<String> testSubCategoryList,
-                            ObjectId authMechanismId, String overriddenTestAppUrl, String testRoleId) {
+    List<String> testSubCategoryList,
+    ObjectId authMechanismId, String overriddenTestAppUrl, String testRoleId) {
+        this(id, collectionWiseApiInfoKey, testSubCategoryList, authMechanismId, overriddenTestAppUrl, testRoleId,
+            false, null);
+    }
+
+    public TestingRunConfig(int id, Map<Integer, List<ApiInfo.ApiInfoKey>> collectionWiseApiInfoKey,
+        List<String> testSubCategoryList, ObjectId authMechanismId, String overriddenTestAppUrl, String testRoleId,
+        boolean cleanUp, AutoTicketingDetails autoTicketingDetails) {
         this.id = id;
         this.collectionWiseApiInfoKey = collectionWiseApiInfoKey;
         this.testSubCategoryList = testSubCategoryList;
         this.authMechanismId = authMechanismId;
         this.overriddenTestAppUrl = overriddenTestAppUrl;
         this.testRoleId = testRoleId;
+        this.cleanUp = cleanUp;
+        this.autoTicketingDetails = autoTicketingDetails;
     }
 
     public List<String> getTestSubCategoryList() {
@@ -94,7 +123,10 @@ public class TestingRunConfig {
         if(this.testRoleId == null) {
             this.testRoleId = that.testRoleId;
         }
+
+        this.cleanUp = that.cleanUp;
     }
+
     
     public String getTestRoleId() {
         return testRoleId;
@@ -102,5 +134,28 @@ public class TestingRunConfig {
 
     public void setTestRoleId(String testRoleId) {
         this.testRoleId = testRoleId;
+    }
+
+    public List<TestConfigsAdvancedSettings> getConfigsAdvancedSettings() {
+        return configsAdvancedSettings;
+    }
+    public void setConfigsAdvancedSettings(List<TestConfigsAdvancedSettings> configsAdvancedSettings) {
+        this.configsAdvancedSettings = configsAdvancedSettings;
+    }
+
+    public boolean getCleanUp() {
+        return this.cleanUp;
+    }
+
+    public void setCleanUp(boolean cleanUp) {
+        this.cleanUp = cleanUp;
+    }
+
+    public List<String> getTestSuiteIds() {
+        return testSuiteIds;
+    }
+
+    public void setTestSuiteIds(List<String> testSuiteIds) {
+        this.testSuiteIds = testSuiteIds;
     }
 }

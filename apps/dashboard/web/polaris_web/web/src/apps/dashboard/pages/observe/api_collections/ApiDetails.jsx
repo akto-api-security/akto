@@ -1,5 +1,5 @@
 import LayoutWithTabs from "../../../components/layouts/LayoutWithTabs"
-import { Box, Button, Popover, Modal, Tooltip, VerticalStack } from "@shopify/polaris"
+import { Box, Button, Popover, Modal, Tooltip, VerticalStack, ActionList } from "@shopify/polaris"
 import FlyLayout from "../../../components/layouts/FlyLayout";
 import GithubCell from "../../../components/tables/cells/GithubCell";
 import SampleDataList from "../../../components/shared/SampleDataList";
@@ -13,12 +13,19 @@ import transform from "../transform";
 import ApiDependency from "./ApiDependency";
 import RunTest from "./RunTest";
 import PersistStore from "../../../../main/PersistStore";
+import values from "@/util/values";
+import gptApi from "../../../components/aktoGpt/api";
 
 import { HorizontalDotsMinor, FileMinor } from "@shopify/polaris-icons"
+import LocalStore from "../../../../main/LocalStorageStore";
+import APICollectionDescriptionModal from "../../../components/shared/APICollectionDescriptionModal";
 
 function ApiDetails(props) {
 
     const { showDetails, setShowDetails, apiDetail, headers, getStatus, isGptActive } = props
+
+    const localCategoryMap = LocalStore.getState().categoryMap
+    const localSubCategoryMap = LocalStore.getState().subCategoryMap
 
     const [sampleData, setSampleData] = useState([])
     const [paramList, setParamList] = useState([])
@@ -29,12 +36,50 @@ function ApiDetails(props) {
     const [badgeActive, setBadgeActive] = useState(false)
     const [showMoreActions, setShowMoreActions] = useState(false)
     const setSelectedSampleApi = PersistStore(state => state.setSelectedSampleApi)
+    const [disabledTabs, setDisabledTabs] = useState([])
+    const [description, setDescription] = useState("")
+    const [showDescriptionModal, setShowDescriptionModal] = useState(false)
+    const [headersWithData, setHeadersWithData] = useState([])
+
+    const [useLocalSubCategoryData, setUseLocalSubCategoryData] = useState(false)
+
+    const statusFunc = getStatus ? getStatus : (x) => {
+        try {
+            if (paramList && paramList.length > 0 &&
+                paramList.filter(x => x?.nonSensitiveDataType).map(x => x.subTypeString).includes(x)) {
+                return "info"
+            }else if(headersWithData && headersWithData.length > 0 &&
+                headersWithData.filter(h => h.includes(x)).length > 0){
+                return "success"
+            }
+        } catch (e) {
+
+        }
+        return "warning"
+    }
 
     const fetchData = async () => {
         if (showDetails) {
             setLoading(true)
-            const { apiCollectionId, endpoint, method } = apiDetail
+            const { apiCollectionId, endpoint, method, description } = apiDetail
             setSelectedUrl({ url: endpoint, method: method })
+            api.checkIfDependencyGraphAvailable(apiCollectionId, endpoint, method).then((resp) => {
+                if (!resp.dependencyGraphExists) {
+                    setDisabledTabs(["dependency"])
+                } else {
+                    setDisabledTabs([])
+                }
+            })
+
+            setTimeout(() => {
+                setDescription(description == null ? "" : description)
+            }, 100)
+            headers.forEach((header) => {
+                if (header.value === "description") {
+                    header.action = () => setShowDescriptionModal(true)
+                }
+            })
+
             let commonMessages = []
             await api.fetchSampleData(endpoint, apiCollectionId, method).then((res) => {
                 api.fetchSensitiveSampleData(endpoint, apiCollectionId, method).then(async (resp) => {
@@ -50,6 +95,7 @@ function ApiDetails(props) {
                             sensitiveData = res3.data.endpoints;
                         })
                         let samples = res.sampleDataList.map(x => x.samples)
+                        samples = samples.reverse();
                         samples = samples.flat()
                         let newResp = transform.convertSampleDataToSensitiveSampleData(samples, sensitiveData)
                         commonMessages = transform.prepareSampleData(newResp, '')
@@ -77,13 +123,52 @@ function ApiDetails(props) {
                                 resp.data.params[index].subType = JSON.parse(JSON.stringify(resp.data.params[index].subType))
                             }
                         }
-
                     })
+
+                    try {
+                        resp.data.params?.forEach(x => {
+                            if (!values?.skipList.includes(x.subTypeString) && !x?.savedAsSensitive && !x?.sensitive) {
+                                x.nonSensitiveDataType = true
+                            }
+                        })
+                    } catch (e){
+                    }
                     setParamList(resp.data.params)
                 })
             })
+
+            const queryPayload = dashboardFunc.getApiPrompts(apiCollectionId, endpoint, method)[0].prepareQuery();
+            try{
+                if(isGptActive && window.STIGG_FEATURE_WISE_ALLOWED["AKTO_GPT_AI"] && window.STIGG_FEATURE_WISE_ALLOWED["AKTO_GPT_AI"]?.isGranted === true){
+                    await gptApi.ask_ai(queryPayload).then((res) => {
+                        if (res.response.responses && res.response.responses.length > 0) {
+                            setHeadersWithData(res.response.responses)
+                        }
+                    }
+                    ).catch((err) => {
+                        console.error("Failed to fetch prompts:", err);
+                    })
+                }
+            }catch (e) {
+            }
+            
         }
     }
+
+    const handleSaveDescription = async () => {
+        const { apiCollectionId, endpoint, method } = apiDetail;
+        
+        setShowDescriptionModal(false);
+        
+        await api.saveEndpointDescription(apiCollectionId, endpoint, method, description)
+            .then(() => {
+                func.setToast(true, false, "Description saved successfully");
+            })
+            .catch((err) => {
+                console.error("Failed to save description:", err);
+                func.setToast(true, true, "Failed to save description. Please try again.");
+            });
+    };
 
     const runTests = async (testsList) => {
         setIsGptScreenActive(false)
@@ -101,6 +186,13 @@ function ApiDetails(props) {
     }
 
     useEffect(() => {
+        if (
+            (localCategoryMap && Object.keys(localCategoryMap).length > 0) &&
+            (localSubCategoryMap && Object.keys(localSubCategoryMap).length > 0)
+        ) {
+            setUseLocalSubCategoryData(true)
+        }
+
         fetchData();
     }, [apiDetail])
 
@@ -163,6 +255,7 @@ function ApiDetails(props) {
                 heading={"Sample values"}
                 minHeight={"35vh"}
                 vertical={true}
+                metadata={headersWithData.map(x => x.split(" ")[0])}
             />
         </Box>,
     }
@@ -190,23 +283,44 @@ function ApiDetails(props) {
         method: apiDetail.method,
         endpoint: apiDetail.endpoint
     }
+
+    try {
+        newData['nonSensitiveTags'] = [...new Set(paramList.filter(x => x?.nonSensitiveDataType).map(x => x.subTypeString))]
+    } catch (e){
+    }
+    try {
+        newData['sensitiveTags'] = apiDetail?.sensitiveTags && apiDetail?.sensitiveTags.length > 0 ? apiDetail?.sensitiveTags : 
+        [...new Set(paramList.filter(x => x?.savedAsSensitive || x?.sensitive).map(x => x.subTypeString))]
+    } catch (e){
+    }
+
+    try {
+        newData['headersInfo'] = [...new Set(headersWithData.map(x => x.split(" ").slice(1,x.length - 1).join(" ")))]
+    } catch (e) {
+    }
+
     const headingComp = (
         <div style={{ display: "flex", justifyContent: "space-between" }} key="heading">
-            <div style={{ display: "flex", gap: '8px' }}>
-                <GithubCell
-                    width="32vw"
-                    data={newData}
-                    headers={headers}
-                    getStatus={getStatus}
-                    isBadgeClickable={true}
-                    badgeClicked={badgeClicked}
-                />
+            <div style={{ display: "flex", flexDirection: "column"}}>
+                <div style={{ display: "flex", gap: '8px' }}>
+                    <GithubCell
+                        width="32vw"
+                        data={newData}
+                        headers={headers}
+                        getStatus={statusFunc}
+                        isBadgeClickable={true}
+                        badgeClicked={badgeClicked}
+                    />
+                </div>
             </div>
             <div style={{ display: "flex", gap: '8px' }}>
                 <RunTest
                     apiCollectionId={apiDetail["apiCollectionId"]}
                     endpoints={[apiDetail]}
                     filtered={true}
+                    useLocalSubCategoryData={useLocalSubCategoryData}
+                    preActivator={false}
+                    disabled={window.USER_ROLE === "GUEST"}
                 />
                 <Box>
                     <Tooltip content="Open URL in test editor" dismissOnMouseOut>
@@ -223,12 +337,12 @@ function ApiDetails(props) {
                         onClose={() => setShowMoreActions(false)}
                     >
                         <Popover.Pane fixed>
-                            <Popover.Section>
-                                <VerticalStack gap={"2"}>
-                                    {isGptActive ? <Button plain monochrome removeUnderline onClick={displayGPT} size="slim">Ask AktoGPT</Button> : null}
-                                    {isDemergingActive ? <Button plain monochrome removeUnderline size="slim" onClick={deMergeApis}>De merge</Button> : null}
-                                </VerticalStack>
-                            </Popover.Section>
+                            <ActionList
+                                items={[
+                                    isGptActive ? { content: "Ask AktoGPT", onAction: displayGPT } : null,
+                                    isDemergingActive ? { content: "De-merge", onAction: deMergeApis } : null,
+                                ]}
+                            />
                         </Popover.Pane>
                     </Popover> : null
                 }
@@ -238,12 +352,12 @@ function ApiDetails(props) {
     )
 
     const components = [
-        headingComp
-        ,
+        headingComp,
         <LayoutWithTabs
             key="tabs"
-            tabs={[SchemaTab, ValuesTab, DependencyTab]}
+            tabs={[ValuesTab, SchemaTab, DependencyTab]}
             currTab={() => { }}
+            disabledTabs={disabledTabs}
         />
     ]
 
@@ -255,6 +369,15 @@ function ApiDetails(props) {
                 setShow={setShowDetails}
                 components={components}
                 loading={loading}
+            />
+            <APICollectionDescriptionModal
+                showDescriptionModal={showDescriptionModal}
+                setShowDescriptionModal={setShowDescriptionModal}
+                title="API Endpoint Description"
+                handleSaveDescription={handleSaveDescription}
+                description={description}
+                setDescription={setDescription}
+                placeholder={"Add a brief description for this endpoint"}
             />
             <Modal large open={isGptScreenActive} onClose={() => setIsGptScreenActive(false)} title="Akto GPT">
                 <Modal.Section flush>

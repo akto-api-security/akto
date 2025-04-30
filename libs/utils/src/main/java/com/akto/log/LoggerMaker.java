@@ -1,30 +1,40 @@
 package com.akto.log;
 
-import com.akto.dao.*;
+import com.akto.dao.AnalyserLogsDao;
+import com.akto.dao.BillingLogsDao;
+import com.akto.dao.ConfigsDao;
+import com.akto.dao.DashboardLogsDao;
+import com.akto.dao.LogsDao;
+import com.akto.dao.PupeteerLogsDao;
+import com.akto.dao.RuntimeLogsDao;
 import com.akto.dao.context.Context;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.AccountSettings;
 import com.akto.dto.Config;
 import com.akto.dto.Log;
+import com.akto.util.DashboardMode;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
-
-import java.io.IOException;
+import com.slack.api.Slack;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-
 import org.bson.conversions.Bson;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import com.slack.api.Slack;
+import org.slf4j.simple.SimpleLogger;
 
 public class LoggerMaker  {
+
+    static {
+        System.setProperty(SimpleLogger.DEFAULT_LOG_LEVEL_KEY, System.getenv().getOrDefault("AKTO_LOG_LEVEL", "WARN"));
+        System.out.printf("AKTO_LOG_LEVEL is set to: %s \n", System.getProperty(SimpleLogger.DEFAULT_LOG_LEVEL_KEY));
+    }
 
     public static final int LOG_SAVE_INTERVAL = 60*60; // 1 hour
 
@@ -40,7 +50,7 @@ public class LoggerMaker  {
 
     static {
         scheduler.scheduleAtFixedRate(new Runnable() {
-            
+
             @Override
             public void run() {
                 try {
@@ -64,8 +74,12 @@ public class LoggerMaker  {
 
     private LogDb db;
 
+    public void setDb(LogDb db) {
+        this.db = db;
+    }
+
     public enum LogDb {
-        TESTING,RUNTIME,DASHBOARD,BILLING, ANALYSER
+        TESTING,RUNTIME,DASHBOARD,BILLING, ANALYSER, THREAT_DETECTION, PUPPETEER
     }
 
     private static AccountSettings accountSettings = null;
@@ -145,7 +159,7 @@ public class LoggerMaker  {
 
     public void errorAndAddToDb(String err, LogDb db) {
         try {
-            basicError(err, db);
+            err = basicError(err, db);
 
             if (db.equals(LogDb.BILLING) || db.equals(LogDb.DASHBOARD)) {
                 sendToSlack(err);
@@ -213,11 +227,13 @@ public class LoggerMaker  {
     private void insert(String info, String key, LogDb db) {
         String text = aClass + " : " + info;
         Log log = new Log(text, key, Context.now());
-        
+        if(DashboardMode.isSaasDeployment()) {
+            return;
+        }
         if(checkUpdate() && db!=null){
             switch(db){
                 case TESTING: 
-                    LogsDao.instance.insertOne(log);
+                    dataActor.insertTestingLog(log);
                     break;
                 case RUNTIME: 
                     dataActor.insertRuntimeLog(log);
@@ -230,6 +246,9 @@ public class LoggerMaker  {
                     break;
                 case BILLING:
                     BillingLogsDao.instance.insertOne(log);
+                    break;
+                case THREAT_DETECTION:
+                    dataActor.insertProtectionLog(log);
                     break;
                 default:
                     break;
@@ -266,9 +285,43 @@ public class LoggerMaker  {
             case BILLING:
                 logs = BillingLogsDao.instance.findAll(filters, Projections.include("log", Log.TIMESTAMP));
                 break;
+            case PUPPETEER:
+                logs = PupeteerLogsDao.instance.findAll(filters, Projections.include("log", Log.TIMESTAMP));
+                break;
             default:
                 break;
         }
         return logs;
+    }
+
+    public void info(String message, Object... vars) {
+        logger.info(message, vars);
+    }
+
+    public void error(String errorMessage, Object... vars) {
+        logger.error(errorMessage, vars);
+    }
+
+    public void debug(String message, Object... vars) {
+        logger.debug(message, vars);
+    }
+
+    public void warn(String message, Object... vars) {
+        logger.warn(message, vars);
+    }
+
+    public void debugAndAddToDb(String message) {
+        debugAndAddToDb(message, this.db);
+    }
+
+    public void debugAndAddToDb(String message, LogDb db) {
+        String accountId = Context.accountId.get() != null ? Context.accountId.get().toString() : "NA";
+        String debugMessage = "acc: " + accountId + ", " + message;
+        debug(debugMessage);
+        try{
+            insert(debugMessage, "debug", db);
+        } catch (Exception e){
+
+        }
     }
 }

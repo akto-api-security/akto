@@ -1,17 +1,31 @@
 package com.akto.rules;
 
+import static com.akto.runtime.APICatalogSync.trimAndSplit;
+import static com.akto.runtime.utils.Utils.convertOriginalReqRespToString;
+
 import com.akto.dao.SingleTypeInfoDao;
-import com.akto.dto.*;
+import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
+import com.akto.dto.OriginalHttpRequest;
+import com.akto.dto.OriginalHttpResponse;
+import com.akto.dto.RawApi;
+import com.akto.dto.SampleRequestReplayResponse;
 import com.akto.dto.test_editor.DataOperandsFilterResponse;
 import com.akto.dto.test_editor.FilterNode;
-import com.akto.dto.testing.*;
+import com.akto.dto.testing.EndpointLogicalGroup;
+import com.akto.dto.testing.TestResult;
+import com.akto.dto.testing.TestRoles;
+import com.akto.dto.testing.TestingEndpoints;
+import com.akto.dto.testing.TestingRunConfig;
 import com.akto.dto.testing.info.TestInfo;
-import com.akto.dto.type.*;
+import com.akto.dto.type.APICatalog;
+import com.akto.dto.type.RequestTemplate;
+import com.akto.dto.type.SingleTypeInfo;
+import com.akto.dto.type.URLMethods;
+import com.akto.dto.type.URLTemplate;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.runtime.APICatalogSync;
-import com.akto.runtime.RelationshipSync;
 import com.akto.store.SampleMessageStore;
 import com.akto.store.TestingUtil;
 import com.akto.test_editor.filter.Filter;
@@ -19,32 +33,28 @@ import com.akto.test_editor.filter.data_operands_impl.ValidationResult;
 import com.akto.testing.StatusCodeAnalyser;
 import com.akto.types.CappedSet;
 import com.akto.util.JSONUtils;
-import com.akto.utils.RedactSampleData;
 import com.fasterxml.jackson.core.JsonFactory;
-import com.fasterxml.jackson.core.JsonParser;
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
-
-import org.bson.conversions.Bson;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
-import static com.akto.runtime.APICatalogSync.trimAndSplit;
+import org.bson.conversions.Bson;
 
 
 public abstract class TestPlugin {
     static ObjectMapper mapper = new ObjectMapper();
     static JsonFactory factory = mapper.getFactory();
-    static final LoggerMaker loggerMaker = new LoggerMaker(TestPlugin.class);
-
-    private static final Logger logger = LoggerFactory.getLogger(TestPlugin.class);
+    static final LoggerMaker loggerMaker = new LoggerMaker(TestPlugin.class, LogDb.TESTING);
     private static final Gson gson = new Gson();
 
     public abstract Result  start(ApiInfoKey apiInfoKey, TestingUtil testingUtil, TestingRunConfig testingRunConfig);
@@ -53,13 +63,12 @@ public abstract class TestPlugin {
     public abstract String subTestName();
 
     public static boolean isStatusGood(int statusCode) {
-        return statusCode >= 200 && statusCode<300;
+        // TODO: 250 status code is for a client. To be verified later.
+        return statusCode >= 200 && statusCode < 300 && statusCode != 250;
     }
 
     public static void extractAllValuesFromPayload(String payload, Map<String,Set<String>> payloadMap) throws Exception{
-        JsonParser jp = factory.createParser(payload);
-        JsonNode node = mapper.readTree(jp);
-        RelationshipSync.extractAllValuesFromPayload(node,new ArrayList<>(),payloadMap);
+        com.akto.runtime.RuntimeUtil.extractAllValuesFromPayload(payload,payloadMap);
     }
 
     public String decrementUrlVersion(String url, int decrementValue, int limit) {
@@ -93,55 +102,7 @@ public abstract class TestPlugin {
     }
 
     public static double compareWithOriginalResponse(String originalPayload, String currentPayload, Map<String, Boolean> comparisonExcludedKeys) {
-        if (originalPayload == null && currentPayload == null) return 100;
-        if (originalPayload == null || currentPayload == null) return 0;
-
-        String trimmedOriginalPayload = originalPayload.trim();
-        String trimmedCurrentPayload = currentPayload.trim();
-        if (trimmedCurrentPayload.equals(trimmedOriginalPayload)) return 100;
-
-        Map<String, Set<String>> originalResponseParamMap = new HashMap<>();
-        Map<String, Set<String>> currentResponseParamMap = new HashMap<>();
-        try {
-            extractAllValuesFromPayload(originalPayload, originalResponseParamMap);
-            extractAllValuesFromPayload(currentPayload, currentResponseParamMap);
-        } catch (Exception e) {
-            return 0.0;
-        }
-
-        if (originalResponseParamMap.keySet().size() == 0 && currentResponseParamMap.keySet().size() == 0) {
-            return 100.0;
-        }
-
-        Set<String> visited = new HashSet<>();
-        int matched = 0;
-        for (String k1: originalResponseParamMap.keySet()) {
-            if (visited.contains(k1) || comparisonExcludedKeys.containsKey(k1)) continue;
-            visited.add(k1);
-            Set<String> v1 = originalResponseParamMap.get(k1);
-            Set<String> v2 = currentResponseParamMap.get(k1);
-            if (Objects.equals(v1, v2)) matched +=1;
-        }
-
-        for (String k1: currentResponseParamMap.keySet()) {
-            if (visited.contains(k1) || comparisonExcludedKeys.containsKey(k1)) continue;
-            visited.add(k1);
-            Set<String> v1 = originalResponseParamMap.get(k1);
-            Set<String> v2 = currentResponseParamMap.get(k1);
-            if (Objects.equals(v1, v2)) matched +=1;
-        }
-
-        int visitedSize = visited.size();
-        if (visitedSize == 0) return 0.0;
-
-        double result = (100.0*matched)/visitedSize;
-
-        if (Double.isFinite(result)) {
-            return result;
-        } else {
-            return 0.0;
-        }
-
+       return com.akto.testing.Utils.compareWithOriginalResponse(originalPayload, currentPayload, comparisonExcludedKeys);
     }
 
     public Result addWithoutRequestError(String originalMessage, TestResult.TestError testError) {
@@ -153,7 +114,7 @@ public abstract class TestPlugin {
     public TestResult buildFailedTestResultWithOriginalMessage(String originalMessage, TestResult.TestError testError, OriginalHttpRequest request, TestInfo testInfo) {
         String message = null;
         try {
-            message = RedactSampleData.convertOriginalReqRespToString(request, null);
+            message = convertOriginalReqRespToString(request, null);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error while converting testRequest object to string : " + e, LogDb.TESTING);
         }
@@ -174,11 +135,11 @@ public abstract class TestPlugin {
         List<String> errors = new ArrayList<>();
         String message = null;
         try {
-            message = RedactSampleData.convertOriginalReqRespToString(request, response);
+            message = convertOriginalReqRespToString(request, response);
         } catch (Exception e) {
             // TODO:
-            logger.error("Error while converting OriginalHttpRequest to string", e);
-            message = RedactSampleData.convertOriginalReqRespToString(new OriginalHttpRequest(), new OriginalHttpResponse());
+            loggerMaker.error("Error while converting OriginalHttpRequest to string", e);
+            message = convertOriginalReqRespToString(new OriginalHttpRequest(), new OriginalHttpResponse());
             errors.add(TestResult.TestError.FAILED_TO_CONVERT_TEST_REQUEST_TO_STRING.getMessage());
         }
 
@@ -365,9 +326,7 @@ public abstract class TestPlugin {
     }
 
     public static ValidationResult validateFilter(FilterNode filterNode, RawApi rawApi, ApiInfoKey apiInfoKey, Map<String, Object> varMap, String logId) {
-        if (filterNode == null) return new ValidationResult(true, "");
-        if (rawApi == null) return  new ValidationResult(true, "raw api is null");
-        return validate(filterNode, rawApi, null, apiInfoKey,"filter", varMap, logId);
+        return com.akto.testing.Utils.validateFilter(filterNode, rawApi, apiInfoKey, varMap, logId);
     }
 
     public static boolean validateValidator(FilterNode validatorNode, RawApi rawApi, RawApi testRawApi, ApiInfoKey apiInfoKey, Map<String, Object> varMap, String logId) {
@@ -379,7 +338,7 @@ public abstract class TestPlugin {
         boolean isDefaultPayload = StatusCodeAnalyser.isDefaultPayload(body);
         ValidationResult validateResult = validate(validatorNode,rawApi,testRawApi, apiInfoKey,"validator", varMap, logId);
 
-        // loggerMaker.infoAndAddToDb(logId + " isDefaultPayload = " + isDefaultPayload + "; validateResult = " + validateResult, LogDb.TESTING);
+        // loggerMaker.debugAndAddToDb(logId + " isDefaultPayload = " + isDefaultPayload + "; validateResult = " + validateResult, LogDb.TESTING);
         return !isDefaultPayload && validateResult.getIsValid();
     }
 

@@ -1,17 +1,20 @@
 package com.akto.action;
 
+import com.akto.dao.CustomRoleDao;
 import com.akto.dao.PendingInviteCodesDao;
 import com.akto.dao.RBACDao;
 import com.akto.dao.UsersDao;
 import com.akto.dao.context.Context;
+import com.akto.dto.CustomRole;
 import com.akto.dto.PendingInviteCode;
-import com.akto.dto.RBAC;
+import com.akto.dto.RBAC.Role;
 import com.akto.dto.User;
 import com.akto.log.LoggerMaker;
 import com.akto.notifications.email.SendgridEmail;
 import com.akto.util.DashboardMode;
 import com.akto.utils.JWT;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Updates;
 import com.opensymphony.xwork2.Action;
 import com.sendgrid.helpers.mail.Mail;
 
@@ -22,6 +25,8 @@ import java.io.IOException;
 import java.security.NoSuchAlgorithmException;
 import java.security.spec.InvalidKeySpecException;
 import java.util.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class InviteUserAction extends UserAction{
 
@@ -35,6 +40,7 @@ public class InviteUserAction extends UserAction{
     public static final String AKTO_DOMAIN = "akto.io";
 
     public static Map<String, String> commonOrganisationsMap = new HashMap<>();
+    private static final ExecutorService executor = Executors.newFixedThreadPool(1);
 
     public static String validateEmail(String email, String adminLogin) {
         if (email == null) return INVALID_EMAIL_ERROR;
@@ -50,11 +56,11 @@ public class InviteUserAction extends UserAction{
         String domain = loginArr[1];
         String inviteeEmailDomain = inviteeEmailArr[1];
 
-        loggerMaker.infoAndAddToDb("inviteeEmailDomain: " + inviteeEmailDomain);
-        loggerMaker.infoAndAddToDb("admin domain: " + domain);
+        loggerMaker.debugAndAddToDb("inviteeEmailDomain: " + inviteeEmailDomain);
+        loggerMaker.debugAndAddToDb("admin domain: " + domain);
 
         boolean isSameDomainVal = isSameDomain(inviteeEmailDomain, domain);
-        loggerMaker.infoAndAddToDb("is same domain: " + isSameDomainVal);
+        loggerMaker.debugAndAddToDb("is same domain: " + isSameDomainVal);
 
         if (!isSameDomainVal && !inviteeEmailDomain.equals(AKTO_DOMAIN))  {
             return DIFFERENT_ORG_EMAIL_ERROR;
@@ -67,36 +73,49 @@ public class InviteUserAction extends UserAction{
         if (inviteeDomain == null || adminDomain == null) return false;
         if (inviteeDomain.equalsIgnoreCase(adminDomain)) return true;
 
+        if (("consulting-for."+adminDomain).equals(inviteeDomain)) return true;
+
         String inviteeOrg = commonOrganisationsMap.get(inviteeDomain);
         String adminOrg = commonOrganisationsMap.get(adminDomain);
 
-        loggerMaker.infoAndAddToDb("inviteeOrg: " + inviteeOrg);
-        loggerMaker.infoAndAddToDb("adminOrg: " + adminOrg);
+        loggerMaker.debugAndAddToDb("inviteeOrg: " + inviteeOrg);
+        loggerMaker.debugAndAddToDb("adminOrg: " + adminOrg);
         if (inviteeOrg == null || adminOrg == null) return false;
 
         if (inviteeOrg.equalsIgnoreCase(adminOrg)) return true;
 
-        loggerMaker.infoAndAddToDb("inviteeOrg and adminOrg different");
+        loggerMaker.debugAndAddToDb("inviteeOrg and adminOrg different");
         return false;
     }
 
     private String finalInviteCode;
-    private RBAC.Role inviteeRole;
+    private String inviteeRole;
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(InviteUserAction.class, LoggerMaker.LogDb.DASHBOARD);
 
     @Override
     public String execute() {
         int user_id = getSUser().getId();
-        loggerMaker.infoAndAddToDb(user_id + " inviting " + inviteeEmail);
+        loggerMaker.debugAndAddToDb(user_id + " inviting " + inviteeEmail);
 
-        User admin = UsersDao.instance.getFirstUser(Context.accountId.get());
-        if (admin == null) {
-            loggerMaker.infoAndAddToDb("admin is null");
+        Integer accountId = Context.accountId.get();
+        User user = UsersDao.instance.findOne(Filters.and(
+                Filters.eq(User.LOGIN, inviteeEmail),
+                Filters.eq(User.ACCOUNTS+"."+accountId+".accountId", accountId)
+        ));
+        if(user != null) {
+            addActionError("User already exists");
             return ERROR.toUpperCase();
         }
 
-        loggerMaker.infoAndAddToDb("admin user: " + admin.getLogin());
+
+        User admin = UsersDao.instance.getFirstUser(Context.accountId.get());
+        if (admin == null) {
+            loggerMaker.debugAndAddToDb("admin not found for organization");
+            return ERROR.toUpperCase();
+        }
+
+        loggerMaker.debugAndAddToDb("admin user: " + admin.getLogin());
         String code = validateEmail(this.inviteeEmail, admin.getLogin());
 
         if (code != null) {
@@ -104,9 +123,23 @@ public class InviteUserAction extends UserAction{
             return ERROR.toUpperCase();
         }
 
-        RBAC.Role userRole = RBACDao.getCurrentRoleForUser(user_id, Context.accountId.get());
+        Role userRole = RBACDao.getCurrentRoleForUser(user_id, Context.accountId.get());
+        Role baseRole = null;
 
-        if (!Arrays.asList(userRole.getRoleHierarchy()).contains(this.inviteeRole)) {
+        CustomRole customRole = CustomRoleDao.instance.findRoleByName(this.inviteeRole);
+
+        try {
+            if (customRole != null) {
+                baseRole = Role.valueOf(customRole.getBaseRole());
+            } else {
+                baseRole = Role.valueOf(this.inviteeRole);
+            }
+        } catch (Exception e) {
+            addActionError("Invalid role");
+            return ERROR.toUpperCase();
+        }
+
+        if (!Arrays.asList(userRole.getRoleHierarchy()).contains(baseRole)) {
             addActionError("User not allowed to invite for this role");
             return ERROR.toUpperCase();
         }
@@ -134,8 +167,21 @@ public class InviteUserAction extends UserAction{
 
         try {
             Jws<Claims> jws = JWT.parseJwt(inviteCode,"");
-            PendingInviteCodesDao.instance.insertOne(
-                    new PendingInviteCode(inviteCode, user_id, inviteeEmail,jws.getBody().getExpiration().getTime(),Context.accountId.get(), this.inviteeRole)
+            /*
+             * There should only be one invite code per user per account.
+             * So if we update with upsert:true per account-inviteeEmail
+             */
+            PendingInviteCodesDao.instance.updateOne(
+                    Filters.and(
+                        Filters.eq(PendingInviteCode.ACCOUNT_ID, Context.accountId.get()),
+                        Filters.eq(PendingInviteCode.INVITEE_EMAIL_ID, inviteeEmail)
+                    ),
+                    Updates.combine(
+                        Updates.set(PendingInviteCode.INVITEE_ROLE, this.inviteeRole),
+                        Updates.set(PendingInviteCode.INVITE_CODE, inviteCode),
+                        Updates.set(PendingInviteCode._EXPIRY, jws.getBody().getExpiration().getTime()),
+                        Updates.set(PendingInviteCode._ISSUER, user_id)
+                    )
             );
         } catch (NoSuchAlgorithmException | InvalidKeySpecException | IOException e) {
             e.printStackTrace();
@@ -147,15 +193,24 @@ public class InviteUserAction extends UserAction{
 
         String inviteFrom = getSUser().getName();
         Mail email = SendgridEmail.getInstance().buildInvitationEmail(inviteeName, inviteeEmail, inviteFrom, finalInviteCode);
+        if (!DashboardMode.isOnPremDeployment()) {
+            sendInviteEmail(email);
+        } else {
+            executor.submit(() -> {
+                sendInviteEmail(email);
+            });
+        }
+
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    private void sendInviteEmail(Mail email) {
         try {
             SendgridEmail.getInstance().send(email);
         } catch (IOException e) {
             loggerMaker.errorAndAddToDb("invite email sending failed" + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
             e.printStackTrace();
-//            return ERROR.toUpperCase();
         }
-
-        return Action.SUCCESS.toUpperCase();
     }
 
     private String invitationCodeToDelete;
@@ -184,11 +239,11 @@ public class InviteUserAction extends UserAction{
         return finalInviteCode;
     }
 
-    public RBAC.Role getInviteeRole() {
+    public String getInviteeRole() {
         return inviteeRole;
     }
 
-    public void setInviteeRole(RBAC.Role inviteeRole) {
+    public void setInviteeRole(String inviteeRole) {
         this.inviteeRole = inviteeRole;
     }
 }

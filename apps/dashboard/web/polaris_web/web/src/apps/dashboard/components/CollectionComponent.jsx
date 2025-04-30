@@ -24,15 +24,18 @@ function CollectionComponent(props) {
 
     const { condition, index, dispatch, operatorComponent } = props
     const [apiEndpoints, setApiEndpoints] = useState({})
-    const [regexText, setRegexText] = useState('')
-    const [hostRegexText, setHostRegexText] = useState('')
+    const initialRegexText = (condition && condition?.type === 'REGEX') ? (condition?.data?.regex || '') : ''
+    const initialHostRegexText = (condition && condition?.type === 'HOST_REGEX') ? (condition?.data?.host_regex || '') : ''
+    const [regexText, setRegexText] = useState(initialRegexText)
+    const [hostRegexText, setHostRegexText] = useState(initialHostRegexText)
 
     useEffect(() => {
         fetchApiEndpoints(condition.data)
     }, [condition])
 
     const allCollections = PersistStore(state => state.allCollections);
-    const allCollectionsOptions = allCollections.filter(x => x.type !== "API_GROUP")
+    const activatedCollections = allCollections.filter(collection => collection.deactivated === false)
+    const allCollectionsOptions = activatedCollections.filter(x => x.type !== "API_GROUP")
         .map(collection => {
             return {
                 label: collection.displayName,

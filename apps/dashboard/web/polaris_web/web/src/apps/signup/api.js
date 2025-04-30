@@ -62,5 +62,33 @@ export default {
                 email, password, invitationCode
             }
         })
+    },
+    triggerGoogleSSO: function(userEmail){
+        return request({
+            url: '/trigger-google-sso',
+            method: 'post',
+            data: {
+                userEmail
+            }
+        })
+    },
+    sendPasswordResetLink: function(email) {
+        return request({
+            url: 'auth/sendPasswordResetLink',
+            method: 'post',
+            data: {
+                forgotPasswordEmail: email
+            }
+        })
+    },
+    resetPassword: function(token, newPassword) {
+        return request({
+            url: 'auth/resetPassword',
+            method: 'post',
+            data: {
+                resetPasswordToken: token,
+                newPassword
+            }
+        })
     }
 }

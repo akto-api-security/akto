@@ -10,6 +10,7 @@ import java.util.Collections;
 
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.*;
+import org.apache.commons.lang3.function.FailableFunction;
 import org.bson.conversions.Bson;
 
 import com.akto.dao.ApiInfoDao;
@@ -25,7 +26,6 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.parsers.HttpCallParser;
 import com.akto.runtime.policies.AuthPolicy;
-import com.akto.util.Constants;
 import com.google.gson.Gson;
 
 import static com.akto.dto.ApiInfo.ALL_AUTH_TYPES_FOUND;
@@ -77,20 +77,7 @@ public class CustomAuthUtil {
 
     public static void customAuthTypeUtil(List<CustomAuthType> customAuthTypes) {
 
-        List<WriteModel<ApiInfo>> apiInfosUpdates = new ArrayList<>();
-
-        int skip = 0;
-        int limit = 1000;
-        boolean fetchMore = false;
-        do {
-            fetchMore = false;
-            List<ApiInfo> apiInfos = ApiInfoDao.instance.findAll(new BasicDBObject(), skip, limit,
-                    Sorts.descending(Constants.ID));
-
-            loggerMaker.infoAndAddToDb("Read " + (apiInfos.size() + skip) + " api infos for custom auth type",
-                    LogDb.DASHBOARD);
-
-        for (ApiInfo apiInfo : apiInfos) {
+        FailableFunction<ApiInfo, UpdateOneModel<ApiInfo>, Exception> func = (apiInfo) -> {
 
             Set<Set<ApiInfo.AuthType>> authTypes = apiInfo.getAllAuthTypesFound();
             authTypes.remove(new HashSet<>());
@@ -122,24 +109,13 @@ public class CustomAuthUtil {
                 }
             }
 
-            UpdateOneModel<ApiInfo> update = new UpdateOneModel<>(
+                return new UpdateOneModel<>(
                     ApiInfoDao.getFilter(apiInfo.getId()),
                     Updates.set(ALL_AUTH_TYPES_FOUND, apiInfo.getAllAuthTypesFound()),
                     new UpdateOptions().upsert(false));
-            apiInfosUpdates.add(update);
+        };
 
-        }
-
-        if (apiInfos.size() == limit) {
-            skip += limit;
-            fetchMore = true;
-        }
-
-    } while (fetchMore);
-
-            if (apiInfosUpdates.size() > 0) {
-                ApiInfoDao.instance.getMCollection().bulkWrite(apiInfosUpdates);
-            }
+        CalculateJob.apiInfoUpdateJob(func);
     }
 
     public static void resetAllCustomAuthTypes() {

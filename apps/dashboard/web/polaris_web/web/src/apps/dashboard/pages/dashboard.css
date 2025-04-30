@@ -1,6 +1,36 @@
 .dashboard {
     overflow-x: hidden;
 }
+.custom-color .Polaris-Text--success {
+    color: rgb(0, 127, 95) !important;
+}
+
+.custom-badge-color .Polaris-Badge--statusCritical {
+    background-color: #E45357;
+    color: white;
+}
+
+.custom-badge-color .Polaris-Badge--statusAttention{
+    background-color: #EF864C;
+    color: white;
+}
+
+.custom-badge-color .Polaris-Badge--statusWarning{
+    background-color: #F6C564;
+}
+
+.custom-badge-color .Polaris-Badge--statusInfo {
+    background-color: #F5D8A1;
+}
+
+.custom-badge-color .Polaris-Badge--statusNew {
+    background-color: #A4E8F2;
+}
+
+.custom-badge-color .Polaris-Badge--statusSuccess {
+    background-color: #6FD1A6;
+    color: white;
+}
 
 .aktoButton {
     z-index: 518;
@@ -28,6 +58,39 @@
     border-bottom: 1px solid #E1E3E5;
 }
 
+.call-banner {
+    width: 200px;
+    position: fixed;
+    left: 1.2vw;
+    z-index: 100;
+    bottom: 8vh;
+}
+
+.call-banner .Polaris-Text--headingMd {
+    font-size: 14px !important;
+}
+
+.call-banner .Polaris-Banner--withinPage {
+    background: #EDEEEF !important;
+}
+
+.alerts-banner {
+    width: 400px;
+    position: fixed;
+    right: 24px;
+    z-index: 100;
+    bottom: 80px;
+}
+
+.alerts-banner .Polaris-Banner--withinPage{
+    padding: 8px !important;
+    margin-top: unset !important;
+}
+
+.alerts-banner .Polaris-Banner__Dismiss{
+    top: 12px !important;
+}
+
 :root {
     --akto-primary: #6200EA;
    --color-post: #49cc90 ;
@@ -38,7 +101,16 @@
    --color-patch: #50e3c2 ;
    --color-disabled: #ebebeb ;
    --color-options: #0d5aa7 ;
+   --color-success-new: #008060;
    --white: #ffffff;
+   --borderShadow-box-shadow: #AEB4B9;
+   --inset-box-shadow: 0px 1px 0px 0px #898F94 inset;
+   --agent-grey-background: #F6F6F7;
+
+   --text-default: #202223;
+   --text-subdued: #6D7175;
+
+   --background-selected: #EDEEEF;
 
     --p-color-bg-primary: var(--akto-primary) !important;
     --p-color-bg-primary-hover: #5400CB !important;
@@ -49,6 +121,7 @@
     --p-color-text-primary: var(--akto-primary) !important;
     --p-color-text-success: var(--akto-primary) !important;
     --p-color-text-primary-hover: var(--akto-primary) !important;
+    --p-color-text-success-new: var(--color-success-new) !important;
     
     --p-color-icon-primary: var(--akto-primary) !important;
     --p-color-bg-interactive-selected: #F6F6F7 !important;
@@ -124,4 +197,37 @@
 
 .form-class .Polaris-Label{
     color: #202223 !important;
+}
+
+.welcome-back-modal-title {
+    width: 95%;
+    position: absolute;
+    z-index: 2;
+    background: white;
+    margin-top: -20px;
+    padding-block: 10px;
+}
+
+.badge-wrapper-CRITICAL .Polaris-Badge {
+    background-color: #DF2909 !important;
+    color: #FFFBFB !important;
+    font-weight: 550 !important;
+}
+
+.badge-wrapper-HIGH .Polaris-Badge {
+    background-color: #FED3D1 !important;
+    color: #202223 !important;
+    font-weight: 550 !important;
+}
+
+.badge-wrapper-MEDIUM .Polaris-Badge {
+    background-color: #FFD79D !important;
+    color: #202223 !important;
+    font-weight: 550 !important;
+}
+
+.badge-wrapper-LOW .Polaris-Badge {
+    background-color: #E4E5E7;
+    color: #202223 !important;
+    font-weight: 550 !important;
 }

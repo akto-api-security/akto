@@ -13,11 +13,13 @@ import transform from './customDiffEditor';
 
 function SampleDataComponent(props) {
 
-    const { type, sampleData, minHeight, showDiff, isNewDiff } = props;
+    const { type, sampleData, minHeight, showDiff, isNewDiff, metadata } = props;
     const [sampleJsonData, setSampleJsonData] = useState({ request: { message: "" }, response: { message: "" } });
     const [popoverActive, setPopoverActive] = useState({});
     const [lineNumbers, setLineNumbers] = useState({request: [], response: []})
     const [currentIndex, setCurrentIndex] = useState({request: 0, response: 0})
+    const [responseTime, setResponseTime] = useState(undefined)
+    const [ipObj, setIpObj] = useState({sourceIP: "", destIP: ""})
 
     const ref = useRef(null)
 
@@ -28,8 +30,15 @@ function SampleDataComponent(props) {
         } catch {
           parsed = undefined
         }
-        let responseJson = func.responseJson(parsed, sampleData?.highlightPaths)
-        let requestJson = func.requestJson(parsed, sampleData?.highlightPaths)
+        if (parsed?.ip != null && parsed?.destIp != null) {
+            setIpObj({sourceIP: parsed?.ip, destIP: parsed?.destIp})
+        }
+        
+        let responseJson = func.responseJson(parsed, sampleData?.highlightPaths, metadata)
+        let requestJson = func.requestJson(parsed, sampleData?.highlightPaths, metadata)
+
+        let responseTime = parsed?.responseTime;
+        setResponseTime(responseTime)
         
         let originalParsed;
         try{
@@ -63,7 +72,7 @@ function SampleDataComponent(props) {
                 response: { message: transform.formatData(responseJson,"http"), original: transform.formatData(originalResponseJson,"http"), highlightPaths:responseJson?.highlightPaths },
             })
         }
-      }, [sampleData])
+      }, [sampleData, metadata])
 
     const copyContent = async(type,completeData) => {
         let copyString = "";
@@ -197,11 +206,15 @@ function SampleDataComponent(props) {
     let currentLineActive = lineNumbers && lineNumbers[type].length > 0 ? lineNumbers[type][currentIndex[type]] : 1
     return (
 
-        <Box>
+        <Box id='sample-data-editor-container'>
             <LegacyCard.Section flush>
                 <Box padding={"2"}>
                     <HorizontalStack padding="2" align='space-between'>
-                        {func.toSentenceCase(type)}
+                        {func.toSentenceCase(type)} 
+                        { type==="response" && responseTime ? (` (${responseTime} ms)`) : "" }
+                        { type==="request" && (ipObj?.sourceIP.length>0 || ipObj?.destIP.length>0) ? 
+                            (` (${ipObj?.sourceIP ? `Src: ${ipObj.sourceIP}` : ""}${ipObj?.sourceIP && ipObj?.destIP ? " & " : ""}${ipObj?.destIP ? `Dest: ${ipObj.destIP}` : ""})`) 
+                            : "" }
                         <HorizontalStack gap={2}>
                         {isNewDiff ? <HorizontalStack gap="2">
                                 <Box borderInlineEndWidth='1' borderColor="border-subdued" padding="1">
@@ -241,7 +254,7 @@ function SampleDataComponent(props) {
                 </Box>
             </LegacyCard.Section>
             <LegacyCard.Section flush>
-                <SampleData data={sampleJsonData[type]} minHeight={minHeight || "400px"} showDiff={showDiff} editorLanguage="custom_http" currLine={currentLineActive} getLineNumbers={getLineNumbers}/>
+                <SampleData data={sampleJsonData[type]} minHeight={minHeight || "400px"} useDynamicHeight={props?.useDynamicHeight || false} showDiff={showDiff} editorLanguage="custom_http" currLine={currentLineActive} getLineNumbers={getLineNumbers}/>
             </LegacyCard.Section>
         </Box>
     )

@@ -4,7 +4,6 @@ import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 
 import com.akto.DaoInit;
@@ -16,6 +15,8 @@ import com.akto.kafka.Kafka;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.parsers.HttpCallParser;
+import com.akto.util.filter.DictionaryFilter;
+import com.akto.runtime.utils.Utils;
 import com.akto.util.AccountTask;
 import com.akto.util.DashboardMode;
 import com.google.gson.Gson;
@@ -44,14 +45,6 @@ public class Main {
 
     // this sync threshold time is used for deleting sample data
     public static final int sync_threshold_time = 120;
-
-    private static int debugPrintCounter = 500;
-    private static void printL(Object o) {
-        if (debugPrintCounter > 0) {
-            debugPrintCounter--;
-            logger.info(o.toString());
-        }
-    }   
 
     public static boolean isOnprem = false;
 
@@ -157,6 +150,8 @@ public class Main {
         }
         int maxPollRecordsConfig = Integer.parseInt(System.getenv("AKTO_KAFKA_MAX_POLL_RECORDS_CONFIG"));
 
+        DictionaryFilter.readDictionaryBinary();
+
         if (topicName == null) topicName = "akto.api.logs";
 
         DaoInit.init(new ConnectionString(mongoURI));
@@ -178,7 +173,7 @@ public class Main {
         }
 
         final Main main = new Main();
-        Properties properties = main.configProperties(kafkaBrokerUrl, groupIdConfig, maxPollRecordsConfig);
+        Properties properties = Utils.configProperties(kafkaBrokerUrl, groupIdConfig, maxPollRecordsConfig);
         main.consumer = new KafkaConsumer<>(properties);
 
         final Thread mainThread = Thread.currentThread();
@@ -225,7 +220,7 @@ public class Main {
                     HttpResponseParams httpResponseParams;
                     try {
                          
-                        printL(r.value());
+                        Utils.printL(r.value());
                         lastSyncOffset++;
 
                         if (lastSyncOffset % 100 == 0) {
@@ -302,7 +297,7 @@ public class Main {
           // nothing to catch. This exception is called from the shutdown hook.
         } catch (Exception e) {
             exceptionOnCommitSync.set(true);
-            printL(e);
+            Utils.printL(e);
             loggerMaker.errorAndAddToDb("Error in main runtime: " + e.getMessage(),LogDb.RUNTIME);
             e.printStackTrace();
             System.exit(0);
@@ -422,19 +417,5 @@ public class Main {
             }
             ApiCollectionsDao.instance.insertOne(new ApiCollection(0, "Default", Context.now(), urls, null, 0, false, true));
         }
-    }
-
-
-    public static Properties configProperties(String kafkaBrokerUrl, String groupIdConfig, int maxPollRecordsConfig) {
-        Properties properties = new Properties();
-        properties.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, kafkaBrokerUrl);
-        properties.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
-        properties.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
-        properties.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, maxPollRecordsConfig);
-        properties.put(ConsumerConfig.GROUP_ID_CONFIG, groupIdConfig);
-        properties.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
-        properties.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, false);
-
-        return properties;
     }
 }

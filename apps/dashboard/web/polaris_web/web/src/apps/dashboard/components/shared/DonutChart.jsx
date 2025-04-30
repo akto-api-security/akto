@@ -7,7 +7,7 @@ import PersistStore from '../../../main/PersistStore';
 import observeFunc from "../../pages/observe/transform"
 
 
-function DonutChart({data, title, size,type,navUrl, isRequest}) {
+function DonutChart({data, title, size,type,navUrl, isRequest, pieInnerSize}) {
     const chartComponentRef = useRef(null)
     const navigate = useNavigate()
     const filtersMap = PersistStore(state => state.filtersMap)
@@ -54,7 +54,7 @@ function DonutChart({data, title, size,type,navUrl, isRequest}) {
         plotOptions: {
             pie: {
               size: (size+'px'),
-              innerSize: '60%',
+              innerSize: pieInnerSize ? pieInnerSize : '60%',
               dataLabels: {
                 enabled: false
               }

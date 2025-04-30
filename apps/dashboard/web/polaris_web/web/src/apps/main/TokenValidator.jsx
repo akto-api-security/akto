@@ -1,12 +1,12 @@
 import React from 'react'
 import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import PersistStore from './PersistStore'
+import SessionStore from './SessionStore'
 
 function TokenValidator() {
 
     let navigate = useNavigate()
-    const accessToken = PersistStore(state => state.accessToken)
+    const accessToken = SessionStore(state => state.accessToken)
   useEffect(() => {
     console.log(accessToken)
     if (accessToken === null || accessToken === '') {

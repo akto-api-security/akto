@@ -1,10 +1,23 @@
 package com.akto.action;
 
+import static com.akto.action.SignupAction.BUSINESS_EMAIL_URI;
+import static com.akto.action.SignupAction.CHECK_INBOX_URI;
+import static com.akto.action.SignupAction.SSO_URL;
+import static com.akto.action.SignupAction.TEST_EDITOR_URL;
+import static com.akto.filter.UserDetailsFilter.LOGIN_URI;
+
+import com.akto.dao.SSOConfigsDao;
 import com.akto.dao.UsersDao;
+import com.akto.dto.Config;
 import com.akto.dto.User;
 import com.akto.listener.InitializerListener;
-import com.akto.utils.*;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.DashboardMode;
+import com.akto.utils.Auth0;
+import com.akto.utils.GithubLogin;
+import com.akto.utils.JWT;
+import com.akto.utils.OktaLogin;
 import com.auth0.AuthorizeUrl;
 import com.auth0.SessionUtils;
 import com.mongodb.BasicDBObject;
@@ -12,20 +25,13 @@ import com.mongodb.client.model.Filters;
 import com.opensymphony.xwork2.Action;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jws;
+import java.nio.charset.StandardCharsets;
+import java.util.Map;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 import org.apache.struts2.interceptor.ServletRequestAware;
 import org.apache.struts2.interceptor.ServletResponseAware;
 import org.apache.struts2.interceptor.SessionAware;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-import java.nio.charset.StandardCharsets;
-import java.util.Base64;
-import java.util.Map;
-
-import static com.akto.action.SignupAction.*;
-import static com.akto.filter.UserDetailsFilter.LOGIN_URI;
 
 // This is the first action that is triggered when the webpage is first fetched
 // Basically sets the access token from the session (saved by UserDetailsFilter)
@@ -33,8 +39,9 @@ import static com.akto.filter.UserDetailsFilter.LOGIN_URI;
 // in ${accessToken} field.
 public class HomeAction implements Action, SessionAware, ServletResponseAware, ServletRequestAware {
 
+    private static final LoggerMaker logger = new LoggerMaker(CustomAuthTypeAction.class, LogDb.DASHBOARD);
+
     protected HttpServletResponse servletResponse;
-    private static final Logger logger = LoggerFactory.getLogger(LoginAction.class);
 
     @Override
     public void setServletResponse(HttpServletResponse httpServletResponse) {
@@ -43,48 +50,58 @@ public class HomeAction implements Action, SessionAware, ServletResponseAware, S
 
     protected HttpServletRequest servletRequest;
 
-    public String verifyEmail(){
-        return "SUCCESS";
-    }
     @Override
     public String execute() {
 
+        try {
+            String nodeEnv = System.getenv("NODE_ENV");
+            servletRequest.setAttribute("nodeEnv", nodeEnv != null ? nodeEnv : "production");    
+        } catch(Exception e){
+        }
+
         servletRequest.setAttribute("isSaas", InitializerListener.isSaas);
-        if (GithubLogin.getClientId() != null) {
-            servletRequest.setAttribute("githubClientId", new String(Base64.getEncoder().encode(GithubLogin.getClientId().getBytes())));
+        if(DashboardMode.isOnPremDeployment()){
+            if (GithubLogin.getGithubUrl() != null) {
+                servletRequest.setAttribute("githubAuthUrl", GithubLogin.getGithubUrl() + "/login/oauth/authorize?client_id=" + GithubLogin.getClientId() + "&scope=user&state=1000000");
+                servletRequest.setAttribute("activeSso", Config.ConfigType.GITHUB);
+            }
+    
+            if (OktaLogin.getAuthorisationUrl() != null) {
+                servletRequest.setAttribute("oktaAuthUrl", OktaLogin.getAuthorisationUrl());
+                servletRequest.setAttribute("activeSso", Config.ConfigType.OKTA);
+            }
+    
+            if (SSOConfigsDao.getSAMLConfigByAccountId(1000000, Config.ConfigType.AZURE) != null) {
+                servletRequest.setAttribute("activeSso", Config.ConfigType.AZURE);
+            }
+    
+            if (SSOConfigsDao.getSAMLConfigByAccountId(1000000, Config.ConfigType.GOOGLE_SAML) != null) {
+                servletRequest.setAttribute("activeSso", Config.ConfigType.GOOGLE_SAML);
+            }
         }
-        if (GithubLogin.getGithubUrl() != null) {
-            servletRequest.setAttribute("githubUrl", GithubLogin.getGithubUrl());
-        }
-        if(OktaLogin.getAuthorisationUrl() != null){
-            servletRequest.setAttribute("oktaAuthUrl", new String(Base64.getEncoder().encode(OktaLogin.getAuthorisationUrl().getBytes())));
-        }
-        if(AzureLogin.getSamlSettings() != null){
-            servletRequest.setAttribute("azureRequestUrl", new String(Base64.getEncoder().encode((AzureLogin.getInstance().getAzureConfig().getApplicationIdentifier() + "/signup-azure-request").getBytes())));
-        }
+        
         if (InitializerListener.aktoVersion != null && InitializerListener.aktoVersion.contains("akto-release-version")) {
             servletRequest.setAttribute("AktoVersionGlobal", "");
         } else {
             servletRequest.setAttribute("AktoVersionGlobal", InitializerListener.aktoVersion);
         }
-        logger.info("in Home::execute: settings IS_SAAS to " + InitializerListener.isSaas);
-        if(DashboardMode.isSaasDeployment()){
+        logger.debug("in Home::execute: settings IS_SAAS to {}", InitializerListener.isSaas);
+        if(DashboardMode.isSaasDeployment()) {
             if(accessToken != null && servletRequest.getAttribute("username") == null) {
                 try {
                     Jws<Claims> jws = JWT.parseJwt(accessToken, "");
                     String username = jws.getBody().get("username").toString();
                     User user = UsersDao.instance.findOne(Filters.eq(User.LOGIN, username));
                     if(user != null && user.getRefreshTokens() != null && !user.getRefreshTokens().isEmpty()){
-                        logger.info("User has refresh tokens, setting up window vars");
+                        logger.debug("User has refresh tokens, setting up window vars");
                         ProfileAction.executeMeta1(null, user, servletRequest, servletResponse);
                     }
                 }catch (Exception e){
-                    logger.info("Access token expired, unable to set window vars", e);
+                    logger.debug("Access token expired, unable to set window vars", e);
                 }
             }
             return redirectToAuth0(servletRequest, servletResponse, accessToken, new BasicDBObject());
         }
-        // Use existing flow
 
         return "SUCCESS";
     }
@@ -102,7 +119,9 @@ public class HomeAction implements Action, SessionAware, ServletResponseAware, S
 
         if(servletRequest.getRequestURI().equals(CHECK_INBOX_URI) ||
             servletRequest.getRequestURI().contains(BUSINESS_EMAIL_URI) ||
-            servletRequest.getRequestURI().contains(TEST_EDITOR_URL)) {
+            servletRequest.getRequestURI().contains(TEST_EDITOR_URL) || 
+            servletRequest.getRequestURI().contains(SSO_URL)
+            ) {
             return "SUCCESS";
         }
 

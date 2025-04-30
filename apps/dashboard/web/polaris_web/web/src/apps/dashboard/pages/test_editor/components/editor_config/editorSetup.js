@@ -128,18 +128,15 @@ const editorSetup = {
         })
     },
 
-    findErrors: function(Editor,keywords){
-        // a key may start with spaces and may have a "-" before starting
-        // it will end with ":" and may have spaces at the end.
-        let keyRegex = /(?<=^\s*-?\s*)(\w+)(?=:( *)$)/
-
+    findErrors: function(Editor, keywords){
+        let keyRegex = /^\s*-?\s*(\w+)\s*:( *)$/;
         Editor.onDidChangeModelContent(() => {
             const model = Editor.getModel();
             const markers = model.getValue().split('\n').flatMap((line, index) => {
                 let match = keyRegex.exec(line);
                 const words = [];
-                if(match!=null){
-                    words.push(match[0]);
+                if (match != null) {
+                    words.push(match[1]);
                 }
                 const errors = words.flatMap((word, wordIndex) => {
                     const matchingKeywords = keywords.filter(keyword => {
@@ -157,10 +154,10 @@ const editorSetup = {
                 });
                 return errors;
             });
-            editor.setModelMarkers(model, 'keyword-marker-owner', markers)
-
-        })
+            editor.setModelMarkers(model, 'keyword-marker-owner', markers);
+        });
     }
+    
 
 }
 

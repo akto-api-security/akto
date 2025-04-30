@@ -1,32 +1,71 @@
 import {create} from "zustand"
-import {devtools, persist, createJSONStorage} from "zustand/middleware"
+import { devtools, persist, createJSONStorage } from "zustand/middleware"
 
 const initialState = {
     subCategoryMap: {},
     categoryMap: {},
     sendEventOnLogin: false,
+    defaultIgnoreSummaryTime: 2 * 60 * 60
 };
 
 let localStore = (set) => ({
     ...initialState,
-    setSubCategoryMap: (subCategoryMap) => set({ subCategoryMap }),
-    setCategoryMap: (categoryMap) => set({ categoryMap }),
-    setSendEventOnLogin: (sendEventOnLogin) => set({ sendEventOnLogin }),
-    resetStore: () => set(initialState), // Reset function
-})
+
+    setSubCategoryMap: (subCategoryMap) => {
+        try {
+            set({ subCategoryMap });
+        } catch (error) {
+            console.error("Error setting subCategoryMap:", error);
+        }
+    },
+
+    setCategoryMap: (categoryMap) => {
+        try {
+            set({ categoryMap });
+        } catch (error) {
+            console.error("Error setting categoryMap:", error);
+        }
+    },
+
+    setSendEventOnLogin: (sendEventOnLogin) => {
+        try {
+            set({ sendEventOnLogin });
+        } catch (error) {
+            console.error("Error setting sendEventOnLogin:", error);
+        }
+    },
+
+    setDefaultIgnoreSummaryTime: (val) => {
+        try {
+            set({ val });
+        } catch (error) {
+            console.error("Error setting defaultIgnoreSummaryTime:", error);
+        }
+    },
+
+    resetStore: () => {
+        try {
+            set(initialState);
+        } catch (error) {
+            console.error("Error resetting store:", error);
+        }
+    },
+});
 
 localStore = devtools(localStore)
-localStore = persist(localStore,{storage: createJSONStorage(() => localStorage)})
+localStore = persist(localStore,{name: 'Akto-tests-store',storage: createJSONStorage(() => localStorage)})
 
 const LocalStore = create(localStore);
 
-window.addEventListener('storage', (event) => {
-   if (event.key === 'subCategoryMap') {
-    LocalStore.setState({
-      subCategoryMap: JSON.parse(event.newValue)
-    });
-  }
-});
+// window.addEventListener('storage', (event) => {
+//   const isFromAkto = (window.IS_SAAS === 'true' && event.url.includes("akto") || event.url.includes("dashboard"))
+//   if(event.key === 'undefined' && isFromAkto) {
+//     const newStorageValue = JSON.parse(event.newValue)
+//     LocalStore.setState({
+//       subCategoryMap: newStorageValue.state.subCategoryMap
+//     });
+//   }
+// });
 
 export default LocalStore
 

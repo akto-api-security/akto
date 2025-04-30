@@ -1,13 +1,10 @@
 package com.akto.store;
 
 import com.akto.dao.SampleDataDao;
-import com.akto.dao.testing.EndpointLogicalGroupDao;
 import com.akto.dao.testing.TestRolesDao;
 import com.akto.dto.*;
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dto.ApiInfo;
-import com.akto.dto.HttpRequestParams;
-import com.akto.dto.HttpResponseParams;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.testing.*;
 import com.akto.dto.traffic.Key;
@@ -18,15 +15,13 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import org.bson.conversions.Bson;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.util.*;
 
 public class SampleMessageStore {
 
 
-    private static final LoggerMaker loggerMaker = new LoggerMaker(SampleMessageStore.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(SampleMessageStore.class, LogDb.TESTING);
     private Map<ApiInfo.ApiInfoKey, List<String>> sampleDataMap = new HashMap<>();
     private Map<String, SingleTypeInfo> singleTypeInfos = new HashMap<>();
     public void buildSingleTypeInfoMap(TestingEndpoints testingEndpoints) {
@@ -134,6 +129,22 @@ public class SampleMessageStore {
         }
 
         return filteredMessages;
+    }
+
+    public List<RawApi> findSampleMessages(int k) {
+        List<RawApi> samples = new ArrayList<>();
+        if (sampleDataMap == null) return samples;
+
+        for (ApiInfoKey apiInfoKey : sampleDataMap.keySet()) {
+            List<String> messages = sampleDataMap.getOrDefault(apiInfoKey, new ArrayList<>());
+            if (!messages.isEmpty()) {
+                RawApi rawApi = RawApi.buildFromMessage(messages.get(0));
+                samples.add(rawApi);
+            }
+            if (samples.size() >= k) break;
+        }
+
+        return samples;
     }
 
     public Map<String, SingleTypeInfo> getSingleTypeInfos() {

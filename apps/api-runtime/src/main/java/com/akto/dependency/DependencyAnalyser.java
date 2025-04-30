@@ -22,15 +22,19 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.*;
 import org.bson.Document;
 import org.bson.conversions.Bson;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 
 import java.util.*;
 
 import static com.akto.util.HttpRequestResponseUtils.extractValuesFromPayload;
+import static com.akto.runtime.utils.Utils.parseCookie;
 
 public class DependencyAnalyser {
     Store valueStore; // this is to store all the values seen in response payload
     Store urlValueStore; // this is to store all the url$value seen in response payload
     Store urlParamValueStore; // this is to store all the url$param$value seen in response payload
+    private static final LoggerMaker loggerMaker = new LoggerMaker(DependencyAnalyser.class, LogDb.RUNTIME);
 
     Map<String, Set<String>> urlsToResponseParam = new HashMap<>();
 
@@ -108,7 +112,7 @@ public class DependencyAnalyser {
         for (String param: responseHeaders.keySet()) {
             List<String> values = responseHeaders.get(param);
             if (param.equalsIgnoreCase("set-cookie")) {
-                Map<String,String> cookieMap = AuthPolicy.parseCookie(values);
+                Map<String,String> cookieMap = parseCookie(values);
                 for (String cookieKey: cookieMap.keySet()) {
                     String cookieVal = cookieMap.get(cookieKey);
                     if (!filterValues(cookieVal)) continue;
@@ -148,18 +152,20 @@ public class DependencyAnalyser {
         if (APICatalog.isTemplateUrl(url)) {
             String ogUrl = urlStatic.getUrl();
             String[] ogUrlSplit = ogUrl.split("/");
-            URLTemplate urlTemplate = APICatalogSync.createUrlTemplate(url, URLMethods.Method.fromString(method));
-            for (int i = 0; i < urlTemplate.getTypes().length; i++) {
-                SingleTypeInfo.SuperType superType = urlTemplate.getTypes()[i];
-                if (superType == null) continue;
-                int idx = ogUrl.startsWith("http") ? i:i+1;
-                Object s = ogUrlSplit[idx]; // because ogUrl=/api/books/123 while template url=api/books/INTEGER
-                if (superType.equals(SingleTypeInfo.SuperType.INTEGER)) {
-                    s = Integer.parseInt(ogUrlSplit[idx]);
+            if (ogUrlSplit.length > 0) {
+                URLTemplate urlTemplate = APICatalogSync.createUrlTemplate(url, URLMethods.Method.fromString(method));
+                for (int i = 0; i < urlTemplate.getTypes().length; i++) {
+                    SingleTypeInfo.SuperType superType = urlTemplate.getTypes()[i];
+                    if (superType == null) continue;
+                    int idx = ogUrl.startsWith("http") ? i:i+1;
+                    Object s = ogUrlSplit[idx]; // because ogUrl=/api/books/123 while template url=api/books/INTEGER
+                    if (superType.equals(SingleTypeInfo.SuperType.INTEGER)) {
+                        s = Integer.parseInt(ogUrlSplit[idx]);
+                    }
+                    Set<Object> val = new HashSet<>();
+                    val.add(s);
+                    processRequestParam(i+"", val, combinedUrl, true, false, isHar);
                 }
-                Set<Object> val = new HashSet<>();
-                val.add(s);
-                processRequestParam(i+"", val, combinedUrl, true, false, isHar);
             }
         }
 
@@ -169,7 +175,7 @@ public class DependencyAnalyser {
             List<String> values = requestHeaders.get(param);
 
             if (param.equals("cookie")) {
-                Map<String,String> cookieMap = AuthPolicy.parseCookie(values);
+                Map<String,String> cookieMap = parseCookie(values);
                 for (String cookieKey: cookieMap.keySet()) {
                     String cookieValue = cookieMap.get(cookieKey);
                     processRequestParam(cookieKey, new HashSet<>(Collections.singletonList(cookieValue)), combinedUrl, false, true, isHar);
@@ -352,10 +358,12 @@ public class DependencyAnalyser {
     }
 
     public void syncWithDb() {
+        loggerMaker.infoAndAddToDb("Syncing dependency analyser nodes");
         ArrayList<WriteModel<DependencyNode>> bulkUpdates1 = new ArrayList<>();
         ArrayList<WriteModel<DependencyNode>> bulkUpdates2 = new ArrayList<>();
         ArrayList<WriteModel<DependencyNode>> bulkUpdates3 = new ArrayList<>();
 
+        loggerMaker.infoAndAddToDb("dependency analyser nodes size: " + nodes.size());
         mergeNodes();
 
         for (DependencyNode dependencyNode: nodes.values()) {
@@ -446,6 +454,10 @@ public class DependencyAnalyser {
                 bulkUpdates3.add(updateOneModel3);
             }
         }
+
+        loggerMaker.infoAndAddToDb("dependency analyser bulkUpdates1 size: " + bulkUpdates1.size());
+        loggerMaker.infoAndAddToDb("dependency analyser bulkUpdates2 size: " + bulkUpdates2.size());
+        loggerMaker.infoAndAddToDb("dependency analyser bulkUpdates3 size: " + bulkUpdates3.size());
 
         // ordered has to be true or else won't work
         if (bulkUpdates1.size() > 0) DependencyNodeDao.instance.getMCollection().bulkWrite(bulkUpdates1, new BulkWriteOptions().ordered(false));

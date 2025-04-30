@@ -1,38 +1,40 @@
 package com.akto.action;
 
-import com.akto.DaoInit;
-import com.akto.action.test_editor.SaveTestEditorAction;
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.SampleDataDao;
 import com.akto.dao.context.Context;
-import com.akto.dto.*;
-import com.akto.dto.traffic.Key;
+import com.akto.dto.ApiCollection;
+import com.akto.dto.HttpRequestParams;
+import com.akto.dto.HttpResponseParams;
+import com.akto.dto.OriginalHttpRequest;
+import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.traffic.SampleData;
-import com.akto.dto.type.URLMethods;
+import com.akto.jobs.executors.JiraTicketJobExecutor;
 import com.akto.listener.InitializerListener;
 import com.akto.listener.RuntimeListener;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.parsers.HttpCallParser;
+import com.akto.utils.CurlUtils;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
-import com.mongodb.ConnectionString;
-import com.mongodb.client.model.Filters;
-import com.sun.jndi.toolkit.url.Uri;
-import org.jetbrains.annotations.Nullable;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 
 public class ExportSampleDataAction extends UserAction {
-    private final static ObjectMapper mapper = new ObjectMapper();
-    private static final Logger logger = LoggerFactory.getLogger(ExportSampleDataAction.class);
+    private static final LoggerMaker logger = new LoggerMaker(ExportSampleDataAction.class, LogDb.DASHBOARD);;
+    private static final ObjectMapper mapper = new ObjectMapper();
     private static final JsonFactory factory = mapper.getFactory();
     @Override
     public String execute() {
@@ -65,7 +67,7 @@ public class ExportSampleDataAction extends UserAction {
             if (samples.size() < 1) continue;
 
             String msg = samples.get(0);
-            Map<String, String> burpRequestFromSampleData = generateBurpRequestFromSampleData(msg);
+            Map<String, String> burpRequestFromSampleData = generateBurpRequestFromSampleData(msg, false);
             // use url from the sample data instead of relying on the id
             // this is to handle parameterised URLs
             String url = burpRequestFromSampleData.get("url");
@@ -95,13 +97,13 @@ public class ExportSampleDataAction extends UserAction {
             return ERROR.toUpperCase();
         }
 
-        Map<String, String> result = generateBurpRequestFromSampleData(sampleData);
+        Map<String, String> result = generateBurpRequestFromSampleData(sampleData, true);
         burpRequest = result.get("request_path");
         return SUCCESS.toUpperCase();
     }
 
 
-    private Map<String, String> generateBurpRequestFromSampleData(String sampleData) {
+    private Map<String, String> generateBurpRequestFromSampleData(String sampleData, boolean shouldDeleteContentLengthHeader) {
         OriginalHttpRequest originalHttpRequest = new OriginalHttpRequest();
         try {
             originalHttpRequest.buildFromSampleMessage(sampleData);
@@ -130,6 +132,10 @@ public class ExportSampleDataAction extends UserAction {
                 } catch (URISyntaxException e) {
                 }
             }
+        }
+
+        if(shouldDeleteContentLengthHeader){
+            originalHttpRequest.getHeaders().remove("content-length");
         }
 
         StringBuilder builderWithUrl = buildRequest(originalHttpRequest, url);
@@ -219,101 +225,7 @@ public class ExportSampleDataAction extends UserAction {
     }
 
     public static String getCurl(String sampleData) throws IOException {
-        HttpResponseParams httpResponseParams;
-        try {
-            httpResponseParams = HttpCallParser.parseKafkaMessage(sampleData);
-        } catch (Exception e) {
-            try {
-                OriginalHttpRequest originalHttpRequest = new OriginalHttpRequest();
-                originalHttpRequest.buildFromApiSampleMessage(sampleData);
-
-                HttpRequestParams httpRequestParams = new HttpRequestParams(
-                        originalHttpRequest.getMethod(), originalHttpRequest.getFullUrlWithParams(), originalHttpRequest.getType(),
-                        originalHttpRequest.getHeaders(), originalHttpRequest.getBody(), 0
-                );
-
-                httpResponseParams = new HttpResponseParams();
-                httpResponseParams.requestParams = httpRequestParams;
-            } catch (Exception e1) {
-                throw e1;
-            }
-
-        }
-
-        HttpRequestParams httpRequestParams = httpResponseParams.getRequestParams();
-        StringBuilder builder = new StringBuilder("curl -v ");
-
-        Map<String, List<String>> headers = httpRequestParams.getHeaders();
-        List<String> values = headers.get("x-forwarded-proto");
-        String protocol = values != null && values.size() != 0 ? values.get(0) : "https";
-        // Method
-        builder.append("-X ").append(httpRequestParams.getMethod()).append(" \\\n  ");
-
-        String hostName = null;
-        // Headers
-        for (Map.Entry<String, List<String>> entry : httpRequestParams.getHeaders().entrySet()) {
-            if (entry.getKey().equalsIgnoreCase("host") && entry.getValue().size() > 0) {
-                hostName = entry.getValue().get(0);
-            }
-            builder.append("-H '").append(entry.getKey()).append(":");
-            for (String value : entry.getValue()) {
-                builder.append(" ").append(value.replaceAll("\"", "\\\\\""));
-            }
-            builder.append("' \\\n  ");
-        }
-
-        String urlString;
-        String path = httpRequestParams.getURL();
-        if (hostName != null && !(path.toLowerCase().startsWith("http") || path.toLowerCase().startsWith("www."))) {
-            urlString = path.startsWith("/") ? hostName + path : hostName + "/" + path;
-        } else {
-            urlString = path;
-        }
-
-        if (!urlString.startsWith("http")) {
-            urlString = protocol + "://" + urlString;
-        }
-
-        StringBuilder url = new StringBuilder(urlString);
-        // Body
-        try {
-            String payload = httpRequestParams.getPayload();
-            if (payload == null) payload = "";
-            boolean curlyBracesCond = payload.startsWith("{") && payload.endsWith("}");
-            boolean squareBracesCond = payload.startsWith("[") && payload.endsWith("]");
-            if (curlyBracesCond || squareBracesCond) {
-                if (!Objects.equals(httpRequestParams.getMethod(), "GET")) {
-                    builder.append("-d '").append(payload).append("' \\\n  ");
-                } else {
-                    JsonParser jp = factory.createParser(payload);
-                    JsonNode node = mapper.readTree(jp);
-                    if (node != null) {
-                        Iterator<String> fieldNames = node.fieldNames();
-                        boolean flag =true;
-                        while(fieldNames.hasNext()) {
-                            String fieldName = fieldNames.next();
-                            JsonNode fieldValue = node.get(fieldName);
-                            if (fieldValue.isValueNode()) {
-                                if (flag) {
-                                    url.append("?").append(fieldName).append("=").append(fieldValue.asText());
-                                    flag = false;
-                                } else {
-                                    url.append("&").append(fieldName).append("=").append(fieldValue.asText());
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        } catch (Exception e) {
-            throw e;
-        }
-
-
-        // URL
-        builder.append("\"").append(url).append("\"");
-
-        return builder.toString();
+        return CurlUtils.getCurl(sampleData);
     }
 
     int accountId;

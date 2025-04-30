@@ -1,7 +1,9 @@
 import { Avatar, Box, HorizontalStack, Link, Popover, Text, Tooltip } from '@shopify/polaris'
 import React, { useState } from 'react'
 
-function TitleWithInfo({titleComp, textProps, titleText, tooltipContent, docsUrl}) {
+function TitleWithInfo(props) {
+
+    const { titleComp, textProps, titleText, tooltipContent, docsUrl } = props
     
     const content = docsUrl ?
 
@@ -42,9 +44,9 @@ function TitleWithInfo({titleComp, textProps, titleText, tooltipContent, docsUrl
                         {content}
                     </div>
                 </div>
-            </Popover> : <Tooltip content={tooltipContent} dismissOnMouseOut><div className='reduce-size'>
+            </Popover> : tooltipContent ? <Tooltip content={tooltipContent} dismissOnMouseOut><div className='reduce-size'>
                             <Avatar shape="round" size="extraSmall" source='/public/info_filled_icon.svg'/>
-                        </div> </Tooltip>
+                        </div> </Tooltip> : null
             }
         </HorizontalStack>
     )

@@ -38,6 +38,9 @@ public class Main {
 
         String json = requestBody.toString();
         JsonNode node = ApiRequest.postRequest(generateHeadersWithAuth(), url,json);
+
+        System.out.println("createApi: " + node.toPrettyString());
+        
         String apiId = node.get("api").get("id").textValue();
         return apiId;
     }

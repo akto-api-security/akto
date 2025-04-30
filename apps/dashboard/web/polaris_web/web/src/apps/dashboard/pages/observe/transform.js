@@ -1,10 +1,10 @@
 import func from "@/util/func";
-import { Badge, Box, HorizontalStack, Icon, Text, Tooltip } from "@shopify/polaris";
+import { Badge, Box, Button, HorizontalStack, Icon, Text, Tooltip } from "@shopify/polaris";
 import PersistStore from "../../../main/PersistStore";
 import TooltipText from "../../components/shared/TooltipText";
 import StyledEndpoint from "./api_collections/component/StyledEndpoint"
 import CopyEndpoint from "./api_collections/component/CopyEndpoint"
-import { SearchMinor, InfoMinor, LockMinor, ClockMinor, PasskeyMinor, LinkMinor, DynamicSourceMinor, GlobeMinor, LocationsMinor, PriceLookupMinor } from "@shopify/polaris-icons"
+import { SearchMinor, InfoMinor, LockMinor, ClockMinor, PasskeyMinor, LinkMinor, DynamicSourceMinor, GlobeMinor, LocationsMinor, PriceLookupMinor, ArrowUpMinor, ArrowDownMinor } from "@shopify/polaris-icons"
 import api from "./api";
 import GetPrettifyEndpoint from "./GetPrettifyEndpoint";
 
@@ -112,6 +112,24 @@ const apiDetailsHeaders = [
         value: "parameterisedEndpoint",
         itemOrder: 1,
         component: (data) => CopyEndpoint(data)
+    },
+    {
+        text: 'Non-Sensitive Params',
+        value: 'nonSensitiveTags',
+        itemOrder: 4,
+    },
+    {
+        text: 'Description',
+        itemOrder: 2,
+        value: 'description',
+        alignVertical: "bottom",
+        component: (data) => (<Button plain onClick={data?.action} textAlign="left">Add description</Button>),
+        action: () => {}
+    },
+    {
+        text: "AI-Data",
+        value: "headersInfo",
+        itemOrder: 4,
     }
 ]
 
@@ -222,6 +240,19 @@ const transform = {
                 x["highlightValue"] = val
                 return x
             })
+            if(c.includes("x-akto-decode")){
+                highlightPaths.push({
+                    "highlightValue": {
+                        "value": "x-akto-decode",
+                        "wholeRow": true,
+                        "className": "akto-decoded",
+                        "highlight": true,
+                    },
+                    "responseCode": -1,
+                    "header": 'x-akto-decode',
+                    "param": "x-akto-decode",
+                })
+            }
             paths.push({message:c, highlightPaths:highlightPaths}); 
         }
         return paths;
@@ -331,6 +362,7 @@ const transform = {
             }
             
         })
+        uniqueNonSensitive = uniqueNonSensitive.reverse();
         let finalArr = [...uniqueNonSensitive]
         if(samples.size > 0){
             finalArr = [...sensitiveSamples, ...finalArr]
@@ -346,13 +378,35 @@ const transform = {
         return { sensitiveSampleData: sensitiveSampleData };
     },
 
-    getColor(key){
+    getColor(key, isSensitiveBadge=false){
         switch(key.toUpperCase()){
-            case "HIGH" : return "critical";
-            case "MEDIUM": return "attention";
-            case "LOW": return "info";
+            case "CRITICAL": return "critical-strong-experimental"
+            case "HIGH" : {
+                if(isSensitiveBadge){
+                    return "warning"
+                }
+                return "critical"
+            }
+            case "MEDIUM": return "attention"
+            case "LOW": {
+                if(isSensitiveBadge){
+                    return "success"
+                }
+                return "info"
+            }
             default:
                 return "bg";
+        }
+    },
+
+    getColorForSensitiveData(key){
+        switch(key.toUpperCase()){
+            case "CRITICAL": return "#E45357"
+            case "HIGH" : return "#EF864C"
+            case "MEDIUM": return "#F6C564"
+            case "LOW": return "#6FD1A6"
+            default:
+                return "#6FD1A6";
         }
     },
 
@@ -371,12 +425,15 @@ const transform = {
     },
 
     getIssuesList(severityInfo){
+        const sortedSeverityInfo = func.sortObjectBySeverity(severityInfo)
         return (
             <HorizontalStack gap="1" wrap={false}>
                 {
-                    Object.keys(severityInfo).length > 0 ? Object.keys(severityInfo).map((key,index)=>{
+                    Object.keys(sortedSeverityInfo).length > 0 ? Object.keys(sortedSeverityInfo).map((key,index)=>{
                         return(
-                            <Badge size="small" status={this.getColor(key)} key={index}>{severityInfo[key].toString()}</Badge>
+                            <div className={`badge-wrapper-${key}`}>
+                                <Badge size="small" key={index}>{sortedSeverityInfo[key].toString()}</Badge>
+                            </div>
                         )
                     }):
                     <Text fontWeight="regular" variant="bodyMd" color="subdued">-</Text>
@@ -386,11 +443,12 @@ const transform = {
     },
 
     getIssuesListText(severityInfo){
+        const sortedSeverityInfo = func.sortObjectBySeverity(severityInfo)
         let val = "-"
-        if(Object.keys(severityInfo).length > 0){
+        if(Object.keys(sortedSeverityInfo).length > 0){
             val = ""
-            Object.keys(severityInfo).map((key) => {
-                val += (key + ": " + severityInfo[key] + " ")
+            Object.keys(sortedSeverityInfo).map((key) => {
+                val += (key + ": " + sortedSeverityInfo[key] + " ")
             })
         } 
         return val
@@ -401,7 +459,7 @@ const transform = {
             <Box maxWidth="200px">
                 <HorizontalStack gap={1} wrap={false}>
                     {sensitiveTags.map((item,index)=>{
-                        return (index < 4 ? <Tooltip dismissOnMouseOut content={item} key={index}><Box>
+                        return (index < 4 ? <Tooltip dismissOnMouseOut content={item} key={index + item}><Box>
                             <div className={deactivated ? "icon-deactivated" : ""}>
                                 <Icon color={deactivated ? "" : "subdued"} source={func.getSensitiveIcons(item)} />
                             </div>
@@ -439,7 +497,7 @@ const transform = {
                 riskScore: c.riskScore,
                 deactivatedRiskScore: c.deactivated ? (c.riskScore - 10 ) : c.riskScore,
                 activatedRiskScore: -1 * (c.deactivated ? c.riskScore : (c.riskScore - 10 )),
-                envTypeComp: isLoading ? loadingComp : c.envType ? <Badge size="small" status="info">{func.toSentenceCase(c.envType)}</Badge> : null,
+                envTypeComp: isLoading ? loadingComp : c.envType ? <Badge size="small" status="info">{c.envType}</Badge> : null,
                 sensitiveSubTypesVal: c?.sensitiveInRespTypes.join(" ") ||  "-"
             }
         })
@@ -457,7 +515,9 @@ const transform = {
             if (c.hasOwnProperty('type') && c.type === 'API_GROUP') {
                 return
             }
-
+            if (c.deactivated) {
+                return
+            }
             totalUrl += c.urlsCount ;
             totalTested += c.testedEndpoints;
         })
@@ -506,6 +566,9 @@ const transform = {
                 isNew: this.isNewEndpoint(url.lastSeenTs),
                 sensitiveDataTags: url?.sensitiveTags.join(" "),
                 codeAnalysisEndpoint: false,
+                issuesComp: url.severityObj? this.getIssuesList(url.severityObj):'-',
+                severity: url.severityObj? Object.keys(url.severityObj):[],
+                description: url.description
             }
         })
 
@@ -599,9 +662,56 @@ const transform = {
             
         }
         return tempSensitiveInfo; 
-    }
+    },
 
-      
+    convertToPrettifyData(c){
+        return{
+            riskScoreComp:<Badge key={c.level} status={this.getStatus(c.riskScore)} size="small">{c.riskScore}</Badge>,
+            coverage: c.urlsCount !== 0 ? Math.min( Math.floor((c.testedEndpoints * 100)/c.urlsCount), 100) + "%": '0%',
+            issuesArr: this.getIssuesList(c.severityInfo),
+            sensitiveSubTypes: this.prettifySubtypes(c?.sensitiveInRespTypes || []),
+            lastTraffic: func.prettifyEpoch(c.detectedTimestamp),
+            discovered: func.prettifyEpoch(c.startTs),
+        }
+    },
+    generateByLineComponent: (val, time) => {
+        if (!val || isNaN(val)) return null
+        if (val === 0 ) {
+            return <Text>No change in {time}</Text>
+        }
+        const source = val > 0 ? ArrowUpMinor : ArrowDownMinor
+        return (
+            <HorizontalStack gap={1}>
+                <Box>
+                    <Icon source={source} color='subdued' />
+                </Box>
+                <Text color='subdued' fontWeight='medium'>{Math.abs(val)}</Text>
+                <Text color='subdued' fontWeight='semibold'>{time}</Text>
+            </HorizontalStack>
+        )
+    },
+    getCumulativeData: (data) => {
+        let cumulative = []
+        data.reduce((acc, val, i) => cumulative[i] = acc + val, 0)
+        return cumulative
+    },
+    setIssuesState: (data, setState, setDelta, useCumulative) => {
+        if(useCumulative) {
+            data = transform.getCumulativeData(data)
+        }
+
+        if (data == null || data.length === 0) {
+            setState([0, 0])
+            setDelta(0)
+        } else if (data.length === 1) {
+            setState([0, data[0]])
+            setDelta(data[0])
+        } else {
+            setState(data)
+            
+            setDelta(data[data.length-1] - data[0])
+        }
+    }
 }
 
 export default transform

@@ -8,6 +8,7 @@ import com.akto.dto.AccountSettings;
 import com.akto.dto.HttpResponseParams;
 import com.akto.log.LoggerMaker;
 import com.akto.parsers.HttpCallParser;
+import com.akto.runtime.utils.Utils;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Updates;
 import org.apache.kafka.clients.consumer.Consumer;
@@ -46,7 +47,7 @@ public class Main {
         String groupIdConfig = "analyzer-group-config";
 
         final Main main = new Main();
-        Properties properties = com.akto.runtime.Main.configProperties(centralBrokerIp, groupIdConfig, maxPollRecordsConfig);
+        Properties properties = Utils.configProperties(centralBrokerIp, groupIdConfig, maxPollRecordsConfig);
         main.consumer = new KafkaConsumer<>(properties);
 
         final Thread mainThread = Thread.currentThread();

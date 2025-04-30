@@ -36,11 +36,30 @@ const tableFunc = {
         localFilters = localFilters.filter((filter) => {return filter.choices.length>0})
         setFilters(localFilters);
           let tempData = props.data;
+
+        let dataSortKey = props?.sortOptions?.filter(value => {
+          return (value.value.startsWith(sortKey))
+        }).filter(value => {
+          return (value.value.endsWith(sortOrder === -1 ? 'asc' : 'desc'))
+        })[0]?.sortKey;
+
+        if(props?.customFilters){
+          tempData = props?.modifyData(filters, dataSortKey, sortOrder)
+          tempData = tempData.filter((value) => {
+            return func.findInObjectValue(value, queryValue.toLowerCase(), ['id', 'time', 'icon', 'order', 'conditions']);
+          })
+          let page = skip / limit;
+          let pageLimit = limit;
+          let final2Data = tempData && tempData.length <= pageLimit ? tempData :
+          tempData.slice(page * pageLimit, Math.min((page + 1) * pageLimit, tempData.length))
+
+          return {value:final2Data,total:tempData.length, fullDataIds: tempData.map((x) => {return {id: x?.id}})}
+        }
           let singleFilterData = tempData
           Object.keys(filters).forEach((filterKey)=>{
             singleFilterData = props.data;
             let filterSet = new Set(filters[filterKey]);
-            if(filterSet.size!=0){
+            if(filterSet.size!==0){
               singleFilterData = singleFilterData.filter((value) => {
                   return [].concat(value[filterKey]).filter(v => filterSet.has(v)).length > 0
                 })
@@ -50,20 +69,20 @@ const tableFunc = {
           tempData = tempData.filter((value) => {
             return func.findInObjectValue(value, queryValue.toLowerCase(), ['id', 'time', 'icon', 'order', 'conditions']);
           })
-          let dataSortKey = props?.sortOptions?.filter(value => {
-            return (value.value.startsWith(sortKey))
-          }).filter(value => {
-            return (value.value.endsWith(sortOrder == -1 ? 'asc' : 'desc'))
-          })[0]?.sortKey;
-  
-          tempData = func.sortFunc(tempData, dataSortKey, sortOrder)
+
+          tempData = func.sortFunc(tempData, dataSortKey, sortOrder, props?.treeView !== undefined ? true : false)
           if(props.getFilteredItems){
             props.getFilteredItems(tempData)
           }
   
           let finalData = props.useModifiedData ? props.modifyData(tempData,filters) : tempData
-  
-          return {value:finalData,total:tempData.length}
+          
+          let page = skip / limit;
+          let pageLimit = limit;
+          let final2Data = finalData && finalData.length <= pageLimit ? finalData :
+          finalData.slice(page * pageLimit, Math.min((page + 1) * pageLimit, finalData.length))
+
+          return {value:final2Data,total:tempData.length, fullDataIds: finalData.map((x) => {return {id: x?.id}})}
     },
     mergeFilters(filterArray1, filterArray2, labelFunc, handleRemoveAppliedFilter){
       const combined = [...filterArray1, ...filterArray2];
@@ -148,6 +167,10 @@ const tableFunc = {
   },
 
   convertValue(value) {
+    const countDecimals = value.split('.').length - 1;
+    if(countDecimals > 1){
+      return value;
+    }
     const intValue = parseInt(value, 10);
     if (!isNaN(intValue)) return intValue;
     return value;

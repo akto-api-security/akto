@@ -1,10 +1,9 @@
 package com.akto.data_actor;
 
-import com.akto.DaoInit;
+import com.akto.dto.filter.MergedUrls;
 import com.akto.testing.ApiExecutor;
-import com.akto.bulk_update_util.ApiInfoBulkUpdate;
-import com.akto.dao.SetupDao;
-import com.akto.dao.context.Context;
+import com.auth0.jwt.JWT;
+import com.auth0.jwt.interfaces.DecodedJWT;
 import com.akto.dto.*;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.bulk_updates.BulkUpdates;
@@ -22,22 +21,16 @@ import com.akto.dto.data_types.Conditions.Operator;
 import com.akto.dto.runtime_filters.FieldExistsFilter;
 import com.akto.dto.runtime_filters.ResponseCodeRuntimeFilter;
 import com.akto.dto.runtime_filters.RuntimeFilter;
-import com.akto.dto.traffic.SampleData;
-import com.akto.dto.traffic.TrafficInfo;
+import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
-import com.mongodb.ConnectionString;
-import com.mongodb.client.model.WriteModel;
-
-import org.apache.commons.collections.functors.EqualPredicate;
-import org.bson.types.ObjectId;
-import org.checkerframework.checker.units.qual.s;
-
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -46,36 +39,77 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+
+import org.bson.types.ObjectId;
+
 import com.google.gson.Gson;
 
 public class ClientActor extends DataActor {
 
-    private static final int batchWriteLimit = 1000;
+    private static final int batchWriteLimit = 8;
     private static final String url = buildDbAbstractorUrl();
     private static final LoggerMaker loggerMaker = new LoggerMaker(ClientActor.class);
-    private static final int maxConcurrentBatchWrites = 2;
+    private static final int maxConcurrentBatchWrites = 150;
     private static final Gson gson = new Gson();
+    public static final String CYBORG_URL = "https://cyborg.akto.io";
+    private static ExecutorService threadPool = Executors.newFixedThreadPool(maxConcurrentBatchWrites);
+    private static AccountSettings accSettings;
     
-    ObjectMapper objectMapper = new ObjectMapper();
+    ObjectMapper objectMapper = new ObjectMapper().configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false).configure(DeserializationFeature.FAIL_ON_INVALID_SUBTYPE, false).configure(DeserializationFeature.FAIL_ON_IGNORED_PROPERTIES, false);
 
     public static String buildDbAbstractorUrl() {
-        String dbAbsHost = System.getenv("DATABASE_ABSTRACTOR_SERVICE_URL");
+        String dbAbsHost = CYBORG_URL;
+        if (checkAccount()) {
+            dbAbsHost = System.getenv("DATABASE_ABSTRACTOR_SERVICE_URL");
+        }
+        System.out.println("dbHost value " + dbAbsHost);
         if (dbAbsHost.endsWith("/")) {
             dbAbsHost = dbAbsHost.substring(0, dbAbsHost.length() - 1);
         }
         return dbAbsHost + "/api";
     }
 
-    
+    public static boolean checkAccount() {
+        try {
+            String token = System.getenv("DATABASE_ABSTRACTOR_SERVICE_TOKEN");
+            DecodedJWT jwt = JWT.decode(token);
+            String payload = jwt.getPayload();
+            byte[] decodedBytes = Base64.getUrlDecoder().decode(payload);
+            String decodedPayload = new String(decodedBytes);
+            BasicDBObject basicDBObject = BasicDBObject.parse(decodedPayload);
+            int accId = (int) basicDBObject.getInt("accountId");
+            System.out.println("checkaccount accountId log " + accId);
+            return accId == 1000000;
+        } catch (Exception e) {
+            System.out.println("checkaccount error" + e.getStackTrace());
+        }
+        return false;
+    }
 
     public AccountSettings fetchAccountSettings() {
+        AccountSettings acc = null;
+        for (int i=0; i < 5; i++) {
+            acc = fetchAccountSettingsRetry();
+            if (acc != null) {
+                break;
+            }
+        }
+        if (acc == null) {
+            return accSettings;
+        } else {
+            accSettings = acc;
+            return acc;
+        }
+    }
+
+    public AccountSettings fetchAccountSettingsRetry() {
         Map<String, List<String>> headers = buildHeaders();
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchAccountSettings", "", "GET", null, headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
             String responsePayload = response.getBody();
             if (response.getStatusCode() != 200 || responsePayload == null) {
-                loggerMaker.errorAndAddToDb("non 2xx response in fetchEstimatedDocCount", LoggerMaker.LogDb.RUNTIME);
+                loggerMaker.errorAndAddToDb("non 2xx response in fetchAccountSettings", LoggerMaker.LogDb.RUNTIME);
                 return null;
             }
             BasicDBObject payloadObj;
@@ -83,12 +117,16 @@ public class ClientActor extends DataActor {
                 payloadObj =  BasicDBObject.parse(responsePayload);
                 BasicDBObject accountSettingsObj = (BasicDBObject) payloadObj.get("accountSettings");
                 accountSettingsObj.put("telemetrySettings", null);
-                return objectMapper.readValue(accountSettingsObj.toJson(), AccountSettings.class);
+                accountSettingsObj.put("defaultPayloads", null);
+                AccountSettings ac = objectMapper.readValue(accountSettingsObj.toJson(), AccountSettings.class);
+                accSettings = ac;
+                return ac;
             } catch(Exception e) {
+                loggerMaker.errorAndAddToDb("error in fetchAccountSettings" + e, LoggerMaker.LogDb.RUNTIME);
                 return null;
             }
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("error in fetchEstimatedDocCount" + e, LoggerMaker.LogDb.RUNTIME);
+            loggerMaker.errorAndAddToDb("error in fetchAccountSettings" + e, LoggerMaker.LogDb.RUNTIME);
             return null;
         }
     }
@@ -177,10 +215,7 @@ public class ClientActor extends DataActor {
         }
     }
 
-
     public void bulkWrite(List<Object> bulkWrites, String path, String key) {
-        ExecutorService threadPool = Executors.newFixedThreadPool(maxConcurrentBatchWrites);
-
         ArrayList<BulkUpdates> writes = new ArrayList<>();
         for (int i = 0; i < bulkWrites.size(); i++) {
             writes.add((BulkUpdates) bulkWrites.get(i));
@@ -978,11 +1013,11 @@ public class ClientActor extends DataActor {
             OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
             String responsePayload = response.getBody();
             if (response.getStatusCode() != 200 || responsePayload == null) {
-                loggerMaker.errorAndAddToDb("non 2xx response in insertRuntimeLog", LoggerMaker.LogDb.RUNTIME);
+                System.out.println("non 2xx response in insertRuntimeLog");
                 return;
             }
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("error in insertRuntimeLog" + e, LoggerMaker.LogDb.RUNTIME);
+            System.out.println("error in insertRuntimeLog" + e);
             return;
         }
     }
@@ -1001,6 +1036,50 @@ public class ClientActor extends DataActor {
             }
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("error in insertAnalyserLog" + e, LoggerMaker.LogDb.RUNTIME);
+            return;
+        }
+    }
+
+    public void insertTestingLog(Log log) {
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        BasicDBObject logObj = new BasicDBObject();
+        logObj.put("key", log.getKey());
+        logObj.put("log", log.getLog());
+        logObj.put("timestamp", log.getTimestamp());
+        obj.put("log", logObj);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/insertTestingLog", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                System.out.println("non 2xx response in insertTestingLog");
+                return;
+            }
+        } catch (Exception e) {
+            System.out.println("error in insertTestingLog" + e);
+            return;
+        }
+    }
+
+    public void insertProtectionLog(Log log) {
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        BasicDBObject logObj = new BasicDBObject();
+        logObj.put("key", log.getKey());
+        logObj.put("log", log.getLog());
+        logObj.put("timestamp", log.getTimestamp());
+        obj.put("log", logObj);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/insertProtectionLog", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                System.out.println("non 2xx response in insertProtectionLog");
+                return;
+            }
+        } catch (Exception e) {
+            System.out.println("error in insertProtectionLog" + e);
             return;
         }
     }
@@ -1101,10 +1180,166 @@ public class ClientActor extends DataActor {
         }
     }
 
+    public void syncExtractedAPIs( CodeAnalysisRepo codeAnalysisRepo, List<CodeAnalysisApi> codeAnalysisApisList, boolean isLastBatch) {
+        Map<String, List<String>> headers = buildHeaders();
+
+        Map<String, Object> m = new HashMap<>();
+        m.put("projectName", codeAnalysisRepo.getProjectName());
+        m.put("repoName", codeAnalysisRepo.getRepoName());
+        m.put("codeAnalysisRepo",codeAnalysisRepo);
+        m.put("isLastBatch", isLastBatch);
+        m.put("codeAnalysisApisList", codeAnalysisApisList);
+
+        String json = gson.toJson(m);
+
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/syncExtractedAPIs", "", "POST", json , headers, "");
+
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            if (response.getStatusCode() != 200) {
+                loggerMaker.errorAndAddToDb("non 2xx response in syncExtractedAPIs", LoggerMaker.LogDb.RUNTIME);
+                return;
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("non 2xx response in syncExtractedAPIs", LoggerMaker.LogDb.RUNTIME);
+            return;
+        }
+
+
+    }
+
+    public void updateRepoLastRun( CodeAnalysisRepo codeAnalysisRepo) {
+        Map<String, List<String>> headers = buildHeaders();
+
+        Map<String, Object> m = new HashMap<>();
+        m.put("projectName", codeAnalysisRepo.getProjectName());
+        m.put("repoName", codeAnalysisRepo.getRepoName());
+        m.put("codeAnalysisRepo",codeAnalysisRepo);
+
+        String json = gson.toJson(m);
+
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/updateRepoLastRun", "", "POST", json , headers, "");
+
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            if (response.getStatusCode() != 200) {
+                loggerMaker.errorAndAddToDb("non 2xx response in syncExtractedAPIs", LoggerMaker.LogDb.RUNTIME);
+                return;
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("non 2xx response in syncExtractedAPIs", LoggerMaker.LogDb.RUNTIME);
+            return;
+        }
+
+
+    }
+
+    public List<CodeAnalysisRepo> findReposToRun()  {
+        List<CodeAnalysisRepo> codeAnalysisRepos = new ArrayList<>();
+
+        Map<String, List<String>> headers = buildHeaders();
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/findReposToRun", "", "GET", "{}", headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in findReposToRun", LoggerMaker.LogDb.RUNTIME);
+                return codeAnalysisRepos;
+            }
+            BasicDBObject payloadObj;
+            try {
+                payloadObj =  BasicDBObject.parse(responsePayload);
+                BasicDBList reposObj= (BasicDBList) payloadObj.get("reposToRun");
+                for (Object repoObj: reposObj) {
+                    BasicDBObject repo = (BasicDBObject) repoObj;
+                    repo.put("id", null);
+                    String hexId = repo.getString("hexId");
+                    CodeAnalysisRepo s = objectMapper.readValue(repo.toJson(), CodeAnalysisRepo.class);
+                    s.setId(new ObjectId(hexId));
+                    codeAnalysisRepos.add(s);
+                }
+            } catch(Exception e) {
+                return codeAnalysisRepos;
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in findReposToRun" + e, LoggerMaker.LogDb.RUNTIME);
+            return codeAnalysisRepos;
+        }
+
+        return codeAnalysisRepos;
+    }
+
     public Map<String, List<String>> buildHeaders() {
         Map<String, List<String>> headers = new HashMap<>();
         headers.put("Authorization", Collections.singletonList(System.getenv("DATABASE_ABSTRACTOR_SERVICE_TOKEN")));
         return headers;
     }
 
+    public void bulkWriteSuspectSampleData(List<Object> writesForSuspectSampleData) {
+        bulkWrite(writesForSuspectSampleData, "/bulkWriteSuspectSampleData", "writesForSuspectSampleData");
+    }
+
+    public List<YamlTemplate> fetchFilterYamlTemplates() {
+        Map<String, List<String>> headers = buildHeaders();
+        List<YamlTemplate> templates = new ArrayList<>();
+        BasicDBObject obj = new BasicDBObject();
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchFilterYamlTemplates", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in fetchFilterYamlTemplates", LoggerMaker.LogDb.THREAT_DETECTION);
+                return null;
+            }
+            BasicDBObject payloadObj;
+            try {
+                payloadObj =  BasicDBObject.parse(responsePayload);
+                BasicDBList yamlTemplates = (BasicDBList) payloadObj.get("yamlTemplates");
+                for (Object template: yamlTemplates) {
+                    BasicDBObject obj2 = (BasicDBObject) template;
+                    templates.add(objectMapper.readValue(obj2.toJson(), YamlTemplate.class));
+                }
+            } catch(Exception e) {
+                loggerMaker.errorAndAddToDb("error extracting response in fetchFilterYamlTemplates" + e, LoggerMaker.LogDb.THREAT_DETECTION);
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in fetchFilterYamlTemplates" + e, LoggerMaker.LogDb.THREAT_DETECTION);
+            return null;
+        }
+        return templates;
+    }
+
+    public Set<MergedUrls> fetchMergedUrls() {
+        Map<String, List<String>> headers = buildHeaders();
+
+        List<MergedUrls> respList = new ArrayList<>();
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchMergedUrls", "", "POST", "", headers, "");
+
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in fetchMergedUrls", LoggerMaker.LogDb.RUNTIME);
+                return null;
+            }
+            BasicDBObject payloadObj;
+
+            try {
+                payloadObj = BasicDBObject.parse(responsePayload);
+                BasicDBList newUrls = (BasicDBList) payloadObj.get("mergedUrls");
+                for (Object url: newUrls) {
+                    BasicDBObject urlObj = (BasicDBObject) url;
+                    MergedUrls mergedUrl = objectMapper.readValue(urlObj.toJson(), MergedUrls.class);
+                    respList.add(mergedUrl);
+                }
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("error extracting response in fetchMergedUrls" + e, LoggerMaker.LogDb.RUNTIME);
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in fetching merged urls: " + e, LoggerMaker.LogDb.RUNTIME);
+            return null;
+        }
+
+        return new HashSet<>(respList);
+    }
 }

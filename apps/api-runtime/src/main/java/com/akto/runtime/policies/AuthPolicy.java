@@ -12,6 +12,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.*;
+import static com.akto.runtime.utils.Utils.parseCookie;
 
 public class AuthPolicy {
 
@@ -31,25 +32,6 @@ public class AuthPolicy {
             return Collections.singletonList(ApiInfo.AuthType.AUTHORIZATION_HEADER);
         }
         return new ArrayList<>();
-    }
-
-    public static Map<String,String> parseCookie(List<String> cookieList){
-        Map<String,String> cookieMap = new HashMap<>();
-        if(cookieList==null)return cookieMap;
-        for (String cookieValues : cookieList) {
-            String[] cookies = cookieValues.split(";");
-            for (String cookie : cookies) {
-                cookie=cookie.trim();
-                String[] cookieFields = cookie.split("=");
-                boolean twoCookieFields = cookieFields.length == 2;
-                if (twoCookieFields) {
-                    if(!cookieMap.containsKey(cookieFields[0])){
-                        cookieMap.put(cookieFields[0], cookieFields[1]);
-                    }
-                }
-            }
-        }
-        return cookieMap;
     }
 
     public static boolean findAuthType(HttpResponseParams httpResponseParams, ApiInfo apiInfo, RuntimeFilter filter, List<CustomAuthType> customAuthTypes) {

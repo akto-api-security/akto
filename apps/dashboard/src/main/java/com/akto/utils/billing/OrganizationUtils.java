@@ -1,18 +1,13 @@
 package com.akto.utils.billing;
 
-import java.io.IOException;
-import java.util.*;
-
 import com.akto.billing.UsageMetricUtils;
-import com.akto.dao.RBACDao;
 import com.akto.dao.billing.OrganizationsDao;
-import com.akto.dao.billing.TokensDao;
 import com.akto.dao.context.Context;
-import com.akto.dto.RBAC;
 import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.billing.OrgMetaData;
 import com.akto.dto.billing.Organization;
 import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.UsageUtils;
 import com.akto.util.http_util.CoreHTTPClient;
 import com.google.gson.Gson;
@@ -20,16 +15,22 @@ import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
-
-import okhttp3.*;
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.UUID;
+import okhttp3.MediaType;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.RequestBody;
+import okhttp3.Response;
+import okhttp3.ResponseBody;
 import org.apache.commons.lang3.StringUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public class OrganizationUtils {
 
-    private static final Logger logger = LoggerFactory.getLogger(OrganizationUtils.class);
-    private static final LoggerMaker loggerMaker = new LoggerMaker(OrganizationUtils.class);
+    private static final LoggerMaker logger = new LoggerMaker(OrganizationUtils.class, LogDb.DASHBOARD);
+
     private static final OkHttpClient client = CoreHTTPClient.client.newBuilder().build();
 
     public static boolean isOverage(HashMap<String, FeatureAccess> featureWiseAllowed) {
@@ -66,11 +67,11 @@ public class OrganizationUtils {
                     }
                     result.put(featureLabel, new FeatureAccess(isGranted));
                 } else {
-                    loggerMaker.errorAndAddToDb("unable to find feature object for this entitlement " + bO.toString(), LoggerMaker.LogDb.DASHBOARD);
+                    logger.errorAndAddToDb("unable to find feature object for this entitlement " + bO.toString(), LoggerMaker.LogDb.DASHBOARD);
                 }
 
                 if(featureLabel.isEmpty() && featureObject != null){
-                    loggerMaker.errorAndAddToDb("unable to find feature label for this feature " + featureObject.toString(), LoggerMaker.LogDb.DASHBOARD);
+                    logger.errorAndAddToDb("unable to find feature label for this feature " + featureObject.toString(), LoggerMaker.LogDb.DASHBOARD);
                 }
 
                 Object usageLimitObj = bO.get("usageLimit");
@@ -86,7 +87,7 @@ public class OrganizationUtils {
                     result.put(featureLabel, new FeatureAccess(isGranted, overageFirstDetected, usageLimit, usage));
                 }
             } catch (Exception e) {
-                loggerMaker.infoAndAddToDb("unable to parse usage: " + o.toString(), LoggerMaker.LogDb.DASHBOARD);
+                logger.debugAndAddToDb("unable to parse usage: " + o.toString(), LoggerMaker.LogDb.DASHBOARD);
                 continue;
             }
         }
@@ -94,23 +95,6 @@ public class OrganizationUtils {
         return result;
     }
 
-    public static Set<Integer> findAccountsBelongingToOrganization(int adminUserId) {
-        Set<Integer> accounts = new HashSet<Integer>();
-
-        try {
-            List<RBAC> adminAccountsRbac = RBACDao.instance.findAll(
-                Filters.eq(RBAC.USER_ID, adminUserId)
-            );
-
-            for (RBAC accountRbac : adminAccountsRbac) {
-                accounts.add(accountRbac.getAccountId());
-            }
-        } catch (Exception e) {
-            logger.info("Failed to find accounts belonging to organization. Error - " + e.getMessage());
-        }
-        
-        return accounts;
-    }
 
     private static BasicDBObject fetchFromInternalService(String apiName, BasicDBObject reqBody) {
         String json = reqBody.toJson();
@@ -138,7 +122,7 @@ public class OrganizationUtils {
             return BasicDBObject.parse(responseBody.string());
 
         } catch (IOException e) {
-            logger.info("Failed to sync organization with Akto. Error - " +  e.getMessage());
+            logger.debug("Failed to sync organization with Akto. Error - " +  e.getMessage());
             return null;
         } finally {
             if (response != null) {
@@ -213,7 +197,7 @@ public class OrganizationUtils {
                 Updates.set(Organization.SYNCED_WITH_AKTO, true)
             );
         } catch (IOException e) {
-            logger.info("Failed to sync organization with Akto. Error - " +  e.getMessage());
+            logger.debug("Failed to sync organization with Akto. Error - " +  e.getMessage());
             return false;
         } finally {
             if (response != null) {
@@ -235,12 +219,7 @@ public class OrganizationUtils {
         }
 
         String domain = parts[1];
-        String[] domainParts = domain.split("\\.");
-        if (domainParts.length != 2) {
-            return domain;
-        }
-
-        return domainParts[0];
+        return domain;
     }
 
     public static BasicDBList fetchEntitlements(String orgId, String adminEmail) {
@@ -265,7 +244,7 @@ public class OrganizationUtils {
         try {
             gracePeriod = Integer.parseInt(gracePeriodStr);
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("Failed to parse grace period" + gracePeriodStr, LoggerMaker.LogDb.DASHBOARD);
+            logger.errorAndAddToDb("Failed to parse grace period" + gracePeriodStr, LoggerMaker.LogDb.DASHBOARD);
         }
         if(gracePeriod <= 0) {
             return 0;
@@ -290,6 +269,14 @@ public class OrganizationUtils {
 
     public static String fetchHotjarSiteId(BasicDBObject additionalMetaData) {
         return additionalMetaData.getString("HOTJAR_SITE_ID", "");
+    }
+
+    public static String fetchplanType(BasicDBObject additionalMetaData) {
+        return additionalMetaData.getString("PLAN_TYPE", "");
+    }
+
+    public static String fetchtrialMsg(BasicDBObject additionalMetaData) {
+        return additionalMetaData.getString("TRIAL_MSG", "");
     }
 
     public static boolean fetchTelemetryEnabled(BasicDBObject additionalMetaData) {

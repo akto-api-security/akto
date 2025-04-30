@@ -1,8 +1,11 @@
 package com.akto.testing;
 
 import com.akto.dao.context.Context;
+import com.akto.dao.test_editor.TestEditorEnums;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
+import com.akto.dto.CollectionConditions.ConditionsType;
+import com.akto.dto.CollectionConditions.TestConfigsAdvancedSettings;
 import com.akto.dto.testing.TestingRunConfig;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.rate_limit.RateLimitHandler;
@@ -12,11 +15,11 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.Constants;
 import com.akto.util.HttpRequestResponseUtils;
 import com.akto.util.grpc.ProtoBufUtils;
+
 import kotlin.Pair;
 import okhttp3.*;
 import okio.BufferedSink;
 import org.apache.commons.lang3.StringUtils;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
@@ -25,7 +28,7 @@ import java.net.URL;
 import java.util.*;
 
 public class ApiExecutor {
-    private static final LoggerMaker loggerMaker = new LoggerMaker(ApiExecutor.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(ApiExecutor.class, LogDb.TESTING);
 
     // Load only first 1 MiB of response body into memory.
     private static final int MAX_RESPONSE_SIZE = 1024*1024;
@@ -38,14 +41,22 @@ public class ApiExecutor {
             boolean rateLimitHit = true;
             while (RateLimitHandler.getInstance(accountId).shouldWait(request)) {
                 if(rateLimitHit){
-                    loggerMaker.infoAndAddToDb("Rate limit hit, sleeping", LogDb.TESTING);
+                    if (!(request.url().toString().contains("insertRuntimeLog") || request.url().toString().contains("insertTestingLog") || request.url().toString().contains("insertProtectionLog"))) {
+                        loggerMaker.infoAndAddToDb("Rate limit hit, sleeping", LogDb.TESTING);
+                    }else {
+                        System.out.println("Rate limit hit, sleeping");
+                    }
                 }
                 rateLimitHit = false;
                 Thread.sleep(1000);
                 i++;
 
                 if (i%30 == 0) {
-                    loggerMaker.infoAndAddToDb("waiting for rate limit availability", LogDb.TESTING);
+                    if (!(request.url().toString().contains("insertRuntimeLog") || request.url().toString().contains("insertTestingLog") || request.url().toString().contains("insertProtectionLog"))) {
+                        loggerMaker.infoAndAddToDb("waiting for rate limit availability", LogDb.TESTING);
+                    }else{
+                        System.out.println("waiting for rate limit availability");
+                    }                
                 }
             }
         }
@@ -82,19 +93,40 @@ public class ApiExecutor {
                     for (byte b : grpcBody) {
                         builder.append(b).append(",");
                     }
-                    loggerMaker.infoAndAddToDb(builder.toString(), LogDb.TESTING);
+                    if (!(request.url().toString().contains("insertRuntimeLog") || request.url().toString().contains("insertTestingLog") || request.url().toString().contains("insertProtectionLog"))) {
+                        loggerMaker.infoAndAddToDb(builder.toString(), LogDb.TESTING);
+                    }else {
+                        System.out.println(builder.toString());
+                    }
                     String responseBase64Encoded = Base64.getEncoder().encodeToString(grpcBody);
-                    loggerMaker.infoAndAddToDb("grpc response base64 encoded:" + responseBase64Encoded, LogDb.TESTING);
+                    if (!(request.url().toString().contains("insertRuntimeLog") || request.url().toString().contains("insertTestingLog") || request.url().toString().contains("insertProtectionLog"))) {
+                        loggerMaker.infoAndAddToDb("grpc response base64 encoded:" + responseBase64Encoded, LogDb.TESTING);
+                    }else {
+                        System.out.println("grpc response base64 encoded:" + responseBase64Encoded);
+                    }
                     body = HttpRequestResponseUtils.convertGRPCEncodedToJson(grpcBody);
-                } else {
+                } else if(requestProtocol != null && (requestProtocol.contains(HttpRequestResponseUtils.SOAP) || requestProtocol.contains(HttpRequestResponseUtils.XML))){
+                    // here we are assuming that the response is in xml format
+                    // now convert this into valid json body string
+                    body = HttpRequestResponseUtils.convertXmlToJson(responseBody.string());
+                } 
+                else {
                     body = responseBody.string();
                 }
             } catch (IOException e) {
-                loggerMaker.errorAndAddToDb("Error while parsing response body: " + e, LogDb.TESTING);
+                if (!(request.url().toString().contains("insertRuntimeLog") || request.url().toString().contains("insertTestingLog") || request.url().toString().contains("insertProtectionLog"))) {
+                    loggerMaker.errorAndAddToDb("Error while parsing response body: " + e, LogDb.TESTING);
+                } else {
+                    System.out.println("Error while parsing response body: " + e);
+                }
                 body = "{}";
             }
         } catch (IOException e) {
-            loggerMaker.errorAndAddToDb("Error while executing request " + request.url() + ": " + e, LogDb.TESTING);
+            if (!(request.url().toString().contains("insertRuntimeLog") || request.url().toString().contains("insertTestingLog") || request.url().toString().contains("insertProtectionLog"))) {
+                loggerMaker.errorAndAddToDb("Error while executing request " + request.url() + ": " + e, LogDb.TESTING);
+            } else {
+                System.out.println("Error while executing request " + request.url() + ": " + e);
+            }
             throw new Exception("Api Call failed");
         } finally {
             if (response != null) {
@@ -214,16 +246,32 @@ public class ApiExecutor {
         return replaceHostFromConfig(url, testingRunConfig);
     }
 
-    public static OriginalHttpResponse sendRequest(OriginalHttpRequest request, boolean followRedirects, TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck) throws Exception {
-        // don't lowercase url because query params will change and will result in incorrect request
+    public static OriginalHttpResponse sendRequest(OriginalHttpRequest request, boolean followRedirects, TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck, boolean useTestingRunConfig) throws Exception {
+        if(useTestingRunConfig) {
+            return sendRequest(request, followRedirects, testingRunConfig, debug, testLogs, skipSSRFCheck);
+        }else{
+            TestingRunConfig runConfig = new TestingRunConfig();
+            runConfig.setOverriddenTestAppUrl("");
+            runConfig.setConfigsAdvancedSettings(testingRunConfig.getConfigsAdvancedSettings());
+            return sendRequest(request, followRedirects, runConfig, debug, testLogs, skipSSRFCheck);
+        }
 
+        
+    }
+
+    public static Request buildRequest(OriginalHttpRequest request, TestingRunConfig testingRunConfig) throws Exception{
+        boolean executeScript = testingRunConfig != null;
+        ApiExecutorUtil.calculateHashAndAddAuth(request, executeScript);
         String url = prepareUrl(request, testingRunConfig);
-
-        loggerMaker.infoAndAddToDb("Final url is: " + url, LogDb.TESTING);
         request.setUrl(url);
-
         Request.Builder builder = new Request.Builder();
-        String type = request.findContentType();
+        addHeaders(request, builder);
+        builder = builder.url(request.getFullUrlWithParams());
+        Request okHttpRequest = builder.build();
+        return okHttpRequest;
+    }
+
+    private static void addHeaders(OriginalHttpRequest request, Request.Builder builder){
         // add headers
         List<String> forbiddenHeaders = Arrays.asList("content-length", "accept-encoding");
         Map<String, List<String>> headersMap = request.getHeaders();
@@ -239,11 +287,37 @@ public class ApiExecutor {
                 builder.addHeader(headerName, headerValue);
             }
         }
+    }
+
+    public static OriginalHttpResponse sendRequest(OriginalHttpRequest request, boolean followRedirects, TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck) throws Exception {
+        // don't lowercase url because query params will change and will result in incorrect request
+
+        if(testingRunConfig != null && testingRunConfig.getConfigsAdvancedSettings() != null && !testingRunConfig.getConfigsAdvancedSettings().isEmpty()){
+            calculateFinalRequestFromAdvancedSettings(request, testingRunConfig.getConfigsAdvancedSettings());
+        }
+
+        boolean executeScript = testingRunConfig != null;
+        ApiExecutorUtil.calculateHashAndAddAuth(request, executeScript);
+
+        String url = prepareUrl(request, testingRunConfig);
+
+        if (!(url.contains("insertRuntimeLog") || url.contains("insertTestingLog") || url.contains("insertProtectionLog"))) {
+            loggerMaker.infoAndAddToDb("Final url is: " + url, LogDb.TESTING);
+        }
+        request.setUrl(url);
+
+        Request.Builder builder = new Request.Builder();
+        addHeaders(request, builder);
+
+        // assuming we are storing the headers we want for xml format as well
+        String type = request.findContentType();
         URLMethods.Method method = URLMethods.Method.fromString(request.getMethod());
 
         builder = builder.url(request.getFullUrlWithParams());
 
         OriginalHttpResponse response = null;
+        HostValidator.validate(url);
+
         switch (method) {
             case GET:
             case HEAD:
@@ -261,7 +335,9 @@ public class ApiExecutor {
             case OTHER:
                 throw new Exception("Invalid method name");
         }
-        loggerMaker.infoAndAddToDb("Received response from: " + url, LogDb.TESTING);
+        if (!(url.contains("insertRuntimeLog") || url.contains("insertTestingLog") || url.contains("insertProtectionLog"))) {
+            loggerMaker.infoAndAddToDb("Received response from: " + url, LogDb.TESTING);
+        }
 
         return response;
     }
@@ -315,7 +391,38 @@ public class ApiExecutor {
         
     }
 
+    private static void calculateFinalRequestFromAdvancedSettings(OriginalHttpRequest originalHttpRequest, List<TestConfigsAdvancedSettings> advancedSettings){
+        Map<String,List<ConditionsType>> headerConditions = new HashMap<>();
+        Map<String,List<ConditionsType>> payloadConditions = new HashMap<>();
 
+        for(TestConfigsAdvancedSettings settings: advancedSettings){
+            if(settings.getOperatorType().toLowerCase().contains("header")){
+                headerConditions.put(settings.getOperatorType(), settings.getOperationsGroupList());
+            }else{
+                payloadConditions.put(settings.getOperatorType(), settings.getOperationsGroupList());
+            }
+        }
+        List<ConditionsType> emptyList = new ArrayList<>();
+
+        Utils.modifyHeaderOperations(originalHttpRequest, 
+            headerConditions.getOrDefault(TestEditorEnums.NonTerminalExecutorDataOperands.MODIFY_HEADER.name(), emptyList), 
+            headerConditions.getOrDefault(TestEditorEnums.NonTerminalExecutorDataOperands.ADD_HEADER.name(), emptyList),
+            headerConditions.getOrDefault(TestEditorEnums.TerminalExecutorDataOperands.DELETE_HEADER.name(), emptyList)
+        );
+
+        Utils.modifyBodyOperations(originalHttpRequest, 
+            payloadConditions.getOrDefault(TestEditorEnums.NonTerminalExecutorDataOperands.MODIFY_BODY_PARAM.name(), emptyList), 
+            payloadConditions.getOrDefault(TestEditorEnums.NonTerminalExecutorDataOperands.ADD_BODY_PARAM.name(), emptyList),
+            payloadConditions.getOrDefault(TestEditorEnums.TerminalExecutorDataOperands.DELETE_BODY_PARAM.name(), emptyList)
+        );
+
+        // modify query params as well from payload conditions only, not handling query conditions separately for now
+        Utils.modifyQueryOperations(originalHttpRequest, 
+            payloadConditions.getOrDefault(TestEditorEnums.NonTerminalExecutorDataOperands.MODIFY_BODY_PARAM.name(), emptyList), 
+            emptyList,
+            payloadConditions.getOrDefault(TestEditorEnums.TerminalExecutorDataOperands.DELETE_BODY_PARAM.name(), emptyList)
+        );
+    }
 
     private static OriginalHttpResponse sendWithRequestBody(OriginalHttpRequest request, Request.Builder builder, boolean followRedirects, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck, String requestProtocol) throws Exception {
         Map<String,List<String>> headers = request.getHeaders();
@@ -345,6 +452,11 @@ public class ApiExecutor {
             if (payload == null) payload = "{}";
             payload = payload.trim();
             if (!payload.startsWith("[") && !payload.startsWith("{")) payload = "{}";
+        } else if (contentType.contains(HttpRequestResponseUtils.FORM_URL_ENCODED_CONTENT_TYPE)) {
+            if(payload.startsWith("{")) {
+                payload = HttpRequestResponseUtils.jsonToFormUrlEncoded(payload);
+                body = RequestBody.create(payload, MediaType.parse(contentType));
+            }
         } else if (contentType.contains(HttpRequestResponseUtils.GRPC_CONTENT_TYPE)) {
             try {
                 loggerMaker.infoAndAddToDb("encoding to grpc payload:" + payload, LogDb.TESTING);
@@ -360,11 +472,33 @@ public class ApiExecutor {
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb("Unable to decode grpc payload:" + payload, LogDb.TESTING);
             }
-        }
+        }else if(contentType.contains(HttpRequestResponseUtils.SOAP) || contentType.contains(HttpRequestResponseUtils.XML)){
+            // here we are assuming that the request is in xml format
+            // now convert this into valid json body string
+
+            // get the url and method from temp headers
+            if(request.getHeaders().containsKey("x-akto-original-url") && request.getHeaders().containsKey("x-akto-original-method")){
+                String url = request.getHeaders().get("x-akto-original-url").get(0);
+                String method = request.getHeaders().get("x-akto-original-method").get(0);
+                String originalXmlPayload = OriginalReqResPayloadInformation.getInstance().getOriginalReqPayloadMap().get(method + "_" + url); // get original payload
+                if(originalXmlPayload != null && !originalXmlPayload.isEmpty()){
+                    String modifiedXmlPayload = HttpRequestResponseUtils.updateXmlWithModifiedJson(originalXmlPayload, payload);
+                    payload = modifiedXmlPayload;
+                }
+                // remove the temp headers
+                request.getHeaders().remove("x-akto-original-url");
+                request.getHeaders().remove("x-akto-original-method");
+            }  
+        } 
 
         if (payload == null) payload = "";
         if (body == null) {// body not created by GRPC block yet
-            body = RequestBody.create(payload, MediaType.parse(contentType));
+            if (request.getHeaders().containsKey("charset")) {
+                body = RequestBody.create(payload, null);
+                request.getHeaders().remove("charset");
+            } else {
+                body = RequestBody.create(payload, MediaType.parse(contentType));
+            }
         }
         builder = builder.method(request.getMethod(), body);
         Request okHttpRequest = builder.build();

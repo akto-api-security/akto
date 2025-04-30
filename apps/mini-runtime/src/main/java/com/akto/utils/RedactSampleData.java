@@ -204,7 +204,7 @@ public class RedactSampleData {
                 String f = fieldNames.next();
                 JsonNode fieldValue = parent.get(f);
                 if (fieldValue.isValueNode()) {
-                    if(redactAll && !(isGraphqlModified && f.equalsIgnoreCase(GraphQLUtils.QUERY))){
+                    if(redactAll && !(isGraphqlModified && f.equalsIgnoreCase(HttpResponseParams.QUERY))){
                         ((ObjectNode) parent).put(f, newValue);
                     }
                     else {
@@ -266,6 +266,8 @@ public class RedactSampleData {
         m.put("time", httpResponseParams.getTime() + "");
         m.put("akto_account_id", httpResponseParams.getAccountId() + "");
         m.put("ip", httpResponseParams.getSourceIP());
+        m.put("destIp", httpResponseParams.getDestIP());
+        m.put("direction", httpResponseParams.getDirection());
         m.put("is_pending", httpResponseParams.getIsPending() + "");
         m.put("source", httpResponseParams.getSource());
 

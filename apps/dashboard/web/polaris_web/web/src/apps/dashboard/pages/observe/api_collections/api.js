@@ -14,5 +14,19 @@ export default {
             method: 'post',
             data: { apiCollections: items }
         })
+    },
+    fetchCountForHostnameDeactivatedCollections(){
+        return request({
+            url: '/api/getCountForHostnameDeactivatedCollections',
+            method: 'post',
+            data: {}
+        })
+    },
+    getCollection(apiCollectionId){
+        return  request({
+            url: '/api/getCollection',
+            method: 'post',
+            data: {apiCollectionId}
+        })
     }
 }

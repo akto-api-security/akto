@@ -11,6 +11,7 @@
                 <title>Akto</title>
                 <link rel="shortcut icon" href="/public/favicon.svg" type="image/svg" />
                 <link rel="manifest" href="/public/manifest.json" />
+                <link href="https://cdn.jsdelivr.net/npm/vscode-codicons@0.0.16/dist/codicon.min.css" rel="stylesheet">
             </head>
 
             <body>
@@ -19,6 +20,7 @@
                 </script>
                 <script src="https://apis.google.com/js/client:platform.js?onload=start" async defer>
                 </script>
+                <script src="https://unpkg.com/@tailwindcss/browser@4"></script>
                 <script type="text/javascript">
                     (function (f, b) {
                         if (!b.__SV) {
@@ -67,7 +69,16 @@
                     window.STIGG_CUSTOMER_TOKEN='${requestScope.stiggCustomerToken}'
                     window.STIGG_CLIENT_KEY='${requestScope.stiggClientKey}'
                     window.JIRA_INTEGRATED ='${requestScope.jiraIntegrated}'
+                    window.AZURE_BOARDS_INTEGRATED ='${requestScope.azureBoardsIntegrated}'
                     window.USER_ROLE ='${requestScope.userRole}'
+                    window.TIME_ZONE = '${requestScope.currentTimeZone}'
+                    window.USER_FULL_NAME = '${requestScope.userFullName}'
+                    window.ORGANIZATION_NAME = '${requestScope.organizationName}'
+                    window.GOOGLE_SAML_AUTH_URL=atob('${requestScope.googleSamlAuthUrl}')
+                    window.OKTA_AUTH_URL = '${requestScope.oktaAuthUrl}'
+                    window.AZURE_AUTH_URL = '${requestScope.azureAuthUrl}'
+                    window.GITHUB_AUTH_URL = '${requestScope.githubAuthUrl}'
+                    window.ACTIVE_SSO = '${requestScope.activeSso}'
 
                     window.STIGG_IS_OVERAGE='${requestScope.stiggIsOverage}'
                     window.USAGE_PAUSED=JSON.parse('${requestScope.usagePaused}' || '{}');
@@ -91,6 +102,10 @@
 
                     window.EXPIRED = '${requestScope.expired}'
 
+                    window.PLAN_TYPE = '${requestScope.planType}'
+
+                    window.TRIAL_MSG = '${requestScope.trialMsg}'
+
                     // Enabling the debug mode flag is useful during implementation,
                     // but it's recommended you remove it for production
 
@@ -102,7 +117,19 @@
                         mixpanel.init('c403d0b00353cc31d7e33d68dc778806', { debug: false, ignore_dnt: true });
                         let distinct_id = window.USER_NAME + '_' + (window.IS_SAAS === 'true' ? "SAAS" : window.DASHBOARD_MODE);
                         mixpanel.identify(distinct_id);
-                        mixpanel.people.set({ "$email": window.USER_NAME, "$account Name": window.ACCOUNT_NAME });
+                        let mixpanelUserProps = { "$email": window.USER_NAME, "$account Name": window.ACCOUNT_NAME }
+
+                        if (window.USER_FULL_NAME?.length > 0) {
+                            mixpanelUserProps["name"] = window.USER_FULL_NAME
+                            mixpanelUserProps["$name"] = window.USER_FULL_NAME
+                        }
+
+                        if (window.ORGANIZATION_NAME?.length > 0) {
+                            mixpanelUserProps["company"] = window.ORGANIZATION_NAME
+                            mixpanelUserProps["$company"] = window.ORGANIZATION_NAME
+                        }
+
+                        mixpanel.people.set(mixpanelUserProps);
 
                         mixpanel.register({
                             'email': window.USER_NAME,
@@ -120,6 +147,22 @@
                             show_overage: window.STIGG_IS_OVERAGE==='true',
                             data_ingestion_paused: window.USAGE_PAUSED?.dataIngestion === 'true',
                             test_runs_paused: window.USAGE_PAUSED?.testRuns === 'true'
+                        };
+
+                        if (window.USER_FULL_NAME?.length > 0) {
+                            window.intercomSettings["name"] = window.USER_FULL_NAME
+                        }
+
+                        if (window.ORGANIZATION_NAME?.length > 0 && window.USER_NAME.indexOf("@")> 0) {
+                            let company_id = window.USER_NAME.split("@")[1];
+                            window.intercomSettings["company"] = {name: window.ORGANIZATION_NAME, company_id}
+                        }
+
+                    } else if (window.location.href.includes('check-inbox') || window.location.href.includes('business-email')) {
+                        (function () { var w = window; var ic = w.Intercom; if (typeof ic === "function") { ic('reattach_activator'); ic('update', w.intercomSettings); } else { var d = document; var i = function () { i.c(arguments); }; i.q = []; i.c = function (args) { i.q.push(args); }; w.Intercom = i; var l = function () { var s = d.createElement('script'); s.type = 'text/javascript'; s.async = true; s.src = 'https://widget.intercom.io/widget/e9w9wkdk'; var x = d.getElementsByTagName('script')[0]; x.parentNode.insertBefore(s, x); }; if (document.readyState === 'complete') { l(); } else if (w.attachEvent) { w.attachEvent('onload', l); } else { w.addEventListener('load', l, false); } } })();
+                        window.intercomSettings = {
+                            api_base: "https://api-iam.intercom.io",
+                            app_id: "e9w9wkdk"
                         };
                     }
    // mixpanel.track('Login');
@@ -140,16 +183,15 @@
                 <script type="text/javascript" src="https://app.getbeamer.com/js/beamer-embed.js" defer="defer"></script>                
                 <script>
                     var script = document.createElement('script');
-
-                    // since release_version is not available till a user login, 
-                    // the user will always see the old login screen
                     script.type = "text/javascript"
-                    if (window.RELEASE_VERSION_GLOBAL == '' || window.RELEASE_VERSION_GLOBAL == 'akto-release-version') {// Case when akto version is not available
+                    if ('${requestScope.nodeEnv}' === 'development') {
+                        script.src = "http://localhost:3000/dist/main.js";
+                    } else if (window.RELEASE_VERSION_GLOBAL == '' || window.RELEASE_VERSION_GLOBAL == 'akto-release-version') {
                         script.src = "/polaris_web/web/dist/main.js";
                     } else if (window.RELEASE_VERSION == '' || window.RELEASE_VERSION == 'akto-release-version') {
-                        script.src = "https://d1hvi6xs55woen.cloudfront.net/polaris_web/" + window.RELEASE_VERSION_GLOBAL + "/dist/main.js";;
+                        script.src = "https://d1hvi6xs55woen.cloudfront.net/polaris_web/" + window.RELEASE_VERSION_GLOBAL + "/dist/main.js";
                     } else {
-                        script.src = "https://d1hvi6xs55woen.cloudfront.net/polaris_web/" + window.RELEASE_VERSION + "/dist/main.js";;
+                        script.src = "https://d1hvi6xs55woen.cloudfront.net/polaris_web/" + window.RELEASE_VERSION + "/dist/main.js";
                     }
                     document.body.appendChild(script);
                 </script>

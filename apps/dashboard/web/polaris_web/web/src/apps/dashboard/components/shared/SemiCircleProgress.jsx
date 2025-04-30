@@ -39,6 +39,9 @@ function SemiCircleProgress({progress, size, height, width, title}) {
             }
         },
         series: seriesData,
+        exporting: {
+            enabled: false
+        },
         plotOptions: {
             pie: {
                 size: size,

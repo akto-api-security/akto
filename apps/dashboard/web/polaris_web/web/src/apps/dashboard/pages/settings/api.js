@@ -145,21 +145,21 @@ const settingRequests = {
         })
     },
 
-    addCustomWebhook(webhookName, url, queryParams, method, headerString, body, frequencyInSeconds, selectedWebhookOptions, newEndpointCollections, newSensitiveEndpointCollections) {
+    addCustomWebhook(webhookName, url, queryParams, method, headerString, body, frequencyInSeconds, selectedWebhookOptions, newEndpointCollections, newSensitiveEndpointCollections, batchSize, webhookType, sendInstantly) {
         return request({
             url: '/api/addCustomWebhook',
             method: 'post',
             data: {
-                webhookName, url, queryParams, method, headerString, body, frequencyInSeconds, selectedWebhookOptions, newEndpointCollections, newSensitiveEndpointCollections
+                webhookName, url, queryParams, method, headerString, body, frequencyInSeconds, selectedWebhookOptions, newEndpointCollections, newSensitiveEndpointCollections, batchSize, webhookType, sendInstantly
             }
         })
     },
-    updateCustomWebhook(id, webhookName, url, queryParams, method, headerString, body, frequencyInSeconds, selectedWebhookOptions, newEndpointCollections, newSensitiveEndpointCollections) {
+    updateCustomWebhook(id, webhookName, url, queryParams, method, headerString, body, frequencyInSeconds, selectedWebhookOptions, newEndpointCollections, newSensitiveEndpointCollections, batchSize, sendInstantly) {
         return request({
             url: '/api/updateCustomWebhook',
             method: 'post',
             data: {
-                id, webhookName, url, queryParams, method, headerString, body, frequencyInSeconds, selectedWebhookOptions, newEndpointCollections, newSensitiveEndpointCollections
+                id, webhookName, url, queryParams, method, headerString, body, frequencyInSeconds, selectedWebhookOptions, newEndpointCollections, newSensitiveEndpointCollections, batchSize, sendInstantly
             }
         })
     },
@@ -253,11 +253,11 @@ const settingRequests = {
         })
     },
 
-    addJiraIntegration(userEmail, apiToken, baseUrl, projId, issueType) {
+    addJiraIntegration(userEmail, apiToken, baseUrl, projId, projectAndIssueMap) {
         return request({
             url: '/api/addIntegration',
             method: 'post',
-            data: {userEmail, apiToken, baseUrl, projId, issueType}
+            data: {userEmail, apiToken, baseUrl, projId, projectAndIssueMap}
         })
     },
 
@@ -277,27 +277,27 @@ const settingRequests = {
         })
     },
 
-    fetchAzureSso() {
+    fetchAzureSso(configType) {
         return request({
-            url: '/api/fetchAzureSso',
+            url: '/api/fetchSAMLSso',
             method: 'post',
-            data: {}
+            data: {configType}
         })
     },
 
-    addAzureSso(loginUrl, x509Certificate, azureEntityId, applicationIdentifier, acsUrl) {
+    addAzureSso(loginUrl, x509Certificate, ssoEntityId, applicationIdentifier, acsUrl, configType) {
         return request({
-            url: '/api/addAzureSso',
+            url: '/api/addSAMLSso',
             method: 'post',
-            data: {loginUrl, x509Certificate, azureEntityId, applicationIdentifier, acsUrl}
+            data: {loginUrl, x509Certificate, ssoEntityId, applicationIdentifier, acsUrl, configType}
         })
     },
 
-    deleteAzureSso() {
+    deleteAzureSso(configType) {
         return request({
-            url: '/api/deleteAzureSso',
+            url: '/api/deleteSamlSso',
             method: 'post',
-            data: {}
+            data: {configType}
         })
     },
 
@@ -414,6 +414,13 @@ const settingRequests = {
             data: {partnerIpList}
         })
     },
+    applyAccessType(){
+        return request({
+            url: '/api/applyAccessType',
+            method: 'post',
+            data: {}
+        })
+    },
     handleRedundantUrls(allowRedundantEndpointsList) {
         return request({
             url: '/api/updateUrlSettings',
@@ -423,14 +430,147 @@ const settingRequests = {
             }
         });
     },
-    getRoleHierarchy(userRole){
+    getRoleHierarchy(){
         return request({
             url: '/api/getRoleHierarchy',
             method: 'post',
             data: {
-                userRole
             }
         });
+    },
+    updateAccountSettings(accountPermission,modifiedValueForAccount){
+        return request({
+            url: '/api/modifyAccountSettings',
+            method: "post",
+            data: {
+                accountPermission, modifiedValueForAccount
+            }
+        })
+    },
+    updateApisCaseInsensitive(toggleCaseSensitiveApis){
+        return request({
+            url: '/api/toggleCaseSensitiveApis',
+            method: "post",
+            data: {
+                toggleCaseSensitiveApis
+            }
+        })
+    },
+    switchTestingModule(miniTestingEnabled){
+        return request({
+            url: '/api/switchTestingModule',
+            method: "post",
+            data: {
+                miniTestingEnabled
+            }
+        })
+    },
+    resetUserPassword(userEmail) {
+        return request({
+            url: '/api/resetUserPassword',
+            method: 'post',
+            data: {userEmail}
+        })
+    },
+    fetchApiAuditLogsFromDb(skip, limit, sortOrder, startTimestamp, endTimestamp) {
+        return request({
+            url: '/api/fetchApiAuditLogsFromDb',
+            method: 'post',
+            data: {skip, limit, sortOrder, startTimestamp, endTimestamp}
+        })
+    },
+    getCustomRoles() {
+        return request({
+            url: '/api/getCustomRoles',
+            method: 'post',
+            data: {}
+        })
+    },
+    createCustomRole(apiCollectionIds, roleName, baseRole, defaultInviteRole) {
+        return request({
+            url: '/api/createCustomRole',
+            method: 'post',
+            data: { apiCollectionIds, roleName, baseRole, defaultInviteRole }
+        })
+    },
+    updateCustomRole(apiCollectionIds, roleName, baseRole, defaultInviteRole) {
+        return request({
+            url: '/api/updateCustomRole',
+            method: 'post',
+            data: {apiCollectionIds, roleName, baseRole, defaultInviteRole}
+        })
+    },
+    deleteCustomRole(roleName) {
+        return request({
+            url: '/api/deleteCustomRole',
+            method: 'post',
+            data: {roleName}
+        })
+    },
+    addAwsWafIntegration(awsAccessKey, awsSecretKey, region, ruleSetId, ruleSetName) {
+        return request({
+            url: '/api/addAwsWafIntegration',
+            method: 'post',
+            data: {awsAccessKey, awsSecretKey, region, ruleSetId, ruleSetName}
+        })
+    },
+    fetchAwsWafIntegration() {
+        return request({
+            url: '/api/fetchAwsWafIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+    addSplunkIntegration(splunkUrl, splunkToken) {
+        return request({
+            url: '/api/addSplunkIntegration',
+            method: 'post',
+            data: {splunkUrl, splunkToken}
+        })
+    },
+    fetchSplunkIntegration() {
+        return request({
+            url: '/api/fetchSplunkIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    fetchAzureBoardsIntegration() {
+        return request({
+            url: '/api/fetchAzureBoardsIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    addAzureBoardsIntegration(azureBoardsBaseUrl, organization, projectList, personalAuthToken) {
+        return request({
+            url: '/api/addAzureBoardsIntegration',
+            method: 'post',
+            data: {azureBoardsBaseUrl, organization, projectList, personalAuthToken}
+        })
+    },
+    removeAzureBoardsIntegration() {
+        return request({
+            url: '/api/removeAzureBoardsIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+    removeInvitation(email) {
+        return request({
+            url: '/api/removeInvitation',
+            method: 'post',
+            data: {email}
+        })
+    },
+    async fetchModuleInfo() {
+        return await request({
+            url: '/api/fetchModuleInfo',
+            method: 'post',
+            data: {}
+        })
     }
 }
 
