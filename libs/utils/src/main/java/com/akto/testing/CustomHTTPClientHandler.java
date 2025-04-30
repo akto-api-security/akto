@@ -1,4 +1,4 @@
-package com.akto.util.http_util;
+package com.akto.testing;
 
 import javax.net.ssl.KeyManager;
 import javax.net.ssl.KeyManagerFactory;
@@ -13,6 +13,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.akto.dto.testing.TLSAuthParam;
+import com.akto.util.http_util.CoreHTTPClient;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.Charset;
@@ -51,22 +53,22 @@ public class CustomHTTPClientHandler {
 
     public static CustomHTTPClientHandler instance = new CustomHTTPClientHandler();
 
-    public OkHttpClient getClient(TLSAuthParam authParam) throws Exception {
+    public OkHttpClient getClient(TLSAuthParam authParam, boolean isHttps, boolean followRedirect, String contentType) throws Exception {
         if (authParam == null) {
             return CoreHTTPClient.client;
         }
 
-        int hashCode = authParam.hashCode();
+        int hashCode = authParam.hashCode() + (isHttps ? 1 : 0) + (followRedirect ? 1 : 0) + contentType.hashCode();
 
         if (!tlsClientMap.containsKey(hashCode)) {
-            OkHttpClient okHttpClient = getTLSClient(authParam);
+            OkHttpClient okHttpClient = getTLSClient(authParam, isHttps, followRedirect,contentType);
             tlsClientMap.put(hashCode, okHttpClient);
         }
 
         return tlsClientMap.get(hashCode);
     }
 
-    private OkHttpClient getTLSClient(TLSAuthParam authParam) throws Exception {
+    private OkHttpClient getTLSClient(TLSAuthParam authParam, boolean isHttps, boolean followRedirect, String contentType) throws Exception {
         try {
             TrustManager[] trustManagers = getTrustManagers(authParam.getCAcertificate());
             SSLContext sslContext = SSLContext.getInstance("SSL");
@@ -75,7 +77,7 @@ public class CustomHTTPClientHandler {
 
             SSLSocketFactory sslSocketFactory = sslContext.getSocketFactory();
 
-            OkHttpClient okHttpClient = CoreHTTPClient.client.newBuilder()
+            OkHttpClient okHttpClient = HTTPClientHandler.instance.getHTTPClient(isHttps, followRedirect, contentType).newBuilder()
                     .sslSocketFactory(sslSocketFactory, (X509TrustManager) trustManagers[0])
                     // might need to revisit this.
                     .hostnameVerifier((hostname, session) -> true)
