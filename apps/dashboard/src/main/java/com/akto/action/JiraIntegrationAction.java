@@ -3,7 +3,12 @@ package com.akto.action;
 import com.akto.dao.ConfigsDao;
 import com.akto.dto.Config.AktoHostUrlConfig;
 import com.akto.dto.Config.ConfigType;
+import com.akto.dto.jira_integration.JiraStatus;
+import com.akto.dto.jira_integration.JiraStatusApiResponse;
+import com.akto.dto.jira_integration.ProjectMapping;
 import com.akto.util.DashboardMode;
+import com.akto.utils.JsonUtils;
+import com.fasterxml.jackson.core.type.TypeReference;
 import java.io.File;
 import java.net.URL;
 import java.util.*;
@@ -17,9 +22,9 @@ import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.TestingRunResult;
 import com.mongodb.client.model.Projections;
+import java.util.stream.Collectors;
 import javax.servlet.http.HttpServletRequest;
 import org.apache.struts2.interceptor.ServletRequestAware;
-import org.bson.BsonDocument;
 import org.bson.Document;
 import org.bson.conversions.Bson;
 
@@ -74,11 +79,13 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
     private String dashboardUrl;
 
     private Map<String,List<BasicDBObject>> projectAndIssueMap;
+    private Map<String, ProjectMapping> projectMappings;
 
-    private final String META_ENDPOINT = "/rest/api/3/issue/createmeta";
-    private final String CREATE_ISSUE_ENDPOINT = "/rest/api/3/issue";
-    private final String CREATE_ISSUE_ENDPOINT_BULK = "/rest/api/3/issue/bulk";
-    private final String ATTACH_FILE_ENDPOINT = "/attachments";
+    private static final String META_ENDPOINT = "/rest/api/3/issue/createmeta";
+    private static final String CREATE_ISSUE_ENDPOINT = "/rest/api/3/issue";
+    private static final String CREATE_ISSUE_ENDPOINT_BULK = "/rest/api/3/issue/bulk";
+    private static final String ATTACH_FILE_ENDPOINT = "/attachments";
+    private static final String ISSUE_STATUS_ENDPOINT = "/rest/api/3/project/%s/statuses";
     private static final LoggerMaker loggerMaker = new LoggerMaker(ApiExecutor.class, LogDb.DASHBOARD);
     private static final OkHttpClient client = CoreHTTPClient.client.newBuilder()
             .connectTimeout(60, TimeUnit.SECONDS)
@@ -172,6 +179,89 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
         return Action.SUCCESS.toUpperCase();
     }
 
+    public String fetchJiraStatusMappings() {
+        if(apiToken.contains("******")){
+            JiraIntegration jiraIntegration = JiraIntegrationDao.instance.findOne(Filters.empty());
+            if(jiraIntegration != null){
+                setApiToken(jiraIntegration.getApiToken());
+            }
+        }
+
+        String authHeader = Base64.getEncoder().encodeToString((userEmail + ":" + apiToken).getBytes());
+
+        try {
+            setProjId(projId.replaceAll("\\s+", ""));
+
+            // Step 2: Call the API to get issue types for the project
+            String statusUrl = baseUrl + String.format(ISSUE_STATUS_ENDPOINT, projId) + "?maxResults=100";
+
+            Request.Builder builder = new Request.Builder();
+            builder.addHeader("Authorization", "Basic " + authHeader);
+            builder.addHeader("Accept", "application/json");
+            builder = builder.url(statusUrl);
+            Request okHttpRequest = builder.build();
+
+            Response response = null;
+            String responsePayload;
+
+            try {
+                response = client.newCall(okHttpRequest).execute();
+
+                if (!response.isSuccessful()) {
+                    loggerMaker.error(
+                        "Error while fetching Jira Project statuses. Response code: {}, accountId: {}, projectId: {}",
+                        response.code(), Context.accountId.get(), projId);
+                    return Action.ERROR.toUpperCase();
+                }
+
+                if (response.body() == null) {
+                    loggerMaker.error(
+                        "Error while fetching Jira Project statuses. Response body is null. accountId: {}, projectId: {}",
+                        Context.accountId.get(), projId);
+                    return Action.ERROR.toUpperCase();
+                }
+
+                responsePayload = response.body().string();
+
+            } catch (Exception e) {
+                String msg = "Error while fetching Jira Project statuses";
+                addActionError(msg);
+                loggerMaker.error(msg, e);
+                return Action.ERROR.toUpperCase();
+            } finally {
+                if (response != null) {
+                    response.close();
+                }
+            }
+
+            this.projectMappings = new HashMap<>();
+            this.projectMappings.put(projId, new ProjectMapping(
+                extractUniqueStatusCategories(responsePayload),
+                null
+            ));
+            return Action.SUCCESS.toUpperCase();
+
+        } catch (Exception e) {
+            addActionError("Error while fetching jira project status mappings");
+            loggerMaker.error("Error while fetching jira project status mappings. p[rojId: {}", projId, e);
+            return Action.ERROR.toUpperCase();
+        }
+    }
+
+    private Set<JiraStatus> extractUniqueStatusCategories(String responsePayload) {
+        List<JiraStatusApiResponse> statusesMap = JsonUtils.fromJson(responsePayload,
+            new TypeReference<List<JiraStatusApiResponse>>() {
+            });
+
+        if (statusesMap == null || statusesMap.isEmpty()) {
+            return Collections.emptySet();
+        }
+
+        return statusesMap.stream()
+            .flatMap(statusResp -> statusResp.getStatuses().stream())
+            .collect(Collectors.toSet());
+    }
+
     private List<BasicDBObject> getIssueTypesWithIds(BasicDBList issueTypes) {
 
         List<BasicDBObject> idPairs = new ArrayList<>();
@@ -201,7 +291,8 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
             Updates.set("issueType", issueType),
             Updates.setOnInsert("createdTs", Context.now()),
             Updates.set("updatedTs", Context.now()),
-            Updates.set("projectIdsMap", projectAndIssueMap)
+            Updates.set("projectIdsMap", projectAndIssueMap),
+            Updates.set("projectMappings", projectMappings)
         );
         if(!apiToken.contains("******")){
             integrationUpdate = Updates.combine(integrationUpdate, tokenUpdate);
@@ -214,6 +305,144 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
         );
 
         return Action.SUCCESS.toUpperCase();
+    }
+
+    public String addIntegrationV2() {
+
+        if (projectMappings == null || projectMappings.isEmpty()) {
+            addActionError("Project mappings cannot be empty");
+            return Action.ERROR.toUpperCase();
+        }
+
+        JiraIntegration existingIntegration = JiraIntegrationDao.instance.findOne(new BasicDBObject());
+
+        if (existingIntegration == null) {
+            this.projectAndIssueMap = new HashMap<>();
+            try {
+                for (Map.Entry<String, ProjectMapping> entry : projectMappings.entrySet()) {
+                    List<BasicDBObject> issueTypes = getProjectMetadata(entry.getKey());
+                    this.projectAndIssueMap.put(entry.getKey(), issueTypes);
+                }
+            } catch (Exception ex) {
+                loggerMaker.error("Error while fetching project metadata", ex);
+                addActionError("Error while fetching project metadata");
+                return Action.ERROR.toUpperCase();
+            }
+            String response = addIntegration();
+            this.jiraIntegration = JiraIntegrationDao.instance.findOne(new BasicDBObject());
+            return response;
+        }
+
+        addAktoHostUrl();
+
+        Map<String, ProjectMapping> existingProjectMappings = existingIntegration.getProjectMappings();
+
+        if (existingProjectMappings == null) {
+            existingProjectMappings = new HashMap<>();
+        }
+
+        for (Map.Entry<String, ProjectMapping> entry : projectMappings.entrySet()) {
+            if (existingProjectMappings.containsKey(entry.getKey())) {
+                loggerMaker.error("Project Key: {} is already mapped", entry.getKey());
+                addActionError("Project Key: " + entry.getKey() + " is already mapped");
+                return Action.ERROR.toUpperCase();
+            }
+        }
+
+        existingProjectMappings.putAll(projectMappings);
+
+        UpdateOptions updateOptions = new UpdateOptions();
+        updateOptions.upsert(false);
+
+        Bson integrationUpdate = Updates.combine(
+            Updates.set("updatedTs", Context.now()),
+            Updates.set("projectMappings", existingProjectMappings)
+        );
+
+        Map<String, List<BasicDBObject>> existingProjectIdMap = existingIntegration.getProjectIdsMap();
+
+        if (existingProjectIdMap == null) {
+            existingProjectIdMap = new HashMap<>();
+        }
+
+        try {
+            for (Map.Entry<String, ProjectMapping> entry : projectMappings.entrySet()) {
+                List<BasicDBObject> issueTypes = getProjectMetadata(entry.getKey());
+                existingProjectIdMap.put(entry.getKey(), issueTypes);
+            }
+        } catch (Exception ex) {
+            loggerMaker.error("Error while fetching project metadata", ex);
+            addActionError("Error while fetching project metadata");
+            return Action.ERROR.toUpperCase();
+        }
+
+        integrationUpdate = Updates.combine(integrationUpdate, Updates.set("projectIdsMap", existingProjectIdMap));
+
+        JiraIntegrationDao.instance.getMCollection().updateOne(
+            new BasicDBObject(),
+            integrationUpdate,
+            updateOptions
+        );
+
+        this.jiraIntegration = JiraIntegrationDao.instance.findOne(new BasicDBObject());
+
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    private List<BasicDBObject> getProjectMetadata(String projectId) throws Exception {
+
+        if (apiToken.contains("******")) {
+            JiraIntegration jiraIntegration = JiraIntegrationDao.instance.findOne(Filters.empty());
+            if (jiraIntegration != null) {
+                setApiToken(jiraIntegration.getApiToken());
+            } else {
+                throw new IllegalStateException("No Jira integration found");
+            }
+        }
+
+        String url = baseUrl + META_ENDPOINT;
+        String authHeader = Base64.getEncoder().encodeToString((userEmail + ":" + apiToken).getBytes());
+
+        Request.Builder builder = new Request.Builder();
+        builder.addHeader("Authorization", "Basic " + authHeader);
+        builder.addHeader("Accept-Encoding", "gzip");
+        builder = builder.url(url);
+        Request okHttpRequest = builder.build();
+
+        Response response = null;
+        String responsePayload;
+
+        try {
+            response = client.newCall(okHttpRequest).execute();
+            responsePayload = response.body().string();
+
+            if (!Utils.isJsonPayload(responsePayload)) {
+                builder.removeHeader("Accept-Encoding");
+                builder = builder.url(url);
+                okHttpRequest = builder.build();
+                response = client.newCall(okHttpRequest).execute();
+                responsePayload = response.body().string();
+            }
+        } finally {
+            if (response != null) {
+                response.close();
+            }
+        }
+
+        BasicDBObject payloadObj = BasicDBObject.parse(responsePayload);
+        BasicDBList projects = (BasicDBList) payloadObj.get("projects");
+
+        for (Object projObj : projects) {
+            BasicDBObject obj = (BasicDBObject) projObj;
+            String key = obj.getString("key");
+
+            if (projectId.equals(key)) {
+                BasicDBList issueTypes = (BasicDBList) obj.get("issuetypes");
+                return getIssueTypesWithIds(issueTypes);
+            }
+        }
+
+        throw new IllegalArgumentException("Project with ID '" + projectId + "' not found");
     }
 
     public String fetchIntegration() {
@@ -339,7 +568,7 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
         } catch (Exception ex) {
                 ex.printStackTrace();
         }
-        
+
 
         return Action.SUCCESS.toUpperCase();
     }
@@ -373,6 +602,7 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
     String aktoDashboardHost;
     List<TestingIssuesId> issuesIds;
     private String errorMessage;
+
     public String bulkCreateJiraTickets (){
         if(issuesIds == null || issuesIds.isEmpty()){
             addActionError("Cannot create an empty jira issue.");
@@ -650,7 +880,7 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
     public void setIssueType(String issueType) {
         this.issueType = issueType;
     }
-    
+
     public JiraIntegration getJiraIntegration() {
         return jiraIntegration;
     }
@@ -717,6 +947,14 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
 
     public String getErrorMessage() {
         return errorMessage;
+    }
+
+    public Map<String, ProjectMapping> getProjectMappings() {
+        return projectMappings;
+    }
+
+    public void setProjectMappings(Map<String, ProjectMapping> projectMappings) {
+        this.projectMappings = projectMappings;
     }
 
     @Override
