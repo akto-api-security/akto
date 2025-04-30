@@ -1287,8 +1287,7 @@ public class DbLayer {
             return null;
         }
 
-        String id = fileUpload.getSwaggerFileId().toString().replaceAll("BsonObjectId\\{value=([0-9a-fA-F]{24})\\}", "$1");
-        ObjectId objectId = new ObjectId(id);
+        ObjectId objectId = new ObjectId(fileUpload.getSwaggerFileId());
 
         File file = FilesDao.instance.findOne(Filters.eq("_id", objectId));
         if (file == null) {
