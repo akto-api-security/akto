@@ -16,7 +16,6 @@ const service = axios.create({
 const err = async (error) => {
   let status
   let data
-
   if(error.response) {
     status = error.response.status
     data = error.response.data
