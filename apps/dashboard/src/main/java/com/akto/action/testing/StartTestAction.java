@@ -1469,8 +1469,6 @@ public class StartTestAction extends UserAction {
     }
 
     private Set<String> miniTestingServiceNames;
-    private boolean isHybridTestingEnabled;
-    //todo: fix here
     public String fetchMiniTestingServiceNames() {
         List<ModuleInfo> moduleInfos = ModuleInfoDao.instance.findAll(Filters.and(
                         Filters.eq(ModuleInfo.MODULE_TYPE, ModuleInfo.ModuleType.MINI_TESTING),
@@ -1887,14 +1885,6 @@ public class StartTestAction extends UserAction {
 
     public void setMiniTestingServiceNames(Set<String> miniTestingServiceNames) {
         this.miniTestingServiceNames = miniTestingServiceNames;
-    }
-
-    public boolean getIsHybridTestingEnabled() {
-        return isHybridTestingEnabled;
-    }
-
-    public void setIsHybridTestingEnabled(boolean isHybridTestingEnabled) {
-        this.isHybridTestingEnabled = isHybridTestingEnabled;
     }
 
     public void setSelectedMiniTestingServiceName(String selectedMiniTestingServiceName) {
