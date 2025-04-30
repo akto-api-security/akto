@@ -1,109 +1,52 @@
 package com.akto.action.testing;
 
-import com.akto.DaoInit;
-import com.akto.action.ExportSampleDataAction;
-import com.akto.action.AccountAction;
 import com.akto.action.UserAction;
-import com.akto.dao.ApiCollectionsDao;
-import com.akto.dao.RBACDao;
-import com.akto.dao.AccountsDao;
 import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.context.Context;
+import com.akto.dao.monitoring.ModuleInfoDao;
 import com.akto.dao.test_editor.YamlTemplateDao;
-import com.akto.dao.testing.DeleteTestRunsDao;
-import com.akto.dao.testing.TestRolesDao;
-import com.akto.dao.testing.TestingRunConfigDao;
-import com.akto.dao.testing.TestingRunDao;
-import com.akto.dao.testing.TestingRunResultDao;
-import com.akto.dao.testing.TestingRunResultSummariesDao;
-import com.akto.dao.testing.VulnerableTestingRunResultDao;
-import com.akto.dao.testing.WorkflowTestsDao;
+import com.akto.dao.testing.*;
 import com.akto.dao.testing.sources.TestSourceConfigsDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
-import com.akto.dao.testing.*;
-import com.akto.dao.testing.config.TestSuiteDao;
-import com.akto.dto.ApiCollection;
-import com.akto.dto.Account;
-import com.akto.dto.billing.FeatureAccess;
-import com.akto.dto.testing.config.EditableTestingRunConfig;
-import com.akto.dto.testing.config.TestSuites;
 import com.akto.dto.ApiInfo;
-import com.akto.dto.MiniTestingServiceHeartbeat;
-import com.akto.dto.User;
 import com.akto.dto.ApiToken.Utility;
 import com.akto.dto.CollectionConditions.TestConfigsAdvancedSettings;
 import com.akto.dto.User;
+import com.akto.dto.billing.FeatureAccess;
+import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.dto.test_editor.Info;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
-import com.akto.dto.testing.AuthMechanism;
-import com.akto.dto.testing.AutoTicketingDetails;
-import com.akto.dto.testing.CollectionWiseTestingEndpoints;
-import com.akto.dto.testing.CustomTestingEndpoints;
-import com.akto.dto.testing.DeleteTestRuns;
-import com.akto.dto.testing.GenericTestResult;
-import com.akto.dto.testing.MultiExecTestResult;
-import com.akto.dto.testing.TestResult;
+import com.akto.dto.testing.*;
 import com.akto.dto.testing.TestResult.TestError;
-import com.akto.dto.testing.TestingEndpoints;
-import com.akto.dto.testing.TestingRun;
 import com.akto.dto.testing.TestingRun.State;
 import com.akto.dto.testing.TestingRun.TestingRunType;
-import com.akto.dto.testing.TestingRunConfig;
-import com.akto.dto.testing.TestingRunResult;
-import com.akto.dto.testing.TestingRunResultSummary;
-import com.akto.dto.testing.WorkflowTest;
-import com.akto.dto.testing.WorkflowTestingEndpoints;
 import com.akto.dto.testing.config.EditableTestingRunConfig;
 import com.akto.dto.testing.info.CurrentTestsStatus;
 import com.akto.dto.testing.info.CurrentTestsStatus.StatusForIndividualTest;
 import com.akto.dto.testing.sources.TestSourceConfig;
-import com.akto.dto.usage.MetricTypes;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-import com.akto.testing.TestCompletion;
 import com.akto.usage.UsageMetricCalculator;
-import com.akto.usage.UsageMetricHandler;
 import com.akto.util.Constants;
-import com.akto.util.DashboardMode;
-import com.akto.util.Pair;
-import com.akto.util.UsageUtils;
 import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.Severity;
 import com.akto.util.enums.GlobalEnums.TestErrorSource;
 import com.akto.utils.DeleteTestRunUtils;
 import com.akto.utils.Utils;
 import com.google.gson.Gson;
-import com.mongodb.ConnectionString;
 import com.mongodb.client.model.*;
-import com.mongodb.client.model.Aggregates;
-import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.Projections;
-import com.mongodb.client.model.Sorts;
-import com.mongodb.client.model.Updates;
 import com.mongodb.client.result.InsertOneResult;
 import com.opensymphony.xwork2.Action;
-import java.time.Instant;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
-import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
+
+import java.time.Instant;
+import java.util.*;
+import java.util.concurrent.*;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 public class StartTestAction extends UserAction {
 
@@ -1527,27 +1470,16 @@ public class StartTestAction extends UserAction {
 
     private Set<String> miniTestingServiceNames;
     private boolean isHybridTestingEnabled;
+    //todo: fix here
     public String fetchMiniTestingServiceNames() {
-        int accountId = Context.accountId.get();
-        Account account = AccountsDao.instance.findOne(Filters.eq("_id", accountId), Projections.include(Account.HYBRID_TESTING_ENABLED, Account.MINI_TESTING_HEARTBEAT));
-        if(account == null || !account.getHybridTestingEnabled() || account.getMiniTestingHeartbeat() == null) {
-            return SUCCESS.toUpperCase();
-        }
-
-        List<MiniTestingServiceHeartbeat> miniTestingHeartbeats = account.getMiniTestingHeartbeat();
-        isHybridTestingEnabled = account.getHybridTestingEnabled();
-
-        miniTestingServiceNames = new HashSet<>();
-
-        for(MiniTestingServiceHeartbeat miniTestingHeartbeat : miniTestingHeartbeats) {
-            String miniTestingServiceName = miniTestingHeartbeat.getMiniTestingServiceName();
-            int miniTestingLastHeartbeat = miniTestingHeartbeat.getLastHeartbeatTimestamp();
-
-            if(Math.abs(Context.now() - miniTestingLastHeartbeat) <= 300) {
-                miniTestingServiceNames.add(miniTestingServiceName);
+        List<ModuleInfo> moduleInfos = ModuleInfoDao.instance.findAll(Filters.and(
+                        Filters.eq(ModuleInfo.MODULE_TYPE, ModuleInfo.ModuleType.MINI_TESTING),
+                        Filters.gt(ModuleInfo.LAST_HEARTBEAT_RECEIVED, Context.now() - 20 * 60)));
+        for (ModuleInfo moduleInfo : moduleInfos) {
+            if (moduleInfo.getName() != null) {
+                this.miniTestingServiceNames.add(moduleInfo.getName());
             }
         }
-
         return SUCCESS.toUpperCase();
     }
 
