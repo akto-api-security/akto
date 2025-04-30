@@ -11,7 +11,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.ConcurrentHashMap;
 
 import com.akto.bulk_update_util.ApiInfoBulkUpdate;
@@ -1063,6 +1062,7 @@ public class DbLayer {
         Integer accountId = Context.accountId.get();
         AccountsDao.instance.updateOne(Filters.eq("_id", accountId), Updates.set(Account.HYBRID_TESTING_ENABLED, hybridTestingEnabled));
     }
+
 
     public static DataControlSettings fetchDataControlSettings(String prevResult, String prevCommand) {
         Integer accountId = Context.accountId.get();
