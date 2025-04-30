@@ -249,7 +249,7 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
     }
 
     private Set<JiraStatus> extractUniqueStatusCategories(String responsePayload) {
-        List<JiraStatusApiResponse> statusesMap = JsonUtils.jsonToMap(responsePayload,
+        List<JiraStatusApiResponse> statusesMap = JsonUtils.fromJson(responsePayload,
             new TypeReference<List<JiraStatusApiResponse>>() {
             });
 

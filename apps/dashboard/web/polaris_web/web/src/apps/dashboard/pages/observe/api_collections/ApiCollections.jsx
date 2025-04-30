@@ -774,33 +774,40 @@ function ApiCollections() {
                 )}
                 autofocusTarget="first-node"
                 onClose={() => { setMoreActions(false) }}
-                preferredAlignment="right"
             >
                 <Popover.Pane fixed>
-                    <Popover.Section>
-                        <Button plain monochrome onClick={() =>exportCsv()} removeUnderline>
-                            <HorizontalStack gap={"2"}>
-                                <Box><Icon source={FileMinor} /></Box>
-                                <Text>Export as CSV</Text>
-                            </HorizontalStack>
-                        </Button>
-                        </Popover.Section>
-                        <Popover.Section>
-                        <Button plain monochrome onClick={() => setCenterView(centerView === CenterViewType.Tree ? CenterViewType.Table : CenterViewType.Tree)} removeUnderline>
-                            <HorizontalStack gap={"2"}>
-                                <Box><Icon source={centerView === CenterViewType.Tree ? HideMinor : ViewMinor} /></Box>
-                                <Text>{centerView === CenterViewType.Tree ? "Hide tree view": "Display tree view"}</Text>
-                            </HorizontalStack>
-                        </Button>
-                    </Popover.Section>
-                    {window.USER_NAME && window.USER_NAME.endsWith("akto.io") && <Popover.Section>
-                        <Button plain monochrome onClick={() => switchToGraphView()} removeUnderline>
-                            <HorizontalStack gap={"2"}>
-                                <Box><Icon source={centerView === CenterViewType.Graph ? HideMinor : ViewMinor} /></Box>
-                                <Text>{centerView === CenterViewType.Tree ? "Hide graph view": "Display graph view"}</Text>
-                            </HorizontalStack>
-                        </Button>
-                    </Popover.Section>}
+                    <ActionList
+                        actionRole="menuitem"
+                        sections={
+                            [
+                                {
+                                    title: 'Export',
+                                    items: [
+                                        {
+                                            content: 'Export as CSV',
+                                            onAction: () => exportCsv(),
+                                            prefix: <Box><Icon source={FileMinor} /></Box>
+                                        }
+                                    ]
+                                },
+                                {
+                                    title: 'Switch view',
+                                    items: [
+                                        {
+                                            content: centerView === CenterViewType.Tree ? "Hide tree view": "Display tree view",
+                                            onAction: () => setCenterView(centerView === CenterViewType.Tree ? CenterViewType.Table : CenterViewType.Tree),
+                                            prefix: <Box><Icon source={centerView === CenterViewType.Tree ? HideMinor : ViewMinor} /></Box>
+                                        },
+                                        window.USER_NAME && window.USER_NAME.endsWith("akto.io") &&{
+                                            content: centerView === CenterViewType.Graph ? "Hide graph view": "Display graph view",
+                                            onAction: () => switchToGraphView(),
+                                            prefix: <Box><Icon source={centerView === CenterViewType.Graph ? HideMinor : ViewMinor} /></Box>
+                                        }
+                                    ]
+                                }
+                            ]
+                        }
+                    />
                 </Popover.Pane>
             </Popover>
             <Button id={"create-new-collection-popup"} secondaryActions onClick={showCreateNewCollectionPopup}>Create new collection</Button>

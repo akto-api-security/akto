@@ -4,7 +4,6 @@ import com.akto.dto.type.RequestTemplate;
 import com.akto.util.HttpRequestResponseUtils;
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONObject;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
 import okhttp3.HttpUrl;
@@ -15,7 +14,6 @@ import java.util.*;
 public class OriginalHttpRequest {
 
     private static final Gson gson = new Gson();
-    private final static ObjectMapper mapper = new ObjectMapper();
     private String url;
     private String type;
     private String queryParams;

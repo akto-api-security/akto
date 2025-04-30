@@ -12,11 +12,8 @@ import com.akto.dto.ApiInfo;
 import com.akto.dto.CustomAuthType;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.RawApi;
-import com.akto.dto.RecordedLoginFlowInput;
 import com.akto.dto.testing.*;
-import com.akto.dto.testing.sources.AuthWithCond;
 import com.akto.testing.*;
-import com.akto.util.enums.LoginFlowEnums;
 import com.akto.util.enums.LoginFlowEnums.AuthMechanismTypes;
 import com.akto.dto.api_workflow.Graph;
 import com.akto.dto.test_editor.*;
@@ -26,10 +23,9 @@ import com.akto.dto.type.KeyTypes;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.rules.TestPlugin;
-import com.akto.store.TestRolesCache;
 import com.akto.test_editor.Utils;
 import com.akto.util.Constants;
-import com.akto.util.JSONUtils;
+import com.akto.util.HttpRequestResponseUtils;
 import com.akto.util.modifier.JWTPayloadReplacer;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -195,6 +191,18 @@ public class Executor {
                         // TODO: handle exception
                     }
                 }
+                List<String> contentType = origRawApi.getRequest().getHeaders().getOrDefault("content-type", new ArrayList<>());
+                String contentTypeString = "";
+                if(!contentType.isEmpty()){
+                    contentTypeString = contentType.get(0);
+                }
+                if(!contentTypeString.isEmpty() && (contentTypeString.contains(HttpRequestResponseUtils.SOAP) || contentTypeString.contains(HttpRequestResponseUtils.XML))){
+                    // since we are storing a map for original raw payload, we need original raw url and method to float to api executor
+                    // we are adding custom header here and when sending request we will remove them
+                    testReq.getRequest().getHeaders().put("x-akto-original-url", Collections.singletonList(origRawApi.getRequest().getUrl()));
+                    testReq.getRequest().getHeaders().put("x-akto-original-method", Collections.singletonList(origRawApi.getRequest().getMethod()));   
+                }
+
                 testResponse = ApiExecutor.sendRequest(testReq.getRequest(), followRedirect, testingRunConfig, debug, testLogs, Utils.SKIP_SSRF_CHECK, false);
                 requestSent = true;
                 ExecutionResult attempt = new ExecutionResult(singleReq.getSuccess(), singleReq.getErrMsg(), testReq.getRequest(), testResponse);

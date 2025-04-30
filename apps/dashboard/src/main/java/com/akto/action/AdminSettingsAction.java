@@ -28,6 +28,9 @@ import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
 import com.opensymphony.xwork2.Action;
+
+import lombok.Setter;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -39,13 +42,10 @@ import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.bson.conversions.Bson;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public class AdminSettingsAction extends UserAction {
 
     private static final LoggerMaker logger = new LoggerMaker(AdminSettingsAction.class, LogDb.DASHBOARD);
-    private static final Logger log = LoggerFactory.getLogger(AdminSettingsAction.class);
 
     AccountSettings accountSettings;
     private int globalRateLimit = 0;
@@ -67,7 +67,7 @@ public class AdminSettingsAction extends UserAction {
         if(Context.accountId.get() != null && Context.accountId.get() != 0){
             currentAccount = AccountsDao.instance.findOne(
                 Filters.eq(Constants.ID, Context.accountId.get()),
-                Projections.include("name", "timezone")
+                Projections.include("name", "timezone", Account.HYBRID_SAAS_ACCOUNT, Account.HYBRID_TESTING_ENABLED)
             );
         }
         return SUCCESS.toUpperCase();
@@ -82,6 +82,9 @@ public class AdminSettingsAction extends UserAction {
 	private Set<String> partnerIpList;
     private List<String> allowRedundantEndpointsList;
     private boolean toggleCaseSensitiveApis;
+
+    @Setter
+    private boolean miniTestingEnabled;
 
     public String updateSetupType() {
         AccountSettingsDao.instance.getMCollection().updateOne(
@@ -461,6 +464,14 @@ public class AdminSettingsAction extends UserAction {
         );
 
         return SUCCESS.toUpperCase();
+    }
+
+    public String switchTestingModule(){
+        AccountsDao.instance.updateOne(
+            Filters.eq(Constants.ID, Context.accountId.get()),
+            Updates.set(Account.HYBRID_TESTING_ENABLED, this.miniTestingEnabled)
+        );
+        return SUCCESS.toUpperCase();   
     }
 
     public void setAccountPermission(String accountPermission) {
