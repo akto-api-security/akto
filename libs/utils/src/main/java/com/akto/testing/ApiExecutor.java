@@ -105,7 +105,12 @@ public class ApiExecutor {
                         System.out.println("grpc response base64 encoded:" + responseBase64Encoded);
                     }
                     body = HttpRequestResponseUtils.convertGRPCEncodedToJson(grpcBody);
-                } else {
+                } else if(requestProtocol != null && (requestProtocol.contains(HttpRequestResponseUtils.SOAP) || requestProtocol.contains(HttpRequestResponseUtils.XML))){
+                    // here we are assuming that the response is in xml format
+                    // now convert this into valid json body string
+                    body = HttpRequestResponseUtils.convertXmlToJson(responseBody.string());
+                } 
+                else {
                     body = responseBody.string();
                 }
             } catch (IOException e) {
@@ -304,6 +309,7 @@ public class ApiExecutor {
         Request.Builder builder = new Request.Builder();
         addHeaders(request, builder);
 
+        // assuming we are storing the headers we want for xml format as well
         String type = request.findContentType();
         URLMethods.Method method = URLMethods.Method.fromString(request.getMethod());
 
@@ -466,7 +472,24 @@ public class ApiExecutor {
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb("Unable to decode grpc payload:" + payload, LogDb.TESTING);
             }
-        }
+        }else if(contentType.contains(HttpRequestResponseUtils.SOAP) || contentType.contains(HttpRequestResponseUtils.XML)){
+            // here we are assuming that the request is in xml format
+            // now convert this into valid json body string
+
+            // get the url and method from temp headers
+            if(request.getHeaders().containsKey("x-akto-original-url") && request.getHeaders().containsKey("x-akto-original-method")){
+                String url = request.getHeaders().get("x-akto-original-url").get(0);
+                String method = request.getHeaders().get("x-akto-original-method").get(0);
+                String originalXmlPayload = OriginalReqResPayloadInformation.getInstance().getOriginalReqPayloadMap().get(method + "_" + url); // get original payload
+                if(originalXmlPayload != null && !originalXmlPayload.isEmpty()){
+                    String modifiedXmlPayload = HttpRequestResponseUtils.updateXmlWithModifiedJson(originalXmlPayload, payload);
+                    payload = modifiedXmlPayload;
+                }
+                // remove the temp headers
+                request.getHeaders().remove("x-akto-original-url");
+                request.getHeaders().remove("x-akto-original-method");
+            }  
+        } 
 
         if (payload == null) payload = "";
         if (body == null) {// body not created by GRPC block yet
