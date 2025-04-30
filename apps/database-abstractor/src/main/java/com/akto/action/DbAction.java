@@ -2347,7 +2347,7 @@ public class DbAction extends ActionSupport {
         }
         return Action.SUCCESS.toUpperCase();
     }
-    
+
     public String getCurrentTestingRunDetailsFromEditor(){
         try {
             testingRunPlayground = DbLayer.getCurrentTestingRunDetailsFromEditor(this.ts);
@@ -3485,7 +3485,7 @@ public class DbAction extends ActionSupport {
     public List<String> getTestSuiteTestSubCategories() {
         return testSuiteTestSubCategories;
     }
-    
+
     public TestingRunPlayground getTestingRunPlayground() {
         return testingRunPlayground;
     }

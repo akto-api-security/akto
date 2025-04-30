@@ -11,6 +11,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 import com.akto.bulk_update_util.ApiInfoBulkUpdate;
 import com.akto.dao.*;
@@ -106,6 +107,12 @@ public class DbLayer {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(DbLayer.class, LoggerMaker.LogDb.DASHBOARD);
 
+    private static final ConcurrentHashMap<Integer, Integer> lastUpdatedTsMap = new ConcurrentHashMap<>();
+
+    private static int getLastUpdatedTsForAccount(int accountId) {
+        return lastUpdatedTsMap.computeIfAbsent(accountId, k -> 0);
+    }
+
     public DbLayer() {
     }
 
@@ -138,8 +145,60 @@ public class DbLayer {
                         Updates.setOnInsert(ModuleInfo.MODULE_TYPE, moduleInfo.getModuleType()),
                         Updates.setOnInsert(ModuleInfo.STARTED_TS, moduleInfo.getStartedTs()),
                         Updates.setOnInsert(ModuleInfo.CURRENT_VERSION, moduleInfo.getCurrentVersion()),
+                        Updates.setOnInsert(ModuleInfo.NAME, moduleInfo.getName()),
                         Updates.set(ModuleInfo.LAST_HEARTBEAT_RECEIVED, moduleInfo.getLastHeartbeatReceived())
                 ), updateOptions);
+        if (moduleInfo.getModuleType() == ModuleInfo.ModuleType.MINI_TESTING) {
+            //Only for mini-testing heartbeat mark testing run failed state
+            if (Context.now() - getLastUpdatedTsForAccount(Context.accountId.get()) > 10 * 60) {
+                try {
+                    fetchAndFailOutdatedTests();
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb("Error while updating out");
+                    //Ignore
+                }
+                lastUpdatedTsMap.put(Context.accountId.get(), Context.now());
+            }
+        }
+    }
+
+    public static void fetchAndFailOutdatedTests() {
+        List<TestingRun> testingRunList = TestingRunDao.instance.findAll(
+                Filters.and(
+                        Filters.or(
+                                Filters.eq(TestingRun.STATE, State.SCHEDULED),
+                                Filters.eq(TestingRun.STATE, State.RUNNING)
+                        ),
+                        Filters.exists(ModuleInfo.NAME, true),
+                        Filters.ne(ModuleInfo.NAME, null)
+                )
+        );
+
+        for (TestingRun testingRun : testingRunList) {
+            String miniTestingServiceName = testingRun.getMiniTestingServiceName();
+            if(!miniTestingServiceName.isEmpty()) {
+                List<ModuleInfo> moduleInfos = ModuleInfoDao.instance.
+                        findAll(Filters.eq(ModuleInfo.NAME, miniTestingServiceName), 0, 1,
+                                Sorts.descending(ModuleInfo.LAST_HEARTBEAT_RECEIVED));
+                boolean isValid = true;
+                if (moduleInfos != null && !moduleInfos.isEmpty()) {
+                    isValid = Context.now() - moduleInfos.get(0).getLastHeartbeatReceived() < 20 * 60;
+                }
+
+                if(!isValid) {
+                    Bson filter = Filters.or(
+                            Filters.eq(TestingRun.STATE, State.SCHEDULED),
+                            Filters.eq(TestingRun.STATE, State.RUNNING));
+                    TestingRunDao.instance.updateOne(
+                            Filters.and(filter, Filters.eq(Constants.ID, testingRun.getId())),
+                            Updates.set(TestingRun.STATE, State.FAILED));
+                    TestingRunResultSummariesDao.instance.updateOneNoUpsert(
+                            Filters.eq(TestingRunResultSummary.TESTING_RUN_ID, testingRun.getId()),
+                            Updates.set(TestingRunResultSummary.STATE, State.FAILED)
+                    );
+                }
+            }
+        }
     }
 
 
