@@ -173,10 +173,18 @@ public class UsageMetricUtils {
             for (UsageMetric metric : usageMetrics) {
                 JSONObject jo = new JSONObject(props);
                 jo.put("Metric Type", metric.getMetricType());
-                jo.put("Usage", metric.getUsage());
+                int metricData = metric.getUsage();
+                if(metricData == 0){
+                    continue;
+                }
+                jo.put("Usage", metricData);
                 String eventName = String.valueOf(metric.getMetricType());
                 map.put(eventName, jo);
                 logger.info("Sending event to mixpanel: " + eventName);
+            }
+
+            if(map.size() == 0){
+                return;
             }
 
             AktoMixpanel aktoMixpanel = new AktoMixpanel();
