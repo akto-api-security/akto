@@ -8,7 +8,7 @@ function TlsAuth(props) {
 
     const authMechanism = TestingStore(state => state.authMechanism)
     const [authParams, setAuthParams] = useState([{
-        CAcertificate: "",
+        certAuthorityCertificate: "",
         clientCertificate: "",
         clientKey: "",
         certificateType: "PEM",
@@ -26,7 +26,7 @@ function TlsAuth(props) {
 
     function getLabel(key) {
         switch (key) {
-            case "CAcertificate":
+            case "certAuthorityCertificate":
                 return "CA certificate"
             case "clientCertificate":
                 return "Client certificate"

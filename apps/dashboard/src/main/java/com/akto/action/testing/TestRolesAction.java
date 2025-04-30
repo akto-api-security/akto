@@ -106,7 +106,7 @@ public class TestRolesAction extends UserAction {
                             authParamDataElem.getValue(), authParamDataElem.getShowHeader());
                 } else if (authAutomationType.toUpperCase()
                         .equals(LoginFlowEnums.AuthMechanismTypes.TLS_AUTH.toString())) {
-                    param = new TLSAuthParam(authParamDataElem.getCAcertificate(),
+                    param = new TLSAuthParam(authParamDataElem.getCertAuthorityCertificate(),
                             authParamDataElem.getCertificateType(), authParamDataElem.getClientCertificate(),
                             authParamDataElem.getClientKey());
                 }
