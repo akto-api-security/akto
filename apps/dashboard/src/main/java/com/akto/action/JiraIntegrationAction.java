@@ -3,8 +3,8 @@ package com.akto.action;
 import com.akto.dao.ConfigsDao;
 import com.akto.dto.Config.AktoHostUrlConfig;
 import com.akto.dto.Config.ConfigType;
+import com.akto.dto.jira_integration.JiraStatus;
 import com.akto.dto.jira_integration.JiraStatusApiResponse;
-import com.akto.dto.jira_integration.JiraStatusApiResponse.JiraStatus;
 import com.akto.dto.jira_integration.ProjectMapping;
 import com.akto.util.DashboardMode;
 import com.akto.utils.JsonUtils;
@@ -79,7 +79,6 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
     private String dashboardUrl;
 
     private Map<String,List<BasicDBObject>> projectAndIssueMap;
-    private Set<JiraStatus> projectStatusSet;
     private Map<String, ProjectMapping> projectMappings;
 
     private static final String META_ENDPOINT = "/rest/api/3/issue/createmeta";
@@ -329,7 +328,9 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
                 addActionError("Error while fetching project metadata");
                 return Action.ERROR.toUpperCase();
             }
-            return addIntegration();
+            String response = addIntegration();
+            this.jiraIntegration = JiraIntegrationDao.instance.findOne(new BasicDBObject());
+            return response;
         }
 
         addAktoHostUrl();
@@ -946,15 +947,6 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
 
     public String getErrorMessage() {
         return errorMessage;
-    }
-
-    public Set<JiraStatus> getProjectStatusSet() {
-        return projectStatusSet;
-    }
-
-    public void setProjectStatusSet(
-        Set<JiraStatus> projectStatusSet) {
-        this.projectStatusSet = projectStatusSet;
     }
 
     public Map<String, ProjectMapping> getProjectMappings() {
