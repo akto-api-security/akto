@@ -1,7 +1,6 @@
 package com.akto.dto.testing;
 
 import com.akto.dto.OriginalHttpRequest;
-import com.akto.util.http_util.CustomHTTPClientHandler;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -39,18 +38,12 @@ public class TLSAuthParam extends AuthParam {
     }
 
     boolean addAuthTokens(OriginalHttpRequest request) {
-        try {
-            request.setClient(
-                    CustomHTTPClientHandler.instance.getClient(this)
-                            .newBuilder()
-                            .build());
-        } catch (Exception e) {
-        }
+        request.setTlsAuthParam(this);
         return true;
     }
 
     public boolean removeAuthTokens(OriginalHttpRequest request) {
-        request.setClient(null);
+        request.setTlsAuthParam(null);
         // re-check this.
         return true;
     }

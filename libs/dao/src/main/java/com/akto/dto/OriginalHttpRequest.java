@@ -1,5 +1,6 @@
 package com.akto.dto;
 
+import com.akto.dto.testing.TLSAuthParam;
 import com.akto.dto.type.RequestTemplate;
 import com.akto.util.HttpRequestResponseUtils;
 import com.alibaba.fastjson2.JSON;
@@ -10,7 +11,6 @@ import com.mongodb.BasicDBObject;
 import lombok.Getter;
 import lombok.Setter;
 import okhttp3.HttpUrl;
-import okhttp3.OkHttpClient;
 
 import java.net.URI;
 import java.util.*;
@@ -29,7 +29,7 @@ public class OriginalHttpRequest {
 
     @Getter
     @Setter
-    private OkHttpClient client;
+    private TLSAuthParam tlsAuthParam;
 
     public OriginalHttpRequest() { }
 
@@ -43,11 +43,11 @@ public class OriginalHttpRequest {
         this.type = type;
     }
 
-    public OriginalHttpRequest(String url, String queryParams, String method, String body, String sourceIp, String destinationIp, Map<String, List<String>> headers, String type, OkHttpClient client) {
+    public OriginalHttpRequest(String url, String queryParams, String method, String body, String sourceIp, String destinationIp, Map<String, List<String>> headers, String type, TLSAuthParam tlsAuthParam) {
         this(url, queryParams, method, body, headers, type);
         this.sourceIp = sourceIp;
         this.destinationIp = destinationIp;
-        this.client = client;
+        this.tlsAuthParam = tlsAuthParam;
     }
 
     public OriginalHttpRequest copy() {
@@ -59,7 +59,7 @@ public class OriginalHttpRequest {
         }
         return new OriginalHttpRequest(
                 this.url, this.queryParams, this.method, this.body, this.sourceIp, this.destinationIp, headersCopy, this.type, 
-                this.client
+                this.tlsAuthParam
         );
     }
 
