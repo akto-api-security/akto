@@ -8,6 +8,7 @@ import com.akto.dao.loaders.LoadersDao;
 import com.akto.dao.test_editor.TestingRunPlaygroundDao;
 import com.akto.dao.testing.TestRolesDao;
 import com.akto.dao.testing.TestingRunDao;
+import com.akto.dao.testing.BidirectionalSyncSettingsDao;
 import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dao.testing.TestingRunResultSummariesDao;
 import com.akto.dao.testing.VulnerableTestingRunResultDao;
@@ -289,6 +290,7 @@ public class DaoInit {
         ClassModel<AutoTicketParams> autoTicketParams = ClassModel.builder(AutoTicketParams.class).enableDiscriminator(true).build();
         ClassModel<Model> agentModel = ClassModel.builder(Model.class).enableDiscriminator(true).build();
         ClassModel<ModuleInfo> ModuleInfoClassModel = ClassModel.builder(ModuleInfo.class).enableDiscriminator(true).build();
+        ClassModel<BidirectionalSyncSettings> testingIssueTicketsModel = ClassModel.builder(BidirectionalSyncSettings.class).enableDiscriminator(true).build();
 
         CodecRegistry pojoCodecRegistry = fromProviders(PojoCodecProvider.builder().register(
                 configClassModel, signupInfoClassModel, apiAuthClassModel, attempResultModel, urlTemplateModel,
@@ -329,7 +331,7 @@ public class DaoInit {
                 eventsExampleClassModel, remediationClassModel, complianceInfoModel, complianceMappingModel,
                 RuntimeMetricsClassModel, codeAnalysisRepoModel, codeAnalysisApiModel, historicalDataClassModel,
                 configSettingClassModel, configSettingsConditionTypeClassModel, roleClassModel, testingInstanceHeartBeat,
-                jobParams, autoTicketParams, agentModel, ModuleInfoClassModel)
+                jobParams, autoTicketParams, agentModel, ModuleInfoClassModel, testingIssueTicketsModel)
             .automatic(true).build());
 
         final CodecRegistry customEnumCodecs = CodecRegistries.fromCodecs(
@@ -449,6 +451,6 @@ public class DaoInit {
         PupeteerLogsDao.instance.createIndicesIfAbsent();
         SourceCodeVulnerabilitiesDao.instance.createIndicesIfAbsent();
         JobsDao.instance.createIndicesIfAbsent();
+        BidirectionalSyncSettingsDao.instance.createIndicesIfAbsent();
     }
-
 }

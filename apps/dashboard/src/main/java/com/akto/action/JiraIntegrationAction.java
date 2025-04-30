@@ -7,6 +7,7 @@ import com.akto.dto.jira_integration.JiraStatus;
 import com.akto.dto.jira_integration.JiraStatusApiResponse;
 import com.akto.dto.jira_integration.ProjectMapping;
 import com.akto.util.DashboardMode;
+import com.akto.util.enums.GlobalEnums;
 import com.akto.utils.JsonUtils;
 import com.fasterxml.jackson.core.type.TypeReference;
 import java.io.File;
@@ -518,7 +519,11 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
             TestingRunIssuesDao.instance.getMCollection().updateOne(
                 Filters.eq(Constants.ID, jiraMetaData.getTestingIssueId()),
                 Updates.combine(
-                        Updates.set("jiraIssueUrl", jiraTicketUrl)
+                    Updates.set("jiraIssueUrl", jiraTicketUrl),
+                    Updates.set(TestingRunIssues.TICKET_SOURCE, GlobalEnums.TicketSource.JIRA.name()),
+                    Updates.set(TestingRunIssues.TICKET_PROJECT_KEY, projId),
+                    Updates.set(TestingRunIssues.TICKET_ID, this.jiraTicketKey),
+                    Updates.set(TestingRunIssues.TICKET_LAST_UPDATED_AT, Context.now())
                 ),
                 updateOptions
             );
@@ -770,7 +775,13 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
                     JiraMetaData metaData = jiraMetaDataList.get(i);
                     TestingRunIssuesDao.instance.getMCollection().updateOne(
                             Filters.eq(Constants.ID, metaData.getTestingIssueId()),
-                            Updates.combine(Updates.set("jiraIssueUrl", jiraTicketUrl)),
+                            Updates.combine(
+                                Updates.set("jiraIssueUrl", jiraTicketUrl),
+                                Updates.set(TestingRunIssues.TICKET_SOURCE, GlobalEnums.TicketSource.JIRA.name()),
+                                Updates.set(TestingRunIssues.TICKET_PROJECT_KEY, projId),
+                                Updates.set(TestingRunIssues.TICKET_ID, this.jiraTicketKey),
+                                Updates.set(TestingRunIssues.TICKET_LAST_UPDATED_AT, Context.now())
+                            ),
                             new UpdateOptions().upsert(false)
                     );
                 }

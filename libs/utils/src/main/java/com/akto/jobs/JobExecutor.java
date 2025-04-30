@@ -5,6 +5,7 @@ import com.akto.dao.jobs.JobsDao;
 import com.akto.dto.jobs.Job;
 import com.akto.dto.jobs.JobParams;
 import com.akto.dto.jobs.JobStatus;
+import com.akto.dto.jobs.ScheduleType;
 import com.akto.jobs.exception.RetryableJobException;
 import com.akto.log.LoggerMaker;
 import com.mongodb.client.model.Filters;
@@ -30,16 +31,18 @@ public abstract class JobExecutor<T extends JobParams> {
             runJob(job);
             executedJob = logSuccess(jobId);
             logger.info("Finished executing job: {}", executedJob);
+            handleRecurringJob(job);
         } catch (RetryableJobException rex) {
             executedJob = reScheduleJob(job);
             logger.error("Error occurred while executing the job. Re-scheduling the job. {}", executedJob, rex);
         } catch (Exception e) {
             executedJob = logFailure(jobId, e);
             logger.error("Error occurred while executing the job. Not re-scheduling. {}", executedJob, e);
+            handleRecurringJob(job);
         }
     }
 
-    protected Job logSuccess(ObjectId id) {
+    private Job logSuccess(ObjectId id) {
         return JobsDao.instance.getMCollection().findOneAndUpdate(
             Filters.and(
                 Filters.eq(Job.ID, id),
@@ -88,6 +91,20 @@ public abstract class JobExecutor<T extends JobParams> {
                 Updates.set(Job.JOB_STATUS, JobStatus.SCHEDULED.name())
             ),
             new FindOneAndUpdateOptions().returnDocument(ReturnDocument.AFTER));
+    }
+
+    private void handleRecurringJob(Job job) {
+        if (job.getScheduleType() != ScheduleType.RECURRING) {
+            return;
+        }
+        logger.info("Re-scheduling recurring job: {}", job);
+        JobsDao.instance.getMCollection().updateOne(
+            Filters.and(
+                Filters.eq(Job.ID, job.getId()),
+                Filters.eq(Job.JOB_STATUS, JobStatus.COMPLETED.name())
+            ),
+            Updates.set(Job.SCHEDULED_AT, Context.now() + 60 * 60)
+        );
     }
 
     protected abstract void runJob(Job job) throws Exception;
