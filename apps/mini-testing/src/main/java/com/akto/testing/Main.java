@@ -69,7 +69,10 @@ public class Main {
     public static boolean SKIP_SSRF_CHECK = ("true".equalsIgnoreCase(System.getenv("SKIP_SSRF_CHECK")) || !DashboardMode.isSaasDeployment());
     public static final boolean IS_SAAS = "true".equalsIgnoreCase(System.getenv("IS_SAAS"));
     
-    private static String customMiniTestingServiceName = System.getenv("MINI_TESTING_NAME");
+    public static final String customMiniTestingServiceName;
+    static {
+        customMiniTestingServiceName = System.getenv("MINI_TESTING_NAME") == null? "Default_" + UUID.randomUUID().toString().substring(0, 4) : System.getenv("MINI_TESTING_NAME");
+    }
 
     private static void setupRateLimitWatcher (AccountSettings settings) {
         
@@ -247,20 +250,8 @@ public class Main {
         }, 0, 5, TimeUnit.MINUTES);
     }
 
-    public static void modifyHybridTestingSettingWithCustomName() {
-        scheduler.scheduleAtFixedRate(new Runnable() {
-            public void run() {
-                dataActor.modifyHybridTestingSettingWithCustomName(RuntimeMode.isHybridDeployment(), customMiniTestingServiceName);
-            }
-        }, 0, 1, TimeUnit.MINUTES);
-    }
-
     public static void main(String[] args) throws InterruptedException {
         AccountSettings accountSettings = dataActor.fetchAccountSettings();
-        if(customMiniTestingServiceName == null || customMiniTestingServiceName.trim().isEmpty()) {
-            customMiniTestingServiceName = "Default_" + UUID.randomUUID().toString().substring(0, 4);
-        }
-        modifyHybridTestingSettingWithCustomName();
         setupRateLimitWatcher(accountSettings);
         checkForPlaygroundTest();
 
@@ -276,7 +267,7 @@ public class Main {
         Producer testingProducer = new Producer();
         ConsumerUtil testingConsumer = new ConsumerUtil();
         TestCompletion testCompletion = new TestCompletion();
-        ModuleInfoWorker.init(ModuleInfo.ModuleType.MINI_TESTING, dataActor);
+        ModuleInfoWorker.init(ModuleInfo.ModuleType.MINI_TESTING, dataActor, customMiniTestingServiceName);
         loggerMaker.infoAndAddToDb("Starting.......", LogDb.TESTING);
 
         if(Constants.IS_NEW_TESTING_ENABLED){
@@ -366,20 +357,22 @@ public class Main {
             long startDetailed = System.currentTimeMillis();
             int delta = start - 20*60;
 
-            TestingRunResultSummary trrs = dataActor.findPendingTestingRunResultSummary(start, delta, customMiniTestingServiceName);
+            TestingRunResultSummary trrs = dataActor.findPendingTestingRunResultSummary(start, delta);
             boolean isSummaryRunning = trrs != null && trrs.getState().equals(State.RUNNING);
             TestingRun testingRun;
             ObjectId summaryId = null;
             if (trrs == null) {
                 delta = Context.now() - 20*60;
-                testingRun = dataActor.findPendingTestingRun(delta, customMiniTestingServiceName);
+                testingRun = dataActor.findPendingTestingRun(delta);
             } else {
                 summaryId = trrs.getId();
                 loggerMaker.infoAndAddToDb("Found trrs " + trrs.getHexId() +  " for account: " + accountId);
                 testingRun = dataActor.findTestingRun(trrs.getTestingRunId().toHexString());
             }
 
-            if (testingRun == null) {
+            if (testingRun == null ||
+                    (testingRun.getMiniTestingServiceName() != null &&
+                            !testingRun.getMiniTestingServiceName().equalsIgnoreCase(customMiniTestingServiceName))) {
                 Thread.sleep(1000);
                 continue;
             }
@@ -391,10 +384,6 @@ public class Main {
                     dataActor.updateTestRunResultSummaryNoUpsert(trrs.getId().toHexString());
                     loggerMaker.infoAndAddToDb("Stopped TRRS: " + trrs.getId());
                 }
-                continue;
-            }
-
-            if(customMiniTestingServiceName != null && !customMiniTestingServiceName.equals(testingRun.getMiniTestingServiceName())) {
                 continue;
             }
 
