@@ -58,6 +58,7 @@ function TlsAuth(props) {
 
                                                 return (
                                                     <TextField
+                                                        multiline
                                                         label={getLabel(key)}
                                                         value={authParam[key]}
                                                         disabled={key === "certificateType"}
