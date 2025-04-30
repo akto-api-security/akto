@@ -13,7 +13,7 @@ import lombok.Setter;
 @AllArgsConstructor
 public class TLSAuthParam extends AuthParam {
 
-    String CAcertificate;
+    String certAuthorityCertificate;
     CertificateType certificateType;
     String clientCertificate;
     String clientKey;
@@ -75,7 +75,21 @@ public class TLSAuthParam extends AuthParam {
 
     @Override
     public int hashCode() {
-        return CAcertificate.hashCode() + certificateType.hashCode() + clientCertificate.hashCode()
+
+        if (certAuthorityCertificate == null) {
+            certAuthorityCertificate = "";
+        }
+        if (certificateType == null) {
+            certificateType = CertificateType.PEM;
+        }
+        if (clientCertificate == null) {
+            clientCertificate = "";
+        }
+        if (clientKey == null) {
+            clientKey = "";
+        }
+
+        return certAuthorityCertificate.hashCode() + certificateType.hashCode() + clientCertificate.hashCode()
                 + clientKey.hashCode();
     }
 
