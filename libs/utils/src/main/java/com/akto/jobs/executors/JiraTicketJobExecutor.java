@@ -22,6 +22,7 @@ import com.akto.dto.testing.MultiExecTestResult;
 import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.jobs.JobExecutor;
+import com.akto.jobs.utils.JobConstants;
 import com.akto.log.LoggerMaker;
 import com.akto.testing.ApiExecutor;
 import com.akto.util.Constants;
@@ -349,6 +350,7 @@ public class JiraTicketJobExecutor extends JobExecutor<AutoTicketParams> {
 
         fields.put("issuetype", new BasicDBObject("id", issueType));
         fields.put("project", new BasicDBObject("key", projId));
+        fields.put("labels", new String[] {JobConstants.TICKET_LABEL_AKTO_SYNC});
 
         BasicDBList contentList = new BasicDBList();
         contentList.add(buildContentDetails(meta.getHostStr(), null));
