@@ -54,21 +54,24 @@ public class CustomHTTPClientHandler {
     public static CustomHTTPClientHandler instance = new CustomHTTPClientHandler();
 
     public OkHttpClient getClient(TLSAuthParam authParam, boolean isHttps, boolean followRedirect, String contentType) throws Exception {
+
+        OkHttpClient baseClient = HTTPClientHandler.instance.getHTTPClient(isHttps, followRedirect, contentType);
+
         if (authParam == null) {
-            return CoreHTTPClient.client;
+            return baseClient;
         }
 
         int hashCode = authParam.hashCode() + (isHttps ? 1 : 0) + (followRedirect ? 1 : 0) + contentType.hashCode();
 
         if (!tlsClientMap.containsKey(hashCode)) {
-            OkHttpClient okHttpClient = getTLSClient(authParam, isHttps, followRedirect,contentType);
+            OkHttpClient okHttpClient = getTLSClient(authParam, baseClient);
             tlsClientMap.put(hashCode, okHttpClient);
         }
 
         return tlsClientMap.get(hashCode);
     }
 
-    private OkHttpClient getTLSClient(TLSAuthParam authParam, boolean isHttps, boolean followRedirect, String contentType) throws Exception {
+    private OkHttpClient getTLSClient(TLSAuthParam authParam, OkHttpClient baseClient) throws Exception {
         try {
             TrustManager[] trustManagers = getTrustManagers(authParam.getCAcertificate());
             SSLContext sslContext = SSLContext.getInstance("SSL");
@@ -77,7 +80,7 @@ public class CustomHTTPClientHandler {
 
             SSLSocketFactory sslSocketFactory = sslContext.getSocketFactory();
 
-            OkHttpClient okHttpClient = HTTPClientHandler.instance.getHTTPClient(isHttps, followRedirect, contentType).newBuilder()
+            OkHttpClient okHttpClient = baseClient.newBuilder()
                     .sslSocketFactory(sslSocketFactory, (X509TrustManager) trustManagers[0])
                     // might need to revisit this.
                     .hostnameVerifier((hostname, session) -> true)
@@ -87,7 +90,7 @@ public class CustomHTTPClientHandler {
         } catch (Exception e) {
             logger.error("Error in creating TLS client ", e);
         }
-        return CoreHTTPClient.client.newBuilder().build();
+        return baseClient;
     }
 
     private KeyManager[] getKeyManagers(String privateKey, String certificate) throws Exception {
