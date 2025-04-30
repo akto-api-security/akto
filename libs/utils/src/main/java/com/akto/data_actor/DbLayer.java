@@ -145,6 +145,7 @@ public class DbLayer {
                         Updates.setOnInsert(ModuleInfo.MODULE_TYPE, moduleInfo.getModuleType()),
                         Updates.setOnInsert(ModuleInfo.STARTED_TS, moduleInfo.getStartedTs()),
                         Updates.setOnInsert(ModuleInfo.CURRENT_VERSION, moduleInfo.getCurrentVersion()),
+                        Updates.setOnInsert(ModuleInfo.NAME, moduleInfo.getName()),
                         Updates.set(ModuleInfo.LAST_HEARTBEAT_RECEIVED, moduleInfo.getLastHeartbeatReceived())
                 ), updateOptions);
         if (moduleInfo.getModuleType() == ModuleInfo.ModuleType.MINI_TESTING) {
