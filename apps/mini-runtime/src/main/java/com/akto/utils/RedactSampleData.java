@@ -6,6 +6,10 @@ import com.akto.dto.type.SingleTypeInfo;
 import com.akto.graphql.GraphQLUtils;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.test_editor.Utils;
+import com.akto.util.HttpRequestResponseUtils;
+import com.alibaba.fastjson2.JSON;
+import com.alibaba.fastjson2.JSONObject;
 import com.akto.hybrid_parsers.HttpCallParser;
 import com.akto.hybrid_runtime.policies.AuthPolicy;
 import com.fasterxml.jackson.core.JsonFactory;
@@ -19,8 +23,12 @@ import com.fasterxml.jackson.databind.node.TextNode;
 import com.mongodb.BasicDBObject;
 
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static com.akto.dto.RawApi.convertHeaders;
+import static com.akto.util.HttpRequestResponseUtils.SOAP;
+import static com.akto.util.HttpRequestResponseUtils.XML;
 
 public class RedactSampleData {
     static ObjectMapper mapper = new ObjectMapper();
@@ -119,12 +127,49 @@ public class RedactSampleData {
     // never use this function directly. This alters the httpResponseParams
     public static String redact(HttpResponseParams httpResponseParams, final boolean redactAll) throws Exception {
         // response headers
+        // check for content type in both request and response headers, if they are xml format, read payload from original payload instead of httpResponseParams
         Map<String, List<String>> responseHeaders = httpResponseParams.getHeaders();
         if (responseHeaders == null) responseHeaders = new HashMap<>();
-        handleHeaders(responseHeaders, redactAll);
 
+        // request headers
+        Map<String, List<String>> requestHeaders = httpResponseParams.requestParams.getHeaders();
+        if (requestHeaders == null) requestHeaders = new HashMap<>();
+
+        // check for header here for content type
+        String acceptableContentType = HttpRequestResponseUtils.getAcceptableContentType(responseHeaders);
+        if(acceptableContentType == null) {
+            acceptableContentType = HttpRequestResponseUtils.getAcceptableContentType(requestHeaders);
+        }
         // response payload
         String responsePayload = httpResponseParams.getPayload();
+        String finalOrigReqPayload = "";
+        String finalOrigResPayload = "";
+
+        if (acceptableContentType != null && (acceptableContentType.contains(XML) || acceptableContentType.contains(SOAP))) {
+            String origMessage = httpResponseParams.getOrig();
+            JSONObject jsonObject = JSON.parseObject(origMessage);
+            String rawRequestPayload = jsonObject.getString("requestPayload");
+            String rawResponsePayload = jsonObject.getString("responsePayload");
+
+            try {
+                if (rawRequestPayload != null && !rawRequestPayload.isEmpty()) {
+                    finalOrigReqPayload = redactXmlWithRegex(rawRequestPayload, redactValue, redactAll);
+                }
+                if(rawResponsePayload != null && !rawResponsePayload.isEmpty()){
+                    finalOrigResPayload = redactXmlWithRegex(rawResponsePayload, redactValue, redactAll);
+                }
+            } catch (Exception e) {
+                // TODO: handle exception
+                e.printStackTrace();
+                loggerMaker.errorAndAddToDb("Error in redacting original payloads for xml content type: " +e.getMessage());
+            }
+
+            
+        }
+
+        handleHeaders(responseHeaders, redactAll);
+        handleHeaders(requestHeaders, redactAll);
+
         if (responsePayload == null) responsePayload = "{}";
         try {
             JsonParser jp = factory.createParser(responsePayload);
@@ -136,15 +181,12 @@ public class RedactSampleData {
                 responsePayload = "{}";
             }
         } catch (Exception e) {
-            responsePayload = "{}";
+            if (Utils.isJsonPayload(responsePayload)) {
+                responsePayload = "{}";
+            }
         }
 
         httpResponseParams.setPayload(responsePayload);
-
-        // request headers
-        Map<String, List<String>> requestHeaders = httpResponseParams.requestParams.getHeaders();
-        if (requestHeaders == null) requestHeaders = new HashMap<>();
-        handleHeaders(requestHeaders, redactAll);
 
         // request payload
         String requestPayload = httpResponseParams.requestParams.getPayload();
@@ -172,14 +214,26 @@ public class RedactSampleData {
                 requestPayload = "{}";
             }
         } catch (Exception e) {
-            requestPayload = "{}";
+            if (Utils.isJsonPayload(requestPayload)) {
+                requestPayload = "{}";
+            }
         }
 
         httpResponseParams.requestParams.setPayload(requestPayload);
 
-        return convertHttpRespToOriginalString(httpResponseParams);
+        // ip
+        if(redactAll) {
+            httpResponseParams.setSourceIP(redactValue);
+        }
 
-    }
+        if(!finalOrigReqPayload.isEmpty() || !finalOrigResPayload.isEmpty()){
+            return convertHttpRespToOriginalString(httpResponseParams, finalOrigReqPayload, finalOrigResPayload);
+        }else{
+            return convertHttpRespToOriginalString(httpResponseParams);
+        }
+        
+
+    }    
 
     public static void change(String parentName, JsonNode parent, String newValue, boolean redactAll, boolean isGraphqlModified) {
         if (parent == null) return;
@@ -250,7 +304,69 @@ public class RedactSampleData {
         return ret.toString();
     }
 
-    public static String convertHttpRespToOriginalString(HttpResponseParams httpResponseParams) throws JsonProcessingException {
+    private static String redactXmlWithRegex(String xmlString, String newValue, boolean redactAll) {
+        if (xmlString == null || xmlString.isEmpty()) {
+            return xmlString;
+        }
+        
+        // Pattern to match XML tags and their content: <tagName>content</tagName>
+        Pattern pattern = Pattern.compile("<([^>/]+)>([^<>]*)</\\1>");
+        Matcher matcher = pattern.matcher(xmlString);
+        StringBuffer result = new StringBuffer();
+        
+        while (matcher.find()) {
+            String tagName = matcher.group(1);
+            String tagContent = matcher.group(2);
+            
+            // Apply redaction based on conditions
+            if (redactAll) {
+                // Redact all content
+                matcher.appendReplacement(result, Matcher.quoteReplacement("<" + tagName + ">" + newValue + "</" + tagName + ">"));
+            } else {
+                // Check if this specific value needs redaction
+                SingleTypeInfo.SubType subType = KeyTypes.findSubType(tagContent, tagName, null);
+                if (SingleTypeInfo.isRedacted(subType.getName())) {
+                    matcher.appendReplacement(result, Matcher.quoteReplacement("<" + tagName + ">" + newValue + "</" + tagName + ">"));
+                } else {
+                    // Keep original content
+                    matcher.appendReplacement(result, Matcher.quoteReplacement("<" + tagName + ">" + tagContent + "</" + tagName + ">"));
+                }
+            }
+        }
+        
+        matcher.appendTail(result);
+        
+        // Process attributes if needed (simplified version)
+        // Pattern to match attributes: tagName attribute="value"
+        Pattern attrPattern = Pattern.compile("(\\w+)\\s*=\\s*\"([^\"]*)\"");
+        matcher = attrPattern.matcher(result.toString());
+        StringBuffer finalResult = new StringBuffer();
+        
+        while (matcher.find()) {
+            String attrName = matcher.group(1);
+            String attrValue = matcher.group(2);
+            // Apply redaction based on conditions
+            if (redactAll) {
+                matcher.appendReplacement(finalResult, Matcher.quoteReplacement(attrName + "=\"" + newValue + "\""));
+            } else {
+                SingleTypeInfo.SubType subType = KeyTypes.findSubType(attrValue, attrName, null);
+                if (SingleTypeInfo.isRedacted(subType.getName())) {
+                    matcher.appendReplacement(finalResult, Matcher.quoteReplacement(attrName + "=\"" + newValue + "\""));
+                } else {
+                    matcher.appendReplacement(finalResult, Matcher.quoteReplacement(attrName + "=\"" + attrValue + "\""));
+                }
+            }
+        }
+        
+        if (finalResult.length() > 0) {
+            matcher.appendTail(finalResult);
+            return finalResult.toString();
+        }
+        
+        return result.toString();
+    }
+
+    private static Map<String, Object> getFinalMap(HttpResponseParams httpResponseParams) {
         Map<String,Object> m = new HashMap<>();
         HttpRequestParams httpRequestParams = httpResponseParams.getRequestParams();
 
@@ -273,7 +389,18 @@ public class RedactSampleData {
         m.put("direction", httpResponseParams.getDirection());
         m.put("is_pending", httpResponseParams.getIsPending() + "");
         m.put("source", httpResponseParams.getSource());
+        return m;
+    }
 
+    public static String convertHttpRespToOriginalString(HttpResponseParams httpResponseParams) throws JsonProcessingException {
+        Map<String, Object> m = getFinalMap(httpResponseParams);
+        return mapper.writeValueAsString(m);
+    }
+
+    private static String convertHttpRespToOriginalString(HttpResponseParams httpResponseParams, String origReqPayload, String origResPayload) throws JsonProcessingException {
+        Map<String, Object> m = getFinalMap(httpResponseParams);
+        m.put("originalRequestPayload", origReqPayload);
+        m.put("originalResponsePayload", origResPayload);
         return mapper.writeValueAsString(m);
     }
 
