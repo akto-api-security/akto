@@ -5,7 +5,8 @@ const initialState = {
     subCategoryMap: {},
     categoryMap: {},
     sendEventOnLogin: false,
-    defaultIgnoreSummaryTime: 2 * 60 * 60
+    defaultIgnoreSummaryTime: 2 * 60 * 60,
+    lastEndpointEpoch: 0
 };
 
 let localStore = (set) => ({
@@ -40,6 +41,14 @@ let localStore = (set) => ({
             set({ val });
         } catch (error) {
             console.error("Error setting defaultIgnoreSummaryTime:", error);
+        }
+    },
+
+    setLastEndpointEpoch: (lastEndpointEpoch) => {
+        try {
+            set({ lastEndpointEpoch });
+        } catch (error) {
+            console.error("Error setting lastEndpointEpoch:", error);
         }
     },
 

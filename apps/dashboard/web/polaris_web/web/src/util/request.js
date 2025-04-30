@@ -2,6 +2,7 @@ import axios from 'axios'
 import func from "./func"
 import { history } from './history';
 import SessionStore from '../apps/main/SessionStore';
+import LocalStore from '../apps/main/LocalStorageStore';
 
 const accessTokenUrl = "/dashboard/accessToken"
 
@@ -15,7 +16,7 @@ const service = axios.create({
 const err = async (error) => {
   let status
   let data
-  
+
   if(error.response) {
     status = error.response.status
     data = error.response.data
@@ -157,10 +158,22 @@ async function raiseMixpanelEvent(api, data) {
     }
   }
   if (api && !black_list_apis.some(black_list_api => api.includes(black_list_api))) {
-    if (api?.startsWith('/api/fetchEndpointsCount')) {
-      window.mixpanel.track('endpoints_count', { newCount: data.newCount, version: (window.RELEASE_VERSION || "na") })
-    } else {
-      window.mixpanel.track(api)
+    const lastEpoch = Number(LocalStore.getState().lastEndpointEpoch) || 0
+    const now = Date.now()/1000
+    const timeElapsed = now - lastEpoch
+
+    // Check if we should track (first time or more than an hour has passed)
+    const shouldTrack = lastEpoch === 0 || timeElapsed > 3600
+
+    if (shouldTrack) {
+      // Store the timestamp before tracking
+      LocalStore.getState().setLastEndpointEpoch(now)
+
+      if (api?.startsWith('/api/fetchEndpointsCount')) {
+        window.mixpanel.track('endpoints_count', { newCount: data.newCount, version: (window.RELEASE_VERSION || "na") })
+      } else {
+        window.mixpanel.track(api)
+      }
     }
   }
 }
