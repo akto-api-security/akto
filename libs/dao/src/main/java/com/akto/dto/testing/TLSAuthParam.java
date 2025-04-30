@@ -38,7 +38,7 @@ public class TLSAuthParam extends AuthParam {
         ENG;
     }
 
-    boolean addAuthTokens(OriginalHttpRequest request) {
+    public boolean addAuthTokens(OriginalHttpRequest request) {
         try {
             request.setClient(
                     CustomHTTPClientHandler.instance.getClient(this)
