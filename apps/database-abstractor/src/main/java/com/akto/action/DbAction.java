@@ -99,6 +99,7 @@ public class DbAction extends ActionSupport {
     List<BulkUpdates> writesForSuspectSampleData;
     List<DependencyNode> dependencyNodeList;
     TestScript testScript;
+    String openApiSchema;
 
     private ModuleInfo moduleInfo;
 
@@ -2423,6 +2424,17 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
+    public String fetchOpenApiSchema() {
+        try {
+            openApiSchema = DbLayer.fetchOpenApiSchema(apiCollectionId);
+        } catch (Exception e) {
+            e.printStackTrace();
+            loggerMaker.errorAndAddToDb(e, "Error in fetchOpenApiSchema " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
     public List<CustomDataTypeMapper> getCustomDataTypes() {
         return customDataTypes;
     }
@@ -3510,4 +3522,13 @@ public class DbAction extends ActionSupport {
     public void setModuleInfo(ModuleInfo moduleInfo) {
         this.moduleInfo = moduleInfo;
     }
+
+    public String getOpenApiSchema() {
+        return openApiSchema;
+    }
+
+    public void setOpenApiSchema(String openApiSchema) {
+        this.openApiSchema = openApiSchema;
+    }
+
 }
