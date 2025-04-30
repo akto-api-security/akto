@@ -73,7 +73,7 @@ public class CustomHTTPClientHandler {
 
     private OkHttpClient getTLSClient(TLSAuthParam authParam, OkHttpClient baseClient) throws Exception {
         try {
-            TrustManager[] trustManagers = getTrustManagers(authParam.getCAcertificate());
+            TrustManager[] trustManagers = getTrustManagers(authParam.getCertAuthorityCertificate());
             SSLContext sslContext = SSLContext.getInstance("SSL");
             sslContext.init(getKeyManagers(authParam.getClientKey(), authParam.getClientCertificate()), trustManagers,
                     new java.security.SecureRandom());
