@@ -1,5 +1,3 @@
-import func from "@/util/func"
-
 const transform = {
     formatJson(data){
         let allKeys = [];
@@ -136,6 +134,9 @@ const transform = {
                         case 'E':
                             let data2 = this.formatJson(diff.lhs) + "->" + this.formatJson(diff.rhs);
                             res.headersMap[searchKey] = { className: 'updated-content', keyLength: key.length + 2, data: data2 }
+                            break;
+                        default:
+                            break;
                     }
                 }
             }

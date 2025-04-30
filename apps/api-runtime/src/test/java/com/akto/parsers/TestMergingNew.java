@@ -564,7 +564,7 @@ public class TestMergingNew extends MongoBasedTest {
 
         boolean merged = true;
         for (SingleTypeInfo singleTypeInfo: SingleTypeInfoDao.instance.findAll(new BasicDBObject())) {
-            if (!singleTypeInfo.getUrl().equals("api/STRING")) {
+            if (!singleTypeInfo.getUrl().equals("/api/STRING")) {
                 merged = false;
                 break;
             }
@@ -1076,7 +1076,7 @@ public class TestMergingNew extends MongoBasedTest {
 
         mergeUrlsAndSave(1, true, false, existingAPIsInDb, false);
 
-        long estimatedDocumentCount = SingleTypeInfoDao.instance.getMCollection().countDocuments(Filters.eq(SingleTypeInfo._URL,"api/books/INTEGER"));
+        long estimatedDocumentCount = SingleTypeInfoDao.instance.getMCollection().countDocuments(Filters.eq(SingleTypeInfo._URL,"/api/books/INTEGER"));
         assertEquals(2, estimatedDocumentCount);
 
         estimatedDocumentCount = SingleTypeInfoDao.instance.getEstimatedCount();
@@ -1159,7 +1159,7 @@ public class TestMergingNew extends MongoBasedTest {
 
         SingleTypeInfo  singleTypeInfo = SingleTypeInfoDao.instance.findOne(Filters.eq(SingleTypeInfo._PARAM, "host"));
         assertNotNull(singleTypeInfo);
-        assertEquals(singleTypeInfo.getUrl(), "v1/payments/STRING/callback/STRING");
+        assertEquals(singleTypeInfo.getUrl(), "/v1/payments/STRING/callback/STRING");
     }
 
 
@@ -1211,7 +1211,7 @@ public class TestMergingNew extends MongoBasedTest {
         assertEquals(1, templateURLToMethods.size());
 
         URLTemplate urlTemplate = (URLTemplate)  templateURLToMethods.keySet().toArray()[0];
-        assertEquals("api/books/INTEGER/cars/INTEGER", urlTemplate.getTemplateString());
+        assertEquals("/api/books/INTEGER/cars/INTEGER", urlTemplate.getTemplateString());
 
         parser.syncFunction(responseParams, true, true, null);
         parser.apiCatalogSync.syncWithDB(true, true, SyncLimit.noLimit, Source.HAR);
@@ -1237,7 +1237,7 @@ public class TestMergingNew extends MongoBasedTest {
         assertEquals(1, templateURLToMethods.size());
 
         URLTemplate urlTemplate = (URLTemplate)  templateURLToMethods.keySet().toArray()[0];
-        assertEquals("api/books/FLOAT/cars/FLOAT", urlTemplate.getTemplateString());
+        assertEquals("/api/books/FLOAT/cars/FLOAT", urlTemplate.getTemplateString());
 
         parser.syncFunction(responseParams, true, true, null);
         parser.apiCatalogSync.syncWithDB(true, true, SyncLimit.noLimit, Source.HAR);

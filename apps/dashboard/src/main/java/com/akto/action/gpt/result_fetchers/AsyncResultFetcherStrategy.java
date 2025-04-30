@@ -19,7 +19,14 @@ public class AsyncResultFetcherStrategy implements ResultFetcherStrategy<BasicDB
     private static final String ASK_GPT_ASYNC_URL = "https://18qazon803.execute-api.ap-south-1.amazonaws.com/ask_gpt_async";
     private static final String FETCH_RESPONSE_URL = "https://18qazon803.execute-api.ap-south-1.amazonaws.com/fetch_response";
 
-    private static final LoggerMaker logger = new LoggerMaker(AsyncResultFetcherStrategy.class, LogDb.DASHBOARD);;
+    private static final LoggerMaker logger = new LoggerMaker(AsyncResultFetcherStrategy.class, LogDb.DASHBOARD);
+
+    private static final OkHttpClient client = CoreHTTPClient.client.newBuilder()
+            .connectTimeout(60, TimeUnit.SECONDS)
+            .readTimeout(60, TimeUnit.SECONDS)
+            .writeTimeout(60, TimeUnit.SECONDS)
+            .build();
+
     @Override
     public BasicDBObject fetchResult(BasicDBObject data) {
         return fetchDataFromLambda(data);
@@ -29,13 +36,8 @@ public class AsyncResultFetcherStrategy implements ResultFetcherStrategy<BasicDB
         String requestId = UUID.randomUUID().toString();
         data.put("request_id", requestId);
         logger.debug("Request body:" + data.toJson());
-        OkHttpClient client = CoreHTTPClient.client.newBuilder()
-                .writeTimeout(3, TimeUnit.SECONDS)
-                .readTimeout(3, TimeUnit.SECONDS)
-                .callTimeout(3, TimeUnit.SECONDS)
-                .build();
         MediaType mediaType = MediaType.parse("application/json");
-        RequestBody body = RequestBody.create(mediaType, new BasicDBObject("data", data).toJson());
+        RequestBody body = RequestBody.create(new BasicDBObject("data", data).toJson(), mediaType);
         Request request = new Request.Builder()
                 .url(ASK_GPT_ASYNC_URL)
                 .method("POST", body)
@@ -69,17 +71,12 @@ public class AsyncResultFetcherStrategy implements ResultFetcherStrategy<BasicDB
     private BasicDBObject fetchResponse(String requestId) {
         int attempts = 0;
         String status = "";
-        OkHttpClient client = CoreHTTPClient.client.newBuilder()
-                .writeTimeout(2, TimeUnit.SECONDS)
-                .readTimeout(2, TimeUnit.SECONDS)
-                .callTimeout(2, TimeUnit.SECONDS)
-                .build();
 
         while (attempts < 10 && !status.equalsIgnoreCase("READY")) {
             logger.debug("Attempt: {} for request id: {}", attempts, requestId);
             BasicDBObject data = new BasicDBObject("request_id", requestId);
             MediaType mediaType = MediaType.parse("application/json");
-            RequestBody body = RequestBody.create(mediaType, new BasicDBObject("data", data).toJson());
+            RequestBody body = RequestBody.create(new BasicDBObject("data", data).toJson(), mediaType);
             Request request = new Request.Builder()
                     .url(FETCH_RESPONSE_URL)
                     .post(body)

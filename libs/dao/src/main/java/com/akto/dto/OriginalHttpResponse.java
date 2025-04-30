@@ -1,8 +1,6 @@
 package com.akto.dto;
 
 import com.akto.util.HttpRequestResponseUtils;
-import com.alibaba.fastjson2.JSON;
-import com.alibaba.fastjson2.JSONObject;
 import com.google.gson.Gson;
 
 import org.apache.commons.lang3.math.NumberUtils;
