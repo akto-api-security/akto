@@ -15,7 +15,7 @@ public class AuthParamData {
     private String value;
     private Boolean showHeader;
 
-    private String CAcertificate;
+    private String certAuthorityCertificate;
     private CertificateType certificateType;
     private String clientCertificate;
     private String clientKey;
