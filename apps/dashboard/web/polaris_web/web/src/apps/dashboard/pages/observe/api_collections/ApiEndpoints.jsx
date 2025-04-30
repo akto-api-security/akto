@@ -773,6 +773,7 @@ function ApiEndpoints(props) {
                 onClose={() => { setExportOpen(false) }}
                 preferredAlignment="right"
             >
+                <div className="inventory-list">
                 <ActionList
                     sections={[
                         {
@@ -780,11 +781,11 @@ function ApiEndpoints(props) {
                             items: [
                                 {
                                     content: 'Refresh',
-                                    onAction: () => { handleRefresh() },
+                                    onAction: () => { handleRefresh(); setExportOpen(false) },
                                 },
                                 isApiGroup ? {
                                     content: 'Re-compute API Group',
-                                    onAction: () => { computeApiGroup() },
+                                    onAction: () => { computeApiGroup(); setExportOpen(false) },
                                 }: {}
                             ]
                         },
@@ -792,24 +793,42 @@ function ApiEndpoints(props) {
                             title: 'Upload',
                             items: [
                                 !isApiGroup &&{
-                                    content: 'Upload OpenAPI file',
-                                    prefix: <UploadFile
-                                                fileFormat=".json,.yaml,.yml"
-                                                fileChanged={file => uploadOpenApiFile(file)}
-                                                tooltipText="Upload openapi file"
-                                                label={<Box><Icon source={FileMinor} /></Box>}
-                                                primary={false} 
-                                            />
+                                    content: '',
+                                    prefix: (<Box width="160px" >
+                                                <UploadFile
+                                                    fileFormat=".json,.yaml,.yml"
+                                                    fileChanged={file => {uploadOpenApiFile(file); setExportOpen(false)}}
+                                                    tooltipText="Upload openapi file"
+                                                    label={(
+                                                        <div style={{ display: "flex", gap:'6px' }}>
+                                                            <Box>
+                                                                <Icon source={FileMinor} />
+                                                            </Box>
+                                                            <Text>Upload OpenAPI file</Text>
+                                                        </div>
+                                                    )}
+                                                    primary={false} 
+                                                />
+                                            </Box>)
                                 },
                                 !isApiGroup && !(isHostnameCollection)  && {
-                                    content: 'Upload traffic .har',
-                                    prefix:  <UploadFile
-                                                fileFormat=".har"
-                                                fileChanged={file => handleFileChange(file)}
-                                                tooltipText="Upload traffic(.har)"
-                                                label={<Box><Icon source={FileMinor} /></Box>}
-                                                primary={false} 
-                                            />
+                                    content: '',
+                                    prefix:  (<Box width="160px" >
+                                        <UploadFile
+                                            fileFormat=".har"
+                                            fileChanged={file => {handleFileChange(file); setExportOpen(false)}}
+                                            tooltipText="Upload traffic(.har)"
+                                            label={(
+                                                <div style={{ display: "flex", gap:'6px' }}>
+                                                    <Box>
+                                                        <Icon source={FileMinor} />
+                                                    </Box>
+                                                    <Text>Upload har file</Text>
+                                                </div>
+                                            )}
+                                            primary={false} 
+                                        />
+                                    </Box>)
                                 }
                             ]
                         },
@@ -822,11 +841,11 @@ function ApiEndpoints(props) {
                                 },
                                 {
                                     content: 'Postman',
-                                    onAction: () => { exportPostman() },
+                                    onAction: () => { exportPostman(); setExportOpen(false) },
                                 },
                                 {
                                     content: 'CSV',
-                                    onAction: () => { exportCsv() },
+                                    onAction: () => { exportCsv(); setExportOpen(false) },
                                 }
                             ]
                         },
@@ -835,12 +854,12 @@ function ApiEndpoints(props) {
                             items: [
                                 {
                                     content: `${showWorkflowTests ? "Hide" : "Show"} workflow tests`,
-                                    onAction: () => { toggleWorkflowTests() },
+                                    onAction: () => { toggleWorkflowTests(); setExportOpen(false) },
                                 },
                                 {
-                                    content: 'Redact',
+                                    content: '',
                                     prefix: <Box paddingInlineStart={"2"}><Checkbox
-                                                label=''
+                                                label='Redact'
                                                 checked={redacted}
                                                 onChange={() => redactCheckBoxClicked()}
                                             /></Box>,
@@ -850,6 +869,7 @@ function ApiEndpoints(props) {
                         }
                     ]}
                 />
+                </div>
             </Popover>
 
             {isApiGroup &&collectionsObj?.automated !== true ? <Button onClick={() => navigate("/dashboard/observe/query_mode?collectionId=" + apiCollectionId)}>Edit conditions</Button> : null}
