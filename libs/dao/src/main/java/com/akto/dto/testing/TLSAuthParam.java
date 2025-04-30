@@ -77,7 +77,7 @@ public class TLSAuthParam extends AuthParam {
     }
 
     public void setValue(String value) {
-        throw new UnsupportedOperationException("Unimplemented method 'setValue'");
+        // no-op
     }
 
     @Override
