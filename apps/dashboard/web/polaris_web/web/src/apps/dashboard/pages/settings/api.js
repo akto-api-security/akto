@@ -261,6 +261,22 @@ const settingRequests = {
         })
     },
 
+    fetchJiraStatusMapping(projId, baseUrl, userEmail, apiToken){
+        return request({
+            url: '/api/fetchJiraStatusMappings',
+            method: 'post',
+            data: {projId, baseUrl, userEmail, apiToken}
+        })
+    },
+
+    addJiraIntegrationV2(data) {
+        return request({
+            url: '/api/addIntegration/v2',
+            method: 'post',
+            data: {...data}
+        })
+    },
+
     addOktaSso(clientId, clientSecret, authorisationServerId, oktaDomain, redirectUri) {
         return request({
             url: '/api/addOktaSso',
