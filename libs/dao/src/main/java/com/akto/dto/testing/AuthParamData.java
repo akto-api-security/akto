@@ -1,5 +1,12 @@
 package com.akto.dto.testing;
 
+import com.akto.dto.testing.TLSAuthParam.CertificateType;
+
+import lombok.Getter;
+import lombok.Setter;
+
+@Getter
+@Setter
 public class AuthParamData {
 
     private AuthParam.Location where;
@@ -7,6 +14,11 @@ public class AuthParamData {
 
     private String value;
     private Boolean showHeader;
+
+    private String CAcertificate;
+    private CertificateType certificateType;
+    private String clientCertificate;
+    private String clientKey;
 
     public AuthParamData() { }
     public AuthParamData(AuthParam.Location where, String key, String value, Boolean showHeader) {
