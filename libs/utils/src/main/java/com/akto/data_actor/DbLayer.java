@@ -2,13 +2,22 @@ package com.akto.data_actor;
 
 import static com.akto.util.Constants.ID;
 
-import java.util.*;
+import com.akto.dao.jobs.JobsDao;
+import com.akto.dto.jobs.Job;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import com.akto.bulk_update_util.ApiInfoBulkUpdate;
 import com.akto.dao.*;
 import com.akto.dao.filter.MergedUrlsDao;
 import com.akto.dao.graph.SvcToSvcGraphEdgesDao;
 import com.akto.dao.graph.SvcToSvcGraphNodesDao;
+import com.akto.dao.monitoring.ModuleInfoDao;
 import com.akto.dao.settings.DataControlSettingsDao;
 import com.akto.dao.testing.config.TestSuiteDao;
 import com.akto.dependency_analyser.DependencyAnalyserUtils;
@@ -16,8 +25,8 @@ import com.akto.dto.*;
 import com.akto.dto.filter.MergedUrls;
 import com.akto.dto.graph.SvcToSvcGraphEdge;
 import com.akto.dto.graph.SvcToSvcGraphNode;
+import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.dto.settings.DataControlSettings;
-import com.akto.dto.testing.config.TestSuites;
 import com.mongodb.BasicDBList;
 import com.mongodb.client.model.*;
 import org.bson.conversions.Bson;
@@ -42,7 +51,6 @@ import com.akto.dao.testing.TestingRunResultSummariesDao;
 import com.akto.dao.testing.VulnerableTestingRunResultDao;
 import com.akto.dao.testing.WorkflowTestResultsDao;
 import com.akto.dao.testing.WorkflowTestsDao;
-import com.akto.dao.testing.config.TestCollectionPropertiesDao;
 import com.akto.dao.testing.config.TestScriptsDao;
 import com.akto.dao.testing.sources.TestSourceConfigsDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
@@ -115,6 +123,21 @@ public class DbLayer {
                 Updates.set(ApiCollection.NAME, name)
         );
     }
+
+    public static void updateModuleInfo(ModuleInfo moduleInfo) {
+        FindOneAndUpdateOptions updateOptions = new FindOneAndUpdateOptions();
+        updateOptions.upsert(true);
+        ModuleInfoDao.instance.getMCollection().findOneAndUpdate(Filters.eq(ModuleInfoDao.ID, moduleInfo.getId()),
+                Updates.combine(
+                        //putting class name because findOneAndUpdate doesn't put class name by default
+                        Updates.setOnInsert("_t", moduleInfo.getClass().getName()),
+                        Updates.setOnInsert(ModuleInfo.MODULE_TYPE, moduleInfo.getModuleType()),
+                        Updates.setOnInsert(ModuleInfo.STARTED_TS, moduleInfo.getStartedTs()),
+                        Updates.setOnInsert(ModuleInfo.CURRENT_VERSION, moduleInfo.getCurrentVersion()),
+                        Updates.set(ModuleInfo.LAST_HEARTBEAT_RECEIVED, moduleInfo.getLastHeartbeatReceived())
+                ), updateOptions);
+    }
+
 
     public static void updateCidrList(List<String> cidrList) {
         AccountSettingsDao.instance.getMCollection().updateOne(
@@ -1259,8 +1282,19 @@ public class DbLayer {
 
         BulkWriteOptions options = new BulkWriteOptions().ordered(false).bypassDocumentValidation(true);
         List<WriteModel<SvcToSvcGraphEdge>> bulkList = new ArrayList<>();    
+        UpdateOptions updateOptions = new UpdateOptions().upsert(true).bypassDocumentValidation(true);
         for(SvcToSvcGraphEdge edge: edges) {
-            bulkList.add(new InsertOneModel<SvcToSvcGraphEdge>(edge));
+            Bson updates = Updates.combine(
+                Updates.setOnInsert(SvcToSvcGraphEdge.SOURCE, edge.getSource()),
+                Updates.setOnInsert(SvcToSvcGraphEdge.TARGET, edge.getTarget()),
+                Updates.setOnInsert(SvcToSvcGraphEdge.TYPE, edge.getType().toString()),
+                Updates.setOnInsert(SvcToSvcGraphEdge.COUNTER, edge.getCounter()),
+                Updates.setOnInsert(SvcToSvcGraphEdge.LAST_SEEN_EPOCH, edge.getLastSeenEpoch()),
+                Updates.setOnInsert(SvcToSvcGraphEdge.CREATTION_EPOCH, edge.getCreationEpoch()),
+                Updates.setOnInsert(ID, edge.getId())
+            );
+
+            bulkList.add(new UpdateOneModel<>(Filters.eq(ID, edge.getId()), updates, updateOptions));
         }
 
         SvcToSvcGraphEdgesDao.instance.bulkWrite(bulkList, options);
@@ -1272,10 +1306,20 @@ public class DbLayer {
             return;
         }
 
+        UpdateOptions updateOptions = new UpdateOptions().upsert(true).bypassDocumentValidation(true);
+
         BulkWriteOptions options = new BulkWriteOptions().ordered(false).bypassDocumentValidation(true);
         List<WriteModel<SvcToSvcGraphNode>> bulkList = new ArrayList<>();    
         for(SvcToSvcGraphNode node: nodes) {
-            bulkList.add(new InsertOneModel<SvcToSvcGraphNode>(node));
+            Bson updates = Updates.combine(
+                Updates.setOnInsert(SvcToSvcGraphEdge.TYPE, node.getType().toString()),
+                Updates.setOnInsert(SvcToSvcGraphEdge.COUNTER, node.getCounter()),
+                Updates.setOnInsert(SvcToSvcGraphEdge.LAST_SEEN_EPOCH, node.getLastSeenEpoch()),
+                Updates.setOnInsert(SvcToSvcGraphEdge.CREATTION_EPOCH, node.getCreationEpoch()),
+                Updates.setOnInsert(ID, node.getId())
+            );
+
+            bulkList.add(new UpdateOneModel<>(Filters.eq(ID, node.getId()), updates, updateOptions));
         }
 
         SvcToSvcGraphNodesDao.instance.bulkWrite(bulkList, options);
@@ -1296,7 +1340,6 @@ public class DbLayer {
                 )
         );
     }
-
     public static void updateTestingRunPlayground(TestingRunPlayground testingRunPlayground) {
         TestingRunPlaygroundDao.instance.updateOne(
                 Filters.eq(Constants.ID, testingRunPlayground.getId()),
@@ -1318,4 +1361,7 @@ public class DbLayer {
             );
     }
 
+    public static void insertJob(Job job) {
+        JobsDao.instance.insertOne(job);
+    }
 }
